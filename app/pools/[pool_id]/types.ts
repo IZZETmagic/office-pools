@@ -20,6 +20,12 @@ export type PoolData = {
   max_participants: number | null
   max_entries_per_user: number
   tournament_id: string
+  /**
+   * The league season this pool plays, for prediction_mode = league_pickem.
+   * Carried ALONGSIDE tournament_id in the vertical slice rather than instead
+   * of it — see drafts/2026-08-22_league_vertical_slice.md §1.
+   */
+  league_season_id: string | null
   prediction_deadline: string | null
   prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
   created_at: string

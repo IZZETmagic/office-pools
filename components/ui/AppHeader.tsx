@@ -216,6 +216,8 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true }: 
           </form>
         </div>
         <div className="border-t border-border-subtle px-5 py-2.5 flex items-center gap-2">
+          <Link href="/pricing" onClick={() => setMenuOpen(false)} className="t-detail text-muted hover:text-ink transition">Pricing</Link>
+          <span className="text-muted">&middot;</span>
           <Link href="/faq" onClick={() => setMenuOpen(false)} className="t-detail text-muted hover:text-ink transition">FAQ</Link>
           <span className="text-muted">&middot;</span>
           <Link href="/contact" onClick={() => setMenuOpen(false)} className="t-detail text-muted hover:text-ink transition">Contact</Link>
@@ -223,6 +225,8 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true }: 
           <Link href="/privacy" onClick={() => setMenuOpen(false)} className="t-detail text-muted hover:text-ink transition">Privacy</Link>
           <span className="text-muted">&middot;</span>
           <Link href="/terms" onClick={() => setMenuOpen(false)} className="t-detail text-muted hover:text-ink transition">Terms</Link>
+          <span className="text-muted">&middot;</span>
+          <Link href="/refund-policy" onClick={() => setMenuOpen(false)} className="t-detail text-muted hover:text-ink transition">Refunds</Link>
         </div>
       </div>
     </>,

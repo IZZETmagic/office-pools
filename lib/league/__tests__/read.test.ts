@@ -10,10 +10,11 @@
 import { describe, it, expect } from 'vitest'
 import { deriveRoundSubmissions } from '@/lib/league/read'
 import { matchesInRound } from '@/lib/competitionRounds'
-import type { Match, Prediction } from '@/lib/tournament'
+import type { Prediction } from '@/lib/tournament'
+import type { MatchData } from '@/app/pools/[pool_id]/types'
 
 /** A fixture in the shape the adapter produces. */
-function fx(id: string, matchweek: number): Match {
+function fx(id: string, matchweek: number): MatchData {
   return {
     match_id: id,
     match_number: 1,
@@ -30,7 +31,21 @@ function fx(id: string, matchweek: number): Match {
     away_team_id: 'a',
     home_team_placeholder: null,
     away_team_placeholder: null,
-  } as Match
+    home_score_ft: null,
+    away_score_ft: null,
+    home_score_pso: null,
+    away_score_pso: null,
+    winner_team_id: null,
+    is_completed: false,
+    completed_at: null,
+    status_detail: null,
+    original_match_date: null,
+    live_minute: null,
+    live_period: null,
+    home_team: null,
+    away_team: null,
+    tournament_id: 't1',
+  }
 }
 
 function pick(matchId: string): Prediction {
@@ -56,7 +71,7 @@ describe('the adapter output groups by the round selector', () => {
     // stage === 'regular_season', so every round came back empty — with no
     // error anywhere. This asserts the failure mode rather than trusting a
     // comment not to drift.
-    const wrong = [{ ...fx('a', 1), stage: 'mw_1' } as Match]
+    const wrong = [{ ...fx('a', 1), stage: 'mw_1' } as MatchData]
     expect(matchesInRound(wrong, 'mw_1')).toHaveLength(0)
   })
 })

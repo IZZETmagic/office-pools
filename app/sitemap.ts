@@ -29,6 +29,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
+      url: `${baseUrl}/pricing`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
       url: `${baseUrl}/faq`,
       lastModified: new Date(),
       changeFrequency: "monthly",
@@ -48,6 +54,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: `${baseUrl}/privacy`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
+    {
+      url: `${baseUrl}/refund-policy`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.4,

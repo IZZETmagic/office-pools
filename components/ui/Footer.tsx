@@ -39,10 +39,12 @@ export default function Footer() {
               to /signup on a page that already has it in the nav and twice in
               the body. What is left is the reference material a footer is for. */}
           <nav className="flex items-center gap-4 text-xs">
+            <Link href="/pricing" className="hover:text-white dark:hover:text-ink transition">Pricing</Link>
             <Link href="/faq" className="hover:text-white dark:hover:text-ink transition">FAQ</Link>
             <Link href="/contact" className="hover:text-white dark:hover:text-ink transition">Contact</Link>
             <Link href="/privacy" className="hover:text-white dark:hover:text-ink transition">Privacy</Link>
             <Link href="/terms" className="hover:text-white dark:hover:text-ink transition">Terms</Link>
+            <Link href="/refund-policy" className="hover:text-white dark:hover:text-ink transition">Refunds</Link>
           </nav>
           <span className="text-xs shrink-0">&copy; 2026 SportPool</span>
         </div>

@@ -25,14 +25,15 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Match, Team, Prediction } from '@/lib/tournament'
+import type { Prediction } from '@/lib/tournament'
+import type { MatchData, TeamData, ExistingPrediction } from '@/app/pools/[pool_id]/types'
 import type { PoolRoundState, EntryRoundSubmission } from '@/app/pools/[pool_id]/types'
 import { matchweekKey } from '@/lib/competitionRounds'
 
 /** Everything the prediction flow needs for one league pool. */
 export type LeaguePoolView = {
-  teams: Team[]
-  matches: Match[]
+  teams: TeamData[]
+  matches: MatchData[]
   roundStates: PoolRoundState[]
   matchweekCount: number
 }
@@ -81,7 +82,7 @@ type MatchweekRow = {
  * neither, and the matchweek branch of the flow already omits the "Group X"
  * caption when the letter is blank rather than printing "Group null".
  */
-function clubToTeam(c: ClubRow): Team {
+function clubToTeam(c: ClubRow): TeamData {
   return {
     team_id: c.club_id,
     country_name: c.name,
@@ -111,9 +112,19 @@ function clubToTeam(c: ClubRow): Team {
  * day the season is published, and a regular-season match cannot go to
  * penalties.
  */
-function fixtureToMatch(f: FixtureRow, matchweekNumber: number): Match {
+function fixtureToMatch(
+  f: FixtureRow,
+  matchweekNumber: number,
+  tournamentId: string,
+  clubById: Map<string, TeamData>,
+): MatchData {
+  const asEmbedded = (id: string) => {
+    const c = clubById.get(id)
+    return c ? { country_name: c.country_name, country_code: c.country_code, flag_url: c.flag_url } : null
+  }
   return {
     match_id: f.fixture_id,
+    tournament_id: tournamentId,
     match_number: f.fixture_number,
     stage: 'regular_season',
     group_letter: null,
@@ -125,7 +136,22 @@ function fixtureToMatch(f: FixtureRow, matchweekNumber: number): Match {
     away_team_id: f.away_club_id,
     home_team_placeholder: null,
     away_team_placeholder: null,
-  } as Match
+    // Real results, so the same rows serve the fixture list and the results
+    // view. No PSO and no winner column: a regular-season fixture has neither.
+    home_score_ft: f.home_goals,
+    away_score_ft: f.away_goals,
+    home_score_pso: null,
+    away_score_pso: null,
+    winner_team_id: null,
+    is_completed: f.is_completed,
+    completed_at: null,
+    status_detail: null,
+    original_match_date: null,
+    live_minute: null,
+    live_period: null,
+    home_team: asEmbedded(f.home_club_id),
+    away_team: asEmbedded(f.away_club_id),
+  }
 }
 
 /**
@@ -180,7 +206,7 @@ function matchweekToRoundState(mw: MatchweekRow, poolId: string, now: number): P
  */
 export async function readLeaguePoolView(
   supabase: SupabaseClient,
-  args: { poolId: string; seasonId: string; now?: number },
+  args: { poolId: string; seasonId: string; tournamentId: string; now?: number },
 ): Promise<{ view: LeaguePoolView | null; error: string | null }> {
   const now = args.now ?? Date.now()
 
@@ -224,10 +250,15 @@ export async function readLeaguePoolView(
     return { view: null, error: `${orphans.length} fixture(s) reference a matchweek not in this season` }
   }
 
+  const teams = ((clubs ?? []) as unknown as ClubRow[]).map(clubToTeam)
+  const clubById = new Map(teams.map((t) => [t.team_id, t]))
+
   return {
     view: {
-      teams: ((clubs ?? []) as unknown as ClubRow[]).map(clubToTeam),
-      matches: fixtures.map((f) => fixtureToMatch(f, numberByMatchweekId.get(f.matchweek_id)!)),
+      teams,
+      matches: fixtures.map((f) =>
+        fixtureToMatch(f, numberByMatchweekId.get(f.matchweek_id)!, args.tournamentId, clubById),
+      ),
       roundStates: matchweekRows.map((m) => matchweekToRoundState(m, args.poolId, now)),
       matchweekCount: matchweekRows.length,
     },
@@ -244,8 +275,10 @@ export async function readLeaguePoolView(
 export async function readLeaguePredictions(
   supabase: SupabaseClient,
   entryId: string,
-): Promise<{ predictions: Prediction[]; error: string | null }> {
-  const out: Prediction[] = []
+): Promise<{ predictions: ExistingPrediction[]; error: string | null }> {
+  // ExistingPrediction, not Prediction: these are real stored rows, so
+  // `prediction_id` is always present. The looser type would make the page cast.
+  const out: ExistingPrediction[] = []
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from('league_predictions')
@@ -286,7 +319,7 @@ export async function readLeaguePredictions(
  */
 export function deriveRoundSubmissions(
   entryId: string,
-  matches: Match[],
+  matches: MatchData[],
   predictions: Prediction[],
 ): EntryRoundSubmission[] {
   const predicted = new Set(predictions.map((p) => p.match_id))

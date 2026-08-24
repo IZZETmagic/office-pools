@@ -59,10 +59,16 @@ export default async function PoolPage({
   if (!pool) redirect('/dashboard')
 
   const {
-    members, matches, settings, teams, conductData,
+    members, settings, conductData,
     bonusScores, bpProvisionalScoring, tournamentAwards, entryStats, matchdayMVP,
     matchAccuracy,
   } = shared
+  // Reassignable: a league pool replaces both with its own competition's rows.
+  // getPoolData scopes these to `pool.tournament_id`, which for a league is the
+  // placeholder row carrying 0 matches and 0 teams — so they arrive empty and
+  // correct, rather than wrong, and the league branch below fills them.
+  let matches = shared.matches
+  let teams = shared.teams
 
   // ---- PER-USER derivations on top of shared data ------------------------
   const currentMember = membership
@@ -73,12 +79,15 @@ export default async function PoolPage({
   const defaultEntry = userEntries[0]
 
   // The viewer's own predictions for their default entry (small, per-user).
-  const { data: userPredictions } = defaultEntry
+  // Explicitly typed: the league branch below replaces this with adapter
+  // output, and inference from the World Cup select alone is too narrow.
+  let userPredictions: ExistingPrediction[] | null
+  ;({ data: userPredictions } = (defaultEntry
     ? await supabase
         .from('predictions')
         .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id, prediction_id')
         .eq('entry_id', defaultEntry.entry_id)
-    : { data: [] }
+    : { data: [] }) as { data: ExistingPrediction[] | null })
 
   // Progressive pools: round states (+lazy seed) and the viewer's submissions.
   // Kept uncached because the seed performs an INSERT side-effect.
@@ -110,6 +119,51 @@ export default async function PoolPage({
         .insert(seedRows)
         .select('*')
       if (seeded) roundStates = seeded as PoolRoundState[]
+    }
+  }
+
+  // ---- LEAGUE ------------------------------------------------------------
+  // Ryan's 2026-08-15 decision, applied: the front end is unchanged and points
+  // at the new data. Everything below this block — PoolDetail, the prediction
+  // flow, the tabs — is the same code the World Cup runs.
+  //
+  // Round state is DERIVED from `league_matchweeks` on every read rather than
+  // seeded into `pool_round_states`. A league pool holds zero of those rows by
+  // design: the table cannot express 38 matchweeks whose locks are per-week
+  // facts of the fixture list, and seeding them is what the P0 fix removed.
+  //
+  // Submission state is derived from the picks themselves rather than read from
+  // `entry_round_submissions`, for the same reason the write path never sets
+  // `pool_entries.has_submitted_predictions`: that column is one of only two
+  // doors by which a league entry can reach the World Cup scoring selectors.
+  if (pool.league_season_id) {
+    const { readLeaguePoolView, readLeaguePredictions, deriveRoundSubmissions } =
+      await import('@/lib/league/read')
+
+    const { view, error: leagueErr } = await readLeaguePoolView(supabase, {
+      poolId: pool_id,
+      seasonId: pool.league_season_id,
+      tournamentId: pool.tournament_id,
+    })
+    if (leagueErr) {
+      // Loud. A league pool rendering an empty fixture list is exactly the
+      // silent-empty failure this codebase keeps producing.
+      console.error('[pool page] league view failed:', leagueErr)
+    }
+    if (view) {
+      matches = view.matches
+      teams = view.teams
+      roundStates = view.roundStates
+
+      if (defaultEntry) {
+        const { predictions: leaguePicks, error: pickErr } = await readLeaguePredictions(
+          supabase,
+          defaultEntry.entry_id,
+        )
+        if (pickErr) console.error('[pool page] league predictions failed:', pickErr)
+        userPredictions = leaguePicks
+        roundSubmissions = deriveRoundSubmissions(defaultEntry.entry_id, view.matches, leaguePicks)
+      }
     }
   }
 
