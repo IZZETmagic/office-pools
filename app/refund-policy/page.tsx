@@ -40,7 +40,11 @@ export default function RefundPolicyPage() {
       {/* Content */}
       <section className="py-16 sm:py-24">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-sm text-neutral-500 mb-12">Last updated: August 22, 2026</p>
+          <p className="text-sm text-neutral-500 mb-6">Last updated: August 23, 2026</p>
+
+          <div className="mb-12 rounded-card border border-border-default bg-surface p-5 text-sm text-neutral-700 leading-relaxed">
+            <strong className="text-neutral-900">Paid tiers are not on sale yet.</strong> SportPool is free to use today, so there is currently nothing to refund. This policy is published in advance so you know the terms before anything goes on sale, and it applies from the moment it does.
+          </div>
 
           {/* Summary card */}
           <div className="mb-12 rounded-card border border-border-default bg-surface-secondary p-6">
@@ -69,7 +73,7 @@ export default function RefundPolicyPage() {
               </h2>
               <div className="space-y-3 text-neutral-700 leading-relaxed">
                 <p>
-                  This policy applies to payments made to SportPool for paid pool tiers &mdash; Pool Plus, Pool Max, and Pool Ultra &mdash; and to any other product we sell directly, as listed on our{' '}
+                  This policy applies to payments made to SportPool for paid pool tiers &mdash; Pool Plus, Pool Max, and Pool Ultra &mdash; and to any other product we sell directly, as and when they go on sale. Prices and what each tier includes are on our{' '}
                   <Link href="/pricing" className="text-primary-600 hover:underline">
                     Pricing page
                   </Link>

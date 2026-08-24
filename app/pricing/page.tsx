@@ -32,6 +32,7 @@ const TIERS = [
     bestFor: 'Friends & family',
     cta: 'Create a pool',
     href: '/signup',
+    available: true,
     variant: 'outline' as const,
     highlight: false,
     points: [
@@ -50,6 +51,7 @@ const TIERS = [
     bestFor: 'Office or friend group',
     cta: 'Choose Plus',
     href: '/signup',
+    available: false,
     variant: 'primary' as const,
     highlight: true,
     points: [
@@ -69,6 +71,7 @@ const TIERS = [
     bestFor: 'Big organised pool',
     cta: 'Choose Max',
     href: '/signup',
+    available: false,
     variant: 'outline' as const,
     highlight: false,
     points: [
@@ -89,6 +92,7 @@ const TIERS = [
     bestFor: 'Sports bars and venues',
     cta: 'Talk to us',
     href: '/contact',
+    available: true,
     variant: 'outline' as const,
     highlight: false,
     points: [
@@ -177,6 +181,9 @@ export default function PricingPage() {
               Start a pool for free. Upgrade only when your pool outgrows it &mdash; one payment, for one season. No subscription.
             </p>
             <p className="mt-3 text-sm text-neutral-500">All prices in USD.</p>
+            <p className="mt-6 inline-block rounded-card border border-border-default bg-surface px-4 py-3 text-sm text-neutral-700">
+              <strong className="text-neutral-900">Paid tiers are not on sale yet.</strong> Creating a pool is free today &mdash; the tiers below are what we are building towards, and we will say so here the day they open.
+            </p>
           </div>
         </div>
       </section>
@@ -230,9 +237,17 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <Button href={tier.href} variant={tier.variant} fullWidth className="mt-7">
-                  {tier.cta}
-                </Button>
+                {tier.available ? (
+                  <Button href={tier.href} variant={tier.variant} fullWidth className="mt-7">
+                    {tier.cta}
+                  </Button>
+                ) : (
+                  /* No checkout exists for these tiers yet, so this must not look
+                     like a buy button. Keep it a plain statement until it does. */
+                  <p className="mt-7 rounded-control border border-dashed border-border-default px-4 py-3 text-center text-sm font-semibold text-neutral-500">
+                    Not yet available
+                  </p>
+                )}
               </div>
             ))}
           </div>
