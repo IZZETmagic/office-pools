@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { retireEntries } from '@/lib/entries/retire'
 
 // POST /api/pools/:pool_id/stop-participating
 //
@@ -49,19 +50,31 @@ export async function POST(
     return NextResponse.json({ error: 'You are not a member of this pool' }, { status: 404 })
   }
 
-  // Delete the caller's entries for this pool. The 12 cascade children
-  // (predictions, group_predictions, special_predictions, match_scores,
-  // player_scores, bonus_scores, point_adjustments, entry_round_submissions,
-  // entry_xp_state, bracket_picker_*) are all ON DELETE CASCADE, so the
-  // single delete here cleans up everything. The admin client bypasses
-  // RLS on the children that lack user-facing DELETE policies.
-  const { error: deleteError, count } = await adminClient
-    .from('pool_entries')
-    .delete({ count: 'exact' })
-    .eq('member_id', membership.member_id)
-  if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 })
+  // RETIRE the caller's entries for this pool — migration 056.
+  //
+  // This used to DELETE them. The 12 cascade children (predictions,
+  // group_predictions, special_predictions, match_scores, player_scores,
+  // bonus_scores, point_adjustments, entry_round_submissions, entry_xp_state,
+  // bracket_picker_*) are all ON DELETE CASCADE, so that single delete erased
+  // an entire season with no undo — the cause of the World Cup complaints
+  // about people who could not be put back.
+  //
+  // Now the entries are flagged instead: they stop being scored and drop off
+  // the leaderboard, every prediction is kept, and restoring reinstates the
+  // lot including matchweeks that completed while they were out.
+  //
+  // Membership stays untouched, as before: stopping participation means
+  // staying in the pool for the banter without competing.
+  const { retired, error: retireError } = await retireEntries(
+    adminClient,
+    { memberIds: [membership.member_id] },
+    'stopped',
+    userData.user_id,
+  )
+
+  if (retireError) {
+    return NextResponse.json({ error: retireError }, { status: 500 })
   }
 
-  return NextResponse.json({ removed_entries: count ?? 0 })
+  return NextResponse.json({ removed_entries: retired })
 }

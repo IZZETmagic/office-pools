@@ -22,12 +22,23 @@
  * furniture: fixtures in `matches`, clubs in `teams.country_name`, league arms
  * inside the shared shadow scoring functions. That is being replaced by a
  * purpose-built league backend (Ryan's decision, 2026-08-15) — see
- * drafts/2026-08-16_premier_league_backend_design_v2.md.
+ * drafts/2026-08-24_league_pools_full_plan.md.
  *
- * Until then a league pool still cannot score: `getScoringSource` returns
- * 'shadow' for `league_pickem` and the shadow tables hold nothing for it, so
- * every fixture scores zero with no error. Flip this to 'open' only when a real
- * matchweek has been scored and checked against a hand computation.
+ * UPDATED 2026-08-24. The paragraph that used to sit here said a league pool
+ * "still cannot score" because `getScoringSource` returned 'shadow'. That is no
+ * longer true: the league has its own engine, `league_score_fixture` (migration
+ * 055), over its own `league_*` tables, and `readSource` returns 'league'.
+ *
+ * It stays 'upcoming' anyway, because the condition below has not been met —
+ * and the condition, not the plumbing, is what this flag is about:
+ *
+ *   Flip to 'open' only when a real matchweek has been scored and checked
+ *   against a hand computation.
+ *
+ * `league_predictions` holds ZERO rows database-wide. Nobody has ever made a
+ * pick through the interface, so nothing has ever been scored, so there is
+ * nothing to check by hand yet. Both league pools are otherwise live and
+ * verified — `npx tsx scripts/verify-league-pool-member-view.ts`.
  */
 export type CompetitionState = 'open' | 'upcoming' | 'complete'
 

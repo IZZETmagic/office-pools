@@ -15,9 +15,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const getFixturesAllPages = vi.fn()
 
+// `getStandings` is stubbed to an empty table rather than left real. The sync
+// now refreshes standings whenever a fixture completes (plan §0.3), and the real
+// function makes an HTTP call — which in a unit test has no API key, fails, and
+// pushes a `league_standings` error into every result that happens to contain a
+// completion. Returning [] is the "season has no table yet" path, which the sync
+// treats as a clean no-op.
+const getStandings = vi.fn(async () => [])
+
 vi.mock('@/lib/integrations/apiFootball/client', async (orig) => {
   const actual = await orig<typeof import('@/lib/integrations/apiFootball/client')>()
-  return { ...actual, getFixturesAllPages: (...a: unknown[]) => getFixturesAllPages(...a) }
+  return {
+    ...actual,
+    getFixturesAllPages: (...a: unknown[]) => getFixturesAllPages(...a),
+    getStandings: (...a: unknown[]) => getStandings(...(a as [])),
+  }
 })
 
 const { syncLeagueFixtures, formatLeagueNoteParts } = await import(
@@ -517,9 +529,13 @@ describe('syncLeagueFixtures — feed-error rate limit', () => {
 // =============================================================
 
 describe('syncLeagueFixtures — scores a fixture that just completed', () => {
-  const oneChanged = (isCompleted: boolean) => ({
+  const oneChanged = (
+    isCompleted: boolean,
+    goals: [number | null, number | null] = [2, 0],
+    status = 'completed',
+  ) => ({
     seen: 1,
-    changed: [{ fixture_id: 'fx-1', external_fixture_id: '1557368', status: 'completed', home_goals: 2, away_goals: 0, is_completed: isCompleted }],
+    changed: [{ fixture_id: 'fx-1', external_fixture_id: '1557368', status, home_goals: goals[0], away_goals: goals[1], is_completed: isCompleted }],
   })
 
   function dbWithRpc(rpcImpl: (fn: string, args: Record<string, unknown>) => unknown) {
@@ -553,9 +569,30 @@ describe('syncLeagueFixtures — scores a fixture that just completed', () => {
     expect(formatLeagueNoteParts(r)).toContain('scored=1')
   })
 
-  it('does NOT score a fixture that merely changed', async () => {
+  // ⚠ INVERTED BY MIGRATION 063. This used to assert that a fixture which had
+  // not completed was NOT scored. That was the old rule, and it was the whole
+  // thing standing between the product and "the leaderboard moves while the
+  // match is on". A live fixture carrying a score is now scored.
+  it('DOES score a live fixture whose score moved', async () => {
     getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture(1557368)], calls: 1 })
-    const { client, calls } = dbWithRpc(() => ({ data: oneChanged(false), error: null }))
+    const { client, calls } = dbWithRpc((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: oneChanged(false, [1, 0], 'live'), error: null }
+        : { data: { ok: true, scored: 4, entries: 4 }, error: null },
+    )
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(calls.map((c) => c.fn)).toContain('league_score_fixture')
+    expect(r.scored).toBe(1)
+  })
+
+  it('does NOT score a fixture that has no score yet', async () => {
+    // A kickoff time moving is a change too. Without goals there is nothing to
+    // judge a prediction against, so the sync does not even make the call —
+    // the engine would refuse it, and this saves the round trip.
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture(1557368)], calls: 1 })
+    const { client, calls } = dbWithRpc(() => ({
+      data: oneChanged(false, [null, null], 'scheduled'), error: null,
+    }))
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
     expect(calls.map((c) => c.fn)).not.toContain('league_score_fixture')
     expect(r.scored).toBe(0)

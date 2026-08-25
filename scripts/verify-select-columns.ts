@@ -36,6 +36,19 @@
 // It DOES cover filter and ordering columns (`.eq`, `.in`, `.order`, `.not`,
 // ...), not just projections: `.eq()` on a dropped column 400s exactly the same
 // way, and two of the sites in the round_number outage were filters.
+//
+// ⚠ WIDENED 2026-08-24, and the reason matters more than the change. Comments
+// are now blanked before parsing (see `blankComments`). Until then, a comment
+// anywhere inside a method chain made the ENTIRE query invisible to this scan —
+// not reported as unresolved, not counted, just gone. Since this repo comments
+// inside chains as a matter of style, a green run meant considerably less than
+// it looked like it did.
+//
+// It was found the way these always are: `.order('club_name')` on a table whose
+// column is `name` emptied the club picker for Table mode and Last Man Standing,
+// in a tree this script had just declared clean. If you extend this parser,
+// prefer a failure that SHOUTS over one that skips — a skipped query is
+// indistinguishable from a file with no queries in it.
 // =============================================================
 
 import { readFileSync, readdirSync, statSync } from 'fs'
@@ -81,13 +94,73 @@ function collectConsts(files: string[]): Map<string, string> {
   const consts = new Map<string, string>()
   const decl = /(?:export\s+)?const\s+([A-Z][A-Z0-9_]*)\s*=\s*((?:'[^']*'|"[^"]*")(?:\s*\+\s*(?:'[^']*'|"[^"]*"))*)/g
   for (const f of files) {
-    const src = readFileSync(f, 'utf8')
+    // Comments blanked first, so a commented-out const cannot shadow the real one.
+    const src = blankComments(readFileSync(f, 'utf8'))
     for (const m of src.matchAll(decl)) {
       const joined = [...m[2].matchAll(/'([^']*)'|"([^"]*)"/g)].map((p) => p[1] ?? p[2]).join('')
       consts.set(m[1], joined)
     }
   }
   return consts
+}
+
+/**
+ * Replace every comment with spaces, keeping the file byte-for-byte the same
+ * LENGTH so every index — and therefore every reported line number — still
+ * points where it did.
+ *
+ * ⚠ THIS IS LOAD-BEARING, and its absence hid a real bug for two days.
+ *
+ * The chain walk below decides the chain has ended when the character after a
+ * balanced `)` is not a dot. A comment between `.from('t')` and `.select(...)`
+ * puts a `/` there, so the walk stopped at `.from(` and captured nothing; the
+ * `.select(` match then failed and the ENTIRE query was skipped. Silently —
+ * a skipped query looks exactly like a file with no queries in it.
+ *
+ * That is how `.order('club_name')` on `league_clubs` (which has `name`, not
+ * `club_name`) survived a green run of this script while emptying the club
+ * picker for both Table mode and Last Man Standing. This repo writes comments
+ * inside method chains as a matter of style, so the hole was wide.
+ *
+ * The second reason is subtler: an apostrophe in prose ("the pool's admin")
+ * read as an opening quote, which swallowed the rest of the chain as if it were
+ * a string literal. Both problems disappear once comments are not there.
+ *
+ * ⚠ Still not covered: a `//` inside a REGEX literal. Distinguishing `/` as
+ * division from `/` as a regex start needs real tokenisation, and the cost is
+ * not worth it — the failure mode is a skipped query in that one file, which is
+ * where this check already was for every commented chain.
+ */
+function blankComments(src: string): string {
+  const out = src.split('')
+  let i = 0
+  let quote: string | null = null
+  while (i < src.length) {
+    const c = src[i]
+    if (quote) {
+      if (c === '\\') { i += 2; continue }
+      if (c === quote) quote = null
+      i++
+      continue
+    }
+    if (c === "'" || c === '"' || c === '`') { quote = c; i++; continue }
+    if (c === '/' && src[i + 1] === '/') {
+      while (i < src.length && src[i] !== '\n') { out[i] = ' '; i++ }
+      continue
+    }
+    if (c === '/' && src[i + 1] === '*') {
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) {
+        // Newlines are kept so `slice(0, idx).split('\n').length` still counts
+        // the right line; everything else becomes a space.
+        if (src[i] !== '\n') out[i] = ' '
+        i++
+      }
+      if (i < src.length) { out[i] = ' '; out[i + 1] = ' '; i += 2 }
+      continue
+    }
+    i++
+  }
+  return out.join('')
 }
 
 type Ref = { file: string; line: number; table: string; column: string }
@@ -116,7 +189,9 @@ function parse(files: string[], consts: Map<string, string>) {
   const unresolved: Unresolved[] = []
 
   for (const file of files) {
-    const src = readFileSync(file, 'utf8')
+    // See blankComments: a comment inside a method chain used to make the whole
+    // query invisible to this scan.
+    const src = blankComments(readFileSync(file, 'utf8'))
     // `.from('t')` followed by the next `.select(...)` within a small window.
     const fromRe = /\.from\(\s*['"]([a-z_][a-z0-9_]*)['"]\s*\)/g
     const froms = [...src.matchAll(fromRe)]

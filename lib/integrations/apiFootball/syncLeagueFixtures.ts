@@ -26,6 +26,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { syncLeagueStandings } from './syncLeagueStandings'
 import { getFixturesAllPages } from './client'
 import {
   fixtureToLeagueUpdate,
@@ -87,6 +88,12 @@ export type LeagueSyncResult = {
   scored: number
   /** Entries whose league totals moved as a result. */
   scoredEntries: number
+  /** Standings rows re-ingested this tick, if a fixture finished. */
+  standings: number
+  /** Table-mode pools rescored because the league table moved. */
+  tablePoolsScored: number
+  /** True on the tick that froze the finishing table for the season. */
+  standingsFinalised: boolean
   skippedManual: number
   /** Our rows with no provider fixture this tick. */
   unmatched: number
@@ -136,6 +143,9 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     written: 0,
     scored: 0,
     scoredEntries: 0,
+    standings: 0,
+    tablePoolsScored: 0,
+    standingsFinalised: false,
     skippedManual: 0,
     unmatched: 0,
     unknownProvider: 0,
@@ -420,9 +430,23 @@ export async function syncLeagueFixtures(
   result.written = res.changed?.length ?? 0
 
   // ------------------------------------------------------------- 7b. score
-  // A fixture that just completed is scored immediately, in the same tick that
-  // observed it. `changed` carries the POST-state, so `is_completed` here is
-  // the value the database now holds, not the one the feed reported.
+  // A fixture whose score MOVED is scored immediately, in the same tick that
+  // observed it — including while it is still being played. `changed` carries
+  // the POST-state, so the values here are what the database now holds, not
+  // what the feed reported.
+  //
+  // ⚠ This used to skip anything not completed. Migration 063 opened the
+  // engine's gate so a live fixture scores too, which is the whole in-match
+  // feature: the leaderboard moves on the goal, not at the whistle.
+  //
+  // Because the loop is over `changed` — fixtures whose values actually moved
+  // this tick — a live match costs ONE re-score per goal, not one per minute.
+  //
+  // The only local filter is "do we have a score at all". The status rule
+  // (live/completed score, postponed/cancelled never do) is deliberately NOT
+  // duplicated here: it lives in the engine, which refuses and says why. Two
+  // copies of that rule would be two things to keep in step, and the engine is
+  // the one that cannot be bypassed.
   //
   // Per fixture rather than per matchweek: the RPC recomputes each affected
   // entry's totals from its score rows, so scoring one fixture is complete and
@@ -433,7 +457,7 @@ export async function syncLeagueFixtures(
   // next tick that sees a change will score it. Losing the sync over a scoring
   // problem would be the worse trade.
   for (const c of res.changed ?? []) {
-    if (!c.is_completed) continue
+    if (c.home_goals === null || c.away_goals === null) continue
     const { data: scoreRes, error: scoreErr } = await admin.rpc('league_score_fixture', {
       p_fixture_id: c.fixture_id,
     })
@@ -443,13 +467,72 @@ export async function syncLeagueFixtures(
     }
     const sr = scoreRes as { ok?: boolean; scored?: number; entries?: number; reason?: string } | null
     if (!sr?.ok) {
-      // Not an error: a fixture can report completed to the feed a tick before
-      // its goals land, and `completed_ck` keeps it out of the scored set until
-      // both are present. The next tick picks it up.
+      // Not an error. Two ordinary cases reach here: a fixture reported
+      // completed a tick before its goals land, and a postponed or cancelled
+      // fixture that still carries a score — the engine refuses both and names
+      // which in `reason`. The next tick picks up anything real.
       continue
     }
     result.scored++
     result.scoredEntries += sr.entries ?? 0
+  }
+
+  // ---------------------------------------------------------- 7c. standings
+  // The real league table, re-read ONLY when a fixture actually finished this
+  // tick. Nothing else can move it, so polling it on a timer would spend the
+  // api-football allowance re-reading a number that had not changed.
+  //
+  // Ingested rather than derived because a table computed from our own fixtures
+  // cannot see points deductions, and Table mode scores against it — plan §0.3.
+  //
+  // A failure here is an ERROR but never fails the sync: the fixture data is
+  // already written and correct, and a stale table for one tick is a display
+  // problem, whereas losing the fixture sync is a scoring one.
+  if (res.changed?.some((c) => c.is_completed)) {
+    const st = await syncLeagueStandings(admin, {
+      seasonId: target.seasonId,
+      externalLeagueId: target.league,
+      externalSeason: target.season,
+    })
+    if (st.error) {
+      push('league_standings', st.error)
+    } else {
+      result.standings = st.written
+    }
+    // A club in the feed with no row of ours means the season was imported
+    // against a different club set — the table would render with holes, so it
+    // is surfaced rather than dropped.
+    for (const u of st.unmapped) {
+      push('league_standings', `feed club ${u.externalId} (${u.name}) has no league_clubs row`)
+    }
+
+    // ------------------------------------------------------- 7d. Table mode
+    // The table just moved, so every Table-mode pool in this season is now
+    // worth a different number of points. Scored HERE rather than on a timer
+    // for the same reason the standings are read here: the table moving is the
+    // only event that changes a table score.
+    //
+    // One RPC does both halves. It snapshots the finishing table FIRST if this
+    // was the tick that ended the season — so a pool is paid out against the
+    // frozen table rather than a live third-party read that a June correction
+    // could still move — and then rescores.
+    //
+    // Same failure posture as the standings read above: an error, never fatal.
+    // A stale table score for one tick is a display problem; losing the fixture
+    // sync is a scoring one.
+    if (!st.error) {
+      const { data: tableRes, error: tableErr } = await admin.rpc(
+        'league_after_standings_change',
+        { p_season_id: target.seasonId },
+      )
+      if (tableErr) {
+        push('league_table_mode', tableErr.message)
+      } else {
+        const r = (tableRes ?? {}) as { pools_scored?: number; snapshot?: { final?: boolean } }
+        result.tablePoolsScored = r.pools_scored ?? 0
+        if (r.snapshot?.final) result.standingsFinalised = true
+      }
+    }
   }
 
   // ------------------------------------------------------------ 8. reconcile

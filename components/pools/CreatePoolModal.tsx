@@ -18,6 +18,51 @@ type CreatePoolModalProps = {
 
 type PoolMode = 'full_tournament' | 'progressive' | 'bracket_picker' | 'league_pickem'
 
+/** All four league modes from Decision 9. */
+const LEAGUE_MODES = [
+  {
+    value: 'pickem' as const,
+    label: 'Matchweek Pick\u2019em',
+    desc: 'Members predict each matchweek\u2019s fixtures. Picks lock at the first kick-off, and the next matchweek opens as that one closes.',
+    icon: 'stairs' as const,
+  },
+  {
+    value: 'showdown' as const,
+    label: 'Showdown',
+    desc: 'The same weekly picks, plus a head-to-head duel against one other member. Three points for beating them, one for a tie. The fixture list is drawn up front, so you can see your rival coming.',
+    icon: 'arrow.triangle.merge' as const,
+  },
+  {
+    value: 'last_man_standing' as const,
+    label: 'Last Man Standing',
+    desc: 'Pick one club a week to win. Get it wrong and you\u2019re out — and you can\u2019t use the same club twice. When one player is left the round ends and a new one starts, so nobody is watching from the sidelines in March.',
+    icon: 'flame.fill' as const,
+  },
+  {
+    value: 'table' as const,
+    label: 'Predict the Table',
+    desc: 'One decision before the season: put all twenty clubs in finishing order. Scored live against the real table all the way to May \u2014 good for people who don\u2019t follow every match.',
+    icon: 'list.bullet' as const,
+  },
+]
+
+/**
+ * Level 2, and only for Pick'em. Results is the default on purpose: 380 taps
+ * across a season is something people finish, where 760 numbers is not.
+ */
+const LEAGUE_DEPTHS = [
+  {
+    value: 'results' as const,
+    label: 'Pick a winner',
+    desc: 'Home, draw or away. One tap per match.',
+  },
+  {
+    value: 'scores' as const,
+    label: 'Predict the score',
+    desc: 'Exact goals for both sides. Two numbers per match.',
+  },
+]
+
 type Tournament = {
   tournament_id: string
   name: string
@@ -98,6 +143,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
   // Step 3: Pool Settings
   const [predictionMode, setPredictionMode] = useState<PoolMode>('full_tournament')
+  // Level 1 and level 2 of the league mode structure (plan §0.1). Held
+  // separately from `predictionMode` because they are a different axis: EVERY
+  // league pool is `prediction_mode = 'league_pickem'` — that is the column all
+  // the league plumbing keys on — and `league_mode` is what decides whether it
+  // is played by picking fixtures or by ordering the table.
+  const [leagueMode, setLeagueMode] = useState<'pickem' | 'showdown' | 'last_man_standing' | 'table'>('pickem')
+  const [leagueDepth, setLeagueDepth] = useState<'results' | 'scores'>('results')
   const [isPrivate, setIsPrivate] = useState(false)
   const [maxParticipants, setMaxParticipants] = useState('0')
   const [maxEntries, setMaxEntries] = useState('1')
@@ -111,22 +163,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   // Fetch tournaments on mount
   useEffect(() => {
     async function fetchTournaments() {
-      // Bracket-format competitions only — leagues are OFF the wizard.
+      // Bracket AND league competitions. Leagues were off the wizard until
+      // 2026-08-16 and could not score even once reinstated, because they ran on
+      // World Cup furniture. That is no longer true: the league has its own
+      // tables and its own engine (migrations 050-082), and a league pool now
+      // scores, ranks, notifies and — in Table mode — pays out.
       //
-      // Reinstated 2026-08-16. The Premier League is imported, but it runs on
-      // World Cup furniture (league fixtures in `matches`, clubs in
-      // `teams.country_name`, league arms inside the shared shadow scoring
-      // functions) and that whole arrangement is being replaced by a
-      // purpose-built league backend — see
-      // drafts/2026-08-16_premier_league_backend_design_v2.md.
-      //
-      // Until that lands a league pool cannot score: `getScoringSource` returns
-      // 'shadow' for `league_pickem` and the shadow tables hold nothing for it,
-      // so every fixture scores zero with no error anywhere. Letting someone
-      // create one now also creates a migration problem for the new structure.
-      //
-      // `format` is null on rows predating migration 024, so null is treated as
-      // bracket rather than filtered out.
+      // `format` is null on rows predating migration 024; those are brackets.
       const { data } = await supabase
         .from('tournaments')
         .select('tournament_id, name, short_name, tournament_type, year, host_countries, start_date, end_date, status, description, format, external_provider, external_league_id, external_season')
@@ -277,6 +320,16 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
           league_season_id: selectedTournament?.league_season_id ?? null,
           prediction_deadline: deadline.toISOString(),
           prediction_mode: effectiveMode,
+          // Ignored by the route for a bracket pool, which resolves them to
+          // NULL — sent unconditionally so there is no branch here to drift
+          // out of step with the one the route already has.
+          league_mode: isLeagueTournament ? leagueMode : null,
+          // Showdown carries a depth as well (Decision 9: it scores differently
+          // at each), and the database CHECK refuses the pair without one.
+          league_depth:
+            isLeagueTournament && (leagueMode === 'pickem' || leagueMode === 'showdown')
+              ? leagueDepth
+              : null,
           is_private: isPrivate,
           max_participants: maxP,
           max_entries_per_user: maxE,
@@ -496,17 +549,68 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                 <div className="space-y-4">
                   <p className="text-sm text-neutral-600">How will members make their predictions?</p>
 
-                  <div className="space-y-3">
-                    {(isLeagueTournament ? [
-                      {
-                        value: 'league_pickem' as const,
-                        label: 'Matchweek Pick\u2019em',
-                        desc: 'Members predict each matchweek\u2019s fixtures. Picks lock at the first kick-off of the matchweek, and the next one opens when it finishes.',
-                        icon: (
-                          <Icon name="stairs" size={20} />
-                        ),
-                      },
-                    ] : [
+                  {/* A league offers its own two modes. They are the free tier
+                      (plan §0.11) and the two ways into the product: the person
+                      who follows football, and the person who does not.
+                      Showdown and Last Man Standing are deliberately absent —
+                      they are not built, and offering them would promise a pool
+                      that cannot be played. */}
+                  {isLeagueTournament && (
+                    <div className="space-y-3">
+                      {LEAGUE_MODES.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setLeagueMode(opt.value)}
+                          className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                            leagueMode === opt.value
+                              ? 'border-primary-600 bg-primary-600/8 ring-1 ring-primary-600/25'
+                              : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={leagueMode === opt.value ? 'text-primary-600' : 'text-neutral-400'}>
+                              <Icon name={opt.icon} size={20} />
+                            </span>
+                            <h3 className="text-sm font-semibold text-neutral-900">{opt.label}</h3>
+                          </div>
+                          <p className="text-xs text-neutral-500 mt-1.5">{opt.desc}</p>
+                        </button>
+                      ))}
+
+                      {/* Depth is level 2, and it is asked ONLY of Pick'em —
+                          there is no "predict the scoreline" version of
+                          ordering twenty clubs, and the database CHECK refuses
+                          the pairing outright. */}
+                      {(leagueMode === 'pickem' || leagueMode === 'showdown') && (
+                        <div className="pt-1">
+                          <p className="text-xs font-semibold text-neutral-700 mb-2">
+                            How much do members predict each match?
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {LEAGUE_DEPTHS.map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setLeagueDepth(opt.value)}
+                                className={`text-left p-3 rounded-xl border-2 transition-all ${
+                                  leagueDepth === opt.value
+                                    ? 'border-primary-600 bg-primary-600/8'
+                                    : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                                }`}
+                              >
+                                <h4 className="text-sm font-semibold text-neutral-900">{opt.label}</h4>
+                                <p className="text-[11px] text-neutral-500 mt-1 leading-snug">{opt.desc}</p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className={isLeagueTournament ? 'hidden' : 'space-y-3'}>
+                    {(isLeagueTournament ? [] : [
                       {
                         value: 'full_tournament' as const,
                         label: 'Full Tournament',

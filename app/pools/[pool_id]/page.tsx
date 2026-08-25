@@ -92,6 +92,18 @@ export default async function PoolPage({
   // Progressive pools: round states (+lazy seed) and the viewer's submissions.
   // Kept uncached because the seed performs an INSERT side-effect.
   let roundStates: PoolRoundState[] = []
+  // Results-depth picks, keyed by fixture id. Empty for every Scores pool and
+  // every World Cup pool; PoolDetail only reads it when league_depth='results'.
+  let leagueOutcomeMap = new Map<string, 'home' | 'draw' | 'away'>()
+  // The real league table, ingested from the feed (migration 075). Empty for
+  // every World Cup pool — the tab only exists for a league.
+  let leagueStandings: Awaited<ReturnType<typeof import('@/lib/league/read').readLeagueStandings>>['rows'] = []
+  /** entry_id -> its last five score_types, oldest first. Empty for a World Cup pool. */
+  let leagueForm: Map<string, string[]> = new Map()
+  let leagueStandingsAt: string | null = null
+  let tableModeData: import('./PoolDetail').TableModeData | null = null
+  let showdownData: import('./PoolDetail').ShowdownData | null = null
+  let lmsData: import('./PoolDetail').LmsData | null = null
   let roundSubmissions: EntryRoundSubmission[] = []
   if (pool.prediction_mode === 'progressive') {
     const [roundStatesRes, roundSubsRes] = await Promise.all([
@@ -137,8 +149,179 @@ export default async function PoolPage({
   // `pool_entries.has_submitted_predictions`: that column is one of only two
   // doors by which a league entry can reach the World Cup scoring selectors.
   if (pool.league_season_id) {
-    const { readLeaguePoolView, readLeaguePredictions, deriveRoundSubmissions } =
+    const { readLeaguePoolView, readLeaguePredictions, deriveRoundSubmissions, readLeagueStandings } =
       await import('@/lib/league/read')
+
+    // --------------------------------------------------------- Showdown
+    // The fixture list, the results and the duel table are the same rows —
+    // `league_duels` holds unsettled duels from pool creation, which is what
+    // lets the schedule be published in advance.
+    if (pool.league_mode === 'showdown') {
+      const { readPoolDuels } = await import('@/lib/league/duels')
+      const [{ duels, error: duelErr }, totalsRes] = await Promise.all([
+        readPoolDuels(supabase, pool_id),
+        supabase.from('league_entry_totals').select('entry_id, duel_points').eq('pool_id', pool_id),
+      ])
+      if (duelErr) console.error('[pool page] duels failed:', duelErr)
+
+      // Names for BOTH sides of every duel, so a rival is a person rather than
+      // a uuid. Read from the members already loaded above.
+      const entryNames = new Map<string, string>()
+      for (const m of members) {
+        for (const e of m.entries ?? []) {
+          entryNames.set(e.entry_id, e.entry_name || m.users?.username || 'Entry')
+        }
+      }
+
+      showdownData = {
+        duels,
+        entryNames,
+        ownEntryIds: (userEntries ?? []).map((e) => e.entry_id),
+        currentMatchweek: null,
+        duelPoints: new Map(
+          ((totalsRes.data ?? []) as Array<{ entry_id: string; duel_points: number }>)
+            .map((r) => [r.entry_id, r.duel_points]),
+        ),
+      }
+    }
+
+    // ------------------------------------------------ Last Man Standing
+    if (pool.league_mode === 'last_man_standing') {
+      const { readLmsState } = await import('@/lib/league/lms')
+      const { readSeasonClubs } = await import('@/lib/league/table')
+      const [state, { clubs, error: clubErr }, totalsRes] = await Promise.all([
+        readLmsState(supabase, pool_id, userEntryIds),
+        readSeasonClubs(supabase, pool.league_season_id),
+        supabase.from('league_entry_totals').select('entry_id, rounds_won').eq('pool_id', pool_id),
+      ])
+      if (state.error) console.error('[pool page] lms state failed:', state.error)
+      if (clubErr) console.error('[pool page] season clubs failed:', clubErr)
+
+      const entryNames = new Map<string, string>()
+      for (const m of members) {
+        for (const e of m.entries ?? []) {
+          entryNames.set(e.entry_id, e.entry_name || m.users?.username || 'Entry')
+        }
+      }
+
+      lmsData = {
+        round: state.round,
+        survivors: state.survivors,
+        myPicks: state.myPicks,
+        clubs,
+        entryNames,
+        entryId: defaultEntry?.entry_id ?? null,
+        currentMatchweek: null,
+        roundsWon: new Map(
+          ((totalsRes.data ?? []) as Array<{ entry_id: string; rounds_won: number }>)
+            .map((r) => [r.entry_id, r.rounds_won]),
+        ),
+      }
+    }
+
+    const standings = await readLeagueStandings(supabase, pool.league_season_id)
+    if (standings.error) console.error('[pool page] league standings failed:', standings.error)
+    leagueStandings = standings.rows
+    leagueStandingsAt = standings.fetchedAt
+
+    // The leaderboard's form dots. `entry_xp_state` — which feeds them for a
+    // World Cup pool — is never written for a league entry (XP and badges are
+    // BLOCKED, not skipped: app/api/cron/league-outbox/route.ts), so without
+    // this every league member's form column was a permanent em-dash while
+    // `league_match_scores` held exactly the rows it needed.
+    const { readLeagueFormByEntry } = await import('@/lib/league/read')
+    const formRes = await readLeagueFormByEntry(supabase, pool_id)
+    if (formRes.error) console.error('[pool page] league form failed:', formRes.error)
+    leagueForm = formRes.form
+
+    // --------------------------------------------------------- Table mode
+    // Assembled server-side, like everything else on this page. A Table pool
+    // has no fixture picks at all, so this is its ONLY prediction surface.
+    if (pool.league_mode === 'table') {
+      const { readSeasonClubs, readTablePrediction, readTableBreakdown, seedOrder } =
+        await import('@/lib/league/table')
+
+      const lockAt = pool.league_table_lock_at
+      const isLocked = lockAt ? new Date(lockAt) <= new Date() : false
+
+      // The bands come from the COMPETITION (migration 089), not from 4 and 3 —
+      // those are Premier League numbers, and a league that relegates one club
+      // would have had a screen shading three. An explicit pool setting still
+      // wins, exactly as it does in the engine.
+      const [{ clubs, error: clubErr }, settingsRes, bandsRes] = await Promise.all([
+        readSeasonClubs(supabase, pool.league_season_id),
+        supabase
+          .from('league_pool_settings')
+          // The PRICES as well as the band sizes. The Scoring Rules screen
+          // quotes these back to the member, and quoting the shipped defaults
+          // when a pool has moved a number would describe scoring nobody is
+          // being charged. No row is the normal case (migration 079) — the
+          // engine COALESCEs, and so does the fallback below.
+          // ⚠ One literal, not a concatenation. postgrest-js infers the row
+          // shape from the string, and a `'a, ' + 'b'` expression collapses it
+          // to GenericStringError — every field access then fails to compile.
+          .select('table_top_n, table_relegation_n, table_exact_points, table_step_penalty, table_champion_bonus, table_top_four_bonus, table_relegation_bonus, table_perfect_top_four_bonus')
+          .eq('pool_id', pool_id)
+          .maybeSingle(),
+        supabase.rpc('league_default_bands', { p_season_id: pool.league_season_id }),
+      ])
+      if (bandsRes.error) console.error('[pool page] league bands failed:', bandsRes.error)
+      const bands = (bandsRes.data ?? {}) as {
+        top_n?: number; relegation_n?: number
+        europa_from?: number | null; europa_to?: number | null
+      }
+      if (clubErr) console.error('[pool page] season clubs failed:', clubErr)
+
+      let savedOrder: string[] = []
+      let breakdown: Awaited<ReturnType<typeof readTableBreakdown>>['rows'] = []
+      if (defaultEntry) {
+        const [saved, bd] = await Promise.all([
+          readTablePrediction(supabase, defaultEntry.entry_id),
+          readTableBreakdown(supabase, defaultEntry.entry_id),
+        ])
+        if (saved.error) console.error('[pool page] table prediction failed:', saved.error)
+        if (bd.error) console.error('[pool page] table breakdown failed:', bd.error)
+        savedOrder = saved.order
+        breakdown = bd.rows
+      }
+
+      tableModeData = {
+        entryId: defaultEntry?.entry_id ?? null,
+        clubs,
+        savedOrder,
+        // Decision 12 as revised by 17: seeded from the live table, else
+        // alphabetical. Reads the SAME rows the Table tab renders — a second
+        // standings read could return a different ordering mid-matchweek, and
+        // the screen would seed from a table the member cannot see.
+        seededOrder: seedOrder(clubs, new Map(leagueStandings.map((r) => [r.club_id, r.rank]))),
+        breakdown,
+        lockAt,
+        topN: settingsRes.data?.table_top_n ?? bands.top_n ?? 4,
+        relegationN: settingsRes.data?.table_relegation_n ?? bands.relegation_n ?? 3,
+        // 'headline_only' scores the bands alone, so the Scoring Rules screen
+        // must not promise per-place points this pool never awards.
+        profile: pool.league_table_profile === 'headline_only' ? 'headline_only' : 'full_table',
+        // Defaults mirror league_pool_settings' column defaults, which is what
+        // league_score_table COALESCEs against (migration 080).
+        prices: {
+          exactPoints: settingsRes.data?.table_exact_points ?? 100,
+          stepPenalty: settingsRes.data?.table_step_penalty ?? 20,
+          championBonus: settingsRes.data?.table_champion_bonus ?? 500,
+          topFourBonus: settingsRes.data?.table_top_four_bonus ?? 100,
+          relegationBonus: settingsRes.data?.table_relegation_bonus ?? 100,
+          perfectTopFourBonus: settingsRes.data?.table_perfect_top_four_bonus ?? 250,
+        },
+        // Bounds, not a count — and null is a real answer: a competition without
+        // Europa places should not shade a band it does not have.
+        europaFrom: bands.europa_from ?? null,
+        europaTo: bands.europa_to ?? null,
+        isLocked,
+        // Decision 11: joined after the deadline, so never had the chance.
+        // Distinguished from "had the chance and skipped it" because the two
+        // deserve different sentences.
+        joinedAfterLock: isLocked && savedOrder.length === 0,
+      }
+    }
 
     const { view, error: leagueErr } = await readLeaguePoolView(supabase, {
       poolId: pool_id,
@@ -155,14 +338,30 @@ export default async function PoolPage({
       teams = view.teams
       roundStates = view.roundStates
 
+      // Now the round states exist, so "this week" can be named. `mw_N` is the
+      // key matchweekKey() emits.
+      if (showdownData || lmsData) {
+        const open = view.roundStates.find((r) => r.state === 'open')
+        const n = open ? Number(String(open.round_key).replace('mw_', '')) : NaN
+        const mw = Number.isFinite(n) ? n : null
+        if (showdownData) showdownData.currentMatchweek = mw
+        if (lmsData) lmsData.currentMatchweek = mw
+      }
+
       if (defaultEntry) {
-        const { predictions: leaguePicks, error: pickErr } = await readLeaguePredictions(
+        const { predictions: leaguePicks, outcomes: leagueOutcomes, error: pickErr } = await readLeaguePredictions(
           supabase,
           defaultEntry.entry_id,
         )
         if (pickErr) console.error('[pool page] league predictions failed:', pickErr)
         userPredictions = leaguePicks
-        roundSubmissions = deriveRoundSubmissions(defaultEntry.entry_id, view.matches, leaguePicks)
+        leagueOutcomeMap = leagueOutcomes
+        // Both kinds of pick count towards "this matchweek is submitted" — a
+        // Results pool has no scorelines at all, so passing only `leaguePicks`
+        // would leave every matchweek looking untouched.
+        roundSubmissions = deriveRoundSubmissions(
+          defaultEntry.entry_id, view.matches, leaguePicks, leagueOutcomes,
+        )
       }
     }
   }
@@ -255,6 +454,15 @@ export default async function PoolPage({
       hasSeenHowToPlay={membership?.has_seen_how_to_play ?? true}
       roundStates={roundStates}
       roundSubmissions={roundSubmissions}
+      leagueDepth={pool.league_depth ?? null}
+      leagueOutcomes={leagueOutcomeMap}
+      leagueStandings={leagueStandings}
+      leagueForm={leagueForm}
+      leagueStandingsAt={leagueStandingsAt}
+      leagueMode={pool.league_mode ?? null}
+      tableModeData={tableModeData}
+      showdownData={showdownData}
+      lmsData={lmsData}
       bpGroupRankings={bpGroupRankings}
       bpThirdPlaceRankings={bpThirdPlaceRankings}
       bpKnockoutPicks={bpKnockoutPicks}

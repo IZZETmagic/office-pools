@@ -73,3 +73,44 @@ export type ApiFootballQuotaInfo = {
   /** Per-minute requests remaining. */
   rateLimitRemaining: number | null
 }
+
+/**
+ * One club's row in `/standings`.
+ *
+ * ⚠ `rank` already applies the competition's real tiebreakers — for the Premier
+ * League that ends at head-to-head. Never recompute it from `points`: that is
+ * exactly the information a derived table loses.
+ */
+export type ApiFootballStandingRow = {
+  rank: number
+  team: { id: number; name: string; logo?: string | null }
+  points: number
+  goalsDiff: number
+  group?: string | null
+  /** Recent form, most recent last, e.g. 'WWDLW'. */
+  form?: string | null
+  /** same | up | down since the previous round — the movement arrows. */
+  status?: string | null
+  /** Band label, e.g. 'Promotion - Champions League (Group Stage)'. */
+  description?: string | null
+  all: {
+    played: number
+    win: number
+    draw: number
+    lose: number
+    goals: { for: number; against: number }
+  }
+}
+
+/**
+ * `/standings` nests the table two levels down, and the inner level is an ARRAY
+ * OF GROUPS — one for a league, several for a cup group stage. Flattening it is
+ * the mapper's job, not the caller's.
+ */
+export type ApiFootballStandingsResponse = {
+  league: {
+    id: number
+    season: number
+    standings: ApiFootballStandingRow[][]
+  }
+}

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { RoundStatusCard } from './RoundStatusCard'
 import { GroupStageForm } from './GroupStageForm'
 import { KnockoutStageForm } from './KnockoutStageForm'
+import { MatchweekResultsForm, type LeagueOutcome } from './MatchweekResultsForm'
 import {
   type Match,
   type Team,
@@ -39,6 +40,14 @@ type Props = {
   predictionsLocked: boolean
   roundStates: PoolRoundState[]
   roundSubmissions: EntryRoundSubmission[]
+  /**
+   * League pools only. 'results' swaps the two score steppers for one tap per
+   * fixture. NULL/undefined is every World Cup pool and every league pool
+   * created before migration 064, all of which are Scores.
+   */
+  leagueDepth?: 'results' | 'scores' | null
+  /** Saved Results picks, keyed by fixture id. Ignored unless depth is 'results'. */
+  existingOutcomes?: Map<string, LeagueOutcome>
   onUnsavedChangesRef?: React.RefObject<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>
   onStatusChange?: (status: { saveStatus: SaveStatus; lastSavedAt: string | null; predictedCount: number }) => void
 }
@@ -53,6 +62,8 @@ export default function ProgressivePredictionsFlow({
   predictionsLocked,
   roundStates,
   roundSubmissions,
+  leagueDepth,
+  existingOutcomes,
   onUnsavedChangesRef,
   onStatusChange,
 }: Props) {
@@ -99,6 +110,15 @@ export default function ProgressivePredictionsFlow({
 
   // Prediction state
   const pendingChanges = useRef(false)
+
+  // Results-depth picks live in their OWN map, not folded into PredictionMap.
+  // A tap has no scoreline, and `ScoreEntry` is the World Cup's type — widening
+  // it to carry an outcome would put a league concept into shared World Cup
+  // code for no gain, since the two depths never render the same control.
+  const isResults = leagueDepth === 'results'
+  const [outcomes, setOutcomes] = useState<Map<string, LeagueOutcome>>(
+    () => new Map(existingOutcomes ?? []),
+  )
 
   const [predictions, setPredictions] = useState<PredictionMap>(() => {
     const map = new Map<string, ScoreEntry>()
@@ -166,7 +186,9 @@ export default function ProgressivePredictionsFlow({
   // Match & round stats
   const roundMatchCount = roundMatches.length
   const completedRoundMatchCount = roundMatches.filter(m => (m as any).is_completed).length
-  const predictedRoundCount = roundMatches.filter(m => isPredictionComplete(predictions.get(m.match_id))).length
+  const predictedRoundCount = isResults
+    ? roundMatches.filter((m) => outcomes.has(m.match_id)).length
+    : roundMatches.filter((m) => isPredictionComplete(predictions.get(m.match_id))).length
 
   // Bracket resolution for group stage (needed by GroupStageForm for standings display)
   const allGroupStandings = useMemo(() => {
@@ -252,21 +274,34 @@ export default function ProgressivePredictionsFlow({
     setSaveStatus('saving')
     setError(null)
 
-    // Build payload for current round's predictions only
+    // Build payload for current round's predictions only.
+    //
+    // A Results pool sends `outcome` and NOTHING ELSE. The route refuses a
+    // payload whose shape disagrees with the pool's depth, and the database
+    // refuses a row carrying both — so sending a placeholder scoreline
+    // alongside would fail, which is the point: there is no scoreline to send.
     const predictionsPayload: any[] = []
-    for (const match of roundMatches) {
-      const scores = predictions.get(match.match_id)
-      if (!scores || (scores.home == null && scores.away == null)) continue
-      const existingId = existingPredictionIds.current.get(match.match_id)
-      predictionsPayload.push({
-        matchId: match.match_id,
-        predictionId: existingId,
-        homeScore: scores.home ?? 0,
-        awayScore: scores.away ?? 0,
-        homePso: scores.homePso ?? null,
-        awayPso: scores.awayPso ?? null,
-        winnerTeamId: scores.winnerTeamId ?? null,
-      })
+    if (isResults) {
+      for (const match of roundMatches) {
+        const outcome = outcomes.get(match.match_id)
+        if (!outcome) continue
+        predictionsPayload.push({ matchId: match.match_id, outcome })
+      }
+    } else {
+      for (const match of roundMatches) {
+        const scores = predictions.get(match.match_id)
+        if (!scores || (scores.home == null && scores.away == null)) continue
+        const existingId = existingPredictionIds.current.get(match.match_id)
+        predictionsPayload.push({
+          matchId: match.match_id,
+          predictionId: existingId,
+          homeScore: scores.home ?? 0,
+          awayScore: scores.away ?? 0,
+          homePso: scores.homePso ?? null,
+          awayPso: scores.awayPso ?? null,
+          winnerTeamId: scores.winnerTeamId ?? null,
+        })
+      }
     }
 
     if (predictionsPayload.length === 0) {
@@ -329,7 +364,11 @@ export default function ProgressivePredictionsFlow({
       setSaveStatus('error')
       setError(err.message || 'Failed to save predictions')
     }
-  }, [saving, isReadOnly, roundMatches, predictions, poolId, entryId, selectedRound, backupKey, showToast])
+    // `outcomes` and `isResults` are dependencies for the same reason
+    // `predictions` is: without them useCallback never rebuilds, the ref below
+    // keeps pointing at the first closure, and every save would post the map as
+    // it was on mount — so a Results pool would silently save nothing.
+  }, [saving, isReadOnly, roundMatches, predictions, outcomes, isResults, poolId, entryId, selectedRound, backupKey, showToast])
 
   // Keep ref in sync
   savePredictionsRef.current = savePredictions
@@ -337,6 +376,23 @@ export default function ProgressivePredictionsFlow({
   // =====================
   // AUTO-SAVE TIMERS
   // =====================
+  // Same debounce and same dirty flag as updatePrediction, so a Results pool
+  // autosaves on exactly the rhythm a Scores pool does.
+  const updateOutcome = useCallback((matchId: string, outcome: LeagueOutcome) => {
+    setOutcomes((prev) => {
+      const next = new Map(prev)
+      next.set(matchId, outcome)
+      return next
+    })
+    pendingChanges.current = true
+    setSaveStatus('idle')
+
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      if (pendingChanges.current) savePredictionsRef.current()
+    }, 500)
+  }, [])
+
   const updatePrediction = useCallback((matchId: string, score: ScoreEntry) => {
     setPredictions(prev => {
       const next = new Map(prev)
@@ -531,8 +587,18 @@ export default function ProgressivePredictionsFlow({
             />
           )}
 
+          {/* Results depth: one tap per fixture, instead of two steppers. */}
+          {selectedRound !== 'group' && isResults && (
+            <MatchweekResultsForm
+              resolvedMatches={resolvedKnockoutMatches}
+              outcomes={outcomes}
+              onUpdateOutcome={isReadOnly ? undefined : updateOutcome}
+              readOnly={isReadOnly}
+            />
+          )}
+
           {/* Knockout Stage Forms */}
-          {selectedRound !== 'group' && (
+          {selectedRound !== 'group' && !isResults && (
             <KnockoutStageForm
               stage={selectedRound}
               resolvedMatches={resolvedKnockoutMatches}

@@ -25,12 +25,28 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type LeaguePick = {
-  /** `league_fixtures.fixture_id`. Named matchId by the shared flow. */
-  matchId: string
-  homeScore: number
-  awayScore: number
-}
+export type LeagueOutcome = 'home' | 'draw' | 'away'
+
+/**
+ * One pick, in exactly ONE of the two shapes a league pool can ask for.
+ *
+ * A discriminated union rather than four optional fields, because it mirrors
+ * `league_predictions_shape_ck` (migration 064): the database refuses a row
+ * carrying both a scoreline and an outcome, or neither, so a type that permits
+ * either would only defer the error to runtime.
+ *
+ * ⚠ NEVER express an outcome as a sentinel scoreline. 1-0 / 0-0 / 0-1 would
+ * score as genuine `exact`s and show the member a scoreline they never entered
+ * — Decision 9 names this trap explicitly.
+ */
+export type LeaguePick =
+  | { matchId: string; homeScore: number; awayScore: number; outcome?: never }
+  | { matchId: string; outcome: LeagueOutcome; homeScore?: never; awayScore?: never }
+
+const isOutcomePick = (p: LeaguePick): p is Extract<LeaguePick, { outcome: LeagueOutcome }> =>
+  p.outcome !== undefined
+
+const OUTCOMES: readonly LeagueOutcome[] = ['home', 'draw', 'away']
 
 export type LeagueSaveResult = {
   /** Picks the database actually holds for this entry after the write. */
@@ -75,6 +91,15 @@ export async function saveLeaguePredictions(
   }
 
   for (const p of picks) {
+    if (isOutcomePick(p)) {
+      if (!OUTCOMES.includes(p.outcome)) {
+        return {
+          predicted: 0, accepted: 0, rejected: [],
+          error: `A result must be one of ${OUTCOMES.join(', ')}.`,
+        }
+      }
+      continue
+    }
     if (
       !Number.isInteger(p.homeScore) || !Number.isInteger(p.awayScore) ||
       p.homeScore < MIN_SCORE || p.homeScore > MAX_SCORE ||
@@ -110,11 +135,16 @@ export async function saveLeaguePredictions(
   const { error: upErr } = await supabase
     .from('league_predictions')
     .upsert(
+      // Both shapes name ALL THREE columns, setting the unused ones to null.
+      // An upsert that omitted them would leave a stale scoreline behind when a
+      // pick changed shape, and the row would then fail shape_ck — or worse,
+      // pass it while carrying a value the member never entered.
       picks.map((p) => ({
         entry_id: entryId,
         fixture_id: p.matchId,
-        predicted_home_score: p.homeScore,
-        predicted_away_score: p.awayScore,
+        predicted_home_score: isOutcomePick(p) ? null : p.homeScore,
+        predicted_away_score: isOutcomePick(p) ? null : p.awayScore,
+        predicted_outcome: isOutcomePick(p) ? p.outcome : null,
         updated_at: new Date().toISOString(),
       })),
       // The real UNIQUE (entry_id, fixture_id). A bare 'fixture_id' would 42P10;
@@ -130,18 +160,27 @@ export async function saveLeaguePredictions(
   // succeeded if you only count rows.
   const { data: after, error: rErr } = await supabase
     .from('league_predictions')
-    .select('fixture_id, predicted_home_score, predicted_away_score')
+    .select('fixture_id, predicted_home_score, predicted_away_score, predicted_outcome')
     .eq('entry_id', entryId)
     .in('fixture_id', ids)
   if (rErr) return { predicted: 0, accepted: 0, rejected: [], error: rErr.message }
 
-  const stored = new Map(
-    ((after ?? []) as Array<{ fixture_id: string; predicted_home_score: number; predicted_away_score: number }>)
-      .map((r) => [r.fixture_id, r]),
-  )
+  type StoredRow = {
+    fixture_id: string
+    predicted_home_score: number | null
+    predicted_away_score: number | null
+    predicted_outcome: string | null
+  }
+  const stored = new Map(((after ?? []) as StoredRow[]).map((r) => [r.fixture_id, r]))
   const rejected = picks.filter((p) => {
     const s = stored.get(p.matchId)
-    return !s || s.predicted_home_score !== p.homeScore || s.predicted_away_score !== p.awayScore
+    if (!s) return true
+    // Compared per SHAPE. Checking only the scoreline would report every
+    // accepted Results pick as rejected, because its scoreline is legitimately
+    // null on both sides.
+    return isOutcomePick(p)
+      ? s.predicted_outcome !== p.outcome
+      : s.predicted_home_score !== p.homeScore || s.predicted_away_score !== p.awayScore
   })
 
   const { count, error: cErr } = await supabase

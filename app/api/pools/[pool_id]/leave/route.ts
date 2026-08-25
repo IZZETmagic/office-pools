@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { retireEntries } from '@/lib/entries/retire'
 
 // POST /api/pools/:pool_id/leave
 //
@@ -75,6 +76,13 @@ export async function POST(
     event_type: 'left',
     pool_name: pool.pool_name,
   })
+
+  // Soft delete (migration 056). Mark their entries retired BEFORE the
+  // membership goes, so the reason is recorded while member_id still resolves.
+  // The delete below then detaches rather than destroys: the FK is
+  // ON DELETE SET NULL, so the entry survives with member_id = NULL and its
+  // predictions intact, and rejoining reunites them.
+  await retireEntries(adminClient, { memberIds: [membership.member_id] }, 'left', userData.user_id)
 
   const { error: deleteError } = await adminClient
     .from('pool_members')

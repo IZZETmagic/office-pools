@@ -12,11 +12,37 @@ import type { MatchScoreData } from '../types'
 // =============================================
 // TYPES
 // =============================================
+/**
+ * How a Results-depth tap reads on screen. Named by CLUB rather than as
+ * "Home win", because that is how a person says it out loud — and for a league
+ * `country_name` is the club name (the World Cup field names are wrong for a
+ * club; see lib/league/read.ts).
+ */
+export function outcomeLabel(match: {
+  predicted_outcome?: 'home' | 'draw' | 'away' | null
+  home_team: { country_name: string } | null
+  away_team: { country_name: string } | null
+}): string | null {
+  const o = match.predicted_outcome
+  if (!o) return null
+  if (o === 'draw') return 'Draw'
+  const name = o === 'home' ? match.home_team?.country_name : match.away_team?.country_name
+  return name ? `${name} win` : o === 'home' ? 'Home win' : 'Away win'
+}
+
 export type ResultMatch = {
   match_id: string
   match_number: number
   stage: string
   group_letter: string | null
+  /**
+   * The MATCHWEEK, for a league fixture. The adapter stamps
+   * `stage = 'regular_season'` and puts the matchweek here rather than in
+   * `stage`, because `competitionRounds.matchInRound` keys on exactly that pair
+   * (lib/league/read.ts:99). Null for every World Cup match, which groups by
+   * stage instead.
+   */
+  round_number?: number | null
   match_date: string
   venue: string | null
   status: string
@@ -41,6 +67,15 @@ export type ResultMatch = {
     predicted_away_pso: number | null
     predicted_winner_team_id: string | null
   } | null
+  /**
+   * A league pool played at RESULTS depth stores a TAP, not a scoreline, so
+   * `prediction` above is null and this carries the pick instead.
+   *
+   * Beside the scoreline rather than inside it, on purpose. Decision 9 forbids
+   * encoding home/draw/away as 1-0 / 0-0 / 0-1: a sentinel scoreline scores as a
+   * genuine exact and shows a member a prediction they never made.
+   */
+  predicted_outcome?: 'home' | 'draw' | 'away' | null
   // Predicted teams for knockout matches (resolved from user's bracket)
   predicted_home_team_name: string | null
   predicted_away_team_name: string | null
@@ -51,7 +86,29 @@ export type ResultMatch = {
 // =============================================
 // HELPERS
 // =============================================
-function getStageLabel(stage: string, groupLetter: string | null): string {
+/**
+ * What to call the part of the competition a match belongs to.
+ *
+ * ⚠ The final fallback returns the RAW `stage` value, and that is how
+ * `regular_season · #1` reached the screen for every league fixture: the league
+ * adapter invents `'regular_season'` for a value `matches_stage_check` does not
+ * even admit, so it was never going to be in STAGE_LABELS. A member reading a
+ * Premier League results list saw a database enum.
+ *
+ * A league groups by MATCHWEEK, which the adapter carries in `round_number`.
+ * The fallback is kept rather than made exhaustive — a competition format we
+ * have not met yet should degrade to something readable-ish, not throw — but a
+ * raw enum on screen is a bug wherever it appears, so anything new landing here
+ * wants a case, not a shrug.
+ */
+function getStageLabel(
+  stage: string,
+  groupLetter: string | null,
+  roundNumber?: number | null,
+): string {
+  if (stage === 'regular_season') {
+    return roundNumber ? `Matchweek ${roundNumber}` : 'Regular Season'
+  }
   if (stage === 'group' && groupLetter) return `Group ${groupLetter}`
   if (stage === 'third_place') return 'Third Place'
   if (stage === 'final') return 'Final'
@@ -81,6 +138,47 @@ function countryCodeToEmoji(code: string): string {
   const offset = 0x1f1e6
   const a = 'A'.charCodeAt(0)
   return String.fromCodePoint(upper.charCodeAt(0) - a + offset, upper.charCodeAt(1) - a + offset)
+}
+
+/**
+ * A team's badge, in the shape that team's badge actually is.
+ *
+ * ⚠ THE WRONG BOX CROPS THE IMAGE, and it did.
+ *
+ * A national flag is a 3:2 landscape rectangle, so `w-6 h-4` with `object-cover`
+ * fills the box exactly and the 2px rounding reads as a flag. A club crest is
+ * SQUARE — api-football serves them at 150×150 — and the league adapter puts the
+ * crest URL in that same `flag_url` field, so every club badge was being poured
+ * into a landscape box.
+ *
+ * The arithmetic, because "it looked wrong" is not a diagnosis: `object-cover`
+ * scales to COVER, so a 150×150 image in a 24×16 box scales by 24/150 to 24×24
+ * and is then clipped to the box height — losing 4px off the TOP and 4px off the
+ * BOTTOM of every crest, a third of it gone. Arsenal's cannon, United's devil and
+ * Brighton's gull all came out as letterboxed slices.
+ *
+ * So a crest gets a SQUARE box and `object-contain` — fit the whole thing, never
+ * crop — and no corner rounding, because a crest is already a shape and rounding
+ * shaves whatever reaches the corners.
+ *
+ * The emoji fallback below is unreachable for a league (clubs have no ISO-2
+ * country code) and is left alone.
+ */
+function TeamBadge({
+  url, alt, isLeague,
+}: { url: string; alt: string; isLeague: boolean }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={alt}
+      className={
+        isLeague
+          ? 'w-6 h-6 object-contain shrink-0'
+          : 'w-6 h-4 rounded-[2px] object-cover shrink-0'
+      }
+    />
+  )
 }
 
 function getLeftBorderColor(result: PointsResult | null, isUpcoming: boolean): string {
@@ -145,6 +243,7 @@ export function MatchCard({
   index = 0,
   storedScore,
   bracketPick,
+  isLeague = false,
 }: {
   match: ResultMatch
   poolSettings: PoolSettings
@@ -152,13 +251,23 @@ export function MatchCard({
   index?: number
   storedScore?: MatchScoreData | null
   bracketPick?: BracketPick | null
+  /**
+   * League pools carry a club CREST in `flag_url`, not a national flag, and the
+   * two need different boxes — see TeamBadge. Defaults false so the World Cup
+   * call sites (BracketResultsTab, XPProgressSection) are untouched.
+   */
+  isLeague?: boolean
 }) {
   const isCompleted = match.status === 'completed'
   const isLive = match.status === 'live'
   const isUpcoming = !isCompleted && !isLive
   const hasActualScores =
     match.home_score_ft !== null && match.away_score_ft !== null
-  const hasPrediction = match.prediction !== null
+  // A Results-depth league pick is a tap with no scoreline, so both shapes count
+  // as "predicted" — otherwise the screen says "No prediction" to a member who
+  // made one.
+  const predictedTap = outcomeLabel(match)
+  const hasPrediction = match.prediction !== null || predictedTap !== null
 
   const hasPsoScores =
     match.home_score_pso !== null && match.away_score_pso !== null
@@ -220,8 +329,10 @@ export function MatchCard({
 
   // Build prediction display string
   let predictionDisplay: string | null = null
-  if (hasPrediction) {
-    predictionDisplay = `${match.prediction!.predicted_home_score} - ${match.prediction!.predicted_away_score}`
+  if (match.prediction) {
+    predictionDisplay = `${match.prediction.predicted_home_score} - ${match.prediction.predicted_away_score}`
+  } else if (predictedTap) {
+    predictionDisplay = predictedTap
   }
 
   return (
@@ -232,7 +343,12 @@ export function MatchCard({
       {/* ── Top Row: Stage label + Badge/Points ── */}
       <div className="flex items-center justify-between px-4 pt-3 pb-1">
         <span className="t-body text-muted">
-          {getStageLabel(match.stage, match.group_letter)} · Match #{match.match_number}
+          {/* The season-wide fixture ordinal is dropped for a league. "#274" is
+              an internal number; nobody says it out loud, and the matchweek is
+              already the thing members navigate by. The World Cup keeps it —
+              there, "Match #12" is how the schedule is published. */}
+          {getStageLabel(match.stage, match.group_letter, match.round_number)}
+          {!isLeague && ` · Match #${match.match_number}`}
         </span>
         <div>
           {pointsResult ? (
@@ -271,7 +387,7 @@ export function MatchCard({
           {/* Home team */}
           <div className="flex items-center gap-2 min-w-0">
             {homeFlagUrl ? (
-              <img src={homeFlagUrl} alt={homeName} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
+              <TeamBadge url={homeFlagUrl} alt={homeName} isLeague={isLeague} />
             ) : countryCodeToEmoji(homeCode) ? (
               <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>
             ) : null}
@@ -310,7 +426,7 @@ export function MatchCard({
               {awayName}
             </span>
             {awayFlagUrl ? (
-              <img src={awayFlagUrl} alt={awayName} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
+              <TeamBadge url={awayFlagUrl} alt={awayName} isLeague={isLeague} />
             ) : countryCodeToEmoji(awayCode) ? (
               <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(awayCode)}</span>
             ) : null}
@@ -359,6 +475,7 @@ export function MatchCard({
                 {match.predicted_away_team_name || '?'}
               </span>
               {hasPsoScores &&
+                match.prediction &&
                 match.prediction!.predicted_home_pso != null &&
                 match.prediction!.predicted_away_pso != null && (
                   <span className="text-muted">
@@ -380,6 +497,7 @@ export function MatchCard({
                 {predictionDisplay}
               </span>
               {hasPsoScores &&
+                match.prediction &&
                 match.prediction!.predicted_home_pso != null &&
                 match.prediction!.predicted_away_pso != null && (
                   <span className="text-muted">
@@ -414,18 +532,26 @@ export function MatchTableRow({
   predictionMode,
   storedScore,
   bracketPick,
+  isLeague = false,
 }: {
   match: ResultMatch
   predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
   storedScore?: MatchScoreData | null
   bracketPick?: BracketPick | null
+  /**
+   * League pools carry a club CREST in `flag_url`, not a national flag, and the
+   * two need different boxes — see TeamBadge. Defaults false so the World Cup
+   * call sites (BracketResultsTab, XPProgressSection) are untouched.
+   */
+  isLeague?: boolean
 }) {
   const isCompleted = match.status === 'completed'
   const isLive = match.status === 'live'
   const isUpcoming = !isCompleted && !isLive
   const hasActualScores = match.home_score_ft !== null && match.away_score_ft !== null
   const hasPsoScores = match.home_score_pso !== null && match.away_score_pso !== null
-  const hasPrediction = match.prediction !== null
+  const predictedTap = outcomeLabel(match)
+  const hasPrediction = match.prediction !== null || predictedTap !== null
   const pointsResult: PointsResult | null = bracketPick
     ? bracketPick.points !== null
       ? {
@@ -491,7 +617,8 @@ export function MatchTableRow({
           first cell — same colour vocabulary as the mobile card. */}
       <td className={`px-4 py-3 border-l-[3px] ${getLeftBorderColor(pointsResult, isUpcoming)}`}>
         <span className="t-body text-muted whitespace-nowrap">
-          {getStageLabel(match.stage, match.group_letter)} · #{match.match_number}
+          {getStageLabel(match.stage, match.group_letter, match.round_number)}
+          {!isLeague && ` · #${match.match_number}`}
         </span>
       </td>
 
@@ -502,8 +629,7 @@ export function MatchTableRow({
           {/* flag_url is authoritative — it carries the real ISO-2. The emoji
               is only a fallback for teams that have no image. */}
           {homeFlagUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={homeFlagUrl} alt="" className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
+            <TeamBadge url={homeFlagUrl} alt="" isLeague={isLeague} />
           ) : countryCodeToEmoji(homeCode) ? (
             <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(homeCode)}</span>
           ) : null}
@@ -530,14 +656,18 @@ export function MatchTableRow({
         )}
         {/* The prediction sits directly under the actual score in the muted
             tone, so the column reads actual-over-predicted at a glance. */}
-        {hasPrediction ? (
+        {match.prediction ? (
           <span className="t-num t-num-medium text-xs text-muted block h-4 mt-1 leading-4">
-            {match.prediction!.predicted_home_score} - {match.prediction!.predicted_away_score}
-            {match.prediction!.predicted_home_pso != null &&
-              match.prediction!.predicted_away_pso != null && (
-                <> ({match.prediction!.predicted_home_pso}-{match.prediction!.predicted_away_pso})</>
+            {match.prediction.predicted_home_score} - {match.prediction.predicted_away_score}
+            {match.prediction.predicted_home_pso != null &&
+              match.prediction.predicted_away_pso != null && (
+                <> ({match.prediction.predicted_home_pso}-{match.prediction.predicted_away_pso})</>
               )}
           </span>
+        ) : predictedTap ? (
+          // Not tabular-numeric: this is a name, not a score, and the column
+          // reads actual-over-predicted either way.
+          <span className="t-detail text-muted block h-4 mt-1 leading-4 truncate">{predictedTap}</span>
         ) : (
           <span className="t-detail text-muted block h-4 mt-1 leading-4">no pick</span>
         )}
@@ -546,8 +676,7 @@ export function MatchTableRow({
       <td className="px-4 py-3">
         <div className="h-6 flex items-center gap-2 min-w-0">
           {awayFlagUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={awayFlagUrl} alt="" className="w-6 h-4 rounded-[2px] object-cover shrink-0" />
+            <TeamBadge url={awayFlagUrl} alt="" isLeague={isLeague} />
           ) : countryCodeToEmoji(awayCode) ? (
             <span className="text-sm leading-none shrink-0">{countryCodeToEmoji(awayCode)}</span>
           ) : null}

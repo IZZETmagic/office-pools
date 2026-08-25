@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { retireEntries } from '@/lib/entries/retire'
 
 // POST /api/pools/:pool_id/entries/:entry_id/delete
 //
@@ -86,16 +87,24 @@ export async function POST(
     }
   }
 
-  // Delete. All 12 cascade children (predictions, scores, bracket
-  // picks, etc.) clean up via ON DELETE CASCADE. Admin client so RLS
-  // on the protected score tables doesn't roll the transaction back.
-  const { error: deleteError } = await adminClient
-    .from('pool_entries')
-    .delete()
-    .eq('entry_id', entry_id)
-  if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 })
+  // RETIRE, don't delete — migration 056.
+  //
+  // This used to DELETE, and all 12 cascade children (predictions, scores,
+  // bracket picks, ...) went with it via ON DELETE CASCADE. That is the door
+  // an admin uses to remove somebody, so it is the one most likely to be
+  // clicked by mistake, and it had no undo.
+  //
+  // The entry now stops scoring and leaves the leaderboard while its
+  // predictions are kept. Re-adding the member restores everything.
+  const { error: retireError } = await retireEntries(
+    adminClient,
+    { entryIds: [entry_id] },
+    isOwner ? 'left' : 'removed',
+    userData.user_id,
+  )
+  if (retireError) {
+    return NextResponse.json({ error: retireError }, { status: 500 })
   }
 
-  return NextResponse.json({ deleted: true })
+  return NextResponse.json({ deleted: true, retired: true })
 }

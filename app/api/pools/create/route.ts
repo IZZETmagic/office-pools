@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
     description,
     tournament_id,
     league_season_id,
+    league_mode,
+    league_depth,
+    league_table_profile,
     prediction_deadline,
     prediction_mode,
     is_private,
@@ -75,6 +78,10 @@ export async function POST(request: NextRequest) {
   let resolvedTournamentId: string | null = tournament_id ?? null
   let resolvedMode: string = prediction_mode
   let resolvedDeadline: string | null = prediction_deadline ?? null
+  let resolvedLeagueMode: string | null = null
+  let resolvedProfile: string | null = null
+  let resolvedTableLockAt: string | null = null
+  let resolvedDepth: string | null = null
 
   if (league_season_id) {
     const { data: season, error: seasonErr } = await adminClient
@@ -140,6 +147,61 @@ export async function POST(request: NextRequest) {
       )
     }
     resolvedDeadline = lastKickoff.last_kickoff_at as string
+
+    // ------------------------------------------------------- level 1: mode
+    // Plan §0.1. `league_mode` is what kind of pool this is; `league_depth` is
+    // how deep its picks go and is asked ONLY of the two modes that have picks.
+    // Both are immutable after this insert.
+    //
+    // Validated against the same list as the CHECK rather than passed through:
+    // a typo would otherwise reach the database as a 23514 the member sees as
+    // "Please try again".
+    const LEAGUE_MODES = ['pickem', 'showdown', 'last_man_standing', 'table']
+    resolvedLeagueMode = typeof league_mode === 'string' ? league_mode : 'pickem'
+    if (!LEAGUE_MODES.includes(resolvedLeagueMode)) {
+      return NextResponse.json(
+        { error: `Unknown league mode "${resolvedLeagueMode}".` },
+        { status: 400 },
+      )
+    }
+
+    // Depth belongs to the two modes that have weekly picks, and to no others.
+    // Decision 6 keeps `results` the default — 380 taps is a season people
+    // finish, where 760 numbers is not.
+    if (resolvedLeagueMode === 'pickem' || resolvedLeagueMode === 'showdown') {
+      resolvedDepth = league_depth === 'scores' ? 'scores' : 'results'
+    }
+
+    if (resolvedLeagueMode === 'table') {
+      resolvedProfile = league_table_profile === 'headline_only' ? 'headline_only' : 'full_table'
+
+      // §3.4 — the deadline is the first kickoff of the first matchweek that
+      // has NOT yet locked. Pool-level, so everyone in this pool faces the same
+      // deadline and their scores stay comparable; and computed at creation, so
+      // a pool started in November still gets a real, live prediction instead
+      // of being asked for one whose deadline was August.
+      const nowIso = new Date().toISOString()
+      const { data: nextMw } = await adminClient
+        .from('league_matchweeks')
+        .select('first_kickoff_at, lock_at')
+        .eq('season_id', league_season_id)
+        .not('first_kickoff_at', 'is', null)
+        .gt('lock_at', nowIso)
+        .order('matchweek_number', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (!nextMw?.first_kickoff_at) {
+        // Every matchweek has locked: the season is over, or so close to it
+        // that a table prediction would be a formality. Refusing is kinder than
+        // creating a pool whose central question is already answered.
+        return NextResponse.json(
+          { error: 'This season has no matchweeks left to predict — a table pool needs at least one.' },
+          { status: 409 },
+        )
+      }
+      resolvedTableLockAt = nextMw.first_kickoff_at as string
+    }
   }
 
   // 1. Create pool
@@ -150,6 +212,17 @@ export async function POST(request: NextRequest) {
       description: description?.trim() || null,
       tournament_id: resolvedTournamentId,
       league_season_id: league_season_id ?? null,
+      // Both league columns are resolved above, and NULL for everything else —
+      // set here rather than as column defaults, because a default would stamp a
+      // league concept onto all 623 bracket pools.
+      //
+      // Both are immutable once written (migrations 064 and 077): mixed depths
+      // make weekly scores incomparable and break Showdown, and a changed mode
+      // strands every prediction already made.
+      league_depth: resolvedDepth,
+      league_mode: resolvedLeagueMode,
+      league_table_profile: resolvedProfile,
+      league_table_lock_at: resolvedTableLockAt,
       admin_user_id: userData.user_id,
       prediction_deadline: resolvedDeadline,
       prediction_mode: resolvedMode,
@@ -223,6 +296,43 @@ export async function POST(request: NextRequest) {
   // `league_pickem` is deliberately NOT in this list. A league's rounds are
   // DERIVED from `league_matchweeks` (fixture_count, lock_at,
   // completed_fixture_count) rather than seeded into `pool_round_states`, which
+  // A Showdown pool gets its fixture list the moment it exists. One entry means
+  // no duels yet — the generator says so and writes nothing — but every later
+  // join regenerates, so the list is always current rather than built once and
+  // left to rot.
+  if (resolvedLeagueMode === 'showdown') {
+    const { regenerateDuelSchedule } = await import('@/lib/league/duels')
+    const sched = await regenerateDuelSchedule(adminClient, newPool.pool_id)
+    if (sched.error) console.error('[create pool] duel schedule failed:', sched.error)
+  }
+
+  // Last Man Standing opens its first round at whichever matchweek is currently
+  // open, so a pool created in November starts playing in November rather than
+  // carrying eleven weeks of history nobody was there for.
+  //
+  // ⚠ Nothing is wired into JOIN on purpose. A late joiner enters the NEXT
+  // round, not the one in progress: everyone already in it has burned clubs on
+  // it, and dropping somebody in with a full set of twenty would hand them an
+  // advantage nobody else had. Rounds repeat, so the wait is bounded — which is
+  // the same reasoning that made them repeat in the first place.
+  if (resolvedLeagueMode === 'last_man_standing' && league_season_id) {
+    const { data: openMw } = await adminClient
+      .from('league_matchweeks')
+      .select('matchweek_number')
+      .eq('season_id', league_season_id)
+      .gt('lock_at', new Date().toISOString())
+      .order('matchweek_number', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (openMw?.matchweek_number) {
+      const { error: roundErr } = await adminClient.rpc('league_lms_open_round', {
+        p_pool_id: newPool.pool_id,
+        p_matchweek: openMw.matchweek_number,
+      })
+      if (roundErr) console.error('[create pool] lms round failed:', roundErr.message)
+    }
+  }
+
   // is World-Cup-shaped. `seedPoolRoundStates` refuses a league outright.
   if (resolvedMode === 'progressive') {
     const seed = await seedPoolRoundStates(adminClient, {

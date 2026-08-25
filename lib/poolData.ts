@@ -176,7 +176,21 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
     admin
       .from('pool_members')
       .select(`${POOL_MEMBER_COLUMNS}, users!inner(user_id, username, full_name, email), pool_entries(*)`)
-      .eq('pool_id', poolId),
+      .eq('pool_id', poolId)
+      // Migration 057: a RETIRED entry is not on the leaderboard.
+      //
+      // This is THE gathering point for entries pool-wide, so one filter here
+      // covers every leaderboard surface at once. It is a filter on the EMBEDDED
+      // resource, not `!inner`: the member row survives with an empty entries
+      // array, which is exactly the zero-entry state `stop participating` has
+      // always produced (it used to DELETE the entries) — so no consumer sees a
+      // shape it has not already been handling. Verified against production:
+      // a non-matching embedded filter returned 3 members / 0 entries, not 0
+      // members.
+      //
+      // Retiring is not deleting. The entry, its predictions and its points all
+      // still exist and come back in full on restore — see lib/entries/retire.ts.
+      .is('pool_entries.retired_at', null),
     admin.from('pool_settings').select('*').eq('pool_id', poolId).single(),
     admin
       .from('teams')
@@ -481,6 +495,10 @@ export async function getPoolBulkDataUncached(
     .from('pool_members')
     .select('pool_entries(entry_id)')
     .eq('pool_id', poolId)
+    // Migration 057, same rule as getPoolDataUncached: these ids feed
+    // readMatchScoresNarrow and the pool-wide predictions read, both of which
+    // are leaderboard data. A retired entry must not be in either.
+    .is('pool_entries.retired_at', null)
   const allEntryIds = ((memberRows ?? []) as Array<{ pool_entries?: Array<{ entry_id: string }> | null }>)
     .flatMap((m) => m.pool_entries ?? [])
     .map((e) => e.entry_id)

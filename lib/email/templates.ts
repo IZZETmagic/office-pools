@@ -641,6 +641,76 @@ export function roundDeadlineReminderTemplate(params: {
   }
 }
 
+// --- League Templates ---
+
+/**
+ * "Matchweek 12 is scored." Sent once, when a matchweek is both fully played
+ * AND fully counted.
+ *
+ * ⚠ Deliberately FACTUAL. It reports what happened — points, position,
+ * movement — and does not ask for anything. CLAUDE.md's disclosure gate is
+ * satisfied by "when a matchweek finishes, we tell you how you did"; a version
+ * that leaned on the movement to pull somebody back ("you've slipped to 4th —
+ * don't let them get away") would fail it, and is the reason the movement line
+ * is stated plainly and then left alone.
+ *
+ * Voice is plural "we", per the house rule — never first person.
+ */
+export function leagueMatchweekResultTemplate(params: {
+  userName: string
+  poolName: string
+  matchweekName: string
+  pointsThisWeek: number
+  totalPoints: number
+  rank: number | null
+  previousRank: number | null
+  memberCount: number
+  poolUrl: string
+}): { subject: string; html: string } {
+  const {
+    userName, poolName, matchweekName, pointsThisWeek, totalPoints,
+    rank, previousRank, memberCount, poolUrl,
+  } = params
+
+  // Movement is only meaningful once there is something to compare against —
+  // the first scored matchweek of a season has no previous position.
+  const delta = rank !== null && previousRank !== null ? previousRank - rank : null
+  const movement =
+    delta === null ? '' :
+    delta > 0 ? ` — up ${delta} place${delta === 1 ? '' : 's'}` :
+    delta < 0 ? ` — down ${-delta} place${-delta === 1 ? '' : 's'}` :
+    ' — no change'
+
+  const position = rank !== null ? `${ordinal(rank)} of ${memberCount}` : 'unranked'
+
+  return {
+    subject: `${matchweekName} is scored - ${poolName}`,
+    html: brandedTemplate({
+      preheader: `You scored ${pointsThisWeek} in ${matchweekName}.`,
+      heading: `${matchweekName} Results`,
+      body: `
+        ${greeting(userName)}
+        ${paragraph(`<strong>${matchweekName}</strong> is done and counted in <strong>${poolName}</strong>.`)}
+        ${callout(
+          'info',
+          `${calloutLine('info', `${pointsThisWeek} points this matchweek`, { bold: true, marginBottom: 6 })}
+           ${calloutLine('info', `${totalPoints} points overall`, { size: 13, marginBottom: 6 })}
+           ${calloutLine('info', `You are ${position}${movement}`, { size: 13 })}`
+        )}
+        ${paragraph('The next matchweek is open — see how everyone else got on.', { marginBottom: 0 })}
+      `,
+      ctaText: 'See the table',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] || s[v] || s[0])
+}
+
 // --- Announcement Templates ---
 
 export function allTeamsAnnouncementTemplate(params: {

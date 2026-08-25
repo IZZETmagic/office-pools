@@ -316,7 +316,19 @@ export async function readBonusScores(
   entryIds: string[],
   source: ScoringSource,
 ): Promise<BonusScoreData[]> {
-  if (source === 'league' && leagueNotImplemented('readBonusScores')) return []
+  // NOT a missing arm — the complete answer. A league awards no bonuses, so
+  // there are no rows to read and there is no table to read them from:
+  // migration 050 deliberately left `league_bonus_scores` unbuilt ("a league
+  // writes zero bonus rows in v1. A table with no writer invites one. It
+  // arrives with Final Table"). `league_entry_totals.bonus_points` exists but
+  // is never written by any engine.
+  //
+  // This used to go through leagueNotImplemented(), which logged a
+  // console.error on EVERY league pool page load — reporting a designed state
+  // as a defect, filling the dev overlay and the production logs, and teaching
+  // everyone to scroll past that message. When Final Table adds real league
+  // bonuses this becomes a genuine arm; until then silence is the honest answer.
+  if (source === 'league') return []
 
   if (entryIds.length === 0) return []
   const shared =
@@ -387,7 +399,26 @@ export async function readRecentForm(
   source: ScoringSource,
   limit = 5,
 ): Promise<string[]> {
-  if (source === 'league' && leagueNotImplemented('readRecentForm')) return []
+  // The league arm. Same bounded query, different table and a different name
+  // for the ordering column — `league_match_scores` counts fixtures, not
+  // matches. Its score_type CHECK is ('exact','winner_gd','winner','miss'),
+  // which is the same vocabulary the form dots already render.
+  //
+  // This is a real arm rather than the leagueNotImplemented() stub it replaces:
+  // the table is written by every league engine (migrations 055/059/063/066),
+  // so the dots were showing blank on the pools list and the dashboard for
+  // league pools that had scores sitting right there — and logging a
+  // console.error on every one of those page loads to say so.
+  if (source === 'league') {
+    const { data, error } = await admin
+      .from('league_match_scores')
+      .select('score_type, fixture_number')
+      .eq('entry_id', entryId)
+      .order('fixture_number', { ascending: false })
+      .limit(limit)
+    if (error) return []
+    return (data ?? []).reverse().map((s: { score_type: string }) => s.score_type)
+  }
 
   const table = source === 'shadow' ? 'shadow_match_scores' : 'match_scores'
   const { data, error } = await admin

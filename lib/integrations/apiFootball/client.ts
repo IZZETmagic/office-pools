@@ -1,4 +1,6 @@
 import type {
+  ApiFootballStandingRow,
+  ApiFootballStandingsResponse,
   ApiFootballEnvelope,
   ApiFootballEvent,
   ApiFootballFixture,
@@ -195,8 +197,39 @@ export async function getFixturesAllPages(
   return { fixtures: out, calls }
 }
 
+/**
+ * The real league table, from the feed.
+ *
+ * NEW INGESTION PATH (plan §0.3). Until this, the client spoke only /fixtures,
+ * /fixtures/events and /teams.
+ *
+ * ⚠ Checks `errors` and THROWS, like getFixturesAllPages and unlike
+ * getFixtures. api-football answers a refusal — a bad parameter, an exhausted
+ * plan allowance, a season the key cannot see — with **HTTP 200 and a populated
+ * `errors` object**, and an empty `response`. Without this check a refusal is
+ * indistinguishable from "this league has no table", which would silently blank
+ * the standings for every member and, once Table mode ships, silently score
+ * everybody against nothing.
+ *
+ * Returns the FLATTENED rows. `/standings` nests them under
+ * `response[0].league.standings`, and that inner level is an array of groups —
+ * one for a league, several for a cup group stage.
+ */
+export async function getStandings(params: {
+  league: number
+  season: number
+}, opts: ApiFootballRequestOptions = {}): Promise<ApiFootballStandingRow[]> {
+  const env = await request<ApiFootballStandingsResponse>('/standings', params, opts)
+  if (hasEnvelopeErrors(env.errors)) {
+    throw new Error(`api-football /standings refused: ${JSON.stringify(env.errors)}`)
+  }
+  const groups = env.response[0]?.league?.standings ?? []
+  return groups.flat()
+}
+
 export const ApiFootballClient = {
   getFixtures,
+  getStandings,
   getFixtureById,
   getFixtureEvents,
   getTeamsForLeague,

@@ -16,12 +16,20 @@ import { ResultsTab } from './ResultsTab'
 import { BracketResultsTab } from './BracketResultsTab'
 import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
+import { LeagueScoringRulesTab, type LeagueScoringMode } from './LeagueScoringRulesTab'
 import { CommunityTab } from './CommunityTab'
 import { HowToPlayModal } from './HowToPlayModal'
 import { AnalyticsTab } from './AnalyticsTab'
 import { PoolInfoTab } from './PoolInfoTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
 import ProgressivePredictionsFlow from '@/components/predictions/ProgressivePredictionsFlow'
+import LeagueTableTab, { type LeagueStandingRow } from './LeagueTableTab'
+import TablePredictionTab from './TablePredictionTab'
+import DuelsTab from './DuelsTab'
+import SurvivorTab from './SurvivorTab'
+import type { LmsRound, LmsSurvivor, LmsPick } from '@/lib/league/lms'
+import type { DuelRow } from '@/lib/league/duels'
+import type { SeasonClub, TableBreakdownRow } from '@/lib/league/table'
 import { usesRounds } from '@/lib/competitionRounds'
 import BracketPickerFlow from '@/components/predictions/BracketPickerFlow'
 import { EntriesListView } from '@/components/predictions/EntriesListView'
@@ -67,11 +75,65 @@ import { Badge } from '@/components/ui/Badge'
 // =====================
 // TAB DEFINITIONS
 // =====================
+/** Everything SurvivorTab needs, assembled server-side in page.tsx. */
+export type LmsData = {
+  round: LmsRound | null
+  survivors: LmsSurvivor[]
+  myPicks: LmsPick[]
+  clubs: SeasonClub[]
+  entryNames: Map<string, string>
+  entryId: string | null
+  currentMatchweek: number | null
+  roundsWon: Map<string, number>
+}
+
+/** Everything DuelsTab needs, assembled server-side in page.tsx. */
+export type ShowdownData = {
+  duels: DuelRow[]
+  entryNames: Map<string, string>
+  ownEntryIds: string[]
+  currentMatchweek: number | null
+  duelPoints: Map<string, number>
+}
+
+/** Everything TablePredictionTab needs, assembled server-side in page.tsx. */
+export type TableModeData = {
+  entryId: string | null
+  clubs: SeasonClub[]
+  savedOrder: string[]
+  seededOrder: string[]
+  breakdown: TableBreakdownRow[]
+  lockAt: string | null
+  topN: number
+  relegationN: number
+  europaFrom: number | null
+  europaTo: number | null
+  isLocked: boolean
+  joinedAfterLock: boolean
+  /** 'headline_only' scores the bands alone — no per-position arithmetic. */
+  profile: 'full_table' | 'headline_only'
+  /**
+   * What this pool actually charges, for the Scoring Rules screen. Resolved
+   * server-side against `league_pool_settings`' column defaults so the screen
+   * and `league_score_table` cannot disagree.
+   */
+  prices: {
+    exactPoints: number
+    stepPenalty: number
+    championBonus: number
+    topFourBonus: number
+    relegationBonus: number
+    perfectTopFourBonus: number
+  }
+}
+
 type Tab =
   | 'leaderboard'
   | 'predictions'
   | 'results'
   | 'my_bracket'
+  /** Showdown only. Its own key rather than borrowing `my_bracket`, which is a World Cup concept. */
+  | 'duels'
   | 'analytics'
   | 'standings'
   | 'pool_info'
@@ -152,6 +214,25 @@ type PoolDetailProps = {
   isSuperAdminViewing?: boolean
   hasSeenHowToPlay: boolean
   roundStates?: PoolRoundState[]
+  /** League pools only: 'results' swaps the score steppers for one tap per fixture. */
+  leagueDepth?: 'results' | 'scores' | null
+  /** Saved Results picks, keyed by fixture id. Empty unless depth is 'results'. */
+  leagueOutcomes?: Map<string, 'home' | 'draw' | 'away'>
+  /** The real league table, from the feed. Empty for every World Cup pool. */
+  leagueStandings?: LeagueStandingRow[]
+  leagueStandingsAt?: string | null
+  /**
+   * entry_id -> its last five score_types, oldest first. Read from
+   * `league_match_scores`, because `entry_xp_state` — which feeds the form dots
+   * for a World Cup pool — is never written for a league entry.
+   */
+  leagueForm?: Map<string, string[]>
+  /** Level 1 — what kind of league pool this is (plan §0.1). NULL for the World Cup. */
+  leagueMode?: string | null
+  /** Table mode's screen: the clubs, the entry's ordering, and the comparison. */
+  tableModeData?: TableModeData | null
+  showdownData?: ShowdownData | null
+  lmsData?: LmsData | null
   roundSubmissions?: EntryRoundSubmission[]
   bpGroupRankings?: BPGroupRanking[]
   bpThirdPlaceRankings?: BPThirdPlaceRanking[]
@@ -194,6 +275,15 @@ export function PoolDetail({
   isSuperAdminViewing,
   hasSeenHowToPlay,
   roundStates = [],
+  leagueDepth = null,
+  leagueOutcomes,
+  leagueStandings = [],
+  leagueStandingsAt = null,
+  leagueForm,
+  leagueMode = null,
+  tableModeData = null,
+  showdownData = null,
+  lmsData = null,
   roundSubmissions = [],
   bpGroupRankings = [],
   bpThirdPlaceRankings = [],
@@ -259,6 +349,14 @@ export function PoolDetail({
   const [settings, setSettings] = useState(initialSettings)
   // Loaded on demand — see loadBulkData below. Empty until a tab needs them.
   const [allPredictions, setAllPredictions] = useState<PredictionData[]>([])
+  /**
+   * Everyone's Results-depth taps, reveal-gated by the bulk route — a matchweek
+   * that is still open is not in here. Separate from `allPredictions` because
+   * `PredictionData` requires non-null scores and a tap has none.
+   */
+  const [allLeagueOutcomes, setAllLeagueOutcomes] = useState<
+    Array<{ entry_id: string; match_id: string; outcome: 'home' | 'draw' | 'away' }>
+  >([])
   // Stateful so the live delta can be merged in without a full RSC refresh.
   const [matchScores, setMatchScores] = useState<MatchScoreNarrow[]>([])
   const [bulkState, setBulkState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -661,9 +759,14 @@ export function PoolDetail({
     try {
       const res = await fetch(`/api/pools/${pool.pool_id}/bulk`, { cache: 'no-store' })
       if (!res.ok) throw new Error(`bulk ${res.status}`)
-      const data = (await res.json()) as { predictions: PredictionData[]; matchScores: MatchScoreNarrow[] }
+      const data = (await res.json()) as {
+        predictions: PredictionData[]
+        matchScores: MatchScoreNarrow[]
+        outcomes?: Array<{ entry_id: string; match_id: string; outcome: 'home' | 'draw' | 'away' }>
+      }
       setAllPredictions(data.predictions ?? [])
       setMatchScores(data.matchScores ?? [])
+      setAllLeagueOutcomes(data.outcomes ?? [])
       setBulkState('ready')
     } catch {
       // These tabs render empty rather than wrong on failure, and the banner
@@ -992,14 +1095,115 @@ export function PoolDetail({
     away_team: m.away_team ? { country_name: m.away_team.country_name, country_code: m.away_team.country_code, flag_url: m.away_team.flag_url ?? null } : null,
   }))
 
+  const isLeaguePool = pool.league_season_id !== null
+
   const adminTabs = [
-    ...(usesRoundFlow ? [{ key: 'rounds' as Tab, label: 'Rounds' }] : []),
+    // ⚠ No Rounds tab for a league. That panel opens and closes rounds by
+    // writing `pool_round_states`, and a league pool holds ZERO of those rows
+    // BY DESIGN — its matchweeks are DERIVED from `league_matchweeks` on every
+    // read (page.tsx), and which one is open is enforced in the database by
+    // `enforce_league_prediction_before_lock` (migration 058). There is no
+    // admin lever here and there must not be one: the rhythm is self-driving,
+    // and a screen offering to open matchweek 30 in August would be offering
+    // something the database will refuse.
+    ...(usesRoundFlow && !isLeaguePool ? [{ key: 'rounds' as Tab, label: 'Rounds' }] : []),
     { key: 'members' as Tab, label: 'Members' },
     ...(pool.entry_fee ? [{ key: 'fees' as Tab, label: 'Fees' }] : []),
-    { key: 'scoring_config' as Tab, label: 'Scoring Config' },
+    /* ⚠ No Scoring Config for a league either, and this one is hidden because
+       it is DANGEROUS rather than merely useless.
+
+       `league_score_fixture` reads its prices from `pool_settings.group_*`
+       (migration 066), so three of that panel's sliders are live wires — but
+       the panel is labelled for a World Cup. At Results depth the only control
+       that does anything is "Exact Score Match", which sets what a correct
+       CALL is worth (`px_results`), while "Correct Winner Only" — the one that
+       names exactly what members do — is inert. An admin who wants to reprice a
+       correct call reaches for the dead slider, watches it save, and changes
+       nothing. Everything else on the panel (knockout multipliers, PSO, every
+       bonus) writes to columns no league engine reads, under a caption that
+       says a Final called exactly is worth 800 points.
+
+       Not replaced with a league version yet, on purpose: migration 079 says
+       moving the fixture prices onto `league_pool_settings` — with a real
+       `results_correct` column — is the unfinished half of L-D. A config UI
+       built against `pool_settings.group_*` today is a UI L-D would move.
+       Verified safe to hide 2026-08-24: all nine league pools sit at the
+       shipped defaults and `league_pool_settings` holds zero rows, so this
+       strands no one. */
+    ...(isLeaguePool ? [] : [{ key: 'scoring_config' as Tab, label: 'Scoring Config' }]),
     { key: 'settings' as Tab, label: 'Settings' },
   ]
-  const USER_TABS = isBracketPicker ? USER_TABS_BRACKET_PICKER : USER_TABS_DEFAULT
+  // `standings` is commented out of the World Cup lists because there it
+  // duplicates the Form tab. For a LEAGUE it is the actual competition table —
+  // new information, and the one thing a Premier League pool most obviously
+  // ought to show. Inserted after Results, where a football follower looks.
+  // Memoised because the league branch builds a NEW array, and this list feeds
+  // an effect further down — without this it would be a fresh reference on
+  // every render and the effect would re-run for no reason.
+  // Table mode has no fixture picks at all, so Results and Form would both be
+  // empty screens promising something that never arrives. Its Predictions tab
+  // IS the table, renamed to say so.
+  const isTableMode = leagueMode === 'table'
+  // Showdown keeps every Pick'em tab — it is a LAYER over the same weekly picks
+  // — and adds one. That is the difference between a layer and a mode.
+  const isShowdown = leagueMode === 'showdown'
+  // Last Man Standing has its own pick shape and no depth (Decision 9), so it
+  // replaces the Predictions tab rather than adding to it — there are no fixture
+  // picks in this mode at all.
+  const isLms = leagueMode === 'last_man_standing'
+  const USER_TABS = useMemo(
+    () =>
+      isBracketPicker
+        ? USER_TABS_BRACKET_PICKER
+        : isTableMode
+          ? USER_TABS_DEFAULT.flatMap((t) => {
+              if (t.key === 'results' || t.key === 'analytics') return []
+              if (t.key === 'predictions') {
+                return [
+                  { key: 'predictions' as Tab, label: 'My Table' },
+                  { key: 'standings' as Tab, label: 'Table' },
+                ]
+              }
+              return [t]
+            })
+          : isLms
+            ? USER_TABS_DEFAULT.flatMap((t) => {
+                if (t.key === 'results' || t.key === 'analytics') return []
+                if (t.key === 'predictions') {
+                  return [
+                    { key: 'predictions' as Tab, label: 'Survival' },
+                    { key: 'standings' as Tab, label: 'Table' },
+                  ]
+                }
+                return [t]
+              })
+          : isLeaguePool
+            ? USER_TABS_DEFAULT.flatMap((t) => {
+                // No Form tab. Table mode and Last Man Standing already dropped
+                // it; Pick'em and Showdown kept it and should not have, because
+                // it cannot render for ANY league pool — every one of its inputs
+                // is missing, and deliberately so.
+                //
+                // `entryStats` is never written: the league outbox route BLOCKS
+                // XP and badges rather than skipping them, because
+                // `computePoolEntryAnalytics` reads `readMatchScores`, which has
+                // no league arm — running it would compute accuracy and streak
+                // from zero rows and store the zeros, "worse than blank"
+                // (app/api/cron/league-outbox/route.ts). The deferral is already
+                // a recorded decision, plan section 0.5; this finishes it in the
+                // one place it had not been applied.
+                if (t.key === 'analytics') return []
+                if (t.key === 'results') return [t, { key: 'standings' as Tab, label: 'Table' }]
+                // Beside the Leaderboard, because in Showdown the duel IS the
+                // competition and the totals are the tiebreak.
+                if (t.key === 'leaderboard' && isShowdown) {
+                  return [t, { key: 'duels' as Tab, label: 'Duels' }]
+                }
+                return [t]
+              })
+            : USER_TABS_DEFAULT,
+    [isBracketPicker, isLeaguePool, isTableMode, isShowdown, isLms],
+  )
   /**
    * An archived pool is readable, not editable. Nothing stopped an admin
    * opening one and changing its settings or scoring config — the page had no
@@ -1422,10 +1626,17 @@ export function PoolDetail({
                 allBPKnockoutPicks={allBPKnockoutPicks}
                 bpProvisionalScoring={bpProvisionalScoring}
                 tournamentAwards={tournamentAwards}
+                isLeague={isLeaguePool}
+                leagueMode={leagueMode}
+                leagueDepth={leagueDepth}
+                leagueForm={leagueForm}
               />
             )}
 
-            {activeTab === 'analytics' && (
+            {/* Mirrors the strip — ?tab=analytics would otherwise render the
+                panel with empty inputs and show a member 0% accuracy and no
+                streak, which is the wrongness the block above avoids. */}
+            {activeTab === 'analytics' && !isLeaguePool && (
               <AnalyticsTab
                 poolId={pool.pool_id}
                 matches={matches}
@@ -1446,7 +1657,43 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'predictions' && activeEntry && usesRoundFlow && (
+            {/* Table mode's Predictions tab is the table itself. Placed before
+                the three fixture-pick branches and gating them below, so a
+                Table pool cannot fall through into a matchweek picker for
+                fixtures it never predicts. */}
+            {activeTab === 'predictions' && isLms && lmsData && (
+              <SurvivorTab
+                poolId={pool.pool_id}
+                round={lmsData.round}
+                survivors={lmsData.survivors}
+                myPicks={lmsData.myPicks}
+                clubs={lmsData.clubs}
+                entryNames={lmsData.entryNames}
+                entryId={lmsData.entryId}
+                currentMatchweek={lmsData.currentMatchweek}
+                roundsWon={lmsData.roundsWon}
+              />
+            )}
+
+            {activeTab === 'predictions' && isTableMode && tableModeData && (
+              <TablePredictionTab
+                poolId={pool.pool_id}
+                entryId={tableModeData.entryId}
+                clubs={tableModeData.clubs}
+                savedOrder={tableModeData.savedOrder}
+                seededOrder={tableModeData.seededOrder}
+                breakdown={tableModeData.breakdown}
+                lockAt={tableModeData.lockAt}
+                topN={tableModeData.topN}
+                relegationN={tableModeData.relegationN}
+                europaFrom={tableModeData.europaFrom}
+                europaTo={tableModeData.europaTo}
+                isLocked={tableModeData.isLocked}
+                joinedAfterLock={tableModeData.joinedAfterLock}
+              />
+            )}
+
+            {activeTab === 'predictions' && !isTableMode && !isLms && activeEntry && usesRoundFlow && (
               spectatingEntry ? (
                 <ProgressiveSpectatorView
                   ownerName={spectatingEntry.ownerName}
@@ -1531,6 +1778,8 @@ export function PoolDetail({
                       onStatusChange={setPredictionStatus}
                       roundStates={roundStates}
                       roundSubmissions={activeRoundSubmissions}
+                      leagueDepth={leagueDepth}
+                      existingOutcomes={leagueOutcomes}
                     />
                   </div>
                 )
@@ -1549,11 +1798,13 @@ export function PoolDetail({
                   onStatusChange={setPredictionStatus}
                   roundStates={roundStates}
                   roundSubmissions={activeRoundSubmissions}
+                  leagueDepth={leagueDepth}
+                  existingOutcomes={leagueOutcomes}
                 />
               )
             )}
 
-            {activeTab === 'predictions' && activeEntry && isBracketPicker && (
+            {activeTab === 'predictions' && !isTableMode && !isLms && activeEntry && isBracketPicker && (
               spectatingEntry ? (
                 <BracketSpectatorView
                   ownerName={spectatingEntry.ownerName}
@@ -1651,7 +1902,7 @@ export function PoolDetail({
               )
             )}
 
-            {activeTab === 'predictions' && activeEntry && !usesRoundFlow && !isBracketPicker && (
+            {activeTab === 'predictions' && !isTableMode && !isLms && activeEntry && !usesRoundFlow && !isBracketPicker && (
               spectatingEntry ? (
                 <SpectatorEntryView
                   ownerName={spectatingEntry.ownerName}
@@ -1810,6 +2061,20 @@ export function PoolDetail({
               )
             )}
 
+            {activeTab === 'duels' && isShowdown && showdownData && (
+              <DuelsTab
+                duels={showdownData.duels}
+                entryNames={showdownData.entryNames}
+                ownEntryIds={showdownData.ownEntryIds}
+                currentMatchweek={showdownData.currentMatchweek}
+                duelPoints={showdownData.duelPoints}
+              />
+            )}
+
+            {activeTab === 'standings' && isLeaguePool && (
+              <LeagueTableTab rows={leagueStandings} fetchedAt={leagueStandingsAt} />
+            )}
+
             {activeTab === 'results' && !isBracketPicker && (
               <ResultsTab
                 matches={matches}
@@ -1823,6 +2088,9 @@ export function PoolDetail({
                 isAdmin={isAdmin}
                 members={members}
                 allPredictions={allPredictions}
+                isLeaguePool={isLeaguePool}
+                ownLeagueOutcomes={leagueOutcomes}
+                allLeagueOutcomes={allLeagueOutcomes}
                 matchScores={activeEntryScores}
                 currentEntryId={activeEntry?.entry_id || ''}
                 userEntries={entries}
@@ -1849,7 +2117,27 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'standings' && (
+            {/* ⚠ `!isLeaguePool` is load-bearing, not defensive.
+
+                A league pool already renders LeagueTableTab above under this
+                same tab key. Ungated, this block rendered UNDERNEATH it: an
+                empty "Group Standings — no group stage matches have been
+                completed yet", followed by a full Knockout Bracket with R32
+                through FINAL, populated with Premier League clubs paired off
+                against each other.
+
+                It was not reading stale data — page.tsx substitutes the league
+                adapter's output into `matches` and `teams` so the World Cup
+                components keep working, so this had all 380 fixtures and all 20
+                clubs and drew a tournament tree from a competition that has
+                neither groups nor knockouts. "11/380 played" was the giveaway.
+
+                The `standings` key is commented out of USER_TABS_DEFAULT, so a
+                World Cup pool cannot reach this today — which is exactly why it
+                went unnoticed: the only pools that could open the tab were the
+                ones it was wrong for. Gated rather than deleted, because the
+                comment on that line says the tab is *temporarily* hidden. */}
+            {activeTab === 'standings' && !isLeaguePool && (
               <StandingsTab
                 matches={matches}
                 teams={teams}
@@ -1871,9 +2159,35 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'scoring_rules' && (
+            {/* A league is scored by its own engines against its own tables, so
+                it gets its own screen rather than the World Cup's with the
+                groups and knockouts hidden. See LeagueScoringRulesTab's header:
+                the old shared screen did not just show irrelevant cards, it
+                quoted a Results-depth member the wrong price. */}
+            {activeTab === 'scoring_rules' && (isLeaguePool ? (
+              <LeagueScoringRulesTab
+                mode={(leagueMode ?? 'pickem') as LeagueScoringMode}
+                depth={leagueDepth}
+                prices={{
+                  exact: settings?.group_exact_score ?? 100,
+                  goalDifference: settings?.group_correct_difference ?? 75,
+                  result: settings?.group_correct_result ?? 50,
+                }}
+                table={
+                  tableModeData
+                    ? {
+                        ...tableModeData.prices,
+                        topN: tableModeData.topN,
+                        relegationN: tableModeData.relegationN,
+                        profile: tableModeData.profile,
+                      }
+                    : null
+                }
+                clubCount={lmsData?.clubs.length ?? null}
+              />
+            ) : (
               <ScoringRulesTab settings={settings} predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'} />
-            )}
+            ))}
 
             {activeTab === 'community' && (
               <CommunityTab
@@ -1924,7 +2238,11 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'scoring_config' && canAdmin && (
+            {/* Mirrors the strip. Hiding the button alone leaves
+                ?tab=scoring_config rendering the full editable form — the
+                archived-pool lesson, and here it would be an editable form
+                whose live sliders are mislabelled. */}
+            {activeTab === 'scoring_config' && canAdmin && !isLeaguePool && (
               <ScoringTab
                 pool={pool}
                 settings={settings}
@@ -1945,7 +2263,11 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'rounds' && canAdmin && usesRoundFlow && (
+            {/* `!isLeaguePool` mirrors the strip above. Hiding the button is not
+                enough: ?tab=rounds, or tab state left over from another pool,
+                still renders the panel — that is exactly how an archived pool
+                kept showing its editable admin forms. */}
+            {activeTab === 'rounds' && canAdmin && usesRoundFlow && !isLeaguePool && (
               <RoundsTab
                 poolId={pool.pool_id}
                 roundStates={roundStates}

@@ -13,6 +13,10 @@
 //   * progressive — per round, once that round is locked (state locked /
 //     in_progress / complete, or its round deadline has passed). Earlier rounds
 //     reveal while later rounds stay hidden.
+//   * league_pickem — per MATCHWEEK, once that matchweek's own lock_at has
+//     passed. Thirty-eight reveals a season rather than one, which is the point
+//     (plan §0.9: "the league version is stronger"). Clock-only, deliberately —
+//     see the branch itself.
 //
 // Pure functions only — no DB, no ambient clock. `now` is injected so the gate
 // is deterministic and unit-testable, and callers own the clock.
@@ -62,6 +66,33 @@ export function computeReveal(
   if (pool.prediction_mode === 'progressive') {
     const roundKeys = (roundStates ?? [])
       .filter((r) => isRoundLocked(r, now))
+      .map((r) => r.round_key)
+    return roundKeys.length > 0
+      ? { revealed: true, scope: 'rounds', roundKeys }
+      : { revealed: false }
+  }
+
+  if (pool.prediction_mode === 'league_pickem') {
+    // A league matchweek reveals once it has GENUINELY LOCKED — its own
+    // `lock_at` has passed. Two reasons this is its own branch rather than
+    // falling into either of the others:
+    //
+    // 1. The pool-wide branch below never fires for a league. A league pool's
+    //    `prediction_deadline` is the season's LAST kickoff, set that way on
+    //    purpose (create/route.ts) so the whole-entry reveal cannot go off in
+    //    August. Left as it was, a league would reveal nothing all season.
+    //
+    // 2. It is NOT the progressive branch. A league matchweek that has not
+    //    OPENED yet is also mapped to state 'locked' — that is what 'locked'
+    //    means in the World Cup round vocabulary, "not yet open" — so
+    //    `isRoundLocked` would call a matchweek in April revealable in August.
+    //    Nothing would leak today, because migration 058 refuses a pick for any
+    //    matchweek but the open one, so those rounds hold nothing. But that is
+    //    a coincidence of another rule, not a reason, and it would stop being
+    //    true the day "pick ahead" ships. So this branch reads the CLOCK, which
+    //    is the thing the promise was actually made about.
+    const roundKeys = (roundStates ?? [])
+      .filter((r) => isDeadlinePassed(r.deadline, now))
       .map((r) => r.round_key)
     return roundKeys.length > 0
       ? { revealed: true, scope: 'rounds', roundKeys }

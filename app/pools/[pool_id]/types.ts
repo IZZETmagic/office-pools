@@ -26,6 +26,26 @@ export type PoolData = {
    * of it — see drafts/2026-08-22_league_vertical_slice.md §1.
    */
   league_season_id: string | null
+  /**
+   * Level 1 of the league mode structure (plan §0.1): what kind of pool this
+   * is. NULL for the 623 World Cup pools. Immutable after creation.
+   */
+  league_mode: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null
+  /**
+   * Level 2: how deep the picks go, for the two modes that have picks.
+   * NULL for Table and Last Man Standing, and for every World Cup pool.
+   *
+   * It was missing from this type even though `poolData` selects `*` and the
+   * column has existed since migration 064, so page.tsx read it through
+   * `(pool as { league_depth?: … })` — the cast-a-league-into-a-shape-it-is-not
+   * pattern that lib/predictionMode.ts was written to stamp out. Declared here
+   * so callers can just read it.
+   */
+  league_depth: 'results' | 'scores' | null
+  /** Table mode only: what the pool pays for. */
+  league_table_profile: 'full_table' | 'headline_only' | null
+  /** Table mode only: when the finishing-order prediction closes. */
+  league_table_lock_at: string | null
   prediction_deadline: string | null
   prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
   created_at: string

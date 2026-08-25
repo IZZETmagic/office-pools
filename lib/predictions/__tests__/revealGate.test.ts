@@ -216,3 +216,98 @@ describe('gatePoolPredictions', () => {
     expect(out).toEqual([])
   })
 })
+
+// =============================================================
+// league_pickem — the reveal that fires thirty-eight times
+// =============================================================
+// Plan §0.9. The World Cup reveals once, before match one; a league reveals
+// every matchweek, which is what makes it a rhythm rather than an event.
+//
+// The trap these tests exist for is the SECOND one. A league matchweek that has
+// not opened yet is derived as state 'locked' — that is what the word means in
+// the World Cup round vocabulary ("not yet open"), and `pool_round_states` seeds
+// unopened bracket rounds exactly that way. Reusing the progressive branch would
+// therefore have called a matchweek in April revealable in August. Nothing would
+// leak *today*, because migration 058 refuses a pick for any matchweek but the
+// open one — but that is a coincidence of a different rule, and the day "pick
+// ahead" ships it stops being true.
+// =============================================================
+
+const LEAGUE_POOL = {
+  prediction_mode: 'league_pickem' as const,
+  // A league pool's deadline is the season's LAST kickoff, set that way at
+  // creation so the whole-entry reveal can never fire. Held here as a real
+  // future date so the tests prove the branch does not fall through to it.
+  prediction_deadline: FUTURE,
+}
+
+describe('computeReveal — league_pickem', () => {
+  it('reveals nothing while every matchweek is still to come', () => {
+    expect(
+      computeReveal(LEAGUE_POOL, [
+        { round_key: 'mw_1', state: null, deadline: FUTURE },
+        { round_key: 'mw_2', state: null, deadline: FUTURE },
+      ], NOW),
+    ).toEqual({ revealed: false })
+  })
+
+  it('reveals only the matchweeks that have actually locked', () => {
+    const r = computeReveal(LEAGUE_POOL, [
+      { round_key: 'mw_1', state: null, deadline: PAST },
+      { round_key: 'mw_2', state: null, deadline: PAST },
+      { round_key: 'mw_3', state: null, deadline: FUTURE },
+    ], NOW)
+    expect(r).toEqual({ revealed: true, scope: 'rounds', roundKeys: ['mw_1', 'mw_2'] })
+  })
+
+  it('does NOT reveal a future matchweek that is merely in the "locked" state', () => {
+    // The whole reason this is its own branch rather than the progressive one.
+    const r = computeReveal(LEAGUE_POOL, [
+      { round_key: 'mw_1', state: 'completed', deadline: PAST },
+      { round_key: 'mw_2', state: 'open', deadline: FUTURE },
+      { round_key: 'mw_3', state: 'locked', deadline: FUTURE }, // not yet OPEN
+      { round_key: 'mw_38', state: 'locked', deadline: FUTURE },
+    ], NOW)
+    expect(r).toEqual({ revealed: true, scope: 'rounds', roundKeys: ['mw_1'] })
+  })
+
+  it('never reveals the whole entry, whatever the pool deadline says', () => {
+    // If the branch fell through, a league pool whose deadline had passed would
+    // reveal all thirty-eight matchweeks at once — including ones nobody has
+    // reached.
+    const r = computeReveal(
+      { prediction_mode: 'league_pickem', prediction_deadline: PAST },
+      [{ round_key: 'mw_38', state: null, deadline: FUTURE }],
+      NOW,
+    )
+    expect(r).toEqual({ revealed: false })
+  })
+
+  it('gates a Results-depth outcome by exactly the same rule as a scoreline', () => {
+    // Outcomes are picks. They go through gatePoolPredictions unchanged, so a
+    // second implementation of the rule cannot drift away from the first.
+    const reveal = computeReveal(LEAGUE_POOL, [
+      { round_key: 'mw_1', state: null, deadline: PAST },
+      { round_key: 'mw_2', state: null, deadline: FUTURE },
+    ], NOW)
+    const stageById = new Map([['fx1', 'mw_1'], ['fx2', 'mw_2']])
+    const outcomes = [
+      { entry_id: 'mine', match_id: 'fx1', outcome: 'home' },
+      { entry_id: 'mine', match_id: 'fx2', outcome: 'away' },
+      { entry_id: 'theirs', match_id: 'fx1', outcome: 'draw' },
+      { entry_id: 'theirs', match_id: 'fx2', outcome: 'home' },
+    ]
+    const shown = gatePoolPredictions({
+      predictions: outcomes,
+      ownEntryIds: ['mine'],
+      isAdmin: false,
+      reveal,
+      matchStageById: stageById,
+    })
+    // Both of mine, plus only the locked matchweek of theirs.
+    expect(shown).toHaveLength(3)
+    expect(shown.filter((o) => o.entry_id === 'theirs')).toEqual([
+      { entry_id: 'theirs', match_id: 'fx1', outcome: 'draw' },
+    ])
+  })
+})

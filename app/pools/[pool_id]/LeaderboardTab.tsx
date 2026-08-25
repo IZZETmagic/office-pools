@@ -35,6 +35,20 @@ type LeaderboardTabProps = {
   allBPKnockoutPicks?: BPKnockoutPick[]
   bpProvisionalScoring?: boolean
   tournamentAwards?: PodiumResult | null
+  /**
+   * ⚠ A league pool's leaderboard has to drop several columns, and not for
+   * taste — they read `entryStats` (`pool_entry_analytics`), which is NEVER
+   * written for a league entry. XP, badges and analytics are BLOCKED rather
+   * than skipped (app/api/cron/league-outbox/route.ts), because computing them
+   * from zero match scores would store zeros and show a member 0% accuracy
+   * instead of nothing. So awards, levels and streaks are permanently empty
+   * here, and rendering them promises something that cannot arrive.
+   */
+  isLeague?: boolean
+  leagueMode?: string | null
+  leagueDepth?: 'results' | 'scores' | null
+  /** entry_id -> last five score_types, oldest first, from `league_match_scores`. */
+  leagueForm?: Map<string, string[]>
 }
 
 // =============================================
@@ -74,7 +88,24 @@ export function LeaderboardTab({
   allBPKnockoutPicks = [],
   bpProvisionalScoring = false,
   tournamentAwards = null,
+  isLeague = false,
+  leagueMode = null,
+  leagueDepth = null,
+  leagueForm,
 }: LeaderboardTabProps) {
+  // ---- what this pool can actually show -------------------------------
+  // Each of these is "can this ever be non-empty", not "do we like it".
+  //
+  //  awards + levels  need `entry_xp_state` / analytics — never written here.
+  //  bonus            is written ONLY by league_score_table (migration 080), so
+  //                   it is structurally 0 in Pick'em, Showdown and LMS.
+  //  exact_count      at RESULTS depth the engine writes only 'winner' or
+  //                   'miss' (066:184), so "N exact" can never be anything but
+  //                   zero — and "exact" is the wrong word for a tap anyway.
+  const showAwards = !isLeague
+  const showLevels = !isLeague
+  const showBonus = !isLeague || leagueMode === 'table'
+  const isResultsDepth = isLeague && leagueDepth === 'results'
   const isMultiEntry = maxEntriesPerUser > 1
 
   // Flatten members into leaderboard entries (each entry is a row)
@@ -485,6 +516,17 @@ export function LeaderboardTab({
 
   const isBracketPicker = predictionMode === 'bracket_picker'
 
+  /**
+   * One definition for the header and the rows. They were two identical inline
+   * ternaries, which is exactly how a table's header stops lining up with its
+   * body the moment one of them gains a column and the other does not.
+   */
+  const gridCols = isBracketPicker
+    ? 'grid-cols-[3.5rem_1fr_10rem_8rem]'
+    : isLeague
+      ? 'grid-cols-[3.5rem_1fr_8rem_8rem]'
+      : 'grid-cols-[3.5rem_1fr_8rem_10rem_8rem]'
+
   // Read the precomputed stats. These are computed ONCE by the scoring path
   // (lib/analytics/entryAnalytics.ts) and stored per entry; this component used
   // to re-derive them in every browser from every prediction and every score
@@ -557,6 +599,27 @@ export function LeaderboardTab({
       matchNumber: matchdayMVPData.match_number,
     }
   }, [matchdayMVPData, leaderboardEntries, isBracketPicker, isMultiEntry])
+
+  /**
+   * League form dots.
+   *
+   * `entryStatsMap` above is built from `pool_entry_analytics`, which holds no
+   * row for any league entry — so every league member's Form column was a
+   * permanent em-dash. The results themselves were sitting in
+   * `league_match_scores` the whole time; page.tsx now reads them and passes
+   * them in. Merged as a separate map rather than faked into an EntryStats
+   * row, because everything ELSE on that row (streaks, contrarian wins, level)
+   * genuinely is unknown for a league and must stay unknown.
+   */
+  const formByEntry = useMemo(() => {
+    if (!isLeague || !leagueForm) return null
+    return leagueForm
+  }, [isLeague, leagueForm])
+
+  const formFor = (entryId: string): string[] =>
+    formByEntry
+      ? formByEntry.get(entryId) ?? []
+      : entryStatsMap.get(entryId)?.last5 ?? []
 
   // =============================================
   // POOL AWARDS
@@ -1158,8 +1221,23 @@ export function LeaderboardTab({
     )
   }
 
+  /**
+   * Has ANYBODY scored yet?
+   *
+   * Until someone has, every entry is on zero and `sorted` is ordered by the
+   * last rung of the tiebreak — `entry_id`, which is a uuid. A podium built on
+   * that crowns a winner at random and hands two other people a silver and a
+   * bronze they did not earn, from the moment the pool is created. In a league
+   * that state lasts from the day the pool is made until the first matchweek is
+   * scored; in a bracket pool it lasts until the first kickoff.
+   *
+   * Ranking people by nothing is precisely the "bad feelings" the product sets
+   * out not to create, so the podium waits until there is something to rank.
+   */
+  const anyoneHasScored = sorted.some((e) => getPlayerScore(e.entry_id).total_points !== 0)
+
   // Entries after podium (rank 4+)
-  const podiumCount = Math.min(3, sorted.length)
+  const podiumCount = anyoneHasScored ? Math.min(3, sorted.length) : 0
   const afterPodium = sorted.slice(podiumCount)
   const visibleEntries = afterPodium.slice(0, visibleCount)
   const hasMore = visibleCount < afterPodium.length
@@ -1204,8 +1282,22 @@ export function LeaderboardTab({
         </div>
       )}
 
+      {/* Nobody has scored: say so, rather than inventing a leader. */}
+      {!anyoneHasScored && (
+        <div
+          className="rounded-card border border-border-default bg-surface px-4 py-5 text-center"
+          style={{ animation: 'fadeUp 0.3s ease 0.05s both' }}
+        >
+          <p className="t-body text-ink font-semibold">No scores yet</p>
+          <p className="t-body text-muted mt-1">
+            Everyone is level until the first results are in. The table below is in no
+            particular order.
+          </p>
+        </div>
+      )}
+
       {/* Podium */}
-      {sorted.length >= 1 && (() => {
+      {anyoneHasScored && sorted.length >= 1 && (() => {
         const top3 = sorted.slice(0, Math.min(3, sorted.length))
         const podiumOrder = top3.length === 3 ? [top3[1], top3[0], top3[2]] : top3.length === 2 ? [top3[1], top3[0]] : [top3[0]]
         return (
@@ -1268,13 +1360,15 @@ export function LeaderboardTab({
                       <div className="text-[10px] sm:text-xs text-muted text-center truncate w-full">
                         @{getUsername(entry)}
                       </div>
-                      <div className={`mt-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-pill ${getLevelPillClasses(stats?.level ?? 1)}`}>
-                        {stats?.levelName ?? 'Rookie'}
-                      </div>
+                      {showLevels && (
+                        <div className={`mt-1 text-[8px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-pill ${getLevelPillClasses(stats?.level ?? 1)}`}>
+                          {stats?.levelName ?? 'Rookie'}
+                        </div>
+                      )}
 
-                      {!isBracketPicker && stats && stats.last5.length > 0 && (
+                      {!isBracketPicker && formFor(entry.entry_id).length > 0 && (
                         <div className="flex items-center gap-[3px] sm:gap-1 mt-1.5">
-                          {stats.last5.map((type, di) => (
+                          {formFor(entry.entry_id).map((type, di) => (
                             <div
                               key={di}
                               className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-pill ${getFormDotClass(type)}`}
@@ -1294,16 +1388,31 @@ export function LeaderboardTab({
                       >
                         {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                       </div>
-                      <div className="text-[10px] sm:text-xs text-muted mt-1">
-                        {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
-                      </div>
+                      {showBonus && (
+                        <div className="text-[10px] sm:text-xs text-muted mt-1">
+                          {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
+                        </div>
+                      )}
                       <div className="text-[10px] sm:text-xs text-muted">
                         {isBracketPicker ? (() => {
                           const bpStats = bpStatsMap.get(entry.entry_id)
                           return bpStats && bpStats.total > 0
                             ? `${bpStats.correct}/${bpStats.total} correct · ${bpStats.accuracy.toFixed(0)}%`
                             : 'No picks resolved'
-                        })() : `${stats?.exactCount ?? 0} exact · ${stats ? `${stats.hitRate.toFixed(0)}%` : '0%'} rate`}
+                        })()
+                          // A league shows nothing here rather than something
+                          // false. `exactCount` and `hitRate` both come from
+                          // `pool_entry_analytics`, which holds no league row —
+                          // and at Results depth an "exact" cannot exist at all
+                          // (066:184 writes only 'winner' or 'miss'), so the
+                          // line would read "0 exact · 0% rate" forever.
+                          //
+                          // The honest version is `league_entry_totals`'
+                          // `correct_count`, but that would mean widening the
+                          // shared EntryScoring shape that every World Cup pool
+                          // also reads. Worth doing; not worth doing here.
+                          : isLeague ? null
+                          : `${stats?.exactCount ?? 0} exact · ${stats ? `${stats.hitRate.toFixed(0)}%` : '0%'} rate`}
                       </div>
                     </div>
                   </div>
@@ -1326,6 +1435,7 @@ export function LeaderboardTab({
               this row was still showing 🎲 for Contrarian King while the chip
               showed a branching arrow, so the key was describing a glyph that no
               longer existed. */}
+          {showAwards && (
           <div className="flex flex-wrap items-center justify-center gap-x-2.5 sm:gap-x-4 gap-y-1">
             {([
               { type: 'hot', label: 'Hot Streak', tint: 'text-danger-500' },
@@ -1341,11 +1451,17 @@ export function LeaderboardTab({
               </span>
             ))}
           </div>
+          )}
           {/* Driven by getFormDotClass so the key always matches the dots it explains.
               These were previously hand-written with their own colours, which is how a
               legend silently starts lying about the thing above it. */}
           <div className="flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-4 gap-y-1">
-            {FORM_LEGEND.map(([type, label]) => (
+            {/* At Results depth the engine emits only 'winner' or 'miss'
+                (066:184), so keys for Exact and W+GD would describe dots that
+                cannot appear. */}
+            {FORM_LEGEND.filter(([type]) =>
+              !isResultsDepth || type === 'winner' || type === 'miss' || type === 'no_pick',
+            ).map(([type, label]) => (
               <div key={type} className="flex items-center gap-1">
                 <div className={`w-[7px] h-[7px] sm:w-2 sm:h-2 rounded-pill ${getFormDotClass(type)}`} />
                 <span className="text-[10px] sm:text-xs text-muted">{label}</span>
@@ -1364,11 +1480,11 @@ export function LeaderboardTab({
       </p>
 
       {/* Desktop table header */}
-      <div className={`hidden sm:grid ${isBracketPicker ? 'grid-cols-[3.5rem_1fr_10rem_8rem]' : 'grid-cols-[3.5rem_1fr_8rem_10rem_8rem]'} gap-2 px-4 py-2 text-xs font-semibold text-muted uppercase tracking-wider border-b border-border-default`}>
+      <div className={`hidden sm:grid ${gridCols} gap-2 px-4 py-2 text-xs font-semibold text-muted uppercase tracking-wider border-b border-border-default`}>
         <div>Rank</div>
         <div>Player</div>
         {!isBracketPicker && <div className="text-center">Form</div>}
-        <div className="text-center">Awards</div>
+        {showAwards && <div className="text-center">Awards</div>}
         <div className="text-right">Stats</div>
       </div>
 
@@ -1385,7 +1501,7 @@ export function LeaderboardTab({
             <div
               key={entry.entry_id}
               onClick={() => setSelectedEntry(entry)}
-              className={`grid ${isBracketPicker ? 'grid-cols-[3.5rem_1fr_10rem_8rem]' : 'grid-cols-[3.5rem_1fr_8rem_10rem_8rem]'} gap-2 items-center px-4 py-3 cursor-pointer border-b border-border-default last:border-b-0 transition-colors ${
+              className={`grid ${gridCols} gap-2 items-center px-4 py-3 cursor-pointer border-b border-border-default last:border-b-0 transition-colors ${
                 isCurrentUser
                   ? 'bg-primary-50 dark:bg-primary-500/[0.08] border-l-2 border-l-primary-500'
                   : 'hover:bg-surface-secondary'
@@ -1401,8 +1517,13 @@ export function LeaderboardTab({
             >
               {/* Rank */}
               <div className="flex flex-col items-center">
-                <span className={`t-num text-sm ${getRankClasses(rank)}`}>#{rank}</span>
-                {delta !== null && delta !== 0 && (
+                {/* A position nobody earned is not a position. While every entry
+                    is on zero the list is ordered by uuid, so numbering it would
+                    contradict the "no particular order" note above it. */}
+                <span className={`t-num text-sm ${anyoneHasScored ? getRankClasses(rank) : 'text-muted'}`}>
+                  {anyoneHasScored ? `#${rank}` : '—'}
+                </span>
+                {anyoneHasScored && delta !== null && delta !== 0 && (
                   <span className={`text-[10px] font-bold ${delta > 0 ? 'text-success-500' : 'text-danger-500'}`}>
                     {delta > 0 ? '▲' : '▼'}{Math.abs(delta)}
                   </span>
@@ -1423,25 +1544,27 @@ export function LeaderboardTab({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-muted">@{getUsername(entry)}</span>
-                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getLevelPillClasses(stats?.level ?? 1)}`}>
-                    Lv.{stats?.level ?? 1} {stats?.levelName ?? 'Rookie'}
-                  </span>
+                  {showLevels && (
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getLevelPillClasses(stats?.level ?? 1)}`}>
+                      Lv.{stats?.level ?? 1} {stats?.levelName ?? 'Rookie'}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Form dots */}
               {!isBracketPicker && (
                 <div className="flex items-center gap-1 justify-center">
-                  {stats && stats.last5.length > 0 ? (
+                  {formFor(entry.entry_id).length > 0 ? (
                     <>
-                      {stats.last5.map((type, di) => (
+                      {formFor(entry.entry_id).map((type, di) => (
                         <div
                           key={di}
                           className={`w-2.5 h-2.5 rounded-pill ${getFormDotClass(type)}`}
                           style={{ animation: 'dotReveal 0.5s ease both', animationDelay: `${0.15 + di * 0.12}s` }}
                         />
                       ))}
-                      {stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
+                      {stats && stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
                         <span className="ml-1 text-xs">
                           <Icon
                             name={AWARD_ICON[stats.currentStreak.type === 'hot' ? 'hot' : 'cold']}
@@ -1463,6 +1586,7 @@ export function LeaderboardTab({
               )}
 
               {/* Awards */}
+              {showAwards && (
               <div className="flex items-center gap-1 flex-wrap justify-center">
                 {entryAwards.length > 0 ? entryAwards.map((award, ai) => (
                   <span
@@ -1476,6 +1600,7 @@ export function LeaderboardTab({
                   <span className="text-muted dark:text-muted">—</span>
                 )}
               </div>
+              )}
 
               {/* Stats */}
               <div className="text-right">
@@ -1485,10 +1610,12 @@ export function LeaderboardTab({
                 >
                   {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                 </div>
-                <div className="text-[10px] text-muted">
-                  {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
-                </div>
-                {!isBracketPicker && stats && (
+                {showBonus && (
+                  <div className="text-[10px] text-muted">
+                    {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
+                  </div>
+                )}
+                {!isBracketPicker && !isLeague && stats && (
                   <div className="text-[10px] text-muted">
                     {stats.exactCount} exact · {stats.hitRate.toFixed(0)}%
                   </div>
@@ -1537,11 +1664,11 @@ export function LeaderboardTab({
               <div className="flex items-start gap-2.5">
                 {/* Rank column */}
                 <div className="flex-shrink-0 pt-0.5 flex flex-col items-center">
-                  <span className={`inline-flex items-center justify-center w-8 h-8 rounded-chip bg-mist t-num text-sm ${getRankClasses(rank)}`}>
-                    #{rank}
+                  <span className={`inline-flex items-center justify-center w-8 h-8 rounded-chip bg-mist t-num text-sm ${anyoneHasScored ? getRankClasses(rank) : 'text-muted'}`}>
+                    {anyoneHasScored ? `#${rank}` : '—'}
                   </span>
                   <div className="mt-0.5">
-                    {delta !== null && delta !== 0 && (
+                    {anyoneHasScored && delta !== null && delta !== 0 && (
                       <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${delta > 0 ? 'text-success-500' : 'text-danger-500'}`}>
                         {delta > 0 ? '▲' : '▼'}{Math.abs(delta)}
                       </span>
@@ -1566,9 +1693,11 @@ export function LeaderboardTab({
                   {/* Username + Level pill */}
                   <div className="flex items-center gap-1.5">
                     <span className="text-[11px] text-muted truncate">@{getUsername(entry)}</span>
-                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getLevelPillClasses(stats?.level ?? 1)}`}>
-                      Lv.{stats?.level ?? 1} {stats?.levelName ?? 'Rookie'}
-                    </span>
+                    {showLevels && (
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-pill ${getLevelPillClasses(stats?.level ?? 1)}`}>
+                        Lv.{stats?.level ?? 1} {stats?.levelName ?? 'Rookie'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Awards */}
@@ -1587,11 +1716,11 @@ export function LeaderboardTab({
                   )}
 
                   {/* Form dots */}
-                  {!isBracketPicker && stats && stats.last5.length > 0 && (
+                  {!isBracketPicker && formFor(entry.entry_id).length > 0 && (
                     <div className="flex items-center gap-1 mt-1.5">
                       <span className="text-[9px] font-semibold text-muted uppercase tracking-wide">Form</span>
                       <div className="flex items-center gap-[3px]">
-                        {stats.last5.map((type, di) => (
+                        {formFor(entry.entry_id).map((type, di) => (
                           <div
                             key={di}
                             className={`w-2 h-2 rounded-pill ${getFormDotClass(type)}`}
@@ -1599,7 +1728,7 @@ export function LeaderboardTab({
                           />
                         ))}
                       </div>
-                      {stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
+                      {stats && stats.currentStreak.type !== 'none' && stats.currentStreak.length >= 3 && (
                         <span className="ml-0.5 text-[10px]">
                           <Icon
                             name={AWARD_ICON[stats.currentStreak.type === 'hot' ? 'hot' : 'cold']}
@@ -1625,10 +1754,12 @@ export function LeaderboardTab({
                   >
                     {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
                   </div>
-                  <div className="text-[10px] text-muted">
-                    {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
-                  </div>
-                  {!isBracketPicker && stats && (
+                  {showBonus && (
+                    <div className="text-[10px] text-muted">
+                      {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
+                    </div>
+                  )}
+                  {!isBracketPicker && !isLeague && stats && (
                     <div className="text-[10px] text-muted mt-0.5">
                       {stats.exactCount} exact · {stats.hitRate.toFixed(0)}%
                     </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
+import { readAllLeaguePredictions, readLeagueRevealContext } from '@/lib/league/read'
 import {
   computeReveal,
   filterRevealedPredictions,
@@ -65,7 +66,7 @@ async function handleGET(
   // 3. Pool — mode + deadline drive the reveal gate.
   const { data: pool } = await supabase
     .from('pools')
-    .select('pool_id, tournament_id, prediction_mode, prediction_deadline')
+    .select('pool_id, tournament_id, prediction_mode, prediction_deadline, league_season_id')
     .eq('pool_id', pool_id)
     .single()
   if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
@@ -104,8 +105,19 @@ async function handleGET(
   const adminClient = createAdminClient()
   const mode = pool.prediction_mode as PredictionMode
 
+  // A league pool derives its round states from `league_matchweeks` — it has no
+  // `pool_round_states` rows — and the gate reveals per MATCHWEEK, thirty-eight
+  // times a season rather than once.
+  const leagueSeasonId = (pool as { league_season_id?: string | null }).league_season_id ?? null
+
   let roundStates: RevealRoundState[] = []
-  if (mode === 'progressive') {
+  let leagueStageById: Map<string, string> | null = null
+  if (leagueSeasonId) {
+    const ctx = await readLeagueRevealContext(adminClient, leagueSeasonId)
+    if (ctx.error) console.error('[entry predictions] league reveal context failed:', ctx.error)
+    roundStates = ctx.roundStates as RevealRoundState[]
+    leagueStageById = ctx.stageById
+  } else if (mode === 'progressive') {
     const { data } = await adminClient
       .from('pool_round_states')
       .select('round_key, state, deadline')
@@ -169,8 +181,29 @@ async function handleGET(
     })
   }
 
-  // 7. Score modes (full_tournament / progressive): predictions, filtered to
-  //    revealed rounds for progressive.
+  // 7a. A league entry: picks live in `league_predictions`, and a Results-depth
+  //     pick is a TAP with no scoreline, so outcomes ride alongside rather than
+  //     being forced into the scoreline shape.
+  if (leagueSeasonId) {
+    const { predictions: leaguePicks, outcomes, error } =
+      await readAllLeaguePredictions(adminClient, [entry_id])
+    if (error) console.error('[entry predictions] league predictions failed:', error)
+
+    const stageById = leagueStageById ?? new Map<string, string>()
+    const shownPicks = filterRevealedPredictions(
+      leaguePicks as unknown as PredictionRow[], reveal, stageById,
+    )
+    const shownOutcomes = filterRevealedPredictions(outcomes, reveal, stageById)
+
+    return NextResponse.json({
+      ...base,
+      predictions: shownPicks,
+      outcomes: shownOutcomes.map((o) => ({ match_id: o.match_id, outcome: o.outcome })),
+    })
+  }
+
+  // 7b. Score modes (full_tournament / progressive): predictions, filtered to
+  //     revealed rounds for progressive.
   const { data: predictionsRaw } = await adminClient
     .from('predictions')
     .select(

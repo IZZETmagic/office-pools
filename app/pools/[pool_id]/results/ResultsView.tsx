@@ -51,6 +51,7 @@ export function ResultsView({
   matches,
   poolSettings,
   predictionMode,
+  isLeague = false,
   // Group standings comparison props
   rawMatches,
   teams,
@@ -69,6 +70,8 @@ export function ResultsView({
   matches: ResultMatch[]
   poolSettings: PoolSettings
   predictionMode: 'full_tournament' | 'progressive' | 'bracket_picker'
+  /** Clubs carry a crest where nations carry a flag — see TeamBadge in MatchCard. */
+  isLeague?: boolean
   // Group standings comparison props
   rawMatches: MatchData[]
   teams: TeamData[]
@@ -85,6 +88,16 @@ export function ResultsView({
   onEntryChange?: (entryId: string) => void
 }) {
   const [stageTab, setStageTab] = useState<StageTab>('all')
+  /**
+   * A league has ONE stage — every fixture is `regular_season` — so the round
+   * filter would offer six World Cup rounds that each match nothing. Hidden
+   * when the fixture list has only one stage in it, which is exactly that case
+   * and never the World Cup's, whose full schedule is seeded up front.
+   */
+  const hasMultipleStages = useMemo(
+    () => new Set(matches.map((m) => m.stage)).size > 1,
+    [matches],
+  )
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [groupFilter, setGroupFilter] = useState<string>('all')
 
@@ -179,19 +192,21 @@ export function ResultsView({
           {/* Filters, pushed right. ml-auto sits on the group, not on the last
               select, so the three stay together when the row wraps. */}
           <div className="flex flex-wrap items-center gap-2 ml-auto">
-            <Select
-              value={stageTab}
-              onChange={(e) => {
-                const next = e.target.value as StageTab
-                setStageTab(next)
-                if (next !== 'group') setGroupFilter('all')
-              }}
-              aria-label="Filter by round"
-            >
-              {STAGE_TABS.map((tab) => (
-                <option key={tab.key} value={tab.key}>{tab.label}</option>
-              ))}
-            </Select>
+            {hasMultipleStages && (
+              <Select
+                value={stageTab}
+                onChange={(e) => {
+                  const next = e.target.value as StageTab
+                  setStageTab(next)
+                  if (next !== 'group') setGroupFilter('all')
+                }}
+                aria-label="Filter by round"
+              >
+                {STAGE_TABS.map((tab) => (
+                  <option key={tab.key} value={tab.key}>{tab.label}</option>
+                ))}
+              </Select>
+            )}
 
             <Select
               value={statusFilter}
@@ -287,6 +302,7 @@ export function ResultsView({
                 predictionMode={predictionMode}
                 index={i}
                 storedScore={matchScoreByMatchId.get(match.match_id) ?? null}
+                isLeague={isLeague}
               />
             ))}
           </div>
@@ -313,6 +329,7 @@ export function ResultsView({
                       match={match}
                       predictionMode={predictionMode}
                       storedScore={matchScoreByMatchId.get(match.match_id) ?? null}
+                      isLeague={isLeague}
                     />
                   ))}
                 </tbody>

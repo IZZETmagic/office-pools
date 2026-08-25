@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { withPerfLogging } from '@/lib/api-perf'
+import { createAdminClient } from '@/lib/supabase/server'
+import { retireEntries } from '@/lib/entries/retire'
 
 // Shape returned by `pool_entries` SELECT with `pool_members!inner(...)` join.
 // Supabase's TS inference types this as an array or object depending on the FK,
@@ -83,6 +85,16 @@ async function handlePOST(
     // Business errors from the RPC (RAISE EXCEPTION with P0001) → 400
     // Not-found (P0002) → 404. Everything else → 500.
     const code = (error as { code?: string }).code
+    // SP011 = the pool is at its tier's per-person entry cap (migration 075,
+    // trg_pool_entry_tier_cap). 409, not 400: the request was well-formed and
+    // the caller did nothing wrong — the pool's tier is the reason, and the
+    // fix is an upgrade rather than a different request.
+    if (code === 'SP011') {
+      return NextResponse.json(
+        { error: error.message, reason: 'entry_cap_reached' },
+        { status: 409 },
+      )
+    }
     if (code === 'P0001') {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
@@ -175,6 +187,30 @@ async function handleDELETE(
     return NextResponse.json({ error: 'Cannot delete a submitted entry' }, { status: 400 })
   }
 
+  // ⚠ That guard is BLIND TO LEAGUE ENTRIES, and it is the sharpest edge of the
+  // four deletion doors.
+  //
+  // `has_submitted_predictions` is one of the two columns the league write path
+  // deliberately NEVER SETS — they are the only doors by which a league entry
+  // reaches the World Cup scoring selectors, and a test asserts they stay
+  // untouched. So for a league entry the guard above is permanently false, and
+  // this endpoint would happily discard an entry holding 38 matchweeks of picks
+  // in the belief it was throwing away an empty spare.
+  //
+  // Ask league_predictions directly instead of trusting the World-Cup-shaped
+  // flag.
+  const { count: leaguePicks } = await supabase
+    .from('league_predictions')
+    .select('prediction_id', { count: 'exact', head: true })
+    .eq('entry_id', entryId)
+
+  if ((leaguePicks ?? 0) > 0) {
+    return NextResponse.json(
+      { error: 'Cannot delete an entry that has predictions' },
+      { status: 400 },
+    )
+  }
+
   // Don't allow deleting the last entry
   const { count } = await supabase
     .from('pool_entries')
@@ -185,14 +221,19 @@ async function handleDELETE(
     return NextResponse.json({ error: 'Cannot delete your only entry' }, { status: 400 })
   }
 
-  const { error } = await supabase
-    .from('pool_entries')
-    .delete()
-    .eq('entry_id', entryId)
+  // Retire rather than delete — migration 056. Even a genuinely empty spare
+  // goes through the same door as everything else, so there is exactly one
+  // answer to "what happens when an entry goes away".
+  const { error: retireError } = await retireEntries(
+    createAdminClient(),
+    { entryIds: [entryId] },
+    'spare',
+    userData.user_id,
+  )
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (retireError) return NextResponse.json({ error: retireError }, { status: 500 })
 
-  return NextResponse.json({ deleted: true })
+  return NextResponse.json({ deleted: true, retired: true })
 }
 
 export const GET = withPerfLogging('/api/pools/[id]/entries', handleGET)

@@ -150,7 +150,7 @@ async function handlePOST(
   // Check pool deadline
   const { data: pool } = await supabase
     .from('pools')
-    .select('prediction_deadline, prediction_mode, league_season_id')
+    .select('prediction_deadline, prediction_mode, league_season_id, league_depth')
     .eq('pool_id', pool_id)
     .single()
 
@@ -258,14 +258,41 @@ async function handlePOST(
   // error, the row simply is not written, so the route reads back rather than
   // assuming.
   if (pool?.league_season_id) {
+    // Results depth stores a TAP, Scores depth stores a scoreline, and the two
+    // are mutually exclusive in the database (league_predictions_shape_ck).
+    //
+    // ⚠ The shape is enforced against the POOL'S DEPTH here, not just against
+    // the CHECK. A scoreline reaching a Results pool would satisfy the CHECK
+    // perfectly — and then score zero forever, because the engine's Results arm
+    // compares `predicted_outcome = <actual>` and a NULL comparison is never
+    // true. The member would be silently unscoreable with no error anywhere.
+    // Depth is immutable per pool, so this is a fixed expectation, not a guess.
+    const wantsOutcome = pool.league_depth === 'results'
+    type Incoming = { matchId: string; homeScore?: number; awayScore?: number; outcome?: string }
+    const rows = predictions as Incoming[]
+
+    const wrongShape = rows.filter((p) =>
+      wantsOutcome ? p.outcome == null : p.outcome != null,
+    )
+    if (wrongShape.length > 0) {
+      return NextResponse.json(
+        {
+          error: wantsOutcome
+            ? 'This pool is played by picking a winner, not a scoreline.'
+            : 'This pool is played by predicting the score, not just a winner.',
+        },
+        { status: 400 },
+      )
+    }
+
     const result = await saveLeaguePredictions(supabase, {
       entryId,
       seasonId: pool.league_season_id as string,
-      picks: predictions.map((p: { matchId: string; homeScore: number; awayScore: number }) => ({
-        matchId: p.matchId,
-        homeScore: p.homeScore,
-        awayScore: p.awayScore,
-      })),
+      picks: rows.map((p) =>
+        wantsOutcome
+          ? { matchId: p.matchId, outcome: p.outcome as 'home' | 'draw' | 'away' }
+          : { matchId: p.matchId, homeScore: p.homeScore as number, awayScore: p.awayScore as number },
+      ),
     })
 
     if (result.error) {

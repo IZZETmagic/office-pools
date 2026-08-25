@@ -60,7 +60,7 @@ type FixtureRow = {
   is_completed: boolean
 }
 
-type MatchweekRow = {
+export type MatchweekRow = {
   matchweek_id: string
   matchweek_number: number
   fixture_count: number
@@ -154,6 +154,41 @@ function fixtureToMatch(
   }
 }
 
+const isMatchweekDone = (mw: MatchweekRow) =>
+  mw.fixture_count === 0 || mw.completed_fixture_count >= mw.fixture_count
+
+const isMatchweekLocked = (mw: MatchweekRow, now: number) =>
+  mw.lock_at !== null && Date.parse(mw.lock_at) <= now
+
+/**
+ * Which single matchweek is open for picks right now.
+ *
+ * Decision 16: **strictly one matchweek open at a time**, and matchweek N opens
+ * the moment N−1 locks. Both fall out of one rule — the open matchweek is the
+ * EARLIEST one that is neither locked nor finished. Nothing schedules that and
+ * nothing stores it: the instant N−1's `lock_at` passes, N becomes the earliest
+ * unlocked matchweek and is open by definition. No cron, no admin button, no
+ * state to drift.
+ *
+ * That is the point of the rule. Over 38 matchweeks and ten months, anything
+ * needing a person to press a button is 38 chances for a pool to die in
+ * December because its admin lost interest.
+ *
+ * Returns null once the season is over.
+ */
+export function openMatchweekId(rows: MatchweekRow[], now: number): string | null {
+  const inOrder = [...rows].sort((a, b) => a.matchweek_number - b.matchweek_number)
+  for (const mw of inOrder) {
+    if (isMatchweekDone(mw)) continue
+    // A locked-but-unfinished matchweek is SKIPPED, not returned. Postponements
+    // mean a matchweek can sit locked with fixtures still to play for weeks, and
+    // that must not hold the whole season shut behind it.
+    if (isMatchweekLocked(mw, now)) continue
+    return mw.matchweek_id
+  }
+  return null
+}
+
 /**
  * A matchweek rendered as a `PoolRoundState`.
  *
@@ -167,18 +202,38 @@ function fixtureToMatch(
  *                                        to predict and must not invite picks)
  *   completed_fixture_count = count   -> 'completed'
  *   lock_at <= now                    -> 'locked'
- *   otherwise                         -> 'open'
+ *   the earliest of whatever is left  -> 'open'
+ *   everything after it               -> 'locked'
  *
- * Every matchweek whose lock is still in the future is OPEN. A league is not a
- * cascade: week 30 is predictable in August, which is the whole difference from
- * a bracket.
+ * ⚠ CHANGED — this used to open EVERY matchweek whose lock was in the future,
+ * on the reasoning that "week 30 is predictable in August, which is the whole
+ * difference from a bracket". That was deliberate and it is now overruled by
+ * Ryan's decision 16: one at a time. The accepted cost, recorded rather than
+ * re-argued: somebody away for a fortnight cannot work ahead and scores zero for
+ * two weeks. Letting people pick ahead again is a DISPLAY rule, not a data one,
+ * so nothing here closes that door.
+ *
+ * ⚠ `'locked'` now carries two meanings — "its deadline passed" and "its turn
+ * has not come". That is not new vocabulary: the World Cup already seeds every
+ * unopened bracket round `'locked'` (lib/poolRoundStates.ts). But it matters for
+ * one caller. `computeReveal` treats a *progressive* round as revealable once
+ * its state is locked/in_progress/completed — so if `league_pickem` is ever
+ * added to that branch, every future matchweek would reveal everyone's picks on
+ * day one. It is safe TODAY only because league pools fall through to the
+ * pool-wide deadline gate. Whoever builds the weekly reveal must gate on the
+ * deadline having actually passed, not on the state string.
  */
-function matchweekToRoundState(mw: MatchweekRow, poolId: string, now: number): PoolRoundState {
-  const locked = mw.lock_at !== null && Date.parse(mw.lock_at) <= now
+function matchweekToRoundState(
+  mw: MatchweekRow,
+  poolId: string,
+  now: number,
+  openId: string | null,
+): PoolRoundState {
+  const locked = isMatchweekLocked(mw, now)
   const empty = mw.fixture_count === 0
   const allDone = mw.fixture_count > 0 && mw.completed_fixture_count >= mw.fixture_count
 
-  const state = empty || allDone ? 'completed' : locked ? 'locked' : 'open'
+  const state = empty || allDone ? 'completed' : mw.matchweek_id === openId ? 'open' : 'locked'
 
   return {
     // Synthetic id: these rows are DERIVED and have no database identity. The
@@ -253,13 +308,17 @@ export async function readLeaguePoolView(
   const teams = ((clubs ?? []) as unknown as ClubRow[]).map(clubToTeam)
   const clubById = new Map(teams.map((t) => [t.team_id, t]))
 
+  // Which matchweek is open is a fact about the whole list, so it is resolved
+  // once here rather than re-derived for each of the 38 rows below.
+  const openId = openMatchweekId(matchweekRows, now)
+
   return {
     view: {
       teams,
       matches: fixtures.map((f) =>
         fixtureToMatch(f, numberByMatchweekId.get(f.matchweek_id)!, args.tournamentId, clubById),
       ),
-      roundStates: matchweekRows.map((m) => matchweekToRoundState(m, args.poolId, now)),
+      roundStates: matchweekRows.map((m) => matchweekToRoundState(m, args.poolId, now, openId)),
       matchweekCount: matchweekRows.length,
     },
     error: null,
@@ -275,29 +334,52 @@ export async function readLeaguePoolView(
 export async function readLeaguePredictions(
   supabase: SupabaseClient,
   entryId: string,
-): Promise<{ predictions: ExistingPrediction[]; error: string | null }> {
+): Promise<{
+  predictions: ExistingPrediction[]
+  /**
+   * Results-depth picks, keyed by fixture id. Returned SEPARATELY rather than
+   * folded into `predictions`, and that is a deliberate boundary: a Results pick
+   * has no scoreline, so carrying it as an `ExistingPrediction` would mean
+   * making `predicted_home_score` nullable on a type the World Cup shares — a
+   * hole in the World Cup schema to serve a league feature, which is exactly
+   * what Ryan's 2026-08-15 split forbids.
+   *
+   * The Results screen is a different control anyway (three-way segmented, not
+   * two steppers), so it never needs to travel through `Prediction`.
+   */
+  outcomes: Map<string, 'home' | 'draw' | 'away'>
+  error: string | null
+}> {
   // ExistingPrediction, not Prediction: these are real stored rows, so
   // `prediction_id` is always present. The looser type would make the page cast.
   const out: ExistingPrediction[] = []
+  const outcomes = new Map<string, 'home' | 'draw' | 'away'>()
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from('league_predictions')
-      .select('prediction_id, fixture_id, predicted_home_score, predicted_away_score')
+      .select('prediction_id, fixture_id, predicted_home_score, predicted_away_score, predicted_outcome')
       .eq('entry_id', entryId)
       .range(from, from + 999)
-    if (error) return { predictions: [], error: `league_predictions: ${error.message}` }
+    if (error) return { predictions: [], outcomes, error: `league_predictions: ${error.message}` }
     const page = (data ?? []) as unknown as Array<{
       prediction_id: string
       fixture_id: string
-      predicted_home_score: number
-      predicted_away_score: number
+      // Nullable since migration 064: a Results pick carries an outcome instead.
+      predicted_home_score: number | null
+      predicted_away_score: number | null
+      predicted_outcome: 'home' | 'draw' | 'away' | null
     }>
     for (const p of page) {
+      // Exactly one shape per row — the database guarantees it (shape_ck).
+      if (p.predicted_outcome !== null) {
+        outcomes.set(p.fixture_id, p.predicted_outcome)
+        continue
+      }
       out.push({
         prediction_id: p.prediction_id,
         match_id: p.fixture_id,
-        predicted_home_score: p.predicted_home_score,
-        predicted_away_score: p.predicted_away_score,
+        predicted_home_score: p.predicted_home_score as number,
+        predicted_away_score: p.predicted_away_score as number,
         predicted_home_pso: null,
         predicted_away_pso: null,
         predicted_winner_team_id: null,
@@ -305,7 +387,7 @@ export async function readLeaguePredictions(
     }
     if (page.length < 1000) break
   }
-  return { predictions: out, error: null }
+  return { predictions: out, outcomes, error: null }
 }
 
 /**
@@ -321,8 +403,19 @@ export function deriveRoundSubmissions(
   entryId: string,
   matches: MatchData[],
   predictions: Prediction[],
+  /**
+   * Results-depth picks, keyed by fixture id (migration 064). Optional because
+   * every Scores pool and every World Cup pool has none.
+   *
+   * ⚠ Without this a RESULTS pool would never show a matchweek as submitted:
+   * its picks are all taps, so `predictions` is legitimately empty and the
+   * count below would be 0 out of 10 forever. Derived from the picks, never
+   * from a flag — which means it has to see BOTH kinds of pick.
+   */
+  outcomes?: Map<string, unknown>,
 ): EntryRoundSubmission[] {
-  const predicted = new Set(predictions.map((p) => p.match_id))
+  const predicted = new Set<string>(predictions.map((p) => p.match_id))
+  if (outcomes) for (const id of outcomes.keys()) predicted.add(id)
   const byRound = new Map<string, { total: number; done: number }>()
   for (const m of matches) {
     // Group by the MATCHWEEK, not by `stage`. Every league fixture carries
@@ -354,4 +447,241 @@ export function deriveRoundSubmissions(
     }
   }
   return out
+}
+
+/**
+ * The real league table, as ingested from the feed (migration 075).
+ *
+ * Joined to `league_clubs` for the name and crest, and ordered by the FEED'S
+ * rank — never re-sorted here. That rank already applies the competition's own
+ * tiebreakers, including head-to-head, and re-deriving the order in the client
+ * is exactly the mistake plan §0.3 exists to prevent.
+ */
+export async function readLeagueStandings(
+  supabase: SupabaseClient,
+  seasonId: string,
+): Promise<{
+  rows: Array<{
+    club_id: string; club_name: string; crest_url: string | null
+    rank: number; points: number; played: number; won: number; drawn: number; lost: number
+    goals_for: number; goals_against: number; goals_diff: number
+    form: string | null; description: string | null
+    movement: 'up' | 'down' | 'same' | null
+  }>
+  fetchedAt: string | null
+  error: string | null
+}> {
+  const { data, error } = await supabase
+    .from('league_standings')
+    .select('club_id, rank, points, played, won, drawn, lost, goals_for, goals_against, goals_diff, form, description, movement, fetched_at, league_clubs!inner(name, crest_url)')
+    .eq('season_id', seasonId)
+    .order('rank', { ascending: true })
+
+  if (error) return { rows: [], fetchedAt: null, error: `league_standings: ${error.message}` }
+
+  const raw = (data ?? []) as unknown as Array<Record<string, unknown> & {
+    league_clubs: { name: string; crest_url: string | null } | null
+  }>
+
+  return {
+    rows: raw.map((s) => ({
+      club_id: s.club_id as string,
+      club_name: s.league_clubs?.name ?? 'Unknown',
+      crest_url: s.league_clubs?.crest_url ?? null,
+      rank: s.rank as number,
+      points: s.points as number,
+      played: s.played as number,
+      won: s.won as number,
+      drawn: s.drawn as number,
+      lost: s.lost as number,
+      goals_for: s.goals_for as number,
+      goals_against: s.goals_against as number,
+      goals_diff: s.goals_diff as number,
+      form: (s.form as string | null) ?? null,
+      description: (s.description as string | null) ?? null,
+      movement: (s.movement as 'up' | 'down' | 'same' | null) ?? null,
+    })),
+    fetchedAt: (raw[0]?.fetched_at as string | undefined) ?? null,
+    error: null,
+  }
+}
+
+// =============================================================
+// THE WEEKLY REVEAL — plan §0.9
+// =============================================================
+// "See everyone's picks after lock" got strong feedback on the World Cup, where
+// it fires ONCE, before match one. The league version fires thirty-eight times,
+// which is the whole difference: in a tournament the reveal is an event, and in
+// a league it is a rhythm.
+//
+// The gate itself lives in `lib/predictions/revealGate.ts` and is shared with
+// the World Cup. These two functions supply the league's half of its inputs —
+// which matchweeks have locked, and everybody's picks — because a league pool
+// keeps neither in the tables the World Cup path reads: it has no
+// `pool_round_states` rows (its round states are derived, not stored) and its
+// picks are in `league_predictions`, not `predictions`.
+// =============================================================
+
+/**
+ * Round states shaped for the reveal gate, plus the fixture → matchweek map the
+ * gate needs to filter individual picks.
+ *
+ * `state` is deliberately left NULL. The gate's league branch reads only the
+ * deadline, and handing it the derived state string would be handing it a word
+ * that means "not yet open" for future matchweeks and "closed" for past ones —
+ * see the branch's own comment.
+ */
+export async function readLeagueRevealContext(
+  supabase: SupabaseClient,
+  seasonId: string,
+): Promise<{
+  roundStates: Array<{ round_key: string; state: null; deadline: string | null }>
+  stageById: Map<string, string>
+  error: string | null
+}> {
+  const empty = { roundStates: [], stageById: new Map<string, string>(), error: null }
+
+  const { data: mws, error: mwErr } = await supabase
+    .from('league_matchweeks')
+    .select('matchweek_id, matchweek_number, lock_at')
+    .eq('season_id', seasonId)
+    .order('matchweek_number')
+  if (mwErr) return { ...empty, error: `league_matchweeks: ${mwErr.message}` }
+
+  const rows = (mws ?? []) as Array<{ matchweek_id: string; matchweek_number: number; lock_at: string | null }>
+  const keyByMatchweek = new Map(rows.map((m) => [m.matchweek_id, matchweekKey(m.matchweek_number)]))
+
+  const stageById = new Map<string, string>()
+  // Paged: 380 fixtures today, but a 24-club division is 552 and the PostgREST
+  // cap is silent at 1,000.
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('league_fixtures')
+      .select('fixture_id, matchweek_id')
+      .eq('season_id', seasonId)
+      .range(from, from + 999)
+    if (error) return { ...empty, error: `league_fixtures: ${error.message}` }
+    const page = (data ?? []) as Array<{ fixture_id: string; matchweek_id: string }>
+    for (const f of page) {
+      const key = keyByMatchweek.get(f.matchweek_id)
+      if (key) stageById.set(f.fixture_id, key)
+    }
+    if (page.length < 1000) break
+  }
+
+  return {
+    roundStates: rows.map((m) => ({
+      round_key: matchweekKey(m.matchweek_number),
+      state: null,
+      deadline: m.lock_at,
+    })),
+    stageById,
+    error: null,
+  }
+}
+
+/**
+ * Everybody's league picks, in the shape the pool-wide surfaces already consume.
+ *
+ * Outcomes come back SEPARATELY, exactly as `readLeaguePredictions` does it for
+ * a single entry: `PredictionData` requires non-null scores, and a Results pick
+ * has none. Widening that type would put a nullable hole through four World Cup
+ * call sites to describe a league concept — the thing phase 5 already declined
+ * to do.
+ */
+export async function readAllLeaguePredictions(
+  supabase: SupabaseClient,
+  entryIds: string[],
+): Promise<{
+  predictions: ExistingPrediction[]
+  outcomes: Array<{ entry_id: string; match_id: string; outcome: 'home' | 'draw' | 'away' }>
+  error: string | null
+}> {
+  const out: ExistingPrediction[] = []
+  const outcomes: Array<{ entry_id: string; match_id: string; outcome: 'home' | 'draw' | 'away' }> = []
+  if (entryIds.length === 0) return { predictions: out, outcomes, error: null }
+
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('league_predictions')
+      .select('prediction_id, entry_id, fixture_id, predicted_home_score, predicted_away_score, predicted_outcome')
+      .in('entry_id', entryIds)
+      .order('entry_id', { ascending: true })
+      .order('fixture_id', { ascending: true })
+      .range(from, from + 999)
+    if (error) return { predictions: [], outcomes: [], error: `league_predictions: ${error.message}` }
+    const page = (data ?? []) as unknown as Array<{
+      prediction_id: string
+      entry_id: string
+      fixture_id: string
+      predicted_home_score: number | null
+      predicted_away_score: number | null
+      predicted_outcome: 'home' | 'draw' | 'away' | null
+    }>
+    for (const p of page) {
+      if (p.predicted_outcome !== null) {
+        outcomes.push({ entry_id: p.entry_id, match_id: p.fixture_id, outcome: p.predicted_outcome })
+        continue
+      }
+      out.push({
+        prediction_id: p.prediction_id,
+        entry_id: p.entry_id,
+        match_id: p.fixture_id,
+        predicted_home_score: p.predicted_home_score as number,
+        predicted_away_score: p.predicted_away_score as number,
+        predicted_home_pso: null,
+        predicted_away_pso: null,
+        predicted_winner_team_id: null,
+      } as ExistingPrediction)
+    }
+    if (page.length < 1000) break
+  }
+  return { predictions: out, outcomes, error: null }
+}
+
+/**
+ * The last N results per entry, for the leaderboard's form dots.
+ *
+ * ⚠ NOT the same read as `readRecentForm` in lib/scoring/readSource. That one
+ * answers "this ONE entry's last five" for the pool-list and dashboard cards,
+ * bounded per entry. This answers it for EVERY entry in a pool at once, which
+ * is a different query shape — one round trip instead of one per member.
+ *
+ * ## The 1,000-row cap is handled by ordering, not by hoping
+ *
+ * `league_match_scores` grows to (entries × fixtures) — 3,800 rows for a
+ * ten-person pool by May, well past PostgREST's silent 1,000-row ceiling. So
+ * this orders by `fixture_number DESC` and takes the top slice: the newest rows
+ * are exactly the ones form needs, and truncation removes only ancient history
+ * that would have been discarded anyway. A ten-entry pool still gets ~100
+ * fixtures each, twenty times what it uses.
+ *
+ * Returns oldest-first per entry, matching how the dots read left to right.
+ */
+export async function readLeagueFormByEntry(
+  supabase: SupabaseClient,
+  poolId: string,
+  perEntry = 5,
+): Promise<{ form: Map<string, string[]>; error: string | null }> {
+  const { data, error } = await supabase
+    .from('league_match_scores')
+    .select('entry_id, score_type, fixture_number')
+    .eq('pool_id', poolId)
+    .order('fixture_number', { ascending: false })
+    .limit(1000)
+  if (error) return { form: new Map(), error: error.message }
+
+  const rows = (data ?? []) as Array<{ entry_id: string; score_type: string; fixture_number: number }>
+  const form = new Map<string, string[]>()
+  for (const r of rows) {
+    const got = form.get(r.entry_id) ?? []
+    // Newest first out of the query, so the first `perEntry` seen are the most
+    // recent; reversed below so the dots render oldest to newest.
+    if (got.length < perEntry) {
+      got.push(r.score_type)
+      form.set(r.entry_id, got)
+    }
+  }
+  for (const [k, v] of form) form.set(k, v.reverse())
+  return { form, error: null }
 }
