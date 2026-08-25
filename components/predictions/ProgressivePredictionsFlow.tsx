@@ -181,7 +181,34 @@ export default function ProgressivePredictionsFlow({
     ? new Date(currentRoundState.deadline) < new Date()
     : false
   const isRoundSubmitted = currentSubmission?.has_submitted === true
-  const isReadOnly = predictionsLocked || !isRoundOpen || isRoundPastDeadline || isRoundSubmitted
+
+  /**
+   * ⚠ SUBMITTING DOES NOT LOCK A MATCHWEEK. Only the kickoff does.
+   *
+   * For the World Cup, `isRoundSubmitted` closing the form is the rule: an
+   * entry locks on submit, and an admin can unlock it from the Members tab.
+   *
+   * For a league it was a trap, because `has_submitted` is DERIVED rather than
+   * pressed — `deriveRoundSubmissions` (lib/league/read.ts) returns true as
+   * soon as `done >= total`. So a member's TENTH tap silently froze all ten,
+   * days before the matchweek locked, with the database still willing to accept
+   * a change and no way to reopen it: the admin unlock writes
+   * `entry_round_submissions`, which the league path deliberately never writes.
+   *
+   * The product promises the opposite in three places — Scoring Rules ("locks
+   * at the first kickoff"), lib/league/lms ("changing your mind before the lock
+   * is allowed and expected"), and migration 058, whose trigger is the real and
+   * only gate.
+   *
+   * The two clauses above already say exactly what the database says: it must
+   * be the OPEN matchweek, and its lock must not have passed.
+   */
+  const isMatchweekRound = isMatchweekKey(selectedRound)
+  const isReadOnly =
+    predictionsLocked ||
+    !isRoundOpen ||
+    isRoundPastDeadline ||
+    (isRoundSubmitted && !isMatchweekRound)
 
   // Match & round stats
   const roundMatchCount = roundMatches.length
@@ -541,6 +568,7 @@ export default function ProgressivePredictionsFlow({
         submission={currentSubmission ?? null}
         matchCount={roundMatchCount}
         completedMatchCount={completedRoundMatchCount}
+        predictedCount={predictedRoundCount}
       />
 
       {/* Error */}
@@ -570,7 +598,9 @@ export default function ProgressivePredictionsFlow({
             {roundName} predictions are not yet available.
           </p>
           <p className="text-neutral-400 text-xs mt-1">
-            Available after the previous round completes.
+            {isMatchweekKey(selectedRound)
+              ? 'Opens as soon as the previous matchweek locks, at its first kickoff.'
+              : 'Available after the previous round completes.'}
           </p>
         </div>
       ) : (

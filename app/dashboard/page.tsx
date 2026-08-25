@@ -1,3 +1,4 @@
+import { roundLabel } from '@/lib/competitionRounds'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getShadowReadPools, readEntryScoring, readRecentForm } from '@/lib/scoring/readSource'
 import { redirect } from 'next/navigation'
@@ -285,7 +286,7 @@ export default async function DashboardPage() {
           // There's an open round that needs predictions
           anySubmitted = false
           const { ROUND_LABELS } = await import('@/lib/tournament')
-          currentRoundLabel = ROUND_LABELS[unsubmittedOpenRounds[0] as keyof typeof ROUND_LABELS] ?? unsubmittedOpenRounds[0]
+          currentRoundLabel = roundLabel(unsubmittedOpenRounds[0])
         } else if (submittedRounds.size > 0) {
           // All open rounds are submitted (or no rounds are open) — user is all set
           anySubmitted = true

@@ -173,6 +173,12 @@ or banks at season end, the size of its slice, and what `predictions_submitted_a
 matchweeks (rung 5 of the cascade has no league definition today, and `league_finalize_ranks` needs
 one before L-B ships).
 
+⚠️ **An eighth, added 2026-08-25:** whether members should be asked to *submit* at all. Raised by Ryan
+from this flow — the league already derives submission from the picks, the other two modes make it a
+button that locks the member out early. It carries the `predictions_submitted_at` question above with
+it, because a deadline everyone is auto-submitted at flattens rung 5. Tracked as *Submitting an entry
+is a step that shouldn't exist* in **🔥 Now**.
+
 ---
 
 ### The 2026-07-30 assessment (superseded, kept for the record)
@@ -1050,6 +1056,105 @@ registers are not decoration.
 - **Effort:** ~half a day — the wording exists verbatim in `lib/bonusCalculation.ts:160–184`; the work is re-deriving the team names in SQL and backfilling.
 - **Done when:** `shadow_bonus_scores.description` is prose for every category, the app and web read it unformatted, and `lib/bonusDescription.ts` is deleted rather than left as a permanent shim.
 
+### Submitting an entry is a step that shouldn't exist `Feature` `Design` `Bug` 🔥
+> Added 2026-08-25 on Ryan's instruction, while fixing the league weekly picking flow. **The ask:**
+> a member never presses Submit. Picks stay open and editable until their deadline, the deadline
+> decides what counts, and "submitted" stops being a thing anyone does and becomes a fact the backend
+> derives. Auto-submission already exists and is already promised to members —
+> `app/pools/[pool_id]/HowToPlayTab.tsx:81` tells them *"drafts are auto-submitted when the deadline
+> passes"* — the UI just doesn't behave that way.
+
+- **Is:** three different submission models in one product, and only the newest one matches the ask.
+  1. **`full_tournament` / `bracket_picker` — press once, locked out.** The submit endpoint refuses a
+     partial entry (`app/api/pools/[pool_id]/predictions/route.ts:453` → 400 *"Not all matches
+     predicted"*), then sets `has_submitted_predictions = true` (`:466`). From that moment **saving is
+     refused** — `:238` returns 403 *"Predictions already submitted"* — even if the deadline is weeks
+     out. The only way back is an **admin** (`predictions/unlock/route.ts:28` requires
+     `role = 'admin'`). So a member who commits early cannot change their mind about anything, and a
+     member who hasn't filled in all 104 matches cannot commit at all.
+  2. **`progressive` — per round, same shape.** `entry_round_submissions` per round, and the manual
+     round-submit also sets the legacy flag (`predictions/round/route.ts:157-166`) because half the app
+     reads that flag to decide "submitted or not".
+  3. **`league` — already derived, by design.** The league write path must never write
+     `has_submitted_predictions` (the containment constraint), so submission is computed from the picks
+     instead: `deriveRoundSubmissions` (`lib/league/read.ts:402`) says a matchweek is submitted once
+     `done >= total` — *"a fact about the picks rather than a flag that can drift from them."*
+     **The model being asked for is already built; it is just not the one two of the three modes use.**
+- **It is biting the live PL season right now.** Because league submission is *derived* rather than
+  pressed, the shared `isRoundSubmitted → read-only` rule meant a member's **tenth tap silently froze
+  all ten picks**, days before the matchweek locked, with the database still willing to accept a change
+  (migration 058's trigger is the real gate) and **the admin unlock unable to reopen it** — that unlock
+  writes `entry_round_submissions`, which the league path deliberately never writes. Patched in the
+  working tree by exempting matchweeks (`components/predictions/ProgressivePredictionsFlow.tsx`,
+  uncommitted at the time of writing). **That patch is the symptom; this item is the cause.**
+- **The flag is load-bearing — this is a migration, not a delete.** `has_submitted_predictions` is read
+  in **68 TS/TSX files** (59 web/API, 9 mobile) and 11 migrations. The consumers that change meaning:
+  - **Scoring** — `lib/scoring/recalculate.ts:195` scores **only submitted entries**. Getting this wrong
+    has precedent: filtering on the flag alone made manual progressive submitters invisible on group-stage
+    day 1 — **99 entries across 21 pools stuck on 0 points** (`recalculate.ts:186-196`).
+  - **Nudges** — deadline pushes (`lib/push/deadline-warnings.ts:80`) and pending-prediction emails
+    (`app/api/admin/send-pending-reminders/route.ts:94`) both define their audience as *unsubmitted*.
+  - **Reveal / Results** — `app/pools/[pool_id]/ResultsTab.tsx:111` (already carrying a league special-case).
+  - **Tiebreak** — `predictions_submitted_at` is a rung of the ranking cascade, and **has no league
+    definition today** (one of the seven open calls in the league plan's §6). If everyone is submitted by
+    the deadline, that rung goes flat and ranking falls through to the next one. **That is a scoring
+    semantics change and needs a ruling before, not after.**
+  - **Entry deletion** — `app/pools/[pool_id]/PoolDetail.tsx:425` allows deleting an entry only while unsubmitted.
+- **Auto-submission is not currently a guarantee, and it has to become one.** `vercel.json` is `{}` — the
+  auto-submit cron is **not registered there** (whether a `pg_cron` job covers it is prod state, unverified
+  here; the same assumption was wrong once already, see *XP has two writers* → R19). The fallback is a
+  **per-request side-effect on the pool page** (`app/pools/[pool_id]/page.tsx:414-421`): an entry is
+  auto-submitted when somebody happens to open the pool after the deadline. It also **skips entries with
+  zero predictions** (`lib/auto-submit.ts:103-118`). If the deadline is the only submission event, the
+  deadline must actually fire — which points at the database (the lock triggers already live there:
+  `trg_enforce_prediction_before_kickoff`, migration 058) rather than a cron nobody registered.
+- **⚡ Cost constraint — set by Ryan 2026-08-25: do not pay for this at read time.** The World Cup lesson
+  is measured and in this document: `SELECT predictions.*` alone was **111.3 DB-hours, 33% of all DB time
+  across 30.0M calls**, and the top four statements were **76.4%** — reads, not compute. Replacing a stored
+  boolean with a per-request "count the picks" would rebuild exactly that. The rules for this item:
+  - **Derive from rows already fetched, or store it once on write.** The league precedent costs **zero extra
+    queries** — `deriveRoundSubmissions` runs over picks the page already loaded. A trigger-maintained column
+    is the other acceptable shape. **A per-entry `COUNT` on the read path is not.**
+  - **Fix the N+1 while we're here.** `lib/auto-submit.ts:103` runs **one COUNT per entry per sweep** — the
+    same shape as the `computeCrowdPredictions` defect (2.6M iterations on the largest pool). One set-based
+    statement replaces the loop.
+  - **Don't regrow the payload.** Step 3 took the pool payload **7,721 kB → 457 kB**; no new pool-wide array,
+    and the leaderboard keeps reading precomputed rows (*Scoring engines → the rule*: backend computes and
+    stores once, front ends only display).
+  - **Don't invalidate more.** Submission state changes at most once per entry per round; it must not become
+    a new cache-buster on every save.
+- **Disclosure gate:** passes, and it *removes* a manufactured task rather than adding one. The tooltip is the
+  mechanism: *"Whatever you've picked when the deadline hits is what counts."* The nag class changes with it —
+  "submit your predictions" becomes "you have 4 matches without a pick", which is a fact about the member's
+  picks instead of about a button. Keep the receipt: `predictionsAutoSubmittedTemplate` /
+  `roundAutoSubmittedTemplate` already exist, so the confirmation moment survives without the chore.
+- **Open calls for Ryan:**
+  1. **Zero-pick entries** — in the leaderboard at 0, or out? Today they are invisible to scoring and skipped
+     by the sweep, so the answer is currently "out" by accident, not by decision.
+  2. **What `predictions_submitted_at` means** once nobody submits — first save, last save, or the deadline?
+     It is a live tiebreak rung (and see the league plan's §6).
+  3. **Derived or retired** — does `has_submitted_predictions` stay as a derived/trigger-maintained column
+     (68 files keep working), or does it go and every consumer learn to ask about picks?
+  4. **Does admin unlock survive?** With nothing locking early there is nothing to unlock — but it is also
+     today's only escape hatch for the WC modes.
+  5. **What replaces the "Submitted" badge** in the UI — progress ("10 of 10 picked") is the honest label.
+- **Touches:** `app/api/pools/[pool_id]/predictions/route.ts`, `.../predictions/round/route.ts`,
+  `.../predictions/unlock/route.ts`, `lib/auto-submit.ts`, `lib/scoring/recalculate.ts`,
+  `lib/league/read.ts` (the pattern to copy), `components/predictions/PredictionsFlow.tsx` +
+  `ProgressivePredictionsFlow.tsx` + `BracketPickerFlow.tsx` + `RoundStatusCard.tsx`,
+  `mobile/app/pool/[id]/entry/[entryId].tsx`, `mobile/components/pool-detail/*Wizard.tsx`,
+  `StageNavBar.tsx`, `lib/push/deadline-warnings.ts`, `app/api/admin/send-pending-reminders/route.ts`.
+- **Subsumes:** *Pending-submissions logic (multi-entry)* `#EntrySubmission` — "have all my entries been
+  submitted?" stops being a question the member can get wrong.
+- **Effort:** the live league trap is already patched locally (hours). The model change is ~2–3 days across
+  web + mobile + the sweep, **plus** a ruling on the tiebreak rung before any of it ships. Sequence it with
+  **L-B/L-C** in the league plan — it is the same screens.
+- **Done when:** no surface asks a member to submit; a member can change any pick right up to that pick's own
+  lock; every "submitted" surface reads one derived fact; scoring counts any entry with at least one pick
+  without consulting a flag; auto-submission is guaranteed by a scheduled or database-level mechanism rather
+  than by someone loading a page; and the derivation adds **zero** per-read queries measured against the
+  pool-detail baseline.
+
 > Beyond that and the **recurring knockout ops** below, the master fix list from the June outages is fully resolved (verified in code 2026-07-12). Its residual threads are tracked as their own items: *Badge batch*, *Mobile*, *Post-deadline lock*, *IO reduction*.
 
 ### ✅ Completed (verified against code, 2026-07-12)
@@ -1546,6 +1651,7 @@ registers are not decoration.
 - **Audit 2026-07-12:** TODO — `useHomeData.ts:555` keys `needsPredictions` to the single best entry, not all entries.
 - **Effort:** ~0.5–1 day.
 - **Done when:** multi-entry pools correctly report submitted vs pending across all of a user's entries.
+- ⚠️ **Probably resolved by deletion, 2026-08-25.** See *Submitting an entry is a step that shouldn't exist* in **🔥 Now** — if nobody submits, "have all my entries been submitted?" is not a question a member can get wrong, and this notice becomes "you have N matches without a pick" per entry. Don't fix this one first.
 
 ### Live-update tabs on member removal `Bug`
 - **Is:** When a pool admin removes a member, all tabs should live-update — e.g. the Fees tab should immediately reflect the reduced pot. `#DeleteMember` `#LiveUpdates`
