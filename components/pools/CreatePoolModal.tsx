@@ -284,12 +284,27 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
     }
   }
 
-  // When tournament changes, update deadline to tournament start date
+  // When tournament changes, update deadline to tournament start date.
+  //
+  // ⚠ Unless that date has already gone. A competition already under way — a
+  // Premier League season somebody is joining in October — would otherwise
+  // pre-fill a deadline months in the past, and for a table pool that date is
+  // the real lock (migration 098), not decoration. A week out is the honest
+  // default for a pool starting mid-season: long enough for the group to file
+  // a table, and the admin can move it either way before creating.
   useEffect(() => {
-    if (selectedTournament) {
+    if (!selectedTournament) return
+    const start = new Date(selectedTournament.start_date)
+    const hasStarted = !Number.isNaN(start.getTime()) && start.getTime() <= Date.now()
+
+    if (hasStarted) {
+      const inAWeek = new Date()
+      inAWeek.setDate(inAWeek.getDate() + 7)
+      setDeadlineDate(inAWeek.toISOString().split('T')[0])
+    } else {
       setDeadlineDate(selectedTournament.start_date)
-      setDeadlineTime('13:00')
     }
+    setDeadlineTime('13:00')
   }, [selectedTournamentId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreatePool = async () => {
@@ -705,7 +720,9 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                 <div className="space-y-5">
                   <div>
                     <h3 className="text-sm font-semibold text-neutral-900 mb-3">
-                      {effectiveMode === 'progressive' ? 'Group Stage Deadline' : effectiveMode === 'league_pickem' ? 'Matchweek 1 Deadline' : 'Prediction Deadline'}
+                      {isLeagueTournament && leagueMode === 'table'
+                        ? 'Table Deadline'
+                        : effectiveMode === 'progressive' ? 'Group Stage Deadline' : effectiveMode === 'league_pickem' ? 'Matchweek 1 Deadline' : 'Prediction Deadline'}
                     </h3>
                     <div className="flex gap-3 mb-3 flex-wrap">
                       <div>

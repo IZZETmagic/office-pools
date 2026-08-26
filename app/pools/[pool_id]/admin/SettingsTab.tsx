@@ -237,16 +237,34 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
   const [stopping, setStopping] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
 
-  // Deadline
+  // ---------------------------------------------------------------- Deadline
+  //
+  // ⚠ WHICH COLUMN THIS FIELD EDITS DEPENDS ON THE POOL.
+  //
+  // For a bracket pool `prediction_deadline` is the deadline, and editing it
+  // here is the whole point. For a LEAGUE pool it is not a deadline at all — it
+  // is a sentinel. The create route sets it to the season's LAST kickoff
+  // because the column is NOT NULL and a league locks per matchweek, and it
+  // stays there precisely so `isDeadlinePassed` reads false all season.
+  //
+  // That makes it dangerous to edit. `computeReveal` turns a passed
+  // `prediction_deadline` into `{ revealed: true, scope: 'all' }`
+  // (lib/predictions/revealGate.ts:103) — every member's ENTIRE entry, matchweeks
+  // included, shown to the whole pool. An admin dragging this field back on a
+  // league pool would open everyone's picks.
+  //
+  // So: table mode edits `league_table_lock_at`, which is a real member-facing
+  // deadline (migration 098 lets it move while it is still open). Every other
+  // league mode has nothing here to edit — the card is hidden below.
+  const isLeaguePool = pool.league_mode !== null && pool.league_mode !== undefined
+  const isTableMode = pool.league_mode === 'table'
+  const deadlineSource = isTableMode ? pool.league_table_lock_at : pool.prediction_deadline
+
   const [deadlineDate, setDeadlineDate] = useState(
-    pool.prediction_deadline
-      ? new Date(pool.prediction_deadline).toISOString().split('T')[0]
-      : ''
+    deadlineSource ? new Date(deadlineSource).toISOString().split('T')[0] : ''
   )
   const [deadlineTime, setDeadlineTime] = useState(
-    pool.prediction_deadline
-      ? new Date(pool.prediction_deadline).toTimeString().slice(0, 5)
-      : '14:00'
+    deadlineSource ? new Date(deadlineSource).toTimeString().slice(0, 5) : '14:00'
   )
 
   // UI state
@@ -260,11 +278,11 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
   const [archiving, setArchiving] = useState(false)
 
   // Track if form has unsaved changes
-  const initialDeadlineDate = pool.prediction_deadline
-    ? new Date(pool.prediction_deadline).toISOString().split('T')[0]
+  const initialDeadlineDate = deadlineSource
+    ? new Date(deadlineSource).toISOString().split('T')[0]
     : ''
-  const initialDeadlineTime = pool.prediction_deadline
-    ? new Date(pool.prediction_deadline).toTimeString().slice(0, 5)
+  const initialDeadlineTime = deadlineSource
+    ? new Date(deadlineSource).toTimeString().slice(0, 5)
     : '14:00'
 
   const hasChanges = useMemo(() => {
@@ -298,9 +316,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
     return () => window.removeEventListener('beforeunload', handler)
   }, [hasChanges])
 
-  const currentDeadline = pool.prediction_deadline
-    ? new Date(pool.prediction_deadline)
-    : null
+  const currentDeadline = deadlineSource ? new Date(deadlineSource) : null
   const timeUntilDeadline = currentDeadline
     ? currentDeadline.getTime() - Date.now()
     : null
@@ -362,7 +378,18 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
     }
 
     if (newDeadline) {
-      updatePayload.prediction_deadline = newDeadline.toISOString()
+      if (isTableMode) {
+        // The real deadline for this mode. Migration 098 refuses two moves and
+        // the DATABASE is what decides: a deadline already passed cannot be
+        // reopened, and none can be set in the past. Both surface on this form
+        // as a plain error rather than being re-checked here, so the rule lives
+        // in one place.
+        updatePayload.league_table_lock_at = newDeadline.toISOString()
+      } else if (!isLeaguePool) {
+        updatePayload.prediction_deadline = newDeadline.toISOString()
+      }
+      // Other league modes: nothing. See the note on deadlineSource — writing
+      // prediction_deadline here would open every member's entry.
     }
 
     // .select() so the write reports the truth. Without it, an UPDATE that RLS
@@ -392,7 +419,8 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
     // Check if deadline changed — notify members if so
     const deadlineChanged = newDeadline &&
-      (!pool.prediction_deadline || newDeadline.toISOString() !== new Date(pool.prediction_deadline).toISOString())
+      (isTableMode || !isLeaguePool) &&
+      (!deadlineSource || newDeadline.toISOString() !== new Date(deadlineSource).toISOString())
 
     if (deadlineChanged) {
       fetch('/api/notifications/deadline-changed', {
@@ -416,7 +444,12 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       max_entries_per_user: maxE,
       entry_fee: entryFee ? parseFloat(entryFee) : null,
       entry_fee_currency: entryFeeCurrency,
-      ...(newDeadline ? { prediction_deadline: newDeadline.toISOString() } : {}),
+      ...(newDeadline && isTableMode
+        ? { league_table_lock_at: newDeadline.toISOString() }
+        : {}),
+      ...(newDeadline && !isLeaguePool
+        ? { prediction_deadline: newDeadline.toISOString() }
+        : {}),
     })
     showToast('Settings saved.', 'success')
     setSaving(false)
@@ -712,13 +745,30 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         </div>
       </Card>
 
-        {/* ── Prediction Deadline ── */}
+        {/* ── Prediction Deadline ──
+
+            Hidden for every league mode except table. A pick'em, Showdown or
+            Last-Man-Standing pool locks per MATCHWEEK, from the fixture list —
+            there is no pool-wide deadline for an admin to set, and the field
+            that used to sit here edited `prediction_deadline`, which for a
+            league pool is a sentinel rather than a date. See deadlineSource. */}
+        {(!isLeaguePool || isTableMode) && (
         <Card padding="sm">
           {/* No mode pill here — the Pool Mode card above names the mode, and
               the info banner below already says this pool is progressive. */}
           <Caption>
-            {pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
+            {isTableMode
+              ? 'Table Deadline'
+              : pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
           </Caption>
+
+          {isTableMode && (
+            <Alert variant="info">
+              This is when members stop being able to order the table. You can move
+              it while it is still open — once it passes, everyone who predicted is
+              locked against it and it cannot be reopened.
+            </Alert>
+          )}
 
           {pool.prediction_mode === 'progressive' && (
             <Alert variant="info">
@@ -786,6 +836,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
             <QuickDeadlineButton label="1 Week Before" onClick={() => setQuickDeadline('one_week_before')} />
           </div>
         </Card>
+        )}
 
         </div>
 

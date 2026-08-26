@@ -200,7 +200,35 @@ export async function POST(request: NextRequest) {
           { status: 409 },
         )
       }
-      resolvedTableLockAt = nextMw.first_kickoff_at as string
+
+      // THE ADMIN'S DATE, NOT THE FIXTURE LIST'S.
+      //
+      // §3.4 derived this from the first un-locked matchweek, and the wizard's
+      // deadline field was collected and then ignored — so an admin picked a
+      // date, and members were shown a different one. Worse for the case this
+      // now serves: a pool created mid-season derived a deadline three days
+      // out, and the admin could not say "everyone has until the 31st", which
+      // is how a group actually starts one in October.
+      //
+      // The kickoff stays as the FALLBACK, so a wizard that sends nothing (or
+      // sends a date already gone by the time the request lands) still gets a
+      // real, live deadline rather than a dead pool.
+      //
+      // ⚠ `prediction_deadline` FROM THE BODY, NOT `resolvedDeadline`. By this
+      // line `resolvedDeadline` is no longer the admin's date: the league
+      // branch above replaced it with the season's LAST kickoff, deliberately,
+      // as an inert value that satisfies NOT NULL and keeps
+      // `isDeadlinePassed` false all season. Reading it here would have set
+      // every table pool to close in May.
+      const adminDeadline = prediction_deadline ? new Date(prediction_deadline) : null
+      const adminDeadlineIsUsable =
+        adminDeadline !== null &&
+        !Number.isNaN(adminDeadline.getTime()) &&
+        adminDeadline.getTime() > Date.now()
+
+      resolvedTableLockAt = adminDeadlineIsUsable
+        ? adminDeadline.toISOString()
+        : (nextMw.first_kickoff_at as string)
     }
   }
 
