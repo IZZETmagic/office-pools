@@ -371,17 +371,7 @@ export default function TablePredictionTab({
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-bold text-neutral-900">Predict the table</h2>
-          <SaveStatus
-            hasSaved={hasSaved}
-            saving={saving}
-            dirty={dirty}
-            savedAt={savedAt}
-            message={message}
-            onRetry={() => void flush()}
-          />
-        </div>
+        <h2 className="text-lg font-bold text-neutral-900">Predict the table</h2>
         <p className="text-sm text-neutral-600 mt-1">
           Drag the clubs into the order you think they&apos;ll finish. You only do this once
           — then you watch it all season.
@@ -404,6 +394,17 @@ export default function TablePredictionTab({
             Closes <LocalTime iso={lockAt} format={formatDeadline} />
           </p>
         )}
+      </div>
+
+      <div className="flex justify-end -mb-2">
+        <SaveStatus
+          hasSaved={hasSaved}
+          saving={saving}
+          dirty={dirty}
+          savedAt={savedAt}
+          message={message}
+          onRetry={() => void flush()}
+        />
       </div>
 
       {!mounted ? (
@@ -453,8 +454,8 @@ export default function TablePredictionTab({
           commit. Before a table exists the order on screen is the seeded one
           (decisions 12/17) and it becomes a prediction only when the member
           says so. After that every drag saves itself, so what is left is a
-          STATUS — and that lives at the top, next to the heading, where it is
-          not competing with a button that no longer exists.
+          STATUS — and that lives directly above the list, where the thing it
+          is reporting on actually is.
 
           The failure message stays down HERE for this state, because this is
           the state with a button: somebody scrolled to the bottom pressing Save
@@ -517,7 +518,7 @@ function formatSavedAt(d: Date): string {
 }
 
 /**
- * "Saved", with the time it was saved — top right, beside the heading.
+ * "Saved", with the time it was saved — right-aligned, directly above the list.
  *
  * ⚠ The live region is the WRAPPER and is always mounted. Putting
  * `role="status"` on the branches instead would mean each state change
