@@ -302,6 +302,29 @@ export function PoolDetail({
 }: PoolDetailProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  /**
+   * ⚠ THE TABLE PREDICTION, HELD ABOVE THE UNMOUNT.
+   *
+   * Every tab panel here is conditionally rendered, so switching tabs UNMOUNTS
+   * the one you left. TablePredictionTab seeds its `order` from the
+   * server-rendered `savedOrder` prop, and that prop is a snapshot from page
+   * load — so coming back re-seeded it with the order as it was BEFORE the
+   * member dragged anything, and their saved table appeared to have been
+   * thrown away until they refreshed.
+   *
+   * Holding the last successful save here outlives the unmount. Not
+   * router.refresh(): that re-runs the whole pool page for a twenty-row list,
+   * and autosave fires on every drag.
+   *
+   * ⚠ Only tracks saves made by THIS page. A save from another device still
+   * needs a reload to show up here — acceptable for a once-a-season pick, and
+   * the reason this is state and not a cache.
+   */
+  const [tableSaved, setTableSaved] = useState<{ order: string[]; at: string | null }>(() => ({
+    order: tableModeData?.savedOrder ?? [],
+    at: tableModeData?.savedAt ?? null,
+  }))
+
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const urlTab = searchParams.get('tab') as Tab
     if (urlTab) return urlTab
@@ -1685,8 +1708,9 @@ export function PoolDetail({
                 poolId={pool.pool_id}
                 entryId={tableModeData.entryId}
                 clubs={tableModeData.clubs}
-                savedOrder={tableModeData.savedOrder}
-                savedAt={tableModeData.savedAt}
+                savedOrder={tableSaved.order}
+                savedAt={tableSaved.at}
+                onSaved={(order, at) => setTableSaved({ order, at })}
                 seededOrder={tableModeData.seededOrder}
                 breakdown={tableModeData.breakdown}
                 lockAt={tableModeData.lockAt}

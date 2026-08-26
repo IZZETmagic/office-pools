@@ -75,6 +75,13 @@ type Props = {
   isLocked: boolean
   /** True when this member joined after the deadline and never got to predict. */
   joinedAfterLock: boolean
+  /**
+   * Report a successful save upward. PoolDetail unmounts this tab when the
+   * member switches away, so the parent has to hold what landed — otherwise
+   * coming back re-seeds `order` from the page-load snapshot and the save
+   * looks lost. See the note on `tableSaved` in PoolDetail.
+   */
+  onSaved?: (order: string[], savedAt: string | null) => void
 }
 
 function bandOf(
@@ -206,6 +213,7 @@ export default function TablePredictionTab({
   europaTo,
   isLocked,
   joinedAfterLock,
+  onSaved,
 }: Props) {
   const dndId = useId()
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.club_id, c])), [clubs])
@@ -285,6 +293,15 @@ export default function TablePredictionTab({
   const inFlight = useRef(false)
   const pending = useRef(false)
 
+  /**
+   * Held in a ref so `flush` keeps its [poolId, entryId] deps. The parent
+   * passes an inline arrow, which is a new function every render; in the
+   * dependency list it would rebuild `flush`, and `flush` is a dependency of
+   * the autosave effect — so every parent render would fire another save.
+   */
+  const onSavedRef = useRef(onSaved)
+  onSavedRef.current = onSaved
+
   const flush = useCallback(async () => {
     if (!entryId) return
     if (inFlight.current) {
@@ -315,6 +332,9 @@ export default function TablePredictionTab({
         setHasSaved(true)
         if (json.savedAt) setSavedAt(json.savedAt)
         setMessage(null)
+        // `orderRef`, not `order`: this closure was made before the drag that
+        // triggered it, and the ref is what the request actually carried.
+        onSavedRef.current?.(orderRef.current, json.savedAt ?? null)
       }
     } catch {
       setMessage({ kind: 'error', text: 'Not saved — check your connection. Your changes are still here.' })
