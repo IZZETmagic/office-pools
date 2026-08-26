@@ -24,6 +24,7 @@
 // =============================================================
 
 import { useState, useCallback, useMemo, useId, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   DndContext,
   closestCenter,
@@ -216,7 +217,46 @@ export default function TablePredictionTab({
   onSaved,
 }: Props) {
   const dndId = useId()
+  const router = useRouter()
   const clubsById = useMemo(() => new Map(clubs.map((c) => [c.club_id, c])), [clubs])
+
+  /**
+   * THE DEADLINE ARRIVING WHILE THE PAGE IS OPEN.
+   *
+   * `isLocked` is computed on the server at render, so a reload after the
+   * deadline is already read-only and the trigger from migration 078 refuses
+   * the write regardless. What was missing is the member sitting on this screen
+   * as the clock passes: they went on dragging against a table that was already
+   * closed, and only found out when a save came back 403.
+   *
+   * This asks the SERVER to decide rather than flipping a local flag. Locked is
+   * server state — and the locked screen needs the scoring breakdown, which
+   * only a server render has. Flipping locally would show a member who DID
+   * predict the "you didn't predict the table" card, because their breakdown
+   * had not been fetched.
+   *
+   * ⚠ Re-armed hourly instead of once at the deadline: setTimeout takes a
+   * 32-bit delay, so anything beyond ~24.8 days overflows and fires
+   * IMMEDIATELY — a table closing next season would lock itself on load.
+   */
+  useEffect(() => {
+    if (isLocked || !lockAt) return
+    const deadline = new Date(lockAt).getTime()
+    if (Number.isNaN(deadline)) return
+
+    const HOUR = 60 * 60 * 1000
+    let timer: ReturnType<typeof setTimeout>
+    const tick = () => {
+      const remaining = deadline - Date.now()
+      if (remaining <= 0) {
+        router.refresh()
+        return
+      }
+      timer = setTimeout(tick, Math.min(remaining, HOUR))
+    }
+    tick()
+    return () => clearTimeout(timer)
+  }, [isLocked, lockAt, router])
 
   const [order, setOrder] = useState<string[]>(
     savedOrder.length > 0 ? savedOrder : seededOrder,
