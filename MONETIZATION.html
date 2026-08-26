@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SportPool Monetization Plan</title>
+<style>
+:root{
+  --snow:#F7F8FC; --surface:#FFFFFF; --mist:#EEF1F8; --silver:#D4DAE8;
+  --slate:#7B87A8; --ink:#1B2340; --midnight:#0B0F1A;
+  --primary:#3B6EFF; --primary-light:#F7F9FF;
+  --accent:#F5C518; --accent-light:#FFF8E1; --accent-ink:#8A6D00;
+  --green:#22C55E; --green-light:#ECFDF5;
+  --amber:#F59E0B; --amber-light:#FFFBEB;
+  --red:#EF4444; --red-light:#FEF2F2;
+  --c-net:#3B6EFF; --c-fee:#F59E0B;
+  --shadow:0 1px 2px rgba(27,35,64,.06), 0 4px 12px rgba(27,35,64,.05);
+  --radius:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --snow:#121520; --surface:#1C2030; --mist:#232840; --silver:#2E3448;
+    --slate:#8B97B8; --ink:#E8EAF0; --midnight:#0B0F1A;
+    --primary:#5B8AFF; --primary-light:#1A2440;
+    --accent:#F5C518; --accent-light:#2A2210; --accent-ink:#F5C518;
+    --green:#34D972; --green-light:#0F2A1A;
+    --amber:#FBBF24; --amber-light:#2A2210;
+    --red:#F87171; --red-light:#2A1010;
+    --c-net:#5B8AFF; --c-fee:#CC7F09;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --snow:#121520; --surface:#1C2030; --mist:#232840; --silver:#2E3448;
+  --slate:#8B97B8; --ink:#E8EAF0; --midnight:#0B0F1A;
+  --primary:#5B8AFF; --primary-light:#1A2440;
+  --accent:#F5C518; --accent-light:#2A2210; --accent-ink:#F5C518;
+  --green:#34D972; --green-light:#0F2A1A;
+  --amber:#FBBF24; --amber-light:#2A2210;
+  --red:#F87171; --red-light:#2A1010;
+  --c-net:#5B8AFF; --c-fee:#CC7F09;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth; scroll-padding-top:92px}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{animation:none !important; transition:none !important} }
+body{
+  margin:0; background:var(--snow); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+a{color:var(--primary); text-decoration:none}
+a:hover{text-decoration:underline}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--primary); outline-offset:2px; border-radius:4px}
+code,.mono{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.86em; background:var(--mist); border:1px solid var(--silver);
+  border-radius:5px; padding:1px 5px; color:var(--ink); word-break:break-word;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:0 20px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- masthead ---------- */
+header.masthead{
+  background:linear-gradient(180deg,var(--midnight),#141A2C);
+  color:#fff; padding:30px 0 26px; border-bottom:3px solid var(--accent);
+}
+header.masthead h1{margin:0 0 6px; font-size:27px; letter-spacing:-.4px; font-weight:800}
+header.masthead h1 .sport{color:#fff}
+header.masthead h1 .pool{color:var(--accent)}
+header.masthead p.lede{margin:0; color:#B9C2DA; font-size:13.5px; max-width:78ch}
+header.masthead .src{margin-top:12px; font-size:12px; color:#8D98B6}
+header.masthead .src code{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.14); color:#D7DEF0}
+.mast-meta{display:flex; gap:8px; flex-wrap:wrap; margin-top:13px}
+.mast-meta .chip{background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.16); color:#C9D2E8}
+.mast-meta .chip.live{background:rgba(245,197,24,.14); border-color:var(--accent); color:var(--accent)}
+
+nav.sticky{
+  position:sticky; top:0; z-index:50; background:var(--surface);
+  border-bottom:1px solid var(--silver); box-shadow:var(--shadow);
+}
+nav.sticky .wrap{display:flex; gap:4px; overflow-x:auto; padding-top:9px; padding-bottom:9px; scrollbar-width:thin}
+nav.sticky a{
+  white-space:nowrap; font-size:13px; font-weight:600; color:var(--slate);
+  padding:6px 11px; border-radius:8px;
+}
+nav.sticky a:hover{background:var(--mist); color:var(--ink); text-decoration:none}
+
+main{padding:26px 0 70px}
+section{margin:0 0 44px; scroll-margin-top:92px}
+h2.sec{
+  font-size:20px; margin:0 0 4px; letter-spacing:-.3px; display:flex;
+  align-items:baseline; gap:9px; flex-wrap:wrap;
+}
+h2.sec .count{font-size:12px; font-weight:600; color:var(--slate)}
+.sec-sub{color:var(--slate); font-size:13.5px; margin:0 0 16px; max-width:92ch}
+h3.grp{
+  font-size:15px; margin:26px 0 10px; padding-bottom:6px;
+  border-bottom:1px solid var(--silver); color:var(--ink); letter-spacing:-.2px;
+}
+h4.sub{font-size:13.5px; margin:18px 0 8px; color:var(--ink); letter-spacing:-.1px}
+p{margin:0 0 12px; max-width:92ch}
+p:last-child{margin-bottom:0}
+
+/* ---------- stat strip ---------- */
+.strip{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:14px}
+.stat{
+  background:var(--surface); border:1px solid var(--silver); border-radius:var(--radius);
+  padding:12px 13px; box-shadow:var(--shadow);
+}
+.stat .n{font-size:26px; font-weight:800; line-height:1.1; letter-spacing:-1px; font-variant-numeric:tabular-nums}
+.stat .l{font-size:11.5px; color:var(--slate); font-weight:600; text-transform:uppercase; letter-spacing:.4px; margin-top:3px}
+.stat .s{font-size:12px; color:var(--slate); margin-top:5px}
+.stat.crit{border-left:4px solid var(--red)} .stat.crit .n{color:var(--red)}
+.stat.high{border-left:4px solid var(--amber)} .stat.high .n{color:var(--amber)}
+.stat.med{border-left:4px solid var(--accent)} .stat.med .n{color:var(--accent-ink)}
+.stat.low{border-left:4px solid var(--green)} .stat.low .n{color:var(--green)}
+.stat.pri{border-left:4px solid var(--primary)} .stat.pri .n{color:var(--primary)}
+.stat.neu{border-left:4px solid var(--silver)}
+
+/* ---------- chips ---------- */
+.chip{
+  display:inline-block; font-size:11px; font-weight:700; letter-spacing:.3px;
+  padding:2px 8px; border-radius:999px; border:1px solid var(--silver);
+  background:var(--mist); color:var(--slate); white-space:nowrap;
+}
+.chip.cat{background:var(--primary-light); border-color:var(--primary); color:var(--primary)}
+.chip.ok{background:var(--green-light); border-color:var(--green); color:var(--green)}
+.chip.warn{background:var(--amber-light); border-color:var(--amber); color:var(--amber)}
+.chip.danger{background:var(--red-light); border-color:var(--red); color:var(--red)}
+.chip.gold{background:var(--accent-light); border-color:var(--accent); color:var(--accent-ink)}
+
+/* ---------- tables ---------- */
+.scroller{overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--silver); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow); margin-bottom:14px}
+table{border-collapse:collapse; width:100%; font-size:13px; min-width:640px}
+table.matrix{min-width:900px}
+table.wide{min-width:1000px}
+thead th{
+  background:var(--mist); text-align:left; font-size:11px; text-transform:uppercase;
+  letter-spacing:.5px; color:var(--slate); padding:9px 11px; border-bottom:1px solid var(--silver);
+  position:sticky; top:0; white-space:nowrap; z-index:2;
+}
+tbody td{padding:10px 11px; border-bottom:1px solid var(--silver); vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--mist)}
+td.id{font-weight:800; white-space:nowrap}
+td.n,th.n{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+tr.total td{font-weight:800; background:var(--mist)}
+.risk-crit td.id{color:var(--red)} .risk-high td.id{color:var(--amber)}
+tr.risk-crit{background:var(--red-light)} tr.risk-high{background:var(--amber-light)}
+tr.risk-crit:hover,tr.risk-high:hover{filter:brightness(.98)}
+
+/* tier matrix — frozen first column + tier stripes */
+table.matrix th.feat,table.matrix td.feat{
+  position:sticky; left:0; background:var(--surface); z-index:1;
+  border-right:1px solid var(--silver); font-weight:600; min-width:250px;
+}
+table.matrix thead th.feat{background:var(--mist); z-index:3}
+table.matrix tbody tr:hover td.feat{background:var(--mist)}
+table.matrix th.tier{text-align:center; border-top:3px solid var(--silver); min-width:132px}
+table.matrix th.t-free{border-top-color:var(--slate)}
+table.matrix th.t-plus{border-top-color:var(--primary)}
+table.matrix th.t-max{border-top-color:var(--primary)}
+table.matrix th.t-ultra{border-top-color:var(--accent)}
+table.matrix th.tier .tname{display:block; font-size:12.5px; color:var(--ink); text-transform:none; letter-spacing:-.2px; font-weight:800}
+table.matrix th.tier .tprice{display:block; font-size:11px; color:var(--slate); text-transform:none; letter-spacing:0; margin-top:2px; font-weight:600}
+table.matrix td.cell{text-align:center; font-size:13px}
+.yes{color:var(--green); font-weight:800}
+.no{color:var(--slate); opacity:.55}
+.cond{color:var(--amber); font-weight:800}
+.na{color:var(--red); font-weight:800}
+
+/* ---------- cards / notes ---------- */
+.card{
+  background:var(--surface); border:1px solid var(--silver); border-radius:var(--radius);
+  padding:15px 17px; margin-bottom:12px; box-shadow:var(--shadow);
+}
+.card.crit{border-left:4px solid var(--red)}
+.card.warnc{border-left:4px solid var(--amber)}
+.card.okc{border-left:4px solid var(--green)}
+.card.goldc{border-left:4px solid var(--accent)}
+.card.pric{border-left:4px solid var(--primary)}
+.card.neutral{border-left:4px solid var(--silver)}
+.card h4{margin:0 0 8px; font-size:15px; letter-spacing:-.2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.card ul{margin:0; padding-left:18px}
+.card li{margin:0 0 6px}
+.card li:last-child{margin-bottom:0}
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px}
+.note{
+  background:var(--mist); border-left:3px solid var(--slate); border-radius:0 8px 8px 0;
+  padding:10px 13px; margin:12px 0; font-size:13.5px; color:var(--ink);
+}
+.note.gold{background:var(--accent-light); border-left-color:var(--accent)}
+.note.danger{background:var(--red-light); border-left-color:var(--red)}
+.note.warn{background:var(--amber-light); border-left-color:var(--amber)}
+.note.ok{background:var(--green-light); border-left-color:var(--green)}
+.note p{margin:0 0 7px} .note p:last-child{margin-bottom:0}
+
+.blocker{
+  background:var(--red-light); border:1px solid var(--red); border-left:4px solid var(--red);
+  border-radius:var(--radius); padding:14px 17px; margin-bottom:16px; box-shadow:var(--shadow);
+}
+.blocker h3{margin:0 0 7px; font-size:15px; color:var(--red); letter-spacing:-.2px}
+.blocker p{margin:0 0 7px; font-size:13.5px} .blocker p:last-child{margin-bottom:0}
+
+/* ---------- principles ---------- */
+ol.principles{list-style:none; counter-reset:pr; margin:0; padding:0; display:grid; gap:10px}
+ol.principles li{
+  counter-increment:pr; background:var(--surface); border:1px solid var(--silver);
+  border-radius:var(--radius); padding:13px 16px 13px 52px; position:relative; box-shadow:var(--shadow);
+  font-size:13.5px;
+}
+ol.principles li::before{
+  content:counter(pr); position:absolute; left:15px; top:13px;
+  width:24px; height:24px; border-radius:7px; background:var(--primary); color:#fff;
+  font-weight:800; font-size:12px; display:flex; align-items:center; justify-content:center;
+}
+ol.principles li strong{display:block; margin-bottom:3px; font-size:14px}
+
+/* ---------- roadmap steps ---------- */
+.step{
+  background:var(--surface); border:1px solid var(--silver); border-left:4px solid var(--primary);
+  border-radius:var(--radius); padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow);
+}
+.step h4{margin:0 0 7px; font-size:15px; display:flex; align-items:center; gap:9px; flex-wrap:wrap}
+.step .sn{
+  background:var(--primary); color:#fff; font-weight:800; font-size:12px; min-width:44px; height:24px;
+  border-radius:7px; display:inline-flex; align-items:center; justify-content:center; padding:0 8px;
+}
+.step .why{margin:7px 0 0; font-size:13px; color:var(--slate)}
+.step p{margin:0; font-size:13.5px}
+.step.gate-step{border-left-color:var(--red); background:var(--red-light)}
+.step.gate-step .sn{background:var(--red)}
+.step.deferred{border-left-color:var(--slate); background:var(--mist)}
+.step.deferred .sn{background:var(--slate)}
+
+/* ---------- charts ---------- */
+.figure{
+  background:var(--surface); border:1px solid var(--silver); border-radius:var(--radius);
+  padding:16px 18px; box-shadow:var(--shadow); margin-bottom:14px;
+}
+.figure figcaption{font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--slate); font-weight:700; margin-bottom:3px}
+.figure .ftitle{font-size:14.5px; font-weight:800; letter-spacing:-.2px; margin-bottom:14px}
+.bars{display:grid; gap:9px}
+.bar-row{display:grid; grid-template-columns:minmax(112px,168px) 1fr; gap:12px; align-items:center}
+.bar-label{font-size:12.5px; color:var(--ink); font-weight:600; text-align:right}
+.bar-label small{display:block; color:var(--slate); font-weight:500; font-size:11px; font-variant-numeric:tabular-nums}
+.bar-track{position:relative; background:var(--mist); border-radius:5px; height:22px; display:flex; align-items:center}
+.bar-fill{
+  height:22px; border-radius:0 5px 5px 0; background:var(--c-net);
+  display:flex; align-items:center; justify-content:flex-end; padding-right:8px; min-width:3px;
+}
+.bar-fill.fee{background:var(--c-fee)}
+.bar-val{font-size:11.5px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums; white-space:nowrap}
+.bar-val.outside{color:var(--ink); position:absolute; padding-left:8px}
+.bar-row:hover .bar-fill{filter:brightness(1.08)}
+.floor{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--slate); opacity:.65}
+.floor::after{
+  content:attr(data-label); position:absolute; top:-15px; left:50%; transform:translateX(-50%);
+  font-size:10px; color:var(--slate); font-weight:700; white-space:nowrap;
+}
+.stackbar{display:flex; height:22px; border-radius:5px; overflow:hidden; gap:2px; background:var(--mist)}
+.stackbar span{display:flex; align-items:center; padding:0 7px; font-size:11px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums; white-space:nowrap}
+.seg-net{background:var(--c-net)} .seg-fee{background:var(--c-fee)}
+.legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:14px; padding-top:12px; border-top:1px solid var(--silver)}
+.legend span{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--slate); font-weight:600}
+.legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
+.fnote{font-size:12px; color:var(--slate); margin-top:12px}
+
+/* ---------- details ---------- */
+details.dec{
+  background:var(--surface); border:1px solid var(--silver); border-radius:var(--radius);
+  margin-bottom:9px; box-shadow:var(--shadow); overflow:hidden;
+}
+details.dec>summary{
+  cursor:pointer; padding:12px 15px; font-weight:700; font-size:14px;
+  list-style:none; display:flex; gap:9px; align-items:baseline;
+}
+details.dec>summary::-webkit-details-marker{display:none}
+details.dec>summary::before{content:"\25B8"; color:var(--primary); font-size:12px}
+details.dec[open]>summary::before{content:"\25BE"}
+details.dec>summary:hover{background:var(--mist)}
+details.dec .body{padding:0 17px 15px; border-top:1px solid var(--silver); padding-top:12px; font-size:13.5px}
+.qn{color:var(--slate); font-weight:800; font-size:12px; font-variant-numeric:tabular-nums}
+.lean{font-size:13px; color:var(--slate); margin-top:8px}
+.lean strong{color:var(--ink)}
+
+ul.xref{list-style:none; margin:0; padding:0; display:grid; gap:7px}
+ul.xref li{font-size:13px; padding-left:16px; position:relative; color:var(--slate)}
+ul.xref li::before{content:""; position:absolute; left:0; top:8px; width:6px; height:6px; border-radius:2px; background:var(--silver)}
+ul.xref li strong{color:var(--ink); font-weight:600}
+
+footer{border-top:1px solid var(--silver); padding:22px 0 40px; color:var(--slate); font-size:12.5px}
+footer .rev{margin-top:12px}
+footer .rev p{font-size:12.5px; max-width:100ch; margin:0 0 9px}
+footer .rev .v{font-weight:800; color:var(--ink)}
+
+@media (max-width:640px){
+  body{font-size:14.5px}
+  header.masthead h1{font-size:22px}
+  .bar-row{grid-template-columns:1fr; gap:4px}
+  .bar-label{text-align:left}
+  ol.principles li{padding-left:16px; padding-top:44px}
+  ol.principles li::before{top:13px; left:16px}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <h1><span class="sport">Sport</span><span class="pool">Pool</span> &mdash; Monetization Plan</h1>
+    <p class="lede">Four admin tiers, three player-side revenue vectors, and a Merchant-of-Record payment stack. Validated against 2026 World Cup pool data; projected to 50K users.</p>
+    <div class="mast-meta">
+      <span class="chip live">v1.1 &middot; Aug 2026</span>
+      <span class="chip">Owner: Ryan Sousa</span>
+      <span class="chip">Design proposed</span>
+      <span class="chip">No payment infrastructure built</span>
+    </div>
+    <div class="src">Source of truth: <code>MONETIZATION.md</code> &middot; Programme context: <code>SPORTPOOL_PROGRAMME.md</code> &sect;1 Phase&nbsp;2</div>
+  </div>
+</header>
+
+<nav class="sticky" aria-label="Section navigation">
+  <div class="wrap">
+    <a href="#principles">Principles</a>
+    <a href="#payments">Payments</a>
+    <a href="#tiers">Pool Tiers</a>
+    <a href="#ultra">Marketing Pack</a>
+    <a href="#players">Player Vectors</a>
+    <a href="#stack">Layer Stack</a>
+    <a href="#revenue">Revenue</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#questions">Open Questions</a>
+    <a href="#risks">Risks</a>
+    <a href="#regression">WC Regression</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <div class="blocker">
+    <h3>Open blocker &mdash; nothing below is buildable yet</h3>
+    <p>Paddle's Acceptable Use Policy explicitly prohibits <strong>fantasy sports leagues</strong> and <strong>sports forecasting with prizes</strong>, and prohibits <strong>physical goods</strong> entirely. Nothing in this plan is buildable until Paddle approves the account in writing.</p>
+    <p>See <a href="#risks">RM-08</a> (account rejection risk) and <a href="#risks">RM-09</a> (physical goods off the Paddle rail). Phase <strong>3a.0</strong> exists solely to resolve this.</p>
+  </div>
+
+  <div class="strip">
+    <div class="stat pri"><div class="n">~$223K</div><div class="l">Gross rev / year</div><div class="s">Projected at 50K users</div></div>
+    <div class="stat low"><div class="n">~$184K</div><div class="l">Net of Paddle</div><div class="s">After ~$12.5K processing</div></div>
+    <div class="stat med"><div class="n">2&times;</div><div class="l">Player vector lift</div><div class="s">$114K admin-only &rarr; $223K</div></div>
+    <div class="stat neu"><div class="n">$280</div><div class="l">Actual WC revenue</div><div class="s">15 pools, modelled</div></div>
+    <div class="stat crit"><div class="n">1</div><div class="l">Blocking gate</div><div class="s">Paddle AUP approval</div></div>
+  </div>
+
+  <!-- ============ PRINCIPLES ============ -->
+  <section id="principles">
+    <h2 class="sec">Principles <span class="count">5 rules that constrain everything below</span></h2>
+    <p class="sec-sub">These are load-bearing. Principle 1 in particular stopped being only an ethical stance the moment Paddle became the payment rail &mdash; it is now the commercial argument that keeps SportPool sellable at all.</p>
+
+    <ol class="principles">
+      <li>
+        <strong>No gambling.</strong>
+        The platform never holds prize money, never takes a rake from a prize pool, never settles bets. All revenue is a service charge for organizing tools and venue experience. Pools that involve money continue to settle off-platform if admins choose. <strong>Under Paddle this becomes a payment-processing constraint, not just an ethical one</strong> &mdash; Paddle's AUP prohibits "fantasy sports leagues" and "Sports forecasting/odds making where monetary or material prizes are involved". The fact that no prize money ever touches the platform is the argument that keeps SportPool sellable.
+      </li>
+      <li>
+        <strong>Event-based for admins, continuous for players.</strong>
+        Pool admin revenue is per-tournament one-time. Player revenue is a mix of one-time microtransactions and tournament-agnostic subscriptions, depending on the engagement pattern.
+      </li>
+      <li>
+        <strong>Two independent ladders.</strong>
+        The admin tier (what features exist in a pool) and the player tier (how the player experiences whatever exists) layer cleanly. Neither replaces the other.
+      </li>
+      <li>
+        <strong>Honest pricing-page framing.</strong>
+        Subscriptions and bundles are marketed for the engagement segment they actually serve, not as one-size-fits-all.
+      </li>
+      <li>
+        <strong>The bar tier is the leverage point.</strong>
+        Consumer admin pricing pays for hosting and Paddle overhead (5% + 50&cent; per transaction). Pool Ultra is where the business model lives.
+      </li>
+    </ol>
+  </section>
+
+  <!-- ============ PAYMENTS ============ -->
+  <section id="payments">
+    <h2 class="sec">Payments &mdash; Paddle as Merchant of Record <span class="count">Decision, Aug 2026</span></h2>
+    <p class="sec-sub">Paddle, not Stripe. Paddle is a Merchant of Record (MoR), not a payment processor &mdash; it becomes the legal seller of record for every transaction.</p>
+
+    <div class="grid2">
+      <div class="card okc">
+        <h4>What that buys</h4>
+        <ul>
+          <li><strong>Global tax handled.</strong> Paddle registers for, collects, and remits VAT / GST / US sales tax in every jurisdiction it sells into. For a Bermuda-based operator selling $19&ndash;$500 tiers into the UK, EU and US, this removes the need to track nexus thresholds or hold foreign tax registrations. <em>This is the single reason to prefer Paddle over Stripe.</em></li>
+          <li><strong>Chargeback and fraud liability sits with Paddle</strong>, not with us.</li>
+          <li><strong>Localized checkout and pricing</strong> in supported markets, plus subscription billing, out of the box.</li>
+        </ul>
+      </div>
+      <div class="card crit">
+        <h4>What Paddle cannot process</h4>
+        <ul>
+          <li><strong>Physical goods are prohibited outright</strong> &mdash; "Physical products, or products that require physical delivery". This removes Vector 3 merchandise (T-shirt, mug, medal) from the Paddle rail entirely. See <strong>RM-09</strong>.</li>
+          <li><strong>Prize-money flows</strong> &mdash; already excluded by Principle 1, but now for commercial reasons too. See <strong>RM-08</strong>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 class="grp">What it costs</h3>
+    <p><strong>5% + 50&cent; per checkout transaction</strong>, all-inclusive &mdash; no monthly fee, no separate tax-compliance fee. Compare Stripe at roughly 2.9% + 30&cent;, <em>plus</em> tax compliance handled by us.</p>
+
+    <figure class="figure">
+      <figcaption>Effective rate by product</figcaption>
+      <div class="ftitle">The fixed 50&cent; is what makes cheap products expensive</div>
+      <div class="bars">
+        <div class="bar-row">
+          <div class="bar-label">Cosmetic item<small>$2.99 &middot; fee $0.65</small></div>
+          <div class="bar-track"><div class="bar-fill fee" style="width:90.4%"><span class="bar-val">21.7%</span></div><div class="floor" style="left:20.8%" data-label="5% floor"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Pool Pro <em>monthly</em><small>$4.99 &middot; fee $0.75</small></div>
+          <div class="bar-track"><div class="bar-fill fee" style="width:62.5%"><span class="bar-val">15.0%</span></div><div class="floor" style="left:20.8%"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Pool Plus<small>$19 &middot; fee $1.45</small></div>
+          <div class="bar-track"><div class="bar-fill" style="width:31.7%"><span class="bar-val">7.6%</span></div><div class="floor" style="left:20.8%"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Pool Pro <em>annual</em><small>$39 &middot; fee $2.45</small></div>
+          <div class="bar-track"><div class="bar-fill" style="width:26.3%"><span class="bar-val">6.3%</span></div><div class="floor" style="left:20.8%"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Pool Max<small>$49 &middot; fee $2.95</small></div>
+          <div class="bar-track"><div class="bar-fill" style="width:25.0%"><span class="bar-val">6.0%</span></div><div class="floor" style="left:20.8%"></div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Pool Ultra<small>$500 &middot; fee $25.50</small></div>
+          <div class="bar-track"><div class="bar-fill" style="width:21.3%"><span class="bar-val">5.1%</span></div><div class="floor" style="left:20.8%"></div></div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--c-net)"></i> At or near the 5% floor</span>
+        <span><i style="background:var(--c-fee)"></i> Punitive &mdash; needs a custom rate</span>
+      </div>
+      <p class="fnote">Scale runs 0&ndash;24%. Every bar is labelled with its exact rate; the full figures are in the table below.</p>
+    </figure>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Product</th><th class="n">Price</th><th class="n">Paddle fee</th><th class="n">Effective rate</th></tr></thead>
+        <tbody>
+          <tr><td>Pool Plus</td><td class="n">$19</td><td class="n">$1.45</td><td class="n">7.6%</td></tr>
+          <tr><td>Pool Max</td><td class="n">$49</td><td class="n">$2.95</td><td class="n">6.0%</td></tr>
+          <tr><td>Pool Ultra</td><td class="n">$500</td><td class="n">$25.50</td><td class="n">5.1%</td></tr>
+          <tr><td>Pool Pro <em>(monthly)</em></td><td class="n">$4.99</td><td class="n">$0.75</td><td class="n">15.0%</td></tr>
+          <tr><td>Pool Pro <em>(annual)</em></td><td class="n">$39</td><td class="n">$2.45</td><td class="n">6.3%</td></tr>
+          <tr><td>Cosmetic item</td><td class="n">$2.99</td><td class="n">$0.65</td><td class="n">21.7%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4 class="sub">Two consequences</h4>
+    <div class="grid2">
+      <div class="card pric">
+        <h4><span class="chip cat">1</span> Push annual over monthly on Pool Pro</h4>
+        <p>At $4.99/month Paddle takes 15% &mdash; and does so twelve times a year. The $39 annual plan is already framed as "save 35%" for the player; it is also the materially better deal for us. <strong>Annual should be the default-selected option.</strong></p>
+      </div>
+      <div class="card warnc">
+        <h4><span class="chip warn">2</span> Sub-$10 items are the weak spot</h4>
+        <p>Paddle's pricing page states: <em>"If you're selling products under $10 or require invoicing contact us for custom pricing"</em> &mdash; so the $1.99&ndash;$4.99 cosmetics and the $5 digital trophy need a custom rate negotiated before Vector 1 ships on web. On mobile they route through RevenueCat / App Store IAP and are unaffected.</p>
+      </div>
+    </div>
+
+    <h3 class="grp">Integration surface</h3>
+    <div class="scroller">
+      <table>
+        <thead><tr><th style="min-width:150px">Concern</th><th>Paddle mechanism</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Checkout</strong></td><td>Paddle.js overlay or hosted checkout</td></tr>
+          <tr><td><strong>Catalog</strong></td><td>Paddle products + prices <em>(mirrors the tier table above)</em></td></tr>
+          <tr><td><strong>Recurring</strong></td><td>Paddle Subscriptions <em>(Pool Pro, web)</em></td></tr>
+          <tr><td><strong>Server events</strong></td><td>Notification destinations &mdash; <code>transaction.completed</code>, <code>subscription.created</code>, <code>subscription.updated</code>, <code>subscription.canceled</code></td></tr>
+          <tr><td><strong>Environments</strong></td><td>Sandbox (<code>pdl_sdbx_</code> key) for build + test; Live (OAuth) for production</td></tr>
+          <tr><td><strong>Mobile</strong></td><td><strong>Unchanged</strong> &mdash; RevenueCat + App Store / Play IAP. Paddle is web-only here.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">Agent tooling for all of the above is wired up in <code>.mcp.json</code> (<code>paddle-sandbox</code>, <code>paddle-live</code>, <code>paddle-docs</code>). <strong>Build and test everything against sandbox first.</strong></div>
+  </section>
+
+  <!-- ============ TIERS ============ -->
+  <section id="tiers">
+    <h2 class="sec">Pool Tiers <span class="count">Admin-paid, one-time per tournament &mdash; no subscription</span></h2>
+    <p class="sec-sub">The four tiers an admin chooses when creating a pool. Each tournament is its own purchase.</p>
+
+    <div class="scroller">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th class="feat">Feature</th>
+            <th class="tier t-free"><span class="tname">Free</span><span class="tprice">$0 &middot; Small Pool</span></th>
+            <th class="tier t-plus"><span class="tname">Pool Plus</span><span class="tprice">$19 / season</span></th>
+            <th class="tier t-max"><span class="tname">Pool Max</span><span class="tprice">$49 / season</span></th>
+            <th class="tier t-ultra"><span class="tname">Pool Ultra</span><span class="tprice">$500 / tournament</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="feat">Best for</td><td class="cell">Friends &amp; family</td><td class="cell">Office / friend group</td><td class="cell">Big organized pool</td><td class="cell">Sports bars &amp; venues</td></tr>
+          <tr><td class="feat">Members</td><td class="cell">Up to 10</td><td class="cell">Up to 30</td><td class="cell">Unlimited</td><td class="cell">Unlimited</td></tr>
+          <tr><td class="feat">Entries per user</td><td class="cell">1</td><td class="cell">Up to 3</td><td class="cell">Unlimited</td><td class="cell">Unlimited</td></tr>
+          <tr><td class="feat">Pool modes available</td><td class="cell">1 default per competition</td><td class="cell">All modes</td><td class="cell">All modes</td><td class="cell">All modes</td></tr>
+          <tr><td class="feat">Custom scoring config</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Form tab <em>(XP, badges, level runway)</em></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Banter <em>(mentions, reactions, badge flex)</em></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">How Others Predicted <em>(post-deadline)</em></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell">Member picks</td><td class="cell">Picks + crowd analytics</td><td class="cell">Picks + crowd analytics</td></tr>
+          <tr><td class="feat">Pool branding <em>(name, emoji, color)</em></td><td class="cell">Generic</td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Custom landing page</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Custom TV leaderboard</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Broadcast email to members</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">CSV export of standings</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Multi-pool venue identity</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Public bar profile page <code>/bar/[slug]</code></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Venue directory listing</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Hosted public <code>/tv?venue=&hellip;</code> page</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Live in-bar ticker on TV</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Match-night push to patrons</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Marketing pack <em>(print-ready PDFs)</em></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">House champion ledger</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Bar-specific badges + awards pack</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Multi-staff admin accounts</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Promo code / drink-token tools</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Patron retention dashboard</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Self-serve sponsor slot</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Weekly winner crown mechanic</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="no">&mdash;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Billing</td><td class="cell"><span class="no">&mdash;</span></td><td class="cell">One-time per season<br><span style="color:var(--slate);font-size:12px">Paddle Checkout</span></td><td class="cell">One-time per season<br><span style="color:var(--slate);font-size:12px">Paddle Checkout</span></td><td class="cell">One-time per tournament<br><span style="color:var(--slate);font-size:12px">Paddle Checkout</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="grp">Default mode per competition <span style="font-weight:400;color:var(--slate);font-size:13px">(Free tier)</span></h3>
+    <p>The free tier gets the simplest mode for the competition. Paid tiers unlock the full catalog.</p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Competition</th><th>Default mode <em>(Free)</em></th><th>Modes unlocked on Plus+</th></tr></thead>
+        <tbody>
+          <tr><td><strong>World Cup / Euros</strong></td><td>Full</td><td>Progressive, Bracket</td></tr>
+          <tr><td><strong>Premier League / La Liga</strong></td><td>Weekly pick'em</td><td>Season-long predictor, H2H Showdown</td></tr>
+          <tr><td><strong>FA Cup / Champions League knockout</strong></td><td>Bracket</td><td>Round-by-round progressive</td></tr>
+          <tr><td><strong>Super Bowl squares</strong></td><td>Single-game squares</td><td>Multi-game squares, prop predictions</td></tr>
+          <tr><td><strong>NFL / NBA regular season</strong></td><td>Weekly pick'em</td><td>Season-long, survivor</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn">Mode availability per competition becomes config under <strong>TD-05</strong> (pool template system, Phase 3c.3). Until that lands, mode gating is only enforceable for the World Cup.</div>
+
+    <div class="grid2">
+      <div class="card neutral">
+        <h4>Mix-and-match rule</h4>
+        <p>Each tournament is its own purchase. A bar can buy Pool Ultra for EPL ($500), Pool Max for the FA Cup ($49), and skip the Champions League entirely. Any admin can buy any tier. <strong>Pool Ultra is opt-in, not required for venues.</strong></p>
+      </div>
+      <div class="card pric">
+        <h4>Upsell logic</h4>
+        <ul>
+          <li><strong>Free &rarr; Plus ($19):</strong> unlocks the actual product experience &mdash; banter, form/XP, all modes, custom scoring, pool branding.</li>
+          <li><strong>Plus &rarr; Max ($49):</strong> unlocks the audience experience &mdash; bigger pool, custom landing page, custom TV leaderboard, broadcast email, exports.</li>
+          <li><strong>Max &rarr; Ultra ($500):</strong> unlocks the venue experience &mdash; public hosted TV page, foot-traffic engine, marketing pack, multi-staff admin, house champion ledger, sponsor slot.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 class="grp">Free-tier guardrails</h3>
+    <div class="grid2">
+      <div class="card neutral"><h4>11th member can't join</h4><p>Hard cap at the database level &mdash; the 11th person sees "this pool is full, ask the admin to upgrade." <strong>No soft-cap nag screens.</strong></p></div>
+      <div class="card neutral"><h4>Admin upgrades mid-season</h4><p>Features unlock retroactively. No data deleted. Banter and form history preserved.</p></div>
+      <div class="card neutral"><h4>Free pool data retention</h4><p>Free pools persist after the tournament ends. <strong>Free is a real product, not a trial.</strong></p></div>
+    </div>
+  </section>
+
+  <!-- ============ ULTRA MARKETING PACK ============ -->
+  <section id="ultra">
+    <h2 class="sec">Pool Ultra &mdash; marketing pack <span class="count">15 templates, auto-stamped</span></h2>
+    <p class="sec-sub">The $500 venue tier includes a fully-automated print-ready marketing pack. The bar fills out a branding form once; the server auto-stamps every layout with their logo, colors and QR code via <code>pdf-lib</code>.</p>
+
+    <div class="card neutral">
+      <h4>Common parameterized fields <span class="chip">all templates</span></h4>
+      <p><code>bar_name</code> &middot; <code>bar_logo</code> <em>(SVG preferred, PNG &ge;300dpi)</em> &middot; <code>primary_color</code> / <code>secondary_color</code> <em>(hex)</em> &middot; <code>qr_target</code> <em>(auto-generated)</em> &middot; <code>tournament_name</code> &middot; <code>pool_name</code> <em>(optional)</em> &middot; <code>tagline</code> <em>(optional)</em></p>
+    </div>
+
+    <h3 class="grp">Print pack <span style="font-weight:400;color:var(--slate);font-size:13px">(core 8)</span></h3>
+    <div class="scroller">
+      <table class="wide">
+        <thead><tr><th class="n" style="width:40px">#</th><th>Template</th><th>Size / spec</th><th>Use case</th><th>Extra fields</th></tr></thead>
+        <tbody>
+          <tr><td class="n">1</td><td><strong>Table tent</strong></td><td>A6 folded (4-panel), CMYK, 3mm bleed</td><td>Sits on every table</td><td><span class="no">&mdash;</span></td></tr>
+          <tr><td class="n">2</td><td><strong>Window decal / cling</strong></td><td>A4 portrait, CMYK, sticker-vinyl spec</td><td>Walk-by foot traffic</td><td><span class="no">&mdash;</span></td></tr>
+          <tr><td class="n">3</td><td><strong>Coaster</strong></td><td>95mm round, CMYK, 1mm bleed</td><td>Lives under every drink</td><td><span class="no">&mdash;</span></td></tr>
+          <tr><td class="n">4</td><td><strong>A-frame sidewalk poster</strong></td><td>A2 portrait, CMYK, 5mm bleed</td><td>Outdoor reach</td><td><code>address_line</code>, <code>opening_hours</code></td></tr>
+          <tr><td class="n">5</td><td><strong>Menu / drinks-list insert</strong></td><td>DL slip card (99&times;210mm), double-sided, CMYK</td><td>Tucked into menus</td><td><code>featured_drink</code></td></tr>
+          <tr><td class="n">6</td><td><strong>Bathroom poster</strong></td><td>A3 portrait, CMYK, 5mm bleed</td><td>Captive audience</td><td><span class="no">&mdash;</span></td></tr>
+          <tr><td class="n">7</td><td><strong>TV digital signage slate</strong></td><td>1920&times;1080 16:9, RGB</td><td>Plays between matches</td><td><code>next_match_label</code></td></tr>
+          <tr><td class="n">8</td><td><strong>Welcome flyer</strong></td><td>A5 double-sided, CMYK, 3mm bleed</td><td>Takeaway with rules</td><td><code>rules_summary</code>, <code>prize_info</code>, <code>social_handles</code></td></tr>
+          <tr><td class="n">9</td><td><strong>Print-shop spec sheet</strong></td><td colspan="3">Bleeds, color profile, recommended paper stock, sizes &mdash; so the bar's local printer doesn't ask 14 questions</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid2">
+      <div class="card neutral">
+        <h4>Social pack <span class="chip">RGB, bonus</span></h4>
+        <ul>
+          <li><strong>10 &middot; Instagram square</strong> &mdash; 1080&times;1080 &middot; pool launch / deadline reminders</li>
+          <li><strong>11 &middot; Instagram / Facebook story</strong> &mdash; 1080&times;1920 &middot; vertical countdown / match-night promo</li>
+          <li><strong>12 &middot; Facebook cover</strong> &mdash; 820&times;360 &middot; page header for the season</li>
+        </ul>
+      </div>
+      <div class="card goldc">
+        <h4>Awards pack <span class="chip gold">auto-filled from final standings</span></h4>
+        <ul>
+          <li><strong>13 &middot; Champion certificate</strong> &mdash; A4 landscape, CMYK</li>
+          <li><strong>14 &middot; Champion social tile</strong> &mdash; 1080&times;1080 &middot; "[Player] is Champion of [Bar Name]"</li>
+          <li><strong>15 &middot; Season-recap social tile</strong> &mdash; 1080&times;1080 &middot; top 3 finishers, total participants</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 class="grp">Technical approach</h3>
+    <p>Hand-design layouts once in Affinity / Adobe with proper CMYK + bleed. Export as templates with named placeholder regions. Server stamps placeholders via <code>pdf-lib</code>, zips and delivers.</p>
+    <div class="strip">
+      <div class="stat high"><div class="n">$2&ndash;4K</div><div class="l">Design phase</div><div class="s">Freelance, full set of 14</div></div>
+      <div class="stat pri"><div class="n">~1 wk</div><div class="l">Engineering</div><div class="s">+ ~3 days preview UI</div></div>
+      <div class="stat low"><div class="n">5+1</div><div class="l">MVP option</div><div class="s">Templates 1,2,3,4,7 + spec sheet</div></div>
+    </div>
+  </section>
+
+  <!-- ============ PLAYER VECTORS ============ -->
+  <section id="players">
+    <h2 class="sec">Player-Side Monetization <span class="count">3 vectors</span></h2>
+    <p class="sec-sub">Players currently generate zero revenue. At 50K users, ~83% of users are non-admin players &mdash; the biggest untapped revenue source. Three complementary vectors, all consistent with the no-subscription-for-admin and no-gambling principles.</p>
+
+    <h3 class="grp">Vector 1 &mdash; Cosmetic Marketplace <span class="chip cat">microtransactions</span></h3>
+    <p>Small one-time IAPs. Pure cosmetics. Owned forever. Sport-agnostic. Lives across every pool the player participates in.</p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Item type</th><th class="n">Price</th><th>Examples</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Avatar packs</strong></td><td class="n">$1.99&ndash;4.99</td><td>World Cup country avatars, club crest packs, mascot collection</td></tr>
+          <tr><td><strong>Theme packs</strong></td><td class="n">$1.99&ndash;4.99</td><td>Dark variants, retro arcade, neon, tournament-edition themes</td></tr>
+          <tr><td><strong>Reaction packs</strong></td><td class="n">$2.99</td><td>Animated emoji bundles, sport-specific (yellow card, red card, GOAL!)</td></tr>
+          <tr><td><strong>Badge frames</strong></td><td class="n">$2.99&ndash;4.99</td><td>Premium frames around earned badges (gold, holo, animated)</td></tr>
+          <tr><td><strong>Banter effects</strong></td><td class="n">$1.99</td><td>Confetti on rank-up, custom sounds, message highlight colors</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card neutral">
+      <h4>Properties</h4>
+      <ul>
+        <li>No gameplay impact &mdash; pure visual / audio polish</li>
+        <li>Permanent ownership after purchase</li>
+        <li>Works in any pool tier (Free included)</li>
+        <li>Reuses Pool Ultra's branding/stamping infrastructure for asset rendering</li>
+        <li>Mobile-native via RevenueCat IAP</li>
+      </ul>
+    </div>
+    <div class="note warn"><strong>Web sales need a custom Paddle rate.</strong> Every item here is under $10, where Paddle's standard 5% + 50&cent; becomes punitive (21.7% on a $2.99 item). Negotiate before shipping Vector 1 on web; mobile IAP is unaffected.</div>
+
+    <h3 class="grp">Vector 2 &mdash; Pool Pro <span class="chip cat">subscription, tournament-agnostic</span></h3>
+    <p>A continuous-engagement subscription for engaged players. Works across every pool the player is in, regardless of sport or pool tier. Sport-agnostic by construction &mdash; no "I don't care about NFL" tension, because Pool Pro doesn't sell sports, it sells a better player experience.</p>
+    <div class="scroller">
+      <table class="wide">
+        <thead><tr><th style="min-width:130px">Tier</th><th style="min-width:150px" class="n">Price</th><th>What's included</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Free player</strong></td><td class="n">$0</td><td>Default experience. Can still buy cosmetic IAP and merch &agrave; la carte.</td></tr>
+          <tr><td><strong>Pool Pro</strong></td><td class="n">$4.99/mo<br>or <strong>$39/yr</strong> <span class="chip ok">save 35%</span></td><td>Advanced personal stats <em>(form curves, head-to-head, accuracy trend)</em>, theme picker, priority push category controls, exclusive Pro badge variants, "Pro" verified mark on leaderboards, animated rank-up celebrations, ad-free <em>(if ads ever launch)</em></td></tr>
+          <tr><td><strong>Pool Pro Plus</strong></td><td class="n">$7.99/mo<br>or <strong>$59/yr</strong> <span class="chip ok">save 38%</span></td><td>All Pool Pro + <strong>1 cosmetic item per month</strong> <em>(rotating curated selection)</em>, <strong>year-end "Pool Pro Wrapped" recap</strong>, <strong>custom Pro badge designer</strong>, <strong>priority customer support</strong>, <strong>early access</strong> to beta features</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card okc">
+      <h4>Why subscription works for players (and didn't for admins)</h4>
+      <ul>
+        <li>Engaged players are in 2&ndash;5 pools simultaneously across multiple sports &mdash; engagement is continuous even though each tournament is discrete</li>
+        <li>Tournaments overlap across the calendar (EPL Aug&ndash;May, NFL Sep&ndash;Feb, NBA Oct&ndash;Jun) &mdash; no dormant time</li>
+        <li>Players touch the app daily (predictions, banter, leaderboard checks)</li>
+        <li>Value is in ongoing engagement experience, not discrete setup moments</li>
+      </ul>
+    </div>
+
+    <h3 class="grp">Vector 3 &mdash; Merchandise <span class="chip cat">one-time, event-driven</span></h3>
+    <p>Physical print-on-demand + digital collectibles. Tournament-end / victory-moment revenue. Heaviest build &mdash; ships last.</p>
+    <div class="note danger"><strong>Paddle cannot process this vector.</strong> Paddle's AUP prohibits "Physical products, or products that require physical delivery" outright. The T-shirt, mug and medal lines need a separate rail &mdash; either Stripe alongside Paddle, or Printful's own storefront checkout so the physical sale never touches our books. Only the $5 digital trophy and the $5 sticker pack are Paddle-eligible, and both are sub-$10. See <strong>RM-09</strong>.</div>
+    <div class="scroller">
+      <table class="wide">
+        <thead><tr><th>Item</th><th class="n">Price</th><th>Notes</th><th style="width:130px">Paddle rail</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Digital winner's trophy</strong></td><td class="n">$5</td><td>Auto-generated PDF certificate + shareable social tile with pool name + winner badge</td><td><span class="chip warn">Sub-$10 rate</span></td></tr>
+          <tr><td><strong>Pool-branded T-shirt</strong></td><td class="n">$29</td><td>Print-on-demand via Printful. Platform margin ~25% = $7/sale. Admin opts in.</td><td><span class="chip danger">Not eligible</span></td></tr>
+          <tr><td><strong>Pool-branded mug</strong></td><td class="n">$19</td><td>Same fulfilment pipeline. Platform margin ~$5/sale.</td><td><span class="chip danger">Not eligible</span></td></tr>
+          <tr><td><strong>Physical winner's medal</strong></td><td class="n">$35</td><td>Engraved, print-on-demand. Platform margin ~$10.</td><td><span class="chip danger">Not eligible</span></td></tr>
+          <tr><td><strong>Tournament edition badge stickers</strong></td><td class="n">$5 <em>(pack of 10)</em></td><td>Pure margin. Limited-edition per tournament.</td><td><span class="chip warn">Sub-$10 rate</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card neutral">
+      <h4>Properties</h4>
+      <ul>
+        <li>Print-on-demand &rarr; zero inventory risk</li>
+        <li>Pool Ultra venues can sell their own bar-branded merch through the same pipeline (high-value bar + sponsor co-branded items)</li>
+        <li>One-time purchases, no subscription mechanics</li>
+        <li>Heaviest build: Printful integration, shipping logistics, returns</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ LAYER STACK ============ -->
+  <section id="stack">
+    <h2 class="sec">How the layers stack <span class="count">pool tier &times; player tier</span></h2>
+    <p class="sec-sub">The admin tier (what features exist in the pool) and the player tier (how the player experiences whatever exists) are independent. A Pool Pro subscriber carries their experience into every pool they're in.</p>
+
+    <div class="note">
+      <p><span class="yes">&#10003;</span> <strong>Works</strong> &mdash; feature operates regardless of pool tier &nbsp;&middot;&nbsp; <span class="cond">&#9888;</span> <strong>Conditional</strong> &mdash; requires pool tier to enable the underlying feature first &nbsp;&middot;&nbsp; <span class="na">&#10007;</span> <strong>Redundant</strong> &mdash; pool tier already includes it</p>
+    </div>
+
+    <div class="scroller">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th class="feat">Pool Pro feature</th>
+            <th class="tier t-free"><span class="tname">Free pool</span></th>
+            <th class="tier t-plus"><span class="tname">Pool Plus</span></th>
+            <th class="tier t-max"><span class="tname">Pool Max</span></th>
+            <th class="tier t-ultra"><span class="tname">Pool Ultra</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="feat">Custom avatar</td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Theme picker <em>(player's own app)</em></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">"Pro" mark on leaderboard</td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Animated rank-up celebrations</td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Exclusive Pro badge variants</td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Priority push category controls</td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Advanced personal stats <em>(form, H2H, accuracy)</em></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Premium banter effects <em>(animated reactions, GIF)</em></td><td class="cell"><span class="cond">&#9888;</span> <span style="color:var(--slate);font-size:12px">no banter</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+          <tr><td class="feat">Crowd analytics on How Others Predicted</td><td class="cell"><span class="cond">&#9888;</span> <span style="color:var(--slate);font-size:12px">no HOP</span></td><td class="cell"><span class="yes">&#10003;</span> <span style="color:var(--slate);font-size:12px">adds on top</span></td><td class="cell"><span class="na">&#10007;</span> <span style="color:var(--slate);font-size:12px">Max includes</span></td><td class="cell"><span class="na">&#10007;</span> <span style="color:var(--slate);font-size:12px">same as Max</span></td></tr>
+          <tr><td class="feat">Pool Pro Plus extras <em>(monthly cosmetic, Wrapped, designer)</em></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td><td class="cell"><span class="yes">&#10003;</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid2">
+      <div class="card okc">
+        <h4>Key insight</h4>
+        <p>~80% of Pool Pro's value is in the <span class="yes">&#10003;</span> column &mdash; features that work in <em>any</em> pool, including Free. <strong>Free-pool players get the biggest lift from subscribing</strong>, which is exactly the segment most worth monetizing because the admin isn't paying anything.</p>
+      </div>
+      <div class="card crit">
+        <h4>What does NOT cross the layers</h4>
+        <p><strong>Multi-entry override is deliberately NOT a Pool Pro feature.</strong> A power player who wants 5 entries cannot buy their way around an admin's cap. This protects the admin-tier upsell &mdash; the entry-count rule was responsible for 3 of 10 paying admin tiers in the 2026 WC regression. Pool Pro Plus differentiates through cosmetic + experience extras, not gameplay overrides.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REVENUE ============ -->
+  <section id="revenue">
+    <h2 class="sec">Revenue stack <span class="count">projection at 50K users</span></h2>
+    <p class="sec-sub">Conservative assumptions, all sourced from the 2026 WC regression where data exists. Numbers above 627 users involve extrapolation &mdash; treated as estimates, not forecasts.</p>
+
+    <div class="scroller">
+      <table class="wide">
+        <thead><tr><th>Stream</th><th>Conversion / scale</th><th class="n">Revenue / year</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Admin tier</strong> <em>(Free / Plus / Max)</em></td><td>1.6% paying-admin rate &times; 4 tournaments &times; $28 avg</td><td class="n">~$89,400</td></tr>
+          <tr><td><strong>Pool Ultra</strong> <em>(venues)</em></td><td>1 bar per 2,500 users &times; 75% &times; 4 tournaments &times; $500</td><td class="n">~$25,000</td></tr>
+          <tr><td><strong>Vector 1</strong> &mdash; Cosmetics</td><td>3% of players &times; $3 avg &times; 4 tournaments</td><td class="n">~$15,000</td></tr>
+          <tr><td><strong>Vector 2</strong> &mdash; Pool Pro subscription</td><td>5% of players &times; $39/year avg</td><td class="n">~$82,000</td></tr>
+          <tr><td><strong>Vector 3</strong> &mdash; Merchandise</td><td>1% of players &times; $7 platform margin &times; 4 tournaments</td><td class="n">~$12,000</td></tr>
+          <tr class="total"><td>Total gross revenue</td><td></td><td class="n">~$223,400</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="grp">Processing cost &mdash; what Paddle takes</h3>
+    <p>The table above is <strong>gross revenue</strong>. Three of the five streams run through Paddle and carry the 5% + 50&cent;.</p>
+
+    <figure class="figure">
+      <figcaption>Gross split into net kept vs Paddle fee</figcaption>
+      <div class="ftitle">~6.4% effective across the Paddle-borne streams</div>
+      <div class="bars">
+        <div class="bar-row">
+          <div class="bar-label">Admin tier<small>~3,193 txns @ $28</small></div>
+          <div class="stackbar" style="width:100%">
+            <span class="seg-net" style="width:93.2%">$83,330 net</span><span class="seg-fee" style="width:6.8%">$6,070</span>
+          </div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Pool Pro <em>annual, web</em><small>~2,103 txns @ $39</small></div>
+          <div class="stackbar" style="width:91.7%">
+            <span class="seg-net" style="width:93.7%">$76,850 net</span><span class="seg-fee" style="width:6.3%">$5,150</span>
+          </div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Pool Ultra<small>50 txns @ $500</small></div>
+          <div class="stackbar" style="width:28.0%">
+            <span class="seg-net" style="width:94.9%">$23,725</span><span class="seg-fee" style="width:5.1%"></span>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--c-net)"></i> Net kept</span>
+        <span><i style="background:var(--c-fee)"></i> Paddle fee (5% + 50&cent;)</span>
+      </div>
+      <p class="fnote">Bar widths are proportional to gross. Pool Ultra's fee segment is $1,275 &mdash; too narrow to label in place; see the table below.</p>
+    </figure>
+
+    <div class="scroller">
+      <table class="wide">
+        <thead><tr><th>Stream</th><th class="n">Gross</th><th class="n">Txns <em>(implied)</em></th><th class="n">Paddle fee</th><th class="n">Net</th></tr></thead>
+        <tbody>
+          <tr><td>Admin tier</td><td class="n">~$89,400</td><td class="n">~3,193 @ $28</td><td class="n">~$6,070</td><td class="n">~$83,330</td></tr>
+          <tr><td>Pool Ultra</td><td class="n">~$25,000</td><td class="n">50 @ $500</td><td class="n">~$1,275</td><td class="n">~$23,725</td></tr>
+          <tr><td>Pool Pro <em>(annual, web)</em></td><td class="n">~$82,000</td><td class="n">~2,103 @ $39</td><td class="n">~$5,150</td><td class="n">~$76,850</td></tr>
+          <tr class="total"><td>Paddle-borne subtotal</td><td class="n">~$196,400</td><td class="n"></td><td class="n">~$12,500</td><td class="n">~$183,900</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note warn"><strong>This is a best case.</strong> It assumes every Pool Pro subscriber is annual and on web. Monthly web subscribers cost 15% each, and any mobile subscriber routes through RevenueCat / App Store at 30% in year one &mdash; both materially worse than the line above. Cosmetics (mobile IAP) and merchandise (not Paddle-eligible) are excluded.</div>
+
+    <div class="card pric">
+      <h4>What this changes about the business model</h4>
+      <p>Without player monetization, the admin + venue tiers cap at <strong>~$114K/year</strong> at 50K users &mdash; a meaningful side income but not a primary one. <strong>Adding the three player vectors lifts it to ~$223K/year &mdash; roughly 2&times; admin-only revenue at the same user count.</strong> The player base is the unlock.</p>
+    </div>
+
+    <h3 class="grp">Caveats</h3>
+    <div class="card warnc">
+      <ul>
+        <li>5% paying-player Pool Pro conversion is mature-consumer-app territory; first year likely <strong>2&ndash;3%</strong></li>
+        <li>Apple/Google take 30% on first-year mobile IAP subs (15% year 2+). Web Paddle takes 5% + 50&cent; &mdash; still far better than IAP, but <strong>not</strong> the full margin the Stripe-era version of this plan assumed</li>
+        <li>Subscription churn at month 6&ndash;12 typically <strong>30&ndash;50%</strong> for consumer apps without strong retention features</li>
+        <li>All player numbers are speculative until Vector 1 data exists; treat the $82K Pool Pro projection as a <strong>ceiling, not a forecast</strong></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ ROADMAP ============ -->
+  <section id="roadmap">
+    <h2 class="sec">Implementation roadmap <span class="count">each step gated on the previous</span></h2>
+    <p class="sec-sub">No subscription infrastructure ships before cosmetics validate "will players pay at all." The order is the argument.</p>
+
+    <div class="step gate-step">
+      <h4><span class="sn">3a.0</span> Paddle account approval <span class="chip danger">GATE</span></h4>
+      <p>Submit the business for Paddle review with the Principle-1 framing in writing <em>(we sell pool-organizing software; no prize money touches the platform)</em>. Get the answer before building anything.</p>
+      <p class="why"><strong>Why first:</strong> Paddle's AUP names fantasy sports and prize-based sports forecasting as prohibited. A rejection here invalidates every row below it. See RM-08.</p>
+    </div>
+    <div class="step">
+      <h4><span class="sn">3a</span> Admin tiers <span class="chip">Jul&ndash;Aug 2026</span></h4>
+      <p><strong>Free / Pool Plus / Pool Max</strong> via Paddle Checkout, web-only. Platform charges land in their own <code>pool_purchases</code> table + <code>pools.tier</code>; <strong><code>entry_fee</code> is deliberately NOT reused</strong> &mdash; it is the members' off-platform pot.</p>
+      <p class="why"><strong>Why here:</strong> lowest cost, fastest validation. Doesn't depend on mobile launch.</p>
+    </div>
+    <div class="step">
+      <h4><span class="sn">3b.1</span> Pool Ultra + Cosmetics <span class="chip">Aug 2026+</span></h4>
+      <p><strong>Pool Ultra hand-rolled</strong> for the first 1&ndash;2 venues. <strong>Cosmetic Marketplace (Vector 1)</strong> via RevenueCat.</p>
+      <p class="why"><strong>Why here:</strong> Ultra validates the $500 price point with real venues before generalizing. Cosmetics: RevenueCat plumbing arrives with the Expo launch anyway.</p>
+    </div>
+    <div class="step">
+      <h4><span class="sn">3b.2</span> Pool Pro subscription <span class="chip">Oct&ndash;Dec 2026</span></h4>
+      <p><strong>Vector 2</strong> &mdash; Paddle Subscriptions on web <em>(annual default)</em>, RevenueCat on mobile.</p>
+      <p class="why"><strong>Why here:</strong> only if Vector 1 hits &ge;2% paying-player conversion. Validates the subscription infrastructure investment.</p>
+    </div>
+    <div class="step">
+      <h4><span class="sn">3c.x</span> Self-serve venue + Merchandise <span class="chip">2027+</span></h4>
+      <p><strong>Pool Ultra self-serve</strong> &mdash; venue dashboard, automated marketing pack pipeline, public venue directory. <strong>Merchandise (Vector 3)</strong> via Printful integration &mdash; <strong>on a non-Paddle rail</strong> (RM-09).</p>
+      <p class="why"><strong>Why last:</strong> self-serve venue depends on the multi-sport foundation. Merch is the heaviest build &mdash; ship after Pool Pro confirms players spend.</p>
+    </div>
+    <div class="step deferred">
+      <h4><span class="sn">&mdash;</span> Deferred</h4>
+      <p>Sponsorship marketplace, corporate / white-label tier, sport pass admin subscription.</p>
+      <p class="why"><strong>Why deferred:</strong> don't build until adjacent customers exist. Sport Pass rejected &mdash; an admin subscription is a poor fit for an event-based product.</p>
+    </div>
+  </section>
+
+  <!-- ============ OPEN QUESTIONS ============ -->
+  <section id="questions">
+    <h2 class="sec">Open questions <span class="count">8 &middot; to settle in Phase 2</span></h2>
+    <p class="sec-sub">Each carries a current lean. None are settled.</p>
+
+    <details class="dec"><summary><span class="qn">1</span> Final Free cap &mdash; 10 vs 8 vs 5 members?</summary><div class="body">Regression says 10 is fine.<p class="lean">Lean: <strong>keep at 10.</strong></p></div></details>
+    <details class="dec"><summary><span class="qn">2</span> Plus ceiling &mdash; 30 vs 20 members?</summary><div class="body">Data shows the 21&ndash;30 band is empty.<p class="lean">Lean: <strong>tighten to 20.</strong></p></div></details>
+    <details class="dec"><summary><span class="qn">3</span> Max price &mdash; $49 vs $39?</summary><div class="body">$49 is 2.5&times; Plus.<p class="lean">Lean: <strong>test in Phase 2 once the admin tier ships.</strong></p></div></details>
+    <details class="dec"><summary><span class="qn">4</span> Free-tier banter &mdash; fully off vs read-only?</summary><div class="body">Currently designed as fully off. Read-only might preserve discovery and engagement.<p class="lean">Lean: <strong>open &mdash; genuinely undecided.</strong></p></div></details>
+    <details class="dec"><summary><span class="qn">5</span> Pool Ultra venue sign-up &mdash; self-serve from day one vs hand-rolled cohort?</summary><div class="body">User confirmed self-serve, but the dashboard isn't built.<p class="lean">Lean: <strong>hand-roll the first 1&ndash;2, build self-serve in parallel.</strong></p></div></details>
+    <details class="dec"><summary><span class="qn">6</span> Pool Pro visibility &mdash; visible to other members or only the subscriber?</summary><div class="body">Whether the "Pro" mark is public affects both the upsell and the risk of resentment.<p class="lean">Lean: <strong>visible but subtle</strong> &mdash; small badge on profile + leaderboard, no banter announcements.</p></div></details>
+    <details class="dec"><summary><span class="qn">7</span> Subscription cancellation policy &mdash; pro-rated refunds vs end-of-period?</summary><div class="body">Industry standard is end-of-period.<p class="lean">Lean: <strong>end-of-period.</strong></p></div></details>
+    <details class="dec"><summary><span class="qn">8</span> Dual-rail or Paddle-only?</summary><div class="body">Vector 3 forces a second processor regardless (RM-09). The question is whether to stand Stripe up early as an approval hedge (RM-08) or stay Paddle-only until merch actually ships.<p class="lean">Lean: <strong>Paddle-only until 3c.x</strong> &mdash; conditional on 3a.0 approval coming back clean.</p></div></details>
+  </section>
+
+  <!-- ============ RISKS ============ -->
+  <section id="risks">
+    <h2 class="sec">Risks <span class="count">9 &middot; RM-08 and RM-09 are the new ones</span></h2>
+    <p class="sec-sub">RM-08 is the highest-priority unknown in this document &mdash; it gates the entire plan.</p>
+
+    <div class="scroller">
+      <table class="wide">
+        <thead><tr><th style="width:70px">#</th><th style="min-width:320px">Risk</th><th style="min-width:320px">Mitigation</th></tr></thead>
+        <tbody>
+          <tr class="risk-crit">
+            <td class="id">RM-08</td>
+            <td><strong>Paddle may reject the account outright.</strong> Its AUP prohibits "fantasy sports leagues", "Sports forecasting/odds making where monetary or material prizes are involved", and "lotteries, auctions, contests, sweepstakes, or games of chance". As Merchant of Record, Paddle carries the liability, so it screens harder than a plain processor. <code>app/pools/[pool_id]/admin/FeesTab.tsx</code> (and its mobile twin) &mdash; the existing entry-fee tracking UI &mdash; could read as prize-pool facilitation during domain review even though settlement is off-platform.</td>
+            <td><strong>Highest-priority unknown; resolve before any build.</strong> Approach Paddle pre-emptively with the Principle-1 framing in writing. Be ready to explain FeesTab as an off-platform record-keeping tool. Keep Stripe viable as a fallback &mdash; the tax-compliance work Paddle would absorb is the cost of that fallback, not a blocker.</td>
+          </tr>
+          <tr class="risk-high">
+            <td class="id">RM-09</td>
+            <td><strong>Paddle prohibits physical goods</strong>, removing Vector 3 merchandise (T-shirt, mug, medal) from the Paddle rail.</td>
+            <td>Vector 3 is the last thing built (Phase 3c.x), so this is not urgent &mdash; but it means the payment stack ends up dual-rail. Either add Stripe for physical goods, or push fulfilment to Printful's own storefront so the sale never lands on our books. Digital trophy + stickers stay on Paddle.</td>
+          </tr>
+          <tr><td class="id">RM-01</td><td>App Store / Play Store policy may require IAP for any in-app digital-service purchase</td><td>Keep purchase flows web-only initially. RevenueCat in Phase 3b.1 for mobile IAP.</td></tr>
+          <tr><td class="id">RM-02</td><td>Bar adoption rate is speculative &mdash; no real venue customers in 2026 WC data</td><td>First venue cohort is hand-sold and measured. Don't generalize until &ge;3 venues are renewing.</td></tr>
+          <tr><td class="id">RM-03</td><td>Player IAP conversion may be lower than projected (1% vs 3%)</td><td>Cosmetic Marketplace ships before Pool Pro subscription as a conversion validator.</td></tr>
+          <tr><td class="id">RM-04</td><td>Pool Pro could cannibalize Pool Max if players buy multi-entry from their side</td><td>Resolved by design: multi-entry override is NOT a Pool Pro feature. Pool Pro Plus differentiates through cosmetic + experience extras only.</td></tr>
+          <tr><td class="id">RM-05</td><td>Marketing-pack designer cost ($2&ndash;4K) is upfront before Ultra ships</td><td>MVP with 5 templates instead of 14 ($1&ndash;2K). Add the rest as v1.1.</td></tr>
+          <tr><td class="id">RM-06</td><td>Subscription churn could erode the projected $82K Pool Pro line</td><td>Treat as ceiling; first-year realistic at $30&ndash;40K. Build retention features (Wrapped, monthly cosmetic drop) into Pool Pro Plus.</td></tr>
+          <tr><td class="id">RM-07</td><td>"Default mode per competition" relies on TD-05 (pool template system)</td><td>For WC only, mode gating is enforceable today. Multi-sport mode gating waits for Phase 3c.3.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ REGRESSION ============ -->
+  <section id="regression">
+    <h2 class="sec">2026 World Cup regression <span class="count">baseline data</span></h2>
+    <p class="sec-sub">Tested the pricing model against actual pool data from the 2026 World Cup &mdash; 15 active pools, after excluding test pools and Ryan's own pools except Road to Glory.</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Tier</th><th class="n">Pools</th><th class="n">Revenue</th></tr></thead>
+        <tbody>
+          <tr><td>Free</td><td class="n">5</td><td class="n">$0</td></tr>
+          <tr><td>Pool Plus ($19)</td><td class="n">7</td><td class="n">$133</td></tr>
+          <tr><td>Pool Max ($49)</td><td class="n">3</td><td class="n">$147</td></tr>
+          <tr><td>Pool Ultra</td><td class="n">0 <em>(no venue customers exist)</em></td><td class="n">$0</td></tr>
+          <tr class="total"><td>Total</td><td class="n">15</td><td class="n">$280</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid2">
+      <div class="card crit"><h4>91% of created pools are dead air</h4><p>Fewer than 3 members, or zero submitted predictions. <strong>Free pricing isn't filtering for serious admins.</strong></p></div>
+      <div class="card pric"><h4>Office pools cluster at 10&ndash;18 members</h4><p>This is exactly where Pool Plus lives.</p></div>
+      <div class="card okc"><h4>Two pools busted the entry cap, not the member cap</h4><p>The entry-count rule does real upsell work &mdash; and is why multi-entry stays off the player ladder.</p></div>
+      <div class="card warnc"><h4>Plus 30-member ceiling is rarely hit</h4><p>Could tighten to 20 (see open question 2).</p></div>
+      <div class="card goldc"><h4>Ultra revenue is zero &mdash; pure greenfield</h4><p><strong>Three Ultra signups = 5&times; the entire active WC admin revenue.</strong></p></div>
+    </div>
+    <div class="note">Full regression detail in <code>memory/project_backlog_monetization.md</code>.</div>
+  </section>
+
+  <!-- ============ CROSS-REFS ============ -->
+  <section id="xref">
+    <h2 class="sec">Cross-references</h2>
+    <ul class="xref">
+      <li><strong>SPORTPOOL_PROGRAMME.md</strong> &sect;1 Phase 2 <em>(monetization decision)</em>, &sect;2 <em>(this backlog indexed)</em>, &sect;3 TD-05 <em>(pool template system blocking multi-sport mode gating)</em></li>
+      <li><strong>memory/project_backlog_monetization.md</strong> &mdash; long-form discussion state and history</li>
+      <li><strong>memory/project_backlog_feedback.md</strong> &mdash; Phase 2 survey should test "would you pay" + "would you run a pool at a bar"</li>
+      <li><strong>memory/project_backlog_data_model.md</strong> &mdash; multi-sport foundation gating the 4+ tournament columns in revenue projections</li>
+      <li><strong>memory/project_backlog_pool_templates.md</strong> &mdash; TD-05, gates mode-level pricing enforcement</li>
+      <li><strong>app/pools/[pool_id]/admin/FeesTab.tsx</strong> &mdash; existing manual fee tracking UI (the admin's off-platform pot); entry point for the upgrade flow, but its schema is <strong>not</strong> reused for platform charges</li>
+      <li><strong>lib/integrations/apiFootball/</strong> &mdash; sports data integration; variable cost per tournament</li>
+      <li><strong>.mcp.json</strong> &mdash; <code>paddle-sandbox</code> / <code>paddle-live</code> / <code>paddle-docs</code> MCP servers <em>(gitignored, untracked, local only. The sandbox key is a literal <code>pdl_sdbx_</code> bearer token in the file itself &mdash; <strong>not</strong> an env var. <code>paddle-live</code> and <code>paddle-docs</code> are OAuth and need authorizing before use. Sandbox connection verified against the live API 2026-08-24.)</em></li>
+      <li><a href="https://www.paddle.com/pricing">Paddle pricing</a> &mdash; 5% + 50&cent;, and the sub-$10 custom-pricing note</li>
+      <li><a href="https://www.paddle.com/help/start/intro-to-paddle/what-am-i-not-allowed-to-sell-on-paddle">Paddle AUP &mdash; what you can't sell</a> &mdash; source for RM-08 and RM-09</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <strong>Last updated:</strong> August 2026 &middot; <strong>Owner:</strong> Ryan Sousa &middot; Rendered from <code>MONETIZATION.md</code>
+    <div class="rev">
+      <p><span class="v">v1.1 (Aug 2026)</span> &mdash; <strong>Payment provider switched from Stripe to Paddle.</strong> Rationale: Paddle is a Merchant of Record and absorbs global VAT / sales-tax registration and remittance, which is the dominant consideration for a Bermuda-based operator selling into the UK, EU and US. Cost of that is 5% + 50&cent; vs Stripe's ~2.9% + 30&cent; &mdash; roughly $12.5K/year at the 50K-user projection. Two constraints surfaced during the switch and are <strong>not yet resolved</strong>: Paddle's AUP prohibits fantasy sports and prize-based sports forecasting (RM-08, now gating Phase 3a.0), and prohibits physical goods, which forces Vector 3 merchandise onto a second rail (RM-09). Also corrected the "web = full margin" caveat, which was only ever true under Stripe-with-our-own-tax-handling.</p>
+      <p><span class="v">v1.0 (May 2026)</span> &mdash; Initial monetization plan. Four admin tiers + three player-side vectors. Sport Pass admin subscription explicitly rejected as poor product fit (event-based product, not continuous). Pool Pro player subscription added as tournament-agnostic continuous-engagement layer.</p>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
