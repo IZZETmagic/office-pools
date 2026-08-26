@@ -85,6 +85,7 @@ import {
   MailSend01Icon,
   MapPinIcon,
   Medal01Icon,
+  GripVerticalIcon,
   Menu01Icon,
   MinusSignIcon,
   Moon02Icon,
@@ -274,6 +275,9 @@ const ICON_MAP: Record<string, IconConstant> = {
   'flame.fill': Fire03Icon,
   'gear': Settings02Icon,
   'gearshape.fill': Settings02Icon,
+  /* The 2x3 drag grip. Not an SF Symbol — SF has no grip glyph — so it takes a
+     descriptive name, as 'line.3.horizontal' does below. */
+  'grip.vertical': GripVerticalIcon,
   'hand.raised.fill': HandHelpingIcon,
   'hand.wave.fill': WaveIcon,
   'house.fill': Home03Icon,

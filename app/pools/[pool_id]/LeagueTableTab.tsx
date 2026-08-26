@@ -43,6 +43,7 @@
 
 import { Card } from '@/components/ui/Card'
 import { Icon } from '@/components/ui/Icon'
+import { LocalTime } from '@/components/LocalTime'
 import type { NextFixture } from '@/lib/league/read'
 import { shortClubName } from '@/lib/league/clubName'
 import { orderStandings } from '@/lib/league/standingsOrder'
@@ -134,6 +135,17 @@ const BAND_LABEL: Record<string, string> = {
   relegation: 'Relegation',
 }
 
+/** Both client-only — see the LocalTime notes at the call sites. */
+function formatFetchedAt(d: Date): string {
+  return d.toLocaleString('en-US', {
+    weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  })
+}
+
+function formatKickoff(d: Date): string {
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 export default function LeagueTableTab({ rows, fetchedAt, nextByClub }: Props) {
   // Alphabetical among clubs the feed left genuinely level — see
   // lib/league/standingsOrder.ts for what it is allowed to move and why the
@@ -163,9 +175,11 @@ export default function LeagueTableTab({ rows, fetchedAt, nextByClub }: Props) {
         <h2 className="text-lg font-bold text-neutral-900">League Table</h2>
         {fetchedAt && (
           <p className="text-xs text-neutral-400">
-            Updated {new Date(fetchedAt).toLocaleString('en-US', {
-              weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
-            })}
+            {/* Client-only. Pinning 'en-US' is NOT enough — Node and the
+                browser ship different ICU versions and disagree on the
+                separator, and on Vercel the server runtime is UTC so a
+                server-formatted time is somebody else's clock. */}
+            Updated <LocalTime iso={fetchedAt} format={formatFetchedAt} />
           </p>
         )}
       </div>
@@ -386,10 +400,13 @@ function Next({ fixture }: { fixture?: NextFixture }) {
     // No fixture left is a real answer in May, not an error.
     return <span className="text-neutral-300 text-xs">—</span>
   }
-  const when = new Date(fixture.kickoffAt).toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric',
-  })
-  const spoken = `${fixture.isHome ? 'At home to' : 'Away to'} ${fixture.opponentName}, ${when}`
+  /* ⚠ No date in `title` or in the server-rendered text. A `title` attribute
+     mismatches at hydration exactly like visible text does, and this one would:
+     the kickoff formats differently on Node and in the browser. The date is
+     genuinely useful, so it renders through LocalTime below — client-only,
+     therefore agreeing with itself — while the tooltip keeps the half that is
+     timezone-free. */
+  const spoken = `${fixture.isHome ? 'At home to' : 'Away to'} ${fixture.opponentName}`
 
   return (
     <span className="flex items-center justify-end" title={spoken}>
@@ -402,7 +419,9 @@ function Next({ fixture }: { fixture?: NextFixture }) {
           {fixture.opponentAbbr ?? fixture.opponentName}
         </span>
       )}
-      <span className="sr-only">{spoken}</span>
+      <span className="sr-only">
+        {spoken}, <LocalTime iso={fixture.kickoffAt} format={formatKickoff} />
+      </span>
     </span>
   )
 }

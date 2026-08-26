@@ -17,7 +17,7 @@
     "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "^5.2.14",
     "@hugeicons-pro/core-solid-rounded": "^4.1.4",
-    "@hugeicons/core-free-icons": "^4.1.4",
+    "@hugeicons/core-free-icons": "^4.2.3",
     "@hugeicons/react-native": "^1.0.13",
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-navigation/bottom-tabs": "^7.4.0",

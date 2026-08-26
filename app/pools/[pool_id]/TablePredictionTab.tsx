@@ -23,7 +23,7 @@
 // leaderboard.
 // =============================================================
 
-import { useState, useCallback, useMemo, useId } from 'react'
+import { useState, useCallback, useMemo, useId, useRef, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -44,6 +44,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Card } from '@/components/ui/Card'
 import { Icon } from '@/components/ui/Icon'
+import { LocalTime } from '@/components/LocalTime'
 import { Badge } from '@/components/ui/Badge'
 import type { SeasonClub, TableBreakdownRow } from '@/lib/league/table'
 
@@ -103,15 +104,7 @@ const BAND_STRIPE: Record<string, string> = {
 
 // ---------------------------------------------------------------- picking
 
-function SortableClubRow({
-  club,
-  position,
-  clubCount,
-  topN,
-  relegationN,
-  europaFrom,
-  europaTo,
-}: {
+type RowProps = {
   club: SeasonClub
   position: number
   clubCount: number
@@ -119,7 +112,50 @@ function SortableClubRow({
   relegationN: number
   europaFrom: number | null
   europaTo: number | null
-}) {
+}
+
+/** The row's appearance, with no drag wiring — safe to render on the server. */
+function ClubRowInner({ club, position, band }: { club: SeasonClub; position: number; band: string | null }) {
+  return (
+    <>
+      <span className={`w-[3px] h-7 rounded-full shrink-0 ${band ? BAND_STRIPE[band] : 'bg-transparent'}`} aria-hidden="true" />
+      <span className="w-6 text-sm font-bold text-neutral-900 tabular-nums shrink-0">{position}</span>
+      {club.crest_url && <img src={club.crest_url} alt="" className="w-6 h-6 object-contain shrink-0" />}
+      <span className="flex-1 min-w-0 text-sm font-semibold text-neutral-900 truncate">{club.club_name}</span>
+      <Icon name="grip.vertical" size={16} className="text-neutral-300 shrink-0" />
+    </>
+  )
+}
+
+const ROW_BASE = 'flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl border transition-colors touch-none'
+
+/**
+ * The server-rendered row: identical to look at, inert.
+ *
+ * ⚠ WHY THE LIST IS NOT SERVER-RENDERED AS DRAGGABLE. dnd-kit gives every
+ * sortable node an `aria-describedby` pointing at its own screen-reader
+ * instructions, and that id is React-generated. Server and client produced
+ * different ones (`_R_955…` vs `_R_295…`), which React reports as a hydration
+ * mismatch and — its words — "won't be patched up". The attribute therefore
+ * stays pointing at an element that does not exist, so a screen-reader user
+ * gets NO drag instructions at all. It is an accessibility failure wearing a
+ * console warning.
+ *
+ * `suppressHydrationWarning` would hide it and keep the broken id, which is the
+ * same mistake LocalTime's header warns about. So the list renders inert until
+ * mount and draggable after — you cannot drag before hydration anyway, and this
+ * way the ids are only ever generated once, on the client.
+ */
+function StaticClubRow({ club, position, clubCount, topN, relegationN, europaFrom, europaTo }: RowProps) {
+  const band = bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo)
+  return (
+    <div className={`${ROW_BASE} ${band ? BAND_ROW[band] : 'bg-surface-raised border-border-default'}`}>
+      <ClubRowInner club={club} position={position} band={band} />
+    </div>
+  )
+}
+
+function SortableClubRow({ club, position, clubCount, topN, relegationN, europaFrom, europaTo }: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: club.club_id })
 
@@ -129,21 +165,29 @@ function SortableClubRow({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : undefined }}
-      className={`flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl border transition-colors touch-none
+      className={`${ROW_BASE}
         ${isDragging ? 'bg-primary-50 border-primary-300 shadow-lg opacity-90' : band ? BAND_ROW[band] : 'bg-surface-raised border-border-default'}`}
       {...attributes}
       {...listeners}
     >
-      <span className={`w-[3px] h-7 rounded-full shrink-0 ${band ? BAND_STRIPE[band] : 'bg-transparent'}`} aria-hidden="true" />
-      <span className="w-6 text-sm font-bold text-neutral-900 tabular-nums shrink-0">{position}</span>
-      {club.crest_url && <img src={club.crest_url} alt="" className="w-6 h-6 object-contain shrink-0" />}
-      <span className="flex-1 min-w-0 text-sm font-semibold text-neutral-900 truncate">{club.club_name}</span>
-      <Icon name="arrow.up.arrow.down" size={16} className="text-neutral-300 shrink-0" />
+      <ClubRowInner club={club} position={position} band={band} />
     </div>
   )
 }
 
 // ---------------------------------------------------------------- component
+
+/** Client-only — see the LocalTime note at the call site. */
+function formatDeadline(d: Date): string {
+  return d.toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  })
+}
+
+function formatLockedDate(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 export default function TablePredictionTab({
   poolId,
@@ -170,6 +214,28 @@ export default function TablePredictionTab({
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [dirty, setDirty] = useState(false)
 
+  /**
+   * ⚠ HAS THIS MEMBER ACTUALLY SAVED ANYTHING?
+   *
+   * The button used to read `dirty ? 'Save my table' : 'Saved'`, and `dirty`
+   * starts false — so a member who had never saved opened this screen, saw the
+   * clubs pre-filled in live-table order (decision 12/17, so it looks exactly
+   * like a real prediction), and a DISABLED button saying "Saved". Nothing on
+   * the screen contradicted it. They would close the tab believing they were
+   * done and score nothing when the deadline passed on Friday.
+   *
+   * "Saved" is a claim about the database, so it has to be answerable from the
+   * database: `savedOrder` is the server-rendered truth on load, and this
+   * tracks it forward when a save succeeds. Untouched-and-unsaved must offer
+   * the save — accepting the seeded order with one tap is the whole point of
+   * seeding it.
+   */
+  const [hasSaved, setHasSaved] = useState(savedOrder.length > 0)
+
+  /** See StaticClubRow: dnd-kit's generated ids cannot survive hydration. */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -189,29 +255,83 @@ export default function TablePredictionTab({
     setMessage(null)
   }, [])
 
-  const save = useCallback(async () => {
+  /**
+   * AUTOSAVE, with in-flight coalescing rather than a debounce timer.
+   *
+   * Twenty clubs is a lot of dragging, and making somebody hit Save after each
+   * one is the kind of friction that gets a table left half-ordered. So every
+   * reorder writes.
+   *
+   * ⚠ Coalescing, NOT debouncing, and the difference matters. A debounce holds
+   * the newest state in a timer, so a member who drags and immediately closes
+   * the tab — or whose phone backgrounds the page — loses the change that
+   * triggered it, silently. Here the request goes out at once; if one is already
+   * in flight the next is marked pending and fires the moment it returns. At
+   * most one write is ever queued, the last one always wins, and there is no
+   * window where the newest order exists only in a timer.
+   *
+   * `orderRef` is what gets sent, not the `order` closure: a save that starts
+   * during a drag must post the order as it stands when the request is built,
+   * not as it was when the callback was created.
+   */
+  const orderRef = useRef(order)
+  orderRef.current = order
+  const inFlight = useRef(false)
+  const pending = useRef(false)
+
+  const flush = useCallback(async () => {
     if (!entryId) return
+    if (inFlight.current) {
+      pending.current = true
+      return
+    }
+    inFlight.current = true
     setSaving(true)
     setMessage(null)
     try {
       const res = await fetch(`/api/pools/${poolId}/table-prediction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entryId, order }),
+        body: JSON.stringify({ entryId, order: orderRef.current }),
       })
       const json = await res.json()
       if (!res.ok) {
-        setMessage({ kind: 'error', text: json.error ?? 'That did not save.' })
+        // The lock is a silent-skip trigger, so the route reports it as 403
+        // rather than letting the member believe a refused write landed.
+        setMessage({
+          kind: 'error',
+          text: json.locked
+            ? 'The deadline passed while you were editing — this table is closed.'
+            : json.error ?? 'That did not save.',
+        })
       } else {
         setDirty(false)
-        setMessage({ kind: 'ok', text: 'Your table is in. You can change it until the deadline.' })
+        setHasSaved(true)
+        setMessage(null)
       }
     } catch {
-      setMessage({ kind: 'error', text: 'That did not save — check your connection and try again.' })
+      setMessage({ kind: 'error', text: 'Not saved — check your connection. Your changes are still here.' })
     } finally {
+      inFlight.current = false
       setSaving(false)
+      if (pending.current) {
+        pending.current = false
+        void flush()
+      }
     }
-  }, [poolId, entryId, order])
+  }, [poolId, entryId])
+
+  /**
+   * ⚠ Only autosaves once there IS a table. A member who has never saved is
+   * looking at the seeded order (the live table, decisions 12/17) — writing
+   * that for them would be filing a prediction they never made, on their
+   * behalf, and scoring them on it. They commit it once, deliberately; after
+   * that every change is theirs and saves itself.
+   */
+  useEffect(() => {
+    if (!dirty || !hasSaved) return
+    void flush()
+  }, [order, dirty, hasSaved, flush])
 
   // ------------------------------------------------------------ locked view
   if (isLocked) {
@@ -251,10 +371,20 @@ export default function TablePredictionTab({
         </p>
         {lockAt && (
           <p className="text-xs text-neutral-500 mt-2">
-            Closes {new Date(lockAt).toLocaleString('en-US', {
-              weekday: 'short', month: 'short', day: 'numeric',
-              hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
-            })}
+            {/* ⚠ Formatted on the CLIENT only, via LocalTime.
+
+                The locale here was already pinned to 'en-US' and it STILL
+                mismatched: the server rendered "Fri, Aug 28 at 4:00 PM ADT" and
+                the browser "Fri, Aug 28, 4:00 PM ADT". Pinning the locale does
+                not pin the ICU VERSION, and Node's and the browser's disagree
+                about whether a comma or the word "at" separates date from time.
+
+                The timezone half is the real hazard, as it was in PoolInfoTab:
+                this dev machine happens to be on Atlantic time, but on Vercel
+                the server runtime is UTC — so a server-formatted deadline is a
+                UTC deadline shown to somebody who is not in UTC. Formatting
+                client-side means one runtime does it, and it is the viewer's. */}
+            Closes <LocalTime iso={lockAt} format={formatDeadline} />
           </p>
         )}
       </div>
@@ -267,40 +397,86 @@ export default function TablePredictionTab({
         <Legend stripe={BAND_STRIPE.relegation} label="Relegation" />
       </div>
 
-      <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={order} strategy={verticalListSortingStrategy}>
-          <div className="space-y-1.5">
-            {rows.map((club, i) => (
-              <SortableClubRow
-                key={club.club_id}
-                club={club}
-                position={i + 1}
-                clubCount={rows.length}
-                topN={topN}
-                relegationN={relegationN}
-                europaFrom={europaFrom}
-                europaTo={europaTo}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
-
-      {message && (
-        <p className={`text-sm ${message.kind === 'ok' ? 'text-success-700' : 'text-danger-600'}`} role="status">
-          {message.text}
-        </p>
+      {!mounted ? (
+        <div className="space-y-1.5">
+          {rows.map((club, i) => (
+            <StaticClubRow
+              key={club.club_id}
+              club={club}
+              position={i + 1}
+              clubCount={rows.length}
+              topN={topN}
+              relegationN={relegationN}
+              europaFrom={europaFrom}
+              europaTo={europaTo}
+            />
+          ))}
+        </div>
+      ) : (
+        <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={order} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1.5">
+              {rows.map((club, i) => (
+                <SortableClubRow
+                  key={club.club_id}
+                  club={club}
+                  position={i + 1}
+                  clubCount={rows.length}
+                  topN={topN}
+                  relegationN={relegationN}
+                  europaFrom={europaFrom}
+                  europaTo={europaTo}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
+      {/* Two different footers, because the two states are different promises.
+
+          Before a table exists this is a COMMIT: the order on screen is the
+          seeded one, and it becomes a prediction only when the member says so.
+          After that it is a STATUS: every drag saves itself, and the only thing
+          left to tell them is whether it landed. */}
       <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-surface-base via-surface-base to-transparent">
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || !dirty}
-          className="w-full py-3 rounded-xl bg-primary-600 text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-700 transition-colors"
-        >
-          {saving ? 'Saving…' : dirty ? 'Save my table' : 'Saved'}
-        </button>
+        {!hasSaved ? (
+          <>
+            <button
+              type="button"
+              onClick={() => void flush()}
+              disabled={saving}
+              className="w-full py-3 rounded-xl bg-primary-600 text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-700 transition-colors"
+            >
+              {saving ? 'Saving…' : 'Save my table'}
+            </button>
+            <p className="text-xs text-neutral-500 text-center mt-2">
+              After this, every change saves on its own.
+            </p>
+          </>
+        ) : (
+          <div className="flex items-center justify-center gap-2 py-2 min-h-[2.75rem]" role="status" aria-live="polite">
+            {message?.kind === 'error' ? (
+              <>
+                <span className="text-sm text-danger-600">{message.text}</span>
+                <button
+                  type="button"
+                  onClick={() => void flush()}
+                  className="text-sm font-semibold text-primary-600 hover:text-primary-700 underline"
+                >
+                  Try again
+                </button>
+              </>
+            ) : saving || dirty ? (
+              <span className="text-sm text-neutral-500">Saving…</span>
+            ) : (
+              <span className="text-sm text-success-700 flex items-center gap-1.5">
+                <Icon name="checkmark" size={14} />
+                Saved — you can keep changing it until the deadline
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -369,7 +545,7 @@ function LockedView({
         <h2 className="text-lg font-bold text-neutral-900">Your table</h2>
         {lockAt && (
           <p className="text-xs text-neutral-400">
-            Locked {new Date(lockAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            Locked <LocalTime iso={lockAt} format={formatLockedDate} />
           </p>
         )}
       </div>
