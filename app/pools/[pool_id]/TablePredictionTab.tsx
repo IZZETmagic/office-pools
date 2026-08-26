@@ -376,35 +376,40 @@ export default function TablePredictionTab({
           Drag the clubs into the order you think they&apos;ll finish. You only do this once
           — then you watch it all season.
         </p>
-        {lockAt && (
-          <p className="text-xs text-neutral-500 mt-2">
-            {/* ⚠ Formatted on the CLIENT only, via LocalTime.
+        {/* The two facts about time, on one line: when it closes, and when it
+            last saved. `ml-auto` rather than `justify-between` so the status
+            still sits right when there is no deadline to sit opposite. */}
+        <div className="flex items-center gap-3 mt-2">
+          {lockAt && (
+            <p className="text-xs text-neutral-500">
+              {/* ⚠ Formatted on the CLIENT only, via LocalTime.
 
-                The locale here was already pinned to 'en-US' and it STILL
-                mismatched: the server rendered "Fri, Aug 28 at 4:00 PM ADT" and
-                the browser "Fri, Aug 28, 4:00 PM ADT". Pinning the locale does
-                not pin the ICU VERSION, and Node's and the browser's disagree
-                about whether a comma or the word "at" separates date from time.
+                  The locale here was already pinned to 'en-US' and it STILL
+                  mismatched: the server rendered "Fri, Aug 28 at 4:00 PM ADT"
+                  and the browser "Fri, Aug 28, 4:00 PM ADT". Pinning the locale
+                  does not pin the ICU VERSION, and Node's and the browser's
+                  disagree about whether a comma or the word "at" separates date
+                  from time.
 
-                The timezone half is the real hazard, as it was in PoolInfoTab:
-                this dev machine happens to be on Atlantic time, but on Vercel
-                the server runtime is UTC — so a server-formatted deadline is a
-                UTC deadline shown to somebody who is not in UTC. Formatting
-                client-side means one runtime does it, and it is the viewer's. */}
-            Closes <LocalTime iso={lockAt} format={formatDeadline} />
-          </p>
-        )}
-      </div>
-
-      <div className="flex justify-end -mb-2">
-        <SaveStatus
-          hasSaved={hasSaved}
-          saving={saving}
-          dirty={dirty}
-          savedAt={savedAt}
-          message={message}
-          onRetry={() => void flush()}
-        />
+                  The timezone half is the real hazard, as it was in PoolInfoTab:
+                  this dev machine happens to be on Atlantic time, but on Vercel
+                  the server runtime is UTC — so a server-formatted deadline is a
+                  UTC deadline shown to somebody who is not in UTC. Formatting
+                  client-side means one runtime does it, and it is the viewer's. */}
+              Closes <LocalTime iso={lockAt} format={formatDeadline} />
+            </p>
+          )}
+          <div className="ml-auto">
+            <SaveStatus
+              hasSaved={hasSaved}
+              saving={saving}
+              dirty={dirty}
+              savedAt={savedAt}
+              message={message}
+              onRetry={() => void flush()}
+            />
+          </div>
+        </div>
       </div>
 
       {!mounted ? (
@@ -454,8 +459,8 @@ export default function TablePredictionTab({
           commit. Before a table exists the order on screen is the seeded one
           (decisions 12/17) and it becomes a prediction only when the member
           says so. After that every drag saves itself, so what is left is a
-          STATUS — and that lives directly above the list, where the thing it
-          is reporting on actually is.
+          STATUS — and that lives up on the deadline line, opposite the other
+          fact about time this screen has to state.
 
           The failure message stays down HERE for this state, because this is
           the state with a button: somebody scrolled to the bottom pressing Save
@@ -518,7 +523,7 @@ function formatSavedAt(d: Date): string {
 }
 
 /**
- * "Saved", with the time it was saved — right-aligned, directly above the list.
+ * "Saved", with the time it was saved — right-aligned, on the deadline line.
  *
  * ⚠ The live region is the WRAPPER and is always mounted. Putting
  * `role="status"` on the branches instead would mean each state change
