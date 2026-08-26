@@ -19,6 +19,7 @@ import { ScoringRulesTab } from './ScoringRulesTab'
 import { LeagueScoringRulesTab, type LeagueScoringMode } from './LeagueScoringRulesTab'
 import { CommunityTab } from './CommunityTab'
 import { HowToPlayModal } from './HowToPlayModal'
+import type { LeagueMode } from '@/lib/leagueModeInfo'
 import { AnalyticsTab } from './AnalyticsTab'
 import { PoolInfoTab } from './PoolInfoTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
@@ -2380,6 +2381,8 @@ export function PoolDetail({
           maxEntries={pool.max_entries_per_user}
           isPastDeadline={isPastDeadline}
           predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
+          leagueMode={isLeaguePool ? (leagueMode as LeagueMode | null) : null}
+          leagueDepth={leagueDepth}
           onClose={() => setShowHowToPlayModal(false)}
         />
       )}
