@@ -280,6 +280,7 @@ export default async function PoolPage({
       if (clubErr) console.error('[pool page] season clubs failed:', clubErr)
 
       let savedOrder: string[] = []
+      let savedAt: string | null = null
       let breakdown: Awaited<ReturnType<typeof readTableBreakdown>>['rows'] = []
       if (defaultEntry) {
         const [saved, bd] = await Promise.all([
@@ -289,6 +290,7 @@ export default async function PoolPage({
         if (saved.error) console.error('[pool page] table prediction failed:', saved.error)
         if (bd.error) console.error('[pool page] table breakdown failed:', bd.error)
         savedOrder = saved.order
+        savedAt = saved.savedAt
         breakdown = bd.rows
       }
 
@@ -296,6 +298,7 @@ export default async function PoolPage({
         entryId: defaultEntry?.entry_id ?? null,
         clubs,
         savedOrder,
+        savedAt,
         // Decision 12 as revised by 17: seeded from the live table, else
         // alphabetical. Reads the SAME rows the Table tab renders — a second
         // standings read could return a different ordering mid-matchweek, and

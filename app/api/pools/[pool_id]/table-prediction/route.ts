@@ -39,14 +39,14 @@ export async function GET(
   const entryId = requestedEntry ?? (await firstEntryId(supabase, membership.member_id))
   if (!entryId) return NextResponse.json({ error: 'No entry in this pool' }, { status: 404 })
 
-  const [{ order, error: orderErr }, { rows, error: rowsErr }] = await Promise.all([
+  const [{ order, savedAt, error: orderErr }, { rows, error: rowsErr }] = await Promise.all([
     readTablePrediction(supabase, entryId),
     readTableBreakdown(supabase, entryId),
   ])
   const error = orderErr ?? rowsErr
   if (error) return NextResponse.json({ error }, { status: 500 })
 
-  return NextResponse.json({ entryId, order, breakdown: rows })
+  return NextResponse.json({ entryId, order, savedAt, breakdown: rows })
 }
 
 export async function POST(
@@ -119,7 +119,7 @@ export async function POST(
     )
   }
 
-  return NextResponse.json({ saved: result.stored, entryId: resolvedEntry })
+  return NextResponse.json({ saved: result.stored, savedAt: result.savedAt, entryId: resolvedEntry })
 }
 
 /**

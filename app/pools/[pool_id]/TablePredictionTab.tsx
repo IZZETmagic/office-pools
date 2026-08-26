@@ -54,6 +54,8 @@ type Props = {
   clubs: SeasonClub[]
   /** The entry's saved ordering. Empty means they have not predicted yet. */
   savedOrder: string[]
+  /** When that ordering was last written, server-stamped. Null if never. */
+  savedAt: string | null
   /** What an unpicked screen starts from — the live table, else alphabetical. */
   seededOrder: string[]
   breakdown: TableBreakdownRow[]
@@ -194,6 +196,7 @@ export default function TablePredictionTab({
   entryId,
   clubs,
   savedOrder,
+  savedAt: initialSavedAt,
   seededOrder,
   breakdown,
   lockAt,
@@ -231,6 +234,9 @@ export default function TablePredictionTab({
    * seeding it.
    */
   const [hasSaved, setHasSaved] = useState(savedOrder.length > 0)
+
+  /** Server-stamped, never the browser's clock — see TableSaveResult.savedAt. */
+  const [savedAt, setSavedAt] = useState<string | null>(initialSavedAt)
 
   /** See StaticClubRow: dnd-kit's generated ids cannot survive hydration. */
   const [mounted, setMounted] = useState(false)
@@ -307,6 +313,7 @@ export default function TablePredictionTab({
       } else {
         setDirty(false)
         setHasSaved(true)
+        if (json.savedAt) setSavedAt(json.savedAt)
         setMessage(null)
       }
     } catch {
@@ -364,7 +371,17 @@ export default function TablePredictionTab({
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-bold text-neutral-900">Predict the table</h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-bold text-neutral-900">Predict the table</h2>
+          <SaveStatus
+            hasSaved={hasSaved}
+            saving={saving}
+            dirty={dirty}
+            savedAt={savedAt}
+            message={message}
+            onRetry={() => void flush()}
+          />
+        </div>
         <p className="text-sm text-neutral-600 mt-1">
           Drag the clubs into the order you think they&apos;ll finish. You only do this once
           — then you watch it all season.
@@ -432,51 +449,35 @@ export default function TablePredictionTab({
           directly under the rows it explains. */}
       <BandLegend topN={topN} europaFrom={europaFrom} />
 
-      {/* Two different footers, because the two states are different promises.
+      {/* The footer is a COMMIT, and only exists until there is something to
+          commit. Before a table exists the order on screen is the seeded one
+          (decisions 12/17) and it becomes a prediction only when the member
+          says so. After that every drag saves itself, so what is left is a
+          STATUS — and that lives at the top, next to the heading, where it is
+          not competing with a button that no longer exists.
 
-          Before a table exists this is a COMMIT: the order on screen is the
-          seeded one, and it becomes a prediction only when the member says so.
-          After that it is a STATUS: every drag saves itself, and the only thing
-          left to tell them is whether it landed. */}
-      <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-surface-base via-surface-base to-transparent">
-        {!hasSaved ? (
-          <>
-            <button
-              type="button"
-              onClick={() => void flush()}
-              disabled={saving}
-              className="w-full py-3 rounded-xl bg-primary-600 text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-700 transition-colors"
-            >
-              {saving ? 'Saving…' : 'Save my table'}
-            </button>
-            <p className="text-xs text-neutral-500 text-center mt-2">
-              After this, every change saves on its own.
-            </p>
-          </>
-        ) : (
-          <div className="flex items-center justify-center gap-2 py-2 min-h-[2.75rem]" role="status" aria-live="polite">
-            {message?.kind === 'error' ? (
-              <>
-                <span className="text-sm text-danger-600">{message.text}</span>
-                <button
-                  type="button"
-                  onClick={() => void flush()}
-                  className="text-sm font-semibold text-primary-600 hover:text-primary-700 underline"
-                >
-                  Try again
-                </button>
-              </>
-            ) : saving || dirty ? (
-              <span className="text-sm text-neutral-500">Saving…</span>
-            ) : (
-              <span className="text-sm text-success-700 flex items-center gap-1.5">
-                <Icon name="checkmark" size={14} />
-                Saved — you can keep changing it until the deadline
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+          The failure message stays down HERE for this state, because this is
+          the state with a button: somebody scrolled to the bottom pressing Save
+          should not have to go looking at the top of the page to find out it
+          did not work. */}
+      {!hasSaved && (
+        <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-surface-base via-surface-base to-transparent">
+          {message?.kind === 'error' && (
+            <p className="text-xs text-danger-600 text-center mb-2">{message.text}</p>
+          )}
+          <button
+            type="button"
+            onClick={() => void flush()}
+            disabled={saving}
+            className="w-full py-3 rounded-xl bg-primary-600 text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-700 transition-colors"
+          >
+            {saving ? 'Saving…' : 'Save my table'}
+          </button>
+          <p className="text-xs text-neutral-500 text-center mt-2">
+            After this, every change saves on its own.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -496,6 +497,75 @@ function BandLegend({ topN, europaFrom }: { topN: number; europaFrom: number | n
       <Legend stripe={BAND_STRIPE.top} label={`Top ${topN}`} />
       {europaFrom !== null && <Legend stripe={BAND_STRIPE.europa} label="Europa" />}
       <Legend stripe={BAND_STRIPE.relegation} label="Relegation" />
+    </div>
+  )
+}
+
+/**
+ * Client-only, via LocalTime — so `new Date()` here is the VIEWER's clock, and
+ * "today" means their today.
+ */
+function formatSavedAt(d: Date): string {
+  const now = new Date()
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  return sameDay
+    ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+/**
+ * "Saved", with the time it was saved — top right, beside the heading.
+ *
+ * ⚠ The live region is the WRAPPER and is always mounted. Putting
+ * `role="status"` on the branches instead would mean each state change
+ * unmounts one region and mounts another, and a freshly-mounted live region
+ * does not reliably announce its initial contents — the save would go
+ * unannounced to exactly the people relying on it.
+ */
+function SaveStatus({
+  hasSaved, saving, dirty, savedAt, message, onRetry,
+}: {
+  hasSaved: boolean
+  saving: boolean
+  dirty: boolean
+  savedAt: string | null
+  message: { kind: 'ok' | 'error'; text: string } | null
+  onRetry: () => void
+}) {
+  return (
+    <div
+      className="shrink-0 flex items-center gap-1.5 text-xs min-h-[1.5rem]"
+      role="status"
+      aria-live="polite"
+    >
+      {message?.kind === 'error' ? (
+        <>
+          <span className="text-danger-600 font-medium">Not saved</span>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="font-semibold text-primary-600 hover:text-primary-700 underline"
+          >
+            Try again
+          </button>
+        </>
+      ) : !hasSaved ? null : saving || dirty ? (
+        <span className="text-neutral-500">Saving…</span>
+      ) : (
+        <span className="flex items-center gap-1.5 text-success-700">
+          <Icon name="checkmark" size={13} />
+          {savedAt ? (
+            <>
+              Saved <LocalTime iso={savedAt} format={formatSavedAt} />
+            </>
+          ) : (
+            'Saved'
+          )}
+        </span>
+      )}
     </div>
   )
 }

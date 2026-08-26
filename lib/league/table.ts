@@ -55,6 +55,14 @@ export type TableSaveResult = {
    * house pattern for prediction locks; this flag is how a member finds out.
    */
   locked: boolean
+  /**
+   * When the write landed, as the SERVER stamped it — null when nothing did.
+   *
+   * Returned rather than left to the caller's clock: this is the value the
+   * screen shows as "last saved", and a browser several minutes off would
+   * otherwise report a save time that never happened.
+   */
+  savedAt: string | null
   error: string | null
 }
 
@@ -88,15 +96,23 @@ export async function readSeasonClubs(
 export async function readTablePrediction(
   supabase: SupabaseClient,
   entryId: string,
-): Promise<{ order: string[]; error: string | null }> {
+): Promise<{ order: string[]; savedAt: string | null; error: string | null }> {
   const { data, error } = await supabase
     .from('league_table_predictions')
-    .select('club_id, predicted_position')
+    .select('club_id, predicted_position, updated_at')
     .eq('entry_id', entryId)
     .order('predicted_position')
-  if (error) return { order: [], error: error.message }
+  if (error) return { order: [], savedAt: null, error: error.message }
+  const rows = (data ?? []) as Array<{ club_id: string; updated_at: string }>
   return {
-    order: ((data ?? []) as Array<{ club_id: string }>).map((r) => r.club_id),
+    order: rows.map((r) => r.club_id),
+    // The NEWEST row, not the first. A full reorder rewrites all twenty with
+    // one timestamp, but the lock trigger can drop part of a write, and the
+    // question this answers is "when did this last change".
+    savedAt: rows.reduce<string | null>(
+      (max, r) => (max === null || Date.parse(r.updated_at) > Date.parse(max) ? r.updated_at : max),
+      null,
+    ),
     error: null,
   }
 }
@@ -125,13 +141,13 @@ export async function saveTablePrediction(
   clubIdsInOrder: string[],
 ): Promise<TableSaveResult> {
   if (clubIdsInOrder.length === 0) {
-    return { stored: 0, locked: false, error: 'an empty ordering is not a prediction' }
+    return { stored: 0, locked: false, savedAt: null, error: 'an empty ordering is not a prediction' }
   }
   const unique = new Set(clubIdsInOrder)
   if (unique.size !== clubIdsInOrder.length) {
     // Caught here rather than at the constraint because the constraint would
     // report a position collision, which is true but describes the symptom.
-    return { stored: 0, locked: false, error: 'the same club appears twice in the ordering' }
+    return { stored: 0, locked: false, savedAt: null, error: 'the same club appears twice in the ordering' }
   }
 
   const now = new Date().toISOString()
@@ -144,7 +160,7 @@ export async function saveTablePrediction(
     })),
     { onConflict: 'entry_id,club_id' },
   )
-  if (upErr) return { stored: 0, locked: false, error: upErr.message }
+  if (upErr) return { stored: 0, locked: false, savedAt: null, error: upErr.message }
 
   // READ BACK. The lock trigger drops rows silently, so asking is the only way
   // to know what landed. Compared by POSITION, not by row count: a member who
@@ -154,7 +170,7 @@ export async function saveTablePrediction(
     .from('league_table_predictions')
     .select('club_id, predicted_position')
     .eq('entry_id', entryId)
-  if (rErr) return { stored: 0, locked: false, error: rErr.message }
+  if (rErr) return { stored: 0, locked: false, savedAt: null, error: rErr.message }
 
   const stored = new Map(
     ((after ?? []) as Array<{ club_id: string; predicted_position: number }>)
@@ -162,7 +178,7 @@ export async function saveTablePrediction(
   )
   const landed = clubIdsInOrder.every((clubId, i) => stored.get(clubId) === i + 1)
 
-  return { stored: stored.size, locked: !landed, error: null }
+  return { stored: stored.size, locked: !landed, savedAt: landed ? now : null, error: null }
 }
 
 /**

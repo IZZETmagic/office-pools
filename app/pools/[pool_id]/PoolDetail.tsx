@@ -102,6 +102,7 @@ export type TableModeData = {
   entryId: string | null
   clubs: SeasonClub[]
   savedOrder: string[]
+  savedAt: string | null
   seededOrder: string[]
   breakdown: TableBreakdownRow[]
   lockAt: string | null
@@ -1685,6 +1686,7 @@ export function PoolDetail({
                 entryId={tableModeData.entryId}
                 clubs={tableModeData.clubs}
                 savedOrder={tableModeData.savedOrder}
+                savedAt={tableModeData.savedAt}
                 seededOrder={tableModeData.seededOrder}
                 breakdown={tableModeData.breakdown}
                 lockAt={tableModeData.lockAt}
