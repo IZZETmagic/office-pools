@@ -389,9 +389,6 @@ export default function TablePredictionTab({
         )}
       </div>
 
-      {/* The three bands that pay bonuses, visible while you drag — §3.6. */}
-      <BandLegend topN={topN} europaFrom={europaFrom} />
-
       {!mounted ? (
         <div className="space-y-1.5">
           {rows.map((club, i) => (
@@ -428,10 +425,11 @@ export default function TablePredictionTab({
         </DndContext>
       )}
 
-      {/* The same key again. Twenty rows is taller than a phone screen, so by
-          the time somebody is arranging the relegation places the copy at the
-          top has scrolled off — and that is exactly the end of the table where
-          the colours stop being obvious. */}
+      {/* The band key — §3.6 — below the list rather than above it. Twenty rows
+          is taller than a phone screen, so a key at the top has scrolled away
+          by the time somebody is arranging the relegation places, which is the
+          end of the table where the colours are least obvious. Here it sits
+          directly under the rows it explains. */}
       <BandLegend topN={topN} europaFrom={europaFrom} />
 
       {/* Two different footers, because the two states are different promises.
@@ -484,12 +482,12 @@ export default function TablePredictionTab({
 }
 
 /**
- * The band key, rendered above AND below the list.
+ * The band key.
  *
- * One component rather than two copies of the markup: the bands are derived
- * from the competition (migration 089 exists because they were once hardcoded
- * to England's 4-and-3), so a second inline copy is a second place to forget
- * that `Top 4` is a variable and Europa is optional.
+ * Kept as a component rather than inlined because the labels are DERIVED, not
+ * fixed: `Top 4` is a variable and Europa is optional. Migration 089 exists
+ * because those bands were once hardcoded to England's 4-and-3, so the shape
+ * that reads as a constant here is the one worth keeping in one place.
  */
 function BandLegend({ topN, europaFrom }: { topN: number; europaFrom: number | null }) {
   return (
