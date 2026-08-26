@@ -80,6 +80,54 @@ function PointsRow({ label, value }: { label: string; value: number }) {
   )
 }
 
+/**
+ * What a club is actually worth at each distance from its real finish.
+ *
+ * ⚠ WHY A LADDER AND NOT A RATE. This card used to print "Lost per place out —
+ * 20 pts" beside "Exactly right — 100 pts", and read as though being out cost
+ * you 20 points from your total rather than 20 off that club's 100. Ryan, who
+ * has read the scoring more times than any member will, could not tell which.
+ * Spelling the rungs out removes the reading entirely: 80, 60, 40, 20, nothing.
+ *
+ * Every value is DERIVED from the pool's own two numbers, never assumed — the
+ * defaults are 100 and 20 but both are configurable and the SQL COALESCEs
+ * against them, so a pool that prices places differently gets its own ladder.
+ */
+function placeLadder(exact: number, step: number): Array<{ label: string; value: number }> {
+  const rungs = [{ label: 'Exactly right', value: exact }]
+
+  // No decay: there is no ladder to climb down, and dividing by it would not
+  // terminate. The paragraph below says so in words instead.
+  if (step <= 0) return rungs
+
+  // The first distance worth nothing. Everything beyond it is also nothing, so
+  // the ladder ends there rather than running to twenty.
+  const zeroAt = Math.ceil(exact / step)
+
+  // A long ladder is worse than the rate it replaces — a pool priced 100/5
+  // would print twenty rows. Show where it starts, where it ends, and let the
+  // sentence carry the middle.
+  const detailed = zeroAt <= 6 ? zeroAt - 1 : 2
+
+  for (let out = 1; out <= detailed; out++) {
+    rungs.push({
+      label: out === 1 ? '1 place out' : `${out} places out`,
+      value: Math.max(0, exact - step * out),
+    })
+  }
+
+  // A penalty at or above the full value zeroes a club the moment it is out of
+  // position, so there is no ladder — just a cliff, and it should say so rather
+  // than print "1 or more places out" next to nothing else.
+  rungs.push(
+    zeroAt === 1
+      ? { label: 'Anywhere else', value: 0 }
+      : { label: `${zeroAt} or more places out`, value: 0 },
+  )
+
+  return rungs
+}
+
 function Step({ n, children }: { n: number | string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3">
@@ -226,15 +274,23 @@ function TableCard({ table }: { table: LeagueTablePrices }) {
       {full && (
         <DetailCard title="Every club you place" className="mb-4">
           <div className="mt-1">
-            <PointsRow label="Exactly right" value={table.exactPoints} />
-            <PointsRow label="Lost per place out" value={table.stepPenalty} />
+            {placeLadder(table.exactPoints, table.stepPenalty).map((rung) => (
+              <PointsRow key={rung.label} label={rung.label} value={rung.value} />
+            ))}
           </div>
           <p className="t-body text-muted mt-3">
-            A club placed exactly right is worth {formatNumber(table.exactPoints)}. Every place
-            you are out costs {formatNumber(table.stepPenalty)} of that, so being one off is
-            worth {formatNumber(Math.max(0, table.exactPoints - table.stepPenalty))} and being{' '}
-            {Math.ceil(table.exactPoints / Math.max(1, table.stepPenalty))} or more out is worth
-            nothing. It never goes negative.
+            {table.stepPenalty > 0 ? (
+              <>
+                A club placed exactly right is worth {formatNumber(table.exactPoints)}, and every
+                place you are out costs {formatNumber(table.stepPenalty)} of that. It never goes
+                negative — the worst a club can do is nothing.
+              </>
+            ) : (
+              <>
+                Every club you place is worth {formatNumber(table.exactPoints)} whether or not it
+                finishes where you put it, because this pool charges nothing for being out.
+              </>
+            )}
           </p>
         </DetailCard>
       )}
