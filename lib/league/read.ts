@@ -685,3 +685,76 @@ export async function readLeagueFormByEntry(
   for (const [k, v] of form) form.set(k, v.reverse())
   return { form, error: null }
 }
+
+/** Who a club plays next, for the league table's Next column. */
+export type NextFixture = {
+  opponentId: string
+  opponentName: string
+  opponentAbbr: string | null
+  opponentCrest: string | null
+  /** True when the club in question is at home. */
+  isHome: boolean
+  kickoffAt: string
+}
+
+/**
+ * The next unplayed fixture for every club in a season.
+ *
+ * ⚠ Ordered by kickoff and filtered to `is_completed = false`, NOT derived from
+ * the open matchweek. A postponed fixture keeps its original matchweek but is
+ * played later, and a matchweek can sit locked with games outstanding for weeks
+ * (which is exactly why migration 058 skips locked-but-unfinished weeks). Asking
+ * the fixture list "what is next for this club" answers the question a member is
+ * actually asking; asking the calendar would sometimes answer a different one.
+ *
+ * A season is 380 rows and this reads the unplayed tail, comfortably inside
+ * PostgREST's silent 1,000-row ceiling — but the ceiling is silent, so the query
+ * is bounded and the first fixture per club wins.
+ */
+export async function readNextFixtureByClub(
+  supabase: SupabaseClient,
+  seasonId: string,
+): Promise<{ next: Map<string, NextFixture>; error: string | null }> {
+  const [fixturesRes, clubsRes] = await Promise.all([
+    supabase
+      .from('league_fixtures')
+      .select('home_club_id, away_club_id, kickoff_at')
+      .eq('season_id', seasonId)
+      .eq('is_completed', false)
+      .not('kickoff_at', 'is', null)
+      .order('kickoff_at', { ascending: true })
+      .limit(1000),
+    supabase
+      .from('league_clubs')
+      .select('club_id, name, abbreviation, crest_url')
+      .eq('season_id', seasonId),
+  ])
+  if (fixturesRes.error) return { next: new Map(), error: fixturesRes.error.message }
+  if (clubsRes.error) return { next: new Map(), error: clubsRes.error.message }
+
+  const clubs = new Map(
+    ((clubsRes.data ?? []) as Array<{ club_id: string; name: string; abbreviation: string | null; crest_url: string | null }>)
+      .map((c) => [c.club_id, c]),
+  )
+
+  const next = new Map<string, NextFixture>()
+  for (const f of (fixturesRes.data ?? []) as Array<{ home_club_id: string; away_club_id: string; kickoff_at: string }>) {
+    for (const [self, other, isHome] of [
+      [f.home_club_id, f.away_club_id, true],
+      [f.away_club_id, f.home_club_id, false],
+    ] as const) {
+      if (next.has(self)) continue
+      const opp = clubs.get(other)
+      if (!opp) continue
+      next.set(self, {
+        opponentId: other,
+        opponentName: opp.name,
+        opponentAbbr: opp.abbreviation,
+        opponentCrest: opp.crest_url,
+        isHome,
+        kickoffAt: f.kickoff_at,
+      })
+    }
+  }
+  return { next, error: null }
+}

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Icon } from '@/components/ui/Icon'
+import { Select } from '@/components/ui/Select'
 import type { PoolRoundState, EntryRoundSubmission, RoundStateValue } from '@/app/pools/[pool_id]/types'
 import { isMatchweekKey, roundLabel } from '@/lib/competitionRounds'
 
@@ -18,6 +19,21 @@ type RoundStatusCardProps = {
    * the latter, on the one screen whose entire subject is the former.
    */
   predictedCount?: number
+  /**
+   * Matchweek navigation, when the caller has a season to move through.
+   *
+   * Supplied only for a league: a 38-week season cannot be a row of pills, and
+   * 36 of those pills can never be picked anyway — migration 058 accepts a pick
+   * for the OPEN matchweek only. The World Cup's seven rounds are fine as pills
+   * and keep them, so this is optional and the header falls back to a plain
+   * title without it.
+   */
+  nav?: {
+    /** Every round key, in order. */
+    keys: string[]
+    selected: string
+    onSelect: (key: string) => void
+  }
 }
 
 function getStateBadge(state: RoundStateValue) {
@@ -134,7 +150,7 @@ function CountdownTimer({ deadline, emphasis = false }: { deadline: string; emph
 }
 
 export function RoundStatusCard({
-  roundState, submission, matchCount, completedMatchCount, predictedCount = 0,
+  roundState, submission, matchCount, completedMatchCount, predictedCount = 0, nav,
 }: RoundStatusCardProps) {
   // ⚠ `roundLabel`, not `ROUND_LABELS[k] ?? k`. That fallback returns the RAW
   // KEY, so a league matchweek rendered as the string `mw_2` at the top of the
@@ -191,14 +207,32 @@ export function RoundStatusCard({
      * exactly one thing.
      */
     return (
-      <div className="border-b border-border-default px-1 pb-3">
+      /* ⚠ `bg-mist`, not `bg-surface` and not brand blue.
+
+         Three surfaces were tried. As `bg-surface` it was pixel-identical to
+         the ten pick cards and read as the first row of the list. Tinted
+         `primary-100` it collided with the club buttons, where blue already
+         means "this is your pick" — one colour, two meanings. Stripped to a
+         bare hairline on the page background it stopped looking like anything.
+
+         `bg-mist` distinguishes it by SURFACE LEVEL, which is the design
+         system's own elevation idea and carries no interactive meaning: the
+         pick cards are raised (`surface`), the header is the quieter fill
+         beneath them. `rounded-card` is the 24px token every other card here
+         uses. Accent gold was the other candidate and was rejected because it
+         would fight the amber countdown. */
+      <div className="bg-mist border border-border-strong rounded-card px-4 py-3">
         {/* Wraps rather than overflows. At 375px "Matchweek 2 · Open · ring ·
             Locks in 3d 7h 59m" does not fit on one line, and with everything
             `shrink-0` the countdown was simply clipped by the viewport — the
             one number on the strip a member needs. Wrapped, the right-hand
             group drops to its own line and stays right-aligned. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h3 className="t-card-title text-ink shrink-0">{roundName}</h3>
+          {nav ? (
+            <MatchweekStepper nav={nav} label={roundName} />
+          ) : (
+            <h3 className="t-card-title text-ink shrink-0">{roundName}</h3>
+          )}
           {getStateBadge(roundState.state)}
 
           <div className="ml-auto flex items-center gap-3 shrink-0">
@@ -344,5 +378,82 @@ function CompletionRing({ made, total }: { made: number; total: number }) {
         )}
       </span>
     </span>
+  )
+}
+
+/**
+ * Step through a season, or jump anywhere in it.
+ *
+ * Replaces a row of 38 pills. The pills were optimising for a case that barely
+ * exists: only the OPEN matchweek accepts a pick (migration 058), so thirty-six
+ * of them were there to be greyed out, and the strip still scrolled off both
+ * edges of a phone. What a member actually does is play this week and
+ * occasionally look back at a past one.
+ *
+ * Arrows for the neighbour, because that is the common move. A native <select>
+ * for the rest, because it is the one control that scales to 38 — or to the
+ * Championship's 46 — without the layout caring, and because it brings the
+ * platform picker on mobile, keyboard support and screen-reader semantics that
+ * a div-based listbox would have to reimplement.
+ *
+ * ⚠ Arrows move by POSITION IN THE SEASON, not by what is pickable. Skipping to
+ * the next unlocked week would make the button do different things at different
+ * times, and a member reviewing matchweek 1 expects "next" to mean 2.
+ */
+function MatchweekStepper({
+  nav, label,
+}: {
+  nav: { keys: string[]; selected: string; onSelect: (key: string) => void }
+  label: string
+}) {
+  const i = nav.keys.indexOf(nav.selected)
+  const prev = i > 0 ? nav.keys[i - 1] : null
+  const next = i > -1 && i < nav.keys.length - 1 ? nav.keys[i + 1] : null
+
+  const arrow =
+    'w-8 h-8 shrink-0 rounded-control border border-border-default bg-surface text-muted ' +
+    'flex items-center justify-center transition-colors hover:text-ink hover:border-border-strong ' +
+    'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted ' +
+    'disabled:hover:border-border-default focus:outline-none focus-visible:ring-2 ' +
+    'focus-visible:ring-primary-500'
+
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <button
+        type="button"
+        className={arrow}
+        disabled={!prev}
+        aria-label={prev ? 'Previous matchweek' : 'Already at the first matchweek'}
+        onClick={() => prev && nav.onSelect(prev)}
+      >
+        <Icon name="chevron.left" size={16} />
+      </button>
+
+      {/* The visible label lives on the <select>, so there is one control and
+          one source of truth rather than a title that can disagree with it. */}
+      <Select
+        aria-label="Jump to a matchweek"
+        value={nav.selected}
+        onChange={(e) => nav.onSelect(e.target.value)}
+        className="t-card-title text-ink"
+      >
+        {nav.keys.map((k) => (
+          <option key={k} value={k}>
+            {roundLabel(k)}
+          </option>
+        ))}
+      </Select>
+
+      <button
+        type="button"
+        className={arrow}
+        disabled={!next}
+        aria-label={next ? 'Next matchweek' : 'Already at the last matchweek'}
+        onClick={() => next && nav.onSelect(next)}
+      >
+        <Icon name="chevron.right" size={16} />
+      </button>
+      <span className="sr-only">{label}</span>
+    </div>
   )
 }

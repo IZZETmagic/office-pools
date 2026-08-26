@@ -24,6 +24,7 @@ import { PoolInfoTab } from './PoolInfoTab'
 import PredictionsFlow, { type SaveStatus } from '@/components/predictions/PredictionsFlow'
 import ProgressivePredictionsFlow from '@/components/predictions/ProgressivePredictionsFlow'
 import LeagueTableTab, { type LeagueStandingRow } from './LeagueTableTab'
+import type { NextFixture } from '@/lib/league/read'
 import TablePredictionTab from './TablePredictionTab'
 import DuelsTab from './DuelsTab'
 import SurvivorTab from './SurvivorTab'
@@ -227,6 +228,8 @@ type PoolDetailProps = {
    * for a World Cup pool — is never written for a league entry.
    */
   leagueForm?: Map<string, string[]>
+  /** club_id -> who they play next, for the league table's Next column. */
+  leagueNextFixture?: Map<string, NextFixture>
   /** Level 1 — what kind of league pool this is (plan §0.1). NULL for the World Cup. */
   leagueMode?: string | null
   /** Table mode's screen: the clubs, the entry's ordering, and the comparison. */
@@ -280,6 +283,7 @@ export function PoolDetail({
   leagueStandings = [],
   leagueStandingsAt = null,
   leagueForm,
+  leagueNextFixture,
   leagueMode = null,
   tableModeData = null,
   showdownData = null,
@@ -2072,7 +2076,7 @@ export function PoolDetail({
             )}
 
             {activeTab === 'standings' && isLeaguePool && (
-              <LeagueTableTab rows={leagueStandings} fetchedAt={leagueStandingsAt} />
+              <LeagueTableTab rows={leagueStandings} fetchedAt={leagueStandingsAt} nextByClub={leagueNextFixture} />
             )}
 
             {activeTab === 'results' && !isBracketPicker && (

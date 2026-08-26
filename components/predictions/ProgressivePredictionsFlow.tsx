@@ -6,7 +6,6 @@ import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
-import { Badge } from '@/components/ui/Badge'
 import { RoundStatusCard } from './RoundStatusCard'
 import { GroupStageForm } from './GroupStageForm'
 import { KnockoutStageForm } from './KnockoutStageForm'
@@ -523,7 +522,15 @@ export default function ProgressivePredictionsFlow({
 
   return (
     <div className="space-y-4">
-      {/* Round selector pills */}
+      {/* Round selector pills.
+
+          ⚠ NOT for a league. A 38-week season is not a pill strip: it scrolled
+          off both edges, and 36 of those pills could never be picked anyway
+          because only the open matchweek accepts a pick (migration 058). The
+          matchweek header carries a stepper and a jump list instead — one
+          control, and it scales to the Championship's 46 without the layout
+          caring. The World Cup's seven rounds are fine as pills and keep them. */}
+      {!isMatchweekRound && (
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
         {orderedRoundKeys.map(key => {
           const rs = roundStateMap.get(key)
@@ -556,6 +563,7 @@ export default function ProgressivePredictionsFlow({
           )
         })}
       </div>
+      )}
 
       {/* Round status card */}
       <RoundStatusCard
@@ -569,6 +577,11 @@ export default function ProgressivePredictionsFlow({
         matchCount={roundMatchCount}
         completedMatchCount={completedRoundMatchCount}
         predictedCount={predictedRoundCount}
+        nav={
+          isMatchweekRound
+            ? { keys: orderedRoundKeys, selected: selectedRound, onSelect: setSelectedRound }
+            : undefined
+        }
       />
 
       {/* Error */}

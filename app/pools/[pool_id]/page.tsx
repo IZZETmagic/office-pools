@@ -100,6 +100,8 @@ export default async function PoolPage({
   let leagueStandings: Awaited<ReturnType<typeof import('@/lib/league/read').readLeagueStandings>>['rows'] = []
   /** entry_id -> its last five score_types, oldest first. Empty for a World Cup pool. */
   let leagueForm: Map<string, string[]> = new Map()
+  /** club_id -> who they play next, for the league table. */
+  let leagueNextFixture: Map<string, import('@/lib/league/read').NextFixture> = new Map()
   let leagueStandingsAt: string | null = null
   let tableModeData: import('./PoolDetail').TableModeData | null = null
   let showdownData: import('./PoolDetail').ShowdownData | null = null
@@ -229,10 +231,15 @@ export default async function PoolPage({
     // BLOCKED, not skipped: app/api/cron/league-outbox/route.ts), so without
     // this every league member's form column was a permanent em-dash while
     // `league_match_scores` held exactly the rows it needed.
-    const { readLeagueFormByEntry } = await import('@/lib/league/read')
-    const formRes = await readLeagueFormByEntry(supabase, pool_id)
+    const { readLeagueFormByEntry, readNextFixtureByClub } = await import('@/lib/league/read')
+    const [formRes, nextRes] = await Promise.all([
+      readLeagueFormByEntry(supabase, pool_id),
+      readNextFixtureByClub(supabase, pool.league_season_id),
+    ])
     if (formRes.error) console.error('[pool page] league form failed:', formRes.error)
     leagueForm = formRes.form
+    if (nextRes.error) console.error('[pool page] next fixtures failed:', nextRes.error)
+    leagueNextFixture = nextRes.next
 
     // --------------------------------------------------------- Table mode
     // Assembled server-side, like everything else on this page. A Table pool
@@ -458,6 +465,7 @@ export default async function PoolPage({
       leagueOutcomes={leagueOutcomeMap}
       leagueStandings={leagueStandings}
       leagueForm={leagueForm}
+      leagueNextFixture={leagueNextFixture}
       leagueStandingsAt={leagueStandingsAt}
       leagueMode={pool.league_mode ?? null}
       tableModeData={tableModeData}
