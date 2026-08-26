@@ -390,12 +390,7 @@ export default function TablePredictionTab({
       </div>
 
       {/* The three bands that pay bonuses, visible while you drag — §3.6. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Legend stripe={BAND_STRIPE.champion} label="Champion" />
-        <Legend stripe={BAND_STRIPE.top} label={`Top ${topN}`} />
-        {europaFrom !== null && <Legend stripe={BAND_STRIPE.europa} label="Europa" />}
-        <Legend stripe={BAND_STRIPE.relegation} label="Relegation" />
-      </div>
+      <BandLegend topN={topN} europaFrom={europaFrom} />
 
       {!mounted ? (
         <div className="space-y-1.5">
@@ -432,6 +427,12 @@ export default function TablePredictionTab({
           </SortableContext>
         </DndContext>
       )}
+
+      {/* The same key again. Twenty rows is taller than a phone screen, so by
+          the time somebody is arranging the relegation places the copy at the
+          top has scrolled off — and that is exactly the end of the table where
+          the colours stop being obvious. */}
+      <BandLegend topN={topN} europaFrom={europaFrom} />
 
       {/* Two different footers, because the two states are different promises.
 
@@ -478,6 +479,25 @@ export default function TablePredictionTab({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * The band key, rendered above AND below the list.
+ *
+ * One component rather than two copies of the markup: the bands are derived
+ * from the competition (migration 089 exists because they were once hardcoded
+ * to England's 4-and-3), so a second inline copy is a second place to forget
+ * that `Top 4` is a variable and Europa is optional.
+ */
+function BandLegend({ topN, europaFrom }: { topN: number; europaFrom: number | null }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <Legend stripe={BAND_STRIPE.champion} label="Champion" />
+      <Legend stripe={BAND_STRIPE.top} label={`Top ${topN}`} />
+      {europaFrom !== null && <Legend stripe={BAND_STRIPE.europa} label="Europa" />}
+      <Legend stripe={BAND_STRIPE.relegation} label="Relegation" />
     </div>
   )
 }
