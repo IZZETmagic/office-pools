@@ -134,12 +134,19 @@ async function handle(request: NextRequest) {
     }
   }
 
-  // --- MATCHWEEK events: one notification each. Handled per event rather than
-  // grouped, because each kind has different recipients — the lock reminder
-  // goes only to people who have not picked.
-  for (const e of events.filter((ev) => ev.matchweek_id !== null)) {
+  // --- NOTIFICATION events: one notification each. Handled per event rather
+  // than grouped, because each kind has different recipients — the lock
+  // reminder goes only to people who have not picked.
+  //
+  // ⚠ SELECTED BY "NOT A FIXTURE EVENT", not by "has a matchweek". Migration 099
+  // added a third target shape: `table_deadline` is POOL-level and carries
+  // neither a fixture nor a matchweek. Under the old `matchweek_id !== null`
+  // filter such a row matched no branch at all — so it was claimed every tick,
+  // never sent, never marked, and would have accumulated forever while the
+  // reminder it represents was never delivered.
+  for (const e of events.filter((ev) => ev.fixture_id === null)) {
     try {
-      const result = await sendLeagueNotice(admin, e.kind, e.pool_id, e.matchweek_id as string)
+      const result = await sendLeagueNotice(admin, e.kind, e.pool_id, e.matchweek_id)
       if (result.skipped) {
         // A skip is a real outcome, not a failure: an archived pool, a
         // matchweek everyone has already picked, or a kind with no handler.

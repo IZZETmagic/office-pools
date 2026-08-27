@@ -16,6 +16,11 @@ export const maxDuration = 60
 //   matchweek_opened   a new matchweek became the open one
 //   lock_reminder      it locks soon and somebody has not picked
 //
+// ...and the one POOL-level notice, via `league_queue_table_deadline_notices`
+// (migration 099):
+//
+//   table_deadline     a Table pool closes soon and somebody has no table
+//
 // It only QUEUES. Sending is the outbox consumer's job
 // (/api/cron/league-outbox), which is what gives a notification a durable owner:
 // if the send fails, the row is still there to retry, and nothing is lost
@@ -91,6 +96,25 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 
+  // The TABLE deadline, migration 099. Queued separately from the matchweek
+  // notices because it is a different shape of event — pool-level, with no
+  // matchweek behind it — and on a different window: 72 hours, not 24.
+  //
+  // Its failure is deliberately NOT fatal to the response above. The matchweek
+  // notices have already been queued and stamped by this point; returning 500
+  // would tell the cron the whole tick failed for something that is retried in
+  // an hour anyway, and the stamps mean the matchweek half will not re-queue.
+  const { data: tableData, error: tableErr } = await admin.rpc(
+    'league_queue_table_deadline_notices',
+  )
+  if (tableErr) console.error('[league-notices] table deadline queue failed:', tableErr.message)
+
   const result = (data ?? { opened: 0, reminded: 0 }) as { opened: number; reminded: number }
-  return NextResponse.json({ ok: true, ...result })
+  const table = (tableData ?? { table_deadline: 0 }) as { table_deadline: number }
+  return NextResponse.json({
+    ok: true,
+    ...result,
+    table_deadline: table.table_deadline,
+    ...(tableErr ? { table_deadline_error: tableErr.message } : {}),
+  })
 }

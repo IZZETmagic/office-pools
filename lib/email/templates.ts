@@ -1395,3 +1395,74 @@ export function mentionNotificationTemplate(params: {
     }),
   }
 }
+
+/**
+ * "You haven't put your table in order yet, and it closes on Friday."
+ *
+ * ⚠ THE HIGHEST-STAKES EMAIL IN THE PRODUCT, and the reason it says so plainly.
+ * Every other reminder is about one week of a thirty-eight week season. This one
+ * is about the whole season: Table mode is a single decision, it locks once, and
+ * migration 098 will not reopen it for anybody afterwards. Somebody who ignores
+ * this email scores nothing until May.
+ *
+ * So the consequence is stated outright rather than dressed up as urgency. "You
+ * would score nothing for the season" is a fact about the rules; "don't miss
+ * out!" is a feeling we would be manufacturing. The disclosure gate in CLAUDE.md
+ * is what separates them, and it is why this sends ONCE and only to people who
+ * have not filed a table — both enforced upstream.
+ *
+ * Voice is plural: we/us/our, never "I".
+ */
+export function leagueTableDeadlineTemplate(params: {
+  userName: string
+  poolName: string
+  deadline: string
+  /** Entries with no table yet. One in the ordinary case; more with multi-entry. */
+  unpredictedEntries: string[]
+  clubCount: number
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, deadline, unpredictedEntries, clubCount, poolUrl } = params
+  const deadlineFormatted = new Date(deadline).toLocaleString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  })
+  const many = unpredictedEntries.length > 1
+
+  return {
+    subject: `Your table for ${poolName} closes ${new Date(deadline).toLocaleDateString('en-US', { weekday: 'long' })}`,
+    html: brandedTemplate({
+      preheader: `Put ${clubCount} clubs in finishing order before ${deadlineFormatted}.`,
+      heading: 'Your table closes soon',
+      body: `
+        ${greeting(userName)}
+        ${paragraph(
+          `<strong>${poolName}</strong> is a Predict the Table pool: you put all ${clubCount} clubs ` +
+          `into the order you think they will finish, once, and then watch it all season. ` +
+          `${many ? 'Some of your entries have' : 'You have'} not done it yet.`,
+        )}
+        ${callout(
+          'warning',
+          `${calloutLine('warning', `Closes ${deadlineFormatted}`, { bold: true, marginBottom: many ? 8 : 0 })}
+           ${
+             many
+               ? `${calloutLine('warning', 'Entries with no table yet:', { size: 13, marginBottom: 4 })}
+                  ${calloutList('warning', unpredictedEntries)}`
+               : ''
+           }`,
+        )}
+        ${paragraph(
+          `After that it is fixed for the season — nobody can reopen it, including your pool admin. ` +
+          `An entry with no table scores nothing, so it is worth the five minutes.`,
+        )}
+        ${paragraph(
+          `You can change your order as many times as you like until it closes, and every change ` +
+          `saves on its own.`,
+          { marginBottom: 0 },
+        )}
+      `,
+      ctaText: 'Order your table',
+      ctaUrl: `${poolUrl}?tab=predictions`,
+    }),
+  }
+}

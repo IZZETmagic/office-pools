@@ -14,6 +14,8 @@
 //   lock_reminder        "If you haven't picked yet, we remind you once before
 //                         the deadline."
 //   matchweek_completed  "When a matchweek finishes, we tell you how you did."
+//   table_deadline       "If you haven't put your table in order yet, we remind
+//                         you once before it closes."
 //
 // The reminder passes BECAUSE of its two constraints, not despite them. Sending
 // it to somebody who has already picked would be engagement bait carrying no
@@ -40,11 +42,17 @@ import {
   roundOpenTemplate,
   roundDeadlineReminderTemplate,
   leagueMatchweekResultTemplate,
+  leagueTableDeadlineTemplate,
 } from '@/lib/email/templates'
 import { sendPushToUsers } from '@/lib/push/apns'
 import type { PushCategory } from '@/lib/push/categories'
 
-export type LeagueNoticeKind = 'matchweek_opened' | 'lock_reminder' | 'matchweek_completed'
+export type LeagueNoticeKind =
+  | 'matchweek_opened'
+  | 'lock_reminder'
+  | 'matchweek_completed'
+  /** POOL-level, not matchweek-level — see notifyTableDeadline. */
+  | 'table_deadline'
 
 export type NoticeResult = { emails: number; pushes: number; skipped?: string }
 
@@ -304,12 +312,137 @@ export async function notifyMatchweekCompleted(
 }
 
 /** Dispatch by kind. Unknown kinds are reported, never silently dropped. */
+/**
+ * "Your table closes on Friday, and you haven't ordered it yet."
+ *
+ * ⚠ POOL-LEVEL, unlike the other three. There is no matchweek behind a table
+ * deadline — it is one date on `pools.league_table_lock_at` — which is why
+ * migration 099 had to add a third target shape to the outbox before this kind
+ * could be written at all.
+ *
+ * ONLY to members with at least one entry that has no table. That constraint is
+ * what lets the reminder exist under the disclosure gate: telling somebody who
+ * has already predicted that they might not have predicted is engagement bait
+ * carrying no information. Sending once is the producer's job
+ * (`table_deadline_reminder_sent_at`); sending to the right people is this
+ * function's, because who has filed a table is a per-member fact.
+ */
+export async function notifyTableDeadline(
+  admin: SupabaseClient,
+  poolId: string,
+): Promise<NoticeResult> {
+  const { data: pool } = await admin
+    .from('pools')
+    .select('pool_name, archived_at, league_mode, league_table_lock_at, league_season_id')
+    .eq('pool_id', poolId)
+    .single()
+  if (!pool) return { emails: 0, pushes: 0, skipped: 'pool not found' }
+
+  const p = pool as {
+    pool_name: string; archived_at: string | null; league_mode: string | null
+    league_table_lock_at: string | null; league_season_id: string | null
+  }
+  if (p.archived_at !== null) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
+  if (p.league_mode !== 'table') return { emails: 0, pushes: 0, skipped: 'not a table pool' }
+  if (!p.league_table_lock_at) return { emails: 0, pushes: 0, skipped: 'pool has no table deadline' }
+
+  // Re-checked at SEND time, not just at queue time. A row can sit in the outbox
+  // across a failed drain, and mailing "closes soon" about a deadline that has
+  // already gone would be worse than staying quiet — nothing can be done about
+  // it, and migration 098 will not reopen it.
+  if (new Date(p.league_table_lock_at) <= new Date()) {
+    return { emails: 0, pushes: 0, skipped: 'deadline already passed' }
+  }
+
+  // Same retired/detached exclusion as the matchweek notices — migrations
+  // 056/057. Somebody who stopped participating should not be chased.
+  const { data: members } = await admin
+    .from('pool_members')
+    .select('user_id, users!inner(email, username, full_name), pool_entries(entry_id, entry_name)')
+    .eq('pool_id', poolId)
+    .is('pool_entries.retired_at', null)
+
+  const roster = ((members ?? []) as unknown as MemberRow[]).filter((m) => m.users?.email)
+  const entryIds = roster.flatMap((m) => (m.pool_entries ?? []).map((e) => e.entry_id))
+  if (entryIds.length === 0) return { emails: 0, pushes: 0, skipped: 'no active entries' }
+
+  // WHO HAS FILED A TABLE. One row per club, so presence of ANY row is the
+  // answer — a half-finished order is not possible through the UI, which writes
+  // all twenty positions in one upsert.
+  const { data: filed } = await admin
+    .from('league_table_predictions')
+    .select('entry_id')
+    .in('entry_id', entryIds)
+
+  const hasTable = new Set(((filed ?? []) as Array<{ entry_id: string }>).map((r) => r.entry_id))
+
+  const due = roster
+    .map((m) => ({
+      member: m,
+      missing: (m.pool_entries ?? []).filter((e) => !hasTable.has(e.entry_id)).map((e) => e.entry_name),
+    }))
+    .filter((r) => r.missing.length > 0)
+
+  if (due.length === 0) {
+    // The happy path, and worth naming rather than sending nothing silently.
+    return { emails: 0, pushes: 0, skipped: 'everyone has filed a table' }
+  }
+
+  // How many clubs they are being asked to order. Read rather than assumed —
+  // twenty is England; the Bundesliga is eighteen.
+  const { count: clubCount } = await admin
+    .from('league_clubs')
+    .select('*', { count: 'exact', head: true })
+    .eq('season_id', p.league_season_id ?? '')
+
+  const poolUrl = `${appUrl()}/pools/${poolId}`
+  const emails = due.map(({ member, missing }) => {
+    const { subject, html } = leagueTableDeadlineTemplate({
+      userName: displayName(member),
+      poolName: p.pool_name,
+      deadline: p.league_table_lock_at as string,
+      unpredictedEntries: missing,
+      clubCount: clubCount ?? 20,
+      poolUrl,
+    })
+    return {
+      to: member.users!.email as string,
+      subject,
+      html,
+      topicId: TOPICS.PREDICTIONS,
+      tags: [{ name: 'category', value: 'league_table_deadline' }],
+    }
+  })
+
+  return deliver(
+    emails,
+    due.map((r) => r.member.user_id),
+    {
+      title: `Your table closes soon`,
+      body: `You haven't ordered the clubs yet in ${p.pool_name}.`,
+      data: { poolId, tab: 'predictions' },
+    },
+    'PREDICTIONS',
+  )
+}
+
 export async function sendLeagueNotice(
   admin: SupabaseClient,
   kind: string,
   poolId: string,
-  matchweekId: string,
+  matchweekId: string | null,
 ): Promise<NoticeResult> {
+  // POOL-level kinds first: they legitimately arrive with no matchweek, and the
+  // outbox constraint (migration 099) guarantees the pairing is right.
+  if (kind === 'table_deadline') return notifyTableDeadline(admin, poolId)
+
+  // Everything else is matchweek-level. A missing matchweek here is a malformed
+  // row, and saying so is better than passing an empty string into a query that
+  // would simply find nothing and look like "everyone has picked".
+  if (!matchweekId) {
+    return { emails: 0, pushes: 0, skipped: `'${kind}' needs a matchweek and the row has none` }
+  }
+
   switch (kind) {
     case 'matchweek_opened':
       return notifyMatchweekOpened(admin, poolId, matchweekId)
