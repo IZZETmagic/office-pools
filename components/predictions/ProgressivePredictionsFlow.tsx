@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useStickyState, hasStickyState } from '@/hooks/useStickyState'
 import { Icon } from '@/components/ui/Icon'
 import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
@@ -115,26 +116,50 @@ export default function ProgressivePredictionsFlow({
   // it to carry an outcome would put a league concept into shared World Cup
   // code for no gain, since the two depths never render the same control.
   const isResults = leagueDepth === 'results'
-  const [outcomes, setOutcomes] = useState<Map<string, LeagueOutcome>>(
-    () => new Map(existingOutcomes ?? []),
+  // Sticky — this whole flow unmounts when the member switches tabs, and both
+  // maps would otherwise re-seed from the page-load props. Proven, not assumed:
+  // tapping a Draw and returning to the tab put the old pick back on screen
+  // while the database held the new one.
+  const [outcomes, setOutcomes] = useStickyState<Map<string, LeagueOutcome>>(
+    `outcomes:${poolId}:${entryId}`,
+    new Map(existingOutcomes ?? []),
   )
 
-  const [predictions, setPredictions] = useState<PredictionMap>(() => {
-    const map = new Map<string, ScoreEntry>()
-    for (const p of existingPredictions) {
-      map.set(p.match_id, {
-        home: p.predicted_home_score,
-        away: p.predicted_away_score,
-        homePso: p.predicted_home_pso,
-        awayPso: p.predicted_away_pso,
-        winnerTeamId: p.predicted_winner_team_id,
-      })
-    }
-    return map
-  })
+  const [predictions, setPredictions] = useStickyState<PredictionMap>(
+    `predictions:${poolId}:${entryId}`,
+    (() => {
+      const map = new Map<string, ScoreEntry>()
+      for (const p of existingPredictions) {
+        map.set(p.match_id, {
+          home: p.predicted_home_score,
+          away: p.predicted_away_score,
+          homePso: p.predicted_home_pso,
+          awayPso: p.predicted_away_pso,
+          winnerTeamId: p.predicted_winner_team_id,
+        })
+      }
+      return map
+    })(),
+  )
 
   // Sync predictions state when existingPredictions prop changes (e.g., after async re-fetch on tab return)
+  //
+  // ⚠ SKIPS ITS FIRST RUN ON A REMOUNT — and only then.
+  //
+  // Coming back to this tab, the prop is the same page-load snapshot it always
+  // was and `pendingChanges` is a fresh ref reading false, so this effect would
+  // overwrite the sticky value with the stale picks and undo the fix above.
+  //
+  // But it must still run on a genuine FIRST mount: `existingPredictions` can
+  // arrive empty and populate from an async fetch, and skipping that would
+  // leave the screen blank. `hasStickyState` is what tells the two apart —
+  // a cache entry only exists if a previous mount wrote one.
+  const didInitialSync = useRef(false)
   useEffect(() => {
+    if (!didInitialSync.current) {
+      didInitialSync.current = true
+      if (hasStickyState(`predictions:${poolId}:${entryId}`)) return
+    }
     if (pendingChanges.current) return // Don't overwrite unsaved local edits
     const map = new Map<string, ScoreEntry>()
     for (const p of existingPredictions) {

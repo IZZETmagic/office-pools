@@ -21,6 +21,7 @@
 // =============================================================
 
 import { useState, useMemo, useCallback } from 'react'
+import { useStickyState } from '@/hooks/useStickyState'
 import { Card } from '@/components/ui/Card'
 import { Icon } from '@/components/ui/Icon'
 import type { LmsRound, LmsSurvivor, LmsPick } from '@/lib/league/lms'
@@ -49,7 +50,11 @@ export default function SurvivorTab({
   poolId, round, survivors, myPicks, clubs, entryNames, entryId, currentMatchweek, roundsWon,
   fixtures,
 }: Props) {
-  const [picks, setPicks] = useState<LmsPick[]>(myPicks)
+  // Sticky, not plain useState: this tab unmounts when the member switches tabs
+  // and its initialiser would otherwise re-run against the page-load snapshot,
+  // showing the club they backed BEFORE the pick they just made. See the header
+  // of useStickyState.
+  const [picks, setPicks] = useStickyState<LmsPick[]>(`lms:${poolId}`, myPicks)
   const [saving, setSaving] = useState<string | null>(null)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
