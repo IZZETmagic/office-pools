@@ -268,7 +268,7 @@ export default async function PoolPage({
           // ⚠ One literal, not a concatenation. postgrest-js infers the row
           // shape from the string, and a `'a, ' + 'b'` expression collapses it
           // to GenericStringError — every field access then fails to compile.
-          .select('table_top_n, table_relegation_n, table_exact_points, table_step_penalty, table_champion_bonus, table_top_four_bonus, table_relegation_bonus, table_perfect_top_four_bonus')
+          .select('table_top_n, table_relegation_n, table_exact_points, table_step_penalty, table_champion_bonus, table_top_four_bonus, table_relegation_bonus, table_perfect_top_four_bonus, table_europa_bonus')
           .eq('pool_id', pool_id)
           .maybeSingle(),
         supabase.rpc('league_default_bands', { p_season_id: pool.league_season_id }),
@@ -321,6 +321,9 @@ export default async function PoolPage({
           topFourBonus: settingsRes.data?.table_top_four_bonus ?? 100,
           relegationBonus: settingsRes.data?.table_relegation_bonus ?? 100,
           perfectTopFourBonus: settingsRes.data?.table_perfect_top_four_bonus ?? 250,
+          // Defaults mirror migration 093's COALESCE, which is the only place
+          // that decides what a Europa hit is worth.
+          europaBonus: settingsRes.data?.table_europa_bonus ?? 50,
         },
         // Bounds, not a count — and null is a real answer: a competition without
         // Europa places should not shade a band it does not have.

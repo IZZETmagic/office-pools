@@ -46,7 +46,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Card } from '@/components/ui/Card'
 import { Icon } from '@/components/ui/Icon'
 import { LocalTime } from '@/components/LocalTime'
-import { Badge } from '@/components/ui/Badge'
+import { TableBreakdownView, type TablePrices } from './TableBreakdownView'
 import type { SeasonClub, TableBreakdownRow } from '@/lib/league/table'
 
 type Props = {
@@ -76,6 +76,8 @@ type Props = {
   isLocked: boolean
   /** True when this member joined after the deadline and never got to predict. */
   joinedAfterLock: boolean
+  /** Band bonus values, so the locked view can show how a total is made up. */
+  prices: TablePrices
   /**
    * Report a successful save upward. PoolDetail unmounts this tab when the
    * member switches away, so the parent has to hold what landed — otherwise
@@ -85,7 +87,7 @@ type Props = {
   onSaved?: (order: string[], savedAt: string | null) => void
 }
 
-function bandOf(
+export function bandOf(
   position: number, clubCount: number, topN: number, relegationN: number,
   europaFrom: number | null, europaTo: number | null,
 ) {
@@ -105,7 +107,7 @@ const BAND_ROW: Record<string, string> = {
   relegation: 'bg-danger-50/50 border-danger-200',
 }
 
-const BAND_STRIPE: Record<string, string> = {
+export const BAND_STRIPE: Record<string, string> = {
   champion: 'bg-warning-500',
   top: 'bg-primary-500',
   europa: 'bg-success-500',
@@ -214,6 +216,7 @@ export default function TablePredictionTab({
   europaTo,
   isLocked,
   joinedAfterLock,
+  prices,
   onSaved,
 }: Props) {
   const dndId = useId()
@@ -404,6 +407,7 @@ export default function TablePredictionTab({
   if (isLocked) {
     return (
       <LockedView
+        prices={prices}
         breakdown={breakdown}
         joinedAfterLock={joinedAfterLock}
         lockAt={lockAt}
@@ -652,6 +656,7 @@ function LockedView({
   joinedAfterLock,
   lockAt,
   clubCount,
+  prices,
   topN,
   relegationN,
   europaFrom,
@@ -665,6 +670,7 @@ function LockedView({
   relegationN: number
   europaFrom: number | null
   europaTo: number | null
+  prices: TablePrices
 }) {
   // Decision 11, said plainly rather than hidden. A member who joined after the
   // deadline scores nothing on this component and is told so in one sentence —
@@ -689,10 +695,6 @@ function LockedView({
     )
   }
 
-  const total = breakdown.reduce((sum, r) => sum + (r.points ?? 0), 0)
-  const isFinal = breakdown[0]?.is_final ?? false
-  const exact = breakdown.filter((r) => r.delta === 0).length
-
   return (
     <div className="space-y-4">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
@@ -704,91 +706,17 @@ function LockedView({
         )}
       </div>
 
-      <Card padding="md">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-2xl font-bold text-neutral-900 tabular-nums">{total.toLocaleString()}</p>
-            <p className="text-xs text-neutral-500 mt-0.5">
-              points from your table · {exact} exactly right
-            </p>
-          </div>
-          {/* "Provisional" until the season-end snapshot exists — decision 9.
-              The label is the honest half of scoring it live. */}
-          <Badge variant={isFinal ? "green" : "gray"}>
-            {isFinal ? 'Final' : 'Provisional'}
-          </Badge>
-        </div>
-      </Card>
-
-      <Card padding="none" className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[420px] text-sm tabular-nums">
-            <thead>
-              <tr className="bg-neutral-50 text-[10px] uppercase tracking-wider text-neutral-500">
-                <th className="py-2.5 pl-3 pr-1 text-left font-bold w-12">You</th>
-                <th className="py-2.5 px-2 text-left font-bold">Club</th>
-                <th className="py-2.5 px-2 text-right font-bold w-12">Now</th>
-                <th className="py-2.5 px-2 text-right font-bold w-14">Diff</th>
-                <th className="py-2.5 pl-2 pr-3 text-right font-bold w-14">Pts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {breakdown.map((r) => {
-                const band = bandOf(r.predicted_position, clubCount, topN, relegationN, europaFrom, europaTo)
-                return (
-                  <tr key={r.club_id} className="border-t border-border-default">
-                    <td className="py-2 pl-3 pr-1">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`w-[3px] h-5 rounded-full ${band ? BAND_STRIPE[band] : 'bg-transparent'}`}
-                          aria-hidden="true"
-                        />
-                        <span className="font-bold text-neutral-900">{r.predicted_position}</span>
-                      </div>
-                    </td>
-                    <td className="py-2 px-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {r.crest_url && <img src={r.crest_url} alt="" className="w-5 h-5 object-contain shrink-0" />}
-                        <span className="font-semibold text-neutral-900 truncate">{r.club_name}</span>
-                      </div>
-                    </td>
-                    <td className="py-2 px-2 text-right text-neutral-600">
-                      {r.actual_position ?? '—'}
-                    </td>
-                    <td className="py-2 px-2 text-right">
-                      <Delta delta={r.delta} />
-                    </td>
-                    <td className="py-2 pl-2 pr-3 text-right font-bold text-neutral-900">
-                      {r.points ?? '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <p className="text-xs text-neutral-400">
-        {isFinal
-          ? 'The season is over — these are the final positions.'
-          : 'Positions move every matchweek, so this total is provisional until the season ends.'}
-      </p>
+      {/* The presentation lives in TableBreakdownView so that this screen and
+          the one showing a RIVAL's table cannot drift apart. */}
+      <TableBreakdownView
+        breakdown={breakdown}
+        topN={topN}
+        prices={prices}
+        bandOf={(position) => bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo)}
+        bandStripe={BAND_STRIPE}
+        ownerLabel="You"
+      />
     </div>
   )
 }
 
-/**
- * How far off you are, in the direction a football follower reads it: a club
- * finishing HIGHER than you said is a positive surprise, so it shows green.
- */
-function Delta({ delta }: { delta: number | null }) {
-  if (delta === null) return <span className="text-neutral-300">—</span>
-  if (delta === 0) return <span className="text-success-600 font-semibold">exact</span>
-  const better = delta < 0
-  return (
-    <span className={better ? 'text-success-600' : 'text-danger-600'}>
-      {better ? '▲' : '▼'} {Math.abs(delta)}
-    </span>
-  )
-}

@@ -8,6 +8,8 @@ import { calculateBracketPickerPoints, type MatchWithResult as BPMatchWithResult
 import { calculateGroupStandings, rankThirdPlaceTeams, GROUP_LETTERS } from '@/lib/tournament'
 import { computeEntryPredictedPodium, resolvePredictedBracket } from '@/lib/bracketResolver'
 import { getFormDotClass, FORM_LEGEND } from '@/lib/design/formDots'
+import { TableEntryModal } from './TableEntryModal'
+import { bandOf, BAND_STRIPE } from './TablePredictionTab'
 import type { MemberData, LeaderboardEntry, PlayerScoreData, BonusScoreData, MatchScoreData, MatchData, TeamData, PredictionData, BPGroupRanking, BPThirdPlaceRanking, BPKnockoutPick, PodiumResult, EntryStatsData, MatchdayMVPData } from './types'
 import type { PredictionMap, MatchConductData, Team, GroupStanding, ScoreEntry } from '@/lib/tournament'
 import type { PoolSettings } from './results/points'
@@ -49,6 +51,25 @@ type LeaderboardTabProps = {
   leagueDepth?: 'results' | 'scores' | null
   /** entry_id -> last five score_types, oldest first, from `league_match_scores`. */
   leagueForm?: Map<string, string[]>
+  /**
+   * Table mode only: everything the per-entry breakdown modal needs to colour a
+   * band and to decide whether a rival's table may be opened yet.
+   */
+  tableView?: {
+    isLocked: boolean
+    clubCount: number
+    topN: number
+    relegationN: number
+    europaFrom: number | null
+    europaTo: number | null
+    prices: {
+      championBonus: number
+      topFourBonus: number
+      perfectTopFourBonus: number
+      relegationBonus: number
+      europaBonus: number
+    }
+  } | null
 }
 
 // =============================================
@@ -92,6 +113,7 @@ export function LeaderboardTab({
   leagueMode = null,
   leagueDepth = null,
   leagueForm,
+  tableView = null,
 }: LeaderboardTabProps) {
   // ---- what this pool can actually show -------------------------------
   // Each of these is "can this ever be non-empty", not "do we like it".
@@ -105,6 +127,8 @@ export function LeaderboardTab({
   // Hoisted to sit with the flags that read it — `showForm` below would
   // otherwise touch it in its own initialiser, 400 lines before it existed.
   const isBracketPicker = predictionMode === 'bracket_picker'
+
+  const isTableMode = isLeague && leagueMode === 'table'
 
   const showAwards = !isLeague
   const showLevels = !isLeague
@@ -1894,7 +1918,26 @@ export function LeaderboardTab({
       </div>
 
       {/* Points Breakdown Modal */}
-      {selectedEntry && (
+      {/* ⚠ Table mode gets its OWN breakdown modal. PointsBreakdownModal is built
+          from match scores, bonus rows and a podium — a table pool has none of
+          the three, so clicking a member opened a shell with nothing in it.
+          That is what "no way to see anybody's points breakdown" looked like. */}
+      {selectedEntry && isTableMode && tableView ? (
+        <TableEntryModal
+          poolId={poolId}
+          entryId={selectedEntry.entry_id}
+          displayName={selectedEntry.entry_name || selectedEntry.users?.username || 'This member'}
+          isOwnEntry={selectedEntry.users?.user_id === currentUserId}
+          isLocked={tableView.isLocked}
+          bandOf={(position) =>
+            bandOf(position, tableView.clubCount, tableView.topN, tableView.relegationN,
+              tableView.europaFrom, tableView.europaTo)}
+          bandStripe={BAND_STRIPE}
+          topN={tableView.topN}
+          prices={tableView.prices}
+          onClose={() => setSelectedEntry(null)}
+        />
+      ) : selectedEntry && (
         <PointsBreakdownModal
           entry={selectedEntry}
           playerScore={getPlayerScore(selectedEntry.entry_id)}

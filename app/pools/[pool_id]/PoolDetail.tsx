@@ -129,6 +129,7 @@ export type TableModeData = {
     topFourBonus: number
     relegationBonus: number
     perfectTopFourBonus: number
+    europaBonus: number
   }
 }
 
@@ -1661,6 +1662,22 @@ export function PoolDetail({
                 leagueMode={leagueMode}
                 leagueDepth={leagueDepth}
                 leagueForm={leagueForm}
+                tableView={
+                  isTableMode && tableModeData
+                    ? {
+                        // The deadline, not RLS, is what the modal gates on —
+                        // see TableEntryModal's header for why that matters for
+                        // an admin who also plays.
+                        isLocked: tableModeData.isLocked,
+                        clubCount: tableModeData.clubs.length,
+                        topN: tableModeData.topN,
+                        relegationN: tableModeData.relegationN,
+                        europaFrom: tableModeData.europaFrom,
+                        europaTo: tableModeData.europaTo,
+                        prices: tableModeData.prices,
+                      }
+                    : null
+                }
               />
             )}
 
@@ -1724,6 +1741,7 @@ export function PoolDetail({
                 europaTo={tableModeData.europaTo}
                 isLocked={tableModeData.isLocked}
                 joinedAfterLock={tableModeData.joinedAfterLock}
+                prices={tableModeData.prices}
               />
             )}
 
