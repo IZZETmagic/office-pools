@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { POOL_MODE_INFO, type PredictionMode } from '@/lib/poolModeInfo'
+import { leagueModeInfo, type LeagueMode, type LeagueDepth } from '@/lib/leagueModeInfo'
 
 type SettingsTabProps = {
   pool: PoolData
@@ -595,11 +596,28 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
     { value: true as const, label: 'Private', desc: 'Hidden from Discover. People need the code.' },
   ]
 
-  // Falls back to full_tournament, matching HowToPlayTab's own default, so a
-  // pool with an unset or unrecognised mode still renders a description rather
-  // than crashing on an undefined lookup.
-  const modeInfo =
-    POOL_MODE_INFO[pool.prediction_mode as PredictionMode] ?? POOL_MODE_INFO.full_tournament
+  /**
+   * ⚠ A LEAGUE MUST NOT REACH POOL_MODE_INFO — the same trap PoolInfoTab
+   * already carries a note about, still open on this screen weeks later.
+   *
+   * A league pool's `prediction_mode` is `'league_pickem'`, which is not a key
+   * of that record, so the `??` caught it and this card told the ADMIN of a
+   * Premier League pool that their pool was a Full Tournament: "a score for
+   * every match in the tournament, all in one sitting", "one deadline covers
+   * the whole tournament", "all 104 matches". Every clause false, on the screen
+   * they go to precisely because they want to check how their own pool works.
+   *
+   * The fallback is right for an unrecognised mode. The wrong part was having
+   * nothing for a mode we ship. `leagueModeInfo` is that something, and it is
+   * the same source Pool Info reads — so the admin's view and the members' view
+   * of one pool cannot describe it differently.
+   */
+  const modeInfo = isLeaguePool
+    ? leagueModeInfo(
+        (pool.league_mode ?? 'pickem') as LeagueMode,
+        (pool.league_depth ?? null) as LeagueDepth,
+      )
+    : POOL_MODE_INFO[pool.prediction_mode as PredictionMode] ?? POOL_MODE_INFO.full_tournament
 
   return (
     <div className="relative pb-20">
