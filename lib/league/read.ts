@@ -758,3 +758,78 @@ export async function readNextFixtureByClub(
   }
   return { next, error: null }
 }
+
+/**
+ * Who every club plays in ONE named matchweek.
+ *
+ * ⚠ NOT `readNextFixtureByClub`, and the difference matters for Last Man
+ * Standing. That one returns each club's next unplayed fixture ANYWHERE in the
+ * season, which is usually this matchweek's — but when a club's game here has
+ * been postponed it is a fixture weeks away, and showing it would tell a member
+ * the club plays this week when it does not. Under the LMS rules a club with no
+ * game is precisely the case where a picker survives without being tested, so
+ * the distinction is the difference between an informed pick and a misled one.
+ *
+ * A club missing from the returned map has no fixture in this matchweek. That is
+ * a real answer, not an error, and the caller is expected to say so.
+ */
+export async function readMatchweekFixtureByClub(
+  supabase: SupabaseClient,
+  seasonId: string,
+  matchweekNumber: number,
+): Promise<{ byClub: Map<string, NextFixture>; error: string | null }> {
+  // ⚠ VIA matchweek_id. `league_fixtures` has NO `matchweek_number` column —
+  // the first draft of this filtered on one, PostgREST refused the whole select,
+  // and every club rendered "no game this week". Wrong, silently, at HTTP 200:
+  // the same shape as the dropped-column outage, and the reason
+  // scripts/verify-select-columns.ts exists.
+  const { data: mw, error: mwErr } = await supabase
+    .from('league_matchweeks')
+    .select('matchweek_id')
+    .eq('season_id', seasonId)
+    .eq('matchweek_number', matchweekNumber)
+    .maybeSingle()
+  if (mwErr) return { byClub: new Map(), error: mwErr.message }
+  if (!mw) return { byClub: new Map(), error: null }
+
+  const [fixturesRes, clubsRes] = await Promise.all([
+    supabase
+      .from('league_fixtures')
+      .select('home_club_id, away_club_id, kickoff_at')
+      .eq('matchweek_id', (mw as { matchweek_id: string }).matchweek_id),
+    supabase
+      .from('league_clubs')
+      .select('club_id, name, abbreviation, crest_url')
+      .eq('season_id', seasonId),
+  ])
+  if (fixturesRes.error) return { byClub: new Map(), error: fixturesRes.error.message }
+  if (clubsRes.error) return { byClub: new Map(), error: clubsRes.error.message }
+
+  const clubs = new Map(
+    ((clubsRes.data ?? []) as Array<{ club_id: string; name: string; abbreviation: string | null; crest_url: string | null }>)
+      .map((c) => [c.club_id, c]),
+  )
+
+  const byClub = new Map<string, NextFixture>()
+  for (const f of (fixturesRes.data ?? []) as Array<{
+    home_club_id: string; away_club_id: string; kickoff_at: string | null
+  }>) {
+    for (const [self, other, isHome] of [
+      [f.home_club_id, f.away_club_id, true],
+      [f.away_club_id, f.home_club_id, false],
+    ] as const) {
+      const opp = clubs.get(other)
+      if (!opp) continue
+      byClub.set(self, {
+        opponentId: other,
+        opponentName: opp.name,
+        opponentAbbr: opp.abbreviation,
+        opponentCrest: opp.crest_url,
+        isHome,
+        kickoffAt: f.kickoff_at ?? '',
+      })
+    }
+  }
+
+  return { byClub, error: null }
+}

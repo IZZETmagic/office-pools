@@ -87,6 +87,8 @@ export type LmsData = {
   entryId: string | null
   currentMatchweek: number | null
   roundsWon: Map<string, number>
+  /** Who each club plays in the open matchweek. Empty when none is open. */
+  fixtures: Map<string, import('@/lib/league/read').NextFixture>
 }
 
 /** Everything DuelsTab needs, assembled server-side in page.tsx. */
@@ -1701,6 +1703,7 @@ export function PoolDetail({
                 entryId={lmsData.entryId}
                 currentMatchweek={lmsData.currentMatchweek}
                 roundsWon={lmsData.roundsWon}
+                fixtures={lmsData.fixtures}
               />
             )}
 

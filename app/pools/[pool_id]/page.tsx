@@ -214,6 +214,7 @@ export default async function PoolPage({
         entryNames,
         entryId: defaultEntry?.entry_id ?? null,
         currentMatchweek: null,
+        fixtures: new Map(),
         roundsWon: new Map(
           ((totalsRes.data ?? []) as Array<{ entry_id: string; rounds_won: number }>)
             .map((r) => [r.entry_id, r.rounds_won]),
@@ -356,6 +357,18 @@ export default async function PoolPage({
         const mw = Number.isFinite(n) ? n : null
         if (showdownData) showdownData.currentMatchweek = mw
         if (lmsData) lmsData.currentMatchweek = mw
+
+        // Who each club plays THIS matchweek, so the Survivor picker can show
+        // the fixture beside the crest. Loaded here rather than with the rest of
+        // lmsData because the open matchweek is only known at this point.
+        if (lmsData && mw !== null && pool.league_season_id) {
+          const { readMatchweekFixtureByClub } = await import('@/lib/league/read')
+          const { byClub, error: fxErr } = await readMatchweekFixtureByClub(
+            supabase, pool.league_season_id, mw,
+          )
+          if (fxErr) console.error('[pool page] lms matchweek fixtures failed:', fxErr)
+          lmsData.fixtures = byClub
+        }
       }
 
       if (defaultEntry) {

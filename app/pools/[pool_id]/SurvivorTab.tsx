@@ -25,6 +25,7 @@ import { Card } from '@/components/ui/Card'
 import { Icon } from '@/components/ui/Icon'
 import type { LmsRound, LmsSurvivor, LmsPick } from '@/lib/league/lms'
 import type { SeasonClub } from '@/lib/league/table'
+import type { NextFixture } from '@/lib/league/read'
 
 type Props = {
   poolId: string
@@ -37,10 +38,16 @@ type Props = {
   currentMatchweek: number | null
   /** Rounds won this season, per entry. */
   roundsWon: Map<string, number>
+  /**
+   * Who each club plays in the OPEN matchweek. A club missing from the map has
+   * no fixture this week — a real state under these rules, not a gap.
+   */
+  fixtures: Map<string, NextFixture>
 }
 
 export default function SurvivorTab({
   poolId, round, survivors, myPicks, clubs, entryNames, entryId, currentMatchweek, roundsWon,
+  fixtures,
 }: Props) {
   const [picks, setPicks] = useState<LmsPick[]>(myPicks)
   const [saving, setSaving] = useState<string | null>(null)
@@ -138,9 +145,22 @@ export default function SurvivorTab({
             <p className="text-sm font-semibold text-neutral-900">
               You&apos;re backing{' '}
               {clubs.find((c) => c.club_id === thisWeekPick.club_id)?.club_name ?? 'a club'}
+              {/* The fixture again, on the line that confirms the pick. Somebody
+                  coming back to this screen mid-week wants to know what they
+                  are watching, not just who they chose. */}
+              {(() => {
+                const f = fixtures.get(thisWeekPick.club_id)
+                return f ? (
+                  <span className="font-normal text-neutral-500">
+                    {' '}— {f.isHome ? 'v' : 'at'} {f.opponentName}
+                  </span>
+                ) : null
+              })()}
             </p>
             <p className="text-xs text-neutral-500 mt-1">
-              They have to win. A draw is not enough.
+              {fixtures.has(thisWeekPick.club_id)
+                ? 'They have to win. A draw is not enough.'
+                : 'They have no game this matchweek, so you go through — you cannot be beaten by a match that was not played.'}
             </p>
           </div>
         ) : (
@@ -164,6 +184,7 @@ export default function SurvivorTab({
               const usedIn = usedBy.get(c.club_id)
               const isThisWeek = thisWeekPick?.club_id === c.club_id
               const spent = usedIn !== undefined && !isThisWeek
+              const fixture = fixtures.get(c.club_id) ?? null
               return (
                 <button
                   key={c.club_id}
@@ -181,6 +202,27 @@ export default function SurvivorTab({
                   {c.crest_url && <img src={c.crest_url} alt="" className="w-6 h-6 object-contain shrink-0" />}
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-neutral-900 truncate">{c.club_name}</span>
+                    {/* WHO THEY PLAY. The whole decision in this mode is "can
+                        this club win THIS week", and until now the screen
+                        offered twenty crests and no fixtures — so the answer
+                        lived on another tab, or in the member's head.
+
+                        Home and away are named rather than implied by order,
+                        because "v" and "at" are doing real work here: a good
+                        side away at a rival is a different bet from the same
+                        side at home. */}
+                    {fixture ? (
+                      <span className="block text-[10px] text-neutral-500 truncate">
+                        {fixture.isHome ? 'v ' : 'at '}
+                        {fixture.opponentName}
+                      </span>
+                    ) : (
+                      // No fixture is not an oversight — a club with no game
+                      // cannot lose, and under these rules that survives you.
+                      // Saying so is the difference between a safe pick and a
+                      // blank space.
+                      <span className="block text-[10px] text-neutral-400 truncate">no game this week</span>
+                    )}
                     {spent && (
                       <span className="block text-[10px] text-neutral-500">used in MW {usedIn}</span>
                     )}
