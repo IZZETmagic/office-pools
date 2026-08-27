@@ -36,20 +36,46 @@ import type { TableBreakdownRow } from '@/lib/league/table'
  * ladder prints on the Scoring Rules tab, which is the point: the two screens
  * describe one scale.
  */
-const HEAT: ReadonlyArray<readonly [maxRatio: number, className: string]> = [
-  [0.25, 'text-success-600'],
-  [0.50, 'text-warning-500'],
-  [0.75, 'text-warning-600'],
-  [0.99, 'text-danger-500'],
-]
+/**
+ * How far along the ramp this club sits: 0 exact, 1 worth nothing.
+ *
+ * Kept separate from the colour so the progression can be tested as a number
+ * rather than by string-matching a CSS expression.
+ */
+export function deltaHeatRatio(delta: number, zeroAt: number): number {
+  if (zeroAt <= 0) return 0
+  return Math.min(1, Math.abs(delta) / zeroAt)
+}
 
-export function deltaHeatClass(delta: number, zeroAt: number): string {
+/**
+ * The heat colour, mixed from the theme's OWN semantic tokens.
+ *
+ * ⚠ WHY NOT TAILWIND SHADES. The first version stepped
+ * success-600 → warning-500 → warning-600 → danger-500 → danger-600, and it
+ * failed in both themes for different reasons. In light mode danger-500
+ * (#F15757) and danger-600 (#EF4444) are the same red to the eye, so 4 and 5
+ * were indistinguishable — which is what Ryan saw. In DARK mode the ramps are
+ * inverted, higher numbers being lighter: warning-600 (#FCCE52) is a paler
+ * yellow than warning-500 (#FBBF24), so step 3 looked LESS severe than step 2.
+ *
+ * A shade ladder cannot escalate in both themes at once, because the palette
+ * deliberately flips direction between them. Mixing does: green → amber → red
+ * are the same three meanings in either theme, and `color-mix` walks between
+ * whatever those tokens currently are. Two segments rather than one, because a
+ * direct green-to-red mix passes through mud.
+ */
+export function deltaHeatColor(delta: number, zeroAt: number): string {
   // No decay configured: nothing is "more wrong" than anything else, so there
   // is no heat to show and inventing one would be a lie about the scoring.
-  if (zeroAt <= 0) return 'text-neutral-500'
-  const ratio = Math.abs(delta) / zeroAt
-  for (const [maxRatio, className] of HEAT) if (ratio <= maxRatio) return className
-  return 'text-danger-600'
+  if (zeroAt <= 0) return 'var(--neutral-500)'
+
+  const ratio = deltaHeatRatio(delta, zeroAt)
+  if (ratio <= 0.5) {
+    const t = Math.round((ratio / 0.5) * 100)
+    return `color-mix(in oklab, var(--warning-500) ${t}%, var(--success-600))`
+  }
+  const t = Math.round(((ratio - 0.5) / 0.5) * 100)
+  return `color-mix(in oklab, var(--danger-600) ${t}%, var(--warning-500))`
 }
 
 export function Delta({ delta, zeroAt }: { delta: number | null; zeroAt: number }) {
@@ -58,7 +84,7 @@ export function Delta({ delta, zeroAt }: { delta: number | null; zeroAt: number 
   // The arrow still says WHICH way — that is real information, and a member
   // wants it. It just no longer decides the colour.
   return (
-    <span className={deltaHeatClass(delta, zeroAt)}>
+    <span style={{ color: deltaHeatColor(delta, zeroAt) }}>
       {delta < 0 ? '▲' : '▼'} {Math.abs(delta)}
     </span>
   )

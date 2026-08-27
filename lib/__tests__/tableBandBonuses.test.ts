@@ -26,7 +26,7 @@
 // stored totals exactly.
 
 import { describe, it, expect } from 'vitest'
-import { bandBonuses, deltaHeatClass, type TablePrices } from '@/app/pools/[pool_id]/TableBreakdownView'
+import { bandBonuses, deltaHeatRatio, deltaHeatColor, type TablePrices } from '@/app/pools/[pool_id]/TableBreakdownView'
 import type { TableBreakdownRow } from '@/lib/league/table'
 
 /** Migration 093's COALESCE defaults, which is what a pool with no settings row gets. */
@@ -126,42 +126,57 @@ describe('bandBonuses', () => {
 // than a fixed five, so it agrees with the rungs printed on the Scoring Rules
 // tab for any pricing.
 
-describe('deltaHeatClass', () => {
+describe('the Diff heat scale', () => {
   // Default pricing: 100 a club, 20 a place, so nothing survives 5 out.
   const ZERO_AT = 5
 
   it('does not care which way you were wrong', () => {
     for (const n of [1, 2, 3, 4, 5, 9]) {
-      expect(deltaHeatClass(n, ZERO_AT), `${n} vs -${n}`).toBe(deltaHeatClass(-n, ZERO_AT))
+      expect(deltaHeatRatio(n, ZERO_AT), `${n} vs -${n}`).toBe(deltaHeatRatio(-n, ZERO_AT))
+      expect(deltaHeatColor(n, ZERO_AT)).toBe(deltaHeatColor(-n, ZERO_AT))
     }
   })
 
-  it('warms up one place at a time, and never cools going out', () => {
-    const ramp = [1, 2, 3, 4, 5].map((n) => deltaHeatClass(n, ZERO_AT))
-    // Five distinct steps, in order, ending red.
-    expect(new Set(ramp).size).toBe(5)
-    expect(ramp[0]).toContain('success')
-    expect(ramp[4]).toBe('text-danger-600')
+  it('gets hotter every single place out — no two steps look alike', () => {
+    // The bug Ryan caught: 4 and 5 were both red because they were adjacent
+    // shades of one token. Every step must differ from the one before it.
+    const ramp = [0, 1, 2, 3, 4, 5].map((n) => deltaHeatRatio(n, ZERO_AT))
+    for (let i = 1; i < ramp.length; i++) {
+      expect(ramp[i], `${i} places out`).toBeGreaterThan(ramp[i - 1])
+    }
+    expect(new Set([0, 1, 2, 3, 4, 5].map((n) => deltaHeatColor(n, ZERO_AT))).size).toBe(6)
+  })
+
+  it('runs green at exact and red at the end of the ladder', () => {
+    expect(deltaHeatColor(0, ZERO_AT)).toContain('var(--success-600)')
+    expect(deltaHeatColor(5, ZERO_AT)).toBe(
+      'color-mix(in oklab, var(--danger-600) 100%, var(--warning-500))',
+    )
+  })
+
+  it('passes through amber rather than mud', () => {
+    // Halfway is the warning token exactly — a direct green-to-red mix would
+    // go through brown, which reads as neither.
+    expect(deltaHeatColor(2.5, ZERO_AT)).toContain('var(--warning-500) 100%')
   })
 
   it('everything past the ladder is the same red — six is not worse than sixteen', () => {
-    // They are worth the same: nothing. Shading them differently would imply a
+    // They are worth the same: nothing. Shading them apart would imply a
     // penalty that does not exist.
-    const beyond = [5, 6, 11, 19].map((n) => deltaHeatClass(n, ZERO_AT))
+    const beyond = [5, 6, 11, 19].map((n) => deltaHeatColor(n, ZERO_AT))
     expect(new Set(beyond).size).toBe(1)
-    expect(beyond[0]).toBe('text-danger-600')
   })
 
   it('runs the ramp over the POOL’s ladder, not a hardcoded five', () => {
-    // A pool charging 25 a place zeroes at four, so four must already be red
-    // there while it is still amber on the default pricing.
-    expect(deltaHeatClass(4, 4)).toBe('text-danger-600')
-    expect(deltaHeatClass(4, ZERO_AT)).not.toBe('text-danger-600')
+    // A pool charging 25 a place zeroes at four, so four is fully red there
+    // while it is still short of red on the default pricing.
+    expect(deltaHeatRatio(4, 4)).toBe(1)
+    expect(deltaHeatRatio(4, ZERO_AT)).toBeLessThan(1)
   })
 
   it('shows no heat at all when the pool charges nothing per place', () => {
-    // With no decay every club is worth full marks wherever it lands; a colour
-    // ramp would be inventing a penalty the scoring does not apply.
-    expect(deltaHeatClass(9, 0)).toBe('text-neutral-500')
+    // With no decay every club is worth full marks wherever it lands; a ramp
+    // would be inventing a penalty the scoring does not apply.
+    expect(deltaHeatColor(9, 0)).toBe('var(--neutral-500)')
   })
 })
