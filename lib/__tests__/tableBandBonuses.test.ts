@@ -26,6 +26,8 @@
 // stored totals exactly.
 
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 import { bandBonuses, deltaHeatRatio, deltaHeatColor, type TablePrices } from '@/app/pools/[pool_id]/TableBreakdownView'
 import type { TableBreakdownRow } from '@/lib/league/table'
 
@@ -178,5 +180,36 @@ describe('the Diff heat scale', () => {
     // With no decay every club is worth full marks wherever it lands; a ramp
     // would be inventing a penalty the scoring does not apply.
     expect(deltaHeatColor(9, 0)).toBe('var(--neutral-500)')
+  })
+})
+
+describe('the breakdown table fits a phone', () => {
+  const src = readFileSync(
+    resolve(process.cwd(), 'app/pools/[pool_id]/TableBreakdownView.tsx'),
+    'utf8',
+  )
+
+  it('⚠ forces no minimum width', () => {
+    // It was min-w-[420px] — wider than a 375px phone minus the modal's own
+    // padding, so the one screen that explains how somebody scored had to be
+    // scrolled sideways to read. Measured after the fix: 339px table in a 339px
+    // container at 375px wide, no overflow.
+    const table = src.match(/<table className="([^"]*)"/)
+    expect(table, 'the breakdown table markup moved').not.toBeNull()
+    expect(table![1]).not.toMatch(/min-w-/)
+  })
+
+  it('shortens the club name on mobile only', () => {
+    // Truncation would eat the half that tells two clubs apart —
+    // "Manchester Unit…" beside "Manchester Cit…". Verified at both widths:
+    // 375px shows "Man United", 840px shows "Manchester United".
+    expect(src).toContain('<span className="hidden sm:inline">{r.club_name}</span>')
+    expect(src).toContain('<span className="sm:hidden">{shortClubName(r.club_name)}</span>')
+  })
+
+  it('uses the same shortener as the league table, not its own', () => {
+    // Two shorteners would mean a member reading one name on the table tab and
+    // a different one here, for the same club.
+    expect(src).toContain("from '@/lib/league/clubName'")
   })
 })

@@ -19,6 +19,7 @@
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import type { TableBreakdownRow } from '@/lib/league/table'
+import { shortClubName } from '@/lib/league/clubName'
 
 /**
  * How far off the prediction is — coloured by HOW WRONG, not by which way.
@@ -214,14 +215,18 @@ export function TableBreakdownView({
 
       <Card padding="none" className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[420px] text-sm tabular-nums">
+          {/* ⚠ NO min-width. It was 420px, which is wider than a 375px phone
+              MINUS the modal's own padding — so the one screen explaining how
+              somebody scored had to be scrolled sideways to read. The columns
+              tighten instead, and the club name shortens. */}
+          <table className="w-full text-sm tabular-nums">
             <thead>
               <tr className="bg-neutral-50 text-[10px] uppercase tracking-wider text-neutral-500">
-                <th className="py-2.5 pl-3 pr-1 text-left font-bold w-12">{ownerLabel}</th>
-                <th className="py-2.5 px-2 text-left font-bold">Club</th>
-                <th className="py-2.5 px-2 text-right font-bold w-12">Now</th>
-                <th className="py-2.5 px-2 text-right font-bold w-14">Diff</th>
-                <th className="py-2.5 pl-2 pr-3 text-right font-bold w-14">Pts</th>
+                <th className="py-2.5 pl-2 pr-1 sm:pl-3 text-left font-bold w-9 sm:w-12">{ownerLabel}</th>
+                <th className="py-2.5 px-1 sm:px-2 text-left font-bold">Club</th>
+                <th className="py-2.5 px-1 sm:px-2 text-right font-bold w-9 sm:w-12">Now</th>
+                <th className="py-2.5 px-1 sm:px-2 text-right font-bold w-12 sm:w-14">Diff</th>
+                <th className="py-2.5 pl-1 pr-2 sm:pl-2 sm:pr-3 text-right font-bold w-10 sm:w-14">Pts</th>
               </tr>
             </thead>
             <tbody>
@@ -229,7 +234,7 @@ export function TableBreakdownView({
                 const band = bandOf(r.predicted_position)
                 return (
                   <tr key={r.club_id} className="border-t border-border-default">
-                    <td className="py-2 pl-3 pr-1">
+                    <td className="py-2 pl-2 pr-1 sm:pl-3">
                       <div className="flex items-center gap-1.5">
                         <span
                           className={`w-[3px] h-5 rounded-full ${band ? bandStripe[band] : 'bg-transparent'}`}
@@ -238,16 +243,23 @@ export function TableBreakdownView({
                         <span className="font-bold text-neutral-900">{r.predicted_position}</span>
                       </div>
                     </td>
-                    <td className="py-2 px-2">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <td className="py-2 px-1 sm:px-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         {r.crest_url && <img src={r.crest_url} alt="" className="w-5 h-5 object-contain shrink-0" />}
-                        <span className="font-semibold text-neutral-900 truncate">{r.club_name}</span>
+                        {/* Truncation would eat the half that tells two clubs
+                            apart — "Manchester Unit…" beside "Manchester Cit…".
+                            Same shortener the league table uses, so a member
+                            reads the same name on both screens. */}
+                        <span className="font-semibold text-neutral-900 truncate">
+                          <span className="hidden sm:inline">{r.club_name}</span>
+                          <span className="sm:hidden">{shortClubName(r.club_name)}</span>
+                        </span>
                       </div>
                     </td>
-                    <td className="py-2 px-2 text-right text-neutral-600">{r.actual_position ?? '—'}</td>
-                    <td className="py-2 px-2 text-right"><Delta delta={r.delta} zeroAt={zeroAt} /></td>
-                    <td className="py-2 pl-2 pr-3 text-right font-bold text-neutral-900">{r.points ?? '—'}</td>
+                    <td className="py-2 px-1 sm:px-2 text-right text-neutral-600">{r.actual_position ?? '—'}</td>
+                    <td className="py-2 px-1 sm:px-2 text-right"><Delta delta={r.delta} zeroAt={zeroAt} /></td>
+                    <td className="py-2 pl-1 pr-2 sm:pl-2 sm:pr-3 text-right font-bold text-neutral-900">{r.points ?? '—'}</td>
                   </tr>
                 )
               })}
