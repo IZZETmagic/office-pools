@@ -26,11 +26,13 @@
 // stored totals exactly.
 
 import { describe, it, expect } from 'vitest'
-import { bandBonuses, type TablePrices } from '@/app/pools/[pool_id]/TableBreakdownView'
+import { bandBonuses, deltaHeatClass, type TablePrices } from '@/app/pools/[pool_id]/TableBreakdownView'
 import type { TableBreakdownRow } from '@/lib/league/table'
 
 /** Migration 093's COALESCE defaults, which is what a pool with no settings row gets. */
 const PRICES: TablePrices = {
+  exactPoints: 100,
+  stepPenalty: 20,
   championBonus: 500,
   topFourBonus: 100,
   perfectTopFourBonus: 250,
@@ -110,5 +112,56 @@ describe('bandBonuses', () => {
     const { lines, total } = bandBonuses(r, 4, PRICES)
     expect(lines.reduce((s, l) => s + l.points, 0)).toBe(total)
     expect(total).toBe(500 + 400 + 250 + 50 + 100)
+  })
+})
+
+// =============================================================
+// The Diff heat scale
+// =============================================================
+// It used to colour by DIRECTION — a club finishing higher than predicted was
+// green, lower was red. That measured the wrong thing: the points are identical
+// either way, so a green "▲ 7" sat beside a red "▼ 6" while both earned zero.
+//
+// The heat now tracks what the member keeps, over the pool's own ladder rather
+// than a fixed five, so it agrees with the rungs printed on the Scoring Rules
+// tab for any pricing.
+
+describe('deltaHeatClass', () => {
+  // Default pricing: 100 a club, 20 a place, so nothing survives 5 out.
+  const ZERO_AT = 5
+
+  it('does not care which way you were wrong', () => {
+    for (const n of [1, 2, 3, 4, 5, 9]) {
+      expect(deltaHeatClass(n, ZERO_AT), `${n} vs -${n}`).toBe(deltaHeatClass(-n, ZERO_AT))
+    }
+  })
+
+  it('warms up one place at a time, and never cools going out', () => {
+    const ramp = [1, 2, 3, 4, 5].map((n) => deltaHeatClass(n, ZERO_AT))
+    // Five distinct steps, in order, ending red.
+    expect(new Set(ramp).size).toBe(5)
+    expect(ramp[0]).toContain('success')
+    expect(ramp[4]).toBe('text-danger-600')
+  })
+
+  it('everything past the ladder is the same red — six is not worse than sixteen', () => {
+    // They are worth the same: nothing. Shading them differently would imply a
+    // penalty that does not exist.
+    const beyond = [5, 6, 11, 19].map((n) => deltaHeatClass(n, ZERO_AT))
+    expect(new Set(beyond).size).toBe(1)
+    expect(beyond[0]).toBe('text-danger-600')
+  })
+
+  it('runs the ramp over the POOL’s ladder, not a hardcoded five', () => {
+    // A pool charging 25 a place zeroes at four, so four must already be red
+    // there while it is still amber on the default pricing.
+    expect(deltaHeatClass(4, 4)).toBe('text-danger-600')
+    expect(deltaHeatClass(4, ZERO_AT)).not.toBe('text-danger-600')
+  })
+
+  it('shows no heat at all when the pool charges nothing per place', () => {
+    // With no decay every club is worth full marks wherever it lands; a colour
+    // ramp would be inventing a penalty the scoring does not apply.
+    expect(deltaHeatClass(9, 0)).toBe('text-neutral-500')
   })
 })

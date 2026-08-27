@@ -21,21 +21,53 @@ import { Badge } from '@/components/ui/Badge'
 import type { TableBreakdownRow } from '@/lib/league/table'
 
 /**
- * How far off the prediction is, in the direction a football follower reads it:
- * a club finishing HIGHER than you said is a positive surprise, so it is green.
+ * How far off the prediction is — coloured by HOW WRONG, not by which way.
+ *
+ * ⚠ THIS USED TO COLOUR BY DIRECTION: a club finishing higher than you said was
+ * green, lower was red. It read as praise and blame, and it was measuring the
+ * wrong thing. Being six places out is six places out; the points are identical
+ * whether the club overperformed or collapsed, so a green "▲ 7" sat next to a
+ * red "▼ 6" while both were worth exactly zero.
+ *
+ * The heat now tracks what the member actually keeps. `zeroAt` is the distance
+ * at which a club stops being worth anything — derived from the pool's own
+ * prices, not fixed at five, so a pool that charges 25 a place runs the ramp
+ * over four instead. On the default 100/20 it is exactly the five the scoring
+ * ladder prints on the Scoring Rules tab, which is the point: the two screens
+ * describe one scale.
  */
-export function Delta({ delta }: { delta: number | null }) {
+const HEAT: ReadonlyArray<readonly [maxRatio: number, className: string]> = [
+  [0.25, 'text-success-600'],
+  [0.50, 'text-warning-500'],
+  [0.75, 'text-warning-600'],
+  [0.99, 'text-danger-500'],
+]
+
+export function deltaHeatClass(delta: number, zeroAt: number): string {
+  // No decay configured: nothing is "more wrong" than anything else, so there
+  // is no heat to show and inventing one would be a lie about the scoring.
+  if (zeroAt <= 0) return 'text-neutral-500'
+  const ratio = Math.abs(delta) / zeroAt
+  for (const [maxRatio, className] of HEAT) if (ratio <= maxRatio) return className
+  return 'text-danger-600'
+}
+
+export function Delta({ delta, zeroAt }: { delta: number | null; zeroAt: number }) {
   if (delta === null) return <span className="text-neutral-300">—</span>
   if (delta === 0) return <span className="text-success-600 font-semibold">exact</span>
-  const better = delta < 0
+  // The arrow still says WHICH way — that is real information, and a member
+  // wants it. It just no longer decides the colour.
   return (
-    <span className={better ? 'text-success-600' : 'text-danger-600'}>
-      {better ? '▲' : '▼'} {Math.abs(delta)}
+    <span className={deltaHeatClass(delta, zeroAt)}>
+      {delta < 0 ? '▲' : '▼'} {Math.abs(delta)}
     </span>
   )
 }
 
 export type TablePrices = {
+  /** What a club placed exactly right is worth, and what each place out costs. */
+  exactPoints: number
+  stepPenalty: number
   championBonus: number
   topFourBonus: number
   perfectTopFourBonus: number
@@ -105,6 +137,10 @@ export function TableBreakdownView({
   ownerLabel,
   showFooterNote = true,
 }: Props) {
+  // The first distance worth nothing — the same arithmetic the Scoring Rules
+  // ladder uses, so the colours and the printed rungs cannot disagree.
+  const zeroAt = prices.stepPenalty > 0 ? Math.ceil(prices.exactPoints / prices.stepPenalty) : 0
+
   const positional = breakdown.reduce((sum, r) => sum + (r.points ?? 0), 0)
   const bonuses = bandBonuses(breakdown, topN, prices)
   const total = positional + bonuses.total
@@ -184,7 +220,7 @@ export function TableBreakdownView({
                       </div>
                     </td>
                     <td className="py-2 px-2 text-right text-neutral-600">{r.actual_position ?? '—'}</td>
-                    <td className="py-2 px-2 text-right"><Delta delta={r.delta} /></td>
+                    <td className="py-2 px-2 text-right"><Delta delta={r.delta} zeroAt={zeroAt} /></td>
                     <td className="py-2 pl-2 pr-3 text-right font-bold text-neutral-900">{r.points ?? '—'}</td>
                   </tr>
                 )

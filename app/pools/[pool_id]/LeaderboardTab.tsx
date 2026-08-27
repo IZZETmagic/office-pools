@@ -63,6 +63,8 @@ type LeaderboardTabProps = {
     europaFrom: number | null
     europaTo: number | null
     prices: {
+      exactPoints: number
+      stepPenalty: number
       championBonus: number
       topFourBonus: number
       perfectTopFourBonus: number
