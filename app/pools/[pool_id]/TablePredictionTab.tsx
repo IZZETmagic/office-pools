@@ -345,6 +345,34 @@ export default function TablePredictionTab({
   const onSavedRef = useRef(onSaved)
   onSavedRef.current = onSaved
 
+  /**
+   * ⚠ TELL THE REST OF THE PAGE THE SCORE MOVED — once per burst, not per drag.
+   *
+   * Reordering the table changes what it is worth, and the API now rescores on
+   * every save so the database is right immediately. The LEADERBOARD is not:
+   * it is server-rendered, so switching to that tab without reloading still
+   * showed the total from page load. That is the second half of Ryan seeing
+   * 1,000 on the leaderboard and 860 in the breakdown — fixing the engine alone
+   * left the screen disagreeing with itself.
+   *
+   * `router.refresh()` re-runs the server component and is the only thing that
+   * corrects it. It is also expensive on this page, and autosave fires on every
+   * drag — so the timer RESETS on each save and fires once the member stops.
+   * Dragging six clubs costs one refresh, not six.
+   *
+   * Safe against in-progress edits: `order` is seeded in a useState initialiser
+   * that does not re-run on a prop change, and PoolDetail's `tableSaved` is
+   * state rather than derived, so neither is clobbered by fresher props.
+   */
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current)
+    refreshTimer.current = setTimeout(() => router.refresh(), 2500)
+  }, [router])
+  useEffect(() => () => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current)
+  }, [])
+
   const flush = useCallback(async () => {
     if (!entryId) return
     if (inFlight.current) {
@@ -378,6 +406,7 @@ export default function TablePredictionTab({
         // `orderRef`, not `order`: this closure was made before the drag that
         // triggered it, and the ref is what the request actually carried.
         onSavedRef.current?.(orderRef.current, json.savedAt ?? null)
+        scheduleRefresh()
       }
     } catch {
       setMessage({ kind: 'error', text: 'Not saved — check your connection. Your changes are still here.' })
@@ -389,7 +418,7 @@ export default function TablePredictionTab({
         void flush()
       }
     }
-  }, [poolId, entryId])
+  }, [poolId, entryId, scheduleRefresh])
 
   /**
    * ⚠ Only autosaves once there IS a table. A member who has never saved is

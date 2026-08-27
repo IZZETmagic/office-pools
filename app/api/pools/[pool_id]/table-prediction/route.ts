@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
+import { invalidatePoolCache } from '@/lib/poolData'
 import { saveTablePrediction, readTablePrediction, readTableBreakdown } from '@/lib/league/table'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -117,6 +119,47 @@ export async function POST(
       },
       { status: 403 },
     )
+  }
+
+  // ⚠ RESCORE NOW, or the leaderboard keeps yesterday's answer.
+  //
+  // `league_entry_totals` is written by `league_score_table`, and until now the
+  // only thing that called it was the fixtures sync — via
+  // `league_after_standings_change`, when a fixture COMPLETES. That is the right
+  // trigger for "the real table moved". It is not the only thing that changes a
+  // score: reordering your own prediction changes it too.
+  //
+  // So between editing a table and the next fixture finishing — which before a
+  // season starts can be days — the leaderboard showed a total computed from an
+  // ordering the member had already replaced. Caught by Ryan reading 1,000 on
+  // the leaderboard and 860 in the breakdown for the same entry: the breakdown
+  // computes live and was right, the stored total was fourteen hours old.
+  //
+  // Pool-scoped and idempotent, so calling it per save is cheap — and a table
+  // is edited in one short window before one deadline, not all season.
+  //
+  // ⚠ NEVER fails the save. The prediction is already committed and verified by
+  // this point; a scoring hiccup must not tell the member their table did not
+  // save. It is stale for one more tick instead, which is what it was before.
+  //
+  // Admin client on purpose: this is a system recomputation over the whole
+  // pool's entries, not a read on the caller's behalf. The route's user-scoped
+  // client stays user-scoped for everything that touches predictions.
+  try {
+    const { error: scoreErr } = await createAdminClient()
+      .rpc('league_score_table', { p_pool_id: pool_id })
+    if (scoreErr) console.error('[table-prediction] rescore failed:', scoreErr.message)
+    // ⚠ AND EXPIRE THE POOL CACHE, or rescoring changes nothing anyone can see.
+    //
+    // The pool page is cached with a 45s TTL (lib/poolData.ts), so a
+    // `router.refresh()` right after a save re-fetches and is handed the SAME
+    // stale render. Measured: the database moved to 840 while the leaderboard
+    // went on showing 920 through a refresh. The outbox consumer already does
+    // this for exactly the same reason after a fixture is scored; a member
+    // reordering their own table is the other thing that changes a total.
+    invalidatePoolCache(pool_id)
+  } catch (err) {
+    console.error('[table-prediction] rescore threw:', err instanceof Error ? err.message : err)
   }
 
   return NextResponse.json({ saved: result.stored, savedAt: result.savedAt, entryId: resolvedEntry })
