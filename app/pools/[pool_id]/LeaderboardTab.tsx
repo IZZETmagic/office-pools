@@ -102,10 +102,45 @@ export function LeaderboardTab({
   //  exact_count      at RESULTS depth the engine writes only 'winner' or
   //                   'miss' (066:184), so "N exact" can never be anything but
   //                   zero — and "exact" is the wrong word for a tap anyway.
+  // Hoisted to sit with the flags that read it — `showForm` below would
+  // otherwise touch it in its own initialiser, 400 lines before it existed.
+  const isBracketPicker = predictionMode === 'bracket_picker'
+
   const showAwards = !isLeague
   const showLevels = !isLeague
-  const showBonus = !isLeague || leagueMode === 'table'
   const isResultsDepth = isLeague && leagueDepth === 'results'
+
+  /**
+   * ⚠ "0 + 1,240 bonus" WAS TRUE AND MEANT NOTHING.
+   *
+   * The base/bonus split is a World Cup shape: match points from predictions,
+   * bonus points from group and podium awards. Table mode has no match points
+   * at all — `league_score_table` (migrations 080/093) files BOTH the per-place
+   * points and the band bonuses under `bonus_points`, so the line always read
+   * "0 + <the whole score> bonus".
+   *
+   * Verified rather than assumed, because "the per-place points are missing
+   * from the total" was the other explanation and would have been a scoring
+   * bug: for every entry in the seeded pool, `bonus_points` minus the breakdown
+   * RPC's per-place sum equals exactly that entry's band bonuses. Nothing is
+   * lost — it is only filed under a name members never see.
+   *
+   * So the total stands alone. There is deliberately no substitute sub-line:
+   * `exact_count` reads 0 for every table entry, so "N exact" would be a
+   * confident zero rather than a fact.
+   */
+  const showBonus = !isLeague
+
+  /**
+   * Form is a WEEKLY record, so it only means something in a mode that has
+   * weeks. Pick'em and Showdown score every matchweek and fill `leagueForm`;
+   * Table is one prediction for the season and Last Man Standing has no points
+   * to plot, so both returned an empty array and rendered a column of em-dashes
+   * under a heading promising form.
+   */
+  const showForm =
+    !isBracketPicker &&
+    (!isLeague || leagueMode === 'pickem' || leagueMode === 'showdown')
   const isMultiEntry = maxEntriesPerUser > 1
 
   // Flatten members into leaderboard entries (each entry is a row)
@@ -514,7 +549,6 @@ export function LeaderboardTab({
     bonusPoints: number
   }
 
-  const isBracketPicker = predictionMode === 'bracket_picker'
 
   /**
    * One definition for the header and the rows. They were two identical inline
@@ -524,7 +558,9 @@ export function LeaderboardTab({
   const gridCols = isBracketPicker
     ? 'grid-cols-[3.5rem_1fr_10rem_8rem]'
     : isLeague
-      ? 'grid-cols-[3.5rem_1fr_8rem_8rem]'
+      // Rank · Player · [Form] · Stats. Table and Last Man Standing drop the
+      // Form column entirely rather than reserving 8rem for em-dashes.
+      ? (showForm ? 'grid-cols-[3.5rem_1fr_8rem_8rem]' : 'grid-cols-[3.5rem_1fr_8rem]')
       : 'grid-cols-[3.5rem_1fr_8rem_10rem_8rem]'
 
   // Read the precomputed stats. These are computed ONCE by the scoring path
@@ -1366,7 +1402,7 @@ export function LeaderboardTab({
                         </div>
                       )}
 
-                      {!isBracketPicker && formFor(entry.entry_id).length > 0 && (
+                      {showForm && formFor(entry.entry_id).length > 0 && (
                         <div className="flex items-center gap-[3px] sm:gap-1 mt-1.5">
                           {formFor(entry.entry_id).map((type, di) => (
                             <div
@@ -1454,7 +1490,13 @@ export function LeaderboardTab({
           )}
           {/* Driven by getFormDotClass so the key always matches the dots it explains.
               These were previously hand-written with their own colours, which is how a
-              legend silently starts lying about the thing above it. */}
+              legend silently starts lying about the thing above it.
+
+              And hidden entirely where there are no dots: a Table pool was
+              printing "Exact · W+GD · Winner · Miss · No Pick" above a
+              leaderboard with no form column at all, describing an outcome set
+              that mode does not have. */}
+          {showForm && (
           <div className="flex flex-wrap items-center justify-center gap-x-3 sm:gap-x-4 gap-y-1">
             {/* At Results depth the engine emits only 'winner' or 'miss'
                 (066:184), so keys for Exact and W+GD would describe dots that
@@ -1468,6 +1510,7 @@ export function LeaderboardTab({
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 
@@ -1483,7 +1526,7 @@ export function LeaderboardTab({
       <div className={`hidden sm:grid ${gridCols} gap-2 px-4 py-2 text-xs font-semibold text-muted uppercase tracking-wider border-b border-border-default`}>
         <div>Rank</div>
         <div>Player</div>
-        {!isBracketPicker && <div className="text-center">Form</div>}
+        {showForm && <div className="text-center">Form</div>}
         {showAwards && <div className="text-center">Awards</div>}
         <div className="text-right">Stats</div>
       </div>
@@ -1553,7 +1596,7 @@ export function LeaderboardTab({
               </div>
 
               {/* Form dots */}
-              {!isBracketPicker && (
+              {showForm && (
                 <div className="flex items-center gap-1 justify-center">
                   {formFor(entry.entry_id).length > 0 ? (
                     <>
@@ -1716,7 +1759,7 @@ export function LeaderboardTab({
                   )}
 
                   {/* Form dots */}
-                  {!isBracketPicker && formFor(entry.entry_id).length > 0 && (
+                  {showForm && formFor(entry.entry_id).length > 0 && (
                     <div className="flex items-center gap-1 mt-1.5">
                       <span className="text-[9px] font-semibold text-muted uppercase tracking-wide">Form</span>
                       <div className="flex items-center gap-[3px]">
