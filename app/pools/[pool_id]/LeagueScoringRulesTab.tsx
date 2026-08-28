@@ -35,7 +35,7 @@ import { formatNumber } from '@/lib/format'
 // screen cannot drift into describing scoring nobody is using:
 //
 //   fixtures   pool_settings.group_*            -> league_score_fixture (055/066)
-//   duels      3 / 1 / 0, fixed                 -> league_score_duels   (084)
+//   duels      3 / 1 / 0, bye 1, fixed          -> league_score_duels   (084, bye 100)
 //   table      league_pool_settings.table_*     -> league_score_table   (080)
 //   ordering   league_finalize_ranks' ORDER BY  -> (059, 084, 087)
 //
@@ -213,17 +213,18 @@ function DuelCard() {
   return (
     <DetailCard title="Your weekly duel" className="mb-4">
       <div className="mt-1">
-        {/* Fixed in league_score_duels (084), not a pool setting — so these are
+        {/* Fixed in league_score_duels (100), not a pool setting — so these are
             literals rather than a lie about being configurable. */}
         <PointsRow label="Beat your opponent" value={3} />
         <PointsRow label="Tie with them" value={1} />
+        <PointsRow label="No opponent this week" value={1} />
         <PointsRow label="Lose" value={0} />
       </div>
       <p className="t-body text-muted mt-3">
         Every matchweek you are drawn against one other member. Whoever scored more that week
-        wins the duel. The fixture list is published in advance and everyone plays everyone the
-        same number of times — with an odd number of entries, the bye rotates so nobody sits out
-        twice before everyone has sat out once.
+        wins the duel. The fixture list is published in advance and rotates so that everybody
+        meets everybody. With an odd number of entries somebody sits out each week and takes a
+        point — there was no opponent, so there was no defeat.
       </p>
       <p className="t-body text-muted mt-3">
         Duel points decide the table. Your matchweek points are the tiebreak, so a heavy week

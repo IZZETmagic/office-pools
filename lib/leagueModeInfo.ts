@@ -24,6 +24,13 @@
  *  1. `LeagueScoringRulesTab`, which states the same mechanics to the same
  *     member on a neighbouring tab. Two screens disagreeing about how a pool
  *     works is worse than either being briefly out of date.
+ *
+ * ⚠ Showdown's copy USED to promise "everyone plays everyone the same number of
+ * times, so nobody gets an easier run than anybody else". True of a fixed
+ * roster, and false the moment somebody joins in October — Decision 10 settles
+ * that a straggler joins the draw from the next matchweek, which necessarily
+ * gives them fewer duels than the members who were there in August. The promise
+ * is now about the draw being published and rotated, which stays true.
  *  2. The engines. Every number quoted in `points` below is a default the SQL
  *     COALESCEs against, not a number this file decides.
  */
@@ -87,13 +94,15 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
             : 'Members call all ten fixtures each matchweek, ') +
           'and are drawn against one other member for that week. Whoever scores more wins the ' +
           'duel — three points for a win, one for a tie. The fixture list is published in ' +
-          'advance and everyone plays everyone the same number of times, so nobody gets an ' +
-          'easier run than anybody else. Duel points decide the table; the weekly score is ' +
-          'the tiebreak, so a big week still counts even if you lost the head-to-head.',
+          'advance and rotates so that everybody meets everybody, rather than the same pairs ' +
+          'coming round again. With an odd number of members somebody sits out each week and ' +
+          'takes a point — there was no opponent, so there was no defeat. Duel points decide ' +
+          'the table; the weekly score is the tiebreak, so a big week still counts even if you ' +
+          'lost the head-to-head.',
         points: [
           'A different opponent every matchweek, drawn in advance.',
           'Three points a win, one a tie, none for a loss.',
-          'Everyone plays everyone the same number of times.',
+          'A week with no opponent is worth a point.',
         ],
       }
 
