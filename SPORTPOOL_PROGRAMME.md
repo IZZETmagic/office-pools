@@ -2008,6 +2008,120 @@ engine, not a second engine**.
 
 ---
 
+### Decision 10 — Deadlines: the product enforces information, the admin controls timing
+
+Settled 2026-08-27 with Ryan, after three seasons of real Premier League fixtures were measured
+rather than assumed (2022–24, 114 rounds, 1,140 games, pulled from api-football).
+
+**The tension.** A deadline has to be hard enough that nobody predicts on information others didn't
+have, and soft enough that a friend group with one straggler isn't punished for the rest of the
+season. Ryan's framing, which decided the shape: predicting on time is trading on public market
+information; predicting later is **insider information** — injuries, form, who is benched, results
+already played. *"What's making it fair is to have the same deadline for everybody."*
+
+**The principle.** SportPool is never the master admin. It is the referee on what is *knowable*:
+
+> A deadline may move as long as the information it protects has not arrived — and it always applies
+> to everyone in the pool at once.
+
+Everything below follows from that one sentence.
+
+#### Matchweek modes — Pick'em (both depths), Showdown, Last Man Standing
+
+- **A matchweek locks 1 hour before its own first kickoff**, recomputed live from the fixture list
+  and frozen the moment it passes. `refresh_league_matchweek_window` (migration 050) already tracks
+  and freezes it; **only the 1-hour offset is new**. Picks reveal at the lock, so the group sees each
+  other's calls an hour before kickoff — nobody can change anything by then, and it buys an hour of
+  banter.
+- **The next matchweek opens 72 hours after the current one locks** — matching the measured
+  56-hour median playing window — **and never later than 48 hours before its own deadline.**
+- **No admin lever to move a matchweek deadline later.** Kickoff is not ours to move and no admin
+  wants it. **Earlier is allowed** — it gives everyone *less* information, symmetrically — so a group
+  who wants "everyone in by Friday night" can have it.
+- **A late joiner scores nothing for the weeks before them.** Everyone playing matchweek N faces the
+  same instant, so fairness is structural. What is owed is honesty, not a lever: the leaderboard must
+  say *when* a member joined, or four missing weeks read as "bad at football".
+
+Why the floor exists, from the data:
+
+| rule | min window | p05 | median | rounds under 24h |
+|---|---|---|---|---|
+| open 72h after the previous lock | **−121 days** | 0.2d | 4.0d | **21 of 111 — 19%** |
+| …and never later than 48h before its own deadline | **2.0 days** | 2.0d | 4.0d | 0 |
+
+The floor does real work in **25 of 111 rounds (23%)** — roughly one week in four.
+
+#### ⚠ Moved fixtures are re-homed. Our matchweeks are PICKING rounds, not league rounds.
+
+**api-football never re-homes a moved fixture.** Verified: *Arsenal v Manchester City*, labelled
+`Regular Season - 12`, bulk played 18 Oct 2022, actually played **15 Feb 2023 — 120 days later,
+still labelled round 12**. Round 8 of 2022 has three fixtures played 145, 180 and **200 days** after
+the rest. The round label is permanent, so tracking this is ours to do.
+
+> A fixture whose date moves is re-homed to the matchweek whose window **most recently precedes** its
+> new date — and only while its current matchweek is still unlocked.
+
+- **The preceding weekend, never the following one.** Attaching a midweek makeup game to the weekend
+  *before* makes it a late straggler: the lock is untouched, and it is predicted on the Friday and
+  played the following Wednesday — a five-day wait instead of four months. Attaching it to the
+  weekend *after* would drag that matchweek's lock back to the Tuesday and leave a one-day picking
+  window. The data splits these cleanly: late stragglers are **10 of 114 rounds (9%)** and harmless;
+  games pulled ahead of the bulk are **3 of 114 (3%)** and cost a median 6 days of picking time.
+- **Once the source matchweek has locked, the fixture stays put** and scores whenever it is finally
+  played. Predictions made before a lock stand — *"once they've locked, the predictions are what they
+  are."* Fixture moves are announced weeks ahead, so this is the rare path.
+- **This is the Fantasy Premier League model**, which is where blank and double gameweeks come from.
+- ⚠ **The cost, accepted knowingly:** our matchweek 24 may contain a fixture the league calls round
+  12. Our rounds become picking rounds that can be short or long. Internally consistent and the
+  ingested table is untouched, but it is a real divergence from official numbering and **the UI must
+  stop implying they are the same thing.**
+- ✅ **What it buys beyond the experience:** every matchweek's fixtures happen inside its own window,
+  so the postponed-fixture stall migration 094 works around largely stops occurring.
+
+#### Predict the Table — the only mode with a genuine deadline decision
+
+One prediction, one deadline, everybody at once. There is no fixture list to enforce it, so this is
+where admin authority actually lives.
+
+- **The admin owns the date**, set at creation and movable while it is still open (migrations 077 →
+  098). It is expressed relative to the **pool**, not the season: pools routinely begin after a
+  season has started, and a pool created in October is a legitimate *"predict the final table from
+  here"* game.
+- **Nobody is locked until everybody is locked.** There is no submit step — members edit until the
+  close — so extending the close extends it equally for all. That, not concealment, is what makes an
+  extension fair: Alice can revise with exactly the information Bob has.
+- **Everyone in, or nobody sees.** If someone has not filed when the deadline arrives, nothing
+  reveals and the admin chooses: **extend for everyone**, or **reveal without them**. Both are
+  legitimate, both are fair, and the lever has no shape that lets one member be given extra time.
+- **Once revealed, frozen — including for the admin.** Reopening hands one person everybody else's
+  answers, which is the one thing an admin cannot consent to on other members' behalf.
+- **An extension must be announced.** It is only fair if the members who filed on time learn they can
+  revise. The outbox has `table_deadline`; a "deadline moved" kind is owed alongside it.
+
+#### ⚠ This narrows Decision 7
+
+Decision 7 grants admins, freely up to kickoff: *"extend a deadline, reopen a round for everyone,
+**reopen for one specific member**"*. **The per-member reopen is withdrawn for league modes.** It was
+written for a single-deadline World Cup bracket; across a 38-week season a member reopened alone is
+predicting with results the others did not have, and the accusation Decision 7 exists to prevent
+— *"the risk isn't that admins cheat, it's that they can be accused of it"* — is exactly what a
+per-member extension invites. Extending for everyone is the same generosity with none of the doubt.
+The rest of Decision 7 stands, including the override log.
+
+#### Still owed
+
+- The 1-hour offset in `refresh_league_matchweek_window`, and re-homing itself — neither is built.
+- ⚠ **`league_open_matchweek` sorts by `matchweek_number`.** Three seasons contain round pairs whose
+  games run **out of numerical order** (minimum gap −121 days), so it can open a matchweek whose
+  games are months away while a later-numbered one is being played. It must sort by lock time.
+- A postponed fixture completing weeks after its matchweek settled has **never been exercised**.
+  Believed correct under 094; worth a test before the season rather than a discovery in November.
+- "Since you joined" leaderboard view — candidate, not committed.
+- Last Man Standing's late joiner enters the *next* round, which is fair but means **dead time** in a
+  round that can run six weeks. A different problem from this one; not bundled in.
+
+---
+
 ### Still open
 
 - **Presets for new pools with existing pools grandfathered** — assumed yes, not explicitly ruled.
