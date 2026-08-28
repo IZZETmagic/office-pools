@@ -190,16 +190,22 @@ export default function SurvivorTab({
               const isThisWeek = thisWeekPick?.club_id === c.club_id
               const spent = usedIn !== undefined && !isThisWeek
               const fixture = fixtures.get(c.club_id) ?? null
+              // ⚠ A club with no fixture cannot be backed to WIN, so it cannot
+              // be picked. Until migration 103 it could — and `league_lms_settle`
+              // survives an entry whose club had no completed fixture, so a
+              // non-playing club was a guaranteed pass. In a blank matchweek
+              // everybody could take one and nobody would ever go out.
+              const notPlaying = fixture === null
               return (
                 <button
                   key={c.club_id}
                   type="button"
-                  disabled={spent || saving !== null}
+                  disabled={spent || notPlaying || saving !== null}
                   onClick={() => choose(c.club_id)}
                   className={`flex items-center gap-2 p-2.5 rounded-xl border-2 text-left transition-all ${
                     isThisWeek
                       ? 'border-primary-600 bg-primary-600/8'
-                      : spent
+                      : spent || notPlaying
                         ? 'border-neutral-200 bg-neutral-50 opacity-45 cursor-not-allowed'
                         : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
                   }`}
@@ -222,11 +228,11 @@ export default function SurvivorTab({
                         {fixture.opponentName}
                       </span>
                     ) : (
-                      // No fixture is not an oversight — a club with no game
-                      // cannot lose, and under these rules that survives you.
-                      // Saying so is the difference between a safe pick and a
-                      // blank space.
-                      <span className="block text-[10px] text-neutral-400 truncate">no game this week</span>
+                      // Greyed out AND labelled. A blank space would read as a
+                      // loading state; "not playing" is the reason the tile
+                      // cannot be tapped, and the reason is the whole point —
+                      // what you have left to spend IS the game.
+                      <span className="block text-[10px] text-neutral-400 truncate">not playing this week</span>
                     )}
                     {spent && (
                       <span className="block text-[10px] text-neutral-500">used in MW {usedIn}</span>
@@ -238,6 +244,7 @@ export default function SurvivorTab({
           </div>
           <p className="text-xs text-neutral-400 mt-2">
             One club per round — once you&apos;ve used them, they&apos;re gone until the next round.
+            Clubs with no game this matchweek can&apos;t be picked.
           </p>
         </div>
       )}
