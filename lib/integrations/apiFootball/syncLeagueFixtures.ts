@@ -33,6 +33,7 @@ import {
   type LeagueFixtureRow,
   type LeagueFixturePayload,
 } from './mappers'
+import { rehomeSeason } from '@/lib/league/rehomeSeason'
 import type { LeagueSyncTarget } from './syncTargets'
 import type { ApiFootballFixture } from './types'
 
@@ -111,6 +112,8 @@ export type LeagueSyncResult = {
    * counting the ask would report a move that never happened.
    */
   rescheduleApplied: number
+  /** Fixtures moved to a different matchweek because their kickoff moved. */
+  rehomed: number
   awarded: number
   finalWithoutGoals: number
   fetchedFeed: boolean
@@ -162,6 +165,7 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     roundUnknown: 0,
     rescheduleDetected: 0,
     rescheduleApplied: 0,
+    rehomed: 0,
     awarded: 0,
     finalWithoutGoals: 0,
     fetchedFeed: false,
@@ -503,6 +507,27 @@ export async function syncLeagueFixtures(
     result.scoredEntries += sr.entries ?? 0
   }
 
+  // ------------------------------------------------------------ 7b2. re-home
+  // Our matchweeks are PICKING rounds, so a fixture that just moved may now
+  // belong to a different one — Decision 10, and the policy lives in
+  // lib/league/rehome.ts where three real seasons can be replayed over it.
+  //
+  // Gated on a move having ACTUALLY landed rather than merely being proposed,
+  // because this is the one step in the sync that reads the whole season. A
+  // reschedule happens a handful of times a year; the other 500,000 ticks skip
+  // it entirely.
+  //
+  // A failure is an ERROR but never fails the sync, on the same trade as
+  // scoring: the fixture data is already correct, and the next move re-plans
+  // from scratch — the planner reads current state and holds nothing.
+  if (result.rescheduleApplied > 0) {
+    try {
+      result.rehomed = await rehomeSeason(admin, target.seasonId, push)
+    } catch (e) {
+      push('league_rehome', e instanceof Error ? e.message : String(e))
+    }
+  }
+
   // ---------------------------------------------------------- 7c. standings
   // The real league table, re-read ONLY when a fixture actually finished this
   // tick. Nothing else can move it, so polling it on a timer would spend the
@@ -611,6 +636,7 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     r.rescheduleDetected > 0
       ? `resched=${r.rescheduleDetected}/${r.rescheduleApplied}`
       : null,
+    r.rehomed > 0 ? `rehomed=${r.rehomed}` : null,
     r.awarded > 0 ? `awarded=${r.awarded}` : null,
     r.finalWithoutGoals > 0 ? `ft_no_goals=${r.finalWithoutGoals}` : null,
     r.scoredEntries > 0 ? `pts_entries=${r.scoredEntries}` : null,
