@@ -10,6 +10,8 @@ import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
+import { DatePicker } from '@/components/ui/DatePicker'
+import { TimePicker } from '@/components/ui/TimePicker'
 
 type CreatePoolModalProps = {
   onClose: () => void
@@ -76,6 +78,15 @@ type Tournament = {
   description: string | null
   /** 'league' | 'groups_knockout'. Null on rows predating migration 024. */
   format: string | null
+  /**
+   * The competition's crest, served by the fixtures provider.
+   *
+   * ⚠ NULL is the common case and a real answer, not a missing one. The
+   * provider has a genuine crest for the Premier League and a generic grey
+   * shield for the World Cup, so the column is filled only where the image is
+   * actually the competition's own.
+   */
+  logo_url: string | null
   /** Set only for a league: the `league_seasons` row this entry actually plays. */
   league_season_id: string | null
 }
@@ -113,6 +124,97 @@ const SCORING_DEFAULTS = {
   bonus_top_scorer_correct: 100,
 }
 
+/**
+ * The tournament name without its season.
+ *
+ * "Premier League 2026/27" -> "Premier League"
+ * "FIFA World Cup 2026"    -> "FIFA World Cup"
+ *
+ * Only ever one active competition is offered here, so the year distinguishes
+ * nothing — and the exact dates are printed two lines below it on the same card,
+ * which is where somebody actually checks which season they are joining.
+ *
+ * ⚠ DISPLAY ONLY. `tournaments.name` is unchanged, because it is what every
+ * other surface, every email and every export uses, and there the season is
+ * doing real work. `short_name` is not usable for this either: it reads
+ * "Premier League" for the league but "WC2026" for the World Cup, so it is a
+ * code, not a display name.
+ *
+ * Anchored to the END of the string, so a name that legitimately contains a year
+ * ("Copa America 2024 Qualifiers") keeps it.
+ */
+function withoutSeason(name: string): string {
+  return name.replace(/\s+\d{4}(\s*\/\s*\d{2,4})?$/, '')
+}
+
+/**
+ * One titled block of the wizard's last step.
+ *
+ * The step was four unrelated groups separated by `<hr>`, with headings set at
+ * the same weight as the field labels inside them — so nothing read as a
+ * boundary and the whole thing scrolled as one list. A bordered block per group
+ * is what makes it scannable; the rules are gone.
+ */
+function Section({
+  title, description, children,
+}: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-neutral-200 p-4">
+      <h3 className="text-sm font-bold text-neutral-900">{title}</h3>
+      {description && (
+        <p className="text-xs text-neutral-500 mt-1 leading-relaxed">{description}</p>
+      )}
+      <div className="mt-3">{children}</div>
+    </section>
+  )
+}
+
+/**
+ * An instant -> the local `YYYY-MM-DD` / `HH:MM` pair the pickers speak.
+ *
+ * ⚠ LOCAL GETTERS, never `toISOString()`. A matchweek locks at 19:00 UTC; in
+ * Bermuda that is 15:00 the same day, and `toISOString().split('T')[0]` would be
+ * right there but wrong for a lock just after midnight UTC — which is the shape
+ * of every date bug fixed in this file today.
+ */
+function localParts(iso: string): { date: string; time: string } {
+  const d = new Date(iso)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return {
+    date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    time: `${p(d.getHours())}:${p(d.getMinutes())}`,
+  }
+}
+
+/** Today, local, as `YYYY-MM-DD` — the floor for every deadline. */
+function todayLocal(): string {
+  return localParts(new Date().toISOString()).date
+}
+
+/**
+ * Competitions shown as "coming soon" — a PREVIEW, not a capability.
+ *
+ * ⚠ These are NOT rows in `tournaments` and must not become them until each has
+ * actually been imported. `scripts/import-league-season.ts` puts it well of its
+ * own catalogue: "an entry that has never been run is a claim, not a
+ * capability." A selectable card for a league with no fixtures, clubs or
+ * matchweeks would create a pool that scores nothing.
+ *
+ * Crests come from the fixtures provider by league id, the same source and the
+ * same path as the live one — so this row previews the real thing rather than
+ * a mock of it.
+ */
+const COMING_SOON = [
+  { id: 140, name: 'La Liga', country: 'Spain' },
+  { id: 78, name: 'Bundesliga', country: 'Germany' },
+  { id: 135, name: 'Serie A', country: 'Italy' },
+  { id: 61, name: 'Ligue 1', country: 'France' },
+  { id: 2, name: 'Champions League', country: 'Europe' },
+] as const
+
+const providerCrest = (leagueId: number) =>
+  `https://media.api-sports.io/football/leagues/${leagueId}.png`
+
 const STEPS = [
   { key: 'tournament', label: 'Tournament', mobileLabel: 'Tournament' },
   { key: 'pool_type', label: 'Pool Type', mobileLabel: 'Type' },
@@ -126,6 +228,59 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   const supabase = createClient()
   const router = useRouter()
   const { showToast } = useToast()
+
+  /**
+   * Hold the page still while the wizard is open.
+   *
+   * ⚠ The modal never did this. Anything the browser could not scroll inside
+   * the dialog — a wheel over a picker column that had reached its end, a
+   * trackpad flick anywhere outside it — scrolled the pool list behind instead,
+   * which is how this surfaced: "the page in the background scrolls instead of
+   * the time options".
+   *
+   * ⚠ `overflow: hidden` ALONE IS NOT ENOUGH, and looks fine until you try it
+   * on a page that is already scrolled. The scroll offset is retained in
+   * `window.scrollY` but the clamped scrollport paints from the top, so opening
+   * the modal 400px down the pool list visibly threw the background 400px out
+   * of place behind it.
+   *
+   * So the body is pinned with `position: fixed` at `top: -scrollY`, which
+   * holds the page exactly where it was, and the offset is scrolled back on
+   * close. Same technique CommunityTab uses for the mobile keyboard, minus its
+   * `window.scrollTo(0, 0)` — that one is a full-screen chat and can afford to
+   * start at the top; this must come back to wherever the admin was.
+   *
+   * The padding compensates for the scrollbar the lock removes; without it the
+   * whole page shifts sideways as the modal opens. It is 0 on overlay-scrollbar
+   * platforms, which is why it is conditional rather than assumed.
+   */
+  useEffect(() => {
+    const { body } = document
+    const scrollY = window.scrollY
+    const prev = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      paddingRight: body.style.paddingRight,
+    }
+    const scrollbar = window.innerWidth - document.documentElement.clientWidth
+
+    body.style.overflow = 'hidden'
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.width = '100%'
+    if (scrollbar > 0) body.style.paddingRight = `${scrollbar}px`
+
+    return () => {
+      body.style.overflow = prev.overflow
+      body.style.position = prev.position
+      body.style.top = prev.top
+      body.style.width = prev.width
+      body.style.paddingRight = prev.paddingRight
+      window.scrollTo(0, scrollY)
+    }
+  }, [])
 
   // Step state
   const [currentStep, setCurrentStep] = useState<Step>('tournament')
@@ -151,7 +306,17 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   const [leagueMode, setLeagueMode] = useState<'pickem' | 'showdown' | 'last_man_standing' | 'table'>('pickem')
   const [leagueDepth, setLeagueDepth] = useState<'results' | 'scores'>('results')
   const [isPrivate, setIsPrivate] = useState(false)
-  const [maxParticipants, setMaxParticipants] = useState('0')
+  // ⚠ NO `maxParticipants` STATE, and its absence is deliberate.
+  //
+  // The wizard used to ask for a member limit. Migration 075 records why it
+  // should not: `pools.max_participants` is "stored, displayed and editable but
+  // enforced NOWHERE" — an admin could set 20 and 50 people would still join.
+  // It was a control that had never done anything, sitting in the three-question
+  // step where every question is meant to matter.
+  //
+  // The limit that IS real is the tier ceiling, enforced by a BEFORE INSERT
+  // trigger from the same migration precisely so no route or client can miss it.
+  // New pools are created uncapped by the admin and capped by their tier.
   const [maxEntries, setMaxEntries] = useState('1')
   const [deadlineDate, setDeadlineDate] = useState('2026-06-11')
   const [deadlineTime, setDeadlineTime] = useState('13:00')
@@ -172,7 +337,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
       // `format` is null on rows predating migration 024; those are brackets.
       const { data } = await supabase
         .from('tournaments')
-        .select('tournament_id, name, short_name, tournament_type, year, host_countries, start_date, end_date, status, description, format, external_provider, external_league_id, external_season')
+        .select('tournament_id, name, short_name, tournament_type, year, host_countries, start_date, end_date, status, description, format, external_provider, external_league_id, external_season, logo_url')
         .or('format.is.null,format.eq.groups_knockout,format.eq.league')
         .order('start_date', { ascending: false })
 
@@ -217,7 +382,48 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
     fetchTournaments()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * The next few matchweek locks, for the shortcut chips.
+   *
+   * ⚠ Only meaningful once a season is UNDER WAY. "Tournament Start (Aug 21)"
+   * is a useful shortcut in July and a dead one in September — the date is
+   * behind us and the button sets something the form then rejects. Mid-season
+   * the shortcut somebody actually wants is the next matchweek's deadline, so
+   * that is what replaces it.
+   */
+  const [upcomingLocks, setUpcomingLocks] = useState<
+    Array<{ number: number; label: string | null; lockAt: string }>
+  >([])
+
   const selectedTournament = tournaments.find((t) => t.tournament_id === selectedTournamentId)
+
+  // Fetch the next matchweek locks whenever the chosen competition changes.
+  // Only the ones still ahead of us — a lock in the past is not a shortcut.
+  useEffect(() => {
+    const seasonId = selectedTournament?.league_season_id
+    if (!seasonId) { setUpcomingLocks([]); return }
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('league_matchweeks')
+        .select('matchweek_number, label, lock_at')
+        .eq('season_id', seasonId)
+        .not('lock_at', 'is', null)
+        .gt('lock_at', new Date().toISOString())
+        .order('lock_at', { ascending: true })
+        .limit(3)
+      if (cancelled) return
+      setUpcomingLocks(
+        (data ?? []).map((r) => ({
+          number: r.matchweek_number as number,
+          label: r.label as string | null,
+          lockAt: r.lock_at as string,
+        })),
+      )
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTournament?.league_season_id])
 
   // A league has no bracket, so the three World Cup modes cannot score it —
   // `full_tournament` in particular would score ZERO for every fixture,
@@ -258,32 +464,6 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
     }
   }
 
-  function setQuickDeadline(option: string) {
-    if (!selectedTournament) return
-    const start = new Date(selectedTournament.start_date)
-    switch (option) {
-      case 'tournament_start': {
-        setDeadlineDate(selectedTournament.start_date)
-        setDeadlineTime('13:00')
-        break
-      }
-      case 'one_day_before': {
-        const d = new Date(start)
-        d.setDate(d.getDate() - 1)
-        setDeadlineDate(d.toISOString().split('T')[0])
-        setDeadlineTime('13:00')
-        break
-      }
-      case 'one_week_before': {
-        const d = new Date(start)
-        d.setDate(d.getDate() - 7)
-        setDeadlineDate(d.toISOString().split('T')[0])
-        setDeadlineTime('13:00')
-        break
-      }
-    }
-  }
-
   // When tournament changes, update deadline to tournament start date.
   //
   // ⚠ Unless that date has already gone. A competition already under way — a
@@ -294,13 +474,17 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   // a table, and the admin can move it either way before creating.
   useEffect(() => {
     if (!selectedTournament) return
-    const start = new Date(selectedTournament.start_date)
+    // ⚠ Both halves were the UTC bug again. `new Date('2026-08-21')` parses as
+    // UTC, so `hasStarted` flipped a day early west of Greenwich; and
+    // `inAWeek.toISOString().split('T')[0]` reads the UTC date off a LOCAL Date,
+    // so after 20:00 in Bermuda the prefilled deadline landed a day late.
+    const start = new Date(selectedTournament.start_date + 'T00:00:00')
     const hasStarted = !Number.isNaN(start.getTime()) && start.getTime() <= Date.now()
 
     if (hasStarted) {
       const inAWeek = new Date()
       inAWeek.setDate(inAWeek.getDate() + 7)
-      setDeadlineDate(inAWeek.toISOString().split('T')[0])
+      setDeadlineDate(localParts(inAWeek.toISOString()).date)
     } else {
       setDeadlineDate(selectedTournament.start_date)
     }
@@ -317,9 +501,18 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
       return
     }
 
-    const maxP = parseInt(maxParticipants) || 0
     const maxE = Math.max(1, Math.min(10, parseInt(maxEntries) || 1))
     const deadline = new Date(`${deadlineDate}T${deadlineTime}:00`)
+
+    // ⚠ There was NO past-date check here at all. The calendar greys out earlier
+    // days, but a day-level floor cannot catch "today at 09:00" chosen at noon —
+    // and the wizard submitted it. A deadline already gone closes nothing, and
+    // for a table pool it is the real lock, so the pool would be created shut.
+    if (Number.isNaN(deadline.getTime()) || deadline <= new Date()) {
+      setError('The deadline has to be in the future.')
+      setLoading(false)
+      return
+    }
 
     try {
       const res = await fetch('/api/pools/create', {
@@ -346,7 +539,9 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
               ? leagueDepth
               : null,
           is_private: isPrivate,
-          max_participants: maxP,
+          // 0 means "no admin-set limit", which the create route turns into
+          // NULL. The real ceiling is the tier one, enforced by a trigger.
+          max_participants: 0,
           max_entries_per_user: maxE,
         }),
       })
@@ -381,39 +576,82 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   }
 
   // Format date for display
-  function formatDate(dateStr: string) {
+  /**
+   * "Aug 2026" — the month a season starts or ends, without the day.
+   *
+   * A competition is picked by which one it is and roughly when it runs; the
+   * exact 21st is noise here, and dropping it takes a third off the widest line
+   * on the card, which is what lets the list run two-up on desktop.
+   *
+   * ⚠ KEEP THE `T00:00:00`. A bare 'YYYY-MM-DD' is parsed as UTC, so a season
+   * starting on the 1st renders as the previous month for anyone west of
+   * Greenwich. That mattered less when the day was shown beside it; now it
+   * would silently change the only part of the date left.
+   */
+  function formatMonthYear(dateStr: string) {
     return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric',
       year: 'numeric',
     })
   }
 
   // Quick deadline button label with formatted date
-  function quickDeadlineLabel(option: string) {
-    if (!selectedTournament) return ''
-    const start = new Date(selectedTournament.start_date)
-    switch (option) {
-      case 'tournament_start': {
-        const formatted = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        return `Tournament Start (${formatted})`
-      }
-      case 'one_day_before': {
+  /**
+   * The shortcut chips, which depend on whether the competition has started.
+   *
+   * BEFORE IT STARTS — the three that have always been here: kick-off, and the
+   * day and week before it. They are what somebody setting up in advance wants.
+   *
+   * ONCE IT HAS STARTED — those three are all in the past. "Tournament Start
+   * (Aug 21)" in September is not a shortcut, it is a button that sets a date
+   * the form immediately rejects. They are replaced by the next matchweek
+   * deadlines, which is the thing a mid-season pool is actually being set to.
+   *
+   * NEITHER — a competition that has started and has no matchweeks we can read
+   * (any World Cup, or a league whose fixtures have not been imported) gets no
+   * chips at all. An empty row is honest; a row of dead buttons is not.
+   */
+  const quickPicks: Array<{ key: string; label: string; date: string; time: string }> = (() => {
+    if (!selectedTournament) return []
+    const started = new Date(selectedTournament.start_date + 'T00:00:00') <= new Date()
+
+    if (!started) {
+      const start = new Date(selectedTournament.start_date + 'T00:00:00')
+      const shift = (days: number) => {
         const d = new Date(start)
-        d.setDate(d.getDate() - 1)
-        const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        return `1 Day Before (${formatted})`
+        d.setDate(d.getDate() - days)
+        return d
       }
-      case 'one_week_before': {
-        const d = new Date(start)
-        d.setDate(d.getDate() - 7)
-        const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        return `1 Week Before (${formatted})`
-      }
-      default:
-        return ''
+      const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      return [
+        { key: 'start', days: 0 },
+        { key: 'day', days: 1 },
+        { key: 'week', days: 7 },
+      ].map(({ key, days }) => {
+        const d = shift(days)
+        const prefix = days === 0 ? 'Tournament Start' : days === 1 ? '1 Day Before' : '1 Week Before'
+        return {
+          key,
+          label: `${prefix} (${fmt(d)})`,
+          date: localParts(d.toISOString()).date,
+          time: '13:00',
+        }
+      })
     }
-  }
+
+    // Under way: the next matchweek locks, at their real lock TIME rather than
+    // a made-up 13:00 — the point of the shortcut is to match the competition.
+    return upcomingLocks.map((mw) => {
+      const { date, time } = localParts(mw.lockAt)
+      const when = new Date(mw.lockAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      return {
+        key: `mw${mw.number}`,
+        label: `${mw.label ?? `Matchweek ${mw.number}`} (${when})`,
+        date,
+        time,
+      }
+    })
+  })()
 
   return (
     <div
@@ -425,7 +663,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         if (e.target === e.currentTarget && !loading) onClose()
       }}
     >
-      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-lg w-full sm:mx-4 flex flex-col max-h-[90vh] dark:shadow-none dark:border dark:border-border-default modal-panel animate-modal-slide-up">
+      <div className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-2xl w-full sm:mx-4 flex flex-col max-h-[90vh] dark:shadow-none dark:border dark:border-border-default modal-panel animate-modal-slide-up">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-neutral-100 shrink-0">
           <h2 id="create-pool-title" className="text-lg font-bold text-neutral-900">Create a Pool</h2>
@@ -478,8 +716,24 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       idx + 1
                     )}
                   </span>
-                  <span className="hidden sm:inline">{step.label}</span>
-                  <span className="sm:hidden">{step.mobileLabel}</span>
+                  {/* nowrap on both: "Pool Type" was breaking onto a second
+                      line and shoving the row out of alignment. The wider panel
+                      above is what gives it room on desktop.
+                      ⚠ On MOBILE nowrap alone made it worse, not better — four
+                      labels plus three connectors overflow 375px, so "Settings"
+                      was simply clipped off the right edge instead of wrapping.
+                      Below `sm` only the CURRENT step is labelled and the rest
+                      are numbers, which fits at any width. `sr-only` rather than
+                      `hidden`, so the row still reads as four named steps to a
+                      screen reader. */}
+                  <span className="hidden sm:inline whitespace-nowrap">{step.label}</span>
+                  <span
+                    className={`sm:hidden whitespace-nowrap ${
+                      step.key === currentStep ? '' : 'sr-only'
+                    }`}
+                  >
+                    {step.mobileLabel}
+                  </span>
                 </button>
                 {idx < STEPS.length - 1 && (
                   <div className={`w-6 sm:w-12 h-0.5 rounded ${idx < currentStepIndex ? 'bg-neutral-300' : 'bg-neutral-100'}`} />
@@ -508,50 +762,114 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {tournaments.map((t) => (
+                      {tournaments.map((t) => {
+                        const dateRange = `${formatMonthYear(t.start_date)} \u2013 ${formatMonthYear(t.end_date)}`
+                        return (
                         <button
                           key={t.tournament_id}
                           onClick={() => setSelectedTournamentId(t.tournament_id)}
+                          // ⚠ The tick that used to sit on the right was the only
+                          // non-colour signal of which card is chosen, so removing
+                          // it left selection conveyed by border and tint alone.
+                          // aria-pressed carries it for anyone who cannot see
+                          // either — a screen reader now reads "selected" rather
+                          // than four identical buttons.
+                          aria-pressed={selectedTournamentId === t.tournament_id}
                           className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
                             selectedTournamentId === t.tournament_id
                               ? 'border-primary-600 bg-primary-600/8 ring-1 ring-primary-600/25'
                               : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <h3 className="text-sm font-semibold text-neutral-900">{t.name}</h3>
+                          {/* items-CENTER, not items-start. The crest used to be
+                              pinned to the top of a four-line block and floated
+                              well above its optical middle. With the format blurb
+                              gone the block is two or three short lines, which a
+                              centred crest sits against cleanly at any of them. */}
+                          <div className="flex items-center gap-3.5">
+                            {/* ⚠ Rendered only when there IS one, and the column
+                                is NULL more often than not on purpose. The
+                                provider serves a real crest for the Premier
+                                League and a generic grey shield for the World
+                                Cup — so a card with no logo is a deliberate
+                                state, not a loading one, and must not get a
+                                placeholder box. */}
+                            {t.logo_url && (
+                              <img
+                                src={t.logo_url}
+                                alt=""
+                                className="w-11 h-11 object-contain shrink-0"
+                              />
+                            )}
+                            {/* space-y rather than per-line margins, so the lines
+                                cannot drift apart as any one of them is added or
+                                removed — `host_countries` is nullable. */}
+                            <div className="min-w-0 space-y-0.5">
+                              <h3 className="text-base font-bold text-neutral-900 leading-tight">
+                                {withoutSeason(t.name)}
+                              </h3>
                               {t.host_countries && (
-                                <p className="text-xs text-neutral-500 mt-0.5">{t.host_countries}</p>
+                                <p className="text-xs text-neutral-500">{t.host_countries}</p>
                               )}
-                              <p className="text-xs text-neutral-500 mt-1">
-                                {formatDate(t.start_date)} &ndash; {formatDate(t.end_date)}
-                              </p>
-                              {t.description && (
-                                <p className="text-xs text-neutral-400 mt-1">{t.description}</p>
-                              )}
+                              {/* The dates live on the RIGHT of the card from `sm`
+                                  up, where there is otherwise dead space. They
+                                  cannot go there on a phone: crest + name + a
+                                  28-character range is a few pixels wider than a
+                                  390px screen allows, and the name would be the
+                                  thing that gave way. So below `sm` they stay
+                                  stacked under the name and the right-hand copy
+                                  is hidden. One string, two placements. */}
+                              <p className="text-xs text-neutral-500 sm:hidden">{dateRange}</p>
+                              {/* ⚠ `t.description` is deliberately NOT rendered.
+                                  "20 clubs, 38 matchweeks, 380 fixtures. Flat
+                                  round-robin: no groups, no knockout." is format
+                                  detail for a step where the only decision is
+                                  WHICH competition — and with one option on
+                                  screen it was the longest line on the card
+                                  while carrying the least. The column is still
+                                  selected and still populated; it just does not
+                                  belong here. */}
                             </div>
-                            <div className="shrink-0 mt-0.5">
-                              {selectedTournamentId === t.tournament_id ? (
-                                <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
-                                  <Icon name="checkmark" size={12} className="text-white" />
-                                </div>
-                              ) : (
-                                <div className="w-5 h-5 rounded-full border-2 border-neutral-300" />
-                              )}
-                            </div>
+
+                            <p className="hidden sm:block ml-auto pl-4 shrink-0 text-xs text-neutral-500 whitespace-nowrap">
+                              {dateRange}
+                            </p>
                           </div>
                         </button>
-                      ))}
+                        )
+                      })}
 
-                      {/* Coming soon placeholders */}
-                      <div className="w-full text-left p-4 rounded-2xl border-2 border-dashed border-neutral-200 opacity-50">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-sm font-semibold text-neutral-400">More tournaments coming soon</h3>
-                            <p className="text-xs text-neutral-400 mt-0.5">UEFA EURO, Super Bowl Squares, and more</p>
-                          </div>
-                          <span className="text-xs bg-neutral-100 text-neutral-400 px-2 py-0.5 rounded-full font-medium">Coming Soon</span>
+                      {/* Coming soon. Named competitions with their real crests
+                          rather than one dashed box reading "and more" — the
+                          question this step answers is "is my league here", and
+                          a list you can scan answers it faster than a promise. */}
+                      <div className="pt-1">
+                        <p className="t-caption text-muted mb-2">Coming soon</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {COMING_SOON.map((c) => (
+                            <div
+                              key={c.id}
+                              aria-disabled="true"
+                              className="flex items-center gap-2.5 p-2.5 rounded-xl border border-dashed border-border-default"
+                            >
+                              {/* ⚠ A white plate, deliberately NOT a token. Several
+                                  league marks are monochrome black on transparent —
+                                  Ligue 1 is — and would disappear entirely on the
+                                  dark surface. A brand lockup sits on its own
+                                  ground; this is not UI chrome following the theme. */}
+                              <span className="w-8 h-8 rounded-chip bg-white grid place-items-center shrink-0">
+                                <img
+                                  src={providerCrest(c.id)}
+                                  alt=""
+                                  className="w-6 h-6 object-contain opacity-70"
+                                />
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-muted truncate">{c.name}</p>
+                                <p className="t-detail text-muted/70 truncate">{c.country}</p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -715,139 +1033,140 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                 </div>
               )}
 
-              {/* STEP 4: Settings */}
+              {/* STEP 4: Settings
+                  ============================================================
+                  Four groups, each in its own bordered block. It used to be the
+                  same four separated by `<hr>` with headings at the same weight
+                  as the labels inside them, so nothing read as a boundary — and
+                  two competing label systems ran down it at once: sentence-case
+                  section headings against ALL-CAPS FormField labels, plus a
+                  third lowercase style on the Date/Time inputs.
+
+                  Now: the block title names the setting, and a label only
+                  appears where a block holds more than one control. */}
               {currentStep === 'settings' && (
-                <div className="space-y-5">
-                  <div>
-                    <h3 className="text-sm font-semibold text-neutral-900 mb-3">
-                      {isLeagueTournament && leagueMode === 'table'
-                        ? 'Table Deadline'
-                        : effectiveMode === 'progressive' ? 'Group Stage Deadline' : effectiveMode === 'league_pickem' ? 'Matchweek 1 Deadline' : 'Prediction Deadline'}
-                    </h3>
-                    <div className="flex gap-3 mb-3 flex-wrap">
-                      <div>
-                        <label className="block text-xs font-medium text-neutral-600 mb-1">Date</label>
-                        <input
-                          type="date"
+                <div className="space-y-4">
+
+                  <Section
+                    title={
+                      isLeagueTournament && leagueMode === 'table'
+                        ? 'Table deadline'
+                        : effectiveMode === 'progressive'
+                          ? 'Group stage deadline'
+                          : effectiveMode === 'league_pickem'
+                            ? 'First matchweek deadline'
+                            : 'Prediction deadline'
+                    }
+                    description={
+                      isLeagueTournament && leagueMode === 'table'
+                        ? 'When the table locks. Every member’s order is shown to the pool at this moment, and the date is fixed once it passes.'
+                        : 'When picks close. You can move this later from the pool’s settings.'
+                    }
+                  >
+                    <div className="flex gap-3 flex-wrap">
+                      {/* The last two native controls on this screen. The
+                          browser drew them in its own greys and its own type,
+                          with a panel that ignored dark mode entirely — see
+                          components/ui/DatePicker for the whole note. */}
+                      <FormField label="Date">
+                        {/* A deadline in the past closes nothing. The calendar
+                            greys out everything before today; the combined
+                            date+time is re-checked on save, because "today at
+                            09:00" is still in the past at noon. */}
+                        <DatePicker
                           value={deadlineDate}
-                          onChange={(e) => setDeadlineDate(e.target.value)}
-                          className="px-4 py-3 rounded-control text-sm bg-mist text-ink border border-transparent focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 transition-colors"
+                          onChange={setDeadlineDate}
+                          min={todayLocal()}
+                          ariaLabel="Deadline date"
                         />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-neutral-600 mb-1">Time</label>
-                        <input
-                          type="time"
+                      </FormField>
+                      <FormField label="Time">
+                        <TimePicker
                           value={deadlineTime}
-                          onChange={(e) => setDeadlineTime(e.target.value)}
-                          className="px-4 py-3 rounded-control text-sm bg-mist text-ink border border-transparent focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 transition-colors"
+                          onChange={setDeadlineTime}
+                          ariaLabel="Deadline time"
                         />
+                      </FormField>
+                    </div>
+                    {quickPicks.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {quickPicks.map((q) => (
+                          <button
+                            key={q.key}
+                            type="button"
+                            onClick={() => { setDeadlineDate(q.date); setDeadlineTime(q.time) }}
+                            className="text-xs px-3 py-1.5 rounded-pill bg-mist text-ink hover:bg-silver transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600/40"
+                          >
+                            {q.label}
+                          </button>
+                        ))}
                       </div>
+                    )}
+                  </Section>
+
+                  <Section
+                    title="Who can join"
+                    description="Everyone needs the pool code either way. Private also keeps it out of Discover."
+                  >
+                    <div className="grid grid-cols-2 gap-2">
+                      {([
+                        { value: false, label: 'Public', desc: 'Listed in Discover' },
+                        { value: true, label: 'Private', desc: 'Code only' },
+                      ] as const).map((opt) => (
+                        <button
+                          key={String(opt.value)}
+                          type="button"
+                          onClick={() => setIsPrivate(opt.value)}
+                          aria-pressed={isPrivate === opt.value}
+                          className={`p-3 rounded-xl border cursor-pointer transition text-left ${
+                            isPrivate === opt.value
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-neutral-200 hover:border-neutral-300'
+                          }`}
+                        >
+                          <p className="text-sm font-medium text-neutral-900">{opt.label}</p>
+                          <p className="text-xs text-neutral-500">{opt.desc}</p>
+                        </button>
+                      ))}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setQuickDeadline('tournament_start')}
-                        className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
-                      >
-                        {quickDeadlineLabel('tournament_start')}
-                      </button>
-                      <button
-                        onClick={() => setQuickDeadline('one_day_before')}
-                        className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
-                      >
-                        {quickDeadlineLabel('one_day_before')}
-                      </button>
-                      <button
-                        onClick={() => setQuickDeadline('one_week_before')}
-                        className="text-xs px-3 py-1.5 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition"
-                      >
-                        {quickDeadlineLabel('one_week_before')}
-                      </button>
+                  </Section>
+
+                  {/* The heading names the control, so the FormField label that
+                      used to sit above the 1–10 strip has gone — it was the third
+                      time the same words appeared in one block. */}
+                  <Section
+                    title="Entries per member"
+                    description="More than one lets somebody enter several predictions. Each is scored and ranked on the leaderboard by itself."
+                  >
+                    <div className="flex">
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setMaxEntries(String(n))}
+                          aria-pressed={parseInt(maxEntries) === n}
+                          className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-xl last:rounded-r-xl transition ${
+                            parseInt(maxEntries) === n
+                              ? 'bg-primary-500 text-white border-primary-500 z-10'
+                              : 'bg-surface text-neutral-700 border-neutral-200 hover:bg-neutral-100'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
                     </div>
-                  </div>
+                  </Section>
 
-                  <hr className="border-neutral-100" />
-
-                  <div>
-                    <h3 className="text-sm font-semibold text-neutral-900 mb-3">Privacy Settings</h3>
-                    <div className="space-y-4">
-                      <FormField label="Pool Visibility">
-                        <div className="inline-grid grid-cols-2 gap-2">
-                          {([
-                            { value: false, label: 'Public', desc: 'Anyone with code can join' },
-                            { value: true, label: 'Private', desc: 'Requires pool code to join' },
-                          ] as const).map((opt) => (
-                            <button
-                              key={String(opt.value)}
-                              type="button"
-                              onClick={() => setIsPrivate(opt.value)}
-                              className={`p-3 rounded-xl border cursor-pointer transition text-left ${
-                                isPrivate === opt.value
-                                  ? 'border-primary-500 bg-primary-50'
-                                  : 'border-neutral-200 hover:border-neutral-300'
-                              }`}
-                            >
-                              <p className="text-sm font-medium text-neutral-900">{opt.label}</p>
-                              <p className="text-xs text-neutral-500">{opt.desc}</p>
-                            </button>
-                          ))}
-                        </div>
-                      </FormField>
-
-                      <FormField label="Maximum Members" helperText="Set to 0 for unlimited">
-                        <div className="w-[10.3125rem]">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={maxParticipants}
-                            onChange={(e) => setMaxParticipants(e.target.value)}
-                          />
-                        </div>
-                      </FormField>
-                    </div>
-                  </div>
-
-                  <hr className="border-neutral-100" />
-
-                  <div>
-                    <h3 className="text-sm font-semibold text-neutral-900 mb-3">Prediction Entries</h3>
-                    <p className="text-sm text-neutral-600 mb-4">
-                      Allow members to submit multiple sets of predictions. Each entry is scored and ranked independently on the leaderboard.
-                    </p>
-                    <div className="space-y-4">
-                      <FormField label="Max Entries Per Member">
-                        <div className="flex">
-                          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                            <button
-                              key={n}
-                              type="button"
-                              onClick={() => setMaxEntries(String(n))}
-                              className={`w-9 h-9 text-sm font-medium border -ml-px first:ml-0 first:rounded-l-xl last:rounded-r-xl transition ${
-                                parseInt(maxEntries) === n
-                                  ? 'bg-primary-500 text-white border-primary-500 z-10'
-                                  : 'bg-surface text-neutral-700 border-neutral-200 hover:bg-neutral-100'
-                              }`}
-                            >
-                              {n}
-                            </button>
-                          ))}
-                        </div>
-                      </FormField>
-
-                    </div>
-                  </div>
-
-                  <hr className="border-neutral-100" />
-
-                  {/* Scoring info note */}
+                  {/* Not a Section: it is not a setting, and giving it the same
+                      chrome as the three above would imply there is something
+                      here to decide. */}
                   <div className="flex gap-3 p-3 bg-primary-50 border border-primary-200 rounded-xl">
                     <Icon name="info.circle.fill" size={20} className="text-primary-800 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-primary-800">Scoring & Bonus Points</p>
-                      <p className="text-xs text-primary-800 mt-0.5">
-                        Your pool will be created with default scoring settings. You can customize all scoring rules, multipliers, and bonus points from the pool admin settings after creation.
-                      </p>
-                    </div>
+                    <p className="text-xs text-primary-800 leading-relaxed">
+                      <span className="font-medium">Scoring uses the defaults.</span>{' '}
+                      Every rule, multiplier and bonus can be changed from the pool’s
+                      admin settings once it exists.
+                    </p>
                   </div>
                 </div>
               )}

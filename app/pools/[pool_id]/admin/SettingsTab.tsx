@@ -15,6 +15,8 @@ import { Select } from '@/components/ui/Select'
 import { POOL_MODE_INFO, type PredictionMode } from '@/lib/poolModeInfo'
 import { leagueModeInfo, type LeagueMode, type LeagueDepth } from '@/lib/leagueModeInfo'
 import { LocalTime } from '@/components/LocalTime'
+import { DatePicker } from '@/components/ui/DatePicker'
+import { TimePicker } from '@/components/ui/TimePicker'
 
 type SettingsTabProps = {
   pool: PoolData
@@ -60,6 +62,12 @@ function localTimeValue(iso: string | null | undefined): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '14:00'
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+/** Today, local, as YYYY-MM-DD — the floor for every deadline. */
+function todayLocal(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
 /**
@@ -338,6 +346,65 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
     missingEntryIds: string[]
   }
   const [tableStatus, setTableStatus] = useState<TableStatus | null>(null)
+
+  /**
+   * The next few matchweek locks, for the shortcut chips.
+   *
+   * ⚠ The chips this replaces were hardcoded to June 2026 — the World Cup's
+   * kick-off — so on a Premier League pool every one of them set a date eight
+   * months in the past, which the form then refused. Dead controls, in the one
+   * place an admin goes to change a date.
+   *
+   * A real anchor beats a relative nudge: "close it when Matchweek 5 locks" is a
+   * decision about the competition, where "+3 days" is a guess that happens to
+   * land somewhere. Where there are no matchweeks to read — a World Cup pool, or
+   * a league whose fixtures have not been imported — the relative options are
+   * the honest fallback, because for an EXISTING pool they always mean something.
+   */
+  const [upcomingLocks, setUpcomingLocks] = useState<
+    Array<{ number: number; label: string | null; lockAt: string }>
+  >([])
+
+  useEffect(() => {
+    if (!pool.league_season_id) { setUpcomingLocks([]); return }
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('league_matchweeks')
+        .select('matchweek_number, label, lock_at')
+        .eq('season_id', pool.league_season_id)
+        .not('lock_at', 'is', null)
+        .gt('lock_at', new Date().toISOString())
+        .order('lock_at', { ascending: true })
+        .limit(3)
+      if (cancelled) return
+      setUpcomingLocks((data ?? []).map((r) => ({
+        number: r.matchweek_number as number,
+        label: r.label as string | null,
+        lockAt: r.lock_at as string,
+      })))
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pool.league_season_id])
+
+  useEffect(() => {
+    if (!isTableMode) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/pools/${pool.pool_id}/table-deadline`)
+        if (!res.ok) return
+        const json = (await res.json()) as TableStatus
+        if (!cancelled) setTableStatus(json)
+      } catch {
+        // Non-fatal: the deadline field still works without the count. Failing
+        // loudly here would block an admin from moving a deadline because we
+        // could not tell them how many people had filed.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [isTableMode, pool.pool_id, pool.league_table_lock_at])
 
   // The deadline the admin is about to commit to, held while they read what it
   // will do. Null whenever the modal is shut.
@@ -626,46 +693,36 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
     router.push('/dashboard')
   }
 
-
   /**
-   * "Give them another N days," counted from NOW rather than from the existing
-   * deadline. The time of day is kept, so a pool closing at 19:00 goes on
-   * closing at 19:00.
+   * The shortcut chips. Real anchors when the competition provides them,
+   * relative nudges when it does not. See `upcomingLocks` for why.
    */
-  function setDeadlineIn(days: number) {
-    const base = new Date()
-    base.setDate(base.getDate() + days)
-    const [h, m] = (deadlineTime || '19:00').split(':').map(Number)
-    base.setHours(Number.isFinite(h) ? h : 19, Number.isFinite(m) ? m : 0, 0, 0)
-    if (base <= new Date()) base.setDate(base.getDate() + 1)
-    setDeadlineDate(localDateValue(base.toISOString()))
-    setDeadlineTime(localTimeValue(base.toISOString()))
-  }
-
-  // Quick deadline options
-  function setQuickDeadline(option: string) {
-    // World Cup 2026 starts June 11
-    let d: Date
-    switch (option) {
-      case 'tournament_start':
-        d = new Date('2026-06-11T13:00:00')
-        break
-      case 'one_day_before':
-        d = new Date('2026-06-10T13:00:00')
-        break
-      case 'one_week_before':
-        d = new Date('2026-06-04T13:00:00')
-        break
-      default:
-        return
-    }
-    // Same frame for both halves — see localDateValue. These shortcuts had the
-    // identical UTC-date/local-time mismatch: `new Date('2026-06-11T13:00:00')`
-    // parses as local, and taking the date from toISOString() moves it a day
-    // for anyone whose local date and UTC date disagree at that hour.
-    setDeadlineDate(localDateValue(d.toISOString()))
-    setDeadlineTime(localTimeValue(d.toISOString()))
-  }
+  const quickPicks: Array<{ key: string; label: string; date: string; time: string }> =
+    upcomingLocks.length > 0
+      ? upcomingLocks.map((mw) => {
+          const d = new Date(mw.lockAt)
+          return {
+            key: `mw${mw.number}`,
+            // The lock's own TIME, not a rounded guess — the point of the
+            // shortcut is that it matches the competition exactly.
+            date: localDateValue(mw.lockAt),
+            time: localTimeValue(mw.lockAt),
+            label: `${mw.label ?? `Matchweek ${mw.number}`} (${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`,
+          }
+        })
+      : [1, 3, 7].map((days) => {
+          const base = new Date()
+          base.setDate(base.getDate() + days)
+          const [h, m] = (deadlineTime || '19:00').split(':').map(Number)
+          base.setHours(Number.isFinite(h) ? h : 19, Number.isFinite(m) ? m : 0, 0, 0)
+          if (base <= new Date()) base.setDate(base.getDate() + 1)
+          return {
+            key: `plus${days}`,
+            label: days === 1 ? '+1 day' : days === 7 ? '+1 week' : `+${days} days`,
+            date: localDateValue(base.toISOString()),
+            time: localTimeValue(base.toISOString()),
+          }
+        })
 
   // 'closed' used to live here, meaning "no new members" — a join-ability
   // concept sharing a column with lifecycle. It now has its own toggle below
@@ -1029,51 +1086,46 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
             </div>
           )}
 
+          {/* The same two pickers the create wizard uses. They were native
+              `<input type="date">` / `<input type="time">` here too — browser
+              chrome, browser type, and a panel that ignores dark mode. */}
           <div className="flex gap-3 mb-4 flex-wrap">
             <div>
-              <label className="block t-body text-ink mb-1">
-                Date
-              </label>
-              <input
-                type="date"
+              <label className="block t-body text-ink mb-1">Date</label>
+              {/* The same floor the wizard uses: a deadline in the past closes
+                  nothing, and migration 109's trigger refuses it anyway — better
+                  to grey it out than to let the admin pick it and be told no. */}
+              <DatePicker
                 value={deadlineDate}
-                onChange={(e) => setDeadlineDate(e.target.value)}
-                className="px-3 py-2.5 rounded-chip bg-mist text-sm text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent"
+                onChange={setDeadlineDate}
+                min={todayLocal()}
+                ariaLabel="Deadline date"
               />
             </div>
             <div>
-              <label className="block t-body text-ink mb-1">
-                Time
-              </label>
-              <input
-                type="time"
+              <label className="block t-body text-ink mb-1">Time</label>
+              <TimePicker
                 value={deadlineTime}
-                onChange={(e) => setDeadlineTime(e.target.value)}
-                className="px-3 py-2.5 rounded-chip bg-mist text-sm text-ink focus:ring-2 focus:ring-primary-600/40 focus:border-transparent"
+                onChange={setDeadlineTime}
+                ariaLabel="Deadline time"
               />
             </div>
           </div>
 
-          {/* ⚠ The three World Cup shortcuts are hardcoded to June 2026 and are
-              DEAD CONTROLS on a table pool — every one of them sets a date in
-              the past, which the form then refuses. A table pool's shortcuts
-              are relative to now, because the move that matters is "give them
-              another few days", not "the tournament starts on the 11th". */}
-          <div className="flex flex-wrap gap-2">
-            {isTableMode ? (
-              <>
-                <QuickDeadlineButton label="+1 day" onClick={() => setDeadlineIn(1)} />
-                <QuickDeadlineButton label="+3 days" onClick={() => setDeadlineIn(3)} />
-                <QuickDeadlineButton label="+1 week" onClick={() => setDeadlineIn(7)} />
-              </>
-            ) : (
-              <>
-                <QuickDeadlineButton label="Tournament Start" onClick={() => setQuickDeadline('tournament_start')} />
-                <QuickDeadlineButton label="1 Day Before" onClick={() => setQuickDeadline('one_day_before')} />
-                <QuickDeadlineButton label="1 Week Before" onClick={() => setQuickDeadline('one_week_before')} />
-              </>
-            )}
-          </div>
+          {/* Hidden once the deadline has passed: it is fixed from then on
+              (migration 109), so a row of shortcuts would offer a move the
+              database refuses. */}
+          {!(isTableMode && tableStatus?.hasPassed) && (
+            <div className="flex flex-wrap gap-2">
+              {quickPicks.map((q) => (
+                <QuickDeadlineButton
+                  key={q.key}
+                  label={q.label}
+                  onClick={() => { setDeadlineDate(q.date); setDeadlineTime(q.time) }}
+                />
+              ))}
+            </div>
+          )}
         </Card>
         )}
 

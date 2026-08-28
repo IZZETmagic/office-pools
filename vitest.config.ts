@@ -14,10 +14,16 @@ export default defineConfig({
     // app/** was added 2026-07-28 for pure logic that lives next to a component
     // rather than in lib/ — the /live delta merge, whose paths no production
     // data can reach (every match is completed, so the live half is empty).
+    //
+    // components/** was added 2026-08-28 for the same reason and with the same
+    // limit: pure functions and source-text guards only, no rendering. The
+    // first one is the create-pool wizard's `withoutSeason`, which decides what
+    // a member reads on the card they pick a competition from.
     include: [
       'lib/**/*.test.ts',
       'lib/**/__tests__/**/*.test.ts',
       'app/**/__tests__/**/*.test.ts',
+      'components/**/__tests__/**/*.test.ts',
     ],
     reporters: ['default'],
   },
