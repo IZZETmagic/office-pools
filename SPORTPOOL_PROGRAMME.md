@@ -2358,10 +2358,31 @@ The rest of Decision 7 stands, including the override log.
   `POST /api/pools/[id]/table-deadline` are both live; the admin has no way to press it, so a pool
   whose straggler never files stays unrevealed until the admin keeps extending. Scoring is unaffected
   — the reveal gates visibility only.
-- ⏳ **Re-homing has no end-to-end run in the wild.** The policy is replayed over three real seasons
-  in `lib/league/__tests__/rehome.test.ts` and the write path is now proven in production under
-  rollback, but no *actual* reschedule has yet arrived from the feed and been followed all the way to
-  a moved deadline. That resolves itself the first time a game moves.
+- 🔴 **RE-HOMING IS SHIPPED BUT UNREACHABLE. Found 2026-08-28 by running the sync and asking why
+  nothing moved.** The engine is correct and applied; the *wiring* cannot deliver it a reschedule in
+  time to act on.
+
+  The league sync only ever looks at a fixture within about three hours of the kickoff **it already
+  holds** — `WINDOW_BEFORE_MS` is 30 minutes, `WINDOW_AFTER_MS` is 2.5 hours — plus a catch-up pass
+  restricted to fixtures whose recorded kickoff is already **in the past**. Nothing looks at a
+  fixture more than 30 minutes ahead of its stored date. So a game moved from February to May stays
+  invisible until its **original February kickoff arrives**.
+
+  And by then it is too late by construction: a matchweek locks an hour before its own first
+  kickoff, and any fixture in it enters the sync window at the earliest 30 minutes before its own
+  kickoff — which is always *after* that lock. So **the source matchweek has always locked by the
+  moment we first see the move**, and `league_apply_rehome` refuses it, correctly, by its own guard.
+  Every real reschedule arrives too late. The 43-fixtures-a-season figure is what re-homing *would*
+  move given timely information; through this path it moves none.
+
+  ⚠ This is not a bug in 105 or 106 — both do exactly what they claim. It is a missing input.
+
+  **The World Cup already solved this exact problem**, and its solution is the shape of the fix:
+  `app/api/cron/reconcile-schedule` is a *daily* reconcile of stored kickoff times against
+  api-football, whose own docstring says *"the per-minute live sync only writes scores/status and
+  never `match_date`"*. It reads `matches` and has **zero** references to any `league_*` table. The
+  league needs the same thing: one `getFixturesAllPages` per season per day, reconciling dates —
+  cheap, and it is what turns re-homing on.
 - A postponed fixture completing weeks after its matchweek settled has **never been exercised**.
   Believed correct under 094; worth a test before the season rather than a discovery in November.
 - "Since you joined" leaderboard view — candidate, not committed.
