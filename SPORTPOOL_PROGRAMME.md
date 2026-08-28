@@ -31,7 +31,51 @@ L0. A league pool now scores correctly — verified against production. Behind t
 accepted (empty-bracket bonus inflation, ~243k pts) on the condition it be fixed *before the next
 competition* — **that condition is now due**.
 
-## 🟢 Premier League 2026/27 — DEPLOYED AND LIVE (updated 2026-08-23)
+## 🟠 Premier League 2026/27 — LIVE, but running 24 Aug code (updated 2026-08-28)
+
+> The heading said **DEPLOYED AND LIVE** until 2026-08-28. It is now known that `origin/master` is
+> 32 commits behind, so what is live is the 24 Aug app: Pick'em at Scores depth, no wizard, no
+> notifications. Everything built since is on Ryan's machine. Read the audit block first — the ✅s
+> further down describe the branch, not production.
+
+### 🔴 AUDIT 2026-08-28 — the Pick'em season, verified against production
+
+Asked by Ryan: *"finish up the Pick'em logic and flow for the season."* This block is what the audit
+found. **It corrects the ✅s below it**, which describe the branch on this machine rather than what
+members are using. Full working: `drafts/2026-08-28_pickem_season_audit.md`.
+
+**The one fact everything else follows from: the web app is 32 commits behind.** `origin/master` is
+`6dc5710` (24 Aug). The database has moved ~40 migrations past it. Everything from the league UI/UX
+pass onward — the mode wizard, the matchweek stepper, Results-depth screens, the league table tab,
+the weekly reveal, Showdown, Last Man Standing, Table mode, and **both cron routes** — exists only
+locally. 625 tests pass on that branch; none of it is serving a member.
+
+**Where the season actually is.** Not one Pick'em point has ever been scored — `league_match_scores`
+is empty. Matchweek 1 finished (10/10, snapshotted 25 Aug) before anybody picked. **All 240 picks are
+for matchweek 2**, which locks 2026-08-28 19:00 UTC — about five hours after this audit ran. That
+weekend is the first time the scoring
+path meets a real member's pick.
+
+| Finding | State |
+|---|---|
+| **Nothing reminds anyone to pick.** The four deployed push crons contain no league code; `league-notices` is undeployed and therefore unschedulable. For a 38-week season the weekly nudge *is* the product | 🔴 open |
+| **The outbox is never drained.** 9 `matchweek_completed` events unclaimed since 25 Aug. Producer works, consumer does not exist in production ⇒ no "results are in", no cache invalidation after scoring | 🔴 open |
+| **NULL `league_depth` is described as Results and scored as Scores.** Both real pools carry NULL mode+depth, because the deployed create route predates migration 077. The engine's fall-through is deliberate (066 — NULL takes the Scores ladder) and the picker and leaderboard agree (`=== 'results'`); three copy sites invert it — `lib/leagueModeInfo.ts:57`, `LeagueHowToPlayTab.tsx:50`, `LeagueScoringRulesTab.tsx:381`. On deploy those members are told *"call each match Home, Draw or Away, every fixture is worth the same"* while entering scorelines paid at 100/75/50. Their Scoring Rules tab also hides the fixture card (`depth !== null`) | 🔴 **deploy blocker** |
+| **A Pick'em season has no end.** `openMatchweekId` returns null after matchweek 38 and that is all of it — no completion, no winner, no final standing, no wrap-up; `pools.status` stays `'open'` for ever. The season-end snapshot that exists belongs to Table mode alone | 🔴 open, unplanned |
+| Form tab / XP / badges blocked for league — three stubbed `readSource` arms, which is why the outbox deliberately skips XP | 🟠 known |
+| Mobile has no league code at all | 🟠 known |
+| No reconciler | 🟠 known |
+
+⚠ **The copy defect is the same class as `leagueModeCopy.guard.test.ts`, one level down and uncovered.**
+That guard asserts no surface describes a league pool out of the bracket copy; nothing asserts the
+copy layer's depth polarity matches the engine's.
+
+**Two live pools created by real users on 26 Aug** — `7WZ7RZGW` and `ZQMCEP2W` — carry NULL
+`league_mode`/`league_depth`. Their picks are scorelines and the engine scores them on the Scores
+ladder, so they are internally consistent; nobody chose Scores, and Decision 9 makes Results the
+recommendation. Both columns are still settable: `trg_league_depth_immutable` fires only when the old
+value is non-NULL.
+
 
 **The 2026-07-30 assessment below this block is superseded.** It said the season was "not reachable":
 league scoring and bonuses did not exist, matchweek deadlines did not exist, the sync cron was
@@ -81,6 +125,11 @@ of the two competition columns disagreeing is one row; with two it is a real haz
 **What is NOT built:** Decision 9's mode grid. What ships today is **Pick'em at Scores depth** only —
 no Results depth, no Showdown, no Last Man Standing, no Final Table. See *Modes and scoring* below.
 
+> ⚠ **Superseded 2026-08-28.** All four modes and both depths are now **built and migrated** —
+> Results depth (064–066), Showdown (083–085, 095, 100), Last Man Standing (086–088, 097), Table
+> mode (077–082, 089–093). What is true is narrower and worse: **none of it is deployed.** See the
+> audit block at the top of this section.
+
 ---
 
 ### 📐 Sub-plan: League pools, end to end — `drafts/2026-08-24_league_pools_full_plan.md`
@@ -120,6 +169,10 @@ The original finding, kept for the record:
 - **`league_predictions` holds 0 rows database-wide.** Every ✅ above was verified by script or SQL
   probe; **nobody has ever made a pick through the UI.** The *"nobody has clicked through it in a
   browser"* caveat is the cause and this is its consequence.
+  > ✅ **Closed 2026-08-28.** `league_predictions` holds **240 rows**, all for matchweek 2, made
+  > 25–26 Aug — including by two members who found the product on their own. Humans have now picked
+  > through the UI. What has *not* happened is any of it being **scored**: matchweek 1 finished
+  > before the first pick existed, so `league_match_scores` is still empty.
 
 🟠 **Four gaps behind the ✅s**, each a thing the status table implies works:
 
@@ -833,7 +886,7 @@ surface:
 | **Per-match aggregates** — migrations 038/039, `pool_match_prediction_accuracy()` | Counts, per match: how the pool split home/draw/away, how many were right, the most popular scoreline | Any pool-wide aggregate a screen needs — Matchday Pulse, Form's crowd section | ✅ live. Takes `p_submitted_only` because its two callers count different populations |
 | **Podium** — `lib/podium.ts` **+ `tournament_podium_view`** (migration 027) | Derives the actual and predicted tournament podium | Champion / runner-up / third bonuses | ✅ **Now in SQL as well as Node — prod-verified 2026-07-30.** Migrations **027** `tournament_podium_view` (20260727155217) and **028** `shadow_podium_use_view` (20260727160124) are applied and shadow reads the view; bonuses stored at full strength (837 champion / 738 runner-up / 167 third). **Retirement gate 2 cleared.** `lib/podium.ts` still runs in Node while `prod_scoring_enabled = true`. Closes **R4** |
 | **Bracket-picker provisional** — `lib/bracketPickerScoring.ts` | Client-side scoring of bracket picks for live display | Provisional standings before official scoring lands | ⚠️ still computed in the browser — the last real violation of the rule above, and a **blocker on Node retirement** (2026-07-30) |
-| **League engine** — `league_score_fixture` + `league_finalize_ranks` + `league_snapshot_matchweek_ranks`, over the `league_*` tables | Set-based, DB-native, per fixture: judges every pick against the result, recomputes each affected entry's totals from its score rows (never increments — a correction has to be able to take points away), then ranks the pool and queues an outbox event | **The league's engine, and only ever that.** Premier League today, other leagues later. Under Ryan's 2026-08-15 split it must never learn about the World Cup, and the shadow engine must never learn about leagues | ✅ **LIVE since 2026-08-24 — this row previously said NOT BUILT and was stale.** Migrations **055** (the engine), **057** (a retired entry stops scoring), **059** (ranks, the weekly movement snapshot, and an outbox producer), **060** (realtime broadcast on `league_entry_totals`), **061** (the arrow waits for the whole matchweek to be *scored*, not merely finished), **062** (outbox claim, FOR UPDATE SKIP LOCKED), **063** (**scores a LIVE fixture** — the table moves on the goal, not the whistle). Flat `group_*` prices, no multipliers. ⚠ It has scored **0 real entries** — `league_predictions` is still 0 rows database-wide, so every assertion about it rests on scratch-data verification (`scripts/verify-league-leaderboard.ts`, `verify-soft-delete.ts`), never on a member. Helper functions: `league_finalize_ranks`, `league_snapshot_matchweek_ranks`, `league_claim_score_events`. ⚠ **No reconciler** — the World Cup has `shadow_reconcile_matches()` every minute to catch what the engine missed; the league has nothing equivalent and no phase asked for one |
+| **League engine** — `league_score_fixture` + `league_finalize_ranks` + `league_snapshot_matchweek_ranks`, over the `league_*` tables | Set-based, DB-native, per fixture: judges every pick against the result, recomputes each affected entry's totals from its score rows (never increments — a correction has to be able to take points away), then ranks the pool and queues an outbox event | **The league's engine, and only ever that.** Premier League today, other leagues later. Under Ryan's 2026-08-15 split it must never learn about the World Cup, and the shadow engine must never learn about leagues | ✅ **LIVE since 2026-08-24 — this row previously said NOT BUILT and was stale.** Migrations **055** (the engine), **057** (a retired entry stops scoring), **059** (ranks, the weekly movement snapshot, and an outbox producer), **060** (realtime broadcast on `league_entry_totals`), **061** (the arrow waits for the whole matchweek to be *scored*, not merely finished), **062** (outbox claim, FOR UPDATE SKIP LOCKED), **063** (**scores a LIVE fixture** — the table moves on the goal, not the whistle). Flat `group_*` prices, no multipliers. ⚠ **Updated 2026-08-28: it has still scored 0 real entries, for a new reason.** `league_predictions` now holds 240 rows, but every one of them is for matchweek 2 — matchweek 1 finished before the first pick existed, so `league_match_scores` is empty. The first contact between this engine and a real member's pick is matchweek 2, locking 2026-08-28 19:00 UTC. Until then every assertion about it rests on scratch-data verification (`scripts/verify-league-leaderboard.ts`, `verify-soft-delete.ts`), never on a member. Helper functions: `league_finalize_ranks`, `league_snapshot_matchweek_ranks`, `league_claim_score_events`. ⚠ **No reconciler** — the World Cup has `shadow_reconcile_matches()` every minute to catch what the engine missed; the league has nothing equivalent and no phase asked for one |
 | **Table-mode engine** — `league_score_table` + `league_snapshot_final_standings`, over `league_table_predictions` and `league_standings` | Set-based, DB-native, per pool: prices one entry's whole finishing order against the real table — a distance-decayed positional term plus champion / top-N / relegation bonuses scored **as sets** — and writes the result to `league_entry_totals.bonus_points`, which the fixture engine already leaves alone. Recomputed whenever the table moves, so it composes with `league_score_fixture` without either function knowing about the other | **Table mode, and only Table mode.** It returns `not a table pool` for anything else, so a Pick'em pool cannot be scored by it by accident | ✅ **LIVE since 2026-08-24.** Migrations **077** (`league_mode`, the mode/depth CHECK, the profile and the immutable pool-level deadline), **078** (`league_table_predictions`, RLS, the silent-skip lock), **079** (`league_pool_settings`), **080** (the engine + the season-end snapshot), **081/082** (`league_table_breakdown` — the per-club formula, defined once and read by the screen). ⚠ It has scored **0 real entries**: no pool has `league_mode='table'`, because no wizard can create one yet (phase 9). Verified against scratch data by `scripts/verify-table-mode.ts`. ⚠ **The snapshot is the load-bearing part** — `league_standings` is upserted current state, so without freezing it a feed correction would silently restate an award already paid. ⚠ Shares the league engine's gap: **no reconciler** |
 | **Showdown layer** — `league_score_duels` + `league_generate_duel_schedule`, over `league_duels` | Set-based, DB-native, per pool per matchweek: reads ONE number — the entry's `SUM(league_match_scores.total_points)` for that matchweek — compares the two sides of each duel, and pays 3 / 1 / 0 into `league_entry_totals.duel_points`, which then LEADS the shared rank cascade | **A layer, not a peer engine.** Because both depths price into the same column, it never learns whether it is sitting over Results or Scores — which is exactly what Decision 9 means by a layer. It refuses any pool whose `league_mode` is not `showdown` | ✅ **LIVE since 2026-08-24.** Migrations **083** (the fixture list + circle-method generator), **084** (scoring, the leading rank key, the settle trigger), **085** (a totals row for every entry). 🔴 **The pairing is a PUBLISHED ROUND-ROBIN, overturning the concept note's random draw on gate 5** — who you happen to draw is our randomness, not the sport's. Ryan's call 2026-08-24. ⚠ It has scored **0 real entries**: no pool has `league_mode='showdown'`. ⚠ The concept's second tiebreak (lifetime H2H between tied players) is **not implemented** — it is pairwise and cannot be a sort key over one row. Verified by `scripts/verify-showdown.ts`, which asserts the round-robin property itself |
 | **Last Man Standing engine** — `league_lms_settle` + `league_lms_open_round`, over `league_lms_rounds` / `_survivors` / `_picks` | Set-based, DB-native, per pool per matchweek: judges one club per entry — WIN survives, draw or loss is out, no pick is out, and a fixture that never completed survives because you were not beaten. When one player is left the round closes, winners are stamped, `rounds_won` is recomputed from the record, and the next round opens with **everybody back in** | **Its own pick shape and no depth axis** (Decision 9). Repeating rounds are the design, not a variant: a single elimination is over in five or six matchweeks of thirty-eight, and a pool dead in September fails the purpose clause | ✅ **LIVE since 2026-08-24.** Migrations **086** (schema + the club-once-per-round rule + a MATCHWEEK-level lock), **087** (the engine, `rounds_won` leading the cascade, the settle trigger), **088** (the lock was guarding the engine's own result write — every eliminated pick stayed `result = NULL`). ⚠ It has scored **0 real entries**. ⚠ A late joiner enters the NEXT round, never the one running. Verified by `scripts/verify-last-man-standing.ts`, which plays all five outcomes against one set of fixtures |
@@ -1877,15 +1930,20 @@ must pass the disclosure gate in `CLAUDE.md` and the five gates in *Multi-sport 
 8*, of which the fifth is the binding one here: **all uncertainty must be inherited from the sporting
 event.** A mechanic that adds randomness of our own is gambling design whether or not money moves.
 
-**What is actually BUILT as of 2026-08-23** — one cell of the grid:
+**What is actually BUILT — updated 2026-08-28.** The whole grid is built and migrated. The column
+that matters now is not *built* but *deployed*: `origin/master` is 32 commits behind, so **every ✅
+below is running only on Ryan's machine.**
 
-| | Results (H/D/A) | Scores (exact goals) |
-|---|---|---|
-| **Pick'em** | ❌ not built | ✅ **LIVE** |
-| **Showdown** | ❌ not built | ❌ not built |
-| **Last Man Standing** | ❌ not built | |
+| | Results (H/D/A) | Scores (exact goals) | Migrations |
+|---|---|---|---|
+| **Pick'em** | ✅ built, ⛔ undeployed | ✅ **LIVE in production** | 055/057/059/063, 064–066 |
+| **Showdown** | ✅ built, ⛔ undeployed | ✅ built, ⛔ undeployed | 083–085, 095, 100 |
+| **Last Man Standing** | ✅ built, ⛔ undeployed — its own pick shape, no depth axis | | 086–088, 097 |
+| **Table** | ✅ built, ⛔ undeployed — no depth axis | | 077–082, 089–093, 098–099 |
 
-Final Table add-on: ❌ not built.
+Only the **Scores** cell of Pick'em is reachable by a member today, and only because it is what the
+24 Aug code already did. Table is a standalone MODE, not the add-on this section originally called
+it — Decision 9 amended 2026-08-24.
 
 🆕 **Full Table Prediction — added by Ryan 2026-08-24, ❌ not built.** Rank all 20 clubs before the
 season locks, set for the season, shown live against the real table. ⚠ It contradicts Decision 9's
@@ -1913,6 +1971,19 @@ default. No multipliers, no bonuses, no bracket gate.
 Decision 9 also notes Results is cheap once the column exists — `getWinner()` already exists and the
 engine already resolves winner-vs-winner before paying out, so it is **a mode flag on the league
 engine, not a second engine**.
+
+> ✅ **Both closed 2026-08-28.** `league_predictions.predicted_outcome` is real (064), the engine
+> judges on it (066), and the wizard pre-selects Results (`create/route.ts` — anything that is not
+> the string `'scores'` resolves to `'results'`). Neither is reachable by a member until the branch
+> ships.
+>
+> 🔴 **What the gap left behind, and it is live.** A pool created before the wizard has
+> `league_depth = NULL`. The engine reads that as **Scores** — deliberately, byte for byte (066).
+> The copy layer reads it as **Results**, because three sites derive the wrong half of the pair:
+> `const scores = depth === 'scores'`. So a NULL-depth pool is *described* as one game and *scored*
+> as the other. Two production pools are in exactly that state. The polarity that agrees with the
+> engine is `depth === 'results'` — which is what the picker, the leaderboard and the save route all
+> use. See the audit block at the top of the Premier League section.
 
 ---
 
@@ -2039,6 +2110,15 @@ Everything below follows from that one sentence.
   says it *"never writes: kickoff_at, original_kickoff_at (**L11 owns rescheduling**)"*. L11 is
   unbuilt. So today a fixture moved from February to May is **invisible to us**: our kickoff, the
   matchweek window, the deadline and the "Next" column all keep the February date forever.
+- ✅ **FIXED the same day — migration 105.** The sync writes `kickoff_at` and stamps
+  `original_kickoff_at` the first time a fixture moves. Two guards live in SQL and not only in the
+  mapper: a **completed** fixture is never moved (it would restate a scored week), and the original
+  is written through `COALESCE` so the **first** value recorded survives a second postponement. The
+  deadline needed no new code — the window trigger already fires on `UPDATE OF kickoff_at`, and
+  101's CASE re-derives only locks that have not passed, so a reschedule can neither reopen a week
+  people have finished picking nor slam shut one they have not. Found while building it: the sync's
+  `PROJECTION` never selected `original_kickoff_at`, so every move would have looked like the first
+  and overwritten the true original.
 - Picks reveal at the lock, so the group sees each other's calls an hour before kickoff — nobody can
   change anything by then, and it buys an hour of banter.
 - **The next matchweek opens 72 hours after the current one locks** — matching the measured
@@ -2069,11 +2149,33 @@ the rest. The round label is permanent, so tracking this is ours to do.
 > A fixture whose date moves is re-homed to the matchweek whose window **most recently precedes** its
 > new date — and only while its current matchweek is still unlocked.
 
-⚠ **Blocked on L11, and cannot be built before it.** Re-homing reacts to a fixture's date changing,
-and nothing currently detects that a date HAS changed — see the correction above. L11 (read
-`fixture.date`, write `kickoff_at`, stamp `original_kickoff_at` the first time it moves) is the
-prerequisite, and it is the more urgent of the two on its own merits: without it every deadline in a
-real season silently drifts from reality the first time a game is rearranged.
+✅ **BUILT 2026-08-28 — migration 106, policy in [`lib/league/rehome.ts`](lib/league/rehome.ts).**
+The rule is a **pure function**, deliberately, because the ingest arm is the only thing that ever
+moves a fixture between matchweeks and there is no second writer to guard against — which buys a
+replay of all three measured seasons in a unit test. The write is SQL and repeats every guard.
+
+Re-measured on the way in, and the numbers moved slightly from the first pass:
+
+| | fixtures moved | smallest round | matchweeks emptied |
+|---|---|---|---|
+| date rule alone | **43 of 1,140 (3.8%)** | **1** | 0 |
+| …plus the floor of five | 49 of 1,140 (4.3%) | **7** | **3 — one per season** |
+
+⚠ **The floor empties a matchweek, and that turned out to be a season-ending bug in two modes.** A
+matchweek holding no fixtures never snapshots its ranks — `league_snapshot_matchweek_ranks` returned
+early on `fixture_count = 0` — and **both Showdown and Last Man Standing settle off that snapshot
+going non-NULL**. Shipping re-homing alone would have frozen every Showdown and LMS pool in the
+league around March, once a year, permanently: the exact stall migration 094 exists to prevent,
+reached by a different road. Worse, LMS reads a missing pick as elimination, and an empty matchweek
+never opens — so **nobody** has a pick and **everybody** goes out in one statement, which is the
+production incident of 2026-08-24 all over again. Migration 106 fixes both. Showdown needed nothing:
+its accuracy sums `COALESCE` to 0, so a week with no games is 0–0, a draw, a point each.
+
+> **When adding anything that can empty a matchweek, ask what every mode does with a week nobody
+> could pick in.** That is now twice.
+
+The sync re-plans only when a move actually *landed*, so the one whole-season read in the arm costs
+a handful of ticks a year rather than every 60 seconds.
 
 - **The preceding weekend, never the following one.** Attaching a midweek makeup game to the weekend
   *before* makes it a late straggler: the lock is untouched, and it is predicted on the Friday and
@@ -2128,9 +2230,16 @@ The rest of Decision 7 stands, including the override log.
 - ✅ `league_open_matchweek` sorting by lock time rather than `matchweek_number` — migration 101,
   and `openMatchweekId` in `lib/league/read.ts`, which is the same rule in TypeScript and had to
   move with it.
-- 🔴 **L11 — rescheduling. The biggest gap this decision uncovered, and a prerequisite for
-  re-homing.** Nothing reads `fixture.date`, so a moved game never moves for us.
-- ⏳ Re-homing itself, once L11 exists.
+- ✅ **L11 — rescheduling.** Migration 105. Was the biggest gap this decision uncovered.
+- ✅ Re-homing, with the floor of five — migration 106.
+- 🔴 **Migrations 098–106 are all UNAPPLIED**, and 105/106 have never been executed by Postgres at
+  all: the session that wrote them had no database. Apply in order; every one that replaces a live
+  function carries a `pg_get_functiondef` pre-flight in its header, and `plpgsql` accepts a wrong
+  column name at CREATE time and fails at RUN time (the 081→082 lesson), so a clean apply is not a
+  clean run.
+- 🔴 **Re-homing has no end-to-end verification.** The policy is replayed over three real seasons in
+  `lib/league/__tests__/rehome.test.ts`, but nothing has moved a fixture in a live season and watched
+  the deadline, the duel and the LMS round follow it. `scripts/verify-*` is the shape that is owed.
 - A postponed fixture completing weeks after its matchweek settled has **never been exercised**.
   Believed correct under 094; worth a test before the season rather than a discovery in November.
 - "Since you joined" leaderboard view — candidate, not committed.
