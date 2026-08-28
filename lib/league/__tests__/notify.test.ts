@@ -50,7 +50,7 @@ type Member = {
  * resolves to the first row.
  */
 function fakeAdmin(seed: {
-  pool?: { pool_name: string; archived_at: string | null }
+  pool?: { pool_name: string; archived_at: string | null; league_mode?: string | null }
   matchweek?: { matchweek_number: number; label: string | null; lock_at: string | null; fixture_count: number }
   members?: Member[]
   fixtures?: Array<{ fixture_id: string }>
@@ -86,7 +86,11 @@ const MEMBER = (n: number, entries: string[]): Member => ({
 })
 
 const BASE = {
-  pool: { pool_name: 'Office League', archived_at: null },
+  // ⚠ `league_mode` is load-bearing since migration 108: the three matchweek
+  // notices are refused for any mode whose picks do not live in
+  // `league_predictions`, which is what the consumer reads to decide who to
+  // chase. A fixture with no mode is a pool that gets nothing.
+  pool: { pool_name: 'Office League', archived_at: null, league_mode: 'pickem' },
   matchweek: { matchweek_number: 12, label: 'Matchweek 12', lock_at: '2026-11-01T12:30:00Z', fixture_count: 2 },
   fixtures: [{ fixture_id: 'f1' }, { fixture_id: 'f2' }],
 }
@@ -175,7 +179,7 @@ describe('the lock reminder goes ONLY to people who have not picked', () => {
     const r = await notifyLockReminder(
       fakeAdmin({
         ...BASE,
-        pool: { pool_name: 'Old League', archived_at: '2026-08-01T00:00:00Z' },
+        pool: { pool_name: 'Old League', archived_at: '2026-08-01T00:00:00Z', league_mode: 'pickem' },
         members: [MEMBER(1, ['e1'])],
       }),
       'p1',
@@ -193,6 +197,69 @@ describe('the lock reminder goes ONLY to people who have not picked', () => {
     )
     expect(r.skipped).toBe('matchweek has no fixtures')
     expect(sendBatchEmails).not.toHaveBeenCalled()
+  })
+
+  // ===========================================================
+  // Migration 108 — the mode has to be able to act on the notice
+  // ===========================================================
+  // This reminder decides who to chase by reading `league_predictions`. Two of
+  // the four modes never write to that table, so before 108 every one of their
+  // members read as "hasn't picked" — every week, with no action available that
+  // could clear it. Silence is the correct answer for those modes; a weekly
+  // reminder they cannot satisfy is not.
+
+  it('sends nothing to a TABLE pool — it has no weekly picks at all', async () => {
+    const r = await notifyLockReminder(
+      fakeAdmin({
+        ...BASE,
+        pool: { pool_name: 'Predict the Table', archived_at: null, league_mode: 'table' },
+        members: [MEMBER(1, ['e1'])],
+        // The trap in one line: a table entry has no rows here BY DESIGN — its
+        // ordering lives in `league_table_predictions` — so the old code read
+        // this member as unpicked and mailed them.
+        predictions: [],
+      }),
+      'p1',
+      'mw1',
+    )
+    expect(r.skipped).toBe('mode has no weekly fixture picks')
+    expect(sendBatchEmails).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing to a LAST MAN STANDING pool — its picks are in another table', async () => {
+    // ⚠ LMS has a real weekly decision; it is just not stored in
+    // `league_predictions`. So this is a KNOWN GAP, not a solved problem: after
+    // 108 an LMS pool gets no weekly reminder at all, and closing that needs its
+    // own notice kind reading `league_lms_picks`.
+    const r = await notifyLockReminder(
+      fakeAdmin({
+        ...BASE,
+        pool: { pool_name: 'Last Man Standing', archived_at: null, league_mode: 'last_man_standing' },
+        members: [MEMBER(1, ['e1'])],
+        predictions: [],
+      }),
+      'p1',
+      'mw1',
+    )
+    expect(r.skipped).toBe('mode has no weekly fixture picks')
+    expect(sendBatchEmails).not.toHaveBeenCalled()
+  })
+
+  it('still reminds a SHOWDOWN pool — it does have fixture picks', async () => {
+    // The allowlist has to admit both modes that write to league_predictions,
+    // or 108 fixes a wrong message by creating a missing one.
+    const r = await notifyLockReminder(
+      fakeAdmin({
+        ...BASE,
+        pool: { pool_name: 'Showdown Duels', archived_at: null, league_mode: 'showdown' },
+        members: [MEMBER(1, ['e1'])],
+        predictions: [],
+      }),
+      'p1',
+      'mw1',
+    )
+    expect(r.skipped).toBeUndefined()
+    expect(recipients()).toHaveLength(1)
   })
 
   it('uses the PREDICTIONS push category, so an opt-out is honoured', async () => {

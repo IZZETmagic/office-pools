@@ -47,6 +47,12 @@ export async function POST(request: NextRequest) {
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
+  // ⚠ `timeZoneName` is not decoration. This renders on a Vercel runtime whose
+  // clock is UTC, so without it every member was emailed a UTC time formatted
+  // as though it were their own — the exact defect `components/LocalTime` was
+  // written for on the web side, and which the pool screen already avoids. An
+  // email cannot run that, so naming the zone is the only honest option: the
+  // screen said 16:00, this said 19:00, and neither admitted which was which.
   const formattedDeadline = new Date(new_deadline).toLocaleString('en-US', {
     weekday: 'long',
     month: 'long',
@@ -54,6 +60,7 @@ export async function POST(request: NextRequest) {
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZoneName: 'short',
   })
 
   const emails = members.map((member) => {

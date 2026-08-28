@@ -113,7 +113,17 @@ export type TableModeData = {
   relegationN: number
   europaFrom: number | null
   europaTo: number | null
+  /** The deadline has passed: nobody may edit their table. Gates WRITES. */
   isLocked: boolean
+  /**
+   * Everybody's table is visible to everybody else. Gates READS.
+   *
+   * Derived from the same deadline as `isLocked` since migration 110 — one
+   * switch, two consequences. Kept as its own field because the question a
+   * consumer asks of it is different: `isLocked` is "may I still edit mine",
+   * `isRevealed` is "may I open somebody else's".
+   */
+  isRevealed: boolean
   joinedAfterLock: boolean
   /** 'headline_only' scores the bands alone — no per-position arithmetic. */
   profile: 'full_table' | 'headline_only'
@@ -1665,10 +1675,11 @@ export function PoolDetail({
                 tableView={
                   isTableMode && tableModeData
                     ? {
-                        // The deadline, not RLS, is what the modal gates on —
-                        // see TableEntryModal's header for why that matters for
-                        // an admin who also plays.
-                        isLocked: tableModeData.isLocked,
+                        // The same fact as `isLocked` since migration 110 — the
+                        // deadline passing is what opens every table. Passed as
+                        // its own field because the modal asks a different
+                        // question of it than the editing screen does.
+                        isRevealed: tableModeData.isRevealed,
                         clubCount: tableModeData.clubs.length,
                         topN: tableModeData.topN,
                         relegationN: tableModeData.relegationN,

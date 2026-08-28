@@ -63,10 +63,27 @@ describe('leagueTableDeadlineTemplate', () => {
     expect(one.html).not.toMatch(/last chance|hurry|act now|running out/i)
   })
 
-  it('says the thing that is actually irreversible', () => {
-    // A member who believes an admin can reopen it will not treat the deadline
-    // as real. Migration 098 is explicit that nobody can.
-    expect(one.html).toMatch(/nobody can reopen it/i)
+  it('does not promise the admin cannot reopen it', () => {
+    // ⚠ THIS TEST IS INVERTED FROM WHAT IT ASSERTED, deliberately.
+    //
+    // It used to require the sentence "nobody can reopen it", on migration
+    // 098's rule that a passed deadline is frozen for everyone. 098 was never
+    // applied and migration 104 supersedes it: an admin MAY move the deadline
+    // forward, including after it has passed, precisely so a member who forgot
+    // is not written off for a whole season.
+    //
+    // So the old promise is now false, and a reminder that makes it is worse
+    // than one that says nothing — it tells a member they have no recourse at
+    // the exact moment they do.
+    expect(one.html).not.toMatch(/nobody can reopen/i)
+    expect(one.html).not.toMatch(/including your pool admin/i)
+  })
+
+  it('still states what the deadline actually does', () => {
+    // Dropping the false promise must not drop the consequence with it: the
+    // order is fixed at the deadline and everyone's table is shown at once.
+    expect(one.html).toMatch(/your order is fixed/i)
+    expect(one.html).toMatch(/shown to the pool at once/i)
   })
 
   it('reassures that predicting early is not a commitment trap', () => {

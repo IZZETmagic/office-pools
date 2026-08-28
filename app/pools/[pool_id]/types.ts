@@ -44,7 +44,16 @@ export type PoolData = {
   league_depth: 'results' | 'scores' | null
   /** Table mode only: what the pool pays for. */
   league_table_profile: 'full_table' | 'headline_only' | null
-  /** Table mode only: when the finishing-order prediction closes. */
+  /**
+   * Table mode only: when the finishing-order prediction closes.
+   *
+   * ONE switch, not two — migration 110. At this instant writes stop AND every
+   * member's table becomes visible to every other member. 104 briefly split
+   * those into a separate `league_table_revealed_at` stamp, to support an admin
+   * reopening a passed deadline for somebody who forgot; 109 removed the reopen
+   * and 110 removed the stamp, which by then only recorded when we got round to
+   * writing it down (it lagged the deadline by 15 minutes in production).
+   */
   league_table_lock_at: string | null
   prediction_deadline: string | null
   prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'

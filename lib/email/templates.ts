@@ -1451,8 +1451,14 @@ export function leagueTableDeadlineTemplate(params: {
                : ''
            }`,
         )}
+        ${/* ⚠ This used to promise "nobody can reopen it, including your pool
+              admin", which migration 104 made false: an admin MAY move the
+              deadline forward if somebody has not filed. Promising otherwise
+              would be the more comfortable sentence and the wrong one — a
+              member who reads it has been told they have no recourse when they
+              do. */''}
         ${paragraph(
-          `After that it is fixed for the season — nobody can reopen it, including your pool admin. ` +
+          `After that your order is fixed and everyone's table is shown to the pool at once. ` +
           `An entry with no table scores nothing, so it is worth the five minutes.`,
         )}
         ${paragraph(
@@ -1462,6 +1468,83 @@ export function leagueTableDeadlineTemplate(params: {
         )}
       `,
       ctaText: 'Order your table',
+      ctaUrl: `${poolUrl}?tab=predictions`,
+    }),
+  }
+}
+
+/**
+ * "The deadline moved, and your table is open again."
+ *
+ * The announcement that makes an extension FAIR rather than merely generous.
+ * A table pool has one decision in it, and an admin moving the deadline
+ * silently would mean the members who filed on time never learn they may
+ * revise — so the people who were organised are the only ones who do not get
+ * the extra days. Telling everybody, in the same message, is the whole point.
+ *
+ * ⚠ Goes to EVERY member, not only the stragglers, and says so plainly. That
+ * is the disclosure gate in one line: "the deadline moved, everyone's table is
+ * open again until then." If it only worked by quietly telling the people who
+ * had not filed, it would not be a fair extension.
+ *
+ * ⚠ `timeZoneName: 'short'` is not decoration. This renders on a Vercel
+ * runtime whose clock is UTC, so a time printed without its zone is a UTC time
+ * shown to somebody who is not in UTC — the exact defect `components/LocalTime`
+ * exists for on the web side, and email cannot run that. Labelling it is the
+ * only honest option available here.
+ */
+export function leagueTableDeadlineMovedTemplate(params: {
+  userName: string
+  poolName: string
+  /** The new deadline, ISO. */
+  deadline: string
+  /** True when this member (or one of their entries) still has no table. */
+  hasUnfiledEntry: boolean
+  /** Whether the old deadline had already passed — i.e. this is a REOPEN. */
+  wasReopened: boolean
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, deadline, hasUnfiledEntry, wasReopened, poolUrl } = params
+  const deadlineFormatted = new Date(deadline).toLocaleString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  })
+
+  return {
+    subject: wasReopened
+      ? `Your table for ${poolName} is open again`
+      : `The table deadline for ${poolName} has moved`,
+    html: brandedTemplate({
+      preheader: `New deadline: ${deadlineFormatted}. You can change your order until then.`,
+      heading: wasReopened ? 'Your table is open again' : 'The table deadline has moved',
+      body: `
+        ${greeting(userName)}
+        ${paragraph(
+          wasReopened
+            ? `The admin of <strong>${poolName}</strong> has reopened the table prediction and set a ` +
+              `new deadline. Everyone's table is editable again until then — not just the people who ` +
+              `hadn't filed one.`
+            : `The admin of <strong>${poolName}</strong> has changed when the table prediction closes.`,
+        )}
+        ${callout(
+          'info',
+          calloutLine('info', `Now closes ${deadlineFormatted}`, { bold: true, marginBottom: 0 }),
+        )}
+        ${paragraph(
+          hasUnfiledEntry
+            ? `You haven't put a table in yet. An entry with no table scores nothing all season, so ` +
+              `this is the time.`
+            : `You've already filed a table. You don't have to touch it — but you can change it as ` +
+              `many times as you like before the new deadline, on exactly the same information as ` +
+              `everybody else.`,
+        )}
+        ${paragraph(
+          `Nobody's table is shown to the pool until picking closes with everyone in, so no one has ` +
+          `seen your order.`,
+          { marginBottom: 0 },
+        )}
+      `,
+      ctaText: hasUnfiledEntry ? 'Order your table' : 'Review your table',
       ctaUrl: `${poolUrl}?tab=predictions`,
     }),
   }

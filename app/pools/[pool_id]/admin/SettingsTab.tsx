@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { POOL_MODE_INFO, type PredictionMode } from '@/lib/poolModeInfo'
 import { leagueModeInfo, type LeagueMode, type LeagueDepth } from '@/lib/leagueModeInfo'
+import { LocalTime } from '@/components/LocalTime'
 
 type SettingsTabProps = {
   pool: PoolData
@@ -21,6 +22,58 @@ type SettingsTabProps = {
   members: MemberData[]
   currentUserId: string
   onDirtyChange?: (dirty: boolean) => void
+}
+
+// ------------------------------------------------- the deadline form fields
+//
+// ⚠ BOTH HALVES MUST BE IN THE SAME FRAME, and for a while they were not.
+//
+// `<input type="date">` and `<input type="time">` hold LOCAL wall-clock values,
+// and `handleSaveAll` recombines them as `new Date(\`${date}T${time}:00\`)`,
+// which JavaScript parses as LOCAL. So both fields have to be seeded from local
+// parts. The date was seeded from `toISOString().split('T')[0]`, which is the
+// UTC calendar date, while the time was seeded from `toTimeString()`, which is
+// local — a UTC date glued to a local time and then read back as local.
+//
+// It round-trips silently whenever the two calendar dates agree, which is most
+// of the day, and jumps a full 24 hours when they do not. In Bermuda (UTC−3/−4)
+// that is any deadline between midnight and 03:00/04:00 UTC: opening Settings
+// and pressing Save WITHOUT TOUCHING THE FIELD moved the deadline a day, and
+// the pool was then emailed the wrong new date as though the admin had chosen
+// it. Under the old trigger it merely failed the whole save; under migration
+// 104 it is a legal move, so this had to be fixed in the same pass.
+//
+// Applies to `prediction_deadline` on bracket pools too — same two fields.
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** Local calendar date as YYYY-MM-DD. NOT toISOString(), which is UTC. */
+function localDateValue(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+/** Local wall-clock time as HH:MM, to pair with localDateValue. */
+function localTimeValue(iso: string | null | undefined): string {
+  if (!iso) return '14:00'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '14:00'
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+/**
+ * How the confirmation dialog prints a deadline.
+ *
+ * ⚠ Rendered through `<LocalTime>`, never on the server. The confirmation is
+ * the one screen where the admin commits to an instant, so showing it in the
+ * server's timezone would be the worst possible place for that defect.
+ */
+function formatMoveTime(d: Date): string {
+  return d.toLocaleString(undefined, {
+    weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  })
 }
 
 
@@ -261,16 +314,35 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
   const isTableMode = pool.league_mode === 'table'
   const deadlineSource = isTableMode ? pool.league_table_lock_at : pool.prediction_deadline
 
-  const [deadlineDate, setDeadlineDate] = useState(
-    deadlineSource ? new Date(deadlineSource).toISOString().split('T')[0] : ''
-  )
-  const [deadlineTime, setDeadlineTime] = useState(
-    deadlineSource ? new Date(deadlineSource).toTimeString().slice(0, 5) : '14:00'
-  )
+  const [deadlineDate, setDeadlineDate] = useState(localDateValue(deadlineSource))
+  const [deadlineTime, setDeadlineTime] = useState(localTimeValue(deadlineSource))
 
   // UI state
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  /**
+   * Who has filed a table, and whether the pool has been revealed.
+   *
+   * Fetched rather than derived from `pool`, because neither fact is on the
+   * pool row the page already has: "how many have filed" is a count across
+   * entries, and migration 104 put it behind `league_table_filing_status` so
+   * that an admin who is also playing gets the count without the contents.
+   */
+  type TableStatus = {
+    lockAt: string | null
+    /** The deadline has passed — which since migration 110 IS the reveal. */
+    hasPassed: boolean
+    total: number
+    filed: number
+    missingEntryIds: string[]
+  }
+  const [tableStatus, setTableStatus] = useState<TableStatus | null>(null)
+
+  // The deadline the admin is about to commit to, held while they read what it
+  // will do. Null whenever the modal is shut.
+  const [showDeadlineModal, setShowDeadlineModal] = useState(false)
+  const [pendingDeadline, setPendingDeadline] = useState<Date | null>(null)
 
   // Archive state. There is deliberately no delete state: "Delete Pool" was
   // removed in favour of a reversible archive (decision 2026-07-25, migration
@@ -279,12 +351,28 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
   const [archiving, setArchiving] = useState(false)
 
   // Track if form has unsaved changes
-  const initialDeadlineDate = deadlineSource
-    ? new Date(deadlineSource).toISOString().split('T')[0]
-    : ''
-  const initialDeadlineTime = deadlineSource
-    ? new Date(deadlineSource).toTimeString().slice(0, 5)
-    : '14:00'
+  const initialDeadlineDate = localDateValue(deadlineSource)
+  const initialDeadlineTime = localTimeValue(deadlineSource)
+
+  /**
+   * Which of the moves this is, and how many people it is being made for.
+   *
+   * ⚠ `reopen` is now unreachable — migration 109 refuses any move once the
+   * deadline has passed, because that is the instant every table is revealed.
+   * The branch is kept rather than deleted: it costs one comparison, and the
+   * decision to make the deadline final is one day old. If extensions come
+   * back, this comes back with them.
+   */
+  const deadlineMove = useMemo(() => {
+    const old = deadlineSource ? new Date(deadlineSource) : null
+    const hadPassed = old !== null && old <= new Date()
+    const kind: 'reopen' | 'extend' | 'shorten' = hadPassed
+      ? 'reopen'
+      : old && pendingDeadline && pendingDeadline < old
+        ? 'shorten'
+        : 'extend'
+    return { kind, missing: tableStatus ? tableStatus.total - tableStatus.filed : 0 }
+  }, [deadlineSource, pendingDeadline, tableStatus])
 
   const hasChanges = useMemo(() => {
     return (
@@ -330,7 +418,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       )
     : null
 
-  async function handleSaveAll() {
+  async function handleSaveAll(opts?: { deadlineConfirmed?: boolean }) {
     // Validate pool name
     if (!poolName.trim()) {
       setError('Pool name is required.')
@@ -343,6 +431,28 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       newDeadline = new Date(`${deadlineDate}T${deadlineTime}:00`)
       if (newDeadline <= new Date()) {
         setError('Deadline must be in the future.')
+        return
+      }
+    }
+
+    // ---------------------------------------------- confirm before moving it
+    //
+    // ⚠ THE ONLY SETTING ON THIS FORM THAT CHANGES THE COMPETITION. Every other
+    // field is administrative — a name, a cap, a fee. Moving a table deadline
+    // changes when twenty clubs stop being orderable AND when every member's
+    // order is shown to the whole pool, and it emails all of them.
+    //
+    // ⚠ `opts?.deadlineConfirmed` and NOT a positional boolean: the Save button
+    // calls this as `onClick={() => handleSaveAll()}`, and the bare
+    // `onClick={handleSaveAll}` form would hand a MouseEvent in as `opts` — which
+    // a positional boolean would satisfy, silently skipping the confirmation.
+    if (newDeadline && isTableMode && !opts?.deadlineConfirmed) {
+      const changed =
+        !deadlineSource ||
+        newDeadline.toISOString() !== new Date(deadlineSource).toISOString()
+      if (changed) {
+        setPendingDeadline(newDeadline)
+        setShowDeadlineModal(true)
         return
       }
     }
@@ -378,20 +488,16 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       updated_at: new Date().toISOString(),
     }
 
-    if (newDeadline) {
-      if (isTableMode) {
-        // The real deadline for this mode. Migration 098 refuses two moves and
-        // the DATABASE is what decides: a deadline already passed cannot be
-        // reopened, and none can be set in the past. Both surface on this form
-        // as a plain error rather than being re-checked here, so the rule lives
-        // in one place.
-        updatePayload.league_table_lock_at = newDeadline.toISOString()
-      } else if (!isLeaguePool) {
-        updatePayload.prediction_deadline = newDeadline.toISOString()
-      }
-      // Other league modes: nothing. See the note on deadlineSource — writing
-      // prediction_deadline here would open every member's entry.
+    // ⚠ TABLE MODE'S DEADLINE IS NOT IN THIS PAYLOAD, on purpose. It goes
+    // through PATCH /api/pools/[id]/table-deadline below, because the
+    // announcement that makes a move fair has to be part of the same operation
+    // rather than a fire-and-forget afterthought. Writing it here as well would
+    // move it twice and announce a move that already happened.
+    if (newDeadline && !isLeaguePool) {
+      updatePayload.prediction_deadline = newDeadline.toISOString()
     }
+    // Other league modes: nothing. See the note on deadlineSource — writing
+    // prediction_deadline here would open every member's entry.
 
     // .select() so the write reports the truth. Without it, an UPDATE that RLS
     // filters out comes back 200 with zero rows and NO error — PostgREST does
@@ -418,12 +524,46 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       return
     }
 
-    // Check if deadline changed — notify members if so
-    const deadlineChanged = newDeadline &&
+    const deadlineChanged = !!newDeadline &&
       (isTableMode || !isLeaguePool) &&
       (!deadlineSource || newDeadline.toISOString() !== new Date(deadlineSource).toISOString())
 
-    if (deadlineChanged) {
+    // TABLE MODE — the deadline is moved by the route, which also announces it.
+    // AWAITED, and a failure stops the save reporting success: a deadline that
+    // moved with nobody told is the unfair version of this, and the admin is the
+    // only person who can put it right.
+    let announcedToast = false
+    if (deadlineChanged && isTableMode) {
+      const res = await fetch(`/api/pools/${pool.pool_id}/table-deadline`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deadline: newDeadline!.toISOString() }),
+      }).catch(() => null)
+
+      const body = res ? await res.json().catch(() => null) : null
+
+      if (!res || !res.ok) {
+        // The trigger's own sentence when there is one — "a table deadline
+        // cannot be set in the past", "the table prediction for this pool closed
+        // at …". Those explain the refusal; a generic message would not.
+        setError(body?.error ?? 'The deadline could not be moved. Nothing else was changed.')
+        setSaving(false)
+        return
+      }
+      announcedToast = true
+      if (body?.announced === false) {
+        showToast(body.error ?? 'Deadline moved, but the pool could not be told.', 'error')
+      } else {
+        showToast(
+          `Deadline moved. ${body.emails ?? 0} member${body.emails === 1 ? '' : 's'} told.`,
+          'success',
+        )
+      }
+    }
+
+    // Every other mode keeps the existing notification. Still fire-and-forget,
+    // which is a real weakness, but it is a World Cup path and out of scope.
+    if (deadlineChanged && !isTableMode) {
       fetch('/api/notifications/deadline-changed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -452,7 +592,9 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         ? { prediction_deadline: newDeadline.toISOString() }
         : {}),
     })
-    showToast('Settings saved.', 'success')
+    // One toast, not two — the table-deadline branch above already said
+    // something more specific than "Settings saved."
+    if (!announcedToast) showToast('Settings saved.', 'success')
     setSaving(false)
   }
 
@@ -484,6 +626,22 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
     router.push('/dashboard')
   }
 
+
+  /**
+   * "Give them another N days," counted from NOW rather than from the existing
+   * deadline. The time of day is kept, so a pool closing at 19:00 goes on
+   * closing at 19:00.
+   */
+  function setDeadlineIn(days: number) {
+    const base = new Date()
+    base.setDate(base.getDate() + days)
+    const [h, m] = (deadlineTime || '19:00').split(':').map(Number)
+    base.setHours(Number.isFinite(h) ? h : 19, Number.isFinite(m) ? m : 0, 0, 0)
+    if (base <= new Date()) base.setDate(base.getDate() + 1)
+    setDeadlineDate(localDateValue(base.toISOString()))
+    setDeadlineTime(localTimeValue(base.toISOString()))
+  }
+
   // Quick deadline options
   function setQuickDeadline(option: string) {
     // World Cup 2026 starts June 11
@@ -501,8 +659,12 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
       default:
         return
     }
-    setDeadlineDate(d.toISOString().split('T')[0])
-    setDeadlineTime(d.toTimeString().slice(0, 5))
+    // Same frame for both halves — see localDateValue. These shortcuts had the
+    // identical UTC-date/local-time mismatch: `new Date('2026-06-11T13:00:00')`
+    // parses as local, and taking the date from toISOString() moves it a day
+    // for anyone whose local date and UTC date disagree at that hour.
+    setDeadlineDate(localDateValue(d.toISOString()))
+    setDeadlineTime(localTimeValue(d.toISOString()))
   }
 
   // 'closed' used to live here, meaning "no new members" — a join-ability
@@ -780,12 +942,56 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
               : pool.prediction_mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
           </Caption>
 
-          {isTableMode && (
+          {/* ⚠ This copy described migration 098's rule, which was never applied
+              and is superseded by 104. It told the admin the deadline "cannot be
+              reopened" once it passes — the opposite of what the product now
+              does, and the exact moment they most need to know they have a
+              lever. */}
+          {isTableMode && !tableStatus?.hasPassed && (
             <Alert variant="info">
-              This is when members stop being able to order the table. You can move
-              it while it is still open — once it passes, everyone who predicted is
-              locked against it and it cannot be reopened.
+              This is when members stop being able to order the table, and the moment
+              every table is shown to the whole pool. You can move it to any future date
+              while it is still open — we tell everyone when you do — but once it passes
+              the tables are out and it is fixed.
             </Alert>
+          )}
+
+          {/* Once the tables are out the deadline is fixed, and saying so where
+              the admin would otherwise try to move it is kinder than letting the
+              trigger refuse them after they have typed a date. */}
+          {isTableMode && tableStatus?.hasPassed && (
+            <Alert variant="warning">
+              This deadline has passed, so every table is open to the pool and the date
+              is now fixed. Reopening it would let someone rewrite their order having
+              already read everybody else&apos;s.
+            </Alert>
+          )}
+
+          {/* THE STRAGGLER. The whole reason the deadline can move after it has
+              passed — so the count belongs next to the field that moves it, not
+              on another screen. Entry ids only ever come back as a count here:
+              migration 104 closed the admin's read policy, so "who is missing"
+              is answerable and "what did they put" is not. */}
+          {isTableMode && tableStatus && tableStatus.total > 0 && (
+            <p className="t-body text-muted mb-3">
+              {tableStatus.filed === tableStatus.total ? (
+                <>
+                  <strong className="text-ink">Everyone has filed a table</strong> —{' '}
+                  {tableStatus.filed} of {tableStatus.total}.
+                  {!tableStatus.hasPassed && ' They all open the moment this deadline passes.'}
+                  {tableStatus.hasPassed && ' They are open to the pool now.'}
+                </>
+              ) : (
+                <>
+                  <strong className="text-ink">
+                    {tableStatus.filed} of {tableStatus.total} have filed a table.
+                  </strong>{' '}
+                  {tableStatus.hasPassed
+                    ? 'Everyone’s table is now open to the pool. The ones with no table score nothing.'
+                    : 'Nobody sees anybody else’s until this deadline passes.'}
+                </>
+              )}
+            </p>
           )}
 
           {pool.prediction_mode === 'progressive' && (
@@ -848,10 +1054,25 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
             </div>
           </div>
 
+          {/* ⚠ The three World Cup shortcuts are hardcoded to June 2026 and are
+              DEAD CONTROLS on a table pool — every one of them sets a date in
+              the past, which the form then refuses. A table pool's shortcuts
+              are relative to now, because the move that matters is "give them
+              another few days", not "the tournament starts on the 11th". */}
           <div className="flex flex-wrap gap-2">
-            <QuickDeadlineButton label="Tournament Start" onClick={() => setQuickDeadline('tournament_start')} />
-            <QuickDeadlineButton label="1 Day Before" onClick={() => setQuickDeadline('one_day_before')} />
-            <QuickDeadlineButton label="1 Week Before" onClick={() => setQuickDeadline('one_week_before')} />
+            {isTableMode ? (
+              <>
+                <QuickDeadlineButton label="+1 day" onClick={() => setDeadlineIn(1)} />
+                <QuickDeadlineButton label="+3 days" onClick={() => setDeadlineIn(3)} />
+                <QuickDeadlineButton label="+1 week" onClick={() => setDeadlineIn(7)} />
+              </>
+            ) : (
+              <>
+                <QuickDeadlineButton label="Tournament Start" onClick={() => setQuickDeadline('tournament_start')} />
+                <QuickDeadlineButton label="1 Day Before" onClick={() => setQuickDeadline('one_day_before')} />
+                <QuickDeadlineButton label="1 Week Before" onClick={() => setQuickDeadline('one_week_before')} />
+              </>
+            )}
           </div>
         </Card>
         )}
@@ -1025,7 +1246,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           <div className="mx-auto max-w-3xl flex items-center justify-between px-4 py-3">
             <p className="t-body text-muted">You have unsaved changes</p>
             <Button
-              onClick={handleSaveAll}
+              onClick={() => handleSaveAll()}
               loading={saving}
               loadingText="Saving..."
             >
@@ -1077,6 +1298,120 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
 
       {/* Archive Confirmation Modal */}
+      {/* ============================================================
+          MOVING THE TABLE DEADLINE — what is about to happen
+          ============================================================
+          Three different moves hide behind one date field, and they have
+          genuinely different consequences. Naming which one this is, before it
+          happens, is the whole point of the dialog:
+
+            REOPEN     the deadline had passed. Everyone's table becomes
+                       editable again — the thing an admin most needs to
+                       understand, because it is not what "change a setting"
+                       usually means.
+            EXTEND     later, still open. Straightforwardly more time.
+            SHORTEN    earlier, still open. Members LOSE time they could see
+                       they had. Allowed (migration 104 keys on the current
+                       date, not the old value) but never silently.
+
+          It states the mechanism rather than reassuring: what changes, who is
+          told, and what stays hidden. That is the disclosure gate applied to an
+          admin control rather than a member-facing one. */}
+      {showDeadlineModal && pendingDeadline && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 animate-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="deadline-move-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !saving) setShowDeadlineModal(false)
+          }}
+        >
+          <div className="bg-surface rounded-t-sheet sm:rounded-card shadow-card-elevated overflow-hidden sm:max-w-md w-full sm:mx-4 p-4 sm:p-6 dark:shadow-none dark:border dark:border-border-default animate-modal-slide-up">
+            <h3 id="deadline-move-title" className="t-section-header text-ink mb-3">
+              {deadlineMove.kind === 'reopen'
+                ? 'Reopen the table?'
+                : deadlineMove.kind === 'shorten'
+                  ? 'Bring the deadline forward?'
+                  : 'Extend the deadline?'}
+            </h3>
+
+            <p className="t-body text-ink mb-3">
+              {deadlineMove.kind === 'reopen' ? (
+                <>
+                  This pool&apos;s table closed{' '}
+                  <strong><LocalTime iso={deadlineSource!} format={formatMoveTime} /></strong>.
+                  You&apos;re opening it again until{' '}
+                  <strong><LocalTime iso={pendingDeadline.toISOString()} format={formatMoveTime} /></strong>.
+                </>
+              ) : (
+                <>
+                  The table will close{' '}
+                  <strong><LocalTime iso={pendingDeadline.toISOString()} format={formatMoveTime} /></strong>
+                  {' '}instead of{' '}
+                  <strong><LocalTime iso={deadlineSource!} format={formatMoveTime} /></strong>.
+                </>
+              )}
+            </p>
+
+            <Alert variant={deadlineMove.kind === 'shorten' ? 'warning' : 'info'}>
+              <ul className="space-y-1">
+                {deadlineMove.kind === 'reopen' && (
+                  <li>
+                    &#8226; <strong>Everyone&apos;s table becomes editable again</strong> — not
+                    just {deadlineMove.missing === 1 ? 'the one person' : `the ${deadlineMove.missing} people`} who
+                    hasn&apos;t filed one
+                  </li>
+                )}
+                {deadlineMove.kind === 'extend' && (
+                  <li>&#8226; Members can keep changing their table until the new date</li>
+                )}
+                {deadlineMove.kind === 'shorten' && (
+                  <li>
+                    &#8226; <strong>Members lose time they could see they had</strong> — anyone
+                    part-way through an order has less of it
+                  </li>
+                )}
+                <li>
+                  &#8226; All {members.length} member{members.length === 1 ? '' : 's'} get an
+                  email and a push telling them the new deadline
+                </li>
+                <li>
+                  &#8226; Nobody has seen anybody else&apos;s table, so no one revises with an
+                  advantage
+                </li>
+                {tableStatus && tableStatus.total > 0 && (
+                  <li>
+                    &#8226; {tableStatus.filed} of {tableStatus.total} have filed a table so far
+                  </li>
+                )}
+                <li>
+                  &#8226; Once every table is in and the deadline passes, they all open at
+                  once — and the date is fixed from then on
+                </li>
+              </ul>
+            </Alert>
+
+            <div className="flex gap-3 justify-end">
+              <Button variant="gray" onClick={() => setShowDeadlineModal(false)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button
+                variant={deadlineMove.kind === 'shorten' ? 'warning' : 'primary'}
+                onClick={() => {
+                  setShowDeadlineModal(false)
+                  handleSaveAll({ deadlineConfirmed: true })
+                }}
+                loading={saving}
+                loadingText="Saving..."
+              >
+                {deadlineMove.kind === 'reopen' ? 'Reopen and tell everyone' : 'Move it and tell everyone'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showArchiveModal && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 animate-modal-backdrop"

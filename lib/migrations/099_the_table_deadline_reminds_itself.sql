@@ -9,11 +9,15 @@
 -- It is the one that matters most.
 --
 -- A missed matchweek costs a member one week out of thirty-eight. A missed
--- TABLE deadline costs them the entire season: the mode is a single decision,
--- it locks once, and migration 098 will not reopen it afterwards for anybody.
--- A member who simply never opens the screen currently hears nothing at all and
--- scores zero — which is the one failure this mode cannot survive, and the
+-- TABLE deadline costs them the entire season: the mode is a single decision
+-- and it locks once. A member who simply never opens the screen hears nothing
+-- at all and scores zero — the one failure this mode cannot survive, and the
 -- opposite of "no bad feelings".
+--
+-- ⚠ Migration 104 gives the admin a way to rescue that member, by reopening the
+-- deadline for the whole pool. That makes this reminder MORE important, not
+-- less: everything 104 built is the cleanup for a message that never went out,
+-- and it costs every member in the pool their settled answer to recover one.
 --
 -- ## Why the kind could not be written even though it existed
 --
@@ -57,6 +61,18 @@
 -- hours puts a weekend inside the window for a deadline that usually falls on a
 -- Friday. It is a default, overridable per call.
 --
+-- =============================================================
+-- ⚠ AMENDED BEFORE IT WAS EVER APPLIED — 2026-08-28
+-- =============================================================
+-- Written 2026-08-26 against migration 098's rule, sat unapplied, and 098 was
+-- then superseded by 104: a table deadline CAN now be reopened after it has
+-- passed. Two comments below said the opposite and have been corrected, and the
+-- once-only stamp changed meaning — it is once per DEADLINE, not once per pool,
+-- because a reopened deadline is a new window that the straggler has heard
+-- nothing about. Migration 107 clears the stamp when the deadline moves.
+--
+-- What is in production is this file, applied 2026-08-28. The pre-104 wording
+-- was never applied anywhere.
 -- =============================================================
 
 -- ---------------------------------------------------- 1. the third target
@@ -114,8 +130,8 @@ BEGIN
        -- Inside the window...
        AND po.league_table_lock_at <= now() + p_reminder_window
        -- ...and NOT already gone. A reminder for a deadline that has passed is
-       -- worse than none: nothing can be done about it, and migration 098
-       -- guarantees it cannot be reopened.
+       -- worse than none: the member cannot act on it. (The ADMIN can — 104
+       -- lets them reopen — but that is their lever, not a member reminder.)
        AND po.league_table_lock_at > now()
   ),
   queued AS (
@@ -140,7 +156,7 @@ END;
 $fn$;
 
 COMMENT ON FUNCTION public.league_queue_table_deadline_notices(uuid, interval) IS
-  'Queues one table_deadline outbox event per table pool whose deadline falls inside the window and has not passed. p_season_id NULL means every season (the cron); pass one to scope it, which is how it is tested without touching real members. Once-only per pool via pools.table_deadline_reminder_sent_at, stamped in the same statement that queues. Skips archived pools. WHO gets the reminder is the consumer''s job, because "has not filed a table" is a per-member fact.';
+  'Queues one table_deadline outbox event per table pool whose deadline falls inside the window and has not passed. p_season_id NULL means every season (the cron); pass one to scope it, which is how it is tested without touching real members. Once-only PER DEADLINE via pools.table_deadline_reminder_sent_at, which migration 107 clears whenever the deadline moves. Skips archived pools. WHO gets the reminder is the consumer''s job, because "has not filed a table" is a per-member fact.';
 
 REVOKE EXECUTE ON FUNCTION public.league_queue_table_deadline_notices(uuid, interval) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.league_queue_table_deadline_notices(uuid, interval) TO service_role;

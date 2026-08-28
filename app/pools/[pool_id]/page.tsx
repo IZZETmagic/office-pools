@@ -250,7 +250,22 @@ export default async function PoolPage({
         await import('@/lib/league/table')
 
       const lockAt = pool.league_table_lock_at
+
+      // ONE SWITCH, TWO CONSEQUENCES — migration 110.
+      //
+      // The deadline passing both closes writes and opens every member's table
+      // to every other member. `isRevealed` is a separate NAME because the two
+      // consequences read differently at their call sites — a locked screen is
+      // about you, a revealed table is about everyone — but they are one fact
+      // and must stay derived from one expression.
+      //
+      // ⚠ Do not reintroduce a stamp. 104 tried it, to let an admin reopen a
+      // passed deadline for somebody who forgot. 109 removed the reopen and 110
+      // removed the stamp, which by then recorded only when we got round to
+      // writing it down — it lagged the deadline by 15 minutes in production,
+      // and the length of that lag depended on who next opened the app.
       const isLocked = lockAt ? new Date(lockAt) <= new Date() : false
+      const isRevealed = isLocked
 
       // The bands come from the COMPETITION (migration 089), not from 4 and 3 —
       // those are Premier League numbers, and a league that relegates one club
@@ -330,6 +345,10 @@ export default async function PoolPage({
         europaFrom: bands.europa_from ?? null,
         europaTo: bands.europa_to ?? null,
         isLocked,
+        // Whether RIVALS' tables may be opened. The same fact as `isLocked`
+        // since 110 — kept as its own field because the consumer asks a
+        // different question of it.
+        isRevealed,
         // Decision 11: joined after the deadline, so never had the chance.
         // Distinguished from "had the chance and skipped it" because the two
         // deserve different sentences.

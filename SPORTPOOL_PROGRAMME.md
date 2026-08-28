@@ -1939,7 +1939,7 @@ below is running only on Ryan's machine.**
 | **Pick'em** | ✅ built, ⛔ undeployed | ✅ **LIVE in production** | 055/057/059/063, 064–066 |
 | **Showdown** | ✅ built, ⛔ undeployed | ✅ built, ⛔ undeployed | 083–085, 095, 100 |
 | **Last Man Standing** | ✅ built, ⛔ undeployed — its own pick shape, no depth axis | | 086–088, 097 |
-| **Table** | ✅ built, ⛔ undeployed — no depth axis | | 077–082, 089–093, 098–099 |
+| **Table** | ✅ built, ✅ deadline rules LIVE | | 077–082, 089–093, ⛔098, 099, 104, 107 |
 
 Only the **Scores** cell of Pick'em is reachable by a member today, and only because it is what the
 24 Aug code already did. Table is a standalone MODE, not the add-on this section originally called
@@ -2199,20 +2199,74 @@ a handful of ticks a year rather than every 60 seconds.
 One prediction, one deadline, everybody at once. There is no fixture list to enforce it, so this is
 where admin authority actually lives.
 
-- **The admin owns the date**, set at creation and movable while it is still open (migrations 077 →
-  098). It is expressed relative to the **pool**, not the season: pools routinely begin after a
-  season has started, and a pool created in October is a legitimate *"predict the final table from
-  here"* game.
+✅ **SETTLED AND BUILT 2026-08-28 — migration 104, live in production.** Ryan's rule, in one line:
+
+> **A table deadline can be moved to any future instant while it is still open. Once it passes,
+> every table is revealed to the pool and the deadline is final.**
+
+⚠ **Narrowed the same day, 2026-08-28 — migration 109.** The rule above first read *"can always be
+moved to a future instant, including after it has passed"*, and 104 built the reveal-hold that made
+that safe. Karon then called it the other way: **"the predictions should all be revealed when the
+deadline has passed."** The two cannot both hold — if the reveal rides on the clock, then the moment
+the deadline passes everyone has seen everyone, and reopening would let a member rewrite theirs
+knowing the answers. So **the reopen is gone and the straggler has no second window.**
+
+- **The admin owns the date**, set at creation and movable to any **future** instant — *including
+  after it has already passed.* It is expressed relative to the **pool**, not the season: pools
+  routinely begin after a season has started, and a pool created in October is a legitimate
+  *"predict the final table from here"* game.
 - **Nobody is locked until everybody is locked.** There is no submit step — members edit until the
   close — so extending the close extends it equally for all. That, not concealment, is what makes an
   extension fair: Alice can revise with exactly the information Bob has.
-- **Everyone in, or nobody sees.** If someone has not filed when the deadline arrives, nothing
-  reveals and the admin chooses: **extend for everyone**, or **reveal without them**. Both are
-  legitimate, both are fair, and the lever has no shape that lets one member be given extra time.
+- ⛔ **"Everyone in, or nobody sees" is WITHDRAWN** (109). It was built in 104 and lived for one day.
+  The cost was real: a single member who never opened the app could hold a twenty-person pool in the
+  dark indefinitely, and the exits were an admin noticing or extending again and again. The
+  replacement needs no admin at all — *the deadline passes, every table is shown* — and survives the
+  disclosure gate without a subordinate clause, which the old rule could not.
+- ⛔ **"Reveal without them" is withdrawn with it.** The RPC is dropped, the route's `POST` is gone,
+  and the admin button that briefly existed is removed. There is no hold left to override.
 - **Once revealed, frozen — including for the admin.** Reopening hands one person everybody else's
   answers, which is the one thing an admin cannot consent to on other members' behalf.
-- **An extension must be announced.** It is only fair if the members who filed on time learn they can
-  revise. The outbox has `table_deadline`; a "deadline moved" kind is owed alongside it.
+- **An extension must be announced**, and is — `notifyTableDeadlineMoved`, sent by the route that
+  performs the move rather than queued, because it is caused by a person pressing a button and its
+  failure belongs to them. Goes to **everyone**, not only the stragglers, and says so.
+- **The admin is shown what the move will do before it happens** — a confirmation naming which move it
+  is (extend / shorten), who gets told, and what stays hidden. The `reopen` branch is retained in the
+  code but unreachable under 109.
+- ⭐ **NO CRON IS INVOLVED IN ANY OF THIS** (110). Every restriction in Table mode — writes closing,
+  tables opening, the deadline going final — is a comparison against `now()`, evaluated where it is
+  read. **A deadline can lock, but it cannot speak:** the only thing still needing a scheduler is the
+  pre-deadline *reminder*, which is an outbound message at a time nobody is looking. That is
+  `league-notices` + `league-outbox`, still unscheduled — and since 109 removed the admin's ability to
+  rescue a member who missed the deadline, it went from safety net to **the only thing** between
+  somebody and a scoreless season.
+
+#### ⚠ Migration 098 was written, never applied, and is superseded
+
+098 (2026-08-25) froze the deadline **on the clock**: no move once `now()` passed it. That forecloses
+the straggler case entirely, because letting the deadline pass *is how an admin finds out there is a
+straggler*. It sat unapplied for three days; production was still running 077's *"fixed at pool
+creation"*, so **the deadline could not be moved at all** and the whole Settings save failed on any
+attempt. **Do not apply 098.** 099 (applied since), 101, 102 and 103 were unapplied alongside it — see
+*Still owed*.
+
+#### ⚠ The reveal is no longer the deadline — they were one switch
+
+`enforce_league_table_before_lock` and the RLS read policy both keyed on `now() >= league_table_lock_at`,
+so the deadline passing **closed writes and opened everybody's table in the same instant**. Under the
+new rule that is unsafe: the deadline passes Friday, the admin notices the straggler on Saturday and
+extends — and everyone re-enters an editing window having already read each other's tables. 104 splits
+them. The clock keeps the **write lock**; a set-once `pools.league_table_revealed_at` owns the
+**reveal**, fired when the deadline passes *and every competing entry has filed*.
+
+- ⚠ **It also closed a hole that was never a table-mode decision:** 078's *"Pool admins can view all
+  table predictions"* policy carried **no gate at all**. `TableEntryModal` refused rival tables in the
+  *component*, so `GET /api/pools/[id]/table-prediction?entryId=<rival>` answered a playing admin in
+  full. In a pool of colleagues the admin is nearly always also a player. Now gated on the reveal;
+  `league_table_filing_status` gives the admin the count without the contents.
+- ⚠ **Nothing writes to the database when a clock passes**, so the reveal needs a sweeper.
+  `league_sweep_table_reveals` exists for it — but **no league cron is scheduled at all**, so the pool
+  page calls `league_reveal_table_if_ready` on read as the interim guarantee.
 
 #### ⚠ This narrows Decision 7
 
@@ -2232,11 +2286,51 @@ The rest of Decision 7 stands, including the override log.
   move with it.
 - ✅ **L11 — rescheduling.** Migration 105. Was the biggest gap this decision uncovered.
 - ✅ Re-homing, with the floor of five — migration 106.
-- 🔴 **Migrations 098–106 are all UNAPPLIED**, and 105/106 have never been executed by Postgres at
-  all: the session that wrote them had no database. Apply in order; every one that replaces a live
-  function carries a `pg_get_functiondef` pre-flight in its header, and `plpgsql` accepts a wrong
-  column name at CREATE time and fails at RUN time (the 081→082 lesson), so a clean apply is not a
-  clean run.
+- ⛔ **098 — do not apply. Superseded by 104**, which is the same decision made correctly. Applying it
+  after 104 would silently reinstate the clock-keyed freeze and re-break the straggler case.
+- ✅ **104 — APPLIED to production 2026-08-28** and verified behaviourally: an open deadline moves
+  forward, a past date is refused, a *passed* deadline reopens, the reveal is held at 5-of-6 filed,
+  `league_reveal_table_now` overrides it, and the deadline freezes afterwards. Production had been
+  running **077**, verified by hashing `prosrc`, not 098.
+- ✅ **099 — APPLIED 2026-08-28.** The pre-deadline reminder can now be produced at all; before this
+  `pools.table_deadline_reminder_sent_at` did not exist, so `/api/cron/league-notices` would have
+  failed at the RPC. ⚠ **Still unreachable in practice — no league cron is scheduled** (`cron.job` has
+  no `league-notices`, `league-outbox` or `league-standings` entry). The producer works; nothing calls
+  it. That is now the single highest-value thing left in this section.
+- ✅ **108 — APPLIED 2026-08-28.** `league_queue_matchweek_notices` had no `league_mode` predicate and
+  none of the three consumers added one, so scheduling `league-notices` would have given every Table
+  and Last Man Standing pool 38 weeks of *"you haven't picked yet"* — a reminder those modes can never
+  satisfy, because the consumer reads `league_predictions` and neither writes to it. Now an
+  **allowlist** (`pickem`, `showdown`), plus a send-time guard in `lib/league/notify.ts`. Verified
+  against the real season: 6 of 9 pools queued, the 2 Table and 1 LMS pools none. ⚠ **LMS is now
+  silent, not fixed** — it has a real weekly decision and owes its own notice kind reading
+  `league_lms_picks`.
+- ✅ **109 — APPLIED 2026-08-28.** The reveal fires on the deadline alone; 104's hold and its
+  "reveal without them" override are both withdrawn. Also makes the deadline final on the clock.
+- ✅ **110 — APPLIED 2026-08-28. The deadline is the ONLY switch.** Karon: *"maybe we don't need
+  crons. We just use the deadline date as the restrictor."* Correct, and further than proposed: once
+  109 removed the hold, `league_table_revealed_at` carried nothing `league_table_lock_at` did not.
+  In production it lagged the deadline by **15 minutes** on both live pools — that lag was only when
+  a page load happened to fire. So the column, its index, `league_reveal_table_if_ready` and
+  `league_sweep_table_reveals` are all dropped, the read policies go back to migration 078's
+  `now() >= lock_at`, and there is no lazy write and no cron. **The admin read gate 104 added is
+  KEPT** — 078 had none, so a playing admin could read every rival's table through the API. Verified
+  live: closed pool refuses writes silently and shows rivals; open pool accepts writes and hides them;
+  an open deadline moves, a passed one does not.
+- ✅ **107 — APPLIED 2026-08-28.** 099 and 104 are each correct and together strand the straggler:
+  099 fires the reminder once per pool, 104 lets a passed deadline reopen, so **the one member an
+  extension exists for is the one the reminder skips**. 107 clears the stamp whenever the deadline
+  moves, in the trigger rather than the route because mobile and scripts also write. Verified: queue →
+  re-run queues 0 → move the deadline → stamp cleared → new window queues 1 → passed deadline queues 0.
+- 🔴 **Migrations 101, 102, 103, 105 and 106 are still UNAPPLIED**, and 105/106 have never been
+  executed by Postgres at all: the session that wrote them had no database. Apply in order; every one
+  that replaces a live function carries a `pg_get_functiondef` pre-flight in its header, and `plpgsql`
+  accepts a wrong column name at CREATE time and fails at RUN time (the 081→082 lesson), so a clean
+  apply is not a clean run.
+- 🔴 **"Reveal without them" has no button.** `league_reveal_table_now` and
+  `POST /api/pools/[id]/table-deadline` are both live; the admin has no way to press it, so a pool
+  whose straggler never files stays unrevealed until the admin keeps extending. Scoring is unaffected
+  — the reveal gates visibility only.
 - 🔴 **Re-homing has no end-to-end verification.** The policy is replayed over three real seasons in
   `lib/league/__tests__/rehome.test.ts`, but nothing has moved a fixture in a live season and watched
   the deadline, the duel and the LMS round follow it. `scripts/verify-*` is the shape that is owed.

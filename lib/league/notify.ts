@@ -43,6 +43,7 @@ import {
   roundDeadlineReminderTemplate,
   leagueMatchweekResultTemplate,
   leagueTableDeadlineTemplate,
+  leagueTableDeadlineMovedTemplate,
 } from '@/lib/email/templates'
 import { sendPushToUsers } from '@/lib/push/apns'
 import type { PushCategory } from '@/lib/push/categories'
@@ -67,7 +68,7 @@ type MemberRow = {
 /** Everything all three notices need, fetched once. */
 async function context(admin: SupabaseClient, poolId: string, matchweekId: string) {
   const [{ data: pool }, { data: mw }] = await Promise.all([
-    admin.from('pools').select('pool_name, archived_at').eq('pool_id', poolId).single(),
+    admin.from('pools').select('pool_name, archived_at, league_mode').eq('pool_id', poolId).single(),
     admin
       .from('league_matchweeks')
       .select('matchweek_number, label, lock_at, fixture_count')
@@ -88,6 +89,27 @@ async function context(admin: SupabaseClient, poolId: string, matchweekId: strin
   return {
     poolName: (pool as { pool_name: string }).pool_name,
     archived: (pool as { archived_at: string | null }).archived_at !== null,
+    /**
+     * Does this pool's mode actually have weekly fixture picks?
+     *
+     * ⚠ ALL THREE MATCHWEEK NOTICES ARE MEANINGLESS WITHOUT IT. They were
+     * written against migration 073, before Decision 9's four modes existed,
+     * and they decide who to chase by reading `league_predictions` — where a
+     * Table entry and a Last Man Standing entry both have ZERO rows by design.
+     * So every member of those pools reads as "hasn't picked", every week, and
+     * nothing they do can clear it.
+     *
+     * Migration 108 stops such a row being QUEUED. This is the send-time
+     * re-check, and it is not redundant: a row queued before 108 can still be
+     * sitting in the outbox, and these consumers are reachable by hand from the
+     * super-admin surface. Same posture `notifyTableDeadline` already takes.
+     *
+     * An ALLOWLIST, matching 108 exactly — a mode added later inherits nothing
+     * until somebody decides it should.
+     */
+    hasFixturePicks: ['pickem', 'showdown'].includes(
+      (pool as { league_mode: string | null }).league_mode ?? '',
+    ),
     matchweekName: (mw as { label: string | null; matchweek_number: number }).label
       || `Matchweek ${(mw as { matchweek_number: number }).matchweek_number}`,
     matchweekNumber: (mw as { matchweek_number: number }).matchweek_number,
@@ -133,6 +155,9 @@ export async function notifyMatchweekOpened(
   const ctx = await context(admin, poolId, matchweekId)
   if (!ctx) return { emails: 0, pushes: 0, skipped: 'pool or matchweek not found' }
   if (ctx.archived) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
+  if (!ctx.hasFixturePicks) {
+    return { emails: 0, pushes: 0, skipped: 'mode has no weekly fixture picks' }
+  }
 
   const emails = ctx.members.map((m) => {
     const { subject, html } = roundOpenTemplate({
@@ -178,6 +203,9 @@ export async function notifyLockReminder(
   const ctx = await context(admin, poolId, matchweekId)
   if (!ctx) return { emails: 0, pushes: 0, skipped: 'pool or matchweek not found' }
   if (ctx.archived) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
+  if (!ctx.hasFixturePicks) {
+    return { emails: 0, pushes: 0, skipped: 'mode has no weekly fixture picks' }
+  }
 
   const { data: fixtures } = await admin
     .from('league_fixtures').select('fixture_id').eq('matchweek_id', matchweekId)
@@ -252,6 +280,9 @@ export async function notifyMatchweekCompleted(
   const ctx = await context(admin, poolId, matchweekId)
   if (!ctx) return { emails: 0, pushes: 0, skipped: 'pool or matchweek not found' }
   if (ctx.archived) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
+  if (!ctx.hasFixturePicks) {
+    return { emails: 0, pushes: 0, skipped: 'mode has no weekly fixture picks' }
+  }
 
   const entryIds = ctx.members.flatMap((m) => (m.pool_entries ?? []).map((e) => e.entry_id))
   if (entryIds.length === 0) return { emails: 0, pushes: 0, skipped: 'no active entries' }
@@ -420,6 +451,94 @@ export async function notifyTableDeadline(
     {
       title: `Your table closes soon`,
       body: `You haven't ordered the clubs yet in ${p.pool_name}.`,
+      data: { poolId, tab: 'predictions' },
+    },
+    'PREDICTIONS',
+  )
+}
+
+/**
+ * "The table deadline moved, and everyone's table is open again."
+ *
+ * ⚠ THE ONLY THING THAT MAKES AN EXTENSION FAIR. A table pool contains one
+ * decision, so moving its deadline is not an administrative tidy-up — it hands
+ * back the whole game. If it happened quietly, the members who filed on time
+ * would be the only ones who never learned they could revise, which inverts the
+ * thing entirely: being organised would cost you.
+ *
+ * So this goes to EVERY member, not only the stragglers, and the copy says as
+ * much. It is also why it is sent from the server route that performs the move
+ * rather than from the browser: the previous deadline-changed call was a
+ * fire-and-forget `fetch(...).catch(() => {})` in SettingsTab, so closing the
+ * tab moved a deadline nobody was told about.
+ *
+ * Not an outbox kind. The outbox exists for things a cron discovers; this is
+ * caused by a person pressing a button and belongs in the same request, where
+ * its failure can be reported to the person who caused it.
+ */
+export async function notifyTableDeadlineMoved(
+  admin: SupabaseClient,
+  poolId: string,
+  opts: { newDeadline: string; wasReopened: boolean },
+): Promise<NoticeResult> {
+  const { data: pool } = await admin
+    .from('pools')
+    .select('pool_name, archived_at, league_mode')
+    .eq('pool_id', poolId)
+    .single()
+  if (!pool) return { emails: 0, pushes: 0, skipped: 'pool not found' }
+
+  const p = pool as { pool_name: string; archived_at: string | null; league_mode: string | null }
+  if (p.archived_at !== null) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
+  if (p.league_mode !== 'table') return { emails: 0, pushes: 0, skipped: 'not a table pool' }
+
+  // Same retired/detached exclusion as every other league notice — migrations
+  // 056/057. Somebody who stopped participating is not owed the news.
+  const { data: members } = await admin
+    .from('pool_members')
+    .select('user_id, users!inner(email, username, full_name), pool_entries(entry_id, entry_name)')
+    .eq('pool_id', poolId)
+    .is('pool_entries.retired_at', null)
+
+  const roster = ((members ?? []) as unknown as MemberRow[]).filter((m) => m.users?.email)
+  if (roster.length === 0) return { emails: 0, pushes: 0, skipped: 'no members to tell' }
+
+  const entryIds = roster.flatMap((m) => (m.pool_entries ?? []).map((e) => e.entry_id))
+  const { data: filed } = entryIds.length
+    ? await admin.from('league_table_predictions').select('entry_id').in('entry_id', entryIds)
+    : { data: [] as Array<{ entry_id: string }> }
+  const hasTable = new Set(((filed ?? []) as Array<{ entry_id: string }>).map((r) => r.entry_id))
+
+  const poolUrl = `${appUrl()}/pools/${poolId}`
+  const emails = roster.map((m) => {
+    // "Has an entry with no table" — the copy changes, the recipient list does
+    // not. Everybody is told; only the sentence about what to do differs.
+    const hasUnfiledEntry = (m.pool_entries ?? []).some((e) => !hasTable.has(e.entry_id))
+    const { subject, html } = leagueTableDeadlineMovedTemplate({
+      userName: displayName(m),
+      poolName: p.pool_name,
+      deadline: opts.newDeadline,
+      hasUnfiledEntry,
+      wasReopened: opts.wasReopened,
+      poolUrl,
+    })
+    return {
+      to: m.users!.email as string,
+      subject,
+      html,
+      topicId: TOPICS.PREDICTIONS,
+      tags: [{ name: 'category', value: 'league_table_deadline_moved' }],
+    }
+  })
+
+  return deliver(
+    emails,
+    roster.map((m) => m.user_id),
+    {
+      title: opts.wasReopened ? 'Your table is open again' : 'Table deadline moved',
+      body: opts.wasReopened
+        ? `${p.pool_name}: everyone can change their table until the new deadline.`
+        : `${p.pool_name}: the table prediction now closes at a new time.`,
       data: { poolId, tab: 'predictions' },
     },
     'PREDICTIONS',

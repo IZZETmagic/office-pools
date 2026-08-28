@@ -12,14 +12,23 @@
 //
 // ## Who may see what, decided twice
 //
-// RLS on `league_table_predictions` (migration 078) is the real gate: your own
-// always, everybody else's only once `league_table_lock_at` has passed.
+// RLS on `league_table_predictions` is the real gate: your own always,
+// everybody else's once `pools.league_table_lock_at` has passed — migration 110.
 //
-// ⚠ This component ALSO refuses before the lock, and that is not redundant.
-// Migration 078's admin policy — "Pool admins can view all table predictions" —
-// carries no lock check, so an admin who is also playing would otherwise open
-// this and read every rival's table while the window was still open. RLS is
-// protecting the data; this is protecting the competition.
+// ⚠ `isRevealed` is a separate PROP but not a separate FACT. 104 split the
+// reveal onto its own stamp so an admin could reopen a passed deadline for
+// somebody who forgot; 109 removed the reopen, 110 removed the stamp, and the
+// deadline is once again the only switch. The prop keeps its name because the
+// question this component asks — "may I open somebody else's table" — is not
+// the question the editing screen asks. Do not reintroduce a stamp to answer it.
+//
+// ⚠ This component ALSO refuses before the reveal, and that is not redundant —
+// but it is no longer load-bearing. Until 104, migration 078's admin policy
+// ("Pool admins can view all table predictions") carried no gate at all, so an
+// admin who was also playing could read every rival's table while the window
+// was open — and this component was the only thing stopping them, which meant
+// the API answered them in full. 104 gates the admin policy too. The check
+// below now agrees with RLS rather than substituting for it.
 
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
@@ -34,8 +43,8 @@ type Props = {
   /** Shown in the title, and as the first column heading on a rival's table. */
   displayName: string
   isOwnEntry: boolean
-  /** Has the pool's table deadline passed? */
-  isLocked: boolean
+  /** Have this pool's tables been revealed to everyone? Not "deadline passed". */
+  isRevealed: boolean
   bandOf: (position: number) => string | null
   bandStripe: Record<string, string>
   /** Both needed to show how the total is made up — see bandBonuses. */
@@ -45,14 +54,13 @@ type Props = {
 }
 
 export function TableEntryModal({
-  poolId, entryId, displayName, isOwnEntry, isLocked, bandOf, bandStripe, topN, prices, onClose,
+  poolId, entryId, displayName, isOwnEntry, isRevealed, bandOf, bandStripe, topN, prices, onClose,
 }: Props) {
   const [rows, setRows] = useState<TableBreakdownRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Nothing is fetched for a rival before the lock — see the header. The
-  // request would very likely succeed for an admin, which is the point.
-  const mayView = isOwnEntry || isLocked
+  // Nothing is fetched for a rival before the reveal — see the header.
+  const mayView = isOwnEntry || isRevealed
 
   useEffect(() => {
     if (!mayView) return
@@ -88,12 +96,17 @@ export function TableEntryModal({
         {!mayView ? (
           <div className="text-center py-8">
             <Icon name="lock.fill" size={32} className="mx-auto text-neutral-300 mb-3" />
+            {/* ⚠ This copy has been through both rules. 104 held the reveal
+                until everyone had filed; 109 withdrew that, so the deadline is
+                once again the whole story — and the copy is back to saying so.
+                Keep it matching `league_reveal_table_if_ready`, not the other
+                way round. */}
             <p className="text-sm font-medium text-neutral-700">
               Hidden until the deadline
             </p>
             <p className="text-xs text-neutral-500 mt-1.5 max-w-xs mx-auto">
-              Everyone&apos;s table opens up the moment picking closes. Until then the
-              only one you can see is your own — including if you run the pool.
+              Every table opens at once, the moment picking closes. Until then the only
+              one you can see is your own, including if you run the pool.
             </p>
           </div>
         ) : error ? (

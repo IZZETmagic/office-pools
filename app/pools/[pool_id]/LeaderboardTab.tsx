@@ -56,7 +56,8 @@ type LeaderboardTabProps = {
    * band and to decide whether a rival's table may be opened yet.
    */
   tableView?: {
-    isLocked: boolean
+    /** Whether rivals' tables may be opened — the REVEAL, not the deadline. */
+    isRevealed: boolean
     clubCount: number
     topN: number
     relegationN: number
@@ -1930,7 +1931,7 @@ export function LeaderboardTab({
           entryId={selectedEntry.entry_id}
           displayName={selectedEntry.entry_name || selectedEntry.users?.username || 'This member'}
           isOwnEntry={selectedEntry.users?.user_id === currentUserId}
-          isLocked={tableView.isLocked}
+          isRevealed={tableView.isRevealed}
           bandOf={(position) =>
             bandOf(position, tableView.clubCount, tableView.topN, tableView.relegationN,
               tableView.europaFrom, tableView.europaTo)}
