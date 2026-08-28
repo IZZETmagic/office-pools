@@ -2377,12 +2377,31 @@ The rest of Decision 7 stands, including the override log.
 
   ⚠ This is not a bug in 105 or 106 — both do exactly what they claim. It is a missing input.
 
-  **The World Cup already solved this exact problem**, and its solution is the shape of the fix:
+  **The World Cup already solved this exact problem**, and its solution was the shape of the fix:
   `app/api/cron/reconcile-schedule` is a *daily* reconcile of stored kickoff times against
   api-football, whose own docstring says *"the per-minute live sync only writes scores/status and
-  never `match_date`"*. It reads `matches` and has **zero** references to any `league_*` table. The
-  league needs the same thing: one `getFixturesAllPages` per season per day, reconciling dates —
-  cheap, and it is what turns re-homing on.
+  never `match_date`"*. It reads `matches` and has **zero** references to any `league_*` table.
+- ✅ **FIXED the same day — `/api/cron/league-reconcile`** (`lib/integrations/apiFootball/
+  reconcileLeagueSchedule.ts`). One `getFixturesAllPages` per season per day, comparing every future
+  kickoff against the feed and re-homing whatever a move displaced.
+
+  The division of labour is the whole design, and the two arms cannot contend: the **live sync owns
+  the ~3 hours around a kickoff** (scores, status, the live triple, a reschedule discovered late);
+  this owns **everything beyond it**, where a move can still be acted on. A fixture is never in
+  scope for both. It reuses `fixtureToLeagueUpdate` and `league_apply_fixture_sync` rather than
+  writing the table, so the guards — completed refused, `manual_override` untouchable, the first
+  `original_kickoff_at` kept by COALESCE — are the same ones already under test. ⚠ Do **not** copy
+  the World Cup reconciler's direct-UPDATE shape here; it predates the RPC.
+
+  Verified against production 2026-08-28: `checked=369 calls=1 moved=0/0`. It compared every future
+  fixture in the season — all 369 the live sync would never look at — for **one** api-football call,
+  and the `--apply` run left the fixture-state hash byte-identical. Nothing in Premier League
+  2026/27 has been rescheduled yet, which is the expected answer in week two; the measured rate is
+  ~18% of rounds over a season.
+
+  Runnable by hand: `npx tsx scripts/run-league-reconcile.ts` (dry by default, `--apply` to write).
+  ⚠ **Not scheduled** — like the other league crons it must be deployed before pg_cron can point at
+  it. Suggested `20 3 * * *`.
 - A postponed fixture completing weeks after its matchweek settled has **never been exercised**.
   Believed correct under 094; worth a test before the season rather than a discovery in November.
 - "Since you joined" leaderboard view — candidate, not committed.
