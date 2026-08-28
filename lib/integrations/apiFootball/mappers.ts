@@ -280,6 +280,8 @@ export type LeagueFixtureRow = {
   matchweek_id: string
   external_fixture_id: string
   kickoff_at: string
+  /** NULL until the fixture has moved at least once. See LeagueFixturePayload. */
+  original_kickoff_at?: string | null
   status: string
   status_detail: string | null
   home_goals: number | null
@@ -316,6 +318,16 @@ export type LeagueFixturePayload = {
   live_minute?: number | null
   live_period?: string | null
   live_added?: number | null
+  /**
+   * L11 — rescheduling. Set when the provider's kickoff instant differs from
+   * ours. `original_kickoff_at` carries the value we are moving AWAY from, and
+   * only on the first move: it means "this fixture has moved", and overwriting
+   * it on a second move would lose the date members originally planned around.
+   */
+  set_kickoff?: boolean
+  kickoff_at?: string
+  set_original_kickoff?: boolean
+  original_kickoff_at?: string
 }
 
 /** Conditions the arm reports but deliberately does not act on. */
@@ -425,7 +437,38 @@ export function fixtureToLeagueUpdate(
     // offset is a formatting choice rather than an instant, and a string compare
     // would report a move on every fixture on every tick. TBD carries a
     // placeholder date and is never a move.
+    //
+    // ⚠ This flag was DETECT-ONLY for three migrations — L3's contract said
+    // "never writes kickoff_at (L11 owns rescheduling)" and L11 did not exist.
+    // So a fixture moved from February to May stayed at its February date
+    // forever: the matchweek window, the deadline and the league table's "Next"
+    // column all wrong, silently, from the first rearrangement of a season.
     rescheduled: short !== 'TBD' && Date.parse(f.fixture.date) !== Date.parse(cur.kickoff_at),
+  }
+
+  // L11 — act on it. Writing the kickoff is enough on its own: the matchweek
+  // window trigger fires on `UPDATE OF kickoff_at`, so first_kickoff_at and the
+  // deadline follow without anything else being told.
+  //
+  // ⚠ A COMPLETED FIXTURE'S KICKOFF IS HISTORY. The provider occasionally
+  // restates the date of a played match; moving it would rewrite when a result
+  // happened, and `lock_at` freezes on the way past so it could not undo the
+  // deadline anyway — it would only make the record disagree with itself.
+  if (flags.rescheduled && !cur.is_completed) {
+    out.set_kickoff = true
+    out.kickoff_at = f.fixture.date
+    moved = true
+
+    // Stamped ONCE, with the value we are moving away from. It means "this
+    // fixture has moved" — lib/matchStatus.ts badges a not-started fixture
+    // Delayed on the strength of it — so a second move must not overwrite the
+    // date members originally planned around. Migration 053 had to null 380 rows
+    // a previous import created by seeding it equal to kickoff_at; this is the
+    // only writer, and it only ever writes when the column is empty.
+    if (!cur.original_kickoff_at) {
+      out.set_original_kickoff = true
+      out.original_kickoff_at = cur.kickoff_at
+    }
   }
 
   return { payload: moved ? out : null, flags }

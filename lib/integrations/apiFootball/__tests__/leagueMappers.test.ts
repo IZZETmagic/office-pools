@@ -278,3 +278,88 @@ describe('getFixturesAllPages', () => {
     ).rejects.toThrow(/paging cap/)
   })
 })
+
+// =============================================================
+// L11 — a moved kickoff is now WRITTEN, not just counted
+// =============================================================
+// The mapper has flagged `rescheduled` since 053 and had nowhere to put it: the
+// RPC's own comment said it never writes kickoff_at, so every postponement in
+// three seasons was detected, counted, and dropped. Migration 104 opened the
+// write; this is the half that decides what to send.
+//
+// It matters more than a display date. `lock_at` derives from the first kickoff
+// in a matchweek (101), so a fixture that moves and is never written leaves the
+// deadline sitting on a match that is no longer being played.
+
+describe('fixtureToLeagueUpdate — L11 rescheduling', () => {
+  const WAS = '2026-08-21T19:00:00+00:00'
+  const NOW = '2026-12-03T20:00:00+00:00'
+
+  it('sends the new kickoff when the feed moves one', () => {
+    const { payload, flags } = fixtureToLeagueUpdate(
+      fx({ short: 'PST', date: NOW }),
+      row({ kickoff_at: WAS }),
+    )
+    expect(flags.rescheduled).toBe(true)
+    expect(payload?.set_kickoff).toBe(true)
+    expect(payload?.kickoff_at).toBe(NOW)
+  })
+
+  it('keeps the ORIGINAL kickoff the first time, so "moved from" survives', () => {
+    const { payload } = fixtureToLeagueUpdate(
+      fx({ short: 'PST', date: NOW }),
+      row({ kickoff_at: WAS, original_kickoff_at: null }),
+    )
+    expect(payload?.set_original_kickoff).toBe(true)
+    expect(payload?.original_kickoff_at).toBe(WAS)
+  })
+
+  it('⚠ and never re-stamps it on a SECOND move', () => {
+    // A fixture moved twice was originally scheduled once. Re-stamping would
+    // overwrite August with December and lose the only record of it — and this
+    // is not hypothetical: the sync's PROJECTION did not select the column, so
+    // `cur.original_kickoff_at` was undefined and every move looked like a
+    // first. 104 also COALESCEs it in SQL, because the projection is a deploy
+    // and the database is a property.
+    const { payload } = fixtureToLeagueUpdate(
+      fx({ short: 'PST', date: '2027-01-14T20:00:00+00:00' }),
+      row({ kickoff_at: NOW, original_kickoff_at: WAS }),
+    )
+    expect(payload?.set_kickoff).toBe(true)
+    expect(payload?.set_original_kickoff).toBeUndefined()
+    expect(payload).not.toHaveProperty('original_kickoff_at')
+  })
+
+  it('⚠ refuses to move a COMPLETED fixture', () => {
+    // Re-homing a played match into another matchweek would restate what was
+    // already scored. Detection still fires — we want to see it in the log —
+    // but nothing is written.
+    const { payload, flags } = fixtureToLeagueUpdate(
+      fx({ short: 'FT', date: NOW, home: 2, away: 1 }),
+      row({ kickoff_at: WAS, is_completed: true }),
+    )
+    expect(flags.rescheduled).toBe(true)
+    expect(payload?.set_kickoff).toBeUndefined()
+    expect(payload?.set_original_kickoff).toBeUndefined()
+  })
+
+  it('proposes no kickoff at all when the time has not moved', () => {
+    const { payload, flags } = fixtureToLeagueUpdate(
+      fx({ short: 'FT', date: WAS, home: 1, away: 0 }),
+      row({ kickoff_at: WAS }),
+    )
+    expect(flags.rescheduled).toBe(false)
+    expect(payload?.set_kickoff).toBeUndefined()
+  })
+
+  it('a TBD fixture is not a reschedule, whatever date rides with it', () => {
+    // api-football ships a placeholder date with TBD. Treating that as a move
+    // would drag the matchweek deadline onto a fiction.
+    const { payload, flags } = fixtureToLeagueUpdate(
+      fx({ short: 'TBD', date: NOW }),
+      row({ kickoff_at: WAS }),
+    )
+    expect(flags.rescheduled).toBe(false)
+    expect(payload?.set_kickoff).toBeUndefined()
+  })
+})

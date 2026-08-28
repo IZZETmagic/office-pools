@@ -65,7 +65,9 @@ const FEED_ERROR_REPORT_INTERVAL_MS = 15 * 60 * 1000
 
 const PROJECTION =
   'fixture_id, matchweek_id, external_fixture_id, kickoff_at, status, status_detail, ' +
-  'home_goals, away_goals, is_completed, live_minute, live_period, live_added, manual_override'
+  'home_goals, away_goals, is_completed, live_minute, live_period, live_added, manual_override, ' +
+  // L11 — the mapper needs it to tell a FIRST move from a later one.
+  'original_kickoff_at'
 
 export type LeagueSyncResult = {
   seasonId: string
@@ -102,6 +104,13 @@ export type LeagueSyncResult = {
   roundMismatch: number
   roundUnknown: number
   rescheduleDetected: number
+  /**
+   * How many of those the DATABASE actually moved — read back from the RPC, not
+   * counted from what we sent. The two differ whenever a guard fires: a
+   * completed fixture and a manual_override row are both refused in SQL, and
+   * counting the ask would report a move that never happened.
+   */
+  rescheduleApplied: number
   awarded: number
   finalWithoutGoals: number
   fetchedFeed: boolean
@@ -152,6 +161,7 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     roundMismatch: 0,
     roundUnknown: 0,
     rescheduleDetected: 0,
+    rescheduleApplied: 0,
     awarded: 0,
     finalWithoutGoals: 0,
     fetchedFeed: false,
@@ -354,6 +364,8 @@ export async function syncLeagueFixtures(
 
   // ------------------------------------------------------- 6. per-row diff
   const payload: LeagueFixturePayload[] = []
+  /** externalId -> the kickoff we ASKED for, so 7a can check the database agreed. */
+  const moveAsked = new Map<string, string>()
   const seenIds: string[] = []
   let firstUnknownRound: string | null = null
 
@@ -384,6 +396,7 @@ export async function syncLeagueFixtures(
     if (flags.finalWithoutGoals) result.finalWithoutGoals++
     if (flags.awarded) result.awarded++
     if (flags.rescheduled) result.rescheduleDetected++
+    if (p?.set_kickoff && p.kickoff_at) moveAsked.set(p.external_fixture_id, p.kickoff_at)
     if (p) payload.push(p)
   }
   result.proposed = payload.length
@@ -424,10 +437,23 @@ export async function syncLeagueFixtures(
       home_goals: number | null
       away_goals: number | null
       is_completed: boolean
+      kickoff_at: string | null
     }>
   }
   result.seen = res.seen ?? 0
   result.written = res.changed?.length ?? 0
+
+  // ------------------------------------------------- 7a. reschedules confirmed
+  // A move is only real once the row comes back carrying it. Both SQL guards —
+  // completed, and manual_override — drop the write without erroring, which is
+  // correct behaviour and silent by design; this is the line that keeps it from
+  // also being invisible.
+  for (const c of res.changed ?? []) {
+    const asked = moveAsked.get(c.external_fixture_id)
+    if (asked && c.kickoff_at && Date.parse(c.kickoff_at) === Date.parse(asked)) {
+      result.rescheduleApplied++
+    }
+  }
 
   // ------------------------------------------------------------- 7b. score
   // A fixture whose score MOVED is scored immediately, in the same tick that
@@ -582,7 +608,9 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
   const whenNonZero = [
     r.roundMismatch > 0 ? `round_mismatch=${r.roundMismatch}` : null,
     r.roundUnknown > 0 ? `round_unknown=${r.roundUnknown}` : null,
-    r.rescheduleDetected > 0 ? `resched=${r.rescheduleDetected}` : null,
+    r.rescheduleDetected > 0
+      ? `resched=${r.rescheduleDetected}/${r.rescheduleApplied}`
+      : null,
     r.awarded > 0 ? `awarded=${r.awarded}` : null,
     r.finalWithoutGoals > 0 ? `ft_no_goals=${r.finalWithoutGoals}` : null,
     r.scoredEntries > 0 ? `pts_entries=${r.scoredEntries}` : null,
