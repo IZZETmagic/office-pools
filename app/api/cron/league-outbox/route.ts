@@ -51,6 +51,24 @@ export const maxDuration = 60
 // handled, as of phase 6 — see the switch below. Each one sends an email and a
 // push through lib/league/notify.ts, which honours per-category push
 // preferences and Resend topics.
+//
+// ============================================================
+// CADENCE
+// ============================================================
+// Every minute, matching the fixtures sync that produces most of its work.
+// This is the route that DRAINS the outbox — until it runs, nothing is ever
+// sent and nothing is ever invalidated, however many events the producers
+// queue. Claims are capped per run and `league_claim_score_events` takes
+// FOR UPDATE SKIP LOCKED, so an overlapping run costs nothing.
+//
+// ⚠ NOT SCHEDULED YET, and it cannot be: this route is not on `master`, so a
+// job would POST to a 404 every minute. Schedule it once production has it:
+//
+//   select cron.schedule('league-outbox', '* * * * *', $$
+//     select net.http_post(
+//       url := 'https://sportpool.io/api/cron/league-outbox',
+//       headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.cron_secret'))
+//     )$$);
 // =============================================================
 
 const CAP = 200 // events per run; the rest spill to the next minute

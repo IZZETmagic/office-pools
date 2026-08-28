@@ -42,8 +42,9 @@ export const maxDuration = 60
 // it. Running every minute would buy nothing and give a bad `lock_at` an hour's
 // less warning before it started emailing people.
 //
-// ⚠ NOT SCHEDULED YET. This route has to be deployed before a pg_cron job can
-// point at it, or the job 404s every hour. Suggested, once deployed:
+// ⚠ NOT SCHEDULED YET, and it cannot be until production has this route.
+// Confirmed 2026-08-28: it is not on `master`, so a job would POST to a 404
+// every hour. Schedule it once master ships:
 //
 //   select cron.schedule('league-notices', '0 * * * *', $$
 //     select net.http_post(

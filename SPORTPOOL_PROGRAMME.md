@@ -2028,11 +2028,19 @@ Everything below follows from that one sentence.
 
 #### Matchweek modes — Pick'em (both depths), Showdown, Last Man Standing
 
-- **A matchweek locks 1 hour before its own first kickoff**, recomputed live from the fixture list
-  and frozen the moment it passes. `refresh_league_matchweek_window` (migration 050) already tracks
-  and freezes it; **only the 1-hour offset is new**. Picks reveal at the lock, so the group sees each
-  other's calls an hour before kickoff — nobody can change anything by then, and it buys an hour of
-  banter.
+- **A matchweek locks 1 hour before its own first kickoff**, recomputed from the fixture list and
+  frozen the moment it passes. ✅ Shipped in migration 101, with a backfill.
+- ⚠ **CORRECTION, 2026-08-28.** This decision originally said `lock_at` "already tracks the live
+  fixture list", and that is false in practice. The *mechanism* is there —
+  `refresh_league_matchweek_window` recomputes from the fixtures and its trigger fires on
+  `UPDATE OF kickoff_at` — but **nothing ever updates `kickoff_at`.** `fixtureToLeagueUpdate`
+  (`lib/integrations/apiFootball/mappers.ts:371`) compares status, status detail, goals and
+  completion and **never reads `f.fixture.date`**, and `league_apply_fixture_sync`'s own contract
+  says it *"never writes: kickoff_at, original_kickoff_at (**L11 owns rescheduling**)"*. L11 is
+  unbuilt. So today a fixture moved from February to May is **invisible to us**: our kickoff, the
+  matchweek window, the deadline and the "Next" column all keep the February date forever.
+- Picks reveal at the lock, so the group sees each other's calls an hour before kickoff — nobody can
+  change anything by then, and it buys an hour of banter.
 - **The next matchweek opens 72 hours after the current one locks** — matching the measured
   56-hour median playing window — **and never later than 48 hours before its own deadline.**
 - **No admin lever to move a matchweek deadline later.** Kickoff is not ours to move and no admin
@@ -2060,6 +2068,12 @@ the rest. The round label is permanent, so tracking this is ours to do.
 
 > A fixture whose date moves is re-homed to the matchweek whose window **most recently precedes** its
 > new date — and only while its current matchweek is still unlocked.
+
+⚠ **Blocked on L11, and cannot be built before it.** Re-homing reacts to a fixture's date changing,
+and nothing currently detects that a date HAS changed — see the correction above. L11 (read
+`fixture.date`, write `kickoff_at`, stamp `original_kickoff_at` the first time it moves) is the
+prerequisite, and it is the more urgent of the two on its own merits: without it every deadline in a
+real season silently drifts from reality the first time a game is rearranged.
 
 - **The preceding weekend, never the following one.** Attaching a midweek makeup game to the weekend
   *before* makes it a late straggler: the lock is untouched, and it is predicted on the Friday and
@@ -2110,10 +2124,13 @@ The rest of Decision 7 stands, including the override log.
 
 #### Still owed
 
-- The 1-hour offset in `refresh_league_matchweek_window`, and re-homing itself — neither is built.
-- ⚠ **`league_open_matchweek` sorts by `matchweek_number`.** Three seasons contain round pairs whose
-  games run **out of numerical order** (minimum gap −121 days), so it can open a matchweek whose
-  games are months away while a later-numbered one is being played. It must sort by lock time.
+- ✅ The 1-hour offset — migration 101.
+- ✅ `league_open_matchweek` sorting by lock time rather than `matchweek_number` — migration 101,
+  and `openMatchweekId` in `lib/league/read.ts`, which is the same rule in TypeScript and had to
+  move with it.
+- 🔴 **L11 — rescheduling. The biggest gap this decision uncovered, and a prerequisite for
+  re-homing.** Nothing reads `fixture.date`, so a moved game never moves for us.
+- ⏳ Re-homing itself, once L11 exists.
 - A postponed fixture completing weeks after its matchweek settled has **never been exercised**.
   Believed correct under 094; worth a test before the season rather than a discovery in November.
 - "Since you joined" leaderboard view — candidate, not committed.
