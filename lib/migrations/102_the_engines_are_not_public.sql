@@ -58,7 +58,12 @@ DECLARE
     'public.league_lms_open_round(uuid, integer)',
     'public.league_lms_settle(uuid, integer)',
     'public.league_finalize_ranks(uuid)',
-    'public.league_claim_score_events(integer, interval)'
+    'public.league_claim_score_events(integer, interval)',
+    -- Added after 106 shipped a tenth engine of the same kind. It is
+    -- SECURITY INVOKER, so RLS already bounds what a signed-in caller could do
+    -- with it — but "the engines are not public" should not have an exception
+    -- whose safety rests on a second mechanism.
+    'public.league_apply_rehome(uuid, jsonb, timestamptz)'
   ];
 BEGIN
   FOREACH fn IN ARRAY engines LOOP

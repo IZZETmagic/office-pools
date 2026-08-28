@@ -2322,18 +2322,40 @@ The rest of Decision 7 stands, including the override log.
   extension exists for is the one the reminder skips**. 107 clears the stamp whenever the deadline
   moves, in the trigger rather than the route because mobile and scripts also write. Verified: queue →
   re-run queues 0 → move the deadline → stamp cleared → new window queues 1 → passed deadline queues 0.
-- 🔴 **Migrations 101, 102, 103, 105 and 106 are still UNAPPLIED**, and 105/106 have never been
-  executed by Postgres at all: the session that wrote them had no database. Apply in order; every one
-  that replaces a live function carries a `pg_get_functiondef` pre-flight in its header, and `plpgsql`
-  accepts a wrong column name at CREATE time and fails at RUN time (the 081→082 lesson), so a clean
-  apply is not a clean run.
+- ✅ **105 and 106 APPLIED 2026-08-28, and verified rather than assumed.** The pre-flight found real
+  drift in `league_apply_fixture_sync` — 54 bytes — which turned out to be comment rewording only:
+  stripping comments before hashing showed all three replaced functions byte-identical in
+  *executable* code. ⭐ **That is the drift check worth keeping** — a raw length mismatch alone would
+  have blocked a safe apply. After applying, all four bodies were re-hashed against the repo and
+  match exactly.
+- ✅ **Exercised against real production data in rolled-back transactions**, because `plpgsql`
+  resolves column names at RUN time (the 081→082 lesson) so a clean apply proves nothing. Proved: a
+  real fixture moved and stamped its original; a **second** move kept the FIRST original (the
+  `COALESCE` held against a deliberately bogus value); a **completed** fixture was refused; matchweek
+  38 emptied through `league_apply_rehome`, its ten fixtures landed in 37, the window trigger cleared
+  38's window — and then **the empty matchweek settled**, which was impossible before 106, while
+  `league_lms_settle` returned `skipped: no fixtures in this matchweek` instead of eliminating the
+  pool. Production re-verified clean after: 0 moved fixtures, 0 empty matchweeks, 36/37/38 all at 10.
+- 🔴 **100, 101, 102 and 103 are still UNAPPLIED** — checked against the live database, not inferred.
+  ⚠ This list previously omitted 100; `league_score_duels` still reads
+  `points_a = CASE WHEN acc.b IS NULL THEN 0`, so **a Showdown bye is still worth nothing**. Also
+  live: `lock_at` is still the first kickoff exactly rather than an hour before and
+  `league_open_matchweek` still orders by `matchweek_number` (101); and Last Man Standing still lets
+  a member back **a club that is not playing**, a guaranteed survival (103).
+- 🔴 **The engines are still executable by any signed-in user (102).** Verified live:
+  `authenticated` holds EXECUTE on `league_lms_settle`, `league_score_duels`,
+  `league_generate_duel_schedule`, `league_lms_open_round` and `league_score_table` — and the first
+  four are `SECURITY DEFINER`, so this is not bounded by RLS. Anyone with an account can settle or
+  redraw somebody else's pool. **This is the most urgent thing on the list.** 102's file has been
+  extended to cover `league_apply_rehome`, the tenth engine of the same kind, which 106 added.
 - 🔴 **"Reveal without them" has no button.** `league_reveal_table_now` and
   `POST /api/pools/[id]/table-deadline` are both live; the admin has no way to press it, so a pool
   whose straggler never files stays unrevealed until the admin keeps extending. Scoring is unaffected
   — the reveal gates visibility only.
-- 🔴 **Re-homing has no end-to-end verification.** The policy is replayed over three real seasons in
-  `lib/league/__tests__/rehome.test.ts`, but nothing has moved a fixture in a live season and watched
-  the deadline, the duel and the LMS round follow it. `scripts/verify-*` is the shape that is owed.
+- ⏳ **Re-homing has no end-to-end run in the wild.** The policy is replayed over three real seasons
+  in `lib/league/__tests__/rehome.test.ts` and the write path is now proven in production under
+  rollback, but no *actual* reschedule has yet arrived from the feed and been followed all the way to
+  a moved deadline. That resolves itself the first time a game moves.
 - A postponed fixture completing weeks after its matchweek settled has **never been exercised**.
   Believed correct under 094; worth a test before the season rather than a discovery in November.
 - "Since you joined" leaderboard view — candidate, not committed.
