@@ -2336,18 +2336,24 @@ The rest of Decision 7 stands, including the override log.
   38's window — and then **the empty matchweek settled**, which was impossible before 106, while
   `league_lms_settle` returned `skipped: no fixtures in this matchweek` instead of eliminating the
   pool. Production re-verified clean after: 0 moved fixtures, 0 empty matchweeks, 36/37/38 all at 10.
-- 🔴 **100, 101, 102 and 103 are still UNAPPLIED** — checked against the live database, not inferred.
-  ⚠ This list previously omitted 100; `league_score_duels` still reads
-  `points_a = CASE WHEN acc.b IS NULL THEN 0`, so **a Showdown bye is still worth nothing**. Also
-  live: `lock_at` is still the first kickoff exactly rather than an hour before and
-  `league_open_matchweek` still orders by `matchweek_number` (101); and Last Man Standing still lets
-  a member back **a club that is not playing**, a guaranteed survival (103).
-- 🔴 **The engines are still executable by any signed-in user (102).** Verified live:
-  `authenticated` holds EXECUTE on `league_lms_settle`, `league_score_duels`,
-  `league_generate_duel_schedule`, `league_lms_open_round` and `league_score_table` — and the first
-  four are `SECURITY DEFINER`, so this is not bounded by RLS. Anyone with an account can settle or
-  redraw somebody else's pool. **This is the most urgent thing on the list.** 102's file has been
-  extended to cover `league_apply_rehome`, the tenth engine of the same kind, which 106 added.
+- ✅ **100, 101, 102 and 103 APPLIED 2026-08-28** — the whole 098→107 run is now live. Pre-flight
+  hashed all six replaced bodies against the repo first and found **no unexpected drift**; the only
+  surprise was that 103 was already *half* applied — `enforce_league_prediction_before_lock` already
+  called `league_open_matchweek(v_season)` — so re-applying it was a no-op on that half and added
+  the missing LMS guard on the other.
+- ✅ **Verified live, not assumed.** A Showdown bye now pays **1** and the absent side still scores
+  NULL rather than a point (100). 101's backfill moved **36** deadlines to an hour before kickoff and
+  left the **2** that had already locked untouched — a passed deadline is a promise already kept. An
+  LMS pick for a club with no fixture that matchweek is now **silently refused at the door** (103):
+  the insert ran and no row exists. And the engines are closed (102) — `authenticated` has lost
+  EXECUTE on `league_lms_settle`, `league_score_duels` and `league_apply_rehome`, while the two reads
+  the product genuinely calls client-side, `league_open_matchweek` and `league_table_breakdown`, keep
+  it.
+- ⚠ **The authorization gap this closed was real and had been live.** Before 102, any signed-in user
+  held EXECUTE on `league_lms_settle`, `league_score_duels`, `league_generate_duel_schedule` and
+  `league_lms_open_round` — all `SECURITY DEFINER`, so RLS did not bound them. Anyone with an account
+  could have settled or redrawn somebody else's pool. Nothing suggests anyone did; the exposure
+  simply existed for as long as those functions did.
 - 🔴 **"Reveal without them" has no button.** `league_reveal_table_now` and
   `POST /api/pools/[id]/table-deadline` are both live; the admin has no way to press it, so a pool
   whose straggler never files stays unrevealed until the admin keeps extending. Scoring is unaffected
