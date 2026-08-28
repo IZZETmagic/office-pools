@@ -174,10 +174,28 @@ const isMatchweekLocked = (mw: MatchweekRow, now: number) =>
  * needing a person to press a button is 38 chances for a pool to die in
  * December because its admin lost interest.
  *
+ * ⚠ ORDERED BY LOCK TIME, NOT BY NUMBER — and this must stay in step with
+ * `league_open_matchweek` (migration 101), which is the same rule in SQL.
+ *
+ * Ordering by `matchweek_number` assumes round N is played before round N+1.
+ * Across three real Premier League seasons that is false: the minimum gap
+ * between consecutive rounds' first kickoffs is −121 days, because a whole
+ * round can be moved. 2024 round 29 had its earliest fixture on Wed 19 Feb and
+ * the rest on Sat 15 Mar, so it locks before round 28. Ordering by number opens
+ * a matchweek whose games are weeks away while a later-numbered one is being
+ * played.
+ *
  * Returns null once the season is over.
  */
 export function openMatchweekId(rows: MatchweekRow[], now: number): string | null {
-  const inOrder = [...rows].sort((a, b) => a.matchweek_number - b.matchweek_number)
+  const inOrder = [...rows].sort((a, b) => {
+    // A matchweek with no fixtures has no lock; it must not outrank a real one
+    // that is about to close. Number is the tiebreak, so the answer is
+    // deterministic when two lock at the same instant.
+    const la = a.lock_at === null ? Number.POSITIVE_INFINITY : Date.parse(a.lock_at)
+    const lb = b.lock_at === null ? Number.POSITIVE_INFINITY : Date.parse(b.lock_at)
+    return la !== lb ? la - lb : a.matchweek_number - b.matchweek_number
+  })
   for (const mw of inOrder) {
     if (isMatchweekDone(mw)) continue
     // A locked-but-unfinished matchweek is SKIPPED, not returned. Postponements

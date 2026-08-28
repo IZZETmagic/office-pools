@@ -179,10 +179,35 @@ describe('openMatchweekId — exactly one matchweek is open', () => {
     expect(openMatchweekId([played(1), played(2)], NOW)).toBeNull()
   })
 
-  it('is ordered by matchweek number, not by array order', () => {
-    // The read orders by matchweek_number, but the rule must not depend on the
-    // caller having done that.
+  it('is ordered by the rule, not by array order', () => {
+    // The rule must not depend on the caller having sorted anything.
     expect(openMatchweekId([mw(3), mw(1), mw(2)], NOW)).toBe('mw1')
+  })
+
+  it('⚠ opens the matchweek that LOCKS NEXT, not the lowest-numbered one', () => {
+    // Three real Premier League seasons contain rounds played out of numerical
+    // order — the minimum gap between consecutive rounds' first kickoffs is
+    // −121 days. 2024 round 29 had a fixture on Wed 19 Feb with the rest of it
+    // on Sat 15 Mar, so it locks BEFORE round 28.
+    //
+    // Ordering by number would open round 28 and invite picks for a matchweek
+    // whose games are weeks away, while 29 is the one about to close.
+    const r28 = mw(28, { lock_at: new Date(NOW + 20 * 24 * HOUR).toISOString() })
+    const r29 = mw(29, { lock_at: new Date(NOW + 2 * HOUR).toISOString() })
+    expect(openMatchweekId([r28, r29], NOW)).toBe('mw29')
+  })
+
+  it('a matchweek with no fixtures yet never outranks one about to close', () => {
+    // No fixtures means no lock. Sorted naively that sorts first and would open
+    // an empty matchweek that has nothing to predict.
+    const empty = mw(5, { lock_at: null, fixture_count: 10 })
+    const soon = mw(9, { lock_at: new Date(NOW + HOUR).toISOString() })
+    expect(openMatchweekId([empty, soon], NOW)).toBe('mw9')
+  })
+
+  it('falls back to the number when two matchweeks lock at the same instant', () => {
+    const at = new Date(NOW + 3 * HOUR).toISOString()
+    expect(openMatchweekId([mw(7, { lock_at: at }), mw(4, { lock_at: at })], NOW)).toBe('mw4')
   })
 })
 
