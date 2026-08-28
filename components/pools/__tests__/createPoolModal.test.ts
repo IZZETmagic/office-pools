@@ -194,14 +194,28 @@ describe('the wizard chrome', () => {
     expect(src).toMatch(/new Date\(dateStr \+ 'T00:00:00'\)/)
   })
 
-  it('puts the dates on the right, but not on a phone', () => {
-    // The left-aligned block left the whole right half of the card empty. It
-    // still cannot go there below `sm`, even after the dates lost their days:
-    // measured at 375px it needs 317px of a 305px row. Twelve pixels short, and
-    // a longer competition name makes it worse — the NAME is what would give way.
+  it('puts the competitions two across, and one across on a phone', () => {
+    // Ryan asked for a column of two. The modal is max-w-2xl, so a half-width
+    // card is ~294px — enough for a crest and three short lines. Below `sm` the
+    // panel is a full-width sheet where two columns would be ~170px each and
+    // every competition name would wrap, so it stays single there.
+    const step = src.slice(src.indexOf('STEP 1: Tournament'))
+    expect(step).toMatch(/grid grid-cols-1 sm:grid-cols-2 gap-3/)
+    expect(step).not.toMatch(/<div className="space-y-3">\s*\n\s*\{tournaments\.map/)
+  })
+
+  it('⚠ and therefore has ONE date placement, not two', () => {
+    // The dates used to sit out to the right of a full-width card, where there
+    // was dead space, and stack under the name only on a phone. Two columns
+    // deleted that space: ~294px is narrower than the 375px screen the
+    // right-hand placement already did not fit on (measured then: 317px of a
+    // 305px row). Both halves of the split have to go together — leaving the
+    // `hidden sm:block` copy would put the range back into a card that has no
+    // room for it, and the NAME is what gives way.
     expect(src).toMatch(/const dateRange = /)
-    expect(src).toMatch(/hidden sm:block ml-auto[^"]*whitespace-nowrap/)
-    expect(src).toMatch(/text-xs text-neutral-500 sm:hidden">\{dateRange\}/)
+    expect(src).not.toMatch(/hidden sm:block ml-auto/)
+    expect(src).not.toMatch(/sm:hidden">\{dateRange\}/)
+    expect(src).toMatch(/text-xs text-neutral-500">\{dateRange\}/)
   })
 })
 

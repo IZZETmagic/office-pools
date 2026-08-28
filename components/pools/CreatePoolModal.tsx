@@ -20,30 +20,44 @@ type CreatePoolModalProps = {
 
 type PoolMode = 'full_tournament' | 'progressive' | 'bracket_picker' | 'league_pickem'
 
-/** All four league modes from Decision 9. */
+/**
+ * All four league modes from Decision 9.
+ *
+ * `desc` is a FUNCTION of the club count rather than a string, because Predict
+ * the Table's copy names it — and "put all twenty clubs in finishing order" is
+ * wrong for every league that is not England, Spain or Italy. Bundesliga and
+ * Ligue 1 are eighteen; the Championship is twenty-four; the Scottish
+ * Premiership is twelve.
+ *
+ * Three of the four ignore the argument. That is deliberately uniform: a mix of
+ * strings and functions would need a `typeof` at the render site, and the next
+ * mode whose copy needs a count would have to change the shape again.
+ */
 const LEAGUE_MODES = [
   {
     value: 'pickem' as const,
     label: 'Matchweek Pick\u2019em',
-    desc: 'Members predict each matchweek\u2019s fixtures. Picks lock at the first kick-off, and the next matchweek opens as that one closes.',
+    desc: () => 'Members predict each matchweek\u2019s fixtures. Picks lock at the first kick-off, and the next matchweek opens as that one closes.',
     icon: 'stairs' as const,
   },
   {
     value: 'showdown' as const,
     label: 'Showdown',
-    desc: 'The same weekly picks, plus a head-to-head duel against one other member. Three points for beating them, one for a tie. The fixture list is drawn up front, so you can see your rival coming.',
+    desc: () => 'The same weekly picks, plus a head-to-head duel against one other member. Three points for beating them, one for a tie. The fixture list is drawn up front, so you can see your rival coming.',
     icon: 'arrow.triangle.merge' as const,
   },
   {
     value: 'last_man_standing' as const,
     label: 'Last Man Standing',
-    desc: 'Pick one club a week to win. Get it wrong and you\u2019re out — and you can\u2019t use the same club twice. When one player is left the round ends and a new one starts, so nobody is watching from the sidelines in March.',
+    desc: () => 'Pick one club a week to win. Get it wrong and you\u2019re out — and you can\u2019t use the same club twice. When one player is left the round ends and a new one starts, so nobody is watching from the sidelines in March.',
     icon: 'flame.fill' as const,
   },
   {
     value: 'table' as const,
     label: 'Predict the Table',
-    desc: 'One decision before the season: put all twenty clubs in finishing order. Scored live against the real table all the way to May \u2014 good for people who don\u2019t follow every match.',
+    desc: (clubs: number | null) =>
+      `One decision before the season: put ${clubs ? `all ${clubs} clubs` : 'every club'} in finishing order. ` +
+      'Scored live against the real table all season \u2014 good for people who don\u2019t follow every match.',
     icon: 'list.bullet' as const,
   },
 ]
@@ -89,6 +103,16 @@ type Tournament = {
   logo_url: string | null
   /** Set only for a league: the `league_seasons` row this entry actually plays. */
   league_season_id: string | null
+  /**
+   * Clubs in this league's season. Null for a bracket competition, and null for
+   * a league whose season row is missing — such a league is dropped from the
+   * list below anyway, so the null branch is only ever reached mid-load.
+   *
+   * Read from `league_seasons`, not from `tournaments.num_teams`: the season row
+   * is written by the importer from the feed, where `num_teams` on the
+   * placeholder is a copy of it. One source, and it is the league's own.
+   */
+  league_club_count: number | null
 }
 
 const SCORING_DEFAULTS = {
@@ -348,12 +372,12 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
       // offered — creating a pool on it would 409 at submit.
       const { data: seasons } = await supabase
         .from('league_seasons')
-        .select('season_id, external_provider, external_league_id, external_season')
-      const seasonByTriple = new Map<string, string>()
+        .select('season_id, club_count, external_provider, external_league_id, external_season')
+      const seasonByTriple = new Map<string, { seasonId: string; clubCount: number | null }>()
       for (const sn of seasons ?? []) {
         seasonByTriple.set(
           `${sn.external_provider ?? 'api_football'}|${sn.external_league_id}|${sn.external_season}`,
-          sn.season_id,
+          { seasonId: sn.season_id, clubCount: sn.club_count ?? null },
         )
       }
 
@@ -362,9 +386,14 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         external_league_id?: number | null
         external_season?: number | null
       }>).map((t) => {
-        if (t.format !== 'league') return { ...t, league_season_id: null }
+        if (t.format !== 'league') return { ...t, league_season_id: null, league_club_count: null }
         const key = `${t.external_provider ?? 'api_football'}|${t.external_league_id}|${t.external_season}`
-        return { ...t, league_season_id: seasonByTriple.get(key) ?? null }
+        const season = seasonByTriple.get(key)
+        return {
+          ...t,
+          league_season_id: season?.seasonId ?? null,
+          league_club_count: season?.clubCount ?? null,
+        }
       })
 
       // Drop competitions that have already finished. Creating a pool for a
@@ -761,7 +790,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       <p className="text-sm text-neutral-500">No tournaments available at this time.</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    /* Two across from `sm`, one below it. The modal is
+                       max-w-2xl, so a half-width card is about 294px — roomy
+                       for a crest and two short lines, and far too narrow for
+                       the third one to sit out to the right (see below). On a
+                       phone the panel is a full-width sheet, where two columns
+                       would be ~170px each and the names would wrap. */
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {tournaments.map((t) => {
                         const dateRange = `${formatMonthYear(t.start_date)} \u2013 ${formatMonthYear(t.end_date)}`
                         return (
@@ -811,15 +846,16 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                               {t.host_countries && (
                                 <p className="text-xs text-neutral-500">{t.host_countries}</p>
                               )}
-                              {/* The dates live on the RIGHT of the card from `sm`
-                                  up, where there is otherwise dead space. They
-                                  cannot go there on a phone: crest + name + a
-                                  28-character range is a few pixels wider than a
-                                  390px screen allows, and the name would be the
-                                  thing that gave way. So below `sm` they stay
-                                  stacked under the name and the right-hand copy
-                                  is hidden. One string, two placements. */}
-                              <p className="text-xs text-neutral-500 sm:hidden">{dateRange}</p>
+                              {/* ⚠ The dates USED TO SPLIT — stacked here on a
+                                  phone, moved out to the right of the card from
+                                  `sm` up, where a full-width card had dead
+                                  space. Two columns removed that space: the
+                                  card is now ~294px at every width above the
+                                  breakpoint, which is narrower than the 390px
+                                  screen the right-hand placement already did
+                                  not fit on. So there is one placement again,
+                                  and it is this one. */}
+                              <p className="text-xs text-neutral-500">{dateRange}</p>
                               {/* ⚠ `t.description` is deliberately NOT rendered.
                                   "20 clubs, 38 matchweeks, 380 fixtures. Flat
                                   round-robin: no groups, no knockout." is format
@@ -830,10 +866,6 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                                   selected and still populated; it just does not
                                   belong here. */}
                             </div>
-
-                            <p className="hidden sm:block ml-auto pl-4 shrink-0 text-xs text-neutral-500 whitespace-nowrap">
-                              {dateRange}
-                            </p>
                           </div>
                         </button>
                         )
@@ -907,7 +939,9 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                             </span>
                             <h3 className="text-sm font-semibold text-neutral-900">{opt.label}</h3>
                           </div>
-                          <p className="text-xs text-neutral-500 mt-1.5">{opt.desc}</p>
+                          <p className="text-xs text-neutral-500 mt-1.5">
+                            {opt.desc(selectedTournament?.league_club_count ?? null)}
+                          </p>
                         </button>
                       ))}
 
