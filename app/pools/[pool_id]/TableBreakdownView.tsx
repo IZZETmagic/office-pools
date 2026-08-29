@@ -100,6 +100,7 @@ export type TablePrices = {
   perfectTopFourBonus: number
   relegationBonus: number
   europaBonus: number
+  conferenceBonus: number
 }
 
 /**
@@ -113,6 +114,7 @@ export type TablePrices = {
  *   + (top_hits = top_n AND top_n > 0 ? perfect : 0)
  *   + releg_hits   * releg_bonus
  *   + europa_hits  * eur_bonus
+ *   + conference_hits * conf_bonus
  *
  * It is repeated here rather than returned by the RPC because the breakdown is
  * per club and the bonuses are per entry. If the engine's formula changes, this
@@ -126,6 +128,7 @@ export function bandBonuses(rows: TableBreakdownRow[], topN: number, prices: Tab
   const topHits = rows.filter((r) => r.top_hit).length
   const relegHits = rows.filter((r) => r.releg_hit).length
   const europaHits = rows.filter((r) => r.europa_hit).length
+  const conferenceHits = rows.filter((r) => r.conference_hit).length
   const perfectTop = topN > 0 && topHits === topN
 
   const lines: Array<{ label: string; points: number }> = []
@@ -133,6 +136,7 @@ export function bandBonuses(rows: TableBreakdownRow[], topN: number, prices: Tab
   if (topHits > 0) lines.push({ label: `Top ${topN} named — ${topHits}`, points: topHits * prices.topFourBonus })
   if (perfectTop) lines.push({ label: `All ${topN}, as a set`, points: prices.perfectTopFourBonus })
   if (europaHits > 0) lines.push({ label: `Europa places named — ${europaHits}`, points: europaHits * prices.europaBonus })
+  if (conferenceHits > 0) lines.push({ label: `Conference places named — ${conferenceHits}`, points: conferenceHits * prices.conferenceBonus })
   if (relegHits > 0) lines.push({ label: `Relegation named — ${relegHits}`, points: relegHits * prices.relegationBonus })
 
   return { lines, total: lines.reduce((sum, l) => sum + l.points, 0) }

@@ -15,7 +15,12 @@ export type ApiFootballFixture = {
     venue: { id: number | null; name: string | null; city: string | null }
     status: { long: string; short: ApiFootballStatusShort; elapsed: number | null; extra: number | null }
   }
-  league: { id: number; season: number; round: string }
+  // `name`, `country` and `logo` are OPTIONAL because this type is shared with
+  // the World Cup path, which has never read them — not because the feed
+  // sometimes omits them. It does not: every /fixtures row carries all three,
+  // and the league importer uses them to build a competition's `tournaments`
+  // placeholder without a second API call or a hand-maintained catalogue entry.
+  league: { id: number; season: number; round: string; name?: string; country?: string; logo?: string }
   teams: {
     home: { id: number; name: string; winner: boolean | null }
     away: { id: number; name: string; winner: boolean | null }

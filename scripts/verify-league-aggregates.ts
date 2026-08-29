@@ -48,8 +48,18 @@ import { resolve } from 'path'
 })()
 
 import { createAdminClient } from '../lib/supabase/server'
+import { earlyKickoff } from '../lib/league/earlyKickoff'
 
 const admin = createAdminClient()
+
+/**
+ * How far before its first kickoff a matchweek locks.
+ *
+ * From `refresh_league_matchweek_window` itself — `agg.first_k - interval '1
+ * hour'` — not from observing the data, so that a change to the rule shows up
+ * here as a failure rather than being silently absorbed.
+ */
+const LOCK_LEAD_MS = 60 * 60 * 1000
 
 const seasonArg = process.argv.indexOf('--season')
 const seasonFilter = seasonArg > -1 ? process.argv[seasonArg + 1] : null
@@ -145,12 +155,27 @@ async function main() {
     if ((mw.fixture_count === 0) !== (mw.lock_at === null))
       problems.push(`${where}: empty-has-no-lock violated — fixture_count=${mw.fixture_count}, lock_at=${mw.lock_at}`)
 
-    // The freeze invariant: a lock, once set, is the matchweek's first kickoff
-    // frozen at the moment it passed. Before the lock passes it must track the
-    // earliest kickoff; after, it may legitimately lag a rescheduled fixture.
+    // The freeze invariant: a lock, once set, is frozen at the moment it passed.
+    // Before it passes it must track the earliest kickoff; after, it may
+    // legitimately lag a rescheduled fixture.
+    //
+    // ⚠ CORRECTED 2026-08-28. This asserted `lock_at === first_kickoff`, which
+    // has not been the rule since migration 101. Verified against the live
+    // function body rather than inferred from the data:
+    //
+    //   lock_at = CASE WHEN mw.lock_at IS NULL OR mw.lock_at > now()
+    //                  THEN agg.first_k - interval '1 hour' ELSE mw.lock_at END
+    //
+    // A matchweek locks ONE HOUR before its first kickoff. The stale assertion
+    // made this script report `FAIL — 36 problem(s)` against a perfectly healthy
+    // Premier League season, which is worse than not checking at all: a
+    // verification script that always fails is a verification script nobody runs.
     const locked = mw.lock_at != null && new Date(mw.lock_at).getTime() <= Date.now()
-    if (!locked && iso(mw.lock_at) !== realFirst)
-      problems.push(`${where}: still open, so lock_at should equal first kickoff — lock_at=${iso(mw.lock_at)}, first=${realFirst}`)
+    const expectedLock = realFirst === null
+      ? null
+      : new Date(new Date(realFirst).getTime() - LOCK_LEAD_MS).toISOString()
+    if (!locked && iso(mw.lock_at) !== expectedLock)
+      problems.push(`${where}: still open, so lock_at should be one hour before the first kickoff — lock_at=${iso(mw.lock_at)}, expected=${expectedLock} (first=${realFirst})`)
 
     // The dangerous half of the moved-fixture bug: fixtures present, no lock.
     if (mine.length > 0 && mw.lock_at === null)
@@ -159,6 +184,53 @@ async function main() {
 
   for (const id of orphans)
     problems.push(`orphan: ${byMatchweek.get(id)!.length} fixture(s) reference unknown matchweek ${id}`)
+
+  // ------------------------------------------------------------------------
+  // The season's DRAG PROFILE — reported, never a failure
+  // ------------------------------------------------------------------------
+  // A matchweek locks at its earliest kickoff, so a fixture brought forward
+  // drags the whole round's deadline with it. Nothing is wrong when that
+  // happens — `planRehome` deliberately leaves such a fixture where it is
+  // rather than adding it to a week people have finished picking — but it is
+  // the difference between "pick by Saturday, played Saturday" and La Liga
+  // matchweek 6: picks close 3 September, nine of the ten games played 16th.
+  //
+  // Printed because it was DISCOVERED rather than known. It cost an afternoon
+  // to find by hand on the day a second league landed, and the only reason to
+  // find it by hand twice would be forgetting to print it once.
+  //
+  // Measured 2026-08-28: Premier League 0 of 38, La Liga 3 of 38 (rounds 1, 2
+  // and 6), worst lead 13 days. `lib/league/rehome.ts` measured three real
+  // Premier League seasons at a median 6 days, so the cost PER OCCURRENCE is
+  // the same in both countries — it is the frequency that differs.
+  //
+  // ⚠ Any count here is a FLOOR. The provider publishes reschedules
+  // progressively, so a round in March has not been moved yet.
+  const dragged = matchweeks
+    .map((mw) => {
+      const kickoffs = (byMatchweek.get(mw.matchweek_id) ?? []).map((f) => f.kickoff_at)
+      return { mw, drag: earlyKickoff(kickoffs) }
+    })
+    .filter((d): d is { mw: typeof matchweeks[number]; drag: NonNullable<ReturnType<typeof earlyKickoff>> } => d.drag !== null)
+
+  if (dragged.length === 0) {
+    console.log(`Drag profile: 0 of ${matchweeks.length} rounds lock early. Every round is played together.`)
+  } else {
+    const worst = Math.max(...dragged.map((d) => d.drag.leadDays))
+    const avg = Math.round(dragged.reduce((s, d) => s + d.drag.leadDays, 0) / dragged.length)
+    console.log(
+      `Drag profile: ${dragged.length} of ${matchweeks.length} rounds lock early ` +
+      `— worst ${worst} days, average ${avg}. A FLOOR: later reschedules are not published yet.`,
+    )
+    for (const d of dragged) {
+      const ahead = d.mw.lock_at != null && new Date(d.mw.lock_at) > new Date()
+      console.log(
+        `  - MW${d.mw.matchweek_number}: locks ${iso(d.mw.lock_at)?.slice(0, 10)}, ` +
+        `bulk played ${d.drag.bulkAt.slice(0, 10)} (${d.drag.leadDays}d), ` +
+        `${d.drag.count} early${ahead ? '   <-- STILL AHEAD' : ''}`,
+      )
+    }
+  }
 
   if (problems.length === 0) {
     console.log('OK — every aggregate matches its fixtures, and every invariant holds.')

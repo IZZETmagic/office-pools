@@ -7,6 +7,10 @@
 // text competitions actually produce — so every string below was pulled live
 // from `/standings` on 2026-08-24 and is reproduced verbatim.
 //
+// Four more were pulled on 2026-08-28 from COMPLETED seasons, because every
+// string above is an August one and August is the one month of the year the
+// data is simple. See migration 112.
+//
 // The one that made this file necessary: the Scottish Premiership tags its
 // bottom-half split `"Premiership (Relegation Group)"` — SIX clubs of twelve.
 // Counting that as relegation would have paid a relegation bonus for half the
@@ -60,6 +64,12 @@ type Case = {
   relN: number; relSrc: string
   /** Rank bounds, or null where the competition has no Europa places. */
   eurFrom: number | null; eurTo: number | null
+  /**
+   * The same for Conference (migration 113). NULL is the common August answer:
+   * England tags nothing there until the cups resolve, and Spain's placeholder
+   * reads "ECL Playoffs", which names no competition.
+   */
+  confFrom: number | null; confTo: number | null
   why?: string
 }
 
@@ -74,6 +84,7 @@ const CASES: Case[] = [
     ],
     topN: 4, topSrc: 'feed', relN: 3, relSrc: 'feed',
     eurFrom: 5, eurTo: 5,
+    confFrom: null, confTo: null,
   },
   {
     label: 'La Liga (ESP)', clubs: 20,
@@ -83,6 +94,7 @@ const CASES: Case[] = [
     ],
     topN: 4, topSrc: 'feed', relN: 3, relSrc: 'feed',
     eurFrom: 5, eurTo: 5,
+    confFrom: null, confTo: null,
     why: 'phrased completely differently from England, same answer',
   },
   {
@@ -94,6 +106,7 @@ const CASES: Case[] = [
     ],
     topN: 4, topSrc: 'feed', relN: 3, relSrc: 'feed',
     eurFrom: 5, eurTo: 6,
+    confFrom: 7, confTo: 7,
     why: '2 automatic + 1 playoff counted as 3 — the places genuinely at risk',
   },
   {
@@ -104,6 +117,7 @@ const CASES: Case[] = [
     ],
     topN: 4, topSrc: 'feed', relN: 3, relSrc: 'feed',
     eurFrom: 5, eurTo: 5,
+    confFrom: null, confTo: null,
   },
   {
     label: 'Ligue 1 (FRA)', clubs: 18,
@@ -114,6 +128,7 @@ const CASES: Case[] = [
     ],
     topN: 3, topSrc: 'feed', relN: 3, relSrc: 'feed',
     eurFrom: 5, eurTo: 5,
+    confFrom: null, confTo: null,
     why: 'rank 4 reads " Qualifying" — no competition named, so it is not guessed at',
   },
   {
@@ -128,6 +143,7 @@ const CASES: Case[] = [
     ],
     topN: 2, topSrc: 'feed', relN: 3, relSrc: 'feed',
     eurFrom: 3, eurTo: 3,
+    confFrom: 4, confTo: 7,
     why: 'two Champions League places, not four — a direct one and a qualifier',
   },
   {
@@ -138,6 +154,7 @@ const CASES: Case[] = [
     ],
     topN: 2, topSrc: 'proportional', relN: 2, relSrc: 'unclear',
     eurFrom: null, eurTo: null,
+    confFrom: null, confTo: null,
     why: 'THE case: "Relegation Group" is a post-split half, not six relegation places',
   },
   {
@@ -149,7 +166,81 @@ const CASES: Case[] = [
     ],
     topN: 6, topSrc: 'proportional', relN: 0, relSrc: 'feed',
     eurFrom: null, eurTo: null,
+    confFrom: null, confTo: null,
     why: 'a described table that never says relegation is a league without it — zero is the answer',
+  },
+
+  // ---- COMPLETED seasons -------------------------------------------------
+  // Everything above was pulled on 2026-08-24 — in August, before a cup had
+  // been won. These four came off `/standings` on 2026-08-28 from seasons that
+  // have FINISHED, and they are what migration 112 exists for: the feed also
+  // tags CUP WINNERS, wherever they happened to finish, so the tagged rows stop
+  // being one block at the top of the table. A band read as `min..max`, or as a
+  // count, spans the gap and pays clubs that never qualified by league position.
+  {
+    label: 'ENG 2023/24 FINAL', clubs: 20,
+    bands: [
+      ['Promotion - Champions League (Group Stage: )', 4],
+      ['Promotion - Europa League (Group Stage: )', 1],
+      ['Promotion - Europa Conference League (Qualification: )', 1],
+      [null, 1],
+      ['Promotion - Europa League (Group Stage: )', 1],
+      [null, 9],
+      ['Relegation - Championship', 3],
+    ],
+    topN: 4, topSrc: 'feed', relN: 3, relSrc: 'feed',
+    eurFrom: 5, eurTo: 5,
+    confFrom: 6, confTo: 6,
+    why: '8th-placed Man Utd carry a Europa tag — the FA Cup. min..max would say 5-8',
+  },
+  {
+    label: 'ENG 2024/25 FINAL', clubs: 20,
+    bands: [
+      ['Champions League', 5],
+      ['UEFA Europa League', 1],
+      ['Conference League Qualification', 1],
+      [null, 4],
+      ['UEFA Europa League', 1],
+      [null, 4],
+      ['Champions League', 1],
+      ['Relegation', 3],
+    ],
+    topN: 5, topSrc: 'feed', relN: 3, relSrc: 'feed',
+    eurFrom: 6, eurTo: 6,
+    confFrom: 7, confTo: 7,
+    why: 'THE top-band case: 17th-placed Tottenham won the EL, so COUNTING the tags says 6',
+  },
+  {
+    label: 'ENG 2025/26 FINAL', clubs: 20,
+    bands: [
+      ['Promotion - Champions League (League phase)', 5],
+      ['Promotion - Europa League (League phase)', 2],
+      ['Promotion - Conference League (Qualification)', 1],
+      [null, 6],
+      ['Promotion - Europa League (League phase)', 1],
+      [null, 2],
+      ['Relegation - Championship', 3],
+    ],
+    topN: 5, topSrc: 'feed', relN: 3, relSrc: 'feed',
+    eurFrom: 6, eurTo: 7,
+    confFrom: 8, confTo: 8,
+    why: 'THE europa case: min..max spanned 6-15 — ten clubs paid a bonus sized for one',
+  },
+  {
+    label: 'ESP 2025/26 FINAL', clubs: 20,
+    bands: [
+      ['Promotion - Champions League (League phase)', 5],
+      ['Promotion - Europa League (League phase)', 1],
+      ['Promotion - Conference League (Qualification)', 1],
+      [null, 2],
+      ['Promotion - Europa League (League phase)', 1],
+      [null, 7],
+      ['Relegation - LaLiga2', 3],
+    ],
+    topN: 5, topSrc: 'feed', relN: 3, relSrc: 'feed',
+    eurFrom: 6, eurTo: 6,
+    confFrom: 7, confTo: 7,
+    why: 'not only England — the Copa del Rey winner finished 10th',
   },
 ]
 
@@ -192,19 +283,24 @@ async function run(c: Case, idx: number) {
   const got = await must('bands', admin.rpc('league_default_bands', { p_season_id: SEASON })) as {
     top_n: number; relegation_n: number; top_source: string; relegation_source: string
     europa_from: number | null; europa_to: number | null; europa_source: string
+    conference_from: number | null; conference_to: number | null; conference_source: string
   }
 
   const pad = c.label.padEnd(28)
   const okTop = got.top_n === c.topN && got.top_source === c.topSrc
   const okRel = got.relegation_n === c.relN && got.relegation_source === c.relSrc
   const okEur = (got.europa_from ?? null) === c.eurFrom && (got.europa_to ?? null) === c.eurTo
+  const okConf = (got.conference_from ?? null) === c.confFrom && (got.conference_to ?? null) === c.confTo
+  const confTxt = c.confFrom === null ? 'none'
+    : got.conference_from === got.conference_to ? `${got.conference_from}`
+    : `${got.conference_from}-${got.conference_to}`
   const eurTxt = c.eurFrom === null ? 'none'
     : got.europa_from === got.europa_to ? `${got.europa_from}` : `${got.europa_from}-${got.europa_to}`
-  if (okTop && okRel && okEur) {
-    ok(`${pad} top ${got.top_n}  ·  europa ${eurTxt}  ·  down ${got.relegation_n}   (${got.top_source}/${got.europa_source}/${got.relegation_source})`)
+  if (okTop && okRel && okEur && okConf) {
+    ok(`${pad} top ${got.top_n}  ·  europa ${eurTxt}  ·  conf ${confTxt}  ·  down ${got.relegation_n}   (${got.top_source}/${got.europa_source}/${got.conference_source}/${got.relegation_source})`)
   } else {
-    bad(`${pad} top ${got.top_n} · europa ${got.europa_from}-${got.europa_to} · down ${got.relegation_n}`,
-        `expected top ${c.topN} · europa ${c.eurFrom}-${c.eurTo} · down ${c.relN}`)
+    bad(`${pad} top ${got.top_n} · europa ${got.europa_from}-${got.europa_to} · conf ${got.conference_from}-${got.conference_to} · down ${got.relegation_n}`,
+        `expected top ${c.topN} · europa ${c.eurFrom}-${c.eurTo} · conf ${c.confFrom}-${c.confTo} · down ${c.relN}`)
   }
   if (c.why) note(`  ${' '.repeat(26)}${c.why}`)
 
@@ -219,17 +315,18 @@ async function run(c: Case, idx: number) {
 async function europaIsPaid() {
   head('The Europa band, scored')
 
-  const base = 900000
+  // Well clear of the per-case bases, which are `(idx + 1) * 100000` — at nine
+  // cases 900000 was the ninth case's, and adding one collided on the PK.
+  const base = 9900000
   const SEASON = `${S}${hex(base + 1)}`
   const POOL = `${S}${hex(base + 2)}`
   const MEM = `${S}${hex(base + 3)}`
   const ENTRY = `${S}${hex(base + 4)}`
+  const TOURN = `${S}${hex(base + 5)}`
   const CLUB = (n: number) => `${S}${hex(base + 1000 + n)}`
 
   const users = await must('u', admin.from('users').select('user_id').eq('username', 'IZZETmagic').limit(1))
   const adminUser = ((users ?? [])[0] as { user_id: string }).user_id
-  const tp = await must('t', admin.from('pools').select('tournament_id').not('league_season_id', 'is', null).limit(1))
-  const tournamentId = ((tp ?? [])[0] as { tournament_id: string }).tournament_id
   const future = new Date(Date.now() + 90 * 864e5).toISOString()
 
   try {
@@ -261,8 +358,22 @@ async function europaIsPaid() {
       })),
     ).select('club_id'))
 
+    // Migration 111: a pool's tournament and its league season must name the
+    // SAME competition, on the triple `(provider, league id, season)`. This
+    // used to borrow the real Premier League tournament for a scratch season,
+    // which 111 now refuses — correctly. So the scratch season gets a scratch
+    // tournament that agrees with it.
+    await must('tournament', admin.from('tournaments').insert({
+      tournament_id: TOURN, name: 'Scratch Europa 2026/27',
+      short_name: '__scratch europa (auto-deleted)', tournament_type: 'league',
+      year: 2026, host_countries: 'England', num_teams: 20, num_groups: 0,
+      teams_per_group: 0, start_date: '2026-08-21', end_date: '2027-05-30',
+      prediction_deadline: future, status: 'upcoming', format: 'league',
+      external_provider: 'scratch', external_league_id: -14099, external_season: -2026,
+    }).select('tournament_id'))
+
     await must('pool', admin.from('pools').insert({
-      pool_id: POOL, tournament_id: tournamentId, admin_user_id: adminUser,
+      pool_id: POOL, tournament_id: TOURN, admin_user_id: adminUser,
       pool_name: '__scratch 140 europa (auto-deleted)', prediction_deadline: future,
       status: 'open', prediction_mode: 'league_pickem', league_season_id: SEASON,
       league_mode: 'table', league_depth: null, league_table_profile: 'full_table',
@@ -301,6 +412,7 @@ async function europaIsPaid() {
     await admin.from('pool_entries').delete().eq('pool_id', POOL)
     await admin.from('pools').delete().eq('pool_id', POOL)
     await admin.from('league_seasons').delete().eq('season_id', SEASON)
+    await admin.from('tournaments').delete().eq('tournament_id', TOURN)
   }
 }
 

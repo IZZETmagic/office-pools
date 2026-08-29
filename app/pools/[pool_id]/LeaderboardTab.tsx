@@ -63,6 +63,8 @@ type LeaderboardTabProps = {
     relegationN: number
     europaFrom: number | null
     europaTo: number | null
+    conferenceFrom: number | null
+    conferenceTo: number | null
     prices: {
       exactPoints: number
       stepPenalty: number
@@ -71,6 +73,7 @@ type LeaderboardTabProps = {
       perfectTopFourBonus: number
       relegationBonus: number
       europaBonus: number
+      conferenceBonus: number
     }
   } | null
 }
@@ -1934,7 +1937,8 @@ export function LeaderboardTab({
           isRevealed={tableView.isRevealed}
           bandOf={(position) =>
             bandOf(position, tableView.clubCount, tableView.topN, tableView.relegationN,
-              tableView.europaFrom, tableView.europaTo)}
+              tableView.europaFrom, tableView.europaTo,
+              tableView.conferenceFrom, tableView.conferenceTo)}
           bandStripe={BAND_STRIPE}
           topN={tableView.topN}
           prices={tableView.prices}

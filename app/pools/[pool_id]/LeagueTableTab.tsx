@@ -39,6 +39,12 @@
 // top of an ingested table rather than a contradiction of it. The one case it
 // gets wrong — a head-to-head separation we do not ingest — is written up in
 // lib/league/standingsOrder.ts.
+//
+// ⚠ What moves is the CLUBS. The place keeps its number AND its `description`,
+// because the band text is a fact about finishing 18th rather than about the
+// club standing there. Letting the band ride along with the club is what drew
+// the relegation bar on 17, 19 and 20 on 2026-08-28 — Coventry sorted ahead of
+// a level Tottenham and carried the red stripe up a place with it.
 // =============================================================
 
 import { Card } from '@/components/ui/Card'
@@ -83,14 +89,28 @@ type Props = {
  * couple of keywords is deliberately loose: an unrecognised band simply gets no
  * stripe, which is a missing decoration rather than a wrong one.
  */
-function bandOf(description: string | null): 'champions' | 'europa' | 'relegation' | null {
+function bandOf(description: string | null): 'champions' | 'europa' | 'conference' | 'relegation' | null {
   if (!description) return null
   const d = description.toLowerCase()
   if (d.includes('relegation')) return 'relegation'
   if (d.includes('champions league')) return 'champions'
-  if (d.includes('europa') || d.includes('conference')) return 'europa'
+  // ⚠ CONFERENCE BEFORE EUROPA. The 2023/24 vintage of this feed reads
+  // "Promotion - Europa Conference League (Qualification: )", which contains
+  // both words; testing Conference first is what keeps it out of the Europa
+  // band. The phrases match migration 113's SQL exactly, so a row shaded as
+  // Europa here is a row the engine counts as Europa.
+  if (d.includes('conference league')) return 'conference'
+  if (d.includes('europa league')) return 'europa'
   return null
 }
+
+/**
+ * ⚠ This shades the REAL table, so it can disagree with the scoring band on
+ * purpose. A cup winner sitting 15th carries a Europa tag from the feed and
+ * gets the stripe, because they did qualify — but migration 113's band is the
+ * contiguous run of LEAGUE positions and stops well above them. The table shows
+ * what happened; the band pays for where a club finished.
+ */
 
 /**
  * The qualification bands — a bar at the row's left edge, and the legend swatch.
@@ -112,6 +132,7 @@ function bandOf(description: string | null): 'champions' | 'europa' | 'relegatio
 const BAND_BORDER: Record<string, string> = {
   champions: 'border-l-primary-500',
   europa: 'border-l-success-500',
+  conference: 'border-l-success-300',
   relegation: 'border-l-danger-500',
 }
 
@@ -126,12 +147,16 @@ const BAND_BORDER: Record<string, string> = {
 const BAND_SWATCH: Record<string, string> = {
   champions: 'bg-primary-500',
   europa: 'bg-success-500',
+  // A lighter step of the Europa green rather than a fourth hue — the third
+  // European competition, shaded as the rung below the second.
+  conference: 'bg-success-300',
   relegation: 'bg-danger-500',
 }
 
 const BAND_LABEL: Record<string, string> = {
   champions: 'Champions League',
-  europa: 'Europa / Conference',
+  europa: 'Europa League',
+  conference: 'Conference League',
   relegation: 'Relegation',
 }
 

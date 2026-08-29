@@ -34,6 +34,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { mapLeagueStatus, mapStatusDetail, isFinalStatus } from './mappers'
 import { ApiFootballClient } from './client'
 import type { ApiFootballFixture, ApiFootballTeam } from './types'
 
@@ -88,6 +89,26 @@ export type ImportLeagueResult = {
     date_first: string | null
     date_last: string | null
     plan: LeagueFixturePlan[]
+  }
+  /**
+   * The `tournaments` row this competition-instance needs in order for anybody
+   * to be able to make a pool for it. See the placeholder section below.
+   */
+  placeholder: {
+    tournament_id: string | null
+    status: 'new' | 'existing' | 'planned'
+    name: string
+    reason?: string
+    /**
+     * The row that WAS or WOULD BE written, in full.
+     *
+     * Carried so a dry run can print it. Reporting only "a placeholder would be
+     * created" makes every derived value — country, crest, both dates, the
+     * generated description — invisible until after it has been committed,
+     * which defeats the point of having a dry run at all. Null only when a
+     * placeholder already exists and none was built.
+     */
+    row: Record<string, unknown> | null
   }
   committed: boolean
 }
@@ -152,6 +173,70 @@ function parseRound(round: string): number | null {
  */
 function phaseOf(round: string): string {
   return round.replace(/\s*-?\s*\d+\s*$/, '').trim()
+}
+
+/**
+ * What the feed already knows about a fixture that has been PLAYED.
+ *
+ * ## Why this exists — the Premier League hid the bug
+ *
+ * This used to be `status: 'scheduled', is_completed: false`, hard-coded, for
+ * every one of a season's fixtures. That is true exactly once: when a season is
+ * imported before it starts, which is how the Premier League was imported and
+ * therefore the only case anybody had seen.
+ *
+ * Import a league MID-SEASON — La Liga on 2026-08-28, thirteen days in — and it
+ * is false for every match already played. Worse than false: **unrecoverable**.
+ * The live sync only looks within ~3h of a stored kickoff, and its catch-up pass
+ * reaches back seven days (`CATCHUP_MAX_AGE_MS`). A fixture played eight days
+ * before the import is outside both, forever, so it would have sat at
+ * `scheduled` with no score for the rest of the season.
+ *
+ * And that is not a cosmetic gap. Migration 061 requires a state witness for
+ * every played fixture before a matchweek may snapshot, and Showdown and Last
+ * Man Standing both settle off that snapshot — so one un-completed fixture in
+ * matchweek 1 disables two whole modes for the season. Migration 096 exists
+ * because the Premier League paid exactly that price.
+ *
+ * ## Why it reuses the sync's mappers
+ *
+ * `mapLeagueStatus`, `mapStatusDetail` and `isFinalStatus` already decide what a
+ * provider status means for THIS table, and they have tests pointed at them. A
+ * second interpretation here is how the two arms drift.
+ *
+ * ## The two constraints this must not break
+ *
+ *   `league_fixtures_result_pair_ck`   goals are NULL together or set together
+ *   `league_fixtures_completed_ck`     is_completed requires home_goals
+ *
+ * So an FT with missing goals stays `is_completed: false` and keeps its score
+ * NULL, exactly as `fixtureToLeagueUpdate` does — the feed will correct itself
+ * and the sync will pick it up.
+ */
+function resultOf(f: ApiFootballFixture): {
+  status: string
+  status_detail: string | null
+  home_goals: number | null
+  away_goals: number | null
+  is_completed: boolean
+  completed_at: string | null
+} {
+  const short = f.fixture.status.short
+  // The pair moves together or not at all.
+  const haveGoals = f.goals.home !== null && f.goals.away !== null
+  const completed = isFinalStatus(short) && haveGoals
+  return {
+    status: mapLeagueStatus(short),
+    status_detail: mapStatusDetail(short),
+    home_goals: haveGoals ? f.goals.home : null,
+    away_goals: haveGoals ? f.goals.away : null,
+    is_completed: completed,
+    // `league_fixtures_completed_at_ck` ties these together. The fixture's own
+    // kickoff is the honest stamp at import — we did not witness the whistle,
+    // and `now()` would claim a season's worth of matches all finished at the
+    // instant somebody ran a script.
+    completed_at: completed ? f.fixture.date : null,
+  }
 }
 
 function buildVenue(f: ApiFootballFixture): string | null {
@@ -495,8 +580,7 @@ export async function importLeagueSeason(
       // re-creating them. L11 owns rescheduling and writes it.
       venue,
       external_fixture_id: ext,
-      status: 'scheduled',
-      is_completed: false,
+      ...resultOf(f),
     })
   }
 
@@ -510,6 +594,126 @@ export async function importLeagueSeason(
 
   const newFixtures = fixturePlan.filter((f) => f.status === 'new')
   const dates = newFixtures.map((f) => f.kickoff_at).sort()
+
+  // ---------------------------------------------------- Tournament placeholder
+  //
+  // ## Why an importer writes a `tournaments` row at all
+  //
+  // A league's fixtures, clubs and matchweeks live in `league_*`. Its identity,
+  // for the purposes of MAKING A POOL, still lives in `tournaments`:
+  //
+  //   * `app/api/pools/create/route.ts` resolves the placeholder by this
+  //     competition's (provider, league, season) triple and refuses with a 409
+  //     — "That league has no competition record yet" — if there is none.
+  //   * `CreatePoolModal` builds the wizard's competition list from
+  //     `tournaments`, not `league_seasons`, so a league without one is
+  //     invisible in the wizard even after a perfect import.
+  //
+  // Until now nothing created it. The Premier League's was made by hand, which
+  // is why nobody noticed: importing a second league produced a season that
+  // looked complete and could not be used, and the failure surfaced as a 409 at
+  // the end of somebody's wizard rather than at import time.
+  //
+  // ## Insert-only, never update
+  //
+  // An existing placeholder is left EXACTLY as it is. It may have been tuned by
+  // hand (the Premier League's was), and silently rewriting a live
+  // competition's dates or deadline from a re-run is the shape of change that
+  // causes an outage rather than fixing one. Same rule the season itself
+  // follows twenty lines up: create if absent, otherwise adopt.
+  //
+  // ## Everything here is derived, nothing is declared
+  //
+  // `name`, `country` and `logo` come off the fixtures response that has
+  // already been fetched — no second API call, and no per-league catalogue
+  // fields to get wrong. `description` is generated from the counts, which is
+  // what makes it correct for an 18-club league without anybody editing it.
+  const allKickoffs = fixturePlan
+    .filter((f) => f.status !== 'skipped')
+    .map((f) => f.kickoff_at)
+    .sort()
+  const feedLeague = fixtures[0]?.league
+  const placeholderName = `${competition_name} ${season_label}`
+
+  // Built whether or not it is written, so a dry run can show it. The one thing
+  // it cannot be built without is a kickoff window.
+  const placeholderRow = allKickoffs.length === 0 ? null : {
+    name: placeholderName,
+    short_name: competition_name,
+    // Both are 'league'. `tournament_type` is allowed it by migration 024's
+    // CHECK; `format` is what `loadSyncTargets` and migration 111 read.
+    tournament_type: 'league',
+    format: 'league',
+    year: season_start_year,
+    host_countries: feedLeague?.country ?? null,
+    // NOT NULL, all three. A flat round-robin has no groups, and saying so with
+    // zeros is more honest than leaving the World Cup's shape behind.
+    num_teams: externalTeams.length,
+    num_groups: 0,
+    teams_per_group: 0,
+    start_date: allKickoffs[0].slice(0, 10),
+    end_date: allKickoffs[allKickoffs.length - 1].slice(0, 10),
+    // The competition's own first kickoff. A league has no single pool-wide
+    // deadline — each matchweek locks at its own — and the create route
+    // overrides this per pool anyway. It exists to satisfy NOT NULL with a true
+    // value rather than an invented one.
+    prediction_deadline: allKickoffs[0],
+    // Authored, and known to go stale — `tournaments.status` still read
+    // 'upcoming' a month after the World Cup final. Nothing on the league path
+    // reads it; `hasCompetitionEnded` uses `end_date`, which is real.
+    status: 'upcoming',
+    logo_url: args.logo_url ?? feedLeague?.logo ?? null,
+    description:
+      `${externalTeams.length} clubs, ${matchweekNumbers.length} matchweeks, ` +
+      `${fixturePlan.filter((f) => f.status !== 'skipped').length} fixtures. ` +
+      `Flat round-robin: no groups, no knockout.`,
+    external_provider: 'api_football',
+    external_league_id: league,
+    external_season: season,
+  }
+
+  let placeholder: ImportLeagueResult['placeholder'] = {
+    tournament_id: null,
+    status: 'planned',
+    name: placeholderName,
+    row: placeholderRow,
+  }
+
+  const { data: existingPlaceholder, error: phErr } = await supabase
+    .from('tournaments')
+    .select('tournament_id')
+    .eq('external_provider', 'api_football')
+    .eq('external_league_id', league)
+    .eq('external_season', season)
+    .maybeSingle()
+  if (phErr) throw phErr
+
+  if (existingPlaceholder) {
+    placeholder = {
+      tournament_id: existingPlaceholder.tournament_id,
+      status: 'existing',
+      name: placeholderName,
+      reason: 'left untouched — an existing placeholder is never rewritten',
+      row: null,
+    }
+  } else if (commit) {
+    if (!placeholderRow) {
+      throw new Error(
+        `league=${league} season=${season}: no kickoff times, so a placeholder cannot carry a ` +
+          `start date, end date or prediction deadline. Refusing to write a half-formed competition record.`
+      )
+    }
+    const { data: created, error: createErr } = await supabase
+      .from('tournaments')
+      .insert(placeholderRow)
+      .select('tournament_id')
+      .single()
+    if (createErr) throw createErr
+    placeholder = {
+      tournament_id: created.tournament_id, status: 'new',
+      name: placeholderName, row: placeholderRow,
+    }
+  }
 
   return {
     season_id: seasonId,
@@ -537,6 +741,7 @@ export async function importLeagueSeason(
       date_last: dates[dates.length - 1] ?? null,
       plan: fixturePlan,
     },
+    placeholder,
     committed: commit,
   }
 }

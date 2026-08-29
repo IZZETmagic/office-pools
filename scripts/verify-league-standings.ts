@@ -49,12 +49,19 @@ const head = (m: string) => console.log(`\n  ${m}\n  ${'-'.repeat(66)}`)
       .from('league_seasons')
       .select('season_id, competition_name, season_label, external_league_id, external_season')
       .neq('external_provider', 'scratch')
-    const season = (seasons ?? [])[0] as {
+      .order('competition_slug')
+    const all = (seasons ?? []) as Array<{
       season_id: string; competition_name: string; season_label: string
       external_league_id: number; external_season: number
-    } | undefined
-    if (!season) { bad('a real season exists'); return }
+    }>
+    if (all.length === 0) { bad('a real season exists'); return }
 
+    // ⚠ This used to be `seasons[0]`. Written when there was exactly one league,
+    // it kept reporting "All checks passed" after La Liga landed while having
+    // checked only the Premier League — a verification script that silently
+    // covers half of what it claims is worse than none, because it is trusted.
+    console.log(`\n  ${all.length} season(s) to check: ${all.map((s) => s.competition_name).join(', ')}`)
+    for (const season of all) {
     head(`1. Asking the feed — ${season.competition_name} ${season.season_label}`)
     note(`league ${season.external_league_id}, season ${season.external_season}`)
 
@@ -113,6 +120,7 @@ const head = (m: string) => console.log(`\n  ${m}\n  ${'-'.repeat(66)}`)
         note(`  ${m.club_name}: feed ${m.feed_points}, ours ${m.derived_points} (${m.points_delta >= 0 ? '+' : ''}${m.points_delta})`)
       }
       note('This is the detection mechanism working, not necessarily a bug.')
+    }
     }
   } catch (err) {
     failures++

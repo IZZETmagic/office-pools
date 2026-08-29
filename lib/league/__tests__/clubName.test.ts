@@ -29,6 +29,34 @@ describe('shortClubName', () => {
     expect(shortClubName('Tottenham Hotspur')).toBe('Tottenham')
   })
 
+  it('shortens the two La Liga names the table cannot fit', () => {
+    // Measured, not guessed: the Premier League's longest rendered name is
+    // "Nott'm Forest" (13). These arrived at 19 and 16.
+    expect(shortClubName('Deportivo La Coruna')).toBe('Deportivo')
+    expect(shortClubName('Racing Santander')).toBe('Racing')
+  })
+
+  it('still matches La Coruna if the feed ever grows its tilde', () => {
+    // The provider ships this unaccented today. If that changes, the rule must
+    // not silently stop firing — the failure would be a name three characters
+    // too long, which nothing would report.
+    expect(shortClubName('Deportivo La Coruña')).toBe('Deportivo')
+  })
+
+  it('leaves the merely-longish Spanish names alone', () => {
+    // The restraint IS the rule. A row per mildly-long name turns this back
+    // into the club table it exists not to be.
+    for (const name of ['Atletico Madrid', 'Rayo Vallecano', 'Athletic Club', 'Celta Vigo']) {
+      expect(shortClubName(name)).toBe(name)
+    }
+  })
+
+  it('does not shorten Racing de Ferrol, which keeps the two distinguishable', () => {
+    // The accepted cost of the Racing rule, pinned so it cannot widen by
+    // accident into a bare /\bRacing\b/ that collapses both to one label.
+    expect(shortClubName('Racing Ferrol')).toBe('Racing Ferrol')
+  })
+
   it('applies word rules to clubs it has never seen', () => {
     // The reason this is a word table and not a club table: nobody added a row
     // for either of these.
@@ -49,7 +77,10 @@ describe('shortClubName', () => {
   it('is stable when applied twice', () => {
     // The table renders per row on every re-render; a rule that re-fired on its
     // own output would erode a name a character at a time.
-    for (const name of ['Manchester United', 'Nottingham Forest', 'Wolverhampton Wanderers']) {
+    for (const name of [
+      'Manchester United', 'Nottingham Forest', 'Wolverhampton Wanderers',
+      'Deportivo La Coruna', 'Racing Santander',
+    ]) {
       const once = shortClubName(name)
       expect(shortClubName(once)).toBe(once)
     }

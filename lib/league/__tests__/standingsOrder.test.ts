@@ -22,6 +22,11 @@ function row(
   return { club_name, rank, points, goals_for, goals_against, played, goals_diff: goals_for - goals_against }
 }
 
+/** The same row, plus the feed's band text for the place it holds. */
+function banded(r: OrderableStanding, description: string | null): OrderableStanding {
+  return { ...r, description }
+}
+
 describe('orderStandings', () => {
   it('sorts clubs that are level on every ingested figure', () => {
     // The case that started this: identical on points, GD, scored, conceded.
@@ -109,5 +114,58 @@ describe('orderStandings', () => {
 
   it('survives an empty table', () => {
     expect(orderStandings([])).toEqual([])
+  })
+
+  // ===========================================================
+  // The band belongs to the PLACE
+  // ===========================================================
+  // Found on screen 2026-08-28: the relegation bar was on 17, 19 and 20, and
+  // 18 was clean. The ordering was right — the shading had followed the club.
+
+  it('⚠ leaves the band on the position when the clubs inside it swap', () => {
+    // Verbatim from the feed: Tottenham 17th unbanded, Coventry 18th relegated,
+    // level on every ingested figure. Coventry sorts first and takes 17 — but
+    // 18 is the relegation place, so 18 is what must carry the band.
+    const out = orderStandings([
+      banded(row('Tottenham', 17, 0, 0, 3), null),
+      banded(row('Coventry', 18, 0, 0, 3), 'Relegation - Championship'),
+    ])
+    expect(out.map((r) => [r.rank, r.club_name, r.description])).toEqual([
+      [17, 'Coventry', null],
+      [18, 'Tottenham', 'Relegation - Championship'],
+    ])
+  })
+
+  it('keeps each band on its own place across a group of three', () => {
+    // A tie group straddling the relegation line in both directions.
+    const out = orderStandings([
+      banded(row('Wolves', 17, 5, 4, 4), null),
+      banded(row('Arsenal', 18, 5, 4, 4), 'Relegation'),
+      banded(row('Chelsea', 19, 5, 4, 4), 'Relegation'),
+    ])
+    expect(out.map((r) => [r.rank, r.club_name, r.description])).toEqual([
+      [17, 'Arsenal', null],
+      [18, 'Chelsea', 'Relegation'],
+      [19, 'Wolves', 'Relegation'],
+    ])
+  })
+
+  it('does not invent a description on rows that never carried one', () => {
+    // Callers that do not select the column must come back with the same keys
+    // they went in with — an added `description: undefined` is a new field.
+    const out = orderStandings([
+      row('Manchester City', 7, 3, 2, 1),
+      row('Ipswich', 8, 3, 2, 1),
+    ])
+    expect(out.every((r) => !('description' in r))).toBe(true)
+  })
+
+  it('is stable when applied twice, bands included', () => {
+    const input = [
+      banded(row('Tottenham', 17, 0, 0, 3), null),
+      banded(row('Coventry', 18, 0, 0, 3), 'Relegation - Championship'),
+    ]
+    const once = orderStandings(input)
+    expect(orderStandings(once)).toEqual(once)
   })
 })

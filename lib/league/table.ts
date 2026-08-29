@@ -42,6 +42,8 @@ export type TableBreakdownRow = {
   releg_hit: boolean
   /** In the band the feed marks Europa. False when the competition has none. */
   europa_hit: boolean
+  /** In the band the feed marks Conference. False when the competition has none. */
+  conference_hit: boolean
   /** True once the season-end snapshot exists; until then the score is provisional. */
   is_final: boolean
 }

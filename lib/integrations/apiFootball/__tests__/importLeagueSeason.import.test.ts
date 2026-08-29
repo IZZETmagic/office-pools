@@ -26,8 +26,14 @@ const { importLeagueSeason } = await import('@/lib/integrations/apiFootball/impo
 
 type Row = Record<string, unknown>
 
-/** Records every insert per table; every SELECT resolves empty (fresh season). */
-function fakeSupabase() {
+/**
+ * Records every insert per table; every SELECT resolves empty (fresh season).
+ *
+ * `existing` seeds what `.maybeSingle()` returns for a given table, which is how
+ * the "a placeholder is adopted, never rewritten" case is expressed — the
+ * importer decides between insert and adopt on exactly that read.
+ */
+function fakeSupabase(existing: Record<string, Row> = {}) {
   const inserted: Record<string, Row[]> = {}
   let seq = 0
   const client = {
@@ -36,7 +42,7 @@ function fakeSupabase() {
       const chain = () => api
       api.select = chain
       api.eq = chain
-      api.maybeSingle = async () => ({ data: null, error: null })
+      api.maybeSingle = async () => ({ data: existing[table] ?? null, error: null })
       api.single = async () => ({ data: null, error: null })
       api.then = (res: (v: { data: never[]; error: null }) => unknown) => res({ data: [], error: null })
       api.insert = (rows: Row | Row[]) => {
@@ -47,6 +53,7 @@ function fakeSupabase() {
           season_id: `season-1`,
           club_id: `club-${r.external_club_id ?? ++seq}`,
           matchweek_id: `mw-${r.matchweek_number ?? ++seq}`,
+          tournament_id: `tournament-${++seq}`,
         }))
         return {
           select: () => ({
@@ -63,10 +70,34 @@ function fakeSupabase() {
 }
 
 const team = (id: number, name: string, code: string) => ({ team: { id, name, code, logo: `${code}.png` } })
+/**
+ * ⚠ The `league` block carries Spain's country and crest while `ARGS` below says
+ * league 39 / 'ENG'. That mismatch is DELIBERATE: the placeholder's
+ * `host_countries` and `logo_url` must come off the feed response, and asserting
+ * a value the args could also have produced would prove nothing.
+ */
 const fixture = (id: number, round: string, date: string, home: number, away: number) => ({
   fixture: { id, date, venue: { name: 'Ground', city: 'Town' }, status: { short: 'NS' } },
-  league: { round },
+  // The real feed ALWAYS sends this block, nulls and all. Omitting it here is
+  // what let the importer read `f.goals` for a year without anybody noticing it
+  // never had to handle a played match.
+  goals: { home: null as number | null, away: null as number | null },
+  league: {
+    round,
+    name: 'La Liga',
+    country: 'Spain',
+    logo: 'https://media.api-sports.io/football/leagues/140.png',
+  },
   teams: { home: { id: home, name: `T${home}` }, away: { id: away, name: `T${away}` } },
+})
+
+/** The same fixture, already played. `FT` plus a scoreline, as the feed sends it. */
+const played = (
+  id: number, round: string, date: string, home: number, away: number, hg: number, ag: number,
+) => ({
+  ...fixture(id, round, date, home, away),
+  fixture: { id, date, venue: { name: 'Ground', city: 'Town' }, status: { short: 'FT' } },
+  goals: { home: hg as number | null, away: ag as number | null },
 })
 
 const ARGS = {
@@ -94,10 +125,128 @@ describe('importLeagueSeason — writes the league structure', () => {
     expect(inserted.league_matchweeks).toHaveLength(2)
     expect(inserted.league_fixtures).toHaveLength(2)
 
-    // Nothing goes near the World Cup's tables any more.
+    // Nothing goes near the World Cup's FIXTURE and TEAM tables. This is the
+    // containment guarantee and it is unchanged.
     expect(inserted.teams).toBeUndefined()
     expect(inserted.matches).toBeUndefined()
+
+    // `tournaments` IS written now, and this assertion used to say it was not.
+    // The importer creates the competition's placeholder, because without one
+    // `pools/create` refuses with a 409 and the wizard cannot see the league at
+    // all. So the claim worth defending is no longer "zero rows" — it is
+    // "exactly one row, and unmistakably a league".
+    expect(inserted.tournaments).toHaveLength(1)
+    expect(inserted.tournaments[0]).toMatchObject({
+      format: 'league',
+      tournament_type: 'league',
+      external_provider: 'api_football',
+      external_league_id: 39,
+      external_season: 2026,
+      num_groups: 0,
+      teams_per_group: 0,
+    })
+    expect(res.placeholder.status).toBe('new')
+  })
+
+  it('derives the placeholder from the feed and the counts, not from a catalogue', async () => {
+    getTeamsForLeague.mockResolvedValue([team(1, 'Alpha', 'ALP'), team(2, 'Beta', 'BET')])
+    getFixtures.mockResolvedValue([
+      fixture(100, 'Regular Season - 1', '2026-08-15T12:00:00Z', 1, 2),
+      fixture(101, 'Regular Season - 2', '2027-05-30T14:00:00Z', 2, 1),
+    ])
+
+    const { client, inserted } = fakeSupabase()
+    await importLeagueSeason(client, ARGS)
+
+    const ph = inserted.tournaments[0]
+    // The window spans the whole season, not just the first fixture.
+    expect(ph.start_date).toBe('2026-08-15')
+    expect(ph.end_date).toBe('2027-05-30')
+    expect(ph.prediction_deadline).toBe('2026-08-15T12:00:00Z')
+    // Counts, not constants — this is what makes it right for an 18-club league.
+    expect(ph.num_teams).toBe(2)
+    expect(ph.description).toBe('2 clubs, 2 matchweeks, 2 fixtures. Flat round-robin: no groups, no knockout.')
+    // Country and crest come off the fixtures response already in hand.
+    expect(ph.host_countries).toBe('Spain')
+    expect(ph.logo_url).toBe('https://media.api-sports.io/football/leagues/140.png')
+  })
+
+  it('adopts an existing placeholder and never rewrites it', async () => {
+    getTeamsForLeague.mockResolvedValue([team(1, 'Alpha', 'ALP'), team(2, 'Beta', 'BET')])
+    getFixtures.mockResolvedValue([
+      fixture(100, 'Regular Season - 1', '2026-08-15T12:00:00Z', 1, 2),
+    ])
+
+    // The Premier League's placeholder was made by hand and may have been tuned
+    // since. A re-run that silently reset its dates would be an outage, not a fix.
+    const { client, inserted } = fakeSupabase({ tournaments: { tournament_id: 'hand-made' } })
+    const res = await importLeagueSeason(client, ARGS)
+
     expect(inserted.tournaments).toBeUndefined()
+    expect(res.placeholder).toMatchObject({ tournament_id: 'hand-made', status: 'existing' })
+  })
+
+  it('imports a match that has ALREADY been played with its real result', async () => {
+    // The mid-season import. This used to write `scheduled / not completed` for
+    // every fixture in the season, which is only true if you import before it
+    // starts — how the Premier League was imported, and why nobody saw it.
+    getTeamsForLeague.mockResolvedValue([team(1, 'Alpha', 'ALP'), team(2, 'Beta', 'BET')])
+    getFixtures.mockResolvedValue([
+      played(100, 'Regular Season - 1', '2026-08-15T12:00:00Z', 1, 2, 3, 0),
+      fixture(101, 'Regular Season - 2', '2026-08-22T12:00:00Z', 2, 1),
+    ])
+
+    const { client, inserted } = fakeSupabase()
+    await importLeagueSeason(client, ARGS)
+
+    const [first, second] = inserted.league_fixtures
+    expect(first).toMatchObject({
+      status: 'completed', is_completed: true, home_goals: 3, away_goals: 0,
+    })
+    // Stamped with the KICKOFF, not `now()` — we did not witness the whistle,
+    // and now() would claim a whole season finished the instant a script ran.
+    expect(first.completed_at).toBe('2026-08-15T12:00:00Z')
+
+    expect(second).toMatchObject({
+      status: 'scheduled', is_completed: false, home_goals: null, away_goals: null,
+      completed_at: null,
+    })
+  })
+
+  it('refuses to mark a final fixture completed when the feed has no score', async () => {
+    // `league_fixtures_completed_ck` is CHECK (NOT is_completed OR home_goals IS
+    // NOT NULL), so writing FT-without-goals as completed raises 23514 and takes
+    // the whole batch down. Same rule fixtureToLeagueUpdate follows.
+    getTeamsForLeague.mockResolvedValue([team(1, 'Alpha', 'ALP'), team(2, 'Beta', 'BET')])
+    getFixtures.mockResolvedValue([
+      { ...played(100, 'Regular Season - 1', '2026-08-15T12:00:00Z', 1, 2, 0, 0),
+        goals: { home: null, away: null } },
+    ])
+
+    const { client, inserted } = fakeSupabase()
+    await importLeagueSeason(client, ARGS)
+
+    expect(inserted.league_fixtures[0]).toMatchObject({
+      status: 'completed', is_completed: false, home_goals: null, away_goals: null,
+      completed_at: null,
+    })
+  })
+
+  it('never writes half a scoreline', async () => {
+    // `league_fixtures_result_pair_ck` — goals are NULL together or set together.
+    getTeamsForLeague.mockResolvedValue([team(1, 'Alpha', 'ALP'), team(2, 'Beta', 'BET')])
+    getFixtures.mockResolvedValue([
+      { ...played(100, 'Regular Season - 1', '2026-08-15T12:00:00Z', 1, 2, 0, 0),
+        goals: { home: 2, away: null } },
+    ])
+
+    const { client, inserted } = fakeSupabase()
+    await importLeagueSeason(client, ARGS)
+
+    const row = inserted.league_fixtures[0]
+    expect(row.home_goals).toBeNull()
+    expect(row.away_goals).toBeNull()
+    expect(row.is_completed).toBe(false)
   })
 
   it('gives a club a real name, not a country with a flag', async () => {

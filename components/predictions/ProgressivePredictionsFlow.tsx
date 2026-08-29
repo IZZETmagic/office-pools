@@ -26,6 +26,7 @@ import {
 // Round identity comes from the competition, not from lib/tournament's seven
 // hardcoded World Cup keys — a league pool's rounds are its matchweeks.
 import { isMatchweekKey, matchesInRound, roundLabel, roundShortLabel, sortRoundKeys } from '@/lib/competitionRounds'
+import { earlyKickoff } from '@/lib/league/earlyKickoff'
 import { resolveMatchesFromActual } from '@/lib/bracketResolver'
 import type { PoolRoundState, EntryRoundSubmission, RoundStateValue } from '@/app/pools/[pool_id]/types'
 import type { SaveStatus } from './PredictionsFlow'
@@ -235,6 +236,19 @@ export default function ProgressivePredictionsFlow({
     (isRoundSubmitted && !isMatchweekRound)
 
   // Match & round stats
+  /**
+   * Does THIS round lock long before most of it is played?
+   *
+   * Computed from the round's own kickoffs rather than passed down, because the
+   * fixtures are already here and the alternative is threading a derived fact
+   * through the page, the pool payload and the props. Null for all 38 Premier
+   * League rounds and 35 of 38 La Liga ones — see lib/league/earlyKickoff.ts.
+   */
+  const roundEarlyKickoff = useMemo(
+    () => earlyKickoff(roundMatches.map((m) => m.match_date)),
+    [roundMatches],
+  )
+
   const roundMatchCount = roundMatches.length
   const completedRoundMatchCount = roundMatches.filter(m => (m as any).is_completed).length
   const predictedRoundCount = isResults
@@ -602,6 +616,7 @@ export default function ProgressivePredictionsFlow({
         matchCount={roundMatchCount}
         completedMatchCount={completedRoundMatchCount}
         predictedCount={predictedRoundCount}
+        earlyKickoff={roundEarlyKickoff}
         nav={
           isMatchweekRound
             ? { keys: orderedRoundKeys, selected: selectedRound, onSelect: setSelectedRound }

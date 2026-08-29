@@ -113,6 +113,8 @@ export type TableModeData = {
   relegationN: number
   europaFrom: number | null
   europaTo: number | null
+  conferenceFrom: number | null
+  conferenceTo: number | null
   /** The deadline has passed: nobody may edit their table. Gates WRITES. */
   isLocked: boolean
   /**
@@ -140,6 +142,7 @@ export type TableModeData = {
     relegationBonus: number
     perfectTopFourBonus: number
     europaBonus: number
+    conferenceBonus: number
   }
 }
 
@@ -1685,6 +1688,8 @@ export function PoolDetail({
                         relegationN: tableModeData.relegationN,
                         europaFrom: tableModeData.europaFrom,
                         europaTo: tableModeData.europaTo,
+                        conferenceFrom: tableModeData.conferenceFrom,
+                        conferenceTo: tableModeData.conferenceTo,
                         prices: tableModeData.prices,
                       }
                     : null
@@ -1750,6 +1755,8 @@ export function PoolDetail({
                 relegationN={tableModeData.relegationN}
                 europaFrom={tableModeData.europaFrom}
                 europaTo={tableModeData.europaTo}
+                conferenceFrom={tableModeData.conferenceFrom}
+                conferenceTo={tableModeData.conferenceTo}
                 isLocked={tableModeData.isLocked}
                 joinedAfterLock={tableModeData.joinedAfterLock}
                 prices={tableModeData.prices}

@@ -72,6 +72,13 @@ type Props = {
    */
   europaFrom: number | null
   europaTo: number | null
+  /**
+   * The Conference band, same shape and same rule (migration 113). NULL until
+   * the feed names it — which for England is not until the cups resolve, so
+   * this band appears during the season rather than at the start of it.
+   */
+  conferenceFrom: number | null
+  conferenceTo: number | null
   /** Read-only because the deadline passed — decision 11 covers joining late. */
   isLocked: boolean
   /** True when this member joined after the deadline and never got to predict. */
@@ -90,20 +97,33 @@ type Props = {
 export function bandOf(
   position: number, clubCount: number, topN: number, relegationN: number,
   europaFrom: number | null, europaTo: number | null,
+  conferenceFrom: number | null = null, conferenceTo: number | null = null,
 ) {
   if (position === 1) return 'champion' as const
   if (position <= topN) return 'top' as const
   if (europaFrom !== null && europaTo !== null && position >= europaFrom && position <= europaTo) {
     return 'europa' as const
   }
+  if (conferenceFrom !== null && conferenceTo !== null
+      && position >= conferenceFrom && position <= conferenceTo) {
+    return 'conference' as const
+  }
   if (position > clubCount - relegationN) return 'relegation' as const
   return null
 }
 
+/**
+ * ⚠ Conference is a LIGHTER STEP OF THE EUROPA GREEN, not a fifth hue. Four
+ * band colours are already in play and the only unused token family is
+ * `accent`, which is gold — a neighbour of the amber that marks the champion.
+ * Shading the third European competition as a rung below the second says what
+ * it actually is, and is how printed league tables have always done it.
+ */
 const BAND_ROW: Record<string, string> = {
   champion: 'bg-warning-50/60 border-warning-200',
   top: 'bg-primary-50/50 border-primary-200',
   europa: 'bg-success-50/50 border-success-200',
+  conference: 'bg-success-50/30 border-success-100',
   relegation: 'bg-danger-50/50 border-danger-200',
 }
 
@@ -111,6 +131,7 @@ export const BAND_STRIPE: Record<string, string> = {
   champion: 'bg-warning-500',
   top: 'bg-primary-500',
   europa: 'bg-success-500',
+  conference: 'bg-success-300',
   relegation: 'bg-danger-500',
 }
 
@@ -124,6 +145,8 @@ type RowProps = {
   relegationN: number
   europaFrom: number | null
   europaTo: number | null
+  conferenceFrom: number | null
+  conferenceTo: number | null
 }
 
 /** The row's appearance, with no drag wiring — safe to render on the server. */
@@ -158,8 +181,8 @@ const ROW_BASE = 'flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl border tran
  * mount and draggable after — you cannot drag before hydration anyway, and this
  * way the ids are only ever generated once, on the client.
  */
-function StaticClubRow({ club, position, clubCount, topN, relegationN, europaFrom, europaTo }: RowProps) {
-  const band = bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo)
+function StaticClubRow({ club, position, clubCount, topN, relegationN, europaFrom, europaTo, conferenceFrom, conferenceTo }: RowProps) {
+  const band = bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo, conferenceFrom, conferenceTo)
   return (
     <div className={`${ROW_BASE} ${band ? BAND_ROW[band] : 'bg-surface-raised border-border-default'}`}>
       <ClubRowInner club={club} position={position} band={band} />
@@ -167,11 +190,11 @@ function StaticClubRow({ club, position, clubCount, topN, relegationN, europaFro
   )
 }
 
-function SortableClubRow({ club, position, clubCount, topN, relegationN, europaFrom, europaTo }: RowProps) {
+function SortableClubRow({ club, position, clubCount, topN, relegationN, europaFrom, europaTo, conferenceFrom, conferenceTo }: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: club.club_id })
 
-  const band = bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo)
+  const band = bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo, conferenceFrom, conferenceTo)
 
   return (
     <div
@@ -214,6 +237,8 @@ export default function TablePredictionTab({
   relegationN,
   europaFrom,
   europaTo,
+  conferenceFrom,
+  conferenceTo,
   isLocked,
   joinedAfterLock,
   prices,
@@ -445,6 +470,8 @@ export default function TablePredictionTab({
         relegationN={relegationN}
         europaFrom={europaFrom}
         europaTo={europaTo}
+        conferenceFrom={conferenceFrom}
+        conferenceTo={conferenceTo}
       />
     )
   }
@@ -517,6 +544,8 @@ export default function TablePredictionTab({
               relegationN={relegationN}
               europaFrom={europaFrom}
               europaTo={europaTo}
+              conferenceFrom={conferenceFrom}
+              conferenceTo={conferenceTo}
             />
           ))}
         </div>
@@ -534,6 +563,8 @@ export default function TablePredictionTab({
                   relegationN={relegationN}
                   europaFrom={europaFrom}
                   europaTo={europaTo}
+                  conferenceFrom={conferenceFrom}
+                  conferenceTo={conferenceTo}
                 />
               ))}
             </div>
@@ -546,7 +577,7 @@ export default function TablePredictionTab({
           by the time somebody is arranging the relegation places, which is the
           end of the table where the colours are least obvious. Here it sits
           directly under the rows it explains. */}
-      <BandLegend topN={topN} europaFrom={europaFrom} />
+      <BandLegend topN={topN} europaFrom={europaFrom} conferenceFrom={conferenceFrom} />
 
       {/* The footer is a COMMIT, and only exists until there is something to
           commit. Before a table exists the order on screen is the seeded one
@@ -589,12 +620,15 @@ export default function TablePredictionTab({
  * because those bands were once hardcoded to England's 4-and-3, so the shape
  * that reads as a constant here is the one worth keeping in one place.
  */
-function BandLegend({ topN, europaFrom }: { topN: number; europaFrom: number | null }) {
+function BandLegend({ topN, europaFrom, conferenceFrom }: {
+  topN: number; europaFrom: number | null; conferenceFrom: number | null
+}) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <Legend stripe={BAND_STRIPE.champion} label="Champion" />
       <Legend stripe={BAND_STRIPE.top} label={`Top ${topN}`} />
       {europaFrom !== null && <Legend stripe={BAND_STRIPE.europa} label="Europa" />}
+      {conferenceFrom !== null && <Legend stripe={BAND_STRIPE.conference} label="Conference" />}
       <Legend stripe={BAND_STRIPE.relegation} label="Relegation" />
     </div>
   )
@@ -690,6 +724,8 @@ function LockedView({
   relegationN,
   europaFrom,
   europaTo,
+  conferenceFrom,
+  conferenceTo,
 }: {
   breakdown: TableBreakdownRow[]
   joinedAfterLock: boolean
@@ -699,6 +735,8 @@ function LockedView({
   relegationN: number
   europaFrom: number | null
   europaTo: number | null
+  conferenceFrom: number | null
+  conferenceTo: number | null
   prices: TablePrices
 }) {
   // Decision 11, said plainly rather than hidden. A member who joined after the
@@ -741,7 +779,7 @@ function LockedView({
         breakdown={breakdown}
         topN={topN}
         prices={prices}
-        bandOf={(position) => bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo)}
+        bandOf={(position) => bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo, conferenceFrom, conferenceTo)}
         bandStripe={BAND_STRIPE}
         ownerLabel="You"
       />

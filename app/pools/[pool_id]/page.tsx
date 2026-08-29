@@ -283,7 +283,7 @@ export default async function PoolPage({
           // ⚠ One literal, not a concatenation. postgrest-js infers the row
           // shape from the string, and a `'a, ' + 'b'` expression collapses it
           // to GenericStringError — every field access then fails to compile.
-          .select('table_top_n, table_relegation_n, table_exact_points, table_step_penalty, table_champion_bonus, table_top_four_bonus, table_relegation_bonus, table_perfect_top_four_bonus, table_europa_bonus')
+          .select('table_top_n, table_relegation_n, table_exact_points, table_step_penalty, table_champion_bonus, table_top_four_bonus, table_relegation_bonus, table_perfect_top_four_bonus, table_europa_bonus, table_conference_bonus')
           .eq('pool_id', pool_id)
           .maybeSingle(),
         supabase.rpc('league_default_bands', { p_season_id: pool.league_season_id }),
@@ -292,6 +292,7 @@ export default async function PoolPage({
       const bands = (bandsRes.data ?? {}) as {
         top_n?: number; relegation_n?: number
         europa_from?: number | null; europa_to?: number | null
+        conference_from?: number | null; conference_to?: number | null
       }
       if (clubErr) console.error('[pool page] season clubs failed:', clubErr)
 
@@ -339,11 +340,15 @@ export default async function PoolPage({
           // Defaults mirror migration 093's COALESCE, which is the only place
           // that decides what a Europa hit is worth.
           europaBonus: settingsRes.data?.table_europa_bonus ?? 50,
+          // Migration 113: half the Europa band, which is half the top band.
+          conferenceBonus: settingsRes.data?.table_conference_bonus ?? 25,
         },
         // Bounds, not a count — and null is a real answer: a competition without
         // Europa places should not shade a band it does not have.
         europaFrom: bands.europa_from ?? null,
         europaTo: bands.europa_to ?? null,
+        conferenceFrom: bands.conference_from ?? null,
+        conferenceTo: bands.conference_to ?? null,
         isLocked,
         // Whether RIVALS' tables may be opened. The same fact as `isLocked`
         // since 110 — kept as its own field because the consumer asks a

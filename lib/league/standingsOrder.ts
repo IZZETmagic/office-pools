@@ -50,6 +50,12 @@ export type OrderableStanding = {
   goals_for: number
   goals_against: number
   played: number
+  /**
+   * The feed's qualification band text — "Relegation - Championship" and so on.
+   * Optional because not every caller reads the column, but where it IS read it
+   * has to travel with the place rather than the club. See below.
+   */
+  description?: string | null
 }
 
 /** Every ingested figure must match before two clubs are considered level. */
@@ -66,9 +72,28 @@ function isLevel(a: OrderableStanding, b: OrderableStanding): boolean {
 /**
  * Rows in the feed's order, with each run of level clubs sorted by name.
  *
- * The rank NUMBERS stay where they were — a group holding 7 and 8 still shows 7
- * and 8, just against different clubs. Renumbering would be deriving rank,
- * which is the thing that is not allowed.
+ * ## The clubs move between places; the places do not move
+ *
+ * A place owns two things, and BOTH stay put when the clubs inside a tie group
+ * are reordered:
+ *
+ *   * its `rank` — a group holding 7 and 8 still shows 7 and 8, just against
+ *     different clubs. Renumbering would be deriving rank, which is the thing
+ *     that is not allowed.
+ *   * its `description` — the feed's band text describes the PLACE ("Relegation
+ *     - Championship" is a fact about finishing 18th), not the club standing in
+ *     it, so it belongs to the number it arrived with.
+ *
+ * ⚠ Everything else belongs to the CLUB and rides along with it: `form`,
+ * `movement`, the crest, the name. The stat columns are equal across a tie
+ * group by definition, so they cannot tell the difference either way. Before
+ * adding a field here, ask which of the two it describes.
+ *
+ * Missing the `description` half is what put the relegation bar on the wrong
+ * row: on 2026-08-28 the feed had Tottenham 17th with no band and Coventry 18th
+ * relegated, exactly level on every ingested figure. Alphabetical put Coventry
+ * into 17 — and the red bar went with it, so the table showed 17, 19 and 20
+ * going down and 18 surviving.
  *
  * Input is not mutated; callers hold the array from the server read.
  */
@@ -87,11 +112,24 @@ export function orderStandings<T extends OrderableStanding>(rows: readonly T[]):
       out.push(rows[i])
     } else {
       const group = rows.slice(i, j)
-      // The positions this group occupies, kept in ascending order so the
-      // numbers read 7, 8, 9 whatever the clubs turn out to be.
-      const ranks = group.map((r) => r.rank).sort((a, b) => a - b)
+      // The PLACES this group occupies — each one's number and its band text —
+      // kept in ascending rank order, so the numbers read 7, 8, 9 and the
+      // shading stays on the positions it describes, whatever the clubs turn
+      // out to be.
+      const places = group
+        .map((r) => ({ rank: r.rank, description: r.description }))
+        .sort((a, b) => a.rank - b.rank)
       const sorted = [...group].sort((a, b) => a.club_name.localeCompare(b.club_name))
-      sorted.forEach((row, k) => out.push({ ...row, rank: ranks[k] }))
+      sorted.forEach((row, k) => {
+        // Re-home `description` only where the rows actually carry the column.
+        // Writing it unconditionally would invent the key on callers that never
+        // selected it, and `undefined` reads differently from absent.
+        out.push(
+          'description' in row
+            ? { ...row, rank: places[k].rank, description: places[k].description }
+            : { ...row, rank: places[k].rank },
+        )
+      })
     }
     i = j
   }

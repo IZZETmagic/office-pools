@@ -6,6 +6,20 @@ import { Icon } from '@/components/ui/Icon'
 import { Select } from '@/components/ui/Select'
 import type { PoolRoundState, EntryRoundSubmission, RoundStateValue } from '@/app/pools/[pool_id]/types'
 import { isMatchweekKey, roundLabel } from '@/lib/competitionRounds'
+import { LocalTime } from '@/components/LocalTime'
+
+/**
+ * The day the bulk of a dragged matchweek is actually played.
+ *
+ * Rendered through `LocalTime` (client-only) for the reason its header gives:
+ * formatting a date on the server freezes it in the server's zone, which is the
+ * bug the component exists to prevent. No time of day — the point is which
+ * WEEKEND the rest of the round lands on, and a clock time would invite the
+ * reader to think it is another deadline.
+ */
+function formatBulkDate(d: Date): string {
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
 
 type RoundStatusCardProps = {
   roundState: PoolRoundState
@@ -19,6 +33,15 @@ type RoundStatusCardProps = {
    * the latter, on the one screen whose entire subject is the former.
    */
   predictedCount?: number
+  /**
+   * Set only when this round LOCKS well before most of it is played, because
+   * one or more fixtures were brought forward. See lib/league/earlyKickoff.ts.
+   *
+   * Optional and normally absent: it is 0 of 38 Premier League rounds and 3 of
+   * 38 La Liga rounds. A note that appeared every week would be ignored every
+   * week.
+   */
+  earlyKickoff?: { count: number; bulkAt: string; leadDays: number } | null
   /**
    * Matchweek navigation, when the caller has a season to move through.
    *
@@ -151,6 +174,7 @@ function CountdownTimer({ deadline, emphasis = false }: { deadline: string; emph
 
 export function RoundStatusCard({
   roundState, submission, matchCount, completedMatchCount, predictedCount = 0, nav,
+  earlyKickoff = null,
 }: RoundStatusCardProps) {
   // ⚠ `roundLabel`, not `ROUND_LABELS[k] ?? k`. That fallback returns the RAW
   // KEY, so a league matchweek rendered as the string `mw_2` at the top of the
@@ -265,6 +289,32 @@ export function RoundStatusCard({
             )}
           </div>
         </div>
+
+        {/* ⚠ WHY THE DEADLINE LOOKS WRONG, said before the member decides it is.
+            
+            A matchweek locks at its EARLIEST kickoff, because everything in it
+            must be picked before anything in it is played. Usually the round is
+            one weekend and nobody notices. Occasionally a fixture is brought
+            forward — La Liga matchweek 6 is played on 3 and 16 September — and
+            then the screen asks for ten predictions, says the deadline is
+            Thursday, and plays nine of the games a fortnight later.
+
+            Stating the mechanism plainly is the whole point: "picks close early
+            because one match is played early" is a sentence a member can check
+            against the fixture list two inches below it. Hiding it would leave
+            them to conclude the deadline is a mistake — or worse, that we moved
+            it to catch them out.
+
+            Deliberately NOT a warning colour. Nothing is wrong and nothing is
+            urgent; the countdown beside it already carries urgency. */}
+        {showDeadline && earlyKickoff && (
+          <p className="t-body text-muted mt-2.5">
+            Picks close {earlyKickoff.leadDays} days before most of this
+            matchweek is played — {earlyKickoff.count === 1 ? 'one match is' : `${earlyKickoff.count} matches are`}{' '}
+            played early. The rest follow on{' '}
+            <LocalTime iso={earlyKickoff.bulkAt} format={formatBulkDate} />.
+          </p>
+        )}
 
         {/* The one state that still needs a sentence. Locked says its piece in
             the empty state below the card, and open needs nothing beyond the

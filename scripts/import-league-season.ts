@@ -29,10 +29,21 @@ try {
 }
 
 // The competitions we know how to import. A new league is a row here plus one
-// run — no code. Deliberately small: v1 ships the Premier League only, and an
-// entry that has never been run is a claim, not a capability.
+// run — no code. An entry that has never been run is a claim, not a capability,
+// so this stays as small as what has actually been imported.
+//
+// ⚠ Only leagues with ONE clean regular-season phase belong here today. The feed
+// GROWS a split or play-off phase partway through a season, and the fixture sync
+// never inserts a fixture the provider invents later — so Scotland, Belgium, the
+// Netherlands, Portugal and the Championship would silently end short. See
+// drafts/2026-08-28_european_leagues_expansion_research.md §4.
 const CATALOGUE: Record<string, { name: string; country: string; apiLeagueId: number }> = {
   'premier-league': { name: 'Premier League', country: 'ENG', apiLeagueId: 39 },
+  // Added 2026-08-28 as league #2. 20 clubs, 38 matchweeks, 380 fixtures — the
+  // same shape as England, which is exactly why it was chosen to go first.
+  'la-liga': { name: 'La Liga', country: 'ESP', apiLeagueId: 140 },
+  // Added 2026-08-28 as league #3. Same shape again: 20/38/380, one phase.
+  'serie-a': { name: 'Serie A', country: 'ITA', apiLeagueId: 135 },
 }
 
 function seasonLabel(startYear: number): string {
@@ -129,7 +140,40 @@ async function main() {
     for (const s of skipped.slice(0, 20)) console.log(`    - ${s.home} vs ${s.away} [${s.provider_round}]: ${s.reason}`)
   }
 
-  console.log(apply ? '\nApplied — season, clubs, matchweeks and fixtures inserted.' : '\nNo changes written (dry run). Re-run with --apply.')
+  // The competition record. Reported LOUDLY and on its own line, because its
+  // absence is invisible until somebody reaches the last step of the pool wizard
+  // and gets a 409 — which is exactly how the Premier League shipped a complete
+  // season nobody could make a pool for.
+  console.log('\nCompetition record (`tournaments` placeholder):')
+  if (res.placeholder.status === 'existing') {
+    console.log(`    EXISTS   ${res.placeholder.name}  [${res.placeholder.tournament_id}]`)
+    console.log(`    ${res.placeholder.reason ?? 'adopted'}`)
+  } else {
+    console.log(res.placeholder.status === 'new'
+      ? `    CREATED  ${res.placeholder.name}  [${res.placeholder.tournament_id}]`
+      : `    WOULD CREATE  ${res.placeholder.name}`)
+    // Printed field by field, because every one of these is DERIVED — from the
+    // feed or from the counts — and a dry run that hides them cannot be used to
+    // check them. `host_countries` and `logo_url` in particular come off the
+    // fixtures response, so a wrong one means the feed shape changed.
+    const row = res.placeholder.row
+    if (row) {
+      const show = ['host_countries', 'num_teams', 'start_date', 'end_date',
+                    'prediction_deadline', 'logo_url', 'description'] as const
+      for (const k of show) {
+        console.log(`      ${k.padEnd(20)} ${String(row[k] ?? '(null)')}`)
+      }
+    } else {
+      console.log('      (no kickoff times — a placeholder cannot be built)')
+    }
+    if (res.placeholder.status === 'planned') {
+      console.log('    Without it `pools/create` returns 409 and the wizard cannot see this league.')
+    }
+  }
+
+  console.log(apply
+    ? '\nApplied — season, clubs, matchweeks, fixtures and the competition record.'
+    : '\nNo changes written (dry run). Re-run with --apply.')
 }
 
 main().catch((e) => { console.error('FAILED:', e instanceof Error ? e.message : e); process.exit(1) })

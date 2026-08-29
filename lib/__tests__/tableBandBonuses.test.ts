@@ -40,10 +40,11 @@ const PRICES: TablePrices = {
   perfectTopFourBonus: 250,
   relegationBonus: 100,
   europaBonus: 50,
+  conferenceBonus: 25,
 }
 
 function rows(
-  hits: Array<Partial<Pick<TableBreakdownRow, 'champion_hit' | 'top_hit' | 'releg_hit' | 'europa_hit'>>>,
+  hits: Array<Partial<Pick<TableBreakdownRow, 'champion_hit' | 'top_hit' | 'releg_hit' | 'europa_hit' | 'conference_hit'>>>,
 ): TableBreakdownRow[] {
   return hits.map((h, i) => ({
     club_id: `c${i}`,
@@ -57,6 +58,7 @@ function rows(
     top_hit: false,
     releg_hit: false,
     europa_hit: false,
+    conference_hit: false,
     is_final: false,
     ...h,
   })) as TableBreakdownRow[]
@@ -91,6 +93,13 @@ describe('bandBonuses', () => {
 
   it('counts Europa hits at their own price', () => {
     expect(bandBonuses(rows([{ europa_hit: true }, { europa_hit: true }]), 4, PRICES).total).toBe(100)
+  })
+
+  // Migration 113. Half the Europa band, which is half the top band — the
+  // ladder is the point, so the test prices the rung rather than the number.
+  it('counts Conference hits at half the Europa price', () => {
+    expect(bandBonuses(rows([{ conference_hit: true }]), 4, PRICES).total).toBe(25)
+    expect(bandBonuses(rows([{ europa_hit: true }, { conference_hit: true }]), 4, PRICES).total).toBe(75)
   })
 
   it('a competition with no top band cannot earn the set bonus', () => {

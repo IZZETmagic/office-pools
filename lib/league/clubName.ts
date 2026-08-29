@@ -28,6 +28,23 @@
  * "Nottm Forest". "Manchester" → "Man" is the one that does the real work, and
  * `United` is deliberately left alone — "Man United" reads more naturally than
  * "Man Utd" at the size we use it, and it is the form Ryan asked for.
+ *
+ * ## What La Liga added, and what it did NOT
+ *
+ * Measured before adding anything: after shortening, the Premier League's
+ * longest rendered name is "Nott'm Forest" at 13 characters. La Liga arrived
+ * with "Deportivo La Coruna" at 19 and "Racing Santander" at 16 — roughly 50%
+ * past what the 375px table was built for. Those two got rules.
+ *
+ * "Atletico Madrid" (15) did NOT, and that restraint is the point: it is two
+ * characters over, every plausible short form ("Atletico", "Atleti") is a
+ * judgement call rather than something the competition writes, and a rule
+ * per mildly-long name is how this becomes the club table it exists not to be.
+ *
+ * ⚠ ACCENTS ARE OUT OF SCOPE, deliberately. The feed ships "Alaves",
+ * "Atletico Madrid" and "La Coruna" without them. Restoring accents correctly
+ * is a per-club map — exactly what this file refuses to become — so it belongs
+ * in ingestion or with the provider, not here.
  */
 
 /**
@@ -41,6 +58,24 @@ const SHORTENINGS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bBrighton & Hove Albion\b/i, 'Brighton'],
   [/\bWest Bromwich Albion\b/i, 'West Brom'],
   [/\bTottenham Hotspur\b/i, 'Tottenham'],
+
+  // Spain, added with La Liga 2026-08-28. Both are the form LaLiga writes in
+  // its own fixture lists, and both are whole-name forms rather than word rules
+  // because neither word is worth shortening on its own: "Deportivo" prefixes
+  // several unrelated clubs (Alaves is Deportivo Alaves) and "Santander" is a
+  // place, not a shortenable component.
+  //
+  // The `[nñ]` is deliberate. The feed currently ships this name UNACCENTED —
+  // "Deportivo La Coruna" — but that is a property of the provider, not of the
+  // club, and a rule that silently stopped matching if the feed ever fixed its
+  // encoding would fail the way this file is least able to notice: quietly, by
+  // rendering a name three characters too long.
+  [/\bDeportivo La Coru[nñ]a\b/i, 'Deportivo'],
+  // ⚠ Known cost, accepted: Racing de Ferrol shortens to nothing and stays
+  // "Racing Ferrol", so a table holding BOTH would show "Racing" and "Racing
+  // Ferrol". They have never shared a division, and this is a label, never an
+  // identity — but if they ever do, this rule is the thing to revisit.
+  [/\bRacing Santander\b/i, 'Racing'],
 
   // Word-level. These carry across competitions.
   [/\bManchester\b/i, 'Man'],
