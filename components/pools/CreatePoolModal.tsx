@@ -229,9 +229,6 @@ function todayLocal(): string {
  * a mock of it.
  */
 const COMING_SOON = [
-  { id: 140, name: 'La Liga', country: 'Spain' },
-  { id: 78, name: 'Bundesliga', country: 'Germany' },
-  { id: 135, name: 'Serie A', country: 'Italy' },
   { id: 61, name: 'Ligue 1', country: 'France' },
   { id: 2, name: 'Champions League', country: 'Europe' },
 ] as const

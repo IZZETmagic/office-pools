@@ -193,6 +193,29 @@ season that stopped). It affects **Scotland, Belgium, Netherlands, Portugal, Ger
 the Championship** — every league with a play-off or split phase. It does *not* affect La Liga,
 Serie A or the Premier League.
 
+### ⚠ CORRECTION, 2026-08-28 — this list conflates two different consequences
+
+Checked against a **finished** season rather than reasoning from the phase list. `league=78&season=2024`
+returns **308** fixtures:
+
+```
+phase "Regular Season"    306 fixtures, rounds 1–34   <- the league, COMPLETE
+phase "Relegation Round"    2 fixtures                <- vs a 2. Bundesliga club
+```
+
+That season reports **19 clubs**, not 18, because the play-off opponent is not in the league.
+
+So the grown phase is real for Germany, and **losing it costs nothing**: rounds 1–34 are the whole
+Bundesliga season, and the extra tie is against a club outside the competition. Contrast Scotland,
+where the grown phase **is** rounds 34–38 of the league itself — miss it and the season genuinely
+ends at 33.
+
+**The distinction that matters is not "does a phase appear later" but "is the missing phase part of
+the league season".** Split leagues (Scotland, Belgium) fail that test; play-off leagues (Germany,
+and by the same argument France and the Championship, though those are unverified) pass it. Germany
+was therefore safe to import as league #4, and was — see the catalogue comment in
+`scripts/import-league-season.ts`.
+
 **This is the strongest argument for going La Liga or Serie A first:** it is the only candidate
 problem with no known solution yet, and neither of those two has it.
 

@@ -44,6 +44,20 @@ const CATALOGUE: Record<string, { name: string; country: string; apiLeagueId: nu
   'la-liga': { name: 'La Liga', country: 'ESP', apiLeagueId: 140 },
   // Added 2026-08-28 as league #3. Same shape again: 20/38/380, one phase.
   'serie-a': { name: 'Serie A', country: 'ITA', apiLeagueId: 135 },
+  // Added 2026-08-28 as league #4, and the FIRST that is not England-shaped:
+  // 18 clubs, 34 matchweeks, 306 fixtures, 9 a round.
+  //
+  // ⚠ The expansion research lists Germany among the leagues where "the feed
+  // grows a phase mid-season", which is true and — checked against a finished
+  // season today — harmless HERE, unlike Scotland. League 78 season 2024 returns
+  // 308 fixtures: "Regular Season" rounds 1-34 complete, plus a two-fixture
+  // "Relegation Round" against a 2. Bundesliga club (which is why that season
+  // reports 19 clubs, not 18). Scotland's grown phase IS rounds 34-38 of the
+  // league, so missing it ends the season early; Germany's is a play-off
+  // against a club outside the league, so missing it loses nothing. The
+  // importer picks the largest phase and skips the rest, which is the right
+  // answer both times for different reasons.
+  'bundesliga': { name: 'Bundesliga', country: 'GER', apiLeagueId: 78 },
 }
 
 function seasonLabel(startYear: number): string {
