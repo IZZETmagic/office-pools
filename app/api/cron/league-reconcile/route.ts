@@ -60,8 +60,20 @@ export const maxDuration = 60
 //   select cron.schedule('league-reconcile', '20 3 * * *', $$
 //     select net.http_post(
 //       url := 'https://sportpool.io/api/cron/league-reconcile',
-//       headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.cron_secret'))
+//       headers := jsonb_build_object(
+//         'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets
+//                                         where name = 'sync_cron_secret'),
+//         'Content-Type',  'application/json'
+//       ),
+//       timeout_milliseconds := 30000
 //     )$$);
+//
+// ⚠ THE SECRET COMES FROM THE VAULT, NOT FROM A GUC. This block used to read
+// `current_setting('app.cron_secret')`, copied from a template nobody had run:
+// that setting does not exist in this database, so the job would have been
+// created happily and then failed on its first tick. Verified against the live
+// `cron.job` table — every working web-route job here reads
+// `vault.decrypted_secrets` where name = 'sync_cron_secret'.
 //
 // `?dry=1` previews without writing — it reports what WOULD move and spends the
 // same one call.
