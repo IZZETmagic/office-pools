@@ -40,6 +40,9 @@
  * nothing to check by hand yet. Both league pools are otherwise live and
  * verified — `npx tsx scripts/verify-league-pool-member-view.ts`.
  */
+import { getPoolStripe } from '@/lib/design/poolMode'
+import { LEAGUE_ID } from '@/lib/design/competitionColor'
+
 export type CompetitionState = 'open' | 'upcoming' | 'complete'
 
 export type Competition = {
@@ -48,17 +51,37 @@ export type Competition = {
   state: CompetitionState
   /** Short status line. This is all a visitor gets — the strip has no links. */
   status: string
-  /** Two-stop gradient for the card's mode stripe, mirroring PoolListItem. */
+  /**
+   * Two-stop gradient for the strip's chip.
+   *
+   * ⚠ DERIVE IT from `getPoolStripe` for any competition the app has a brand
+   * colour for, rather than writing a second pair of hexes here. This file had
+   * the Premier League as BLUE while every pool card rendered it in the club's
+   * purple — two files each internally consistent and disagreeing with each
+   * other, which is exactly what a shared source prevents.
+   */
   stripe: [string, string]
 }
 
 export const COMPETITIONS: Competition[] = [
+  // Derived, so the strip cannot drift from the card again. #3D195B, the
+  // club's own purple — this row used to read ['#667EEA', '#3B6EFF'], a blue
+  // chosen when the World Cup was the only real competition and nothing else
+  // had an opinion about what the Premier League looks like.
   { key: 'premier-league', name: 'Premier League', state: 'upcoming',
-    status: 'Coming soon', stripe: ['#667EEA', '#3B6EFF'] },
+    status: 'Coming soon', stripe: getPoolStripe({ externalLeagueId: LEAGUE_ID.premierLeague }) },
   { key: 'world-cup-2026', name: 'FIFA World Cup', state: 'complete',
     status: '2026 · complete', stripe: ['#F5C518', '#CD7F32'] },
+  // ⚠ STILL AUTHORED, and still green, which is not a Champions League colour
+  // by any reading — lib/design/competitionColor.ts has it as navy (#0B1E64).
+  // Left alone because it is marketing copy Ryan has not asked to change, and
+  // because flipping it is now one line: swap the pair for
+  // `getPoolStripe({ externalLeagueId: LEAGUE_ID.championsLeague })`.
   { key: 'champions-league', name: 'Champions League', state: 'upcoming',
     status: 'Coming soon', stripe: ['#34D399', '#059669'] },
+  // Six Nations and the NFL have no `external_league_id` — they are not
+  // football competitions in the fixtures provider — so nothing else in the app
+  // defines a colour for them and these stay authored here.
   { key: 'six-nations', name: 'Six Nations', state: 'upcoming',
     status: 'Coming soon', stripe: ['#F97362', '#EF4444'] },
   { key: 'nfl', name: 'NFL', state: 'upcoming',
