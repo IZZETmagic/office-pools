@@ -19,6 +19,7 @@ import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
 import { getModeName, getPoolStripe, getModeChip } from '@/lib/design/poolMode'
 import type { PredictionMode } from '@/lib/predictionMode'
 import { getFormDotClass } from '@/lib/design/formDots'
+import { shortClubName } from '@/lib/league/clubName'
 
 // =====================
 // TYPES
@@ -187,6 +188,52 @@ function formatDeadline(deadline: string | null) {
 function stripeVars(pool: { externalLeagueId?: number | null }): CSSProperties {
   const [from, to] = getPoolStripe({ externalLeagueId: pool.externalLeagueId })
   return { '--stripe-from': from, '--stripe-to': to } as CSSProperties
+}
+
+/**
+ * A club crest or a national flag — they are NOT the same shape.
+ *
+ * ⚠ Every badge on this page was a 24x16 box with `object-cover`, which is
+ * right for a flag and wrong for a crest: a square club badge gets its top and
+ * bottom cropped off. The Liverpool liver bird and the Forest tree both lost
+ * their heads on the live card.
+ *
+ * A league fixture is the tell — `competition` is set only for those — so a
+ * crest gets a square box and `object-contain`, and flags keep the 3:2 they
+ * have always had.
+ */
+function TeamBadge({ url, name, isCrest, size }: {
+  url: string | null
+  name: string
+  isCrest: boolean
+  size: 'sm' | 'md'
+}) {
+  if (!url) return null
+  // Crests run larger than the flags they replace. A flag is a solid rectangle
+  // and reads at 24x16; a crest is line art on transparent, so at the same box
+  // it disappears next to a 18px score. Sized against the score rather than
+  // against the flag.
+  const box = isCrest
+    ? (size === 'sm' ? 'w-6 h-6' : 'w-9 h-9') + ' object-contain'
+    : (size === 'sm' ? 'w-6 h-4' : 'w-10 h-7') + ' rounded-[2px] object-cover'
+  return <img src={url} alt={name} className={`${box} shrink-0`} />
+}
+
+/**
+ * What the small line above a match says.
+ *
+ * ⚠ It used to say `regular_season` — `formatStage` maps the World Cup's stages
+ * and returns anything else unchanged, and a league fixture's stage is a value
+ * the adapter invents for the prediction flow's round matching. A database
+ * identifier reaching a member is the same defect the mode pill had.
+ *
+ * A league says which competition, which is the useful fact when two leagues'
+ * fixtures are interleaved. `#12` is dropped there too: a fixture number is
+ * internal, where a World Cup match number is something people actually cite.
+ */
+function matchCaption(match: { competition?: string | null; stage: string; match_number: number }): string {
+  if (match.competition) return match.competition
+  return `${formatStage(match.stage)} \u00B7 #${match.match_number}`
 }
 
 function getPoolStatusText(pool: PoolCardData): string {
@@ -1007,17 +1054,19 @@ export function DashboardClient({
                   {liveMatches.map((match) => {
                     const homeTeamData = match.home_team as any
                     const awayTeamData = match.away_team as any
-                    const homeTeam = homeTeamData?.country_name ?? match.home_team_placeholder ?? 'TBD'
-                    const awayTeam = awayTeamData?.country_name ?? match.away_team_placeholder ?? 'TBD'
+                    // shortClubName is the same label the mobile league table uses,
+                    // so a club is called the same thing on every surface. It is a
+                    // no-op on a national team, which has no long-name problem.
+                    const homeTeam = shortClubName(homeTeamData?.country_name ?? match.home_team_placeholder ?? 'TBD')
+                    const awayTeam = shortClubName(awayTeamData?.country_name ?? match.away_team_placeholder ?? 'TBD')
                     const homeFlagUrl = homeTeamData?.flag_url ?? null
                     const awayFlagUrl = awayTeamData?.flag_url ?? null
+                    const isCrest = !!match.competition
                     const elapsed = match.match_date ? getElapsedTime(match.match_date) : null
                     return (
                       <div key={match.match_id} className="bg-surface rounded-card shadow dark:shadow-none dark:border dark:border-border-default border border-danger-200/60 dark:border-danger-800/50 px-4 py-2.5">
                         <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[10px] text-muted">
-                            {formatStage(match.stage)} &middot; #{match.match_number}
-                          </p>
+                          <p className="text-[10px] text-muted">{matchCaption(match)}</p>
                           <div className="flex items-center gap-1.5">
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-danger-600">
                               <span className="relative flex h-1.5 w-1.5">
@@ -1031,19 +1080,22 @@ export function DashboardClient({
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 flex items-center justify-end gap-1.5 pr-2">
-                            {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />}
-                            <p className="font-semibold text-ink text-xs">{homeTeam}</p>
+                        {/* Badges sit either side of the score, names outermost, so
+                            the eye runs name -> badge -> score -> badge -> name and
+                            the two crests read as a pairing rather than as bookends. */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
+                            <p className="font-semibold text-ink text-xs truncate text-right">{homeTeam}</p>
+                            <TeamBadge url={homeFlagUrl} name={homeTeam} isCrest={isCrest} size="sm" />
                           </div>
-                          <div className="flex items-center gap-2 px-3 py-1 bg-snow dark:bg-surface-tertiary rounded-chip border border-border-default">
+                          <div className="shrink-0 flex items-center gap-2 px-3 py-1 bg-snow dark:bg-surface-tertiary rounded-chip border border-border-default">
                             <span className="text-lg font-extrabold text-ink">{match.home_score_ft ?? 0}</span>
                             <span className="text-muted text-sm">-</span>
                             <span className="text-lg font-extrabold text-ink">{match.away_score_ft ?? 0}</span>
                           </div>
-                          <div className="flex-1 flex items-center gap-1.5 pl-2">
-                            <p className="font-semibold text-ink text-xs">{awayTeam}</p>
-                            {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-6 h-4 rounded-[2px] object-cover shrink-0" />}
+                          <div className="flex-1 min-w-0 flex items-center gap-2">
+                            <TeamBadge url={awayFlagUrl} name={awayTeam} isCrest={isCrest} size="sm" />
+                            <p className="font-semibold text-ink text-xs truncate">{awayTeam}</p>
                           </div>
                         </div>
                       </div>
@@ -1066,8 +1118,12 @@ export function DashboardClient({
                     {knownMatches.map((match) => {
                       const homeTeamData = match.home_team as any
                       const awayTeamData = match.away_team as any
-                      const homeTeam = homeTeamData?.country_name ?? 'TBD'
-                      const awayTeam = awayTeamData?.country_name ?? 'TBD'
+                      const homeTeam = shortClubName(homeTeamData?.country_name ?? 'TBD')
+                      const awayTeam = shortClubName(awayTeamData?.country_name ?? 'TBD')
+                      // A club carries its own abbreviation (LIV, NFO); a national
+                      // team carries a country code. Only fall back to slicing when
+                      // neither exists — `homeTeam.slice(0, 3)` on "Nottingham
+                      // Forest" gives "NOT", which names nobody.
                       const homeCode = (homeTeamData?.country_code ?? homeTeam.slice(0, 3)).toUpperCase()
                       const awayCode = (awayTeamData?.country_code ?? awayTeam.slice(0, 3)).toUpperCase()
                       const homeFlagUrl = homeTeamData?.flag_url ?? null
@@ -1076,12 +1132,12 @@ export function DashboardClient({
                         <Card key={match.match_id} className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className="flex flex-col items-center gap-1">
-                              {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-10 h-7 rounded-[2px] object-cover shrink-0" />}
+                              <TeamBadge url={homeFlagUrl} name={homeTeam} isCrest={!!match.competition} size="md" />
                               <span className="text-xs font-semibold tracking-wide text-ink tabular-nums">{homeCode}</span>
                             </div>
                             <span className="text-muted text-xs self-center">vs</span>
                             <div className="flex flex-col items-center gap-1">
-                              {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-10 h-7 rounded-[2px] object-cover shrink-0" />}
+                              <TeamBadge url={awayFlagUrl} name={awayTeam} isCrest={!!match.competition} size="md" />
                               <span className="text-xs font-semibold tracking-wide text-ink tabular-nums">{awayCode}</span>
                             </div>
                           </div>
@@ -1145,17 +1201,16 @@ export function DashboardClient({
               {liveMatches.map((match) => {
                 const homeTeamData = match.home_team as any
                 const awayTeamData = match.away_team as any
-                const homeTeam = homeTeamData?.country_name ?? match.home_team_placeholder ?? 'TBD'
-                const awayTeam = awayTeamData?.country_name ?? match.away_team_placeholder ?? 'TBD'
+                const homeTeam = shortClubName(homeTeamData?.country_name ?? match.home_team_placeholder ?? 'TBD')
+                const awayTeam = shortClubName(awayTeamData?.country_name ?? match.away_team_placeholder ?? 'TBD')
                 const homeFlagUrl = homeTeamData?.flag_url ?? null
                 const awayFlagUrl = awayTeamData?.flag_url ?? null
+                const isCrest = !!match.competition
                 const elapsed = match.match_date ? getElapsedTime(match.match_date) : null
                 return (
                   <Card key={match.match_id} className="border-danger-200 dark:border-danger-800/50 bg-surface">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs text-muted">
-                        {formatStage(match.stage)} &middot; Match #{match.match_number}
-                      </p>
+                      <p className="text-xs text-muted">{matchCaption(match)}</p>
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger-600 px-2 py-0.5 rounded-pill">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
@@ -1164,16 +1219,22 @@ export function DashboardClient({
                         LIVE
                       </span>
                     </div>
-                    <div className="flex items-center justify-between overflow-hidden">
-                      <div className="flex-1 min-w-0 flex items-center justify-end pr-3">
-                        <p className="font-semibold text-ink text-sm truncate">{homeTeam}</p>
+                    {/* Same arrangement as the mobile card — badges either side of
+                        the score, names outermost. This one carried no badges at
+                        all, so the two live layouts disagreed about what a match
+                        looks like. */}
+                    <div className="flex items-center justify-between gap-2 overflow-hidden">
+                      <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
+                        <p className="font-semibold text-ink text-sm truncate text-right">{homeTeam}</p>
+                        <TeamBadge url={homeFlagUrl} name={homeTeam} isCrest={isCrest} size="md" />
                       </div>
                       <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-snow dark:bg-surface-tertiary rounded-control shadow-sm border border-border-default">
                         <span className="text-2xl font-extrabold text-ink">{match.home_score_ft ?? 0}</span>
                         <span className="text-muted text-lg">-</span>
                         <span className="text-2xl font-extrabold text-ink">{match.away_score_ft ?? 0}</span>
                       </div>
-                      <div className="flex-1 min-w-0 flex items-center pl-3">
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <TeamBadge url={awayFlagUrl} name={awayTeam} isCrest={isCrest} size="md" />
                         <p className="font-semibold text-ink text-sm truncate">{awayTeam}</p>
                       </div>
                     </div>
@@ -1182,13 +1243,7 @@ export function DashboardClient({
                         {elapsed}
                       </p>
                     )}
-                    {/* The mobile live strip below deliberately has no equivalent
-                        — it is a single compact row and a caption would crowd it.
-                        Live games are few and transient, so the ambiguity this
-                        resolves is far more likely in the upcoming list. */}
-                    {match.competition && (
-                      <p className="text-[11px] text-muted mt-1 text-center">{match.competition}</p>
-                    )}
+
                   </Card>
                 )
               })}
@@ -1217,21 +1272,22 @@ export function DashboardClient({
                   {knownMatches.map((match) => {
                     const homeTeamData = match.home_team as any
                     const awayTeamData = match.away_team as any
-                    const homeTeam = homeTeamData?.country_name ?? 'TBD'
-                    const awayTeam = awayTeamData?.country_name ?? 'TBD'
+                    const homeTeam = shortClubName(homeTeamData?.country_name ?? 'TBD')
+                    const awayTeam = shortClubName(awayTeamData?.country_name ?? 'TBD')
                     const homeFlagUrl = homeTeamData?.flag_url ?? null
                     const awayFlagUrl = awayTeamData?.flag_url ?? null
+                    const isCrest = !!match.competition
                     return (
                       <Card key={match.match_id} className="flex items-center justify-between">
                         <div>
                           <p className="font-semibold text-ink flex items-center gap-2">
                             <span className="inline-flex items-center gap-1.5">
-                              {homeFlagUrl && <img src={homeFlagUrl} alt={homeTeam} className="w-5 h-3.5 rounded-[2px] object-cover" />}
+                              <TeamBadge url={homeFlagUrl} name={homeTeam} isCrest={isCrest} size="sm" />
                               {homeTeam}
                             </span>
                             <span className="text-muted font-normal">vs</span>
                             <span className="inline-flex items-center gap-1.5">
-                              {awayFlagUrl && <img src={awayFlagUrl} alt={awayTeam} className="w-5 h-3.5 rounded-[2px] object-cover" />}
+                              <TeamBadge url={awayFlagUrl} name={awayTeam} isCrest={isCrest} size="sm" />
                               {awayTeam}
                             </span>
                           </p>
