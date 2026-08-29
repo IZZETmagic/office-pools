@@ -296,18 +296,18 @@ export default function TablePredictionTab({
   /**
    * ⚠ HAS THIS MEMBER ACTUALLY SAVED ANYTHING?
    *
-   * The button used to read `dirty ? 'Save my table' : 'Saved'`, and `dirty`
-   * starts false — so a member who had never saved opened this screen, saw the
-   * clubs pre-filled in live-table order (decision 12/17, so it looks exactly
-   * like a real prediction), and a DISABLED button saying "Saved". Nothing on
-   * the screen contradicted it. They would close the tab believing they were
-   * done and score nothing when the deadline passed on Friday.
+   * There is no longer a Save button — dragging is the only verb on this
+   * screen, and every drag writes. What survives is the QUESTION the button
+   * used to answer, because the failure it guarded against is still real: the
+   * clubs arrive pre-filled in live-table order (decisions 12/17), so an
+   * untouched screen looks exactly like a filed prediction. A member who reads
+   * it that way closes the tab believing they are done, and scores nothing when
+   * the deadline passes on Friday.
    *
-   * "Saved" is a claim about the database, so it has to be answerable from the
-   * database: `savedOrder` is the server-rendered truth on load, and this
-   * tracks it forward when a save succeeds. Untouched-and-unsaved must offer
-   * the save — accepting the seeded order with one tap is the whole point of
-   * seeding it.
+   * So this is what the status line up top reports — "not saved yet" until
+   * there is a row in the database, "Saved <time>" after. "Saved" is a claim
+   * about the database and has to be answerable from it: `savedOrder` is the
+   * server-rendered truth on load, and this tracks it forward on each success.
    */
   const [hasSaved, setHasSaved] = useState(savedOrder.length > 0)
 
@@ -446,16 +446,26 @@ export default function TablePredictionTab({
   }, [poolId, entryId, scheduleRefresh])
 
   /**
-   * ⚠ Only autosaves once there IS a table. A member who has never saved is
-   * looking at the seeded order (the live table, decisions 12/17) — writing
-   * that for them would be filing a prediction they never made, on their
-   * behalf, and scoring them on it. They commit it once, deliberately; after
-   * that every change is theirs and saves itself.
+   * ⚠ THE GATE IS `dirty`, AND IT HAS TO STAY THAT WAY.
+   *
+   * This used to require `hasSaved` as well, so the first table was committed
+   * by a button and only later drags saved themselves. The button is gone —
+   * dragging is the whole interface now — but the reason it existed is not, and
+   * `dirty` is what carries it: a member who has never saved is looking at the
+   * SEEDED order (the live table, decisions 12/17), not at anything they chose.
+   * Writing that on mount would file a prediction they never made and score
+   * them on it — and would make "opened the tab once" indistinguishable from
+   * "predicted", which is the one thing this table has to be able to tell apart.
+   *
+   * `dirty` only turns true in `handleDragEnd`, so nothing is written until the
+   * member moves a club. That first drag files the whole order, the nineteen
+   * untouched positions included — which is correct: they are looking at the
+   * list, and leaving a club where it sits is a choice about that club.
    */
   useEffect(() => {
-    if (!dirty || !hasSaved) return
+    if (!dirty) return
     void flush()
-  }, [order, dirty, hasSaved, flush])
+  }, [order, dirty, flush])
 
   // ------------------------------------------------------------ locked view
   if (isLocked) {
@@ -493,8 +503,8 @@ export default function TablePredictionTab({
       <div>
         <h2 className="text-lg font-bold text-neutral-900">Predict the table</h2>
         <p className="text-sm text-neutral-600 mt-1">
-          Drag the clubs into the order you think they&apos;ll finish. You only do this once
-          — then you watch it all season.
+          Drag the clubs into the order you think they&apos;ll finish — it saves as you go.
+          You only do this once, then you watch it all season.
         </p>
         {/* The two facts about time, on one line: when it closes, and when it
             last saved. `ml-auto` rather than `justify-between` so the status
@@ -579,35 +589,18 @@ export default function TablePredictionTab({
           directly under the rows it explains. */}
       <BandLegend topN={topN} europaFrom={europaFrom} conferenceFrom={conferenceFrom} />
 
-      {/* The footer is a COMMIT, and only exists until there is something to
-          commit. Before a table exists the order on screen is the seeded one
-          (decisions 12/17) and it becomes a prediction only when the member
-          says so. After that every drag saves itself, so what is left is a
-          STATUS — and that lives up on the deadline line, opposite the other
-          fact about time this screen has to state.
+      {/* ⚠ THERE IS NO SAVE BUTTON, AND THAT IS THE DESIGN.
+          Ryan's call: the only verb on this screen is dragging, and a table is
+          finished when the deadline says so, not when somebody presses a thing.
+          A commit button on a screen that already autosaves every other change
+          was one rule for the first drag and another for the rest of them.
 
-          The failure message stays down HERE for this state, because this is
-          the state with a button: somebody scrolled to the bottom pressing Save
-          should not have to go looking at the top of the page to find out it
-          did not work. */}
-      {!hasSaved && (
-        <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-surface-base via-surface-base to-transparent">
-          {message?.kind === 'error' && (
-            <p className="text-xs text-danger-600 text-center mb-2">{message.text}</p>
-          )}
-          <button
-            type="button"
-            onClick={() => void flush()}
-            disabled={saving}
-            className="w-full py-3 rounded-xl bg-primary-600 text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-700 transition-colors"
-          >
-            {saving ? 'Saving…' : 'Save my table'}
-          </button>
-          <p className="text-xs text-neutral-500 text-center mt-2">
-            After this, every change saves on its own.
-          </p>
-        </div>
-      )}
+          What the button was ALSO carrying is the un-filed state, and that has
+          not gone away — a never-touched screen shows the seeded live table and
+          reads exactly like a real prediction. It moved to `SaveStatus`, which
+          says so in words instead of implying it with a disabled control. Don't
+          put a button back here; if the un-filed state needs to be louder, make
+          the status line louder. */}
     </div>
   )
 }
@@ -685,8 +678,20 @@ function SaveStatus({
             Try again
           </button>
         </>
-      ) : !hasSaved ? null : saving || dirty ? (
+      ) : saving || dirty ? (
         <span className="text-neutral-500">Saving…</span>
+      ) : !hasSaved ? (
+        /* ⚠ NOT styled as quiet grey, and not `null`.
+           With the Save button gone this is the only thing on the screen that
+           distinguishes "I have filed my table" from "I am looking at the live
+           table somebody seeded for me". Grey reads as a caption and gets
+           skipped; amber reads as something outstanding, which it is. It is
+           still not a control — there is nothing to press, and the member
+           clears it by dragging. */
+        <span className="flex items-center gap-1.5 text-warning-700 font-medium">
+          <Icon name="exclamationmark.circle.fill" size={13} />
+          Not saved yet
+        </span>
       ) : (
         <span className="flex items-center gap-1.5 text-success-700">
           <Icon name="checkmark" size={13} />
