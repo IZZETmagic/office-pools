@@ -43,10 +43,21 @@ describe('shortClubName', () => {
     expect(shortClubName('Deportivo La Coruña')).toBe('Deportivo')
   })
 
-  it('leaves the merely-longish Spanish names alone', () => {
-    // The restraint IS the rule. A row per mildly-long name turns this back
-    // into the club table it exists not to be.
-    for (const name of ['Atletico Madrid', 'Rayo Vallecano', 'Athletic Club', 'Celta Vigo']) {
+  it('⚠ OVERTURNED — Atletico and Rayo now shorten', () => {
+    // This assertion used to hold the opposite, on the reasoning that the 375px
+    // TABLE held 15 characters so restraint was cheaper than a rule. That was
+    // true of the table. The dashboard's live card gives a name 98px, where
+    // "Atletico Madrid" does not fit, so the premise changed rather than the
+    // principle. Ryan's call, 2026-08-29.
+    expect(shortClubName('Atletico Madrid')).toBe('Atletico')
+    expect(shortClubName('Rayo Vallecano')).toBe('Rayo')
+  })
+
+  it('still leaves the names that genuinely fit alone', () => {
+    // The restraint IS the rule, and it still applies to everything that has
+    // not been measured as overrunning. A row per mildly-long name turns this
+    // back into the club table it exists not to be.
+    for (const name of ['Athletic Club', 'Celta Vigo', 'Real Betis', 'Girona']) {
       expect(shortClubName(name)).toBe(name)
     }
   })
@@ -68,7 +79,7 @@ describe('shortClubName', () => {
     for (const name of [
       'Arsenal', 'Everton', 'Leeds', 'Liverpool', 'Chelsea',
       'Aston Villa', 'Crystal Palace', 'Hull City', 'Ipswich',
-      'Bayer Leverkusen', 'Real Sociedad',
+      'Real Sociedad', 'Union Berlin', 'Werder Bremen',
     ]) {
       expect(shortClubName(name)).toBe(name)
     }
@@ -80,9 +91,70 @@ describe('shortClubName', () => {
     for (const name of [
       'Manchester United', 'Nottingham Forest', 'Wolverhampton Wanderers',
       'Deportivo La Coruna', 'Racing Santander',
+      'Borussia Mönchengladbach', 'Bayern München', 'Atletico Madrid',
+      'Bayer Leverkusen', 'SC Paderborn 07',
     ]) {
       const once = shortClubName(name)
       expect(shortClubName(once)).toBe(once)
+    }
+  })
+})
+
+describe('the German and Spanish names (added 2026-08-29)', () => {
+  it('shortens every Bundesliga club that overran', () => {
+    // The seven measured as over 13 characters after the English rules ran.
+    expect(shortClubName('Borussia Mönchengladbach')).toBe('Gladbach')
+    expect(shortClubName('Borussia Dortmund')).toBe('Dortmund')
+    expect(shortClubName('Eintracht Frankfurt')).toBe('Frankfurt')
+    expect(shortClubName('Bayer Leverkusen')).toBe('Leverkusen')
+    expect(shortClubName('Bayern München')).toBe('Bayern')
+    expect(shortClubName('1899 Hoffenheim')).toBe('Hoffenheim')
+    expect(shortClubName('SC Paderborn 07')).toBe('Paderborn')
+  })
+
+  it('shortens the two La Liga names that overran', () => {
+    expect(shortClubName('Atletico Madrid')).toBe('Atletico')
+    expect(shortClubName('Rayo Vallecano')).toBe('Rayo')
+  })
+
+  it('⚠ matches the German names with OR without their umlauts', () => {
+    // The feed ships Bundesliga names accented and La Liga names bare, so the
+    // encoding is a property of the provider rather than of the club. A rule
+    // that stopped matching when that changed would fail the way this file is
+    // least able to notice — by rendering a name three times the width the
+    // layout holds, silently.
+    expect(shortClubName('Borussia Monchengladbach')).toBe('Gladbach')
+    expect(shortClubName('Bayern Munchen')).toBe('Bayern')
+    expect(shortClubName('Atlético Madrid')).toBe('Atletico')
+  })
+
+  it('⚠ does NOT shorten on the shared prefix words', () => {
+    // "Borussia" is Dortmund and Mönchengladbach both; "Eintracht" is Frankfurt
+    // and Braunschweig. A word rule on either would collide the moment the
+    // second is promoted, so all seven are whole-name forms.
+    expect(shortClubName('Borussia Neunkirchen')).toBe('Borussia Neunkirchen')
+    expect(shortClubName('Eintracht Braunschweig')).toBe('Eintracht Braunschweig')
+  })
+
+  it('leaves "Bayern" and "Bayer" as distinct clubs', () => {
+    // One is a prefix of the other. Getting this wrong would rename Leverkusen
+    // to Bayern, which is a different club in a different city.
+    expect(shortClubName('Bayern München')).toBe('Bayern')
+    expect(shortClubName('Bayer Leverkusen')).toBe('Leverkusen')
+  })
+
+  it('brings every club in the four leagues within the layout', () => {
+    // The measured ceiling: a name gets 98px in the live card's stacked
+    // layout, which holds about 16 characters at text-xs. Crystal Palace (14)
+    // is the longest that remains and is deliberately left alone — the English
+    // calibration in the header stands.
+    const longest = [
+      'Borussia Mönchengladbach', 'Eintracht Frankfurt', 'Bayer Leverkusen',
+      'Atletico Madrid', 'Rayo Vallecano', '1899 Hoffenheim', 'SC Paderborn 07',
+      'Nottingham Forest', 'Deportivo La Coruna',
+    ]
+    for (const name of longest) {
+      expect(shortClubName(name).length).toBeLessThanOrEqual(13)
     }
   })
 })

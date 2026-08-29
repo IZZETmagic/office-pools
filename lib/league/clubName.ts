@@ -36,15 +36,29 @@
  * with "Deportivo La Coruna" at 19 and "Racing Santander" at 16 — roughly 50%
  * past what the 375px table was built for. Those two got rules.
  *
- * "Atletico Madrid" (15) did NOT, and that restraint is the point: it is two
- * characters over, every plausible short form ("Atletico", "Atleti") is a
- * judgement call rather than something the competition writes, and a rule
- * per mildly-long name is how this becomes the club table it exists not to be.
+ * "Atletico Madrid" (15) did NOT, on the reasoning that two characters over
+ * was cheaper to absorb than a rule.
  *
- * ⚠ ACCENTS ARE OUT OF SCOPE, deliberately. The feed ships "Alaves",
- * "Atletico Madrid" and "La Coruna" without them. Restoring accents correctly
- * is a per-club map — exactly what this file refuses to become — so it belongs
- * in ingestion or with the provider, not here.
+ * ## ⚠ That call was OVERTURNED on 2026-08-29, because the premise moved
+ *
+ * The 15-character allowance was measured against the 375px TABLE. The
+ * dashboard's live card gives a name 98px — about 16 characters — and it shows
+ * two names either side of a score rather than one per row. Measured across
+ * every club in the four imported leagues, that left seven Bundesliga names and
+ * two Spanish ones overrunning, "Borussia Mönchengladbach" at 24 characters
+ * worst. So Germany got rules, and Atletico and Rayo got theirs.
+ *
+ * The restraint still stands for everything that FITS: "Crystal Palace" (14) is
+ * the longest name now left alone, deliberately. What changed is the ceiling,
+ * not the principle — a name earns a rule by being measured over it, never by
+ * looking long.
+ *
+ * ⚠ ACCENTS ARE PARTLY IN SCOPE NOW, and only because the feed is inconsistent
+ * about them. It ships "Alaves" and "La Coruna" bare while shipping "Bayern
+ * München" and "Borussia Mönchengladbach" accented. The rules therefore match
+ * both spellings of the German names. That is a matching concern, not a
+ * rendering one: RESTORING an accent the feed omitted is still out of scope and
+ * still belongs in ingestion or with the provider.
  */
 
 /**
@@ -76,6 +90,39 @@ const SHORTENINGS: ReadonlyArray<readonly [RegExp, string]> = [
   // Ferrol". They have never shared a division, and this is a label, never an
   // identity — but if they ever do, this rule is the thing to revisit.
   [/\bRacing Santander\b/i, 'Racing'],
+
+  // Spain, second pass (2026-08-29). "Atletico Madrid" was declined the first
+  // time on the grounds that the 375px TABLE held 15 characters — which was
+  // true of the table, and is not true of the dashboard's live card, where a
+  // name gets 98px. Ryan's call to add it. Both are the forms LaLiga writes.
+  //
+  // ⚠ Same caveat as Racing: several clubs outside the top flight are
+  // "Atletico" something. This is a label, never an identity, and they have not
+  // shared a division — but a promotion is the thing that would make this
+  // rule wrong.
+  [/\bAtl[eé]tico Madrid\b/i, 'Atletico'],
+  [/\bRayo Vallecano\b/i, 'Rayo'],
+
+  // Germany, added with the Bundesliga (2026-08-29). All seven are whole-name
+  // forms rather than word rules, because the word worth keeping is the CITY
+  // and the word being dropped is a sponsor, a founding year or a club-type
+  // prefix that several unrelated clubs share — "Borussia" is Dortmund and
+  // Mönchengladbach both, "Eintracht" is Frankfurt and Braunschweig, and a
+  // word rule on either would collide the moment the second one is promoted.
+  //
+  // ⚠ THE UMLAUTS ARE REAL HERE, unlike La Liga. The feed ships "Bayern
+  // München" and "Borussia Mönchengladbach" accented while it ships "Alaves"
+  // and "La Coruna" bare — so these match both spellings, for the reason the
+  // `[nñ]` on Deportivo already does: a rule that silently stopped matching if
+  // the provider changed its encoding would fail by rendering a name twice as
+  // long as the layout holds, and nothing would report it.
+  [/\bBorussia M[öo]nchengladbach\b/i, 'Gladbach'],
+  [/\bBorussia Dortmund\b/i, 'Dortmund'],
+  [/\bEintracht Frankfurt\b/i, 'Frankfurt'],
+  [/\bBayer Leverkusen\b/i, 'Leverkusen'],
+  [/\bBayern M[üu]nchen\b/i, 'Bayern'],
+  [/\b1899 Hoffenheim\b/i, 'Hoffenheim'],
+  [/\bSC Paderborn 07\b/i, 'Paderborn'],
 
   // Word-level. These carry across competitions.
   [/\bManchester\b/i, 'Man'],

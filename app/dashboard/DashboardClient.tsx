@@ -1080,22 +1080,23 @@ export function DashboardClient({
                             )}
                           </div>
                         </div>
-                        {/* Badges sit either side of the score, names outermost, so
-                            the eye runs name -> badge -> score -> badge -> name and
-                            the two crests read as a pairing rather than as bookends. */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
-                            <p className="font-semibold text-ink text-xs truncate text-right">{homeTeam}</p>
-                            <TeamBadge url={homeFlagUrl} name={homeTeam} isCrest={isCrest} size="sm" />
+                        {/* Same stack as the desktop card, and for the same reason:
+                            at 375px this card is 349px wide — within 3px of the
+                            desktop one at a third of the page — so the two have
+                            the same problem and take the same shape. */}
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
+                            <TeamBadge url={homeFlagUrl} name={homeTeam} isCrest={isCrest} size="md" />
+                            <p className="font-semibold text-ink text-xs text-center leading-tight w-full truncate">{homeTeam}</p>
                           </div>
-                          <div className="shrink-0 flex items-center gap-2 px-3 py-1 bg-snow dark:bg-surface-tertiary rounded-chip border border-border-default">
-                            <span className="text-lg font-extrabold text-ink">{match.home_score_ft ?? 0}</span>
+                          <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-snow dark:bg-surface-tertiary rounded-chip border border-border-default">
+                            <span className="text-xl font-extrabold text-ink">{match.home_score_ft ?? 0}</span>
                             <span className="text-muted text-sm">-</span>
-                            <span className="text-lg font-extrabold text-ink">{match.away_score_ft ?? 0}</span>
+                            <span className="text-xl font-extrabold text-ink">{match.away_score_ft ?? 0}</span>
                           </div>
-                          <div className="flex-1 min-w-0 flex items-center gap-2">
-                            <TeamBadge url={awayFlagUrl} name={awayTeam} isCrest={isCrest} size="sm" />
-                            <p className="font-semibold text-ink text-xs truncate">{awayTeam}</p>
+                          <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
+                            <TeamBadge url={awayFlagUrl} name={awayTeam} isCrest={isCrest} size="md" />
+                            <p className="font-semibold text-ink text-xs text-center leading-tight w-full truncate">{awayTeam}</p>
                           </div>
                         </div>
                       </div>
@@ -1197,13 +1198,12 @@ export function DashboardClient({
               </span>
               <h3 className="text-xl font-bold text-ink">Live Matches</h3>
             </div>
-            {/* ⚠ TWO ACROSS, NOT THREE. At `lg:grid-cols-3` inside a max-w-6xl
-                page each card is 346px, and after the Card's own p-6 and the
-                score chip that leaves 50px for a club's name — so "Liverpool"
-                and "Nott'm Forest" both rendered as "Liverp…" and "Nott'…".
-                Measured at a 1440 viewport, not guessed. Half-width gives the
-                names 172px, which fits every club in the four leagues. */}
-            <div className="grid md:grid-cols-2 gap-3">
+            {/* Three across is affordable again now the name sits UNDER its
+                badge rather than beside it. Measured at a 1440 viewport: a
+                346px card gave a side-by-side name 50px, where the stacked one
+                gets 98px — about 16 characters, which holds every club in the
+                four leagues after shortClubName runs. */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
               {liveMatches.map((match) => {
                 const homeTeamData = match.home_team as any
                 const awayTeamData = match.away_team as any
@@ -1225,23 +1225,23 @@ export function DashboardClient({
                         LIVE
                       </span>
                     </div>
-                    {/* Same arrangement as the mobile card — badges either side of
-                        the score, names outermost. This one carried no badges at
-                        all, so the two live layouts disagreed about what a match
-                        looks like. */}
-                    <div className="flex items-center justify-between gap-2 overflow-hidden">
-                      <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
-                        <p className="font-semibold text-ink text-sm truncate text-right">{homeTeam}</p>
+                    {/* Badge over name, both flanking the score. Stacking is what
+                        makes the name legible in a third-width card: laid out
+                        beside its badge it competes with the score for the same
+                        horizontal run, and the score always wins. */}
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
                         <TeamBadge url={homeFlagUrl} name={homeTeam} isCrest={isCrest} size="md" />
+                        <p className="font-semibold text-ink text-xs text-center leading-tight w-full truncate">{homeTeam}</p>
                       </div>
-                      <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-snow dark:bg-surface-tertiary rounded-control shadow-sm border border-border-default">
+                      <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-snow dark:bg-surface-tertiary rounded-control shadow-sm border border-border-default">
                         <span className="text-2xl font-extrabold text-ink">{match.home_score_ft ?? 0}</span>
                         <span className="text-muted text-lg">-</span>
                         <span className="text-2xl font-extrabold text-ink">{match.away_score_ft ?? 0}</span>
                       </div>
-                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
                         <TeamBadge url={awayFlagUrl} name={awayTeam} isCrest={isCrest} size="md" />
-                        <p className="font-semibold text-ink text-sm truncate">{awayTeam}</p>
+                        <p className="font-semibold text-ink text-xs text-center leading-tight w-full truncate">{awayTeam}</p>
                       </div>
                     </div>
                     {elapsed && (
