@@ -204,6 +204,22 @@ describe('the wizard chrome', () => {
     expect(step).not.toMatch(/<div className="space-y-3">\s*\n\s*\{tournaments\.map/)
   })
 
+  it('⚠ keeps "Coming soon" OUT of that grid', () => {
+    // The bug this caused, and it only showed up at THREE live competitions:
+    // while the block sat inside the grid it was a grid CELL, so it landed
+    // beside the odd-one-out card and stretched it to its own height — a grid
+    // row is as tall as its tallest item. It is a full-width footer to the
+    // choice, not one of the choices.
+    const step = src.slice(src.indexOf('STEP 1: Tournament'), src.indexOf('STEP 2: Pool Type'))
+    const gridOpen = step.indexOf('grid grid-cols-1 sm:grid-cols-2 gap-3')
+    const mapClose = step.indexOf('})}', gridOpen)
+    const comingSoon = step.indexOf('Coming soon. Named competitions')
+    expect(gridOpen).toBeGreaterThan(-1)
+    expect(comingSoon).toBeGreaterThan(mapClose)
+    // The grid closes between the map and the block — that closing tag IS the fix.
+    expect(step.slice(mapClose, comingSoon)).toMatch(/<\/div>/)
+  })
+
   it('⚠ and therefore has ONE date placement, not two', () => {
     // The dates used to sit out to the right of a full-width card, where there
     // was dead space, and stack under the name only on a phone. Two columns

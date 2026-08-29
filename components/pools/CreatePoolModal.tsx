@@ -796,6 +796,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                        the third one to sit out to the right (see below). On a
                        phone the panel is a full-width sheet, where two columns
                        would be ~170px each and the names would wrap. */
+                    <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {tournaments.map((t) => {
                         const dateRange = `${formatMonthYear(t.start_date)} \u2013 ${formatMonthYear(t.end_date)}`
@@ -870,8 +871,17 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                         </button>
                         )
                       })}
+                    </div>
 
-                      {/* Coming soon. Named competitions with their real crests
+                      {/* ⚠ OUTSIDE the grid, and that is the whole point of the
+                          fragment. While this sat inside it, "Coming soon" was
+                          a GRID CELL: it landed beside the third competition
+                          and stretched that card to its own height, because a
+                          grid row is as tall as its tallest item. It is a
+                          full-width footer to the choice, not one of the
+                          choices.
+
+                          Coming soon. Named competitions with their real crests
                           rather than one dashed box reading "and more" — the
                           question this step answers is "is my league here", and
                           a list you can scan answers it faster than a promise. */}
@@ -904,7 +914,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                           ))}
                         </div>
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               )}
