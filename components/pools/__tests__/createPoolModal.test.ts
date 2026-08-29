@@ -220,6 +220,26 @@ describe('the wizard chrome', () => {
     expect(step.slice(mapClose, comingSoon)).toMatch(/<\/div>/)
   })
 
+  it('⚠ gives the crest a white plate in DARK MODE ONLY', () => {
+    // Several league marks are dark on transparent — the Premier League lion is
+    // near-black purple, Ligue 1 is monochrome black — and on the dark surface
+    // they all but vanish. Ryan reported the lion; Ligue 1 was worse.
+    //
+    // A plate rather than a filter, per the rule already written on the Coming
+    // soon chips: a brand lockup sits on its own ground and is not UI chrome
+    // that follows the theme.
+    //
+    // ⚠ But dark-mode ONLY, and that asymmetry is load-bearing. In light mode
+    // the page is already that ground, so a plate buys nothing and costs the
+    // inset it needs for itself — measured side by side, an always-on plate
+    // reads as a shrunken logo in light mode for no reason. Light keeps w-11.
+    const step = src.slice(src.indexOf('STEP 1: Tournament'), src.indexOf('STEP 2: Pool Type'))
+    expect(step).toMatch(/dark:bg-white/)
+    expect(step).toMatch(/className="w-11 h-11 dark:w-8 dark:h-8 object-contain"/)
+    // Never an unconditional plate on this card.
+    expect(step).not.toMatch(/place-items-center shrink-0 bg-white/)
+  })
+
   it('⚠ and therefore has ONE date placement, not two', () => {
     // The dates used to sit out to the right of a full-width card, where there
     // was dead space, and stack under the name only on a phone. Two columns

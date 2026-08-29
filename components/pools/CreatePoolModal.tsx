@@ -831,11 +831,29 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                                 state, not a loading one, and must not get a
                                 placeholder box. */}
                             {t.logo_url && (
-                              <img
-                                src={t.logo_url}
-                                alt=""
-                                className="w-11 h-11 object-contain shrink-0"
-                              />
+                              // ⚠ The white plate is DARK MODE ONLY, and the
+                              // asymmetry is the point. Several league marks are
+                              // dark on transparent — the Premier League lion is
+                              // near-black purple, Ligue 1 is monochrome black —
+                              // and on the dark surface they all but vanish. The
+                              // house rule already says why the answer is a plate
+                              // rather than a filter: a brand lockup sits on its
+                              // own ground and is not UI chrome that follows the
+                              // theme (see the Coming soon chips below).
+                              //
+                              // In LIGHT mode the page is already that ground, so
+                              // a plate buys nothing and costs something — it has
+                              // to inset the mark to make room for itself, and
+                              // measured side by side that reads as a shrunken
+                              // logo for no reason. So light mode keeps the crest
+                              // at full size, exactly as before.
+                              <span className="w-11 h-11 rounded-xl grid place-items-center shrink-0 dark:bg-white">
+                                <img
+                                  src={t.logo_url}
+                                  alt=""
+                                  className="w-11 h-11 dark:w-8 dark:h-8 object-contain"
+                                />
+                              </span>
                             )}
                             {/* space-y rather than per-line margins, so the lines
                                 cannot drift apart as any one of them is added or
