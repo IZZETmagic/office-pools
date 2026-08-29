@@ -255,7 +255,12 @@ export async function POST(request: NextRequest) {
       prediction_deadline: resolvedDeadline,
       prediction_mode: resolvedMode,
       status: 'open',
-      is_private,
+      // ⚠ PRIVATE WHEN THE CALLER DOES NOT SAY. Both wizards send this
+      // explicitly, so this only decides what an omitted field means — and the
+      // wrong answer there is the one that publishes a pool to Discover because
+      // a request left a key out. Defaults belong on the safe side of a
+      // visibility decision.
+      is_private: is_private ?? true,
       max_participants: max_participants > 0 ? max_participants : null,
       max_entries_per_user: Math.max(1, Math.min(10, max_entries_per_user || 1)),
     })

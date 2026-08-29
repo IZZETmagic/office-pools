@@ -326,7 +326,14 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   // is played by picking fixtures or by ordering the table.
   const [leagueMode, setLeagueMode] = useState<'pickem' | 'showdown' | 'last_man_standing' | 'table'>('pickem')
   const [leagueDepth, setLeagueDepth] = useState<'results' | 'scores'>('results')
-  const [isPrivate, setIsPrivate] = useState(false)
+  // ⚠ PRIVATE BY DEFAULT (Ryan, 2026-08-29). A pool code is required either
+  // way; the only thing this decides is whether the pool is also listed in
+  // Discover. Defaulting to listed meant an admin had to notice a toggle to
+  // keep their office pool off a public directory — the wrong way round for a
+  // product whose median pool is a handful of people who already know each
+  // other. The accepted cost, recorded rather than rediscovered: Discover now
+  // fills only with pools somebody deliberately opted in.
+  const [isPrivate, setIsPrivate] = useState(true)
   // ⚠ NO `maxParticipants` STATE, and its absence is deliberate.
   //
   // The wizard used to ask for a member limit. Migration 075 records why it

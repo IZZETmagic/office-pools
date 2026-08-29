@@ -126,7 +126,10 @@ export default function CreatePoolModal() {
 
   // Step 4
   const [deadline, setDeadline] = useState<Date | null>(null);
-  const [isPrivate, setIsPrivate] = useState(false);
+  // Private by default, matching the web wizard — see the note in
+  // components/pools/CreatePoolModal.tsx. Two create surfaces disagreeing
+  // about a privacy default is the kind of drift nobody reports.
+  const [isPrivate, setIsPrivate] = useState(true);
   const [maxParticipants, setMaxParticipants] = useState('0');
   const [maxEntriesPerUser, setMaxEntriesPerUser] = useState(1);
 
