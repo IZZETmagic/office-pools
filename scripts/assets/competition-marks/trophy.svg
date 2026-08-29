@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="19 12 62 167">
+  <!-- Original mark drawn for SportPool. Built the way the form actually reads:
+       one solid silhouette with slivers cut through it, rather than parts
+       assembled. Our own geometry, proportions and cut placement — deliberately
+       not a trace of the FIFA World Cup Trophy, a 1971 Gazzaniga sculpture still
+       under copyright.
+
+       ⚠ THE VIEWBOX IS THE ART — contain scales padding as readily as artwork.
+       ⚠ THE CUTS ARE A MASK: this file doubles as a CSS mask-image for the
+       tinted watermark, so separations must live in alpha, not a second colour. -->
+  <mask id="t" maskUnits="userSpaceOnUse" x="19" y="12" width="62" height="167">
+    <g fill="#fff">
+      <circle cx="50" cy="44" r="30"/>
+      <path d="M27 62 C 30 98, 38 126, 42 146 L58 146 C 62 126, 70 98, 73 62 Z"/>
+      <rect x="37" y="146" width="26" height="8" rx="2"/>
+      <rect x="30" y="157" width="40" height="8" rx="2"/>
+      <rect x="22" y="168" width="56" height="9" rx="3"/>
+    </g>
+    <g fill="none" stroke="#000" stroke-width="5" stroke-linecap="round">
+      <path d="M43 146 C 41 112, 38 84, 46 60 C 51 46, 60 34, 70 30"/>
+      <path d="M57 144 C 60 112, 64 86, 60 66"/>
+      <path d="M30 60 C 27 44, 33 28, 44 20"/>
+    </g>
+  </mask>
+  <rect x="19" y="12" width="62" height="167" fill="#fff" mask="url(#t)"/>
+</svg>

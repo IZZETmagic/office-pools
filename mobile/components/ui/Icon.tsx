@@ -135,9 +135,13 @@ import {
 // here unlocks a single SF name → Pro solid mapping in SOLID_ICON_MAP
 // below. Add new ones as components migrate.
 import {
+  Alert02Icon as Alert02SolidIcon,
+  AlertCircleIcon as AlertCircleSolidIcon,
   ChampionIcon as ChampionSolidIcon,
+  CheckmarkCircle01Icon as CheckmarkCircle01SolidIcon,
   Fire03Icon as Fire03SolidIcon,
   FlashIcon as FlashSolidIcon,
+  InformationCircleIcon as InformationCircleSolidIcon,
 } from '@hugeicons-pro/core-solid-rounded';
 
 import { type ColorToken, useTheme } from '@/theme';
@@ -180,7 +184,19 @@ type IconProps = {
 // the `solid` prop; other names fall through to ICON_MAP regardless.
 const SOLID_ICON_MAP: Record<string, IconConstant> = {
   'bolt.fill': FlashSolidIcon,
+  // The four status glyphs. A toast or an inline banner is where the
+  // `.fill` in an SF name has to be literally true: the icon carries the
+  // variant on its own there, and a stroke outline at 18px reads as
+  // decoration rather than as a state. Added for the web toast and banner
+  // (components/ui/Toast.tsx, components/ui/Alert.tsx) and mirrored here
+  // because lib/design/__tests__/iconMap.test.ts requires both maps to
+  // hold the same SF names — the two apps fill the same glyphs or neither
+  // does.
+  'checkmark.circle.fill': CheckmarkCircle01SolidIcon,
+  'exclamationmark.circle.fill': AlertCircleSolidIcon,
+  'exclamationmark.triangle.fill': Alert02SolidIcon,
   'flame.fill': Fire03SolidIcon,
+  'info.circle.fill': InformationCircleSolidIcon,
   'trophy': ChampionSolidIcon,
   'trophy.circle.fill': ChampionSolidIcon,
   'trophy.fill': ChampionSolidIcon,

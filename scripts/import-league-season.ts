@@ -44,6 +44,12 @@ const CATALOGUE: Record<string, { name: string; country: string; apiLeagueId: nu
   'la-liga': { name: 'La Liga', country: 'ESP', apiLeagueId: 140 },
   // Added 2026-08-28 as league #3. Same shape again: 20/38/380, one phase.
   'serie-a': { name: 'Serie A', country: 'ITA', apiLeagueId: 135 },
+  // Added 2026-08-28 as league #4, and the FIRST that is not 20/38/380: 18
+  // clubs, 34 matchweeks, 9 fixtures a round. Also the first with a winter
+  // break, and the one whose qualification bands the feed under-describes —
+  // migration 090 derives 3 rather than 4 because rank 4 reads " Qualifying"
+  // with no competition named, and guessing is what 090 exists to stop.
+  'ligue-1': { name: 'Ligue 1', country: 'FRA', apiLeagueId: 61 },
   // Added 2026-08-28 as league #4, and the FIRST that is not England-shaped:
   // 18 clubs, 34 matchweeks, 306 fixtures, 9 a round.
   //

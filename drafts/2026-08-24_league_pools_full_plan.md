@@ -685,9 +685,15 @@ and a season-end reveal is the kind of surprise that makes bad feelings.
 One screen, reachable from the pool until `league_table_lock_at`:
 
 - 20 club rows, drag to reorder, position number on the left, crest and name.
-- **Pre-seeded from `league_actual_table()` as it currently stands, falling back to
-  alphabetical** when no fixture has completed yet — **decided (12)**, so the lazy path is one
-  tap, not twenty drags.
+- **Pre-seeded ALPHABETICALLY, always** — ~~pre-seeded from `league_actual_table()` as it
+  currently stands, falling back to alphabetical when no fixture has completed yet (12/17)~~.
+  **Overturned 2026-08-29, Ryan's call.** Reason: a pool created in November opened on a table
+  that was already most of the way right, while an August pool dragged twenty clubs to build the
+  same prediction — one mode, two starting difficulties, and the November prediction is mostly
+  ours rather than theirs. Alphabetical is the only order carrying no opinion about where a club
+  finishes, so every first-time screen is the same screen. The cost is accepted knowingly: there
+  is no longer a one-tap lazy path. `seedOrder` takes no standings argument at all, so this
+  cannot drift back by a call site passing one.
   ⚠ The original wording said *"last season's finishing order"*. **There is no prior season:**
   `league_seasons` holds exactly one row (2026/27) and `league_clubs` carries no prior
   position — verified 2026-08-24. Importing 2025/26 purely for standings was rejected as a new
@@ -1011,7 +1017,7 @@ rather than diverging quietly.
 | 9 | Table scored live or banked | **Live, labelled *provisional*** until MW38's final whistle. Recomputed whenever a fixture completes | L-E |
 | 10 | Size of the table slice | **≈12–15% of a season** — the §3.5 defaults as written. All values are `league_pool_settings` columns and remain movable | L-E |
 | 11 | Late joiners | **Read-only, scores 0, said plainly** — *"closed before you joined"*, with the live comparison still visible. Keeps every total in a pool comparable | L-E |
-| 12 | What pre-seeds the table screen | **`league_actual_table()` as it stands, else alphabetical.** No prior-season import — see §3.6 | L-E |
+| 12 | What pre-seeds the table screen | ~~**`league_actual_table()` as it stands, else alphabetical.**~~ **OVERTURNED 2026-08-29 by decision 18 — alphabetical, always.** No prior-season import either way — see §3.6 | L-E |
 | 13 | Head-to-head in `league_actual_table` | **v1 simplification.** `name ASC`, recorded as known, shown in the table's own footnote. Revisit when a real case appears | L-D |
 
 Two further decisions taken in the same pass, recorded where they bind:
@@ -1032,7 +1038,8 @@ win** — decisions 12 and 13 in particular are affected.
 | 14 | Free-tier mode allowance, now that Table is a mode | **Free gets Pick'em + Table.** Showdown and Last Man Standing are the paid draw |
 | 15 | Rejoin scoring after a soft delete | **Full history restored** — retained predictions re-scored including the away period |
 | 16 | When a matchweek opens | **Strictly one at a time**, opening when the previous locks. No working ahead |
-| 17 | Source of the actual league table *(revises 12 and 13)* | **The `/standings` feed.** Pre-seed comes from it too; head-to-head stops being ours to solve |
+| 17 | Source of the actual league table *(revises 12 and 13)* | **The `/standings` feed.** ~~Pre-seed comes from it too~~ (the pre-seed clause is overturned by 18); head-to-head stops being ours to solve |
+| 18 | What pre-seeds the table screen *(overturns 12, and 17's pre-seed clause)* | **Alphabetical, always — never the live table.** Fairness: every first-time screen must be the same screen, whenever the pool was created. Knowingly gives up the one-tap lazy path. Ryan, 2026-08-29 — see §3.6 |
 
 Ryan also confirmed **all four §8 recommendations** from the journeys artifact: soft
 deletion over hard delete, Pick'em-at-Results first with Showdown committed, the

@@ -31,7 +31,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { openMatchweekId, type MatchweekRow } from './read'
+import { inPlayMatchweekId, openMatchweekId, type MatchweekRow } from './read'
 
 type AdminClient = SupabaseClient
 
@@ -53,6 +53,15 @@ export type LeagueCardPool = {
 export type LeagueCardFacts = {
   /** For the card's third tile. NULL once the season is over. */
   openMatchweekNumber: number | null
+  /**
+   * The matchweek being PLAYED, for the same tile. NULL between rounds.
+   *
+   * ⚠ The tile prefers this one. The open matchweek is what you can still pick,
+   * which from Friday kickoff to Monday night is the week AFTER the one being
+   * played — so all weekend the card said the season was a week further along
+   * than it was. See `inPlayMatchweekId`.
+   */
+  inPlayMatchweekNumber: number | null
   /**
    * How many matchweeks this season has, for the "3 of 38" caption.
    *
@@ -84,6 +93,7 @@ export type LeagueCardFacts = {
 
 const EMPTY: LeagueCardFacts = {
   openMatchweekNumber: null,
+  inPlayMatchweekNumber: null,
   matchweekCount: 0,
   deadlineAt: null,
   totalPicks: 0,
@@ -137,9 +147,15 @@ export async function readLeagueCardFacts(
   // would be a third copy, and wrong: a whole round can be moved, so round N is
   // not always played before N+1.
   const openByPool = new Map<string, MatchweekRow>()
+  const inPlayByPool = new Map<string, MatchweekRow>()
   for (const p of pools) {
     if (!p.seasonId) continue
     const rows = bySeason.get(p.seasonId) ?? []
+    // The matchweek being played is the tile's number; the open one is still
+    // what every count below is about, because it is the one owing a decision.
+    const inPlayId = inPlayMatchweekId(rows, now)
+    const inPlay = rows.find((r) => r.matchweek_id === inPlayId)
+    if (inPlay) inPlayByPool.set(p.poolId, inPlay)
     const openId = openMatchweekId(rows, now)
     const open = rows.find((r) => r.matchweek_id === openId)
     if (!open) continue
@@ -253,6 +269,7 @@ export async function readLeagueCardFacts(
     const made = madeByPool.get(p.poolId) ?? 0
     out.set(p.poolId, {
       openMatchweekNumber: open?.matchweek_number ?? null,
+      inPlayMatchweekNumber: inPlayByPool.get(p.poolId)?.matchweek_number ?? null,
       matchweekCount: (p.seasonId ? bySeason.get(p.seasonId)?.length : 0) ?? 0,
       // Table mode's deadline is its own column and has nothing to do with a
       // matchweek — "one decision, all season" is the whole mode.

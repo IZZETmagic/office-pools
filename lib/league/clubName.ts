@@ -91,6 +91,24 @@ const SHORTENINGS: ReadonlyArray<readonly [RegExp, string]> = [
   // identity — but if they ever do, this rule is the thing to revisit.
   [/\bRacing Santander\b/i, 'Racing'],
 
+  // France, added with Ligue 1 2026-08-28.
+  //
+  // ⚠ "Paris Saint Germain" shortens to PSG and NOT to "Paris", because Ligue 1
+  // 2026/27 also contains **Paris FC**. "Paris" and "Paris FC" side by side in a
+  // table would read as two spellings of one club — the exact failure this file
+  // is meant to prevent, and the reason the Racing rule above carries its own
+  // warning. PSG is also the form the competition writes itself.
+  //
+  // An initialism is a departure: every other rule here shortens words. It earns
+  // it by being the name the club is universally known by — ligue1.com, L'Équipe
+  // and the club's own crest all use it — where "Paris SG" is a compromise
+  // nobody says out loud.
+  [/\bParis Saint[- ]Germain\b/i, 'PSG'],
+  // "Stade" prefixes several unrelated French clubs (Stade Rennais, Stade de
+  // Reims), so it is not a word worth shortening on its own; and the trailing
+  // "29" is the département, not part of the name anybody uses.
+  [/\bStade Brestois(\s+\d+)?\b/i, 'Brest'],
+
   // Spain, second pass (2026-08-29). "Atletico Madrid" was declined the first
   // time on the grounds that the 375px TABLE held 15 characters — which was
   // true of the table, and is not true of the dashboard's live card, where a

@@ -1245,6 +1245,47 @@ html.dark .light-scope {
 }
 
 /* =============================================================
+   Competition rail and mark
+   =============================================================
+   The wide form of the stripe above, for competitions that have a mark built
+   (see lib/design/competitionMark.ts). The bar answers "which competition" by
+   colour alone, which stops working once two leagues share a colour family —
+   La Liga and the Bundesliga shipped 0.069 apart in OKLab. The mark answers it
+   directly, so the colour no longer has to.
+
+   ⚠ THE MARK IS A MASK, NOT AN <img>. The files are white-on-transparent, so a
+   mask lets the rail tint them rather than trusting every asset to be the right
+   white — and it is the same mechanism whether the source is a PNG or the
+   World Cup's SVG. `background-color` supplies the ink.
+
+   ⚠ 46px IS LOAD-BEARING. Measured on a 358px phone card, the rail costs 47px
+   of body width, clips the "Matchweek" label and wraps the pill row, which
+   makes every card 23px taller. Narrower than this and the mark drops below the
+   ~36px where the wordmark lockups stop resolving; wider and the card's four
+   KPI tiles start colliding.
+   ============================================================= */
+.competition-rail {
+  background: linear-gradient(to bottom, var(--stripe-from), var(--stripe-to));
+  background: linear-gradient(to bottom in oklch, var(--stripe-from), var(--stripe-to));
+  display: grid;
+  place-items: center;
+}
+
+/* Size, ink and opacity come from the component, so the same rule serves a
+   knockout on a rail and a tinted watermark. Only the mask mechanics live here. */
+.competition-mark {
+  display: block;
+  -webkit-mask-image: var(--mark);
+  mask-image: var(--mark);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+/* =============================================================
    Mode pill — one colour per game mode
    =============================================================
    ⚠ THE ONLY PLACE THE MODE IS COLOURED, now that the card's stripe carries the

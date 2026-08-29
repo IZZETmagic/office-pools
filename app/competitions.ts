@@ -73,7 +73,7 @@ export const COMPETITIONS: Competition[] = [
   { key: 'world-cup-2026', name: 'FIFA World Cup', state: 'complete',
     status: '2026 · complete', stripe: ['#F5C518', '#CD7F32'] },
   // ⚠ STILL AUTHORED, and still green, which is not a Champions League colour
-  // by any reading — lib/design/competitionColor.ts has it as navy (#0B1E64).
+  // by any reading — lib/design/competitionColor.ts has it as midnight navy (#050B5E).
   // Left alone because it is marketing copy Ryan has not asked to change, and
   // because flipping it is now one line: swap the pair for
   // `getPoolStripe({ externalLeagueId: LEAGUE_ID.championsLeague })`.

@@ -13,12 +13,23 @@ import { Icon } from './Icon'
  *
  *              light            dark
  *   info       6.05:1          10.10:1     primary-800
- *   success    5.56:1          15.16:1     success-900
+ *   success    6.05:1          10.10:1     primary-800  (see below)
  *   warning    5.08:1          14.94:1     warning-800
  *   error      5.16:1          11.19:1     danger-800
  *
- * `success` needs 900 where the others need 800: at 800 it measured 3.58:1,
- * a fail, because green is the lightest of the four tones.
+ * SUCCESS IS NO LONGER GREEN, AND SHARES INFO'S TINT (2026-08-29, Ryan). Green
+ * survives in the product as a RESULT colour — a correct pick, a rising rank —
+ * so spending it on "Message sent" made a confirmation speak in the same voice
+ * as a scoring event. The two variants are now separated by their ICON, not
+ * their tone: a check for something the member did, an info glyph for something
+ * they are being told. Keep them on the same classes; a "nearly info" third
+ * blue would read as a rendering bug rather than a distinction. The toast in
+ * components/ui/Toast.tsx makes the same move for the same reason.
+ *
+ * Which is also why the glyphs are FILLED — the Hugeicons Pro solid-rounded set,
+ * opted into with `solid` (SOLID_ICON_MAP in components/ui/Icon.tsx). Once the
+ * icon is the only thing separating success from info, a stroke outline is too
+ * quiet to carry that job.
  *
  * The two variants this file used to ship both failed AA in light mode —
  * `success` was text-success-700 at 2.96:1 and `error` was 4.42:1. Do not
@@ -34,7 +45,7 @@ type AlertProps = {
 
 const variantClasses = {
   info: 'bg-primary-600/12 text-primary-800',
-  success: 'bg-success-600/12 text-success-900',
+  success: 'bg-primary-600/12 text-primary-800',
   warning: 'bg-warning-500/12 text-warning-800',
   error: 'bg-danger-600/12 text-danger-800',
 }
@@ -56,7 +67,7 @@ export function Alert({ variant, children, className = 'mb-4' }: AlertProps) {
       )}
       role={variant === 'error' || variant === 'warning' ? 'alert' : 'status'}
     >
-      <Icon name={variantIcon[variant]} size={18} weight="semibold" className="shrink-0 mt-px" />
+      <Icon name={variantIcon[variant]} size={18} solid className="shrink-0 mt-px" />
       <div className="flex-1 min-w-0">{children}</div>
     </div>
   )

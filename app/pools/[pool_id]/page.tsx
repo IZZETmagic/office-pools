@@ -179,7 +179,8 @@ export default async function PoolPage({
         duels,
         entryNames,
         ownEntryIds: (userEntries ?? []).map((e) => e.entry_id),
-        currentMatchweek: null,
+        openMatchweek: null,
+        inPlayMatchweek: null,
         duelPoints: new Map(
           ((totalsRes.data ?? []) as Array<{ entry_id: string; duel_points: number }>)
             .map((r) => [r.entry_id, r.duel_points]),
@@ -316,11 +317,13 @@ export default async function PoolPage({
         clubs,
         savedOrder,
         savedAt,
-        // Decision 12 as revised by 17: seeded from the live table, else
-        // alphabetical. Reads the SAME rows the Table tab renders — a second
-        // standings read could return a different ordering mid-matchweek, and
-        // the screen would seed from a table the member cannot see.
-        seededOrder: seedOrder(clubs, new Map(leagueStandings.map((r) => [r.club_id, r.rank]))),
+        // ALPHABETICAL, always — and deliberately not the live table, which is
+        // what decisions 12/17 used to say. A pool created in November would
+        // otherwise open on a table that is already most of the way right,
+        // while an August pool built the same prediction by hand. `seedOrder`
+        // carries the full reasoning; note that it takes no standings, so this
+        // cannot drift back by someone passing `leagueStandings` here again.
+        seededOrder: seedOrder(clubs),
         breakdown,
         lockAt,
         topN: settingsRes.data?.table_top_n ?? bands.top_n ?? 4,
@@ -376,13 +379,18 @@ export default async function PoolPage({
       teams = view.teams
       roundStates = view.roundStates
 
-      // Now the round states exist, so "this week" can be named. `mw_N` is the
-      // key matchweekKey() emits.
+      // Now the season has been read, so the two weeks can be named. They are
+      // NOT the same week from Friday kickoff to Monday night: `openMatchweek`
+      // is what you can still pick, `inPlayMatchweek` is what is being played.
+      // Both come off the view rather than being parsed back out of `mw_N`.
       if (showdownData || lmsData) {
-        const open = view.roundStates.find((r) => r.state === 'open')
-        const n = open ? Number(String(open.round_key).replace('mw_', '')) : NaN
-        const mw = Number.isFinite(n) ? n : null
-        if (showdownData) showdownData.currentMatchweek = mw
+        const mw = view.openMatchweekNumber
+        if (showdownData) {
+          showdownData.openMatchweek = mw
+          showdownData.inPlayMatchweek = view.inPlayMatchweekNumber
+        }
+        // LMS takes the open one only: a Survivor pick is written for the week
+        // being picked.
         if (lmsData) lmsData.currentMatchweek = mw
 
         // Who each club plays THIS matchweek, so the Survivor picker can show

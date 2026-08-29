@@ -30,6 +30,7 @@ import { resolve } from 'path'
 import { createAdminClient } from '../lib/supabase/server'
 import { readEntryScoring, readRecentForm } from '../lib/scoring/readSource'
 import { readLeagueCardFacts } from '../lib/league/poolCards'
+import { matchweekTile } from '../lib/league/matchweekTile'
 import { getModeName, getPoolStripe } from '../lib/design/poolMode'
 import { hasCompetitionColor } from '../lib/design/competitionColor'
 import { pickBestEntry } from '../lib/bestEntry'
@@ -112,7 +113,12 @@ async function main() {
     if (pts > 0) anyWithPoints++
 
     console.log(`── ${p.pool_name}   [${pill}]`)
-    console.log(`   Points ${pts}   Rank ${s?.current_rank ?? '—'} of ${entries.length}   MW ${f?.openMatchweekNumber ?? '—'} of ${f?.matchweekCount ?? '?'}   Form ${form.length ? form.join(',') : '(none)'}`)
+    // Printed through `matchweekTile` so this line is literally what the card
+    // renders. Printing `openMatchweekNumber` here is what let the tile claim
+    // MW3 all through the weekend MW2 was played without this script noticing.
+    const tile = matchweekTile(f ?? {})
+    console.log(`   Points ${pts}   Rank ${s?.current_rank ?? '—'} of ${entries.length}   MW ${tile.number ?? '—'} ${tile.caption}   Form ${form.length ? form.join(',') : '(none)'}`)
+    console.log(`   in play ${f?.inPlayMatchweekNumber ?? 'none'}   open for picks ${f?.openMatchweekNumber ?? 'none'}   of ${f?.matchweekCount ?? '?'}`)
     console.log(`   pill "${pill}"   picks ${f?.madePicks ?? 0}/${f?.totalPicks ?? 0}   submitted=${f?.hasSubmitted}`)
     console.log(`   clock ${f?.deadlineAt ?? 'none'}   (pools.prediction_deadline was ${p.prediction_deadline})`)
 

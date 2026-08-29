@@ -23,7 +23,12 @@ import {
 } from '@/lib/design/poolMode'
 import { PREDICTION_MODES } from '@/lib/predictionMode'
 import { lightness } from '@/lib/design/oklch'
-import { UNTHEMED_COMPETITION, getCompetitionColor, hasCompetitionColor } from '@/lib/design/competitionColor'
+import {
+  THEMED_COMPETITION_IDS,
+  UNTHEMED_COMPETITION,
+  getCompetitionColor,
+  hasCompetitionColor,
+} from '@/lib/design/competitionColor'
 
 describe('league pills', () => {
   it('names all four league games', () => {
@@ -88,9 +93,12 @@ describe('the stripe', () => {
   })
 
   it('gives every competition its own stripe', () => {
-    const ids = [1, 2, 39, 61, 78, 135, 140]
-    const bases = ids.map((id) => getPoolStripe({ externalLeagueId: id })[1])
-    expect(new Set(bases).size).toBe(ids.length)
+    // ⚠ THIS ONLY PROVES THE STRINGS DIFFER, which two identical-looking reds
+    // also do — it is why La Liga and the Bundesliga shipped 0.069 apart. The
+    // real check is competitionColor.test.ts, which measures how far apart they
+    // LOOK. Kept because a duplicate key in the table is still worth catching.
+    const bases = THEMED_COMPETITION_IDS.map((id) => getPoolStripe({ externalLeagueId: id })[1])
+    expect(new Set(bases).size).toBe(THEMED_COMPETITION_IDS.length)
   })
 
   it('uses the unthemed slate for a competition nobody has coloured', () => {
@@ -104,7 +112,7 @@ describe('the stripe', () => {
 
   it('never returns a malformed colour', () => {
     const HEX = /^#[0-9A-F]{6}$/
-    for (const id of [1, 2, 39, 61, 78, 135, 140, 9999, null]) {
+    for (const id of [...THEMED_COMPETITION_IDS, 9999, null]) {
       const [top, base] = getPoolStripe({ externalLeagueId: id })
       expect(top).toMatch(HEX)
       expect(base).toMatch(HEX)

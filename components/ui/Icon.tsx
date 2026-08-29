@@ -136,9 +136,13 @@ import {
 // Pro solid-rounded variants — opt-in via the `solid` prop, one entry per name in
 // SOLID_ICON_MAP below.
 import {
+  Alert02Icon as Alert02SolidIcon,
+  AlertCircleIcon as AlertCircleSolidIcon,
   ChampionIcon as ChampionSolidIcon,
+  CheckmarkCircle01Icon as CheckmarkCircle01SolidIcon,
   Fire03Icon as Fire03SolidIcon,
   FlashIcon as FlashSolidIcon,
+  InformationCircleIcon as InformationCircleSolidIcon,
 } from '@hugeicons-pro/core-solid-rounded'
 
 import type { ColorToken } from '@/lib/design/tokens'
@@ -191,7 +195,15 @@ type IconProps = {
  */
 const SOLID_ICON_MAP: Record<string, IconConstant> = {
   'bolt.fill': FlashSolidIcon,
+  // The four status glyphs. A toast or an inline banner is where the `.fill` in
+  // an SF name has to be literally true: the icon is carrying the variant on its
+  // own there, and a stroke outline at 18px reads as decoration rather than as a
+  // state. See components/ui/Toast.tsx and components/ui/Alert.tsx.
+  'checkmark.circle.fill': CheckmarkCircle01SolidIcon,
+  'exclamationmark.circle.fill': AlertCircleSolidIcon,
+  'exclamationmark.triangle.fill': Alert02SolidIcon,
   'flame.fill': Fire03SolidIcon,
+  'info.circle.fill': InformationCircleSolidIcon,
   'trophy': ChampionSolidIcon,
   'trophy.circle.fill': ChampionSolidIcon,
   'trophy.fill': ChampionSolidIcon,
@@ -401,8 +413,8 @@ export function Icon({
 
   // Do NOT pass strokeWidth for solid icons. The Hugeicons wrapper spreads
   // stroke="currentColor" onto every path whenever strokeWidth is defined, which
-  // layers an outline over a filled body and visually fattens it. (Carried over from
-  // the RN implementation; it will matter here once the Pro package is installed.)
+  // layers an outline over a filled body and visually fattens it. (Carried over
+  // from the RN implementation.)
   const isSolid = solid && SOLID_ICON_MAP[name] !== undefined
 
   return (

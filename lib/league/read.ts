@@ -36,6 +36,15 @@ export type LeaguePoolView = {
   matches: MatchData[]
   roundStates: PoolRoundState[]
   matchweekCount: number
+  /**
+   * The matchweek open for picks. Null once the season is over.
+   *
+   * Returned as a number so callers stop parsing it back out of `mw_N` in
+   * `roundStates`; the pool page did that for Showdown and LMS.
+   */
+  openMatchweekNumber: number | null
+  /** The matchweek being played right now. Null between rounds. */
+  inPlayMatchweekNumber: number | null
 }
 
 type ClubRow = {
@@ -161,6 +170,19 @@ const isMatchweekLocked = (mw: MatchweekRow, now: number) =>
   mw.lock_at !== null && Date.parse(mw.lock_at) <= now
 
 /**
+ * The season in the order the rhythm rules read it: by when each one locks.
+ *
+ * A matchweek with no fixtures has no lock; it must not outrank a real one that
+ * is about to close. Number is the tiebreak, so the answer is deterministic
+ * when two lock at the same instant.
+ */
+const byLockTime = (a: MatchweekRow, b: MatchweekRow) => {
+  const la = a.lock_at === null ? Number.POSITIVE_INFINITY : Date.parse(a.lock_at)
+  const lb = b.lock_at === null ? Number.POSITIVE_INFINITY : Date.parse(b.lock_at)
+  return la !== lb ? la - lb : a.matchweek_number - b.matchweek_number
+}
+
+/**
  * Which single matchweek is open for picks right now.
  *
  * Decision 16: **strictly one matchweek open at a time**, and matchweek N opens
@@ -188,14 +210,7 @@ const isMatchweekLocked = (mw: MatchweekRow, now: number) =>
  * Returns null once the season is over.
  */
 export function openMatchweekId(rows: MatchweekRow[], now: number): string | null {
-  const inOrder = [...rows].sort((a, b) => {
-    // A matchweek with no fixtures has no lock; it must not outrank a real one
-    // that is about to close. Number is the tiebreak, so the answer is
-    // deterministic when two lock at the same instant.
-    const la = a.lock_at === null ? Number.POSITIVE_INFINITY : Date.parse(a.lock_at)
-    const lb = b.lock_at === null ? Number.POSITIVE_INFINITY : Date.parse(b.lock_at)
-    return la !== lb ? la - lb : a.matchweek_number - b.matchweek_number
-  })
+  const inOrder = [...rows].sort(byLockTime)
   for (const mw of inOrder) {
     if (isMatchweekDone(mw)) continue
     // A locked-but-unfinished matchweek is SKIPPED, not returned. Postponements
@@ -203,6 +218,54 @@ export function openMatchweekId(rows: MatchweekRow[], now: number): string | nul
     // that must not hold the whole season shut behind it.
     if (isMatchweekLocked(mw, now)) continue
     return mw.matchweek_id
+  }
+  return null
+}
+
+/**
+ * Which matchweek is being PLAYED right now. The other half of the rhythm.
+ *
+ * `openMatchweekId` answers "what can I still pick", and for four days a week
+ * that is also the answer to "where is the season up to". For the three days the
+ * football is actually on, it is not — and those are the days a member looks.
+ *
+ * Ryan, 2026-08-29, on the pools list showing **Matchweek 3** while every club
+ * was playing its second game: MW2 locked at its own first kickoff on the
+ * Friday night, so from that moment MW3 was the earliest unlocked matchweek and
+ * correctly open. The card put that number under the word "Matchweek" and told
+ * four members the season was a week further along than it was.
+ *
+ * Walking the same lock-time order from the END gives the matchweek the season
+ * has most recently reached:
+ *
+ *   not locked yet        -> keep walking back; it has not started
+ *   locked and unfinished -> IN PLAY
+ *   locked and finished   -> null; the round is over and nothing has replaced it
+ *
+ * Null between rounds is the point, not a gap. From Monday night to Friday
+ * evening there is no football, and a caller that wants something to show then
+ * should fall back to the open matchweek — which is the honest answer to "what
+ * happens next".
+ *
+ * ⚠ THE LAST ONE TO LOCK, NOT THE HIGHEST-NUMBERED. Same reason
+ * `openMatchweekId` orders by lock time: a whole round can be moved, so round N
+ * is not always played before N+1.
+ *
+ * ⚠ Postponements cannot freeze this. A matchweek with one called-off fixture
+ * stays unfinished for weeks, but the moment the next one locks it is no longer
+ * the last to have locked, so it stops being in play. That is deliberately the
+ * same boundary migration 094 settles a matchweek on — "the next matchweek has
+ * locked" — reached from the other side. 094 phrases it by NUMBER because it is
+ * asking a conservative question (has the competition moved on at all, may I
+ * settle); this is asking which round the football is in, so it uses the
+ * ordering the rest of this module uses.
+ */
+export function inPlayMatchweekId(rows: MatchweekRow[], now: number): string | null {
+  const inOrder = [...rows].sort(byLockTime)
+  for (let i = inOrder.length - 1; i >= 0; i--) {
+    const mw = inOrder[i]
+    if (!isMatchweekLocked(mw, now)) continue
+    return isMatchweekDone(mw) ? null : mw.matchweek_id
   }
   return null
 }
@@ -326,9 +389,11 @@ export async function readLeaguePoolView(
   const teams = ((clubs ?? []) as unknown as ClubRow[]).map(clubToTeam)
   const clubById = new Map(teams.map((t) => [t.team_id, t]))
 
-  // Which matchweek is open is a fact about the whole list, so it is resolved
-  // once here rather than re-derived for each of the 38 rows below.
+  // Which matchweek is open — and which is being played — are facts about the
+  // whole list, so both are resolved once here rather than re-derived for each
+  // of the 38 rows below.
   const openId = openMatchweekId(matchweekRows, now)
+  const inPlayId = inPlayMatchweekId(matchweekRows, now)
 
   return {
     view: {
@@ -338,6 +403,8 @@ export async function readLeaguePoolView(
       ),
       roundStates: matchweekRows.map((m) => matchweekToRoundState(m, args.poolId, now, openId)),
       matchweekCount: matchweekRows.length,
+      openMatchweekNumber: openId === null ? null : numberByMatchweekId.get(openId) ?? null,
+      inPlayMatchweekNumber: inPlayId === null ? null : numberByMatchweekId.get(inPlayId) ?? null,
     },
     error: null,
   }

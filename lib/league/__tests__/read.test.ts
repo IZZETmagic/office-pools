@@ -8,7 +8,7 @@
 // =============================================================
 
 import { describe, it, expect } from 'vitest'
-import { deriveRoundSubmissions, openMatchweekId } from '@/lib/league/read'
+import { deriveRoundSubmissions, inPlayMatchweekId, openMatchweekId } from '@/lib/league/read'
 import type { MatchweekRow } from '@/lib/league/read'
 import { matchesInRound } from '@/lib/competitionRounds'
 import type { Prediction } from '@/lib/tournament'
@@ -208,6 +208,70 @@ describe('openMatchweekId — exactly one matchweek is open', () => {
   it('falls back to the number when two matchweeks lock at the same instant', () => {
     const at = new Date(NOW + 3 * HOUR).toISOString()
     expect(openMatchweekId([mw(7, { lock_at: at }), mw(4, { lock_at: at })], NOW)).toBe('mw4')
+  })
+})
+
+// =============================================================
+// The other half of the rhythm — which matchweek is being PLAYED
+// =============================================================
+// Ryan, 2026-08-29: the pools list said "Matchweek 3" on the weekend every club
+// played its second game. MW2 had locked at its own first kickoff on the Friday
+// night, so MW3 was correctly open — and the card put that number under the
+// word "Matchweek". The open matchweek answers "what can I still pick"; this
+// answers "where is the season", and they differ for the three days a week the
+// football is actually on.
+
+describe('inPlayMatchweekId — which matchweek is being played', () => {
+  it('is the matchweek whose games are on, not the one open for picks', () => {
+    // The exact Premier League shape on 2026-08-29: MW1 played out, MW2 locked
+    // on the Friday with two of ten games gone, MW3 open and locking next week.
+    const season = [played(1), locked(2), mw(3)]
+    expect(inPlayMatchweekId(season, NOW)).toBe('mw2')
+    expect(openMatchweekId(season, NOW)).toBe('mw3')
+  })
+
+  it('is null between rounds, so the caller can fall back to what is open', () => {
+    // Monday night to Friday evening there is no football. Null is the answer,
+    // not the last round played — the card shows the open one for those days.
+    expect(inPlayMatchweekId([played(1), played(2), mw(3)], NOW)).toBeNull()
+  })
+
+  it('is null before a ball is kicked', () => {
+    expect(inPlayMatchweekId([mw(1), mw(2), mw(3)], NOW)).toBeNull()
+  })
+
+  it('is null once the season is over', () => {
+    expect(inPlayMatchweekId([played(1), played(2)], NOW)).toBeNull()
+  })
+
+  it('⚠ a postponement cannot freeze it on an old matchweek', () => {
+    // MW2 keeps one called-off fixture and stays unfinished for weeks. The
+    // moment a later matchweek locks it is no longer the last to have locked,
+    // so the season moves on — the same boundary migration 094 settles on.
+    const stalled = mw(2, {
+      completed_fixture_count: 9,
+      lock_at: new Date(NOW - 30 * 24 * HOUR).toISOString(),
+    })
+    expect(inPlayMatchweekId([played(1), stalled, locked(8), mw(9)], NOW)).toBe('mw8')
+  })
+
+  it('⚠ is the LAST to lock, not the highest-numbered', () => {
+    // The moved-round case openMatchweekId is built around, from the other end:
+    // round 29 has one fixture pulled weeks ahead of the rest, so it locks
+    // before round 28. On the weekend round 28 is played, that is the round the
+    // season is in — even though 29 carries the bigger number.
+    const r28 = mw(28, { lock_at: new Date(NOW - HOUR).toISOString() })
+    const r29 = mw(29, { lock_at: new Date(NOW - 20 * 24 * HOUR).toISOString() })
+    expect(inPlayMatchweekId([r28, r29], NOW)).toBe('mw28')
+  })
+
+  it('ignores an unscheduled matchweek that has no lock at all', () => {
+    const empty = mw(5, { lock_at: null })
+    expect(inPlayMatchweekId([locked(2), empty], NOW)).toBe('mw2')
+  })
+
+  it('is not affected by array order', () => {
+    expect(inPlayMatchweekId([mw(3), played(1), locked(2)], NOW)).toBe('mw2')
   })
 })
 

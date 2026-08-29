@@ -17,9 +17,11 @@ import { formatNumber, formatTimeAgo } from '@/lib/format'
 import { getLevelName } from '@/lib/levelNames'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
-import { getModeName, getPoolStripe, getModeChip } from '@/lib/design/poolMode'
+import { getModeName, getModeChip } from '@/lib/design/poolMode'
+import { CompetitionRail } from '@/components/competitions/CompetitionRail'
 import type { PredictionMode } from '@/lib/predictionMode'
 import { getFormDotClass } from '@/lib/design/formDots'
+import { matchweekTile } from '@/lib/league/matchweekTile'
 
 // =====================
 // TYPES
@@ -51,6 +53,8 @@ type PoolData = {
   externalLeagueId?: number | null
   /** The open matchweek, shown where a World Cup card shows the XP level. */
   openMatchweekNumber?: number | null
+  /** The matchweek being played, which the tile prefers. Null between rounds. */
+  inPlayMatchweekNumber?: number | null
   /** This season's matchweek count — 38 in England, 34 in Germany. */
   matchweekCount?: number | null
   current_rank: number | null
@@ -142,18 +146,7 @@ function formatDeadline(deadline: string | null) {
   }
 }
 
-/**
- * The stripe's two stops — the competition's brand colour, lifted at the top —
- * as custom properties for the `.pool-stripe` class.
- *
- * Not a composed `background` string: a React style prop holds one value per
- * property, and `.pool-stripe` needs two background declarations so the OKLCH
- * one can override an sRGB fallback. See app/globals.css.
- */
-function stripeVars(pool: { externalLeagueId?: number | null }): CSSProperties {
-  const [from, to] = getPoolStripe({ externalLeagueId: pool.externalLeagueId })
-  return { '--stripe-from': from, '--stripe-to': to } as CSSProperties
-}
+
 
 function getStatusAccentColor(status: string): string {
   switch (status) {
@@ -203,8 +196,9 @@ function getPoolStatusText(pool: PoolData): string {
 }
 
 /**
- * The card's third tile: XP level on a World Cup pool, the open matchweek on a
- * league one.
+ * The card's third tile: XP level on a World Cup pool, the matchweek on a
+ * league one — the one being PLAYED where there is one, else the one open for
+ * picks. `matchweekTile` holds that rule for both cards.
  *
  * Two different facts in one slot, which is worth defending. XP does not exist
  * for a league — `entry_xp_state` is written by World Cup scoring and the
@@ -221,18 +215,14 @@ function getPoolStatusText(pool: PoolData): string {
  */
 function ProgressTile({ pool }: { pool: PoolData }) {
   if (pool.prediction_mode === 'league_pickem') {
-    const mw = pool.openMatchweekNumber
+    const { number: mw, caption } = matchweekTile(pool)
     return (
       <div className="flex-[1.2] py-3 px-3">
         <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Matchweek</p>
         <p className={`text-xl font-bold leading-none ${mw == null ? 'text-muted' : 'text-primary-800'}`}>
           {mw == null ? '—' : mw}
         </p>
-        {/* Null means no matchweek is open — every one is played or locked, so
-            the season is done. Said plainly rather than left as a bare dash. */}
-        <p className="text-[10px] text-muted mt-0.5">
-          {mw == null ? 'Season over' : pool.matchweekCount ? `of ${pool.matchweekCount}` : 'this week'}
-        </p>
+        <p className="text-[10px] text-muted mt-0.5">{caption}</p>
       </div>
     )
   }
@@ -661,13 +651,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                           {/* Mode stripe — the 5px full-height bar on every pool card in
                               the app. Branded pools get the brand banner above instead,
                               so they skip it, exactly as PoolListItem does in RN. */}
-                          {!hasBranding && (
-                            <span
-                              aria-hidden="true"
-                              className="w-[5px] shrink-0 pool-stripe"
-                              style={stripeVars(pool)}
-                            />
-                          )}
+                          {!hasBranding && <CompetitionRail externalLeagueId={pool.externalLeagueId} />}
                           <div className="flex-1 px-4 py-3.5">
                             {/* Header: name + tags + action pill */}
                             <div className="flex items-center justify-between gap-3 mb-3">
@@ -812,13 +796,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                           className="hidden md:flex flex-1"
                           style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
                         >
-                          {!hasBranding && (
-                            <span
-                              aria-hidden="true"
-                              className="w-[5px] shrink-0 pool-stripe"
-                              style={stripeVars(pool)}
-                            />
-                          )}
+                          {!hasBranding && <CompetitionRail externalLeagueId={pool.externalLeagueId} />}
                           {/* Column, so the status row below can be pushed to the
                               bottom when the grid stretches this card to match a
                               taller sibling. */}

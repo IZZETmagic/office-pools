@@ -57,7 +57,10 @@ type Props = {
   savedOrder: string[]
   /** When that ordering was last written, server-stamped. Null if never. */
   savedAt: string | null
-  /** What an unpicked screen starts from — the live table, else alphabetical. */
+  /**
+   * What an unpicked screen starts from — ALPHABETICAL, always. Never the live
+   * table: every first-time screen has to be the same screen. See `seedOrder`.
+   */
   seededOrder: string[]
   breakdown: TableBreakdownRow[]
   lockAt: string | null
@@ -299,10 +302,10 @@ export default function TablePredictionTab({
    * There is no longer a Save button — dragging is the only verb on this
    * screen, and every drag writes. What survives is the QUESTION the button
    * used to answer, because the failure it guarded against is still real: the
-   * clubs arrive pre-filled in live-table order (decisions 12/17), so an
-   * untouched screen looks exactly like a filed prediction. A member who reads
-   * it that way closes the tab believing they are done, and scores nothing when
-   * the deadline passes on Friday.
+   * clubs arrive pre-filled (alphabetically — see `seedOrder`), so an untouched
+   * screen looks exactly like a filed prediction. A member who reads it that
+   * way closes the tab believing they are done, and scores nothing when the
+   * deadline passes on Friday.
    *
    * So this is what the status line up top reports — "not saved yet" until
    * there is a row in the database, "Saved <time>" after. "Saved" is a claim
@@ -452,7 +455,7 @@ export default function TablePredictionTab({
    * by a button and only later drags saved themselves. The button is gone —
    * dragging is the whole interface now — but the reason it existed is not, and
    * `dirty` is what carries it: a member who has never saved is looking at the
-   * SEEDED order (the live table, decisions 12/17), not at anything they chose.
+   * SEEDED order (alphabetical — see `seedOrder`), not at anything they chose.
    * Writing that on mount would file a prediction they never made and score
    * them on it — and would make "opened the tab once" indistinguishable from
    * "predicted", which is the one thing this table has to be able to tell apart.
@@ -596,8 +599,8 @@ export default function TablePredictionTab({
           was one rule for the first drag and another for the rest of them.
 
           What the button was ALSO carrying is the un-filed state, and that has
-          not gone away — a never-touched screen shows the seeded live table and
-          reads exactly like a real prediction. It moved to `SaveStatus`, which
+          not gone away — a never-touched screen shows the alphabetical seed and
+          still reads like a real prediction. It moved to `SaveStatus`, which
           says so in words instead of implying it with a disabled control. Don't
           put a button back here; if the un-filed state needs to be louder, make
           the status line louder. */}

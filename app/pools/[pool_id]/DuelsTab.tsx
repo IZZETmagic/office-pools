@@ -33,8 +33,18 @@ type Props = {
   entryNames: Map<string, string>
   /** The viewer's own entries, so their duels can be picked out. */
   ownEntryIds: string[]
-  /** The matchweek currently open, so "this week" means something. */
-  currentMatchweek: number | null
+  /**
+   * The matchweek open for PICKS. Null once the season is over.
+   *
+   * ⚠ NOT the same week as the duel being played, and this tab used to be given
+   * only this one. MW2 locks at its own first kickoff on the Friday, so all
+   * weekend "this week's duel" was MW3 — the one nobody had played yet — while
+   * the duel that was actually being decided sat further down the page under
+   * "Coming up". Ryan caught the same conflation on the pools-list tile.
+   */
+  openMatchweek: number | null
+  /** The matchweek being played right now. Null between rounds. */
+  inPlayMatchweek: number | null
   /** Duel points per entry, from the leaderboard read. */
   duelPoints: Map<string, number>
 }
@@ -45,7 +55,8 @@ export default function DuelsTab({
   duels,
   entryNames,
   ownEntryIds,
-  currentMatchweek,
+  openMatchweek,
+  inPlayMatchweek,
   duelPoints,
 }: Props) {
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
@@ -85,13 +96,21 @@ export default function DuelsTab({
     return { won, drawn, lost, byes }
   }, [mine])
 
-  const thisWeek = useMemo(
-    () => (currentMatchweek === null ? null : mine.find((m) => m.matchweek === currentMatchweek) ?? null),
-    [mine, currentMatchweek],
+  /**
+   * Which duel the card at the top is about.
+   *
+   * The one being PLAYED, because that is the one with something happening in
+   * it. Between rounds there is none, and then it is the one you are picking —
+   * which is the honest answer to "what happens next".
+   */
+  const featuredMatchweek = inPlayMatchweek ?? openMatchweek
+  const featured = useMemo(
+    () => (featuredMatchweek === null ? null : mine.find((m) => m.matchweek === featuredMatchweek) ?? null),
+    [mine, featuredMatchweek],
   )
   const next = useMemo(
-    () => mine.filter((m) => !m.duel.settled_at && (currentMatchweek === null || m.matchweek > currentMatchweek)).slice(0, 4),
-    [mine, currentMatchweek],
+    () => mine.filter((m) => !m.duel.settled_at && (featuredMatchweek === null || m.matchweek > featuredMatchweek)).slice(0, 4),
+    [mine, featuredMatchweek],
   )
 
   // The duel table — everyone, by duel points. Built from the duels themselves
@@ -143,17 +162,23 @@ export default function DuelsTab({
         </p>
       </div>
 
-      {/* This week */}
-      {thisWeek && (
+      {/* The duel with something happening in it */}
+      {featured && (
         <Card padding="md">
           <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-2.5">
-            Matchweek {thisWeek.matchweek}
+            Matchweek {featured.matchweek}
+            {/* Which of the two weeks this is. Without it the heading is the
+                same whether these games are being played right now or are
+                still six days away. */}
+            <span className="ml-1.5 font-semibold text-neutral-400 normal-case tracking-normal">
+              {featured.matchweek === inPlayMatchweek ? '· being played now' : '· you are picking this one'}
+            </span>
           </p>
-          {thisWeek.them ? (
+          {featured.them ? (
             <div className="flex items-center gap-3">
-              <Fighter label="You" name={name(thisWeek.you.entry)} accuracy={thisWeek.you.accuracy} align="left" />
+              <Fighter label="You" name={name(featured.you.entry)} accuracy={featured.you.accuracy} align="left" />
               <span className="text-xs font-bold text-neutral-400 shrink-0">v</span>
-              <Fighter label="Them" name={name(thisWeek.them.entry)} accuracy={thisWeek.them.accuracy} align="right" />
+              <Fighter label="Them" name={name(featured.them.entry)} accuracy={featured.them.accuracy} align="right" />
             </div>
           ) : (
             <p className="text-sm text-neutral-600">
@@ -161,10 +186,10 @@ export default function DuelsTab({
               week — it rotates, so everyone gets the same number.
             </p>
           )}
-          {thisWeek.duel.settled_at && thisWeek.them && (
+          {featured.duel.settled_at && featured.them && (
             <p className="text-xs text-neutral-500 mt-3 pt-3 border-t border-border-default">
-              {thisWeek.you.points === 3 ? 'You won this duel — three points.'
-                : thisWeek.you.points === 1 ? 'A tie — one point each.'
+              {featured.you.points === 3 ? 'You won this duel — three points.'
+                : featured.you.points === 1 ? 'A tie — one point each.'
                 : 'They took this one.'}
             </p>
           )}
@@ -202,6 +227,14 @@ export default function DuelsTab({
                 <span className="flex-1 min-w-0 font-semibold text-neutral-900 truncate">
                   {m.them ? name(m.them.entry) : 'Bye'}
                 </span>
+                {/* While last week's duel is still being played, the week you
+                    are actually picking is in this list rather than the card
+                    above — so it says so. */}
+                {m.matchweek === openMatchweek && (
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-warning-600 shrink-0">
+                    Picking now
+                  </span>
+                )}
               </li>
             ))}
           </ul>

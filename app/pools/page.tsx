@@ -420,6 +420,7 @@ export default async function PoolsPage() {
         prediction_deadline: league ? league.deadlineAt : pool.prediction_deadline,
         externalLeagueId: leagueIdByTournament.get(pool.tournament_id) ?? null,
         openMatchweekNumber: league?.openMatchweekNumber ?? null,
+        inPlayMatchweekNumber: league?.inPlayMatchweekNumber ?? null,
         matchweekCount: league?.matchweekCount ?? null,
       }
     })

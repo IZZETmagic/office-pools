@@ -107,7 +107,7 @@ const head = (m: string) => console.log(`\n  ${m}\n  ${'-'.repeat(66)}`)
     const { data: cross, error: cErr } = await admin
       .rpc('league_standings_crosscheck', { p_season_id: season.season_id })
     if (cErr) { bad('cross-check ran', cErr.message); return }
-    const rows = (cross ?? []) as Array<{ club_name: string; kind: string; feed_points: number; derived_points: number; points_delta: number }>
+    const rows = (cross ?? []) as Array<{ club_id: string; club_name: string; kind: string; feed_points: number; derived_points: number; points_delta: number }>
     const mismatch = rows.filter(r => r.kind === 'points_mismatch')
     const tiebreak = rows.filter(r => r.kind === 'tiebreak_only')
     ok('cross-check ran', `${rows.length} clubs compared`)
@@ -115,11 +115,50 @@ const head = (m: string) => console.log(`\n  ${m}\n  ${'-'.repeat(66)}`)
     if (mismatch.length === 0) {
       ok('no points mismatch', 'no deduction, and our arithmetic agrees with the feed')
     } else {
-      note(`${mismatch.length} POINTS mismatches — a deduction, or our fixtures are wrong:`)
-      for (const m of mismatch) {
-        note(`  ${m.club_name}: feed ${m.feed_points}, ours ${m.derived_points} (${m.points_delta >= 0 ? '+' : ''}${m.points_delta})`)
+      // ⚠ A POINTS mismatch has TWO causes and they need telling apart.
+      //
+      //   played counts EQUAL     -> the feed knows about the same matches we do
+      //                              and still disagrees on points. That is a
+      //                              DEDUCTION (or our result is wrong), and it
+      //                              is the thing this check exists to catch.
+      //   feed played < ours      -> the feed's TABLE is simply behind its own
+      //                              FIXTURES. Seen live on 2026-08-29: three
+      //                              Serie A clubs each +3, every one a match
+      //                              played that same day. Self-corrects.
+      //
+      // Without this split the check cries wolf every matchday, and a script
+      // that cries wolf is a script nobody reads — the same failure the stale
+      // lock assertion in verify-league-aggregates.ts had.
+      const { data: playedRows } = await admin
+        .from('league_standings').select('club_id, played').eq('season_id', season.season_id)
+      const feedPlayed = new Map(
+        ((playedRows ?? []) as Array<{ club_id: string; played: number }>).map((r) => [r.club_id, r.played]),
+      )
+      const { data: ourFixtures } = await admin
+        .from('league_fixtures')
+        .select('home_club_id, away_club_id')
+        .eq('season_id', season.season_id).eq('is_completed', true)
+      const ourPlayed = new Map<string, number>()
+      for (const f of (ourFixtures ?? []) as Array<{ home_club_id: string; away_club_id: string }>) {
+        ourPlayed.set(f.home_club_id, (ourPlayed.get(f.home_club_id) ?? 0) + 1)
+        ourPlayed.set(f.away_club_id, (ourPlayed.get(f.away_club_id) ?? 0) + 1)
       }
-      note('This is the detection mechanism working, not necessarily a bug.')
+
+      const lagging = mismatch.filter((m) => (feedPlayed.get(m.club_id) ?? 0) < (ourPlayed.get(m.club_id) ?? 0))
+      const real = mismatch.filter((m) => !lagging.includes(m))
+
+      if (lagging.length > 0) {
+        note(`${lagging.length} mismatch(es) are the feed's TABLE lagging its own FIXTURES — expected on a matchday, self-corrects:`)
+        for (const m of lagging) {
+          note(`  ${m.club_name}: feed ${m.feed_points}pts from ${feedPlayed.get(m.club_id)} played, ours ${m.derived_points}pts from ${ourPlayed.get(m.club_id)}`)
+        }
+      }
+      if (real.length > 0) {
+        bad(`${real.length} POINTS mismatch(es) on EQUAL played counts — a deduction, or our result is wrong`)
+        for (const m of real) {
+          note(`  ${m.club_name}: feed ${m.feed_points}, ours ${m.derived_points} (${m.points_delta >= 0 ? '+' : ''}${m.points_delta}), both played ${ourPlayed.get(m.club_id)}`)
+        }
+      }
     }
     }
   } catch (err) {

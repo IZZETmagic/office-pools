@@ -2,10 +2,15 @@
 // Table mode — the seed, and the two things a save refuses outright
 // =============================================================
 // `seedOrder` decides what a member sees the FIRST time they open the screen,
-// and decision 12 (as revised by 17) makes that "the table as it stands, else
-// alphabetical". It is worth pinning because the failure mode is silent: a seed
-// that quietly drops a club produces a nineteen-club prediction that scores
-// slightly low forever, and nothing anywhere would report it.
+// and that is now ALPHABETICAL, always — overturning decision 12 (as revised by
+// 17), which seeded from the live table. Pinned here because the property that
+// matters is a fairness one and it is invisible in the UI: a pool created in
+// November has to open on exactly the list an August pool opened on, or the two
+// are playing the same mode at different difficulties.
+//
+// The second failure mode is silent too: a seed that quietly drops a club
+// produces a nineteen-club prediction that scores slightly low forever, and
+// nothing anywhere would report it.
 //
 // The scoring arithmetic is NOT tested here. It lives in SQL and is verified
 // against a real database by scripts/verify-table-mode.ts — reimplementing it
@@ -30,31 +35,39 @@ const CLUBS = [
 ]
 
 describe('seedOrder', () => {
-  it('falls back to alphabetical before a ball is kicked', () => {
-    expect(seedOrder(CLUBS, new Map())).toEqual(['c1', 'c2', 'c3', 'c4'])
+  it('is alphabetical before a ball is kicked', () => {
+    expect(seedOrder(CLUBS)).toEqual(['c1', 'c2', 'c3', 'c4'])
   })
 
-  it('uses the live table when there is one', () => {
-    const standings = new Map([['c4', 1], ['c2', 2], ['c3', 3], ['c1', 4]])
-    expect(seedOrder(CLUBS, standings)).toEqual(['c4', 'c2', 'c3', 'c1'])
+  it('is STILL alphabetical once the season is under way', () => {
+    // The whole point of the change. There is no argument to pass a live table
+    // through any more, so the only thing this can assert is that mid-season
+    // the answer has not moved — a pool created in matchweek 20 opens on the
+    // same list as one created in matchweek 1.
+    expect(seedOrder(CLUBS)).toEqual(['c1', 'c2', 'c3', 'c4'])
   })
 
-  it('APPENDS a club the table has not got rather than dropping it', () => {
-    // A partial table is the realistic case: a newly promoted club can be
-    // missing for a tick, and a prediction with a hole in it is not a
-    // prediction — it silently scores nothing for that club, forever.
-    const partial = new Map([['c4', 1], ['c2', 2]])
-    const seeded = seedOrder(CLUBS, partial)
-    expect(seeded).toHaveLength(4)
-    expect(seeded.slice(0, 2)).toEqual(['c4', 'c2'])
-    // The leftovers keep a stable, explainable order rather than whatever the
-    // database happened to return.
-    expect(seeded.slice(2)).toEqual(['c1', 'c3'])
+  it('orders by NAME, not by whatever order the clubs arrived in', () => {
+    // `CLUBS` is deliberately unsorted, so a seed that just passed the input
+    // through would fail here rather than pass by accident.
+    expect(seedOrder(CLUBS).map((id) => CLUBS.find((c) => c.club_id === id)!.club_name))
+      .toEqual(['Apple United', 'Banana City', 'Cherry Town', 'Damson Rovers'])
   })
 
   it('never invents or loses a club', () => {
-    const seeded = seedOrder(CLUBS, new Map([['c1', 2], ['c2', 1]]))
+    // A prediction with a hole in it is not a prediction — it silently scores
+    // nothing for the missing club, forever.
+    const seeded = seedOrder(CLUBS)
+    expect(seeded).toHaveLength(CLUBS.length)
     expect([...seeded].sort()).toEqual(['c1', 'c2', 'c3', 'c4'])
+  })
+
+  it('does not mutate the clubs it was handed', () => {
+    // It sorts a copy. Sorting the caller's array in place would reorder the
+    // very list the picking screen renders from.
+    const before = CLUBS.map((c) => c.club_id)
+    seedOrder(CLUBS)
+    expect(CLUBS.map((c) => c.club_id)).toEqual(before)
   })
 })
 

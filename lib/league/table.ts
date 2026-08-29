@@ -184,22 +184,35 @@ export async function saveTablePrediction(
 }
 
 /**
- * What the picking screen starts from — decision 12, as revised by decision 17.
+ * What the picking screen starts from — ALPHABETICAL, always.
  *
- * The live table if there is one, so the lazy path is one tap rather than
- * twenty drags; alphabetical before a ball has been kicked. There is no
- * last-season order to fall back on: `league_seasons` holds exactly one row,
- * and three promoted clubs would have no prior position even if it held two.
+ * ⚠ This OVERTURNS decision 12 (as revised by 17), which pre-seeded the list
+ * from the live table so the lazy path was one tap rather than twenty drags.
+ * Ryan's call, and the reason is fairness: a pool created in November opened on
+ * a table that was already most of the way right, while the pool created in
+ * August dragged twenty clubs to build the same prediction. Same mode, two
+ * different starting difficulties — and the November table is mostly ours
+ * rather than theirs. Alphabetical is the one order that carries no opinion
+ * about where a club will finish, so every first-time screen is the same
+ * screen.
  *
- * Clubs missing from the standings are appended in name order rather than
- * dropped — a table prediction with eighteen clubs in it is not a prediction.
+ * It also makes the seed STABLE. A live-table seed changed under the same pool
+ * every week, so "what does an untouched screen look like" had no single
+ * answer — which is exactly the question the un-filed status line on
+ * TablePredictionTab exists to answer.
+ *
+ * There is deliberately NO standings argument. A caller cannot reintroduce the
+ * old behaviour by passing one, and the club-dropping failure the old version
+ * guarded against (a promoted club missing from the feed for a tick, silently
+ * yielding a nineteen-club prediction) is now impossible by construction: the
+ * season's clubs are the only input.
+ *
+ * There is no last-season order to fall back on either: `league_seasons` holds
+ * exactly one row, and three promoted clubs would have no prior position even
+ * if it held two.
  */
-export function seedOrder(clubs: SeasonClub[], standingsRankByClub: Map<string, number>): string[] {
-  const alphabetical = [...clubs].sort((a, b) => a.club_name.localeCompare(b.club_name))
-  if (standingsRankByClub.size === 0) return alphabetical.map((c) => c.club_id)
-
-  const ranked = alphabetical.filter((c) => standingsRankByClub.has(c.club_id))
-  const unranked = alphabetical.filter((c) => !standingsRankByClub.has(c.club_id))
-  ranked.sort((a, b) => standingsRankByClub.get(a.club_id)! - standingsRankByClub.get(b.club_id)!)
-  return [...ranked, ...unranked].map((c) => c.club_id)
+export function seedOrder(clubs: SeasonClub[]): string[] {
+  return [...clubs]
+    .sort((a, b) => a.club_name.localeCompare(b.club_name))
+    .map((c) => c.club_id)
 }

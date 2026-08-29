@@ -68,6 +68,28 @@ describe('shortClubName', () => {
     expect(shortClubName('Racing Ferrol')).toBe('Racing Ferrol')
   })
 
+  it('shortens the two Ligue 1 names that overran', () => {
+    expect(shortClubName('Paris Saint Germain')).toBe('PSG')
+    expect(shortClubName('Paris Saint-Germain')).toBe('PSG')
+    expect(shortClubName('Stade Brestois 29')).toBe('Brest')
+  })
+
+  it('⚠ keeps Paris FC distinct from PSG', () => {
+    // The whole reason PSG is not shortened to "Paris": both clubs are in Ligue
+    // 1 2026/27, and "Paris" beside "Paris FC" reads as two spellings of one
+    // club. Pinned so the rule cannot be "simplified" into a collision later —
+    // the same hazard the Racing Ferrol test above guards.
+    expect(shortClubName('Paris FC')).toBe('Paris FC')
+    expect(shortClubName('Paris Saint Germain')).not.toBe('Paris')
+  })
+
+  it('leaves other Stade clubs alone', () => {
+    // "Stade" prefixes several unrelated French clubs, so the rule is
+    // whole-name and must not generalise to the word.
+    expect(shortClubName('Stade Rennais')).toBe('Stade Rennais')
+    expect(shortClubName('Stade de Reims')).toBe('Stade de Reims')
+  })
+
   it('applies word rules to clubs it has never seen', () => {
     // The reason this is a word table and not a club table: nobody added a row
     // for either of these.
@@ -93,6 +115,7 @@ describe('shortClubName', () => {
       'Deportivo La Coruna', 'Racing Santander',
       'Borussia Mönchengladbach', 'Bayern München', 'Atletico Madrid',
       'Bayer Leverkusen', 'SC Paderborn 07',
+      'Paris Saint Germain', 'Stade Brestois 29',
     ]) {
       const once = shortClubName(name)
       expect(shortClubName(once)).toBe(once)
@@ -152,6 +175,8 @@ describe('the German and Spanish names (added 2026-08-29)', () => {
       'Borussia Mönchengladbach', 'Eintracht Frankfurt', 'Bayer Leverkusen',
       'Atletico Madrid', 'Rayo Vallecano', '1899 Hoffenheim', 'SC Paderborn 07',
       'Nottingham Forest', 'Deportivo La Coruna',
+      // Ligue 1, added 2026-08-28 with the league itself.
+      'Paris Saint Germain', 'Stade Brestois 29', 'Estac Troyes', 'Strasbourg',
     ]
     for (const name of longest) {
       expect(shortClubName(name).length).toBeLessThanOrEqual(13)

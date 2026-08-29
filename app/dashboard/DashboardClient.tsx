@@ -16,10 +16,12 @@ import { LocalTime } from '@/components/LocalTime'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
-import { getModeName, getPoolStripe, getModeChip } from '@/lib/design/poolMode'
+import { getModeName, getModeChip } from '@/lib/design/poolMode'
+import { CompetitionRail } from '@/components/competitions/CompetitionRail'
 import type { PredictionMode } from '@/lib/predictionMode'
 import { getFormDotClass } from '@/lib/design/formDots'
 import { shortClubName } from '@/lib/league/clubName'
+import { matchweekTile } from '@/lib/league/matchweekTile'
 
 // =====================
 // TYPES
@@ -58,6 +60,8 @@ type PoolCardData = {
   externalLeagueId?: number | null
   /** The open matchweek, shown where a World Cup card shows the XP level. */
   openMatchweekNumber?: number | null
+  /** The matchweek being played, which the tile prefers. Null between rounds. */
+  inPlayMatchweekNumber?: number | null
   /** This season's matchweek count — 38 in England, 34 in Germany. */
   matchweekCount?: number | null
   has_submitted_predictions: boolean
@@ -177,18 +181,6 @@ function formatDeadline(deadline: string | null) {
 }
 
 
-/**
- * The stripe's two stops — the competition's brand colour, lifted at the top —
- * as custom properties for the `.pool-stripe` class.
- *
- * Not a composed `background` string: a React style prop holds one value per
- * property, and `.pool-stripe` needs two background declarations so the OKLCH
- * one can override an sRGB fallback. See app/globals.css.
- */
-function stripeVars(pool: { externalLeagueId?: number | null }): CSSProperties {
-  const [from, to] = getPoolStripe({ externalLeagueId: pool.externalLeagueId })
-  return { '--stripe-from': from, '--stripe-to': to } as CSSProperties
-}
 
 /**
  * A club crest or a national flag — they are NOT the same shape.
@@ -262,13 +254,13 @@ function getPoolStatusText(pool: PoolCardData): string {
 function ProgressTile({ pool, variant }: { pool: PoolCardData; variant: 'compact' | 'tile' }) {
   const isLeague = pool.prediction_mode === 'league_pickem'
   const label = isLeague ? 'Matchweek' : 'Level'
-  const mw = pool.openMatchweekNumber
+  // The matchweek being PLAYED where there is one, else the one open for picks
+  // — the same rule the pools list uses, from the same function so the two
+  // cards cannot answer Ryan's question differently.
+  const tile = matchweekTile(pool)
+  const mw = isLeague ? tile.number : null
   const value = isLeague ? (mw == null ? '—' : String(mw)) : String(pool.highest_level ?? 1)
-  const caption = isLeague
-    // Null means nothing is open — every matchweek is played or locked, so the
-    // season is done. Said plainly rather than left as a bare dash.
-    ? (mw == null ? 'Season over' : pool.matchweekCount ? `of ${pool.matchweekCount}` : 'this week')
-    : getLevelName(pool.highest_level ?? 1)
+  const caption = isLeague ? tile.caption : getLevelName(pool.highest_level ?? 1)
 
   if (variant === 'compact') {
     return (
@@ -458,15 +450,12 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
       href={`/pools/${pool.pool_id}`}
       className={`w-56 h-full min-h-[9rem] rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface flex hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden`}
     >
-      {/* Mode stripe — the 5px full-height bar down the left edge of every pool card
-          in the app. Branded pools show their banner instead, as RN's PoolCard does. */}
-      {!hasBranding && (
-        <span
-          aria-hidden="true"
-          className="w-[5px] shrink-0 pool-stripe"
-          style={stripeVars(pool)}
-        />
-      )}
+      {/* ⚠ `compact`, NOT the default rail, and the difference is deliberate. This
+          card is 224px wide; the 46px rail the pools page uses is a fifth of that
+          and wraps the title. 30px keeps the layout at the cost of the wordmark
+          lockups, which stop resolving at 22px — see SIZES in CompetitionRail.
+          Branded pools show their banner instead, as RN's PoolCard does. */}
+      {!hasBranding && <CompetitionRail externalLeagueId={pool.externalLeagueId} size="compact" />}
       <div className="flex-1 flex flex-col min-w-0">
       {hasBranding && (
         <div className="flex items-center gap-1.5 px-3 py-1.5 text-white" style={{ backgroundColor: pool.brand_color! }}>
@@ -555,7 +544,7 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
   return (
     <Link
       href={`/pools/${pool.pool_id}`}
-      className={`block rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
+      className={`h-full flex flex-col rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
       style={{ animationDelay: `${index * 0.06}s` }}
     >
       {hasBranding && (
@@ -569,17 +558,19 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
           <span className="text-[10px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by SportPool</span>
         </div>
       )}
+      {/* ⚠ flex-1, or the rail stops short. The grid stretches every card to the
+          tallest in its row, but this row only grew to its own content, so a
+          shorter card drew its rail down two thirds of the card and left white
+          below it. */}
       <div
-        className="flex"
+        className="flex flex-1"
         style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
       >
-        {!hasBranding && (
-          <span
-            aria-hidden="true"
-            className="w-[5px] shrink-0 pool-stripe"
-            style={stripeVars(pool)}
-          />
-        )}
+        {/* ⚠ `compact` HERE TOO, despite this being the roomy card. It sits in a
+            lg:grid-cols-3 inside max-w-6xl, so it is 357px wide — not the 544px
+            of the pools page. 357px is the width measured as the point where a
+            46px rail clips the Matchweek label and wraps the pill row. */}
+        {!hasBranding && <CompetitionRail externalLeagueId={pool.externalLeagueId} size="compact" />}
         <div className="flex-1 p-4">
           {/* Header row */}
           <div className="flex items-center justify-between gap-3 mb-2">

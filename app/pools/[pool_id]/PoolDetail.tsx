@@ -85,6 +85,10 @@ export type LmsData = {
   clubs: SeasonClub[]
   entryNames: Map<string, string>
   entryId: string | null
+  /**
+   * ⚠ The OPEN matchweek, deliberately — an LMS pick is written against the week
+   * being picked, not the one being played, so this must stay the pickable one.
+   */
   currentMatchweek: number | null
   roundsWon: Map<string, number>
   /** Who each club plays in the open matchweek. Empty when none is open. */
@@ -96,7 +100,11 @@ export type ShowdownData = {
   duels: DuelRow[]
   entryNames: Map<string, string>
   ownEntryIds: string[]
-  currentMatchweek: number | null
+  /** Open for picks. ⚠ During a matchweek this is the week AFTER the one being
+   *  played, which is why the tab is given both. */
+  openMatchweek: number | null
+  /** Being played right now. Null between rounds. */
+  inPlayMatchweek: number | null
   duelPoints: Map<string, number>
 }
 
@@ -2136,7 +2144,8 @@ export function PoolDetail({
                 duels={showdownData.duels}
                 entryNames={showdownData.entryNames}
                 ownEntryIds={showdownData.ownEntryIds}
-                currentMatchweek={showdownData.currentMatchweek}
+                openMatchweek={showdownData.openMatchweek}
+                inPlayMatchweek={showdownData.inPlayMatchweek}
                 duelPoints={showdownData.duelPoints}
               />
             )}

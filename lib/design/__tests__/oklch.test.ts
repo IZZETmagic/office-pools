@@ -8,9 +8,16 @@
 
 import { describe, it, expect } from 'vitest'
 import { toOklab, fromOklab, lightness, adjustLightness, parseHex, toHex } from '@/lib/design/oklch'
+import { COMPETITION_COLOR, UNTHEMED_COMPETITION } from '@/lib/design/competitionColor'
 
-/** Every competition colour, plus the extremes and the unthemed fallback. */
-const COLORS = ['#3D195B', '#EE2737', '#D20515', '#0067B1', '#091C3E', '#0B1E64', '#C9A227', '#4A5568']
+/**
+ * Every competition colour, plus the unthemed fallback.
+ *
+ * Read from the palette rather than copied out of it. The hand-kept version
+ * still listed La Liga as #EE2737 and Ligue 1 as #091C3E after both had moved,
+ * so these tests were pinning the maths against colours the app no longer draws.
+ */
+const COLORS = [...Object.values(COMPETITION_COLOR), UNTHEMED_COMPETITION]
 
 describe('round trip', () => {
   it('returns the colour it was given', () => {
@@ -36,11 +43,12 @@ describe('lightness', () => {
   })
 
   it('orders the competition colours the way the eye does', () => {
-    // Ligue 1's navy is the darkest brand in the set and the World Cup's gold
-    // the lightest. If this inverts, the matrices are wrong.
-    expect(lightness('#091C3E')).toBeLessThan(lightness('#3D195B'))
-    expect(lightness('#3D195B')).toBeLessThan(lightness('#EE2737'))
-    expect(lightness('#EE2737')).toBeLessThan(lightness('#C9A227'))
+    // Ligue 1's near-black is the darkest brand in the set and the World Cup's
+    // gold the lightest. If this inverts, the matrices are wrong.
+    const ordered = ['#101215', '#3D195B', '#EE2737', '#C9A227']
+    for (let i = 1; i < ordered.length; i++) {
+      expect(lightness(ordered[i - 1])).toBeLessThan(lightness(ordered[i]))
+    }
   })
 })
 
@@ -66,7 +74,7 @@ describe('adjustLightness', () => {
 
   it('gives the same perceived step to a dark navy and a light gold', () => {
     // A percentage-of-channel lift would move the gold far more than the navy.
-    const navy = lightness(adjustLightness('#091C3E', 0.14)) - lightness('#091C3E')
+    const navy = lightness(adjustLightness('#050B5E', 0.14)) - lightness('#050B5E')
     const gold = lightness(adjustLightness('#C9A227', 0.14)) - lightness('#C9A227')
     expect(Math.abs(navy - gold)).toBeLessThan(0.02)
   })
