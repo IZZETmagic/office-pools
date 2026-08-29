@@ -1197,7 +1197,13 @@ export function DashboardClient({
               </span>
               <h3 className="text-xl font-bold text-ink">Live Matches</h3>
             </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* ⚠ TWO ACROSS, NOT THREE. At `lg:grid-cols-3` inside a max-w-6xl
+                page each card is 346px, and after the Card's own p-6 and the
+                score chip that leaves 50px for a club's name — so "Liverpool"
+                and "Nott'm Forest" both rendered as "Liverp…" and "Nott'…".
+                Measured at a 1440 viewport, not guessed. Half-width gives the
+                names 172px, which fits every club in the four leagues. */}
+            <div className="grid md:grid-cols-2 gap-3">
               {liveMatches.map((match) => {
                 const homeTeamData = match.home_team as any
                 const awayTeamData = match.away_team as any
