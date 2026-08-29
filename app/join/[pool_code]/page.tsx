@@ -32,7 +32,7 @@ export default async function JoinPage({
   const adminClient = createAdminClient()
   const { data: pool } = await adminClient
     .from('pools')
-    .select('pool_id, pool_name, pool_code, description, status, accepting_members, prediction_mode, brand_name, brand_emoji, brand_color, brand_accent, brand_logo_url')
+    .select('pool_id, pool_name, pool_code, description, status, accepting_members, prediction_mode, league_mode, brand_name, brand_emoji, brand_color, brand_accent, brand_logo_url')
     .eq('pool_code', pool_code.toUpperCase())
     .single()
 
@@ -80,6 +80,9 @@ export default async function JoinPage({
         status: pool.status,
         accepting_members: pool.accepting_members ?? true,
         prediction_mode: pool.prediction_mode,
+        // Without this the invite page greets a stranger with the literal
+        // string "league_pickem" — see getModeLongName.
+        league_mode: pool.league_mode ?? null,
         brand_name: pool.brand_name ?? null,
         brand_emoji: pool.brand_emoji ?? null,
         brand_color: pool.brand_color ?? null,

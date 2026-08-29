@@ -22,7 +22,7 @@ async function handleGET(request: NextRequest) {
   // Build query for public pools
   let query = supabase
     .from('pools')
-    .select('pool_id, pool_name, pool_code, description, status, prediction_deadline, prediction_mode, created_at')
+    .select('pool_id, pool_name, pool_code, description, status, prediction_deadline, prediction_mode, league_mode, created_at')
     .eq('is_private', false)
 
   if (q.trim()) {

@@ -17,6 +17,7 @@ type PoolInfo = {
   status: string
   accepting_members: boolean | null
   prediction_mode: string
+  league_mode: string | null
   brand_name: string | null
   brand_emoji: string | null
   brand_color: string | null
@@ -109,7 +110,7 @@ export function JoinPoolClient({ pool, memberCount, isAlreadyMember }: JoinPoolC
               </div>
               <div className="flex items-center gap-1.5 text-muted">
                 <Icon name="ticket.fill" size={16} weight="semibold" />
-                <span>{getModeLongName(pool.prediction_mode)}</span>
+                <span>{getModeLongName(pool.prediction_mode, pool.league_mode)}</span>
               </div>
             </div>
 

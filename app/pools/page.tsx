@@ -4,7 +4,37 @@ import { getShadowReadPools, readEntryScoring, readRecentForm } from '@/lib/scor
 import { redirect } from 'next/navigation'
 import { resolveEntryLevel } from '@/lib/entryLevel'
 import { pickBestEntry } from '@/lib/bestEntry'
+import { readLeagueCardFacts } from '@/lib/league/poolCards'
+import type { EntryScoring } from '@/lib/scoring/readSource'
 import { PoolsClient } from './PoolsClient'
+
+/**
+ * The fields of a `pool_members` row the league branches below read.
+ *
+ * Narrow on purpose. The rest of this file predates it and still destructures
+ * membership rows as `any`; this covers the columns the league work touches so
+ * a mistyped one is a compile error rather than `undefined` flowing into a
+ * query filter — which is the shape of the bug that emptied these cards.
+ */
+type LeagueMembership = {
+  pools: {
+    pool_id: string
+    prediction_mode: string
+    tournament_id: string | null
+    league_mode: string | null
+    league_season_id: string | null
+    league_table_lock_at: string | null
+  }
+  // The three columns `pickBestEntry` sorts on, plus the id. Both are NULL for
+  // every league entry — which is exactly why the league branches replace what
+  // they feed, not how the best entry is chosen: with all ranks null the tie
+  // falls to the first entry, and a league member has one.
+  pool_entries?: Array<{
+    entry_id: string
+    current_rank?: number | null
+    scored_total_points?: number | null
+  }> | null
+}
 
 export default async function PoolsPage() {
   const supabase = await createClient()
@@ -39,6 +69,9 @@ export default async function PoolsPage() {
         prediction_deadline,
         prediction_mode,
         tournament_id,
+        league_mode,
+        league_season_id,
+        league_table_lock_at,
         created_at,
         brand_name,
         brand_emoji,
@@ -83,15 +116,41 @@ export default async function PoolsPage() {
       const pm = Array.isArray(row.pool_members) ? row.pool_members[0] : row.pool_members
       if (pm?.pool_id) hasScoringByPool.set(pm.pool_id, true)
     }
+    // The same gate for a league, over the table a league is actually scored
+    // into. Without this arm the gate is false for every league pool forever,
+    // so the Rank tile rendered "—" even where league_entry_totals held a rank.
+    //
+    // ⚠ AND IT IS STILL A GATE, not a shortcut to `final_rank != null`. The
+    // league engine ranks every entry from the moment the pool exists — a pool
+    // with four entries and no fixture played yet has four rows, all on zero,
+    // all ranked. "#1 of 4" before a ball is kicked is exactly what this
+    // suppresses.
+    const leaguePoolIds = ((userPools ?? []) as unknown as LeagueMembership[])
+      .filter((m) => m.pools.prediction_mode === 'league_pickem')
+      .map((m) => m.pools.pool_id)
+    if (leaguePoolIds.length > 0) {
+      const { data: leagueScored } = await supabase
+        .from('league_entry_totals')
+        .select('pool_id')
+        .in('pool_id', leaguePoolIds)
+        .gt('total_points', 0)
+      for (const row of (leagueScored ?? []) as Array<{ pool_id: string }>) {
+        hasScoringByPool.set(row.pool_id, true)
+      }
+    }
   }
 
   // Per-entry XP level (the real XP system, same as the in-pool Form tab) so
   // cards can show the user's HIGHEST level across their entries. Batched into
   // one query keyed by entry_id. entry_xp_state is populated during scoring;
   // entries without a row default to level 1 (Rookie).
-  const allEntryIds = (userPools ?? []).flatMap((m: any) =>
-    ((m.pool_entries || []) as any[]).map((e: any) => e.entry_id)
-  )
+  //
+  // League entries are excluded, not merely ignored downstream: neither table
+  // below can ever hold a row for one, so including them is two `.in()` filters
+  // carrying ids that are guaranteed to miss.
+  const allEntryIds = ((userPools ?? []) as unknown as LeagueMembership[])
+    .filter((m) => m.pools.prediction_mode !== 'league_pickem')
+    .flatMap((m) => (m.pool_entries ?? []).map((e) => e.entry_id))
   const levelByEntry = new Map<string, number>()
   if (allEntryIds.length > 0) {
     const { data: xpRows } = await supabase
@@ -117,9 +176,18 @@ export default async function PoolsPage() {
       predCountByEntry.set(row.entry_id, (predCountByEntry.get(row.entry_id) ?? 0) + 1)
     }
   }
+  // Serial, one query per tournament, and league tournaments are left out — a
+  // league's fixtures are in `league_fixtures`, so this counts 0 for every one
+  // of them and then feeds that 0 to a level calculation league pools no longer
+  // show.
   const matchCountByTournament = new Map<string, number>()
   const tournamentIds = Array.from(
-    new Set((userPools ?? []).map((m: any) => m.pools.tournament_id).filter(Boolean))
+    new Set(
+      ((userPools ?? []) as unknown as LeagueMembership[])
+        .filter((m) => m.pools.prediction_mode !== 'league_pickem')
+        .map((m) => m.pools.tournament_id)
+        .filter(Boolean),
+    )
   )
   for (const tid of tournamentIds) {
     const { count } = await supabase
@@ -127,6 +195,27 @@ export default async function PoolsPage() {
       .select('*', { count: 'exact', head: true })
       .eq('tournament_id', tid)
     matchCountByTournament.set(tid as string, count ?? 0)
+  }
+
+
+  // The competition's colour key for the card stripe. `external_league_id` is
+  // the api-football league id and is the SAME key CreatePoolModal already uses
+  // to build a competition's crest URL, so the crest and the colour cannot
+  // drift apart. One batched read for every tournament on the page.
+  const leagueIdByTournament = new Map<string, number>()
+  {
+    const ids = Array.from(
+      new Set(((userPools ?? []) as unknown as LeagueMembership[]).map((m) => m.pools.tournament_id).filter(Boolean)),
+    ) as string[]
+    if (ids.length > 0) {
+      const { data: comps } = await supabase
+        .from('tournaments')
+        .select('tournament_id, external_league_id')
+        .in('tournament_id', ids)
+      for (const row of (comps ?? []) as Array<{ tournament_id: string; external_league_id: number | null }>) {
+        if (row.external_league_id != null) leagueIdByTournament.set(row.tournament_id, row.external_league_id)
+      }
+    }
   }
 
   // Enrich pools with member counts and stored v2 scores
@@ -143,17 +232,60 @@ export default async function PoolsPage() {
   const scoringAdmin = createAdminClient()
   const shadowPools = await getShadowReadPools(scoringAdmin)
 
-  // Batch the scoring read: one call for every entry on the page, rather than
-  // one per pool. Only entries in shadow-enabled pools need it — prod values
-  // are already on the pool_entries rows fetched above.
-  const shadowEntryIds = (userPools ?? []).flatMap((m: any) =>
-    shadowPools.has(m.pools?.pool_id)
-      ? ((m.pool_entries || []) as any[]).map((e) => e.entry_id)
-      : [],
+  // ⚠ THE SOURCE IS THREE-VALUED, NOT TWO. This used to be
+  // `shadowPools.has(pool_id) ? 'shadow' : 'prod'`, written out by hand here and
+  // again on the dashboard, and it has no way to say 'league'. So every league
+  // pool was read as a World Cup pool: points and rank came from
+  // `pool_entries`, which is NULL for all 13 of them in production, while
+  // `league_entry_totals` held the real numbers and ranks right beside it.
+  //
+  // `getScoringSource` is the function that answers this — it keys off the
+  // mode, so a new league pool is correct the moment it exists. It is not used
+  // directly only because it takes one pool at a time and would mean a query
+  // per card; `getShadowReadPools` above is the batched half of it, and the
+  // league half needs no query at all.
+  const sourceFor = (pool: { pool_id: string; prediction_mode: string }): 'prod' | 'shadow' | 'league' =>
+    pool.prediction_mode === 'league_pickem'
+      ? 'league'
+      : shadowPools.has(pool.pool_id)
+        ? 'shadow'
+        : 'prod'
+
+  // Batch the scoring read: one call per source for every entry on the page,
+  // rather than one per pool. Prod pools need neither — their values are
+  // already on the pool_entries rows fetched above.
+  const entryIdsBySource = { shadow: [] as string[], league: [] as string[] }
+  for (const m of ((userPools ?? []) as unknown as LeagueMembership[])) {
+    const source = sourceFor(m.pools)
+    if (source === 'prod') continue
+    for (const e of m.pool_entries ?? []) entryIdsBySource[source].push(e.entry_id)
+  }
+  const scoredByEntry = new Map<string, EntryScoring>()
+  for (const source of ['shadow', 'league'] as const) {
+    if (entryIdsBySource[source].length === 0) continue
+    const read = await readEntryScoring(scoringAdmin, entryIdsBySource[source], source)
+    for (const [k, v] of read) scoredByEntry.set(k, v)
+  }
+
+  // League facts the World Cup tables cannot answer: which matchweek is open,
+  // when it locks, and whether this member has done it. See lib/league/poolCards.ts.
+  const leagueFacts = await readLeagueCardFacts(
+    scoringAdmin,
+    ((userPools ?? []) as unknown as LeagueMembership[])
+      .filter((m) => m.pools.prediction_mode === 'league_pickem')
+      .map((m) => {
+        const entries = m.pool_entries ?? []
+        // The same "best" entry whose points, rank and form the card shows, so
+        // the deadline and the action pill describe that entry too.
+        return {
+          poolId: m.pools.pool_id,
+          seasonId: m.pools.league_season_id,
+          leagueMode: m.pools.league_mode,
+          tableLockAt: m.pools.league_table_lock_at,
+          entryId: pickBestEntry(entries, scoredByEntry)?.entry_id ?? entries[0]?.entry_id ?? null,
+        }
+      }),
   )
-  const scoredByEntry = shadowEntryIds.length > 0
-    ? await readEntryScoring(scoringAdmin, shadowEntryIds, 'shadow')
-    : new Map()
 
   const pools = await Promise.all(
     (userPools ?? []).map(async (m: any) => {
@@ -178,7 +310,10 @@ export default async function PoolsPage() {
       const entries = ((m as any).pool_entries || []) as any[]
       // "Best" = lowest leaderboard rank, so the card's rank, points, and
       // form dots all describe the same entry.
-      const bestEntry = pickBestEntry(entries)
+      // `scoredByEntry` is passed because a shadow or league pool's ranks are
+      // NOT on `pool_entries` — without it this picks an arbitrary entry and the
+      // card shows one entry's points under another's rank.
+      const bestEntry = pickBestEntry(entries, scoredByEntry)
       const defaultEntry = bestEntry || entries[0]
       const defaultEntryId = defaultEntry?.entry_id
 
@@ -228,12 +363,18 @@ export default async function PoolsPage() {
       // pool. Shadow tables are RLS deny-all (0 policies) so they are readable
       // only by the service role — hence scoringAdmin, scoped to entries this
       // user already proved access to via the RLS'd query above.
-      const source = shadowPools.has(pool.pool_id) ? 'shadow' as const : 'prod' as const
+      const source = sourceFor(pool)
 
       let form: string[] = []
       if (defaultEntryId) {
         form = await readRecentForm(scoringAdmin, defaultEntryId, source, 5)
       }
+
+      // League pools answer the deadline and the action pill from their own
+      // rhythm, not from the World Cup columns. `prediction_deadline` on a
+      // league pool is the season end and `has_submitted_predictions` is NULL
+      // by design — see lib/league/poolCards.ts.
+      const league = leagueFacts.get(pool.pool_id)
 
       return {
         ...pool,
@@ -248,7 +389,14 @@ export default async function PoolsPage() {
         // Highest XP level across all of this user's entries — matches the
         // in-pool Form tab (scored snapshot if present, else live pre-tournament
         // submission-badge level). Defaults to 1.
-        highest_level: (() => {
+        //
+        // ⚠ NULL for a league pool, and the card shows the matchweek in its
+        // place. XP is World Cup machinery end to end: `entry_xp_state` is
+        // written by World Cup scoring and `computePreTournamentLevel` counts
+        // rows in `predictions`. Both are empty for a league entry, so this
+        // returned 1 for everyone — and there is no in-pool Analytics tab on a
+        // league pool to check it against, because none of it applies.
+        highest_level: league ? null : (() => {
           const totalMatches = matchCountByTournament.get(pool.tournament_id) ?? 0
           const levels = entries.map((e: any) =>
             resolveEntryLevel({
@@ -259,13 +407,20 @@ export default async function PoolsPage() {
           )
           return levels.length > 0 ? Math.max(...levels) : 1
         })(),
-        has_submitted_predictions: anySubmitted,
+        has_submitted_predictions: league ? league.hasSubmitted : anySubmitted,
         joined_at: m.joined_at,
         memberCount: memberCount ?? 0,
         totalEntries: totalEntries ?? 0,
         hasScoringStarted: hasScoringByPool.get(pool.pool_id) ?? false,
         form,
         currentRoundLabel,
+        // The card's clock. A league's next decision is this matchweek's lock
+        // (or, in Table mode, the one-off table lock) — never the season end
+        // sitting in `prediction_deadline`.
+        prediction_deadline: league ? league.deadlineAt : pool.prediction_deadline,
+        externalLeagueId: leagueIdByTournament.get(pool.tournament_id) ?? null,
+        openMatchweekNumber: league?.openMatchweekNumber ?? null,
+        matchweekCount: league?.matchweekCount ?? null,
       }
     })
   )

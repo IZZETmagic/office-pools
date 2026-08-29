@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import type { CSSProperties } from 'react'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -16,7 +17,8 @@ import { formatNumber, formatTimeAgo } from '@/lib/format'
 import { getLevelName } from '@/lib/levelNames'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
-import { getModeName, getModeStripe, getModeTagClass } from '@/lib/design/poolMode'
+import { getModeName, getPoolStripe, getModeChip } from '@/lib/design/poolMode'
+import type { PredictionMode } from '@/lib/predictionMode'
 import { getFormDotClass } from '@/lib/design/formDots'
 
 // =====================
@@ -30,13 +32,28 @@ type PoolData = {
   status: string
   is_private: boolean
   prediction_deadline: string | null
-  prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
+  // The full union from lib/predictionMode.ts, which exists because this very
+  // line used to omit `league_pickem` in four files at once — telling the
+  // compiler a league pool is a World Cup pool.
+  prediction_mode: PredictionMode
+  /** pickem | showdown | last_man_standing | table. NULL on a World Cup pool. */
+  league_mode: string | null
   tournament_id: string
   created_at: string
   role: string
   total_points: number
+  /** NULL for a league pool: there is no league XP system. See the server note. */
+  highest_level: number | null
+  /**
+   * `tournaments.external_league_id` — the competition, for the stripe's top
+   * half. Null renders the unthemed slate rather than guessing a colour.
+   */
+  externalLeagueId?: number | null
+  /** The open matchweek, shown where a World Cup card shows the XP level. */
+  openMatchweekNumber?: number | null
+  /** This season's matchweek count — 38 in England, 34 in Germany. */
+  matchweekCount?: number | null
   current_rank: number | null
-  highest_level: number
   has_submitted_predictions: boolean
   joined_at: string
   memberCount: number
@@ -59,7 +76,8 @@ type PublicPool = {
   description: string | null
   status: string
   prediction_deadline: string | null
-  prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
+  prediction_mode: PredictionMode
+  league_mode: string | null
   created_at: string
   memberCount: number
 }
@@ -124,6 +142,19 @@ function formatDeadline(deadline: string | null) {
   }
 }
 
+/**
+ * The stripe's two stops — the competition's brand colour, lifted at the top —
+ * as custom properties for the `.pool-stripe` class.
+ *
+ * Not a composed `background` string: a React style prop holds one value per
+ * property, and `.pool-stripe` needs two background declarations so the OKLCH
+ * one can override an sRGB fallback. See app/globals.css.
+ */
+function stripeVars(pool: { externalLeagueId?: number | null }): CSSProperties {
+  const [from, to] = getPoolStripe({ externalLeagueId: pool.externalLeagueId })
+  return { '--stripe-from': from, '--stripe-to': to } as CSSProperties
+}
+
 function getStatusAccentColor(status: string): string {
   switch (status) {
     case 'open':
@@ -169,6 +200,50 @@ function getPoolStatusText(pool: PoolData): string {
   if (pool.current_rank && pool.current_rank <= 3) return 'On the podium!'
   if (pool.current_rank) return 'Keep climbing!'
   return `${formatNumber(pool.total_points)} pts`
+}
+
+/**
+ * The card's third tile: XP level on a World Cup pool, the open matchweek on a
+ * league one.
+ *
+ * Two different facts in one slot, which is worth defending. XP does not exist
+ * for a league — `entry_xp_state` is written by World Cup scoring and the
+ * pre-tournament fallback counts rows in `predictions`, both empty for a league
+ * entry — so the tile read "Level 1 · Rookie" on every league card no matter
+ * what the member had done, and there is no in-pool Analytics tab on a league
+ * pool to check it against. The matchweek is the equivalent orientation: how
+ * far into the season this pool is. It is shown for Table mode too, where the
+ * order was decided in August but is scored against the real table every week.
+ *
+ * One component rather than a conditional written twice, because the mobile and
+ * desktop cards render the same tile and had already drifted nowhere only by
+ * luck.
+ */
+function ProgressTile({ pool }: { pool: PoolData }) {
+  if (pool.prediction_mode === 'league_pickem') {
+    const mw = pool.openMatchweekNumber
+    return (
+      <div className="flex-[1.2] py-3 px-3">
+        <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Matchweek</p>
+        <p className={`text-xl font-bold leading-none ${mw == null ? 'text-muted' : 'text-primary-800'}`}>
+          {mw == null ? '—' : mw}
+        </p>
+        {/* Null means no matchweek is open — every one is played or locked, so
+            the season is done. Said plainly rather than left as a bare dash. */}
+        <p className="text-[10px] text-muted mt-0.5">
+          {mw == null ? 'Season over' : pool.matchweekCount ? `of ${pool.matchweekCount}` : 'this week'}
+        </p>
+      </div>
+    )
+  }
+  const level = pool.highest_level ?? 1
+  return (
+    <div className="flex-[1.2] py-3 px-3">
+      <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Level</p>
+      <p className="text-xl font-bold text-primary-800 leading-none">{level}</p>
+      <p className="text-[10px] text-muted mt-0.5">{getLevelName(level)}</p>
+    </div>
+  )
 }
 
 function getStatusTagClass(status: string): string {
@@ -589,8 +664,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                           {!hasBranding && (
                             <span
                               aria-hidden="true"
-                              className="w-[5px] shrink-0"
-                              style={{ background: getModeStripe(pool.prediction_mode) }}
+                              className="w-[5px] shrink-0 pool-stripe"
+                              style={stripeVars(pool)}
                             />
                           )}
                           <div className="flex-1 px-4 py-3.5">
@@ -610,7 +685,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 {/* Badges + player count */}
                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                   {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-border-default text-muted">Admin</span>}
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
+                                  <span
+                                    className="text-[10px] px-1.5 py-0.5 rounded font-bold mode-pill"
+                                    style={getModeChip(pool.prediction_mode, pool.league_mode) as CSSProperties}
+                                  >{getModeName(pool.prediction_mode, pool.league_mode)}</span>
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
                                   <span className="text-xs text-muted ml-0.5">
                                     {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
@@ -642,7 +720,6 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Stats grid */}
                             {(() => {
-                              const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
                               return (
                                 <div className="flex items-stretch rounded-control bg-snow/75 mb-3 overflow-hidden">
                                   {/* Points */}
@@ -672,14 +749,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                     )}
                                   </div>
                                   <div className="w-px my-5 bg-silver" />
-                                  {/* Level */}
-                                  <div className="flex-[1.2] py-3 px-3">
-                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Level</p>
-                                    <p className="text-xl font-bold text-primary-800 leading-none">
-                                      {level.level}
-                                    </p>
-                                    <p className="text-[10px] text-muted mt-0.5">{level.name}</p>
-                                  </div>
+                                  <ProgressTile pool={pool} />
                                   {/* Form */}
                                   <div className="flex-1 py-3 px-3">
                                     <p className="text-[10px] font-medium text-muted mb-1 tracking-wide text-right">Form</p>
@@ -745,8 +815,8 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                           {!hasBranding && (
                             <span
                               aria-hidden="true"
-                              className="w-[5px] shrink-0"
-                              style={{ background: getModeStripe(pool.prediction_mode) }}
+                              className="w-[5px] shrink-0 pool-stripe"
+                              style={stripeVars(pool)}
                             />
                           )}
                           {/* Column, so the status row below can be pushed to the
@@ -768,7 +838,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 </div>
                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                   {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-border-default text-muted">Admin</span>}
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
+                                  <span
+                                    className="text-[10px] px-1.5 py-0.5 rounded font-bold mode-pill"
+                                    style={getModeChip(pool.prediction_mode, pool.league_mode) as CSSProperties}
+                                  >{getModeName(pool.prediction_mode, pool.league_mode)}</span>
                                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
                                   <span className="text-[11px] text-muted">
                                     {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
@@ -797,7 +870,6 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
 
                             {/* Stats row */}
                             {(() => {
-                              const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
                               return (
                                 <div className="flex items-stretch rounded-control bg-snow/75 mt-3 overflow-hidden">
                                   {/* Points */}
@@ -827,14 +899,7 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                     )}
                                   </div>
                                   <div className="w-px my-5 bg-silver" />
-                                  {/* Level */}
-                                  <div className="flex-[1.2] py-3 px-3">
-                                    <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Level</p>
-                                    <p className="text-xl font-bold text-primary-800 leading-none">
-                                      {level.level}
-                                    </p>
-                                    <p className="text-[10px] text-muted mt-0.5">{level.name}</p>
-                                  </div>
+                                  <ProgressTile pool={pool} />
                                   {/* Form */}
                                   <div className="flex-1 py-3 px-3">
                                     <p className="text-[10px] font-medium text-muted mb-1 tracking-wide text-right">Form</p>
@@ -959,7 +1024,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 {pool.pool_name}
                               </h4>
                               <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 rounded font-bold mode-pill"
+                                  style={getModeChip(pool.prediction_mode, pool.league_mode) as CSSProperties}
+                                >{getModeName(pool.prediction_mode, pool.league_mode)}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
                                 <span className="text-xs text-muted ml-0.5">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
@@ -1016,7 +1084,10 @@ export function PoolsClient({ user, pools, stats }: PoolsClientProps) {
                                 {pool.pool_name}
                               </h4>
                               <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 rounded font-bold mode-pill"
+                                  style={getModeChip(pool.prediction_mode, pool.league_mode) as CSSProperties}
+                                >{getModeName(pool.prediction_mode, pool.league_mode)}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
                                 <span className="text-[11px] text-muted">
                                   {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}

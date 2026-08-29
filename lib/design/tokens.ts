@@ -113,6 +113,54 @@ export const poolModeGradient = {
   bracket_picker: ['#FBBF24', '#D97706'],
 } as const
 
+/**
+ * How much lighter the TOP of a pool card's stripe sits than its brand colour.
+ *
+ * The stripe is one competition colour drawn as two stops, matching the shape
+ * every other stripe in the app already has (see `poolModeGradient`, three pairs
+ * that are each one hue at two lightnesses). In OKLab units, so the step looks
+ * the same on Ligue 1's near-black navy as on the World Cup's gold.
+ */
+export const STRIPE_TOP_LIFT = 0.14
+
+/**
+ * One colour per game mode — all seven — for the pill on a pool card.
+ *
+ * ⚠ THE PILL IS NOW THE ONLY PLACE THE MODE IS COLOURED. The card's stripe
+ * became the competition's brand colour (Ryan, 2026-08-29), so a member telling
+ * a Showdown pool from a Last Man Standing one at a glance depends entirely on
+ * this. Before it, all four league modes shared one gold pill.
+ *
+ * ## Why these seven and not others
+ *
+ * The three bracket colours are FIXED: they mirror `poolModeColor` below, which
+ * mirrors mobile/theme, and moving them would drift the two apps apart. That
+ * leaves the four league modes to fit around three fixed points at 265°, 163°
+ * and 58° — an uneven ring whose largest empty arc is 153°. Four colours in
+ * that arc is ~30° each, so the set below reaches a minimum pairwise separation
+ * of 28° (full_tournament / table). Seven evenly spaced would be 51°; 28° is
+ * near the achievable maximum, not a shrug.
+ *
+ * Measured, not eyeballed — `lib/design/__tests__/modeIdentity.test.ts` pins the
+ * separation so a future eighth mode cannot be dropped in on top of an existing
+ * one.
+ *
+ * The pill's text and tint are DERIVED from these at render (see getModeChip in
+ * poolMode.ts) rather than authored per theme, which is why one value each is
+ * enough and why a new mode needs exactly one line here.
+ */
+export const modeIdentityColor = {
+  full_tournament:   '#3B6EFF',  // hue 265 — the brand blue, unchanged
+  progressive:       '#059669',  // hue 163 — unchanged
+  bracket_picker:    '#D97706',  // hue  58 — unchanged
+  pickem:            '#0891B2',  // hue 222 — teal, the everyday league mode
+  table:             '#7C3AED',  // hue 293 — violet, an ordered list
+  showdown:          '#C026D3',  // hue 323 — magenta, a clash
+  last_man_standing: '#E11D48',  // hue  18 — crimson, elimination
+} as const
+
+export type ModeIdentityKey = keyof typeof modeIdentityColor
+
 /** Flat mode colours used for pills and tab accents (PoolDetailHeader.tsx). */
 export const poolModeColor = {
   full_tournament: '#3B6EFF',

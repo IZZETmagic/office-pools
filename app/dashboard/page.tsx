@@ -1,6 +1,8 @@
 import { roundLabel } from '@/lib/competitionRounds'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getShadowReadPools, readEntryScoring, readRecentForm } from '@/lib/scoring/readSource'
+import { readLeagueCardFacts } from '@/lib/league/poolCards'
+import type { EntryScoring } from '@/lib/scoring/readSource'
 import { redirect } from 'next/navigation'
 import { fetchMatchConductForTournaments } from '@/lib/matchConduct'
 import { resolveEntryLevel } from '@/lib/entryLevel'
@@ -8,6 +10,31 @@ import { pickBestEntry } from '@/lib/bestEntry'
 import { DashboardClient } from './DashboardClient'
 import type { MatchWithResult } from '@/lib/bonusCalculation'
 import type { Team, MatchConductData } from '@/lib/tournament'
+
+/**
+ * The fields of a `pool_members` row the league branches below read. Narrow on
+ * purpose — see the identical note in app/pools/page.tsx.
+ */
+type LeagueMembership = {
+  pools: {
+    pool_id: string
+    prediction_mode: string
+    tournament_id: string
+    league_mode: string | null
+    league_season_id: string | null
+    league_table_lock_at: string | null
+  }
+  // The three columns `pickBestEntry` sorts on, plus the id. Both are NULL for
+  // every league entry — which is exactly why the league branches replace what
+  // they feed, not how the best entry is chosen: with all ranks null the tie
+  // falls to the first entry, and a league member has one.
+  pool_entries?: Array<{
+    entry_id: string
+    current_rank?: number | null
+    scored_total_points?: number | null
+  }> | null
+}
+
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -42,6 +69,9 @@ export default async function DashboardPage() {
         prediction_deadline,
         tournament_id,
         prediction_mode,
+        league_mode,
+        league_season_id,
+        league_table_lock_at,
         brand_name,
         brand_emoji,
         brand_color,
@@ -177,14 +207,30 @@ export default async function DashboardPage() {
       const pm = Array.isArray(row.pool_members) ? row.pool_members[0] : row.pool_members
       if (pm?.pool_id) hasScoringByPool.set(pm.pool_id, true)
     }
+    // The league arm of the same gate — see the fuller note in app/pools/page.tsx.
+    // Still a gate rather than `final_rank != null`: the league engine ranks
+    // every entry from the moment the pool exists, all on zero.
+    const leaguePoolIds = ((userPools ?? []) as unknown as LeagueMembership[])
+      .filter((m) => m.pools.prediction_mode === 'league_pickem')
+      .map((m) => m.pools.pool_id)
+    if (leaguePoolIds.length > 0) {
+      const { data: leagueScored } = await supabase
+        .from('league_entry_totals')
+        .select('pool_id')
+        .in('pool_id', leaguePoolIds)
+        .gt('total_points', 0)
+      for (const row of (leagueScored ?? []) as Array<{ pool_id: string }>) {
+        hasScoringByPool.set(row.pool_id, true)
+      }
+    }
   }
 
   // Per-entry XP level (real XP system, same as the in-pool Form tab) so cards
   // can show the user's HIGHEST level across their entries. Batched by entry_id;
   // entries without an entry_xp_state row default to level 1 (Rookie).
-  const xpEntryIds = (userPools ?? []).flatMap((m: any) =>
-    ((m.pool_entries || []) as any[]).map((e: any) => e.entry_id)
-  )
+  const xpEntryIds = ((userPools ?? []) as unknown as LeagueMembership[])
+    .filter((m) => m.pools.prediction_mode !== 'league_pickem')
+    .flatMap((m) => (m.pool_entries ?? []).map((e) => e.entry_id))
   const levelByEntry = new Map<string, number>()
   if (xpEntryIds.length > 0) {
     const { data: xpRows } = await supabase
@@ -196,6 +242,27 @@ export default async function DashboardPage() {
     }
   }
 
+
+  // The competition's colour key for the card stripe. `external_league_id` is
+  // the api-football league id and is the SAME key CreatePoolModal already uses
+  // to build a competition's crest URL, so the crest and the colour cannot
+  // drift apart. One batched read for every tournament on the page.
+  const leagueIdByTournament = new Map<string, number>()
+  {
+    const ids = Array.from(
+      new Set(((userPools ?? []) as unknown as LeagueMembership[]).map((m) => m.pools.tournament_id).filter(Boolean)),
+    ) as string[]
+    if (ids.length > 0) {
+      const { data: comps } = await supabase
+        .from('tournaments')
+        .select('tournament_id, external_league_id')
+        .in('tournament_id', ids)
+      for (const row of (comps ?? []) as Array<{ tournament_id: string; external_league_id: number | null }>) {
+        if (row.external_league_id != null) leagueIdByTournament.set(row.tournament_id, row.external_league_id)
+      }
+    }
+  }
+
   // STEP 5: Enrich each pool with calculated points (match + bonus), member count, match counts
   // Scoring source resolution — one pass, before the per-pool work. See the
   // fuller note in app/pools/page.tsx: shadow_* tables are RLS deny-all, so
@@ -203,14 +270,46 @@ export default async function DashboardPage() {
   // out of the RLS-checked membership query above.
   const scoringAdmin = createAdminClient()
   const shadowPools = await getShadowReadPools(scoringAdmin)
-  const shadowEntryIds = (userPools ?? []).flatMap((m: any) =>
-    shadowPools.has(m.pools?.pool_id)
-      ? ((m.pool_entries || []) as any[]).map((e) => e.entry_id)
-      : [],
+
+  // ⚠ THE SOURCE IS THREE-VALUED. See the fuller note in app/pools/page.tsx:
+  // this was `shadowPools.has(pool_id) ? 'shadow' : 'prod'`, which has no way
+  // to say 'league', so every league pool was read out of World Cup tables that
+  // are empty for it — silently, because empty is a valid result.
+  const sourceFor = (pool: { pool_id: string; prediction_mode: string }): 'prod' | 'shadow' | 'league' =>
+    pool.prediction_mode === 'league_pickem'
+      ? 'league'
+      : shadowPools.has(pool.pool_id)
+        ? 'shadow'
+        : 'prod'
+
+  const entryIdsBySource = { shadow: [] as string[], league: [] as string[] }
+  for (const m of ((userPools ?? []) as unknown as LeagueMembership[])) {
+    const source = sourceFor(m.pools)
+    if (source === 'prod') continue
+    for (const e of m.pool_entries ?? []) entryIdsBySource[source].push(e.entry_id)
+  }
+  const scoredByEntry = new Map<string, EntryScoring>()
+  for (const source of ['shadow', 'league'] as const) {
+    if (entryIdsBySource[source].length === 0) continue
+    const read = await readEntryScoring(scoringAdmin, entryIdsBySource[source], source)
+    for (const [k, v] of read) scoredByEntry.set(k, v)
+  }
+
+  const leagueFacts = await readLeagueCardFacts(
+    scoringAdmin,
+    ((userPools ?? []) as unknown as LeagueMembership[])
+      .filter((m) => m.pools.prediction_mode === 'league_pickem')
+      .map((m) => {
+        const entries = m.pool_entries ?? []
+        return {
+          poolId: m.pools.pool_id,
+          seasonId: m.pools.league_season_id,
+          leagueMode: m.pools.league_mode,
+          tableLockAt: m.pools.league_table_lock_at,
+          entryId: pickBestEntry(entries, scoredByEntry)?.entry_id ?? entries[0]?.entry_id ?? null,
+        }
+      }),
   )
-  const scoredByEntry = shadowEntryIds.length > 0
-    ? await readEntryScoring(scoringAdmin, shadowEntryIds, 'shadow')
-    : new Map()
 
   const pools = await Promise.all(
     (userPools ?? []).map(async (m: any) => {
@@ -232,18 +331,28 @@ export default async function DashboardPage() {
         .select('entry_id, pool_members!inner(pool_id)', { count: 'exact', head: true })
         .eq('pool_members.pool_id', pool.pool_id)
 
-      // Get total matches count
-      const { count: totalMatchesCount } = await supabase
-        .from('matches')
-        .select('*', { count: 'exact', head: true })
-        .eq('tournament_id', pool.tournament_id)
+      // ⚠ SKIPPED FOR A LEAGUE. `matches` holds zero rows for every league
+      // tournament_id — a league's fixtures are `league_fixtures` — so both of
+      // these were a full round trip each, per league pool, per dashboard load,
+      // to fetch nothing. The second is the expensive one: it selects every
+      // column of every match with both team joins.
+      const isLeaguePool = pool.prediction_mode === 'league_pickem'
+
+      const { count: totalMatchesCount } = isLeaguePool
+        ? { count: 0 }
+        : await supabase
+            .from('matches')
+            .select('*', { count: 'exact', head: true })
+            .eq('tournament_id', pool.tournament_id)
 
       // Get ALL matches for this tournament (needed for bonus calculation)
-      const { data: allMatches } = await supabase
-        .from('matches')
-        .select('*, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
-        .eq('tournament_id', pool.tournament_id)
-        .order('match_number', { ascending: true })
+      const { data: allMatches } = isLeaguePool
+        ? { data: [] }
+        : await supabase
+            .from('matches')
+            .select('*, home_team:teams!matches_home_team_id_fkey(country_name, flag_url), away_team:teams!matches_away_team_id_fkey(country_name, flag_url)')
+            .eq('tournament_id', pool.tournament_id)
+            .order('match_number', { ascending: true })
 
       // Normalize match join results
       const normalizedMatches: MatchWithResult[] = (allMatches ?? []).map((match: any) => ({
@@ -255,7 +364,10 @@ export default async function DashboardPage() {
       // Get entries for this member. "Best" = lowest leaderboard rank, so the
       // card's rank, points, and form dots all describe the same entry.
       const entries = ((m as any).pool_entries || []) as any[]
-      const bestEntry = pickBestEntry(entries)
+      // `scoredByEntry` is passed because a shadow or league pool's ranks are
+      // NOT on `pool_entries` — without it this picks an arbitrary entry and the
+      // card shows one entry's points under another's rank.
+      const bestEntry = pickBestEntry(entries, scoredByEntry)
       const defaultEntry = bestEntry || entries[0]
       const defaultEntryId = defaultEntry?.entry_id
 
@@ -303,15 +415,19 @@ export default async function DashboardPage() {
       // Same source as the pool's leaderboard — see the note in app/pools/page.tsx.
       // Bounded (limit 5) rather than readMatchScores, which would pull every
       // match score for every entry to render five dots.
-      const source = shadowPools.has(pool.pool_id) ? 'shadow' as const : 'prod' as const
+      const source = sourceFor(pool)
 
       let form: string[] = []
       if (defaultEntryId) {
         form = await readRecentForm(scoringAdmin, defaultEntryId, source, 5)
       }
 
+      // A league pool answers its deadline, its action pill and its progress
+      // from its own rhythm — see lib/league/poolCards.ts.
+      const league = leagueFacts.get(pool.pool_id)
+
       // Build per-entry progress (prediction counts for each entry)
-      const entryIds = entries.map((e: any) => e.entry_id)
+      const entryIds = isLeaguePool ? [] : entries.map((e: any) => e.entry_id)
       let entryPredCounts: Record<string, number> = {}
       if (entryIds.length > 0) {
         const { data: entryPreds } = await supabase
@@ -347,7 +463,13 @@ export default async function DashboardPage() {
         // Highest XP level across all of this user's entries — matches the
         // in-pool Form tab (scored snapshot if present, else live pre-tournament
         // submission-badge level). Defaults to 1.
-        highest_level: (() => {
+        //
+        // ⚠ NULL for a league pool, where the card shows the matchweek instead.
+        // XP is World Cup machinery on both sides — `entry_xp_state` is written
+        // by World Cup scoring and the fallback counts rows in `predictions` —
+        // so this returned 1 for every league member regardless of what they
+        // had done.
+        highest_level: league ? null : (() => {
           const levels = entries.map((e: any) =>
             resolveEntryLevel({
               snapshotLevel: levelByEntry.get(e.entry_id) ?? null,
@@ -357,19 +479,32 @@ export default async function DashboardPage() {
           )
           return levels.length > 0 ? Math.max(...levels) : 1
         })(),
-        has_submitted_predictions: anySubmitted,
+        has_submitted_predictions: league ? league.hasSubmitted : anySubmitted,
         predictions_submitted_at: bestEntry?.predictions_submitted_at ?? null,
         predictions_last_saved_at: bestEntry?.predictions_last_saved_at ?? null,
         joined_at: m.joined_at,
         memberCount: memberCount ?? 0,
         totalEntries: totalEntries ?? 0,
         hasScoringStarted: hasScoringByPool.get(pool.pool_id) ?? false,
-        totalMatches: totalMatchesCount ?? 0,
-        completedMatches: normalizedMatches.filter((m: any) => m.is_completed).length,
-        predictedMatches: entryPredCounts[defaultEntryId] || 0,
+        // ⚠ THE UNIT IS THE OPEN MATCHWEEK FOR A LEAGUE, not the season. These
+        // three are not rendered as a bar — they are the dashboard's
+        // needs-attention sort key, which ranks a pool the member has STARTED
+        // but not finished above one they have not touched. Over 380 fixtures
+        // "12 of 380" would put a member who is fully up to date in the
+        // started-not-finished bucket every week of the season. The weekly
+        // question is the one the sort is actually asking.
+        totalMatches: league ? league.totalPicks : (totalMatchesCount ?? 0),
+        completedMatches: league
+          ? league.completedPicks
+          : normalizedMatches.filter((m: any) => m.is_completed).length,
+        predictedMatches: league ? league.madePicks : (entryPredCounts[defaultEntryId] || 0),
         entries: entriesProgress,
         form,
         currentRoundLabel,
+        prediction_deadline: league ? league.deadlineAt : pool.prediction_deadline,
+        externalLeagueId: leagueIdByTournament.get(pool.tournament_id) ?? null,
+        openMatchweekNumber: league?.openMatchweekNumber ?? null,
+        matchweekCount: league?.matchweekCount ?? null,
       }
     })
   )

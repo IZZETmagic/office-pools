@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
@@ -15,7 +16,8 @@ import { LocalTime } from '@/components/LocalTime'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
 import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
-import { getModeName, getModeStripe, getModeTagClass } from '@/lib/design/poolMode'
+import { getModeName, getPoolStripe, getModeChip } from '@/lib/design/poolMode'
+import type { PredictionMode } from '@/lib/predictionMode'
 import { getFormDotClass } from '@/lib/design/formDots'
 
 // =====================
@@ -35,14 +37,28 @@ type PoolCardData = {
   description: string | null
   status: string
   prediction_deadline: string | null
-  prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
+  // The full union from lib/predictionMode.ts — this line omitting
+  // `league_pickem` is what let a league pool be typed as a World Cup one.
+  prediction_mode: PredictionMode
+  /** pickem | showdown | last_man_standing | table. NULL on a World Cup pool. */
+  league_mode: string | null
   tournament_id: string
   role: string
   match_points: number
   bonus_points: number
   total_points: number
   current_rank: number | null
-  highest_level: number
+  /** NULL for a league pool: there is no league XP system. */
+  highest_level: number | null
+  /**
+   * `tournaments.external_league_id` — the competition, for the stripe's top
+   * half. Null renders the unthemed slate rather than guessing a colour.
+   */
+  externalLeagueId?: number | null
+  /** The open matchweek, shown where a World Cup card shows the XP level. */
+  openMatchweekNumber?: number | null
+  /** This season's matchweek count — 38 in England, 34 in Germany. */
+  matchweekCount?: number | null
   has_submitted_predictions: boolean
   predictions_submitted_at: string | null
   predictions_last_saved_at: string | null
@@ -151,6 +167,19 @@ function formatDeadline(deadline: string | null) {
 }
 
 
+/**
+ * The stripe's two stops — the competition's brand colour, lifted at the top —
+ * as custom properties for the `.pool-stripe` class.
+ *
+ * Not a composed `background` string: a React style prop holds one value per
+ * property, and `.pool-stripe` needs two background declarations so the OKLCH
+ * one can override an sRGB fallback. See app/globals.css.
+ */
+function stripeVars(pool: { externalLeagueId?: number | null }): CSSProperties {
+  const [from, to] = getPoolStripe({ externalLeagueId: pool.externalLeagueId })
+  return { '--stripe-from': from, '--stripe-to': to } as CSSProperties
+}
+
 function getPoolStatusText(pool: PoolCardData): string {
   if (pool.total_points === 0 && !pool.has_submitted_predictions) return 'No results yet'
   if (pool.total_points === 0 && pool.has_submitted_predictions) return 'Awaiting results'
@@ -159,6 +188,51 @@ function getPoolStatusText(pool: PoolCardData): string {
   return `${formatNumber(pool.total_points)} pts`
 }
 
+
+/**
+ * XP level on a World Cup pool, the open matchweek on a league one.
+ *
+ * The same tile as app/pools/PoolsClient.tsx — kept in step by hand, as the
+ * other card helpers in this file already are. XP does not exist for a league
+ * (`entry_xp_state` is written by World Cup scoring, and the pre-tournament
+ * fallback counts rows in `predictions`, both empty for a league entry), so the
+ * tile read "Level 1 · Rookie" on every league card whatever the member had
+ * done. The matchweek is the orientation that is actually true of a league.
+ *
+ * `variant` because the two dashboard cards style the same tile differently:
+ * the narrow horizontal-scroll card centres three small stats, the wide card
+ * uses the four-column strip the pools list uses.
+ */
+function ProgressTile({ pool, variant }: { pool: PoolCardData; variant: 'compact' | 'tile' }) {
+  const isLeague = pool.prediction_mode === 'league_pickem'
+  const label = isLeague ? 'Matchweek' : 'Level'
+  const mw = pool.openMatchweekNumber
+  const value = isLeague ? (mw == null ? '—' : String(mw)) : String(pool.highest_level ?? 1)
+  const caption = isLeague
+    // Null means nothing is open — every matchweek is played or locked, so the
+    // season is done. Said plainly rather than left as a bare dash.
+    ? (mw == null ? 'Season over' : pool.matchweekCount ? `of ${pool.matchweekCount}` : 'this week')
+    : getLevelName(pool.highest_level ?? 1)
+
+  if (variant === 'compact') {
+    return (
+      <div className="text-center">
+        <p className="text-[10px] font-medium text-muted mb-0.5">{label}</p>
+        <p className={`t-num text-lg leading-tight ${isLeague && mw == null ? 'text-muted' : 'text-ink'}`}>{value}</p>
+        <p className="text-[9px] text-muted leading-tight">{caption}</p>
+      </div>
+    )
+  }
+  return (
+    <div className="flex-[1.2] py-3 px-3">
+      <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">{label}</p>
+      <p className={`text-xl font-bold leading-none ${isLeague && mw == null ? 'text-muted' : 'text-primary-800'}`}>
+        {value}
+      </p>
+      <p className="text-[10px] text-muted mt-0.5">{caption}</p>
+    </div>
+  )
+}
 
 function getStatusTagClass(status: string): string {
   return toneToTagClass(poolStatusDisplay({ status }).tone)
@@ -321,7 +395,6 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
 // =====================
 function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount: number }) {
   const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
-  const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
   const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
 
   return (
@@ -334,8 +407,8 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
       {!hasBranding && (
         <span
           aria-hidden="true"
-          className="w-[5px] shrink-0"
-          style={{ background: getModeStripe(pool.prediction_mode) }}
+          className="w-[5px] shrink-0 pool-stripe"
+          style={stripeVars(pool)}
         />
       )}
       <div className="flex-1 flex flex-col min-w-0">
@@ -388,11 +461,7 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
             </p>
           )}
         </div>
-        <div className="text-center">
-          <p className="text-[10px] font-medium text-muted mb-0.5">Level</p>
-          <p className="t-num text-lg text-ink leading-tight">{level.level}</p>
-          <p className="text-[9px] text-muted leading-tight">{level.name}</p>
-        </div>
+        <ProgressTile pool={pool} variant="compact" />
         <div className="text-right">
           <p className="text-[10px] font-medium text-muted mb-0.5">Points</p>
           <p className="t-num text-lg text-primary-600 leading-tight">{formatNumber(pool.total_points ?? 0)}</p>
@@ -425,7 +494,6 @@ function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount
 function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?: number; unreadCount: number }) {
   const deadline = formatDeadline(pool.prediction_deadline)
   const statusText = getPoolStatusText(pool)
-  const level = { level: pool.highest_level ?? 1, name: getLevelName(pool.highest_level ?? 1) }
   const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
 
   return (
@@ -452,8 +520,8 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
         {!hasBranding && (
           <span
             aria-hidden="true"
-            className="w-[5px] shrink-0"
-            style={{ background: getModeStripe(pool.prediction_mode) }}
+            className="w-[5px] shrink-0 pool-stripe"
+            style={stripeVars(pool)}
           />
         )}
         <div className="flex-1 p-4">
@@ -473,7 +541,10 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
               <div className="flex items-center gap-1.5 mt-1">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-border-default text-muted">Admin</span>}
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getModeTagClass(pool.prediction_mode)}`}>{getModeName(pool.prediction_mode)}</span>
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded font-bold mode-pill"
+                    style={getModeChip(pool.prediction_mode, pool.league_mode) as CSSProperties}
+                  >{getModeName(pool.prediction_mode, pool.league_mode)}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
                   <span className="text-[11px] text-muted">
                     {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
@@ -518,13 +589,7 @@ function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?
             </div>
             <div className="w-px my-5 bg-silver" />
             {/* Level */}
-            <div className="flex-[1.2] py-3 px-3">
-              <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Level</p>
-              <p className="text-xl font-bold text-primary-800 leading-none">
-                {level.level}
-              </p>
-              <p className="text-[10px] text-muted mt-0.5">{level.name}</p>
-            </div>
+            <ProgressTile pool={pool} variant="tile" />
             {/* Form */}
             <div className="flex-1 py-3 px-3">
               <p className="text-[10px] font-medium text-muted mb-1 tracking-wide text-right">Form</p>

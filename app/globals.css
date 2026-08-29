@@ -1221,3 +1221,53 @@ html.dark .light-scope {
     }
   }
 }
+
+/* =============================================================
+   Pool card stripe — the competition's brand colour
+   =============================================================
+   Two declarations, and the order is load-bearing. The first is the sRGB
+   fallback; the second overrides it wherever `in oklch` is understood
+   (Chrome 111+, Safari 16.2+, Firefox 113+). A browser that does not know the
+   syntax discards the second as invalid and keeps the first.
+
+   Both stops are one hue at two lightnesses, so the two spaces agree closely
+   here — OKLCH just keeps the ramp a touch more even through the middle. The
+   stops themselves are computed in OKLab by getPoolStripe(), which is where
+   holding hue and chroma while lightening actually matters.
+
+   They arrive as custom properties rather than as a composed gradient string
+   because a React `style` prop holds one value per property and cannot express
+   a fallback pair.
+   ============================================================= */
+.pool-stripe {
+  background: linear-gradient(to bottom, var(--stripe-from), var(--stripe-to));
+  background: linear-gradient(to bottom in oklch, var(--stripe-from), var(--stripe-to));
+}
+
+/* =============================================================
+   Mode pill — one colour per game mode
+   =============================================================
+   ⚠ THE ONLY PLACE THE MODE IS COLOURED, now that the card's stripe carries the
+   competition instead. Seven modes need seven colours and the palette has five
+   semantic families, so the colour is authored once per mode in
+   `modeIdentityColor` and arrives here as a custom property.
+
+   What stays theme-aware is the TREATMENT, not the hue: how light the text sits
+   and how strong the tint is. The two ink values are derived from the same
+   authored colour at absolute lightness targets, which is what keeps all seven
+   between 6.3:1 and 9.2:1 against their own tint — above WCAG AAA for the 10px
+   bold this is set in.
+
+   The dark tint is stronger than the light one (22% vs 14%) because the same
+   alpha over a dark ground reads as a fainter wash.
+   ============================================================= */
+.mode-pill {
+  color: var(--mode-ink);
+  background: color-mix(in srgb, var(--mode-base) 14%, transparent);
+}
+
+html.dark .mode-pill {
+  color: var(--mode-ink-dark);
+  background: color-mix(in srgb, var(--mode-base) 22%, transparent);
+}
+
