@@ -2,6 +2,7 @@ import { roundLabel } from '@/lib/competitionRounds'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getShadowReadPools, readEntryScoring, readRecentForm } from '@/lib/scoring/readSource'
 import { readLeagueCardFacts } from '@/lib/league/poolCards'
+import { readLeagueDashboardFixtures } from '@/lib/league/read'
 import type { EntryScoring } from '@/lib/scoring/readSource'
 import { redirect } from 'next/navigation'
 import { fetchMatchConductForTournaments } from '@/lib/matchConduct'
@@ -20,6 +21,10 @@ type LeagueMembership = {
     pool_id: string
     prediction_mode: string
     tournament_id: string
+    /** 'open' | 'completed' — the competition lifecycle (pools_status_check). */
+    status: string
+    /** Migration 040. A separate axis from status: this is visibility. */
+    archived_at: string | null
     league_mode: string | null
     league_season_id: string | null
     league_table_lock_at: string | null
@@ -104,8 +109,39 @@ export default async function DashboardPage() {
   // Collect unique tournament IDs from user's pools
   const userTournamentIds = [...new Set((userPools ?? []).map((m: any) => m.pools.tournament_id))]
 
+  // ---- what the matches panel is allowed to show -------------------------
+  //
+  // ⚠ NARROWER THAN `userTournamentIds`, and deliberately a separate set. That
+  // one still feeds the bonus calculation, which has to cover completed and
+  // archived pools or their scores stop rendering. The panel is a different
+  // question — "what is on next for me" — and a finished or archived pool has
+  // no answer to it.
+  //
+  // ⚠ AND IT HAS TWO SOURCES. `matches` holds ZERO rows for a league
+  // tournament; a league's fixtures are `league_fixtures`, keyed by season. So
+  // a member whose only pool was a Premier League one saw "No upcoming matches
+  // scheduled" on a Saturday with ten games to come — silently, because an
+  // empty result is a valid one.
+  const activeMemberships = ((userPools ?? []) as unknown as LeagueMembership[]).filter(
+    (m) => m.pools.status === 'open' && !m.pools.archived_at,
+  )
+  const bracketTournamentIds = [
+    ...new Set(
+      activeMemberships
+        .filter((m) => m.pools.prediction_mode !== 'league_pickem')
+        .map((m) => m.pools.tournament_id)
+        .filter(Boolean),
+    ),
+  ]
+  const activeSeasonIds = [
+    ...new Set(activeMemberships.map((m) => m.pools.league_season_id).filter(Boolean)),
+  ] as string[]
+
+  const UPCOMING_LIMIT = 5
+  const leagueFixtures = await readLeagueDashboardFixtures(supabase, activeSeasonIds, UPCOMING_LIMIT)
+
   let liveMatches: any[] | null = null
-  if (userTournamentIds.length > 0) {
+  if (bracketTournamentIds.length > 0) {
     const { data } = await supabase
       .from('matches')
       .select(`
@@ -122,14 +158,14 @@ export default async function DashboardPage() {
         away_team_placeholder
       `)
       .eq('status', 'live')
-      .in('tournament_id', userTournamentIds)
+      .in('tournament_id', bracketTournamentIds)
       .order('match_date', { ascending: true })
     liveMatches = data
   }
 
   // STEP 4b: Fetch upcoming matches — only from tournaments the user has pools in
   let upcomingMatches: any[] | null = null
-  if (userTournamentIds.length > 0) {
+  if (bracketTournamentIds.length > 0) {
     const { data } = await supabase
       .from('matches')
       .select(`
@@ -145,24 +181,41 @@ export default async function DashboardPage() {
         away_team_placeholder
       `)
       .in('status', ['scheduled', 'upcoming'])
-      .in('tournament_id', userTournamentIds)
+      .in('tournament_id', bracketTournamentIds)
       .order('match_date', { ascending: true })
-      .limit(5)
+      .limit(UPCOMING_LIMIT)
     upcomingMatches = data
   }
 
   // Normalize team data (Supabase may return arrays for FK joins)
-  const normalizedLiveMatches = (liveMatches ?? []).map((m: any) => ({
+  const normalizeMatch = (m: any) => ({
     ...m,
     home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
     away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
-  }))
+    // World Cup rows carry no competition caption. The panel only prints one
+    // when it has it, so a single-competition member sees no change.
+    competition: m.competition ?? null,
+  })
 
-  const normalizedUpcomingMatches = (upcomingMatches ?? []).map((m: any) => ({
-    ...m,
-    home_team: Array.isArray(m.home_team) ? m.home_team[0] ?? null : m.home_team,
-    away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
-  }))
+  const byKickoff = (a: { match_date: string | null }, b: { match_date: string | null }) =>
+    (a.match_date ? Date.parse(a.match_date) : Infinity) -
+    (b.match_date ? Date.parse(b.match_date) : Infinity)
+
+  const normalizedLiveMatches = [
+    ...(liveMatches ?? []).map(normalizeMatch),
+    ...leagueFixtures.live,
+  ].sort(byKickoff)
+
+  // ⚠ THE LIMIT IS APPLIED AFTER THE MERGE, not per source. Each query takes
+  // its own five, so a member in both a World Cup and a league pool would
+  // otherwise get ten — and, worse, five of them from a competition whose next
+  // fixture is months away, pushing this weekend's games off the list.
+  const normalizedUpcomingMatches = [
+    ...(upcomingMatches ?? []).map(normalizeMatch),
+    ...leagueFixtures.upcoming,
+  ]
+    .sort(byKickoff)
+    .slice(0, UPCOMING_LIMIT)
 
   // STEP 4c: Fetch shared data needed for bonus calculation (teams, conduct)
   // Both scoped to the tournaments this user actually has pools in. Unscoped,

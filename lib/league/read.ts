@@ -851,3 +851,139 @@ export async function readMatchweekFixtureByClub(
 
   return { byClub, error: null }
 }
+
+/**
+ * Live and upcoming league fixtures for the dashboard's matches panel.
+ *
+ * ⚠ THE PANEL WAS EMPTY FOR EVERY LEAGUE MEMBER. It reads `matches` filtered by
+ * the tournaments a member has pools in, and a league tournament has ZERO rows
+ * there — a league's fixtures are `league_fixtures`. So a member whose only pool
+ * was a Premier League one saw "No upcoming matches scheduled" on a Saturday
+ * morning with ten games to come. Nothing errored: an empty result is valid.
+ *
+ * Shaped to the panel's existing contract rather than given a new one, the same
+ * trade the rest of this file makes — `country_name` carries the club's name,
+ * `country_code` its abbreviation and `flag_url` its crest, because the panel
+ * reads those fields positionally.
+ *
+ * `competition` is the one ADDITION. A member in a Premier League pool and a La
+ * Liga pool now sees both leagues' fixtures in one list, and two crests with no
+ * caption cannot say which competition a game belongs to.
+ */
+export type DashboardFixture = {
+  match_id: string
+  match_number: number
+  stage: string
+  match_date: string
+  status: string
+  venue: string | null
+  home_team: { country_name: string; country_code: string | null; flag_url: string | null } | null
+  away_team: { country_name: string; country_code: string | null; flag_url: string | null } | null
+  home_team_placeholder: null
+  away_team_placeholder: null
+  home_score_ft: number | null
+  away_score_ft: number | null
+  /** The competition's display name, e.g. "Premier League". */
+  competition: string | null
+}
+
+export async function readLeagueDashboardFixtures(
+  supabase: SupabaseClient,
+  seasonIds: string[],
+  upcomingLimit: number,
+): Promise<{ live: DashboardFixture[]; upcoming: DashboardFixture[]; error: string | null }> {
+  const empty = { live: [], upcoming: [], error: null }
+  if (seasonIds.length === 0) return empty
+
+  // ⚠ Bounded, and ordered by kickoff so the bound takes the SOONEST rather
+  // than an arbitrary page. A season is 380 rows and a member can be in pools
+  // across several, so an unbounded select here would eventually meet
+  // PostgREST's silent 1,000-row cap — which would drop fixtures without
+  // saying so, the exact failure this function exists to fix.
+  const nowIso = new Date().toISOString()
+  const [liveRes, upcomingRes, clubsRes, seasonsRes] = await Promise.all([
+    supabase
+      .from('league_fixtures')
+      .select(FIXTURE_PANEL_COLS)
+      .in('season_id', seasonIds)
+      .eq('status', 'live')
+      .order('kickoff_at', { ascending: true })
+      .limit(50),
+    supabase
+      .from('league_fixtures')
+      .select(FIXTURE_PANEL_COLS)
+      .in('season_id', seasonIds)
+      .eq('status', 'scheduled')
+      .gte('kickoff_at', nowIso)
+      .order('kickoff_at', { ascending: true })
+      .limit(upcomingLimit),
+    supabase
+      .from('league_clubs')
+      .select('club_id, name, abbreviation, crest_url')
+      .in('season_id', seasonIds),
+    supabase
+      .from('league_seasons')
+      .select('season_id, competition_name')
+      .in('season_id', seasonIds),
+  ])
+
+  const err = liveRes.error ?? upcomingRes.error ?? clubsRes.error ?? seasonsRes.error
+  // Decorative panel: a failure must not take the dashboard down with it.
+  if (err) return { live: [], upcoming: [], error: err.message }
+
+  const clubById = new Map(
+    ((clubsRes.data ?? []) as Array<{ club_id: string; name: string; abbreviation: string | null; crest_url: string | null }>)
+      .map((c) => [c.club_id, c]),
+  )
+  const competitionBySeason = new Map(
+    ((seasonsRes.data ?? []) as Array<{ season_id: string; competition_name: string }>)
+      .map((s) => [s.season_id, s.competition_name]),
+  )
+
+  const shape = (f: FixturePanelRow): DashboardFixture => {
+    const club = (id: string) => {
+      const c = clubById.get(id)
+      return c ? { country_name: c.name, country_code: c.abbreviation, flag_url: c.crest_url } : null
+    }
+    return {
+      match_id: f.fixture_id,
+      match_number: f.fixture_number,
+      // Same value fixtureToMatch uses. The panel only reads `stage` in its
+      // "awaiting results" branch, which a league fixture never reaches — both
+      // clubs are known from the day the season is published.
+      stage: 'regular_season',
+      match_date: f.kickoff_at,
+      status: f.status,
+      venue: f.venue,
+      home_team: club(f.home_club_id),
+      away_team: club(f.away_club_id),
+      home_team_placeholder: null,
+      away_team_placeholder: null,
+      home_score_ft: f.home_goals,
+      away_score_ft: f.away_goals,
+      competition: competitionBySeason.get(f.season_id) ?? null,
+    }
+  }
+
+  return {
+    live: ((liveRes.data ?? []) as FixturePanelRow[]).map(shape),
+    upcoming: ((upcomingRes.data ?? []) as FixturePanelRow[]).map(shape),
+    error: null,
+  }
+}
+
+const FIXTURE_PANEL_COLS =
+  'fixture_id, fixture_number, season_id, kickoff_at, venue, status, home_goals, away_goals, home_club_id, away_club_id'
+
+type FixturePanelRow = {
+  fixture_id: string
+  fixture_number: number
+  season_id: string
+  kickoff_at: string
+  venue: string | null
+  status: string
+  home_goals: number | null
+  away_goals: number | null
+  home_club_id: string
+  away_club_id: string
+}

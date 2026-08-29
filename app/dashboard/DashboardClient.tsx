@@ -107,6 +107,15 @@ type UpcomingMatch = {
   away_team: { country_name: string; flag_url: string | null } | null
   home_team_placeholder: string | null
   away_team_placeholder: string | null
+  /**
+   * The competition this fixture belongs to, e.g. "Premier League".
+   *
+   * Only set for league fixtures. A member in a Premier League pool and a
+   * La Liga pool sees both leagues' games in one list, and two crests with no
+   * caption cannot say which competition a game belongs to. Absent on World Cup
+   * rows, where the panel has only ever shown one competition anyway.
+   */
+  competition?: string | null
 }
 
 type LiveMatch = UpcomingMatch & {
@@ -1080,6 +1089,9 @@ export function DashboardClient({
                             <p className="text-xs font-medium text-muted">
                               {match.match_date ? <LocalTime iso={match.match_date} format={formatDateTime} /> : 'TBD'}
                             </p>
+                            {match.competition && (
+                              <p className="text-[11px] text-muted mt-0.5">{match.competition}</p>
+                            )}
                             {match.venue && (
                               <p className="text-xs text-muted mt-0.5">{match.venue}</p>
                             )}
@@ -1170,6 +1182,13 @@ export function DashboardClient({
                         {elapsed}
                       </p>
                     )}
+                    {/* The mobile live strip below deliberately has no equivalent
+                        — it is a single compact row and a caption would crowd it.
+                        Live games are few and transient, so the ambiguity this
+                        resolves is far more likely in the upcoming list. */}
+                    {match.competition && (
+                      <p className="text-[11px] text-muted mt-1 text-center">{match.competition}</p>
+                    )}
                   </Card>
                 )
               })}
@@ -1224,6 +1243,9 @@ export function DashboardClient({
                           <p className="text-sm font-medium text-ink">
                             {match.match_date ? <LocalTime iso={match.match_date} format={formatDateTime} /> : 'TBD'}
                           </p>
+                          {match.competition && (
+                            <p className="text-[11px] text-muted mt-0.5">{match.competition}</p>
+                          )}
                           {match.venue && (
                             <p className="text-xs text-muted mt-0.5">{match.venue}</p>
                           )}
