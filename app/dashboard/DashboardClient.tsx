@@ -1284,32 +1284,38 @@ export function DashboardClient({
                     const awayFlagUrl = awayTeamData?.flag_url ?? null
                     const isCrest = !!match.competition
                     return (
-                      <Card key={match.match_id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-ink flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5">
+                      // ⚠ THE COMPETITION APPEARS ONCE, on the left, as the match's
+                      // caption. It used to sit under the kick-off time on the
+                      // right while the left read `regular_season · Match #14` —
+                      // so the card showed a raw database value AND named the
+                      // competition twice over. `matchCaption` gives a league its
+                      // competition and a World Cup match its stage and number.
+                      <Card key={match.match_id} padding="sm" className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-ink flex items-center gap-2 min-w-0">
+                            <span className="inline-flex items-center gap-1.5 min-w-0">
                               <TeamBadge url={homeFlagUrl} name={homeTeam} isCrest={isCrest} size="sm" />
-                              {homeTeam}
+                              <span className="truncate">{homeTeam}</span>
                             </span>
-                            <span className="text-muted font-normal">vs</span>
-                            <span className="inline-flex items-center gap-1.5">
+                            <span className="text-muted font-normal shrink-0">vs</span>
+                            <span className="inline-flex items-center gap-1.5 min-w-0">
                               <TeamBadge url={awayFlagUrl} name={awayTeam} isCrest={isCrest} size="sm" />
-                              {awayTeam}
+                              <span className="truncate">{awayTeam}</span>
                             </span>
                           </p>
-                          <p className="text-xs text-muted">
-                            {formatStage(match.stage)} &middot; Match #{match.match_number}
-                          </p>
+                          <p className="text-xs text-muted mt-0.5">{matchCaption(match)}</p>
                         </div>
-                        <div className="text-right shrink-0 ml-4">
-                          <p className="text-sm font-medium text-ink">
+                        {/* ⚠ CAPPED, because venues run long. The longest in the
+                            four leagues is "Waldstadion Kaiserlinde,
+                            Spiesen-Elversberg" at 43 characters, and with the
+                            right column shrink-0 an uncapped one would push the
+                            clubs off the left rather than truncate itself. */}
+                        <div className="text-right shrink-0 max-w-[45%]">
+                          <p className="text-sm font-medium text-ink whitespace-nowrap">
                             {match.match_date ? <LocalTime iso={match.match_date} format={formatDateTime} /> : 'TBD'}
                           </p>
-                          {match.competition && (
-                            <p className="text-[11px] text-muted mt-0.5">{match.competition}</p>
-                          )}
                           {match.venue && (
-                            <p className="text-xs text-muted mt-0.5">{match.venue}</p>
+                            <p className="text-xs text-muted mt-0.5 truncate" title={match.venue}>{match.venue}</p>
                           )}
                         </div>
                       </Card>
