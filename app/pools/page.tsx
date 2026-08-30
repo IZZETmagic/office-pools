@@ -105,6 +105,9 @@ export default async function PoolsPage() {
   const poolIdsForScoring = Array.from(
     new Set((userPools ?? []).map((m: any) => m.pools.pool_id))
   )
+  // Hoisted above the scoring gate below, which needs it: that gate reads
+  // `league_entry_totals`, which is RLS-protected.
+  const scoringAdmin = createAdminClient()
   const hasScoringByPool = new Map<string, boolean>()
   if (poolIdsForScoring.length > 0) {
     const { data: scoringRows } = await supabase
@@ -129,11 +132,22 @@ export default async function PoolsPage() {
       .filter((m) => m.pools.prediction_mode === 'league_pickem')
       .map((m) => m.pools.pool_id)
     if (leaguePoolIds.length > 0) {
-      const { data: leagueScored } = await supabase
+      // ⚠ ADMIN, NOT `supabase`. This one query used the request-scoped client
+      // while every other read of `league_entry_totals` on this page uses the
+      // admin one — and the table is RLS-protected, so it came back EMPTY. The
+      // error was discarded too (`const { data }`), so nothing said so.
+      //
+      // The visible symptom was the Rank tile reading "—" on every league card
+      // while `final_rank` sat in the table beside the points that DID render:
+      // points came through the admin read, the rank was suppressed by this
+      // gate. It is still a gate — total_points > 0 — so "#1 of 4" before a ball
+      // is kicked stays suppressed, which is what the gate is for.
+      const { data: leagueScored, error: leagueScoredErr } = await scoringAdmin
         .from('league_entry_totals')
         .select('pool_id')
         .in('pool_id', leaguePoolIds)
         .gt('total_points', 0)
+      if (leagueScoredErr) console.error('league scoring gate:', leagueScoredErr.message)
       for (const row of (leagueScored ?? []) as Array<{ pool_id: string }>) {
         hasScoringByPool.set(row.pool_id, true)
       }
@@ -229,7 +243,6 @@ export default async function PoolsPage() {
   // would silently return zero rows. scoringAdmin is used ONLY to read scoring
   // for entry ids that came out of the RLS-checked membership query, so it
   // never widens what this user can see.
-  const scoringAdmin = createAdminClient()
   const shadowPools = await getShadowReadPools(scoringAdmin)
 
   // ⚠ THE SOURCE IS THREE-VALUED, NOT TWO. This used to be
@@ -412,6 +425,15 @@ export default async function PoolsPage() {
         memberCount: memberCount ?? 0,
         totalEntries: totalEntries ?? 0,
         hasScoringStarted: hasScoringByPool.get(pool.pool_id) ?? false,
+        // ⚠ THE UNIT IS THE OPEN MATCHWEEK FOR A LEAGUE, not the season. These
+        // feed the action pill's "6 of 10 picked". Over 380 fixtures "12 of
+        // 380" would be true and useless — the weekly question is the one a
+        // member is actually asking. Same pair, same reasoning, as
+        // app/dashboard/page.tsx.
+        totalMatches: league ? league.totalPicks : (matchCountByTournament.get(pool.tournament_id) ?? 0),
+        predictedMatches: league
+          ? league.madePicks
+          : (defaultEntryId ? (predCountByEntry.get(defaultEntryId) ?? 0) : 0),
         form,
         currentRoundLabel,
         // The card's clock. A league's next decision is this matchweek's lock
@@ -422,6 +444,10 @@ export default async function PoolsPage() {
         openMatchweekNumber: league?.openMatchweekNumber ?? null,
         inPlayMatchweekNumber: league?.inPlayMatchweekNumber ?? null,
         matchweekCount: league?.matchweekCount ?? null,
+        // Showdown's four tiles. NULL for every other mode.
+        showdown: league?.showdown ?? null,
+        lms: league?.lms ?? null,
+        table: league?.table ?? null,
       }
     })
   )

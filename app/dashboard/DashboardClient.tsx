@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
@@ -11,17 +10,14 @@ import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
 import { formatNumber } from '@/lib/format'
-import { getLevelName } from '@/lib/levelNames'
 import { LocalTime } from '@/components/LocalTime'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
-import { poolStatusDisplay, toneToTagClass } from '@/lib/poolStatus'
-import { getModeName, getModeChip } from '@/lib/design/poolMode'
-import { CompetitionRail } from '@/components/competitions/CompetitionRail'
 import type { PredictionMode } from '@/lib/predictionMode'
-import { getFormDotClass } from '@/lib/design/formDots'
+import type { ShowdownCardFacts, LmsCardFacts, TableCardFacts } from '@/lib/league/poolCards'
 import { shortClubName } from '@/lib/league/clubName'
-import { matchweekTile } from '@/lib/league/matchweekTile'
+import { PoolCard, PoolStripCard } from '@/components/pools/PoolCard'
+import { byAttention } from '@/lib/pools/card'
 
 // =====================
 // TYPES
@@ -64,6 +60,12 @@ type PoolCardData = {
   inPlayMatchweekNumber?: number | null
   /** This season's matchweek count — 38 in England, 34 in Germany. */
   matchweekCount?: number | null
+  /** Showdown's KPI tiles. NULL for every other mode. */
+  showdown?: ShowdownCardFacts | null
+  /** Last Man Standing's KPI tiles. NULL for every other mode. */
+  lms?: LmsCardFacts | null
+  /** Predict the Table's KPI tiles. NULL for every other mode. */
+  table?: TableCardFacts | null
   has_submitted_predictions: boolean
   predictions_submitted_at: string | null
   predictions_last_saved_at: string | null
@@ -154,34 +156,6 @@ function getInitials(fullName: string | null, username: string): string {
   return username.slice(0, 2).toUpperCase()
 }
 
-function formatDeadline(deadline: string | null) {
-  if (!deadline) return { text: 'No deadline set', className: 'text-muted' }
-
-  const deadlineDate = new Date(deadline)
-  const now = new Date()
-  const daysUntil = Math.floor((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-
-  const formatted = deadlineDate.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-
-  if (daysUntil < 0) {
-    return { text: `${formatted} (closed)`, className: 'text-danger-600 font-semibold' }
-  } else if (daysUntil === 0) {
-    return { text: `${formatted} (today!)`, className: 'text-danger-600 font-semibold' }
-  } else if (daysUntil === 1) {
-    return { text: `${formatted} (1 day)`, className: 'text-warning-600 font-semibold' }
-  } else if (daysUntil < 7) {
-    return { text: `${formatted} (${daysUntil} days)`, className: 'text-warning-600 font-semibold' }
-  } else {
-    return { text: `${formatted} (${daysUntil} days)`, className: 'text-muted' }
-  }
-}
-
-
-
 /**
  * A club crest or a national flag — they are NOT the same shape.
  *
@@ -226,68 +200,6 @@ function TeamBadge({ url, name, isCrest, size }: {
 function matchCaption(match: { competition?: string | null; stage: string; match_number: number }): string {
   if (match.competition) return match.competition
   return `${formatStage(match.stage)} \u00B7 #${match.match_number}`
-}
-
-function getPoolStatusText(pool: PoolCardData): string {
-  if (pool.total_points === 0 && !pool.has_submitted_predictions) return 'No results yet'
-  if (pool.total_points === 0 && pool.has_submitted_predictions) return 'Awaiting results'
-  if (pool.current_rank && pool.current_rank <= 3) return 'On the podium!'
-  if (pool.current_rank) return 'Keep climbing!'
-  return `${formatNumber(pool.total_points)} pts`
-}
-
-
-/**
- * XP level on a World Cup pool, the open matchweek on a league one.
- *
- * The same tile as app/pools/PoolsClient.tsx — kept in step by hand, as the
- * other card helpers in this file already are. XP does not exist for a league
- * (`entry_xp_state` is written by World Cup scoring, and the pre-tournament
- * fallback counts rows in `predictions`, both empty for a league entry), so the
- * tile read "Level 1 · Rookie" on every league card whatever the member had
- * done. The matchweek is the orientation that is actually true of a league.
- *
- * `variant` because the two dashboard cards style the same tile differently:
- * the narrow horizontal-scroll card centres three small stats, the wide card
- * uses the four-column strip the pools list uses.
- */
-function ProgressTile({ pool, variant }: { pool: PoolCardData; variant: 'compact' | 'tile' }) {
-  const isLeague = pool.prediction_mode === 'league_pickem'
-  const label = isLeague ? 'Matchweek' : 'Level'
-  // The matchweek being PLAYED where there is one, else the one open for picks
-  // — the same rule the pools list uses, from the same function so the two
-  // cards cannot answer Ryan's question differently.
-  const tile = matchweekTile(pool)
-  const mw = isLeague ? tile.number : null
-  const value = isLeague ? (mw == null ? '—' : String(mw)) : String(pool.highest_level ?? 1)
-  const caption = isLeague ? tile.caption : getLevelName(pool.highest_level ?? 1)
-
-  if (variant === 'compact') {
-    return (
-      <div className="text-center">
-        <p className="text-[10px] font-medium text-muted mb-0.5">{label}</p>
-        <p className={`t-num text-lg leading-tight ${isLeague && mw == null ? 'text-muted' : 'text-ink'}`}>{value}</p>
-        <p className="text-[9px] text-muted leading-tight">{caption}</p>
-      </div>
-    )
-  }
-  return (
-    <div className="flex-[1.2] py-3 px-3">
-      <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">{label}</p>
-      <p className={`text-xl font-bold leading-none ${isLeague && mw == null ? 'text-muted' : 'text-primary-800'}`}>
-        {value}
-      </p>
-      <p className="text-[10px] text-muted mt-0.5">{caption}</p>
-    </div>
-  )
-}
-
-function getStatusTagClass(status: string): string {
-  return toneToTagClass(poolStatusDisplay({ status }).tone)
-}
-
-function getStatusLabel(status: string): string {
-  return poolStatusDisplay({ status }).label
 }
 
 function formatDateTime(d: Date) {
@@ -436,239 +348,6 @@ function activityDescription(activity: ActivityItem, poolLink: React.ReactNode):
     case 'points_adjusted':
       return <>Points adjusted <span className={`font-semibold ${activity.adjustment > 0 ? 'text-success-900' : 'text-danger-800'}`}>{activity.adjustment > 0 ? '+' : ''}{activity.adjustment}</span> in {poolLink} &mdash; {activity.reason}</>
   }
-}
-
-// =====================
-// MOBILE POOL CARD
-// =====================
-function MobilePoolCard({ pool, unreadCount }: { pool: PoolCardData; unreadCount: number }) {
-  const needsPredictions = (pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions
-  const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
-
-  return (
-    <Link
-      href={`/pools/${pool.pool_id}`}
-      className={`w-56 h-full min-h-[9rem] rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface flex hover:shadow-md active:scale-[0.98] transition-all duration-200 overflow-hidden`}
-    >
-      {/* ⚠ `compact`, NOT the default rail, and the difference is deliberate. This
-          card is 224px wide; the 46px rail the pools page uses is a fifth of that
-          and wraps the title. 30px keeps the layout at the cost of the wordmark
-          lockups, which stop resolving at 22px — see SIZES in CompetitionRail.
-          Branded pools show their banner instead, as RN's PoolCard does. */}
-      {!hasBranding && <CompetitionRail externalLeagueId={pool.externalLeagueId} size="compact" />}
-      <div className="flex-1 flex flex-col min-w-0">
-      {hasBranding && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 text-white" style={{ backgroundColor: pool.brand_color! }}>
-          {pool.brand_logo_url ? (
-            <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-4 h-4 rounded-sm object-cover" />
-          ) : (
-            <span className="text-xs">{pool.brand_emoji}</span>
-          )}
-          <span className="text-[10px] font-bold">{pool.brand_name}</span>
-          <span className="text-[8px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by SportPool</span>
-        </div>
-      )}
-      <div
-        className="p-3 flex flex-col flex-1"
-        style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
-      >
-      <div className="flex items-center gap-1.5">
-        <h4 className="text-sm font-bold text-ink line-clamp-2">{pool.pool_name}</h4>
-        {unreadCount > 0 && (
-          <span className="min-w-[18px] h-[18px] px-1 rounded-pill bg-danger-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-      </div>
-      {needsPredictions ? (
-        <p className="text-[10px] font-semibold text-warning-800 mt-1">
-          {pool.currentRoundLabel ? `${pool.currentRoundLabel} needs predictions` : 'Needs predictions'}
-        </p>
-      ) : (
-        <p className="text-[10px] font-semibold text-success-900 mt-1">All set</p>
-      )}
-
-      <div className="mt-auto pt-3 grid grid-cols-3 gap-1">
-        <div>
-          <p className="text-[10px] font-medium text-muted mb-0.5">Rank</p>
-          {pool.hasScoringStarted && pool.current_rank != null ? (
-            <>
-              <p className="t-num text-lg text-ink leading-tight">
-                {pool.current_rank}
-              </p>
-              <p className="text-[9px] text-muted leading-tight">
-                of {pool.totalEntries}
-              </p>
-            </>
-          ) : (
-            <p className="t-num text-lg text-muted leading-tight">
-              —
-            </p>
-          )}
-        </div>
-        <ProgressTile pool={pool} variant="compact" />
-        <div className="text-right">
-          <p className="text-[10px] font-medium text-muted mb-0.5">Points</p>
-          <p className="t-num text-lg text-primary-600 leading-tight">{formatNumber(pool.total_points ?? 0)}</p>
-        </div>
-      </div>
-
-      {/* Form dots */}
-      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-border-subtle">
-        <span className="text-[10px] font-medium text-muted">Form</span>
-        <div className="flex items-center gap-[5px]">
-          {pool.form.length > 0
-            ? pool.form.map((type, i) => (
-                <div key={i} className={`w-[7px] h-[7px] rounded-pill ${getFormDotClass(type)}`} />
-              ))
-            : [0, 1, 2, 3, 4].map((i) => (
-                <div key={i} className={`w-[7px] h-[7px] rounded-pill ${getFormDotClass('no_pick')}`} />
-              ))
-          }
-        </div>
-      </div>
-      </div>
-      </div>
-    </Link>
-  )
-}
-
-// =====================
-// POOL CARD (desktop — matches pools page design)
-// =====================
-function PoolCard({ pool, index = 0, unreadCount }: { pool: PoolCardData; index?: number; unreadCount: number }) {
-  const deadline = formatDeadline(pool.prediction_deadline)
-  const statusText = getPoolStatusText(pool)
-  const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
-
-  return (
-    <Link
-      href={`/pools/${pool.pool_id}`}
-      className={`h-full flex flex-col rounded-card ${hasBranding ? '' : 'border border-border-subtle'} bg-surface hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-up`}
-      style={{ animationDelay: `${index * 0.06}s` }}
-    >
-      {hasBranding && (
-        <div className="flex items-center gap-2 px-4 py-2 text-white" style={{ backgroundColor: pool.brand_color! }}>
-          {pool.brand_logo_url ? (
-            <img src={pool.brand_logo_url} alt={pool.brand_name || ''} className="w-5 h-5 rounded-sm object-cover" />
-          ) : (
-            <span className="text-base">{pool.brand_emoji}</span>
-          )}
-          <span className="text-xs font-bold">{pool.brand_name}</span>
-          <span className="text-[10px] font-semibold ml-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>Powered by SportPool</span>
-        </div>
-      )}
-      {/* ⚠ flex-1, or the rail stops short. The grid stretches every card to the
-          tallest in its row, but this row only grew to its own content, so a
-          shorter card drew its rail down two thirds of the card and left white
-          below it. */}
-      <div
-        className="flex flex-1"
-        style={hasBranding ? { backgroundColor: `${pool.brand_color}1F` } : undefined}
-      >
-        {/* ⚠ `compact` HERE TOO, despite this being the roomy card. It sits in a
-            lg:grid-cols-3 inside max-w-6xl, so it is 357px wide — not the 544px
-            of the pools page. 357px is the width measured as the point where a
-            46px rail clips the Matchweek label and wraps the pill row. */}
-        {!hasBranding && <CompetitionRail externalLeagueId={pool.externalLeagueId} size="compact" />}
-        <div className="flex-1 p-4">
-          {/* Header row */}
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h4 className="text-lg font-bold text-ink truncate">
-                  {pool.pool_name}
-                </h4>
-                {unreadCount > 0 && (
-                  <span className="min-w-[20px] h-[20px] px-1.5 rounded-pill bg-danger-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {pool.role === 'admin' && <span className="text-[10px] px-1.5 py-0.5 rounded font-bold border border-border-default text-muted">Admin</span>}
-                  <span
-                    className="text-[10px] px-1.5 py-0.5 rounded font-bold mode-pill"
-                    style={getModeChip(pool.prediction_mode, pool.league_mode) as CSSProperties}
-                  >{getModeName(pool.prediction_mode, pool.league_mode)}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold capitalize ${getStatusTagClass(pool.status)}`}>{getStatusLabel(pool.status)}</span>
-                  <span className="text-[11px] text-muted">
-                    {pool.memberCount} player{pool.memberCount !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                {(pool.status === 'open' || pool.status === 'active') && !pool.has_submitted_predictions && (
-                  <span className="ml-auto text-[11px] font-semibold text-warning-800 shrink-0">
-                    {pool.currentRoundLabel ? `${pool.currentRoundLabel} needs predictions` : 'Needs predictions'}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* KPI section */}
-          <div className="flex items-stretch rounded-control bg-snow/75 mt-3 overflow-hidden">
-            {/* Points */}
-            <div className="flex-1 py-3 px-3">
-              <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Points</p>
-              <p className="text-xl font-bold text-primary-800 leading-none">
-                {formatNumber(pool.total_points ?? 0)}
-              </p>
-            </div>
-            <div className="w-px my-5 bg-silver" />
-            {/* Rank */}
-            <div className="flex-1 py-3 px-3">
-              <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">Rank</p>
-              {pool.hasScoringStarted && pool.current_rank != null ? (
-                <div className="flex items-baseline gap-1">
-                  <p className="text-xl font-bold text-ink leading-none">
-                    #{pool.current_rank}
-                  </p>
-                  <p className="text-[11px] text-muted leading-none">
-                    of {pool.totalEntries}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xl font-bold text-muted leading-none">
-                  —
-                </p>
-              )}
-            </div>
-            <div className="w-px my-5 bg-silver" />
-            {/* Level */}
-            <ProgressTile pool={pool} variant="tile" />
-            {/* Form */}
-            <div className="flex-1 py-3 px-3">
-              <p className="text-[10px] font-medium text-muted mb-1 tracking-wide text-right">Form</p>
-              <div className="flex items-center justify-end gap-[5px] mt-1.5">
-                {pool.form.length > 0
-                  ? pool.form.map((type, i) => (
-                      <div key={i} className={`w-[10px] h-[10px] rounded-pill ${getFormDotClass(type)}`} />
-                    ))
-                  : [0, 1, 2, 3, 4].map((i) => (
-                      <div key={i} className="w-[10px] h-[10px] rounded-pill bg-silver" />
-                    ))
-                }
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom row */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
-            <span className="text-[11px] text-muted">
-              {statusText}
-            </span>
-            {deadline.text !== 'No deadline set' && (
-              <span className={`inline-flex items-center gap-1 text-[11px] font-semibold ${deadline.className}`}>
-                <Icon name="clock" size={14} weight="semibold" />
-                {deadline.text}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </Link>
-  )
 }
 
 // =====================
@@ -919,29 +598,12 @@ export function DashboardClient({
               {/* Mobile: compact horizontal scroll strip — full-bleed, first card aligns with header */}
               <div className="md:hidden relative -mx-4 sm:-mx-6">
                 <div className="flex items-stretch gap-3 overflow-x-auto scrollbar-hide pb-2 pl-4 sm:pl-6 pr-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                  {[...pools].sort((a, b) => {
-                    // Branded pools always first
-                    const aBrand = (a.brand_name && (a.brand_emoji || a.brand_logo_url) && a.brand_color) ? 0 : 1
-                    const bBrand = (b.brand_name && (b.brand_emoji || b.brand_logo_url) && b.brand_color) ? 0 : 1
-                    if (aBrand !== bBrand) return aBrand - bBrand
-                    // Pools with unread banter first
-                    const aUnread = (unreadCounts.get(a.pool_id) ?? 0) > 0 ? 0 : 1
-                    const bUnread = (unreadCounts.get(b.pool_id) ?? 0) > 0 ? 0 : 1
-                    if (aUnread !== bUnread) return aUnread - bUnread
-                    const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
-                      ? 0 : !a.has_submitted_predictions && a.predictedMatches === 0 ? 1 : 2
-                    const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
-                      ? 0 : !b.has_submitted_predictions && b.predictedMatches === 0 ? 1 : 2
-                    if (aScore !== bScore) return aScore - bScore
-                    const aDeadline = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
-                    const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
-                    return aDeadline - bDeadline
-                  }).map((pool, i) => (
+                  {[...pools].sort(byAttention(unreadCounts)).map((pool, i) => (
                     <div key={pool.pool_id} className="shrink-0 flex animate-slide-in-right" style={{ animationDelay: `${i * 0.08}s` }}>
-                      <MobilePoolCard pool={pool} unreadCount={unreadCounts.get(pool.pool_id) ?? 0} />
+                      <PoolStripCard pool={pool} unreadCount={unreadCounts.get(pool.pool_id) ?? 0} />
                     </div>
                   ))}
-                  {/* View All. Matches MobilePoolCard beside it — same radius,
+                  {/* View All. Matches PoolStripCard beside it — same radius,
                       same border, same hover. It was on rounded-control with a
                       neutral-200 edge, so it read as a slightly different shape
                       sitting at the end of the strip. */}
@@ -957,25 +619,25 @@ export function DashboardClient({
 
               {/* Desktop: full card grid */}
               <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[...pools].sort((a, b) => {
-                  // Branded pools always first
-                  const aBrand = (a.brand_name && (a.brand_emoji || a.brand_logo_url) && a.brand_color) ? 0 : 1
-                  const bBrand = (b.brand_name && (b.brand_emoji || b.brand_logo_url) && b.brand_color) ? 0 : 1
-                  if (aBrand !== bBrand) return aBrand - bBrand
-                  // Pools with unread banter first
-                  const aUnread = (unreadCounts.get(a.pool_id) ?? 0) > 0 ? 0 : 1
-                  const bUnread = (unreadCounts.get(b.pool_id) ?? 0) > 0 ? 0 : 1
-                  if (aUnread !== bUnread) return aUnread - bUnread
-                  const aScore = !a.has_submitted_predictions && a.predictedMatches > 0 && a.predictedMatches < a.totalMatches
-                    ? 0 : !a.has_submitted_predictions && a.predictedMatches === 0 ? 1 : 2
-                  const bScore = !b.has_submitted_predictions && b.predictedMatches > 0 && b.predictedMatches < b.totalMatches
-                    ? 0 : !b.has_submitted_predictions && b.predictedMatches === 0 ? 1 : 2
-                  if (aScore !== bScore) return aScore - bScore
-                  const aDeadline = a.prediction_deadline ? new Date(a.prediction_deadline).getTime() : Infinity
-                  const bDeadline = b.prediction_deadline ? new Date(b.prediction_deadline).getTime() : Infinity
-                  return aDeadline - bDeadline
-                }).map((pool, i) => (
-                  <PoolCard key={pool.pool_id} pool={pool} index={i} unreadCount={unreadCounts.get(pool.pool_id) ?? 0} />
+                {[...pools].sort(byAttention(unreadCounts)).map((pool, i) => (
+                  <PoolCard
+                    key={pool.pool_id}
+                    pool={pool}
+                    index={i}
+                    unreadCount={unreadCounts.get(pool.pool_id) ?? 0}
+                    // ⚠ `grid`, not `list`: this card is 357px in a lg:grid-cols-3
+                    // inside max-w-6xl, not the pools list's 544px. That buys a
+                    // narrower rail and three KPI tiles instead of four — see
+                    // SHAPE in components/pools/PoolCard.tsx for the measurements
+                    // behind both.
+                    variant="grid"
+                    // No onCopyLink/onCopyCode, so no invite nudge — DELIBERATE,
+                    // and now a single visible line rather than two card copies
+                    // that happened to differ. The dashboard answers "what needs
+                    // me today"; growing every under-ten-player card by a row of
+                    // admin chrome is the pools list's job, and that list is
+                    // 544px wide with room for it.
+                  />
                 ))}
               </div>
             </>

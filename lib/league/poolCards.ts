@@ -32,6 +32,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { inPlayMatchweekId, openMatchweekId, type MatchweekRow } from './read'
+import { shortClubName } from './clubName'
 
 type AdminClient = SupabaseClient
 
@@ -89,7 +90,106 @@ export type LeagueCardFacts = {
   madePicks: number
   /** True when nothing is left to decide for the current matchweek. */
   hasSubmitted: boolean
+  /**
+   * Showdown's KPI strip. NULL for every other mode.
+   *
+   * Showdown is a LAYER over the weekly accuracy number (migration 084), so its
+   * card cannot be the Pick'em card: the number that decides its leaderboard is
+   * `duel_points`, not accuracy points, and its opponent is the whole mode.
+   */
+  showdown: ShowdownCardFacts | null
+  /** Last Man Standing's KPI strip. NULL for every other mode. */
+  lms: LmsCardFacts | null
+  /** Predict the Table's KPI strip. NULL for every other mode. */
+  table: TableCardFacts | null
 }
+
+/**
+ * Everything a Predict the Table card's four tiles need.
+ *
+ * ⚠ BOTH NUMBERS ARE A COMPARISON OF TWO STORED ORDERINGS, not a second scoring
+ * engine. `predicted_position` comes from `league_table_predictions` and the
+ * actual position is `league_standings.rank` — the INGESTED rank, read as-is.
+ * Never recompute a rank from points: the real table carries points deductions
+ * the feed knows about and arithmetic does not, which is the whole reason phase
+ * 7 ingests standings rather than deriving them.
+ *
+ * The card deliberately does NOT call `league_table_breakdown`. That RPC is
+ * per-entry, and this module's contract is one query per table for the whole
+ * page — see the header. Points still come from the engine.
+ */
+export type TableCardFacts = {
+  /** Clubs whose predicted position equals their actual one. */
+  spotOn: number
+  /** How many clubs the season has — 20 in England, 18 in Germany. */
+  clubCount: number
+  /** Mean |predicted − actual| across every club. NULL before a ball is kicked. */
+  averageOff: number | null
+  /** False before this member has ordered the table at all. */
+  hasTable: boolean
+  /**
+   * True once `league_standings_final` exists for the season.
+   *
+   * Until then the score is PROVISIONAL and the card says so — scoring is live
+   * all season by Decision 9, and a hidden bank revealed on the last day would
+   * be a lurch. See the header of migration 080.
+   */
+  isFinal: boolean
+}
+
+/** Everything a Last Man Standing card's four tiles need. */
+export type LmsCardFacts = {
+  /**
+   * ⚠ THE STORED VALUE from `league_entry_totals.rounds_won`. Rounds repeat all
+   * season and the season score is rounds won (migration 087), so this — not
+   * survival, not accuracy — is what `league_finalize_ranks` leads on, ahead
+   * even of Showdown's duel_points. Reading it is what makes the Rounds tile and
+   * the Rank tile beside it agree by construction.
+   */
+  roundsWon: number
+  /** The round in progress. NULL before one has opened. */
+  roundNumber: number | null
+  /** Still standing in the open round? */
+  isEliminated: boolean
+  /**
+   * The matchweek whose RESULT knocked them out — not the one they failed to
+   * pick in, so it reads as a football event rather than an administrative one.
+   * See the column comment on league_lms_survivors.eliminated_matchweek.
+   */
+  eliminatedMatchweek: number | null
+  /** How many are still standing in the open round, and how many started it. */
+  survivorsLeft: number
+  roundEntrants: number
+  /** The club picked for the open matchweek, already shortened. NULL if none. */
+  clubName: string | null
+}
+
+/** Everything a Showdown card's four tiles need. */
+export type ShowdownCardFacts = {
+  /**
+   * ⚠ THE STORED VALUE from `league_entry_totals.duel_points`, not `won*3+tied`
+   * recomputed here. It is what `league_finalize_ranks` leads its cascade on, so
+   * reading it is what makes the Duel pts tile and the Rank tile beside it agree
+   * by construction. (`DuelsTab` does recompute it — if the two ever disagree
+   * that is a real bug, and it should be visible rather than papered over by a
+   * second derivation.)
+   */
+  duelPoints: number
+  won: number
+  tied: number
+  lost: number
+  byes: number
+  /** Who this member plays in the open matchweek. NULL on a bye. */
+  opponentName: string | null
+  /** True when the open matchweek is this member's bye. */
+  isBye: boolean
+  /** The matchweek that duel belongs to. */
+  duelMatchweek: number | null
+  /** The last five SETTLED duels, oldest first. */
+  recentDuels: DuelOutcome[]
+}
+
+export type DuelOutcome = 'won' | 'tied' | 'lost' | 'bye'
 
 const EMPTY: LeagueCardFacts = {
   openMatchweekNumber: null,
@@ -100,6 +200,9 @@ const EMPTY: LeagueCardFacts = {
   completedPicks: 0,
   madePicks: 0,
   hasSubmitted: false,
+  showdown: null,
+  lms: null,
+  table: null,
 }
 
 /**
@@ -219,44 +322,289 @@ export async function readLeagueCardFacts(
   //     made once, in August, and stays made.
   const tablePools = single.filter((p) => p.leagueMode === 'table' && p.entryId)
   if (tablePools.length > 0) {
-    const { data: tblData } = await admin
-      .from('league_table_predictions')
-      .select('entry_id')
-      .in('entry_id', tablePools.map((p) => p.entryId as string))
-    const hasOrder = new Set(((tblData ?? []) as Array<{ entry_id: string }>).map((r) => r.entry_id))
+    const tableEntryIds = tablePools.map((p) => p.entryId as string)
+    const tableSeasonIds = Array.from(
+      new Set(tablePools.map((p) => p.seasonId).filter((x): x is string => !!x)),
+    )
+
+    const [{ data: tblData }, { data: standingRows }, { data: finalRows }] = await Promise.all([
+      admin
+        .from('league_table_predictions')
+        .select('entry_id, club_id, predicted_position')
+        .in('entry_id', tableEntryIds),
+      // ⚠ `rank` AS INGESTED. Never recompute it from points — the real table
+      // carries deductions the feed knows about and arithmetic does not.
+      tableSeasonIds.length > 0
+        ? admin.from('league_standings').select('season_id, club_id, rank').in('season_id', tableSeasonIds)
+        : Promise.resolve({ data: [] as Array<{ season_id: string; club_id: string; rank: number }> }),
+      tableSeasonIds.length > 0
+        ? admin.from('league_standings_final').select('season_id').in('season_id', tableSeasonIds)
+        : Promise.resolve({ data: [] as Array<{ season_id: string }> }),
+    ])
+
+    const predictions = (tblData ?? []) as Array<{ entry_id: string; club_id: string; predicted_position: number }>
+    const hasOrder = new Set(predictions.map((r) => r.entry_id))
     for (const p of tablePools) madeByPool.set(p.poolId, hasOrder.has(p.entryId as string) ? 1 : 0)
+
+    // actual rank, per season, per club
+    const actualBySeason = new Map<string, Map<string, number>>()
+    for (const r of (standingRows ?? []) as Array<{ season_id: string; club_id: string; rank: number }>) {
+      const got = actualBySeason.get(r.season_id) ?? new Map<string, number>()
+      got.set(r.club_id, r.rank)
+      actualBySeason.set(r.season_id, got)
+    }
+    const finalSeasons = new Set(((finalRows ?? []) as Array<{ season_id: string }>).map((r) => r.season_id))
+
+    const predsByEntry = new Map<string, Array<{ club_id: string; predicted_position: number }>>()
+    for (const r of predictions) {
+      const got = predsByEntry.get(r.entry_id) ?? []
+      got.push(r)
+      predsByEntry.set(r.entry_id, got)
+    }
+
+    for (const p of tablePools) {
+      const me = p.entryId as string
+      const mine = predsByEntry.get(me) ?? []
+      const actual = p.seasonId ? actualBySeason.get(p.seasonId) : undefined
+
+      let spotOn = 0
+      let deltaSum = 0
+      let compared = 0
+      for (const row of mine) {
+        const actualRank = actual?.get(row.club_id)
+        // NULL until the club has a standings row — i.e. before a ball is
+        // kicked. An unplayed season is not a table full of misses.
+        if (actualRank == null) continue
+        compared++
+        const delta = Math.abs(row.predicted_position - actualRank)
+        if (delta === 0) spotOn++
+        deltaSum += delta
+      }
+
+      const facts = out.get(p.poolId)
+      if (facts) {
+        facts.table = {
+          spotOn,
+          clubCount: mine.length,
+          averageOff: compared > 0 ? Math.round((deltaSum / compared) * 10) / 10 : null,
+          hasTable: mine.length > 0,
+          isFinal: p.seasonId ? finalSeasons.has(p.seasonId) : false,
+        }
+      }
+    }
   }
 
   // 2c. Last Man Standing — one club for the open matchweek, in the open round.
-  //     A member already eliminated has nothing to pick, and correctly reads as
-  //     done rather than as owing a decision.
   const lmsPools = single.filter((p) => p.leagueMode === 'last_man_standing' && p.entryId)
   if (lmsPools.length > 0) {
+    const lmsEntryIds = lmsPools.map((p) => p.entryId as string)
     const { data: roundData } = await admin
       .from('league_lms_rounds')
-      .select('round_id, pool_id')
+      .select('round_id, pool_id, round_number')
       .in('pool_id', lmsPools.map((p) => p.poolId))
       .is('last_matchweek', null)
     const roundByPool = new Map(
-      ((roundData ?? []) as Array<{ round_id: string; pool_id: string }>).map((r) => [r.pool_id, r.round_id]),
+      ((roundData ?? []) as Array<{ round_id: string; pool_id: string; round_number: number }>)
+        .map((r) => [r.pool_id, r]),
     )
-    const roundIds = Array.from(new Set(roundByPool.values()))
+    const roundIds = Array.from(new Set(Array.from(roundByPool.values()).map((r) => r.round_id)))
+
     if (roundIds.length > 0) {
-      const { data: lmsPicks } = await admin
-        .from('league_lms_picks')
-        .select('round_id, entry_id, matchweek_number')
-        .in('round_id', roundIds)
-        .in('entry_id', lmsPools.map((p) => p.entryId as string))
-      const picked = new Set(
-        ((lmsPicks ?? []) as Array<{ round_id: string; entry_id: string; matchweek_number: number }>).map(
-          (r) => `${r.round_id}:${r.entry_id}:${r.matchweek_number}`,
-        ),
+      const [{ data: lmsPicks }, { data: survivorRows }, { data: totalRows }] = await Promise.all([
+        admin
+          .from('league_lms_picks')
+          .select('round_id, entry_id, matchweek_number, club_id')
+          .in('round_id', roundIds)
+          .in('entry_id', lmsEntryIds),
+        // ⚠ EVERY entrant in the round, not just this member — "4 of 10 left" is
+        // the mode's tension and it is a fact about the pool, so it cannot be
+        // scoped to the viewer's own row.
+        admin
+          .from('league_lms_survivors')
+          .select('round_id, entry_id, eliminated_matchweek')
+          .in('round_id', roundIds),
+        admin
+          .from('league_entry_totals')
+          .select('entry_id, rounds_won')
+          .in('entry_id', lmsEntryIds),
+      ])
+
+      const pickRows = (lmsPicks ?? []) as Array<{ round_id: string; entry_id: string; matchweek_number: number; club_id: string }>
+      const picked = new Set(pickRows.map((r) => `${r.round_id}:${r.entry_id}:${r.matchweek_number}`))
+      const roundsWonByEntry = new Map(
+        ((totalRows ?? []) as Array<{ entry_id: string; rounds_won: number | null }>)
+          .map((r) => [r.entry_id, r.rounds_won ?? 0]),
       )
+
+      const survivors = (survivorRows ?? []) as Array<{ round_id: string; entry_id: string; eliminated_matchweek: number | null }>
+      const standingByRound = new Map<string, number>()
+      const entrantsByRound = new Map<string, number>()
+      const mineByRound = new Map<string, { eliminated_matchweek: number | null }>()
+      for (const r of survivors) {
+        entrantsByRound.set(r.round_id, (entrantsByRound.get(r.round_id) ?? 0) + 1)
+        if (r.eliminated_matchweek === null) {
+          standingByRound.set(r.round_id, (standingByRound.get(r.round_id) ?? 0) + 1)
+        }
+        if (lmsEntryIds.includes(r.entry_id)) mineByRound.set(`${r.round_id}:${r.entry_id}`, r)
+      }
+
+      // Club names for the picks on this page only.
+      const clubIds = Array.from(new Set(pickRows.map((r) => r.club_id)))
+      const clubNameById = new Map<string, string>()
+      if (clubIds.length > 0) {
+        const { data: clubRows } = await admin
+          .from('league_clubs')
+          // `league_clubs` names the column `name`; aliased rather than renamed,
+          // as every other league read does.
+          .select('club_id, club_name:name, short_name')
+          .in('club_id', clubIds)
+        for (const c of (clubRows ?? []) as Array<{ club_id: string; club_name: string | null; short_name: string | null }>) {
+          const label = c.short_name || c.club_name
+          if (label) clubNameById.set(c.club_id, shortClubName(label))
+        }
+      }
+
       for (const p of lmsPools) {
-        const roundId = roundByPool.get(p.poolId)
+        const round = roundByPool.get(p.poolId)
         const open = openByPool.get(p.poolId)
-        if (!roundId || !open) continue
-        madeByPool.set(p.poolId, picked.has(`${roundId}:${p.entryId}:${open.matchweek_number}`) ? 1 : 0)
+        if (!round || !open) continue
+        const me = p.entryId as string
+
+        const mine = mineByRound.get(`${round.round_id}:${me}`)
+        const isEliminated = !!mine && mine.eliminated_matchweek !== null
+        const hasPicked = picked.has(`${round.round_id}:${me}:${open.matchweek_number}`)
+
+        // ⚠ AN ELIMINATED MEMBER READS AS DONE. The old comment here claimed
+        // exactly this, but nothing read `league_lms_survivors`, so somebody
+        // knocked out in September got `made = 0` — an amber "Pick your club"
+        // pill, on a button that sends them to a screen where they cannot pick,
+        // every week until the round ends.
+        madeByPool.set(p.poolId, isEliminated || hasPicked ? 1 : 0)
+
+        const myPick = pickRows.find(
+          (r) => r.round_id === round.round_id && r.entry_id === me && r.matchweek_number === open.matchweek_number,
+        )
+
+        const facts = out.get(p.poolId)
+        if (facts) {
+          facts.lms = {
+            roundsWon: roundsWonByEntry.get(me) ?? 0,
+            roundNumber: round.round_number,
+            isEliminated,
+            eliminatedMatchweek: mine?.eliminated_matchweek ?? null,
+            survivorsLeft: standingByRound.get(round.round_id) ?? 0,
+            roundEntrants: entrantsByRound.get(round.round_id) ?? 0,
+            clubName: myPick ? (clubNameById.get(myPick.club_id) ?? null) : null,
+          }
+        }
+      }
+    }
+  }
+
+  // ---- 2d. Showdown — the duel, the record, and who you play next ----------
+  //
+  // Showdown pools only. `league_duels` IS the fixture list (migration 083):
+  // unsettled rows exist from pool creation, so the opponent is readable weeks
+  // ahead — which is the honest half of choosing a published round-robin over a
+  // weekly draw, and the reason a "This week" tile can exist at all.
+  const showdownPools = pools.filter((p) => p.leagueMode === 'showdown' && p.entryId)
+  if (showdownPools.length > 0) {
+    const showdownEntryIds = showdownPools.map((p) => p.entryId as string)
+
+    const [{ data: duelRows }, { data: totalRows }] = await Promise.all([
+      admin
+        .from('league_duels')
+        .select('pool_id, matchweek_number, entry_a, entry_b, points_a, points_b, settled_at')
+        .in('pool_id', showdownPools.map((p) => p.poolId)),
+      // ⚠ The STORED duel points. See the note on ShowdownCardFacts.duelPoints.
+      admin
+        .from('league_entry_totals')
+        .select('entry_id, duel_points')
+        .in('entry_id', showdownEntryIds),
+    ])
+
+    const duelPointsByEntry = new Map(
+      ((totalRows ?? []) as Array<{ entry_id: string; duel_points: number | null }>)
+        .map((r) => [r.entry_id, r.duel_points ?? 0]),
+    )
+
+    // Opponent names. Only the entries actually drawn against somebody on this
+    // page, so the IN list stays the size of the page rather than the pool.
+    const myDuels = new Map<string, Array<Record<string, unknown>>>()
+    const opponentIds = new Set<string>()
+    for (const row of (duelRows ?? []) as Array<Record<string, unknown>>) {
+      const a = row.entry_a as string
+      const b = row.entry_b as string | null
+      for (const p of showdownPools) {
+        if (p.poolId !== row.pool_id) continue
+        if (a !== p.entryId && b !== p.entryId) continue
+        const got = myDuels.get(p.poolId) ?? []
+        got.push(row)
+        myDuels.set(p.poolId, got)
+        const them = a === p.entryId ? b : a
+        if (them) opponentIds.add(them)
+      }
+    }
+
+    const nameByEntry = new Map<string, string>()
+    if (opponentIds.size > 0) {
+      const { data: nameRows } = await admin
+        .from('pool_entries')
+        .select('entry_id, entry_name')
+        .in('entry_id', Array.from(opponentIds))
+      for (const r of (nameRows ?? []) as Array<{ entry_id: string; entry_name: string | null }>) {
+        if (r.entry_name) nameByEntry.set(r.entry_id, r.entry_name)
+      }
+    }
+
+    for (const p of showdownPools) {
+      const mine = myDuels.get(p.poolId) ?? []
+      const me = p.entryId as string
+      const open = openByPool.get(p.poolId)
+
+      let won = 0, tied = 0, lost = 0, byes = 0
+      const settled: Array<{ mw: number; outcome: DuelOutcome }> = []
+
+      for (const d of mine) {
+        const isA = (d.entry_a as string) === me
+        const them = isA ? (d.entry_b as string | null) : (d.entry_a as string)
+        const mw = d.matchweek_number as number
+
+        if (!them) {
+          // A bye scores nothing and says so (migration 083). Counted, but it is
+          // not a result — it must never read as a draw.
+          if (d.settled_at) { byes++; settled.push({ mw, outcome: 'bye' }) }
+          continue
+        }
+        if (!d.settled_at) continue
+
+        const mineP = (isA ? d.points_a : d.points_b) as number | null
+        if (mineP === 3) { won++; settled.push({ mw, outcome: 'won' }) }
+        else if (mineP === 1) { tied++; settled.push({ mw, outcome: 'tied' }) }
+        else { lost++; settled.push({ mw, outcome: 'lost' }) }
+      }
+
+      // Who you play next: the duel in the OPEN matchweek — the one this member
+      // is picking for. Not the in-play one, which is already decided.
+      const next = open
+        ? mine.find((d) => (d.matchweek_number as number) === open.matchweek_number)
+        : undefined
+      const nextThem = next
+        ? ((next.entry_a as string) === me ? (next.entry_b as string | null) : (next.entry_a as string))
+        : null
+
+      settled.sort((x, y) => x.mw - y.mw)
+
+      const facts = out.get(p.poolId)
+      if (facts) {
+        facts.showdown = {
+          duelPoints: duelPointsByEntry.get(me) ?? 0,
+          won, tied, lost, byes,
+          opponentName: nextThem ? (nameByEntry.get(nextThem) ?? null) : null,
+          isBye: !!next && !nextThem,
+          duelMatchweek: next ? (next.matchweek_number as number) : null,
+          recentDuels: settled.slice(-5).map((r) => r.outcome),
+        }
       }
     }
   }
@@ -265,6 +613,10 @@ export async function readLeagueCardFacts(
   for (const p of pools) {
     const open = openByPool.get(p.poolId)
     const isSingle = SINGLE_DECISION_MODES.has(p.leagueMode ?? '')
+    // ⚠ Carried across the rewrite below, which replaces the whole entry.
+    const showdown = out.get(p.poolId)?.showdown ?? null
+    const lms = out.get(p.poolId)?.lms ?? null
+    const table = out.get(p.poolId)?.table ?? null
     const total = isSingle ? 1 : (open?.fixture_count ?? 0)
     const made = madeByPool.get(p.poolId) ?? 0
     out.set(p.poolId, {
@@ -278,6 +630,9 @@ export async function readLeagueCardFacts(
       completedPicks: isSingle ? 0 : (open?.completed_fixture_count ?? 0),
       madePicks: made,
       hasSubmitted: total > 0 && made >= total,
+      showdown,
+      lms,
+      table,
     })
   }
 
