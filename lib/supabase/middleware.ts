@@ -1,5 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import {
+  isAllowedTester,
+  isTesterGateEnabled,
+  isTesterGateExempt,
+} from '@/lib/testerGate'
 
 // Routes that require authentication
 const protectedRoutes = ['/dashboard', '/pools', '/profile', '/join']
@@ -49,6 +54,28 @@ export async function updateSession(request: NextRequest) {
     // Preserve the intended destination so we can redirect back after login
     const redirectTo = pathname + request.nextUrl.search
     url.searchParams.set('redirectTo', redirectTo)
+    return NextResponse.redirect(url)
+  }
+
+  // Tester gate — preview builds only, never production. See lib/testerGate.ts
+  // for why this lives here instead of behind Vercel's deployment protection.
+  // Read each variable by static access: middleware is bundled for the Edge
+  // runtime, where a destructured `process.env` is not reliably populated.
+  if (
+    user &&
+    isTesterGateEnabled(process.env.VERCEL_ENV, process.env.TESTER_ALLOWLIST) &&
+    !isTesterGateExempt(pathname) &&
+    !isAllowedTester(user.email, process.env.TESTER_ALLOWLIST)
+  ) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'This build is limited to invited testers.' },
+        { status: 403 }
+      )
+    }
+    const url = request.nextUrl.clone()
+    url.pathname = '/not-a-tester'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 
