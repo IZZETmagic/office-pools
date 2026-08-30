@@ -476,7 +476,22 @@ function lmsTiles(lms: LmsCardFacts, pool: PoolCardPool): KpiTile[] {
 }
 
 /**
- * The third tile in all three states this mode has.
+ * The third tile, in the four states this mode has.
+ *
+ * ⚠ THE CLUB BEING PLAYED WINS, and the matchweek is always named.
+ *
+ * The tile is labelled "This week", and it used to be handed the pick for the
+ * OPEN matchweek — the one you can still change. Those are the same week from
+ * Monday night to Friday evening and different for the three days the football
+ * is on, so on a live Saturday the card named a club whose game had not kicked
+ * off and said nothing about the one being watched. Reproduced 30 Aug 2026: MW2
+ * in play with Arsenal picked, MW3 open with Hull City picked, tile read
+ * "Hull City". Same collapse `matchweekTile` was written to undo.
+ *
+ * In play wins WHEN THERE IS AN ANSWER, and otherwise it falls back rather than
+ * inventing one. A round can open on the week after the one still being played,
+ * and there is no pick for a week that preceded the round — reading that
+ * absence as "you missed it" would alarm somebody who did nothing wrong.
  *
  * ⚠ "Out" is not an error state and must not read as one. Being knocked out is
  * the mode working, the round carries on without you, and a new one opens with
@@ -494,10 +509,27 @@ function lmsWeekTile(lms: LmsCardFacts): KpiTile {
       wide: true,
     }
   }
-  if (!lms.clubName) {
-    return { kind: 'stat', label: 'This week', value: 'Pick a club', tone: 'muted', wide: true }
+  if (lms.inPlayClubName) {
+    return {
+      kind: 'stat',
+      label: 'This week',
+      value: lms.inPlayClubName,
+      sub: lms.inPlayMatchweek != null ? `MW ${lms.inPlayMatchweek} in play` : undefined,
+      tone: 'ink',
+      wide: true,
+    }
   }
-  return { kind: 'stat', label: 'This week', value: lms.clubName, tone: 'ink', wide: true }
+  if (lms.openClubName) {
+    return {
+      kind: 'stat',
+      label: 'This week',
+      value: lms.openClubName,
+      sub: lms.openMatchweek != null ? `MW ${lms.openMatchweek}` : undefined,
+      tone: 'ink',
+      wide: true,
+    }
+  }
+  return { kind: 'stat', label: 'This week', value: 'Pick a club', tone: 'muted', wide: true }
 }
 
 /**

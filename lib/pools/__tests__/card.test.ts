@@ -286,7 +286,9 @@ describe('kpiTiles — the mode-dependent slot', () => {
 describe('kpiTiles — Last Man Standing', () => {
   const lms = {
     roundsWon: 2, roundNumber: 3, isEliminated: false, eliminatedMatchweek: null,
-    survivorsLeft: 4, roundEntrants: 10, clubName: 'Arsenal',
+    survivorsLeft: 4, roundEntrants: 10,
+    inPlayClubName: 'Arsenal', inPlayMatchweek: 2,
+    openClubName: 'Hull City', openMatchweek: 3,
   }
   const lmsPool = (over = {}) =>
     pool({ league_mode: 'last_man_standing', totalMatches: 1, hasScoringStarted: true,
@@ -300,18 +302,41 @@ describe('kpiTiles — Last Man Standing', () => {
     expect(kpiTiles(lmsPool())[0]).toMatchObject({ value: '2', sub: 'Round 3' })
   })
 
-  it('names the club picked this week', () => {
-    expect(kpiTiles(lmsPool())[2]).toMatchObject({ value: 'Arsenal', tone: 'ink' })
+  it('names the club being PLAYED, not the one lined up for next week', () => {
+    // ⚠ THE BUG THIS REPLACES. Reproduced against production 30 Aug 2026: MW2 in
+    // play with Arsenal picked, MW3 open with Hull City picked, and the tile —
+    // labelled "This week" — read "Hull City", a club whose game had not kicked
+    // off. The two weeks are the same from Monday night to Friday evening and
+    // different for the three days the football is on, which are the days
+    // somebody looks at the card.
+    expect(kpiTiles(lmsPool())[2]).toMatchObject({ value: 'Arsenal', sub: 'MW 2 in play', tone: 'ink' })
   })
 
-  it('asks for a club when none is picked', () => {
-    expect(kpiTiles(lmsPool({ clubName: null }))[2]).toMatchObject({ value: 'Pick a club', tone: 'muted' })
+  it('falls back to the open week between rounds', () => {
+    // Tuesday to Friday there is no football. The next decision is the honest
+    // answer to "this week", and the matchweek is named so it cannot be
+    // mistaken for one in progress.
+    expect(kpiTiles(lmsPool({ inPlayClubName: null, inPlayMatchweek: null }))[2])
+      .toMatchObject({ value: 'Hull City', sub: 'MW 3', tone: 'ink' })
+  })
+
+  it('falls back rather than accusing you when the round began after the week in play', () => {
+    // A round can open on the matchweek AFTER the one still being played, so a
+    // missing in-play pick is not always a missed pick. The tile shows what they
+    // HAVE decided instead of an alarm they did not earn.
+    expect(kpiTiles(lmsPool({ inPlayClubName: null }))[2])
+      .toMatchObject({ value: 'Hull City', sub: 'MW 3', tone: 'ink' })
+  })
+
+  it('asks for a club when neither week is picked', () => {
+    expect(kpiTiles(lmsPool({ inPlayClubName: null, openClubName: null }))[2])
+      .toMatchObject({ value: 'Pick a club', tone: 'muted' })
   })
 
   it('says Out, and names the matchweek whose RESULT knocked you out', () => {
     // Not the one they failed to pick in — see the eliminated_matchweek comment.
     // And it must not read as an error: being knocked out is the mode working.
-    const tiles = kpiTiles(lmsPool({ isEliminated: true, eliminatedMatchweek: 6, clubName: null }))
+    const tiles = kpiTiles(lmsPool({ isEliminated: true, eliminatedMatchweek: 6, inPlayClubName: null, openClubName: null }))
     expect(tiles[2]).toMatchObject({ value: 'Out', sub: 'went MW 6', tone: 'muted' })
   })
 
@@ -391,7 +416,7 @@ describe('kpiTiles — every mode now has a branch', () => {
     const modes: Array<Partial<PoolCardPool>> = [
       { league_mode: 'pickem' },
       { league_mode: 'showdown', showdown: { duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, opponentName: null, isBye: false, duelMatchweek: null, recentDuels: [] } },
-      { league_mode: 'last_man_standing', lms: { roundsWon: 0, roundNumber: 1, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 5, roundEntrants: 5, clubName: null } },
+      { league_mode: 'last_man_standing', lms: { roundsWon: 0, roundNumber: 1, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 5, roundEntrants: 5, inPlayClubName: null, inPlayMatchweek: null, openClubName: null, openMatchweek: 1 } },
       { league_mode: 'table', table: { spotOn: 0, clubCount: 20, averageOff: null, hasTable: true, isFinal: false } },
       { prediction_mode: 'full_tournament', league_mode: null },
     ]
@@ -409,7 +434,7 @@ describe('kpiTiles — tile order is a contract, because the dashboard drops the
   const cases: Array<[string, Partial<PoolCardPool>, string]> = [
     ['pickem', { league_mode: 'pickem', openMatchweekNumber: 3 }, 'Points'],
     ['showdown', { league_mode: 'showdown', showdown: { duelPoints: 4, won: 1, tied: 1, lost: 0, byes: 0, opponentName: 'Ana', isBye: false, duelMatchweek: 3, recentDuels: [] } }, 'Duel pts'],
-    ['last_man_standing', { league_mode: 'last_man_standing', lms: { roundsWon: 1, roundNumber: 2, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 3, roundEntrants: 8, clubName: 'Arsenal' } }, 'Rounds won'],
+    ['last_man_standing', { league_mode: 'last_man_standing', lms: { roundsWon: 1, roundNumber: 2, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 3, roundEntrants: 8, inPlayClubName: 'Arsenal', inPlayMatchweek: 4, openClubName: null, openMatchweek: 5 } }, 'Rounds won'],
     ['table', { league_mode: 'table', table: { spotOn: 4, clubCount: 20, averageOff: 1.2, hasTable: true, isFinal: false } }, 'Table pts'],
     ['full_tournament', { prediction_mode: 'full_tournament', league_mode: null }, 'Points'],
   ]

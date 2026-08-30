@@ -160,8 +160,21 @@ export type LmsCardFacts = {
   /** How many are still standing in the open round, and how many started it. */
   survivorsLeft: number
   roundEntrants: number
-  /** The club picked for the open matchweek, already shortened. NULL if none. */
-  clubName: string | null
+  /**
+   * The club picked for the matchweek being PLAYED, already shortened. NULL when
+   * nothing is in play, or when they did not pick that week.
+   *
+   * ⚠ THE TILE LEADS ON THIS ONE. A single `clubName` used to carry the OPEN
+   * week's pick and sit under the words "This week", so from Friday kickoff to
+   * Monday night the card named a club whose game had not started while the club
+   * the member was actually watching went unmentioned. Same collapse
+   * `matchweekTile` was built to undo, one tile across.
+   */
+  inPlayClubName: string | null
+  inPlayMatchweek: number | null
+  /** The club picked for the week still OPEN — the next decision, not this one. */
+  openClubName: string | null
+  openMatchweek: number | null
 }
 
 /** Everything a Showdown card's four tiles need. */
@@ -481,9 +494,17 @@ export async function readLeagueCardFacts(
         // every week until the round ends.
         madeByPool.set(p.poolId, isEliminated || hasPicked ? 1 : 0)
 
-        const myPick = pickRows.find(
-          (r) => r.round_id === round.round_id && r.entry_id === me && r.matchweek_number === open.matchweek_number,
-        )
+        // Both weeks. `pickRows` already holds every matchweek in the round, so
+        // naming the second one costs nothing but a find.
+        const inPlay = inPlayByPool.get(p.poolId)
+        const pickIn = (mw: number | undefined) =>
+          mw === undefined
+            ? undefined
+            : pickRows.find(
+                (r) => r.round_id === round.round_id && r.entry_id === me && r.matchweek_number === mw,
+              )
+        const inPlayPick = pickIn(inPlay?.matchweek_number)
+        const openPick = pickIn(open.matchweek_number)
 
         const facts = out.get(p.poolId)
         if (facts) {
@@ -494,7 +515,10 @@ export async function readLeagueCardFacts(
             eliminatedMatchweek: mine?.eliminated_matchweek ?? null,
             survivorsLeft: standingByRound.get(round.round_id) ?? 0,
             roundEntrants: entrantsByRound.get(round.round_id) ?? 0,
-            clubName: myPick ? (clubNameById.get(myPick.club_id) ?? null) : null,
+            inPlayClubName: inPlayPick ? (clubNameById.get(inPlayPick.club_id) ?? null) : null,
+            inPlayMatchweek: inPlay?.matchweek_number ?? null,
+            openClubName: openPick ? (clubNameById.get(openPick.club_id) ?? null) : null,
+            openMatchweek: open.matchweek_number,
           }
         }
       }

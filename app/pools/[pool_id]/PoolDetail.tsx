@@ -86,13 +86,30 @@ export type LmsData = {
   entryNames: Map<string, string>
   entryId: string | null
   /**
-   * ⚠ The OPEN matchweek, deliberately — an LMS pick is written against the week
+   * ⚠ The OPEN matchweek, deliberately — an LMS pick is WRITTEN against the week
    * being picked, not the one being played, so this must stay the pickable one.
+   * It is the wrong week to NARRATE with: see `inPlayMatchweek`.
    */
   currentMatchweek: number | null
+  /**
+   * The matchweek being played. NULL between rounds.
+   *
+   * ⚠ NOT the same week as `currentMatchweek` from Friday kickoff to Monday
+   * night — and those are the days a member looks. Collapsing the two is what
+   * put next week's club under the words "This week" on a live Saturday, the
+   * same mistake `matchweekTile` was built to stop. Showdown has carried both
+   * numbers since it shipped; this mode only got one.
+   */
+  inPlayMatchweek: number | null
   roundsWon: Map<string, number>
-  /** Who each club plays in the open matchweek. Empty when none is open. */
+  /** Who each club plays in the open matchweek — the picker's grid. */
   fixtures: Map<string, import('@/lib/league/read').NextFixture>
+  /**
+   * The game behind each of the viewer's own picks, keyed by `lmsPickKey`.
+   * Resolved against each pick's OWN matchweek and frozen once settled, so a
+   * pick from three weeks ago keeps the opponent it was made against.
+   */
+  pickFixtures: Map<string, import('@/lib/league/lms').LmsPickFixture>
 }
 
 /** Everything DuelsTab needs, assembled server-side in page.tsx. */
@@ -1743,8 +1760,10 @@ export function PoolDetail({
                 entryNames={lmsData.entryNames}
                 entryId={lmsData.entryId}
                 currentMatchweek={lmsData.currentMatchweek}
+                inPlayMatchweek={lmsData.inPlayMatchweek}
                 roundsWon={lmsData.roundsWon}
                 fixtures={lmsData.fixtures}
+                pickFixtures={lmsData.pickFixtures}
               />
             )}
 

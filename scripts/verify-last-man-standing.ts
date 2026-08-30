@@ -228,10 +228,27 @@ async function theFiveWays() {
   note('you were not beaten. Gameable in theory, but it burns one of your twenty clubs')
 
   const marks = await must('pick results', admin.from('league_lms_picks')
-    .select('entry_id, result').eq('round_id', round.round_id).eq('matchweek_number', 1))
-  const byEntry = new Map(((marks ?? []) as Array<{ entry_id: string; result: string }>)
-    .map((r) => [r.entry_id, r.result]))
+    .select('entry_id, result, fixture_id').eq('round_id', round.round_id).eq('matchweek_number', 1))
+  const rows = (marks ?? []) as Array<{ entry_id: string; result: string; fixture_id: string | null }>
+  const byEntry = new Map(rows.map((r) => [r.entry_id, r.result]))
   eq('the pick itself records what happened', byEntry.get(E(2)), 'eliminated')
+
+  // --- 115: and WHICH GAME it happened in -------------------------------
+  //
+  // Until this, the opponent was never stored. Every screen re-derived it from
+  // whichever matchweek was OPEN at the moment of the read, so a pick from three
+  // weeks ago was narrated by next weekend's fixture, and "I picked Arsenal and
+  // they beat Fulham, that is why I am still in" could not be shown at all.
+  //
+  // FIX(n,0) is clubs 1 v 2, FIX(n,1) is 3 v 4, FIX(n,2) is 5 v 6.
+  const fixOf = new Map(rows.map((r) => [r.entry_id, r.fixture_id]))
+  eq('the winner’s pick names the game they won', fixOf.get(E(1)), FIX(1, 0))
+  eq('the loser’s pick names the same game, from the other side', fixOf.get(E(2)), FIX(1, 0))
+  eq('the draw names the game that was not won', fixOf.get(E(3)), FIX(1, 1))
+  // A club that never played still had a fixture, and naming it is what explains
+  // the week — "no game" and "the game was called off" are different sentences.
+  eq('the unplayed pick still names its fixture', fixOf.get(E(5)), FIX(1, 2))
+  note('the opponent is now a stored fact, so a later open matchweek cannot restate it')
 }
 
 async function theLock() {

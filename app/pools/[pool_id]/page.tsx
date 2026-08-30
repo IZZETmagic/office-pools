@@ -215,7 +215,9 @@ export default async function PoolPage({
         entryNames,
         entryId: defaultEntry?.entry_id ?? null,
         currentMatchweek: null,
+        inPlayMatchweek: null,
         fixtures: new Map(),
+        pickFixtures: new Map(),
         roundsWon: new Map(
           ((totalsRes.data ?? []) as Array<{ entry_id: string; rounds_won: number }>)
             .map((r) => [r.entry_id, r.rounds_won]),
@@ -389,12 +391,18 @@ export default async function PoolPage({
           showdownData.openMatchweek = mw
           showdownData.inPlayMatchweek = view.inPlayMatchweekNumber
         }
-        // LMS takes the open one only: a Survivor pick is written for the week
-        // being picked.
-        if (lmsData) lmsData.currentMatchweek = mw
+        // LMS needs BOTH, for two different jobs. The pick is WRITTEN against
+        // the open week — that is what a member can still change. The screen
+        // NARRATES the week being played, because on a Saturday that is the club
+        // they are watching. Handing it only the open one is what put next
+        // week's pick under the words "This week".
+        if (lmsData) {
+          lmsData.currentMatchweek = mw
+          lmsData.inPlayMatchweek = view.inPlayMatchweekNumber
+        }
 
-        // Who each club plays THIS matchweek, so the Survivor picker can show
-        // the fixture beside the crest. Loaded here rather than with the rest of
+        // Who each club plays in the OPEN matchweek, so the picker can show the
+        // fixture beside the crest. Loaded here rather than with the rest of
         // lmsData because the open matchweek is only known at this point.
         if (lmsData && mw !== null && pool.league_season_id) {
           const { readMatchweekFixtureByClub } = await import('@/lib/league/read')
@@ -403,6 +411,20 @@ export default async function PoolPage({
           )
           if (fxErr) console.error('[pool page] lms matchweek fixtures failed:', fxErr)
           lmsData.fixtures = byClub
+        }
+
+        // And the game behind every pick already made, each against its OWN
+        // matchweek. Separate from the map above on purpose: that one answers
+        // "who could I pick this week", this one answers "who did I back, and
+        // what happened" — and the second must never be answered with the first
+        // week's fixtures, which is precisely the bug migration 115 ends.
+        if (lmsData && lmsData.myPicks.length > 0 && pool.league_season_id) {
+          const { readLmsPickFixtures } = await import('@/lib/league/lms')
+          const { byPick, error: pfErr } = await readLmsPickFixtures(
+            supabase, pool.league_season_id, lmsData.myPicks,
+          )
+          if (pfErr) console.error('[pool page] lms pick fixtures failed:', pfErr)
+          lmsData.pickFixtures = byPick
         }
       }
 

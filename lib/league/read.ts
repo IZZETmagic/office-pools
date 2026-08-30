@@ -881,7 +881,16 @@ export async function readMatchweekFixtureByClub(
     supabase
       .from('league_fixtures')
       .select('home_club_id, away_club_id, kickoff_at')
-      .eq('matchweek_id', (mw as { matchweek_id: string }).matchweek_id),
+      .eq('matchweek_id', (mw as { matchweek_id: string }).matchweek_id)
+      // ⚠ ORDERED, and the loop below takes the FIRST. A club can hold two
+      // fixtures in one matchweek — `planRehome` attaches a makeup game to the
+      // weekend BEFORE and has no clash guard — and this map has room for one.
+      // Unordered, last-wins, the answer was whichever row PostgREST happened to
+      // return last: the same club showing a different opponent between two
+      // loads of the same screen. Earliest kickoff is the first game they play
+      // that week, and it is the same tie-break `league_lms_deciding_fixture`
+      // uses for an unplayed game, so the live view and the frozen record agree.
+      .order('kickoff_at', { ascending: true, nullsFirst: false }),
     supabase
       .from('league_clubs')
       .select('club_id, name, abbreviation, crest_url')
@@ -903,6 +912,7 @@ export async function readMatchweekFixtureByClub(
       [f.home_club_id, f.away_club_id, true],
       [f.away_club_id, f.home_club_id, false],
     ] as const) {
+      if (byClub.has(self)) continue
       const opp = clubs.get(other)
       if (!opp) continue
       byClub.set(self, {
