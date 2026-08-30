@@ -56,6 +56,7 @@ const MW = (n: number) => `${S}00000000002${n}`
 const CLUB = (n: number) => `${S}00000000003${n}`
 const FIX = (mw: number, n: number) => `${S}0000000004${mw}${n}`
 const E = (n: number) => `${S}00000000005${n}`
+const TOURN = `${S}000000000006`
 
 let failures = 0
 const ok = (m: string, x = '') => console.log(`    ✓ ${m}${x ? `  — ${x}` : ''}`)
@@ -105,9 +106,25 @@ async function setup() {
   const users = await must('admin user',
     admin.from('users').select('user_id').eq('username', 'IZZETmagic').limit(1))
   const adminUser = ((users ?? [])[0] as { user_id: string }).user_id
-  const tp = await must('league tournament',
-    admin.from('pools').select('tournament_id').not('league_season_id', 'is', null).limit(1))
-  const tournamentId = ((tp ?? [])[0] as { tournament_id: string }).tournament_id
+  // ⚠ ITS OWN TOURNAMENT, NOT A BORROWED ONE. This used to grab the
+  // tournament_id off any existing league pool, which migration 111 turned into
+  // a hard failure: a pool carrying both `tournament_id` and `league_season_id`
+  // must have them resolve to the SAME
+  // (external_provider, external_league_id, external_season) triple. Borrowing
+  // one meant the scratch pool claimed a scratch season and, say, the
+  // Bundesliga — exactly the corruption 111 exists to refuse. The script had
+  // been dead at setup since 111 landed on 28 Aug 2026.
+  //
+  // So the scratch season gets a scratch tournament matching its own triple.
+  // `format: 'league'` is also required by 111. Torn down with everything else.
+  await must('tournament', admin.from('tournaments').insert({
+    tournament_id: TOURN, name: '__scratch 110 (auto-deleted)', tournament_type: 'league',
+    year: 2026, num_teams: 6, num_groups: 0, teams_per_group: 0,
+    start_date: '2026-08-01', end_date: '2027-05-31', prediction_deadline: hours(24 * 4),
+    status: 'upcoming', external_provider: 'scratch', external_league_id: -110,
+    external_season: -2026, format: 'league',
+  }).select('tournament_id'))
+  const tournamentId = TOURN
 
   await must('season', admin.from('league_seasons').insert({
     season_id: SEASON, competition_slug: 'scratch-110', competition_name: 'Scratch 110',
@@ -371,12 +388,14 @@ async function teardown() {
     await admin.from('pools').delete().eq('pool_id', pid)
   }
   await admin.from('league_seasons').delete().eq('season_id', SEASON)
+  // After the pools, which reference it.
+  await admin.from('tournaments').delete().eq('tournament_id', TOURN)
 
   const left: string[] = []
   for (const [t, col, val] of [
     ['pools', 'pool_id', POOL], ['pools', 'pool_id', POOL_PICK],
     ['league_seasons', 'season_id', SEASON], ['league_lms_rounds', 'pool_id', POOL],
-    ['league_fixtures', 'season_id', SEASON],
+    ['league_fixtures', 'season_id', SEASON], ['tournaments', 'tournament_id', TOURN],
   ] as const) {
     const { count } = await admin.from(t).select('*', { count: 'exact', head: true }).eq(col, val)
     if ((count ?? 0) > 0) left.push(`${t}=${count}`)
