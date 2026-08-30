@@ -236,3 +236,43 @@ export function roundShortLabel(key: string): string {
   if (mw !== null) return `MW ${mw}`
   return roundLabel(key)
 }
+
+/**
+ * Is this round locked because its turn has not come — as opposed to locked
+ * because it has already been played?
+ *
+ * ⚠ `'locked'` MEANS TWO THINGS, and the difference is invisible in the state
+ * string. `matchweekToRoundState` (lib/league/read.ts) says so in its own
+ * comment: a matchweek is `'locked'` both when `lock_at` has passed and when it
+ * is simply not the open one. The World Cup has the same shape — every unopened
+ * bracket round is seeded `'locked'` with no deadline.
+ *
+ * Reading the string alone put a member of a Scores pool in front of a lock
+ * icon reading "Matchweek 2 predictions are not yet available — opens as soon
+ * as the previous matchweek locks" for a matchweek that was ON at that moment,
+ * with their own ten picks in the database and no way to look at them. Reported
+ * by Ryan, 30 Aug 2026.
+ *
+ * The deadline is what separates them, and it needs no new data: a round
+ * awaiting its turn either has no deadline yet (the World Cup sets one when the
+ * round opens) or has one in the future. A round that has been played has a
+ * deadline in the past, by definition — that is what locked it.
+ *
+ * Structurally typed rather than taking `PoolRoundState`, so `lib/` does not
+ * have to reach into `app/` for a two-field read.
+ *
+ * ⚠ NOT YET APPLIED to `getSubmissionStatus` in RoundStatusCard, which has the
+ * same conflation and labels a played round "Not yet available". That label is
+ * only read on the league strip to decide whether to print the "Missed" line,
+ * and that line says "You scored 0 points for it" — untrue for a member who
+ * picked six of ten before the lock. Correcting it needs the pick count, which
+ * that function is not given, so it is a separate change rather than a silent
+ * side effect of this one.
+ */
+export function isRoundNotYetOpen(
+  round: { state: string; deadline: string | null } | null | undefined,
+): boolean {
+  if (!round || round.state !== 'locked') return false
+  if (!round.deadline) return true
+  return new Date(round.deadline) > new Date()
+}

@@ -10,6 +10,7 @@ import { RoundStatusCard } from './RoundStatusCard'
 import { GroupStageForm } from './GroupStageForm'
 import { KnockoutStageForm } from './KnockoutStageForm'
 import { MatchweekResultsForm, type LeagueOutcome } from './MatchweekResultsForm'
+import { MatchweekScoresForm } from './MatchweekScoresForm'
 import {
   type Match,
   type Team,
@@ -24,7 +25,7 @@ import {
 } from '@/lib/tournament'
 // Round identity comes from the competition, not from lib/tournament's seven
 // hardcoded World Cup keys — a league pool's rounds are its matchweeks.
-import { isMatchweekKey, matchesInRound, roundLabel, roundShortLabel, sortRoundKeys } from '@/lib/competitionRounds'
+import { isMatchweekKey, isRoundNotYetOpen, matchesInRound, roundLabel, roundShortLabel, sortRoundKeys } from '@/lib/competitionRounds'
 import { earlyKickoff } from '@/lib/league/earlyKickoff'
 import { resolveMatchesFromActual } from '@/lib/bracketResolver'
 import type { PoolRoundState, EntryRoundSubmission, RoundStateValue } from '@/app/pools/[pool_id]/types'
@@ -142,24 +143,29 @@ export default function ProgressivePredictionsFlow({
     })(),
   )
 
-  // Sync predictions state when existingPredictions prop changes (e.g., after async re-fetch on tab return)
+  // Sync predictions state when existingPredictions prop changes (e.g., after
+  // async re-fetch on tab return).
   //
-  // ⚠ SKIPS ITS FIRST RUN ON A REMOUNT — and only then.
+  // ⚠ THE STICKY VALUE WINS FOR THE WHOLE LIFE OF THIS MOUNT, not just its
+  // first run. That is `useStickyState`'s stated contract — "the sticky value
+  // wins until the page is reloaded" — and this effect used to break it.
   //
-  // Coming back to this tab, the prop is the same page-load snapshot it always
-  // was and `pendingChanges` is a fresh ref reading false, so this effect would
-  // overwrite the sticky value with the stale picks and undo the fix above.
+  // The guard was `didInitialSync`, a first-run-only check, which held exactly
+  // as long as the prop's identity never changed again. It changes on every
+  // return to this tab: PoolDetail refetches on `activeTab`, and a new array
+  // arrives a moment later. On THAT run the flag was already spent and
+  // `pendingChanges` reads false because the autosave had finished — so the
+  // fetched snapshot replaced the member's picks. When the fetch was also
+  // reading the wrong table for a league pool, the snapshot was empty and the
+  // board simply cleared.
   //
-  // But it must still run on a genuine FIRST mount: `existingPredictions` can
-  // arrive empty and populate from an async fetch, and skipping that would
-  // leave the screen blank. `hasStickyState` is what tells the two apart —
-  // a cache entry only exists if a previous mount wrote one.
-  const didInitialSync = useRef(false)
+  // It must still run on a genuine FIRST mount, because `existingPredictions`
+  // can arrive empty and populate from an async fetch and skipping that leaves
+  // the screen blank. `hasStickyState` tells the two apart on its own: a cache
+  // entry exists only once something has been written from a previous mount —
+  // which is to say, only once the member has actually touched a pick.
   useEffect(() => {
-    if (!didInitialSync.current) {
-      didInitialSync.current = true
-      if (hasStickyState(`predictions:${poolId}:${entryId}`)) return
-    }
+    if (hasStickyState(`predictions:${poolId}:${entryId}`)) return
     if (pendingChanges.current) return // Don't overwrite unsaved local edits
     const map = new Map<string, ScoreEntry>()
     for (const p of existingPredictions) {
@@ -356,6 +362,22 @@ export default function ProgressivePredictionsFlow({
       for (const match of roundMatches) {
         const scores = predictions.get(match.match_id)
         if (!scores || (scores.home == null && scores.away == null)) continue
+        /**
+         * ⚠ A LEAGUE SCORELINE IS SENT WHOLE OR NOT AT ALL.
+         *
+         * The payload below fills a missing half with `?? 0`, so a member who
+         * typed 2 and had not yet reached the away box autosaved a 2-0 — a
+         * scoreline they never made, against a fixture the completion ring was
+         * still counting as unpicked. The ring and the database disagreed, and
+         * the database was the one that gets scored.
+         *
+         * Scoped to a matchweek because that is where it bites: `league_score_
+         * fixture` scores whatever row is there the moment the fixture ends,
+         * and there is no submit step left to catch it. The World Cup path is
+         * untouched — its pools are complete, and its half-picks have already
+         * been scored as they were.
+         */
+        if (isMatchweekRound && (scores.home == null || scores.away == null)) continue
         const existingId = existingPredictionIds.current.get(match.match_id)
         predictionsPayload.push({
           matchId: match.match_id,
@@ -433,7 +455,7 @@ export default function ProgressivePredictionsFlow({
     // `predictions` is: without them useCallback never rebuilds, the ref below
     // keeps pointing at the first closure, and every save would post the map as
     // it was on mount — so a Results pool would silently save nothing.
-  }, [saving, isReadOnly, roundMatches, predictions, outcomes, isResults, poolId, entryId, selectedRound, backupKey, showToast])
+  }, [saving, isReadOnly, roundMatches, predictions, outcomes, isResults, isMatchweekRound, poolId, entryId, selectedRound, backupKey, showToast])
 
   // Keep ref in sync
   savePredictionsRef.current = savePredictions
@@ -610,8 +632,19 @@ export default function ProgressivePredictionsFlow({
         </div>
       )}
 
-      {/* Prediction form for current round */}
-      {currentRoundState?.state === 'locked' ? (
+      {/* Prediction form for current round.
+
+          ⚠ LOCKED IS NOT ONE STATE. A matchweek reads `'locked'` both before
+          its turn and after it has been played, and this branch used to send
+          both to the same lock screen — so the week actually being played, the
+          one a member most wants to look at on a Saturday, answered "not yet
+          available" and showed them nothing. Their picks were in the database
+          the whole time.
+
+          A played round now falls through to the form, which `isReadOnly`
+          already closes: every control renders disabled with the picks in it,
+          the save bar is hidden, and the strip above it still says Locked. */}
+      {isRoundNotYetOpen(currentRoundState) ? (
         <div className="text-center py-12">
           <div className="text-4xl mb-3">
             <Icon name="lock.fill" size={48} className="mx-auto text-neutral-300" />
@@ -649,8 +682,26 @@ export default function ProgressivePredictionsFlow({
             />
           )}
 
-          {/* Knockout Stage Forms */}
-          {selectedRound !== 'group' && !isResults && (
+          {/* Scores depth: the same fixture list as Results, with a scoreline
+              where the tap goes.
+
+              ⚠ Keyed on the ROUND being a matchweek, not on `leagueDepth ===
+              'scores'`. Depth is NULL for every league pool created before
+              migration 064 and all of those are Scores — so a depth test would
+              have sent the oldest league pools in the product back to the World
+              Cup form, which is the one case this is meant to catch. A World
+              Cup round is never a matchweek, so it never reaches here. */}
+          {isMatchweekRound && !isResults && (
+            <MatchweekScoresForm
+              resolvedMatches={resolvedKnockoutMatches}
+              predictions={predictions}
+              onUpdatePrediction={isReadOnly ? undefined : updatePrediction}
+              readOnly={isReadOnly}
+            />
+          )}
+
+          {/* Knockout Stage Forms — the World Cup's, and only the World Cup's. */}
+          {selectedRound !== 'group' && !isResults && !isMatchweekRound && (
             <KnockoutStageForm
               stage={selectedRound}
               resolvedMatches={resolvedKnockoutMatches}

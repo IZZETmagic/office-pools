@@ -596,10 +596,47 @@ export function PoolDetail({
   const [bpEntryProgressMap, setBPEntryProgressMap] = useState<Record<string, number>>(initialBPEntryProgressMap)
 
   // Fetch predictions for the active entry from the database
+  /**
+   * ⚠ A LEAGUE PICK IS NOT IN `predictions`.
+   *
+   * This read is not cosmetic — it is what the Predictions tab rehydrates from
+   * every time a member returns to it (the effect below fires on `activeTab`).
+   * Pointed at `predictions`, a league entry has ZERO rows there, so it wrote an
+   * EMPTY array into `liveEntryPredictions` — and `activeEntryPredictions`
+   * prefers live over server data, so the picks the member had just made were
+   * replaced with nothing, on a screen whose database rows were perfectly
+   * intact. Reported by Ryan on 30 Aug 2026 as "predictions are not being
+   * saved"; they were. Confirmed against production: the two picks made at
+   * 16:04 UTC were in `league_predictions` while the screen showed none.
+   *
+   * `.select()` with no `if (data)` guard is the other half of why it was
+   * invisible: an empty array is truthy, so the write happened silently.
+   *
+   * `readLeaguePredictions` rather than a second hand-rolled mapping — it
+   * already pages past the 1,000-row cap, already reports its errors, and
+   * already splits the two depths. Results-depth picks come back as `outcomes`
+   * and are deliberately dropped here: they never travel as an
+   * `ExistingPrediction` (see the note on that return type), and the Results
+   * control reads its own sticky map.
+   */
   const fetchEntryPredictions = useCallback(async (entryId: string) => {
     setLoadingPredictions(true)
     try {
       const supabase = createClient()
+
+      if (pool.league_season_id) {
+        const { readLeaguePredictions } = await import('@/lib/league/read')
+        const { predictions, error } = await readLeaguePredictions(supabase, entryId)
+        if (error) {
+          // Loud, and NO WRITE. Writing `[]` on a failed read is what made the
+          // original bug look like data loss rather than a failed fetch.
+          console.error('[pool detail] league predictions refetch failed:', error)
+          return
+        }
+        setLiveEntryPredictions(prev => ({ ...prev, [entryId]: predictions }))
+        return
+      }
+
       const { data } = await supabase
         .from('predictions')
         .select('match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id, prediction_id')
@@ -613,7 +650,7 @@ export function PoolDetail({
     } finally {
       setLoadingPredictions(false)
     }
-  }, [])
+  }, [pool.league_season_id])
 
   // Fetch round submissions for an entry (progressive pools)
   const fetchEntryRoundSubmissions = useCallback(async (entryId: string) => {
@@ -1812,6 +1849,7 @@ export function PoolDetail({
                       prediction_id: p.prediction_id,
                     }))}
                   roundStates={roundStates}
+                  leagueDepth={leagueDepth}
                   onBack={() => setSpectatingEntry(null)}
                 />
               ) : (pool.max_entries_per_user > 1 || isPastDeadline) ? (
