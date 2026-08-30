@@ -152,6 +152,8 @@ export type MatchData = {
   original_match_date: string | null
   live_minute: number | null
   live_period: string | null
+  /** Stoppage minutes on top of `live_minute` — the "+8" in "90+8'". */
+  live_added: number | null
   home_team: { country_name: string; country_code: string; flag_url: string | null } | null
   away_team: { country_name: string; country_code: string; flag_url: string | null } | null
 }

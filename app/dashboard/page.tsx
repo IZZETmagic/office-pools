@@ -155,7 +155,10 @@ export default async function DashboardPage() {
         home_team:teams!matches_home_team_id_fkey(country_name, flag_url),
         away_team:teams!matches_away_team_id_fkey(country_name, flag_url),
         home_team_placeholder,
-        away_team_placeholder
+        away_team_placeholder,
+        live_minute,
+        live_period,
+        live_added
       `)
       .eq('status', 'live')
       .in('tournament_id', bracketTournamentIds)

@@ -249,6 +249,7 @@ export function ResultsTab({
       original_match_date: m.original_match_date,
       live_minute: m.live_minute,
       live_period: m.live_period,
+      live_added: m.live_added,
       home_score_ft: m.home_score_ft,
       away_score_ft: m.away_score_ft,
       home_score_pso: m.home_score_pso,

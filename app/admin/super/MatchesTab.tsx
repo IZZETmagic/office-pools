@@ -10,8 +10,25 @@ import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { useToast } from '@/components/ui/Toast'
 import { logAuditEvent } from '@/lib/audit'
+import { getLiveClock } from '@/lib/matchStatus'
 import { SpTable, type SpColumn } from './SpTable'
 import { SyncStatusPanel } from './SyncStatusPanel'
+
+/**
+ * The live clock for the operator's row — "67'", "90+8'", "HT", "ET 105'".
+ *
+ * The same helper the member-facing surfaces use, for the same reason: this row
+ * printed the bare minute, so a game deep in stoppage read "90'" and looked
+ * stuck to whoever was deciding whether to intervene.
+ */
+function liveClock(match: SuperMatchData): string | null {
+  return getLiveClock({
+    status: match.status,
+    livePeriod: match.live_period,
+    liveMinute: match.live_minute,
+    liveAdded: match.live_added,
+  })
+}
 
 // Shared inline border styles
 const thinBorder = '0.5px solid var(--sp-silver)66'
@@ -695,6 +712,7 @@ export function MatchesTab({
         data_source: 'api',
         live_minute: null,
         live_period: null,
+        live_added: null,
       })
       .eq('match_id', match.match_id)
 
@@ -884,7 +902,7 @@ export function MatchesTab({
         <div className="flex flex-col items-center gap-0.5">
           <Badge variant={getStatusBadgeVariant(match.status)}>
             {match.status}
-            {match.status === 'live' && match.live_minute != null && ` ${match.live_minute}'`}
+            {match.status === 'live' && liveClock(match) && ` ${liveClock(match)}`}
           </Badge>
           <SourceBadge match={match} />
         </div>
@@ -1130,7 +1148,7 @@ export function MatchesTab({
                   </span>
                   <Badge variant={getStatusBadgeVariant(match.status)}>
                     {match.status}
-                    {match.status === 'live' && match.live_minute != null && ` ${match.live_minute}'`}
+                    {match.status === 'live' && liveClock(match) && ` ${liveClock(match)}`}
                   </Badge>
                   <SourceBadge match={match} />
                   <span className="ml-auto text-[11px] sp-text-slate sp-body">

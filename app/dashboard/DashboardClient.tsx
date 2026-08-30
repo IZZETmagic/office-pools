@@ -10,6 +10,7 @@ import { AppHeader } from '@/components/ui/AppHeader'
 import { JoinPoolModal } from '@/components/pools/JoinPoolModal'
 import { CreatePoolModal } from '@/components/pools/CreatePoolModal'
 import { formatNumber } from '@/lib/format'
+import { getLiveClock } from '@/lib/matchStatus'
 import { LocalTime } from '@/components/LocalTime'
 import { useSlideIndicator } from '@/hooks/useSlideIndicator'
 import { useUnreadBanter } from '@/hooks/useUnreadBanter'
@@ -128,6 +129,16 @@ type UpcomingMatch = {
 type LiveMatch = UpcomingMatch & {
   home_score_ft: number | null
   away_score_ft: number | null
+  /**
+   * The live clock as the feed reports it — the running minute, the phase
+   * (1H / HT / 2H / ET / PEN) and the stoppage on top of the minute.
+   *
+   * Both sources fill these: `matches` for a World Cup fixture, `league_fixtures`
+   * for a league one (see readLeagueDashboardFixtures).
+   */
+  live_minute: number | null
+  live_period: string | null
+  live_added: number | null
 }
 
 type DashboardClientProps = {
@@ -252,17 +263,27 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function getElapsedTime(matchDate: string): string | null {
-  const start = new Date(matchDate)
-  const now = new Date()
-  const elapsedMinutes = Math.floor((now.getTime() - start.getTime()) / 60000)
-
-  if (elapsedMinutes < 0) return null
-  if (elapsedMinutes <= 45) return `${elapsedMinutes}'`
-  if (elapsedMinutes <= 60) return 'HT'
-  if (elapsedMinutes <= 105) return `${elapsedMinutes - 15}'` // subtract 15 min HT
-  if (elapsedMinutes <= 120) return 'FT'
-  return 'FT'
+/**
+ * The live clock for a card on this page — "67'", "45+2'", "90+8'", "HT", "ET
+ * 105'", "PENS" — or null when the feed has not reported a minute yet, where the
+ * pulsing LIVE badge says everything we know.
+ *
+ * ⚠ THIS IS THE FEED'S MINUTE, NOT THE WALL CLOCK. It used to be
+ * `getElapsedTime(match_date)`: minutes since kick-off, less a hard-coded
+ * fifteen for half time, called "FT" at 120. That is wrong three ways over —
+ * it never saw stoppage time, a delayed kick-off put it minutes out for the
+ * whole game, and it printed "FT" under a LIVE badge on a match still being
+ * played (Man United 5-1 Ipswich, in 90+8, read "FT"). `getLiveClock` is the
+ * same helper the RN app has used since it learned about `live_added`, so both
+ * surfaces now say the same thing about the same minute.
+ */
+function liveClock(match: LiveMatch): string | null {
+  return getLiveClock({
+    status: match.status,
+    livePeriod: match.live_period,
+    liveMinute: match.live_minute,
+    liveAdded: match.live_added,
+  })
 }
 
 function formatDayHeader(dateStr: string): string {
@@ -715,7 +736,7 @@ export function DashboardClient({
                     const homeFlagUrl = homeTeamData?.flag_url ?? null
                     const awayFlagUrl = awayTeamData?.flag_url ?? null
                     const isCrest = !!match.competition
-                    const elapsed = match.match_date ? getElapsedTime(match.match_date) : null
+                    const clock = liveClock(match)
                     return (
                       <div key={match.match_id} className="bg-surface rounded-card shadow dark:shadow-none dark:border dark:border-border-default border border-danger-200/60 dark:border-danger-800/50 px-4 py-2.5">
                         <div className="flex items-center justify-between mb-1.5">
@@ -728,8 +749,8 @@ export function DashboardClient({
                               </span>
                               LIVE
                             </span>
-                            {elapsed && (
-                              <span className="text-[10px] font-semibold text-danger-600">{elapsed}</span>
+                            {clock && (
+                              <span className="text-[10px] font-semibold text-danger-600">{clock}</span>
                             )}
                           </div>
                         </div>
@@ -865,7 +886,7 @@ export function DashboardClient({
                 const homeFlagUrl = homeTeamData?.flag_url ?? null
                 const awayFlagUrl = awayTeamData?.flag_url ?? null
                 const isCrest = !!match.competition
-                const elapsed = match.match_date ? getElapsedTime(match.match_date) : null
+                const clock = liveClock(match)
                 return (
                   <Card key={match.match_id} className="border-danger-200 dark:border-danger-800/50 bg-surface">
                     <div className="flex items-center justify-between mb-3">
@@ -897,9 +918,9 @@ export function DashboardClient({
                         <p className="font-semibold text-ink text-xs text-center leading-tight w-full truncate">{awayTeam}</p>
                       </div>
                     </div>
-                    {elapsed && (
+                    {clock && (
                       <p className="text-sm font-semibold text-danger-600 mt-3 text-center">
-                        {elapsed}
+                        {clock}
                       </p>
                     )}
 

@@ -50,6 +50,8 @@ export type ResultMatch = {
   original_match_date: string | null
   live_minute: number | null
   live_period: string | null
+  /** Stoppage on top of the minute — the "+8" in "90+8'". */
+  live_added: number | null
   home_score_ft: number | null
   away_score_ft: number | null
   home_score_pso: number | null
@@ -272,12 +274,13 @@ export function MatchCard({
   const hasPsoScores =
     match.home_score_pso !== null && match.away_score_pso !== null
 
-  // Live clock ("45'" / HT / ET / PENS) and exception-status badge
+  // Live clock ("45+2'" / HT / ET 105' / PENS) and exception-status badge
   // (Delayed / Postponed / Suspended / …), shared with mobile via lib/matchStatus.
   const liveClock = getLiveClock({
     status: match.status,
     livePeriod: match.live_period,
     liveMinute: match.live_minute,
+    liveAdded: match.live_added,
   })
   const statusBadge = getMatchStatusBadge({
     status: match.status,
@@ -713,7 +716,7 @@ export function MatchTableRow({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-pill bg-danger-400 opacity-75" />
               <span className="relative inline-flex rounded-pill h-1.5 w-1.5 bg-danger-500" />
             </span>
-            {getLiveClock({ status: match.status, livePeriod: match.live_period, liveMinute: match.live_minute }) ?? 'LIVE'}
+            {getLiveClock({ status: match.status, livePeriod: match.live_period, liveMinute: match.live_minute, liveAdded: match.live_added }) ?? 'LIVE'}
           </span>
         ) : null}
       </td>

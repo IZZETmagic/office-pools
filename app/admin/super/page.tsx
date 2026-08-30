@@ -30,6 +30,7 @@ export type SuperMatchData = {
   last_synced_at: string | null
   live_minute: number | null
   live_period: string | null
+  live_added: number | null
   home_team: { country_name: string } | null
   away_team: { country_name: string } | null
   tournaments: { name: string } | null

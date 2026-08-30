@@ -43,6 +43,7 @@ function fx(id: string, matchweek: number): MatchData {
     original_match_date: null,
     live_minute: null,
     live_period: null,
+    live_added: null,
     home_team: null,
     away_team: null,
     tournament_id: 't1',

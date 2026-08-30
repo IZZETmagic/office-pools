@@ -67,6 +67,12 @@ type FixtureRow = {
   home_goals: number | null
   away_goals: number | null
   is_completed: boolean
+  // The live clock, written by the per-minute sync (migration 050 defines all
+  // three on league_fixtures; 105's RPC keeps them current). `live_added` is the
+  // stoppage on top of the minute — a game in 90+8 is live, not finished.
+  live_minute: number | null
+  live_period: string | null
+  live_added: number | null
 }
 
 export type MatchweekRow = {
@@ -156,8 +162,9 @@ function fixtureToMatch(
     completed_at: null,
     status_detail: null,
     original_match_date: null,
-    live_minute: null,
-    live_period: null,
+    live_minute: f.live_minute,
+    live_period: f.live_period,
+    live_added: f.live_added,
     home_team: asEmbedded(f.home_club_id),
     away_team: asEmbedded(f.away_club_id),
   }
@@ -366,7 +373,7 @@ export async function readLeaguePoolView(
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from('league_fixtures')
-      .select('fixture_id, matchweek_id, fixture_number, home_club_id, away_club_id, kickoff_at, venue, status, home_goals, away_goals, is_completed')
+      .select('fixture_id, matchweek_id, fixture_number, home_club_id, away_club_id, kickoff_at, venue, status, home_goals, away_goals, is_completed, live_minute, live_period, live_added')
       .eq('season_id', args.seasonId)
       .order('fixture_number', { ascending: true })
       .range(from, from + 999)
@@ -960,6 +967,18 @@ export type DashboardFixture = {
   away_team_placeholder: null
   home_score_ft: number | null
   away_score_ft: number | null
+  /**
+   * The live clock, straight off the feed: the running minute, the phase (1H,
+   * HT, 2H, ET, PEN) and the stoppage on top of the minute.
+   *
+   * ⚠ The panel used to DERIVE its clock from `match_date` and wall time, which
+   * called a game finished 120 minutes after kick-off — so a match still being
+   * played in 90+8 read "FT" under a LIVE badge. The feed knows the difference;
+   * a clock built from kick-off time never can.
+   */
+  live_minute: number | null
+  live_period: string | null
+  live_added: number | null
   /** The competition's display name, e.g. "Premier League". */
   competition: string | null
 }
@@ -1038,6 +1057,9 @@ export async function readLeagueDashboardFixtures(
       away_team_placeholder: null,
       home_score_ft: f.home_goals,
       away_score_ft: f.away_goals,
+      live_minute: f.live_minute,
+      live_period: f.live_period,
+      live_added: f.live_added,
       competition: competitionBySeason.get(f.season_id) ?? null,
     }
   }
@@ -1050,7 +1072,7 @@ export async function readLeagueDashboardFixtures(
 }
 
 const FIXTURE_PANEL_COLS =
-  'fixture_id, fixture_number, season_id, kickoff_at, venue, status, home_goals, away_goals, home_club_id, away_club_id'
+  'fixture_id, fixture_number, season_id, kickoff_at, venue, status, home_goals, away_goals, home_club_id, away_club_id, live_minute, live_period, live_added'
 
 type FixturePanelRow = {
   fixture_id: string
@@ -1063,4 +1085,7 @@ type FixturePanelRow = {
   away_goals: number | null
   home_club_id: string
   away_club_id: string
+  live_minute: number | null
+  live_period: string | null
+  live_added: number | null
 }

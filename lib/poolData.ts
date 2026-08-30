@@ -47,15 +47,20 @@ export const PREDICTION_COLUMNS =
   'prediction_id, entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id'
 
 // The exact columns behind `MatchData` — nothing more. `matches` has 30 columns;
-// the type declares 23, so `*` was dragging created_at, updated_at,
-// external_match_id, data_source, last_synced_at, result_pushes_sent_at and
-// live_added over the wire for every fixture. Verified zero reads of those in the
-// web UI before narrowing. 100 kB -> 72 kB on a 104-match tournament.
+// the type declares 24, so `*` was dragging created_at, updated_at,
+// external_match_id, data_source, last_synced_at and result_pushes_sent_at over
+// the wire for every fixture. Verified zero reads of those in the web UI before
+// narrowing. 100 kB -> 72 kB on a 104-match tournament.
+//
+// ⚠ `live_added` was in that dropped set until 2026-08-30, when the web clock
+// started showing stoppage time ("90+8'") the way the RN app already did. It is
+// read now — see lib/matchStatus.ts — so it has to be selected.
 export const MATCH_COLUMNS =
   'match_id, tournament_id, match_number, stage, group_letter, home_team_id, away_team_id, ' +
   'home_team_placeholder, away_team_placeholder, match_date, venue, status, ' +
   'home_score_ft, away_score_ft, home_score_pso, away_score_pso, winner_team_id, ' +
-  'is_completed, completed_at, status_detail, original_match_date, live_minute, live_period'
+  'is_completed, completed_at, status_detail, original_match_date, live_minute, live_period, ' +
+  'live_added'
 
 // The exact columns behind `MemberData` — nothing more. `pool_members` has 10;
 // the type declares 6. The four dropped (payment_method, payment_notes,
