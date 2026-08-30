@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Icon } from '@/components/ui/Icon'
-import { createPortal } from 'react-dom'
 import type {
   TeamData,
   MatchData,
@@ -35,13 +34,11 @@ type BracketPickerFlowProps = {
   matches: MatchData[]
   settings: SettingsData
   predictionDeadline: string | null
-  isSubmitted: boolean
   isLocked: boolean
   existingGroupRankings: BPGroupRanking[]
   existingThirdPlaceRankings: BPThirdPlaceRanking[]
   existingKnockoutPicks: BPKnockoutPick[]
   onSaveStatusChange?: (status: 'idle' | 'saving' | 'saved' | 'error') => void
-  onSubmit?: () => void
 }
 
 type KnockoutPick = {
@@ -63,7 +60,8 @@ const STEPS = [
   { key: 'quarter_final', label: 'Quarter Finals' },
   { key: 'semi_final', label: 'Semi Finals' },
   { key: 'third_final', label: '3rd Place & Final' },
-  { key: 'review', label: 'Review & Submit' },
+  // "Review", not "Review & Submit" — there is nothing to submit on it.
+  { key: 'review', label: 'Review' },
 ] as const
 
 const REVIEW_STEP = STEPS.length - 1 // 7
@@ -176,13 +174,11 @@ export default function BracketPickerFlow({
   matches,
   settings,
   predictionDeadline,
-  isSubmitted: initialIsSubmitted,
   isLocked,
   existingGroupRankings,
   existingThirdPlaceRankings,
   existingKnockoutPicks,
   onSaveStatusChange,
-  onSubmit,
 }: BracketPickerFlowProps) {
   const { showToast } = useToast()
   const router = useRouter()
@@ -192,7 +188,18 @@ export default function BracketPickerFlow({
   // =============================================
 
   const [currentStep, setCurrentStep] = useState(() => {
-    if (initialIsSubmitted) return REVIEW_STEP
+    // ⚠ THIS USED TO OPEN ON REVIEW FOR ANY SUBMITTED ENTRY, and that had to
+    // change with the flag's meaning. `initialIsSubmitted` is now true from the
+    // member's first save, so keeping it here would drop somebody one pick into
+    // a 104-match bracket straight onto the Review screen, past every step they
+    // still had to fill in.
+    //
+    // A CLOSED entry still opens on Review, because there is nothing to edit
+    // and Review is the screen worth seeing. An open one resumes at its
+    // furthest progress, which is what the ladder below has always done well.
+    const isClosed =
+      isLocked || (predictionDeadline ? new Date(predictionDeadline) < new Date() : false)
+    if (isClosed) return REVIEW_STEP
     // Resume at the furthest step the user has reached based on existing data
     const hasKnockoutStage = (stages: string[]) =>
       existingKnockoutPicks.some(p => {
@@ -207,9 +214,6 @@ export default function BracketPickerFlow({
     if (existingThirdPlaceRankings.length > 0) return 1
     return 0
   })
-  const [isSubmitted, setIsSubmitted] = useState(initialIsSubmitted)
-  const [submitting, setSubmitting] = useState(false)
-  const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -240,7 +244,10 @@ export default function BracketPickerFlow({
     return new Date(predictionDeadline) < new Date()
   }, [predictionDeadline])
 
-  const isReadOnly = isSubmitted || isLocked || isPastDeadline
+  // ⚠ `isSubmitted` deliberately gone from this. Submitting never was the thing
+  // that should close a bracket — the deadline is, and `isLocked` remains the
+  // admin's separate lever, unchanged.
+  const isReadOnly = isLocked || isPastDeadline
 
   // =============================================
   // DEADLINE COUNTDOWN
@@ -404,7 +411,10 @@ export default function BracketPickerFlow({
   // =============================================
 
   const saveBracketPicks = useCallback(async () => {
-    if (savingRef.current || isSubmitted) return
+    // ⚠ `isSubmitted` deliberately absent. It would now stop the auto-save for
+    // any entry the server has already marked submitted — which, since the save
+    // path sets that flag, is every entry from its first write onward.
+    if (savingRef.current) return
     savingRef.current = true
     pendingChanges.current = false
     setSaveStatus('saving')
@@ -456,7 +466,6 @@ export default function BracketPickerFlow({
       savingRef.current = false
     }
   }, [
-    isSubmitted,
     entryId,
     groupRankings,
     thirdPlaceRanking,
@@ -570,6 +579,15 @@ export default function BracketPickerFlow({
 
   const isKnockoutComplete = isR32Complete && isR16Complete && isQFComplete && isSFComplete && isThirdFinalComplete
 
+  /**
+   * "Submitted", derived — every group ranked, every third-place team ranked,
+   * every knockout tie picked. The same `done >= total` rule the league path
+   * uses (`deriveRoundSubmissions`, lib/league/read.ts), and what the Submit
+   * button's `disabled` used to compute before letting anyone press it. Now it
+   * simply IS the state, with nothing to press.
+   */
+  const isBracketComplete = isGroupsComplete && isThirdPlaceComplete && isKnockoutComplete
+
   const totalKnockoutMatches = useMemo(() => {
     return matches.filter(m => m.stage !== 'group').length
   }, [matches])
@@ -639,39 +657,12 @@ export default function BracketPickerFlow({
   }, [currentStep, initializeThirdPlaceIfNeeded])
 
   // =============================================
-  // SUBMISSION
+  // NO SUBMISSION STEP
   // =============================================
-
-  const handleSubmit = useCallback(async () => {
-    setSubmitting(true)
-    setError(null)
-
-    try {
-      await saveBracketPicksRef.current()
-
-      const res = await fetch(`/api/pools/${poolId}/bracket-picks`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry_id: entryId }),
-      })
-
-      const data = await res.json().catch(() => ({}))
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to submit predictions')
-      }
-
-      setIsSubmitted(true)
-      setShowSubmitModal(false)
-      showToast('Bracket predictions submitted! Good luck!', 'success')
-      onSubmit?.()
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit predictions')
-      showToast('Failed to submit. Please try again.', 'error')
-    } finally {
-      setSubmitting(false)
-    }
-  }, [poolId, entryId, showToast, onSubmit])
+  // `handleSubmit` and its confirmation modal were deleted 2026-08-29. The
+  // bracket saves as it is built and the deadline is the only switch;
+  // completeness is reported by `isBracketComplete` instead of asserted by the
+  // member. PUT /bracket-picks is no longer called from here.
 
   // =============================================
   // TEAM LOOKUP HELPER
@@ -685,24 +676,30 @@ export default function BracketPickerFlow({
 
   return (
     <div>
-      {/* Submitted banner */}
-      {isSubmitted && (
+      {/* Closed banner — the bracket is done being editable.
+
+          ⚠ Keyed on `isReadOnly`, not on `isSubmitted`. Being submitted stopped
+          closing a bracket; the deadline (or the admin's lock) is what does. An
+          entry that submitted under the old flow still reads correctly here
+          because it is past its deadline by now anyway. */}
+      {isReadOnly && isBracketComplete && (
         <div className="flex items-center gap-3 p-4 rounded-xl border bg-success-50 border-success-200 text-success-800 mb-4">
           <Icon name="checkmark.circle.fill" size={20} className="text-success-600 shrink-0" />
-          <p className="text-sm font-medium">Your bracket predictions have been submitted. Good luck!</p>
+          <p className="text-sm font-medium">Your bracket predictions are locked in. Good luck!</p>
         </div>
       )}
 
       {/* Locked banner */}
-      {isLocked && !isSubmitted && (
+      {isLocked && !isBracketComplete && (
         <div className="flex items-center gap-3 p-4 rounded-xl border bg-neutral-50 border-neutral-200 text-neutral-800 mb-4">
           <Icon name="lock.fill" size={20} className="text-neutral-600 shrink-0" />
           <p className="text-sm font-medium">Your predictions have been locked by the pool admin.</p>
         </div>
       )}
 
-      {/* Deadline info */}
-      {deadlineInfo && !isSubmitted && (
+      {/* Deadline info — now shown right up to the deadline, since a complete
+          bracket is still editable and its owner still needs the countdown. */}
+      {deadlineInfo && (
         <div className={`flex items-center gap-3 p-4 rounded-xl border mb-4 ${
           deadlineInfo.isPast
             ? 'bg-danger-50 border-danger-200 text-danger-800'
@@ -1191,22 +1188,29 @@ export default function BracketPickerFlow({
             </div>
           </div>
 
-          {/* Submit Button */}
+          {/* Closing state — NO SUBMIT BUTTON.
+
+              The bracket saves itself as it is built, so what belongs at the
+              bottom of Review is whether the bracket is WHOLE, not an action.
+              `isBracketComplete` is derived from the picks, so it cannot claim
+              something the stored bracket does not support. */}
           {!isReadOnly && (
             <div className="mt-4">
-              <Button
-                variant="green"
-                size="lg"
-                fullWidth
-                onClick={() => setShowSubmitModal(true)}
-                disabled={!isGroupsComplete || !isThirdPlaceComplete || !isKnockoutComplete}
-              >
-                Submit Predictions
-              </Button>
-              {(!isGroupsComplete || !isThirdPlaceComplete || !isKnockoutComplete) && (
-                <p className="text-xs text-neutral-500 text-center mt-2">
-                  Complete all steps before submitting.
-                </p>
+              {isBracketComplete ? (
+                <div className="flex items-center gap-3 p-4 rounded-xl border bg-success-50 border-success-200 text-success-800">
+                  <Icon name="checkmark.circle.fill" size={20} className="text-success-600 shrink-0" />
+                  <p className="text-sm font-medium">
+                    Your bracket is complete and saved. You can still change it until the deadline.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-4 rounded-xl border bg-neutral-50 border-border-default text-neutral-700">
+                  <Icon name="clock" size={20} className="text-neutral-500 shrink-0" />
+                  <p className="text-sm">
+                    Your bracket saves as you build it. Finish every step before the
+                    deadline — anything left blank earns 0 points.
+                  </p>
+                </div>
               )}
             </div>
           )}
@@ -1237,73 +1241,6 @@ export default function BracketPickerFlow({
             }
           </Button>
         </div>
-      )}
-
-      {/* =============================================
-          SUBMIT CONFIRMATION MODAL
-          ============================================= */}
-      {showSubmitModal && createPortal(
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-overlay sm:p-4" onClick={() => setShowSubmitModal(false)}>
-          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-md w-full p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default modal-panel" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-neutral-900 mb-2">
-              Submit Bracket Predictions?
-            </h3>
-            <div className="bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4">
-              <p className="text-sm text-warning-800">
-                Once submitted, you <strong>cannot</strong> make changes to your bracket predictions.
-              </p>
-            </div>
-
-            {bracket.champion && (
-              <div className="bg-neutral-50 rounded-xl p-3 mb-4 flex items-center gap-2">
-                <span className="text-sm text-neutral-700">Your champion:</span>
-                {bracket.champion.flag_url && (
-                  <img src={bracket.champion.flag_url} alt={bracket.champion.country_name} className="w-6 h-4 rounded-[2px] object-cover" />
-                )}
-                <span className="text-sm font-bold text-neutral-900">{bracket.champion.country_name}</span>
-              </div>
-            )}
-
-            <div className="bg-neutral-50 rounded-xl p-3 mb-4 space-y-1">
-              <p className="text-sm text-neutral-700">
-                Groups ranked: <strong>{groupRankings.size} / {GROUP_LETTERS.length}</strong>
-              </p>
-              <p className="text-sm text-neutral-700">
-                Third-place teams ranked: <strong>{thirdPlaceRanking.length} / 12</strong>
-              </p>
-              <p className="text-sm text-neutral-700">
-                Knockout matches picked: <strong>{knockoutPickedCount} / {totalKnockoutMatches}</strong>
-              </p>
-            </div>
-
-            {(!isGroupsComplete || !isThirdPlaceComplete || !isKnockoutComplete) && (
-              <Alert variant="error" className="mb-4">
-                You must complete all predictions before submitting.
-              </Alert>
-            )}
-
-            <div className="flex gap-3">
-              <Button
-                variant="gray"
-                onClick={() => setShowSubmitModal(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="green"
-                onClick={handleSubmit}
-                disabled={submitting || !isGroupsComplete || !isThirdPlaceComplete || !isKnockoutComplete}
-                loading={submitting}
-                loadingText="Submitting..."
-                className="flex-1"
-              >
-                Submit Predictions
-              </Button>
-            </div>
-          </div>
-        </div>,
-        document.body
       )}
 
       {/* Bottom spacer for mobile */}

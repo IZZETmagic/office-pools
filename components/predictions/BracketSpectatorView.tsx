@@ -104,13 +104,13 @@ export function BracketSpectatorView({
           matches={matches}
           settings={settings}
           predictionDeadline={predictionDeadline}
-          isSubmitted={true}
+          // `isLocked` alone now carries what `isSubmitted` used to add here:
+          // a spectator view is read-only, full stop.
           isLocked={true}
           existingGroupRankings={state.picks.groupRankings}
           existingThirdPlaceRankings={state.picks.thirdPlaceRankings}
           existingKnockoutPicks={state.picks.knockoutPicks}
           onSaveStatusChange={() => {}}
-          onSubmit={() => {}}
         />
       )}
     </SpectatorFrame>

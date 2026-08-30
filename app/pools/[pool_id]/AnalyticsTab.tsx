@@ -519,7 +519,7 @@ export function AnalyticsTab({
       {!isEntrySubmitted && !isBracketPicker && (
         <Alert variant="warning" className="mb-0">
           <p>
-            Submit your predictions to see your XP progression, accuracy breakdown, streaks, and crowd comparison.
+            Make your predictions to see your XP progression, accuracy breakdown, streaks, and crowd comparison.
             Pool-wide stats are shown below.
           </p>
         </Alert>

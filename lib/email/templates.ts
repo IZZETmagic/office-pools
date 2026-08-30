@@ -255,19 +255,19 @@ export function deadlineReminderTemplate(params: {
   return {
     subject: `Prediction deadline approaching for ${poolName}`,
     html: brandedTemplate({
-      preheader: `Less than 24 hours to submit your predictions for ${poolName}!`,
+      preheader: `Less than 24 hours to finish your predictions for ${poolName}!`,
       heading: 'Deadline Approaching!',
       body: `
         ${greeting(userName)}
         ${paragraph(`The prediction deadline for <strong>${poolName}</strong> is <strong>${deadline}</strong>.`)}
         ${callout(
           'warning',
-          `${calloutLine('warning', 'Unsubmitted entries:', { bold: true, marginBottom: 8 })}
+          `${calloutLine('warning', 'Entries still to finish:', { bold: true, marginBottom: 8 })}
            ${calloutList('warning', unsubmittedEntries)}`
         )}
-        ${paragraph(`Don't miss out - submit your predictions now!`, { marginBottom: 0 })}
+        ${paragraph(`There is nothing to submit - your picks save as you make them. Just make sure they are all in before the deadline.`, { marginBottom: 0 })}
       `,
-      ctaText: 'Submit Predictions',
+      ctaText: 'Finish Your Picks',
       ctaUrl: `${poolUrl}?tab=predictions`,
     }),
   }
@@ -400,7 +400,7 @@ export function predictionsUnlockedTemplate(params: {
       body: `
         ${greeting(userName)}
         ${paragraph(`A pool admin has unlocked your predictions for <strong>${entryName}</strong> in <strong>${poolName}</strong>.`)}
-        ${paragraph('You can now edit and resubmit your predictions.', { marginBottom: 0 })}
+        ${paragraph('You can edit them again now - every change saves itself.', { marginBottom: 0 })}
       `,
       ctaText: 'Edit Predictions',
       ctaUrl: `${poolUrl}?tab=predictions`,
@@ -628,14 +628,14 @@ export function roundDeadlineReminderTemplate(params: {
           `${calloutLine('warning', `Deadline: ${deadlineFormatted}`, { bold: true, marginBottom: unsubmittedEntries.length > 0 ? 8 : 0 })}
            ${
              unsubmittedEntries.length > 0
-               ? `${calloutLine('warning', 'Unsubmitted entries:', { size: 13, marginBottom: 4 })}
+               ? `${calloutLine('warning', 'Entries still to finish:', { size: 13, marginBottom: 4 })}
                   ${calloutList('warning', unsubmittedEntries)}`
                : ''
            }`
         )}
-        ${paragraph('Submit your predictions before time runs out!', { marginBottom: 0 })}
+        ${paragraph('Your picks save as you make them - just make sure they are all in before time runs out.', { marginBottom: 0 })}
       `,
-      ctaText: 'Submit Predictions',
+      ctaText: 'Finish Your Picks',
       ctaUrl: poolUrl,
     }),
   }

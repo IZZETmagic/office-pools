@@ -61,6 +61,41 @@ export async function fetchRoundMatches<T = Record<string, unknown>>(
 }
 
 /**
+ * How many fixtures a member has to predict for a whole tournament.
+ *
+ * The denominator of "is this entry complete?", which is the question that
+ * replaced the submit button: since 2026-08-29 nothing is submitted, so a
+ * finished card is one whose picks cover every fixture.
+ *
+ * ⚠ `excludeGroupStage` is for BRACKET PICKER pools, and getting it wrong is
+ * silent. A bracket picker ranks the group stage rather than predicting it
+ * match by match, and only ever writes a row per knockout tie — so counting all
+ * 104 fixtures against ~40 picks would mark a finished bracket incomplete
+ * forever, and anything keyed on that (deadline reminders) would chase members
+ * who had done everything asked of them.
+ *
+ * ⚠ WORLD-CUP-SHAPED POOLS ONLY. League fixtures live in `league_fixtures`, so
+ * this returns 0 for a league season rather than a wrong number — callers must
+ * not reach here for one. That is the same refusal `fetchRoundMatches` makes
+ * for a matchweek key, and for the same reason.
+ */
+export async function fetchTournamentFixtureCount(
+  supabase: SupabaseClient,
+  args: { tournamentId: string; excludeGroupStage?: boolean }
+): Promise<{ count: number; error: string | null }> {
+  let q = supabase
+    .from('matches')
+    .select('*', { count: 'exact', head: true })
+    .eq('tournament_id', args.tournamentId)
+
+  if (args.excludeGroupStage) q = q.neq('stage', 'group')
+
+  const { count, error } = await q
+  if (error) return { count: 0, error: error.message }
+  return { count: count ?? 0, error: null }
+}
+
+/**
  * The round keys a pool actually has, in competition order.
  *
  * `nextRoundKey` resolves the successor against real rows rather than a static

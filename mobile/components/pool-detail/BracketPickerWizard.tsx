@@ -148,38 +148,14 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectat
     setKnockoutPick,
     submit,
   } = useBracketPickerPredictions(poolId, entryId, { spectate });
-  // Admin/spectator view forces a locked state on every editable surface.
-  const submitted = rawSubmitted || readOnly || spectate;
-  const [submitting, setSubmitting] = useState(false);
-  // Custom in-app submit dialogs replacing Alert.alert. Same pattern as
-  // the full-tournament wizard: a pre-flight "fill everything in" check,
-  // a destructive confirmation, and a follow-up error if the server
-  // rejects the submit. Single ConfirmDialog instance per state.
-  type SubmitDialog =
-    | { kind: 'none' }
-    | { kind: 'incomplete' }
-    | { kind: 'confirm' }
-    | { kind: 'error'; message: string };
-  const [submitDialog, setSubmitDialog] = useState<SubmitDialog>({ kind: 'none' });
-
-  function handleSubmit() {
-    if (!completedStages.has('review')) {
-      setSubmitDialog({ kind: 'incomplete' });
-      return;
-    }
-    setSubmitDialog({ kind: 'confirm' });
-  }
-
-  async function confirmSubmit() {
-    setSubmitting(true);
-    const result = await submit();
-    setSubmitting(false);
-    setSubmitDialog({ kind: 'none' });
-    if (result.error) {
-      const message = result.error;
-      setTimeout(() => setSubmitDialog({ kind: 'error', message }), 100);
-    }
-  }
+  // ⚠ `rawSubmitted` NO LONGER CLOSES THE BRACKET, and must not be added back
+  // here. Since 2026-08-29 that flag is set by the first save, so treating it
+  // as "locked" would freeze a member out after a single pick. Only an admin
+  // or spectator view makes this read-only now; the deadline does the rest,
+  // server-side.
+  const closed = readOnly || spectate;
+  // No submit handler, no confirmation dialogs — the bracket saves as it is
+  // built. `submit` is left unused on the hook until the next OTA drops it.
 
   const counts = useMemo(
     () => ({
@@ -345,7 +321,7 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectat
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.snow, paddingTop: insets.top }}>
-      <Header title={data.entry.entryName} saving={saving} submitted={submitted} />
+      <Header title={data.entry.entryName} saving={saving} submitted={closed} />
 
       <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md }}>
         <StageTabs
@@ -368,8 +344,10 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectat
       >
         {readOnly ? (
           <AdminViewBanner submitted={rawSubmitted} />
-        ) : submitted ? (
+        ) : closed ? (
           <SubmittedBanner />
+        ) : completedStages.has('review') ? (
+          <CompleteBanner />
         ) : null}
 
         <View style={{ gap: theme.spacing.xxs, paddingTop: theme.spacing.xxs }}>
@@ -393,7 +371,7 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectat
                 groupLetter={letter}
                 teamsInGroup={teamsByGroup.get(letter) ?? []}
                 rankings={groupRankings.filter((r) => r.group_letter === letter)}
-                disabled={submitted}
+                disabled={closed}
                 onChange={(ordered) => setGroupForLetter(letter, ordered)}
               />
             ))}
@@ -401,7 +379,7 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectat
         ) : currentStage === 'third_place' ? (
           <ThirdPlaceCard
             teams={thirdPlaceTeams}
-            disabled={submitted}
+            disabled={closed}
             onChange={setAllThirdPlaceRankings}
           />
         ) : KNOCKOUT_STAGES_DB.includes(stageKeyToDb(currentStage)) ? (
@@ -410,7 +388,7 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectat
             matches={data.matches}
             knockoutTeamMap={knockoutTeamMap}
             picksByMatchId={knockoutPickByMatchId}
-            disabled={submitted}
+            disabled={closed}
             onPick={setKnockoutPick}
           />
         ) : currentStage === 'review' ? (
@@ -420,7 +398,7 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectat
             thirdPlace={resolvedBracket.thirdPlace}
             completedStages={completedStages}
             allComplete={completedStages.has('review')}
-            submitted={submitted}
+            submitted={closed}
             onJumpTo={setCurrentStage}
           />
         ) : (
@@ -428,7 +406,7 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectat
         )}
       </ScrollViewContainer>
 
-      {!submitted ? (
+      {!closed ? (
         <BottomNav
           currentStage={currentStage}
           counts={counts}
@@ -436,40 +414,8 @@ export function BracketPickerWizard({ poolId, entryId, readOnly = false, spectat
           knockoutPickByMatchId={knockoutPickByMatchId}
           bottomInset={insets.bottom}
           onAdvance={setCurrentStage}
-          allComplete={completedStages.has('review')}
-          submitting={submitting}
-          onSubmit={handleSubmit}
         />
       ) : null}
-
-      {/* Submit dialogs — see SubmitDialog union above. */}
-      <ConfirmDialog
-        visible={submitDialog.kind === 'incomplete'}
-        title="Not yet"
-        description="Complete every stage before submitting."
-        confirmLabel="OK"
-        onConfirm={() => setSubmitDialog({ kind: 'none' })}
-      />
-      <ConfirmDialog
-        visible={submitDialog.kind === 'confirm'}
-        title="Submit bracket?"
-        description="Once submitted, you can't change your picks."
-        confirmLabel="Submit"
-        cancelLabel="Cancel"
-        destructive
-        busy={submitting}
-        onConfirm={confirmSubmit}
-        onCancel={() => setSubmitDialog({ kind: 'none' })}
-      />
-      <ConfirmDialog
-        visible={submitDialog.kind === 'error'}
-        title="Couldn't submit"
-        description={
-          submitDialog.kind === 'error' ? submitDialog.message : undefined
-        }
-        confirmLabel="OK"
-        onConfirm={() => setSubmitDialog({ kind: 'none' })}
-      />
     </View>
   );
 }
@@ -506,9 +452,6 @@ function BottomNav({
   knockoutPickByMatchId,
   bottomInset,
   onAdvance,
-  allComplete,
-  submitting,
-  onSubmit,
 }: {
   currentStage: BPStageKey;
   counts: { groups: number; thirdPlace: number; knockout: number };
@@ -516,9 +459,6 @@ function BottomNav({
   knockoutPickByMatchId: Map<string, BPKnockoutPick>;
   bottomInset: number;
   onAdvance: (next: BPStageKey) => void;
-  allComplete: boolean;
-  submitting: boolean;
-  onSubmit: () => void;
 }) {
   const theme = useTheme();
 
@@ -547,8 +487,9 @@ function BottomNav({
   const isReview = currentStage === 'review';
   const showNext = !isReview && !!nextStage && currentStageComplete(currentStage);
 
-  // On review: show Back + Submit. Submit is disabled until allComplete.
-  if (!previousStage && !showNext && !isReview) return null;
+  // On review there is nothing but Back — the bracket is already saved, so the
+  // bar has no forward action left to offer.
+  if (!previousStage && !showNext) return null;
 
   return (
     <View
@@ -571,14 +512,7 @@ function BottomNav({
           onPress={() => onAdvance(previousStage)}
         />
       ) : null}
-      {isReview ? (
-        <SubmitButton
-          flex={previousStage ? 1.3 : 1}
-          enabled={allComplete && !submitting}
-          submitting={submitting}
-          onPress={onSubmit}
-        />
-      ) : showNext ? (
+      {showNext ? (
         <NextButton
           label={NEXT_STAGE_LABEL[currentStage] ?? 'Next'}
           flex={previousStage ? 1.3 : 1}
@@ -1305,7 +1239,43 @@ function SubmittedBanner() {
           color: theme.colors.green,
         }}
       >
-        Bracket submitted — locked
+        Bracket locked
+      </RNText>
+    </View>
+  );
+}
+
+/**
+ * The bracket is whole, and still editable.
+ *
+ * Distinct from SubmittedBanner, which says "locked". Completing every stage
+ * used to be the thing that enabled the Submit button; now it is simply a state
+ * worth reporting, and it deliberately does NOT claim the bracket is closed —
+ * the member can still change any pick until the deadline.
+ */
+function CompleteBanner() {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.xs,
+        paddingHorizontal: theme.spacing.md,
+        paddingVertical: theme.spacing.sm,
+        borderRadius: theme.radii.md,
+        backgroundColor: withOpacity(theme.colors.green, 0.12),
+      }}
+    >
+      <Icon name="checkmark.seal.fill" size={12} tint={theme.colors.green} weight="semibold" />
+      <RNText
+        style={{
+          fontFamily: fontFamilies.semibold,
+          fontSize: 12,
+          color: theme.colors.green,
+        }}
+      >
+        Bracket complete and saved \u2014 editable until the deadline
       </RNText>
     </View>
   );

@@ -92,12 +92,16 @@ export default function PredictionsFlow({
 
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [hasSubmitted, setHasSubmitted] = useState(initialHasSubmitted)
-  const [submittedAt, setSubmittedAt] = useState(initialSubmittedAt)
+  // ⚠ `hasSubmitted` and `submittedAt` are now READ-ONLY props, held as plain
+  // consts rather than state. Nothing in this component can change them any
+  // more: the submit action that used to set them is gone, and the flag is
+  // written server-side by the save path. Keeping them as `useState` would
+  // leave setters that look available and would silently desync the screen from
+  // the database if anyone reached for one.
+  const hasSubmitted = initialHasSubmitted
+  const submittedAt = initialSubmittedAt
   const [lastSavedAt, setLastSavedAt] = useState(initialLastSavedAt)
-  const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
   const [showRecoveryModal, setShowRecoveryModal] = useState(false)
   const [recoveryData, setRecoveryData] = useState<Record<string, ScoreEntry> | null>(null)
@@ -137,6 +141,18 @@ export default function PredictionsFlow({
 
   const totalMatches = matches.length
   const predictedCount = Array.from(predictions.values()).filter(p => isPredictionComplete(p)).length
+  /**
+   * "Submitted", derived.
+   *
+   * Every match predicted — the same `done >= total` rule the league path has
+   * always used (`deriveRoundSubmissions`, lib/league/read.ts). This is what
+   * the Submit button used to assert, except that it is now a fact about the
+   * picks rather than a claim the member had to make about them, so it cannot
+   * disagree with what is stored.
+   *
+   * `> 0` guards the empty pool: zero of zero is not a completed entry.
+   */
+  const isComplete = totalMatches > 0 && predictedCount >= totalMatches
   const progressPercent = totalMatches > 0 ? Math.round((predictedCount / totalMatches) * 100) : 0
 
   const hasUnsavedChanges = useMemo(() => {
@@ -344,7 +360,12 @@ export default function PredictionsFlow({
   // =============================================
 
   const savePredictions = async () => {
-    if (saving || hasSubmitted) return
+    // ⚠ `hasSubmitted` deliberately absent from this guard. The flag is now set
+    // by the FIRST save (POST /predictions), so keeping it here would have made
+    // every entry's second save a silent no-op — the auto-save would appear to
+    // run, the bar would say Saved, and nothing after the first burst would ever
+    // reach the database.
+    if (saving) return
 
     // If offline, save to localStorage immediately
     if (!navigator.onLine) {
@@ -481,39 +502,16 @@ export default function PredictionsFlow({
   savePredictionsRef.current = savePredictions
 
   // =============================================
-  // SUBMIT ALL PREDICTIONS (final)
+  // NO SUBMIT STEP
   // =============================================
-
-  const submitPredictions = async () => {
-    setSubmitting(true)
-    setError(null)
-
-    try {
-      // Save first
-      await savePredictions()
-
-      // Then submit
-      const res = await fetch(`/api/pools/${poolId}/predictions`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entryId }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to submit predictions')
-      }
-
-      setHasSubmitted(true)
-      setSubmittedAt(data.submittedAt)
-      setShowSubmitModal(false)
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit predictions')
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  // `submitPredictions` and its confirmation modal were deleted 2026-08-29.
+  // Picks save as they are made; the deadline is the only switch. "Submitted"
+  // survives as a DERIVED state — see `isComplete` above — so the member still
+  // gets told when their entry is whole, without having to assert it.
+  //
+  // The modal it opened is worth remembering, because it is what the change is
+  // against: it warned "Once submitted, you cannot make changes." That was true
+  // and it was the problem.
 
   // =============================================
   // NAVIGATION
@@ -566,7 +564,11 @@ export default function PredictionsFlow({
   // READ-ONLY MODE CHECK
   // =============================================
 
-  const isReadOnly = hasSubmitted || predictionsLocked || isPastDeadline
+  // ⚠ `hasSubmitted` no longer closes the form — the deadline does. It now
+  // means "this entry has saved picks", which is true from the first save, so
+  // leaving it here would have locked members out of their own predictions the
+  // moment they made one.
+  const isReadOnly = predictionsLocked || isPastDeadline
 
   // =============================================
   // RENDER: LOCKED / SUBMITTED / DEADLINE STATES
@@ -577,7 +579,7 @@ export default function PredictionsFlow({
       <div>
         <StatusBanner
           type="locked"
-          message="The prediction deadline has passed. You can no longer submit or edit predictions."
+          message="The prediction deadline has passed. You can no longer edit predictions."
         />
       </div>
     )
@@ -585,17 +587,40 @@ export default function PredictionsFlow({
 
   return (
     <div>
-      {/* Status Banner */}
-      {hasSubmitted && autoSubmitted && (
+      {/* Status banners.
+
+          ⚠ "SUBMITTED" IS DERIVED FROM THE PICKS, not from a flag and not from
+          a button. `isComplete` — every match predicted and saved — is the same
+          rule `deriveRoundSubmissions` (lib/league/read.ts) has always applied
+          to a league matchweek, now applied here too.
+
+          It cannot be `hasSubmitted`: that column is true from the member's
+          FIRST save, so it would announce "you're done" to somebody one pick
+          into sixty-four.
+
+          And being submitted does not close anything — the banner says so,
+          because the member can still change any of it until the deadline. */}
+      {isComplete && !isPastDeadline && (
+        <StatusBanner
+          type="submitted"
+          message={`All ${totalMatches} predictions are in and saved. You can still change them until the deadline.`}
+        />
+      )}
+      {isPastDeadline && autoSubmitted && (
         <StatusBanner
           type="auto-submitted"
           message={`Your predictions were auto-submitted when the deadline passed${submittedAt ? ` on ${formatDate(submittedAt)}` : ''}. Any missing predictions will earn 0 points.`}
         />
       )}
-      {hasSubmitted && !autoSubmitted && (
+      {/* ⚠ NO DATE ON THIS ONE. `submittedAt` now records the FIRST SAVE rather
+          than the press of a submit button, so "submitted on 3 June" would name
+          the day they started picking, not the day their picks closed. */}
+      {isPastDeadline && !autoSubmitted && (
         <StatusBanner
           type="submitted"
-          message={`Your predictions were submitted${submittedAt ? ` on ${formatDate(submittedAt)}` : ''}. Good luck!`}
+          message={isComplete
+            ? 'Your predictions are locked in. Good luck!'
+            : `The deadline has passed. ${predictedCount} of ${totalMatches} predictions are in; the rest will earn 0 points.`}
         />
       )}
 
@@ -735,9 +760,9 @@ export default function PredictionsFlow({
           knockoutResolutions={knockoutResolutionsForSummary}
           champion={champion}
           onEditStage={goToStage}
-          onSubmit={() => setShowSubmitModal(true)}
-          submitting={submitting}
-          hasSubmitted={hasSubmitted}
+          // Derived completeness, NOT the `hasSubmitted` flag — that one is
+          // true from the first save and would call a one-pick entry finished.
+          hasSubmitted={isComplete}
           readOnly={isReadOnly}
         />
       )}
@@ -763,52 +788,6 @@ export default function PredictionsFlow({
               : `Complete all ${STAGE_LABELS[stageName]?.toLowerCase()} predictions`
             }
           </Button>
-        </div>
-      )}
-
-      {/* Submit Confirmation Modal — full-screen on mobile, centered on desktop */}
-      {showSubmitModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setShowSubmitModal(false)} />
-          <div className="relative bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl sm:max-w-md w-full p-6 max-h-[90vh] overflow-y-auto dark:shadow-none dark:border dark:border-border-default">
-            <h3 className="text-lg font-bold text-neutral-900 mb-2">
-              Submit Final Predictions?
-            </h3>
-            <div className="bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4">
-              <p className="text-sm text-warning-800">
-                Once submitted, you <strong>cannot</strong> make changes to your predictions.
-              </p>
-            </div>
-            <div className="bg-neutral-50 rounded-xl p-3 mb-4">
-              <p className="text-sm text-neutral-700">
-                Progress: <strong>{predictedCount} / {totalMatches}</strong> matches ({progressPercent}%)
-              </p>
-            </div>
-            {predictedCount < totalMatches && (
-              <Alert variant="error" className="mb-4">
-                You have not predicted all matches. You must complete all {totalMatches} predictions before submitting.
-              </Alert>
-            )}
-            <div className="flex gap-3">
-              <Button
-                variant="gray"
-                onClick={() => setShowSubmitModal(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="green"
-                onClick={submitPredictions}
-                disabled={submitting || predictedCount < totalMatches}
-                loading={submitting}
-                loadingText="Submitting..."
-                className="flex-1"
-              >
-                Submit Predictions
-              </Button>
-            </div>
-          </div>
         </div>
       )}
 

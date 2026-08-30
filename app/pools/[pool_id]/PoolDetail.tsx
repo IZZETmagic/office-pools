@@ -1949,13 +1949,11 @@ export function PoolDetail({
                       matches={predictionsMatches}
                       settings={settings!}
                       predictionDeadline={pool.prediction_deadline}
-                      isSubmitted={activeEntry.has_submitted_predictions}
                       isLocked={activeEntry.predictions_locked}
                       existingGroupRankings={activeBPGroupRankings}
                       existingThirdPlaceRankings={activeBPThirdPlaceRankings}
                       existingKnockoutPicks={activeBPKnockoutPicks}
                       onSaveStatusChange={(status) => setPredictionStatus(prev => ({ ...prev, saveStatus: status }))}
-                      onSubmit={() => { router.refresh() }}
                     />
                   </div>
                 )
@@ -1969,13 +1967,11 @@ export function PoolDetail({
                   matches={predictionsMatches}
                   settings={settings!}
                   predictionDeadline={pool.prediction_deadline}
-                  isSubmitted={activeEntry.has_submitted_predictions}
                   isLocked={activeEntry.predictions_locked}
                   existingGroupRankings={activeBPGroupRankings}
                   existingThirdPlaceRankings={activeBPThirdPlaceRankings}
                   existingKnockoutPicks={activeBPKnockoutPicks}
                   onSaveStatusChange={(status) => setPredictionStatus(prev => ({ ...prev, saveStatus: status }))}
-                  onSubmit={() => { router.refresh() }}
                 />
               )
             )}

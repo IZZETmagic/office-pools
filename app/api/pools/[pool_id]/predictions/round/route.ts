@@ -10,6 +10,21 @@ import { withPerfLogging } from '@/lib/api-perf'
 // =============================================================
 // PUT /api/pools/:poolId/predictions/round - Submit round predictions
 // =============================================================
+// ⚠ DEPRECATED 2026-08-29. The web flow no longer calls it; mobile stops once
+// the OTA lands. Submitting is not an act any more — picks save as they are
+// made, POST /predictions sets the flag on the first save, and the round's
+// deadline is the only thing that closes it.
+//
+// It stays reachable so that app builds older than the OTA keep working. Its
+// writes are now redundant rather than wrong.
+//
+// ⚠ IT NEVER WORKED FOR A LEAGUE POOL, and that is not fixed here because
+// nothing should reach it. The mode guard below admits only `progressive`,
+// while every league pool is `league_pickem` (app/api/pools/create:123) — and
+// even past that, the count below reads `predictions`, where a league pool has
+// no rows because its picks live in `league_predictions`. The web league flow
+// rendered a Submit button that could only ever return 400; removing that
+// button is what actually closed this.
 async function handlePUT(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
@@ -87,13 +102,23 @@ async function handlePUT(
   // Check if already submitted for this round
   const { data: existingSubmission } = await supabase
     .from('entry_round_submissions')
-    .select('id, has_submitted')
+    .select('id, has_submitted, submitted_at, prediction_count')
     .eq('entry_id', entryId)
     .eq('round_key', roundKey)
     .single()
 
+  // 200 rather than the old 403 — same reasoning as the sibling route: an old
+  // client that saved and then submitted has its picks stored either way, and
+  // an error on that screen would describe a failure that did not happen. The
+  // stored values are echoed back rather than zeroes, so the caller shows what
+  // the row actually holds.
   if (existingSubmission?.has_submitted) {
-    return NextResponse.json({ error: 'Predictions already submitted for this round' }, { status: 403 })
+    return NextResponse.json({
+      submitted: true,
+      roundKey,
+      submittedAt: existingSubmission.submitted_at,
+      predictedCount: existingSubmission.prediction_count ?? 0,
+    })
   }
 
   // Get matches for this round, via the round selector. A matchweek's fixtures

@@ -5,7 +5,6 @@ import { useStickyState, hasStickyState } from '@/hooks/useStickyState'
 import { Icon } from '@/components/ui/Icon'
 import { useToast } from '@/components/ui/Toast'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { RoundStatusCard } from './RoundStatusCard'
 import { GroupStageForm } from './GroupStageForm'
@@ -189,8 +188,6 @@ export default function ProgressivePredictionsFlow({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [showSubmitModal, setShowSubmitModal] = useState(false)
   const saving = saveStatus === 'saving'
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const periodicSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -205,19 +202,26 @@ export default function ProgressivePredictionsFlow({
   const isRoundPastDeadline = currentRoundState?.deadline
     ? new Date(currentRoundState.deadline) < new Date()
     : false
-  const isRoundSubmitted = currentSubmission?.has_submitted === true
+  // ⚠ NO `isRoundSubmitted` HERE ANY MORE. Nothing in this component may branch
+  // on submission state: it gated the form's editability and the save bar's
+  // visibility, and both now key on the deadline alone. `currentSubmission` is
+  // still read below, but only so RoundStatusCard can DISPLAY the state — never
+  // to decide what the member is allowed to do.
 
   /**
-   * ⚠ SUBMITTING DOES NOT LOCK A MATCHWEEK. Only the kickoff does.
+   * ⚠ SUBMITTING DOES NOT LOCK ANYTHING. Only the deadline does.
    *
-   * For the World Cup, `isRoundSubmitted` closing the form is the rule: an
-   * entry locks on submit, and an admin can unlock it from the Members tab.
+   * This used to carry an exemption — a league matchweek stayed editable while
+   * a World Cup round froze on submit — and 2026-08-29 turned the exemption
+   * into the rule for every mode. There is no submit button any longer, so
+   * there is no act left to lock on.
    *
-   * For a league it was a trap, because `has_submitted` is DERIVED rather than
+   * The league half of that exemption is worth keeping in view, because it is
+   * why the rule is the right way round. `has_submitted` is DERIVED there, not
    * pressed — `deriveRoundSubmissions` (lib/league/read.ts) returns true as
-   * soon as `done >= total`. So a member's TENTH tap silently froze all ten,
-   * days before the matchweek locked, with the database still willing to accept
-   * a change and no way to reopen it: the admin unlock writes
+   * soon as `done >= total`. A member's TENTH tap silently froze all ten, days
+   * before the matchweek locked, with the database still willing to accept a
+   * change and no way to reopen it: the admin unlock writes
    * `entry_round_submissions`, which the league path deliberately never writes.
    *
    * The product promises the opposite in three places — Scoring Rules ("locks
@@ -225,15 +229,11 @@ export default function ProgressivePredictionsFlow({
    * is allowed and expected"), and migration 058, whose trigger is the real and
    * only gate.
    *
-   * The two clauses above already say exactly what the database says: it must
-   * be the OPEN matchweek, and its lock must not have passed.
+   * What remains says exactly what the database says: it must be the OPEN
+   * round, and its lock must not have passed.
    */
   const isMatchweekRound = isMatchweekKey(selectedRound)
-  const isReadOnly =
-    predictionsLocked ||
-    !isRoundOpen ||
-    isRoundPastDeadline ||
-    (isRoundSubmitted && !isMatchweekRound)
+  const isReadOnly = predictionsLocked || !isRoundOpen || isRoundPastDeadline
 
   // Match & round stats
   /**
@@ -509,53 +509,14 @@ export default function ProgressivePredictionsFlow({
   }, [saveStatus, lastSavedAt, totalPredictedCount, onStatusChange])
 
   // =====================
-  // SUBMIT (per-round)
-  // =====================
-  const submitRound = async () => {
-    setSubmitting(true)
-    setError(null)
-
-    try {
-      // Save first
-      await savePredictions()
-
-      const res = await fetch(`/api/pools/${poolId}/predictions/round`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entryId, roundKey: selectedRound }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to submit predictions')
-      }
-
-      // Update local submission state
-      roundSubmissionMap.set(selectedRound, {
-        id: '',
-        entry_id: entryId,
-        round_key: selectedRound,
-        has_submitted: true,
-        submitted_at: data.submittedAt,
-        auto_submitted: false,
-        prediction_count: data.predictedCount,
-        created_at: data.submittedAt,
-        updated_at: data.submittedAt,
-      })
-
-      setShowSubmitModal(false)
-      showToast(`${roundLabel(selectedRound)} predictions submitted!`, 'success')
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit predictions')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  // =====================
   // RENDER
   // =====================
+  // ⚠ THERE IS NO SUBMIT STEP. `submitRound` and its confirmation modal were
+  // deleted 2026-08-29 — picks save as they are made and the deadline is the
+  // only switch. What the button used to communicate is already on screen and
+  // better placed: RoundStatusCard carries the completion ring and a live
+  // "Locks in 3d 7h 59m", and the bar below carries the save state. Adding a
+  // "locks at" line here would be the third telling of the same fact.
   const roundName = roundLabel(selectedRound)
   const isAllRoundPredicted = predictedRoundCount === roundMatchCount && roundMatchCount > 0
 
@@ -627,11 +588,19 @@ export default function ProgressivePredictionsFlow({
       {/* Error */}
       {error && <Alert variant="error">{error}</Alert>}
 
-      {/* Save status bar */}
-      {isRoundOpen && !isRoundPastDeadline && !isRoundSubmitted && (
+      {/* Save status bar.
+
+          ⚠ NO LONGER HIDDEN ONCE THE ROUND IS COMPLETE. It used to carry
+          `!isRoundSubmitted`, which for a league pool meant it vanished on the
+          member's last pick — the exact moment they most want to be told the
+          thing is saved. With the submit button gone this bar IS the
+          confirmation, so it has to survive completion. */}
+      {isRoundOpen && !isRoundPastDeadline && (
         <div className="flex items-center justify-between text-xs text-neutral-500 px-1">
           <span>
-            {predictedRoundCount} / {roundMatchCount} matches predicted
+            {isAllRoundPredicted
+              ? `All ${roundMatchCount} picked`
+              : `${predictedRoundCount} / ${roundMatchCount} matches predicted`}
           </span>
           <span>
             {saveStatus === 'saving' && 'Saving...'}
@@ -692,62 +661,9 @@ export default function ProgressivePredictionsFlow({
             />
           )}
 
-          {/* Submit button for current round */}
-          {isRoundOpen && !isRoundPastDeadline && !isRoundSubmitted && (
-            <div className="sticky bottom-0 bg-surface/95 backdrop-blur-sm border-t border-border-default py-3 px-1 -mx-1">
-              <Button
-                variant="green"
-                onClick={() => setShowSubmitModal(true)}
-                disabled={!isAllRoundPredicted || submitting}
-                className="w-full"
-              >
-                {isAllRoundPredicted
-                  ? `Submit ${roundName} Predictions`
-                  : `${predictedRoundCount}/${roundMatchCount} matches predicted`
-                }
-              </Button>
-            </div>
-          )}
         </>
       )}
 
-      {/* Submit confirmation modal */}
-      {showSubmitModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowSubmitModal(false) }}
-        >
-          <div className="fixed inset-0 bg-black/50" onClick={() => setShowSubmitModal(false)} />
-          <div className="relative bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl sm:max-w-sm w-full p-6 space-y-4 dark:shadow-none dark:border dark:border-border-default">
-            <h3 className="text-lg font-bold text-neutral-900">Submit {roundName}?</h3>
-            <p className="text-sm text-neutral-600">
-              You&apos;re about to submit your predictions for <strong>{roundMatchCount}</strong> {roundName} matches.
-              Once submitted, you cannot change them.
-            </p>
-            {error && <Alert variant="error">{error}</Alert>}
-            <div className="flex gap-3">
-              <Button
-                variant="gray"
-                onClick={() => setShowSubmitModal(false)}
-                disabled={submitting}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="green"
-                onClick={submitRound}
-                disabled={submitting}
-                loading={submitting}
-                loadingText="Submitting..."
-                className="flex-1"
-              >
-                Submit
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

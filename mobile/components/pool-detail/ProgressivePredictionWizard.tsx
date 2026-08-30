@@ -11,8 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GroupCollapsibleSection, MatchPredictionRow, ThirdPlaceTable } from '@/components/pool-detail';
 import { usePoolSettings } from '@/lib/usePoolSettings';
-import { ConfirmDialog, Icon, Text } from '@/components/ui';
-import { submitRoundPredictions } from '@/lib/api';
+import { Icon, Text } from '@/components/ui';
 import type { BracketResult } from '@/lib/bracket/bracketResolver';
 import {
   GROUP_LETTERS,
@@ -96,8 +95,10 @@ export function ProgressivePredictionWizard({
         /* read-only: drop edits silently */
       })
     : updatePrediction;
-  const effectiveSubmitted =
-    readOnly || data.entry.hasSubmittedPredictions;
+  // ⚠ NO `effectiveSubmitted`. `hasSubmittedPredictions` is set by an entry's
+  // first SAVE now, so gating edits on it would freeze a member out of their own
+  // round the moment they made one pick. `readOnly` (admin viewing) is the only
+  // thing left that closes the form other than the round's own state.
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { data: roundsData, refresh: refreshRounds } = usePoolRounds(poolId);
@@ -121,12 +122,12 @@ export function ProgressivePredictionWizard({
   }, [roundsData]);
 
   const firstEditableRound = useMemo<RoundKey>(() => {
+    // The first round still accepting picks. It used to skip rounds already
+    // submitted; nothing is submitted any more, and a completed round is still
+    // editable until it locks, so the open round IS the one to land on.
     for (const key of ROUND_KEYS) {
       const state = roundStateByKey.get(key)?.state;
-      if (state === 'open' || state === 'in_progress') {
-        const sub = submissions.get(key);
-        if (!sub?.hasSubmitted) return key;
-      }
+      if (state === 'open' || state === 'in_progress') return key;
     }
     // Fallback: first non-locked round, else group.
     for (const key of ROUND_KEYS) {
@@ -137,38 +138,12 @@ export function ProgressivePredictionWizard({
   }, [roundStateByKey, submissions]);
 
   const [currentRound, setCurrentRound] = useState<RoundKey>(firstEditableRound);
-  const [submitting, setSubmitting] = useState(false);
   const [expandAllSignal, setExpandAllSignal] = useState(1);
-  const [justSubmittedRound, setJustSubmittedRound] = useState<RoundKey | null>(null);
-  // Submit dialog state — replaces previous Alert.alert calls with our
-  // own ConfirmDialog primitive so the look matches the rest of the app.
-  type SubmitDialog =
-    | { kind: 'none' }
-    | { kind: 'incomplete' }
-    | { kind: 'confirm' }
-    | { kind: 'error'; message: string };
-  const [submitDialog, setSubmitDialog] = useState<SubmitDialog>({ kind: 'none' });
-
-  // Auto-advance once the just-submitted round shows up in fresh submissions
-  useEffect(() => {
-    if (!justSubmittedRound) return;
-    const sub = submissions.get(justSubmittedRound);
-    if (!sub?.hasSubmitted) return;
-    const idx = ROUND_KEYS.indexOf(justSubmittedRound);
-    for (let i = idx + 1; i < ROUND_KEYS.length; i++) {
-      const nextKey = ROUND_KEYS[i];
-      const nextState = roundStateByKey.get(nextKey)?.state;
-      const nextSub = submissions.get(nextKey);
-      if (
-        (nextState === 'open' || nextState === 'in_progress') &&
-        !nextSub?.hasSubmitted
-      ) {
-        setCurrentRound(nextKey);
-        break;
-      }
-    }
-    setJustSubmittedRound(null);
-  }, [justSubmittedRound, submissions, roundStateByKey]);
+  // ⚠ NO SUBMIT STATE, NO AUTO-ADVANCE. Both went with the button on
+  // 2026-08-29. The auto-advance hopped to the next round once a submission
+  // landed; with nothing to submit there is no event to hop on, and jumping a
+  // member off a round they can still edit would take the screen away from them
+  // mid-change.
 
   // Re-anchor to first editable round when round states first load
   useEffect(() => {
@@ -179,19 +154,18 @@ export function ProgressivePredictionWizard({
   const currentState = roundStateByKey.get(currentRound)?.state ?? 'locked';
   const currentSubmission = submissions.get(currentRound);
   const isSubmitted = currentSubmission?.hasSubmitted ?? false;
+  // Editable while the round is open. Completing it does not close it — only
+  // the round's own state does, which is the database's rule too.
   const canEdit =
-    !readOnly &&
-    !effectiveSubmitted &&
-    !isSubmitted &&
-    (currentState === 'open' || currentState === 'in_progress');
+    !readOnly && (currentState === 'open' || currentState === 'in_progress');
 
   const stageMatches = useMemo<Match[]>(() => {
     const stages = ROUND_MATCH_STAGES[currentRound];
     return data.matches.filter((m) => stages.includes(m.stage));
   }, [data.matches, currentRound]);
 
-  const roundComplete = useMemo(
-    () => stageMatches.length > 0 && stageMatches.every((m) => isPredictionComplete(predictions.get(m.match_id))),
+  const pickedCount = useMemo(
+    () => stageMatches.filter((m) => isPredictionComplete(predictions.get(m.match_id))).length,
     [stageMatches, predictions],
   );
 
@@ -199,30 +173,6 @@ export function ProgressivePredictionWizard({
     const state = roundStateByKey.get(key)?.state ?? 'locked';
     if (state === 'locked') return;
     setCurrentRound(key);
-  }
-
-  function handleSubmit() {
-    if (!canEdit) return;
-    if (!roundComplete) {
-      setSubmitDialog({ kind: 'incomplete' });
-      return;
-    }
-    setSubmitDialog({ kind: 'confirm' });
-  }
-
-  async function confirmSubmit() {
-    setSubmitDialog({ kind: 'none' });
-    setSubmitting(true);
-    try {
-      await submitRoundPredictions(poolId, data.entry.entryId, currentRound);
-      await Promise.all([refreshSubmissions(), refreshRounds()]);
-      setJustSubmittedRound(currentRound);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setTimeout(() => setSubmitDialog({ kind: 'error', message }), 100);
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   return (
@@ -294,42 +244,11 @@ export function ProgressivePredictionWizard({
         )}
       </ScrollView>
 
-      <SubmitBar
-        roundLabel={ROUND_LABELS[currentRound]}
+      <ProgressBar
         canEdit={canEdit}
-        roundComplete={roundComplete}
-        submitting={submitting}
-        isSubmitted={isSubmitted}
-        onSubmit={handleSubmit}
-      />
-
-      {/* Submit dialogs — see SubmitDialog union above. */}
-      <ConfirmDialog
-        visible={submitDialog.kind === 'incomplete'}
-        title="Not yet"
-        description="Fill in every match before submitting this round."
-        confirmLabel="OK"
-        onConfirm={() => setSubmitDialog({ kind: 'none' })}
-      />
-      <ConfirmDialog
-        visible={submitDialog.kind === 'confirm'}
-        title={`Submit ${ROUND_LABELS[currentRound]}?`}
-        description={`Once submitted, your ${ROUND_LABELS[currentRound]} predictions cannot be changed.`}
-        confirmLabel="Submit"
-        cancelLabel="Cancel"
-        destructive
-        busy={submitting}
-        onConfirm={confirmSubmit}
-        onCancel={() => setSubmitDialog({ kind: 'none' })}
-      />
-      <ConfirmDialog
-        visible={submitDialog.kind === 'error'}
-        title="Couldn't submit"
-        description={
-          submitDialog.kind === 'error' ? submitDialog.message : undefined
-        }
-        confirmLabel="OK"
-        onConfirm={() => setSubmitDialog({ kind: 'none' })}
+        picked={pickedCount}
+        total={stageMatches.length}
+        saving={saving}
       />
     </View>
   );
@@ -675,32 +594,39 @@ function KnockoutStageContent({
   );
 }
 
-function SubmitBar({
-  roundLabel,
+/**
+ * What the submit button became.
+ *
+ * It reports two facts and offers no action: how much of the round is picked,
+ * and whether the last change reached the server. That is everything the button
+ * used to carry in its label ("Submit Matchweek 3" / "7/10 matches predicted"),
+ * minus the press — which now has nothing to do, because every pick has already
+ * saved itself and the deadline is what closes the round.
+ */
+function ProgressBar({
   canEdit,
-  roundComplete,
-  submitting,
-  isSubmitted,
-  onSubmit,
+  picked,
+  total,
+  saving,
 }: {
-  roundLabel: string;
   canEdit: boolean;
-  roundComplete: boolean;
-  submitting: boolean;
-  isSubmitted: boolean;
-  onSubmit: () => void;
+  picked: number;
+  total: number;
+  saving: boolean;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  if (isSubmitted) return null;
-  if (!canEdit) return null;
+  if (!canEdit || total === 0) return null;
 
-  const enabled = roundComplete && !submitting;
+  const complete = picked >= total;
+  // Two forms of the same colour: `tintName` for <Icon>, which takes a theme
+  // colour NAME, and `tint` for style values, which take the resolved string.
+  const tintName = complete ? 'green' : 'primary';
+  const tint = complete ? theme.colors.green : theme.colors.primary;
+
   return (
-    <Pressable
-      onPress={onSubmit}
-      disabled={!enabled}
-      style={({ pressed }) => ({
+    <View
+      style={{
         position: 'absolute',
         left: theme.spacing.lg,
         right: theme.spacing.lg,
@@ -711,27 +637,29 @@ function SubmitBar({
         gap: 8,
         paddingVertical: 14,
         borderRadius: theme.radii.md,
-        backgroundColor: withOpacity(theme.colors.primary, enabled ? 0.2 : 0.08),
+        backgroundColor: withOpacity(tint, 0.12),
         borderWidth: 1,
-        borderColor: withOpacity(theme.colors.primary, enabled ? 0.3 : 0.1),
-        opacity: enabled ? (pressed ? 0.85 : 1) : 0.6,
-      })}
+        borderColor: withOpacity(tint, 0.24),
+      }}
     >
-      {submitting ? <ActivityIndicator size="small" color={theme.colors.primary} /> : null}
+      {saving ? <ActivityIndicator size="small" color={tint} /> : null}
+      {!saving && complete ? (
+        <Icon name="checkmark.circle.fill" size={16} color={tintName} />
+      ) : null}
       <RNText
         style={{
           fontFamily: fontFamilies.bold,
           fontSize: 14,
-          color: theme.colors.primary,
+          color: tint,
         }}
       >
-        {submitting
-          ? 'Submitting…'
-          : roundComplete
-            ? `Submit ${roundLabel}`
-            : `Complete all picks to submit`}
+        {saving
+          ? 'Saving\u2026'
+          : complete
+            ? `All ${total} picked \u00b7 saved`
+            : `${picked} of ${total} picked \u00b7 saved`}
       </RNText>
-    </Pressable>
+    </View>
   );
 }
 

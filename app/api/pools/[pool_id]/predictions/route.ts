@@ -211,34 +211,35 @@ async function handlePOST(
       }
     }
 
-    // Check if already submitted for this round
-    const { data: roundSubmission } = await supabase
-      .from('entry_round_submissions')
-      .select('has_submitted')
-      .eq('entry_id', entryId)
-      .eq('round_key', roundKey)
-      .single()
-
-    if (roundSubmission?.has_submitted) {
-      return NextResponse.json({ error: 'Predictions already submitted for this round' }, { status: 403 })
-    }
+    // ⚠ NO "already submitted for this round" REJECTION, and its absence is the
+    // point. Submission is no longer an act that closes a round — it is a
+    // consequence of having saved (see the write below). The two clauses above
+    // are the whole gate: the round must be open, and its deadline must not
+    // have passed. That is also exactly what the database says, via
+    // trg_enforce_prediction_before_kickoff.
+    //
+    // Entries carrying an `entry_round_submissions` row from the old manual
+    // flow still exist in production. Rejecting on it would freeze precisely
+    // those members out of edits the deadline still allows.
   }
 
   // Verify entry belongs to this user
   const { data: entry } = await supabase
     .from('pool_entries')
-    .select('entry_id, has_submitted_predictions, predictions_locked')
+    .select('entry_id, has_submitted_predictions, predictions_submitted_at, predictions_locked')
     .eq('entry_id', entryId)
     .eq('member_id', membership.member_id)
     .single()
 
   if (!entry) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
 
-  // For full tournament mode, check global submission status
-  if (pool?.prediction_mode !== 'progressive' && entry.has_submitted_predictions) {
-    return NextResponse.json({ error: 'Predictions already submitted' }, { status: 403 })
-  }
-
+  // ⚠ THIS IS WHERE THE OLD "Predictions already submitted" 403 WAS, and it had
+  // to go in the SAME change that starts writing `has_submitted_predictions` on
+  // save (see below). It refused a save whenever the flag was set, so with the
+  // flag now set by the FIRST save, keeping it would have rejected every
+  // member's SECOND save — the whole flow, dead, on a 403 nobody would connect
+  // back to this line. Deleting it is not a relaxation of the lock; the lock
+  // moved to the deadline, which is checked above and again by the database.
   if (entry.predictions_locked) {
     return NextResponse.json({ error: 'Predictions are locked' }, { status: 403 })
   }
@@ -358,6 +359,59 @@ async function handlePOST(
     }
     insertedIds.push(...((saved?.inserted ?? []) as { match_id: string; prediction_id: string }[]))
     predicted = saved?.predicted ?? 0
+
+    // =====================================================================
+    // SAVING IS SUBMITTING.
+    // =====================================================================
+    // There is no submit button any more — picks save as they are made and
+    // lock at the deadline. But `has_submitted_predictions` is not cosmetic:
+    // it is the column ~8 SQL functions in the scoring engine read to decide
+    // which entries to score (migrations 028, 030, 032, 034, 039, 046). If
+    // nothing set it, an entry would score nothing until the deadline sweep
+    // in lib/auto-submit.ts got to it.
+    //
+    // So the flag keeps meaning exactly what the engine already assumes —
+    // THIS ENTRY HAS PICKS WORTH SCORING — and the first save is what makes
+    // that true. That is the whole reason this is written here rather than
+    // the engine being taught to count picks: the engine stays closed.
+    //
+    // ⚠ NEVER FOR A LEAGUE POOL. The league branch returns above, at the
+    // `pool.league_season_id` early return, so this line is structurally
+    // unreachable for one — which is deliberate and must stay that way.
+    // lib/league/write.ts names this column as one of the two doors by which
+    // a league entry could walk into the World Cup scoring selectors; the
+    // vertical slice forbids the league path writing it, and it is NULL for
+    // every league entry in production.
+    //
+    // ⚠ GUARDED IN JS, ON THE ROW ALREADY FETCHED ABOVE — not by adding WHERE
+    // clauses to an unconditional UPDATE. The comment on the RPC three lines up
+    // is not decoration: this is the hottest write path in the app, and three
+    // sequential statements per auto-save is what buried the database during
+    // the opening-day pick rush. Auto-save fires every 500 ms of editing, so an
+    // unconditional write here would be a new statement on every keystroke-ish
+    // event, for a column that can only change once. This costs one UPDATE on
+    // an entry's FIRST save and nothing at all on every save after it.
+    //
+    // Both columns move in that single statement. `predictions_submitted_at` is
+    // a RANK TIEBREAKER, so it must mark one moment per entry rather than
+    // travel with each save — it now records the first save instead of the
+    // press of a button, which breaks ties towards whoever picked first rather
+    // than whoever confirmed first. A deliberate change of meaning.
+    //
+    // The NULL check is `!entry.has_submitted_predictions`, not `=== false`:
+    // the column is nullable and a NULL would slip past an equality test,
+    // leaving the entry permanently unscoreable with nothing to show for it.
+    if (!entry.has_submitted_predictions) {
+      await supabase
+        .from('pool_entries')
+        .update({
+          has_submitted_predictions: true,
+          ...(entry.predictions_submitted_at
+            ? {}
+            : { predictions_submitted_at: new Date().toISOString() }),
+        })
+        .eq('entry_id', entryId)
+    }
   } else {
     const { count } = await supabase
       .from('predictions')
@@ -377,6 +431,20 @@ async function handlePOST(
 // =============================================================
 // PUT /api/pools/:poolId/predictions - Submit final predictions
 // =============================================================
+// ⚠ DEPRECATED 2026-08-29 — nothing in this repo calls it any more.
+//
+// Submitting stopped being an act: picks save as they are made, the POST above
+// sets `has_submitted_predictions` on the first save, and the deadline is the
+// only thing that closes an entry. This handler is now a no-op in every field
+// that matters — it sets a flag the save path has already set.
+//
+// It is KEPT rather than deleted for one reason: a browser holding a cached
+// bundle from before this deploy will still call it, and a 404 there would
+// surface as "failed to submit" on a screen whose picks are in fact saved.
+// Delete it once no such client can plausibly remain.
+//
+// It is idempotent and no longer locks anything, so an old client calling it
+// changes nothing an entry has not already got.
 async function handlePUT(
   request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> }
@@ -413,15 +481,26 @@ async function handlePUT(
   // Verify entry belongs to this user
   const { data: entry } = await supabase
     .from('pool_entries')
-    .select('entry_id, entry_name, has_submitted_predictions')
+    .select('entry_id, entry_name, has_submitted_predictions, predictions_submitted_at')
     .eq('entry_id', entryId)
     .eq('member_id', membership.member_id)
     .single()
 
   if (!entry) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
 
+  // ⚠ 200, NOT THE 403 THIS USED TO RETURN.
+  //
+  // The flag is now set by the first SAVE, so an old cached client reaching
+  // this line has already had its picks stored — every time, not occasionally.
+  // A 403 here would put "Predictions already submitted" on a screen whose
+  // picks are safely saved, which is precisely the confusion this route was
+  // kept alive to prevent. It answers with the truth instead: yes, submitted,
+  // and here is when.
   if (entry.has_submitted_predictions) {
-    return NextResponse.json({ error: 'Predictions already submitted' }, { status: 403 })
+    return NextResponse.json({
+      submitted: true,
+      submittedAt: entry.predictions_submitted_at,
+    })
   }
 
   // Check pool deadline

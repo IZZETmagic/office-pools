@@ -14,7 +14,6 @@ import {
 import { StandingsTable } from './StandingsTable'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
 
 type ResolvedKnockoutMatch = {
   match: Match
@@ -30,8 +29,11 @@ type Props = {
   knockoutResolutions: Map<string, ResolvedKnockoutMatch>
   champion: GroupStanding | null
   onEditStage: (stageIndex: number) => void
-  onSubmit: () => void
-  submitting: boolean
+  /**
+   * Is every match predicted? DERIVED by the parent from the picks themselves,
+   * never a flag the member set — `onSubmit`/`submitting` are gone from this
+   * type because there is nothing left to press.
+   */
   hasSubmitted?: boolean
   readOnly?: boolean
 }
@@ -43,8 +45,6 @@ export function SummaryView({
   knockoutResolutions,
   champion,
   onEditStage,
-  onSubmit,
-  submitting,
   hasSubmitted,
   readOnly,
 }: Props) {
@@ -176,32 +176,38 @@ export function SummaryView({
         )
       })}
 
-      {/* Submit button or submitted message */}
+      {/* Closing state.
+
+          ⚠ NO SUBMIT BUTTON. It used to sit under a warning reading "Once
+          submitted, predictions cannot be changed" — the one sentence this
+          whole change exists to delete. Picks save as they are made and the
+          deadline is the only thing that closes them.
+
+          `hasSubmitted` here is the DERIVED completeness the parent computes
+          (all matches predicted), not a flag anyone pressed. */}
       {hasSubmitted ? (
         <div className="mt-8">
           <div className="bg-success-50 border border-success-200 rounded-xl p-4 text-center">
             <p className="text-sm font-semibold text-success-800">
-              Your predictions have been submitted. Good luck!
+              {readOnly
+                ? 'Your predictions are locked in. Good luck!'
+                : 'Every match is predicted and saved.'}
             </p>
+            {!readOnly && (
+              <p className="text-sm text-success-800 mt-1">
+                You can still change any of them until the deadline.
+              </p>
+            )}
           </div>
         </div>
       ) : !readOnly ? (
-        <div className="mt-8 space-y-4">
-          <div className="bg-warning-50 border border-warning-200 rounded-xl p-4">
-            <p className="text-sm text-warning-800">
-              Once submitted, predictions cannot be changed. Please review all your predictions before submitting.
+        <div className="mt-8">
+          <div className="bg-neutral-50 border border-border-default rounded-xl p-4 text-center">
+            <p className="text-sm text-neutral-700">
+              Your picks save themselves as you make them. Anything still blank
+              when the deadline passes earns 0 points.
             </p>
           </div>
-          <Button
-            variant="green"
-            size="lg"
-            fullWidth
-            onClick={onSubmit}
-            loading={submitting}
-            loadingText="Submitting..."
-          >
-            Submit All Predictions
-          </Button>
         </div>
       ) : null}
     </div>

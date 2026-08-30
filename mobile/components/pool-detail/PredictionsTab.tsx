@@ -50,6 +50,9 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, pred
   const isProgressive = predictionMode === 'progressive';
   const { data: roundsData } = usePoolRounds(isProgressive ? poolId : undefined);
   const [roundSubsByEntry, setRoundSubsByEntry] = useState<Map<string, Set<string>>>(new Map());
+  // Entries whose picks cover every fixture — the DERIVED "submitted", for the
+  // modes that keep their picks in `predictions`. See the effect below.
+  const [completeEntryIds, setCompleteEntryIds] = useState<Set<string>>(new Set());
 
   // Refresh whenever the screen regains focus — covers the case where the
   // user submits predictions inside the entry wizard and comes back here.
@@ -112,6 +115,56 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, pred
       cancelled = true;
     };
   }, [isProgressive, entries]);
+
+  /**
+   * Which entries are COMPLETE — every fixture picked.
+   *
+   * ⚠ This exists because `hasSubmittedPredictions` stopped answering it. Since
+   * 2026-08-29 that flag is set by an entry's FIRST SAVE, so a chip reading it
+   * would say "Submitted" to somebody one pick into sixty-four. Completeness is
+   * counted from the picks, the same rule the progressive branch above already
+   * applies via entry_round_submissions.
+   *
+   * ⚠ SKIPPED FOR BRACKET PICKER. Its picks live in bracket_picker_* tables, so
+   * counting `predictions` would return 0 for a finished bracket and mark every
+   * entry incomplete forever. That mode keeps the flag until it gets the same
+   * treatment.
+   */
+  useEffect(() => {
+    if (isProgressive || predictionMode === 'bracket_picker' || entries.length === 0) {
+      setCompleteEntryIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data: pool, error: poolErr } = await supabase
+        .from('pools')
+        .select('tournament_id')
+        .eq('pool_id', poolId)
+        .maybeSingle();
+      if (cancelled || poolErr || !pool) return;
+
+      const { count: total, error: countErr } = await supabase
+        .from('matches')
+        .select('*', { count: 'exact', head: true })
+        .eq('tournament_id', (pool as { tournament_id: string }).tournament_id);
+      // No fixtures means nothing can be complete — 0 >= 0 would mark them all.
+      if (cancelled || countErr || !total) return;
+
+      const complete = new Set<string>();
+      for (const entry of entries) {
+        const { count } = await supabase
+          .from('predictions')
+          .select('*', { count: 'exact', head: true })
+          .eq('entry_id', entry.entryId);
+        if ((count ?? 0) >= total) complete.add(entry.entryId);
+      }
+      if (!cancelled) setCompleteEntryIds(complete);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isProgressive, predictionMode, poolId, entries]);
 
   // "Everyone's predictions" — every OTHER entry in the pool, flattened and
   // labelled by owner. Entry metadata (names) is pool-public; the actual picks
@@ -270,6 +323,7 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, pred
         return (
           <EntryRow
             key={entry.entryId}
+            isComplete={completeEntryIds.has(entry.entryId)}
             entry={entry}
             progressiveStatus={progressiveStatus}
             onPress={() => router.navigate(`/pool/${poolId}/entry/${entry.entryId}`)}
@@ -432,27 +486,36 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, pred
 function EntryRow({
   entry,
   progressiveStatus,
+  isComplete,
   onPress,
   onActions,
 }: {
   entry: PoolEntry;
   progressiveStatus: { submitted: boolean; roundLabel: string } | null;
+  /** Every fixture picked — derived from the picks by the parent. */
+  isComplete: boolean;
   onPress: () => void;
   /** Fires when the user taps the kebab. Distinct from row tap (which opens the wizard). */
   onActions: () => void;
 }) {
   const theme = useTheme();
+  // ⚠ NOT `entry.hasSubmittedPredictions` for the flat case. That flag is true
+  // from the first save now, so it would badge a barely-started entry as done.
+  // The parent derives `isComplete` from the picks; the progressive branch has
+  // always derived its own from entry_round_submissions.
   const isSubmitted = progressiveStatus
     ? progressiveStatus.submitted
-    : entry.hasSubmittedPredictions;
+    : isComplete;
   const statusBg = isSubmitted
     ? withOpacity(theme.colors.green, 0.12)
     : withOpacity(theme.colors.amber, 0.12);
   const statusFg = isSubmitted ? theme.colors.green : theme.colors.amber;
+  // "Complete", not "Submitted" — nothing is submitted any more, and the badge
+  // should say what is actually true: every pick is in, and saved.
   const statusLabel = progressiveStatus
-    ? `${isSubmitted ? 'Submitted' : 'In Progress'} · ${progressiveStatus.roundLabel}`
+    ? `${isSubmitted ? 'Complete' : 'In Progress'} · ${progressiveStatus.roundLabel}`
     : isSubmitted
-      ? 'Submitted'
+      ? 'Complete'
       : 'In Progress';
 
   return (

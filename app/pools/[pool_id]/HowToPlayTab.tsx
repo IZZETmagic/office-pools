@@ -77,8 +77,8 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
             <Step number={2} title="Predict the current round">
               Select the currently open round and enter your score predictions. For knockout rounds, you&apos;ll see the <strong>actual qualified teams</strong> &mdash; no guessing needed.
             </Step>
-            <Step number={3} title="Submit before the deadline">
-              Each round has its own deadline. Submit your predictions before the deadline. Predictions auto-save as drafts, and drafts are auto-submitted when the deadline passes.
+            <Step number={3} title="Nothing to submit">
+              Your picks save themselves the moment you make them &mdash; there is no submit button. Each round has its own deadline, and you can keep changing your mind right up to it. Anything still blank when it passes scores 0.
             </Step>
             <Step number={4} title="Repeat for each round">
               After a round completes and the next round&apos;s teams are confirmed, the new round will open. You&apos;ll be notified by email when each round opens.
@@ -103,8 +103,8 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
             <Step number={5} title="Pick knockout bracket winners">
               Based on your group and third-place rankings, the knockout bracket is built. Select the <strong>winner of each match</strong> from the Round of 32 through the Final. Changing an earlier pick will automatically update later rounds.
             </Step>
-            <Step number={6} title="Submit your bracket">
-              When you&apos;re ready, submit your entry. Once submitted, your bracket is locked and cannot be edited. In special circumstances, the pool administrator can unlock your entry to allow changes.
+            <Step number={6} title="Nothing to submit">
+              Your bracket saves itself as you build it &mdash; there is no submit button. You can change any pick until the deadline, and it locks itself then.
             </Step>
           </div>
         ) : (
@@ -120,8 +120,8 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
             <Step number={3} title="Predict match scores">
               For each match, enter your predicted score for both teams. Your predictions auto-save as you type.
             </Step>
-            <Step number={4} title="Submit your predictions">
-              When you&apos;re ready, submit your entry. Once submitted, your predictions are locked and cannot be edited. In special circumstances, the pool administrator can unlock your entry to allow changes.
+            <Step number={4} title="Nothing to submit">
+              There is no submit button &mdash; what you have entered is already saved. You can change any prediction until the deadline, and everything locks itself then.
             </Step>
           </div>
         )}
@@ -139,11 +139,11 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
             </div>
             <div className="flex items-start gap-2">
               <span className="shrink-0 text-success-600 mt-0.5">&#10003;</span>
-              <p>You can edit predictions for the current open round until the deadline. Once submitted or past deadline, that round&apos;s predictions are locked.</p>
+              <p>You can edit predictions for the current open round right up to its deadline &mdash; completing them does not close them. The deadline is the only thing that locks a round.</p>
             </div>
             <div className="flex items-start gap-2">
               <span className="shrink-0 text-primary-600 mt-0.5">&#128274;</span>
-              <p>If you miss a round&apos;s deadline without submitting, you&apos;ll score <strong>0 points</strong> for that round. You can still predict future rounds.</p>
+              <p>Any match you left blank when the deadline passes scores <strong>0 points</strong>. You can still predict future rounds.</p>
             </div>
           </div>
         ) : (
@@ -154,7 +154,7 @@ export function HowToPlayTab({ poolName, maxEntries, isPastDeadline, predictionM
             </div>
             <div className="flex items-start gap-2">
               <span className="shrink-0 text-success-600 mt-0.5">&#10003;</span>
-              <p>You can edit and re-submit your predictions as many times as you like <strong>before the deadline</strong>.</p>
+              <p>You can change your predictions as many times as you like <strong>before the deadline</strong>. Every change saves itself.</p>
             </div>
             <div className="flex items-start gap-2">
               <span className="shrink-0 text-primary-600 mt-0.5">&#128274;</span>
