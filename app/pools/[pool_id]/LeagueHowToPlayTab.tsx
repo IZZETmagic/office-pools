@@ -91,8 +91,14 @@ export function LeagueHowToPlayTab({ poolName, maxEntries, mode, depth }: Props)
                 Every change is saved on its own once you have committed the first version — there
                 is nothing to submit twice.
               </Step>
+              {/* "Fixed for the season" was true only while migrations 109/110
+                  froze a passed deadline. 114 gave the admin the lever back so
+                  somebody who missed it can still file, and a member told the
+                  order was final would have no idea why it reopened. */}
               <Step number={4} title="Change your mind until the deadline">
-                You can keep rearranging right up to the close. After that it is fixed for the season.
+                You can keep rearranging right up to the close, and every table opens to the pool
+                the moment it passes. Your admin can reopen it afterwards to let someone who missed
+                it file one — we&apos;ll email you if that happens.
               </Step>
             </>
           ) : isLms ? (

@@ -1534,13 +1534,29 @@ export function leagueTableDeadlineMovedTemplate(params: {
           hasUnfiledEntry
             ? `You haven't put a table in yet. An entry with no table scores nothing all season, so ` +
               `this is the time.`
-            : `You've already filed a table. You don't have to touch it — but you can change it as ` +
-              `many times as you like before the new deadline, on exactly the same information as ` +
-              `everybody else.`,
+            : wasReopened
+              ? `You've already filed a table. You don't have to touch it — but you can change it as ` +
+                `many times as you like before the new deadline.`
+              : `You've already filed a table. You don't have to touch it — but you can change it as ` +
+                `many times as you like before the new deadline, on exactly the same information as ` +
+                `everybody else.`,
         )}
         ${paragraph(
-          `Nobody's table is shown to the pool until picking closes with everyone in, so no one has ` +
-          `seen your order.`,
+          // ⚠ THIS PARAGRAPH USED TO BE UNCONDITIONAL, and on a reopen it told
+          // the member the exact opposite of the truth. When the old deadline
+          // passed, every table in the pool was shown to everyone (migration
+          // 110) — so by the time a reopen email goes out, their order HAS been
+          // seen. Saying otherwise leaves the members who filed on time as the
+          // only people who do not know the window has changed under them,
+          // which is the "bad feelings" case this product exists to avoid.
+          //
+          // The non-reopen branch also drops "with everyone in": that was 104's
+          // everybody-has-filed hold, withdrawn by 109. The deadline alone does it.
+          wasReopened
+            ? `One thing to know: when the last deadline passed, everyone's table was shown to the ` +
+              `pool. Anyone who looked has seen your order, and theirs — so this is not a clean ` +
+              `restart, and it is worth a look before the new deadline.`
+            : `Nobody's table is shown to the pool until picking closes, so no one has seen your order.`,
           { marginBottom: 0 },
         )}
       `,

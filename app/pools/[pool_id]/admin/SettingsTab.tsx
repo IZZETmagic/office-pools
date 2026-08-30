@@ -424,11 +424,12 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
   /**
    * Which of the moves this is, and how many people it is being made for.
    *
-   * ⚠ `reopen` is now unreachable — migration 109 refuses any move once the
-   * deadline has passed, because that is the instant every table is revealed.
-   * The branch is kept rather than deleted: it costs one comparison, and the
-   * decision to make the deadline final is one day old. If extensions come
-   * back, this comes back with them.
+   * `reopen` is REACHABLE AGAIN as of migration 114 — the straggler rescue that
+   * 109 removed and 110 left frozen. Worth noting that the branch survived the
+   * two migrations that made it dead code, on the grounds that it cost one
+   * comparison and the decision was a day old; that turned out to be the whole
+   * feature, still wired to its own email and push, waiting for the trigger to
+   * stop refusing it.
    */
   const deadlineMove = useMemo(() => {
     const old = deadlineSource ? new Date(deadlineSource) : null
@@ -494,9 +495,29 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
     // Validate deadline if set
     let newDeadline: Date | null = null
+    // Whether the admin actually touched the date. Computed ONCE and reused by
+    // the future-check, the confirmation modal and the PATCH decision below —
+    // the three had the same expression written out three times, which is how
+    // they drift apart.
+    let deadlineUntouched = false
     if (deadlineDate) {
       newDeadline = new Date(`${deadlineDate}T${deadlineTime}:00`)
-      if (newDeadline <= new Date()) {
+      deadlineUntouched =
+        !!deadlineSource &&
+        newDeadline.toISOString() === new Date(deadlineSource).toISOString()
+
+      // ⚠ ONLY WHEN IT MOVED. This check used to run unconditionally, and the
+      // pickers are seeded FROM the current deadline — so on any pool whose
+      // deadline had passed, the field already held a past instant before the
+      // admin touched anything, and this `return` fired ahead of the pool
+      // UPDATE. The whole form was unsaveable: not the name, the visibility,
+      // the cap, the fee. An admin renaming a table pool was told "Deadline
+      // must be in the future" about a date they had not typed.
+      //
+      // A passed deadline is a legitimate resting state — under 114 it is one
+      // the admin may leave alone or move — so it must not be a validation
+      // error to submit it unchanged.
+      if (!deadlineUntouched && newDeadline <= new Date()) {
         setError('Deadline must be in the future.')
         return
       }
@@ -513,15 +534,10 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
     // calls this as `onClick={() => handleSaveAll()}`, and the bare
     // `onClick={handleSaveAll}` form would hand a MouseEvent in as `opts` — which
     // a positional boolean would satisfy, silently skipping the confirmation.
-    if (newDeadline && isTableMode && !opts?.deadlineConfirmed) {
-      const changed =
-        !deadlineSource ||
-        newDeadline.toISOString() !== new Date(deadlineSource).toISOString()
-      if (changed) {
-        setPendingDeadline(newDeadline)
-        setShowDeadlineModal(true)
-        return
-      }
+    if (newDeadline && isTableMode && !opts?.deadlineConfirmed && !deadlineUntouched) {
+      setPendingDeadline(newDeadline)
+      setShowDeadlineModal(true)
+      return
     }
 
     // Validate max entries
@@ -593,7 +609,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
 
     const deadlineChanged = !!newDeadline &&
       (isTableMode || !isLeaguePool) &&
-      (!deadlineSource || newDeadline.toISOString() !== new Date(deadlineSource).toISOString())
+      !deadlineUntouched
 
     // TABLE MODE — the deadline is moved by the route, which also announces it.
     // AWAITED, and a failure stops the save reporting success: a deadline that
@@ -613,7 +629,15 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
         // The trigger's own sentence when there is one — "a table deadline
         // cannot be set in the past", "the table prediction for this pool closed
         // at …". Those explain the refusal; a generic message would not.
-        setError(body?.error ?? 'The deadline could not be moved. Nothing else was changed.')
+        // ⚠ NOT "Nothing else was changed" — that was false. The pool UPDATE
+        // above has already committed by the time this runs, so the name, the
+        // cap and the fee are saved and only the deadline is not. Telling the
+        // admin nothing landed sends them back to re-enter changes they made.
+        setError(
+          body?.error
+            ? `${body.error} Your other settings were saved.`
+            : 'The deadline could not be moved. Your other settings were saved.'
+        )
         setSaving(false)
         return
       }
@@ -1007,20 +1031,27 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           {isTableMode && !tableStatus?.hasPassed && (
             <Alert variant="info">
               This is when members stop being able to order the table, and the moment
-              every table is shown to the whole pool. You can move it to any future date
-              while it is still open — we tell everyone when you do — but once it passes
-              the tables are out and it is fixed.
+              every table is shown to the whole pool. You can move it to any future date —
+              we tell everyone when you do. Moving it after it has passed is possible too,
+              to rescue someone who missed it, but it costs more: see the warning that
+              appears here once the tables are out.
             </Alert>
           )}
 
-          {/* Once the tables are out the deadline is fixed, and saying so where
-              the admin would otherwise try to move it is kinder than letting the
-              trigger refuse them after they have typed a date. */}
+          {/* ⚠ THIS ALERT IS THE SAFEGUARD. Migration 114 removed the trigger
+              that refused a reopen, so nothing below the UI stops this move —
+              the admin knowing what it does IS the control. That is the whole
+              basis on which 114 clears the disclosure gate, so this text is
+              held in place by a guard test. Do not soften it to "members may
+              revise": the harm is specifically that SOME of them revise knowing
+              what everyone else put, and the pool cannot tell which. */}
           {isTableMode && tableStatus?.hasPassed && (
             <Alert variant="warning">
-              This deadline has passed, so every table is open to the pool and the date
-              is now fixed. Reopening it would let someone rewrite their order having
-              already read everybody else&apos;s.
+              This deadline has passed, so every table is open to the pool. You can still
+              move it forward to let someone who missed it file one — everybody gets told,
+              and every table hides again until the new date. But anyone who already looked
+              can now re-order knowing what their rivals put, and nothing can tell you who
+              did.
             </Alert>
           )}
 
@@ -1112,20 +1143,21 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
             </div>
           </div>
 
-          {/* Hidden once the deadline has passed: it is fixed from then on
-              (migration 109), so a row of shortcuts would offer a move the
-              database refuses. */}
-          {!(isTableMode && tableStatus?.hasPassed) && (
-            <div className="flex flex-wrap gap-2">
-              {quickPicks.map((q) => (
-                <QuickDeadlineButton
-                  key={q.key}
-                  label={q.label}
-                  onClick={() => { setDeadlineDate(q.date); setDeadlineTime(q.time) }}
-                />
-              ))}
-            </div>
-          )}
+          {/* Shown whether or not the deadline has passed. They were hidden
+              while 109/110 froze it, because a shortcut that sets a date the
+              database refuses is a dead control — but 114 unfroze it, and a
+              reopen is the case that needs these MOST. "Close it when Matchweek
+              6 locks" is exactly the decision an admin rescuing a straggler is
+              trying to make, and typing it by hand is where they get it wrong. */}
+          <div className="flex flex-wrap gap-2">
+            {quickPicks.map((q) => (
+              <QuickDeadlineButton
+                key={q.key}
+                label={q.label}
+                onClick={() => { setDeadlineDate(q.date); setDeadlineTime(q.time) }}
+              />
+            ))}
+          </div>
         </Card>
         )}
 
@@ -1406,7 +1438,10 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
               )}
             </p>
 
-            <Alert variant={deadlineMove.kind === 'shorten' ? 'warning' : 'info'}>
+            {/* A reopen is a warning, not an FYI. Only a plain extension of an
+                open deadline — where nobody has seen anything yet — is benign
+                enough to be `info`. */}
+            <Alert variant={deadlineMove.kind === 'extend' ? 'info' : 'warning'}>
               <ul className="space-y-1">
                 {deadlineMove.kind === 'reopen' && (
                   <li>
@@ -1428,18 +1463,40 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
                   &#8226; All {members.length} member{members.length === 1 ? '' : 's'} get an
                   email and a push telling them the new deadline
                 </li>
-                <li>
-                  &#8226; Nobody has seen anybody else&apos;s table, so no one revises with an
-                  advantage
-                </li>
+                {/* ⚠ THIS BULLET WAS UNCONDITIONAL AND IS THE ONE THAT MATTERED.
+                    The reassuring version below is true for an extension and a
+                    shortening — the deadline has not passed, so the RLS policies
+                    are still closed and no table has been read. On a REOPEN it is
+                    exactly backwards: the tables have been open since the old
+                    deadline. Printing it there told the admin the move was safe
+                    at the moment they were confirming the one move that is not.
+                    See migration 114's header. */}
+                {deadlineMove.kind === 'reopen' ? (
+                  <li>
+                    &#8226; <strong>Everyone has already seen everyone else&apos;s table</strong> —
+                    anyone who looked can re-order knowing what their rivals put, and
+                    nothing records who did
+                  </li>
+                ) : (
+                  <li>
+                    &#8226; Nobody has seen anybody else&apos;s table, so no one revises with an
+                    advantage
+                  </li>
+                )}
                 {tableStatus && tableStatus.total > 0 && (
                   <li>
                     &#8226; {tableStatus.filed} of {tableStatus.total} have filed a table so far
                   </li>
                 )}
+                {/* No longer "fixed from then on" — 114 keeps the lever after
+                    the deadline passes, so promising otherwise here would be
+                    the same false statement the old warning alert made.
+                    "Hides again" belongs only to the reopen: in the other two
+                    the deadline has not passed, so nothing was ever open. */}
                 <li>
-                  &#8226; Once every table is in and the deadline passes, they all open at
-                  once — and the date is fixed from then on
+                  {deadlineMove.kind === 'reopen'
+                    ? '• Every table hides again now, and they all open together when this new deadline passes'
+                    : '• They all open together the moment this new deadline passes'}
                 </li>
               </ul>
             </Alert>

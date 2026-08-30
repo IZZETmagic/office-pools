@@ -67,6 +67,7 @@ const settings = read('app/pools/[pool_id]/admin/SettingsTab.tsx')
 const notify = read('lib/league/notify.ts')
 const m109 = read('lib/migrations/109_the_deadline_reveals_everyone.sql')
 const m110 = read('lib/migrations/110_the_deadline_is_the_only_switch.sql')
+const m114 = read('lib/migrations/114_the_deadline_reopens.sql')
 const page = read('app/pools/[pool_id]/page.tsx')
 const detail = read('app/pools/[pool_id]/PoolDetail.tsx')
 
@@ -360,10 +361,35 @@ describe('leagueTableDeadlineMovedTemplate', () => {
     expect(reopened.html).toMatch(/not just the people who hadn(&#39;|')t filed/i)
   })
 
-  it('says nobody has seen their order', () => {
-    // The reason an extension is not a leak — and the thing a member would
-    // otherwise, reasonably, assume had happened.
-    expect(reopened.html).toMatch(/no one has\s+seen your order|nobody(&#39;|')s table is shown/i)
+  it('says nobody has seen their order — on an ORDINARY move', () => {
+    // The reason an extension is not a leak, and the thing a member would
+    // otherwise, reasonably, assume had happened. True here because the
+    // deadline has not passed, so the RLS policies are still closed.
+    expect(moved.html).toMatch(/no one has\s+seen your order|nobody(&#39;|')s table is shown/i)
+  })
+
+  it('does NOT say it on a reopen — by then it is false', () => {
+    // ⚠ THIS ASSERTION USED TO REQUIRE THE OPPOSITE, against `reopened`. It was
+    // written when 104 held the reveal back until everyone had filed, so a
+    // reopened pool genuinely had shown nobody anything. 110 made the deadline
+    // itself the reveal, which means that by the time a REOPEN email exists the
+    // old deadline has passed and every table has been public since. The
+    // sentence survived the migration that falsified it, pinned by this test.
+    expect(reopened.html).not.toMatch(/no one has\s+seen your order/i)
+    expect(reopened.html).not.toMatch(/nobody(&#39;|')s table is shown/i)
+  })
+
+  it('tells the reopened pool that their tables were already seen', () => {
+    // The member who filed on time and did not peek is the one with something
+    // to lose here, and the only one who would not otherwise find out.
+    expect(reopened.html).toMatch(/everyone(&#39;|')s table was shown to the\s+pool/i)
+    expect(reopened.html).toMatch(/has seen your order/i)
+  })
+
+  it('drops 104\'s withdrawn "with everyone in" from the ordinary move', () => {
+    // The everybody-has-filed hold was removed by 109. The deadline alone
+    // reveals, so promising a second condition describes a rule that is gone.
+    expect(moved.html).not.toMatch(/with everyone in/i)
   })
 
   it('distinguishes a reopen from an ordinary move in the subject', () => {
@@ -393,15 +419,43 @@ describe('leagueTableDeadlineMovedTemplate', () => {
 
 // =============================================================
 describe('the admin form no longer promises a frozen deadline', () => {
-  it('tells the admin the deadline is final once it passes', () => {
-    // ⚠ INVERTED BY 109. This test used to require the opposite — that the form
-    // said the deadline could move "including after it has passed" — which was
-    // 104's rule. 109 reveals every table the moment the deadline passes, and
-    // 104 freezes the deadline at the reveal, so the two together make a passed
-    // deadline final. The screen has to say the rule that is live.
+  it('does not tell the admin the deadline is final once it passes', () => {
+    // ⚠ INVERTED TWICE, AND THIS IS THE SECOND TIME. 104 said the deadline could
+    // move "including after it has passed"; 109 + 110 froze it and this test was
+    // flipped to demand the screen say so; 114 unfroze it again. What the test
+    // is really for is that the copy and the trigger agree — a screen promising
+    // a frozen deadline over a database that allows the move is the defect,
+    // whichever way round the rule currently is.
     const alerts = settings.slice(settings.indexOf('isTableMode && !tableStatus?.hasPassed'))
-    expect(alerts.slice(0, 900)).not.toMatch(/including after it has passed/i)
-    expect(alerts.slice(0, 900)).toMatch(/once it passes\s+the tables are out and it is fixed/i)
+    expect(alerts.slice(0, 1400)).not.toMatch(/the tables are out and it is fixed/i)
+    expect(alerts.slice(0, 1400)).not.toMatch(/the date\s+is now fixed/i)
+  })
+
+  it('warns, on the passed-deadline alert, that a reopen hands out an advantage', () => {
+    // ⚠ THE LOAD-BEARING SENTENCE. Migration 114 removed the trigger that
+    // refused the reopen, so this alert is the only thing standing between the
+    // admin and a move that lets anyone who peeked re-order with knowledge.
+    // 114 clears CLAUDE.md's disclosure gate ONLY because this is on screen.
+    const passed = settings.slice(settings.indexOf("isTableMode && tableStatus?.hasPassed"))
+    expect(passed.slice(0, 900)).toMatch(/already looked/i)
+    expect(passed.slice(0, 900)).toMatch(/knowing what their rivals put/i)
+  })
+
+  it('never prints "nobody has seen" on a reopen confirmation', () => {
+    // That bullet was unconditional. On a reopen it is precisely backwards —
+    // the tables have been open since the old deadline — so it reassured the
+    // admin at the one moment the reassurance was false.
+    // codeOnly again: the comment above the ternary quotes the old bullet, so a
+    // raw indexOf finds the explanation rather than the JSX.
+    const jsx = codeOnly(settings)
+    const reopenBullet = jsx.indexOf('Everyone has already seen everyone else')
+    const elseBullet = jsx.indexOf('Nobody has seen anybody else')
+    expect(reopenBullet).toBeGreaterThan(-1)
+    expect(elseBullet).toBeGreaterThan(-1)
+    // The reassuring line must be the ELSE half of a reopen ternary: the reopen
+    // wording comes first, and a `) : (` separates the two.
+    expect(reopenBullet).toBeLessThan(elseBullet)
+    expect(jsx.slice(reopenBullet, elseBullet)).toMatch(/\)\s*:\s*\(/)
   })
 
   it('has no second door — the reveal is not an admin decision any more', () => {
@@ -420,5 +474,97 @@ describe('the admin form no longer promises a frozen deadline', () => {
     // nothing — for any deadline whose UTC and local dates disagree.
     expect(settings).toMatch(/function localDateValue/)
     expect(codeOnly(settings)).not.toMatch(/toISOString\(\)\.split\('T'\)\[0\]/)
+  })
+})
+
+// =============================================================
+// Migration 114 is where the LIVE deadline rule now is. 104, 107, 109 and 110
+// above are the history that produced it, and the assertions that describe a
+// frozen deadline are assertions about those FILES — migrations are append-only,
+// so they stay true and must not be edited to match the new rule.
+// =============================================================
+describe('migration 114 — the deadline reopens', () => {
+  it('removes the freeze', () => {
+    const fn = m114.slice(m114.indexOf('FUNCTION public.enforce_league_mode_immutable'))
+    const body = fn.slice(0, fn.indexOf('COMMENT ON FUNCTION'))
+    // 109's block, kept by 110, gone here. Its absence is the whole migration.
+    expect(codeOnly(body)).not.toMatch(/IF now\(\) >= OLD\.league_table_lock_at THEN/)
+    expect(codeOnly(body)).not.toMatch(/It cannot be reopened/)
+  })
+
+  it('keeps every guard that is not the freeze', () => {
+    // 114 replaces the whole function, so a clause dropped by accident here
+    // silently undoes an earlier migration rather than failing loudly.
+    const fn = m114.slice(m114.indexOf('FUNCTION public.enforce_league_mode_immutable'))
+    const body = fn.slice(0, fn.indexOf('COMMENT ON FUNCTION'))
+    expect(body).toMatch(/league_mode is fixed at pool creation/)
+    expect(body).toMatch(/cannot be set in the past/)
+    expect(body).toMatch(/NEW\.table_deadline_reminder_sent_at := NULL/)
+  })
+
+  it('still refuses a deadline in the past', () => {
+    // With the freeze gone this is the ONLY constraint left on the move. A
+    // reopen landing in the past would reopen writes and re-reveal in the same
+    // instant, which is a state nobody chooses on purpose.
+    const fn = m114.slice(m114.indexOf('FUNCTION public.enforce_league_mode_immutable'))
+    const body = fn.slice(0, fn.indexOf('COMMENT ON FUNCTION'))
+    expect(body).toMatch(/NEW\.league_table_lock_at <= now\(\)/)
+  })
+
+  it('brings back no reveal stamp — 110 stands', () => {
+    // The rescue is restored by dropping the freeze, NOT by restoring 104's
+    // second switch. 109's header asked for exactly this and warned against
+    // the half-revert.
+    expect(codeOnly(m114)).not.toMatch(/league_table_revealed_at/)
+    expect(codeOnly(m114)).not.toMatch(/league_reveal_table_if_ready/)
+    expect(codeOnly(m114)).not.toMatch(/league_reveal_table_now/)
+  })
+
+  it('records what the reopen costs, where the next person will read it', () => {
+    // The harm is disclosed rather than prevented, which is only defensible if
+    // the reasoning survives next to the code that permits it.
+    expect(m114).toMatch(/re-?hides/i)
+    expect(m114).toMatch(/disclosure gate/i)
+  })
+})
+
+// =============================================================
+// The straggler rescue is one path across four files. It was fully built, then
+// made unreachable by 109/110 without being removed, which is why 114 is a
+// trigger change and almost nothing else. These assertions keep the far end of
+// the path alive so it cannot rot while the trigger allows it.
+// =============================================================
+describe('the reopen path is wired end to end', () => {
+  it('the settings form can still reach the reopen branch', () => {
+    expect(settings).toMatch(/kind: 'reopen' \| 'extend' \| 'shorten'/)
+    expect(settings).toMatch(/Reopen and tell everyone/)
+    // The comment that called it dead code has to go with the freeze.
+    expect(settings).not.toMatch(/`reopen` is now unreachable/)
+  })
+
+  it('the route still tells the reopen apart from an ordinary move', () => {
+    expect(codeOnly(route)).toMatch(/wasReopened/)
+  })
+
+  it('the notification still has its own words for a reopen', () => {
+    expect(notify).toMatch(/Your table is open again/)
+  })
+
+  it('an untouched deadline does not block the rest of the form', () => {
+    // The pickers are seeded FROM the deadline, so on a passed-deadline pool
+    // the field holds a past instant before the admin types anything. While the
+    // future-check ran unconditionally, that `return` fired ahead of the pool
+    // UPDATE and NO setting could be saved — not the name, the cap or the fee.
+    expect(settings).toMatch(/deadlineUntouched/)
+    expect(settings).toMatch(/if \(!deadlineUntouched && newDeadline <= new Date\(\)\)/)
+  })
+
+  it('does not claim nothing was saved when the deadline alone failed', () => {
+    // The pool UPDATE commits before the PATCH runs, so "Nothing else was
+    // changed" sent the admin back to re-enter changes that had landed.
+    // codeOnly, because the comment recording the fix quotes the sentence it
+    // replaced — the exact case the helper's own docblock describes.
+    expect(codeOnly(settings)).not.toMatch(/Nothing else was changed/)
+    expect(settings).toMatch(/Your other settings were saved/)
   })
 })
