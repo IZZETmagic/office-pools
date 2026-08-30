@@ -134,6 +134,22 @@ export default function SurvivorTab({
   )
   const iAmOut = me?.eliminated_matchweek != null
 
+  /**
+   * Which of the two week-blocks the status card shows.
+   *
+   * ⚠ `showInPlay` is NOT simply "a week is in play". A round can open on the
+   * matchweek AFTER the one still being played, and there is no pick for a week
+   * that predates the round — so the block is skipped rather than rendered as an
+   * accusation aimed at somebody who did nothing wrong.
+   *
+   * `bothWeeks` is what turns the card into two columns. It is deliberately the
+   * only thing that does: one block on its own gets the full width, because a
+   * half-width lone block reads as something that failed to load.
+   */
+  const showInPlay = inPlayMatchweek !== null && inPlayMatchweek >= (round?.first_matchweek ?? Infinity)
+  const showOpen = currentMatchweek !== null
+  const bothWeeks = showInPlay && showOpen
+
   const standing = survivors.filter((s) => s.eliminated_matchweek === null)
   const out = survivors
     .filter((s) => s.eliminated_matchweek !== null)
@@ -212,13 +228,29 @@ export default function SurvivorTab({
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* IN PLAY. Skipped when the round began after this week did: there
-                is no pick for a matchweek that predates the round, and reading
-                that absence as "you missed it" would alarm somebody who did
-                nothing wrong. */}
-            {inPlayMatchweek !== null && inPlayMatchweek >= round.first_matchweek && (
-              <div>
+          /* NOW AND NEXT, SIDE BY SIDE.
+
+             Ryan, 2026-08-30, on the stacked version: "these can be next to
+             each other or one on the left and one on the right — this is now
+             and the [other] is coming up or next."
+
+             Stacked, the two blocks read as a list of two equal things, and
+             the rule under them has to do all the work of saying which is
+             which. Side by side they read as a SEQUENCE — left is the game on,
+             right is the one to come — which is the relationship, not just the
+             order.
+
+             Two columns only when there ARE two. A lone block spanning half
+             the card would look like something failed to load, so the grid
+             collapses to one column whenever one side is absent, and on a
+             phone always. */
+          <div className={`grid gap-3 ${bothWeeks ? 'sm:grid-cols-2 sm:gap-0' : ''}`}>
+            {/* IN PLAY — the game on now. Skipped when the round began after
+                this week did: there is no pick for a matchweek that predates the
+                round, and reading that absence as "you missed it" would alarm
+                somebody who did nothing wrong. */}
+            {showInPlay && (
+              <div className={bothWeeks ? 'sm:pr-5' : undefined}>
                 <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-0.5">
                   Matchweek {inPlayMatchweek} — in play
                 </p>
@@ -241,13 +273,20 @@ export default function SurvivorTab({
               </div>
             )}
 
-            {/* OPEN — the next decision, kept visually separate from the one
-                already playing. */}
-            {currentMatchweek !== null && (
-              <div className={inPlayMatchweek !== null && inPlayMatchweek >= round.first_matchweek
-                ? 'pt-3 border-t border-border-default' : undefined}>
+            {/* NEXT UP — the decision still to make. "Open" is what the DATABASE
+                calls this week; "next up" is what it is to the person reading,
+                and beside a week that is already running it is the word that
+                carries the sequence. The sentence below still says it can be
+                changed, which is the part "open" was doing.
+
+                The rule between them turns with the layout: a line ABOVE when
+                stacked, a line to the LEFT when side by side. */}
+            {showOpen && (
+              <div className={showInPlay
+                ? 'pt-3 border-t border-border-default sm:pt-0 sm:pl-5 sm:border-t-0 sm:border-l'
+                : undefined}>
                 <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-0.5">
-                  Matchweek {currentMatchweek} — open
+                  Matchweek {currentMatchweek} — next up
                 </p>
                 {openPick ? (
                   <>
@@ -277,7 +316,7 @@ export default function SurvivorTab({
 
             {/* Nothing playing and nothing open: the season has run out of
                 matchweeks. Said plainly rather than left as an empty card. */}
-            {currentMatchweek === null && inPlayMatchweek === null && (
+            {!showInPlay && !showOpen && (
               <div>
                 <p className="text-sm font-semibold text-neutral-900">No matchweek to pick</p>
                 <p className="text-xs text-neutral-500 mt-1">
