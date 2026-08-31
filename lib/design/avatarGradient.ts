@@ -46,3 +46,26 @@ export function avatarGradient(userId: string): string {
   const [from, to] = AVATAR_GRADIENTS[hashUserIdToIndex(userId, AVATAR_GRADIENTS.length)]
   return `linear-gradient(135deg, ${from}, ${to})`
 }
+
+/**
+ * The one flat colour that stands for a user — their avatar's first stop.
+ *
+ * For the places a gradient cannot go: a 6px bar, a ring, a chart segment. It
+ * is the SAME colour the avatar opens with, so a blue segment beside a blue
+ * face reads as one person rather than two things that happen to be blue.
+ *
+ * ⚠ THE FIRST STOP, NOT THE SECOND, and not a blend. Every pair in the list
+ * runs light → dark, so the first is the brighter of the two and the one that
+ * survives on a dark ground. Measured against `--sp-midnight` (#0B0F1A) the ten
+ * first stops sit at L=0.585 (indigo) to L=0.821 (peach) — all clear of the
+ * ground, so no lightening step is needed. If a future colour is added below
+ * about L=0.5, use `adjustLightness` from `lib/design/oklch.ts` rather than
+ * hand-picking a lighter hex, or the two platforms will drift.
+ *
+ * ⚠ NOT MIRRORED IN RN. The array is the thing that has to stay byte-identical
+ * across platforms (`avatarGradient.test.ts` guards it); this is a web-side
+ * accessor over it and adds no new colour.
+ */
+export function avatarColor(userId: string): string {
+  return AVATAR_GRADIENTS[hashUserIdToIndex(userId, AVATAR_GRADIENTS.length)][0]
+}
