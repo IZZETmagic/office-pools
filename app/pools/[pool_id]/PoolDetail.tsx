@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/Icon'
 import { useTheme } from '@/components/ThemeProvider'
 import { AppHeader } from '@/components/ui/AppHeader'
 import { LeaderboardTab } from './LeaderboardTab'
+import { DuelRecapSheet, type DuelRecap } from './DuelRecapSheet'
 import { ResultsTab } from './ResultsTab'
 import { BracketResultsTab } from './BracketResultsTab'
 import { StandingsTab } from './StandingsTab'
@@ -139,6 +140,15 @@ export type MatchweekFixture = {
 /** Everything DuelsTab needs, assembled server-side in page.tsx. */
 export type ShowdownData = {
   duels: DuelRow[]
+  /**
+   * The settled duel this viewer has not been shown yet, or null.
+   *
+   * ⚠ Resolved on the SERVER, not derived here. The test is "my most recently
+   * settled duel is newer than `pool_entries.last_recap_seen_at`", and the
+   * marker is not in this component's props — deliberately, because deriving it
+   * client-side would mean shipping every entry's marker to every member.
+   */
+  recap: DuelRecap | null
   entryNames: Map<string, string>
   ownEntryIds: string[]
   /** Open for picks. ⚠ During a matchweek this is the week AFTER the one being
@@ -454,6 +464,37 @@ export function PoolDetail({
   })
   const isDemoPool = initialPool.pool_id === '66b67286-e36e-40fd-8893-2a1fde0d018b'
   const [showHowToPlayModal, setShowHowToPlayModal] = useState(!hasSeenHowToPlay || isDemoPool)
+
+  /**
+   * THE DUEL RECAP — pool-wide, so it finds the member who never opens the Duel
+   * tab, who is exactly the member it is for. Ryan's call, 2026-08-31.
+   *
+   * ⚠ IT DOES NOT GATE ANYTHING. The result is already on the duel card, the
+   * season table and the leaderboard behind this sheet. Withholding it until
+   * the ceremony is seen would be "we hold your score back so you come back" —
+   * the disclosure gate's own example of a failure.
+   */
+  const [recapDismissed, setRecapDismissed] = useState(false)
+  const duelRecap = showdownData?.recap ?? null
+  const dismissRecap = useCallback(() => {
+    // Optimistic: the sheet closes even if the write is slow or fails. A failed
+    // write means it reappears next visit — mildly annoying, and far better
+    // than the alternative.
+    setRecapDismissed(true)
+    if (!duelRecap || isDemoPool) return
+    const supabase = createClient()
+    supabase
+      .from('pool_entries')
+      .update({ last_recap_seen_at: new Date().toISOString() })
+      .eq('entry_id', duelRecap.entryId)
+      .then(({ error }) => {
+        // ⚠ LOGGED, NOT DISCARDED. `has_seen_how_to_play` throws its result
+        // away with a bare `.then()`, and a swallowed PostgREST error is a
+        // documented way this codebase has lost hours. If the column ever loses
+        // its UPDATE grant this is the only thing that would say so.
+        if (error) console.error('[recap] marking seen failed:', error.message)
+      })
+  }, [duelRecap, isDemoPool])
 
   // Unread banter badge
   const singlePoolId = useMemo(() => [initialPool.pool_id], [initialPool.pool_id])
@@ -2617,6 +2658,15 @@ export function PoolDetail({
           </div>
         </div>
       )}
+
+      {/* ⚠ WRITE ON DISMISS, NOT ON OPEN. The how-to-play effect above marks
+          itself seen the moment it mounts, which is right when the modal IS the
+          page. Here it would mean a member who closes the tab mid-animation has
+          "seen" a result they never read. */}
+      <DuelRecapSheet
+        recap={recapDismissed ? null : duelRecap}
+        onDismiss={dismissRecap}
+      />
     </div>
   )
 }

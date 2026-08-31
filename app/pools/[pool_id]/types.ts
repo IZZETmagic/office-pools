@@ -105,6 +105,15 @@ export type EntryData = {
   previous_rank: number | null
   last_rank_update: string | null
   created_at: string
+  /**
+   * When this entry last dismissed a duel recap (migration 122).
+   *
+   * ⚠ A TIMESTAMP, compared against the duel's `settled_at` — never a
+   * matchweek number. Rounds are played out of numerical order (101 measured a
+   * minimum gap of minus 121 days), so a high-water mark on the number would
+   * silently stop a member ever seeing another recap.
+   */
+  last_recap_seen_at: string | null
   // Stored scoring engine values
   match_points: number | null
   bonus_points: number | null

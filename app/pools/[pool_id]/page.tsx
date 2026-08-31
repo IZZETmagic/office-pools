@@ -192,6 +192,56 @@ export default async function PoolPage({
         }
       }
 
+      /**
+       * The settled duel this viewer has not been shown yet.
+       *
+       * ⚠ ORDERED BY `settled_at`, NEVER BY MATCHWEEK NUMBER. Rounds are played
+       * out of numerical order — migration 101 measured a minimum gap of minus
+       * 121 days across three real seasons — so "the latest" has to mean the
+       * latest to have been DECIDED. Migration 122's marker is a timestamp for
+       * the same reason.
+       *
+       * ⚠ Only ONE is ever returned. A member away for three weeks has three
+       * settled duels behind them and gets the most recent; the rest are
+       * history, and the season table shows them. That falls out of the
+       * comparison rather than needing a rule.
+       */
+      const buildDuelRecap = (): import('./PoolDetail').ShowdownData['recap'] => {
+        const mine = new Set(userEntryIds)
+        const settled = duels
+          .filter((d) => d.settled_at && (mine.has(d.entry_a) || (d.entry_b && mine.has(d.entry_b))))
+          .sort((a, b) => b.settled_at!.localeCompare(a.settled_at!))
+        for (const d of settled) {
+          const iAmA = mine.has(d.entry_a)
+          const myEntry = iAmA ? d.entry_a : d.entry_b!
+          const seen = userEntries.find((e) => e.entry_id === myEntry)?.last_recap_seen_at ?? null
+          if (seen && d.settled_at! <= seen) continue
+          const themEntry = iAmA ? d.entry_b : d.entry_a
+          const side = (e: string) => ({
+            name: entryNames.get(e) ?? 'Unknown',
+            person: entryPeople.get(e) ?? null,
+            score: (iAmA === (e === d.entry_a) ? d.accuracy_a : d.accuracy_b) ?? 0,
+          })
+          return {
+            entryId: myEntry,
+            matchweek: d.matchweek_number,
+            settledAt: d.settled_at!,
+            you: {
+              name: entryNames.get(myEntry) ?? 'You',
+              person: entryPeople.get(myEntry) ?? null,
+              score: (iAmA ? d.accuracy_a : d.accuracy_b) ?? 0,
+            },
+            // ⚠ NULL IS A BYE. It is the only safe test — a bye pays DUEL_BYE,
+            // which IS DUEL_TIE, so the points cannot tell them apart.
+            them: themEntry ? side(themEntry) : null,
+            // What the engine paid, read rather than recomputed, so a future
+            // revaluation needs no change here.
+            points: (iAmA ? d.points_a : d.points_b) ?? 0,
+          }
+        }
+        return null
+      }
+
       showdownData = {
         duels,
         entryNames,
@@ -209,6 +259,7 @@ export default async function PoolPage({
         duelPoints: new Map(
           [...totalsRes.totals].map(([entryId, t]) => [entryId, t.duelPoints]),
         ),
+        recap: buildDuelRecap(),
       }
     }
 

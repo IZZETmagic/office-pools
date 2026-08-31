@@ -68,8 +68,9 @@ export const MATCH_COLUMNS =
 // has_seen_how_to_play from page.tsx's membership lookup, last_read_at from
 // hooks/useUnreadBanter — never off this array. 66 kB -> 44 kB on 192 members.
 //
-// `pool_entries(*)` stays wide on purpose: EntryData declares all 21 columns the
-// table has, and every one is read somewhere in the web app. Narrowing it would
+// `pool_entries(*)` stays wide on purpose: EntryData declares every column the
+// table has, and each is read somewhere in the web app. (It said "all 21" until
+// 2026-08-31; a count in a comment is a fact with an expiry date.) Narrowing it would
 // mean changing the type, and a narrowed SELECT under a wide type hands consumers
 // `undefined` silently.
 export const POOL_MEMBER_COLUMNS = 'member_id, pool_id, user_id, role, joined_at, entry_fee_paid'

@@ -161,7 +161,15 @@ describe('the sealed draw is described honestly', () => {
 // is the app's face and nobody decided that. The allowlist is the decision, and
 // widening it should be as deliberate as adding the font was.
 describe('the Showdown display face does not leak', () => {
-  const ALLOWED = ['app/pools/[pool_id]/DuelsTab.tsx']
+  // ⚠ WIDENED ONCE, 2026-08-31, and this is what widening it should look like:
+  // a named surface with a reason, not a directory. `DuelRecapSheet` is the
+  // one-time "how your duel went" ceremony — the same fight-night register as
+  // the duel card, and the exact case the face was added for. Anything that is
+  // not a ceremony surface still belongs in Nunito.
+  const ALLOWED = [
+    'app/pools/[pool_id]/DuelsTab.tsx',
+    'app/pools/[pool_id]/DuelRecapSheet.tsx',
+  ]
 
   it('only Showdown surfaces use t-display', () => {
     // Comments stripped: `app/layout.tsx` explains the scope rule in a JSDoc
