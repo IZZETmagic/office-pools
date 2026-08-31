@@ -59,7 +59,6 @@
 // =============================================================
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
@@ -133,7 +132,22 @@ type Props = {
   /** Duel points per entry, from the leaderboard read. */
   duelPoints: Map<string, number>
   /** For the "finish your picks" jump. `?tab=` is how PoolCard already does it. */
-  poolId: string
+  /**
+   * Go to the Predictions tab.
+   *
+   * ⚠ A CALLBACK, NOT A `router.push`. This used to push
+   * `/pools/{id}?tab=predictions`, which changed the URL and nothing else: the
+   * pool page reads `?tab=` in a `useState` INITIALISER, so it is consulted
+   * once on mount, and the only thing that re-reads it afterwards is a
+   * `popstate` listener. A client-side push to the same route neither remounts
+   * the page nor fires popstate, so the address bar said `predictions` while
+   * the duel tab stayed on screen — the button looked broken because it did
+   * exactly half its job.
+   *
+   * The parent owns tab state, so the parent switches tabs. This also picks up
+   * `handleTabSwitch`'s unsaved-changes guard for free.
+   */
+  onGoToPicks: () => void
   /** Your points and the pool's median, per matchweek (migration 124). */
   series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
 }
@@ -565,10 +579,9 @@ export default function DuelsTab({
   totals,
   form,
   duelPoints,
-  poolId,
+  onGoToPicks,
   series,
 }: Props) {
-  const router = useRouter()
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
 
   /** Every duel the viewer is in, oriented so "you" is always the first side. */
@@ -1283,7 +1296,7 @@ export default function DuelsTab({
               <p className="t-body text-muted">Your sheet is in. Nothing left to pick.</p>
               <button
                 type="button"
-                onClick={() => router.push(`/pools/${poolId}?tab=predictions`)}
+                onClick={onGoToPicks}
                 className="w-full sm:w-auto shrink-0 rounded-pill bg-primary-600 text-white
                            t-caption px-6 py-3 hover:bg-primary-700 active:bg-primary-800
                            transition-colors"
@@ -1302,7 +1315,7 @@ export default function DuelsTab({
               </p>
               <button
                 type="button"
-                onClick={() => router.push(`/pools/${poolId}?tab=predictions`)}
+                onClick={onGoToPicks}
                 className="w-full sm:w-auto shrink-0 rounded-pill bg-primary-600 text-white
                            t-caption px-6 py-3 hover:bg-primary-700 active:bg-primary-800
                            transition-colors"

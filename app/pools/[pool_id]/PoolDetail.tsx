@@ -2471,7 +2471,7 @@ export function PoolDetail({
                 allPredictions={allPredictions}
                 bulkState={bulkState}
                 totals={showdownData.totals}
-                poolId={pool.pool_id}
+                onGoToPicks={() => handleTabSwitch('predictions')}
                 series={showdownData.series}
                 form={leagueForm}
                 duelPoints={showdownData.duelPoints}
