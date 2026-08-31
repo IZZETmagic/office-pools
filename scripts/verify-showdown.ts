@@ -60,6 +60,13 @@ const POOL_EVEN = `${S}000000000002` // 6 entries
 const POOL_ODD  = `${S}000000000003` // 5 entries -> byes
 const POOL_PICK = `${S}000000000004` // control: pickem, cascade must not move
 const POOL_LATE = `${S}000000000005` // created after matchweeks 1-4 have locked
+// ⚠ The scratch season needs its OWN tournament. Migration 111 raises unless a
+// pool's tournament and league season resolve to the same (external_provider,
+// external_league_id, external_season) triple — and this script used to borrow
+// whichever league pool `.limit(1)` returned, which is a real competition with
+// a real triple. That worked until 111 landed and then failed in setup with
+// "this pool names two different competitions".
+const TOURNAMENT = `${S}000000000009`
 const MEM = (n: number) => `${S}00000000001${n}`
 const MW = (n: number) => `${S}0000000000${(20 + n).toString().padStart(2, '0')}`
 const CLUB = (n: number) => `${S}00000000004${n}`
@@ -105,10 +112,19 @@ async function setup() {
   const users = await must('admin user',
     admin.from('users').select('user_id').eq('username', 'IZZETmagic').limit(1))
   const adminUser = ((users ?? [])[0] as { user_id: string }).user_id
-  const tp = await must('league tournament',
-    admin.from('pools').select('tournament_id').not('league_season_id', 'is', null).limit(1))
-  const tournamentId = ((tp ?? [])[0] as { tournament_id: string }).tournament_id
   const future = (h: number) => new Date(Date.now() + h * 3600e3).toISOString()
+
+  // Matches the scratch season's triple exactly, and format='league' — both
+  // halves of migration 111's rule. Borrowing a real tournament raises.
+  await must('scratch tournament', admin.from('tournaments').insert({
+    tournament_id: TOURNAMENT, name: '__scratch 116 (auto-deleted)',
+    tournament_type: 'league', year: 2026, num_teams: 4, num_groups: 1,
+    teams_per_group: 4, start_date: '2026-08-01', end_date: '2027-05-30',
+    prediction_deadline: future(24), status: 'upcoming',
+    external_provider: 'scratch', external_league_id: -100, external_season: -2026,
+    format: 'league',
+  }).select('tournament_id'))
+  const tournamentId = TOURNAMENT
 
   await must('season', admin.from('league_seasons').insert({
     season_id: SEASON, competition_slug: 'scratch-100', competition_name: 'Scratch 100',
@@ -363,8 +379,23 @@ async function neverInThePast() {
     .update({ lock_at: new Date(Date.now() - 3600e3).toISOString() })
     .in('matchweek_id', [MW(1), MW(2), MW(3), MW(4)]).select('matchweek_id'))
 
+  // ⚠ THIS EXPECTED VALUE WAS STALE — it encoded 095, not 100.
+  //
+  // 095 rebuilt from the first matchweek not yet LOCKED, which is 5 here. 100
+  // then added the guard this file's own header describes — *"never the LIVE
+  // matchweek if it already has a draw… redrawing it swaps the opponent of
+  // somebody who has already picked"* — and POOL_ODD was given a full schedule
+  // back in section 2, so matchweek 5 already has one. The generator must skip
+  // it and start at 6. The assertion was never updated when 100 landed.
+  //
+  // The proof that this is the guard and not an off-by-one is four lines below:
+  // POOL_LATE, brand new and holding no duels at all, still starts at 5.
+  const openHasDraw = (await duelsOf(POOL_ODD)).some((d) => d.matchweek_number === 5)
+  eq('POOL_ODD already holds a draw for the open matchweek', openHasDraw, true)
+
   const gen = await generate(POOL_ODD)
-  eq('the schedule starts at the first matchweek still open', gen.from_matchweek ?? 0, 5)
+  eq('a drawn open matchweek is left alone, so the rebuild starts after it',
+     gen.from_matchweek ?? 0, 6)
 
   // Duels ALREADY written for matchweeks 1-4 stay: they were created while
   // those weeks were open, and repairing a locked week's fixture list would
@@ -375,8 +406,7 @@ async function neverInThePast() {
   note('a locked week keeps its fixture list — its picks are already in')
 
   const late = await must('late pool', admin.from('pools').insert({
-    pool_id: POOL_LATE, tournament_id: (await must('t', admin.from('pools')
-      .select('tournament_id').eq('pool_id', POOL_EVEN)) as Array<{ tournament_id: string }>)[0].tournament_id,
+    pool_id: POOL_LATE, tournament_id: TOURNAMENT,
     admin_user_id: (await must('u', admin.from('pool_members')
       .select('user_id').eq('member_id', MEM(1))) as Array<{ user_id: string }>)[0].user_id,
     pool_name: '__scratch 100 late joiner (auto-deleted)',
@@ -394,7 +424,9 @@ async function neverInThePast() {
     }).select('entry_id'))
   }
   const lateGen = await generate(POOL_LATE)
-  eq('a pool created now starts at matchweek 5', lateGen.from_matchweek ?? 0, 5)
+  // The same open matchweek, the opposite answer — because this pool has no
+  // draw to protect. One guard, both branches.
+  eq('…but a pool with NO draw yet does get the open matchweek', lateGen.from_matchweek ?? 0, 5)
   const lateDuels = await duelsOf(POOL_LATE)
   eq('…and holds NOTHING in the weeks it missed',
      lateDuels.filter((d) => d.matchweek_number < 5).length, 0)
@@ -433,13 +465,26 @@ async function theSeal() {
   }
   const authUserId = created.data.user.id
 
-  const appUser = await must('scratch app user', admin.from('users').insert({
-    auth_user_id: authUserId, username: 'scratch116seal', email: SEAL_EMAIL,
-  }).select('user_id'))
-  const userId = (appUser as Array<{ user_id: string }>)[0].user_id
+  // ⚠ DO NOT INSERT the `users` row. `on_auth_user_created -> handle_new_user`
+  // on auth.users already wrote one, and inserting a second violates
+  // users_email_key. Read what the trigger made instead — which is also the
+  // only way to be testing the same shape a real signup produces.
+  let userId: string | null = null
+  for (let attempt = 0; attempt < 10 && !userId; attempt++) {
+    const { data } = await admin.from('users')
+      .select('user_id').eq('auth_user_id', authUserId).maybeSingle()
+    userId = (data as { user_id: string } | null)?.user_id ?? null
+    if (!userId) await new Promise((r) => setTimeout(r, 200))
+  }
+  if (!userId) {
+    bad('scratch app user', 'handle_new_user did not produce a users row')
+    return
+  }
 
   await must('scratch membership', admin.from('pool_members').insert({
-    member_id: MEM(9), pool_id: POOL_EVEN, user_id: userId, role: 'member',
+    // 'player', not 'member' — pool_members_role_check allows admin | player |
+    // spectator only.
+    member_id: MEM(9), pool_id: POOL_EVEN, user_id: userId, role: 'player',
   }).select('member_id'))
 
   const member = createSupabaseClient(
@@ -566,6 +611,7 @@ async function teardown() {
     await admin.from('pools').delete().eq('pool_id', pid)
   }
   await admin.from('league_seasons').delete().eq('season_id', SEASON)
+  await admin.from('tournaments').delete().eq('tournament_id', TOURNAMENT)
 
   const left: string[] = []
   for (const [t, col, val] of [
@@ -573,6 +619,7 @@ async function teardown() {
     ['pools', 'pool_id', POOL_PICK], ['pools', 'pool_id', POOL_LATE],
     ['league_seasons', 'season_id', SEASON], ['league_duels', 'pool_id', POOL_EVEN],
     ['league_fixtures', 'season_id', SEASON], ['users', 'email', SEAL_EMAIL],
+    ['tournaments', 'tournament_id', TOURNAMENT],
   ] as const) {
     const { count } = await admin.from(t).select('*', { count: 'exact', head: true }).eq(col, val)
     if ((count ?? 0) > 0) left.push(`${t}=${count}`)
