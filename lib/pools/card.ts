@@ -43,6 +43,13 @@ import { matchweekTile } from '@/lib/league/matchweekTile'
 import { getLevelName } from '@/lib/levelNames'
 import { formatNumber } from '@/lib/format'
 
+/** One face in the card's avatar stack. Matches `AvatarPerson`. */
+export type PoolCardMember = {
+  user_id: string
+  full_name: string | null
+  username: string | null
+}
+
 /**
  * Everything the card reads off a pool.
  *
@@ -85,6 +92,16 @@ export type PoolCardPool = {
    */
   has_submitted_predictions: boolean
   memberCount: number
+  /**
+   * The faces at the card's foot — the pool's first few members by `joined_at`,
+   * as RN's home card shows them.
+   *
+   * ⚠ THIS IS NOT THE WHOLE POOL, and `memberCount` above is not derivable from
+   * it. Both page servers ask for three rows and the exact count in one query;
+   * the stack's "+N" is the count minus what it drew. A 192-member pool is the
+   * largest in production and it still sends three rows.
+   */
+  members: PoolCardMember[]
   totalEntries: number
   hasScoringStarted: boolean
   /** Decisions owed in the CURRENT unit. See note 1 in the header. */
@@ -223,21 +240,17 @@ function settledLabel(pool: PoolCardPool): string {
 }
 
 // -------------------------------------------------------------
-// THE STATUS LINE
+// THE STATUS LINE — DELETED, and worth saying why
 // -------------------------------------------------------------
-
-/** The quiet line at the card's foot, opposite the clock. */
-export function poolCardStatusText(pool: PoolCardPool): string {
-  const complete = pool.totalMatches > 0 && pool.predictedMatches >= pool.totalMatches
-  // ⚠ "Awaiting results" replaces the old wording, which was "Awaiting results"
-  // only after a submit. Nothing is submitted now, so the condition is picks
-  // that exist and scoring that has not reached them yet.
-  if (pool.total_points === 0 && !complete && !pool.has_submitted_predictions) return 'No results yet'
-  if (pool.total_points === 0) return 'Awaiting results'
-  if (pool.current_rank && pool.current_rank <= 3) return 'On the podium!'
-  if (pool.current_rank) return 'Keep climbing!'
-  return `${formatNumber(pool.total_points)} pts`
-}
+// `poolCardStatusText` used to own the card's bottom-left: "No results yet",
+// "Awaiting results", "On the podium!", "Keep climbing!". Every one of those
+// was a restatement of a tile already on the card — the first two of a Points
+// tile reading 0, the last two of the Rank tile two inches above them — and the
+// slot now carries the member avatars instead, which are the only thing on the
+// card that says WHO you are playing. Ryan's call, 2026-08-30.
+//
+// The member-count chip went with it for the same reason: the stack's "+N"
+// already counts the pool.
 
 // -------------------------------------------------------------
 // THE CLOCK

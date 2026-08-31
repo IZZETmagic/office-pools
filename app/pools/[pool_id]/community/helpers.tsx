@@ -8,18 +8,9 @@ import type { EarnedBadge } from '../analytics/xpSystem'
 // TEXT HELPERS
 // =====================
 
-export function getInitials(fullName: string | null | undefined, username: string | undefined): string {
-  // Mirrors getInitials in mobile/components/pool-detail/BanterSheet.tsx: first
-  // and last initial for a multi-word name, but the FIRST TWO LETTERS of a
-  // single-word one. The web copy took only the first letter, so a one-word
-  // display name like "OdieBug" showed "O" in a 36px circle where the app
-  // shows "OD".
-  const source = fullName?.trim() || username?.trim()
-  if (!source) return '??'
-  const parts = source.split(/\s+/)
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
+// Moved to lib/design/initials.ts when the pool card started painting avatars
+// too — re-exported here so every `from './helpers'` in this folder still works.
+export { getInitials } from '@/lib/design/initials'
 
 export function formatMessageTime(dateStr: string): string {
   const date = new Date(dateStr)

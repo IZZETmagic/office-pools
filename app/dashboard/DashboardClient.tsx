@@ -19,6 +19,7 @@ import type { ShowdownCardFacts, LmsCardFacts, TableCardFacts } from '@/lib/leag
 import { shortClubName } from '@/lib/league/clubName'
 import { PoolCard, PoolStripCard } from '@/components/pools/PoolCard'
 import { byAttention } from '@/lib/pools/card'
+import type { PoolCardMember } from '@/lib/pools/card'
 
 // =====================
 // TYPES
@@ -72,6 +73,8 @@ type PoolCardData = {
   predictions_last_saved_at: string | null
   joined_at: string
   memberCount: number
+  /** The first three members, for the card's avatar stack. */
+  members: PoolCardMember[]
   totalEntries: number
   hasScoringStarted: boolean
   totalMatches: number

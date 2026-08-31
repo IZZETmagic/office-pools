@@ -304,11 +304,44 @@ export default async function PoolsPage() {
     (userPools ?? []).map(async (m: any) => {
       const pool = m.pools
 
-      // Get member count
-      const { count: memberCount } = await supabase
+      // Member count AND the first three faces, in ONE query.
+      //
+      // ⚠ `count: 'exact'` alongside `.limit(3)` still counts the WHOLE table —
+      // PostgREST's Content-Range total ignores the range — so this is the same
+      // round trip the count used to be, and the avatar stack in the card's foot
+      // rides along free. Do not split it back into two.
+      //
+      // Three by `joined_at` ascending, matching RN's home PoolCard. The largest
+      // pool in production has 192 members and the busiest account is in 17
+      // pools, so nothing here approaches the 1,000-row PostgREST cap.
+      const { data: memberFaces, count: memberCount, error: membersErr } = await supabase
         .from('pool_members')
-        .select('*', { count: 'exact', head: true })
+        .select('user_id, users!inner(full_name, username)', { count: 'exact' })
         .eq('pool_id', pool.pool_id)
+        .order('joined_at', { ascending: true })
+        .limit(3)
+      // ⚠ Read, don't discard. A destructure that keeps only `data` turns a 400
+      // into an empty card that renders forever — see the note on unfiltered
+      // selects in lib/scoring/readSource.ts.
+      //
+      // ⚠ FLATTENED TO A STRING ON PURPOSE. `PostgrestError extends Error`, so
+      // its `message` is non-enumerable, and Next's dev overlay serialises the
+      // object it is handed — which printed this as a bare `{}` and said
+      // nothing at all. Interpolate the fields or the log is useless.
+      if (membersErr) {
+        console.error(
+          `[pool card] member faces ${pool.pool_id} — ${membersErr.code || 'no-code'}: ` +
+            `${membersErr.message} | details=${membersErr.details ?? '-'} | hint=${membersErr.hint ?? '-'}`,
+        )
+      }
+      const members = ((memberFaces ?? []) as unknown as Array<{
+        user_id: string
+        users: { full_name: string | null; username: string | null }
+      }>).map((m) => ({
+        user_id: m.user_id,
+        full_name: m.users?.full_name ?? null,
+        username: m.users?.username ?? null,
+      }))
 
       // Get total entries count — denominator for the "Rank X of Y" KPI on
       // the card (pools can have multi-entry members, so entry count is
@@ -423,6 +456,7 @@ export default async function PoolsPage() {
         has_submitted_predictions: league ? league.hasSubmitted : anySubmitted,
         joined_at: m.joined_at,
         memberCount: memberCount ?? 0,
+        members,
         totalEntries: totalEntries ?? 0,
         hasScoringStarted: hasScoringByPool.get(pool.pool_id) ?? false,
         // ⚠ THE UNIT IS THE OPEN MATCHWEEK FOR A LEAGUE, not the season. These

@@ -31,6 +31,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import { Icon } from '@/components/ui/Icon'
+import { AvatarStack } from '@/components/ui/Avatar'
 import { LocalTime } from '@/components/LocalTime'
 import { CompetitionRail, type RailSize } from '@/components/competitions/CompetitionRail'
 import { getFormDotClass } from '@/lib/design/formDots'
@@ -39,7 +40,6 @@ import {
   type PoolCardPool,
   type KpiTile,
   poolCardAction,
-  poolCardStatusText,
   deadlineChip,
   kpiTiles,
   duelDotClass,
@@ -99,7 +99,6 @@ export function PoolCard({
   const router = useRouter()
   const action = poolCardAction(pool)
   const deadline = deadlineChip(pool.prediction_deadline)
-  const statusText = poolCardStatusText(pool)
   const hasBranding = !!(pool.brand_name && (pool.brand_emoji || pool.brand_logo_url) && pool.brand_color)
   const showInvite = pool.role === 'admin' && pool.memberCount < 10 && !!onCopyLink && !!onCopyCode
 
@@ -140,7 +139,7 @@ export function PoolCard({
             )}
           </div>
 
-          {/* ---- 3. the chips: mode, admin, members ----
+          {/* ---- 3. the chips: mode and admin ----
               ⚠ NO STATUS CHIP. "Open" was on every card that was not finished,
               which is nearly all of them, so it carried almost no information —
               and the two things it could have told you are already said better
@@ -160,10 +159,10 @@ export function PoolCard({
                   Admin
                 </span>
               )}
-              <span className="inline-flex items-center gap-1 text-[11px] text-muted" title={`${pool.memberCount} member${pool.memberCount !== 1 ? 's' : ''}`}>
-                <Icon name="person.2.fill" size={13} weight="semibold" />
-                {pool.memberCount}
-              </span>
+              {/* ⚠ NO MEMBER-COUNT CHIP. The avatar stack in the foot counts the
+                  pool already — three faces and "+N" — and a "👥 10" beside it
+                  was the same number twice. See the note in lib/pools/card.ts
+                  where the status line it replaced used to live. */}
             </div>
 
             {action.isButton ? (
@@ -195,9 +194,11 @@ export function PoolCard({
               and without this the extra height falls BELOW this row rather than
               above it, leaving the border-t floating mid-card. */}
           <div className="flex items-center justify-between gap-2 mt-auto pt-3 border-t border-border-subtle">
-            {/* 6. The personalised line. It sits alone now — the member count
-                moved up to the chips, which the dropped status chip paid for. */}
-            <span className="text-[11px] text-muted truncate">{statusText}</span>
+            {/* 6. Who you are playing. RN's home card has always ended on the
+                member avatars and the web card ended on a sentence restating a
+                tile; this is the app's row. `memberCount` drives the "+N", so a
+                192-member pool still only ships three rows to draw it. */}
+            <AvatarStack people={pool.members} total={pool.memberCount} />
             {deadline.show && (
               <span
                 className={`inline-flex items-center gap-1 text-[11px] font-semibold ${deadline.className}`}

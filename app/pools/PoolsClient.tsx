@@ -21,6 +21,7 @@ import type { ShowdownCardFacts, LmsCardFacts, TableCardFacts } from '@/lib/leag
 import { LocalTime } from '@/components/LocalTime'
 import { PoolCard } from '@/components/pools/PoolCard'
 import { deadlineChip } from '@/lib/pools/card'
+import type { PoolCardMember } from '@/lib/pools/card'
 
 // =====================
 // TYPES
@@ -66,6 +67,8 @@ type PoolData = {
   has_submitted_predictions: boolean
   joined_at: string
   memberCount: number
+  /** The first three members, for the card's avatar stack. */
+  members: PoolCardMember[]
   totalEntries: number
   hasScoringStarted: boolean
   /**

@@ -17,7 +17,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   poolCardAction,
-  poolCardStatusText,
   deadlineChip,
   byAttention,
   kpiTiles,
@@ -44,6 +43,11 @@ function pool(over: Partial<PoolCardPool> = {}): PoolCardPool {
     highest_level: null,
     has_submitted_predictions: false,
     memberCount: 8,
+    members: [
+      { user_id: 'u1', full_name: 'Ryan Sousa', username: 'ryan' },
+      { user_id: 'u2', full_name: null, username: 'odiebug' },
+      { user_id: 'u3', full_name: 'Ali Jones', username: 'ali' },
+    ],
     totalEntries: 8,
     hasScoringStarted: false,
     totalMatches: 10,
@@ -168,18 +172,6 @@ describe('deadlineChip — the clock', () => {
     expect(deadlineChip(inHours(12), NOW).className).toContain('danger')
     expect(deadlineChip(inHours(72), NOW).className).toContain('warning')
     expect(deadlineChip(inHours(24 * 30), NOW).className).toContain('muted')
-  })
-})
-
-describe('poolCardStatusText — the quiet line', () => {
-  it('distinguishes untouched from picked-but-unscored', () => {
-    expect(poolCardStatusText(pool())).toBe('No results yet')
-    expect(poolCardStatusText(pool({ predictedMatches: 10 }))).toBe('Awaiting results')
-  })
-
-  it('celebrates a podium and encourages everyone else', () => {
-    expect(poolCardStatusText(pool({ total_points: 40, current_rank: 2 }))).toBe('On the podium!')
-    expect(poolCardStatusText(pool({ total_points: 40, current_rank: 9 }))).toBe('Keep climbing!')
   })
 })
 
