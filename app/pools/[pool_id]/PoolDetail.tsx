@@ -1020,7 +1020,7 @@ export function PoolDetail({
   }, [needsBulk, bulkState, loadBulkData])
 
   /**
-   * THE DUEL CARD'S LIVE NUMBERS.
+   * THE DUEL CARD'S LIVE NUMBERS — two halves, two mechanisms.
    *
    * ⚠ `showdownData` is a server prop and nothing updated it, so the duel
    * scoreline sat frozen at page load — 400–200 all afternoon — while the
@@ -1028,28 +1028,72 @@ export function PoolDetail({
    * same problem: it showed the minute the page loaded and never advanced.
    * Everything was built; none of it moved.
    *
-   * This rides the SAME broadcast the leaderboard already uses rather than
-   * opening a second channel: two subscriptions to one topic would double the
-   * per-recipient message billing the comment above is about.
+   * FIXTURES now arrive by BROADCAST (migration 125). The score, the flip to
+   * live and the minute are IN the message, so the card repaints the moment the
+   * database learns them — no fetch, no round trip, nothing to debounce.
+   *
+   * POINTS still arrive by fetch. What each entry scored is an aggregate across
+   * the pool's entries that no single row change expresses, and it moves on the
+   * same goal the fixture broadcast already announced — so it can ride the
+   * existing debounce a few seconds behind without anybody seeing a gap.
+   *
+   * Both ride the SAME channel the leaderboard already uses rather than opening
+   * a second one: two subscriptions to one topic would double the per-recipient
+   * message billing the comment below is about.
    */
-  const [duelLive, setDuelLive] = useState<{
+  type LiveFixture = {
+    number: number; homeScore: number | null; awayScore: number | null
+    status: string | null; isCompleted: boolean
+    liveMinute: number | null; livePeriod: string | null; liveAdded: number | null
+  }
+  // ⚠ BOTH CARRY THE MATCHWEEK THEY DESCRIBE, and both are read back through
+  // it. `fixture_number` restarts at 1 every matchweek, and `inPlayMatchweek`
+  // is a server prop that `router.refresh()` can change WITHOUT remounting this
+  // component — so live state cached under week 2 would otherwise be painted
+  // onto week 3's fixture 7 the moment the rollover happened. Stamping the week
+  // makes stale data unreadable rather than merely unlikely.
+  const [duelPoints, setDuelPoints] = useState<{
+    mw: number
     points: Record<string, number>
     perFixture: Record<string, Record<string, number>>
-    fixtures: Array<{
-      number: number; homeScore: number | null; awayScore: number | null
-      status: string | null; isCompleted: boolean
-      liveMinute: number | null; livePeriod: string | null; liveAdded: number | null
-    }>
   } | null>(null)
+  // ⚠ KEYED BY FIXTURE NUMBER, not an array, because a broadcast is a DELTA:
+  // migration 125 sends only the fixtures that actually moved. Merging into a
+  // map is the whole reason the payload can be that small.
+  const [duelFixtures, setDuelFixtures] =
+    useState<{ mw: number; byNumber: Record<number, LiveFixture> } | null>(null)
+
+  // ⚠ The instant the last broadcast landed. A fetch that was already in flight
+  // when a goal went in returns PRE-goal fixtures, and applying them would
+  // flicker the score back for a few seconds. Points are unaffected — they are
+  // computed after the fixture write, so a late fetch is stale for neither.
+  const lastFixtureBroadcast = useRef(0)
 
   const inPlayMw = showdownData?.inPlayMatchweek ?? null
   const applyDuelLive = useCallback(async () => {
     if (inPlayMw === null) return
+    const startedAt = Date.now()
     try {
       const res = await fetch(
         `/api/pools/${pool.pool_id}/duel-live?matchweek=${inPlayMw}`, { cache: 'no-store' })
       if (!res.ok) return
-      setDuelLive(await res.json())
+      const data = await res.json() as {
+        points: Record<string, number>
+        perFixture: Record<string, Record<string, number>>
+        fixtures: LiveFixture[]
+      }
+      setDuelPoints({ mw: inPlayMw, points: data.points, perFixture: data.perFixture })
+
+      // The fixture half of this response is the FALLBACK, and it matters:
+      // Realtime is a pipe, not a log, so a message sent while a socket was
+      // down is simply gone. This is how the card recovers.
+      if (lastFixtureBroadcast.current <= startedAt) {
+        setDuelFixtures(prev => {
+          const byNumber = prev?.mw === inPlayMw ? { ...prev.byNumber } : {}
+          for (const f of data.fixtures ?? []) byNumber[f.number] = f
+          return { mw: inPlayMw, byNumber }
+        })
+      }
     } catch {
       // A dropped poll leaves the last good numbers on screen, which is the
       // right failure: stale beats blank, and the next tick fixes it.
@@ -1141,6 +1185,32 @@ export function PoolDetail({
 
     const channel = supabase
       .channel(`pool:${pool.pool_id}:leaderboard`, { config: { private: true } })
+      // ⚠ FIXTURES: applied straight from the payload, no fetch. Migration 125
+      // puts the score, the status and the minute in the message, so this is
+      // the fast path — the card moves on the goal, not on a round trip.
+      //
+      // NOT debounced, deliberately: the whole point of the leaderboard's
+      // debounce is that a message triggers WORK (an HTTP fetch per viewer).
+      // This triggers a setState off data already in hand, so spacing it out
+      // would only make the score late.
+      .on('broadcast', { event: 'fixtures_update' }, (msg) => {
+        const fixtures = (msg as { payload?: { fixtures?: (LiveFixture & { matchweek: number })[] } })
+          ?.payload?.fixtures
+        if (!fixtures?.length || inPlayMw === null) return
+
+        // A season's pools all share one topic per pool, but a pool only ever
+        // draws ONE matchweek. Dropping the rest here costs nothing and keeps a
+        // rescheduled fixture from another week off this card.
+        const mine = fixtures.filter(f => f.matchweek === inPlayMw)
+        if (!mine.length) return
+
+        lastFixtureBroadcast.current = Date.now()
+        setDuelFixtures(prev => {
+          const byNumber = prev?.mw === inPlayMw ? { ...prev.byNumber } : {}
+          for (const f of mine) byNumber[f.number] = f
+          return { mw: inPlayMw, byNumber }
+        })
+      })
       .on('broadcast', { event: 'leaderboard_update' }, (msg) => {
         const payload = (msg as { payload?: { entries?: LiveEntry[] } })?.payload
         const entries = payload?.entries
@@ -1155,8 +1225,9 @@ export function PoolDetail({
         if (scoresTimer) clearTimeout(scoresTimer)
         scoresTimer = setTimeout(() => {
           void applyLive()
-          // The duel card's own numbers, on the same debounce and the same
-          // jitter — one goal must not make every viewer fetch in one second.
+          // The duel card's POINTS only — its fixtures came in on the
+          // `fixtures_update` handler above with no fetch at all. Same debounce
+          // and jitter: one goal must not make every viewer fetch in one second.
           void applyDuelLive()
         }, 1500 + Math.random() * 4000)
       })
@@ -1172,7 +1243,7 @@ export function PoolDetail({
       if (scoresTimer) clearTimeout(scoresTimer)
       supabase.removeChannel(channel)
     }
-  }, [pool.pool_id, applyLive, applyDuelLive])
+  }, [pool.pool_id, applyLive, applyDuelLive, inPlayMw])
 
   // Fallback poll, in case Realtime drops a message (it is a pipe, not a log —
   // a broadcast sent while the socket is down is gone).
@@ -2366,34 +2437,36 @@ export function PoolDetail({
                 sealedMatchweek={showdownData.sealedMatchweek}
                 sealedOpensAtLatest={showdownData.sealedOpensAtLatest}
                 entryPeople={showdownData.entryPeople}
-                {...(duelLive
-                  ? {
-                      // ⚠ LIVE VALUES WIN, but only the three that move. The
-                      // rest of `showdownData` — names, faces, the draw — is
-                      // page-load data and re-sending it per goal is the
-                      // payload mistake this whole path exists to avoid.
-                      livePoints: new Map(Object.entries(duelLive.points)),
-                      perFixture: new Map(
-                        Object.entries(duelLive.perFixture).map(([e, byFx]) => [
-                          e, new Map(Object.entries(byFx).map(([n, p]) => [Number(n), p])),
-                        ]),
-                      ),
-                      fixtures: showdownData.fixtures.map((f) => {
-                        const live = duelLive.fixtures.find((x) => x.number === f.number)
-                        // A fixture the poll did not return keeps what it had —
-                        // never blanked, which would flicker a score to "v".
-                        // ⚠ `status` is nullable in the feed but not in
-                        // `MatchweekFixture`, so a null must fall back rather
-                        // than overwrite: a fixture the provider has not
-                        // stamped yet would otherwise lose the status it had.
-                        return live ? { ...f, ...live, status: live.status ?? f.status } : f
-                      }),
-                    }
-                  : {
-                      livePoints: showdownData.livePoints,
-                      perFixture: showdownData.perFixture,
-                      fixtures: showdownData.fixtures,
-                    })}
+                // ⚠ LIVE VALUES WIN, but only the three that move — and the
+                // two halves are now independent, because they arrive by
+                // different routes. A broadcast can repaint the score without
+                // waiting for the points fetch, and the points can land without
+                // disturbing a fixture the broadcast already updated. The rest
+                // of `showdownData` — names, faces, the draw — is page-load
+                // data; re-sending it per goal is the payload mistake this
+                // whole path exists to avoid.
+                livePoints={duelPoints?.mw === showdownData.inPlayMatchweek
+                  ? new Map(Object.entries(duelPoints.points))
+                  : showdownData.livePoints}
+                perFixture={duelPoints?.mw === showdownData.inPlayMatchweek
+                  ? new Map(
+                      Object.entries(duelPoints.perFixture).map(([e, byFx]) => [
+                        e, new Map(Object.entries(byFx).map(([n, p]) => [Number(n), p])),
+                      ]),
+                    )
+                  : showdownData.perFixture}
+                fixtures={showdownData.fixtures.map((f) => {
+                  const live = duelFixtures?.mw === showdownData.inPlayMatchweek
+                    ? duelFixtures.byNumber[f.number]
+                    : undefined
+                  // A fixture nothing has said anything about keeps what it had
+                  // — never blanked, which would flicker a score to "v".
+                  // ⚠ `status` is nullable in the feed but not in
+                  // `MatchweekFixture`, so a null must fall back rather than
+                  // overwrite: a fixture the provider has not stamped yet would
+                  // otherwise lose the status it had.
+                  return live ? { ...f, ...live, status: live.status ?? f.status } : f
+                })}
                 leagueOutcomes={allLeagueOutcomes}
                 allPredictions={allPredictions}
                 bulkState={bulkState}
