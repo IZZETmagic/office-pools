@@ -116,19 +116,76 @@ export async function readMatchweekPoints(
   admin: SupabaseClient,
   poolId: string,
   matchweekNumber: number,
-): Promise<{ points: Map<string, number>; scored: Map<string, number>; error: string | null }> {
+): Promise<{
+  points: Map<string, number>
+  scored: Map<string, number>
+  /** entry_id → fixture_number → points, for the fixture-by-fixture breakdown. */
+  perFixture: Map<string, Map<number, number>>
+  error: string | null
+}> {
   const { data, error } = await admin
     .from('league_match_scores')
-    .select('entry_id, total_points')
+    .select('entry_id, total_points, fixture_number')
     .eq('pool_id', poolId)
     .eq('matchweek_number', matchweekNumber)
-  if (error) return { points: new Map(), scored: new Map(), error: error.message }
+  if (error) {
+    return { points: new Map(), scored: new Map(), perFixture: new Map(), error: error.message }
+  }
 
   const points = new Map<string, number>()
   const scored = new Map<string, number>()
-  for (const r of (data ?? []) as Array<{ entry_id: string; total_points: number | null }>) {
+  const perFixture = new Map<string, Map<number, number>>()
+  for (const r of (data ?? []) as Array<{ entry_id: string; total_points: number | null; fixture_number: number }>) {
     points.set(r.entry_id, (points.get(r.entry_id) ?? 0) + (r.total_points ?? 0))
     scored.set(r.entry_id, (scored.get(r.entry_id) ?? 0) + 1)
+    const byFixture = perFixture.get(r.entry_id) ?? new Map<number, number>()
+    byFixture.set(r.fixture_number, r.total_points ?? 0)
+    perFixture.set(r.entry_id, byFixture)
   }
-  return { points, scored, error: null }
+  return { points, scored, perFixture, error: null }
+}
+
+export type EntryTotals = {
+  totalPoints: number
+  rank: number | null
+  duelPoints: number
+  correct: number
+}
+
+/**
+ * Season totals per entry — points, rank, duel points.
+ *
+ * ⚠ ADMIN CLIENT, for the same reason as `readMatchweekPoints`:
+ * `league_entry_totals` is one of migration 050's four DENY-ALL engine tables,
+ * so a user-scoped read returns zero rows and no error.
+ *
+ * That is not hypothetical. The pool page read this table with the user client
+ * for `duel_points`, so `DuelsTab` has been receiving an empty map and falling
+ * back to recomputing `w*3+d` itself — which is exactly the divergence
+ * `ShowdownCardFacts.duelPoints` warns about, sitting one settled matchweek
+ * away from two screens disagreeing about the same number.
+ */
+export async function readEntryTotals(
+  admin: SupabaseClient,
+  poolId: string,
+): Promise<{ totals: Map<string, EntryTotals>; error: string | null }> {
+  const { data, error } = await admin
+    .from('league_entry_totals')
+    .select('entry_id, total_points, final_rank, duel_points, correct_count')
+    .eq('pool_id', poolId)
+  if (error) return { totals: new Map(), error: error.message }
+
+  const totals = new Map<string, EntryTotals>()
+  for (const r of (data ?? []) as Array<{
+    entry_id: string; total_points: number | null; final_rank: number | null
+    duel_points: number | null; correct_count: number | null
+  }>) {
+    totals.set(r.entry_id, {
+      totalPoints: r.total_points ?? 0,
+      rank: r.final_rank,
+      duelPoints: r.duel_points ?? 0,
+      correct: r.correct_count ?? 0,
+    })
+  }
+  return { totals, error: null }
 }

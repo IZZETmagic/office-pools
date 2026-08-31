@@ -142,6 +142,12 @@ export type ShowdownData = {
    */
   livePoints: Map<string, number>
   liveScored: Map<string, number>
+  /** entry_id → fixture_number → points, for the fixture-by-fixture breakdown. */
+  perFixture: Map<string, Map<number, number>>
+  /** fixture_number → "Chelsea v Brighton", for the live matchweek. */
+  fixtureLabels: Map<number, string>
+  /** Season totals per entry — points, rank, duel points. */
+  totals: Map<string, { totalPoints: number; rank: number | null; duelPoints: number; correct: number }>
   duelPoints: Map<string, number>
 }
 
@@ -2243,6 +2249,10 @@ export function PoolDetail({
                 entryPeople={showdownData.entryPeople}
                 livePoints={showdownData.livePoints}
                 liveScored={showdownData.liveScored}
+                perFixture={showdownData.perFixture}
+                fixtureLabels={showdownData.fixtureLabels}
+                totals={showdownData.totals}
+                form={leagueForm}
                 duelPoints={showdownData.duelPoints}
               />
             )}

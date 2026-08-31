@@ -49,7 +49,7 @@ import { useMemo } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { Icon } from '@/components/ui/Icon'
-import type { DuelRow } from '@/lib/league/duels'
+import { headToHead, type DuelRow } from '@/lib/league/duels'
 
 type Props = {
   duels: DuelRow[]
@@ -87,6 +87,14 @@ type Props = {
    */
   livePoints: Map<string, number>
   liveScored: Map<string, number>
+  /** entry_id → fixture_number → points, for the fixture-by-fixture breakdown. */
+  perFixture: Map<string, Map<number, number>>
+  /** fixture_number → "Chelsea v Brighton", for the live matchweek. */
+  fixtureLabels: Map<number, string>
+  /** Season totals per entry — points, rank, duel points. */
+  totals: Map<string, { totalPoints: number; rank: number | null; duelPoints: number; correct: number }>
+  /** Last five score types per entry, oldest first. Same source as the leaderboard's dots. */
+  form?: Map<string, string[]>
   /** Duel points per entry, from the leaderboard read. */
   duelPoints: Map<string, number>
 }
@@ -112,6 +120,10 @@ export default function DuelsTab({
   entryPeople,
   livePoints,
   liveScored,
+  perFixture,
+  fixtureLabels,
+  totals,
+  form,
   duelPoints,
 }: Props) {
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
@@ -243,11 +255,59 @@ export default function DuelsTab({
    * the same list, so the entry with the most rows has seen everything that has
    * been played — and a matchweek is ten fixtures in every league we run.
    */
-  const remainingFixtures = useMemo(() => {
+  /**
+   * The fixture-by-fixture breakdown of the live duel.
+   *
+   * Only the matchweek being played — every later one is sealed and has no
+   * score rows to break down. Ordered by fixture number, which is the order the
+   * score rows are keyed on, NOT kickoff order: `fixture_number` is a stable
+   * identifier and a matchweek's games are not played in it.
+   */
+  /** Fixtures in the live matchweek with no score row yet. */
+  const remainingFixturesRaw = useMemo(() => {
     if (inPlayMatchweek === null || liveScored.size === 0) return null
     const best = Math.max(...liveScored.values())
     return Math.max(0, FIXTURES_PER_MATCHWEEK - best)
   }, [inPlayMatchweek, liveScored])
+
+  const breakdown = useMemo(() => {
+    if (!inPlay || !inPlay.them || inPlayMatchweek === null) return []
+    const mine = perFixture.get(inPlay.you.entry) ?? new Map<number, number>()
+    const theirs = perFixture.get(inPlay.them.entry) ?? new Map<number, number>()
+    const numbers = [...new Set([...mine.keys(), ...theirs.keys()])].sort((a, b) => a - b)
+    return numbers.map((n) => ({
+      n,
+      label: fixtureLabels.get(n) ?? `Fixture ${n}`,
+      mine: mine.get(n) ?? 0,
+      theirs: theirs.get(n) ?? 0,
+    }))
+  }, [inPlay, inPlayMatchweek, perFixture, fixtureLabels])
+
+  /**
+   * Is the live duel already decided?
+   *
+   * A fixture is worth at most `maxPerFixture` — taken from what has actually
+   * been paid out rather than assumed, because Results and Scores depths price
+   * differently and this component is never told which it is sitting over. If
+   * the lead is bigger than everything still to come, it is over: a knockout,
+   * called while the last game is still to be played.
+   */
+  const verdict = useMemo(() => {
+    if (!inPlay || !inPlay.them || breakdown.length === 0 || remainingFixturesRaw === null) return null
+    const you = livePoints.get(inPlay.you.entry) ?? 0
+    const them = livePoints.get(inPlay.them.entry) ?? 0
+    const maxPerFixture = Math.max(...breakdown.map((b) => Math.max(b.mine, b.theirs)), 0)
+    if (maxPerFixture === 0) return null
+    const stillAvailable = remainingFixturesRaw * maxPerFixture
+    const lead = Math.abs(you - them)
+    if (lead > stillAvailable) {
+      return { safe: true, leader: you > them ? 'you' : 'them' as const, lead }
+    }
+    // The games that can still change it — the honest "what decides this".
+    return { safe: false, leader: null, lead, deciders: remainingFixturesRaw }
+  }, [inPlay, breakdown, livePoints, remainingFixturesRaw])
+
+  const remainingFixtures = remainingFixturesRaw
 
   if (duels.length === 0) {
     return (
@@ -336,6 +396,117 @@ export default function DuelsTab({
             </p>
           </div>
         </div>
+      )}
+
+      {/* THE TALE OF THE TAPE — the two of you, measured against each other.
+          Every row is a comparison, so the winning side is bolded rather than
+          labelled: the shape of the card is the comparison. */}
+      {inPlay?.them && (
+        <Card padding="none" className="overflow-hidden">
+          <p className="t-caption text-muted px-4 pt-4 pb-3">Tale of the tape</p>
+          <TapeRow label="Season points"
+            you={totals.get(inPlay.you.entry)?.totalPoints ?? 0}
+            them={totals.get(inPlay.them.entry)?.totalPoints ?? 0} />
+          <TapeRow label="Correct picks"
+            you={totals.get(inPlay.you.entry)?.correct ?? 0}
+            them={totals.get(inPlay.them.entry)?.correct ?? 0} />
+          <TapeRow label="Table" lowerIsBetter
+            you={totals.get(inPlay.you.entry)?.rank ?? null}
+            them={totals.get(inPlay.them.entry)?.rank ?? null} />
+          <TapeRow label="Duel points"
+            you={duelPoints.get(inPlay.you.entry) ?? 0}
+            them={duelPoints.get(inPlay.them.entry) ?? 0} />
+          {form && (
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 border-t border-border-default">
+              <FormDots types={form.get(inPlay.you.entry) ?? []} />
+              <span className="t-detail text-muted uppercase tracking-widest">Form</span>
+              <FormDots types={form.get(inPlay.them.entry) ?? []} align="right" />
+            </div>
+          )}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 border-t border-border-default">
+            {(() => {
+              const h2h = headToHead(duels, inPlay.you.entry, inPlay.them.entry)
+              const met = h2h.won + h2h.drawn + h2h.lost
+              return (
+                <>
+                  {/* Two zeroes under "first meeting" is noise pretending to be
+                      data — there is no record yet, so the row says so and
+                      shows nothing on either side. */}
+                  <span className={met === 0
+                    ? 't-num t-num-medium text-sm text-muted/40'
+                    : 't-num t-num-extrabold text-sm text-ink'}>
+                    {met === 0 ? '\u2014' : h2h.won}
+                  </span>
+                  <span className="t-detail text-muted uppercase tracking-widest whitespace-nowrap">
+                    {met === 0 ? 'First meeting' : `Met ${met}\u00d7 \u00b7 W\u2013D\u2013L`}
+                  </span>
+                  <span className={`text-right ${met === 0
+                    ? 't-num t-num-medium text-sm text-muted/40'
+                    : 't-num t-num-extrabold text-sm text-ink'}`}>
+                    {met === 0 ? '\u2014' : h2h.lost}
+                  </span>
+                </>
+              )
+            })()}
+          </div>
+        </Card>
+      )}
+
+      {/* THE DECIDER — where the duel is actually being won, fixture by
+          fixture, and whether anything left can still change it. */}
+      {inPlay?.them && breakdown.length > 0 && (
+        <Card padding="none" className="overflow-hidden">
+          <p className="t-caption text-muted px-4 pt-4 pb-3">
+            Where it is being won
+            <span className="ml-1.5 text-muted/60 normal-case tracking-normal">
+              Matchweek {inPlayMatchweek}
+            </span>
+          </p>
+          <ul>
+            {breakdown.map((b) => {
+              const outcome = b.mine === b.theirs ? 'level' : b.mine > b.theirs ? 'won' : 'lost'
+              return (
+                <li key={b.n}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-2 border-t border-border-default">
+                  <span className={`t-detail uppercase tracking-widest w-12 shrink-0
+                    ${outcome === 'won' ? 'text-success-600'
+                      : outcome === 'lost' ? 'text-danger-600' : 'text-muted/60'}`}>
+                    {outcome === 'won' ? 'Won' : outcome === 'lost' ? 'Lost' : 'Level'}
+                  </span>
+                  <span className="t-body text-muted truncate">{b.label}</span>
+                  <span className="t-num t-num-medium text-xs text-muted whitespace-nowrap">
+                    {b.mine} <span className="text-muted/40">&ndash;</span> {b.theirs}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+          {verdict && (
+            <p className="t-body px-4 py-3 border-t border-border-default text-muted">
+              {verdict.safe ? (
+                <>
+                  <b className="text-ink">
+                    {verdict.leader === 'you' ? 'Mathematically safe.' : 'Mathematically out of reach.'}
+                  </b>{' '}
+                  {verdict.leader === 'you'
+                    ? `A ${verdict.lead}-point lead with nothing left that can close it — this duel is already won.`
+                    : `Behind by ${verdict.lead}, with less than that still to play for.`}
+                </>
+              ) : verdict.deciders ? (
+                <>
+                  <b className="text-ink">
+                    {verdict.lead === 0 ? 'Level.' : `${verdict.lead} points in it.`}
+                  </b>{' '}
+                  {verdict.deciders === 1
+                    ? 'One game left, and it decides the duel.'
+                    : `${verdict.deciders} games left, and they decide the duel.`}
+                </>
+              ) : (
+                <><b className="text-ink">All games played.</b> Waiting on the matchweek to settle.</>
+              )}
+            </p>
+          )}
+        </Card>
       )}
 
       {/* The rest of the card. Showdown is personal, but the pool is not — five
@@ -562,6 +733,50 @@ function Corner({
       <p className="t-detail text-white/35 uppercase tracking-widest">{label}</p>
       <p className="t-display text-xl text-white truncate mt-0.5">{name}</p>
     </div>
+  )
+}
+
+/** One comparison row. The better side is bolded — the card IS the comparison. */
+function TapeRow({
+  label, you, them, lowerIsBetter = false,
+}: { label: string; you: number | null; them: number | null; lowerIsBetter?: boolean }) {
+  const better = you === null || them === null || you === them
+    ? null
+    : lowerIsBetter ? (you < them ? 'you' : 'them') : (you > them ? 'you' : 'them')
+  const cell = (v: number | null, side: 'you' | 'them') =>
+    `t-num ${better === side ? 't-num-extrabold text-ink' : 't-num-medium text-muted'} text-sm`
+  const show = (v: number | null) => (v === null ? '\u2014' : v)
+  return (
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 border-t border-border-default">
+      <span className={cell(you, 'you')}>{show(you)}</span>
+      <span className="t-detail text-muted uppercase tracking-widest whitespace-nowrap">{label}</span>
+      <span className={`${cell(them, 'them')} text-right`}>{show(them)}</span>
+    </div>
+  )
+}
+
+/**
+ * The leaderboard's form dots, at duel scale.
+ *
+ * Same `score_type` vocabulary the leaderboard reads, so a member sees the same
+ * five results in both places rather than two different truths about a week.
+ */
+function FormDots({ types, align = 'left' }: { types: string[]; align?: 'left' | 'right' }) {
+  if (types.length === 0) {
+    return <span className={`t-detail text-muted/50 ${align === 'right' ? 'text-right block' : ''}`}>&mdash;</span>
+  }
+  return (
+    <span className={`flex gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+      {types.map((t, i) => (
+        <span
+          key={i}
+          className={`w-2 h-2 rounded-full ${
+            t === 'miss' ? 'bg-danger-500'
+              : t === 'none' ? 'bg-muted/30'
+                : 'bg-primary-500'}`}
+        />
+      ))}
+    </span>
   )
 }
 

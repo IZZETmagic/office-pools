@@ -160,11 +160,18 @@ export default async function PoolPage({
     // lets the schedule be published in advance.
     if (pool.league_mode === 'showdown') {
       const { readPoolDuels } = await import('@/lib/league/duels')
+      // ⚠ TOTALS VIA ADMIN. `league_entry_totals` is deny-all (migration 050),
+      // so the user-scoped read this used to do returned zero rows and no
+      // error — DuelsTab got an empty map and quietly recomputed duel points
+      // itself, which is the divergence ShowdownCardFacts warns about.
+      const { readEntryTotals } = await import('@/lib/league/duels')
+      const { createAdminClient: adminForTotals } = await import('@/lib/supabase/server')
       const [{ duels, error: duelErr }, totalsRes] = await Promise.all([
         readPoolDuels(supabase, pool_id),
-        supabase.from('league_entry_totals').select('entry_id, duel_points').eq('pool_id', pool_id),
+        readEntryTotals(adminForTotals(), pool_id),
       ])
       if (duelErr) console.error('[pool page] duels failed:', duelErr)
+      if (totalsRes.error) console.error('[pool page] entry totals failed:', totalsRes.error)
 
       // Names for BOTH sides of every duel, so a rival is a person rather than
       // a uuid. Read from the members already loaded above.
@@ -191,14 +198,16 @@ export default async function PoolPage({
         entryPeople,
         livePoints: new Map(),
         liveScored: new Map(),
+        perFixture: new Map(),
+        fixtureLabels: new Map(),
+        totals: totalsRes.totals,
         ownEntryIds: (userEntries ?? []).map((e) => e.entry_id),
         openMatchweek: null,
         inPlayMatchweek: null,
         sealedMatchweek: null,
         sealedOpensAfter: null,
         duelPoints: new Map(
-          ((totalsRes.data ?? []) as Array<{ entry_id: string; duel_points: number }>)
-            .map((r) => [r.entry_id, r.duel_points]),
+          [...totalsRes.totals].map(([entryId, t]) => [entryId, t.duelPoints]),
         ),
       }
     }
@@ -428,6 +437,18 @@ export default async function PoolPage({
             if (live.error) console.error('[pool page] live duel points failed:', live.error)
             showdownData.livePoints = live.points
             showdownData.liveScored = live.scored
+            showdownData.perFixture = live.perFixture
+            // Fixture names for the breakdown, off the matches the league view
+            // already built — `match_number` IS `league_fixtures.fixture_number`,
+            // which is what the score rows are keyed on.
+            const labels = new Map<number, string>()
+            for (const mt of view.matches) {
+              if (mt.round_number !== liveMw) continue
+              const h = mt.home_team?.country_name ?? 'Home'
+              const a = mt.away_team?.country_name ?? 'Away'
+              labels.set(mt.match_number, `${h} v ${a}`)
+            }
+            showdownData.fixtureLabels = labels
           }
         }
         // LMS needs BOTH, for two different jobs. The pick is WRITTEN against
