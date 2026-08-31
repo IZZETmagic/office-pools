@@ -122,16 +122,32 @@ export default function DuelsTab({
   }, [mine])
 
   /**
-   * Which duel the card at the top is about.
+   * The two duels that are actually happening, in that order.
    *
-   * The one being PLAYED, because that is the one with something happening in
-   * it. Between rounds there is none, and then it is the one you are picking —
-   * which is the honest answer to "what happens next".
+   * ⚠ THESE ARE DIFFERENT WEEKS FOR MOST OF THE WEEKEND, and collapsing them is
+   * a mistake this tab has now made twice. `inPlayMatchweek` is being played;
+   * `openMatchweek` is the one you can still pick. From Friday's kickoff to
+   * Sunday night both exist at once.
+   *
+   * The first version of this file showed only the in-play one and left the
+   * open one in a "Coming up" list. Sealing the draw deleted that list — so the
+   * duel you were actively picking for stopped appearing anywhere, even though
+   * its rows are revealed and in the payload. Caught in the browser on the
+   * seeded pool: matchweek 2 was on screen, matchweek 4 was on screen as
+   * sealed, and matchweek 3 — the one being picked — was nowhere.
+   *
+   * So both render, always, and each says which it is.
    */
-  const featuredMatchweek = inPlayMatchweek ?? openMatchweek
-  const featured = useMemo(
-    () => (featuredMatchweek === null ? null : mine.find((m) => m.matchweek === featuredMatchweek) ?? null),
-    [mine, featuredMatchweek],
+  const inPlay = useMemo(
+    () => (inPlayMatchweek === null ? null : mine.find((m) => m.matchweek === inPlayMatchweek) ?? null),
+    [mine, inPlayMatchweek],
+  )
+  const open = useMemo(
+    () =>
+      openMatchweek === null || openMatchweek === inPlayMatchweek
+        ? null
+        : mine.find((m) => m.matchweek === openMatchweek) ?? null,
+    [mine, openMatchweek, inPlayMatchweek],
   )
 
   // The duel table — everyone, by duel points. Built from the duels themselves
@@ -185,57 +201,10 @@ export default function DuelsTab({
         </p>
       </div>
 
-      {/* The duel with something happening in it */}
-      {featured && (
-        <Card padding="md">
-          <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-2.5">
-            Matchweek {featured.matchweek}
-            {/* Which of the two weeks this is. Without it the heading is the
-                same whether these games are being played right now or are
-                still six days away. */}
-            <span className="ml-1.5 font-semibold text-neutral-400 normal-case tracking-normal">
-              {featured.matchweek === inPlayMatchweek ? '· being played now' : '· you are picking this one'}
-            </span>
-          </p>
-          {featured.them ? (
-            <div className="flex items-center gap-3">
-              <Fighter label="You" name={name(featured.you.entry)} accuracy={featured.you.accuracy} align="left" />
-              <span className="text-xs font-bold text-neutral-400 shrink-0">v</span>
-              <Fighter label="Them" name={name(featured.them.entry)} accuracy={featured.them.accuracy} align="right" />
-            </div>
-          ) : (
-            <p className="text-sm text-neutral-600">
-              You sit this one out. With an odd number of members somebody has a bye each
-              week — it rotates, so everyone gets the same number.
-            </p>
-          )}
-          {featured.duel.settled_at && featured.them && (
-            <p className="text-xs text-neutral-500 mt-3 pt-3 border-t border-border-default">
-              {featured.you.points === 3 ? 'You won this duel — three points.'
-                : featured.you.points === 1 ? 'A tie — one point each.'
-                : 'They took this one.'}
-            </p>
-          )}
-        </Card>
-      )}
-
-      {/* Record */}
-      <Card padding="md">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-baseline gap-4 tabular-nums">
-            <Stat label="Won" value={record.won} />
-            <Stat label="Tied" value={record.drawn} />
-            <Stat label="Lost" value={record.lost} />
-            {record.byes > 0 && <Stat label="Byes" value={record.byes} />}
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-neutral-900 tabular-nums">
-              {record.won * 3 + record.drawn}
-            </p>
-            <p className="text-xs text-neutral-500">duel points</p>
-          </div>
-        </div>
-      </Card>
+      {/* Being played now, then the one you are still picking. Both, because
+          they are different weeks all weekend. */}
+      {inPlay && <DuelPanel m={inPlay} state="playing" name={name} />}
+      {open && <DuelPanel m={open} state="picking" name={name} />}
 
       {/* What is coming, without saying who — the payoff of a sealed draw.
           There is no row for this matchweek in `duels`; RLS withheld it. */}
@@ -269,6 +238,25 @@ export default function DuelsTab({
           </p>
         </Card>
       )}
+
+      {/* Record — AFTER the three duel cards, not between them. Playing, picking
+          and sealed are one timeline and a stats block in the middle breaks it. */}
+      <Card padding="md">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-baseline gap-4 tabular-nums">
+            <Stat label="Won" value={record.won} />
+            <Stat label="Tied" value={record.drawn} />
+            <Stat label="Lost" value={record.lost} />
+            {record.byes > 0 && <Stat label="Byes" value={record.byes} />}
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold text-neutral-900 tabular-nums">
+              {record.won * 3 + record.drawn}
+            </p>
+            <p className="text-xs text-neutral-500">duel points</p>
+          </div>
+        </div>
+      </Card>
 
       {/* The duel table */}
       <Card padding="none" className="overflow-hidden">
@@ -309,6 +297,51 @@ export default function DuelsTab({
         never for a matchweek that has already opened.
       </p>
     </div>
+  )
+}
+
+/**
+ * One duel, with the week it belongs to and what is happening in it.
+ *
+ * Rendered for the in-play week and the open week both, so the heading has to
+ * carry which is which — without it the two cards are identical and the member
+ * cannot tell the games being played from the games they are still picking.
+ */
+function DuelPanel({
+  m, state, name,
+}: {
+  m: { duel: DuelRow; you: Side; them: Side | null; matchweek: number }
+  state: 'playing' | 'picking'
+  name: (e: string | null) => string
+}) {
+  return (
+    <Card padding="md">
+      <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-2.5">
+        Matchweek {m.matchweek}
+        <span className="ml-1.5 font-semibold text-neutral-400 normal-case tracking-normal">
+          {state === 'playing' ? '· being played now' : '· you are picking this one'}
+        </span>
+      </p>
+      {m.them ? (
+        <div className="flex items-center gap-3">
+          <Fighter label="You" name={name(m.you.entry)} accuracy={m.you.accuracy} align="left" />
+          <span className="text-xs font-bold text-neutral-400 shrink-0">v</span>
+          <Fighter label="Them" name={name(m.them.entry)} accuracy={m.them.accuracy} align="right" />
+        </div>
+      ) : (
+        <p className="text-sm text-neutral-600">
+          You sit this one out. With an odd number of members somebody has a bye each
+          week — it rotates, so everyone gets the same number.
+        </p>
+      )}
+      {m.duel.settled_at && m.them && (
+        <p className="text-xs text-neutral-500 mt-3 pt-3 border-t border-border-default">
+          {m.you.points === 3 ? 'You won this duel — three points.'
+            : m.you.points === 1 ? 'A tie — one point each.'
+            : 'They took this one.'}
+        </p>
+      )}
+    </Card>
   )
 }
 
