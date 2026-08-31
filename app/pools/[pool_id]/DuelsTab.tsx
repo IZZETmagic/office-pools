@@ -108,6 +108,18 @@ type Props = {
   perFixture: Map<string, Map<number, number>>
   /** Every fixture of the live matchweek, scored or not. */
   fixtures: MatchweekFixture[]
+  /**
+   * Everyone's Results-depth taps and full predictions, REVEAL-GATED by the
+   * bulk route — a matchweek still open for picks is not in here at all.
+   *
+   * ⚠ That gate is the only thing standing between this card and showing an
+   * opponent's picks before lock. It is enforced server-side in
+   * `app/api/pools/[pool_id]/bulk/route.ts`; nothing in this component may
+   * reconstruct picks from another source.
+   */
+  leagueOutcomes: Array<{ entry_id: string; match_id: string; outcome: 'home' | 'draw' | 'away' }>
+  allPredictions: Array<{ entry_id: string; match_id: string; predicted_home_score: number; predicted_away_score: number }>
+  bulkState: 'idle' | 'loading' | 'ready' | 'error'
   /** Season totals per entry — points, rank, duel points. */
   totals: Map<string, { totalPoints: number; rank: number | null; duelPoints: number; correct: number }>
   /** Last five score types per entry, oldest first. Same source as the leaderboard's dots. */
@@ -147,6 +159,39 @@ function Countdown({ to }: { to: string }) {
   return <>{text}</>
 }
 
+/**
+ * One side's pick for one fixture.
+ *
+ * ⚠ A pick both members share is DRAWN DOWN, not up. Agreements cannot separate
+ * two people — whoever is right, both get the same — so the sheet's whole job is
+ * to make the divergences findable. Colouring every chip would bury them.
+ *
+ * A null label is a pick the reveal gate has not released. It renders as a
+ * dash, never as "no pick": this component cannot tell withheld from never-made
+ * and must not guess.
+ */
+function PickChip({
+  label, side, differ, align = 'left',
+}: { label: string | null; side: 'you' | 'them'; differ: boolean; align?: 'left' | 'right' }) {
+  if (label === null) {
+    return (
+      <span className={`t-num t-num-medium text-xs text-muted/40 ${align === 'right' ? 'text-right' : ''}`}>
+        &mdash;
+      </span>
+    )
+  }
+  return (
+    <span className={align === 'right' ? 'text-right' : ''}>
+      <span className={`inline-block t-detail uppercase tracking-wider text-center rounded-md px-1.5 sm:px-2 py-1 w-full sm:w-auto sm:min-w-[3.25rem]
+        ${differ
+          ? side === 'you' ? 'bg-primary-500 text-white' : 'bg-danger-500 text-white'
+          : 'bg-mist text-muted'}`}>
+        {label}
+      </span>
+    </span>
+  )
+}
+
 /** Kickoff, in the VIEWER's timezone — never the server's. See components/LocalTime. */
 function formatKickoff(d: Date): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })
@@ -172,6 +217,9 @@ export default function DuelsTab({
   livePoints,
   perFixture,
   fixtures,
+  leagueOutcomes,
+  allPredictions,
+  bulkState,
   totals,
   form,
   duelPoints,
@@ -345,6 +393,27 @@ export default function DuelsTab({
     return fixtures.filter((f) => !scored.has(f.number)).length
   }, [inPlayMatchweek, fixtures, perFixture])
 
+  /**
+   * One member's pick for one fixture, as a short label.
+   *
+   * Depth-agnostic on purpose, the same way the duel engine is: a Results pool
+   * has a tap in `outcomes`, a Scores pool has a scoreline in `predictions`, and
+   * this reads whichever is present rather than being told which mode it is in.
+   * Null means not revealed (or never picked) — and those are deliberately the
+   * same to this component, because it must not be able to tell them apart.
+   */
+  const pickLabel = useMemo(() => {
+    const taps = new Map<string, string>()
+    for (const o of leagueOutcomes) {
+      taps.set(`${o.entry_id}:${o.match_id}`, o.outcome === 'home' ? 'HOME' : o.outcome === 'away' ? 'AWAY' : 'DRAW')
+    }
+    for (const p of allPredictions) {
+      const k = `${p.entry_id}:${p.match_id}`
+      if (!taps.has(k)) taps.set(k, `${p.predicted_home_score}-${p.predicted_away_score}`)
+    }
+    return (entryId: string, fixtureId: string) => taps.get(`${entryId}:${fixtureId}`) ?? null
+  }, [leagueOutcomes, allPredictions])
+
   const breakdown = useMemo(() => {
     if (!inPlay || !inPlay.them || inPlayMatchweek === null) return []
     const mine = perFixture.get(inPlay.you.entry) ?? new Map<number, number>()
@@ -356,10 +425,13 @@ export default function DuelsTab({
       const scored = mine.has(f.number) || theirs.has(f.number)
       return {
         n: f.number,
+        id: f.id,
         label: f.label,
         scored,
         mine: mine.get(f.number) ?? 0,
         theirs: theirs.get(f.number) ?? 0,
+        myPick: pickLabel(inPlay.you.entry, f.id),
+        theirPick: inPlay.them ? pickLabel(inPlay.them.entry, f.id) : null,
         clock: getLiveClock({
           status: f.status, livePeriod: f.livePeriod,
           liveMinute: f.liveMinute, liveAdded: f.liveAdded,
@@ -367,7 +439,7 @@ export default function DuelsTab({
         kickoffAt: f.kickoffAt,
       }
     })
-  }, [inPlay, inPlayMatchweek, perFixture, fixtures])
+  }, [inPlay, inPlayMatchweek, perFixture, fixtures, pickLabel])
 
   /**
    * Is the live duel already decided?
@@ -378,6 +450,26 @@ export default function DuelsTab({
    * the lead is bigger than everything still to come, it is over: a knockout,
    * called while the last game is still to be played.
    */
+  /** True once the gate has released at least one of the two sides' picks. */
+  const anyPicksRevealed = useMemo(
+    () => breakdown.some((b) => b.myPick !== null || b.theirPick !== null),
+    [breakdown],
+  )
+
+  /**
+   * "Six of ten are dead heat — this duel is Brighton, Palace and the Sunday
+   * game." Null until the sheet is actually revealed.
+   */
+  const sheetSummary = useMemo(() => {
+    if (!anyPicksRevealed) return null
+    const differ = breakdown.filter((b) => b.myPick && b.theirPick && b.myPick !== b.theirPick)
+    const same = breakdown.length - differ.length
+    if (differ.length === 0) return `Identical sheets — all ${breakdown.length} picks the same.`
+    const names = differ.slice(0, 3).map((d) => d.label.split(' v ')[0])
+    const tail = differ.length > 3 ? ` and ${differ.length - 3} more` : ''
+    return `${same} of ${breakdown.length} are dead heat. This duel is ${names.join(', ')}${tail}.`
+  }, [breakdown, anyPicksRevealed])
+
   const verdict = useMemo(() => {
     if (!inPlay || !inPlay.them || breakdown.length === 0 || remainingFixturesRaw === null) return null
     const you = livePoints.get(inPlay.you.entry) ?? 0
@@ -567,76 +659,86 @@ export default function DuelsTab({
         </Card>
       )}
 
-      {/* THE DECIDER — where the duel is actually being won, fixture by
-          fixture, and whether anything left can still change it. */}
+      {/* THE TEAM SHEET — both sides' picks, fixture by fixture.
+          ⚠ The opponent's column is REVEAL-GATED. `leagueOutcomes` and
+          `allPredictions` come from the bulk route, which withholds a matchweek
+          that is still open for picks; before lock there is simply nothing to
+          render on their side. Nothing here may reconstruct a pick from
+          another source. */}
       {inPlay?.them && breakdown.length > 0 && (
         <Card padding="none" className="overflow-hidden">
-          <p className="t-caption text-muted px-4 pt-4 pb-3">
-            Where it is being won
-            <span className="ml-1.5 text-muted/60 normal-case tracking-normal">
-              Matchweek {inPlayMatchweek}
-            </span>
-          </p>
+          <div className="grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.5rem_1fr_4.5rem] items-center gap-2 sm:gap-3 px-3 sm:px-4 pt-4 pb-3">
+            <span className="t-caption text-primary-600">You</span>
+            <span className="t-caption text-muted text-center">{breakdown.length} fixtures</span>
+            <span className="t-caption text-danger-600 text-right truncate">{name(inPlay.them.entry)}</span>
+          </div>
+
           <ul>
             {breakdown.map((b) => {
-              const outcome = !b.scored ? 'pending'
-                : b.mine === b.theirs ? 'level' : b.mine > b.theirs ? 'won' : 'lost'
+              const differ = b.myPick !== null && b.theirPick !== null && b.myPick !== b.theirPick
               return (
                 <li key={b.n}
-                  className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-2 border-t border-border-default
-                    ${outcome === 'pending' ? 'bg-primary-50/40 dark:bg-primary-900/10' : ''}`}>
-                  <span className={`t-detail uppercase tracking-widest w-12 shrink-0
-                    ${outcome === 'won' ? 'text-success-600'
-                      : outcome === 'lost' ? 'text-danger-600'
-                        : outcome === 'pending' ? 'text-primary-600' : 'text-muted/60'}`}>
-                    {outcome === 'won' ? 'Won' : outcome === 'lost' ? 'Lost'
-                      : outcome === 'pending' ? (b.clock ? 'Live' : 'To play') : 'Level'}
-                  </span>
-                  <span className={`t-body truncate ${outcome === 'pending' ? 'text-ink' : 'text-muted'}`}>
-                    {b.label}
-                  </span>
-                  {/* A fixture with no score row shows WHEN, not a fabricated
-                      0 – 0. The engine writes the row; until it does there is
-                      nothing to compare, and printing zeroes would read as two
-                      members who both got it wrong. */}
-                  {outcome === 'pending' ? (
-                    <span className="t-num t-num-medium text-xs text-primary-600 whitespace-nowrap">
-                      {b.clock ?? <LocalTime iso={b.kickoffAt} format={formatKickoff} />}
+                  className={`grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.5rem_1fr_4.5rem] items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 border-t border-border-default
+                    ${!b.scored ? 'bg-primary-50/40 dark:bg-primary-900/10' : ''}`}>
+                  <PickChip label={b.myPick} side="you" differ={differ} />
+                  <span className="min-w-0 text-center">
+                    <span className={`t-body block truncate ${differ ? 'text-ink' : 'text-muted'}`}>
+                      {b.label}
                     </span>
-                  ) : (
-                    <span className="t-num t-num-medium text-xs text-muted whitespace-nowrap">
-                      {b.mine} <span className="text-muted/40">&ndash;</span> {b.theirs}
-                    </span>
-                  )}
+                    {!b.scored && (
+                      <span className="t-detail text-primary-600 block mt-0.5">
+                        {b.clock ?? <LocalTime iso={b.kickoffAt} format={formatKickoff} />}
+                      </span>
+                    )}
+                  </span>
+                  <PickChip label={b.theirPick} side="them" differ={differ} align="right" />
                 </li>
               )
             })}
           </ul>
-          {verdict && (
-            <p className="t-body px-4 py-3 border-t border-border-default text-muted">
-              {verdict.safe ? (
-                <>
-                  <b className="text-ink">
-                    {verdict.leader === 'you' ? 'Mathematically safe.' : 'Mathematically out of reach.'}
-                  </b>{' '}
-                  {verdict.leader === 'you'
-                    ? `A ${verdict.lead}-point lead with nothing left that can close it — this duel is already won.`
-                    : `Behind by ${verdict.lead}, with less than that still to play for.`}
-                </>
-              ) : verdict.deciders ? (
-                <>
-                  <b className="text-ink">
-                    {verdict.lead === 0 ? 'Level.' : `${verdict.lead} points in it.`}
-                  </b>{' '}
-                  {verdict.deciders === 1
-                    ? 'One game left, and it decides the duel.'
-                    : `${verdict.deciders} games left, and they decide the duel.`}
-                </>
-              ) : (
-                <><b className="text-ink">All games played.</b> Waiting on the matchweek to settle.</>
-              )}
-            </p>
-          )}
+
+          {/* What the sheet MEANS, in a sentence. Agreements cannot separate two
+              members by definition, so the duel is only ever the divergences —
+              which is both the honest reading and the interesting one. */}
+          <div className="px-4 py-3 border-t border-border-default">
+            {sheetSummary && <p className="t-body text-muted mb-1.5">{sheetSummary}</p>}
+            {verdict && (
+              <p className="t-body text-muted">
+                {verdict.safe ? (
+                  <>
+                    <b className="text-ink">
+                      {verdict.leader === 'you' ? 'Mathematically safe.' : 'Mathematically out of reach.'}
+                    </b>{' '}
+                    {verdict.leader === 'you'
+                      ? `A ${verdict.lead}-point lead with nothing left that can close it.`
+                      : `Behind by ${verdict.lead}, with less than that still to play for.`}
+                  </>
+                ) : verdict.deciders ? (
+                  <>
+                    <b className="text-ink">
+                      {verdict.lead === 0 ? 'Level.' : `${verdict.lead} points in it.`}
+                    </b>{' '}
+                    {verdict.deciders === 1
+                      ? 'One game left, and it decides the duel.'
+                      : `${verdict.deciders} games left, and they decide the duel.`}
+                  </>
+                ) : (
+                  <><b className="text-ink">All games played.</b> Waiting on the matchweek to settle.</>
+                )}
+              </p>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Picks are withheld until the matchweek locks — say so, rather than
+          rendering an empty sheet that reads as "nobody picked". */}
+      {inPlay?.them && breakdown.length > 0 && !anyPicksRevealed && bulkState === 'ready' && (
+        <Card padding="md">
+          <p className="t-body text-muted text-center">
+            Both team sheets open when matchweek {inPlayMatchweek} locks. Until then nobody can
+            see anybody else&rsquo;s picks — including you.
+          </p>
         </Card>
       )}
 
@@ -785,10 +887,14 @@ function DuelPanel({
                 fixture list; the numbers are what make it a contest. */}
             {live !== null ? (
               <div className="text-center px-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="t-display text-4xl text-white">{live.you}</span>
-                  <span className="t-display text-lg text-white/25">&ndash;</span>
-                  <span className="t-display text-4xl text-white">{live.them}</span>
+                {/* text-3xl on a phone. At text-4xl the score took enough of a
+                    375px row that both names truncated — and a duel card that
+                    hides who is playing to show the score bigger has its
+                    priorities backwards. */}
+                <div className="flex items-baseline gap-1.5 sm:gap-2">
+                  <span className="t-display text-3xl sm:text-4xl text-white">{live.you}</span>
+                  <span className="t-display text-base sm:text-lg text-white/25">&ndash;</span>
+                  <span className="t-display text-3xl sm:text-4xl text-white">{live.them}</span>
                 </div>
               </div>
             ) : (
@@ -862,7 +968,10 @@ function Corner({
           : <div className="w-11 h-11 rounded-full bg-white/10" aria-hidden="true" />}
       </div>
       <p className="t-detail text-white/35 uppercase tracking-widest">{label}</p>
-      <p className="t-display text-xl text-white truncate mt-0.5">{name}</p>
+      {/* text-lg on a phone: "IZZETMAGIC" in Anton at text-xl truncated to
+          "IZZET…" at 375px, and a duel card whose whole point is two names
+          should not eat half of one. */}
+      <p className="t-display text-lg sm:text-xl text-white truncate mt-0.5">{name}</p>
     </div>
   )
 }

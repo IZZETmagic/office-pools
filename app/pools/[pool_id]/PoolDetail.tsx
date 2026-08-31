@@ -114,6 +114,8 @@ export type LmsData = {
 
 /** One fixture of the live matchweek, whether or not it has been scored. */
 export type MatchweekFixture = {
+  /** `league_fixtures.fixture_id` — what predictions are keyed on. */
+  id: string
   number: number
   label: string
   kickoffAt: string
@@ -243,7 +245,12 @@ type Tab =
  * the post-deadline "everyone else" section and the spectator view; the single
  * active entry's own picks come from their own per-entry fetch.
  */
-const TABS_NEEDING_BULK: Tab[] = ['community', 'results', 'members']
+// `duels` is here for the team sheet: the Showdown breakdown shows BOTH sides'
+// picks, and the only reveal-gated source of another member's picks is the bulk
+// route. Reusing it rather than reading `league_predictions` from the duel path
+// is deliberate — a second read would be a second place to get the gate wrong,
+// and getting it wrong means showing picks before lock.
+const TABS_NEEDING_BULK: Tab[] = ['community', 'results', 'members', 'duels']
 
 /**
  * Showdown leads with the duel.
@@ -2264,6 +2271,9 @@ export function PoolDetail({
                 livePoints={showdownData.livePoints}
                 perFixture={showdownData.perFixture}
                 fixtures={showdownData.fixtures}
+                leagueOutcomes={allLeagueOutcomes}
+                allPredictions={allPredictions}
+                bulkState={bulkState}
                 totals={showdownData.totals}
                 form={leagueForm}
                 duelPoints={showdownData.duelPoints}

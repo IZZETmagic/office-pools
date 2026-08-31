@@ -455,11 +455,18 @@ export default async function PoolPage({
             //
             // `match_number` IS `league_fixtures.fixture_number`, which is what
             // the score rows are keyed on, so the two join without a lookup.
+            const { shortClubName } = await import('@/lib/league/clubName')
             showdownData.fixtures = view.matches
               .filter((mt) => mt.round_number === liveMw)
               .map((mt) => ({
+                id: mt.match_id,
                 number: mt.match_number,
-                label: `${mt.home_team?.country_name ?? 'Home'} v ${mt.away_team?.country_name ?? 'Away'}`,
+                // ⚠ SHORT names. The team sheet puts the fixture between two
+                // pick chips, and at 375px "Crystal Palace v Manchester City"
+                // truncated — eating the half that tells City from United.
+                // `shortClubName` was written for exactly this width, and the
+                // mockup uses the short forms too.
+                label: `${shortClubName(mt.home_team?.country_name ?? 'Home')} v ${shortClubName(mt.away_team?.country_name ?? 'Away')}`,
                 kickoffAt: mt.match_date,
                 isCompleted: mt.is_completed,
                 status: mt.status,
