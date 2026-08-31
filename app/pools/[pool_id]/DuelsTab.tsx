@@ -229,12 +229,19 @@ function DuelSide({
   dimmed: boolean
   align?: 'left' | 'right'
 }) {
+  const face = person
+    ? <span className="shrink-0"><Avatar person={person} size={28} /></span>
+    : <span className="w-7 h-7 rounded-full bg-mist shrink-0" aria-hidden="true" />
+  const label = (
+    <span className={`t-body truncate ${leading ? 'text-ink font-bold' : 'text-muted'}`}>{name}</span>
+  )
+  // Avatar outermost, name inboard — and the group is pushed to the card's own
+  // edge by `justify`, not centred. Children are ordered explicitly rather than
+  // flipped with `flex-row-reverse`, because reverse also inverts what
+  // `justify-end` means and the two fight each other.
   return (
-    <span className={`flex items-center gap-2.5 min-w-0 ${align === 'right' ? 'flex-row-reverse' : ''} ${dimmed ? 'opacity-55' : ''}`}>
-      {person
-        ? <span className="shrink-0"><Avatar person={person} size={28} /></span>
-        : <span className="w-7 h-7 rounded-full bg-mist shrink-0" aria-hidden="true" />}
-      <span className={`t-body truncate ${leading ? 'text-ink font-bold' : 'text-muted'}`}>{name}</span>
+    <span className={`flex items-center gap-2.5 min-w-0 ${align === 'right' ? 'justify-end' : 'justify-start'} ${dimmed ? 'opacity-55' : ''}`}>
+      {align === 'right' ? <>{label}{face}</> : <>{face}{label}</>}
     </span>
   )
 }
@@ -918,7 +925,11 @@ export default function DuelsTab({
               const lead = d.pa === d.pb ? null : d.pa > d.pb ? 'a' : 'b'
               return (
                 <li key={d.id} className="border-t border-border-default px-4 sm:px-5 py-3">
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5 max-w-lg mx-auto">
+                  {/* ⚠ NO max-width. Capping this at max-w-lg centred the whole
+                      row and left dead space at both ends of the card while the
+                      two members huddled around the score. They belong at the
+                      card's edges, with the score in the middle. */}
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
                     <DuelSide
                       name={name(d.a)} person={person(d.a)}
                       leading={lead === 'a'} dimmed={lead === 'b'}
