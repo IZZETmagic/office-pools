@@ -169,6 +169,10 @@ describe('the Showdown display face does not leak', () => {
   const ALLOWED = [
     'app/pools/[pool_id]/DuelsTab.tsx',
     'app/pools/[pool_id]/DuelRecapSheet.tsx',
+    // The "06 Decision" page — the verdict term and the scoreline are the whole
+    // reason the face was added. Named individually, not by directory: the rule
+    // is that widening this list stays as deliberate as adding the font was.
+    'app/pools/[pool_id]/duel/[matchweek]/DuelDecision.tsx',
   ]
 
   it('only Showdown surfaces use t-display', () => {

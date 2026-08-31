@@ -2665,6 +2665,7 @@ export function PoolDetail({
           "seen" a result they never read. */}
       <DuelRecapSheet
         recap={recapDismissed ? null : duelRecap}
+        reviewHref={duelRecap ? `/pools/${pool.pool_id}/duel/${duelRecap.matchweek}` : '#'}
         onDismiss={dismissRecap}
       />
     </div>

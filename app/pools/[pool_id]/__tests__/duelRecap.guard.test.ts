@@ -42,6 +42,7 @@ const migrationSql = migration
 const sheet = read('app/pools/[pool_id]/DuelRecapSheet.tsx')
 const page = read('app/pools/[pool_id]/page.tsx')
 const detail = read('app/pools/[pool_id]/PoolDetail.tsx')
+const decision = read('app/pools/[pool_id]/duel/[matchweek]/DuelDecision.tsx')
 
 describe('the seen-marker is a timestamp, not a matchweek number', () => {
   it('migration 122 adds a timestamptz', () => {
@@ -88,7 +89,13 @@ describe('a bye is never mistaken for a tie', () => {
   it('the bye copy is the one sentence the other surfaces use', () => {
     // Migration 100 and leagueModeInfo.ts both say this. A fourth phrasing is
     // how the surfaces start disagreeing about one rule.
-    expect(sheet).toMatch(/There was no opponent, so there was no defeat/)
+    //
+    // ⚠ It lives on the PAGE, not the popup, since the 2026-08-31 split — the
+    // popup is the news and carries only the headline. This assertion moved
+    // with the sentence rather than being deleted, which is the point of it.
+    expect(decision).toMatch(/There was no opponent, so there was no defeat/)
+    // And the popup still says something true and non-committal about a bye.
+    expect(sheet).toMatch(/No opponent this week/)
   })
 })
 
