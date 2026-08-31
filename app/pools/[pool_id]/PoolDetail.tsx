@@ -1567,6 +1567,20 @@ export function PoolDetail({
    * button ever being shown. The strip and the panels have to read the same
    * flag, which is what this is.
    */
+  /**
+   * ONE-PAGE SHOWDOWN — off by default, reachable at `?layout=onepage`.
+   *
+   * Plan: drafts/2026-08-31_showdown_one_page_plan.md. The duel becomes the
+   * page: the tab strip goes, the band sticks to the top, and Predictions,
+   * Leaderboard and Banter render as sections beneath it.
+   *
+   * ⚠ BEHIND A PARAMETER UNTIL IT IS PROVEN, and only ever for Showdown. Every
+   * other mode — Table, LMS, Pick'em, the World Cup, bracket pools — reads this
+   * as false and is untouched, which is the whole reason it is a flag and not a
+   * rewrite of the tab list.
+   */
+  const onePage = isShowdown && searchParams.get('layout') === 'onepage'
+
   const canAdmin = isAdmin && !isArchived
   const tabs = canAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
 
@@ -1579,6 +1593,12 @@ export function PoolDetail({
       setActiveTab(tabs[0].key)
     }
   }, [tabs, activeTab])
+
+  // ⚠ ONE-PAGE HAS NO TABS, so the machinery that reads `activeTab` needs a
+  // no-tabs path rather than an undefined one — the swipe navigation below and
+  // the pill-scroll effect both assume a strip exists. Named once here so the
+  // guards read as intent rather than as a repeated condition.
+  const showTabStrip = !onePage
 
   // Swipe navigation for mobile — only swipe between primary tabs
   const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
@@ -1853,6 +1873,7 @@ export function PoolDetail({
 
 
             {/* ===== Tab bar — one scrollable strip at every width ===== */}
+            {showTabStrip && (
             <div ref={tabStripRef} className="flex relative items-center gap-2 overflow-x-auto scrollbar-hide py-2">
               {USER_TABS.map((tab) => (
                 <button
@@ -1910,6 +1931,7 @@ export function PoolDetail({
               )}
 
             </div>
+            )}
 
           </div>
         </div>
@@ -1918,10 +1940,17 @@ export function PoolDetail({
 
       {/* Tab content */}
       <main
-        className={`max-w-6xl mx-auto px-4 sm:px-6 ${
-          activeTab === 'community'
-            ? 'pt-3 sm:py-8 pb-0 sm:pb-8'
-            : 'py-6 sm:py-8'
+        /* ⚠ ONE-PAGE ORDERS THE PANES, IT DOES NOT MOVE THEM. All four are
+           already siblings here; sequencing them with `order` beats relocating
+           several hundred lines of JSX, and reverts by deleting a class.
+           The duel has to lead — a `position: sticky` band sitting third would
+           only start sticking once you had scrolled past the leaderboard. */
+        className={`${onePage ? 'sd-page flex flex-col ' : ''}max-w-6xl mx-auto px-4 sm:px-6 ${
+          onePage
+            ? 'pt-0 pb-8'
+            : activeTab === 'community'
+              ? 'pt-3 sm:py-8 pb-0 sm:pb-8'
+              : 'py-6 sm:py-8'
         }`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -1949,7 +1978,7 @@ export function PoolDetail({
               )
             )}
             {(!needsBulk || bulkState === 'ready') && <>
-            {activeTab === 'leaderboard' && (
+            {(onePage || activeTab === 'leaderboard') && (
               <LeaderboardTab
                 poolId={pool.pool_id}
                 members={members}
@@ -2062,8 +2091,9 @@ export function PoolDetail({
               />
             )}
 
-            {activeTab === 'predictions' && !isTableMode && !isLms && activeEntry && usesRoundFlow && (
-              spectatingEntry ? (
+            {(onePage || activeTab === 'predictions') && !isTableMode && !isLms && activeEntry && usesRoundFlow && (
+              <div className={onePage ? 'sd-picks' : 'contents'}>
+              {spectatingEntry ? (
                 <ProgressiveSpectatorView
                   ownerName={spectatingEntry.ownerName}
                   entryName={spectatingEntry.entryName}
@@ -2171,7 +2201,8 @@ export function PoolDetail({
                   leagueDepth={leagueDepth}
                   existingOutcomes={leagueOutcomes}
                 />
-              )
+              )}
+              </div>
             )}
 
             {activeTab === 'predictions' && !isTableMode && !isLms && activeEntry && isBracketPicker && (
@@ -2427,7 +2458,7 @@ export function PoolDetail({
               )
             )}
 
-            {activeTab === 'duels' && isShowdown && showdownData && (
+            {(onePage || activeTab === 'duels') && isShowdown && showdownData && (
               <DuelsTab
                 duels={showdownData.duels}
                 entryNames={showdownData.entryNames}
@@ -2472,6 +2503,7 @@ export function PoolDetail({
                 bulkState={bulkState}
                 totals={showdownData.totals}
                 onGoToPicks={() => handleTabSwitch('predictions')}
+                layout={onePage ? 'onepage' : 'tabs'}
                 series={showdownData.series}
                 form={leagueForm}
                 duelPoints={showdownData.duelPoints}
@@ -2596,7 +2628,7 @@ export function PoolDetail({
               <ScoringRulesTab settings={settings} predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'} />
             ))}
 
-            {activeTab === 'community' && (
+            {(onePage || activeTab === 'community') && (
               <CommunityTab
                 poolId={pool.pool_id}
                 poolName={pool.pool_name}

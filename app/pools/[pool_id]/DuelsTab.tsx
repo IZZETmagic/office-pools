@@ -68,6 +68,7 @@ import { headToHead, type DuelRow } from '@/lib/league/duels'
 import { getLiveClock } from '@/lib/matchStatus'
 import { LocalTime } from '@/components/LocalTime'
 import type { MatchweekFixture } from './PoolDetail'
+import { ShowdownBand } from './ShowdownBand'
 
 type Props = {
   duels: DuelRow[]
@@ -147,6 +148,19 @@ type Props = {
    * `handleTabSwitch`'s unsaved-changes guard for free.
    */
   onGoToPicks: () => void
+  /**
+   * How this tab is being presented.
+   *
+   * `tabs` — the card, exactly as it has always been.
+   * `onepage` — the duel is the head of the page, so the two DuelPanels are
+   *   replaced by a sticky `ShowdownBand` and everything BELOW them renders
+   *   unchanged. Plan: drafts/2026-08-31_showdown_one_page_plan.md.
+   *
+   * ⚠ A PROP, NOT A REPLACEMENT. `DuelPanel` is untouched and still the
+   * default, so the layout that has been live for two weeks is one query
+   * parameter away for as long as the rework is unproven.
+   */
+  layout?: 'tabs' | 'onepage'
   /** Your points and the pool's median, per matchweek (migration 124). */
   series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
 }
@@ -579,6 +593,7 @@ export default function DuelsTab({
   form,
   duelPoints,
   onGoToPicks,
+  layout = 'tabs',
   series,
 }: Props) {
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
@@ -1088,10 +1103,28 @@ export default function DuelsTab({
   }
 
   return (
-    <div className="space-y-4">
+    <div className={layout === 'onepage' ? 'sd-duel space-y-4' : 'space-y-4'}>
+      {/* ⚠ ONE-PAGE: the band stands in for the two cards below it and nothing
+          else changes. It takes DuelPanel's props verbatim — every number is
+          already computed for the card, and a band that derived its own would
+          be a second opinion about the same duel. */}
+      {layout === 'onepage' && (inPlay || open) && (
+        <ShowdownBand
+          m={(inPlay ?? open)!}
+          state={inPlay ? 'playing' : 'picking'}
+          name={name} person={person}
+          live={inPlay ? { you: live(inPlay.you.entry), them: live(inPlay.them?.entry ?? null) } : null}
+          remaining={inPlay ? remainingFixtures : null}
+          liveNow={inPlay ? anyFixtureLive : false}
+          strip={inPlay ? breakdown.map((b) => ({ outcome: b.outcome, live: b.clock !== null })) : []}
+          rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
+          points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
+        />
+      )}
+
       {/* Being played now, then the one you are still picking. Both, because
           they are different weeks all weekend. */}
-      {inPlay && (
+      {layout === 'tabs' && inPlay && (
         <DuelPanel
           m={inPlay} state="playing" name={name} person={person}
           live={{ you: live(inPlay.you.entry), them: live(inPlay.them?.entry ?? null) }}
@@ -1104,7 +1137,7 @@ export default function DuelsTab({
           strip={breakdown.map((b) => ({ outcome: b.outcome, live: b.clock !== null }))}
         />
       )}
-      {open && (
+      {layout === 'tabs' && open && (
         <DuelPanel m={open} state="picking" name={name} person={person}
           live={null} remaining={null} liveNow={false} strip={[]} />
       )}

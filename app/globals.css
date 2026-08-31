@@ -1385,3 +1385,110 @@ html.dark .mode-pill {
 @media (prefers-reduced-motion: reduce) {
   .duel-chip-live { animation: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   THE SHOWDOWN BAND
+   ---------------------------------------------------------------------------
+   Plan: drafts/2026-08-31_showdown_one_page_plan.md §1.
+
+   The duel, as the head of the page rather than a card on it. Sticky, and it
+   collapses as you scroll — driven by one custom property, `--p`, which
+   `ShowdownBand` sets from 0 to 1 over the first 150px of scroll.
+
+   ⚠ THE COLLAPSE MEANS TWO DIFFERENT THINGS, AND THAT IS THE DESIGN.
+
+   On a phone it SHEDS: two names, two ranks and a label have nowhere to go in
+   375px, so they leave, and the avatars rise to flank the clock.
+
+   From `md` it only SHRINKS: a wide band has room for all of it, so nothing is
+   removed and both members stay named and ranked the whole way down.
+
+   Same component, same property, different budget — not two designs.
+
+   ⚠ Interpolated in CSS rather than by re-rendering React on every scroll
+   event. The listener writes one custom property on one element; the browser
+   does the rest off the main thread's critical path. A `useState` per frame
+   would re-render a subtree carrying the whole duel on every pixel.
+--------------------------------------------------------------------------- */
+@utility sd-band {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  overflow: hidden;
+  /* Full-bleed out of the page's padded column: the gradient runs edge to edge
+     while the CONTENTS stay capped (see .sd-inner). A 1920px monitor gets the
+     band without the stretch. */
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding-left: calc(50vw - 50%);
+  padding-right: calc(50vw - 50%);
+}
+
+/* Mobile: absolute placement, because the pieces travel — the avatars move up
+   and inward to sit either side of the clock. */
+.sd-band .sd-m {
+  position: relative;
+  height: calc(320px - 212px * var(--p));
+  transition: height 60ms linear;
+}
+.sd-band .sd-mw    { position: absolute; left: 0; right: 0; text-align: center;
+                     top: calc(20px - 6px * var(--p)); }
+.sd-band .sd-big   { position: absolute; left: 0; right: 0; text-align: center;
+                     top: calc(50px - 22px * var(--p));
+                     font-size: calc(40px - 18px * var(--p)); line-height: 1; }
+.sd-band .sd-sub   { position: absolute; left: 0; right: 0; text-align: center;
+                     top: 104px; opacity: calc(1 - 2.2 * var(--p)); }
+.sd-band .sd-face  { position: absolute;
+                     width:  calc(72px - 38px * var(--p));
+                     height: calc(72px - 38px * var(--p));
+                     top: calc(146px - 106px * var(--p)); }
+.sd-band .sd-face-you  { left:  calc(38px - 24px * var(--p)); }
+.sd-band .sd-face-them { right: calc(38px - 24px * var(--p)); }
+.sd-band .sd-vee   { position: absolute; left: 0; right: 0; text-align: center;
+                     top: 170px; opacity: calc(1 - 2.4 * var(--p)); }
+.sd-band .sd-who   { position: absolute; top: 232px; width: 40%;
+                     opacity: calc(1 - 2.6 * var(--p)); text-align: center; }
+.sd-band .sd-who-you  { left: 2%; }
+.sd-band .sd-who-them { right: 2%; }
+
+/* From `md` the layout is a row and nothing is hidden — every size just eases
+   down. `.sd-m` is replaced by `.sd-d`, which is display:none below md. */
+.sd-band .sd-d { display: none; }
+@media (min-width: 768px) {
+  .sd-band .sd-m { display: none; }
+  .sd-band .sd-d {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: calc(28px - 12px * var(--p));
+    max-width: 940px; margin: 0 auto;
+    padding: calc(28px - 18px * var(--p)) 24px calc(32px - 22px * var(--p));
+  }
+  .sd-band .sd-side  { display: flex; align-items: center; min-width: 0; flex: none;
+                       gap: calc(14px - 5px * var(--p)); }
+  .sd-band .sd-face-d{ width:  calc(70px - 32px * var(--p));
+                       height: calc(70px - 32px * var(--p)); }
+  .sd-band .sd-nm    { font-size: calc(20px - 7px * var(--p)); line-height: 1.1; }
+  .sd-band .sd-pts   { font-size: calc(12px - 2px * var(--p));
+                       margin-top: calc(5px - 2px * var(--p)); }
+  .sd-band .sd-mid   { flex: 1 1 auto; min-width: 0; text-align: center; }
+  .sd-band .sd-mw-d  { margin-bottom: calc(11px - 6px * var(--p));
+                       font-size: calc(12px - 1px * var(--p)); }
+  .sd-band .sd-big-d { font-size: calc(50px - 24px * var(--p)); line-height: 1; }
+  .sd-band .sd-sub-d { margin-top: calc(10px - 5px * var(--p));
+                       height: calc(14px - 14px * var(--p)); overflow: hidden;
+                       opacity: calc(1 - 1.6 * var(--p)); }
+  .sd-band .sd-strip-d { max-width: 300px; margin: calc(14px - 6px * var(--p)) auto 0; }
+}
+
+/* The collapse is spatial information, not decoration — with motion reduced the
+   band simply stays at its full height rather than snapping between sizes. */
+@media (prefers-reduced-motion: reduce) {
+  .sd-band .sd-m, .sd-band .sd-d { --p: 0 !important; }
+}
+
+/* One-page Showdown: the panes are already siblings inside <main>, so the page
+   is sequenced rather than restructured. The duel leads because the band is
+   `position: sticky` — sitting third it would only begin sticking after the
+   leaderboard had scrolled past, which is not a head of page. */
+.sd-page > *         { order: 3; }
+.sd-page > .sd-duel  { order: 1; }
+.sd-page > .sd-picks { order: 2; }
