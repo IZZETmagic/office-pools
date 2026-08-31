@@ -917,6 +917,12 @@ export default function DuelsTab({
       // it is over: the engine writes the row, and until it does there is
       // nothing to compare. Absent ≠ nil-nil.
       const scored = mine.has(f.number) || theirs.has(f.number)
+      // Hoisted above `outcome`, which needs it: a fixture being PLAYED is not
+      // the same thing as one that has not started.
+      const clock = getLiveClock({
+        status: f.status, livePeriod: f.livePeriod,
+        liveMinute: f.liveMinute, liveAdded: f.liveAdded,
+      })
       const mineP = mine.get(f.number) ?? 0
       const theirsP = theirs.get(f.number) ?? 0
       const myPick = pickLabel(inPlay.you.entry, f.id)
@@ -933,7 +939,17 @@ export default function DuelsTab({
        * anything: each one asks whether it is the winner.
        */
       const outcome: 'same' | 'you' | 'them' | 'neither' | 'pending' =
-        !scored ? 'pending'
+        // ⚠ `pending` MEANS NOT STARTED, and a match being played is not that.
+        // Until the engine writes a score row there is nothing to compare, so
+        // nobody can be shown ahead — but "nobody is ahead" is `neither`, which
+        // is grey, not the dashed outline that says the game has not kicked
+        // off. The dashed chip on a live game was reading as "not started"
+        // while the clock beside it ran.
+        //
+        // This window is short by design and shrinks to nothing once the
+        // engine scores live fixtures in production: `scored` goes true on the
+        // first sync tick after kickoff and the real outcome takes over.
+        !scored ? (clock !== null ? 'neither' : 'pending')
           : myPick !== null && theirPick !== null && myPick === theirPick ? 'same'
             : mineP > theirsP ? 'you'
               : theirsP > mineP ? 'them'
@@ -955,8 +971,20 @@ export default function DuelsTab({
          * "different picks, neither scored" row, and seeing 2-2 beside it is
          * what makes the tick pattern legible instead of arbitrary.
          */
+        /**
+         * ⚠ AT FULL TIME ONLY. This drives which club is bolded and which is
+         * faded back, and doing that to a match still being played states an
+         * outcome the game has not reached — a live 0-0 read as a settled draw
+         * and greyed BOTH clubs out, at the exact moment they are the most
+         * interesting thing on the card. 1-0 at 12 minutes would have faded the
+         * side that goes on to win 3-1.
+         *
+         * `isCompleted` rather than a status string: it is the column the
+         * engine, the snapshot guard and the matchweek window all settle on,
+         * and it stays false through HT, ET and a suspension.
+         */
         result:
-          f.homeScore === null || f.awayScore === null ? null
+          !f.isCompleted || f.homeScore === null || f.awayScore === null ? null
             : f.homeScore > f.awayScore ? 'home'
               : f.awayScore > f.homeScore ? 'away' : 'draw',
         outcome,
@@ -965,10 +993,7 @@ export default function DuelsTab({
         theirs: theirsP,
         myPick,
         theirPick,
-        clock: getLiveClock({
-          status: f.status, livePeriod: f.livePeriod,
-          liveMinute: f.liveMinute, liveAdded: f.liveAdded,
-        }),
+        clock,
         kickoffAt: f.kickoffAt,
       }
     })
