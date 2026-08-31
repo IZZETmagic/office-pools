@@ -989,6 +989,21 @@ export default function DuelsTab({
               : f.awayScore > f.homeScore ? 'away' : 'draw',
         outcome,
         scored,
+        /**
+         * ⚠ THE PILL BELOW HANGS OFF THIS, NOT OFF `outcome`.
+         *
+         * It used to render on `outcome === 'pending'`, which worked only
+         * while "not scored" and "not started" were the same state. The moment
+         * a live fixture stopped being `pending` — so its chip could go grey
+         * instead of dashed — the red ticking clock vanished from every game
+         * in play, which is the one row that most needs it.
+         *
+         * Whether to show a time is a question about the MATCH, so it is
+         * answered from the match: not finished means there is still a clock
+         * or a kickoff to show. Who is winning the duel has nothing to do
+         * with it, and coupling the two is what broke it.
+         */
+        isCompleted: f.isCompleted,
         mine: mineP,
         theirs: theirsP,
         myPick,
@@ -1510,7 +1525,7 @@ export default function DuelsTab({
                       <span className={`t-body truncate hidden md:inline ${b.result === 'away' ? 'text-ink font-bold' : 'text-muted'}`}>{b.awayName}</span>
                     </span>
                   </span>
-                  {b.outcome === 'pending' && (
+                  {!b.isCompleted && (
                     <span className="flex justify-center">
                       {/* A pill, so it reads as metadata about the fixture
                           rather than a second line of the fixture itself. A
