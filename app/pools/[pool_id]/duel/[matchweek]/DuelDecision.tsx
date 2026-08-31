@@ -24,6 +24,7 @@
 // not a record, it is a slot machine.
 // =============================================================
 
+import { useState } from 'react'
 import Link from 'next/link'
 
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
@@ -46,6 +47,59 @@ function dayOf(iso: string): string {
   return days <= 6
     ? d.toLocaleDateString(undefined, { weekday: 'long' })
     : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+}
+
+/** 1st, 2nd, 3rd, 4th… including the 11th/12th/13th exceptions. */
+function ordinal(n: number): string {
+  const rem100 = n % 100
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`
+}
+
+/**
+ * Share the result.
+ *
+ * ⚠ IT SHARES A LINK, NOT AN IMAGE, AND THAT IS WHY IT IS SAFE TODAY. The page
+ * behind this URL is membership-gated — a non-member gets a 404 — so the banter
+ * quote cannot leave the pool by this route no matter who the link is sent to.
+ *
+ * ⚠ THAT PROTECTION DISAPPEARS THE DAY AN OG IMAGE EXISTS. An `opengraph-image`
+ * renders the card into a picture that unfurls in any chat app, to anybody, with
+ * no membership check at all. Ryan's rule (2026-08-31) applies there: the quote
+ * does NOT go in it. Whoever builds that is reading this comment, not the plan
+ * doc.
+ *
+ * `navigator.share` where it exists — a phone's own sheet is better than
+ * anything here — and a clipboard copy everywhere else.
+ */
+function ShareButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+  const share = async () => {
+    const absolute = typeof window === 'undefined' ? url : new URL(url, window.location.origin).toString()
+    if (navigator.share) {
+      // A cancelled share rejects. That is the member changing their mind, not
+      // a failure, so it must not surface as one.
+      try { await navigator.share({ url: absolute }); return } catch { return }
+    }
+    try {
+      await navigator.clipboard.writeText(absolute)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // No clipboard permission and no share sheet. Say nothing rather than
+      // claiming a copy that did not happen.
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={share}
+      className="rounded-pill bg-accent-400 text-neutral-900 t-caption py-3.5
+                 hover:bg-accent-300 active:bg-accent-500 transition-colors"
+    >
+      {copied ? 'Link copied' : 'Share the result'}
+    </button>
+  )
 }
 
 function Corner({ side, dim, align }: { side: Side; dim: boolean; align: 'left' | 'right' }) {
@@ -77,6 +131,7 @@ function MovedRow({ label, children }: { label: string; children: React.ReactNod
 
 export function DuelDecision({
   poolId, poolName, matchweek, verdict, scoreline, decisiveFixture, you, them, record, quote,
+  position, shareUrl,
 }: {
   poolId: string
   poolName: string
@@ -99,6 +154,16 @@ export function DuelDecision({
    * does not go in it.
    */
   quote: { content: string; author: string; at: string } | null
+  /**
+   * Position in the pool table, after and before this matchweek settled.
+   *
+   * ⚠ Both may be null — a pool that has never settled a matchweek has no
+   * previous rank, and the row shows the current position with no arrow rather
+   * than inventing a move.
+   */
+  position: { now: number | null; before: number | null }
+  /** Path to this page. See the share note on the button. */
+  shareUrl: string
 }) {
   const bye = verdict.outcome === 'bye'
   const eyebrow =
@@ -140,12 +205,17 @@ export function DuelDecision({
             }}
           />
           <div className="relative px-5 sm:px-8 py-7">
-            <p className="t-caption text-white/45 text-center">{eyebrow}</p>
-
-            {/* ⚠ The verdict term, never chosen for drama — see duelVerdict.ts. */}
-            <p className="t-display text-4xl sm:text-5xl text-accent-400 text-center mt-2">
-              {verdict.term}
+            {/* ⚠ THE NEWS IS THE HEADLINE, THE VERDICT IS THE FLAVOUR. Until
+                2026-08-31 this was the other way round — "DECISION" in 48px
+                gold above "you beat sarah c" in 11px grey — so the biggest
+                thing on the card was a word we chose and the smallest was what
+                actually happened. Ryan's call, and he is right: the term is
+                colour, the result is the point. */}
+            <p className="t-caption text-white/40 text-center">Result</p>
+            <p className="t-display text-3xl sm:text-4xl text-white text-center mt-1.5">
+              {eyebrow}
             </p>
+            <p className="t-caption text-accent-400 text-center mt-2">{verdict.term}</p>
 
             {bye ? (
               <p className="t-body text-white/70 text-center mt-6 max-w-xs mx-auto">
@@ -223,6 +293,25 @@ export function DuelDecision({
         {/* WHAT IT MOVED */}
         <div className="rounded-card overflow-hidden bg-midnight px-5 sm:px-8 py-5">
           <p className="t-caption text-white/45">What it moved</p>
+          {/* ⚠ AND IT SAYS WHEN NOTHING MOVED. Win, stay 4th, and it reads
+              "4th" with no arrow — a block that only ever reports good news is
+              not a record, it is a slot machine. */}
+          {position.now !== null && (
+            <MovedRow label="Your position">
+              {position.before !== null && position.before !== position.now ? (
+                <>
+                  <span className="text-white/45">{ordinal(position.before)}</span>
+                  <span className={`mx-1.5 ${
+                    position.now < position.before ? 'text-success-400' : 'text-danger-400'}`}>&rarr;</span>
+                  <span className={position.now < position.before ? 'text-success-400' : 'text-danger-400'}>
+                    {ordinal(position.now)}
+                  </span>
+                </>
+              ) : (
+                <span>{ordinal(position.now)}</span>
+              )}
+            </MovedRow>
+          )}
           <MovedRow label="Duel points">
             <span className={verdict.outcome === 'lost' ? 'text-white/50' : 'text-success-400'}>
               {verdict.outcome === 'lost' ? '+0' : `+${verdict.outcome === 'won' ? 500 : 250}`}
@@ -240,11 +329,12 @@ export function DuelDecision({
           </MovedRow>
         </div>
 
+        <ShareButton url={shareUrl} />
+
         <Link
           href={`/pools/${poolId}`}
-          className="rounded-pill bg-white/10 dark:bg-white/10 text-ink dark:text-white
-                     t-caption text-center py-3.5 hover:bg-white/15 transition-colors
-                     border border-border-default"
+          className="rounded-pill text-ink dark:text-white t-caption text-center py-3.5
+                     hover:bg-white/5 transition-colors border border-border-default"
         >
           Back to the pool
         </Link>

@@ -107,6 +107,20 @@ export default async function DuelDecisionPage({
   const admin = createAdminClient()
   const { perFixture } = await readMatchweekPoints(admin, pool_id, matchweekNumber)
 
+  // ⚠ THE POSITION CHANGE IS READ, NOT DERIVED. `previous_final_rank` is frozen
+  // by the matchweek snapshot (059/061/094) at the moment a matchweek settles,
+  // and `league_finalize_ranks` then recomputes `final_rank` — so the pair
+  // spans exactly this matchweek's movement, accuracy AND duel points together.
+  // Rebuilding it from the duels alone would give the DUEL table's position,
+  // which since 121 is not the table any more.
+  //
+  // ⚠ Admin: `league_entry_totals` is deny-all (050).
+  const { data: totals } = await admin
+    .from('league_entry_totals')
+    .select('final_rank, previous_final_rank')
+    .eq('entry_id', myEntry)
+    .maybeSingle()
+
   const scoreline = duelScoreline(perFixture.get(myEntry), theirEntry ? perFixture.get(theirEntry) : undefined)
   const verdict = duelVerdict(scoreline, iAmA ? duel.points_a : duel.points_b, theirEntry === null)
   const decisive = theirEntry
@@ -157,12 +171,11 @@ export default async function DuelDecisionPage({
   // `prediction_share` — and quoting one of those back at somebody would be
   // absurd. Only 1,671 are words a person typed.
   //
-  // ⚠ ONLY WHEN YOU WON, which is a judgement call rather than a technical
-  // limit. Their boast read back after they lost is the joke; the same boast
-  // shown to somebody who just lost to them is us curating a moment to twist a
-  // knife. The message is public in the pool either way — they can scroll to it
-  // — so declining to feature it costs nothing and avoids manufacturing a bad
-  // feeling out of a real one.
+  // ⚠ ON A LOSS TOO — Ryan overturned my call, 2026-08-31, and he is right.
+  // I had shown it only on a win, reasoning that their boast read back to
+  // somebody who just lost was twisting a knife. But a pool where people talk
+  // trash wants the receipt on both sides, and hiding it was us deciding what a
+  // member can handle. The message is public either way; they can scroll to it.
   //
   // ⚠ NOT TRUNCATED. A message longer than the card gets DROPPED, not cut:
   // shortening what somebody said changes what they said, and half a sentence
@@ -173,7 +186,7 @@ export default async function DuelDecisionPage({
   // on a card that leaves the pool republishes her somewhere she did not post,
   // and she is not the one pressing the button.
   let quote: { content: string; author: string; at: string } | null = null
-  if (verdict.outcome === 'won' && theirEntry) {
+  if (theirEntry) {
     const { data: mwWindow } = await supabase
       .from('league_matchweeks')
       .select('first_kickoff_at')
@@ -219,6 +232,8 @@ export default async function DuelDecisionPage({
       // ⚠ headToHead over EVERY settled duel between the two, this one included.
       // It read `=== 3` until 2026-08-31 and would have called them all losses.
       record={theirEntry ? headToHead(duels, myEntry, theirEntry) : null}
+      position={{ now: totals?.final_rank ?? null, before: totals?.previous_final_rank ?? null }}
+      shareUrl={`/pools/${pool_id}/duel/${matchweekNumber}`}
     />
   )
 }
