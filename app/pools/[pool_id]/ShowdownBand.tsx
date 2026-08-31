@@ -80,6 +80,20 @@ export type ShowdownBandProps = {
   points?: (e: string | null) => number | null
 }
 
+/**
+ * The matchweek label's size, INLINE.
+ *
+ * ⚠ Inline rather than in globals.css because this checkout's dev server keeps
+ * serving stale CSS while picking up TSX (see the radius note above) — and a
+ * new Tailwind class would not help, since utilities are compiled into that
+ * same stylesheet. A style attribute is the only change that cannot be missed.
+ *
+ * It still interpolates: `--p` is set on the band and inherits down, so the
+ * label shrinks with everything else on the way to collapsed.
+ */
+const MW_SIZE = { fontSize: 'calc(15px - 3px * var(--p))' }
+const MW_SIZE_D = { fontSize: 'calc(16px - 4px * var(--p))' }
+
 /** See the note at the usage site: off-token on purpose, and only here. */
 const BAND_RADIUS = '44px'
 
@@ -198,7 +212,7 @@ export function ShowdownBand({
 
       {/* ── phone: the pieces travel ─────────────────────────── */}
       <div className="sd-m">
-        <p className="sd-mw t-caption text-white/50">Matchweek {matchweek}</p>
+        <p className="sd-mw t-caption text-white/75" style={MW_SIZE}>Matchweek {matchweek}</p>
         <p className="sd-big t-num t-num-black text-white">{headline}</p>
         {sub && <p className="sd-sub t-detail text-white/45">{sub}</p>}
         {liveNow && (
@@ -241,7 +255,7 @@ export function ShowdownBand({
         </div>
 
         <div className="sd-mid">
-          <p className="sd-mw-d t-caption text-white/50">Matchweek {matchweek}</p>
+          <p className="sd-mw-d t-caption text-white/75" style={MW_SIZE_D}>Matchweek {matchweek}</p>
           <p className="sd-big-d t-num t-num-black text-white">{headline}</p>
           {sub && <p className="sd-sub-d t-detail text-white/45">{sub}</p>}
           {liveNow && (

@@ -1437,8 +1437,7 @@ html.dark .mode-pill {
   transition: height 60ms linear;
 }
 .sd-band .sd-mw    { position: absolute; left: 0; right: 0; text-align: center;
-                     top: calc(20px - 8px * var(--p));
-                     font-size: calc(11px - 1px * var(--p)); }
+                     top: calc(20px - 8px * var(--p)); }  /* size: MW_SIZE */
 .sd-band .sd-big   { position: absolute; left: 0; right: 0; text-align: center;
                      top: calc(50px - 28px * var(--p));
                      font-size: calc(40px - 20px * var(--p)); line-height: 1; }
@@ -1476,8 +1475,7 @@ html.dark .mode-pill {
   .sd-band .sd-pts   { font-size: calc(12px - 2px * var(--p));
                        margin-top: calc(5px - 2px * var(--p)); }
   .sd-band .sd-mid   { flex: 1 1 auto; min-width: 0; text-align: center; }
-  .sd-band .sd-mw-d  { margin-bottom: calc(11px - 6px * var(--p));
-                       font-size: calc(12px - 1px * var(--p)); }
+  .sd-band .sd-mw-d  { margin-bottom: calc(11px - 6px * var(--p)); }  /* size: MW_SIZE_D */
   .sd-band .sd-big-d { font-size: calc(50px - 24px * var(--p)); line-height: 1; }
   .sd-band .sd-sub-d { margin-top: calc(10px - 5px * var(--p));
                        height: calc(14px - 14px * var(--p)); overflow: hidden;
