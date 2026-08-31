@@ -212,13 +212,19 @@ function PickChip({
   )
 }
 
-/** A club crest, or nothing. Never a broken image and never a placeholder box. */
+/**
+ * A club crest, or nothing. Never a broken image and never a placeholder box.
+ *
+ * ⚠ LARGER ON A PHONE THAN ON A DESKTOP, which looks backwards and is not:
+ * above `md` the club name sits beside it and the crest is decoration, below
+ * `md` the crest IS the club.
+ */
 function Crest({ url, name }: { url: string | null; name: string }) {
   if (!url) return null
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt="" aria-hidden="true" title={name}
-      className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0" loading="lazy" />
+      className="w-8 h-8 md:w-6 md:h-6 object-contain shrink-0" loading="lazy" />
   )
 }
 
@@ -771,9 +777,13 @@ export default function DuelsTab({
                         A draw dims neither. This is about the MATCH, and is a
                         different question from who took the fixture in the
                         duel: both members can lose a game City won. */}
-                    <span className={`flex items-center justify-end gap-2 min-w-0
-                      ${b.result === 'home' ? 'opacity-100' : b.result ? 'opacity-45' : ''}`}>
-                      <span className={`t-body truncate md:hidden ${b.result === 'home' ? 'text-ink font-bold' : 'text-muted'}`}>{b.homeAbbr}</span>
+                    <span className={`flex items-center justify-end gap-2.5 min-w-0
+                      ${b.result === 'home' ? 'opacity-100' : b.result ? 'opacity-60 md:opacity-45' : ''}`}>
+                      {/* ⚠ THE CREST IS THE ONLY LABEL ON A PHONE, so the name
+                          still has to reach a screen reader — sr-only, not
+                          removed. A crest with no accessible name is an
+                          unlabelled image where the content is. */}
+                      <span className="sr-only">{b.homeName}</span>
                       <span className={`t-body truncate hidden md:inline ${b.result === 'home' ? 'text-ink font-bold' : 'text-muted'}`}>{b.homeName}</span>
                       <Crest url={b.homeCrest} name={b.homeName} />
                     </span>
@@ -790,10 +800,10 @@ export default function DuelsTab({
                       <span className="t-detail text-muted/40">v</span>
                     )}
 
-                    <span className={`flex items-center gap-2 min-w-0
-                      ${b.result === 'away' ? 'opacity-100' : b.result ? 'opacity-45' : ''}`}>
+                    <span className={`flex items-center gap-2.5 min-w-0
+                      ${b.result === 'away' ? 'opacity-100' : b.result ? 'opacity-60 md:opacity-45' : ''}`}>
                       <Crest url={b.awayCrest} name={b.awayName} />
-                      <span className={`t-body truncate md:hidden ${b.result === 'away' ? 'text-ink font-bold' : 'text-muted'}`}>{b.awayAbbr}</span>
+                      <span className="sr-only">{b.awayName}</span>
                       <span className={`t-body truncate hidden md:inline ${b.result === 'away' ? 'text-ink font-bold' : 'text-muted'}`}>{b.awayName}</span>
                     </span>
                   </span>
