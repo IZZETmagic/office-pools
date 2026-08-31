@@ -1484,11 +1484,3 @@ html.dark .mode-pill {
 @media (prefers-reduced-motion: reduce) {
   .sd-band .sd-m, .sd-band .sd-d { --p: 0 !important; }
 }
-
-/* One-page Showdown: the panes are already siblings inside <main>, so the page
-   is sequenced rather than restructured. The duel leads because the band is
-   `position: sticky` — sitting third it would only begin sticking after the
-   leaderboard had scrolled past, which is not a head of page. */
-.sd-page > *         { order: 3; }
-.sd-page > .sd-duel  { order: 1; }
-.sd-page > .sd-picks { order: 2; }

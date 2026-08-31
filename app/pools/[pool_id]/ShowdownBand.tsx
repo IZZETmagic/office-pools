@@ -37,23 +37,34 @@ import { useEffect, useRef } from 'react'
 
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor } from '@/lib/design/avatarGradient'
-import type { DuelRow } from '@/lib/league/duels'
 
-type Side = { entry: string; accuracy: number | null; points: number | null }
-
+/**
+ * ⚠ PRESENTATIONAL, DELIBERATELY. The band decides nothing — not which
+ * matchweek, not whether a duel is sealed, not what the headline says. It is
+ * handed a headline and two people and lays them out at whatever size the
+ * scroll position calls for.
+ *
+ * That is what lets `DuelsTab` drive all three states with the components it
+ * already has: `Countdown` for a sealed week, the running score for a live one,
+ * the final score once it is decided. A band that chose between those would be
+ * a third place that knows the duel lifecycle, and there are already two.
+ */
 export type ShowdownBandProps = {
-  m: { duel: DuelRow; you: Side; them: Side | null; matchweek: number }
-  state: 'playing' | 'picking'
+  matchweek: number
+  /** The viewer's entry. */
+  youEntry: string
+  /** The opponent, or null while the draw is still sealed. */
+  themEntry: string | null
   name: (e: string | null) => string
   person: (e: string | null) => AvatarPerson | null
-  /** Running score, or null before anything has been scored. */
-  live: { you: number; them: number } | null
-  /** Fixtures in this matchweek with no score row yet. */
-  remaining: number | null
+  /** The big number, or the countdown, or whatever this state calls for. */
+  headline: React.ReactNode
+  /** One quiet line under it. */
+  sub?: string | null
   /** A ball is in play RIGHT NOW — not merely "the matchweek is in progress". */
-  liveNow: boolean
+  liveNow?: boolean
   /** One entry per fixture: who is taking it, and whether it is being played. */
-  strip: Array<{ outcome: 'you' | 'them' | 'same' | 'neither' | 'pending'; live: boolean }>
+  strip?: Array<{ outcome: 'you' | 'them' | 'same' | 'neither' | 'pending'; live: boolean }>
   /** Season rank, for the line under each name. Null while unranked. */
   rank?: (e: string | null) => number | null
   /** Season points, same. */
@@ -92,7 +103,8 @@ function Face({
 }
 
 export function ShowdownBand({
-  m, state, name, person, live, remaining, liveNow, strip, rank, points,
+  matchweek, youEntry, themEntry, name, person, headline, sub,
+  liveNow = false, strip = [], rank, points,
 }: ShowdownBandProps) {
   const bandRef = useRef<HTMLDivElement>(null)
 
@@ -117,12 +129,12 @@ export function ShowdownBand({
     }
   }, [])
 
-  const youColour = avatarColor(m.you.entry)
+  const youColour = avatarColor(youEntry)
   // ⚠ SLATE, not a colour, while the opponent is unknown. An absent person has
   // no identity colour, and inventing one would mean the reveal changes a
   // colour the member had already learned.
-  const themColour = m.them ? avatarColor(m.them.entry) : 'var(--sp-slate)'
-  const sealed = m.them === null
+  const themColour = themEntry ? avatarColor(themEntry) : 'var(--sp-slate)'
+  const sealed = themEntry === null
 
   const meta = (e: string | null) => {
     const r = rank?.(e) ?? null
@@ -132,28 +144,6 @@ export function ShowdownBand({
       .filter(Boolean).join(' · ')
   }
 
-  // The headline number: the running score once anything is scored, and the
-  // matchweek's own state before that. Never recomputed — `live` is what
-  // DuelsTab already worked out for the card.
-  const scored = live !== null
-  // ⚠ A VALUE, NOT A COMPONENT. Declaring `const Big = () => …` inside the
-  // body and rendering `{big}` makes React treat it as a new component type
-  // on every render, which remounts its subtree and loses any state in it.
-  const big = scored
-    ? (
-      <>
-        <span>{live.you}</span>
-        <span className="text-white/30 mx-2.5">–</span>
-        <span>{live.them}</span>
-      </>
-    )
-    : <span className="text-white/45">{state === 'picking' ? 'Not started' : '—'}</span>
-
-  const sub = liveNow
-    ? null
-    : remaining !== null && remaining > 0
-      ? `${remaining} ${remaining === 1 ? 'game' : 'games'} still to play`
-      : scored ? 'All games played' : null
 
   return (
     <div
@@ -170,8 +160,8 @@ export function ShowdownBand({
     >
       {/* ── phone: the pieces travel ─────────────────────────── */}
       <div className="sd-m">
-        <p className="sd-mw t-caption text-white/50">Matchweek {m.matchweek}</p>
-        <p className="sd-big t-display text-white">{big}</p>
+        <p className="sd-mw t-caption text-white/50">Matchweek {matchweek}</p>
+        <p className="sd-big t-display text-white">{headline}</p>
         {sub && <p className="sd-sub t-detail text-white/45">{sub}</p>}
         {liveNow && (
           <p className="sd-sub t-detail">
@@ -182,22 +172,22 @@ export function ShowdownBand({
           </p>
         )}
 
-        <Face p={person(m.you.entry)} colour={youColour} className="sd-face sd-face-you" />
+        <Face p={person(youEntry)} colour={youColour} className="sd-face sd-face-you" />
         {sealed
           ? <Face p={null} colour={themColour} className="sd-face sd-face-them" unknown />
-          : <Face p={person(m.them!.entry)} colour={themColour} className="sd-face sd-face-them" />}
+          : <Face p={person(themEntry!)} colour={themColour} className="sd-face sd-face-them" />}
         {sealed && <p className="sd-vee t-display text-accent-400 text-lg select-none">V</p>}
 
         <div className="sd-who sd-who-you">
-          <p className="t-display text-white text-sm truncate">{name(m.you.entry)}</p>
-          {meta(m.you.entry) && <p className="t-num text-[10px] text-white/40 mt-0.5">{meta(m.you.entry)}</p>}
+          <p className="t-display text-white text-sm truncate">{name(youEntry)}</p>
+          {meta(youEntry) && <p className="t-num text-[10px] text-white/40 mt-0.5">{meta(youEntry)}</p>}
         </div>
         <div className="sd-who sd-who-them">
           <p className="t-display text-white text-sm truncate">
-            {sealed ? 'Sealed' : name(m.them!.entry)}
+            {sealed ? 'Sealed' : name(themEntry!)}
           </p>
-          {!sealed && meta(m.them!.entry) && (
-            <p className="t-num text-[10px] text-white/40 mt-0.5">{meta(m.them!.entry)}</p>
+          {!sealed && meta(themEntry!) && (
+            <p className="t-num text-[10px] text-white/40 mt-0.5">{meta(themEntry!)}</p>
           )}
         </div>
       </div>
@@ -205,16 +195,16 @@ export function ShowdownBand({
       {/* ── md and up: nothing is hidden, everything eases down ── */}
       <div className="sd-d">
         <div className="sd-side">
-          <Face p={person(m.you.entry)} colour={youColour} className="sd-face-d" />
+          <Face p={person(youEntry)} colour={youColour} className="sd-face-d" />
           <span className="min-w-0">
-            <span className="sd-nm t-display text-white block truncate">{name(m.you.entry)}</span>
-            {meta(m.you.entry) && <span className="sd-pts t-num text-white/40 block">{meta(m.you.entry)}</span>}
+            <span className="sd-nm t-display text-white block truncate">{name(youEntry)}</span>
+            {meta(youEntry) && <span className="sd-pts t-num text-white/40 block">{meta(youEntry)}</span>}
           </span>
         </div>
 
         <div className="sd-mid">
-          <p className="sd-mw-d t-caption text-white/50">Matchweek {m.matchweek}</p>
-          <p className="sd-big-d t-display text-white">{big}</p>
+          <p className="sd-mw-d t-caption text-white/50">Matchweek {matchweek}</p>
+          <p className="sd-big-d t-display text-white">{headline}</p>
           {sub && <p className="sd-sub-d t-detail text-white/45">{sub}</p>}
           {liveNow && (
             <p className="sd-sub-d t-detail">
@@ -243,13 +233,13 @@ export function ShowdownBand({
         <div className="sd-side flex-row-reverse text-right">
           {sealed
             ? <Face p={null} colour={themColour} className="sd-face-d" unknown />
-            : <Face p={person(m.them!.entry)} colour={themColour} className="sd-face-d" />}
+            : <Face p={person(themEntry!)} colour={themColour} className="sd-face-d" />}
           <span className="min-w-0">
             <span className="sd-nm t-display text-white block truncate">
-              {sealed ? 'Sealed' : name(m.them!.entry)}
+              {sealed ? 'Sealed' : name(themEntry!)}
             </span>
-            {!sealed && meta(m.them!.entry) && (
-              <span className="sd-pts t-num text-white/40 block">{meta(m.them!.entry)}</span>
+            {!sealed && meta(themEntry!) && (
+              <span className="sd-pts t-num text-white/40 block">{meta(themEntry!)}</span>
             )}
           </span>
         </div>

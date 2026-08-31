@@ -1598,7 +1598,11 @@ export function PoolDetail({
   // no-tabs path rather than an undefined one — the swipe navigation below and
   // the pill-scroll effect both assume a strip exists. Named once here so the
   // guards read as intent rather than as a repeated condition.
-  const showTabStrip = !onePage
+  // ⚠ One-page hides the strip on the DUEL and nowhere else. "See your picks"
+  // still switches tabs, and landing on a stripless Predictions pane with no
+  // way back would be a trap. Slice 4 puts the picks on the page as a card and
+  // this goes away with it.
+  const showTabStrip = !onePage || activeTab !== 'duels'
 
   // Swipe navigation for mobile — only swipe between primary tabs
   const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
@@ -1940,14 +1944,12 @@ export function PoolDetail({
 
       {/* Tab content */}
       <main
-        /* ⚠ ONE-PAGE ORDERS THE PANES, IT DOES NOT MOVE THEM. All four are
-           already siblings here; sequencing them with `order` beats relocating
-           several hundred lines of JSX, and reverts by deleting a class.
-           The duel has to lead — a `position: sticky` band sitting third would
-           only start sticking once you had scrolled past the leaderboard. */
-        className={`${onePage ? 'sd-page flex flex-col ' : ''}max-w-6xl mx-auto px-4 sm:px-6 ${
+        /* ⚠ ONE-PAGE HAS NO HORIZONTAL PADDING AND NO TOP PADDING: the band is
+           full-bleed and butts against the header. The duel tab's own cards
+           below it bring their own. */
+        className={`max-w-6xl mx-auto ${onePage ? 'px-0 pt-0 pb-8' : 'px-4 sm:px-6'} ${
           onePage
-            ? 'pt-0 pb-8'
+            ? ''
             : activeTab === 'community'
               ? 'pt-3 sm:py-8 pb-0 sm:pb-8'
               : 'py-6 sm:py-8'
@@ -1978,7 +1980,7 @@ export function PoolDetail({
               )
             )}
             {(!needsBulk || bulkState === 'ready') && <>
-            {(onePage || activeTab === 'leaderboard') && (
+            {activeTab === 'leaderboard' && (
               <LeaderboardTab
                 poolId={pool.pool_id}
                 members={members}
@@ -2091,9 +2093,8 @@ export function PoolDetail({
               />
             )}
 
-            {(onePage || activeTab === 'predictions') && !isTableMode && !isLms && activeEntry && usesRoundFlow && (
-              <div className={onePage ? 'sd-picks' : 'contents'}>
-              {spectatingEntry ? (
+            {activeTab === 'predictions' && !isTableMode && !isLms && activeEntry && usesRoundFlow && (
+              spectatingEntry ? (
                 <ProgressiveSpectatorView
                   ownerName={spectatingEntry.ownerName}
                   entryName={spectatingEntry.entryName}
@@ -2201,8 +2202,7 @@ export function PoolDetail({
                   leagueDepth={leagueDepth}
                   existingOutcomes={leagueOutcomes}
                 />
-              )}
-              </div>
+              )
             )}
 
             {activeTab === 'predictions' && !isTableMode && !isLms && activeEntry && isBracketPicker && (
@@ -2628,7 +2628,7 @@ export function PoolDetail({
               <ScoringRulesTab settings={settings} predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'} />
             ))}
 
-            {(onePage || activeTab === 'community') && (
+            {activeTab === 'community' && (
               <CommunityTab
                 poolId={pool.pool_id}
                 poolName={pool.pool_name}

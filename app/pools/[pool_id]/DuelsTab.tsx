@@ -1103,24 +1103,86 @@ export default function DuelsTab({
   }
 
   return (
-    <div className={layout === 'onepage' ? 'sd-duel space-y-4' : 'space-y-4'}>
+    <div className={layout === 'onepage'
+      /* The band is full-bleed; the cards under it keep the page's gutter. */
+      ? 'px-4 sm:px-6 pb-8 space-y-4'
+      : 'space-y-4'}>
       {/* ⚠ ONE-PAGE: the band stands in for the two cards below it and nothing
           else changes. It takes DuelPanel's props verbatim — every number is
           already computed for the card, and a band that derived its own would
           be a second opinion about the same duel. */}
-      {layout === 'onepage' && (inPlay || open) && (
-        <ShowdownBand
-          m={(inPlay ?? open)!}
-          state={inPlay ? 'playing' : 'picking'}
-          name={name} person={person}
-          live={inPlay ? { you: live(inPlay.you.entry), them: live(inPlay.them?.entry ?? null) } : null}
-          remaining={inPlay ? remainingFixtures : null}
-          liveNow={inPlay ? anyFixtureLive : false}
-          strip={inPlay ? breakdown.map((b) => ({ outcome: b.outcome, live: b.clock !== null })) : []}
-          rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
-          points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
-        />
-      )}
+      {layout === 'onepage' && (() => {
+        /* ⚠ THE THREE STATES ARE CHOSEN HERE, not in the band, and each one
+           reaches for the component this tab already has for it. In play: the
+           running score the card shows. Sealed: the same `Countdown` that has
+           been on the sealed card since 123. Between the two: the matchweek's
+           own name and nothing invented. */
+        // The viewer's own entry. `ownEntryIds` is the prop the tab already
+        // takes; the sealed band needs it because a sealed week has no duel row
+        // to read a side off — that is the whole point of it being sealed.
+        const you = ownEntryIds[0] ?? null
+        if (!you) return null
+
+        if (inPlay) {
+          const y = live(inPlay.you.entry)
+          const t = live(inPlay.them?.entry ?? null)
+          return (
+            <ShowdownBand
+              matchweek={inPlay.matchweek}
+              youEntry={inPlay.you.entry}
+              themEntry={inPlay.them?.entry ?? null}
+              name={name} person={person}
+              headline={
+                <>
+                  <span>{y}</span>
+                  <span className="text-white/30 mx-2.5">–</span>
+                  <span>{t}</span>
+                </>
+              }
+              sub={remainingFixtures
+                ? `${remainingFixtures} ${remainingFixtures === 1 ? 'game' : 'games'} still to play`
+                : 'All games played'}
+              liveNow={anyFixtureLive}
+              strip={breakdown.map((b) => ({ outcome: b.outcome, live: b.clock !== null }))}
+              rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
+              points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
+            />
+          )
+        }
+
+        if (sealedMatchweek !== null) {
+          return (
+            <ShowdownBand
+              matchweek={sealedMatchweek}
+              youEntry={you}
+              themEntry={null}
+              name={name} person={person}
+              headline={sealedOpensAtLatest
+                ? <Countdown to={sealedOpensAtLatest} />
+                : <span className="text-white/45">Sealed</span>}
+              sub="Until your opponent is revealed"
+              rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
+              points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
+            />
+          )
+        }
+
+        if (open) {
+          return (
+            <ShowdownBand
+              matchweek={open.matchweek}
+              youEntry={open.you.entry}
+              themEntry={open.them?.entry ?? null}
+              name={name} person={person}
+              headline={<span className="text-white/45">Not started</span>}
+              sub="Picks are open"
+              rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
+              points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
+            />
+          )
+        }
+        return null
+      })()}
 
       {/* Being played now, then the one you are still picking. Both, because
           they are different weeks all weekend. */}
