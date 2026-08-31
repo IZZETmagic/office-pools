@@ -185,11 +185,20 @@ function Countdown({ to }: { to: string }) {
       const ms = target - Date.now()
       if (ms <= 0) { setText('any moment'); return }
       const s = Math.floor(ms / 1000)
-      const d = Math.floor(s / 86400)
-      const hh = String(Math.floor((s % 86400) / 3600)).padStart(2, '0')
+      // ⚠ HOURS, NOT DAYS. `1d 21:21:54` made the reader do arithmetic to
+      // answer the only question they had — how long — and the two halves were
+      // in different units, so the number stopped being scannable at a glance.
+      // Hours carry all of it and keep one clock.
+      //
+      // It cannot run away: the hold is 48h, floored at 24h before lock (123),
+      // so this is two digits in every ordinary week. A postponement stalling
+      // settlement (094) can push it further, and `padStart(2)` widens rather
+      // than truncating — three digits is ugly and correct, which beats tidy
+      // and wrong.
+      const hh = String(Math.floor(s / 3600)).padStart(2, '0')
       const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
       const ss = String(s % 60).padStart(2, '0')
-      setText(d > 0 ? `${d}d ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`)
+      setText(`${hh}:${mm}:${ss}`)
     }
     tick()
     const id = setInterval(tick, 1000)
