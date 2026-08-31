@@ -1067,14 +1067,31 @@ export default function DuelsTab({
       <Card padding="none" className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[380px] text-sm tabular-nums">
+            {/* ⚠ HEADED LIKE THE OTHER CARDS ON THIS TAB, not like the other
+                data tables in the app. `t-caption text-muted` sitting on the
+                card surface is what "Tale of the tape" and the team sheet's
+                "You / 10 fixtures / Sarah C" both use; this was the one card on
+                the tab wearing a neutral-50 band and hand-rolled type
+                (`text-[10px] tracking-wider`), so it read as pasted in.
+
+                ⚠ IT NOW DIFFERS FROM `LeagueTableTab` AND `TableBreakdownView`,
+                which keep the band — deliberately. Those are dense figure
+                tables where a filled header helps the eye hold a column; this
+                is six columns of small integers under a card that has already
+                introduced itself. Ryan's call, 2026-08-31. If the band ever
+                comes back it should come back to all three at once.
+
+                The first body row's `border-t` becomes the rule under the
+                header, which is exactly how the team sheet above separates its
+                heading from its list. */}
             <thead>
-              <tr className="bg-neutral-50 text-[10px] uppercase tracking-wider text-neutral-500">
-                <th className="py-2.5 pl-3 pr-1 text-left font-bold w-8">#</th>
-                <th className="py-2.5 px-2 text-left font-bold">Member</th>
-                <th className="py-2.5 px-2 text-right font-bold w-9">W</th>
-                <th className="py-2.5 px-2 text-right font-bold w-9">T</th>
-                <th className="py-2.5 px-2 text-right font-bold w-9">L</th>
-                <th className="py-2.5 pl-2 pr-3 text-right font-bold w-11">Pts</th>
+              <tr className="t-caption text-muted">
+                <th className="pt-5 pb-3.5 pl-3 pr-1 text-left w-8">#</th>
+                <th className="pt-5 pb-3.5 px-2 text-left">Member</th>
+                <th className="pt-5 pb-3.5 px-2 text-right w-9">W</th>
+                <th className="pt-5 pb-3.5 px-2 text-right w-9">T</th>
+                <th className="pt-5 pb-3.5 px-2 text-right w-9">L</th>
+                <th className="pt-5 pb-3.5 pl-2 pr-3 text-right w-11">Pts</th>
               </tr>
             </thead>
             <tbody>
