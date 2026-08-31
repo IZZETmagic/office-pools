@@ -80,23 +80,33 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true, ov
           <Link href="/dashboard" className="shrink-0" aria-label="SportPool home">
             {/* Sized down a little on mobile so it does not crowd the breadcrumbs
                 that sit immediately to its right. */}
-            <Wordmark size={26} className="hidden sm:inline" />
-            <Wordmark size={22} className="sm:hidden" />
+            {/* ⚠ OVERLAY GETS THE INITIALS. The full wordmark plus a pool name
+                plus badges plus the menu does not fit a 375px band, and the
+                pool's name is the more useful of the two — you know which app
+                you are in. `onDark` because the band is a dark gradient and
+                "Sport" is ink by default, which is how it came out navy on
+                navy. */}
+            <Wordmark size={overlay ? 24 : 26} compact={overlay} onDark={overlay}
+                      className="hidden sm:inline" />
+            <Wordmark size={overlay ? 22 : 22} compact={overlay} onDark={overlay}
+                      className="sm:hidden" />
           </Link>
           {breadcrumbs && breadcrumbs.length > 0 && (
             <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 text-sm">
               {breadcrumbs.map((crumb, idx) => (
                 <span key={idx} className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                  <span className="text-muted shrink-0">/</span>
+                  <span className={`shrink-0 ${overlay ? 'text-white/35' : 'text-muted'}`}>/</span>
                   {crumb.href ? (
                     <Link
                       href={crumb.href}
-                      className="text-muted hover:text-ink truncate transition"
+                      className={`truncate transition ${
+                        overlay ? 'text-white/70 hover:text-white' : 'text-muted hover:text-ink'}`}
                     >
                       {crumb.label}
                     </Link>
                   ) : (
-                    <span className="t-body font-semibold text-ink truncate">{crumb.label}</span>
+                    <span className={`t-body font-semibold truncate ${
+                      overlay ? 'text-white' : 'text-ink'}`}>{crumb.label}</span>
                   )}
                 </span>
               ))}
@@ -115,8 +125,8 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true, ov
               href={link.href}
               className={`text-sm font-medium transition ${
                 isActive(link.href)
-                  ? 'text-primary-600'
-                  : 'text-muted hover:text-ink'
+                  ? (overlay ? 'text-primary-400' : 'text-primary-600')
+                  : overlay ? 'text-white/70 hover:text-white' : 'text-muted hover:text-ink'
               }`}
             >
               {link.label}
@@ -124,7 +134,9 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true, ov
           ))}
           <button
             onClick={cycleColorMode}
-            className="p-2 rounded-control text-muted hover:text-ink hover:bg-mist transition"
+            className={`p-2 rounded-control transition ${
+              overlay ? 'text-white/70 hover:text-white hover:bg-white/10'
+                      : 'text-muted hover:text-ink hover:bg-mist'}`}
             aria-label={`Color mode: ${colorMode}`}
             title={`Theme: ${colorMode}`}
           >
@@ -141,7 +153,8 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true, ov
           <form action="/auth/signout" method="post">
             <button
               type="submit"
-              className="t-body font-semibold text-muted hover:text-ink"
+              className={`t-body font-semibold ${
+                overlay ? 'text-white/70 hover:text-white' : 'text-muted hover:text-ink'}`}
             >
               Sign Out
             </button>
@@ -151,7 +164,9 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true, ov
         {/* Hamburger button (mobile only) */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="sm:hidden p-1.5 -mr-1.5 rounded-control text-muted hover:text-ink hover:bg-mist transition"
+          className={`sm:hidden p-1.5 -mr-1.5 rounded-control transition ${
+            overlay ? 'text-white hover:bg-white/10'
+                    : 'text-muted hover:text-ink hover:bg-mist'}`}
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
         >
           {menuOpen ? (

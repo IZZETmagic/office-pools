@@ -21,10 +21,23 @@ type WordmarkProps = {
    * brand blue would either clash with the background or disappear into it.
    */
   mono?: boolean
+  /**
+   * The initials mark: `SP` instead of `SportPool`, in the same two colours.
+   *
+   * ⚠ It is the SAME COMPONENT on purpose. The mark's colour rule — the first
+   * half in ink or white, the second half in brand blue — is one decision, and
+   * a separate `<SPMark>` would be a second place to make it. Compacting
+   * "Sport" to S and "Pool" to P keeps the join in the same spot, so the two
+   * marks stay recognisably the same thing.
+   *
+   * For a band, a tab bar, a favicon — anywhere the full wordmark would crowd
+   * the name sitting next to it.
+   */
+  compact?: boolean
   className?: string
 }
 
-export function Wordmark({ size = 32, onDark = false, mono = false, className }: WordmarkProps) {
+export function Wordmark({ size = 32, onDark = false, mono = false, compact = false, className }: WordmarkProps) {
   return (
     <span
       className={cn(
@@ -34,7 +47,8 @@ export function Wordmark({ size = 32, onDark = false, mono = false, className }:
       )}
       style={{ fontSize: size, lineHeight: `${Math.round(size * 1.1)}px` }}
     >
-      Sport<span className={mono ? undefined : 'text-primary-600'}>Pool</span>
+      {compact ? 'S' : 'Sport'}
+      <span className={mono ? undefined : 'text-primary-600'}>{compact ? 'P' : 'Pool'}</span>
     </span>
   )
 }
