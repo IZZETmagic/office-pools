@@ -663,11 +663,12 @@ export default function DuelsTab({
           live={{ you: live(inPlay.you.entry), them: live(inPlay.them?.entry ?? null) }}
           remaining={remainingFixtures}
           liveNow={anyFixtureLive}
+          strip={breakdown.map((b) => b.outcome)}
         />
       )}
       {open && (
         <DuelPanel m={open} state="picking" name={name} person={person}
-          live={null} remaining={null} liveNow={false} />
+          live={null} remaining={null} liveNow={false} strip={[]} />
       )}
 
       {/* WHAT IS COMING, WITHOUT SAYING WHO.
@@ -1063,7 +1064,7 @@ export default function DuelsTab({
  * cannot tell the games being played from the games they are still picking.
  */
 function DuelPanel({
-  m, state, name, person, live, remaining, liveNow,
+  m, state, name, person, live, remaining, liveNow, strip,
 }: {
   m: { duel: DuelRow; you: Side; them: Side | null; matchweek: number }
   state: 'playing' | 'picking'
@@ -1075,6 +1076,8 @@ function DuelPanel({
   remaining: number | null
   /** A ball is in play RIGHT NOW — not merely "the matchweek is in progress". */
   liveNow: boolean
+  /** Per-fixture outcome, in fixture order. Empty before anything is revealed. */
+  strip: Array<'you' | 'them' | 'same' | 'neither' | 'pending'>
 }) {
   const decided = m.duel.settled_at && m.them
   return (
@@ -1118,8 +1121,11 @@ function DuelPanel({
           </p>
         </div>
 
+        {/* ⚠ THE CAP LIFTS ON DESKTOP. max-w-lg keeps the two corners readable
+            on a phone; on a wide card it parked them in the middle with dead
+            space at both ends. Same fix as "elsewhere on the card". */}
         {m.them ? (
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg md:max-w-none mx-auto">
             <Corner side="blue" name={name(m.you.entry)} person={person(m.you.entry)} />
             {/* The score, live. A duel with two names and no numbers is a
                 fixture list; the numbers are what make it a contest. */}
@@ -1145,6 +1151,27 @@ function DuelPanel({
             You sit this one out. With an odd number of members somebody has a bye each
             week — it rotates, so everyone gets the same number.
           </p>
+        )}
+
+        {/* THE STRIP — one segment per fixture, in the order they are played.
+            Blue you took it, red they took it, grey a dead heat neither could
+            win, hollow still to come. It is the team sheet below compressed to
+            a glance: you can see the SHAPE of the duel and how much is left.
+
+            ⚠ Desktop only. The phone card is already right and this is width
+            that only a wide card has going spare — it is not information the
+            small screen is missing, it is the same information the sheet under
+            it carries in full. */}
+        {strip.length > 0 && (
+          <div className="hidden md:flex items-stretch gap-1 mt-7 h-1.5" aria-hidden="true">
+            {strip.map((o, i) => (
+              <span key={i} className={`flex-1 rounded-full ${
+                o === 'you' ? 'bg-primary-500'
+                  : o === 'them' ? 'bg-danger-500'
+                    : o === 'same' || o === 'neither' ? 'bg-white/15'
+                      : 'border border-dashed border-white/25'}`} />
+            ))}
+          </div>
         )}
 
         {!decided && live && m.them && (
