@@ -178,16 +178,22 @@ type DuelFormResult = 'won' | 'tied' | 'lost' | 'bye'
  * near-black. A bye is hollow — nothing happened, and it should not read as a
  * result somebody earned.
  */
-function DuelFormDots({ form }: { form: DuelFormResult[] }) {
+function DuelFormDots({ form, align = 'left' }: {
+  form: DuelFormResult[]
+  align?: 'left' | 'right'
+}) {
   if (!form.length) {
-    return <span className="t-num text-white/20" aria-hidden="true">&mdash;</span>
+    return (
+      <span className={`block t-num text-white/20 ${align === 'right' ? 'text-right sm:text-left' : ''}`}
+            aria-hidden="true">&mdash;</span>
+    )
   }
   return (
-    <span className="flex gap-0.5 sm:gap-1" aria-hidden="true">
+    <span className={`flex gap-1 ${align === 'right' ? 'justify-end sm:justify-start' : ''}`} aria-hidden="true">
       {form.map((r, i) => (
         <span
           key={i}
-          className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${
+          className={`w-2 h-2 rounded-full shrink-0 ${
             r === 'won' ? 'bg-success-400'
               : r === 'lost' ? 'bg-danger-400'
                 : r === 'tied' ? 'bg-white/35'
@@ -1252,18 +1258,20 @@ export default function DuelsTab({
           </div>
         </div>
 
-        {/* ⚠ CRUNCHED ON A PHONE, NOT DROPPED — the rhythm `LeagueTableTab`
-            already uses, and for the reason its own comment records: Ryan's
-            call there was to shrink the gutters and step the type down rather
-            than lose a column. That table fits EIGHT numeric columns plus a
-            club name into 375px; six is easier.
+        {/* ⚠ THE PHONE SHOWS FORM INSTEAD OF W/T/L — Ryan's call, 2026-08-31,
+            once the form column made seven columns at 375px.
 
-            This briefly hid W/T/L below `sm` instead, which was the wrong
-            trade: it fixed Pts falling off the right edge by removing three
-            columns a member wants, when narrowing them fits everything.
-            Gutters go px-0.5 on a phone and px-2 from `sm`, the numeric widths
-            halve, and the type steps to `text-xs`. The figures stay tabular
-            either way, so the columns still line up.
+            This is NOT the "crunch, don't drop" rule from `LeagueTableTab`
+            being abandoned. That rule is about never LOSING information to fit,
+            and it stood while the choice was six columns or five. Seven changed
+            the question from "can it fit" — measured, it could — to "what
+            earns a phone's width", and five dots of form carry more than three
+            integers do: the shape of somebody's season rather than its totals,
+            in less space. Your OWN W/T/L is in the header above regardless, and
+            the desktop keeps all seven.
+
+            Gutters stay px-0.5 on a phone and px-2 from `sm`, and the type
+            steps to `text-xs`, so the desktop rhythm is untouched.
 
             `overflow-x-auto` stays as a floor for an unusually long name. */}
         <div className="relative overflow-x-auto">
@@ -1275,11 +1283,11 @@ export default function DuelsTab({
                 {/* Beside the name rather than out past the totals: identity,
                     then recent shape, then the numbers. Same order as the
                     leaderboard's own PLAYER / FORM / STATS. */}
-                <th className="pt-5 pb-3.5 px-1 sm:px-2 text-left w-[46px] sm:w-16">Form</th>
-                <th className="pt-5 pb-3.5 px-0.5 sm:px-2 text-right w-5 sm:w-9">W</th>
-                <th className="pt-5 pb-3.5 px-0.5 sm:px-2 text-right w-5 sm:w-9">T</th>
-                <th className="pt-5 pb-3.5 px-0.5 sm:px-2 text-right w-5 sm:w-9">L</th>
-                <th className="pt-5 pb-3.5 pl-1 pr-2.5 sm:pl-2 sm:pr-4 text-right w-10 sm:w-16">Pts</th>
+                <th className="pt-5 pb-3.5 px-2 text-right sm:text-left w-[58px] sm:w-16">Form</th>
+                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">W</th>
+                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">T</th>
+                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">L</th>
+                <th className="pt-5 pb-3.5 pl-2 pr-3 sm:pr-4 text-right w-12 sm:w-16">Pts</th>
               </tr>
             </thead>
             <tbody>
@@ -1327,13 +1335,16 @@ export default function DuelsTab({
                         </span>
                       </span>
                     </td>
-                    <td className="py-2.5 px-1 sm:px-2">
-                      <DuelFormDots form={duelForm.get(r.entry) ?? []} />
+                    <td className="py-2.5 px-2">
+                      {/* Right-aligned on a phone, where it is the last thing
+                          before Pts and reads as part of that block; left on
+                          desktop, where W/T/L follow it. */}
+                      <DuelFormDots form={duelForm.get(r.entry) ?? []} align="right" />
                     </td>
-                    <td className="py-2.5 px-0.5 sm:px-2 text-right t-num text-white/55">{r.w}</td>
-                    <td className="py-2.5 px-0.5 sm:px-2 text-right t-num text-white/55">{r.d}</td>
-                    <td className="py-2.5 px-0.5 sm:px-2 text-right t-num text-white/55">{r.l}</td>
-                    <td className="py-2.5 pl-1 pr-2.5 sm:pl-2 sm:pr-4 text-right t-num t-num-black text-white">{r.pts}</td>
+                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.w}</td>
+                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.d}</td>
+                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.l}</td>
+                    <td className="py-2.5 pl-2 pr-3 sm:pr-4 text-right t-num t-num-black text-white">{r.pts}</td>
                   </tr>
                 )
               })}
