@@ -29,6 +29,14 @@ import { resolve } from 'path'
 
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8')
 const migration = read('lib/migrations/100_showdown_survives_a_late_joiner.sql')
+/**
+ * ⚠ 121 SUPERSEDES 100's VALUES. 100 established that a bye pays a tie rather
+ * than nothing — "no opponent, so no defeat" — and that reasoning is untouched.
+ * What changed on 2026-08-31 is the scale: 3/1/0 became 500/250/0, so the
+ * literals must be asserted against the migration that writes them TODAY. 100
+ * is still read above for the parts of the late-joiner behaviour it owns.
+ */
+const duelValues = read('lib/migrations/121_a_duel_is_worth_half_a_perfect_week.sql')
 // ⚠ 117 REPLACED 100's generator. The bye scoring below is still 100's; every
 // rule about WHICH matchweeks get drawn now lives in 117, and asserting those
 // against 100 would be a test that passes while the live function does
@@ -57,19 +65,51 @@ const body = (sql: string) => {
 const modeInfo = read('lib/leagueModeInfo.ts')
 const rulesTab = read('app/pools/[pool_id]/LeagueScoringRulesTab.tsx')
 
-describe('a bye is worth a point', () => {
-  it('the settle function pays 1 for a duel with no opponent', () => {
-    expect(migration).toMatch(/points_a = CASE WHEN acc\.b IS NULL THEN 1/)
+/**
+ * The same file with its JS/TS COMMENTARY removed, so a copy assertion sees
+ * only what a member could see.
+ *
+ * ⚠ Written because a guard added here on 2026-08-31 failed on its own
+ * documentation: `leagueModeInfo.ts` explains in a header comment which
+ * sentence migration 121 retired, and quoting a retired sentence in order to
+ * say it is retired is not the same as still telling somebody it is true. A
+ * banned-phrase check that cannot tell those apart makes the file harder to
+ * document than to get wrong.
+ */
+const prose = (src: string) =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, '')   // block comments, JSX {/* */} included
+    .replace(/^\s*\/\/.*$/gm, '')       // whole-line // comments
+    // ⚠ AND JOIN CONCATENATED LITERALS. `leagueModeInfo.ts` writes every
+    // description as `'…' + '…'` wrapped at 100 columns, so a sentence a member
+    // reads as one line is split in the source wherever the wrap happened to
+    // fall. A phrase check without this passes or fails on where the line broke,
+    // which is worse than not checking — it would go green again the next time
+    // somebody reflowed the paragraph.
+    .replace(/'\s*\+\s*\n?\s*'/g, '')
+const modeInfoProse = prose(modeInfo)
+const rulesTabProse = prose(rulesTab)
+
+describe('a bye is worth a tie, never nothing', () => {
+  it('the settle function pays a bye exactly what it pays a tie', () => {
+    // The RULE, not the number: 100 set it at 1 and 121 at 250, and what has to
+    // survive a revaluation is that the two stay equal. A bye drifting below a
+    // tie would tax a member for a fixture that did not exist.
+    const m = duelValues.match(
+      /points_a = CASE WHEN acc\.b IS NULL THEN (\d+)[\s\S]*?WHEN acc\.a = acc\.b THEN (\d+)/,
+    )
+    expect(m, 'could not parse the points_a CASE out of 121').not.toBeNull()
+    expect(m![1]).toBe(m![2])
   })
 
   it('and never pays the absent side anything', () => {
     // entry_b is the padding. It is nobody, so it scores NULL, not a point.
-    expect(migration).toMatch(/points_b = CASE WHEN acc\.b IS NULL THEN NULL/)
+    expect(duelValues).toMatch(/points_b = CASE WHEN acc\.b IS NULL THEN NULL/)
   })
 
   it('a loss is still zero — the bye is not just "everything scores"', () => {
-    const settle = migration.slice(migration.indexOf('points_a = CASE'))
-    expect(settle).toMatch(/WHEN acc\.a > acc\.b THEN 3/)
+    const settle = duelValues.slice(duelValues.indexOf('points_a = CASE'))
+    expect(settle).toMatch(/WHEN acc\.a > acc\.b THEN \d+/)
     expect(settle).toMatch(/ELSE 0 END/)
   })
 })
@@ -163,10 +203,41 @@ describe('the copy matches the engine', () => {
     }
   })
 
-  it('both surfaces tell the member a bye is worth a point', () => {
+  it('both surfaces say the duel points are ADDED, not ranked ahead', () => {
+    expect(modeInfoProse).toMatch(/added to whatever your picks scored/)
+    expect(rulesTabProse).toMatch(/There is one table/)
+  })
+
+  it('both surfaces disclose that a late joiner plays fewer duels', () => {
+    // Ryan's call, 2026-08-31: state the cost rather than engineer round it.
+    // At 3 points a short season was noise; at 500 it decides places, so the
+    // disclosure gate needs it said out loud on the surfaces a member reads.
+    for (const [name, src] of
+      [['leagueModeInfo', modeInfoProse], ['LeagueScoringRulesTab', rulesTabProse]] as const) {
+      expect(src, name).toMatch(/[Jj]oining after the season has started/)
+      expect(src, name).toMatch(/fewer duels/)
+    }
+  })
+
+  it('both surfaces tell the member a bye is not a defeat', () => {
     expect(modeInfo).toMatch(/no opponent, so there was no defeat/)
     expect(rulesTab).toMatch(/no opponent, so there was no defeat/)
-    expect(rulesTab).toContain('<PointsRow label="No opponent this week" value={1} />')
+    // The VALUE is imported from `duelPoints.ts` rather than typed into the
+    // markup, so it cannot drift from the engine — `duelPoints.guard.test.ts`
+    // holds that end. What this asserts is that the row is still shown at all.
+    expect(rulesTab).toContain('<PointsRow label="No opponent this week" value={DUEL_BYE} />')
+  })
+
+  it('no surface still claims duel points merely BREAK TIES with the weekly score', () => {
+    // Migration 121 changed the ranking from a cascade to a sum, so the old
+    // sentence — "duel points decide the table; the weekly score is the
+    // tiebreak" — now describes an ordering that does not exist.
+    for (const [name, src] of
+      [['leagueModeInfo', modeInfoProse], ['LeagueScoringRulesTab', rulesTabProse]] as const) {
+      expect(src, name).not.toMatch(/[Dd]uel points decide the table/)
+      expect(src, name).not.toMatch(/weekly score is the tiebreak/)
+      expect(src, name).not.toMatch(/matchweek points are the tiebreak/)
+    }
   })
 })
 

@@ -1,6 +1,10 @@
 # Showdown duel points — implementation plan
 
-**Date:** 2026-08-31 · **Status:** 🟡 **PLAN ONLY.** Nothing applied. Decisions in §4 are open.
+**Date:** 2026-08-31 · **Status:** 🟠 **CODE WRITTEN, MIGRATION NOT APPLIED.** §1's bug is fixed and
+committed. Migration **121** is written and its two function bodies diff clean against their bases
+(100 and 087) — but it has NOT been run, and its `md5(prosrc)` pre-check against production is still
+owed because this session had no database access. The front end, the copy and the guards are done and
+ship WITH it, not before: they describe 500/250/0, which is not true until 121 runs. See §9.
 **Decision:** Ryan, 2026-08-31 — *"what if the duels produced more points? … if you win a showdown
 that's 500 points, that's a big movement and shift."* One leaderboard, one currency; the duel table
 becomes a record rather than a rival ranking.
@@ -158,8 +162,20 @@ Decision 10 has a member joining in October entering the draw from the next matc
 fewer duels than the August members, by design.
 
 This is the *"no bad feelings"* line in the vision doc, so it needs an answer before any engine work.
-Options: average points per duel rather than a raw sum; credit unplayed duels at the tie value; or
-accept it and say so plainly in the copy. **No recommendation yet — needs Ryan.**
+
+✅ **DECIDED — Ryan, 2026-08-31: accept it, and say so plainly.** A member who joins in October plays
+fewer duels and has fewer points for them, stated up front rather than engineered around. It is how a
+real league treats a mid-season entrant, and it keeps one currency and a plain sum — the two
+alternatives (crediting unplayed weeks at the tie value, or ranking on points-per-matchweek) each buy
+fairness by making the headline number mean something other than "points you have".
+
+The cost is real and now carried in the copy on both surfaces:
+
+> *"Joining after the season has started means fewer duels than the members who were there from the
+> start, and fewer points to show for them."*
+
+`showdownLateJoiner.test.ts` asserts that sentence is present on both, so it cannot quietly fall out
+of a later copy edit.
 
 ### d. Where does 500 live?
 
@@ -185,8 +201,11 @@ is how the confusion comes back.
 6. Copy: `leagueModeInfo.ts`, `LeagueScoringRulesTab`, `LeagueHowToPlayTab`, `DuelsTab`. All four move
    together and `leagueModeCopy.guard.test.ts` enforces it.
 7. `DuelsTab` — the `PTS` column becomes duel-earned points (§4e).
-8. The Duel tab's full table shrinks to your position and neighbours; the season lives on the
-   Leaderboard.
+8. ~~The Duel tab's full table shrinks to your position and neighbours.~~ ❌ **DROPPED.** This was
+   written before Ryan's own framing, which was the opposite: *"we can keep the original leaderboard.
+   We can keep this table just to see how the users are performing in the showdown area."* Once duel
+   points feed one total, the duel table stops competing with the leaderboard by itself — it is a
+   record, not a rival ranking — so there is nothing left for shrinking it to fix.
 
 ---
 
@@ -222,3 +241,43 @@ before anyone treats it as settled.
 | **3. Symmetry** | ✅ Same bonus available to everyone in a pool. ⚠ Except §4c — the late joiner is precisely a symmetry break, which is why it blocks. |
 | **4. Substitution** | ✅ No new obligation. A member who does nothing differently is not punished; they simply score what they score. |
 | **5. Variance provenance** | ✅ The outcome comes entirely from two members' picks against real results. The draw is a fixed rotation settled once (116–120), not fresh randomness each week. Raising the stakes does not add variance we invented — it raises the weight on variance the sport already produced. |
+
+---
+
+## 9. Build status, 2026-08-31
+
+| # | Step | |
+|---|---|---|
+| 1 | §1's leaderboard rank bug | ✅ committed `a169819` — `getPoolData` stamps `final_rank`/`previous_final_rank` onto league entries. Not observable until a duel settles; see the commit for what that does and does not prove. |
+| 2 | §4c late-joiner rule | ✅ decided — accept and disclose. |
+| 3 | Migration 121, the values | 🟠 written, **not applied** |
+| 4 | Migration 121, the sum | 🟠 written, **not applied** |
+| 5 | Re-rank existing pools | 🟠 in 121's step 3. No `duel_points` backfill is needed — 0 of 333 duels had settled. |
+| 6 | Copy on all four surfaces | ✅ `leagueModeInfo.ts`, `LeagueScoringRulesTab.tsx`. `DuelsTab` carried the verdict line only, now derived. `LeagueHowToPlayTab` carried no point values. |
+| 7 | The `PTS` column is duel-earned points | ✅ falls out of `DUEL_WIN`/`DUEL_TIE` — the column already read `duel_points` from the engine, and only its fallback recompute was hardcoded to `w*3+d`. |
+| 8 | Shrink the Duel tab table | ❌ dropped, see §5. |
+
+### What was added on the way
+
+- **`lib/league/duelPoints.ts`** — one place for the values, because `DuelsTab` carried `points === 3`
+  in three separate spots and would have classified a 500 as a loss. `duelResult()` uses `>=`
+  thresholds so a future revaluation does not need a code change in lockstep.
+- **`duelPoints.guard.test.ts`** — reads the literals out of migration 121 and fails if the TypeScript
+  drifts from the engine. Also asserts the ranker still ADDS rather than cascades, so restoring the
+  old `ORDER BY` rung breaks a test rather than silently making 500 meaningless again.
+- **A hardened copy guard.** `showdownLateJoiner.test.ts` gained a `prose()` helper that strips
+  comments and joins concatenated string literals before asserting. Two reasons, both found by the
+  guard failing on this change: it flagged `leagueModeInfo.ts`'s own header for *explaining* which
+  sentence had been retired, and a phrase check without the literal-join passes or fails on where a
+  100-column wrap happened to fall.
+
+### ⚠ Owed before this ships
+
+1. **The `md5(prosrc)` pre-check in 121's header.** Sixteen migrations touch these two functions and
+   `league_finalize_ranks` has been redefined three times. The bodies here were reconstructed from the
+   repo, not dumped from production.
+2. **Order of operations.** 121 and the front-end commits must land together. The copy already says
+   500; until the migration runs the engine still pays 3, and `duelResult(3)` returns `'lost'` — so a
+   won duel would render as a defeat in the window between them.
+3. **A settled matchweek to verify against.** Nothing in this change is observable while every
+   `duel_points` is 0.

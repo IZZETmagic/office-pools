@@ -1,6 +1,7 @@
 'use client'
 
 import { DetailCard, DetailCaption, DetailRow } from '@/components/ui/DetailCard'
+import { DUEL_WIN, DUEL_TIE, DUEL_BYE, DUEL_LOSS } from '@/lib/league/duelPoints'
 import { formatNumber } from '@/lib/format'
 
 // =============================================================
@@ -213,24 +214,31 @@ function DuelCard() {
   return (
     <DetailCard title="Your weekly duel" className="mb-4">
       <div className="mt-1">
-        {/* Fixed in league_score_duels (100), not a pool setting — so these are
-            literals rather than a lie about being configurable. */}
-        <PointsRow label="Beat your opponent" value={3} />
-        <PointsRow label="Tie with them" value={1} />
-        <PointsRow label="No opponent this week" value={1} />
-        <PointsRow label="Lose" value={0} />
+        {/* Fixed in league_score_duels (121), not a pool setting — so these are
+            literals rather than a lie about being configurable. Imported rather
+            than typed out: `duelPoints.guard.test.ts` fails if they drift from
+            the engine that writes them. */}
+        <PointsRow label="Beat your opponent" value={DUEL_WIN} />
+        <PointsRow label="Tie with them" value={DUEL_TIE} />
+        <PointsRow label="No opponent this week" value={DUEL_BYE} />
+        <PointsRow label="Lose" value={DUEL_LOSS} />
       </div>
       <p className="t-body text-muted mt-3">
         Every matchweek you are drawn against one other member. Whoever scored more that week
         wins the duel. The whole season is drawn when the pool is created, but each opponent is
         revealed only once the previous duel is decided, or a day before you pick if a
         postponement holds that up — one duel at a time, and who comes next is a surprise. The draw rotates, so everybody meets everybody. With an odd number of
-        entries somebody sits out each week and takes a point —
+        entries somebody sits out each week and takes {DUEL_BYE} —
         there was no opponent, so there was no defeat.
       </p>
       <p className="t-body text-muted mt-3">
-        Duel points decide the table. Your matchweek points are the tiebreak, so a heavy week
-        still counts for something even if you lost the head-to-head.
+        There is one table. Your duel points are added to what your picks scored, so a heavy
+        week still counts even if you lost the head-to-head — and a win, at about half a
+        perfect matchweek, moves you further than any single result can.
+      </p>
+      <p className="t-body text-muted mt-3">
+        Joining after the season has started means fewer duels than the members who were here
+        from the start, and fewer points to show for them.
       </p>
     </DetailCard>
   )

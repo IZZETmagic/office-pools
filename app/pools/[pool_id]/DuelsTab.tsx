@@ -62,6 +62,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
+import { DUEL_WIN, DUEL_TIE, duelResult } from '@/lib/league/duelPoints'
 import { Icon } from '@/components/ui/Icon'
 import { headToHead, type DuelRow } from '@/lib/league/duels'
 import { getLiveClock } from '@/lib/matchStatus'
@@ -365,9 +366,12 @@ export default function DuelsTab({
     let won = 0, drawn = 0, lost = 0, byes = 0
     for (const m of mine) {
       if (!m.duel.settled_at) continue
+      // ⚠ `!m.them` FIRST, and it is load-bearing: a bye is worth exactly a
+      // tie (250), so it cannot be told apart from one by looking at points.
       if (!m.them) { byes++; continue }
-      if (m.you.points === 3) won++
-      else if (m.you.points === 1) drawn++
+      const r = duelResult(m.you.points)
+      if (r === 'won') won++
+      else if (r === 'tied') drawn++
       else lost++
     }
     return { won, drawn, lost, byes }
@@ -417,12 +421,14 @@ export default function DuelsTab({
       for (const [e, p] of [[duel.entry_a, duel.points_a], [duel.entry_b, duel.points_b]] as const) {
         if (!e || p === null) continue
         const r = ensure(e)
-        if (p === 3) r.w++
-        else if (p === 1) r.d++
+        const o = duelResult(p)
+        if (o === 'won') r.w++
+        else if (o === 'tied') r.d++
         else r.l++
       }
     }
-    for (const r of rows.values()) r.pts = duelPoints.get(r.entry) ?? r.w * 3 + r.d
+    for (const r of rows.values())
+      r.pts = duelPoints.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE
     return [...rows.values()].sort((a, b) => b.pts - a.pts || b.w - a.w)
   }, [duels, duelPoints])
 
@@ -1339,10 +1345,10 @@ function DuelPanel({
         )}
         {decided && (
           <p className="t-caption text-sm text-center mt-6 pt-5 border-t border-white/10">
-            <span className={m.you.points === 3 ? 'text-success-400'
-              : m.you.points === 1 ? 'text-accent-400' : 'text-white/40'}>
-              {m.you.points === 3 ? 'You won this duel — three points'
-                : m.you.points === 1 ? 'A tie — one point each'
+            <span className={duelResult(m.you.points) === 'won' ? 'text-success-400'
+              : duelResult(m.you.points) === 'tied' ? 'text-accent-400' : 'text-white/40'}>
+              {duelResult(m.you.points) === 'won' ? `You won this duel — ${DUEL_WIN} points`
+                : duelResult(m.you.points) === 'tied' ? `A tie — ${DUEL_TIE} each`
                 : 'They took this one'}
             </span>
           </p>

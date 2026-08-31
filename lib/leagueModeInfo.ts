@@ -34,6 +34,19 @@
  *  2. The engines. Every number quoted in `points` below is a default the SQL
  *     COALESCEs against, not a number this file decides.
  *
+ * ⚠ 2026-08-31 — A DUEL IS NOW WORTH 500, AND THERE IS ONLY ONE TABLE.
+ * Migration 121 raised a win from 3 to 500 (half a perfect matchweek, since
+ * both depths cap at 100 a fixture and a 20-team league plays 10 a week) and
+ * changed `league_finalize_ranks` from ranking duel points AHEAD of accuracy to
+ * ADDING them to it. So the sentence this file used to carry — "duel points
+ * decide the table; the weekly score is the tiebreak" — is retired: they are
+ * now one total, and saying otherwise would describe a cascade that no longer
+ * exists.
+ *
+ * It also carries the late-joiner disclosure. Ryan chose to state the cost
+ * plainly rather than engineer round it: a member who joins in October plays
+ * fewer duels and has fewer points for them, and the copy says so.
+ *
  * ⚠ 2026-08-30 — THE DRAW IS NO LONGER PUBLISHED, AND IT OPENS ONE DUEL AT A
  * TIME. Migration 116 sealed it; migration 119 then moved the reveal from
  * "when the matchweek opens for picks" to "when the PREVIOUS matchweek is
@@ -106,15 +119,18 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
             ? 'Members put a scoreline on all ten fixtures each matchweek, '
             : 'Members call all ten fixtures each matchweek, ') +
           'and are drawn against one other member for that week. Whoever scores more wins the ' +
-          'duel — three points for a win, one for a tie. The whole season is drawn when the ' +
+          'duel — 500 points for a win and 250 for a tie, added to whatever your picks scored ' +
+          'that week. A win is worth about half a perfect matchweek, so the duel moves the ' +
+          'table further than any single result can. The whole season is drawn when the ' +
           'pool is created, but each opponent is revealed only once the previous duel is ' +
           'decided, or a day before you pick if a postponement holds that up — so you play one ' +
           'duel at a time and who comes next is a surprise. The draw ' +
           'rotates, so everybody meets everybody rather than ' +
           'the same pairs coming round again. With an odd number of members somebody sits out ' +
-          'each week and takes a point — there was no opponent, so there was no defeat. Duel ' +
-          'points decide the table; the weekly score is the tiebreak, so a big week still ' +
-          'counts even if you lost the head-to-head.',
+          'each week and takes 250 — there was no opponent, so there was no defeat. There is ' +
+          'one table: your duel points and your weekly scores are the same total. Joining ' +
+          'after the season has started means fewer duels than the members who were there ' +
+          'from the start, and fewer points to show for them.',
         points: [
           // ⚠ THE DISCLOSURE GATE LIVES IN THIS SENTENCE. Migration 116 seals the
           // draw and reveals it a matchweek at a time; that passes gate 1 only
@@ -124,8 +140,8 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
           'Drawn up front; your next opponent opens when the current duel is decided.',
           // The floor clause lives in `description` rather than here — three
           // bullets is the shape, and the headline rule is the settle arm.
-          'Three points a win, one a tie, none for a loss.',
-          'A week with no opponent is worth a point.',
+          '500 for a win, 250 for a tie — about half a perfect matchweek.',
+          'A week with no opponent is worth 250.',
         ],
       }
 
