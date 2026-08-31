@@ -120,7 +120,12 @@ function Face({ side, dim }: { side: Side; dim: boolean }) {
   )
 }
 
-function MovedRow({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * One labelled row. Shared by "How it went" and "What it moved" — the two
+ * blocks are deliberately the same shape, so the page reads as result, then
+ * how, then consequences, rather than as a wall of prose followed by a table.
+ */
+function StatRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 py-3 border-t border-white/10">
       <span className="t-body text-white/70">{label}</span>
@@ -186,10 +191,12 @@ export function DuelDecision({
   const meetings = record ? record.won + record.drawn + record.lost : 0
   const history =
     !record || !them ? null
-      : meetings <= 1 ? `Your first meeting with ${them.name}.`
+      : meetings <= 1 ? 'First meeting'
         : verdict.outcome === 'won' && record.won === 1
-          ? `First time you have ever beaten ${them.name}.`
-          : `You have met ${meetings} times: ${record.won}–${record.drawn}–${record.lost}.`
+          ? `Your first win over ${them.name}`
+          : `${meetings} meetings · ${record.won}–${record.drawn}–${record.lost}`
+  /** Fixtures that actually separated the two of them. */
+  const separated = scoreline.yourFixtures + scoreline.theirFixtures
 
   return (
     <main className="min-h-screen bg-snow dark:bg-midnight px-4 py-6 sm:py-10">
@@ -277,68 +284,66 @@ export function DuelDecision({
                   </p>
                 )}
 
-                {decisiveFixture && (
-                  <p className="t-body text-white/70 text-center mt-7 pt-5 border-t border-white/10">
-                    It came down to <span className="font-bold text-white">{decisiveFixture}</span>.
-                  </p>
-                )}
-                {/* ⚠ No decisive fixture is a REAL answer, not a gap. A duel won
-                    by three games was not decided by one of them, and naming
-                    one anyway would be a story we made up. */}
-                {!decisiveFixture && verdict.outcome !== 'tied' && (
-                  <p className="t-body text-white/50 text-center mt-7 pt-5 border-t border-white/10">
-                    No single fixture decided this one.
-                  </p>
-                )}
-                {/* ⚠ WHERE IT WAS ACTUALLY DECIDED. `levelFixtures` was already
-                    computed and thrown away — it is the most duel-specific
-                    number available, and nothing else in the app says it: most
-                    of a matchweek separates nobody, and the duel turns on the
-                    handful that did. */}
-                {scoreline.levelFixtures > 0 && (
-                  <p className="t-body text-white/70 text-center mt-2">
-                    {scoreline.levelFixtures} of the{' '}
-                    {scoreline.levelFixtures + scoreline.yourFixtures + scoreline.theirFixtures}{' '}
-                    separated nobody. It turned on the other{' '}
-                    {scoreline.yourFixtures + scoreline.theirFixtures}.
-                  </p>
-                )}
-                {bestCall && (
-                  <p className="t-body text-white/70 text-center mt-2">
-                    Your best call was <span className="font-bold text-white">{bestCall}</span>.
-                  </p>
-                )}
-                {history && (
-                  <p className="t-body text-white/70 text-center mt-2">{history}</p>
-                )}
-                {/* ⚠ A run of one is not a streak. Saying "first win in a row"
-                    is the kind of filler that teaches people to stop reading. */}
-                {streak && streak.run >= 2 && (
-                  <p className="t-body text-white/70 text-center mt-2">
-                    {streak.run === 2 ? 'Second' : streak.run === 3 ? 'Third' : `${streak.run}th`}{' '}
-                    {streak.outcome === 'won' ? 'win' : streak.outcome === 'lost' ? 'defeat' : 'draw'}
-                    {' '}in a row.
-                  </p>
-                )}
-
-                {/* ⚠ THEIR WORDS, UNEDITED. The server drops anything over 140
-                    characters rather than truncating it — half a sentence read
-                    back is a misquote with our name on it. And this block is
-                    the one thing that must NOT go into the share image. */}
-                {quote && (
-                  <figure className="mt-6 pl-4 border-l-2 border-danger-400/70 text-left">
-                    <blockquote className="t-body text-white/85 italic">
-                      &ldquo;{quote.content}&rdquo;
-                    </blockquote>
-                    <figcaption className="t-detail text-white/40 mt-1.5">
-                      &mdash; {quote.author}, {dayOf(quote.at)}
-                    </figcaption>
-                  </figure>
-                )}
+                {/* ⚠ The story moved OUT of this card on 2026-08-31. Five
+                    centred sentences stacked under the scoreline was a wall
+                    nobody would finish; they are labelled rows in their own
+                    card below now. This card is the result and nothing else. */}
               </>
             )}
           </div>
         </div>
+
+        {/* HOW IT WENT — the story, as rows rather than prose.
+            ⚠ Every row is omitted when it has nothing true to say. A card that
+            always shows five rows would need filler for the weeks that have no
+            decisive fixture, no streak and no history — and filler is how a
+            member learns to stop reading the card. */}
+        {!bye && (
+          <div className="rounded-card overflow-hidden bg-midnight px-5 sm:px-8 py-5">
+            <p className="t-caption text-white/45">How it went</p>
+
+            <StatRow label="Decided by">
+              {decisiveFixture ?? <span className="text-white/50">No single fixture</span>}
+            </StatRow>
+
+            {separated > 0 && (
+              <StatRow label="Turned on">
+                {separated} of {separated + scoreline.levelFixtures} fixtures
+              </StatRow>
+            )}
+
+            {/* ⚠ Suppressed when it IS the decisive fixture. In a one-fixture
+                win they are usually the same game, and two rows naming it twice
+                reads as a bug. */}
+            {bestCall && bestCall !== decisiveFixture && (
+              <StatRow label="Your best call">{bestCall}</StatRow>
+            )}
+
+            {history && <StatRow label="Head to head">{history}</StatRow>}
+
+            {streak && streak.run >= 2 && (
+              <StatRow label="Run">
+                {streak.run === 2 ? 'Second' : streak.run === 3 ? 'Third' : `${streak.run}th`}{' '}
+                {streak.outcome === 'won' ? 'win' : streak.outcome === 'lost' ? 'defeat' : 'draw'}
+                {' '}in a row
+              </StatRow>
+            )}
+
+            {/* ⚠ Their words, unedited — the server drops anything over 140
+                characters rather than truncating it. And this block is the one
+                thing that must NOT go into the share image. */}
+            {quote && (
+              <figure className="mt-4 pt-4 pl-4 border-t border-white/10 border-l-2 border-l-danger-400/70">
+                <blockquote className="t-body text-white/85 italic">
+                  &ldquo;{quote.content}&rdquo;
+                </blockquote>
+                <figcaption className="t-detail text-white/40 mt-1.5">
+                  &mdash; {quote.author}, {dayOf(quote.at)}
+                </figcaption>
+              </figure>
+            )}
+          </div>
+        )}
 
         {/* WHAT IT MOVED */}
         <div className="rounded-card overflow-hidden bg-midnight px-5 sm:px-8 py-5">
@@ -347,7 +352,7 @@ export function DuelDecision({
               "4th" with no arrow — a block that only ever reports good news is
               not a record, it is a slot machine. */}
           {position.now !== null && (
-            <MovedRow label="Your position">
+            <StatRow label="Your position">
               {position.before !== null && position.before !== position.now ? (
                 <>
                   <span className="text-white/45">{ordinal(position.before)}</span>
@@ -360,29 +365,29 @@ export function DuelDecision({
               ) : (
                 <span>{ordinal(position.now)}</span>
               )}
-            </MovedRow>
+            </StatRow>
           )}
-          <MovedRow label="Duel points">
+          <StatRow label="Duel points">
             <span className={verdict.outcome === 'lost' ? 'text-white/50' : 'text-success-400'}>
               {verdict.outcome === 'lost' ? '+0' : `+${verdict.outcome === 'won' ? 500 : 250}`}
             </span>
-          </MovedRow>
+          </StatRow>
           {record && them && (
-            <MovedRow label={`Record v ${them.name}`}>
+            <StatRow label={`Record v ${them.name}`}>
               {record.won}&ndash;{record.drawn}&ndash;{record.lost}
-            </MovedRow>
+            </StatRow>
           )}
           {topOfWeek && (
-            <MovedRow label="Best in the pool this week">
+            <StatRow label="Best in the pool this week">
               <span className="text-white/70">{topOfWeek.name}</span>
               <span className="ml-2">{topOfWeek.points}</span>
-            </MovedRow>
+            </StatRow>
           )}
-          <MovedRow label={`Matchweek ${matchweek + 1}`}>
+          <StatRow label={`Matchweek ${matchweek + 1}`}>
             <span className="t-caption text-white/45 border border-white/20 rounded-pill px-2.5 py-1">
               Sealed
             </span>
-          </MovedRow>
+          </StatRow>
         </div>
 
         <ShareButton url={shareUrl} />
