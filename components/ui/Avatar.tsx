@@ -38,12 +38,25 @@ export function personName(p: AvatarPerson): string {
 export function Avatar({
   person,
   size = 24,
+  fontSize,
   ring = false,
   className = '',
 }: {
   person: AvatarPerson
   /** Diameter in px. */
-  size?: number
+  /**
+   * Pixels, or any CSS length.
+   *
+   * ⚠ A STRING IS FOR CONTAINERS THAT CHANGE SIZE. `'100%'` lets the avatar
+   * fill a box whose own dimensions interpolate — the Showdown band's faces
+   * shrink on scroll via a `calc()` on a custom property, and a number here
+   * would pin the circle at its full size inside a shrinking parent, which
+   * clips it off-centre rather than scaling it. Pair it with `fontSize`, since
+   * initials cannot be derived from a length that is not a number.
+   */
+  size?: number | string
+  /** Overrides the initials' size. Required when `size` is not a number. */
+  fontSize?: number | string
   /**
    * The surface-coloured ring a stack needs to separate its overlaps.
    *
@@ -63,7 +76,7 @@ export function Avatar({
       style={{
         width: size,
         height: size,
-        fontSize: Math.round(size * 0.38),
+        fontSize: fontSize ?? (typeof size === 'number' ? Math.round(size * 0.38) : undefined),
         backgroundImage: avatarGradient(person.user_id),
       }}
     >

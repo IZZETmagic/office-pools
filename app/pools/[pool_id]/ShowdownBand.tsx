@@ -117,12 +117,20 @@ function Face({
       className={`${className} rounded-full shrink-0 grid place-items-center overflow-hidden`}
       style={unknown
         ? { border: '2px dashed rgba(255,255,255,0.28)' }
-        : { boxShadow: `0 0 0 3px color-mix(in srgb, ${colour} 42%, transparent)` }}
+        /* ⚠ The ring thins as the face shrinks. A fixed 3px is a hairline on a
+           72px circle and a stripe on a 32px one — a ring is a proportion of
+           what it rings. */
+        : { boxShadow: `0 0 0 calc(3px - 1px * var(--p)) color-mix(in srgb, ${colour} 42%, transparent)` }}
     >
       {unknown
-        ? <span className="t-num t-num-black text-white/40 text-lg" aria-hidden="true">?</span>
+        ? <span className="t-num t-num-black text-white/40"
+                style={{ fontSize: 'calc(22px - 10px * var(--p))' }} aria-hidden="true">?</span>
         : p
-          ? <Avatar person={p} size={72} className="w-full h-full" />
+          /* ⚠ `'100%'` AND AN EXPLICIT FONT SIZE. The parent's width is a
+             `calc()` on `--p`, so the avatar has to be told to fill rather than
+             given a number — a number pinned it at 72px inside a 32px box and
+             clipped the circle off-centre on the way down. */
+          ? <Avatar person={p} size="100%" fontSize="calc(26px - 13px * var(--p))" />
           : <span className="block w-full h-full bg-white/10" aria-hidden="true" />}
     </span>
   )
