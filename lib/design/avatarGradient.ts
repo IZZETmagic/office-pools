@@ -1,3 +1,5 @@
+import { withLightness } from './oklch'
+
 /**
  * Per-user avatar gradients.
  *
@@ -68,4 +70,40 @@ export function avatarGradient(userId: string): string {
  */
 export function avatarColor(userId: string): string {
   return AVATAR_GRADIENTS[hashUserIdToIndex(userId, AVATAR_GRADIENTS.length)][0]
+}
+
+/** A user's colour, adjusted so it survives on a light card and a dark one. */
+export type AvatarInk = {
+  /** Fills in either theme, and text on a LIGHT surface. */
+  strong: string
+  /** Text on a DARK surface, where `strong` goes muddy. */
+  soft: string
+}
+
+/**
+ * The two steps of a user's colour that a normal card can use.
+ *
+ * `avatarColor` is the raw stop and is right on the midnight duel card, where
+ * everything is bright against near-black. A `Card` is #FFFFFF in light and
+ * #1C2030 in dark, and the raw stops fail there in BOTH directions: peach
+ * (L=0.82) as text on white is unreadable, and indigo (L=0.59) as text on the
+ * dark card is nearly as bad. A single colour cannot serve both grounds, so
+ * this returns the two the themes need.
+ *
+ * ⚠ THE NUMBERS ARE MEASURED, NOT PICKED. WCAG contrast for all ten colours:
+ *
+ *   L=0.52 vs #FFFFFF   5.17 (emerald) .. 6.23 (violet)
+ *   L=0.70 vs #1C2030   5.55 (pink)    .. 6.45 (emerald)
+ *
+ * so every colour clears 4.5:1 on its own ground with room to spare. 0.52 also
+ * serves as a FILL under white text — a fill's contrast is against the white
+ * text, which is the same figure as the first row — which is why `strong` does
+ * both jobs and there is no third step.
+ *
+ * Derived rather than hand-listed so a colour added to the palette, or one a
+ * member eventually picks on their profile, gets the same treatment for free.
+ */
+export function avatarInk(userId: string): AvatarInk {
+  const base = avatarColor(userId)
+  return { strong: withLightness(base, 0.52), soft: withLightness(base, 0.70) }
 }

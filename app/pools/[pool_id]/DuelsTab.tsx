@@ -61,7 +61,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
-import { avatarColor } from '@/lib/design/avatarGradient'
+import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
 import { Icon } from '@/components/ui/Icon'
 import { headToHead, type DuelRow } from '@/lib/league/duels'
 import { getLiveClock } from '@/lib/matchStatus'
@@ -172,12 +172,14 @@ function Countdown({ to }: { to: string }) {
  * and must not guess.
  */
 function PickChip({
-  label, side, outcome, align = 'left',
+  label, side, outcome, colour, align = 'left',
 }: {
   label: string | null
   side: 'you' | 'them'
   /** Who took the fixture. Absolute — no chip flips it. */
   outcome: 'same' | 'you' | 'them' | 'neither' | 'pending'
+  /** Whose chip this is, in their own colour. */
+  colour: AvatarInk
   align?: 'left' | 'right'
 }) {
   if (label === null) {
@@ -188,15 +190,30 @@ function PickChip({
     )
   }
   const won = outcome === side
+  // ⚠ THE CHIP IS THE PERSON'S COLOUR, not primary-or-danger. `side` still
+  // decides WHICH of the two people it belongs to; it no longer decides the
+  // hue, which now comes from whoever that is.
+  //
+  // A won chip is filled with `strong` under white text, and needs no theme
+  // switch — a fill is its own ground. An unwon chip is coloured TEXT, which
+  // does: `strong` on the white card, `soft` on the dark one. The border is
+  // `currentColor` mixed down, so it follows the text rather than needing a
+  // third value.
   const tone =
-    won ? (side === 'you' ? 'bg-primary-500 text-white' : 'bg-danger-500 text-white')
+    won ? 'text-white'
       : outcome === 'same' ? 'bg-mist text-muted'
-        : side === 'you' ? 'border border-primary-500/40 text-primary-600'
-          : 'border border-danger-500/40 text-danger-600'
+        : 'border text-[var(--chip-strong)] dark:text-[var(--chip-soft)]'
 
   return (
     <span className={`block ${align === 'right' ? 'text-right' : ''}`}>
       <span
+        style={{
+          '--chip-strong': colour.strong,
+          '--chip-soft': colour.soft,
+          ...(won ? { background: colour.strong } : {}),
+          ...(won || outcome === 'same' ? {}
+            : { borderColor: 'color-mix(in srgb, currentColor 40%, transparent)' }),
+        } as React.CSSProperties}
         className={`inline-flex items-center justify-center gap-1 t-detail uppercase tracking-wider rounded-md px-1.5 sm:px-2 py-1 w-full sm:w-auto sm:min-w-[3.25rem] ${tone}`}
         title={won ? 'Took this one'
           : outcome === 'same' ? 'Same pick — cannot separate you'
@@ -411,6 +428,19 @@ export default function DuelsTab({
 
   const name = (e: string | null) => (e ? entryNames.get(e) ?? 'Unknown' : 'Bye')
   const person = (e: string | null): AvatarPerson | null => (e ? entryPeople.get(e) ?? null : null)
+  /**
+   * The team sheet's two colours. `avatarInk` rather than `avatarColor`,
+   * because unlike the duel card this sheet is a normal `Card` — white in
+   * light, #1C2030 in dark — and the raw avatar stop fails on one ground or
+   * the other. Resolved here so the hash and the two OKLab conversions happen
+   * twice rather than once per chip per row.
+   */
+  const inkOf = (e: string | null): AvatarInk => {
+    const p = person(e)
+    return p ? avatarInk(p.user_id) : { strong: 'var(--neutral-500)', soft: 'var(--neutral-400)' }
+  }
+  const youInk = inkOf(inPlay?.you.entry ?? null)
+  const themInk = inkOf(inPlay?.them?.entry ?? null)
   /** Running points for an entry in the matchweek being played. */
   const live = (e: string | null) => (e ? livePoints.get(e) ?? 0 : 0)
 
@@ -705,9 +735,18 @@ export default function DuelsTab({
 
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
               <div className="min-w-0 flex items-center gap-3">
+                {/* Your own colour, as on the duel card. This ring was
+                    primary-500 — a fixed blue drawn touching whatever colour
+                    your face actually is. The OPPONENT side of this card stays
+                    slate on purpose: there is no person there yet to have a
+                    colour, which is the whole point of the sealed state. */}
                 <div
                   className="w-11 h-11 rounded-full shrink-0"
-                  style={{ boxShadow: '0 0 0 3px color-mix(in srgb, var(--primary-500) 45%, transparent)' }}
+                  style={{
+                    boxShadow: `0 0 0 3px color-mix(in srgb, ${
+                      youPerson ? avatarColor(youPerson.user_id) : 'rgba(255,255,255,0.20)'
+                    } 45%, transparent)`,
+                  }}
                 >
                   {youPerson
                     ? <Avatar person={youPerson} size={44} />
@@ -825,9 +864,18 @@ export default function DuelsTab({
       {inPlay?.them && breakdown.length > 0 && (
         <Card padding="none" className="overflow-hidden">
           <div className="grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.75rem_1fr_4.75rem] items-center gap-3 sm:gap-5 px-3 sm:px-5 pt-5 pb-3.5">
-            <span className="t-caption text-primary-600">You</span>
+            {/* The two column headings are the same two colours as the chips
+                beneath them — which is what makes the sheet readable without a
+                key, and what "You" in blue against a name in RED never was. */}
+            <span className="t-caption text-[var(--chip-strong)] dark:text-[var(--chip-soft)]"
+                  style={{ '--chip-strong': youInk.strong, '--chip-soft': youInk.soft } as React.CSSProperties}>
+              You
+            </span>
             <span className="t-caption text-muted text-center">{breakdown.length} fixtures</span>
-            <span className="t-caption text-danger-600 text-right truncate">{name(inPlay.them.entry)}</span>
+            <span className="t-caption text-right truncate text-[var(--chip-strong)] dark:text-[var(--chip-soft)]"
+                  style={{ '--chip-strong': themInk.strong, '--chip-soft': themInk.soft } as React.CSSProperties}>
+              {name(inPlay.them.entry)}
+            </span>
           </div>
 
           <ul>
@@ -835,7 +883,7 @@ export default function DuelsTab({
               <li key={b.n}
                 className={`grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.75rem_1fr_4.75rem] items-center gap-3 sm:gap-5 px-3 sm:px-5 py-3.5 border-t border-border-default
                   ${b.outcome === 'pending' ? 'bg-primary-50/40 dark:bg-primary-900/10 py-4' : ''}`}>
-                <PickChip label={b.myPick} side="you" outcome={b.outcome} />
+                <PickChip label={b.myPick} side="you" outcome={b.outcome} colour={youInk} />
 
                 {/* [name][crest] v [crest][name] — mirrored about the v, so the
                     two clubs carry the same weight and the eye lands in the
@@ -900,7 +948,7 @@ export default function DuelsTab({
                   )}
                 </span>
 
-                <PickChip label={b.theirPick} side="them" outcome={b.outcome} align="right" />
+                <PickChip label={b.theirPick} side="them" outcome={b.outcome} colour={themInk} align="right" />
               </li>
             ))}
           </ul>
