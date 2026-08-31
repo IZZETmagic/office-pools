@@ -1353,11 +1353,6 @@ export default function DuelsTab({
         </div>
       </div>
 
-      <p className="text-xs text-neutral-400">
-        The draw is made when the pool is created and rotates, so everybody meets everybody —
-        but it opens one matchweek at a time. It changes only when someone joins or leaves, and
-        never for a matchweek that has already opened.
-      </p>
     </div>
   )
 }
