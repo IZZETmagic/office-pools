@@ -945,7 +945,7 @@ export default function DuelsTab({
                 ' transparent 52%, color-mix(in srgb, var(--sp-slate) 14%, transparent) 100%)',
             }}
           />
-          <div className="relative px-5 md:px-10 pt-6 pb-7">
+          <div className="relative px-5 md:px-10 pt-6 pb-7 sm:pt-10 sm:pb-12">
             {/* ⚠ THE MATCHWEEK LEADS. It was an 11px eyebrow with "Opponent
                 sealed" trailing after it, so the first thing on the card was a
                 state and the thing that tells you WHICH WEEK you are looking at
@@ -970,12 +970,18 @@ export default function DuelsTab({
                 the "?" circle. So the phone puts the countdown on its own row
                 above the two faces, and the corners layout starts at `sm`,
                 which is where Ryan asked for it anyway. */}
-            <div className="grid grid-cols-2 sm:grid-cols-[auto_1fr_auto] items-center
-                            gap-x-6 gap-y-5 sm:gap-8 mt-6">
+            <div className="grid grid-cols-[1fr_auto_1fr] sm:grid-cols-[auto_1fr_auto] items-center
+                            gap-x-6 gap-y-5 sm:gap-8 mt-6 sm:mt-10">
               <div className="order-2 sm:order-none justify-self-start sm:justify-self-auto
                               flex flex-col items-center gap-2 min-w-0">
+                {/* ⚠ ONE SIZE, BOTH BREAKPOINTS. This was `w-14 h-14
+                    sm:w-[72px]` around an `Avatar size={72}` — so on a phone a
+                    72px face sat inside a 56px box and the ring, drawn on the
+                    BOX, came out smaller than the thing it was ringing. The
+                    `size` prop is inline pixels and cannot be responsive, so
+                    the container must not be either. */}
                 <div
-                  className="w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-full shrink-0"
+                  className="w-16 h-16 rounded-full shrink-0"
                   style={{
                     boxShadow: `0 0 0 3px color-mix(in srgb, ${
                       youPerson ? avatarColor(youPerson.user_id) : 'rgba(255,255,255,0.20)'
@@ -983,9 +989,8 @@ export default function DuelsTab({
                   }}
                 >
                   {youPerson
-                    ? <Avatar person={youPerson} size={72} />
-                    : <div className="w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-full bg-white/10"
-                           aria-hidden="true" />}
+                    ? <Avatar person={youPerson} size={64} />
+                    : <div className="w-16 h-16 rounded-full bg-white/10" aria-hidden="true" />}
                 </div>
                 {/* ⚠ THEIR NAME, NOT "YOU". The other side of this card is a
                     blank where a name will be, so the contrast only reads if
@@ -1002,9 +1007,9 @@ export default function DuelsTab({
                 </div>
               </div>
 
-              <div className="order-1 col-span-2 sm:col-span-1 sm:order-none text-center min-w-0">
+              <div className="order-1 col-span-3 sm:col-span-1 sm:order-none text-center min-w-0">
                 {sealedOpensAtLatest && (
-                  <p className="t-num t-num-black text-3xl sm:text-5xl text-accent-400
+                  <p className="t-num t-num-black text-3xl sm:text-6xl text-accent-400
                                 whitespace-nowrap">
                     <Countdown to={sealedOpensAtLatest} />
                   </p>
@@ -1014,15 +1019,37 @@ export default function DuelsTab({
                 </p>
               </div>
 
+              {/* ⚠ THE V IS PHONE-ONLY. On desktop the countdown sits between
+                  the two and does the separating; stacked, the faces are just
+                  two circles at opposite edges with nothing saying they are
+                  opposed. */}
+              {/* ⚠ ALIGNED TO THE FACES, NOT THE ROW. The grid centres on the
+                  whole row, and each face column carries a name and a meta
+                  line under it — so a centred V sat ~40px BELOW the two
+                  circles it was meant to sit between. `self-start` plus half
+                  an avatar puts it on their axis. */}
+              <span className="order-2 sm:hidden t-display text-xl text-accent-400
+                               justify-self-center self-start mt-[22px] select-none"
+                    aria-hidden="true">V</span>
+
               <div className="order-3 sm:order-none justify-self-end sm:justify-self-auto
                               flex flex-col items-center gap-2 min-w-0">
-                <div className="w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-full shrink-0
+                <div className="w-16 h-16 rounded-full shrink-0
                                 flex items-center justify-center border border-dashed
-                                border-white/25 t-display text-xl sm:text-2xl text-white/35">
+                                border-white/25 t-display text-2xl text-white/35">
                   ?
                 </div>
-                {/* Redacted, not blank — withheld reads differently from missing. */}
-                <div className="h-4 w-20 rounded bg-white/10" aria-hidden="true" />
+                {/* ⚠ TWO BARS, MIRRORING NAME AND RECORD. One bar left this
+                    column a line shorter than yours, and with the grid centring
+                    each column independently that put the "?" 13px BELOW your
+                    face — measured. Redacting both lines makes the columns the
+                    same height, so the two circles land on one axis without
+                    anything being positioned by hand.
+
+                    Redacted, not blank: withheld reads differently from
+                    missing, and both their name and their record are withheld. */}
+                <div className="h-[18px] w-24 rounded bg-white/10" aria-hidden="true" />
+                <div className="h-3 w-16 rounded bg-white/[0.07]" aria-hidden="true" />
                 <span className="sr-only">Opponent not yet revealed</span>
               </div>
             </div>
@@ -1066,20 +1093,26 @@ export default function DuelsTab({
                overturned it, and he is right — this is the only action on the
                card either way, so demoting it just made the card look like it
                had nothing to offer. */
-            <>
-              <p className="t-body text-muted mt-3">Your sheet is in. Nothing left to pick.</p>
+            /* ⚠ FULL WIDTH ON A PHONE, AUTO ON A DESKTOP. A pill stretched
+               across 900px is a thumb target solving a problem a mouse does
+               not have — it reads as a banner, not a button. Stacked under the
+               sentence on a phone where width is the affordance; beside it from
+               `sm`, sized to its own label. */
+            <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p className="t-body text-muted">Your sheet is in. Nothing left to pick.</p>
               <button
                 type="button"
                 onClick={() => router.push(`/pools/${poolId}?tab=predictions`)}
-                className="w-full rounded-pill bg-primary-600 text-white t-caption
-                           py-3.5 mt-4 hover:bg-primary-700 active:bg-primary-800 transition-colors"
+                className="w-full sm:w-auto shrink-0 rounded-pill bg-primary-600 text-white
+                           t-caption px-6 py-3 hover:bg-primary-700 active:bg-primary-800
+                           transition-colors"
               >
                 See your picks
               </button>
-            </>
+            </div>
           ) : (
-            <>
-              <p className="t-body text-muted mt-3">
+            <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p className="t-body text-muted">
                 {mySheet.open.slice(0, 2)
                   .map((f) => `${f.homeName} v ${f.awayName}`)
                   .join(' and ')}
@@ -1089,12 +1122,13 @@ export default function DuelsTab({
               <button
                 type="button"
                 onClick={() => router.push(`/pools/${poolId}?tab=predictions`)}
-                className="w-full rounded-pill bg-primary-600 text-white t-caption
-                           py-3.5 mt-4 hover:bg-primary-700 active:bg-primary-800 transition-colors"
+                className="w-full sm:w-auto shrink-0 rounded-pill bg-primary-600 text-white
+                           t-caption px-6 py-3 hover:bg-primary-700 active:bg-primary-800
+                           transition-colors"
               >
                 Finish your picks
               </button>
-            </>
+            </div>
           )}
         </Card>
       )}
