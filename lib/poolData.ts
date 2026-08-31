@@ -289,6 +289,54 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
     }
   }
 
+  // ⚠ A LEAGUE POOL RANKS ITSELF, and until now nothing carried that rank to
+  // the leaderboard.
+  //
+  // `readEntryScoring` above reads the World-Cup scoring columns, and a league
+  // entry has none of them — `pool_entries.current_rank` is NULL for every one.
+  // `LeaderboardTab` sorts on `current_rank` and falls back to `total_points`
+  // when it is missing, so a league pool was ordered by raw points while the
+  // correct rank sat unread in `league_entry_totals`.
+  //
+  // For three of the four modes the fallback happened to agree, which is why it
+  // survived: `league_finalize_ranks` cascades `total_points` immediately after
+  // `duel_points`, so with no duels settled the two orders match. SHOWDOWN is
+  // where they part. That function leads on `duel_points` — the mode's whole
+  // promise, "duel points decide the table; the weekly score is the tiebreak" —
+  // so the first time a duel settles, the Leaderboard tab and the Duel tab name
+  // different people as winning the same pool, with nothing on screen saying
+  // which is right. Found 2026-08-31, hours before MW2 settled.
+  //
+  // It also restores the RANK ARROWS, which need `previous_rank` and had none.
+  //
+  // ⚠ ADMIN, and it must stay admin: `league_entry_totals` is deny-all
+  // (migration 050). A user-scoped read here returns zero rows and NO ERROR,
+  // which would leave every rank null again and look exactly like this bug.
+  // `denyAllTables.guard.test.ts` covers the call site.
+  if (pool.league_season_id) {
+    const leagueRanks = await safeRead(
+      fetchAllPages<{ entry_id: string; final_rank: number | null; previous_final_rank: number | null }>(
+        'league_entry_totals',
+        (from, to) =>
+          admin
+            .from('league_entry_totals')
+            .select('entry_id, final_rank, previous_final_rank')
+            .eq('pool_id', poolId)
+            .range(from, to),
+      ),
+      [],
+    )
+    const rankByEntry = new Map(leagueRanks.map((r) => [r.entry_id, r]))
+    for (const m of members) {
+      for (const e of (m.entries || [])) {
+        const r = rankByEntry.get(e.entry_id)
+        if (!r) continue
+        e.current_rank = r.final_rank
+        e.previous_rank = r.previous_final_rank
+      }
+    }
+  }
+
   // match_conduct — scoped to this tournament's matches (was an UNFILTERED
   // whole-table pull in page.tsx; SCALE_PLAN §3 0.4). Derive match ids locally.
   const matchIds = matches.map((m) => m.match_id)
