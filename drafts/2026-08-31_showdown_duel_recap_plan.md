@@ -1,204 +1,199 @@
 # Showdown duel recap — implementation plan
 
-**Date:** 2026-08-31 · **Status:** 🟡 **PLAN ONLY.** Nothing built.
-**Decision:** Ryan, 2026-08-31 — *"this could be a slide up modal maybe???"*, then **pool-wide**, and
-**the walk-out is v2**.
-**What it is:** when your duel is decided, the next time you open the pool you get a one-time recap of
-how it went. Once per matchweek, dismissible, and never the only way to learn the result.
+**Date:** 2026-08-31 · **Status:** 🟠 **REWRITTEN AFTER A DESIGN CHANGE.** v1 (one fat sheet) is
+built, applied and committed; this splits it. Migration **122 is applied** and stays as-is.
+**Decision:** Ryan, 2026-08-31 — a **thin popup** with two buttons, and the detail on **its own page**
+styled like the *06 Decision* card from the Fight Night mockups. Pool-wide. Walk-out stays **v2**.
 
----
-
-## 0. What already exists, verified in the code
-
-Not assumed — read:
-
-| | |
-|---|---|
-| A slide-up modal | `components/ui/Modal.tsx:57` — `flex items-end sm:items-center` + `animate-modal-slide-up`. **Already a bottom sheet on a phone and a centred dialog on desktop.** Props: `isOpen`, `onClose`, `title?`, `titleId?`, `size?`, `children`. Escape closes. |
-| A seen-once precedent | `has_seen_how_to_play` on `pool_members`, written non-blocking from a `useEffect` in `PoolDetail.tsx:473`. ⚠ Does not transfer — see §2. |
-| Where a pool-wide modal mounts | `PoolDetail.tsx` — it already owns tab state, the how-to-play effect and `memberId`, and it renders on every tab. |
-| The duel rows | `league_duels`: `duel_id, matchweek_number, entry_a, entry_b, accuracy_a, accuracy_b, points_a, points_b, settled_at`. `settled_at` is the only ordering-safe "when". |
-| `pool_entries` today | 26 columns, none of them a recap marker. Nearest neighbours are `predictions_last_saved_at` and `last_rank_update`, both plain `timestamptz`. |
-| The card's summary state | Already asked for separately (in-play / summary / countdown / picking). This plan does **not** replace it — see §3. |
-| Duel values | 500 / 250 / 0, bye 250 (migration 121, applied). The recap states points, so it must read them rather than restate a rate. |
-
----
-
-## 1. ⚠ The gate, first, because this is the shape it exists for
-
-An auto-opening modal is the classic dark-pattern silhouette. This one passes, but only under a rule
-that has to be written down rather than remembered:
-
-> **The recap may never be the only way to learn the result.**
-
-The standings, the duel card and the leaderboard must already be correct and visible *behind* the
-sheet. The moment a result is withheld until the ceremony is seen, this becomes *"we hold your score
-back so you come back"* — the exact example the disclosure gate names as a failure.
-
-Concretely, three things follow:
-
-1. Dismissing costs nothing. The card's summary state carries the same information until the next
-   matchweek locks.
-2. Nothing is gated behind it — not picking, not the leaderboard, not banter.
-3. It fires at most once per settled duel. A modal that reappears is nagging, not ceremony.
-
-Full gate pass in §8.
-
----
-
-## 2. The seen marker ⭐ the only real decision
-
-`has_seen_how_to_play` is a boolean for the life of the membership. A recap fires **every matchweek,
-once each**, so a boolean cannot express it.
-
-### Recommend: `pool_entries.last_recap_seen_at timestamptz`
-
-There is an unseen recap when the viewer's most recently settled duel has
-`settled_at > last_recap_seen_at` (or the column is NULL).
-
-Why this shape:
-
-- **One column, one write.** It sits beside `predictions_last_saved_at` and `last_rank_update`, which
-  are the same idea.
-- **⚠ IT MUST NOT BE A MATCHWEEK NUMBER.** `last_recap_seen_matchweek int` with a `>= n` test is the
-  obvious design and it is wrong: rounds are played out of numerical order — migration 101 measured a
-  minimum gap of **minus 121 days** across three real seasons — so a member who saw the recap for a
-  late-numbered round played early would never see another. A timestamp cannot have that bug.
-- **It self-limits.** Miss three weeks and you get the latest duel, not three stacked sheets. Falls
-  out of the comparison rather than needing a rule.
-- **Per entry, not per member**, so a multi-entry pool recaps each entry independently.
-
-### Rejected
-
-| | |
-|---|---|
-| `localStorage` | Per-device. See it on the phone, see it again on the laptop. For a once-per-week ceremony that reads as a bug. |
-| `recap_seen_a` / `recap_seen_b` on `league_duels` | Mirrors `points_a/points_b` and is exactly scoped, but adds two columns to the hottest table in the mode and needs the caller to know which side it is. The entry-level timestamp answers the same question with one column. |
-| A `duel_recaps` table | Correct and over-built. Nothing needs the history of which recaps were seen. |
-
----
-
-## 3. Why this does not duplicate the card's summary state
-
-They are different jobs and both should exist:
-
-- **The sheet is the moment.** Fires once, then never for that duel.
-- **The card is the record.** Still there after dismissal, until the next matchweek locks.
-
-That split is what makes dismissal safe, and it is what §1 requires. If the sheet were the only place
-the result lived, dismissing it would destroy information — and then the gate would fail.
-
----
-
-## 4. What the sheet says
-
-One beat in v1. The second beat — *"and here's who's next"*, with the walk-out — is **v2** (Ryan's
-call, 2026-08-31), and the sheet should be built so that beat can be appended rather than bolted on.
-
-**Won**
-> Matchweek 2 · you beat Sarah C · **400 – 200** · +500
-
-**Lost**
-> Matchweek 2 · Sarah C beat you · **200 – 400** · +0
-
-**Tied**
-> Matchweek 2 · level with Sarah C · **300 – 300** · +250 each
-
-**Bye**
-> Matchweek 2 · no opponent this week · **+250** — there was no opponent, so there was no defeat.
-
-⚠ The bye copy is the existing sentence from migration 100 and `leagueModeInfo.ts`, verbatim. A fourth
-way of saying the same rule is how the surfaces start disagreeing.
-
-⚠ **A bye is detected structurally** (`entry_b IS NULL`), never by the points: `DUEL_BYE` **is**
-`DUEL_TIE`, so reading 250 would call it a tie. `lib/league/duelPoints.ts` says this and
-`duelPoints.guard.test.ts` holds it.
-
-⚠ **The points figure comes from the duel row**, not from a rate. It is `points_a`/`points_b` as the
-engine wrote them, so a future revaluation does not need this file edited.
-
-Not in v1: the fixture-by-fixture breakdown (the team sheet already does it, one tap away), the
-leaderboard movement (the arrows already do it), and any share affordance.
-
----
-
-## 5. When it fires
-
-**Pool-wide** — Ryan's call, 2026-08-31. It mounts in `PoolDetail`, not in `DuelsTab`, so it fires
-whichever tab you land on.
-
-The cost is real and accepted: somebody who opened the pool to read Banter gets interrupted. It is
-once a week, it is their own result, and one dismissal ends it. The alternative — Duel-tab-only —
-means the member most likely to miss it is the one who never opens that tab, which is precisely the
-member the recap is for.
-
-Conditions, all required:
-
-1. `pool.league_mode === 'showdown'`
-2. The viewer has an entry in the pool
-3. That entry's most recent duel by `settled_at` is not null
-4. `settled_at > last_recap_seen_at`, or `last_recap_seen_at IS NULL`
-
-⚠ **Condition 4 has a cold-start problem.** A pool created today has `last_recap_seen_at = NULL` for
-everybody, so the first settled duel recaps correctly. But a pool with a season of settled duels
-behind it would fire a recap for a months-old result the first time anyone opens it. Two ways out —
-backfill `last_recap_seen_at = now()` for existing entries in the migration, or add a staleness floor
-(`settled_at > now() - interval '14 days'`). **Recommend the backfill**: it is exact, it runs once,
-and a floor is a second rule to remember forever. Cheap right now — 0 duels have settled anywhere.
-
----
-
-## 6. Marking it seen ⚠ the write is where this gets fragile
-
-The how-to-play precedent writes on mount and never checks the result:
-
-```ts
-supabase.from('pool_members').update({ has_seen_how_to_play: true }).eq('member_id', memberId).then()
+```
+duel settles ──▶ popup: "You beat Sarah C"  ┬── Review summary ──▶ /pools/[id]/duel/[matchweek]
+                                            └── Skip ───────────▶ the sealed card + countdown
 ```
 
-⚠ **Do not copy that shape here.** Two differences matter:
+---
 
-- **It writes on OPEN, not on dismiss.** For how-to-play that is right — the modal is the page. For a
-  recap, writing on open means a member who closes the tab mid-animation has "seen" a result they
-  never read. **Write on dismiss.**
-- **It discards the error.** `const { data } = await …` hiding a 400 is a documented failure mode in
-  this codebase. If the write fails the sheet reappears next visit — annoying but harmless, and far
-  better than silently marking a result seen. **Log the error.**
+## 0. What is already built and applied
 
-There is also an RLS question to answer before writing: `pool_entries` is member-readable, but can a
-member UPDATE their own entry row? If not, this needs either a policy or a small server route. **This
-is the first thing to check when the work starts** — it is exactly the shape of a silent failure.
+| | |
+|---|---|
+| Migration **122** | ✅ applied. `pool_entries.last_recap_seen_at timestamptz` + backfill. **No change needed** — the marker works the same for a two-step flow. |
+| The seen/dismiss plumbing | ✅ `PoolDetail` computes the owed recap server-side, mounts the sheet, writes on dismiss with the error logged. Survives this rewrite. |
+| `DuelRecapSheet` | 🟠 built as the FAT version — scoreline, corners, verdict, points. **Gets narrowed** to §2. |
+| RLS for the write | ✅ verified end to end. `relacl` is `authenticated=arwdDxtm` (table-wide) and *"Users can update own entries"* permits it. A real dismissal wrote through and was then cleared. |
+| Skip's destination | ✅ already exists — the sealed card with the 24h-floor countdown (migrations 119/120). Skip is *just* dismiss. |
+| Nested routes under a pool | `app/pools/[pool_id]/upgrade/page.tsx` is the only one, so the pattern exists but is barely used. |
+| `next/og` | ❌ not used anywhere yet. First use would be here (§6). |
+| `headToHead` | ✅ fixed 2026-08-31 (`e0e96b8`) — it compared against `3`/`1` and would have called every meeting a loss. It is the mockup's *Record v* line. |
+
+---
+
+## 1. What changed, and why the split is better
+
+v1 put the whole story in the modal. That fails two ways: a modal is the wrong place to read
+anything, and there was nowhere to *send* somebody afterwards.
+
+Splitting it gives each half one job:
+
+- **The popup is the news.** Who won. Two buttons. Nothing to read.
+- **The page is the story.** The decisive fixture, what it moved, the record, the share.
+
+It also makes the share affordance possible at all — you cannot share a modal, and a real route gets
+an `/opengraph-image` for free (§6).
+
+---
+
+## 2. The popup
+
+Thin. `Modal` is already `items-end sm:items-center`, so it is a bottom sheet on a phone.
+
+> **Matchweek 2**
+> *(both faces, small)*
+> **You beat Sarah C** · **+500**
+>
+> `[ Review summary ]`  `[ Skip ]`
+
+⚠ **Skip must be as easy as Review.** Not a greyed-out link under a bright button. A member who never
+wants the ceremony should be able to say so in one tap forever, and the fastest way to teach people
+to resent a feature is to make the exit harder than the entrance.
+
+⚠ **Both buttons dismiss.** Review navigates *and* stamps `last_recap_seen_at`; it must not come back
+because you read it. Skip stamps and closes.
+
+Everything else from v1's sheet — the big scoreline, the dimmed loser corner — moves to the page.
+
+---
+
+## 3. The page — `/pools/[pool_id]/duel/[matchweek]`
+
+A route, not an overlay, for three reasons: the back button works, the URL is shareable, and
+`next/og` can render a preview image from it later.
+
+Reachable any time, not just from the popup. The recap is a *record*, and a page you can only see
+once is a page nobody links to.
+
+### The card, top to bottom (Fight Night *06 Decision*)
+
+| | |
+|---|---|
+| Eyebrow | `YOU BEAT PRIYA RAMAN` |
+| **Verdict** | **`SPLIT DECISION`** — see §4 |
+| Scoreline | `7 – 6`, each side in their own colour — see §5 |
+| The story | *"It came down to **Liverpool v Man Utd**. You had the home win, Priya had the draw."* |
+| History | *"First time you have ever beaten Priya."* — from `headToHead` |
+| Banter | a pulled quote — ⚠ see §6 |
+| **What it moved** | position `2nd → 1st`, duel points, `Record v Priya`, next matchweek `SEALED` |
+| Share | `Share the decision` — §6 |
+
+### ⚠ The card must be worth opening when you LOST
+
+The mockup is the winner's view. If only wins get a good card, half the pool learns that Skip is the
+right button — and that is the symmetry gate failing quietly rather than loudly.
+
+A loss gets the same structure and the same care: *"Narrow decision — one fixture in it"*, the same
+decisive-fixture line, the same record. What it does **not** get is consolation. Stating a defeat
+plainly is respect; dressing it up is the thing that produces bad feeling.
+
+### ⚠ "What it moved" must be willing to say nothing moved
+
+If you won and stayed 4th, it says so. A block that only ever reports good news is not a record, it
+is a slot machine. This is the *"no bad feelings"* line in the vision doc.
+
+---
+
+## 4. The verdict term
+
+Boxing's own vocabulary, derived from the margin. Nothing invented, nothing random:
+
+| Margin | Term |
+|---|---|
+| opponent scored nothing | `SHUTOUT` |
+| very wide | `UNANIMOUS DECISION` |
+| clear | `DECISION` |
+| one fixture in it | `SPLIT DECISION` |
+| level | `DRAW` |
+| no opponent | `BYE` |
+
+⚠ **The thresholds must be expressed in FIXTURES, not points.** "One fixture in it" is a sentence a
+member can check; "within 100 points" is one they cannot, and it means something different at
+Results depth and at Scores depth. The bands come out of the same place §5's scoreline does.
+
+⚠ **Gate 5 holds trivially** — every band is a function of two real scores. But it is worth writing
+down that no term may ever be chosen for drama over accuracy. A `SPLIT DECISION` label on a 5-fixture
+gap would be the first lie the product tells.
+
+---
+
+## 5. ⚠ The scoreline is not on the mockup's scale
+
+The mockup shows `7 – 6`, which reads as correct picks out of ten. **The duel is judged on weekly
+points**, so at Results depth that same duel is `700 – 600`. `SPLIT DECISION` over `7 – 6` lands;
+over `700 – 600` it is mush.
+
+**Recommend: correct picks as the big number, points as the sub-line.** Fixtures are what a member
+actually experienced; the points are the audit trail.
+
+⚠ **But Exact Scores depth does not divide into a pick count.** There, a fixture pays 100 / 75 / 50 /
+0, so "6 correct" is not a thing. Options, needing a call:
+
+1. Big number = fixtures the member *beat their opponent on* (works at both depths, is a real
+   head-to-head count, and is what the verdict bands in §4 want anyway). **Recommended.**
+2. Big number = points at Scores depth and fixtures at Results depth. Honest, but the card means two
+   different things in two pools.
+3. Points everywhere. Consistent and dull.
+
+⚠ **Also: `Duel points 9 → 12` in the mockup is the pre-121 world.** Under 500/250/0 that row reads
+`9,000 → 9,500`. Not wrong, much less punchy. Suggest the card shows the **delta** (`+500`) and the
+running total goes in the smaller "what it moved" block.
+
+---
+
+## 6. Sharing, and the thing it drags in ⚠
+
+`Share the decision` is the one item here with a decision that is not ours to make lightly.
+
+**The banter pull-quote sends another member's words out of the pool.** Quoting Priya's trash talk
+back at her *inside* the pool she posted it in is the joke working. Putting it on a card that leaves
+the pool is republishing her, somewhere she did not post. She cannot consent to that at the moment it
+happens and she is not the one pressing the button.
+
+**Recommend: the quote renders in-app and is omitted from anything shared.** One rule, no per-message
+consent flow, and the shared card is still good without it.
+
+Mechanism, when it is built: a real route means `app/pools/[pool_id]/duel/[matchweek]/opengraph-image.tsx`
+via `next/og`, which is not used anywhere in the app yet — this would be the first. That fits the
+Showdown animations backlog, which already names `next/og` for share previews. **Out of scope for
+v1**; the button can be deferred without changing anything above it.
 
 ---
 
 ## 7. The work, in order
 
-1. **Check the `pool_entries` UPDATE policy** (§6). It decides whether step 3 is a client write or a
-   route.
-2. Migration: `ALTER TABLE pool_entries ADD COLUMN last_recap_seen_at timestamptz`, plus the backfill
-   in §5. ⚠ Deploy the code that reads it **after** the column exists — migration 026's lesson was 7
-   hours of silent 400s from doing it the other way round.
-3. Server: the viewer's latest settled duel, on `PoolDetail`'s props. `league_duels` is RLS'd and the
-   reveal gate already withholds unopened matchweeks, so a settled duel is by definition readable.
-4. `DuelRecapSheet` — presentational, takes the duel and the two names, no data access.
-5. Mount in `PoolDetail`, gated on §5's four conditions.
-6. Write on dismiss (§6), with the error logged.
-7. Guard test: the four outcome strings, and that a bye is branched on `entry_b` rather than on 250.
+1. **Narrow `DuelRecapSheet` to §2** — verdict, points, two buttons. Delete the rest; the page takes it.
+2. **The route** `app/pools/[pool_id]/duel/[matchweek]/page.tsx`, server-rendered, reachable directly.
+   ⚠ It must check membership and the reveal gate itself — a URL is guessable, and
+   `/duel/38` must not leak a sealed pairing.
+3. **The verdict + scoreline** (§4, §5) in `lib/league/duelVerdict.ts`, pure and unit-tested. This is
+   the piece worth testing hardest: it is a function of two numbers and it is the card's headline.
+4. **The decisive fixture** — the fixture where the picks diverged that, flipped, changes the result.
+   ⚠ Reveal-gated: it needs the opponent's picks, which come only from `/api/pools/[id]/bulk`.
+5. **What it moved** — reuse the `movement` reduction from `DuelsTab`; it already rebuilds the table
+   one settled matchweek short. Extract rather than copy.
+6. **The loss and bye variants** (§3), with the same care as the win.
+7. Share button — deferred, §6.
 
 ## 8. Gates (Decision 8)
 
 | Gate | |
 |---|---|
-| **1. Disclosure** | ✅ *"When your duel is decided we show you the result once, the next time you open the pool."* True, and it makes the feature sound better rather than worse. |
-| **2. Affect** | ✅ **Only under §1's rule.** Nothing is withheld to create the moment — the result is already on the card, the table and the leaderboard before the sheet opens. Withholding it would fail this gate outright. |
-| **3. Symmetry** | ✅ Everyone gets the same sheet. A loss is stated as plainly as a win, and neither is dressed up. |
-| **4. Substitution** | ✅ No obligation created. Dismissing costs nothing and there is no streak, no reward for opening promptly, and no penalty for never seeing it. |
-| **5. Variance provenance** | ✅ Nothing random. The sheet reports a result the sport produced; it introduces no uncertainty of our own. |
+| **1. Disclosure** | ✅ *"When your duel is decided we tell you once, and you can read the detail or skip it."* Says what it does; sounds better said aloud than hidden. |
+| **2. Affect** | ✅ **Only while the result is already visible behind the popup.** Unchanged from v1 and still the load-bearing rule: the card, the table and the leaderboard are correct before the popup opens. |
+| **3. Symmetry** | ⚠ **The gate this design can fail.** A winner's card that is better made than a loser's teaches half the pool to Skip. §3 is the mitigation and it is not optional. |
+| **4. Substitution** | ✅ Skip is as prominent as Review. No streak, no reward for opening promptly, no penalty for never opening. |
+| **5. Variance provenance** | ✅ Verdict, scoreline and decisive fixture are all functions of real results. §4 records that a term may never be picked for drama. |
 
-## 9. Open, for v2
+## 9. v2
 
-- **The walk-out.** The second beat — *"and here's who's next"*. The sheet's shape should leave room
-  for it, because the reveal currently has no moment at all: the next opponent simply appears on the
-  card.
-- **Push.** A settled duel is a natural notification, and `firePendingMatchdayRecaps` already exists
-  as a pattern. Out of scope here, and it would need its own disclosure line.
+- **The walk-out.** Skip already lands on the sealed card + countdown, which is where the reveal
+  belongs. The ceremony hangs off that, not off this.
+- **Push.** A settled duel is a natural notification; `firePendingMatchdayRecaps` is the pattern.
+- **The share image** (§6).
