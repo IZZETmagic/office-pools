@@ -1045,7 +1045,11 @@ export default function DuelsTab({
           live={{ you: live(inPlay.you.entry), them: live(inPlay.them?.entry ?? null) }}
           remaining={remainingFixtures}
           liveNow={anyFixtureLive}
-          strip={breakdown.map((b) => b.outcome)}
+          // ⚠ `b.clock !== null` is the same live test the red dot above uses
+          // (`getLiveClock` returns null unless the status is 'live'), so the
+          // dot and the flashing chips can never disagree about whether a game
+          // is on. Two definitions of "live" on one card would be one too many.
+          strip={breakdown.map((b) => ({ outcome: b.outcome, live: b.clock !== null }))}
         />
       )}
       {open && (
@@ -1767,7 +1771,15 @@ function DuelPanel({
   /** A ball is in play RIGHT NOW — not merely "the matchweek is in progress". */
   liveNow: boolean
   /** Per-fixture outcome, in fixture order. Empty before anything is revealed. */
-  strip: Array<'you' | 'them' | 'same' | 'neither' | 'pending'>
+  /**
+   * One entry per fixture: who is taking it, and whether a ball is in play in
+   * it right now. `live` drives the flash and nothing else — the COLOUR is the
+   * same function of the score whether the game is running or finished.
+   */
+  strip: Array<{
+    outcome: 'you' | 'them' | 'same' | 'neither' | 'pending'
+    live: boolean
+  }>
 }) {
   const decided = m.duel.settled_at && m.them
   /** A duellist's own colour — the one their avatar opens with. */
@@ -1935,10 +1947,10 @@ function DuelPanel({
             two people it read as a divider. */}
         {strip.length > 0 && m.them && (
           <div className="hidden md:flex items-stretch gap-1 mt-7 h-1.5 max-w-xs mx-auto w-full" aria-hidden="true">
-            {strip.map((o, i) => (
+            {strip.map(({ outcome: o, live: isLive }, i) => (
               <span
                 key={i}
-                className={`flex-1 rounded-full ${
+                className={`flex-1 rounded-full ${isLive ? 'duel-chip-live' : ''} ${
                   o === 'same' || o === 'neither' ? 'bg-white/15'
                     : o === 'pending' ? 'border border-dashed border-white/25' : ''}`}
                 style={o === 'you' ? { background: yourColour }

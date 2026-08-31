@@ -1346,3 +1346,42 @@ html.dark .mode-pill {
   background: color-mix(in srgb, var(--mode-base) 22%, transparent);
 }
 
+
+/* ---------------------------------------------------------------------------
+   THE DUEL STRIP'S LIVE CHIP
+   ---------------------------------------------------------------------------
+   One chip per fixture on the Showdown card, coloured by who is taking that
+   fixture: the viewer's avatar colour, the opponent's, or grey for a fixture
+   that separates nobody — either because both picked the same thing (a wash,
+   where the result cannot matter) or because neither of them called it.
+
+   A fixture being PLAYED right now flashes, because that colour is still
+   moving: a goal can hand the chip from one member to the other, or wash it
+   out to grey.
+
+   ⚠ ONLY THE OPACITY MOVES, and that is the whole reason this works. The two
+   member colours are set inline from the avatar palette and are not knowable
+   here, so a keyframe that animated `background` would have to be written per
+   colour — and would still leave grey and the dashed not-yet-played chip
+   without one. Opacity is colour-agnostic: it reads identically on blue, on
+   pink, and on grey.
+
+   ⚠ Not `animate-pulse`. Tailwind's own pulse bottoms out at .5 opacity over
+   2s, which on a 6px bar under a scoreline is close to invisible. This goes
+   further down and slightly faster, so it reads as a heartbeat at a glance
+   without becoming the loudest thing on the card.
+--------------------------------------------------------------------------- */
+@keyframes duel-chip-live {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.25; }
+}
+
+.duel-chip-live {
+  animation: duel-chip-live 1.4s ease-in-out infinite;
+}
+
+/* The chip keeps its colour and its meaning; it simply stops moving. Nothing
+   here is information that only the animation carries. */
+@media (prefers-reduced-motion: reduce) {
+  .duel-chip-live { animation: none; }
+}
