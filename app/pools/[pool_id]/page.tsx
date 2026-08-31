@@ -242,6 +242,14 @@ export default async function PoolPage({
         return null
       }
 
+      const seriesRes = userEntryIds[0]
+        ? await supabase.rpc('league_matchweek_series', {
+            p_pool_id: pool_id,
+            p_entry_id: userEntryIds[0],
+          })
+        : { data: null, error: null }
+      if (seriesRes.error) console.error('[pool page] matchweek series failed:', seriesRes.error.message)
+
       showdownData = {
         duels,
         entryNames,
@@ -259,6 +267,14 @@ export default async function PoolPage({
           [...totalsRes.totals].map(([entryId, t]) => [entryId, t.duelPoints]),
         ),
         recap: buildDuelRecap(),
+        // ⚠ ONE ROW PER MATCHWEEK, AGGREGATED IN SQL (124). The raw table is
+        // ~3,800 rows for a 10-member season and is deny-all besides; the
+        // function is SECURITY DEFINER and returns only the viewer's points and
+        // the pool's MEDIAN, never another member's row. So this can run on the
+        // USER client.
+        series: (seriesRes.data ?? []) as Array<{
+          matchweek_number: number; your_points: number; median_points: number
+        }>,
       }
     }
 

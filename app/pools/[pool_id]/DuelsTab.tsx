@@ -134,6 +134,8 @@ type Props = {
   duelPoints: Map<string, number>
   /** For the "finish your picks" jump. `?tab=` is how PoolCard already does it. */
   poolId: string
+  /** Your points and the pool's median, per matchweek (migration 124). */
+  series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
 }
 
 type Side = { entry: string; points: number | null; accuracy: number | null }
@@ -400,6 +402,100 @@ function formatKickoff(d: Date): string {
 }
 
 /** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
+/**
+ * Points per matchweek, yours against the pool's median.
+ *
+ * ⚠ HAND-ROLLED, NOT `recharts`. It IS a dependency and `admin/super/StatsTab`
+ * uses it, but that is an admin page nobody opens on a phone. Shipping a chart
+ * library to every member cuts against the payload work that took pool open
+ * from 7,721 kB to ~445 kB, and this is a div per week.
+ *
+ * ⚠ IT HAS TO READ AT n=1 AND AT n=38. The seeded pool has ONE scored
+ * matchweek today, so bars are `flex-1` with a floor rather than a fixed width
+ * — one bar fills the row, thirty-eight share it, and neither needs an axis.
+ *
+ * The median is a ghost bar BEHIND yours rather than a second bar beside it:
+ * the question is "how did I do against the room", and two bars side by side
+ * makes it a comparison you have to perform rather than one you can see.
+ */
+function WeekBars({ series }: {
+  series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
+}) {
+  const top = Math.max(...series.map((r) => Math.max(r.your_points, r.median_points)), 1)
+  return (
+    <div className="px-4 sm:px-5 py-4 border-t border-border-default">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="t-body text-muted">Points a matchweek</p>
+        <p className="t-detail text-muted">
+          <span className="inline-block w-2 h-2 rounded-sm bg-primary-500 mr-1.5" />you
+          <span className="inline-block w-2 h-2 rounded-sm bg-silver ml-3 mr-1.5" />pool median
+        </p>
+      </div>
+      {/* ⚠ `flex-1` ALONE DOES NOT SOLVE n=1 — it makes one bar fill the row and
+          the chart reads as a solid block, which is what it did on first
+          render. Capped at 32px and left-aligned: one bar is a bar, thirty-
+          eight share the row, and neither needs an axis. */}
+      <div className="flex items-end justify-start gap-1 h-24 mt-3">
+        {series.map((r) => (
+          <div key={r.matchweek_number}
+               className="flex-1 relative h-full min-w-[6px] max-w-[32px]"
+               title={`Matchweek ${r.matchweek_number}: ${r.your_points} · median ${r.median_points}`}>
+            {/* The room, behind. */}
+            <div className="absolute bottom-0 inset-x-0 rounded-t-sm bg-silver/60"
+                 style={{ height: `${(r.median_points / top) * 100}%` }} />
+            {/* You, in front and narrower, so the ghost stays readable. */}
+            <div className="absolute bottom-0 inset-x-[22%] rounded-t-sm bg-primary-500"
+                 style={{ height: `${(r.your_points / top) * 100}%` }} />
+          </div>
+        ))}
+      </div>
+      {/* ⚠ Only the ends are labelled. Thirty-eight numbers under a 24px-tall
+          chart is a ruler, not a label. */}
+      {series.length > 1 && (
+        <div className="flex justify-between mt-1.5">
+          <span className="t-detail text-muted">MW {series[0].matchweek_number}</span>
+          <span className="t-detail text-muted">MW {series[series.length - 1].matchweek_number}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Home / draw / away as one bar.
+ *
+ * ⚠ A TENDENCY, NOT A TREND — which is why it can be a single bar and does not
+ * need many weeks the way `WeekBars` does. It replaced two table rows reading
+ * "Backs the home side 40%" and "Calls a draw 20%": same numbers, one shape,
+ * and the away share stops being something the reader has to subtract.
+ */
+function TendencyBar({ home, draw, away }: { home: number; draw: number; away: number }) {
+  const seg = [
+    { label: 'Home', pct: home, cls: 'bg-primary-500' },
+    { label: 'Draw', pct: draw, cls: 'bg-silver' },
+    { label: 'Away', pct: away, cls: 'bg-primary-800' },
+  ].filter((x) => x.pct > 0)
+  return (
+    <div className="px-4 sm:px-5 py-4 border-t border-border-default">
+      <p className="t-body text-muted">How you call them</p>
+      <div className="flex h-3 rounded-pill overflow-hidden mt-3">
+        {seg.map((x) => (
+          <div key={x.label} className={x.cls} style={{ width: `${x.pct}%` }}
+               title={`${x.label} ${x.pct}%`} />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
+        {seg.map((x) => (
+          <span key={x.label} className="t-detail text-muted">
+            <span className={`inline-block w-2 h-2 rounded-sm mr-1.5 ${x.cls}`} />
+            {x.label} <span className="t-num t-num-extrabold text-ink">{x.pct}%</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /** One label/value row on a light card. The mirror of the midnight StatRow. */
 function SeasonRow({ label, value }: { label: string; value: string | number }) {
   return (
@@ -435,6 +531,7 @@ export default function DuelsTab({
   form,
   duelPoints,
   poolId,
+  series,
 }: Props) {
   const router = useRouter()
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
@@ -1178,13 +1275,17 @@ export default function DuelsTab({
             <p className="t-caption text-muted">Your season</p>
             <p className="t-caption text-muted">{mySeason.picks} picks</p>
           </div>
+          {/* ⚠ NUMBERS STAY NUMBERS. Points and correct picks are quantities,
+              and a quantity's best rendering is the quantity — making
+              everything a graphic is its own kind of noise. Only the two
+              things that are SHAPES became shapes. */}
           <SeasonRow label="Points" value={mySeason.points} />
           <SeasonRow label="Correct picks" value={mySeason.correct} />
+
+          {series.length > 0 && <WeekBars series={series} />}
           {mySeason.home !== null && (
-            <SeasonRow label="Backs the home side" value={`${mySeason.home}%`} />
-          )}
-          {mySeason.draw !== null && (
-            <SeasonRow label="Calls a draw" value={`${mySeason.draw}%`} />
+            <TendencyBar home={mySeason.home} draw={mySeason.draw ?? 0}
+                         away={100 - mySeason.home - (mySeason.draw ?? 0)} />
           )}
         </Card>
       )}

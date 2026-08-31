@@ -182,6 +182,14 @@ export type ShowdownData = {
   /** Season totals per entry — points, rank, duel points. */
   totals: Map<string, { totalPoints: number; rank: number | null; duelPoints: number; correct: number }>
   duelPoints: Map<string, number>
+  /**
+   * Your points and the pool's MEDIAN, one row per matchweek (migration 124).
+   *
+   * ⚠ Aggregated in SQL. The raw `league_match_scores` is ~3,800 rows for a
+   * 10-member season and is deny-all besides; the function is SECURITY DEFINER
+   * and returns two numbers a week, never another member's row.
+   */
+  series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
 }
 
 /** Everything TablePredictionTab needs, assembled server-side in page.tsx. */
@@ -2324,6 +2332,7 @@ export function PoolDetail({
                 bulkState={bulkState}
                 totals={showdownData.totals}
                 poolId={pool.pool_id}
+                series={showdownData.series}
                 form={leagueForm}
                 duelPoints={showdownData.duelPoints}
               />
