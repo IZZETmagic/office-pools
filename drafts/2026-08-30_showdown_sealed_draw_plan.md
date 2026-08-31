@@ -1,8 +1,9 @@
 # Showdown sealed draw — implementation plan
 
-**Date:** 2026-08-30 · **Status:** 🟡 **BUILT LOCALLY, NOT APPLIED.** Migrations 116 + 117 are written
-but have **not been run** against any database; every code change below is on disk and green
-(1,084 tests, 0 type errors, 0 lint errors in touched files). See §12 for what is done and what is owed.
+**Date:** 2026-08-30 · **Status:** ✅ **APPLIED AND VERIFIED IN PRODUCTION.** Migrations 116, 117 and
+118 are live on `ujthamlehjyubbzxbnes`, each hash-checked byte-identical to the repo before the next
+was applied. `scripts/verify-showdown.ts` reports ALL CHECKS PASSED, including the member-JWT seal
+pass. Browser pass done on the seeded pool. See §12.
 **Decision:** Ryan, 2026-08-30 — *"we are going to hide the draw from all users and reveal them week
 by week so it is a surprise."* This reverses the **publishing** half of the 24 Aug call. The
 round-robin itself stands.
@@ -389,3 +390,68 @@ made us reject a weekly random draw. What moved is *which week* a fixed set of d
 that assignment was always ours: there is nothing in the sport that says circle-method round 0
 belongs in August. The change is how we make a choice we were already making. If that reading is ever
 disputed, the fallback is one line — delete the permutation and `v_r` returns to `v_slot`.
+
+---
+
+## 14. Applied and verified, 2026-08-30
+
+**Migrations.** 116 → 117 → 118, in order, hash-checked between each:
+
+| | |
+|---|---|
+| Live generator before | `823326d5…` = migration 100's body, byte-identical — the preflight §12 asks for |
+| After 117 | `73db8963…` = 117's file, byte-identical |
+| After 118 | `648f77fa…` = 118's file, byte-identical, `v_perm` present, no `random()` |
+| Policy | `Members see duels up to the open matchweek`, exactly one on `league_duels` |
+
+⚠ Your own apply had not reached the database. `pg_proc` showed no
+`league_duel_is_revealed` and the generator still carrying `v_first_open`. The old policy was intact,
+so nothing was half-applied — but it is worth knowing that 117 and 118 would each have "succeeded"
+alone, which looks like partial progress rather than a failure.
+
+**The seal, on real data.** The two seeded pools went from 185 → **10** and 148 → **8** visible
+duels, both showing matchweeks 2–3 only (MW2 locked, MW3 open). Client-side, the served payload
+contains `matchweek_number` 2 and 3 and nothing else — matchweeks 4–38 never reach the browser.
+That is §8.8, and it is the check that would have caught a UI-only hide.
+
+**`verify-showdown.ts` — ALL CHECKS PASSED**, including §8's member-JWT pass: service_role sees 12
+matchweeks, the member sees 1, every later week withheld, a non-member sees none. Section 9 confirms
+the shuffle is deterministic and that cycle 1 is not a repeat of cycle 0.
+
+### Three faults in the verification script, all older than this work
+
+It had been **unrunnable since migration 111** landed:
+
+1. Setup borrowed whichever tournament `.limit(1)` returned and paired it with the scratch season —
+   111 raises on the mismatch. It now brings its own tournament on the scratch triple.
+2. `theSeal()` inserted a `users` row, but `on_auth_user_created → handle_new_user` already writes
+   one. It now reads what the trigger made.
+3. `role: 'member'` is not in `pool_members_role_check`. That one was mine.
+
+### ⚠ A stale expectation, corrected — and worth remembering
+
+`"the schedule starts at the first matchweek still open — 5"` encoded **095**'s behaviour. Migration
+100 added the guard against redrawing a live matchweek that already has a draw, which makes the
+answer **6**, and the assertion was never updated. It now asserts 6, asserts the *precondition* that
+makes it 6, and reads against `POOL_LATE` — no draw yet, same open matchweek, still 5. One guard,
+both branches.
+
+### 🐛 And one real bug, found only in the browser
+
+`featuredMatchweek = inPlayMatchweek ?? openMatchweek` collapses two weeks that both exist all
+weekend. That was survivable while "Coming up" carried the open week; sealing the draw deleted that
+list and took the open duel with it. On screen: matchweek 2 "being played now", matchweek 4 sealed,
+and **matchweek 3 — the one being picked — nowhere**, despite being revealed and in the payload.
+
+This is the OPEN ≠ IN PLAY conflation again, reintroduced from the other direction by a deletion.
+Both weeks now render, each saying which it is, and the record card sits below them so
+playing / picking / sealed read as one timeline. Fixed in `e651a3e`.
+
+**Green tests did not catch it, and could not have.** Nothing asserted that the open matchweek
+appears on screen.
+
+### Still owed
+
+- **Styling** — scoped display face (`--font-display`), Showdown ceremony surfaces only. Ryan's call
+  2026-08-30. Now unblocked.
+- Step 9 of §9: the walk-out, the three pushes, win-by-KO, the decider.
