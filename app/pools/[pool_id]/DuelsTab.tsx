@@ -403,59 +403,88 @@ function formatKickoff(d: Date): string {
 
 /** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
 /**
- * Points per matchweek, yours against the pool's median.
+ * Every matchweek as a contest against the room: how far ABOVE or BELOW the
+ * pool's median you finished, week by week.
  *
- * ⚠ HAND-ROLLED, NOT `recharts`. It IS a dependency and `admin/super/StatsTab`
- * uses it, but that is an admin page nobody opens on a phone. Shipping a chart
- * library to every member cuts against the payload work that took pool open
- * from 7,721 kB to ~445 kB, and this is a div per week.
+ * ⚠ IT WAS A PAIR OF BARS ON A BASELINE AND IT LOOKED LIKE A SPREADSHEET —
+ * Ryan, 2026-08-31, and he was right. Two bars of absolute points ask the
+ * reader to do the comparison; the interesting number was never "400", it was
+ * "100 clear of the room". So the median becomes the AXIS rather than a second
+ * bar, and each week is one mark above or below it.
  *
- * ⚠ IT HAS TO READ AT n=1 AND AT n=38. The seeded pool has ONE scored
- * matchweek today, so bars are `flex-1` with a floor rather than a fixed width
- * — one bar fills the row, thirty-eight share it, and neither needs an axis.
+ * That is the same language as the duel card's strip — a centre line with the
+ * result diverging from it — which is deliberate: this is that idea over a
+ * season instead of over ten fixtures.
  *
- * The median is a ghost bar BEHIND yours rather than a second bar beside it:
- * the question is "how did I do against the room", and two bars side by side
- * makes it a comparison you have to perform rather than one you can see.
+ * ⚠ THE MAGNITUDE IS DELIBERATELY GONE. A 700 in a big week and a 200 in a
+ * thin one can both be +100 on the room, and on this chart they look the same
+ * — because for a head-to-head pool they ARE the same. The absolute total is
+ * the "Season points" card; this one answers a different question.
+ *
+ * ⚠ Hand-rolled rather than `recharts`, which is a dependency but only earns
+ * its weight on the admin dashboard. A div per week costs nothing.
  */
 function WeekBars({ series }: {
   series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
 }) {
-  const top = Math.max(...series.map((r) => Math.max(r.your_points, r.median_points)), 1)
+  const rows = series.map((r) => ({ ...r, gap: r.your_points - r.median_points }))
+  // Symmetric scale, so +100 and −100 are the same length. A scale fitted to
+  // whichever side happens to be bigger would make a good week look modest
+  // next to one bad one.
+  const reach = Math.max(...rows.map((r) => Math.abs(r.gap)), 1)
+  const beat = rows.filter((r) => r.gap > 0).length
   return (
-    <div className="px-4 sm:px-5 py-4 border-t border-border-default">
+    <div className="px-4 sm:px-5 py-5">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="t-body text-muted">Points a matchweek</p>
-        <p className="t-detail text-muted">
-          <span className="inline-block w-2 h-2 rounded-sm bg-primary-500 mr-1.5" />you
-          <span className="inline-block w-2 h-2 rounded-sm bg-silver ml-3 mr-1.5" />pool median
+        <p className="t-card-title text-ink">Against the room</p>
+        <p className="t-caption text-muted">
+          {beat} of {rows.length} {rows.length === 1 ? 'week' : 'weeks'}
         </p>
       </div>
-      {/* ⚠ `flex-1` ALONE DOES NOT SOLVE n=1 — it makes one bar fill the row and
-          the chart reads as a solid block, which is what it did on first
-          render. Capped at 32px and left-aligned: one bar is a bar, thirty-
-          eight share the row, and neither needs an axis. */}
-      <div className="flex items-end justify-start gap-1 h-24 mt-3">
-        {series.map((r) => (
-          <div key={r.matchweek_number}
-               className="flex-1 relative h-full min-w-[6px] max-w-[32px]"
-               title={`Matchweek ${r.matchweek_number}: ${r.your_points} · median ${r.median_points}`}>
-            {/* The room, behind. */}
-            <div className="absolute bottom-0 inset-x-0 rounded-t-sm bg-silver/60"
-                 style={{ height: `${(r.median_points / top) * 100}%` }} />
-            {/* You, in front and narrower, so the ghost stays readable. */}
-            <div className="absolute bottom-0 inset-x-[22%] rounded-t-sm bg-primary-500"
-                 style={{ height: `${(r.your_points / top) * 100}%` }} />
-          </div>
-        ))}
-      </div>
-      {/* ⚠ Only the ends are labelled. Thirty-eight numbers under a 24px-tall
-          chart is a ruler, not a label. */}
-      {series.length > 1 && (
-        <div className="flex justify-between mt-1.5">
-          <span className="t-detail text-muted">MW {series[0].matchweek_number}</span>
-          <span className="t-detail text-muted">MW {series[series.length - 1].matchweek_number}</span>
+      <p className="t-body text-muted mt-1">
+        How far above or below the pool&rsquo;s median you finished each matchweek.
+      </p>
+
+      <div className="relative mt-5" style={{ height: 112 }}>
+        {/* The room. Everything is measured from here. */}
+        <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border-default" />
+        <div className="absolute inset-0 flex items-stretch justify-start gap-1.5">
+          {rows.map((r) => {
+            const h = `${(Math.abs(r.gap) / reach) * 50}%`
+            return (
+              <div key={r.matchweek_number}
+                   className="relative flex-1 min-w-[10px] max-w-[34px]"
+                   title={`Matchweek ${r.matchweek_number}: ${r.your_points} v median ${r.median_points}`}>
+                {r.gap > 0 && (
+                  <span className="absolute inset-x-0 bottom-1/2 rounded-t-sm bg-success-500"
+                        style={{ height: h }} />
+                )}
+                {r.gap < 0 && (
+                  <span className="absolute inset-x-0 top-1/2 rounded-b-sm bg-danger-500"
+                        style={{ height: h }} />
+                )}
+                {/* Level with the room is a real result, not a gap in the data. */}
+                {r.gap === 0 && (
+                  <span className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2
+                                   rounded-full bg-silver" />
+                )}
+              </div>
+            )
+          })}
         </div>
+      </div>
+
+      {/* ⚠ Only the ENDS are labelled, and only when there are two. Thirty-
+          eight numbers under a 112px chart is a ruler; one week with "MW 2" on
+          the left and "the room" on the right read as a pairing, which it is
+          not. */}
+      {rows.length > 1 ? (
+        <div className="flex justify-between mt-2">
+          <span className="t-detail text-muted">MW {rows[0].matchweek_number}</span>
+          <span className="t-detail text-muted">MW {rows[rows.length - 1].matchweek_number}</span>
+        </div>
+      ) : (
+        <p className="t-detail text-muted mt-2">Matchweek {rows[0].matchweek_number}</p>
       )}
     </div>
   )
@@ -496,15 +525,6 @@ function TendencyBar({ home, draw, away }: { home: number; draw: number; away: n
   )
 }
 
-/** One label/value row on a light card. The mirror of the midnight StatRow. */
-function SeasonRow({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex items-center justify-between gap-4 px-4 sm:px-5 py-3 border-t border-border-default">
-      <span className="t-body text-muted">{label}</span>
-      <span className="t-num t-num-extrabold text-ink">{value}</span>
-    </div>
-  )
-}
 
 function ordinal(n: number): string {
   const rem100 = n % 100
@@ -737,10 +757,15 @@ export default function DuelsTab({
     const picks = leagueOutcomes.filter((o) => o.entry_id === myEntry)
     const share = (o: 'home' | 'draw' | 'away') =>
       picks.length ? Math.round((picks.filter((p) => p.outcome === o).length / picks.length) * 100) : null
+    const correct = t?.correct ?? 0
     return {
       points: t ? t.totalPoints + t.duelPoints : 0,
-      correct: t?.correct ?? 0,
+      correct,
       picks: picks.length,
+      // ⚠ Against picks MADE, not fixtures played. A member who missed a week
+      // did not get those wrong — they were not in them, and counting them as
+      // misses would report somebody's holiday as bad form.
+      accuracy: picks.length ? Math.round((correct / picks.length) * 100) : null,
       // ⚠ Suppressed under ten picks. "100% home" off two picks is noise
       // wearing a percentage, and a tendency needs a season to be one.
       home: picks.length >= 10 ? share('home') : null,
@@ -1266,28 +1291,46 @@ export default function DuelsTab({
         </Card>
       )}
 
-      {/* YOUR SEASON — the mockup's scouting card, turned on the reader.
-          See the note on `mySeason`: scouting the opponent is impossible while
-          the opponent is sealed, and that is the point of the window. */}
-      {inPlayMatchweek === null && sealedMatchweek !== null && mySeason && (
-        <Card padding="none" className="overflow-hidden">
-          <div className="flex items-baseline justify-between gap-3 px-4 sm:px-5 pt-5 pb-3">
-            <p className="t-caption text-muted">Your season</p>
-            <p className="t-caption text-muted">{mySeason.picks} picks</p>
-          </div>
-          {/* ⚠ NUMBERS STAY NUMBERS. Points and correct picks are quantities,
-              and a quantity's best rendering is the quantity — making
-              everything a graphic is its own kind of noise. Only the two
-              things that are SHAPES became shapes. */}
-          <SeasonRow label="Points" value={mySeason.points} />
-          <SeasonRow label="Correct picks" value={mySeason.correct} />
+      {/* ⚠ ONE CARD PER STAT — Ryan, 2026-08-31. They were four rows of a
+          single table, which made a season's worth of different questions look
+          like one list. The two numbers sit two-up on a desktop so four cards
+          do not become four full-width slabs; the two charts get their own
+          width because a chart squeezed to half a column is a sparkline.
 
-          {series.length > 0 && <WeekBars series={series} />}
-          {mySeason.home !== null && (
-            <TendencyBar home={mySeason.home} draw={mySeason.draw ?? 0}
-                         away={100 - mySeason.home - (mySeason.draw ?? 0)} />
+          See the note on `mySeason`: these scout the READER. Scouting the
+          opponent is impossible while the opponent is sealed, which is the
+          entire point of the window. */}
+      {inPlayMatchweek === null && sealedMatchweek !== null && mySeason && (
+        <>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Card padding="md">
+              <p className="t-caption text-muted">Season points</p>
+              <p className="t-num t-num-black text-4xl text-ink mt-2">{mySeason.points}</p>
+            </Card>
+            <Card padding="md">
+              <p className="t-caption text-muted">Accuracy</p>
+              <p className="t-num t-num-black text-4xl text-ink mt-2">
+                {mySeason.accuracy === null ? '—' : `${mySeason.accuracy}%`}
+              </p>
+              <p className="t-body text-muted mt-1">
+                {mySeason.correct} of {mySeason.picks} picks
+              </p>
+            </Card>
+          </div>
+
+          {series.length > 0 && (
+            <Card padding="none" className="overflow-hidden">
+              <WeekBars series={series} />
+            </Card>
           )}
-        </Card>
+
+          {mySeason.home !== null && (
+            <Card padding="none" className="overflow-hidden">
+              <TendencyBar home={mySeason.home} draw={mySeason.draw ?? 0}
+                           away={100 - mySeason.home - (mySeason.draw ?? 0)} />
+            </Card>
+          )}
+        </>
       )}
 
       {/* THE TALE OF THE TAPE — the two of you, measured against each other.
