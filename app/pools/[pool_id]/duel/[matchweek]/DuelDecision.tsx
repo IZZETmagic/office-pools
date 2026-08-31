@@ -29,7 +29,15 @@ import Link from 'next/link'
 
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor } from '@/lib/design/avatarGradient'
-import type { DuelScoreline, DuelVerdict } from '@/lib/league/duelVerdict'
+import type {
+  DuelScoreline, DuelVerdict, DuelFormResult,
+} from '@/lib/league/duelVerdict'
+
+/** A fixture, as the card names one: two badges, with names as the fallback. */
+export type FixtureBadge = {
+  home: { name: string; crest: string | null }
+  away: { name: string; crest: string | null }
+}
 
 type Side = { name: string; person: AvatarPerson | null }
 
@@ -106,6 +114,73 @@ function ShareButton({ url }: { url: string }) {
  * Just the circle. The NAME is rendered on its own row below the scoreline —
  * see the layout note where it is used — so this no longer carries one.
  */
+/**
+ * A fixture as two badges. ⚠ The club NAME is the fallback, not decoration —
+ * `crest_url` is nullable in the feed, and a blank where a badge should be is
+ * worse than the two words.
+ */
+function Fixture({ fixture }: { fixture: FixtureBadge }) {
+  const side = (c: { name: string; crest: string | null }) =>
+    c.crest
+      // eslint-disable-next-line @next/next/no-img-element
+      ? <img src={c.crest} alt={c.name} title={c.name} className="w-5 h-5 object-contain" />
+      : <span className="t-detail text-white/70">{c.name}</span>
+  return (
+    <span className="flex items-center gap-1.5">
+      {side(fixture.home)}
+      <span className="t-detail text-white/30">v</span>
+      {side(fixture.away)}
+    </span>
+  )
+}
+
+/**
+ * The run, as dots rather than words — oldest left, and the MOST RECENT PULSES
+ * because it is the one this page is about.
+ *
+ * ⚠ Same colours as the season table's form guide, and deliberately not the
+ * tier ramp `formDots.ts` uses: that one colours PICK ACCURACY, and one strip
+ * of dots meaning two different things on two screens is the drift that file
+ * exists to prevent.
+ */
+function FormRun({ form, streak }: {
+  form: DuelFormResult[]
+  /** The run these dots describe — the TEXT equivalent, see below. */
+  streak: { outcome: 'won' | 'lost' | 'tied'; run: number } | null
+}) {
+  const tone = (r: DuelFormResult) =>
+    r === 'won' ? 'bg-success-400'
+      : r === 'lost' ? 'bg-danger-400'
+        : r === 'tied' ? 'bg-white/35' : 'border border-white/30'
+
+  // ⚠ THE DOTS ARE `aria-hidden`, so without this a screen reader gets an empty
+  // row labelled "Run". Coloured circles carry no meaning to anything that
+  // cannot see colour, and the streak sentence — which this row REPLACED
+  // visually — is exactly the text equivalent. Nothing is lost, it just moved
+  // to where only some readers need it.
+  const label = streak
+    ? `${streak.run} ${streak.outcome === 'won' ? 'win' : streak.outcome === 'lost' ? 'defeat' : 'draw'}${
+        streak.run === 1 ? '' : streak.outcome === 'lost' ? 's' : 's'} in a row`
+    : 'No settled duels yet'
+
+  return (
+    <span className="flex gap-1.5 justify-end" role="img" aria-label={label}>
+      {form.map((r, i) => {
+        const latest = i === form.length - 1
+        return (
+          <span key={i} className="relative flex w-2.5 h-2.5" aria-hidden="true">
+            {latest && (
+              <span className={`absolute inline-flex w-full h-full rounded-full opacity-75
+                                animate-ping motion-reduce:hidden ${tone(r)}`} />
+            )}
+            <span className={`relative inline-flex w-2.5 h-2.5 rounded-full ${tone(r)}`} />
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
 function Face({ side, dim }: { side: Side; dim: boolean }) {
   const ring = side.person ? avatarColor(side.person.user_id) : 'rgba(255,255,255,0.2)'
   return (
@@ -136,15 +211,15 @@ function StatRow({ label, children }: { label: string; children: React.ReactNode
 
 export function DuelDecision({
   poolId, poolName, matchweek, verdict, scoreline, decisiveFixture, you, them, record, quote,
-  position, shareUrl, bestCall, topOfWeek, streak,
+  position, shareUrl, bestCall, topOfWeek, streak, form,
 }: {
   poolId: string
   poolName: string
   matchweek: number
   verdict: DuelVerdict
   scoreline: DuelScoreline
-  /** "Liverpool v Man Utd", or null when no single fixture decided it. */
-  decisiveFixture: string | null
+  /** The fixture that decided it, or null when no single one did. */
+  decisiveFixture: FixtureBadge | null
   you: Side
   them: Side | null
   record: { won: number; drawn: number; lost: number } | null
@@ -170,11 +245,13 @@ export function DuelDecision({
   /** Path to this page. See the share note on the button. */
   shareUrl: string
   /** The fixture you gained most on — not the same as the decisive one. */
-  bestCall: string | null
+  bestCall: FixtureBadge | null
   /** The best weekly score in the whole pool, for context. */
   topOfWeek: { name: string; points: number } | null
   /** The run this result is part of. `run` of 1 is not worth saying. */
   streak: { outcome: 'won' | 'lost' | 'tied'; run: number } | null
+  /** Last five duel results, oldest first. The last one pulses. */
+  form: DuelFormResult[]
 }) {
   const bye = verdict.outcome === 'bye'
   const eyebrow =
@@ -273,6 +350,27 @@ export function DuelDecision({
                   fixtures won &middot; {scoreline.yourPoints}&ndash;{scoreline.theirPoints} points
                 </p>
 
+                {/* ⚠ THE QUOTE LIVES HERE, at the foot of the result — Ryan,
+                    2026-08-31. It briefly sat in "How it went" with the rows,
+                    which was wrong: it is not a statistic, it is the moment.
+                    Beside the scoreline it reads as somebody's confidence
+                    meeting the result, which is the entire joke.
+
+                    Their words, unedited — the server DROPS anything over 140
+                    characters rather than truncating it. And this block is the
+                    one thing that must not go into the share image. */}
+                {quote && (
+                  <figure className="mt-6 pt-5 pl-4 border-t border-white/10
+                                     border-l-2 border-l-danger-400/70 text-left">
+                    <blockquote className="t-body text-white/85 italic">
+                      &ldquo;{quote.content}&rdquo;
+                    </blockquote>
+                    <figcaption className="t-detail text-white/40 mt-1.5">
+                      &mdash; {quote.author}, {dayOf(quote.at)}
+                    </figcaption>
+                  </figure>
+                )}
+
                 {/* ⚠ THE DISAGREEMENT IS NAMED, not hidden. At Scores depth you
                     can take more fixtures and still lose on points, and a 6-4
                     sitting above "Sarah beat you" would look broken unless the
@@ -299,11 +397,13 @@ export function DuelDecision({
             decisive fixture, no streak and no history — and filler is how a
             member learns to stop reading the card. */}
         {!bye && (
-          <div className="rounded-card overflow-hidden bg-midnight px-5 sm:px-8 py-5">
-            <p className="t-caption text-white/45">How it went</p>
+          <div className="rounded-card overflow-hidden bg-midnight px-5 sm:px-8 pt-6 pb-5">
+            <p className="t-card-title text-white pb-4">How it went</p>
 
             <StatRow label="Decided by">
-              {decisiveFixture ?? <span className="text-white/50">No single fixture</span>}
+              {decisiveFixture
+                ? <Fixture fixture={decisiveFixture} />
+                : <span className="t-body text-white/50">No single fixture</span>}
             </StatRow>
 
             {separated > 0 && (
@@ -316,38 +416,24 @@ export function DuelDecision({
                 win they are usually the same game, and two rows naming it twice
                 reads as a bug. */}
             {bestCall && bestCall !== decisiveFixture && (
-              <StatRow label="Your best call">{bestCall}</StatRow>
+              <StatRow label="Your best call"><Fixture fixture={bestCall} /></StatRow>
             )}
 
             {history && <StatRow label="Head to head">{history}</StatRow>}
 
-            {streak && streak.run >= 2 && (
-              <StatRow label="Run">
-                {streak.run === 2 ? 'Second' : streak.run === 3 ? 'Third' : `${streak.run}th`}{' '}
-                {streak.outcome === 'won' ? 'win' : streak.outcome === 'lost' ? 'defeat' : 'draw'}
-                {' '}in a row
-              </StatRow>
+            {/* ⚠ Dots, not "Third win in a row" — Ryan, 2026-08-31. The words
+                said one thing; five dots say the same thing AND the shape of
+                the month around it. */}
+            {form.length > 0 && (
+              <StatRow label="Run"><FormRun form={form} streak={streak} /></StatRow>
             )}
 
-            {/* ⚠ Their words, unedited — the server drops anything over 140
-                characters rather than truncating it. And this block is the one
-                thing that must NOT go into the share image. */}
-            {quote && (
-              <figure className="mt-4 pt-4 pl-4 border-t border-white/10 border-l-2 border-l-danger-400/70">
-                <blockquote className="t-body text-white/85 italic">
-                  &ldquo;{quote.content}&rdquo;
-                </blockquote>
-                <figcaption className="t-detail text-white/40 mt-1.5">
-                  &mdash; {quote.author}, {dayOf(quote.at)}
-                </figcaption>
-              </figure>
-            )}
           </div>
         )}
 
         {/* WHAT IT MOVED */}
-        <div className="rounded-card overflow-hidden bg-midnight px-5 sm:px-8 py-5">
-          <p className="t-caption text-white/45">What it moved</p>
+        <div className="rounded-card overflow-hidden bg-midnight px-5 sm:px-8 pt-6 pb-5">
+          <p className="t-card-title text-white pb-4">What it moved</p>
           {/* ⚠ AND IT SAYS WHEN NOTHING MOVED. Win, stay 4th, and it reads
               "4th" with no arrow — a block that only ever reports good news is
               not a record, it is a slot machine. */}

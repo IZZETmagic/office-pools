@@ -249,3 +249,37 @@ export function duelStreak(
   }
   return outcome === null ? null : { outcome, run }
 }
+
+export type DuelFormResult = 'won' | 'tied' | 'lost' | 'bye'
+
+/**
+ * A member's last five duel results, OLDEST FIRST.
+ *
+ * The season table has its own copy of this shape inside `DuelsTab`; this one
+ * is exported because the decision page needs it on the server. If a third
+ * caller appears, the tab's should move here rather than a third being written.
+ *
+ * ⚠ ORDERED BY `settled_at`, never matchweek number — rounds are played out of
+ * numerical order (101: a minimum gap of minus 121 days), so numbering them
+ * would show a run in an order the season was not played in.
+ *
+ * ⚠ A BYE IS ITS OWN RESULT and is detected structurally: it pays `DUEL_BYE`,
+ * which IS `DUEL_TIE`, so the number cannot tell them apart.
+ */
+export function duelForm(
+  duels: Array<{
+    entry_a: string; entry_b: string | null
+    points_a: number | null; points_b: number | null
+    settled_at: string | null
+  }>,
+  entry: string,
+  limit = 5,
+): DuelFormResult[] {
+  return duels
+    .filter((d) => d.settled_at && (d.entry_a === entry || d.entry_b === entry))
+    .sort((a, b) => a.settled_at!.localeCompare(b.settled_at!))
+    .map((d): DuelFormResult => d.entry_b === null
+      ? 'bye'
+      : duelResult(d.entry_a === entry ? d.points_a : d.points_b) ?? 'lost')
+    .slice(-limit)
+}

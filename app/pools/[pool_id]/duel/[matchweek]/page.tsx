@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { readPoolDuels, readMatchweekPoints, headToHead } from '@/lib/league/duels'
 import {
-  duelScoreline, duelVerdict, decisiveFixture, bestCall, duelStreak,
+  duelScoreline, duelVerdict, decisiveFixture, bestCall, duelStreak, duelForm,
 } from '@/lib/league/duelVerdict'
 import { DuelDecision } from './DuelDecision'
 
@@ -135,7 +135,10 @@ export default async function DuelDecisionPage({
   // call. ⚠ ONE QUERY FOR BOTH: they are usually different games but often the
   // same one, and two round trips to say two club names would be silly.
   const wanted = [...new Set([decisive, best].filter((n): n is number => n !== null))]
-  const fixtureLabels = new Map<number, string>()
+  const fixtureLabels = new Map<number, {
+    home: { name: string; crest: string | null }
+    away: { name: string; crest: string | null }
+  }>()
   if (wanted.length) {
     // ⚠ SCOPED TO THE POOL'S SEASON. `matchweek_number` is NOT unique — we hold
     // five competitions and every one of them has a matchweek 2 — so an
@@ -155,17 +158,24 @@ export default async function DuelDecisionPage({
         .eq('matchweek_id', mw.matchweek_id)
         .in('fixture_number', wanted)
       const ids = (fx ?? []).flatMap((f) => [f.home_club_id, f.away_club_id])
+      // ⚠ `crest_url` too — the card shows the two badges rather than the club
+      // names. A name in a value column wraps and reads as a sentence; two
+      // crests read as a fixture at a glance and cost no width.
       const { data: clubs } = ids.length
-        ? await supabase.from('league_clubs').select('club_id, short_name, name').in('club_id', ids)
+        ? await supabase.from('league_clubs')
+            .select('club_id, short_name, name, crest_url').in('club_id', ids)
         : { data: [] }
-      const label = (id: string) => {
+      const club = (id: string) => {
         const c = (clubs ?? []).find((x) => x.club_id === id)
-        return c?.short_name || c?.name || null
+        return c ? { name: c.short_name || c.name || '', crest: c.crest_url } : null
       }
       for (const f of fx ?? []) {
-        const h = label(f.home_club_id)
-        const a = label(f.away_club_id)
-        if (h && a) fixtureLabels.set(f.fixture_number, `${h} v ${a}`)
+        const h = club(f.home_club_id)
+        const a = club(f.away_club_id)
+        // ⚠ A crest may be missing from the feed, so the NAME is always carried
+        // and the component falls back to it. A blank space where a badge
+        // should be is worse than the two words.
+        if (h && a) fixtureLabels.set(f.fixture_number, { home: h, away: a })
       }
     }
   }
@@ -186,6 +196,11 @@ export default async function DuelDecisionPage({
   // than breaking a run — the rotation hands those out and a member should not
   // lose a streak to the draw.
   const streak = duelStreak(duels, myEntry)
+
+  // ⚠ The RUN row is dots, not words — Ryan, 2026-08-31. Last five duel
+  // results oldest-first, so the most recent is on the right where the card
+  // pulses it. Ordered by `settled_at`, never matchweek number (101).
+  const form = duelForm(duels, myEntry)
 
   // -----------------------------------------------------------
   // THE BANTER QUOTE — their last word before the games
@@ -258,6 +273,7 @@ export default async function DuelDecisionPage({
       bestCall={bestCallLabel}
       topOfWeek={topOfWeek}
       streak={streak}
+      form={form}
       you={{ name: names.get(myEntry) ?? 'You', person: people.get(myEntry) ?? null }}
       them={theirEntry
         ? { name: names.get(theirEntry) ?? 'Unknown', person: people.get(theirEntry) ?? null }
