@@ -14,6 +14,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { duelResult } from './duelPoints'
 
 export type ScheduleResult = {
   written: number
@@ -80,9 +81,15 @@ export function headToHead(duels: DuelRow[], entryA: string, entryB: string) {
       (d.entry_a === entryA && d.entry_b === entryB) ||
       (d.entry_a === entryB && d.entry_b === entryA)
     if (!isPair) continue
+    // ⚠ `duelResult`, NEVER a literal. This read `mine === 3` / `mine === 1`
+    // until 2026-08-31 — the pre-121 scale — so from the first settled duel it
+    // would have scored every single meeting as a LOSS, silently, and the
+    // head-to-head record on the Tale of the Tape would have read 0-0-N for
+    // everybody. Found while checking what the recap page could show.
     const mine = d.entry_a === entryA ? d.points_a : d.points_b
-    if (mine === 3) won++
-    else if (mine === 1) drawn++
+    const r = duelResult(mine)
+    if (r === 'won') won++
+    else if (r === 'tied') drawn++
     else lost++
   }
   return { won, drawn, lost }

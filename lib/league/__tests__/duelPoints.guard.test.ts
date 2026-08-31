@@ -90,3 +90,32 @@ describe('the SQL and the ranker still agree about what duel points are for', ()
     expect(sql).toMatch(/\(t\.total_points \+ t\.duel_points\)\s+DESC,\s*\n\s*t\.total_points\s+DESC/)
   })
 })
+
+describe('no consumer classifies a duel with a bare literal', () => {
+  // `headToHead` did exactly this — `mine === 3` / `mine === 1` — and survived
+  // the 121 sweep because it lives in `duels.ts` rather than in the tab that
+  // renders it. From the first settled duel it would have scored EVERY meeting
+  // as a loss, with no error and a plausible-looking 0-0-N on screen.
+  //
+  // ⚠ THE SCAN STRIPS COMMENTS, and that is not incidental. The first version of
+  // this test failed on the ⚠ note left INSIDE `headToHead` recording what the
+  // old code was — a ban on `=== 3` cannot tell "this is how it works" from
+  // "this is what it used to do". That is the THIRD guard in one day to fail on
+  // its own documentation (the `t-display` allowlist, the copy guard, and
+  // migration 122's rejected-design note were the others). Every text-scan
+  // guard in this repo should strip comments by default; a guard that punishes
+  // explanation just gets the explanation deleted.
+  const code = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, '')
+       .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+  const duels = code(readFileSync(resolve(process.cwd(), 'lib/league/duels.ts'), 'utf8'))
+
+  it('headToHead asks duelResult rather than comparing to 3 and 1', () => {
+    const from = duels.indexOf('export function headToHead')
+    expect(from, 'headToHead was renamed or removed').toBeGreaterThan(-1)
+    const fn = duels.slice(from, from + duels.slice(from).indexOf('\n}'))
+    expect(fn).toMatch(/duelResult\(/)
+    expect(fn, 'a win is not 3 any more').not.toMatch(/=== 3\b/)
+    expect(fn, 'a tie is not 1 any more').not.toMatch(/=== 1\b/)
+  })
+})
