@@ -213,6 +213,30 @@ function PickChip({
 }
 
 /**
+ * Two numbers either side of a fixed dash.
+ *
+ * The dash sits in the same place on every row and the numbers grow outwards
+ * from it, so a column of scores reads down cleanly whether it is "1-4" or
+ * "300-400". A single centred string cannot do that: it centres the STRING, and
+ * a longer one pushes its own digits sideways.
+ *
+ * `t-num` is tabular, so equal digit counts occupy equal width and the
+ * alignment holds without measuring anything.
+ */
+function Scoreline({
+  left, right, live = false,
+}: { left: number | null; right: number | null; live?: boolean }) {
+  return (
+    <span className={`inline-grid grid-cols-[1fr_auto_1fr] items-baseline t-num t-num-extrabold text-sm whitespace-nowrap
+      ${live ? 'text-danger-600' : 'text-ink'}`}>
+      <span className="text-right">{left}</span>
+      <span className="text-muted/40 font-normal px-0.5">&ndash;</span>
+      <span className="text-left">{right}</span>
+    </span>
+  )
+}
+
+/**
  * One member in someone else's duel: a face, a name, and whether they are ahead.
  *
  * Mirrored like the fixture row — avatar outermost, name inboard — so the two
@@ -826,10 +850,7 @@ export default function DuelsTab({
                         affordable on a phone: it replaces a separator rather
                         than adding a column. */}
                     {b.homeScore !== null && b.awayScore !== null ? (
-                      <span className={`t-num t-num-extrabold text-sm whitespace-nowrap
-                        ${b.clock ? 'text-danger-600' : 'text-ink'}`}>
-                        {b.homeScore}<span className="text-muted/40 font-normal">&ndash;</span>{b.awayScore}
-                      </span>
+                      <Scoreline left={b.homeScore} right={b.awayScore} live={!!b.clock} />
                     ) : (
                       <span className="t-detail text-muted/40">v</span>
                     )}
@@ -934,9 +955,13 @@ export default function DuelsTab({
                       name={name(d.a)} person={person(d.a)}
                       leading={lead === 'a'} dimmed={lead === 'b'}
                     />
-                    <span className="t-num t-num-extrabold text-sm text-ink whitespace-nowrap">
-                      {d.pa}<span className="text-muted/40 font-normal">&ndash;</span>{d.pb}
-                    </span>
+                    {/* ⚠ THE DASH IS THE AXIS, not the middle of the string.
+                        An `auto` column sized itself per row, so "400-0" and
+                        "300-400" centred at different widths and the digits
+                        wandered down the card. Fixed width, home right-aligned,
+                        away left-aligned: the dash lands in the same pixel on
+                        every row and the numbers grow outwards from it. */}
+                    <Scoreline left={d.pa} right={d.pb} />
                     <DuelSide
                       name={name(d.b)} person={person(d.b)}
                       leading={lead === 'b'} dimmed={lead === 'a'} align="right"
