@@ -1019,6 +1019,43 @@ export function PoolDetail({
     loadBulkData()
   }, [needsBulk, bulkState, loadBulkData])
 
+  /**
+   * THE DUEL CARD'S LIVE NUMBERS.
+   *
+   * ⚠ `showdownData` is a server prop and nothing updated it, so the duel
+   * scoreline sat frozen at page load — 400–200 all afternoon — while the
+   * leaderboard beside it moved in realtime. The team sheet's red clock had the
+   * same problem: it showed the minute the page loaded and never advanced.
+   * Everything was built; none of it moved.
+   *
+   * This rides the SAME broadcast the leaderboard already uses rather than
+   * opening a second channel: two subscriptions to one topic would double the
+   * per-recipient message billing the comment above is about.
+   */
+  const [duelLive, setDuelLive] = useState<{
+    points: Record<string, number>
+    perFixture: Record<string, Record<string, number>>
+    fixtures: Array<{
+      number: number; homeScore: number | null; awayScore: number | null
+      status: string | null; isCompleted: boolean
+      liveMinute: number | null; livePeriod: string | null; liveAdded: number | null
+    }>
+  } | null>(null)
+
+  const inPlayMw = showdownData?.inPlayMatchweek ?? null
+  const applyDuelLive = useCallback(async () => {
+    if (inPlayMw === null) return
+    try {
+      const res = await fetch(
+        `/api/pools/${pool.pool_id}/duel-live?matchweek=${inPlayMw}`, { cache: 'no-store' })
+      if (!res.ok) return
+      setDuelLive(await res.json())
+    } catch {
+      // A dropped poll leaves the last good numbers on screen, which is the
+      // right failure: stale beats blank, and the next tick fixes it.
+    }
+  }, [pool.pool_id, inPlayMw])
+
   const applyLive = useCallback(async () => {
     // Guard against out-of-order responses: a slow request that lands after a
     // newer one must not overwrite fresher numbers with staler ones.
@@ -1116,7 +1153,12 @@ export function PoolDetail({
         // from /live. Debounced with jitter so one goal doesn't make every
         // connected client fetch in the same second.
         if (scoresTimer) clearTimeout(scoresTimer)
-        scoresTimer = setTimeout(() => { void applyLive() }, 1500 + Math.random() * 4000)
+        scoresTimer = setTimeout(() => {
+          void applyLive()
+          // The duel card's own numbers, on the same debounce and the same
+          // jitter — one goal must not make every viewer fetch in one second.
+          void applyDuelLive()
+        }, 1500 + Math.random() * 4000)
       })
 
     // Without the JWT the private-channel policy won't authorize the topic and
@@ -1130,7 +1172,7 @@ export function PoolDetail({
       if (scoresTimer) clearTimeout(scoresTimer)
       supabase.removeChannel(channel)
     }
-  }, [pool.pool_id, applyLive])
+  }, [pool.pool_id, applyLive, applyDuelLive])
 
   // Fallback poll, in case Realtime drops a message (it is a pipe, not a log —
   // a broadcast sent while the socket is down is gone).
@@ -2324,9 +2366,34 @@ export function PoolDetail({
                 sealedMatchweek={showdownData.sealedMatchweek}
                 sealedOpensAtLatest={showdownData.sealedOpensAtLatest}
                 entryPeople={showdownData.entryPeople}
-                livePoints={showdownData.livePoints}
-                perFixture={showdownData.perFixture}
-                fixtures={showdownData.fixtures}
+                {...(duelLive
+                  ? {
+                      // ⚠ LIVE VALUES WIN, but only the three that move. The
+                      // rest of `showdownData` — names, faces, the draw — is
+                      // page-load data and re-sending it per goal is the
+                      // payload mistake this whole path exists to avoid.
+                      livePoints: new Map(Object.entries(duelLive.points)),
+                      perFixture: new Map(
+                        Object.entries(duelLive.perFixture).map(([e, byFx]) => [
+                          e, new Map(Object.entries(byFx).map(([n, p]) => [Number(n), p])),
+                        ]),
+                      ),
+                      fixtures: showdownData.fixtures.map((f) => {
+                        const live = duelLive.fixtures.find((x) => x.number === f.number)
+                        // A fixture the poll did not return keeps what it had —
+                        // never blanked, which would flicker a score to "v".
+                        // ⚠ `status` is nullable in the feed but not in
+                        // `MatchweekFixture`, so a null must fall back rather
+                        // than overwrite: a fixture the provider has not
+                        // stamped yet would otherwise lose the status it had.
+                        return live ? { ...f, ...live, status: live.status ?? f.status } : f
+                      }),
+                    }
+                  : {
+                      livePoints: showdownData.livePoints,
+                      perFixture: showdownData.perFixture,
+                      fixtures: showdownData.fixtures,
+                    })}
                 leagueOutcomes={allLeagueOutcomes}
                 allPredictions={allPredictions}
                 bulkState={bulkState}
