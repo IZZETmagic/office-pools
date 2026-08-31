@@ -734,13 +734,19 @@ export default function DuelsTab({
             {breakdown.map((b) => (
               <li key={b.n}
                 className={`grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.75rem_1fr_4.75rem] items-center gap-3 sm:gap-5 px-3 sm:px-5 py-3.5 border-t border-border-default
-                  ${b.outcome === 'pending' ? 'bg-primary-50/40 dark:bg-primary-900/10' : ''}`}>
+                  ${b.outcome === 'pending' ? 'bg-primary-50/40 dark:bg-primary-900/10 py-4' : ''}`}>
                 <PickChip label={b.myPick} side="you" outcome={b.outcome} />
 
                 {/* [name][crest] v [crest][name] — mirrored about the v, so the
                     two clubs carry the same weight and the eye lands in the
                     middle rather than reading left to right. */}
-                <span className="min-w-0">
+                {/* ⚠ A COLUMN, not an inline span with block children. The
+                    kickoff line sat 2px under the crests on a `mt-0.5`, which
+                    is not technically an overlap and reads as one — the crests
+                    are 24px and the text baseline lands right on them. A real
+                    flex column with a gap is the fix; the spacing is then a
+                    property of the container rather than a margin guess. */}
+                <span className="min-w-0 flex flex-col gap-2">
                   <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5 sm:gap-4">
                     {/* ⚠ ABBREVIATION ON A PHONE, NAME ABOVE IT. Adding the
                         crests cost the width that made the names fit: at 375px
@@ -761,8 +767,15 @@ export default function DuelsTab({
                     </span>
                   </span>
                   {b.outcome === 'pending' && (
-                    <span className="t-detail text-primary-600 block text-center mt-0.5">
-                      {b.clock ?? <LocalTime iso={b.kickoffAt} format={formatKickoff} />}
+                    <span className="flex justify-center">
+                      {/* A pill, so it reads as metadata about the fixture
+                          rather than a second line of the fixture itself. A
+                          live clock is red and ticking; a kickoff is blue and
+                          quiet. */}
+                      <span className={`t-detail uppercase tracking-wider rounded-full px-2.5 py-1
+                        ${b.clock ? 'bg-danger-500/15 text-danger-600' : 'bg-primary-500/12 text-primary-600'}`}>
+                        {b.clock ?? <LocalTime iso={b.kickoffAt} format={formatKickoff} />}
+                      </span>
                     </span>
                   )}
                 </span>
