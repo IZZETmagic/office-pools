@@ -491,40 +491,55 @@ function WeekBars({ series }: {
 }
 
 /**
- * Home / draw / away as one bar.
+ * Home / draw / away — how a member calls a fixture when left to themselves.
  *
- * ⚠ A TENDENCY, NOT A TREND — which is why it can be a single bar and does not
- * need many weeks the way `WeekBars` does. It replaced two table rows reading
- * "Backs the home side 40%" and "Calls a draw 20%": same numbers, one shape,
- * and the away share stops being something the reader has to subtract.
+ * ⚠ A TENDENCY, NOT A TREND, which is why one bar is enough and it does not
+ * need many weeks the way "Against the room" does.
+ *
+ * ⚠ IT WAS TOO SMALL AND IT GOT LOST — Ryan, 2026-08-31. A 12px bar over an
+ * 10px legend is mostly whitespace, and sat between two cards with 36px
+ * numerals it read as a footnote to them rather than a stat of its own. The
+ * percentages are now the size of the numbers on the neighbouring cards, which
+ * is what makes it a peer of them; the bar became the illustration rather than
+ * the content.
  */
 function TendencyBar({ home, draw, away }: { home: number; draw: number; away: number }) {
   const seg = [
-    { label: 'Home', pct: home, cls: 'bg-primary-500' },
-    { label: 'Draw', pct: draw, cls: 'bg-silver' },
-    { label: 'Away', pct: away, cls: 'bg-primary-800' },
-  ].filter((x) => x.pct > 0)
+    { label: 'Home', pct: home, bar: 'bg-primary-500', dot: 'bg-primary-500' },
+    { label: 'Draw', pct: draw, bar: 'bg-silver', dot: 'bg-silver' },
+    { label: 'Away', pct: away, bar: 'bg-primary-800', dot: 'bg-primary-800' },
+  ]
   return (
-    <div className="px-4 sm:px-5 py-4 border-t border-border-default">
-      <p className="t-body text-muted">How you call them</p>
-      <div className="flex h-3 rounded-pill overflow-hidden mt-3">
-        {seg.map((x) => (
-          <div key={x.label} className={x.cls} style={{ width: `${x.pct}%` }}
+    <div className="px-4 sm:px-5 py-5">
+      <p className="t-card-title text-ink">How you call them</p>
+      <p className="t-body text-muted mt-1">
+        Which way you lean when you fill in a sheet.
+      </p>
+
+      {/* ⚠ Zero-width segments are dropped, not rendered at 0 — a rounded pill
+          with a 0% child still paints its own corner radius and leaves a nick
+          in the bar. */}
+      <div className="flex h-5 rounded-pill overflow-hidden mt-4">
+        {seg.filter((x) => x.pct > 0).map((x) => (
+          <div key={x.label} className={x.bar} style={{ width: `${x.pct}%` }}
                title={`${x.label} ${x.pct}%`} />
         ))}
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
+
+      <div className="grid grid-cols-3 gap-3 mt-4">
         {seg.map((x) => (
-          <span key={x.label} className="t-detail text-muted">
-            <span className={`inline-block w-2 h-2 rounded-sm mr-1.5 ${x.cls}`} />
-            {x.label} <span className="t-num t-num-extrabold text-ink">{x.pct}%</span>
-          </span>
+          <div key={x.label}>
+            <p className="t-num t-num-black text-2xl sm:text-3xl text-ink">{x.pct}%</p>
+            <p className="t-caption text-muted mt-1">
+              <span className={`inline-block w-2 h-2 rounded-sm mr-1.5 ${x.dot}`} />
+              {x.label}
+            </p>
+          </div>
         ))}
       </div>
     </div>
   )
 }
-
 
 function ordinal(n: number): string {
   const rem100 = n % 100
