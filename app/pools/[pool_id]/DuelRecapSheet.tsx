@@ -69,12 +69,12 @@ function Face({ person, dim = false }: { person: AvatarPerson | null; dim?: bool
   const ring = person ? avatarColor(person.user_id) : 'rgba(255,255,255,0.2)'
   return (
     <span
-      className={`w-11 h-11 rounded-full shrink-0 ${dim ? 'opacity-50' : ''}`}
-      style={{ boxShadow: `0 0 0 2px color-mix(in srgb, ${ring} 45%, transparent)` }}
+      className={`w-16 h-16 rounded-full shrink-0 ${dim ? 'opacity-45' : ''}`}
+      style={{ boxShadow: `0 0 0 3px color-mix(in srgb, ${ring} 45%, transparent)` }}
     >
       {person
-        ? <Avatar person={person} size={44} />
-        : <span className="block w-11 h-11 rounded-full bg-white/10" aria-hidden="true" />}
+        ? <Avatar person={person} size={64} />
+        : <span className="block w-16 h-16 rounded-full bg-white/10" aria-hidden="true" />}
     </span>
   )
 }
@@ -102,8 +102,26 @@ export function DuelRecapSheet({
           : `${recap.them!.name} beat you`
 
   return (
-    <Modal isOpen onClose={onDismiss} size="sm" titleId="duel-recap-title">
-      <div className="bg-midnight -m-6 p-6 rounded-card relative overflow-hidden">
+    // ⚠ THE PANEL ITSELF GOES DARK, via `className`, rather than a dark child
+    // sitting inside a light sheet. `Modal` renders its own grab-handle row
+    // above `children` on mobile, and that row shows the PANEL's background —
+    // so a `bg-midnight` child left a light band with a grabber floating above
+    // the dark card. Colouring the panel puts the handle on the right ground
+    // and lets the panel's own `rounded-t-sheet` + `overflow-hidden` do the
+    // corners, which is what they are there for.
+    <Modal
+      isOpen onClose={onDismiss} size="sm" titleId="duel-recap-title"
+      className="bg-midnight dark:border-white/10"
+    >
+      {/* ⚠ NO `-m-6`. It was there to cancel the Modal's padding, and the Modal
+          has NONE — measured, `padding: 0px` on the panel. So the negative
+          margin pushed this sheet 24px outside the panel on every side
+          (-24…399 inside 0…375) and every bit of padding added here was spent
+          covering that overhang. The buttons ended up flush to the left edge
+          and flush to the bottom, which is what looked broken.
+
+          Now the sheet fills the panel and `px-6 pt-8 pb-6` is real space. */}
+      <div className="relative overflow-hidden">
         <div
           aria-hidden="true"
           className="absolute inset-0 pointer-events-none"
@@ -115,41 +133,57 @@ export function DuelRecapSheet({
               } 18%, transparent) 0%, transparent 55%)`,
           }}
         />
-        <div className="relative">
-          <p className="t-caption text-white/45 text-center">Matchweek {recap.matchweek}</p>
+        <div className="relative px-6 pt-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          <p className="t-caption text-white/40 text-center">Matchweek {recap.matchweek}</p>
 
-          <div className="flex items-center justify-center gap-3 mt-5">
+          {/* ⚠ THE V IS THE SEPARATION. At `gap-3` the two circles touched and
+              read as a stack rather than as opponents; the same V the duel card
+              uses before a score exists does the job and costs one element. */}
+          <div className="flex items-center justify-center gap-5 mt-7">
             <Face person={recap.you.person} dim={outcome === 'lost'} />
-            {!bye && <Face person={recap.them!.person} dim={outcome === 'won'} />}
+            {!bye && (
+              <>
+                <span className="t-display text-xl text-white/25 select-none">V</span>
+                <Face person={recap.them!.person} dim={outcome === 'won'} />
+              </>
+            )}
           </div>
 
           <p
             id="duel-recap-title"
-            className={`t-display text-2xl text-center mt-5 ${
+            className={`t-display text-2xl sm:text-3xl text-center mt-7 ${
               outcome === 'won' ? 'text-success-400'
                 : outcome === 'lost' ? 'text-white/70' : 'text-accent-400'}`}
           >
             {headline}
           </p>
-          <p className="t-num t-num-black text-2xl text-white text-center mt-1.5">
+
+          {/* ⚠ THE NUMBER CARRIES ITS UNIT. "+500" alone is a quantity of
+              nothing — and 500 is a new enough figure that nobody yet reads it
+              as a duel result on sight. */}
+          <p className="t-num t-num-black text-3xl text-white text-center mt-3">
             +{recap.points}
           </p>
+          <p className="t-detail text-white/40 uppercase tracking-widest text-center mt-1">
+            duel points
+          </p>
 
-          {/* ⚠ EQUAL WEIGHT. See the header note — the exit may not be harder
-              than the entrance. Same height, same type, side by side. */}
-          <div className="grid grid-cols-2 gap-3 mt-7">
+          {/* ⚠ EQUAL WEIGHT, and a rule to sit under. See the header note: the
+              exit may not be harder than the entrance. Same height, same type,
+              same width — the only difference is which one is filled. */}
+          <div className="grid grid-cols-2 gap-3 mt-8 pt-6 border-t border-white/10">
             <Link
               href={reviewHref}
               onClick={onDismiss}
-              className="rounded-pill bg-white text-ink t-caption text-center py-3
+              className="rounded-pill bg-white text-ink t-caption text-center py-3.5
                          hover:bg-white/90 active:bg-white/80 transition-colors"
             >
-              Review summary
+              Review
             </Link>
             <button
               type="button"
               onClick={onDismiss}
-              className="rounded-pill bg-white/10 text-white t-caption py-3
+              className="rounded-pill bg-white/10 text-white t-caption py-3.5
                          hover:bg-white/15 active:bg-white/20 transition-colors"
             >
               Skip
