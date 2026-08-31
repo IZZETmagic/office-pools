@@ -34,6 +34,13 @@
  *  2. The engines. Every number quoted in `points` below is a default the SQL
  *     COALESCEs against, not a number this file decides.
  *
+ * ⚠ 2026-08-31 — THE REVEAL WAITS TWO DAYS. Migration 123 holds the next
+ * opponent for 48 hours after the previous matchweek settles, because 119
+ * opened it in the same instant the duel settled — the recap and the next
+ * pairing arrived in one breath and there was no gap for anticipation to live
+ * in. The copy MUST carry the wait: a member who is not told will read it as
+ * the reveal being broken.
+ *
  * ⚠ 2026-08-31 — A DUEL IS NOW WORTH 500, AND THERE IS ONLY ONE TABLE.
  * Migration 121 raised a win from 3 to 500 (half a perfect matchweek, since
  * both depths cap at 100 a fixture and a 20-team league plays 10 a week) and
@@ -122,9 +129,10 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
           'duel — 500 points for a win and 250 for a tie, added to whatever your picks scored ' +
           'that week. A win is worth about half a perfect matchweek, so the duel moves the ' +
           'table further than any single result can. The whole season is drawn when the ' +
-          'pool is created, but each opponent is revealed only once the previous duel is ' +
+          'pool is created, but each opponent is revealed two days after the previous duel is ' +
           'decided, or a day before you pick if a postponement holds that up — so you play one ' +
-          'duel at a time and who comes next is a surprise. The draw ' +
+          'duel at a time, and the wait is on purpose: for two days you know how you did and ' +
+          'not yet who is next. The draw ' +
           'rotates, so everybody meets everybody rather than ' +
           'the same pairs coming round again. With an odd number of members somebody sits out ' +
           'each week and takes 250 — there was no opponent, so there was no defeat. There is ' +
@@ -137,7 +145,7 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
           // while the copy says what actually happens. The draw is made ONCE, at
           // pool creation — never "you have been randomly paired this week",
           // which would be a claim about a thing we did not do.
-          'Drawn up front; your next opponent opens when the current duel is decided.',
+          'Drawn up front; your next opponent opens two days after the current duel is decided.',
           // The floor clause lives in `description` rather than here — three
           // bullets is the shape, and the headline rule is the settle arm.
           '500 for a win, 250 for a tie — about half a perfect matchweek.',

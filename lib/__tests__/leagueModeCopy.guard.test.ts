@@ -136,7 +136,11 @@ describe('the sealed draw is described honestly', () => {
       // Migration 119: one duel at a time. The copy has to carry BOTH halves —
       // when the draw was made, and when each opponent opens — because the
       // second is the part a member would otherwise assume is a weekly draw.
-      expect(all, depth).toMatch(/once the previous duel is decided/i)
+      expect(all, depth).toMatch(/after the previous duel is decided/i)
+      // ⚠ Migration 123's 48-hour hold. Withholding the next opponent on
+      // purpose passes the disclosure gate ONLY while the copy says so — an
+      // undisclosed wait is indistinguishable from the reveal being broken.
+      expect(all, depth).toMatch(/two days after the previous duel is decided/i)
       expect(all, depth).toMatch(/one duel at a time/i)
       // Migration 120's floor. A member who only ever hears the settle arm will
       // read a postponement week as the rule breaking, so both clauses ship.

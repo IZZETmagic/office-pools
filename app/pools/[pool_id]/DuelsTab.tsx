@@ -932,28 +932,44 @@ export default function DuelsTab({
               </div>
             </div>
 
-            {/* The mockup's hero line. A state, not a clock. */}
-            <p className="t-display text-2xl text-accent-400 text-center mt-5">
-              {sealedOpensAfter !== null
-                ? `Opens when matchweek ${sealedOpensAfter} is decided`
-                : 'Opens when the current duel is decided'}
-            </p>
-            {/* The secondary line — the only clock in the rule.
-                ⚠ AN UPPER BOUND, NOT A DUE TIME. The duel almost always opens
-                well before this, the moment the previous matchweek is decided;
-                this is the backstop migration 120 added so a postponement
-                cannot push the reveal past the deadline. Labelled "at the
-                latest" for that reason — a bare countdown would read as a
-                promise about when, and it is a promise about no later than. */}
-            <div className="mt-3 pt-3 border-t border-white/10 text-center">
-              <p className="t-detail text-white/40">
-                Or a day before you pick, whichever comes first.
+            {/* ⚠ THE CLOCK IS THE POINT NOW, so it is the biggest thing here.
+                It used to be a hedged footnote reading "…at the latest", and
+                that was correct under 119: the rule's main arm was "when the
+                previous matchweek is decided", which has no timestamp, so the
+                only instant available was migration 120's floor and a bare
+                countdown would have been a promise we could not keep.
+
+                Migration 123 changed that. The duel opens 48 hours after the
+                previous matchweek settles, so once it HAS settled the instant
+                is exact — and the wait is deliberate. This is the anticipation
+                window: you know the duel is over, you can pick the next
+                matchweek, and you do not yet know who you are playing.
+
+                ⚠ IT OPENS ON THE CLOCK, NOT ON A VISIT. Miss it by three days
+                and you see it three days later, with nothing lost. The moment a
+                reveal needs a member to be present at a time, it stops being a
+                surprise and becomes a retention mechanic — which is exactly
+                what the disclosure gate is for. */}
+            {sealedOpensAtLatest && (
+              <p className="t-num t-num-black text-3xl sm:text-4xl text-accent-400 text-center mt-5">
+                <Countdown to={sealedOpensAtLatest} />
               </p>
-              {sealedOpensAtLatest && (
-                <p className="t-num t-num-medium text-xs text-white/55 mt-1.5">
-                  <Countdown to={sealedOpensAtLatest} /> at the latest
-                </p>
-              )}
+            )}
+            <p className="t-display text-lg text-white text-center mt-2">
+              {sealedOpensAfter !== null
+                ? `until matchweek ${sealedOpensAfter + 1} is revealed`
+                : 'until your next opponent is revealed'}
+            </p>
+            {/* ⚠ BOTH ARMS, because both really happen. The 48h hold is the
+                usual one; the floor bites when a postponement stalls settlement
+                (094) and in the two weeks a season where the gap is under 72h.
+                A member who only ever hears the hold will read a floor week as
+                the rule breaking. */}
+            <div className="mt-4 pt-3 border-t border-white/10 text-center">
+              <p className="t-detail text-white/40">
+                Two days after your last duel is decided, or a day before you
+                pick &mdash; whichever comes first.
+              </p>
             </div>
           </div>
         </div>

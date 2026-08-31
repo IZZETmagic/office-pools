@@ -64,14 +64,20 @@ export type LeaguePoolView = {
    */
   sealedOpensAfterMatchweek: number | null
   /**
-   * The LATEST that duel can open: 24 hours before the sealed matchweek's own
-   * lock (migration 120's floor).
+   * WHEN that duel opens. An exact instant, and a real countdown target.
    *
-   * ⚠ This is the only instant in the reveal rule that is a CLOCK. The rule's
-   * main arm — "when the previous matchweek is decided" — has no timestamp,
-   * because nobody knows when the last game will be played and scored. So a
-   * countdown may only ever be shown against this, and only as an upper bound:
-   * the duel usually opens well before it.
+   * ⚠ IT USED TO BE AN UPPER BOUND AND IT IS NOT ANY MORE. Under 119 the
+   * rule's main arm was "when the previous matchweek is decided", which has no
+   * timestamp — nobody knows when the last game will be played and scored — so
+   * this could only ever be `lock_at - 24h` and the card had to hedge with "at
+   * the latest". Migration **123** added a 48-hour hold from settlement, so
+   * once the previous matchweek HAS settled the instant is exactly known, and
+   * the anticipation window is a thing a member can watch tick down.
+   *
+   * ⚠ READ FROM `league_duel_reveals_at`, NEVER RECOMPUTED HERE. This field
+   * was a hand-rolled `lock_at - 24h` until 123, which meant the reveal rule
+   * lived in two places — and 103 records what that costs: `league_open_
+   * matchweek` came to exist FOUR times and the copies drifted.
    */
   sealedOpensAtLatest: string | null
 }
@@ -465,6 +471,24 @@ export async function readLeaguePoolView(
   const sealedRow = firstSealedIdx === -1 ? null : inLockOrder[firstSealedIdx]
   const blockedByRow = firstSealedIdx <= 0 ? null : inLockOrder[firstSealedIdx - 1]
 
+  // ⚠ THE REVEAL INSTANT COMES FROM SQL. See the field's doc — computing it
+  // here is how the rule ends up in two places. A failure is swallowed to null
+  // rather than thrown: a missing countdown makes the sealed card quieter, and
+  // failing the whole pool view over it would be worse.
+  let sealedRevealsAt: string | null = null
+  if (sealedRow) {
+    const { data: revealsAt, error: revealErr } = await supabase
+      .rpc('league_duel_reveals_at', {
+        p_pool_id: args.poolId,
+        p_matchweek_number: sealedRow.matchweek_number,
+      })
+    if (revealErr) console.error('[league] duel reveal instant failed:', revealErr.message)
+    // `-infinity` means "always open" and is not a countdown target.
+    else if (typeof revealsAt === 'string' && !revealsAt.startsWith('-infinity')) {
+      sealedRevealsAt = revealsAt
+    }
+  }
+
   return {
     view: {
       teams,
@@ -477,10 +501,7 @@ export async function readLeaguePoolView(
       inPlayMatchweekNumber: inPlayId === null ? null : numberByMatchweekId.get(inPlayId) ?? null,
       sealedMatchweekNumber: sealedRow === null ? null : sealedRow.matchweek_number,
       sealedOpensAfterMatchweek: blockedByRow === null ? null : blockedByRow.matchweek_number,
-      sealedOpensAtLatest:
-        sealedRow?.lock_at
-          ? new Date(new Date(sealedRow.lock_at).getTime() - 24 * 3600_000).toISOString()
-          : null,
+      sealedOpensAtLatest: sealedRevealsAt,
     },
     error: null,
   }
