@@ -131,7 +131,6 @@ type Props = {
   form?: Map<string, string[]>
   /** Duel points per entry, from the leaderboard read. */
   duelPoints: Map<string, number>
-  /** For the "finish your picks" jump. `?tab=` is how PoolCard already does it. */
   /**
    * Go to the Predictions tab.
    *
