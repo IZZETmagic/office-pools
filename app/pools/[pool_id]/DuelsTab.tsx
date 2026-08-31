@@ -59,6 +59,7 @@
 // =============================================================
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
@@ -128,6 +129,8 @@ type Props = {
   form?: Map<string, string[]>
   /** Duel points per entry, from the leaderboard read. */
   duelPoints: Map<string, number>
+  /** For the "finish your picks" jump. `?tab=` is how PoolCard already does it. */
+  poolId: string
 }
 
 type Side = { entry: string; points: number | null; accuracy: number | null }
@@ -394,6 +397,16 @@ function formatKickoff(d: Date): string {
 }
 
 /** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
+/** One label/value row on a light card. The mirror of the midnight StatRow. */
+function SeasonRow({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="flex items-center justify-between gap-4 px-4 sm:px-5 py-3 border-t border-border-default">
+      <span className="t-body text-muted">{label}</span>
+      <span className="t-num t-num-extrabold text-ink">{value}</span>
+    </div>
+  )
+}
+
 function ordinal(n: number): string {
   const rem100 = n % 100
   if (rem100 >= 11 && rem100 <= 13) return `${n}th`
@@ -419,7 +432,9 @@ export default function DuelsTab({
   totals,
   form,
   duelPoints,
+  poolId,
 }: Props) {
+  const router = useRouter()
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
 
   /** Every duel the viewer is in, oriented so "you" is always the first side. */
@@ -592,48 +607,47 @@ export default function DuelsTab({
    * to slate for a viewer with no entry — a super admin looking in.
    */
   /**
-   * WHAT A WIN IS WORTH, in places rather than points.
+   * The two things a member can look at while the opponent is sealed: how far
+   * through their own sheet they are, and how they have been playing.
    *
-   * ⚠ A GAP, NEVER A PROJECTION. "A win puts you 1st" would be a false
-   * promise — everyone else scores that week too, so the table they are
-   * sitting on is not the table a win lands in. "You are 500 behind 1st" is
-   * exactly true and just as much of a reason to care.
+   * ⚠ BOTH ARE SELF-SCOUTING, and that is forced rather than chosen. The
+   * mockup's version of the second card scouts the OPPONENT — "Priya backs the
+   * home side 68% of the time" — which cannot exist here: the whole point of
+   * the window is that nobody knows who Priya is yet. Pointing the same stats
+   * at yourself keeps the card and loses nothing, because a member reading
+   * their own tendencies is the one who can act on them.
    *
-   * ⚠ THE COMBINED TOTAL, since migration 121: the leaderboard ranks on
-   * `total_points + duel_points`, so a gap measured on accuracy alone would
-   * name the wrong neighbour.
+   * ⚠ `leagueOutcomes` spans the WHOLE SEASON and always includes your own
+   * entries — the bulk route withholds other members' picks until revealable,
+   * never yours (`bulk/route.ts:110`). So this needs no extra read.
    */
-  const stake = useMemo(() => {
+  const mySheet = useMemo(() => {
+    const myEntry = ownEntryIds[0]
+    if (!myEntry || fixtures.length === 0) return null
+    const picked = new Set(
+      leagueOutcomes.filter((o) => o.entry_id === myEntry).map((o) => o.match_id),
+    )
+    const open = fixtures.filter((f) => !picked.has(f.id))
+    return { done: fixtures.length - open.length, total: fixtures.length, open }
+  }, [leagueOutcomes, fixtures, ownEntryIds])
+
+  const mySeason = useMemo(() => {
     const myEntry = ownEntryIds[0]
     if (!myEntry) return null
-    const combined = (e: string) => {
-      const t = totals.get(e)
-      return t ? t.totalPoints + t.duelPoints : 0
-    }
-    // ⚠ ORDERED BY THE STORED `rank`, NOT BY RECOMPUTING ONE. Sorting on points
-    // alone puts ties in arbitrary order, and `league_finalize_ranks` breaks
-    // them on four further rungs — exact_count, correct_count, bonus_points,
-    // then who picked first. The first version of this said "behind 3rd" while
-    // the card above it said the member was 2nd, which is the same class of
-    // mistake as the leaderboard recomputing its own order.
-    const board = [...totals.entries()]
-      .filter(([, t]) => t.rank !== null)
-      .map(([e, t]) => ({ entry: e, pts: combined(e), rank: t.rank as number }))
-      .sort((a, b) => a.rank - b.rank)
-    const i = board.findIndex((r) => r.entry === myEntry)
-    if (i === -1) return null
-    // Nobody has settled a duel yet — every gap is 0 and "level with 1st" is
-    // true but says nothing. The first duel of a season is its own story.
-    const allLevel = board.every((r) => r.pts === board[0].pts)
+    const t = totals.get(myEntry)
+    const picks = leagueOutcomes.filter((o) => o.entry_id === myEntry)
+    const share = (o: 'home' | 'draw' | 'away') =>
+      picks.length ? Math.round((picks.filter((p) => p.outcome === o).length / picks.length) * 100) : null
     return {
-      rank: board[i].rank,
-      aboveRank: i > 0 ? board[i - 1].rank : null,
-      belowRank: i < board.length - 1 ? board[i + 1].rank : null,
-      allLevel,
-      behind: i > 0 ? board[i - 1].pts - board[i].pts : null,
-      ahead: i < board.length - 1 ? board[i].pts - board[i + 1].pts : null,
+      points: t ? t.totalPoints + t.duelPoints : 0,
+      correct: t?.correct ?? 0,
+      picks: picks.length,
+      // ⚠ Suppressed under ten picks. "100% home" off two picks is noise
+      // wearing a percentage, and a tendency needs a season to be one.
+      home: picks.length >= 10 ? share('home') : null,
+      draw: picks.length >= 10 ? share('draw') : null,
     }
-  }, [totals, ownEntryIds])
+  }, [leagueOutcomes, totals, ownEntryIds])
 
   const ownWash = (() => {
     const p = person(ownEntryIds[0] ?? null)
@@ -956,7 +970,11 @@ export default function DuelsTab({
                 </div>
                 <div className="min-w-0">
                   <p className="t-display text-xl text-white truncate">You</p>
-                  {youMeta && <p className="t-num t-num-medium text-xs text-white/45 mt-0.5">{youMeta}</p>}
+                  {youMeta && (
+                    <p className="t-num t-num-medium text-xs text-white/45 mt-0.5 whitespace-nowrap">
+                      {youMeta}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1019,51 +1037,47 @@ export default function DuelsTab({
         </div>
       )}
 
-      {/* WHAT A WIN IS WORTH — only while the opponent is sealed.
-          ⚠ The point of the wait is that you do not know WHO, so the only
-          honest way to raise the temperature is to raise what is at stake for
-          whoever it turns out to be. Narrowing the field would do the
-          opposite: migration 118's header records that a member who has
-          played everybody by round eight can already work the ninth out by
-          arithmetic, and 118 exists to make that HARDER. Handing them the
-          shortlist would undo it. */}
-      {inPlayMatchweek === null && sealedMatchweek !== null && stake && (
+      {/* YOUR SHEET — the one thing a member can DO in the window.
+          ⚠ Picks are open the whole time the opponent is sealed; that is the
+          design. A progress bar and the games still missing turn the wait into
+          preparation rather than dead time. */}
+      {inPlayMatchweek === null && sealedMatchweek !== null && mySheet && (
         <Card padding="md">
-          <p className="t-card-title text-ink pb-3">What a win is worth</p>
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <span className="t-num t-num-black text-3xl text-ink">+{DUEL_WIN}</span>
-            <span className="t-body text-muted">
-              and {DUEL_TIE} for a tie
-            </span>
-          </div>
-          {stake.allLevel ? (
-            /* Everybody on nothing. "Level with 1st" is true and says nothing;
-               the first duel of a season is its own story. */
-            <p className="t-body text-muted mt-3">
-              Nobody has settled a duel yet. This is the first of the season.
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="t-caption text-muted">Your sheet</p>
+            <p className="t-num t-num-extrabold text-ink">
+              {mySheet.done} <span className="text-muted">/ {mySheet.total}</span>
             </p>
+          </div>
+          <div className="h-2 rounded-pill bg-mist mt-3 overflow-hidden">
+            <div
+              className="h-full rounded-pill bg-primary-500 transition-[width] duration-500"
+              style={{ width: `${(mySheet.done / mySheet.total) * 100}%` }}
+            />
+          </div>
+          {mySheet.open.length === 0 ? (
+            /* ⚠ NO CTA WHEN THERE IS NOTHING TO DO. A "finish your picks"
+               button on a finished sheet is nagging, and the member has
+               already done the thing it would be asking for. */
+            <p className="t-body text-muted mt-3">Your sheet is in. Nothing left to pick.</p>
           ) : (
-            <div className="mt-3 flex flex-col gap-1.5">
-              {/* ⚠ A ZERO GAP IS "LEVEL", NOT "0 BEHIND". Stating a gap of
-                  nothing as a number reads as a bug, and level on points but
-                  behind on a tiebreak is a real and common state. */}
-              {stake.behind !== null && stake.aboveRank !== null && (
-                <p className="t-body text-muted">
-                  {stake.behind === 0
-                    ? <>Level with {ordinal(stake.aboveRank)} on points.</>
-                    : <>You are{' '}
-                        <span className="t-num t-num-extrabold text-ink">{stake.behind}</span>{' '}
-                        behind {ordinal(stake.aboveRank)}.</>}
-                </p>
-              )}
-              {stake.ahead !== null && stake.belowRank !== null && stake.ahead > 0 && (
-                <p className="t-body text-muted">
-                  You are{' '}
-                  <span className="t-num t-num-extrabold text-ink">{stake.ahead}</span>{' '}
-                  clear of {ordinal(stake.belowRank)}.
-                </p>
-              )}
-            </div>
+            <>
+              <p className="t-body text-muted mt-3">
+                {mySheet.open.slice(0, 2)
+                  .map((f) => `${f.homeName} v ${f.awayName}`)
+                  .join(' and ')}
+                {mySheet.open.length > 2 && ` and ${mySheet.open.length - 2} more`}
+                {' '}still open.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push(`/pools/${poolId}?tab=predictions`)}
+                className="w-full rounded-pill bg-primary-600 text-white t-caption
+                           py-3.5 mt-4 hover:bg-primary-700 active:bg-primary-800 transition-colors"
+              >
+                Finish your picks
+              </button>
+            </>
           )}
         </Card>
       )}
@@ -1101,6 +1115,26 @@ export default function DuelsTab({
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+
+      {/* YOUR SEASON — the mockup's scouting card, turned on the reader.
+          See the note on `mySeason`: scouting the opponent is impossible while
+          the opponent is sealed, and that is the point of the window. */}
+      {inPlayMatchweek === null && sealedMatchweek !== null && mySeason && (
+        <Card padding="none" className="overflow-hidden">
+          <div className="flex items-baseline justify-between gap-3 px-4 sm:px-5 pt-5 pb-3">
+            <p className="t-caption text-muted">Your season</p>
+            <p className="t-caption text-muted">{mySeason.picks} picks</p>
+          </div>
+          <SeasonRow label="Points" value={mySeason.points} />
+          <SeasonRow label="Correct picks" value={mySeason.correct} />
+          {mySeason.home !== null && (
+            <SeasonRow label="Backs the home side" value={`${mySeason.home}%`} />
+          )}
+          {mySeason.draw !== null && (
+            <SeasonRow label="Calls a draw" value={`${mySeason.draw}%`} />
+          )}
         </Card>
       )}
 
