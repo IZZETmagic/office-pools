@@ -445,49 +445,49 @@ export async function readLeaguePoolView(
   const openId = openMatchweekId(matchweekRows, now)
   const inPlayId = inPlayMatchweekId(matchweekRows, now)
 
-  // The first matchweek still SEALED, and the one that has to finish first.
-  //
-  // The TS mirror of `league_duel_is_revealed` (migration 119): a matchweek is
-  // open once the matchweek BEFORE IT has settled. In lock order rather than by
-  // number — a whole round can be moved (101, minimum gap −121 days) — and on
-  // `ranks_snapshot_at` rather than a fixture count, because a postponement
-  // leaves the count short for the rest of the season (094).
-  const inLockOrder = matchweekRows
-    .filter((m) => m.lock_at !== null)
-    .sort((a, b) =>
-      new Date(a.lock_at!).getTime() - new Date(b.lock_at!).getTime()
-      || a.matchweek_number - b.matchweek_number)
-  // ⚠ The 24-hour floor (migration 120) is part of the rule, not a detail. A
-  // postponed matchweek settles only when the NEXT one locks (094), which
-  // without this would reveal the opponent at the instant picks close. It never
-  // fires in a normal week — settlement leads the next lock by 66h at the
-  // season's tightest.
-  const FLOOR_MS = 24 * 3600_000
-  const revealedAt = (i: number) =>
-    i === 0
-    || inLockOrder[i - 1].ranks_snapshot_at !== null
-    || new Date(inLockOrder[i].lock_at!).getTime() - FLOOR_MS <= now
-  const firstSealedIdx = inLockOrder.findIndex((_, i) => !revealedAt(i))
-  const sealedRow = firstSealedIdx === -1 ? null : inLockOrder[firstSealedIdx]
-  const blockedByRow = firstSealedIdx <= 0 ? null : inLockOrder[firstSealedIdx - 1]
-
-  // ⚠ THE REVEAL INSTANT COMES FROM SQL. See the field's doc — computing it
-  // here is how the rule ends up in two places. A failure is swallowed to null
-  // rather than thrown: a missing countdown makes the sealed card quieter, and
-  // failing the whole pool view over it would be worse.
-  let sealedRevealsAt: string | null = null
-  if (sealedRow) {
-    const { data: revealsAt, error: revealErr } = await supabase
-      .rpc('league_duel_reveals_at', {
-        p_pool_id: args.poolId,
-        p_matchweek_number: sealedRow.matchweek_number,
-      })
-    if (revealErr) console.error('[league] duel reveal instant failed:', revealErr.message)
-    // `-infinity` means "always open" and is not a countdown target.
-    else if (typeof revealsAt === 'string' && !revealsAt.startsWith('-infinity')) {
-      sealedRevealsAt = revealsAt
-    }
+  /**
+   * The first matchweek still SEALED, the instant it opens, and the matchweek
+   * that has to settle first — ASKED, not worked out.
+   *
+   * ⚠ THIS USED TO BE A HAND-ROLLED MIRROR OF THE REVEAL RULE, and the mirror
+   * drifted. It implemented migration 119 — *a duel opens the moment the
+   * previous matchweek settles* — and stayed that way after 123 replaced it
+   * with a 48-hour hold. So the instant matchweek 2 settled at 20:59, this
+   * file declared matchweek 3 revealed at 20:59:01 and offered a countdown to
+   * matchweek 4, while the database said matchweek 3 opens two days later and
+   * RLS quite correctly withheld the row. The card named the wrong week and
+   * then described THAT week accurately, which is why it looked plausible.
+   *
+   * Migration 123's header had already called this exact failure — "the front
+   * end now READS this instead of recomputing it" — and it was only half true:
+   * 123 wired up the countdown INSTANT and left the SELECTION mirrored here.
+   *
+   * One call, one row, one owner (127). It also replaces two round trips with
+   * one, since the reveal instant comes back with the number.
+   */
+  type SealedRow = {
+    matchweek_number: number
+    reveals_at: string | null
+    opens_after: number | null
   }
+  let sealed: SealedRow | null = null
+  {
+    const { data, error } = await supabase
+      .rpc('league_first_sealed_matchweek', { p_pool_id: args.poolId })
+    // Swallowed to null rather than thrown, as the countdown was before: a
+    // missing sealed card is quieter than failing the whole pool view. Logged,
+    // because a silent null here is indistinguishable from "nothing is sealed".
+    if (error) console.error('[league] first sealed matchweek failed:', error.message)
+    else sealed = ((data ?? []) as SealedRow[])[0] ?? null
+  }
+
+  // `-infinity` means "always open" and is not a countdown target. The SQL
+  // already excludes it; this is the belt to that braces, and it also drops the
+  // `reveals_at IS NULL` case rather than rendering an empty clock.
+  const sealedRevealsAt =
+    typeof sealed?.reveals_at === 'string' && !sealed.reveals_at.startsWith('-infinity')
+      ? sealed.reveals_at
+      : null
 
   return {
     view: {
@@ -499,8 +499,8 @@ export async function readLeaguePoolView(
       matchweekCount: matchweekRows.length,
       openMatchweekNumber: openId === null ? null : numberByMatchweekId.get(openId) ?? null,
       inPlayMatchweekNumber: inPlayId === null ? null : numberByMatchweekId.get(inPlayId) ?? null,
-      sealedMatchweekNumber: sealedRow === null ? null : sealedRow.matchweek_number,
-      sealedOpensAfterMatchweek: blockedByRow === null ? null : blockedByRow.matchweek_number,
+      sealedMatchweekNumber: sealed?.matchweek_number ?? null,
+      sealedOpensAfterMatchweek: sealed?.opens_after ?? null,
       sealedOpensAtLatest: sealedRevealsAt,
     },
     error: null,
