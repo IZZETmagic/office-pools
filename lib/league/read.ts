@@ -803,13 +803,24 @@ export async function readAllLeaguePredictions(
  * fixtures each, twenty times what it uses.
  *
  * Returns oldest-first per entry, matching how the dots read left to right.
+ *
+ * ⚠ TAKES THE ADMIN CLIENT, AND MUST. `league_match_scores` is DENY-ALL — RLS
+ * on, zero policies — and migration 050 lists it as one of exactly four engine
+ * tables deliberately closed to clients. A user-scoped read returns ZERO ROWS
+ * AND NO ERROR.
+ *
+ * This function was written to end "a permanent em-dash in the form column",
+ * and it did not, because it was handed the user client: the read succeeded,
+ * returned nothing, and the em-dash stayed. Found 2026-08-30 while building the
+ * live duel score against the same table — the leaderboard of every league pool
+ * in production had an empty Form column the whole time.
  */
 export async function readLeagueFormByEntry(
-  supabase: SupabaseClient,
+  admin: SupabaseClient,
   poolId: string,
   perEntry = 5,
 ): Promise<{ form: Map<string, string[]>; error: string | null }> {
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('league_match_scores')
     .select('entry_id, score_type, fixture_number')
     .eq('pool_id', poolId)

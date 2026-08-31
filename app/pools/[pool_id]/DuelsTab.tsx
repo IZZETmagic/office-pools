@@ -47,6 +47,7 @@
 
 import { useMemo } from 'react'
 import { Card } from '@/components/ui/Card'
+import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { Icon } from '@/components/ui/Icon'
 import type { DuelRow } from '@/lib/league/duels'
 
@@ -74,11 +75,31 @@ type Props = {
    */
   sealedMatchweek: number | null
   sealedOpensAfter: number | null
+  /** entry_id → the person behind it, for the faces in the corners. */
+  entryPeople: Map<string, AvatarPerson>
+  /**
+   * The RUNNING score of the matchweek being played, and how many of its
+   * fixtures have been scored so far.
+   *
+   * ⚠ The duel row's own `accuracy_a/_b` are NULL until the matchweek settles,
+   * so through the weekend — the one time anybody is watching — they cannot
+   * drive the card. These come from `league_match_scores`.
+   */
+  livePoints: Map<string, number>
+  liveScored: Map<string, number>
   /** Duel points per entry, from the leaderboard read. */
   duelPoints: Map<string, number>
 }
 
 type Side = { entry: string; points: number | null; accuracy: number | null }
+
+/**
+ * ⚠ An assumption, and a shallow one: every league we run is ten fixtures a
+ * matchweek. It is only used to say "1 game still to play", so being wrong
+ * costs a sentence rather than a score — but a 18-club division would be nine,
+ * and the honest fix is to pass the fixture count down from the league view.
+ */
+const FIXTURES_PER_MATCHWEEK = 10
 
 export default function DuelsTab({
   duels,
@@ -88,6 +109,9 @@ export default function DuelsTab({
   inPlayMatchweek,
   sealedMatchweek,
   sealedOpensAfter,
+  entryPeople,
+  livePoints,
+  liveScored,
   duelPoints,
 }: Props) {
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
@@ -181,8 +205,49 @@ export default function DuelsTab({
   }, [duels, duelPoints])
 
   const name = (e: string | null) => (e ? entryNames.get(e) ?? 'Unknown' : 'Bye')
+  const person = (e: string | null): AvatarPerson | null => (e ? entryPeople.get(e) ?? null : null)
+  /** Running points for an entry in the matchweek being played. */
+  const live = (e: string | null) => (e ? livePoints.get(e) ?? 0 : 0)
+
+  /**
+   * Every other duel in the live matchweek — the rest of the card.
+   *
+   * The mode is personal, but the pool is not: five duels resolve on the same
+   * ten fixtures, and knowing Tommy and Aisha are level makes the afternoon
+   * bigger than your own game. Only the matchweek being played, because every
+   * later one is sealed and the rows are not here to show.
+   */
+  const elsewhere = useMemo(() => {
+    if (inPlayMatchweek === null) return []
+    // `livePoints.get` inline rather than the `live` helper above: that helper
+    // is a fresh closure every render, and reaching for it here is what made
+    // the React Compiler bail out of memoising this list.
+    return duels
+      .filter((d) => d.matchweek_number === inPlayMatchweek && d.entry_b !== null)
+      .filter((d) => !own.has(d.entry_a) && !own.has(d.entry_b as string))
+      .map((d) => ({
+        id: d.duel_id,
+        a: d.entry_a, b: d.entry_b as string,
+        pa: livePoints.get(d.entry_a) ?? 0,
+        pb: livePoints.get(d.entry_b as string) ?? 0,
+      }))
+  }, [duels, inPlayMatchweek, own, livePoints])
   /** The viewer, for the sealed card — which has no duel row to read from. */
   const youName = ownEntryIds.length > 0 ? name(ownEntryIds[0]) : 'You'
+
+  /**
+   * Fixtures in the live matchweek with no score row yet.
+   *
+   * Derived from the BEST-covered entry rather than a fixture count, because
+   * this component is never given the fixtures. Everyone in a pool is scored on
+   * the same list, so the entry with the most rows has seen everything that has
+   * been played — and a matchweek is ten fixtures in every league we run.
+   */
+  const remainingFixtures = useMemo(() => {
+    if (inPlayMatchweek === null || liveScored.size === 0) return null
+    const best = Math.max(...liveScored.values())
+    return Math.max(0, FIXTURES_PER_MATCHWEEK - best)
+  }, [inPlayMatchweek, liveScored])
 
   if (duels.length === 0) {
     return (
@@ -212,8 +277,14 @@ export default function DuelsTab({
 
       {/* Being played now, then the one you are still picking. Both, because
           they are different weeks all weekend. */}
-      {inPlay && <DuelPanel m={inPlay} state="playing" name={name} />}
-      {open && <DuelPanel m={open} state="picking" name={name} />}
+      {inPlay && (
+        <DuelPanel
+          m={inPlay} state="playing" name={name} person={person}
+          live={{ you: live(inPlay.you.entry), them: live(inPlay.them?.entry ?? null) }}
+          remaining={remainingFixtures}
+        />
+      )}
+      {open && <DuelPanel m={open} state="picking" name={name} person={person} live={null} remaining={null} />}
 
       {/* What is coming, without saying who — the payoff of a sealed draw.
           There is no row for this matchweek in `duels`; RLS withheld it. The
@@ -237,7 +308,7 @@ export default function DuelsTab({
               <span className="ml-1.5 text-white/30">Sealed</span>
             </p>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
-              <Corner side="blue" label="You" name={youName} accuracy={null} />
+              <Corner side="blue" label="You" name={youName} person={person(ownEntryIds[0] ?? null)} />
               <span className="t-display text-2xl text-white/20 select-none">V</span>
               <div className="min-w-0 text-right">
                 {/* The circle a face has not arrived in yet. Dashed rather than
@@ -265,6 +336,41 @@ export default function DuelsTab({
             </p>
           </div>
         </div>
+      )}
+
+      {/* The rest of the card. Showdown is personal, but the pool is not — five
+          duels resolve on the same ten fixtures, and two members sitting level
+          makes the afternoon bigger than your own game. */}
+      {elsewhere.length > 0 && (
+        <Card padding="none" className="overflow-hidden">
+          <p className="t-caption text-muted px-4 pt-4 pb-3">
+            Elsewhere on the card
+            <span className="ml-1.5 text-muted/60 normal-case tracking-normal">
+              Matchweek {inPlayMatchweek}
+            </span>
+          </p>
+          <ul>
+            {elsewhere.map((d) => {
+              const lead = d.pa === d.pb ? 'level' : d.pa > d.pb ? 'a' : 'b'
+              return (
+                <li
+                  key={d.id}
+                  className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 border-t border-border-default"
+                >
+                  <span className={`t-body truncate ${lead === 'a' ? 'text-ink font-bold' : 'text-muted'}`}>
+                    {name(d.a)}
+                  </span>
+                  <span className="t-num t-num-extrabold text-sm text-ink whitespace-nowrap">
+                    {d.pa} <span className="text-muted/50 font-normal">&ndash;</span> {d.pb}
+                  </span>
+                  <span className={`t-body truncate text-right ${lead === 'b' ? 'text-ink font-bold' : 'text-muted'}`}>
+                    {name(d.b)}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
       )}
 
       {/* Record — AFTER the three duel cards, not between them. Playing, picking
@@ -334,11 +440,16 @@ export default function DuelsTab({
  * cannot tell the games being played from the games they are still picking.
  */
 function DuelPanel({
-  m, state, name,
+  m, state, name, person, live, remaining,
 }: {
   m: { duel: DuelRow; you: Side; them: Side | null; matchweek: number }
   state: 'playing' | 'picking'
   name: (e: string | null) => string
+  person: (e: string | null) => AvatarPerson | null
+  /** Running score, or null before anything has been scored. */
+  live: { you: number; them: number } | null
+  /** Fixtures in this matchweek with no score row yet. */
+  remaining: number | null
 }) {
   const decided = m.duel.settled_at && m.them
   return (
@@ -367,9 +478,21 @@ function DuelPanel({
 
         {m.them ? (
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
-            <Corner side="blue" label="You" name={name(m.you.entry)} accuracy={m.you.accuracy} />
-            <span className="t-display text-2xl text-accent-400 select-none">V</span>
-            <Corner side="red" label="Them" name={name(m.them.entry)} accuracy={m.them.accuracy} align="right" />
+            <Corner side="blue" label="You" name={name(m.you.entry)} person={person(m.you.entry)} />
+            {/* The score, live. A duel with two names and no numbers is a
+                fixture list; the numbers are what make it a contest. */}
+            {live !== null ? (
+              <div className="text-center px-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="t-display text-4xl text-white">{live.you}</span>
+                  <span className="t-display text-lg text-white/25">&ndash;</span>
+                  <span className="t-display text-4xl text-white">{live.them}</span>
+                </div>
+              </div>
+            ) : (
+              <span className="t-display text-2xl text-accent-400 select-none">V</span>
+            )}
+            <Corner side="red" label="Them" name={name(m.them.entry)} person={person(m.them.entry)} align="right" />
           </div>
         ) : (
           <p className="t-body text-white/60 text-center max-w-sm mx-auto">
@@ -378,6 +501,14 @@ function DuelPanel({
           </p>
         )}
 
+        {!decided && live && m.them && (
+          <p className="t-detail text-white/50 text-center mt-4 pt-4 border-t border-white/10">
+            {live.you === live.them
+              ? 'Level'
+              : `${live.you > live.them ? 'You lead' : 'Behind'} by ${Math.abs(live.you - live.them)}`}
+            {remaining ? ` — ${remaining} ${remaining === 1 ? 'game' : 'games'} still to play` : ' — all games played'}
+          </p>
+        )}
         {decided && (
           <p className="t-caption text-center mt-4 pt-4 border-t border-white/10">
             <span className={m.you.points === 3 ? 'text-success-400'
@@ -404,42 +535,32 @@ function DuelPanel({
  * shape below is deliberately the same (circle, initials, size in px).
  */
 function Corner({
-  side, label, name, accuracy, align = 'left',
+  side, label, name, person, align = 'left',
 }: {
   side: 'blue' | 'red'
   label: string
   name: string
-  accuracy: number | null
+  person: AvatarPerson | null
   align?: 'left' | 'right'
 }) {
-  // ⚠ A SINGLE-WORD NAME TAKES TWO LETTERS. "IZZETmagic" is one word, and the
-  // first version of this took one initial from it and rendered "I" in an 44px
-  // circle. Identical rule to `getInitials` in lib/design/initials.ts, which
-  // carries the same warning about "OdieBug" — matched deliberately so the swap
-  // to <Avatar> is a deletion rather than a behaviour change.
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  const initials = parts.length === 0
-    ? '??'
-    : parts.length === 1
-      ? parts[0].slice(0, 2).toUpperCase()
-      : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
   return (
     <div className={`min-w-0 ${align === 'right' ? 'text-right' : ''}`}>
       <div
-        className={`w-11 h-11 rounded-full flex items-center justify-center t-display text-lg text-white mb-2.5
-          ${align === 'right' ? 'ml-auto' : ''}
-          ${side === 'blue' ? 'bg-primary-500' : 'bg-danger-500'}`}
+        className={`w-11 h-11 rounded-full mb-2.5 ${align === 'right' ? 'ml-auto' : ''}`}
         style={{
-          boxShadow: `0 0 0 3px color-mix(in srgb, var(--${side === 'blue' ? 'primary' : 'danger'}-500) 25%, transparent)`,
+          boxShadow: `0 0 0 3px color-mix(in srgb, var(--${side === 'blue' ? 'primary' : 'danger'}-500) 45%, transparent)`,
+          borderRadius: '9999px',
         }}
       >
-        {initials}
+        {/* The shared circle — hashed gradient and initials, the same face this
+            person wears in banter and on the pools list. A duel corner that
+            invented its own colour would make one person look like two. */}
+        {person
+          ? <Avatar person={person} size={44} />
+          : <div className="w-11 h-11 rounded-full bg-white/10" aria-hidden="true" />}
       </div>
       <p className="t-detail text-white/35 uppercase tracking-widest">{label}</p>
       <p className="t-display text-xl text-white truncate mt-0.5">{name}</p>
-      {accuracy !== null && (
-        <p className="t-num t-num-medium text-xs text-white/45 mt-1">{accuracy} pts</p>
-      )}
     </div>
   )
 }

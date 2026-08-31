@@ -169,15 +169,28 @@ export default async function PoolPage({
       // Names for BOTH sides of every duel, so a rival is a person rather than
       // a uuid. Read from the members already loaded above.
       const entryNames = new Map<string, string>()
+      // The person behind each entry, so a corner can carry a face rather than
+      // two letters. Same rows the names come from — no extra read.
+      const entryPeople = new Map<string, { user_id: string; full_name: string | null; username: string | null }>()
       for (const m of members) {
         for (const e of m.entries ?? []) {
           entryNames.set(e.entry_id, e.entry_name || m.users?.username || 'Entry')
+          if (m.users?.user_id) {
+            entryPeople.set(e.entry_id, {
+              user_id: m.users.user_id,
+              full_name: m.users.full_name ?? null,
+              username: m.users.username ?? null,
+            })
+          }
         }
       }
 
       showdownData = {
         duels,
         entryNames,
+        entryPeople,
+        livePoints: new Map(),
+        liveScored: new Map(),
         ownEntryIds: (userEntries ?? []).map((e) => e.entry_id),
         openMatchweek: null,
         inPlayMatchweek: null,
@@ -238,8 +251,12 @@ export default async function PoolPage({
     // this every league member's form column was a permanent em-dash while
     // `league_match_scores` held exactly the rows it needed.
     const { readLeagueFormByEntry, readNextFixtureByClub } = await import('@/lib/league/read')
+    const { createAdminClient: adminForForm } = await import('@/lib/supabase/server')
     const [formRes, nextRes] = await Promise.all([
-      readLeagueFormByEntry(supabase, pool_id),
+      // ⚠ ADMIN. league_match_scores is deny-all (migration 050); the
+      // user-scoped read this used to do returned zero rows with no error, so
+      // the em-dash this function exists to remove was never removed.
+      readLeagueFormByEntry(adminForForm(), pool_id),
       readNextFixtureByClub(supabase, pool.league_season_id),
     ])
     if (formRes.error) console.error('[pool page] league form failed:', formRes.error)
@@ -396,6 +413,22 @@ export default async function PoolPage({
           // rows for a sealed matchweek are not in the payload at all.
           showdownData.sealedMatchweek = view.sealedMatchweekNumber
           showdownData.sealedOpensAfter = view.sealedOpensAfterMatchweek
+
+          // The RUNNING score of the duel being played. `league_duels` carries
+          // accuracy only once the matchweek settles, so through the weekend it
+          // has to come from the score rows themselves.
+          const liveMw = view.inPlayMatchweekNumber ?? view.openMatchweekNumber
+          if (liveMw !== null) {
+            const { readMatchweekPoints } = await import('@/lib/league/duels')
+            const { createAdminClient } = await import('@/lib/supabase/server')
+            // ⚠ ADMIN, not `supabase`. league_match_scores is deny-all by
+            // design (migration 050) and a user-scoped read returns zero rows
+            // with no error — a silently 0–0 duel card.
+            const live = await readMatchweekPoints(createAdminClient(), pool_id, liveMw)
+            if (live.error) console.error('[pool page] live duel points failed:', live.error)
+            showdownData.livePoints = live.points
+            showdownData.liveScored = live.scored
+          }
         }
         // LMS needs BOTH, for two different jobs. The pick is WRITTEN against
         // the open week — that is what a member can still change. The screen

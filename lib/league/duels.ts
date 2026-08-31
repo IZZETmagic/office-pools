@@ -87,3 +87,48 @@ export function headToHead(duels: DuelRow[], entryA: string, entryB: string) {
   }
   return { won, drawn, lost }
 }
+
+/**
+ * Live points per entry for one matchweek — the running duel score.
+ *
+ * ⚠ NOT `league_duels.accuracy_a/_b`. Those are written by `league_score_duels`
+ * when the matchweek settles, so through the weekend — the one time anybody is
+ * watching — they are NULL. Reading them is why the duel card showed two names
+ * and no numbers while the games were being played.
+ *
+ * ⚠ TAKES THE ADMIN CLIENT, AND MUST. `league_match_scores` is DENY-ALL — RLS
+ * on, zero policies — and migration 050 lists it as one of exactly four engine
+ * tables deliberately closed to clients (with `league_entry_totals`,
+ * `league_fixture_state`, `league_score_events`). A user-scoped read returns
+ * ZERO ROWS AND NO ERROR, so the duel card renders 0 – 0 and looks like a pool
+ * where nobody has scored. Found exactly that way.
+ *
+ * Safe because this is a server component that has already established the
+ * viewer is a member of the pool, and the query is scoped to that pool.
+ *
+ * Summed in TypeScript rather than SQL because PostgREST has no GROUP BY. The
+ * row count is entries × fixtures — 100 for a ten-person Premier League pool —
+ * so it is nowhere near the 1,000-row cap, but it does grow with both, and a
+ * 40-entry pool would be 400. If that ever becomes a real shape this wants to be
+ * an RPC rather than a bigger `.range()`.
+ */
+export async function readMatchweekPoints(
+  admin: SupabaseClient,
+  poolId: string,
+  matchweekNumber: number,
+): Promise<{ points: Map<string, number>; scored: Map<string, number>; error: string | null }> {
+  const { data, error } = await admin
+    .from('league_match_scores')
+    .select('entry_id, total_points')
+    .eq('pool_id', poolId)
+    .eq('matchweek_number', matchweekNumber)
+  if (error) return { points: new Map(), scored: new Map(), error: error.message }
+
+  const points = new Map<string, number>()
+  const scored = new Map<string, number>()
+  for (const r of (data ?? []) as Array<{ entry_id: string; total_points: number | null }>) {
+    points.set(r.entry_id, (points.get(r.entry_id) ?? 0) + (r.total_points ?? 0))
+    scored.set(r.entry_id, (scored.get(r.entry_id) ?? 0) + 1)
+  }
+  return { points, scored, error: null }
+}

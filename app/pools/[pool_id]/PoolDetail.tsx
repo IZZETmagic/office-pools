@@ -131,6 +131,17 @@ export type ShowdownData = {
   sealedMatchweek: number | null
   /** The matchweek that must FINISH first — not a clock. Migration 119. */
   sealedOpensAfter: number | null
+  /** entry_id → the person behind it, for the faces in the corners. */
+  entryPeople: Map<string, { user_id: string; full_name: string | null; username: string | null }>
+  /**
+   * The RUNNING score of the matchweek being played, per entry, and how many of
+   * its fixtures have been scored so far.
+   *
+   * ⚠ `league_duels.accuracy_a/_b` are NULL until the matchweek settles, so they
+   * cannot drive a live card. These come from `league_match_scores`.
+   */
+  livePoints: Map<string, number>
+  liveScored: Map<string, number>
   duelPoints: Map<string, number>
 }
 
@@ -2229,6 +2240,9 @@ export function PoolDetail({
                 inPlayMatchweek={showdownData.inPlayMatchweek}
                 sealedMatchweek={showdownData.sealedMatchweek}
                 sealedOpensAfter={showdownData.sealedOpensAfter}
+                entryPeople={showdownData.entryPeople}
+                livePoints={showdownData.livePoints}
+                liveScored={showdownData.liveScored}
                 duelPoints={showdownData.duelPoints}
               />
             )}
