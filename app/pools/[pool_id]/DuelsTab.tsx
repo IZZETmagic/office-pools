@@ -39,6 +39,19 @@
 // decided and before the next one locks. Nothing here enforces that; it falls
 // out of RLS withholding the rows, which is the right place for it.
 //
+// ## No heading, no explainer — the duel is the first thing on the page
+//
+// The tab opened with "Your duels" and a paragraph explaining the format, which
+// pushed the head-to-head card below the fold of attention. Ryan, 2026-08-30:
+// the head-to-head card comes first, front and centre.
+//
+// ⚠ THE DISCLOSURE SENTENCE DID NOT GO WITH IT. "Revealed once matchweek N is
+// decided — or a day before you pick" still sits on the SEALED CARD, which is
+// where a member is actually asking the question, and the full explanation is
+// on Pool Info and Scoring Rules. Removing the paragraph moved the sentence
+// closer to the doubt; it did not delete it. `leagueModeCopy.guard.test.ts`
+// holds the wording on the surfaces that keep it.
+//
 // ## Nothing here computes a score
 //
 // Points come from `league_duels`, written by `league_score_duels` when the
@@ -326,15 +339,6 @@ export default function DuelsTab({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-bold text-neutral-900">Your duels</h2>
-        <p className="text-sm text-neutral-600 mt-1">
-          One duel at a time. You face one member each matchweek, and your next opponent is
-          revealed once the current duel is decided — or a day before you pick, whichever comes
-          first. Beat their score for three points, tie for one.
-        </p>
-      </div>
-
       {/* Being played now, then the one you are still picking. Both, because
           they are different weeks all weekend. */}
       {inPlay && (
