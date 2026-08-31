@@ -218,7 +218,7 @@ function Crest({ url, name }: { url: string | null; name: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt="" aria-hidden="true" title={name}
-      className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" loading="lazy" />
+      className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0" loading="lazy" />
   )
 }
 
@@ -724,7 +724,7 @@ export default function DuelsTab({
           another source. */}
       {inPlay?.them && breakdown.length > 0 && (
         <Card padding="none" className="overflow-hidden">
-          <div className="grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.5rem_1fr_4.5rem] items-center gap-2 sm:gap-3 px-3 sm:px-4 pt-4 pb-3">
+          <div className="grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.75rem_1fr_4.75rem] items-center gap-3 sm:gap-5 px-3 sm:px-5 pt-5 pb-3.5">
             <span className="t-caption text-primary-600">You</span>
             <span className="t-caption text-muted text-center">{breakdown.length} fixtures</span>
             <span className="t-caption text-danger-600 text-right truncate">{name(inPlay.them.entry)}</span>
@@ -733,7 +733,7 @@ export default function DuelsTab({
           <ul>
             {breakdown.map((b) => (
               <li key={b.n}
-                className={`grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.5rem_1fr_4.5rem] items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 border-t border-border-default
+                className={`grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.75rem_1fr_4.75rem] items-center gap-3 sm:gap-5 px-3 sm:px-5 py-3.5 border-t border-border-default
                   ${b.outcome === 'pending' ? 'bg-primary-50/40 dark:bg-primary-900/10' : ''}`}>
                 <PickChip label={b.myPick} side="you" outcome={b.outcome} />
 
@@ -741,23 +741,23 @@ export default function DuelsTab({
                     two clubs carry the same weight and the eye lands in the
                     middle rather than reading left to right. */}
                 <span className="min-w-0">
-                  <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+                  <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5 sm:gap-4">
                     {/* ⚠ ABBREVIATION ON A PHONE, NAME ABOVE IT. Adding the
                         crests cost the width that made the names fit: at 375px
                         six of ten truncated, including "Crystal Palace" and
                         "Man United". A crest beside "CRY" is unambiguous where a
                         clipped "Crystal Pal…" is just worse — and it is what a
                         broadcast scoreboard does at this size. */}
-                    <span className="flex items-center justify-end gap-1.5 min-w-0">
-                      <span className="t-body text-muted truncate sm:hidden">{b.homeAbbr}</span>
-                      <span className="t-body text-muted truncate hidden sm:inline">{b.homeName}</span>
+                    <span className="flex items-center justify-end gap-2 min-w-0">
+                      <span className="t-body text-muted truncate md:hidden">{b.homeAbbr}</span>
+                      <span className="t-body text-muted truncate hidden md:inline">{b.homeName}</span>
                       <Crest url={b.homeCrest} name={b.homeName} />
                     </span>
                     <span className="t-detail text-muted/40">v</span>
-                    <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="flex items-center gap-2 min-w-0">
                       <Crest url={b.awayCrest} name={b.awayName} />
-                      <span className="t-body text-muted truncate sm:hidden">{b.awayAbbr}</span>
-                      <span className="t-body text-muted truncate hidden sm:inline">{b.awayName}</span>
+                      <span className="t-body text-muted truncate md:hidden">{b.awayAbbr}</span>
+                      <span className="t-body text-muted truncate hidden md:inline">{b.awayName}</span>
                     </span>
                   </span>
                   {b.outcome === 'pending' && (
@@ -775,7 +775,7 @@ export default function DuelsTab({
           {/* What the sheet MEANS, in a sentence. Agreements cannot separate two
               members by definition, so the duel is only ever the divergences —
               which is both the honest reading and the interesting one. */}
-          <div className="px-4 py-3 border-t border-border-default">
+          <div className="px-3 sm:px-5 py-4 border-t border-border-default">
             {sheetSummary && <p className="t-body text-muted mb-1.5">{sheetSummary}</p>}
             {verdict && (
               <p className="t-body text-muted">
