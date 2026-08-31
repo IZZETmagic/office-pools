@@ -106,7 +106,7 @@ function Face({
         : { boxShadow: `0 0 0 3px color-mix(in srgb, ${colour} 42%, transparent)` }}
     >
       {unknown
-        ? <span className="t-display text-white/40 text-lg" aria-hidden="true">?</span>
+        ? <span className="t-num t-num-black text-white/40 text-lg" aria-hidden="true">?</span>
         : p
           ? <Avatar person={p} size={72} className="w-full h-full" />
           : <span className="block w-full h-full bg-white/10" aria-hidden="true" />}
@@ -199,7 +199,7 @@ export function ShowdownBand({
       {/* ── phone: the pieces travel ─────────────────────────── */}
       <div className="sd-m">
         <p className="sd-mw t-caption text-white/50">Matchweek {matchweek}</p>
-        <p className="sd-big t-display text-white">{headline}</p>
+        <p className="sd-big t-num t-num-black text-white">{headline}</p>
         {sub && <p className="sd-sub t-detail text-white/45">{sub}</p>}
         {liveNow && (
           <p className="sd-sub t-detail">
@@ -214,14 +214,14 @@ export function ShowdownBand({
         {sealed
           ? <Face p={null} colour={themColour} className="sd-face sd-face-them" unknown />
           : <Face p={person(themEntry!)} colour={themColour} className="sd-face sd-face-them" />}
-        {sealed && <p className="sd-vee t-display text-accent-400 text-lg select-none">V</p>}
+        {sealed && <p className="sd-vee t-caption text-accent-400 text-base select-none">V</p>}
 
         <div className="sd-who sd-who-you">
-          <p className="t-display text-white text-sm truncate">{name(youEntry)}</p>
+          <p className="t-caption text-white truncate">{name(youEntry)}</p>
           {meta(youEntry) && <p className="t-num text-[10px] text-white/40 mt-0.5">{meta(youEntry)}</p>}
         </div>
         <div className="sd-who sd-who-them">
-          <p className="t-display text-white text-sm truncate">
+          <p className="t-caption text-white truncate">
             {sealed ? 'Sealed' : name(themEntry!)}
           </p>
           {!sealed && meta(themEntry!) && (
@@ -235,14 +235,14 @@ export function ShowdownBand({
         <div className="sd-side">
           <Face p={person(youEntry)} colour={youColour} className="sd-face-d" />
           <span className="min-w-0">
-            <span className="sd-nm t-display text-white block truncate">{name(youEntry)}</span>
+            <span className="sd-nm t-caption text-white block truncate">{name(youEntry)}</span>
             {meta(youEntry) && <span className="sd-pts t-num text-white/40 block">{meta(youEntry)}</span>}
           </span>
         </div>
 
         <div className="sd-mid">
           <p className="sd-mw-d t-caption text-white/50">Matchweek {matchweek}</p>
-          <p className="sd-big-d t-display text-white">{headline}</p>
+          <p className="sd-big-d t-num t-num-black text-white">{headline}</p>
           {sub && <p className="sd-sub-d t-detail text-white/45">{sub}</p>}
           {liveNow && (
             <p className="sd-sub-d t-detail">
@@ -273,7 +273,7 @@ export function ShowdownBand({
             ? <Face p={null} colour={themColour} className="sd-face-d" unknown />
             : <Face p={person(themEntry!)} colour={themColour} className="sd-face-d" />}
           <span className="min-w-0">
-            <span className="sd-nm t-display text-white block truncate">
+            <span className="sd-nm t-caption text-white block truncate">
               {sealed ? 'Sealed' : name(themEntry!)}
             </span>
             {!sealed && meta(themEntry!) && (

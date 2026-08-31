@@ -1162,8 +1162,12 @@ export default function DuelsTab({
               themEntry={null}
               name={name} person={person}
               header={bandHeader}
+              /* ⚠ YELLOW, and only here. The accent marks the thing you are
+                 WAITING on — the same gold the sealed card already uses for its
+                 line. A live score is white because it is a fact, not a
+                 promise. */
               headline={sealedOpensAtLatest
-                ? <Countdown to={sealedOpensAtLatest} />
+                ? <span className="text-accent-400"><Countdown to={sealedOpensAtLatest} /></span>
                 : <span className="text-white/45">Sealed</span>}
               sub="Until your opponent is revealed"
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}

@@ -177,11 +177,6 @@ describe('the Showdown display face does not leak', () => {
     // reason the face was added. Named individually, not by directory: the rule
     // is that widening this list stays as deliberate as adding the font was.
     'app/pools/[pool_id]/duel/[matchweek]/DuelDecision.tsx',
-    // The one-page band (2026-08-31). It IS the duel card — the same matchweek,
-    // the same scoreline, the same two faces — presented as the head of the
-    // page instead of a card on it, so it inherits the register along with the
-    // props. Still a named surface with a reason, not a directory.
-    'app/pools/[pool_id]/ShowdownBand.tsx',
   ]
 
   it('only Showdown surfaces use t-display', () => {
