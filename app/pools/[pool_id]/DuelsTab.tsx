@@ -1170,21 +1170,30 @@ export default function DuelsTab({
           </div>
         </div>
 
-        {/* ⚠ W/T/L ARE DESKTOP ONLY, below. They pushed Pts — the column that
-            decides the table — off the right of a 375px screen and behind a
-            sideways scroll nobody would think to do. The header above already
-            carries YOUR record, and everybody else's W/T/L is detail a phone
-            can spare. `overflow-x-auto` stays as a floor for a long name. */}
+        {/* ⚠ CRUNCHED ON A PHONE, NOT DROPPED — the rhythm `LeagueTableTab`
+            already uses, and for the reason its own comment records: Ryan's
+            call there was to shrink the gutters and step the type down rather
+            than lose a column. That table fits EIGHT numeric columns plus a
+            club name into 375px; six is easier.
+
+            This briefly hid W/T/L below `sm` instead, which was the wrong
+            trade: it fixed Pts falling off the right edge by removing three
+            columns a member wants, when narrowing them fits everything.
+            Gutters go px-0.5 on a phone and px-2 from `sm`, the numeric widths
+            halve, and the type steps to `text-xs`. The figures stay tabular
+            either way, so the columns still line up.
+
+            `overflow-x-auto` stays as a floor for an unusually long name. */}
         <div className="relative overflow-x-auto">
-          <table className="w-full text-sm tabular-nums">
+          <table className="w-full text-xs sm:text-sm tabular-nums">
             <thead>
               <tr className="t-caption text-white/40">
-                <th className="pt-5 pb-3.5 pl-4 pr-1 text-left w-11">#</th>
-                <th className="pt-5 pb-3.5 px-2 text-left">Member</th>
-                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">W</th>
-                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">T</th>
-                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">L</th>
-                <th className="pt-5 pb-3.5 pl-2 pr-4 text-right w-16">Pts</th>
+                <th className="pt-5 pb-3.5 pl-2.5 pr-0.5 sm:pl-4 sm:pr-1 text-left w-8 sm:w-11">#</th>
+                <th className="pt-5 pb-3.5 px-1 sm:px-2 text-left">Member</th>
+                <th className="pt-5 pb-3.5 px-0.5 sm:px-2 text-right w-5 sm:w-9">W</th>
+                <th className="pt-5 pb-3.5 px-0.5 sm:px-2 text-right w-5 sm:w-9">T</th>
+                <th className="pt-5 pb-3.5 px-0.5 sm:px-2 text-right w-5 sm:w-9">L</th>
+                <th className="pt-5 pb-3.5 pl-1 pr-2.5 sm:pl-2 sm:pr-4 text-right w-10 sm:w-16">Pts</th>
               </tr>
             </thead>
             <tbody>
@@ -1205,7 +1214,7 @@ export default function DuelsTab({
                           boxShadow: `inset 3px 0 0 0 ${colour}` }
                       : undefined}
                   >
-                    <td className="py-2.5 pl-4 pr-1">
+                    <td className="py-2.5 pl-2.5 pr-0.5 sm:pl-4 sm:pr-1">
                       <span className="flex items-baseline gap-1">
                         <span className={`t-num t-num-medium ${
                           i === 0 ? 'text-accent-400' : you ? 'text-white' : 'text-white/45'}`}>
@@ -1222,20 +1231,20 @@ export default function DuelsTab({
                         )}
                       </span>
                     </td>
-                    <td className="py-2.5 px-2">
-                      <span className="flex items-center gap-2.5 min-w-0">
+                    <td className="py-2.5 px-1 sm:px-2">
+                      <span className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                         {p
-                          ? <Avatar person={p} size={26} />
-                          : <span className="block w-[26px] h-[26px] rounded-full bg-white/10 shrink-0" />}
+                          ? <Avatar person={p} size={22} />
+                          : <span className="block w-[22px] h-[22px] rounded-full bg-white/10 shrink-0" />}
                         <span className={`truncate ${you ? 'font-bold text-white' : 'font-semibold text-white/85'}`}>
                           {name(r.entry)}
                         </span>
                       </span>
                     </td>
-                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.w}</td>
-                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.d}</td>
-                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.l}</td>
-                    <td className="py-2.5 pl-2 pr-4 text-right t-num t-num-black text-white">{r.pts}</td>
+                    <td className="py-2.5 px-0.5 sm:px-2 text-right t-num text-white/55">{r.w}</td>
+                    <td className="py-2.5 px-0.5 sm:px-2 text-right t-num text-white/55">{r.d}</td>
+                    <td className="py-2.5 px-0.5 sm:px-2 text-right t-num text-white/55">{r.l}</td>
+                    <td className="py-2.5 pl-1 pr-2.5 sm:pl-2 sm:pr-4 text-right t-num t-num-black text-white">{r.pts}</td>
                   </tr>
                 )
               })}
