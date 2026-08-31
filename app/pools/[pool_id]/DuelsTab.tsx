@@ -213,6 +213,33 @@ function PickChip({
 }
 
 /**
+ * One member in someone else's duel: a face, a name, and whether they are ahead.
+ *
+ * Mirrored like the fixture row — avatar outermost, name inboard — so the two
+ * cards share a reading direction. `dimmed` rather than a second colour: these
+ * duels are not the viewer's, and colouring them would compete with the blue
+ * and red that mean "you" and "your opponent" everywhere else on the tab.
+ */
+function DuelSide({
+  name, person, leading, dimmed, align = 'left',
+}: {
+  name: string
+  person: AvatarPerson | null
+  leading: boolean
+  dimmed: boolean
+  align?: 'left' | 'right'
+}) {
+  return (
+    <span className={`flex items-center gap-2.5 min-w-0 ${align === 'right' ? 'flex-row-reverse' : ''} ${dimmed ? 'opacity-55' : ''}`}>
+      {person
+        ? <span className="shrink-0"><Avatar person={person} size={28} /></span>
+        : <span className="w-7 h-7 rounded-full bg-mist shrink-0" aria-hidden="true" />}
+      <span className={`t-body truncate ${leading ? 'text-ink font-bold' : 'text-muted'}`}>{name}</span>
+    </span>
+  )
+}
+
+/**
  * A club crest, or nothing. Never a broken image and never a placeholder box.
  *
  * ⚠ LARGER ON A PHONE THAN ON A DESKTOP, which looks backwards and is not:
@@ -871,12 +898,16 @@ export default function DuelsTab({
         </Card>
       )}
 
-      {/* The rest of the card. Showdown is personal, but the pool is not — five
-          duels resolve on the same ten fixtures, and two members sitting level
-          makes the afternoon bigger than your own game. */}
+      {/* THE REST OF THE CARD. Showdown is personal, but the pool is not —
+          five duels resolve on the same ten fixtures, and two members sitting
+          level makes the afternoon bigger than your own game.
+
+          Deliberately the SAME shape as the team sheet above it: two sides
+          mirrored about a centred score. Two cards on one screen that both
+          compare two things should not be read two different ways. */}
       {elsewhere.length > 0 && (
         <Card padding="none" className="overflow-hidden">
-          <p className="t-caption text-muted px-4 pt-4 pb-3">
+          <p className="t-caption text-muted px-4 sm:px-5 pt-5 pb-3.5">
             Elsewhere on the card
             <span className="ml-1.5 text-muted/60 normal-case tracking-normal">
               Matchweek {inPlayMatchweek}
@@ -884,21 +915,22 @@ export default function DuelsTab({
           </p>
           <ul>
             {elsewhere.map((d) => {
-              const lead = d.pa === d.pb ? 'level' : d.pa > d.pb ? 'a' : 'b'
+              const lead = d.pa === d.pb ? null : d.pa > d.pb ? 'a' : 'b'
               return (
-                <li
-                  key={d.id}
-                  className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2.5 border-t border-border-default"
-                >
-                  <span className={`t-body truncate ${lead === 'a' ? 'text-ink font-bold' : 'text-muted'}`}>
-                    {name(d.a)}
-                  </span>
-                  <span className="t-num t-num-extrabold text-sm text-ink whitespace-nowrap">
-                    {d.pa} <span className="text-muted/50 font-normal">&ndash;</span> {d.pb}
-                  </span>
-                  <span className={`t-body truncate text-right ${lead === 'b' ? 'text-ink font-bold' : 'text-muted'}`}>
-                    {name(d.b)}
-                  </span>
+                <li key={d.id} className="border-t border-border-default px-4 sm:px-5 py-3">
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5 max-w-lg mx-auto">
+                    <DuelSide
+                      name={name(d.a)} person={person(d.a)}
+                      leading={lead === 'a'} dimmed={lead === 'b'}
+                    />
+                    <span className="t-num t-num-extrabold text-sm text-ink whitespace-nowrap">
+                      {d.pa}<span className="text-muted/40 font-normal">&ndash;</span>{d.pb}
+                    </span>
+                    <DuelSide
+                      name={name(d.b)} person={person(d.b)}
+                      leading={lead === 'b'} dimmed={lead === 'a'} align="right"
+                    />
+                  </div>
                 </li>
               )
             })}
