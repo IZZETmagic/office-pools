@@ -2,7 +2,9 @@ import { redirect, notFound } from 'next/navigation'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { readPoolDuels, readMatchweekPoints, headToHead } from '@/lib/league/duels'
-import { duelScoreline, duelVerdict, decisiveFixture } from '@/lib/league/duelVerdict'
+import {
+  duelScoreline, duelVerdict, decisiveFixture, bestCall, duelStreak,
+} from '@/lib/league/duelVerdict'
 import { DuelDecision } from './DuelDecision'
 
 // /pools/:pool_id/duel/:matchweek — how one settled duel went.
@@ -50,7 +52,7 @@ export default async function DuelDecisionPage({
   if (!membership) notFound()
 
   const { data: pool } = await supabase
-    .from('pools').select('pool_name, league_mode').eq('pool_id', pool_id).single()
+    .from('pools').select('pool_name, league_mode, league_season_id').eq('pool_id', pool_id).single()
   if (!pool || pool.league_mode !== 'showdown') notFound()
 
   // ⚠ USER CLIENT. See the header — this read IS the reveal gate.
@@ -105,7 +107,7 @@ export default async function DuelDecisionPage({
   // gate: the matchweek is settled, so it is long past lock and there is
   // nothing left to withhold.
   const admin = createAdminClient()
-  const { perFixture } = await readMatchweekPoints(admin, pool_id, matchweekNumber)
+  const { points, perFixture } = await readMatchweekPoints(admin, pool_id, matchweekNumber)
 
   // ⚠ THE POSITION CHANGE IS READ, NOT DERIVED. `previous_final_rank` is frozen
   // by the matchweek snapshot (059/061/094) at the moment a matchweek settles,
@@ -127,37 +129,63 @@ export default async function DuelDecisionPage({
     ? decisiveFixture(perFixture.get(myEntry), perFixture.get(theirEntry))
     : null
 
-  // The fixture that decided it, named. Read on the user client — fixtures are
-  // public within the competition.
-  let decisiveLabel: string | null = null
-  if (decisive !== null) {
+  const best = theirEntry ? bestCall(perFixture.get(myEntry), perFixture.get(theirEntry)) : null
+
+  // Name the fixtures we are going to mention — the decisive one and the best
+  // call. ⚠ ONE QUERY FOR BOTH: they are usually different games but often the
+  // same one, and two round trips to say two club names would be silly.
+  const wanted = [...new Set([decisive, best].filter((n): n is number => n !== null))]
+  const fixtureLabels = new Map<number, string>()
+  if (wanted.length) {
+    // ⚠ SCOPED TO THE POOL'S SEASON. `matchweek_number` is NOT unique — we hold
+    // five competitions and every one of them has a matchweek 2 — so an
+    // unscoped lookup picks whichever row sorts first and then finds no
+    // matching fixture, which reads on screen as the line simply not existing.
+    // Found 2026-08-31 when "Your best call" silently failed to render.
     const { data: mw } = await supabase
       .from('league_matchweeks')
-      .select('matchweek_id, season_id')
+      .select('matchweek_id')
+      .eq('season_id', pool.league_season_id)
       .eq('matchweek_number', matchweekNumber)
-      .limit(1).maybeSingle()
+      .maybeSingle()
     if (mw) {
       const { data: fx } = await supabase
         .from('league_fixtures')
         .select('fixture_number, home_club_id, away_club_id')
         .eq('matchweek_id', mw.matchweek_id)
-        .eq('fixture_number', decisive)
-        .maybeSingle()
-      if (fx) {
-        const { data: clubs } = await supabase
-          .from('league_clubs')
-          .select('club_id, short_name, name')
-          .in('club_id', [fx.home_club_id, fx.away_club_id])
-        const label = (id: string) => {
-          const c = (clubs ?? []).find((x) => x.club_id === id)
-          return c?.short_name || c?.name || null
-        }
-        const h = label(fx.home_club_id)
-        const a = label(fx.away_club_id)
-        if (h && a) decisiveLabel = `${h} v ${a}`
+        .in('fixture_number', wanted)
+      const ids = (fx ?? []).flatMap((f) => [f.home_club_id, f.away_club_id])
+      const { data: clubs } = ids.length
+        ? await supabase.from('league_clubs').select('club_id, short_name, name').in('club_id', ids)
+        : { data: [] }
+      const label = (id: string) => {
+        const c = (clubs ?? []).find((x) => x.club_id === id)
+        return c?.short_name || c?.name || null
+      }
+      for (const f of fx ?? []) {
+        const h = label(f.home_club_id)
+        const a = label(f.away_club_id)
+        if (h && a) fixtureLabels.set(f.fixture_number, `${h} v ${a}`)
       }
     }
   }
+  const decisiveLabel = decisive !== null ? fixtureLabels.get(decisive) ?? null : null
+  const bestCallLabel = best !== null ? fixtureLabels.get(best) ?? null : null
+
+  // ⚠ THE WEEK'S HIGH SCORE, from the map `readMatchweekPoints` already returns
+  // — it was being thrown away. Context the card cannot otherwise give: a 400
+  // means nothing until you know 700 was the best anybody managed.
+  let topOfWeek: { name: string; points: number } | null = null
+  for (const [entryId, total] of points) {
+    if (!topOfWeek || total > topOfWeek.points) {
+      topOfWeek = { name: names.get(entryId) ?? 'Unknown', points: total }
+    }
+  }
+
+  // ⚠ Over EVERY settled duel, ordered by settled_at. Byes are skipped rather
+  // than breaking a run — the rotation hands those out and a member should not
+  // lose a streak to the draw.
+  const streak = duelStreak(duels, myEntry)
 
   // -----------------------------------------------------------
   // THE BANTER QUOTE — their last word before the games
@@ -187,13 +215,15 @@ export default async function DuelDecisionPage({
   // and she is not the one pressing the button.
   let quote: { content: string; author: string; at: string } | null = null
   if (theirEntry) {
+    // ⚠ SCOPED TO THE POOL'S SEASON, same trap as the fixture lookup above:
+    // five competitions, five matchweek 2s. An unscoped window would quote
+    // against another league's kickoff time.
     const { data: mwWindow } = await supabase
       .from('league_matchweeks')
       .select('first_kickoff_at')
+      .eq('season_id', pool.league_season_id)
       .eq('matchweek_number', matchweekNumber)
-      .not('first_kickoff_at', 'is', null)
-      .order('first_kickoff_at', { ascending: false })
-      .limit(1).maybeSingle()
+      .maybeSingle()
     const themPerson = people.get(theirEntry)
     if (mwWindow?.first_kickoff_at && themPerson) {
       const { data: msg } = await supabase
@@ -225,6 +255,9 @@ export default async function DuelDecisionPage({
       verdict={verdict}
       scoreline={scoreline}
       decisiveFixture={decisiveLabel}
+      bestCall={bestCallLabel}
+      topOfWeek={topOfWeek}
+      streak={streak}
       you={{ name: names.get(myEntry) ?? 'You', person: people.get(myEntry) ?? null }}
       them={theirEntry
         ? { name: names.get(theirEntry) ?? 'Unknown', person: people.get(theirEntry) ?? null }

@@ -131,7 +131,7 @@ function MovedRow({ label, children }: { label: string; children: React.ReactNod
 
 export function DuelDecision({
   poolId, poolName, matchweek, verdict, scoreline, decisiveFixture, you, them, record, quote,
-  position, shareUrl,
+  position, shareUrl, bestCall, topOfWeek, streak,
 }: {
   poolId: string
   poolName: string
@@ -164,6 +164,12 @@ export function DuelDecision({
   position: { now: number | null; before: number | null }
   /** Path to this page. See the share note on the button. */
   shareUrl: string
+  /** The fixture you gained most on — not the same as the decisive one. */
+  bestCall: string | null
+  /** The best weekly score in the whole pool, for context. */
+  topOfWeek: { name: string; points: number } | null
+  /** The run this result is part of. `run` of 1 is not worth saying. */
+  streak: { outcome: 'won' | 'lost' | 'tied'; run: number } | null
 }) {
   const bye = verdict.outcome === 'bye'
   const eyebrow =
@@ -284,8 +290,35 @@ export function DuelDecision({
                     No single fixture decided this one.
                   </p>
                 )}
+                {/* ⚠ WHERE IT WAS ACTUALLY DECIDED. `levelFixtures` was already
+                    computed and thrown away — it is the most duel-specific
+                    number available, and nothing else in the app says it: most
+                    of a matchweek separates nobody, and the duel turns on the
+                    handful that did. */}
+                {scoreline.levelFixtures > 0 && (
+                  <p className="t-body text-white/70 text-center mt-2">
+                    {scoreline.levelFixtures} of the{' '}
+                    {scoreline.levelFixtures + scoreline.yourFixtures + scoreline.theirFixtures}{' '}
+                    separated nobody. It turned on the other{' '}
+                    {scoreline.yourFixtures + scoreline.theirFixtures}.
+                  </p>
+                )}
+                {bestCall && (
+                  <p className="t-body text-white/70 text-center mt-2">
+                    Your best call was <span className="font-bold text-white">{bestCall}</span>.
+                  </p>
+                )}
                 {history && (
                   <p className="t-body text-white/70 text-center mt-2">{history}</p>
+                )}
+                {/* ⚠ A run of one is not a streak. Saying "first win in a row"
+                    is the kind of filler that teaches people to stop reading. */}
+                {streak && streak.run >= 2 && (
+                  <p className="t-body text-white/70 text-center mt-2">
+                    {streak.run === 2 ? 'Second' : streak.run === 3 ? 'Third' : `${streak.run}th`}{' '}
+                    {streak.outcome === 'won' ? 'win' : streak.outcome === 'lost' ? 'defeat' : 'draw'}
+                    {' '}in a row.
+                  </p>
                 )}
 
                 {/* ⚠ THEIR WORDS, UNEDITED. The server drops anything over 140
@@ -337,6 +370,12 @@ export function DuelDecision({
           {record && them && (
             <MovedRow label={`Record v ${them.name}`}>
               {record.won}&ndash;{record.drawn}&ndash;{record.lost}
+            </MovedRow>
+          )}
+          {topOfWeek && (
+            <MovedRow label="Best in the pool this week">
+              <span className="text-white/70">{topOfWeek.name}</span>
+              <span className="ml-2">{topOfWeek.points}</span>
             </MovedRow>
           )}
           <MovedRow label={`Matchweek ${matchweek + 1}`}>

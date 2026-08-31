@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 
 import {
-  duelScoreline, duelVerdict, decisiveFixture, ONE_FIXTURE,
+  duelScoreline, duelVerdict, decisiveFixture, bestCall, duelStreak, ONE_FIXTURE,
 } from '../duelVerdict'
 import { DUEL_WIN, DUEL_TIE, DUEL_LOSS, DUEL_BYE } from '../duelPoints'
 
@@ -149,5 +149,71 @@ describe('the decisive fixture', () => {
     // you 200, them 50 -> margin 150; swing must exceed 150.
     // f1 swing 100 (no), f2 swing 200 (yes) -> f2.
     expect(decisiveFixture(you, them)).toBe(2)
+  })
+})
+
+describe('the best call', () => {
+  it('is where you gained most, which is not always the decisive fixture', () => {
+    // Won by three fixtures, so nothing is decisive; the best call still is.
+    const you = scores(100, 50, 100, 100)
+    const them = scores(0, 50, 75, 0)
+    expect(decisiveFixture(you, them)).toBeNull()
+    // Gains: f1 +100, f2 0, f3 +25, f4 +100. First maximum wins.
+    expect(bestCall(you, them)).toBe(1)
+  })
+
+  it('⚠ is null when you gained on nothing — a shutout defeat has no best call', () => {
+    expect(bestCall(results(0, 0, 0), results(1, 1, 1))).toBeNull()
+  })
+
+  it('ignores fixtures you merely drew', () => {
+    expect(bestCall(results(1, 1), results(1, 0))).toBe(2)
+  })
+})
+
+describe('the streak', () => {
+  const d = (at: string, a: string, b: string | null, pa: number | null, pb: number | null) =>
+    ({ entry_a: a, entry_b: b, points_a: pa, points_b: pb, settled_at: at })
+  const ME = 'me'
+
+  it('counts consecutive results back from the most recent', () => {
+    const duels = [
+      d('2026-08-01', ME, 'x', DUEL_WIN, DUEL_LOSS),
+      d('2026-08-08', ME, 'y', DUEL_WIN, DUEL_LOSS),
+      d('2026-08-15', 'z', ME, DUEL_LOSS, DUEL_WIN),
+    ]
+    expect(duelStreak(duels, ME)).toEqual({ outcome: 'won', run: 3 })
+  })
+
+  it('stops at the first different result', () => {
+    const duels = [
+      d('2026-08-01', ME, 'x', DUEL_WIN, DUEL_LOSS),
+      d('2026-08-08', ME, 'y', DUEL_LOSS, DUEL_WIN),
+      d('2026-08-15', ME, 'z', DUEL_WIN, DUEL_LOSS),
+    ]
+    expect(duelStreak(duels, ME)).toEqual({ outcome: 'won', run: 1 })
+  })
+
+  it('⚠ orders by settled_at, not by array order or matchweek number', () => {
+    // Rounds are played out of numerical order (101), so the sequence must come
+    // from when they were DECIDED.
+    const duels = [
+      d('2026-08-15', ME, 'x', DUEL_LOSS, DUEL_WIN),  // most recent, listed first
+      d('2026-08-01', ME, 'y', DUEL_WIN, DUEL_LOSS),
+    ]
+    expect(duelStreak(duels, ME)).toEqual({ outcome: 'lost', run: 1 })
+  })
+
+  it('⚠ a bye neither counts nor breaks the run — the draw hands those out', () => {
+    const duels = [
+      d('2026-08-01', ME, 'x', DUEL_WIN, DUEL_LOSS),
+      d('2026-08-08', ME, null, DUEL_BYE, null),
+      d('2026-08-15', ME, 'y', DUEL_WIN, DUEL_LOSS),
+    ]
+    expect(duelStreak(duels, ME)).toEqual({ outcome: 'won', run: 2 })
+  })
+
+  it('is null when nothing has settled', () => {
+    expect(duelStreak([d('', ME, 'x', null, null)].map(x => ({ ...x, settled_at: null })), ME)).toBeNull()
   })
 })

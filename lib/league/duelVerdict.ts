@@ -10,7 +10,7 @@
  * could catch from the outside. The bands below are the whole contract.
  */
 
-import { DUEL_WIN, DUEL_TIE } from './duelPoints'
+import { DUEL_WIN, DUEL_TIE, duelResult } from './duelPoints'
 
 /** A fixture caps at 100 in BOTH depths — migration 066. So one fixture is 100. */
 export const ONE_FIXTURE = 100
@@ -179,4 +179,73 @@ export function decisiveFixture(
     if (!best || swing < best.swing) best = { n, swing }
   }
   return best?.n ?? null
+}
+
+/**
+ * The fixture you gained most on them.
+ *
+ * ⚠ NOT the same as `decisiveFixture`, and the difference is the point of
+ * having both. Decisive means "flip this and the result changes" — it is about
+ * the margin. Best call means "this is where you took the most out of them" —
+ * it is about the pick. In a one-fixture win they are often the same game; in a
+ * comfortable win they are usually not, and the best call is the more
+ * interesting line because the decisive one does not exist.
+ *
+ * Null when you gained on nothing — a shutout defeat has no best call, and
+ * inventing one would be consolation, which this card does not do.
+ */
+export function bestCall(
+  yourFixtures: Map<number, number> | undefined,
+  theirFixtures: Map<number, number> | undefined,
+): number | null {
+  const mine = yourFixtures ?? new Map<number, number>()
+  const theirs = theirFixtures ?? new Map<number, number>()
+  let best: { n: number; gain: number } | null = null
+  for (const n of new Set([...mine.keys(), ...theirs.keys()])) {
+    const gain = (mine.get(n) ?? 0) - (theirs.get(n) ?? 0)
+    if (gain <= 0) continue
+    if (!best || gain > best.gain) best = { n, gain }
+  }
+  return best?.n ?? null
+}
+
+export type DuelStreak = { outcome: 'won' | 'lost' | 'tied'; run: number }
+
+/**
+ * The run this duel is part of — "third win in a row".
+ *
+ * ⚠ ORDERED BY `settled_at`, never by matchweek number. Rounds are played out
+ * of numerical order (101: a minimum gap of minus 121 days), so numbering them
+ * would count a "run" that never happened in that sequence.
+ *
+ * ⚠ BYES BREAK NOTHING AND COUNT AS NOTHING. A week with no opponent is not a
+ * win and not a defeat, so it is skipped rather than ending a run — the
+ * rotation hands them out, and a member should not lose a streak to the draw.
+ *
+ * Returns a run of 1 for an isolated result; callers decide that is not worth
+ * saying.
+ */
+export function duelStreak(
+  duels: Array<{
+    entry_a: string; entry_b: string | null
+    points_a: number | null; points_b: number | null
+    settled_at: string | null
+  }>,
+  entry: string,
+): DuelStreak | null {
+  const mine = duels
+    .filter((d) => d.settled_at && (d.entry_a === entry || d.entry_b === entry))
+    .sort((a, b) => b.settled_at!.localeCompare(a.settled_at!))
+
+  let outcome: 'won' | 'lost' | 'tied' | null = null
+  let run = 0
+  for (const d of mine) {
+    if (d.entry_b === null) continue                    // a bye: neither, skip
+    const r = duelResult(d.entry_a === entry ? d.points_a : d.points_b)
+    if (r === null) continue
+    if (outcome === null) { outcome = r; run = 1; continue }
+    if (r !== outcome) break
+    run++
+  }
+  return outcome === null ? null : { outcome, run }
 }
