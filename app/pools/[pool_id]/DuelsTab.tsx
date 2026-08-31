@@ -591,6 +591,50 @@ export default function DuelsTab({
    * lightness that a peach glow shouts and an indigo one vanishes. Falls back
    * to slate for a viewer with no entry — a super admin looking in.
    */
+  /**
+   * WHAT A WIN IS WORTH, in places rather than points.
+   *
+   * ⚠ A GAP, NEVER A PROJECTION. "A win puts you 1st" would be a false
+   * promise — everyone else scores that week too, so the table they are
+   * sitting on is not the table a win lands in. "You are 500 behind 1st" is
+   * exactly true and just as much of a reason to care.
+   *
+   * ⚠ THE COMBINED TOTAL, since migration 121: the leaderboard ranks on
+   * `total_points + duel_points`, so a gap measured on accuracy alone would
+   * name the wrong neighbour.
+   */
+  const stake = useMemo(() => {
+    const myEntry = ownEntryIds[0]
+    if (!myEntry) return null
+    const combined = (e: string) => {
+      const t = totals.get(e)
+      return t ? t.totalPoints + t.duelPoints : 0
+    }
+    // ⚠ ORDERED BY THE STORED `rank`, NOT BY RECOMPUTING ONE. Sorting on points
+    // alone puts ties in arbitrary order, and `league_finalize_ranks` breaks
+    // them on four further rungs — exact_count, correct_count, bonus_points,
+    // then who picked first. The first version of this said "behind 3rd" while
+    // the card above it said the member was 2nd, which is the same class of
+    // mistake as the leaderboard recomputing its own order.
+    const board = [...totals.entries()]
+      .filter(([, t]) => t.rank !== null)
+      .map(([e, t]) => ({ entry: e, pts: combined(e), rank: t.rank as number }))
+      .sort((a, b) => a.rank - b.rank)
+    const i = board.findIndex((r) => r.entry === myEntry)
+    if (i === -1) return null
+    // Nobody has settled a duel yet — every gap is 0 and "level with 1st" is
+    // true but says nothing. The first duel of a season is its own story.
+    const allLevel = board.every((r) => r.pts === board[0].pts)
+    return {
+      rank: board[i].rank,
+      aboveRank: i > 0 ? board[i - 1].rank : null,
+      belowRank: i < board.length - 1 ? board[i + 1].rank : null,
+      allLevel,
+      behind: i > 0 ? board[i - 1].pts - board[i].pts : null,
+      ahead: i < board.length - 1 ? board[i].pts - board[i + 1].pts : null,
+    }
+  }, [totals, ownEntryIds])
+
   const ownWash = (() => {
     const p = person(ownEntryIds[0] ?? null)
     return p ? avatarInk(p.user_id).soft : 'var(--sp-slate)'
@@ -973,6 +1017,91 @@ export default function DuelsTab({
             </div>
           </div>
         </div>
+      )}
+
+      {/* WHAT A WIN IS WORTH — only while the opponent is sealed.
+          ⚠ The point of the wait is that you do not know WHO, so the only
+          honest way to raise the temperature is to raise what is at stake for
+          whoever it turns out to be. Narrowing the field would do the
+          opposite: migration 118's header records that a member who has
+          played everybody by round eight can already work the ninth out by
+          arithmetic, and 118 exists to make that HARDER. Handing them the
+          shortlist would undo it. */}
+      {inPlayMatchweek === null && sealedMatchweek !== null && stake && (
+        <Card padding="md">
+          <p className="t-card-title text-ink pb-3">What a win is worth</p>
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <span className="t-num t-num-black text-3xl text-ink">+{DUEL_WIN}</span>
+            <span className="t-body text-muted">
+              and {DUEL_TIE} for a tie
+            </span>
+          </div>
+          {stake.allLevel ? (
+            /* Everybody on nothing. "Level with 1st" is true and says nothing;
+               the first duel of a season is its own story. */
+            <p className="t-body text-muted mt-3">
+              Nobody has settled a duel yet. This is the first of the season.
+            </p>
+          ) : (
+            <div className="mt-3 flex flex-col gap-1.5">
+              {/* ⚠ A ZERO GAP IS "LEVEL", NOT "0 BEHIND". Stating a gap of
+                  nothing as a number reads as a bug, and level on points but
+                  behind on a tiebreak is a real and common state. */}
+              {stake.behind !== null && stake.aboveRank !== null && (
+                <p className="t-body text-muted">
+                  {stake.behind === 0
+                    ? <>Level with {ordinal(stake.aboveRank)} on points.</>
+                    : <>You are{' '}
+                        <span className="t-num t-num-extrabold text-ink">{stake.behind}</span>{' '}
+                        behind {ordinal(stake.aboveRank)}.</>}
+                </p>
+              )}
+              {stake.ahead !== null && stake.belowRank !== null && stake.ahead > 0 && (
+                <p className="t-body text-muted">
+                  You are{' '}
+                  <span className="t-num t-num-extrabold text-ink">{stake.ahead}</span>{' '}
+                  clear of {ordinal(stake.belowRank)}.
+                </p>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* WHAT IT WILL BE DECIDED ON — the matchweek you are picking, during the
+          wait. ⚠ Picks are OPEN the whole time the opponent is sealed; that is
+          the design, not an accident. This is the one thing a member can
+          actually do in the window, so it turns the wait into preparation
+          rather than dead time.
+
+          ⚠ These are already on the page: `liveMw` falls back to the OPEN
+          matchweek when nothing is in play, and during the sealed window the
+          open matchweek IS the sealed one. No extra read. */}
+      {inPlayMatchweek === null && sealedMatchweek !== null && fixtures.length > 0 && (
+        <Card padding="none" className="overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-4 sm:px-5 pt-5 pb-3">
+            <p className="t-card-title text-ink">
+              What it will be decided on
+            </p>
+            <span className="t-caption text-muted">{fixtures.length} fixtures</span>
+          </div>
+          <ul>
+            {fixtures.map((f) => (
+              <li key={f.id}
+                  className="flex items-center gap-3 px-4 sm:px-5 py-2.5 border-t border-border-default">
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <Crest url={f.homeCrest} name={f.homeName} />
+                  <span className="t-body text-ink truncate">{f.homeName}</span>
+                </span>
+                <span className="t-detail text-muted shrink-0">v</span>
+                <span className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                  <span className="t-body text-ink truncate text-right">{f.awayName}</span>
+                  <Crest url={f.awayCrest} name={f.awayName} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       {/* THE TALE OF THE TAPE — the two of you, measured against each other.
