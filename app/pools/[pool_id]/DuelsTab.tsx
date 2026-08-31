@@ -162,6 +162,46 @@ function Countdown({ to }: { to: string }) {
 }
 
 /**
+ * The standings, reduced from the duel rows themselves.
+ *
+ * Module-level rather than inline in a `useMemo` because it is run TWICE — once
+ * for now and once for "before the last matchweek settled", which is where the
+ * movement arrows come from. Two copies of this loop would be two chances for
+ * the arrow to describe a table nobody is looking at.
+ *
+ * `enginePoints` is `league_entry_totals.duel_points` when the caller has it.
+ * Without it the points are counted from the duels, which agrees with the
+ * engine only because `duelPoints.guard.test.ts` holds the constants to the
+ * migration that writes them.
+ */
+function buildDuelTable(
+  duels: DuelRow[],
+  enginePoints?: Map<string, number>,
+): Array<{ entry: string; w: number; d: number; l: number; pts: number }> {
+  const rows = new Map<string, { entry: string; w: number; d: number; l: number; pts: number }>()
+  const ensure = (e: string) => {
+    if (!rows.has(e)) rows.set(e, { entry: e, w: 0, d: 0, l: 0, pts: 0 })
+    return rows.get(e)!
+  }
+  for (const duel of duels) {
+    ensure(duel.entry_a)
+    if (duel.entry_b) ensure(duel.entry_b)
+    if (!duel.settled_at) continue
+    for (const [e, p] of [[duel.entry_a, duel.points_a], [duel.entry_b, duel.points_b]] as const) {
+      if (!e || p === null) continue
+      const r = ensure(e)
+      const o = duelResult(p)
+      if (o === 'won') r.w++
+      else if (o === 'tied') r.d++
+      else r.l++
+    }
+  }
+  for (const r of rows.values())
+    r.pts = enginePoints?.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE
+  return [...rows.values()].sort((a, b) => b.pts - a.pts || b.w - a.w)
+}
+
+/**
  * One side's pick for one fixture.
  *
  * ⚠ A pick both members share is DRAWN DOWN, not up. Agreements cannot separate
@@ -408,29 +448,37 @@ export default function DuelsTab({
 
   // The duel table — everyone, by duel points. Built from the duels themselves
   // so it cannot disagree with the fixture list beside it.
-  const table = useMemo(() => {
-    const rows = new Map<string, { entry: string; w: number; d: number; l: number; pts: number }>()
-    const ensure = (e: string) => {
-      if (!rows.has(e)) rows.set(e, { entry: e, w: 0, d: 0, l: 0, pts: 0 })
-      return rows.get(e)!
-    }
-    for (const duel of duels) {
-      ensure(duel.entry_a)
-      if (duel.entry_b) ensure(duel.entry_b)
-      if (!duel.settled_at) continue
-      for (const [e, p] of [[duel.entry_a, duel.points_a], [duel.entry_b, duel.points_b]] as const) {
-        if (!e || p === null) continue
-        const r = ensure(e)
-        const o = duelResult(p)
-        if (o === 'won') r.w++
-        else if (o === 'tied') r.d++
-        else r.l++
-      }
-    }
-    for (const r of rows.values())
-      r.pts = duelPoints.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE
-    return [...rows.values()].sort((a, b) => b.pts - a.pts || b.w - a.w)
-  }, [duels, duelPoints])
+  const table = useMemo(() => buildDuelTable(duels, duelPoints), [duels, duelPoints])
+
+  /**
+   * How far each member moved when the last duel settled.
+   *
+   * ⚠ DERIVED, NOT STORED. `league_entry_totals.previous_final_rank` tracks the
+   * WEEKLY ACCURACY rank, which is a different table — using it here would draw
+   * an arrow describing somebody else's movement. Rebuilding the standings one
+   * settled matchweek short is exact and costs nothing: the rows are already in
+   * memory.
+   *
+   * ⚠ The prior table cannot use `duelPoints`, which is today's total from the
+   * engine. It falls back to counting the duels, which is only correct because
+   * `DUEL_WIN`/`DUEL_TIE` are guarded against the migration that writes them.
+   *
+   * Positive is UP the table.
+   */
+  const movement = useMemo(() => {
+    const out = new Map<string, number>()
+    const settled = duels.filter((d) => d.settled_at).map((d) => d.matchweek_number)
+    if (!settled.length) return out
+    const latest = Math.max(...settled)
+    const before = buildDuelTable(duels.filter((d) => d.matchweek_number < latest))
+    // A member with no prior row is new to the table, not a riser — no arrow.
+    const was = new Map(before.map((r, i) => [r.entry, i + 1]))
+    table.forEach((r, i) => {
+      const prior = was.get(r.entry)
+      if (prior !== undefined && prior !== i + 1) out.set(r.entry, prior - (i + 1))
+    })
+    return out
+  }, [duels, table])
 
   const name = (e: string | null) => (e ? entryNames.get(e) ?? 'Unknown' : 'Bye')
   const person = (e: string | null): AvatarPerson | null => (e ? entryPeople.get(e) ?? null : null)
@@ -447,6 +495,18 @@ export default function DuelsTab({
   }
   const youInk = inkOf(inPlay?.you.entry ?? null)
   const themInk = inkOf(inPlay?.them?.entry ?? null)
+  /**
+   * Your colour, for the season table's corner glow.
+   *
+   * ⚠ `soft` (L=0.70), not the raw stop, for the same reason the duel card's
+   * corners use it: at a fixed alpha the ten palette colours differ enough in
+   * lightness that a peach glow shouts and an indigo one vanishes. Falls back
+   * to slate for a viewer with no entry — a super admin looking in.
+   */
+  const ownWash = (() => {
+    const p = person(ownEntryIds[0] ?? null)
+    return p ? avatarInk(p.user_id).soft : 'var(--sp-slate)'
+  })()
   /** Running points for an entry in the matchweek being played. */
   const live = (e: string | null) => (e ? livePoints.get(e) ?? 0 : 0)
 
@@ -1056,72 +1116,133 @@ export default function DuelsTab({
         </Card>
       )}
 
-      {/* Record — AFTER the three duel cards, not between them. Playing, picking
-          and sealed are one timeline and a stats block in the middle breaks it. */}
-      <Card padding="md">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-baseline gap-5">
-            <Stat label="Won" value={record.won} />
-            <Stat label="Tied" value={record.drawn} />
-            <Stat label="Lost" value={record.lost} />
-            {record.byes > 0 && <Stat label="Byes" value={record.byes} />}
-          </div>
-          <div className="text-right">
-            <p className="t-num t-num-black text-3xl text-ink">{record.won * 3 + record.drawn}</p>
-            <p className="t-detail text-muted mt-0.5">duel points</p>
+      {/* THE SEASON — the duel table, in the arena treatment.
+          ⚠ DARK, LIKE THE DUEL CARD AT THE TOP, and that is the point of the
+          change rather than decoration. This is the standing record of the mode
+          — the thing members argue about in November — and it was the quietest
+          card on the tab: a white table of small grey integers, fifth in the
+          scroll, indistinguishable from the working detail above it. The tab
+          now opens and closes in the same world (this week's duel, then the
+          season) with the light cards carrying the detail in between. It is
+          also RN's own treatment: `LiveMatchCard` is a #0F0F1A → #1A1830
+          diagonal with a coloured glow bleeding in from one corner.
+
+          ⚠ THE FACES ARE THE POINT, not the darkness. Every other surface on
+          this tab now carries somebody's colour; this table was the one place
+          still purely textual, so it was the one place you could not find
+          yourself at a glance. */}
+      <div className="rounded-card overflow-hidden bg-midnight relative">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(160deg,' +
+              ` color-mix(in srgb, ${ownWash} 16%, transparent) 0%,` +
+              ' transparent 46%)',
+          }}
+        />
+        {/* YOUR RECORD, folded in. It used to be its own white `Card` directly
+            above this one, which restated row 1 in different type and — once
+            this card went dark — read as a stranded slab. Nothing is lost: the
+            same four numbers, now the header of the thing they describe.
+
+            ⚠ IT ALSO CARRIED TWO STALE SUMS. It computed `won * 3 + drawn`,
+            which is the pre-121 rate, and it never counted BYES at all —
+            worth a point since migration 100 and 250 since 121. Both are gone:
+            the engine's own `duel_points` is the number, and the fallback only
+            runs for an entry the engine has no row for. */}
+        <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between
+                        gap-3 px-4 pt-5 pb-4">
+          <p className="t-caption text-white/45">The season</p>
+          <div className="flex items-baseline gap-4 sm:gap-5">
+            <Stat label="Won" value={record.won} tone="dark" />
+            <Stat label="Tied" value={record.drawn} tone="dark" />
+            <Stat label="Lost" value={record.lost} tone="dark" />
+            {record.byes > 0 && <Stat label="Byes" value={record.byes} tone="dark" />}
+            <span className="flex flex-col pl-3 sm:pl-4 border-l border-white/10">
+              <span className="t-num t-num-black text-2xl text-white">
+                {duelPoints.get(youEntry ?? '')
+                  ?? record.won * DUEL_WIN + (record.drawn + record.byes) * DUEL_TIE}
+              </span>
+              <span className="t-detail text-white/40 uppercase tracking-widest mt-0.5">duel points</span>
+            </span>
           </div>
         </div>
-      </Card>
 
-      {/* The duel table */}
-      <Card padding="none" className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[380px] text-sm tabular-nums">
-            {/* ⚠ HEADED LIKE THE OTHER CARDS ON THIS TAB, not like the other
-                data tables in the app. `t-caption text-muted` sitting on the
-                card surface is what "Tale of the tape" and the team sheet's
-                "You / 10 fixtures / Sarah C" both use; this was the one card on
-                the tab wearing a neutral-50 band and hand-rolled type
-                (`text-[10px] tracking-wider`), so it read as pasted in.
-
-                ⚠ IT NOW DIFFERS FROM `LeagueTableTab` AND `TableBreakdownView`,
-                which keep the band — deliberately. Those are dense figure
-                tables where a filled header helps the eye hold a column; this
-                is six columns of small integers under a card that has already
-                introduced itself. Ryan's call, 2026-08-31. If the band ever
-                comes back it should come back to all three at once.
-
-                The first body row's `border-t` becomes the rule under the
-                header, which is exactly how the team sheet above separates its
-                heading from its list. */}
+        {/* ⚠ W/T/L ARE DESKTOP ONLY, below. They pushed Pts — the column that
+            decides the table — off the right of a 375px screen and behind a
+            sideways scroll nobody would think to do. The header above already
+            carries YOUR record, and everybody else's W/T/L is detail a phone
+            can spare. `overflow-x-auto` stays as a floor for a long name. */}
+        <div className="relative overflow-x-auto">
+          <table className="w-full text-sm tabular-nums">
             <thead>
-              <tr className="t-caption text-muted">
-                <th className="pt-5 pb-3.5 pl-3 pr-1 text-left w-8">#</th>
+              <tr className="t-caption text-white/40">
+                <th className="pt-5 pb-3.5 pl-4 pr-1 text-left w-11">#</th>
                 <th className="pt-5 pb-3.5 px-2 text-left">Member</th>
-                <th className="pt-5 pb-3.5 px-2 text-right w-9">W</th>
-                <th className="pt-5 pb-3.5 px-2 text-right w-9">T</th>
-                <th className="pt-5 pb-3.5 px-2 text-right w-9">L</th>
-                <th className="pt-5 pb-3.5 pl-2 pr-3 text-right w-11">Pts</th>
+                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">W</th>
+                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">T</th>
+                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">L</th>
+                <th className="pt-5 pb-3.5 pl-2 pr-4 text-right w-16">Pts</th>
               </tr>
             </thead>
             <tbody>
-              {table.map((r, i) => (
-                <tr
-                  key={r.entry}
-                  className={`border-t border-border-default ${own.has(r.entry) ? 'bg-primary-50/40' : ''}`}
-                >
-                  <td className="py-2 pl-3 pr-1 font-bold text-neutral-900">{i + 1}</td>
-                  <td className="py-2 px-2 font-semibold text-neutral-900 truncate">{name(r.entry)}</td>
-                  <td className="py-2 px-2 text-right text-neutral-600">{r.w}</td>
-                  <td className="py-2 px-2 text-right text-neutral-600">{r.d}</td>
-                  <td className="py-2 px-2 text-right text-neutral-600">{r.l}</td>
-                  <td className="py-2 pl-2 pr-3 text-right font-bold text-neutral-900">{r.pts}</td>
-                </tr>
-              ))}
+              {table.map((r, i) => {
+                const you = own.has(r.entry)
+                const p = person(r.entry)
+                const colour = p ? avatarColor(p.user_id) : 'rgba(255,255,255,0.35)'
+                const moved = movement.get(r.entry) ?? 0
+                return (
+                  <tr
+                    key={r.entry}
+                    className="border-t border-white/10"
+                    /* Your row wears YOUR colour, faintly — the same hue as your
+                       face two rows up in the duel card, so finding yourself is
+                       recognition rather than reading ten names. */
+                    style={you
+                      ? { background: `color-mix(in srgb, ${colour} 14%, transparent)`,
+                          boxShadow: `inset 3px 0 0 0 ${colour}` }
+                      : undefined}
+                  >
+                    <td className="py-2.5 pl-4 pr-1">
+                      <span className="flex items-baseline gap-1">
+                        <span className={`t-num t-num-medium ${
+                          i === 0 ? 'text-accent-400' : you ? 'text-white' : 'text-white/45'}`}>
+                          {i + 1}
+                        </span>
+                        {/* ⚠ Silent until a duel settles. With nothing played
+                            every position is a tie nobody moved into, and an
+                            arrow would be inventing a story. */}
+                        {moved !== 0 && (
+                          <span className={`text-[9px] font-bold ${
+                            moved > 0 ? 'text-success-400' : 'text-danger-400'}`}>
+                            {moved > 0 ? '▲' : '▼'}{Math.abs(moved)}
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-2">
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        {p
+                          ? <Avatar person={p} size={26} />
+                          : <span className="block w-[26px] h-[26px] rounded-full bg-white/10 shrink-0" />}
+                        <span className={`truncate ${you ? 'font-bold text-white' : 'font-semibold text-white/85'}`}>
+                          {name(r.entry)}
+                        </span>
+                      </span>
+                    </td>
+                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.w}</td>
+                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.d}</td>
+                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.l}</td>
+                    <td className="py-2.5 pl-2 pr-4 text-right t-num t-num-black text-white">{r.pts}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
       <p className="text-xs text-neutral-400">
         The draw is made when the pool is created and rotates, so everybody meets everybody —
@@ -1437,11 +1558,21 @@ function FormDots({ types, align = 'left' }: { types: string[]; align?: 'left' |
   )
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, tone = 'light' }: {
+  label: string
+  value: number
+  /** `dark` for the midnight season card; the default is a normal white Card. */
+  tone?: 'light' | 'dark'
+}) {
   return (
     <span className="flex flex-col">
-      <span className="t-num t-num-extrabold text-xl text-ink">{value}</span>
-      <span className="t-detail text-muted uppercase tracking-widest mt-0.5">{label}</span>
+      <span className={`t-num t-num-extrabold text-xl ${tone === 'dark' ? 'text-white' : 'text-ink'}`}>
+        {value}
+      </span>
+      <span className={`t-detail uppercase tracking-widest mt-0.5 ${
+        tone === 'dark' ? 'text-white/40' : 'text-muted'}`}>
+        {label}
+      </span>
     </span>
   )
 }
