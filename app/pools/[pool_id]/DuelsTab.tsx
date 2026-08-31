@@ -122,6 +122,13 @@ type Side = { entry: string; points: number | null; accuracy: number | null }
  */
 const FIXTURES_PER_MATCHWEEK = 10
 
+/** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
+function ordinal(n: number): string {
+  const rem100 = n % 100
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`
+}
+
 export default function DuelsTab({
   duels,
   entryNames,
@@ -257,8 +264,23 @@ export default function DuelsTab({
         pb: livePoints.get(d.entry_b as string) ?? 0,
       }))
   }, [duels, inPlayMatchweek, own, livePoints])
-  /** The viewer, for the sealed card — which has no duel row to read from. */
-  const youName = ownEntryIds.length > 0 ? name(ownEntryIds[0]) : 'You'
+  /**
+   * The viewer, for the sealed card — which has no duel row to read from.
+   *
+   * `youMeta` mirrors the mockup's "2ND · 9 PTS": the rank and duel points the
+   * member carries INTO the sealed week, so the card says something about them
+   * even while it says nothing about the opponent.
+   */
+  const youEntry = ownEntryIds[0] ?? null
+  const youPerson = person(youEntry)
+  const youMeta = useMemo(() => {
+    if (!youEntry) return null
+    const t = totals.get(youEntry)
+    const bits: string[] = []
+    if (t?.rank) bits.push(`${ordinal(t.rank)}`)
+    bits.push(`${duelPoints.get(youEntry) ?? 0} pts`)
+    return bits.join(' \u00b7 ').toUpperCase()
+  }, [youEntry, totals, duelPoints])
 
   /**
    * Fixtures in the live matchweek with no score row yet.
@@ -350,11 +372,20 @@ export default function DuelsTab({
       )}
       {open && <DuelPanel m={open} state="picking" name={name} person={person} live={null} remaining={null} />}
 
-      {/* What is coming, without saying who — the payoff of a sealed draw.
-          There is no row for this matchweek in `duels`; RLS withheld it. The
-          same arena surface as a real duel, drained of colour on the right:
-          the shape is familiar, the person is not there yet. */}
-      {sealedMatchweek !== null && (
+      {/* WHAT IS COMING, WITHOUT SAYING WHO.
+          ⚠ ONLY BETWEEN ROUNDS. While a matchweek is being played this card is
+          hidden entirely — Ryan, 2026-08-30: it pulls attention off the duel
+          that is actually happening. `inPlayMatchweek === null` is exactly
+          "no matchweek is in play", so the card appears when the last one
+          settles and disappears when the next one kicks off.
+
+          ⚠ NO COUNTDOWN, and the mockup had one. That was drawn under the
+          open-for-picks rule, where a duel opened at a known instant. Migration
+          119 opens it when the PREVIOUS MATCHWEEK IS DECIDED, and there is no
+          timestamp for "when the last game is played and scored" — a clock here
+          would be counting to a number we invented. The gold line carries the
+          same weight and says the true thing instead. */}
+      {inPlayMatchweek === null && sealedMatchweek !== null && (
         <div className="rounded-card overflow-hidden bg-midnight relative">
           <div
             aria-hidden="true"
@@ -363,40 +394,55 @@ export default function DuelsTab({
               background:
                 'linear-gradient(105deg,' +
                 ' color-mix(in srgb, var(--primary-500) 22%, transparent) 0%,' +
-                ' transparent 50%, color-mix(in srgb, var(--sp-slate) 16%, transparent) 100%)',
+                ' transparent 52%, color-mix(in srgb, var(--sp-slate) 14%, transparent) 100%)',
             }}
           />
           <div className="relative px-5 pt-4 pb-5">
             <p className="t-caption text-white/45 text-center mb-4">
               Matchweek {sealedMatchweek}
-              <span className="ml-1.5 text-white/30">Sealed</span>
+              <span className="ml-1.5 text-white/30">Opponent sealed</span>
             </p>
+
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
-              <Corner side="blue" label="You" name={youName} person={person(ownEntryIds[0] ?? null)} />
-              <span className="t-display text-2xl text-white/20 select-none">V</span>
-              <div className="min-w-0 text-right">
-                {/* The circle a face has not arrived in yet. Dashed rather than
-                    empty, so it reads as withheld and not as missing data. */}
-                <div className="w-11 h-11 rounded-full ml-auto mb-2.5 flex items-center justify-center
+              <div className="min-w-0 flex items-center gap-3">
+                <div
+                  className="w-11 h-11 rounded-full shrink-0"
+                  style={{ boxShadow: '0 0 0 3px color-mix(in srgb, var(--primary-500) 45%, transparent)' }}
+                >
+                  {youPerson
+                    ? <Avatar person={youPerson} size={44} />
+                    : <div className="w-11 h-11 rounded-full bg-white/10" aria-hidden="true" />}
+                </div>
+                <div className="min-w-0">
+                  <p className="t-display text-xl text-white truncate">You</p>
+                  {youMeta && <p className="t-num t-num-medium text-xs text-white/45 mt-0.5">{youMeta}</p>}
+                </div>
+              </div>
+
+              <span className="t-display text-xl text-accent-400 select-none">V</span>
+
+              <div className="min-w-0 flex items-center gap-3 justify-end">
+                <div className="min-w-0 text-right">
+                  {/* Redacted, not blank — withheld reads differently from missing. */}
+                  <div className="h-5 w-24 ml-auto rounded bg-white/10" aria-hidden="true" />
+                  <p className="t-detail text-white/35 uppercase tracking-widest mt-1.5">Sealed</p>
+                  <span className="sr-only">Opponent not yet revealed</span>
+                </div>
+                <div className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center
                                 border border-dashed border-white/25 t-display text-lg text-white/35">
                   ?
                 </div>
-                <p className="t-detail text-white/35 uppercase tracking-widest">Sealed</p>
-                <div className="h-5 w-24 ml-auto mt-1 rounded bg-white/10" aria-hidden="true" />
-                <span className="sr-only">Opponent not yet revealed</span>
               </div>
             </div>
-            <p className="t-detail text-white/45 text-center mt-4 pt-4 border-t border-white/10 max-w-md mx-auto">
-              {/* Say the mechanism, not a mood. The draw really was made at pool
-                  creation; claiming a weekly pairing is the sentence that would
-                  fail the disclosure gate. */}
-              {sealedOpensAfter !== null ? (
-                <>Revealed once matchweek {sealedOpensAfter} is decided — or a day before you
-                pick, whichever comes first.</>
-              ) : (
-                <>Revealed once the current duel is decided — or a day before you pick,
-                whichever comes first.</>
-              )}
+
+            {/* The mockup's hero line. A state, not a clock. */}
+            <p className="t-display text-2xl text-accent-400 text-center mt-5">
+              {sealedOpensAfter !== null
+                ? `Opens when matchweek ${sealedOpensAfter} is decided`
+                : 'Opens when the current duel is decided'}
+            </p>
+            <p className="t-detail text-white/40 text-center mt-3 pt-3 border-t border-white/10">
+              Or a day before you pick, whichever comes first.
             </p>
           </div>
         </div>
