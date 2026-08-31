@@ -163,8 +163,6 @@ export type ShowdownData = {
    * withholds them — so the sealed card cannot derive this and has to be told.
    */
   sealedMatchweek: number | null
-  /** The matchweek that must FINISH first — not a clock. Migration 119. */
-  sealedOpensAfter: number | null
   /** The LATEST it can open — 24h before its own lock. The only real instant. */
   sealedOpensAtLatest: string | null
   /** entry_id → the person behind it, for the faces in the corners. */
@@ -2316,7 +2314,6 @@ export function PoolDetail({
                 openMatchweek={showdownData.openMatchweek}
                 inPlayMatchweek={showdownData.inPlayMatchweek}
                 sealedMatchweek={showdownData.sealedMatchweek}
-                sealedOpensAfter={showdownData.sealedOpensAfter}
                 sealedOpensAtLatest={showdownData.sealedOpensAtLatest}
                 entryPeople={showdownData.entryPeople}
                 livePoints={showdownData.livePoints}

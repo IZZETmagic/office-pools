@@ -27,7 +27,7 @@
 // withholds the rows, so `duels` contains only matchweeks that have opened. Do
 // not add them back: this component could not render them if it tried.
 //
-// That is also why `sealedMatchweek` and `sealedOpensAfter` are passed
+// That is also why `sealedMatchweek` is passed
 // separately: the sealed card needs numbers that no longer arrive with the
 // duels, because the whole point is that those rows are gone.
 //
@@ -89,12 +89,15 @@ type Props = {
   /** The matchweek being played right now. Null between rounds. */
   inPlayMatchweek: number | null
   /**
-   * The first matchweek still SEALED, and the matchweek that has to FINISH
-   * before it opens (migration 119). Null at the end of the season.
+   * The first matchweek still SEALED. Null at the end of the season.
+   *
+   * ⚠ It used to be paired with `sealedOpensAfter` — "opens when matchweek N
+   * is decided" — which the card led with when the rule had no clock. Migration
+   * 123's 48-hour hold gives it one, so the card leads with the countdown and
+   * that prop is gone rather than left unread.
    */
   sealedMatchweek: number | null
-  sealedOpensAfter: number | null
-  /** The LATEST the duel can open — 24h before its own lock (migration 120). */
+  /** WHEN the duel opens — read from `league_duel_reveals_at` (123). */
   sealedOpensAtLatest: string | null
   /** entry_id → the person behind it, for the faces in the corners. */
   entryPeople: Map<string, AvatarPerson>
@@ -420,7 +423,6 @@ export default function DuelsTab({
   openMatchweek,
   inPlayMatchweek,
   sealedMatchweek,
-  sealedOpensAfter,
   sealedOpensAtLatest,
   entryPeople,
   livePoints,
@@ -943,21 +945,37 @@ export default function DuelsTab({
                 ' transparent 52%, color-mix(in srgb, var(--sp-slate) 14%, transparent) 100%)',
             }}
           />
-          <div className="relative px-5 pt-4 pb-5">
-            <p className="t-caption text-white/45 text-center mb-4">
+          <div className="relative px-5 md:px-10 pt-6 pb-7">
+            {/* ⚠ THE MATCHWEEK LEADS. It was an 11px eyebrow with "Opponent
+                sealed" trailing after it, so the first thing on the card was a
+                state and the thing that tells you WHICH WEEK you are looking at
+                was the smallest text on screen. The sealed state is already
+                said three ways below — a redacted bar, a dashed "?", and a
+                countdown "until your opponent is revealed" — so saying it a
+                fourth time up here bought nothing. */}
+            <p className="t-display text-2xl sm:text-3xl text-white text-center">
               Matchweek {sealedMatchweek}
-              <span className="ml-1.5 text-white/30">Opponent sealed</span>
             </p>
 
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
-              <div className="min-w-0 flex items-center gap-3">
-                {/* Your own colour, as on the duel card. This ring was
-                    primary-500 — a fixed blue drawn touching whatever colour
-                    your face actually is. The OPPONENT side of this card stays
-                    slate on purpose: there is no person there yet to have a
-                    colour, which is the whole point of the sealed state. */}
+            {/* ⚠ THE CLOCK IN THE MIDDLE, THE FACES IN THE CORNERS — Ryan,
+                2026-08-31. The countdown IS the event of this card, so it takes
+                the centre column and the faces move to the edges rather than
+                huddling around a "V". Same grid as the duel card's hero, which
+                is the point: this is that card with the score not yet written.
+
+                The avatars are 72px from `sm` — larger than the duel card's 64
+                — because on this card they are all there is. */}
+            {/* ⚠ THE PHONE STACKS. At 375px a three-column row cannot hold two
+                72px faces AND "3d 00:25:23" — the clock ran straight through
+                the "?" circle. So the phone puts the countdown on its own row
+                above the two faces, and the corners layout starts at `sm`,
+                which is where Ryan asked for it anyway. */}
+            <div className="grid grid-cols-2 sm:grid-cols-[auto_1fr_auto] items-center
+                            gap-x-6 gap-y-5 sm:gap-8 mt-6">
+              <div className="order-2 sm:order-none justify-self-start sm:justify-self-auto
+                              flex flex-col items-center gap-2 min-w-0">
                 <div
-                  className="w-11 h-11 rounded-full shrink-0"
+                  className="w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-full shrink-0"
                   style={{
                     boxShadow: `0 0 0 3px color-mix(in srgb, ${
                       youPerson ? avatarColor(youPerson.user_id) : 'rgba(255,255,255,0.20)'
@@ -965,11 +983,17 @@ export default function DuelsTab({
                   }}
                 >
                   {youPerson
-                    ? <Avatar person={youPerson} size={44} />
-                    : <div className="w-11 h-11 rounded-full bg-white/10" aria-hidden="true" />}
+                    ? <Avatar person={youPerson} size={72} />
+                    : <div className="w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-full bg-white/10"
+                           aria-hidden="true" />}
                 </div>
-                <div className="min-w-0">
-                  <p className="t-display text-xl text-white truncate">You</p>
+                {/* ⚠ THEIR NAME, NOT "YOU". The other side of this card is a
+                    blank where a name will be, so the contrast only reads if
+                    ours is a name too. */}
+                <div className="min-w-0 text-center">
+                  <p className="t-display text-base sm:text-lg text-white truncate max-w-[9rem]">
+                    {name(youEntry)}
+                  </p>
                   {youMeta && (
                     <p className="t-num t-num-medium text-xs text-white/45 mt-0.5 whitespace-nowrap">
                       {youMeta}
@@ -978,61 +1002,39 @@ export default function DuelsTab({
                 </div>
               </div>
 
-              <span className="t-display text-xl text-accent-400 select-none">V</span>
+              <div className="order-1 col-span-2 sm:col-span-1 sm:order-none text-center min-w-0">
+                {sealedOpensAtLatest && (
+                  <p className="t-num t-num-black text-3xl sm:text-5xl text-accent-400
+                                whitespace-nowrap">
+                    <Countdown to={sealedOpensAtLatest} />
+                  </p>
+                )}
+                <p className="t-caption text-white/45 mt-2">
+                  until your opponent is revealed
+                </p>
+              </div>
 
-              <div className="min-w-0 flex items-center gap-3 justify-end">
-                <div className="min-w-0 text-right">
-                  {/* Redacted, not blank — withheld reads differently from missing. */}
-                  <div className="h-5 w-24 ml-auto rounded bg-white/10" aria-hidden="true" />
-                  <p className="t-detail text-white/35 uppercase tracking-widest mt-1.5">Sealed</p>
-                  <span className="sr-only">Opponent not yet revealed</span>
-                </div>
-                <div className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center
-                                border border-dashed border-white/25 t-display text-lg text-white/35">
+              <div className="order-3 sm:order-none justify-self-end sm:justify-self-auto
+                              flex flex-col items-center gap-2 min-w-0">
+                <div className="w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-full shrink-0
+                                flex items-center justify-center border border-dashed
+                                border-white/25 t-display text-xl sm:text-2xl text-white/35">
                   ?
                 </div>
+                {/* Redacted, not blank — withheld reads differently from missing. */}
+                <div className="h-4 w-20 rounded bg-white/10" aria-hidden="true" />
+                <span className="sr-only">Opponent not yet revealed</span>
               </div>
             </div>
 
-            {/* ⚠ THE CLOCK IS THE POINT NOW, so it is the biggest thing here.
-                It used to be a hedged footnote reading "…at the latest", and
-                that was correct under 119: the rule's main arm was "when the
-                previous matchweek is decided", which has no timestamp, so the
-                only instant available was migration 120's floor and a bare
-                countdown would have been a promise we could not keep.
-
-                Migration 123 changed that. The duel opens 48 hours after the
-                previous matchweek settles, so once it HAS settled the instant
-                is exact — and the wait is deliberate. This is the anticipation
-                window: you know the duel is over, you can pick the next
-                matchweek, and you do not yet know who you are playing.
-
-                ⚠ IT OPENS ON THE CLOCK, NOT ON A VISIT. Miss it by three days
-                and you see it three days later, with nothing lost. The moment a
-                reveal needs a member to be present at a time, it stops being a
-                surprise and becomes a retention mechanic — which is exactly
-                what the disclosure gate is for. */}
-            {sealedOpensAtLatest && (
-              <p className="t-num t-num-black text-3xl sm:text-4xl text-accent-400 text-center mt-5">
-                <Countdown to={sealedOpensAtLatest} />
-              </p>
-            )}
-            <p className="t-display text-lg text-white text-center mt-2">
-              {sealedOpensAfter !== null
-                ? `until matchweek ${sealedOpensAfter + 1} is revealed`
-                : 'until your next opponent is revealed'}
-            </p>
-            {/* ⚠ BOTH ARMS, because both really happen. The 48h hold is the
-                usual one; the floor bites when a postponement stalls settlement
-                (094) and in the two weeks a season where the gap is under 72h.
-                A member who only ever hears the hold will read a floor week as
-                the rule breaking. */}
-            <div className="mt-4 pt-3 border-t border-white/10 text-center">
-              <p className="t-detail text-white/40">
-                Two days after your last duel is decided, or a day before you
-                pick &mdash; whichever comes first.
-              </p>
-            </div>
+            {/* ⚠ THE RULE EXPLAINER IS GONE from this card — Ryan's call. It
+                read "Two days after your last duel is decided, or a day before
+                you pick — whichever comes first", which is the disclosure
+                sentence and belongs where somebody goes to READ the rules.
+                Both Pool Info and Scoring Rules still carry it and
+                `leagueModeCopy.guard.test.ts` REQUIRES them to, so the gate is
+                unaffected: the mechanic is disclosed, one tap away, and this
+                surface is the ceremony rather than the manual. */}
           </div>
         </div>
       )}
@@ -1056,19 +1058,21 @@ export default function DuelsTab({
             />
           </div>
           {mySheet.open.length === 0 ? (
-            /* ⚠ A FINISHED SHEET GETS A WAY IN, NOT A TASK. The rule is still
-               that we do not ask for something already done — "Finish your
-               picks" on a full sheet is nagging — but reviewing is not asking,
-               and a member who wants to check what they put down should not
-               have to go hunting for the tab. So: a SECONDARY button, with the
-               primary reserved for the state that actually needs an action. */
+            /* ⚠ A FINISHED SHEET GETS A WAY IN, NOT A TASK. We still do not
+               ask for something already done — "Finish your picks" on a full
+               sheet is nagging — but reviewing is not asking.
+               ⚠ AND IT IS THE SAME BLUE BUTTON. I made it a secondary outline
+               to keep the primary "for the state that needs an action"; Ryan
+               overturned it, and he is right — this is the only action on the
+               card either way, so demoting it just made the card look like it
+               had nothing to offer. */
             <>
               <p className="t-body text-muted mt-3">Your sheet is in. Nothing left to pick.</p>
               <button
                 type="button"
                 onClick={() => router.push(`/pools/${poolId}?tab=predictions`)}
-                className="w-full rounded-pill border border-border-default text-ink t-caption
-                           py-3.5 mt-4 hover:bg-mist active:bg-silver/40 transition-colors"
+                className="w-full rounded-pill bg-primary-600 text-white t-caption
+                           py-3.5 mt-4 hover:bg-primary-700 active:bg-primary-800 transition-colors"
               >
                 See your picks
               </button>

@@ -254,7 +254,6 @@ export default async function PoolPage({
         openMatchweek: null,
         inPlayMatchweek: null,
         sealedMatchweek: null,
-        sealedOpensAfter: null,
         sealedOpensAtLatest: null,
         duelPoints: new Map(
           [...totalsRes.totals].map(([entryId, t]) => [entryId, t.duelPoints]),
@@ -482,7 +481,6 @@ export default async function PoolPage({
           // The sealed card's two facts. They cannot come off `duels` — the
           // rows for a sealed matchweek are not in the payload at all.
           showdownData.sealedMatchweek = view.sealedMatchweekNumber
-          showdownData.sealedOpensAfter = view.sealedOpensAfterMatchweek
           showdownData.sealedOpensAtLatest = view.sealedOpensAtLatest
 
           // The RUNNING score of the duel being played. `league_duels` carries
