@@ -508,6 +508,24 @@ export default function DuelsTab({
     return (entryId: string, fixtureId: string) => taps.get(`${entryId}:${fixtureId}`) ?? null
   }, [leagueOutcomes, allPredictions])
 
+  /**
+   * Is a match being played AT THIS MOMENT — as opposed to the matchweek merely
+   * being in progress?
+   *
+   * ⚠ They are different states and the difference is the whole reason the dot
+   * only pulses sometimes. Matchweek 2 is "in progress" from Friday's kickoff
+   * until Monday night, but for most of that window no ball is in play. A dot
+   * pulsing through Sunday morning would be claiming something untrue, and the
+   * one on Saturday at 3pm would mean nothing because it never stops.
+   */
+  const anyFixtureLive = useMemo(
+    () => fixtures.some((f) => getLiveClock({
+      status: f.status, livePeriod: f.livePeriod,
+      liveMinute: f.liveMinute, liveAdded: f.liveAdded,
+    }) !== null),
+    [fixtures],
+  )
+
   const breakdown = useMemo(() => {
     if (!inPlay || !inPlay.them || inPlayMatchweek === null) return []
     const mine = perFixture.get(inPlay.you.entry) ?? new Map<number, number>()
@@ -644,9 +662,13 @@ export default function DuelsTab({
           m={inPlay} state="playing" name={name} person={person}
           live={{ you: live(inPlay.you.entry), them: live(inPlay.them?.entry ?? null) }}
           remaining={remainingFixtures}
+          liveNow={anyFixtureLive}
         />
       )}
-      {open && <DuelPanel m={open} state="picking" name={name} person={person} live={null} remaining={null} />}
+      {open && (
+        <DuelPanel m={open} state="picking" name={name} person={person}
+          live={null} remaining={null} liveNow={false} />
+      )}
 
       {/* WHAT IS COMING, WITHOUT SAYING WHO.
           ⚠ ONLY BETWEEN ROUNDS. While a matchweek is being played this card is
@@ -1041,7 +1063,7 @@ export default function DuelsTab({
  * cannot tell the games being played from the games they are still picking.
  */
 function DuelPanel({
-  m, state, name, person, live, remaining,
+  m, state, name, person, live, remaining, liveNow,
 }: {
   m: { duel: DuelRow; you: Side; them: Side | null; matchweek: number }
   state: 'playing' | 'picking'
@@ -1051,6 +1073,8 @@ function DuelPanel({
   live: { you: number; them: number } | null
   /** Fixtures in this matchweek with no score row yet. */
   remaining: number | null
+  /** A ball is in play RIGHT NOW — not merely "the matchweek is in progress". */
+  liveNow: boolean
 }) {
   const decided = m.duel.settled_at && m.them
   return (
@@ -1070,12 +1094,31 @@ function DuelPanel({
         }}
       />
       <div className="relative px-5 pt-4 pb-5">
-        <p className="t-caption text-white/45 text-center mb-4">
-          Matchweek {m.matchweek}
-          <span className="ml-1.5 text-white/30">
-            {state === 'playing' ? 'Being played now' : 'You are picking this one'}
-          </span>
-        </p>
+        <div className="flex items-center justify-center gap-2.5 mb-4">
+          {state === 'playing' && (
+            <span className="relative flex w-2.5 h-2.5 shrink-0" aria-hidden="true">
+              {/* Pulses ONLY while a ball is in play. A ring that never stops
+                  stops meaning anything, and reduced-motion users get the dot
+                  without the ring rather than nothing. */}
+              {liveNow && (
+                <span className="absolute inline-flex w-full h-full rounded-full bg-danger-500 opacity-75
+                                 animate-ping motion-reduce:hidden" />
+              )}
+              <span className={`relative inline-flex w-2.5 h-2.5 rounded-full
+                ${liveNow ? 'bg-danger-500' : 'bg-white/30'}`} />
+            </span>
+          )}
+          {/* Bigger and brighter than the caption it was — this is the one line
+              that says WHICH week the card is about. */}
+          <p className="t-caption text-sm text-white/75">
+            Matchweek {m.matchweek}
+            <span className="ml-2 text-xs text-white/35">
+              {state === 'playing'
+                ? (liveNow ? 'Live now' : 'Being played')
+                : 'You are picking this one'}
+            </span>
+          </p>
+        </div>
 
         {m.them ? (
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
