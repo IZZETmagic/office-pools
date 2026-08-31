@@ -133,8 +133,18 @@ describe('the sealed draw is described honestly', () => {
       const info = leagueModeInfo('showdown', depth)
       const all = [info.description, ...info.points].join(' ')
       expect(all, depth).toMatch(/drawn when the pool is created/i)
-      expect(all, depth).toMatch(/one matchweek at a time/i)
+      // Migration 119: one duel at a time. The copy has to carry BOTH halves —
+      // when the draw was made, and when each opponent opens — because the
+      // second is the part a member would otherwise assume is a weekly draw.
+      expect(all, depth).toMatch(/once the previous duel is decided/i)
+      expect(all, depth).toMatch(/one duel at a time/i)
+      // Migration 120's floor. A member who only ever hears the settle arm will
+      // read a postponement week as the rule breaking, so both clauses ship.
+      expect(all, depth).toMatch(/a day before you pick/i)
       expect(all, depth).not.toMatch(/published in advance/i)
+      // The R1 rule, superseded. A surface still promising the opponent at
+      // matchweek-open is describing behaviour the database no longer has.
+      expect(all, depth).not.toMatch(/revealed when the matchweek opens/i)
     }
   })
 })

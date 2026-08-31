@@ -134,6 +134,7 @@ function mw(n: number, over: Partial<MatchweekRow> = {}): MatchweekRow {
     completed_fixture_count: 0,
     lock_at: new Date(NOW + 24 * HOUR * n).toISOString(),
     first_kickoff_at: null,
+    ranks_snapshot_at: null,
     ...over,
   }
 }

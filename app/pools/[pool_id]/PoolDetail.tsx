@@ -129,7 +129,8 @@ export type ShowdownData = {
    * withholds them — so the sealed card cannot derive this and has to be told.
    */
   sealedMatchweek: number | null
-  sealedOpensAt: string | null
+  /** The matchweek that must FINISH first — not a clock. Migration 119. */
+  sealedOpensAfter: number | null
   duelPoints: Map<string, number>
 }
 
@@ -2227,7 +2228,7 @@ export function PoolDetail({
                 openMatchweek={showdownData.openMatchweek}
                 inPlayMatchweek={showdownData.inPlayMatchweek}
                 sealedMatchweek={showdownData.sealedMatchweek}
-                sealedOpensAt={showdownData.sealedOpensAt}
+                sealedOpensAfter={showdownData.sealedOpensAfter}
                 duelPoints={showdownData.duelPoints}
               />
             )}

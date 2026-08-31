@@ -182,7 +182,7 @@ export default async function PoolPage({
         openMatchweek: null,
         inPlayMatchweek: null,
         sealedMatchweek: null,
-        sealedOpensAt: null,
+        sealedOpensAfter: null,
         duelPoints: new Map(
           ((totalsRes.data ?? []) as Array<{ entry_id: string; duel_points: number }>)
             .map((r) => [r.entry_id, r.duel_points]),
@@ -395,7 +395,7 @@ export default async function PoolPage({
           // The sealed card's two facts. They cannot come off `duels` — the
           // rows for a sealed matchweek are not in the payload at all.
           showdownData.sealedMatchweek = view.sealedMatchweekNumber
-          showdownData.sealedOpensAt = view.sealedOpensAt
+          showdownData.sealedOpensAfter = view.sealedOpensAfterMatchweek
         }
         // LMS needs BOTH, for two different jobs. The pick is WRITTEN against
         // the open week — that is what a member can still change. The screen

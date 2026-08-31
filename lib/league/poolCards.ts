@@ -244,7 +244,7 @@ export async function readLeagueCardFacts(
 
   const { data: mwData, error: mwErr } = await admin
     .from('league_matchweeks')
-    .select('matchweek_id, matchweek_number, fixture_count, completed_fixture_count, lock_at, first_kickoff_at, season_id')
+    .select('matchweek_id, matchweek_number, fixture_count, completed_fixture_count, lock_at, first_kickoff_at, ranks_snapshot_at, season_id')
     .in('season_id', seasonIds)
   // A card is decoration around a link. If the league tables cannot be read the
   // list must still render, so every failure below degrades to EMPTY rather
@@ -565,24 +565,31 @@ export async function readLeagueCardFacts(
         .map((r) => [r.entry_id, r.duel_points ?? 0]),
     )
 
-    // The TS half of `league_duel_is_revealed` (migration 116). Measured in LOCK
-    // TIME, never matchweek number: rounds are played out of numerical order —
-    // minimum gap −121 days across three real seasons (migration 101) — so a
-    // number comparison seals a matchweek being played and reveals one weeks
-    // away. `openByPool` already holds the open matchweek, from the same
-    // `openMatchweekId` that mirrors `league_open_matchweek`.
+    // The TS half of `league_duel_is_revealed` (migration 119): a matchweek's
+    // duel opens once the matchweek BEFORE IT has settled, so exactly one duel
+    // is live at a time.
     //
-    // No open matchweek means the season is over, and then everything that ever
-    // locked is revealed — the same COALESCE(..., now()) branch the SQL takes,
-    // and for the same reason: without it a finished season hides its own
-    // results.
+    // Ordered by LOCK TIME, never matchweek number — rounds are played out of
+    // numerical order, minimum gap −121 days across three real seasons
+    // (migration 101). Keyed on `ranks_snapshot_at`, never on a fixture count:
+    // a postponed fixture leaves `completed < total` for the rest of the season
+    // and would stall the reveal forever (migration 094).
     const revealed = (pool: LeagueCardPool, matchweekNumber: number): boolean => {
       if (!pool.seasonId) return false
-      const mw = (bySeason.get(pool.seasonId) ?? [])
-        .find((m) => m.matchweek_number === matchweekNumber)
-      if (!mw?.lock_at) return false
-      const through = openByPool.get(pool.poolId)?.lock_at
-      return new Date(mw.lock_at).getTime() <= (through ? new Date(through).getTime() : now)
+      const inLockOrder = (bySeason.get(pool.seasonId) ?? [])
+        .filter((m) => m.lock_at !== null)
+        .sort((a, b) =>
+          new Date(a.lock_at!).getTime() - new Date(b.lock_at!).getTime()
+          || a.matchweek_number - b.matchweek_number)
+      const i = inLockOrder.findIndex((m) => m.matchweek_number === matchweekNumber)
+      if (i === -1) return false
+      // The season's first playable matchweek has no predecessor and is open —
+      // without that arm a new pool would show nothing, for ever.
+      if (i === 0 || inLockOrder[i - 1].ranks_snapshot_at !== null) return true
+      // The 24-hour floor (migration 120): a postponed matchweek settles only
+      // when the next one LOCKS (094), which would otherwise reveal the
+      // opponent at the moment picks close. Never fires in a normal week.
+      return new Date(inLockOrder[i].lock_at!).getTime() - 24 * 3600_000 <= now
     }
 
     // Opponent names. Only the entries actually drawn against somebody on this

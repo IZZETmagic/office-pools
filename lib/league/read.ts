@@ -46,21 +46,23 @@ export type LeaguePoolView = {
   /** The matchweek being played right now. Null between rounds. */
   inPlayMatchweekNumber: number | null
   /**
-   * The next matchweek after the open one, in LOCK order — the first one whose
-   * Showdown duel is still sealed (migration 116).
+   * The first matchweek whose Showdown duel is still SEALED, in lock order.
    *
-   * Showdown only reads these two. The duel rows for this matchweek are not in
-   * the payload at all — RLS withholds them — so the sealed card needs the
-   * number from somewhere, and this is it. Null when the open matchweek is the
-   * last one of the season.
+   * Its duel rows are not in the payload at all — RLS withholds them — so the
+   * sealed card needs the number from somewhere, and this is it. Null when
+   * everything left is already open.
    */
   sealedMatchweekNumber: number | null
   /**
-   * When that duel opens: the instant the OPEN matchweek locks, because that is
-   * when the next one becomes the open one and `league_duel_is_revealed` starts
-   * saying yes. R1, Ryan 2026-08-30.
+   * The matchweek that has to FINISH before that one opens (migration 119).
+   *
+   * ⚠ Not a timestamp. It used to be the instant the open matchweek locked,
+   * back when a duel opened for picks; since 119 a duel opens when the previous
+   * matchweek SETTLES, and there is no clock for that — it happens when the
+   * last game is played and scored. So the card says "when matchweek 2
+   * finishes", which is both true and the thing the member is watching anyway.
    */
-  sealedOpensAt: string | null
+  sealedOpensAfterMatchweek: number | null
 }
 
 type ClubRow = {
@@ -98,6 +100,14 @@ export type MatchweekRow = {
   completed_fixture_count: number
   lock_at: string | null
   first_kickoff_at: string | null
+  /**
+   * When this matchweek was fully played AND fully scored (084's settle stamp).
+   *
+   * Needed because migration 119 opens a Showdown duel when the matchweek
+   * BEFORE it carries this — never on `completed_fixture_count >= fixture_count`,
+   * which a postponed fixture leaves false for the rest of the season (094).
+   */
+  ranks_snapshot_at: string | null
 }
 
 /**
@@ -379,7 +389,7 @@ export async function readLeaguePoolView(
 
   const { data: mws, error: mwErr } = await supabase
     .from('league_matchweeks')
-    .select('matchweek_id, matchweek_number, fixture_count, completed_fixture_count, lock_at, first_kickoff_at')
+    .select('matchweek_id, matchweek_number, fixture_count, completed_fixture_count, lock_at, first_kickoff_at, ranks_snapshot_at')
     .eq('season_id', args.seasonId)
     .order('matchweek_number', { ascending: true })
     .range(0, 999)
@@ -418,18 +428,31 @@ export async function readLeaguePoolView(
   const openId = openMatchweekId(matchweekRows, now)
   const inPlayId = inPlayMatchweekId(matchweekRows, now)
 
-  // The first matchweek still SEALED for Showdown, and when it opens. Found in
-  // lock order rather than by number, for the same reason `openMatchweekId` is:
-  // a whole round can be moved, so the next matchweek to be played is not
-  // reliably the next number up (migration 101, minimum gap −121 days).
-  const openRow = matchweekRows.find((m) => m.matchweek_id === openId) ?? null
-  const openLock = openRow?.lock_at ? new Date(openRow.lock_at).getTime() : null
-  const sealedRow =
-    openLock === null
-      ? null
-      : matchweekRows
-          .filter((m) => m.lock_at !== null && new Date(m.lock_at).getTime() > openLock)
-          .sort((a, b) => new Date(a.lock_at!).getTime() - new Date(b.lock_at!).getTime())[0] ?? null
+  // The first matchweek still SEALED, and the one that has to finish first.
+  //
+  // The TS mirror of `league_duel_is_revealed` (migration 119): a matchweek is
+  // open once the matchweek BEFORE IT has settled. In lock order rather than by
+  // number — a whole round can be moved (101, minimum gap −121 days) — and on
+  // `ranks_snapshot_at` rather than a fixture count, because a postponement
+  // leaves the count short for the rest of the season (094).
+  const inLockOrder = matchweekRows
+    .filter((m) => m.lock_at !== null)
+    .sort((a, b) =>
+      new Date(a.lock_at!).getTime() - new Date(b.lock_at!).getTime()
+      || a.matchweek_number - b.matchweek_number)
+  // ⚠ The 24-hour floor (migration 120) is part of the rule, not a detail. A
+  // postponed matchweek settles only when the NEXT one locks (094), which
+  // without this would reveal the opponent at the instant picks close. It never
+  // fires in a normal week — settlement leads the next lock by 66h at the
+  // season's tightest.
+  const FLOOR_MS = 24 * 3600_000
+  const revealedAt = (i: number) =>
+    i === 0
+    || inLockOrder[i - 1].ranks_snapshot_at !== null
+    || new Date(inLockOrder[i].lock_at!).getTime() - FLOOR_MS <= now
+  const firstSealedIdx = inLockOrder.findIndex((_, i) => !revealedAt(i))
+  const sealedRow = firstSealedIdx === -1 ? null : inLockOrder[firstSealedIdx]
+  const blockedByRow = firstSealedIdx <= 0 ? null : inLockOrder[firstSealedIdx - 1]
 
   return {
     view: {
@@ -442,7 +465,7 @@ export async function readLeaguePoolView(
       openMatchweekNumber: openId === null ? null : numberByMatchweekId.get(openId) ?? null,
       inPlayMatchweekNumber: inPlayId === null ? null : numberByMatchweekId.get(inPlayId) ?? null,
       sealedMatchweekNumber: sealedRow === null ? null : sealedRow.matchweek_number,
-      sealedOpensAt: openRow?.lock_at ?? null,
+      sealedOpensAfterMatchweek: blockedByRow === null ? null : blockedByRow.matchweek_number,
     },
     error: null,
   }

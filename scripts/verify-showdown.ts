@@ -442,7 +442,7 @@ async function neverInThePast() {
 }
 
 async function theSeal() {
-  head('8. The draw is SEALED until its matchweek opens (migration 116)')
+  head('8. ONE DUEL AT A TIME — the draw opens as duels are decided (116/119/120)')
 
   // ⚠ WHY THIS SECTION EXISTS AT ALL.
   //
@@ -518,20 +518,48 @@ async function theSeal() {
   const memberWeeks = new Set((asMemberRows ?? []).map((d) => d.matchweek_number as number))
 
   eq('service_role still sees the whole season', adminWeeks.size, WEEKS)
-  eq('the member sees ONLY the open matchweek', [...memberWeeks].join(','), '1')
+  // ONE DUEL AT A TIME (119). Only matchweek 1 is open, because it is the only
+  // one with no predecessor.
+  //
+  // ⚠ Section 3 does NOT settle matchweek 1 for this purpose. It calls
+  // `league_score_duels` directly, which settles the DUELS; the matchweek's own
+  // `ranks_snapshot_at` is stamped by `league_snapshot_matchweek_ranks`, and in
+  // production the duel settle trigger fires FROM that stamp rather than the
+  // other way round. So nothing here is stamped, and matchweek 2 stays sealed —
+  // which is the predicate behaving correctly, not a gap in the fixture.
+  eq('the member sees only the duels that have opened', [...memberWeeks].sort((a, b) => a - b).join(','), '1')
   eq('…and every later matchweek is withheld',
      [...adminWeeks].filter((w) => w > 1).every((w) => !memberWeeks.has(w)), true)
   note('a service-role-only test of this policy would pass with the seal wide open')
 
-  // The predicate itself, both sides of the line.
-  const openRevealed = await must('predicate mw1', admin.rpc('league_duel_is_revealed', {
-    p_pool_id: POOL_EVEN, p_matchweek_number: 1,
-  }))
-  const nextRevealed = await must('predicate mw2', admin.rpc('league_duel_is_revealed', {
-    p_pool_id: POOL_EVEN, p_matchweek_number: 2,
-  }))
-  eq('league_duel_is_revealed says yes for the open matchweek', openRevealed as unknown, true)
-  eq('…and no for the one after it', nextRevealed as unknown, false)
+  const revealed = async (n: number) => await must(`predicate mw${n}`,
+    admin.rpc('league_duel_is_revealed', { p_pool_id: POOL_EVEN, p_matchweek_number: n })) as unknown
+
+  eq('the first matchweek has no predecessor, so it is open', await revealed(1), true)
+  eq('…and the one after an unsettled matchweek is not', await revealed(2), false)
+
+  // ⚠ THE REVEAL FOLLOWS THE RESULT. Settling matchweek 2 must open matchweek 3
+  // and nothing further — this is the whole mechanic, and a rule that opened
+  // two at once would look identical on the counts above.
+  await must('settle mw1', admin.from('league_matchweeks')
+    .update({ ranks_snapshot_at: new Date().toISOString() })
+    .eq('matchweek_id', MW(1)).select('matchweek_id'))
+  eq('settling a duel opens the next one', await revealed(2), true)
+  eq('…and only the next one', await revealed(3), false)
+  await must('unsettle mw1', admin.from('league_matchweeks')
+    .update({ ranks_snapshot_at: null }).eq('matchweek_id', MW(1)).select('matchweek_id'))
+
+  // The 24-hour floor (120). A postponed matchweek settles only when the NEXT
+  // one locks (094), which without this reveals the opponent as picks close.
+  await must('mw2 locks within the hour', admin.from('league_matchweeks')
+    .update({ lock_at: new Date(Date.now() + 3600e3).toISOString() })
+    .eq('matchweek_id', MW(2)).select('matchweek_id'))
+  eq('a matchweek about to lock opens even with its predecessor unsettled',
+     await revealed(2), true)
+  note('unreachable in a normal week — settlement leads the next lock by 66h at the tightest')
+  await must('restore mw2 lock', admin.from('league_matchweeks')
+    .update({ lock_at: new Date(Date.now() + 24 * 2 * 3600e3).toISOString() })
+    .eq('matchweek_id', MW(2)).select('matchweek_id'))
 
   // A non-member sees nothing at all — the membership half of the policy is
   // still doing its job, not just the reveal half.

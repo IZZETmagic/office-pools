@@ -27,9 +27,17 @@
 // withholds the rows, so `duels` contains only matchweeks that have opened. Do
 // not add them back: this component could not render them if it tried.
 //
-// That is also why `sealedMatchweek` and `sealedOpensAt` are passed separately.
-// The sealed card needs a number and an instant that no longer arrive with the
+// That is also why `sealedMatchweek` and `sealedOpensAfter` are passed
+// separately: the sealed card needs numbers that no longer arrive with the
 // duels, because the whole point is that those rows are gone.
+//
+// ## ⚠ ONE DUEL AT A TIME (migration 119)
+//
+// A duel opens when the matchweek BEFORE it settles, so through a matchweek
+// there is exactly one live duel and the next opponent is not knowable. The
+// `open` card below therefore renders only BETWEEN rounds — once your duel is
+// decided and before the next one locks. Nothing here enforces that; it falls
+// out of RLS withholding the rows, which is the right place for it.
 //
 // ## Nothing here computes a score
 //
@@ -39,7 +47,6 @@
 
 import { useMemo } from 'react'
 import { Card } from '@/components/ui/Card'
-import { LocalTime } from '@/components/LocalTime'
 import { Icon } from '@/components/ui/Icon'
 import type { DuelRow } from '@/lib/league/duels'
 
@@ -62,12 +69,11 @@ type Props = {
   /** The matchweek being played right now. Null between rounds. */
   inPlayMatchweek: number | null
   /**
-   * The first matchweek still SEALED, and the instant it opens — which is when
-   * the OPEN matchweek locks, because that is when it becomes the open one and
-   * its duel becomes readable. Null at the end of the season.
+   * The first matchweek still SEALED, and the matchweek that has to FINISH
+   * before it opens (migration 119). Null at the end of the season.
    */
   sealedMatchweek: number | null
-  sealedOpensAt: string | null
+  sealedOpensAfter: number | null
   /** Duel points per entry, from the leaderboard read. */
   duelPoints: Map<string, number>
 }
@@ -81,7 +87,7 @@ export default function DuelsTab({
   openMatchweek,
   inPlayMatchweek,
   sealedMatchweek,
-  sealedOpensAt,
+  sealedOpensAfter,
   duelPoints,
 }: Props) {
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
@@ -196,8 +202,9 @@ export default function DuelsTab({
       <div>
         <h2 className="text-lg font-bold text-neutral-900">Your duels</h2>
         <p className="text-sm text-neutral-600 mt-1">
-          Every matchweek you face one member — revealed when the matchweek opens. Beat their
-          score for three points, tie for one.
+          One duel at a time. You face one member each matchweek, and your next opponent is
+          revealed once the current duel is decided — or a day before you pick, whichever comes
+          first. Beat their score for three points, tie for one.
         </p>
       </div>
 
@@ -230,11 +237,13 @@ export default function DuelsTab({
             {/* Say the mechanism, not a mood. The draw really was made at pool
                 creation; claiming a weekly pairing is the sentence that would
                 fail the disclosure gate. */}
-            Your opponent opens when matchweek {sealedMatchweek} does
-            {sealedOpensAt ? (
-              <> — <LocalTime iso={sealedOpensAt} format={formatOpensAt} /></>
-            ) : null}. The whole season was
-            drawn when the pool was created; it opens one matchweek at a time.
+            {sealedOpensAfter !== null ? (
+              <>Your matchweek {sealedMatchweek} opponent is revealed once matchweek{' '}
+              {sealedOpensAfter} is decided — or a day before you pick, whichever comes first.</>
+            ) : (
+              <>Your matchweek {sealedMatchweek} opponent is revealed once the current duel is
+              decided — or a day before you pick, whichever comes first.</>
+            )}
           </p>
         </Card>
       )}
@@ -357,13 +366,6 @@ function Fighter({
       )}
     </div>
   )
-}
-
-/** The viewer's own timezone — never the server's. See components/LocalTime. */
-function formatOpensAt(d: Date): string {
-  return d.toLocaleDateString('en-US', {
-    weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-  })
 }
 
 function Stat({ label, value }: { label: string; value: number }) {

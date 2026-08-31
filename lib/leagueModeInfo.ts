@@ -34,12 +34,18 @@
  *  2. The engines. Every number quoted in `points` below is a default the SQL
  *     COALESCEs against, not a number this file decides.
  *
- * ⚠ 2026-08-30 — THE DRAW IS NO LONGER PUBLISHED. Migration 116 seals it and
- * opens it one matchweek at a time. The copy below must say that the draw was
- * made at pool creation and opens weekly. It must NEVER say a pairing happens
- * each week: that is the one sentence that would fail the disclosure gate,
- * because it is a claim about a thing we did not do. `LeagueScoringRulesTab`
- * and `LeagueHowToPlayTab` carry the same sentence and moved with this one.
+ * ⚠ 2026-08-30 — THE DRAW IS NO LONGER PUBLISHED, AND IT OPENS ONE DUEL AT A
+ * TIME. Migration 116 sealed it; migration 119 then moved the reveal from
+ * "when the matchweek opens for picks" to "when the PREVIOUS matchweek is
+ * decided", so the next opponent cannot be known while the current duel is
+ * still being played.
+ *
+ * The copy below must carry both halves — the draw was made at pool creation,
+ * and each opponent opens when the last duel is settled. It must NEVER say a
+ * pairing happens each week: that is the one sentence that would fail the
+ * disclosure gate, because it is a claim about a thing we did not do.
+ * `LeagueScoringRulesTab`, `LeagueHowToPlayTab` and `DuelsTab` carry the same
+ * sentence and move with this one — `leagueModeCopy.guard.test.ts` enforces it.
  */
 
 export type LeagueMode = 'pickem' | 'showdown' | 'last_man_standing' | 'table'
@@ -101,8 +107,10 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
             : 'Members call all ten fixtures each matchweek, ') +
           'and are drawn against one other member for that week. Whoever scores more wins the ' +
           'duel — three points for a win, one for a tie. The whole season is drawn when the ' +
-          'pool is created and opens one matchweek at a time, so who you are playing is a ' +
-          'surprise each week — and the draw rotates, so everybody meets everybody rather than ' +
+          'pool is created, but each opponent is revealed only once the previous duel is ' +
+          'decided, or a day before you pick if a postponement holds that up — so you play one ' +
+          'duel at a time and who comes next is a surprise. The draw ' +
+          'rotates, so everybody meets everybody rather than ' +
           'the same pairs coming round again. With an odd number of members somebody sits out ' +
           'each week and takes a point — there was no opponent, so there was no defeat. Duel ' +
           'points decide the table; the weekly score is the tiebreak, so a big week still ' +
@@ -113,7 +121,9 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
           // while the copy says what actually happens. The draw is made ONCE, at
           // pool creation — never "you have been randomly paired this week",
           // which would be a claim about a thing we did not do.
-          'Drawn for the whole season up front, opened one matchweek at a time.',
+          'Drawn up front; your next opponent opens when the current duel is decided.',
+          // The floor clause lives in `description` rather than here — three
+          // bullets is the shape, and the headline rule is the settle arm.
           'Three points a win, one a tie, none for a loss.',
           'A week with no opponent is worth a point.',
         ],

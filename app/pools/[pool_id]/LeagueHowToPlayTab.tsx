@@ -129,8 +129,9 @@ export function LeagueHowToPlayTab({ poolName, maxEntries, mode, depth }: Props)
               </Step>
               {isShowdown && (
                 <Step number={4} title="Check who you have drawn">
-                  The Duel tab shows who you are playing. It opens when the matchweek does —
-                  the season is drawn up front, but you meet one opponent at a time.
+                  The Duel tab shows who you are playing. Your next opponent is revealed once
+                  the current duel is decided, or a day before you pick — the season is drawn up
+                  front, but you meet one opponent at a time.
                 </Step>
               )}
             </>
