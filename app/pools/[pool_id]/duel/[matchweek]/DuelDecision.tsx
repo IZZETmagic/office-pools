@@ -102,20 +102,20 @@ function ShareButton({ url }: { url: string }) {
   )
 }
 
-function Corner({ side, dim, align }: { side: Side; dim: boolean; align: 'left' | 'right' }) {
+/**
+ * Just the circle. The NAME is rendered on its own row below the scoreline —
+ * see the layout note where it is used — so this no longer carries one.
+ */
+function Face({ side, dim }: { side: Side; dim: boolean }) {
   const ring = side.person ? avatarColor(side.person.user_id) : 'rgba(255,255,255,0.2)'
   return (
-    <span className={`flex flex-col gap-2 min-w-0 ${align === 'right' ? 'items-end' : 'items-start'} ${
-      dim ? 'opacity-55' : ''}`}>
-      <span
-        className="w-14 h-14 rounded-full shrink-0"
-        style={{ boxShadow: `0 0 0 3px color-mix(in srgb, ${ring} 45%, transparent)` }}
-      >
-        {side.person
-          ? <Avatar person={side.person} size={56} />
-          : <span className="block w-14 h-14 rounded-full bg-white/10" aria-hidden="true" />}
-      </span>
-      <span className="t-display text-lg text-white truncate max-w-full">{side.name}</span>
+    <span
+      className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full shrink-0 ${dim ? 'opacity-55' : ''}`}
+      style={{ boxShadow: `0 0 0 3px color-mix(in srgb, ${ring} 45%, transparent)` }}
+    >
+      {side.person
+        ? <Avatar person={side.person} size={64} />
+        : <span className="block w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/10" aria-hidden="true" />}
     </span>
   )
 }
@@ -226,15 +226,37 @@ export function DuelDecision({
                 {/* ⭐ FIXTURES, not points — Ryan's call. A pick count is a
                     number a member actually experienced, and unlike raw points
                     it means the same thing at both scoring depths. The points
-                    sit underneath as the audit trail. */}
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mt-6">
-                  <span className="t-display text-5xl sm:text-6xl text-right"
-                        style={{ color: youColour }}>{scoreline.yourFixtures}</span>
-                  <span className="t-display text-2xl text-white/25">&ndash;</span>
-                  <span className="t-display text-5xl sm:text-6xl"
-                        style={{ color: themColour }}>{scoreline.theirFixtures}</span>
+                    sit underneath as the audit trail.
+
+                    ⚠ FACES IN LINE WITH THE SCORES, NAMES ON THEIR OWN ROW —
+                    the same fix the duel card's hero needed, for the same
+                    reason. The faces sat in a separate block below, so the
+                    scoreline was two numbers belonging to nobody and you read
+                    the card twice: once for the score, once for whose it was.
+                    Sharing a row with a 60px numeral is what forces the name
+                    onto its own line, not a preference — "IZZETmagic" has half
+                    the card that way instead of a quarter, and truncates at
+                    neither size. */}
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 sm:gap-4 mt-6">
+                  <Face side={you} dim={verdict.outcome === 'lost'} />
+                  <span className="flex items-center justify-center gap-2 sm:gap-3">
+                    <span className="t-display text-5xl sm:text-6xl"
+                          style={{ color: youColour }}>{scoreline.yourFixtures}</span>
+                    <span className="t-display text-2xl text-white/25">&ndash;</span>
+                    <span className="t-display text-5xl sm:text-6xl"
+                          style={{ color: themColour }}>{scoreline.theirFixtures}</span>
+                  </span>
+                  <Face side={them!} dim={verdict.outcome === 'won'} />
                 </div>
-                <p className="t-num t-num-medium text-xs text-white/40 text-center mt-2">
+
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <p className={`t-display text-lg sm:text-xl text-white truncate ${
+                    verdict.outcome === 'lost' ? 'opacity-55' : ''}`}>{you.name}</p>
+                  <p className={`t-display text-lg sm:text-xl text-white truncate text-right ${
+                    verdict.outcome === 'won' ? 'opacity-55' : ''}`}>{them!.name}</p>
+                </div>
+
+                <p className="t-num t-num-medium text-xs text-white/40 text-center mt-4">
                   fixtures won &middot; {scoreline.yourPoints}&ndash;{scoreline.theirPoints} points
                 </p>
 
@@ -248,11 +270,6 @@ export function DuelDecision({
                     duel is decided on points.
                   </p>
                 )}
-
-                <div className="grid grid-cols-2 gap-6 mt-7">
-                  <Corner side={you} dim={verdict.outcome === 'lost'} align="left" />
-                  <Corner side={them!} dim={verdict.outcome === 'won'} align="right" />
-                </div>
 
                 {decisiveFixture && (
                   <p className="t-body text-white/70 text-center mt-7 pt-5 border-t border-white/10">
