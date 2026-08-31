@@ -1415,11 +1415,8 @@ html.dark .mode-pill {
   top: 0;
   z-index: 30;
   overflow: hidden;
-  /* Ryan, 2026-08-31: the card wants rounded corners at the bottom. `radii.lg`,
-     the same 24px every other card in the app uses — the band is a card that
-     happens to be the width of the screen. */
-  border-bottom-left-radius: var(--radius-card);
-  border-bottom-right-radius: var(--radius-card);
+  /* The bottom radius lives on the element in ShowdownBand.tsx — see the note
+     there. One owner, and it cannot be lost to a stale stylesheet. */
   /* Full-bleed out of the page's padded column: the gradient runs edge to edge
      while the CONTENTS stay capped (see .sd-inner). A 1920px monitor gets the
      band without the stretch. */
