@@ -145,8 +145,67 @@ export default async function DuelDecisionPage({
     }
   }
 
+  // -----------------------------------------------------------
+  // THE BANTER QUOTE — their last word before the games
+  // -----------------------------------------------------------
+  // The joke in the mockup is somebody's pre-match confidence read back after
+  // the result. So: the OPPONENT'S last typed message before this matchweek's
+  // first kickoff.
+  //
+  // ⚠ `message_type = 'text'` ONLY. Of 4,626 messages in the database, 2,955
+  // are auto-generated cards — `badge_flex`, `standings_drop`,
+  // `prediction_share` — and quoting one of those back at somebody would be
+  // absurd. Only 1,671 are words a person typed.
+  //
+  // ⚠ ONLY WHEN YOU WON, which is a judgement call rather than a technical
+  // limit. Their boast read back after they lost is the joke; the same boast
+  // shown to somebody who just lost to them is us curating a moment to twist a
+  // knife. The message is public in the pool either way — they can scroll to it
+  // — so declining to feature it costs nothing and avoids manufacturing a bad
+  // feeling out of a real one.
+  //
+  // ⚠ NOT TRUNCATED. A message longer than the card gets DROPPED, not cut:
+  // shortening what somebody said changes what they said, and half a sentence
+  // read back is a misquote with our name on it.
+  //
+  // ⚠ AND IT MUST BE OMITTED FROM ANYTHING SHARED (Ryan, 2026-08-31). Quoting
+  // Priya inside the pool she posted in is the joke working; putting her words
+  // on a card that leaves the pool republishes her somewhere she did not post,
+  // and she is not the one pressing the button.
+  let quote: { content: string; author: string; at: string } | null = null
+  if (verdict.outcome === 'won' && theirEntry) {
+    const { data: mwWindow } = await supabase
+      .from('league_matchweeks')
+      .select('first_kickoff_at')
+      .eq('matchweek_number', matchweekNumber)
+      .not('first_kickoff_at', 'is', null)
+      .order('first_kickoff_at', { ascending: false })
+      .limit(1).maybeSingle()
+    const themPerson = people.get(theirEntry)
+    if (mwWindow?.first_kickoff_at && themPerson) {
+      const { data: msg } = await supabase
+        .from('pool_messages')
+        .select('content, created_at')
+        .eq('pool_id', pool_id)
+        .eq('user_id', themPerson.user_id)
+        .eq('message_type', 'text')
+        .lt('created_at', mwWindow.first_kickoff_at)
+        .order('created_at', { ascending: false })
+        .limit(1).maybeSingle()
+      const content = msg?.content?.trim() ?? ''
+      if (content && content.length <= 140) {
+        quote = {
+          content,
+          author: names.get(theirEntry) ?? themPerson.username ?? 'Them',
+          at: msg!.created_at,
+        }
+      }
+    }
+  }
+
   return (
     <DuelDecision
+      quote={quote}
       poolId={pool_id}
       poolName={pool.pool_name}
       matchweek={matchweekNumber}

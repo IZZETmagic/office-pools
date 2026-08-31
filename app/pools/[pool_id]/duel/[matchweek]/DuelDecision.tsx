@@ -32,6 +32,22 @@ import type { DuelScoreline, DuelVerdict } from '@/lib/league/duelVerdict'
 
 type Side = { name: string; person: AvatarPerson | null }
 
+/**
+ * "Monday" — or a date once it is old enough for a weekday to be ambiguous.
+ *
+ * ⚠ Formatted in the CLIENT, deliberately. This component is `'use client'`, so
+ * `toLocaleDateString` runs in the reader's timezone. Formatting it on the
+ * server would stamp UTC and tell somebody in Bermuda that a Sunday-night
+ * message was posted on Monday — the frozen-UTC bug `LocalTime` exists to fix.
+ */
+function dayOf(iso: string): string {
+  const d = new Date(iso)
+  const days = (Date.now() - d.getTime()) / 86_400_000
+  return days <= 6
+    ? d.toLocaleDateString(undefined, { weekday: 'long' })
+    : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+}
+
 function Corner({ side, dim, align }: { side: Side; dim: boolean; align: 'left' | 'right' }) {
   const ring = side.person ? avatarColor(side.person.user_id) : 'rgba(255,255,255,0.2)'
   return (
@@ -60,7 +76,7 @@ function MovedRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 export function DuelDecision({
-  poolId, poolName, matchweek, verdict, scoreline, decisiveFixture, you, them, record,
+  poolId, poolName, matchweek, verdict, scoreline, decisiveFixture, you, them, record, quote,
 }: {
   poolId: string
   poolName: string
@@ -72,6 +88,17 @@ export function DuelDecision({
   you: Side
   them: Side | null
   record: { won: number; drawn: number; lost: number } | null
+  /**
+   * The opponent's last typed word before kickoff, when there was one.
+   *
+   * ⚠ OMIT THIS FROM ANYTHING SHARED — Ryan, 2026-08-31. Quoting somebody
+   * inside the pool they posted in is the joke working. Putting their words on
+   * a card that leaves the pool republishes them somewhere they did not post,
+   * they cannot consent at the moment it happens, and they are not the one
+   * pressing the button. When the share image lands (`next/og`, v2), this block
+   * does not go in it.
+   */
+  quote: { content: string; author: string; at: string } | null
 }) {
   const bye = verdict.outcome === 'bye'
   const eyebrow =
@@ -172,6 +199,21 @@ export function DuelDecision({
                 )}
                 {history && (
                   <p className="t-body text-white/70 text-center mt-2">{history}</p>
+                )}
+
+                {/* ⚠ THEIR WORDS, UNEDITED. The server drops anything over 140
+                    characters rather than truncating it — half a sentence read
+                    back is a misquote with our name on it. And this block is
+                    the one thing that must NOT go into the share image. */}
+                {quote && (
+                  <figure className="mt-6 pl-4 border-l-2 border-danger-400/70 text-left">
+                    <blockquote className="t-body text-white/85 italic">
+                      &ldquo;{quote.content}&rdquo;
+                    </blockquote>
+                    <figcaption className="t-detail text-white/40 mt-1.5">
+                      &mdash; {quote.author}, {dayOf(quote.at)}
+                    </figcaption>
+                  </figure>
                 )}
               </>
             )}
