@@ -1096,8 +1096,13 @@ function DuelPanel({
             ' color-mix(in srgb, var(--danger-500) 32%, transparent) 100%)',
         }}
       />
-      <div className="relative px-5 pt-6 pb-7 sm:pt-7 sm:pb-8">
-        <div className="flex items-center justify-center gap-2.5 mb-7">
+      {/* ⚠ WIDER SIDE PADDING ON DESKTOP. The avatars and names sit on the
+          grid's outer edges, so the card's own padding is the only thing
+          holding them off the rounded corner — at 20px they were pressed
+          against it. */}
+      <div className="relative px-5 md:px-12 pt-6 pb-7 sm:pt-7 sm:pb-8">
+        {/* More air under the matchweek heading before the contest starts. */}
+        <div className="flex items-center justify-center gap-2.5 mb-8 md:mb-10">
           {/* ⚠ THE DOT IS THE INDICATOR, so it appears ONLY when a ball is in
               play — and the words that used to sit beside it are gone. A grey
               dot with no label says nothing, and "Being played" was saying what
