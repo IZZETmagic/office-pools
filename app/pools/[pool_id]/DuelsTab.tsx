@@ -1093,8 +1093,8 @@ function DuelPanel({
             ' color-mix(in srgb, var(--danger-500) 32%, transparent) 100%)',
         }}
       />
-      <div className="relative px-5 pt-4 pb-5">
-        <div className="flex items-center justify-center gap-2.5 mb-4">
+      <div className="relative px-5 pt-6 pb-7 sm:pt-7 sm:pb-8">
+        <div className="flex items-center justify-center gap-2.5 mb-7">
           {/* ⚠ THE DOT IS THE INDICATOR, so it appears ONLY when a ball is in
               play — and the words that used to sit beside it are gone. A grey
               dot with no label says nothing, and "Being played" was saying what
@@ -1120,7 +1120,7 @@ function DuelPanel({
 
         {m.them ? (
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
-            <Corner side="blue" label="You" name={name(m.you.entry)} person={person(m.you.entry)} />
+            <Corner side="blue" name={name(m.you.entry)} person={person(m.you.entry)} />
             {/* The score, live. A duel with two names and no numbers is a
                 fixture list; the numbers are what make it a contest. */}
             {live !== null ? (
@@ -1138,7 +1138,7 @@ function DuelPanel({
             ) : (
               <span className="t-display text-2xl text-accent-400 select-none">V</span>
             )}
-            <Corner side="red" label="Them" name={name(m.them.entry)} person={person(m.them.entry)} align="right" />
+            <Corner side="red" name={name(m.them.entry)} person={person(m.them.entry)} align="right" />
           </div>
         ) : (
           <p className="t-body text-white/60 text-center max-w-sm mx-auto">
@@ -1148,7 +1148,7 @@ function DuelPanel({
         )}
 
         {!decided && live && m.them && (
-          <p className="t-detail text-white/50 text-center mt-4 pt-4 border-t border-white/10">
+          <p className="t-body text-white/70 text-center mt-6 pt-5 border-t border-white/10">
             {live.you === live.them
               ? 'Level'
               : `${live.you > live.them ? 'You lead' : 'Behind'} by ${Math.abs(live.you - live.them)}`}
@@ -1156,7 +1156,7 @@ function DuelPanel({
           </p>
         )}
         {decided && (
-          <p className="t-caption text-center mt-4 pt-4 border-t border-white/10">
+          <p className="t-caption text-sm text-center mt-6 pt-5 border-t border-white/10">
             <span className={m.you.points === 3 ? 'text-success-400'
               : m.you.points === 1 ? 'text-accent-400' : 'text-white/40'}>
               {m.you.points === 3 ? 'You won this duel — three points'
@@ -1181,10 +1181,9 @@ function DuelPanel({
  * shape below is deliberately the same (circle, initials, size in px).
  */
 function Corner({
-  side, label, name, person, align = 'left',
+  side, name, person, align = 'left',
 }: {
   side: 'blue' | 'red'
-  label: string
   name: string
   person: AvatarPerson | null
   align?: 'left' | 'right'
@@ -1192,7 +1191,7 @@ function Corner({
   return (
     <div className={`min-w-0 ${align === 'right' ? 'text-right' : ''}`}>
       <div
-        className={`w-11 h-11 rounded-full mb-2.5 ${align === 'right' ? 'ml-auto' : ''}`}
+        className={`w-11 h-11 rounded-full mb-3 ${align === 'right' ? 'ml-auto' : ''}`}
         style={{
           boxShadow: `0 0 0 3px color-mix(in srgb, var(--${side === 'blue' ? 'primary' : 'danger'}-500) 45%, transparent)`,
           borderRadius: '9999px',
@@ -1205,11 +1204,14 @@ function Corner({
           ? <Avatar person={person} size={44} />
           : <div className="w-11 h-11 rounded-full bg-white/10" aria-hidden="true" />}
       </div>
-      <p className="t-detail text-white/35 uppercase tracking-widest">{label}</p>
-      {/* text-lg on a phone: "IZZETMAGIC" in Anton at text-xl truncated to
+      {/* ⚠ NO "YOU" / "THEM" LABEL. Your own name sits above your own avatar in
+          your own colour, on a card with exactly two people on it — the label
+          was restating the only thing that was never in doubt.
+
+          text-lg on a phone: "IZZETMAGIC" in Anton at text-xl truncated to
           "IZZET…" at 375px, and a duel card whose whole point is two names
           should not eat half of one. */}
-      <p className="t-display text-lg sm:text-xl text-white truncate mt-0.5">{name}</p>
+      <p className="t-display text-lg sm:text-xl text-white truncate">{name}</p>
     </div>
   )
 }
