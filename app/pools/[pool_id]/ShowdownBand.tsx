@@ -80,6 +80,9 @@ export type ShowdownBandProps = {
   points?: (e: string | null) => number | null
 }
 
+/** See the note at the usage site: off-token on purpose, and only here. */
+const BAND_RADIUS = '44px'
+
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
   const v = n % 100
@@ -172,14 +175,23 @@ export function ShowdownBand({
            rebuild — which is worth something in a checkout where Turbopack has
            repeatedly served stale CSS while picking up TSX fine.
 
-           ⚠ `radii.xl`, NOT the card radius. 24px read as a card that happened
-           to be screen-width; this is the token the bottom sheet uses for the
-           corners where it meets the page, which is the same gesture upside
-           down — the band curving open onto what is beneath it. Semantically
-           the right one, and it is the largest radius the system defines, so
-           anything more generous would have to leave the token set. */
-        borderBottomLeftRadius: 'var(--radius-sheet)',
-        borderBottomRightRadius: 'var(--radius-sheet)',
+           ⚠ OFF-TOKEN, DELIBERATELY, AND THE ONLY PLACE IN THE APP THAT IS.
+           The ladder ran 24px (radii.lg, "a card") then 32px (radii.xl, the
+           bottom sheet's corners) and Ryan asked for more at each step. 32 is
+           the largest radius the system defines, so this leaves the set rather
+           than pretending a bigger token exists.
+
+           It is defensible exactly once: the band is the only screen-width
+           surface in the product, and radii that read as generous on a 340px
+           card read as timid across 1200px. A radius is a proportion of the
+           thing it is on, and nothing else here is this wide.
+
+           ⚠ DO NOT PROMOTE THIS TO A TOKEN without deciding what else would
+           use it. A `--radius-2xl` that one element sets is a constant wearing
+           a token's clothes, and the token block already warns against
+           reshaping the scale by the back door. */
+        borderBottomLeftRadius: BAND_RADIUS,
+        borderBottomRightRadius: BAND_RADIUS,
       } as React.CSSProperties}
     >
       {header && <div className="relative z-10">{header}</div>}
