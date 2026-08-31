@@ -1080,6 +1080,14 @@ function DuelPanel({
   strip: Array<'you' | 'them' | 'same' | 'neither' | 'pending'>
 }) {
   const decided = m.duel.settled_at && m.them
+  /** An 18px face for the strip's anchor. Null entry falls back to a blank
+      circle, exactly as `AvatarRing` does for the corners. */
+  const face = (e: string | null) => {
+    const p = person(e)
+    return p
+      ? <Avatar person={p} size={20} />
+      : <span className="block w-5 h-5 rounded-full bg-white/15" />
+  }
   return (
     <div className="rounded-card overflow-hidden bg-midnight relative">
       {/* Blue corner bleeding in from the left, red from the right. The two
@@ -1144,10 +1152,19 @@ function DuelPanel({
                 <AvatarRing side="blue" person={person(m.you.entry)} />
               </span>
               {live !== null ? (
+                /* ⚠ BOTH NUMBERS ARE WHITE, and that is deliberate.
+                   They used to be primary-400 against danger-400 — two big
+                   saturated digits, one blue one red, side by side on a dark
+                   ground, which is the exact shape of an election-night tally
+                   and read as one. Nothing about a score is a side: the avatar
+                   directly above each number already says whose it is, so
+                   colouring the digit encoded the same fact twice and spent the
+                   card's loudest element doing it. Identity lives in the faces;
+                   these are just the numbers. */
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="t-display text-4xl sm:text-5xl text-primary-400">{live.you}</span>
+                  <span className="t-display text-4xl sm:text-5xl text-white">{live.you}</span>
                   <span className="t-display text-xl sm:text-2xl text-white/30">&ndash;</span>
-                  <span className="t-display text-4xl sm:text-5xl text-danger-400">{live.them}</span>
+                  <span className="t-display text-4xl sm:text-5xl text-white">{live.them}</span>
                 </div>
               ) : (
                 <span className="t-display text-2xl sm:text-3xl text-accent-400 select-none">V</span>
@@ -1169,29 +1186,74 @@ function DuelPanel({
           </p>
         )}
 
-        {/* THE STRIP — one segment per fixture, in the order they are played.
-            Blue you took it, red they took it, grey a dead heat neither could
-            win, hollow still to come. It is the team sheet below compressed to
-            a glance: you can see the SHAPE of the duel and how much is left.
+        {/* THE STRIP — one column per fixture, in the order they are played.
+            Above the line you took it, below the line they did, a stub on the
+            line a dead heat neither could win, hollow still to come. It is the
+            team sheet below compressed to a glance: you can see the SHAPE of
+            the duel and how much is left.
+
+            ⚠ DIRECTION IS THE ENCODING, NOT COLOUR. This was a flat bar of
+            blue-or-red segments, which made hue load-bearing: the ONLY thing
+            saying who took a fixture was which of two colours the segment was.
+            Everything else on this card has a fallback — the scoreline has an
+            avatar over it, the pick chips are positioned left and right — but a
+            flat segment has nothing, so a colour clash here would not look
+            samey, it would be unreadable.
+
+            That matters because the avatar colours are about to become the duel
+            colours (one person, one hue, the rule
+            `lib/design/avatarGradient.ts` already states), and eventually a
+            thing people pick on their profile. Two members WILL land on the
+            same colour — ~10% of pairings hash to the same one of the ten, and
+            coral/rose and sky/indigo are indistinguishable on top of that, so
+            roughly one duel in seven. Once they can choose, friends will clash
+            on purpose, as a joke. So hue has to come out of the mechanism
+            first: up and down carry the meaning, and colour is then free to be
+            personality. Paint these bars in the two people's own colours and
+            nothing breaks when they match.
+
+            ⚠ THE TWO FACES ANCHOR THE AXIS. Up-is-you is not inherited from
+            anything — the card's established axis is left and right — so the
+            avatars sit at the head of the line to say which row is whose. Words
+            would do it too, but "you"/"them" is exactly what came off this card
+            earlier: the faces already carry identity everywhere else.
 
             ⚠ Desktop only. The phone card is already right and this is width
             that only a wide card has going spare — it is not information the
             small screen is missing, it is the same information the sheet under
-            it carries in full.
-
-            ⚠ CAPPED AND CENTRED, so it lives under the SCORE rather than
-            running the full width and passing beneath the avatars and names. It
-            describes the contest in the middle of the card; stretched past the
-            two people it read as a divider. */}
-        {strip.length > 0 && (
-          <div className="hidden md:flex items-stretch gap-1 mt-7 h-1.5 max-w-xs mx-auto w-full" aria-hidden="true">
-            {strip.map((o, i) => (
-              <span key={i} className={`flex-1 rounded-full ${
-                o === 'you' ? 'bg-primary-500'
-                  : o === 'them' ? 'bg-danger-500'
-                    : o === 'same' || o === 'neither' ? 'bg-white/15'
-                      : 'border border-dashed border-white/25'}`} />
-            ))}
+            it carries in full. */}
+        {strip.length > 0 && m.them && (
+          <div className="hidden md:flex items-stretch gap-3 mt-8 h-12 max-w-sm mx-auto w-full" aria-hidden="true">
+            <div className="relative w-5 shrink-0">
+              <span className="absolute left-0 bottom-1/2 mb-0.5">{face(m.you.entry)}</span>
+              <span className="absolute left-0 top-1/2 mt-0.5">{face(m.them.entry)}</span>
+            </div>
+            <div className="relative flex-1">
+              <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/25" />
+              <div className="absolute inset-0 flex items-stretch gap-1">
+                {strip.map((o, i) => (
+                  <span key={i} className="relative flex-1">
+                    {o === 'you' && (
+                      <span className="absolute left-1/2 -translate-x-1/2 w-3.5 bottom-1/2 h-[18px] rounded-t-[3px] bg-white/85" />
+                    )}
+                    {o === 'them' && (
+                      <span className="absolute left-1/2 -translate-x-1/2 w-3.5 top-1/2 h-[18px] rounded-b-[3px] bg-white/85" />
+                    )}
+                    {(o === 'same' || o === 'neither') && (
+                      <span className="absolute left-1/2 -translate-x-1/2 w-3.5 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-white/30" />
+                    )}
+                    {o === 'pending' && (
+                      <span className="absolute left-1/2 -translate-x-1/2 w-3.5 top-1/2 h-1.5 -translate-y-1/2 rounded-full
+                                       border border-dashed border-white/25" />
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {/* Mirrors the face column so the BARS land on the card's centre
+                line, under the score. Without it the anchor pushes the chart
+                20px right of everything above it. */}
+            <div className="w-5 shrink-0" />
           </div>
         )}
 
