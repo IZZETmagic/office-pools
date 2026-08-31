@@ -118,7 +118,6 @@ export async function readMatchweekPoints(
   matchweekNumber: number,
 ): Promise<{
   points: Map<string, number>
-  scored: Map<string, number>
   /** entry_id → fixture_number → points, for the fixture-by-fixture breakdown. */
   perFixture: Map<string, Map<number, number>>
   error: string | null
@@ -129,20 +128,18 @@ export async function readMatchweekPoints(
     .eq('pool_id', poolId)
     .eq('matchweek_number', matchweekNumber)
   if (error) {
-    return { points: new Map(), scored: new Map(), perFixture: new Map(), error: error.message }
+    return { points: new Map(), perFixture: new Map(), error: error.message }
   }
 
   const points = new Map<string, number>()
-  const scored = new Map<string, number>()
   const perFixture = new Map<string, Map<number, number>>()
   for (const r of (data ?? []) as Array<{ entry_id: string; total_points: number | null; fixture_number: number }>) {
     points.set(r.entry_id, (points.get(r.entry_id) ?? 0) + (r.total_points ?? 0))
-    scored.set(r.entry_id, (scored.get(r.entry_id) ?? 0) + 1)
     const byFixture = perFixture.get(r.entry_id) ?? new Map<number, number>()
     byFixture.set(r.fixture_number, r.total_points ?? 0)
     perFixture.set(r.entry_id, byFixture)
   }
-  return { points, scored, perFixture, error: null }
+  return { points, perFixture, error: null }
 }
 
 export type EntryTotals = {

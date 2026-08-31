@@ -197,15 +197,15 @@ export default async function PoolPage({
         entryNames,
         entryPeople,
         livePoints: new Map(),
-        liveScored: new Map(),
         perFixture: new Map(),
-        fixtureLabels: new Map(),
+        fixtures: [],
         totals: totalsRes.totals,
         ownEntryIds: (userEntries ?? []).map((e) => e.entry_id),
         openMatchweek: null,
         inPlayMatchweek: null,
         sealedMatchweek: null,
         sealedOpensAfter: null,
+        sealedOpensAtLatest: null,
         duelPoints: new Map(
           [...totalsRes.totals].map(([entryId, t]) => [entryId, t.duelPoints]),
         ),
@@ -432,6 +432,7 @@ export default async function PoolPage({
           // rows for a sealed matchweek are not in the payload at all.
           showdownData.sealedMatchweek = view.sealedMatchweekNumber
           showdownData.sealedOpensAfter = view.sealedOpensAfterMatchweek
+          showdownData.sealedOpensAtLatest = view.sealedOpensAtLatest
 
           // The RUNNING score of the duel being played. `league_duels` carries
           // accuracy only once the matchweek settles, so through the weekend it
@@ -446,19 +447,27 @@ export default async function PoolPage({
             const live = await readMatchweekPoints(createAdminClient(), pool_id, liveMw)
             if (live.error) console.error('[pool page] live duel points failed:', live.error)
             showdownData.livePoints = live.points
-            showdownData.liveScored = live.scored
             showdownData.perFixture = live.perFixture
-            // Fixture names for the breakdown, off the matches the league view
-            // already built — `match_number` IS `league_fixtures.fixture_number`,
-            // which is what the score rows are keyed on.
-            const labels = new Map<number, string>()
-            for (const mt of view.matches) {
-              if (mt.round_number !== liveMw) continue
-              const h = mt.home_team?.country_name ?? 'Home'
-              const a = mt.away_team?.country_name ?? 'Away'
-              labels.set(mt.match_number, `${h} v ${a}`)
-            }
-            showdownData.fixtureLabels = labels
+            // ⚠ EVERY FIXTURE OF THE MATCHWEEK, not only the scored ones.
+            // The breakdown used to list what had score rows — nine of ten —
+            // while the verdict beside it said "1 game still to play". The
+            // sentence referred to a fixture the list did not contain.
+            //
+            // `match_number` IS `league_fixtures.fixture_number`, which is what
+            // the score rows are keyed on, so the two join without a lookup.
+            showdownData.fixtures = view.matches
+              .filter((mt) => mt.round_number === liveMw)
+              .map((mt) => ({
+                number: mt.match_number,
+                label: `${mt.home_team?.country_name ?? 'Home'} v ${mt.away_team?.country_name ?? 'Away'}`,
+                kickoffAt: mt.match_date,
+                isCompleted: mt.is_completed,
+                status: mt.status,
+                liveMinute: mt.live_minute,
+                livePeriod: mt.live_period,
+                liveAdded: mt.live_added,
+              }))
+              .sort((a, b) => a.number - b.number)
           }
         }
         // LMS needs BOTH, for two different jobs. The pick is WRITTEN against

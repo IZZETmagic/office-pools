@@ -58,11 +58,14 @@
 // matchweek is both fully played and fully scored.
 // =============================================================
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { Icon } from '@/components/ui/Icon'
 import { headToHead, type DuelRow } from '@/lib/league/duels'
+import { getLiveClock } from '@/lib/matchStatus'
+import { LocalTime } from '@/components/LocalTime'
+import type { MatchweekFixture } from './PoolDetail'
 
 type Props = {
   duels: DuelRow[]
@@ -88,6 +91,8 @@ type Props = {
    */
   sealedMatchweek: number | null
   sealedOpensAfter: number | null
+  /** The LATEST the duel can open — 24h before its own lock (migration 120). */
+  sealedOpensAtLatest: string | null
   /** entry_id → the person behind it, for the faces in the corners. */
   entryPeople: Map<string, AvatarPerson>
   /**
@@ -99,11 +104,10 @@ type Props = {
    * drive the card. These come from `league_match_scores`.
    */
   livePoints: Map<string, number>
-  liveScored: Map<string, number>
   /** entry_id → fixture_number → points, for the fixture-by-fixture breakdown. */
   perFixture: Map<string, Map<number, number>>
-  /** fixture_number → "Chelsea v Brighton", for the live matchweek. */
-  fixtureLabels: Map<number, string>
+  /** Every fixture of the live matchweek, scored or not. */
+  fixtures: MatchweekFixture[]
   /** Season totals per entry — points, rank, duel points. */
   totals: Map<string, { totalPoints: number; rank: number | null; duelPoints: number; correct: number }>
   /** Last five score types per entry, oldest first. Same source as the leaderboard's dots. */
@@ -115,12 +119,38 @@ type Props = {
 type Side = { entry: string; points: number | null; accuracy: number | null }
 
 /**
- * ⚠ An assumption, and a shallow one: every league we run is ten fixtures a
- * matchweek. It is only used to say "1 game still to play", so being wrong
- * costs a sentence rather than a score — but a 18-club division would be nine,
- * and the honest fix is to pass the fixture count down from the league view.
+ * A ticking countdown to an instant.
+ *
+ * ⚠ CLIENT-ONLY, like `components/LocalTime` and for the same reason: a value
+ * derived from `Date.now()` differs between the server render and the first
+ * client render, and React keeps the server text rather than reconciling it.
+ * So it renders nothing until mounted, then ticks.
  */
-const FIXTURES_PER_MATCHWEEK = 10
+function Countdown({ to }: { to: string }) {
+  const [text, setText] = useState('')
+  useEffect(() => {
+    const target = new Date(to).getTime()
+    const tick = () => {
+      const ms = target - Date.now()
+      if (ms <= 0) { setText('any moment'); return }
+      const s = Math.floor(ms / 1000)
+      const d = Math.floor(s / 86400)
+      const hh = String(Math.floor((s % 86400) / 3600)).padStart(2, '0')
+      const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
+      const ss = String(s % 60).padStart(2, '0')
+      setText(d > 0 ? `${d}d ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [to])
+  return <>{text}</>
+}
+
+/** Kickoff, in the VIEWER's timezone — never the server's. See components/LocalTime. */
+function formatKickoff(d: Date): string {
+  return d.toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+}
 
 /** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
 function ordinal(n: number): string {
@@ -137,11 +167,11 @@ export default function DuelsTab({
   inPlayMatchweek,
   sealedMatchweek,
   sealedOpensAfter,
+  sealedOpensAtLatest,
   entryPeople,
   livePoints,
-  liveScored,
   perFixture,
-  fixtureLabels,
+  fixtures,
   totals,
   form,
   duelPoints,
@@ -298,25 +328,46 @@ export default function DuelsTab({
    * score rows are keyed on, NOT kickoff order: `fixture_number` is a stable
    * identifier and a matchweek's games are not played in it.
    */
-  /** Fixtures in the live matchweek with no score row yet. */
+  /**
+   * Fixtures in the live matchweek with no score row yet.
+   *
+   * Counted from the real fixture list. It used to be
+   * `10 - (rows the best-covered entry has)`, which assumed every league plays
+   * ten a matchweek — true of the Premier League and wrong for a division of
+   * eighteen, and only ever used to write "1 game still to play".
+   */
   const remainingFixturesRaw = useMemo(() => {
-    if (inPlayMatchweek === null || liveScored.size === 0) return null
-    const best = Math.max(...liveScored.values())
-    return Math.max(0, FIXTURES_PER_MATCHWEEK - best)
-  }, [inPlayMatchweek, liveScored])
+    if (inPlayMatchweek === null || fixtures.length === 0) return null
+    const scored = new Set<number>()
+    for (const byFixture of perFixture.values()) {
+      for (const n of byFixture.keys()) scored.add(n)
+    }
+    return fixtures.filter((f) => !scored.has(f.number)).length
+  }, [inPlayMatchweek, fixtures, perFixture])
 
   const breakdown = useMemo(() => {
     if (!inPlay || !inPlay.them || inPlayMatchweek === null) return []
     const mine = perFixture.get(inPlay.you.entry) ?? new Map<number, number>()
     const theirs = perFixture.get(inPlay.them.entry) ?? new Map<number, number>()
-    const numbers = [...new Set([...mine.keys(), ...theirs.keys()])].sort((a, b) => a - b)
-    return numbers.map((n) => ({
-      n,
-      label: fixtureLabels.get(n) ?? `Fixture ${n}`,
-      mine: mine.get(n) ?? 0,
-      theirs: theirs.get(n) ?? 0,
-    }))
-  }, [inPlay, inPlayMatchweek, perFixture, fixtureLabels])
+    return fixtures.map((f) => {
+      // A fixture is SCORED when a row exists for it, not when the clock says
+      // it is over: the engine writes the row, and until it does there is
+      // nothing to compare. Absent ≠ nil-nil.
+      const scored = mine.has(f.number) || theirs.has(f.number)
+      return {
+        n: f.number,
+        label: f.label,
+        scored,
+        mine: mine.get(f.number) ?? 0,
+        theirs: theirs.get(f.number) ?? 0,
+        clock: getLiveClock({
+          status: f.status, livePeriod: f.livePeriod,
+          liveMinute: f.liveMinute, liveAdded: f.liveAdded,
+        }),
+        kickoffAt: f.kickoffAt,
+      }
+    })
+  }, [inPlay, inPlayMatchweek, perFixture, fixtures])
 
   /**
    * Is the live duel already decided?
@@ -441,9 +492,23 @@ export default function DuelsTab({
                 ? `Opens when matchweek ${sealedOpensAfter} is decided`
                 : 'Opens when the current duel is decided'}
             </p>
-            <p className="t-detail text-white/40 text-center mt-3 pt-3 border-t border-white/10">
-              Or a day before you pick, whichever comes first.
-            </p>
+            {/* The secondary line — the only clock in the rule.
+                ⚠ AN UPPER BOUND, NOT A DUE TIME. The duel almost always opens
+                well before this, the moment the previous matchweek is decided;
+                this is the backstop migration 120 added so a postponement
+                cannot push the reveal past the deadline. Labelled "at the
+                latest" for that reason — a bare countdown would read as a
+                promise about when, and it is a promise about no later than. */}
+            <div className="mt-3 pt-3 border-t border-white/10 text-center">
+              <p className="t-detail text-white/40">
+                Or a day before you pick, whichever comes first.
+              </p>
+              {sealedOpensAtLatest && (
+                <p className="t-num t-num-medium text-xs text-white/55 mt-1.5">
+                  <Countdown to={sealedOpensAtLatest} /> at the latest
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -514,19 +579,35 @@ export default function DuelsTab({
           </p>
           <ul>
             {breakdown.map((b) => {
-              const outcome = b.mine === b.theirs ? 'level' : b.mine > b.theirs ? 'won' : 'lost'
+              const outcome = !b.scored ? 'pending'
+                : b.mine === b.theirs ? 'level' : b.mine > b.theirs ? 'won' : 'lost'
               return (
                 <li key={b.n}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-2 border-t border-border-default">
+                  className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-2 border-t border-border-default
+                    ${outcome === 'pending' ? 'bg-primary-50/40 dark:bg-primary-900/10' : ''}`}>
                   <span className={`t-detail uppercase tracking-widest w-12 shrink-0
                     ${outcome === 'won' ? 'text-success-600'
-                      : outcome === 'lost' ? 'text-danger-600' : 'text-muted/60'}`}>
-                    {outcome === 'won' ? 'Won' : outcome === 'lost' ? 'Lost' : 'Level'}
+                      : outcome === 'lost' ? 'text-danger-600'
+                        : outcome === 'pending' ? 'text-primary-600' : 'text-muted/60'}`}>
+                    {outcome === 'won' ? 'Won' : outcome === 'lost' ? 'Lost'
+                      : outcome === 'pending' ? (b.clock ? 'Live' : 'To play') : 'Level'}
                   </span>
-                  <span className="t-body text-muted truncate">{b.label}</span>
-                  <span className="t-num t-num-medium text-xs text-muted whitespace-nowrap">
-                    {b.mine} <span className="text-muted/40">&ndash;</span> {b.theirs}
+                  <span className={`t-body truncate ${outcome === 'pending' ? 'text-ink' : 'text-muted'}`}>
+                    {b.label}
                   </span>
+                  {/* A fixture with no score row shows WHEN, not a fabricated
+                      0 – 0. The engine writes the row; until it does there is
+                      nothing to compare, and printing zeroes would read as two
+                      members who both got it wrong. */}
+                  {outcome === 'pending' ? (
+                    <span className="t-num t-num-medium text-xs text-primary-600 whitespace-nowrap">
+                      {b.clock ?? <LocalTime iso={b.kickoffAt} format={formatKickoff} />}
+                    </span>
+                  ) : (
+                    <span className="t-num t-num-medium text-xs text-muted whitespace-nowrap">
+                      {b.mine} <span className="text-muted/40">&ndash;</span> {b.theirs}
+                    </span>
+                  )}
                 </li>
               )
             })}

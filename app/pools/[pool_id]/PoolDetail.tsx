@@ -112,6 +112,18 @@ export type LmsData = {
   pickFixtures: Map<string, import('@/lib/league/lms').LmsPickFixture>
 }
 
+/** One fixture of the live matchweek, whether or not it has been scored. */
+export type MatchweekFixture = {
+  number: number
+  label: string
+  kickoffAt: string
+  isCompleted: boolean
+  status: string
+  liveMinute: number | null
+  livePeriod: string | null
+  liveAdded: number | null
+}
+
 /** Everything DuelsTab needs, assembled server-side in page.tsx. */
 export type ShowdownData = {
   duels: DuelRow[]
@@ -131,6 +143,8 @@ export type ShowdownData = {
   sealedMatchweek: number | null
   /** The matchweek that must FINISH first — not a clock. Migration 119. */
   sealedOpensAfter: number | null
+  /** The LATEST it can open — 24h before its own lock. The only real instant. */
+  sealedOpensAtLatest: string | null
   /** entry_id → the person behind it, for the faces in the corners. */
   entryPeople: Map<string, { user_id: string; full_name: string | null; username: string | null }>
   /**
@@ -141,11 +155,10 @@ export type ShowdownData = {
    * cannot drive a live card. These come from `league_match_scores`.
    */
   livePoints: Map<string, number>
-  liveScored: Map<string, number>
   /** entry_id → fixture_number → points, for the fixture-by-fixture breakdown. */
   perFixture: Map<string, Map<number, number>>
-  /** fixture_number → "Chelsea v Brighton", for the live matchweek. */
-  fixtureLabels: Map<number, string>
+  /** Every fixture of the live matchweek, scored or not. */
+  fixtures: MatchweekFixture[]
   /** Season totals per entry — points, rank, duel points. */
   totals: Map<string, { totalPoints: number; rank: number | null; duelPoints: number; correct: number }>
   duelPoints: Map<string, number>
@@ -2246,11 +2259,11 @@ export function PoolDetail({
                 inPlayMatchweek={showdownData.inPlayMatchweek}
                 sealedMatchweek={showdownData.sealedMatchweek}
                 sealedOpensAfter={showdownData.sealedOpensAfter}
+                sealedOpensAtLatest={showdownData.sealedOpensAtLatest}
                 entryPeople={showdownData.entryPeople}
                 livePoints={showdownData.livePoints}
-                liveScored={showdownData.liveScored}
                 perFixture={showdownData.perFixture}
-                fixtureLabels={showdownData.fixtureLabels}
+                fixtures={showdownData.fixtures}
                 totals={showdownData.totals}
                 form={leagueForm}
                 duelPoints={showdownData.duelPoints}

@@ -63,6 +63,17 @@ export type LeaguePoolView = {
    * finishes", which is both true and the thing the member is watching anyway.
    */
   sealedOpensAfterMatchweek: number | null
+  /**
+   * The LATEST that duel can open: 24 hours before the sealed matchweek's own
+   * lock (migration 120's floor).
+   *
+   * ⚠ This is the only instant in the reveal rule that is a CLOCK. The rule's
+   * main arm — "when the previous matchweek is decided" — has no timestamp,
+   * because nobody knows when the last game will be played and scored. So a
+   * countdown may only ever be shown against this, and only as an upper bound:
+   * the duel usually opens well before it.
+   */
+  sealedOpensAtLatest: string | null
 }
 
 type ClubRow = {
@@ -466,6 +477,10 @@ export async function readLeaguePoolView(
       inPlayMatchweekNumber: inPlayId === null ? null : numberByMatchweekId.get(inPlayId) ?? null,
       sealedMatchweekNumber: sealedRow === null ? null : sealedRow.matchweek_number,
       sealedOpensAfterMatchweek: blockedByRow === null ? null : blockedByRow.matchweek_number,
+      sealedOpensAtLatest:
+        sealedRow?.lock_at
+          ? new Date(new Date(sealedRow.lock_at).getTime() - 24 * 3600_000).toISOString()
+          : null,
     },
     error: null,
   }
