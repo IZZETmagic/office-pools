@@ -181,6 +181,8 @@ export default function DuelsTab({
   }, [duels, duelPoints])
 
   const name = (e: string | null) => (e ? entryNames.get(e) ?? 'Unknown' : 'Bye')
+  /** The viewer, for the sealed card — which has no duel row to read from. */
+  const youName = ownEntryIds.length > 0 ? name(ownEntryIds[0]) : 'You'
 
   if (duels.length === 0) {
     return (
@@ -214,55 +216,70 @@ export default function DuelsTab({
       {open && <DuelPanel m={open} state="picking" name={name} />}
 
       {/* What is coming, without saying who — the payoff of a sealed draw.
-          There is no row for this matchweek in `duels`; RLS withheld it. */}
+          There is no row for this matchweek in `duels`; RLS withheld it. The
+          same arena surface as a real duel, drained of colour on the right:
+          the shape is familiar, the person is not there yet. */}
       {sealedMatchweek !== null && (
-        <Card padding="md">
-          <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-2.5">
-            Matchweek {sealedMatchweek}
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">You</p>
-              <p className="text-sm font-bold text-neutral-900 truncate">
-                {ownEntryIds.length > 0 ? name(ownEntryIds[0]) : 'You'}
-              </p>
+        <div className="rounded-card overflow-hidden bg-midnight relative">
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                'linear-gradient(105deg,' +
+                ' color-mix(in srgb, var(--primary-500) 22%, transparent) 0%,' +
+                ' transparent 50%, color-mix(in srgb, var(--sp-slate) 16%, transparent) 100%)',
+            }}
+          />
+          <div className="relative px-5 pt-4 pb-5">
+            <p className="t-caption text-white/45 text-center mb-4">
+              Matchweek {sealedMatchweek}
+              <span className="ml-1.5 text-white/30">Sealed</span>
+            </p>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
+              <Corner side="blue" label="You" name={youName} accuracy={null} />
+              <span className="t-display text-2xl text-white/20 select-none">V</span>
+              <div className="min-w-0 text-right">
+                {/* The circle a face has not arrived in yet. Dashed rather than
+                    empty, so it reads as withheld and not as missing data. */}
+                <div className="w-11 h-11 rounded-full ml-auto mb-2.5 flex items-center justify-center
+                                border border-dashed border-white/25 t-display text-lg text-white/35">
+                  ?
+                </div>
+                <p className="t-detail text-white/35 uppercase tracking-widest">Sealed</p>
+                <div className="h-5 w-24 ml-auto mt-1 rounded bg-white/10" aria-hidden="true" />
+                <span className="sr-only">Opponent not yet revealed</span>
+              </div>
             </div>
-            <span className="text-xs font-bold text-neutral-400 shrink-0">v</span>
-            <div className="flex-1 min-w-0 text-right">
-              <p className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">Sealed</p>
-              <div className="ml-auto h-4 w-20 rounded bg-neutral-200" aria-hidden="true" />
-            </div>
+            <p className="t-detail text-white/45 text-center mt-4 pt-4 border-t border-white/10 max-w-md mx-auto">
+              {/* Say the mechanism, not a mood. The draw really was made at pool
+                  creation; claiming a weekly pairing is the sentence that would
+                  fail the disclosure gate. */}
+              {sealedOpensAfter !== null ? (
+                <>Revealed once matchweek {sealedOpensAfter} is decided — or a day before you
+                pick, whichever comes first.</>
+              ) : (
+                <>Revealed once the current duel is decided — or a day before you pick,
+                whichever comes first.</>
+              )}
+            </p>
           </div>
-          <p className="text-xs text-neutral-500 mt-3 pt-3 border-t border-border-default">
-            {/* Say the mechanism, not a mood. The draw really was made at pool
-                creation; claiming a weekly pairing is the sentence that would
-                fail the disclosure gate. */}
-            {sealedOpensAfter !== null ? (
-              <>Your matchweek {sealedMatchweek} opponent is revealed once matchweek{' '}
-              {sealedOpensAfter} is decided — or a day before you pick, whichever comes first.</>
-            ) : (
-              <>Your matchweek {sealedMatchweek} opponent is revealed once the current duel is
-              decided — or a day before you pick, whichever comes first.</>
-            )}
-          </p>
-        </Card>
+        </div>
       )}
 
       {/* Record — AFTER the three duel cards, not between them. Playing, picking
           and sealed are one timeline and a stats block in the middle breaks it. */}
       <Card padding="md">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-baseline gap-4 tabular-nums">
+          <div className="flex items-baseline gap-5">
             <Stat label="Won" value={record.won} />
             <Stat label="Tied" value={record.drawn} />
             <Stat label="Lost" value={record.lost} />
             {record.byes > 0 && <Stat label="Byes" value={record.byes} />}
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-neutral-900 tabular-nums">
-              {record.won * 3 + record.drawn}
-            </p>
-            <p className="text-xs text-neutral-500">duel points</p>
+            <p className="t-num t-num-black text-3xl text-ink">{record.won * 3 + record.drawn}</p>
+            <p className="t-detail text-muted mt-0.5">duel points</p>
           </div>
         </div>
       </Card>
@@ -323,46 +340,105 @@ function DuelPanel({
   state: 'playing' | 'picking'
   name: (e: string | null) => string
 }) {
+  const decided = m.duel.settled_at && m.them
   return (
-    <Card padding="md">
-      <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-2.5">
-        Matchweek {m.matchweek}
-        <span className="ml-1.5 font-semibold text-neutral-400 normal-case tracking-normal">
-          {state === 'playing' ? '· being played now' : '· you are picking this one'}
-        </span>
-      </p>
-      {m.them ? (
-        <div className="flex items-center gap-3">
-          <Fighter label="You" name={name(m.you.entry)} accuracy={m.you.accuracy} align="left" />
-          <span className="text-xs font-bold text-neutral-400 shrink-0">v</span>
-          <Fighter label="Them" name={name(m.them.entry)} accuracy={m.them.accuracy} align="right" />
-        </div>
-      ) : (
-        <p className="text-sm text-neutral-600">
-          You sit this one out. With an odd number of members somebody has a bye each
-          week — it rotates, so everyone gets the same number.
+    <div className="rounded-card overflow-hidden bg-midnight relative">
+      {/* Blue corner bleeding in from the left, red from the right. The two
+          brand tokens used as sides — the same pair every other screen reads as
+          primary and danger, which is why the card needs no legend. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(105deg,' +
+            ' color-mix(in srgb, var(--primary-500) 30%, transparent) 0%,' +
+            ' transparent 44%, transparent 56%,' +
+            ' color-mix(in srgb, var(--danger-500) 32%, transparent) 100%)',
+        }}
+      />
+      <div className="relative px-5 pt-4 pb-5">
+        <p className="t-caption text-white/45 text-center mb-4">
+          Matchweek {m.matchweek}
+          <span className="ml-1.5 text-white/30">
+            {state === 'playing' ? 'Being played now' : 'You are picking this one'}
+          </span>
         </p>
-      )}
-      {m.duel.settled_at && m.them && (
-        <p className="text-xs text-neutral-500 mt-3 pt-3 border-t border-border-default">
-          {m.you.points === 3 ? 'You won this duel — three points.'
-            : m.you.points === 1 ? 'A tie — one point each.'
-            : 'They took this one.'}
-        </p>
-      )}
-    </Card>
+
+        {m.them ? (
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg mx-auto">
+            <Corner side="blue" label="You" name={name(m.you.entry)} accuracy={m.you.accuracy} />
+            <span className="t-display text-2xl text-accent-400 select-none">V</span>
+            <Corner side="red" label="Them" name={name(m.them.entry)} accuracy={m.them.accuracy} align="right" />
+          </div>
+        ) : (
+          <p className="t-body text-white/60 text-center max-w-sm mx-auto">
+            You sit this one out. With an odd number of members somebody has a bye each
+            week — it rotates, so everyone gets the same number.
+          </p>
+        )}
+
+        {decided && (
+          <p className="t-caption text-center mt-4 pt-4 border-t border-white/10">
+            <span className={m.you.points === 3 ? 'text-success-400'
+              : m.you.points === 1 ? 'text-accent-400' : 'text-white/40'}>
+              {m.you.points === 3 ? 'You won this duel — three points'
+                : m.you.points === 1 ? 'A tie — one point each'
+                : 'They took this one'}
+            </span>
+          </p>
+        )}
+      </div>
+    </div>
   )
 }
 
-function Fighter({
-  label, name, accuracy, align,
-}: { label: string; name: string; accuracy: number | null; align: 'left' | 'right' }) {
+/**
+ * One side of a duel.
+ *
+ * ⚠ The initials are computed here rather than imported from
+ * `lib/design/initials.ts`, and the circle is drawn here rather than using
+ * `components/ui/Avatar`. Both exist, both are better, and both are uncommitted
+ * work in progress — importing them would make this file fail to build for
+ * anyone who has this commit and not that one. Swap when Avatars v1 lands; the
+ * shape below is deliberately the same (circle, initials, size in px).
+ */
+function Corner({
+  side, label, name, accuracy, align = 'left',
+}: {
+  side: 'blue' | 'red'
+  label: string
+  name: string
+  accuracy: number | null
+  align?: 'left' | 'right'
+}) {
+  // ⚠ A SINGLE-WORD NAME TAKES TWO LETTERS. "IZZETmagic" is one word, and the
+  // first version of this took one initial from it and rendered "I" in an 44px
+  // circle. Identical rule to `getInitials` in lib/design/initials.ts, which
+  // carries the same warning about "OdieBug" — matched deliberately so the swap
+  // to <Avatar> is a deletion rather than a behaviour change.
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const initials = parts.length === 0
+    ? '??'
+    : parts.length === 1
+      ? parts[0].slice(0, 2).toUpperCase()
+      : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
   return (
-    <div className={`flex-1 min-w-0 ${align === 'right' ? 'text-right' : ''}`}>
-      <p className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">{label}</p>
-      <p className="text-sm font-bold text-neutral-900 truncate">{name}</p>
+    <div className={`min-w-0 ${align === 'right' ? 'text-right' : ''}`}>
+      <div
+        className={`w-11 h-11 rounded-full flex items-center justify-center t-display text-lg text-white mb-2.5
+          ${align === 'right' ? 'ml-auto' : ''}
+          ${side === 'blue' ? 'bg-primary-500' : 'bg-danger-500'}`}
+        style={{
+          boxShadow: `0 0 0 3px color-mix(in srgb, var(--${side === 'blue' ? 'primary' : 'danger'}-500) 25%, transparent)`,
+        }}
+      >
+        {initials}
+      </div>
+      <p className="t-detail text-white/35 uppercase tracking-widest">{label}</p>
+      <p className="t-display text-xl text-white truncate mt-0.5">{name}</p>
       {accuracy !== null && (
-        <p className="text-xs text-neutral-500 tabular-nums">{accuracy} pts</p>
+        <p className="t-num t-num-medium text-xs text-white/45 mt-1">{accuracy} pts</p>
       )}
     </div>
   )
@@ -371,8 +447,8 @@ function Fighter({
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <span className="flex flex-col">
-      <span className="text-lg font-bold text-neutral-900">{value}</span>
-      <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">{label}</span>
+      <span className="t-num t-num-extrabold text-xl text-ink">{value}</span>
+      <span className="t-detail text-muted uppercase tracking-widest mt-0.5">{label}</span>
     </span>
   )
 }

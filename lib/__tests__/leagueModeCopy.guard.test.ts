@@ -148,3 +148,45 @@ describe('the sealed draw is described honestly', () => {
     }
   })
 })
+
+// =============================================================
+// The display face stays scoped
+// =============================================================
+// `t-display` (Anton) is a SECOND typeface, added for Showdown's ceremony
+// surfaces only — Ryan's call 2026-08-30, choosing a scoped face over a global
+// one. Nunito is the app's voice and stays that way.
+//
+// This is here because the failure mode is not a bug, it is drift: a display
+// face leaks one screen at a time, each use individually reasonable, until it
+// is the app's face and nobody decided that. The allowlist is the decision, and
+// widening it should be as deliberate as adding the font was.
+describe('the Showdown display face does not leak', () => {
+  const ALLOWED = ['app/pools/[pool_id]/DuelsTab.tsx']
+
+  it('only Showdown surfaces use t-display', () => {
+    // Comments stripped: `app/layout.tsx` explains the scope rule in a JSDoc
+    // block, and a guard that counts its own documentation as a violation
+    // teaches people to stop writing the documentation.
+    const stripped = (src: string) =>
+      src.replace(/\/\*[\s\S]*?\*\//g, '')
+         .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+    const users = files
+      .map((f) => f.replace(root + '/', ''))
+      .filter((rel) => /\bt-display\b/.test(stripped(readFileSync(resolve(root, rel), 'utf8'))))
+    expect(users.sort()).toEqual(ALLOWED.sort())
+  })
+
+  it('the rule is written down where someone reaching for the font will meet it', () => {
+    const css = readFileSync(resolve(root, 'app/globals.css'), 'utf8')
+    expect(css).toMatch(/@utility t-display/)
+    expect(css).toMatch(/Showdown ceremony surfaces ONLY/i)
+    expect(css).toMatch(/NOT\s+headings, tab labels, buttons/i)
+  })
+
+  it('Nunito is still the body face', () => {
+    // The scoped face must not have become the default by way of --font-sans.
+    const css = readFileSync(resolve(root, 'app/globals.css'), 'utf8')
+    expect(css).toMatch(/--font-sans:\s*var\(--font-nunito\)/)
+    expect(css).not.toMatch(/--font-sans:\s*var\(--font-anton\)/)
+  })
+})

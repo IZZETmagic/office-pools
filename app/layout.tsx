@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Nunito } from "next/font/google";
+import { Anton, Geist, Geist_Mono, Nunito } from "next/font/google";
 import { GoogleTagManager } from "@next/third-parties/google";
 import "./globals.css";
 import Footer from "@/components/ui/Footer";
@@ -20,6 +20,25 @@ const geistMono = Geist_Mono({
 
 const nunito = Nunito({
   variable: "--font-nunito",
+  subsets: ["latin"],
+});
+
+/**
+ * The DISPLAY face — Showdown's ceremony surfaces only.
+ *
+ * ⚠ SCOPED ON PURPOSE. Nunito is the app's UI face and stays that way; this is
+ * a second voice for one mode, because Showdown is the flagship and its duel
+ * card is meant to read as a broadcast graphic rather than another panel. The
+ * rule for where it may be used is on `t-display` in globals.css, and it is a
+ * rule rather than a convention because a display face that leaks becomes the
+ * app's face by accident.
+ *
+ * Anton ships one weight only, so `weight` is required — it is not a variable
+ * font and next/font will not infer it.
+ */
+const anton = Anton({
+  variable: "--font-anton",
+  weight: "400",
   subsets: ["latin"],
 });
 
@@ -104,7 +123,7 @@ export default function RootLayout({
         <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
       )}
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${nunito.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${nunito.variable} ${anton.variable} antialiased`}
       >
         <ThemeProvider>
           <ToastProvider>

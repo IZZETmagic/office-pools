@@ -308,6 +308,8 @@ html.dark {
      body to Arial — see the base layer below. */
   --font-sans: var(--font-nunito);
   --font-mono: var(--font-geist-mono);
+  /* Showdown ceremony surfaces only — see `t-display` below for the rule. */
+  --font-display: var(--font-anton);
 
   /* Primary */
   --color-primary-50:  var(--primary-50);
@@ -661,6 +663,38 @@ html.dark {
   font-weight: 500;
   font-size: 0.625rem;   /* 10 */
   line-height: 0.8125rem; /* 13 */
+}
+
+/* ---------------------------------------------------------------------------
+   THE DISPLAY FACE — Showdown ceremony surfaces ONLY
+   ---------------------------------------------------------------------------
+   Anton, condensed and single-weight, against Nunito everywhere else. It exists
+   because Showdown's duel card is meant to read as a broadcast graphic — two
+   names either side of a V — and Nunito is a rounded, friendly face that cannot
+   carry that. Ryan's call, 2026-08-30: a scoped display face rather than a
+   global one.
+
+   ⚠ THE SCOPE IS THE POINT, and it is narrow:
+
+     ALLOWED   the two fighter names on a duel card, the V between them, a duel
+               scoreline, and the verdict on a decided duel.
+     NOT       headings, tab labels, buttons, tables, empty states, any other
+               mode, or anything outside a Showdown surface.
+
+   A display face that leaks becomes the app's face by accident, one screen at a
+   time, and nobody makes that decision. If it starts appearing outside a duel,
+   the fix is to remove it there rather than to widen this comment.
+
+   ⚠ NOT A PORT. Every other utility in this file is a 1:1 mirror of
+   mobile/theme/typography.ts; this one has no RN counterpart, because Showdown
+   is not on mobile yet. When it is, the face has to be loaded there too or the
+   two platforms will disagree about what a duel looks like. */
+@utility t-display {
+  font-family: var(--font-anton), Impact, "Arial Narrow", sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.012em;
+  line-height: 1;
 }
 
 /* Every number in the app — ranks, points, scores, levels — renders in a bold
