@@ -1125,27 +1125,38 @@ function DuelPanel({
             on a phone; on a wide card it parked them in the middle with dead
             space at both ends. Same fix as "elsewhere on the card". */}
         {m.them ? (
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 max-w-lg md:max-w-none mx-auto">
-            <Corner side="blue" name={name(m.you.entry)} person={person(m.you.entry)} />
-            {/* The score, live. A duel with two names and no numbers is a
-                fixture list; the numbers are what make it a contest. */}
-            {live !== null ? (
-              <div className="text-center px-1">
-                {/* text-3xl on a phone. At text-4xl the score took enough of a
-                    375px row that both names truncated — and a duel card that
-                    hides who is playing to show the score bigger has its
-                    priorities backwards. */}
-                <div className="flex items-baseline gap-1.5 sm:gap-2">
-                  <span className="t-display text-3xl sm:text-4xl text-white">{live.you}</span>
-                  <span className="t-display text-base sm:text-lg text-white/25">&ndash;</span>
-                  <span className="t-display text-3xl sm:text-4xl text-white">{live.them}</span>
+          <>
+            {/* ⚠ AVATARS IN LINE WITH THE SCORE, NAMES ON THEIR OWN ROW.
+                The avatars stay at the card's edges above their own names, as
+                they were. What moved is the NAME: sharing a row with a 48px
+                scoreline left it about a quarter of the card, and "IZZETmagic"
+                truncated to "IZZET…" at every size we tried. On its own row it
+                gets half the card — more than any name needs — so the fix is
+                layout rather than smaller type, and the names got BIGGER as a
+                result instead of smaller. */}
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+              <span className="flex justify-start">
+                <AvatarRing side="blue" person={person(m.you.entry)} />
+              </span>
+              {live !== null ? (
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="t-display text-4xl sm:text-5xl text-primary-400">{live.you}</span>
+                  <span className="t-display text-xl sm:text-2xl text-white/30">&ndash;</span>
+                  <span className="t-display text-4xl sm:text-5xl text-danger-400">{live.them}</span>
                 </div>
-              </div>
-            ) : (
-              <span className="t-display text-2xl text-accent-400 select-none">V</span>
-            )}
-            <Corner side="red" name={name(m.them.entry)} person={person(m.them.entry)} align="right" />
-          </div>
+              ) : (
+                <span className="t-display text-2xl sm:text-3xl text-accent-400 select-none">V</span>
+              )}
+              <span className="flex justify-end">
+                <AvatarRing side="red" person={person(m.them.entry)} />
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-5">
+              <p className="t-display text-xl sm:text-3xl text-white truncate">{name(m.you.entry)}</p>
+              <p className="t-display text-xl sm:text-3xl text-white truncate text-right">{name(m.them.entry)}</p>
+            </div>
+          </>
         ) : (
           <p className="t-body text-white/60 text-center max-w-sm mx-auto">
             You sit this one out. With an odd number of members somebody has a bye each
@@ -1161,9 +1172,14 @@ function DuelPanel({
             ⚠ Desktop only. The phone card is already right and this is width
             that only a wide card has going spare — it is not information the
             small screen is missing, it is the same information the sheet under
-            it carries in full. */}
+            it carries in full.
+
+            ⚠ CAPPED AND CENTRED, so it lives under the SCORE rather than
+            running the full width and passing beneath the avatars and names. It
+            describes the contest in the middle of the card; stretched past the
+            two people it read as a divider. */}
         {strip.length > 0 && (
-          <div className="hidden md:flex items-stretch gap-1 mt-7 h-1.5" aria-hidden="true">
+          <div className="hidden md:flex items-stretch gap-1 mt-7 h-1.5 max-w-xs mx-auto w-full" aria-hidden="true">
             {strip.map((o, i) => (
               <span key={i} className={`flex-1 rounded-full ${
                 o === 'you' ? 'bg-primary-500'
@@ -1207,38 +1223,23 @@ function DuelPanel({
  * anyone who has this commit and not that one. Swap when Avatars v1 lands; the
  * shape below is deliberately the same (circle, initials, size in px).
  */
-function Corner({
-  side, name, person, align = 'left',
-}: {
-  side: 'blue' | 'red'
-  name: string
-  person: AvatarPerson | null
-  align?: 'left' | 'right'
-}) {
+function AvatarRing({
+  side, person,
+}: { side: 'blue' | 'red'; person: AvatarPerson | null }) {
   return (
-    <div className={`min-w-0 ${align === 'right' ? 'text-right' : ''}`}>
-      <div
-        className={`w-11 h-11 rounded-full mb-3 ${align === 'right' ? 'ml-auto' : ''}`}
-        style={{
-          boxShadow: `0 0 0 3px color-mix(in srgb, var(--${side === 'blue' ? 'primary' : 'danger'}-500) 45%, transparent)`,
-          borderRadius: '9999px',
-        }}
-      >
-        {/* The shared circle — hashed gradient and initials, the same face this
-            person wears in banter and on the pools list. A duel corner that
-            invented its own colour would make one person look like two. */}
-        {person
-          ? <Avatar person={person} size={44} />
-          : <div className="w-11 h-11 rounded-full bg-white/10" aria-hidden="true" />}
-      </div>
-      {/* ⚠ NO "YOU" / "THEM" LABEL. Your own name sits above your own avatar in
-          your own colour, on a card with exactly two people on it — the label
-          was restating the only thing that was never in doubt.
-
-          text-lg on a phone: "IZZETMAGIC" in Anton at text-xl truncated to
-          "IZZET…" at 375px, and a duel card whose whole point is two names
-          should not eat half of one. */}
-      <p className="t-display text-lg sm:text-xl text-white truncate">{name}</p>
+    <div
+      className="w-12 h-12 sm:w-14 sm:h-14 rounded-full shrink-0"
+      style={{
+        boxShadow: `0 0 0 3px color-mix(in srgb, var(--${side === 'blue' ? 'primary' : 'danger'}-500) 45%, transparent)`,
+        borderRadius: '9999px',
+      }}
+    >
+      {/* The shared circle — hashed gradient and initials, the same face this
+          person wears in banter and on the pools list. A duel corner that
+          invented its own colour would make one person look like two. */}
+      {person
+        ? <Avatar person={person} size={56} />
+        : <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/10" aria-hidden="true" />}
     </div>
   )
 }
