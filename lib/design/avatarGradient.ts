@@ -76,7 +76,16 @@ export function avatarColor(userId: string): string {
 export type AvatarInk = {
   /** Fills in either theme, and text on a LIGHT surface. */
   strong: string
-  /** Text on a DARK surface, where `strong` goes muddy. */
+  /**
+   * Text on a DARK surface, where `strong` goes muddy.
+   *
+   * Also the right step for an ambient WASH on a dark ground, for a reason
+   * that has nothing to do with text: every colour is normalised to the same
+   * lightness, so ten different people produce ten corners of equal weight.
+   * The raw stops span L=0.585 to L=0.821, and at a fixed alpha that makes a
+   * peach corner visibly brighter than an indigo one — which on a duel card
+   * reads as one side winning.
+   */
   soft: string
 }
 

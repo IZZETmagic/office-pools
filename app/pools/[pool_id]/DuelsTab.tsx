@@ -720,10 +720,14 @@ export default function DuelsTab({
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none"
+            /* Your colour on the left; the right stays SLATE because there is
+               no opponent yet to have one — that absence is the card. */
             style={{
               background:
                 'linear-gradient(105deg,' +
-                ' color-mix(in srgb, var(--primary-500) 22%, transparent) 0%,' +
+                ` color-mix(in srgb, ${
+                  youPerson ? avatarInk(youPerson.user_id).soft : 'var(--sp-slate)'
+                } 22%, transparent) 0%,` +
                 ' transparent 52%, color-mix(in srgb, var(--sp-slate) 14%, transparent) 100%)',
             }}
           />
@@ -1155,20 +1159,40 @@ function DuelPanel({
   // does not narrow, and it would recompute the hash per segment anyway.
   const yourColour = colourOf(m.you.entry)
   const theirColour = m.them ? colourOf(m.them.entry) : ''
+  /** The corner wash: lightness-normalised, so neither corner outshines the other. */
+  const washOf = (e: string | null) => {
+    const p = person(e)
+    return p ? avatarInk(p.user_id).soft : 'var(--sp-slate)'
+  }
+  const yourWash = washOf(m.you.entry)
+  const theirWash = m.them ? washOf(m.them.entry) : 'var(--sp-slate)'
   return (
     <div className="rounded-card overflow-hidden bg-midnight relative">
-      {/* Blue corner bleeding in from the left, red from the right. The two
-          brand tokens used as sides — the same pair every other screen reads as
-          primary and danger, which is why the card needs no legend. */}
+      {/* YOUR corner bleeding in from the left, THEIRS from the right — the
+          last thing on this card that was primary-and-danger. A fixed blue/red
+          wash behind two identity-coloured avatars would have been a second,
+          contradicting colour system: a green-versus-violet duel sat under a
+          wash matching neither player.
+
+          ⚠ `soft`, NOT the raw stop the ring and the strip use, and the reason
+          is intensity rather than hue. The ten stops span L=0.585 to L=0.821,
+          so at one fixed alpha a peach corner glows and an indigo one barely
+          shows — on a duel card an uneven wash reads as one side winning.
+          `soft` normalises every colour to L=0.70 first, so both corners carry
+          the same weight whoever is in them, which is also why the two mixes
+          are now equal at 30% where they used to be 30/32.
+
+          A BYE has no opponent to have a colour, so that side falls back to
+          slate — the same thing the sealed card does with its unknown half. */}
       <div
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
             'linear-gradient(105deg,' +
-            ' color-mix(in srgb, var(--primary-500) 30%, transparent) 0%,' +
+            ` color-mix(in srgb, ${yourWash} 30%, transparent) 0%,` +
             ' transparent 44%, transparent 56%,' +
-            ' color-mix(in srgb, var(--danger-500) 32%, transparent) 100%)',
+            ` color-mix(in srgb, ${theirWash} 30%, transparent) 100%)`,
         }}
       />
       {/* ⚠ WIDER SIDE PADDING ON DESKTOP. The avatars and names sit on the
