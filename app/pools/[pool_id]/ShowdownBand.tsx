@@ -155,11 +155,27 @@ export function ShowdownBand({
     }
   }, [])
 
-  const youColour = avatarColor(youEntry)
+  /**
+   * ⚠ THE COLOUR COMES FROM THE PERSON, NOT THE ENTRY.
+   *
+   * `avatarColor` hashes a USER id — its parameter says so — into ten palette
+   * slots. Handed an ENTRY id it returns a perfectly valid colour for the wrong
+   * key, which is how a blue avatar ended up inside a red ring: the face is
+   * drawn by `<Avatar>` off `person.user_id`, and the ring was drawn off
+   * something else entirely. Two ids, two hashes, no reason for them to agree.
+   *
+   * Every other site already does it this way — the duel card (×4) and the
+   * recap sheet — so this was the odd one out rather than a new rule.
+   */
+  const colourOf = (e: string | null) => {
+    const p = person(e)
+    return p ? avatarColor(p.user_id) : 'rgba(255,255,255,0.20)'
+  }
+  const youColour = colourOf(youEntry)
   // ⚠ SLATE, not a colour, while the opponent is unknown. An absent person has
   // no identity colour, and inventing one would mean the reveal changes a
   // colour the member had already learned.
-  const themColour = themEntry ? avatarColor(themEntry) : 'var(--sp-slate)'
+  const themColour = themEntry ? colourOf(themEntry) : 'var(--sp-slate)'
   const sealed = themEntry === null
 
   const meta = (e: string | null) => {
