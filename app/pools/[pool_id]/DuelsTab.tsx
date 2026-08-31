@@ -1095,28 +1095,26 @@ function DuelPanel({
       />
       <div className="relative px-5 pt-4 pb-5">
         <div className="flex items-center justify-center gap-2.5 mb-4">
-          {state === 'playing' && (
-            <span className="relative flex w-2.5 h-2.5 shrink-0" aria-hidden="true">
-              {/* Pulses ONLY while a ball is in play. A ring that never stops
-                  stops meaning anything, and reduced-motion users get the dot
-                  without the ring rather than nothing. */}
-              {liveNow && (
-                <span className="absolute inline-flex w-full h-full rounded-full bg-danger-500 opacity-75
-                                 animate-ping motion-reduce:hidden" />
-              )}
-              <span className={`relative inline-flex w-2.5 h-2.5 rounded-full
-                ${liveNow ? 'bg-danger-500' : 'bg-white/30'}`} />
+          {/* ⚠ THE DOT IS THE INDICATOR, so it appears ONLY when a ball is in
+              play — and the words that used to sit beside it are gone. A grey
+              dot with no label says nothing, and "Being played" was saying what
+              the red one already says. No dot means no game on right now, which
+              the "1 game still to play" line under the score already covers. */}
+          {liveNow && (
+            <span className="relative flex w-2.5 h-2.5 shrink-0">
+              <span className="absolute inline-flex w-full h-full rounded-full bg-danger-500 opacity-75
+                               animate-ping motion-reduce:hidden" aria-hidden="true" />
+              <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-danger-500" aria-hidden="true" />
+              <span className="sr-only">Live</span>
             </span>
           )}
-          {/* Bigger and brighter than the caption it was — this is the one line
-              that says WHICH week the card is about. */}
           <p className="t-caption text-sm text-white/75">
             Matchweek {m.matchweek}
-            <span className="ml-2 text-xs text-white/35">
-              {state === 'playing'
-                ? (liveNow ? 'Live now' : 'Being played')
-                : 'You are picking this one'}
-            </span>
+            {/* Kept for the PICKING card only: the dot does not cover this, and
+                without it nothing says why that week is on screen. */}
+            {state === 'picking' && (
+              <span className="ml-2 text-xs text-white/35">You are picking this one</span>
+            )}
           </p>
         </div>
 
