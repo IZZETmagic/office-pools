@@ -171,9 +171,15 @@ export function ShowdownBand({
            it travels with the component rather than depending on a stylesheet
            rebuild — which is worth something in a checkout where Turbopack has
            repeatedly served stale CSS while picking up TSX fine.
-           `radii.lg`, the same 24px every other card in the app uses. */
-        borderBottomLeftRadius: 'var(--radius-card)',
-        borderBottomRightRadius: 'var(--radius-card)',
+
+           ⚠ `radii.xl`, NOT the card radius. 24px read as a card that happened
+           to be screen-width; this is the token the bottom sheet uses for the
+           corners where it meets the page, which is the same gesture upside
+           down — the band curving open onto what is beneath it. Semantically
+           the right one, and it is the largest radius the system defines, so
+           anything more generous would have to leave the token set. */
+        borderBottomLeftRadius: 'var(--radius-sheet)',
+        borderBottomRightRadius: 'var(--radius-sheet)',
       } as React.CSSProperties}
     >
       {header && <div className="relative z-10">{header}</div>}
