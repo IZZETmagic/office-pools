@@ -161,6 +161,8 @@ type Props = {
    * parameter away for as long as the rework is unproven.
    */
   layout?: 'tabs' | 'onepage'
+  /** The app header, drawn INSIDE the band in one-page mode. */
+  bandHeader?: React.ReactNode
   /** Your points and the pool's median, per matchweek (migration 124). */
   series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
 }
@@ -594,6 +596,7 @@ export default function DuelsTab({
   duelPoints,
   onGoToPicks,
   layout = 'tabs',
+  bandHeader = null,
   series,
 }: Props) {
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
@@ -1132,6 +1135,7 @@ export default function DuelsTab({
               youEntry={inPlay.you.entry}
               themEntry={inPlay.them?.entry ?? null}
               name={name} person={person}
+              header={bandHeader}
               headline={
                 <>
                   <span>{y}</span>
@@ -1157,6 +1161,7 @@ export default function DuelsTab({
               youEntry={you}
               themEntry={null}
               name={name} person={person}
+              header={bandHeader}
               headline={sealedOpensAtLatest
                 ? <Countdown to={sealedOpensAtLatest} />
                 : <span className="text-white/45">Sealed</span>}
@@ -1174,6 +1179,7 @@ export default function DuelsTab({
               youEntry={open.you.entry}
               themEntry={open.them?.entry ?? null}
               name={name} person={person}
+              header={bandHeader}
               headline={<span className="text-white/45">Not started</span>}
               sub="Picks are open"
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}

@@ -50,6 +50,15 @@ import { avatarColor } from '@/lib/design/avatarGradient'
  * a third place that knows the duel lifecycle, and there are already two.
  */
 export type ShowdownBandProps = {
+  /**
+   * The app header, drawn INSIDE the band over the gradient.
+   *
+   * ⚠ The band and the header are ONE object — that is the whole point. Left
+   * as two, the header is an opaque bar the band slides underneath, and the
+   * collapse looks like content being clipped rather than a head of page
+   * getting shorter.
+   */
+  header?: React.ReactNode
   matchweek: number
   /** The viewer's entry. */
   youEntry: string
@@ -103,7 +112,7 @@ function Face({
 }
 
 export function ShowdownBand({
-  matchweek, youEntry, themEntry, name, person, headline, sub,
+  header, matchweek, youEntry, themEntry, name, person, headline, sub,
   liveNow = false, strip = [], rank, points,
 }: ShowdownBandProps) {
   const bandRef = useRef<HTMLDivElement>(null)
@@ -158,6 +167,8 @@ export function ShowdownBand({
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       } as React.CSSProperties}
     >
+      {header && <div className="relative z-10">{header}</div>}
+
       {/* ── phone: the pieces travel ─────────────────────────── */}
       <div className="sd-m">
         <p className="sd-mw t-caption text-white/50">Matchweek {matchweek}</p>

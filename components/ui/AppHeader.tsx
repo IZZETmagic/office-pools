@@ -19,9 +19,19 @@ type AppHeaderProps = {
   isSuperAdmin?: boolean
   /** Whether the header should be sticky (default: true) */
   sticky?: boolean
+  /**
+   * Render over a dark surface instead of on `bg-surface`.
+   *
+   * ⚠ STYLING ONLY. The links, the menu, the theme toggle and the sign-out are
+   * untouched — this is the app's primary navigation and it means the same
+   * thing on every page. What changes is that it sits ON something (the
+   * Showdown band) rather than in a bar above it, so it drops its background,
+   * its shadow and its border and lets the surface behind show through.
+   */
+  overlay?: boolean
 }
 
-export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true }: AppHeaderProps) {
+export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true, overlay = false }: AppHeaderProps) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
   const { colorMode, setColorMode } = useTheme()
@@ -62,7 +72,8 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true }: 
 
   return (
     <>
-    <nav className={`${sticky ? 'sticky top-0 shadow-sm dark:shadow-none dark:border-b dark:border-border-default' : ''} z-50 bg-surface`}>
+    <nav className={`${sticky ? 'sticky top-0 shadow-sm dark:shadow-none dark:border-b dark:border-border-default' : ''} z-50 ${
+      overlay ? 'bg-transparent' : 'bg-surface'}`}>
       <div className="px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
         {/* Left: Brand + breadcrumbs */}
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">

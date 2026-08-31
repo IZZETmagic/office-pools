@@ -1822,6 +1822,14 @@ export function PoolDetail({
               )}
             </div>
           </div>
+        ) : onePage ? (
+          /* ⚠ ONE-PAGE PUTS THE HEADER INSIDE THE BAND, so nothing renders
+             here. The same AppHeader — the same links, the same menu, the same
+             sign-out — is handed to DuelsTab and drawn over the gradient with
+             `overlay`, which changes its background and nothing else. That is
+             what makes the header and the duel one object rather than a bar the
+             band scrolls underneath. */
+          null
         ) : (
           /* ── Standard SportPool header ── */
           <AppHeader
@@ -2504,6 +2512,14 @@ export function PoolDetail({
                 totals={showdownData.totals}
                 onGoToPicks={() => handleTabSwitch('predictions')}
                 layout={onePage ? 'onepage' : 'tabs'}
+                bandHeader={onePage ? (
+                  <AppHeader
+                    overlay
+                    sticky={false}
+                    breadcrumbs={[{ label: pool.pool_name }]}
+                    isSuperAdmin={isSuperAdmin}
+                  />
+                ) : null}
                 series={showdownData.series}
                 form={leagueForm}
                 duelPoints={showdownData.duelPoints}
