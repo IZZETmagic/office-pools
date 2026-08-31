@@ -1,6 +1,19 @@
 -- =============================================================
 -- 083 — SHOWDOWN: the fixture list
 -- =============================================================
+-- ⚠⚠ SUPERSEDED IN TWO PLACES. READ THIS BEFORE THE ARGUMENT BELOW.
+--
+--   · Migration 116 SEALS THE DRAW. The section headed "Why the fixture list
+--     is shown in advance" is no longer the product's position — Ryan
+--     overturned it on 2026-08-30 and the schedule now opens one matchweek at
+--     a time. 083's RLS policy is replaced there. The ROUND-ROBIN stands; only
+--     the publishing was reversed.
+--   · Migration 117 replaces `league_generate_duel_schedule` (as 095 and 100
+--     did before it) so the reveal line and the redraw line are the same line.
+--
+-- The SQL below is left exactly as applied. It is a record of what ran, not a
+-- specification — do not "restore" the publishing behaviour from it.
+-- =============================================================
 -- L-J. Showdown is a LAYER, not a peer engine (Decision 9): it consumes
 -- whichever weekly accuracy number the depth produced, so it works over Results
 -- or Scores without knowing which.

@@ -30,9 +30,16 @@
  * roster, and false the moment somebody joins in October — Decision 10 settles
  * that a straggler joins the draw from the next matchweek, which necessarily
  * gives them fewer duels than the members who were there in August. The promise
- * is now about the draw being published and rotated, which stays true.
+ * is now about the draw being made up front and rotated, which stays true.
  *  2. The engines. Every number quoted in `points` below is a default the SQL
  *     COALESCEs against, not a number this file decides.
+ *
+ * ⚠ 2026-08-30 — THE DRAW IS NO LONGER PUBLISHED. Migration 116 seals it and
+ * opens it one matchweek at a time. The copy below must say that the draw was
+ * made at pool creation and opens weekly. It must NEVER say a pairing happens
+ * each week: that is the one sentence that would fail the disclosure gate,
+ * because it is a claim about a thing we did not do. `LeagueScoringRulesTab`
+ * and `LeagueHowToPlayTab` carry the same sentence and moved with this one.
  */
 
 export type LeagueMode = 'pickem' | 'showdown' | 'last_man_standing' | 'table'
@@ -93,14 +100,20 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
             ? 'Members put a scoreline on all ten fixtures each matchweek, '
             : 'Members call all ten fixtures each matchweek, ') +
           'and are drawn against one other member for that week. Whoever scores more wins the ' +
-          'duel — three points for a win, one for a tie. The fixture list is published in ' +
-          'advance and rotates so that everybody meets everybody, rather than the same pairs ' +
-          'coming round again. With an odd number of members somebody sits out each week and ' +
-          'takes a point — there was no opponent, so there was no defeat. Duel points decide ' +
-          'the table; the weekly score is the tiebreak, so a big week still counts even if you ' +
-          'lost the head-to-head.',
+          'duel — three points for a win, one for a tie. The whole season is drawn when the ' +
+          'pool is created and opens one matchweek at a time, so who you are playing is a ' +
+          'surprise each week — and the draw rotates, so everybody meets everybody rather than ' +
+          'the same pairs coming round again. With an odd number of members somebody sits out ' +
+          'each week and takes a point — there was no opponent, so there was no defeat. Duel ' +
+          'points decide the table; the weekly score is the tiebreak, so a big week still ' +
+          'counts even if you lost the head-to-head.',
         points: [
-          'A different opponent every matchweek, drawn in advance.',
+          // ⚠ THE DISCLOSURE GATE LIVES IN THIS SENTENCE. Migration 116 seals the
+          // draw and reveals it a matchweek at a time; that passes gate 1 only
+          // while the copy says what actually happens. The draw is made ONCE, at
+          // pool creation — never "you have been randomly paired this week",
+          // which would be a claim about a thing we did not do.
+          'Drawn for the whole season up front, opened one matchweek at a time.',
           'Three points a win, one a tie, none for a loss.',
           'A week with no opponent is worth a point.',
         ],

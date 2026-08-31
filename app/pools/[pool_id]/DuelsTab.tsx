@@ -6,15 +6,30 @@
 // The mode's whole appeal is that a 38-week parallel pick'em becomes a personal
 // league: by November you have a named rival and a head-to-head record.
 //
-// ## Why the fixture list is shown in advance
+// ## ⚠ THE DRAW IS SEALED — this tab used to argue the opposite
 //
-// Because it exists in advance. The pairing is a round-robin drawn at pool
-// creation rather than a weekly random draw, and that choice was forced by gate
-// 5 — every element of uncertainty must be inherited from the sport, and who you
-// happen to draw is our dice. Publishing it is the honest half of that: a
-// schedule we have already computed and withhold is a different kind of
-// manipulation. It also happens to be better, because a rival you can see coming
-// for three weeks is more anticipation than one you learn about on Monday.
+// It used to carry a section headed "Why the fixture list is shown in advance",
+// ending "a schedule we have already computed and withhold is a different kind
+// of manipulation". Ryan overturned that on 2026-08-30: the draw is hidden and
+// opens one matchweek at a time, so who you are playing is a surprise each week.
+//
+// What did NOT change is the round-robin. Gate 5 was satisfied by drawing a
+// rotation rather than pairing at random each week — nobody faces the strong
+// pickers more often than anybody else — and hiding *when you learn* the pairing
+// changes no outcome. What changed is disclosure, and that is handled by saying
+// plainly what happens: the season is drawn at pool creation and opens weekly.
+// See `leagueModeInfo.ts`, which carries the sentence a member actually reads.
+//
+// ## Two things this tab no longer shows
+//
+// The season fixture list and the "Coming up" list of future opponents. They are
+// not hidden here — they are NOT IN THE PROPS. Migration 116's RLS policy
+// withholds the rows, so `duels` contains only matchweeks that have opened. Do
+// not add them back: this component could not render them if it tried.
+//
+// That is also why `sealedMatchweek` and `sealedOpensAt` are passed separately.
+// The sealed card needs a number and an instant that no longer arrive with the
+// duels, because the whole point is that those rows are gone.
 //
 // ## Nothing here computes a score
 //
@@ -24,6 +39,7 @@
 
 import { useMemo } from 'react'
 import { Card } from '@/components/ui/Card'
+import { LocalTime } from '@/components/LocalTime'
 import { Icon } from '@/components/ui/Icon'
 import type { DuelRow } from '@/lib/league/duels'
 
@@ -45,6 +61,13 @@ type Props = {
   openMatchweek: number | null
   /** The matchweek being played right now. Null between rounds. */
   inPlayMatchweek: number | null
+  /**
+   * The first matchweek still SEALED, and the instant it opens — which is when
+   * the OPEN matchweek locks, because that is when it becomes the open one and
+   * its duel becomes readable. Null at the end of the season.
+   */
+  sealedMatchweek: number | null
+  sealedOpensAt: string | null
   /** Duel points per entry, from the leaderboard read. */
   duelPoints: Map<string, number>
 }
@@ -57,6 +80,8 @@ export default function DuelsTab({
   ownEntryIds,
   openMatchweek,
   inPlayMatchweek,
+  sealedMatchweek,
+  sealedOpensAt,
   duelPoints,
 }: Props) {
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
@@ -108,10 +133,6 @@ export default function DuelsTab({
     () => (featuredMatchweek === null ? null : mine.find((m) => m.matchweek === featuredMatchweek) ?? null),
     [mine, featuredMatchweek],
   )
-  const next = useMemo(
-    () => mine.filter((m) => !m.duel.settled_at && (featuredMatchweek === null || m.matchweek > featuredMatchweek)).slice(0, 4),
-    [mine, featuredMatchweek],
-  )
 
   // The duel table — everyone, by duel points. Built from the duels themselves
   // so it cannot disagree with the fixture list beside it.
@@ -146,7 +167,8 @@ export default function DuelsTab({
           <Icon name="arrow.triangle.merge" size={40} className="mx-auto text-neutral-300 mb-3" />
           <p className="text-sm text-neutral-600 font-medium">No duels yet</p>
           <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
-            The fixture list is drawn once there are two members. Invite someone and it appears.
+            The draw is made once there are two members, and your first opponent opens with the
+            matchweek. Invite someone and it appears.
           </p>
         </div>
       </Card>
@@ -158,7 +180,8 @@ export default function DuelsTab({
       <div>
         <h2 className="text-lg font-bold text-neutral-900">Your duels</h2>
         <p className="text-sm text-neutral-600 mt-1">
-          Every matchweek you face one member. Beat their score for three points, tie for one.
+          Every matchweek you face one member — revealed when the matchweek opens. Beat their
+          score for three points, tie for one.
         </p>
       </div>
 
@@ -214,30 +237,36 @@ export default function DuelsTab({
         </div>
       </Card>
 
-      {/* Who you play next — the payoff of a published fixture list */}
-      {next.length > 0 && (
+      {/* What is coming, without saying who — the payoff of a sealed draw.
+          There is no row for this matchweek in `duels`; RLS withheld it. */}
+      {sealedMatchweek !== null && (
         <Card padding="md">
           <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-2.5">
-            Coming up
+            Matchweek {sealedMatchweek}
           </p>
-          <ul className="space-y-1.5">
-            {next.map((m) => (
-              <li key={m.duel.duel_id} className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-neutral-500 tabular-nums w-14 shrink-0">MW {m.matchweek}</span>
-                <span className="flex-1 min-w-0 font-semibold text-neutral-900 truncate">
-                  {m.them ? name(m.them.entry) : 'Bye'}
-                </span>
-                {/* While last week's duel is still being played, the week you
-                    are actually picking is in this list rather than the card
-                    above — so it says so. */}
-                {m.matchweek === openMatchweek && (
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-warning-600 shrink-0">
-                    Picking now
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">You</p>
+              <p className="text-sm font-bold text-neutral-900 truncate">
+                {ownEntryIds.length > 0 ? name(ownEntryIds[0]) : 'You'}
+              </p>
+            </div>
+            <span className="text-xs font-bold text-neutral-400 shrink-0">v</span>
+            <div className="flex-1 min-w-0 text-right">
+              <p className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">Sealed</p>
+              <div className="ml-auto h-4 w-20 rounded bg-neutral-200" aria-hidden="true" />
+            </div>
+          </div>
+          <p className="text-xs text-neutral-500 mt-3 pt-3 border-t border-border-default">
+            {/* Say the mechanism, not a mood. The draw really was made at pool
+                creation; claiming a weekly pairing is the sentence that would
+                fail the disclosure gate. */}
+            Your opponent opens when matchweek {sealedMatchweek} does
+            {sealedOpensAt ? (
+              <> — <LocalTime iso={sealedOpensAt} format={formatOpensAt} /></>
+            ) : null}. The whole season was
+            drawn when the pool was created; it opens one matchweek at a time.
+          </p>
         </Card>
       )}
 
@@ -275,9 +304,9 @@ export default function DuelsTab({
       </Card>
 
       <p className="text-xs text-neutral-400">
-        The fixture list is drawn when the pool is created and everyone plays everyone
-        the same number of times. It changes only when someone joins or leaves, and never
-        for a matchweek already played.
+        The draw is made when the pool is created and rotates, so everybody meets everybody —
+        but it opens one matchweek at a time. It changes only when someone joins or leaves, and
+        never for a matchweek that has already opened.
       </p>
     </div>
   )
@@ -295,6 +324,13 @@ function Fighter({
       )}
     </div>
   )
+}
+
+/** The viewer's own timezone — never the server's. See components/LocalTime. */
+function formatOpensAt(d: Date): string {
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
 }
 
 function Stat({ label, value }: { label: string; value: number }) {

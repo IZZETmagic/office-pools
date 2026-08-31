@@ -43,9 +43,16 @@ import { resolve } from 'path'
   }
 })()
 
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '../lib/supabase/server'
 
 const admin = createAdminClient()
+
+// A scratch member, used ONLY by the seal check. Everything else in this file
+// runs as service_role, which is exactly why the seal needs its own identity —
+// see `theSeal()`.
+const SEAL_EMAIL = 'scratch-116-seal@example.invalid'
+const SEAL_PASSWORD = 'scratch-116-seal-pw-not-a-real-account'
 
 const S = 'dd100000-0000-4000-8000-'
 const SEASON = `${S}000000000001`
@@ -402,8 +409,158 @@ async function neverInThePast() {
   eq('a finished season schedules nothing', none.skipped, 'no open matchweek left')
 }
 
+async function theSeal() {
+  head('8. The draw is SEALED until its matchweek opens (migration 116)')
+
+  // ⚠ WHY THIS SECTION EXISTS AT ALL.
+  //
+  // Every other check in this file runs as `admin` — the service-role client,
+  // which carries `bypassrls`. Migration 116's policy is invisible to it. A
+  // service-role-only test of a row-level policy PASSES WITH THE SEAL WIDE
+  // OPEN, which is worse than no test: it reports a guarantee nobody is
+  // providing. So this one check needs a real member's JWT.
+  //
+  // State when this runs: every matchweek locks in the future (`setup`), so
+  // matchweek 1 is the open one and matchweeks 2..WEEKS are sealed. Run it
+  // BEFORE `neverInThePast`, which pushes locks into the past.
+
+  const created = await admin.auth.admin.createUser({
+    email: SEAL_EMAIL, password: SEAL_PASSWORD, email_confirm: true,
+  })
+  if (created.error || !created.data.user) {
+    bad('scratch auth user', created.error?.message ?? 'no user returned')
+    return
+  }
+  const authUserId = created.data.user.id
+
+  const appUser = await must('scratch app user', admin.from('users').insert({
+    auth_user_id: authUserId, username: 'scratch116seal', email: SEAL_EMAIL,
+  }).select('user_id'))
+  const userId = (appUser as Array<{ user_id: string }>)[0].user_id
+
+  await must('scratch membership', admin.from('pool_members').insert({
+    member_id: MEM(9), pool_id: POOL_EVEN, user_id: userId, role: 'member',
+  }).select('member_id'))
+
+  const member = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  )
+  const signedIn = await member.auth.signInWithPassword({
+    email: SEAL_EMAIL, password: SEAL_PASSWORD,
+  })
+  if (signedIn.error) {
+    bad('sign in as the scratch member', signedIn.error.message)
+    return
+  }
+
+  const asAdmin = await must('duels as service_role',
+    admin.from('league_duels').select('matchweek_number').eq('pool_id', POOL_EVEN))
+  const adminWeeks = new Set((asAdmin as Array<{ matchweek_number: number }>)
+    .map((d) => d.matchweek_number))
+
+  const { data: asMemberRows, error: memberErr } = await member
+    .from('league_duels').select('matchweek_number').eq('pool_id', POOL_EVEN)
+  if (memberErr) {
+    // An RLS refusal is empty rows, never an error. An error here means the
+    // policy raised — most likely `league_open_matchweek` being revoked from
+    // the caller, which is the hazard `league_duel_is_revealed` is SECURITY
+    // DEFINER to avoid.
+    bad('the member read returns rows, not an error', memberErr.message)
+    return
+  }
+  const memberWeeks = new Set((asMemberRows ?? []).map((d) => d.matchweek_number as number))
+
+  eq('service_role still sees the whole season', adminWeeks.size, WEEKS)
+  eq('the member sees ONLY the open matchweek', [...memberWeeks].join(','), '1')
+  eq('…and every later matchweek is withheld',
+     [...adminWeeks].filter((w) => w > 1).every((w) => !memberWeeks.has(w)), true)
+  note('a service-role-only test of this policy would pass with the seal wide open')
+
+  // The predicate itself, both sides of the line.
+  const openRevealed = await must('predicate mw1', admin.rpc('league_duel_is_revealed', {
+    p_pool_id: POOL_EVEN, p_matchweek_number: 1,
+  }))
+  const nextRevealed = await must('predicate mw2', admin.rpc('league_duel_is_revealed', {
+    p_pool_id: POOL_EVEN, p_matchweek_number: 2,
+  }))
+  eq('league_duel_is_revealed says yes for the open matchweek', openRevealed as unknown, true)
+  eq('…and no for the one after it', nextRevealed as unknown, false)
+
+  // A non-member sees nothing at all — the membership half of the policy is
+  // still doing its job, not just the reveal half.
+  await must('drop scratch membership',
+    admin.from('pool_members').delete().eq('member_id', MEM(9)).select('member_id'))
+  const { data: asStranger } = await member
+    .from('league_duels').select('matchweek_number').eq('pool_id', POOL_EVEN)
+  eq('a non-member sees no duels at all', (asStranger ?? []).length, 0)
+
+  await member.auth.signOut()
+}
+
+async function theShuffle() {
+  head('9. The round order is permuted per cycle, and it is deterministic')
+
+  // Migration 118. The seal has a half-life: with n entries a member has met
+  // everyone by round n-1, so the tail of each cycle is deducible. Sequential
+  // round order made that far worse — cycle 1 repeated cycle 0 exactly, so once
+  // you had seen one cycle you knew the rest of the season outright.
+  //
+  // What must NOT change is the pair multiset. Section 1 already asserts that
+  // property directly against whatever the generator produced, so if the
+  // permutation broke the round-robin this script would have failed before
+  // reaching here. This section checks the two things section 1 cannot see.
+
+  const shape = (rows: Array<{ matchweek_number: number; entry_a: string; entry_b: string | null }>) =>
+    rows
+      .map((d) => `${d.matchweek_number}:${[d.entry_a, d.entry_b ?? '-'].sort().join('|')}`)
+      .sort()
+      .join(',')
+
+  // 1. DETERMINISM. Regenerating with an unchanged roster must produce a
+  //    byte-identical future — under a sealed draw nobody could see it churn.
+  const before = shape(await duelsOf(POOL_ODD))
+  await generate(POOL_ODD)
+  const after = shape(await duelsOf(POOL_ODD))
+  eq('regenerating an unchanged pool changes nothing', after === before, true)
+  note('random() here would redraw the season on every join, invisibly')
+
+  // 2. THE PERMUTATION IS LIVE. Two cycles of the same pool must not use the
+  //    same round order — that is the whole point. Compared by the SET of
+  //    opponents each matchweek pairs, since the round index is not stored.
+  const odd = await duelsOf(POOL_ODD)
+  const rounds = 5 // n-1 for five entries padded to six
+  const weekShape = (mw: number) =>
+    odd.filter((d) => d.matchweek_number === mw)
+       .map((d) => [d.entry_a, d.entry_b ?? '-'].sort().join('|'))
+       .sort().join(',')
+  const cycle0 = Array.from({ length: rounds }, (_, i) => weekShape(i + 1))
+  const cycle1 = Array.from({ length: rounds }, (_, i) => weekShape(i + 1 + rounds))
+  eq('cycle 1 does not simply repeat cycle 0', cycle0.join('#') !== cycle1.join('#'), true)
+
+  // …but it IS the same set of rounds, reordered. Every matchweek of cycle 0
+  // must reappear somewhere in cycle 1.
+  const asSet = new Set(cycle0)
+  eq('…it is the same rounds in a different order',
+     cycle1.every((w) => asSet.has(w)) && new Set(cycle1).size === asSet.size, true)
+  note('same pairs, same byes, same counts — only which week they land in moved')
+}
+
 async function teardown() {
   head('Teardown')
+
+  // The seal check's scratch identity. Removed first, because the app `users`
+  // row references the auth user.
+  await admin.from('pool_members').delete().eq('member_id', MEM(9))
+  const { data: sealUser } = await admin.from('users')
+    .select('user_id, auth_user_id').eq('email', SEAL_EMAIL).maybeSingle()
+  if (sealUser) {
+    await admin.from('users').delete().eq('user_id', (sealUser as { user_id: string }).user_id)
+    const authId = (sealUser as { auth_user_id: string | null }).auth_user_id
+    if (authId) await admin.auth.admin.deleteUser(authId)
+  }
+
   for (const pid of [POOL_EVEN, POOL_ODD, POOL_PICK, POOL_LATE]) {
     await admin.from('pool_entries').delete().eq('pool_id', pid)
     await admin.from('pools').delete().eq('pool_id', pid)
@@ -415,7 +572,7 @@ async function teardown() {
     ['pools', 'pool_id', POOL_EVEN], ['pools', 'pool_id', POOL_ODD],
     ['pools', 'pool_id', POOL_PICK], ['pools', 'pool_id', POOL_LATE],
     ['league_seasons', 'season_id', SEASON], ['league_duels', 'pool_id', POOL_EVEN],
-    ['league_fixtures', 'season_id', SEASON],
+    ['league_fixtures', 'season_id', SEASON], ['users', 'email', SEAL_EMAIL],
   ] as const) {
     const { count } = await admin.from(t).select('*', { count: 'exact', head: true }).eq(col, val)
     if ((count ?? 0) > 0) left.push(`${t}=${count}`)
@@ -425,7 +582,7 @@ async function teardown() {
 }
 
 ;(async () => {
-  console.log('\n  SHOWDOWN — migrations 083-085')
+  console.log('\n  SHOWDOWN — migrations 083-085, 116-118')
   console.log('  ' + '='.repeat(68))
   try {
     await setup()
@@ -434,6 +591,8 @@ async function teardown() {
     await scoring()
     await controlPool()
     await regeneration()
+    await theSeal()
+    await theShuffle()
     await neverInThePast()
   } catch (err) {
     bad('threw', err instanceof Error ? err.message : String(err))

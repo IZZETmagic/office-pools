@@ -26,6 +26,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { resolve, join } from 'path'
+import { leagueModeInfo } from '../leagueModeInfo'
 
 /** Every .tsx/.ts under app/ and components/, which is where copy lives. */
 function walk(dir: string, out: string[] = []): string[] {
@@ -72,6 +73,68 @@ describe('league pools are never described from the bracket copy', () => {
       const src = readFileSync(resolve(root, path), 'utf8')
       expect(src, path).toMatch(/leagueModeInfo\(\s*\n?\s*\(pool\.league_mode \?\? 'pickem'\)/)
       expect(src, path).toMatch(/\(pool\.league_depth \?\? null\)/)
+    }
+  })
+})
+
+// =============================================================
+// The sealed draw's disclosure gate, as a test
+// =============================================================
+// Migration 116 hides the fixture list and opens it one matchweek at a time.
+// That passes gate 1 only while the copy says what actually happens: the draw
+// was made ONCE, at pool creation. The sentence that would fail the gate is a
+// claim that the pairing happens each week — "you have been randomly paired" —
+// because it describes a thing we do not do.
+//
+// The gate is a judgement call when a feature is designed. This is the half of
+// it that can be mechanical, and it is worth having mechanical: the phrasing
+// will be reached for by anyone writing this screen, precisely because it is
+// the natural way to describe what the member experiences.
+//
+// ⚠ It reads what a MEMBER sees, not the source. The first draft of this test
+// failed on its own warning comments — the files explain at length which
+// sentence is forbidden, and that explanation has to quote it.
+describe('the sealed draw is described honestly', () => {
+  /** Source with `//` and block comments removed — copy only. */
+  const prose = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, '')
+       .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+
+  const surfaces = [
+    'lib/leagueModeInfo.ts',
+    'app/pools/[pool_id]/LeagueScoringRulesTab.tsx',
+    'app/pools/[pool_id]/LeagueHowToPlayTab.tsx',
+    'app/pools/[pool_id]/DuelsTab.tsx',
+  ].map((rel) => ({ rel, src: prose(readFileSync(resolve(root, rel), 'utf8')) }))
+
+  it('no surface claims the pairing happens weekly or at random', () => {
+    for (const { rel, src } of surfaces) {
+      expect(src, `${rel} implies a weekly draw`).not.toMatch(/randomly paired/i)
+      expect(src, `${rel} implies a weekly draw`).not.toMatch(/paired (each|every) (week|matchweek)/i)
+      expect(src, `${rel} implies a random draw`).not.toMatch(/random(ly)? (draw|drawn|selected)/i)
+    }
+  })
+
+  it('no surface still promises a published fixture list', () => {
+    // The rows are not in the payload any more — a screen offering the season
+    // fixture list would be promising something RLS withholds.
+    for (const { rel, src } of surfaces) {
+      expect(src, `${rel} still offers a published fixture list`)
+        .not.toMatch(/fixture list is published/i)
+      expect(src, `${rel} still offers the season fixture list`)
+        .not.toMatch(/season fixture list/i)
+    }
+  })
+
+  it('the member-facing explainer says when the draw was made and when it opens', () => {
+    // The RENDERED string, not the source: the description is assembled from
+    // concatenated literals, so a source regex breaks on where the lines wrap.
+    for (const depth of ['results', 'scores'] as const) {
+      const info = leagueModeInfo('showdown', depth)
+      const all = [info.description, ...info.points].join(' ')
+      expect(all, depth).toMatch(/drawn when the pool is created/i)
+      expect(all, depth).toMatch(/one matchweek at a time/i)
+      expect(all, depth).not.toMatch(/published in advance/i)
     }
   })
 })

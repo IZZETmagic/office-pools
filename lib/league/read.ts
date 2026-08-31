@@ -45,6 +45,22 @@ export type LeaguePoolView = {
   openMatchweekNumber: number | null
   /** The matchweek being played right now. Null between rounds. */
   inPlayMatchweekNumber: number | null
+  /**
+   * The next matchweek after the open one, in LOCK order — the first one whose
+   * Showdown duel is still sealed (migration 116).
+   *
+   * Showdown only reads these two. The duel rows for this matchweek are not in
+   * the payload at all — RLS withholds them — so the sealed card needs the
+   * number from somewhere, and this is it. Null when the open matchweek is the
+   * last one of the season.
+   */
+  sealedMatchweekNumber: number | null
+  /**
+   * When that duel opens: the instant the OPEN matchweek locks, because that is
+   * when the next one becomes the open one and `league_duel_is_revealed` starts
+   * saying yes. R1, Ryan 2026-08-30.
+   */
+  sealedOpensAt: string | null
 }
 
 type ClubRow = {
@@ -402,6 +418,19 @@ export async function readLeaguePoolView(
   const openId = openMatchweekId(matchweekRows, now)
   const inPlayId = inPlayMatchweekId(matchweekRows, now)
 
+  // The first matchweek still SEALED for Showdown, and when it opens. Found in
+  // lock order rather than by number, for the same reason `openMatchweekId` is:
+  // a whole round can be moved, so the next matchweek to be played is not
+  // reliably the next number up (migration 101, minimum gap −121 days).
+  const openRow = matchweekRows.find((m) => m.matchweek_id === openId) ?? null
+  const openLock = openRow?.lock_at ? new Date(openRow.lock_at).getTime() : null
+  const sealedRow =
+    openLock === null
+      ? null
+      : matchweekRows
+          .filter((m) => m.lock_at !== null && new Date(m.lock_at).getTime() > openLock)
+          .sort((a, b) => new Date(a.lock_at!).getTime() - new Date(b.lock_at!).getTime())[0] ?? null
+
   return {
     view: {
       teams,
@@ -412,6 +441,8 @@ export async function readLeaguePoolView(
       matchweekCount: matchweekRows.length,
       openMatchweekNumber: openId === null ? null : numberByMatchweekId.get(openId) ?? null,
       inPlayMatchweekNumber: inPlayId === null ? null : numberByMatchweekId.get(inPlayId) ?? null,
+      sealedMatchweekNumber: sealedRow === null ? null : sealedRow.matchweek_number,
+      sealedOpensAt: openRow?.lock_at ?? null,
     },
     error: null,
   }

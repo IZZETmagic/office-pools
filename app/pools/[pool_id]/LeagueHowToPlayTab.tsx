@@ -129,7 +129,8 @@ export function LeagueHowToPlayTab({ poolName, maxEntries, mode, depth }: Props)
               </Step>
               {isShowdown && (
                 <Step number={4} title="Check who you have drawn">
-                  The Duels tab shows your opponent for the week and the season fixture list.
+                  The Duel tab shows who you are playing. It opens when the matchweek does —
+                  the season is drawn up front, but you meet one opponent at a time.
                 </Step>
               )}
             </>
@@ -207,7 +208,7 @@ export function LeagueHowToPlayTab({ poolName, maxEntries, mode, depth }: Props)
             <>
               <p><strong>Predictions</strong> — the open matchweek.</p>
               <p><strong>Results</strong> — what was played, and what everyone picked.</p>
-              {isShowdown && <p><strong>Duels</strong> — your head-to-head, and the season fixture list.</p>}
+              {isShowdown && <p><strong>Duel</strong> — who you are playing this week, your record, and the duel table.</p>}
               {isLms && <p><strong>Survivor</strong> — who is still in, and what they have used.</p>}
               <p><strong>Table</strong> — the real league table, from the official feed.</p>
             </>

@@ -222,9 +222,10 @@ function DuelCard() {
       </div>
       <p className="t-body text-muted mt-3">
         Every matchweek you are drawn against one other member. Whoever scored more that week
-        wins the duel. The fixture list is published in advance and rotates so that everybody
-        meets everybody. With an odd number of entries somebody sits out each week and takes a
-        point — there was no opponent, so there was no defeat.
+        wins the duel. The whole season is drawn when the pool is created and opens one
+        matchweek at a time, so your opponent is a surprise each week — and the draw rotates,
+        so everybody meets everybody. With an odd number of entries somebody sits out each week
+        and takes a point — there was no opponent, so there was no defeat.
       </p>
       <p className="t-body text-muted mt-3">
         Duel points decide the table. Your matchweek points are the tiebreak, so a heavy week

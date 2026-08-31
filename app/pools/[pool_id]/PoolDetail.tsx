@@ -122,6 +122,14 @@ export type ShowdownData = {
   openMatchweek: number | null
   /** Being played right now. Null between rounds. */
   inPlayMatchweek: number | null
+  /**
+   * The first matchweek whose duel is still SEALED, and when it opens.
+   *
+   * ⚠ There are no duel rows for it in `duels` — migration 116's policy
+   * withholds them — so the sealed card cannot derive this and has to be told.
+   */
+  sealedMatchweek: number | null
+  sealedOpensAt: string | null
   duelPoints: Map<string, number>
 }
 
@@ -205,6 +213,24 @@ type Tab =
  * active entry's own picks come from their own per-entry fetch.
  */
 const TABS_NEEDING_BULK: Tab[] = ['community', 'results', 'members']
+
+/**
+ * Showdown leads with the duel.
+ *
+ * It used to sit beside the Leaderboard, third in the row, which is the shape
+ * the mode was criticised for: pick'em with a duel bolted on. In Showdown the
+ * duel IS the competition and the weekly picks are how you play it, so it goes
+ * first and everything else keeps its order. Singular — it is YOUR duel, not a
+ * fixture list, and since the draw was sealed (migration 116) there is no list
+ * to browse anyway.
+ */
+function withShowdownFirst(
+  isShowdown: boolean,
+  tabs: { key: Tab; label: string }[],
+): { key: Tab; label: string }[] {
+  if (!isShowdown) return tabs
+  return [{ key: 'duels' as Tab, label: 'Duel' }, ...tabs]
+}
 
 const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
   { key: 'community', label: 'Banter' },
@@ -370,6 +396,12 @@ export function PoolDetail({
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const urlTab = searchParams.get('tab') as Tab
     if (urlTab) return urlTab
+    // Showdown opens on the duel. In every other mode the leaderboard is the
+    // thing you came to look at; in this one it is who you are playing, and a
+    // pool that opens on a totals table reads as pick'em with a duel attached.
+    // Read off `initialPool` rather than `isShowdown`, which is derived far
+    // below this initialiser.
+    if (initialPool.league_mode === 'showdown') return 'duels'
     return 'leaderboard'
   })
   const isDemoPool = initialPool.pool_id === '66b67286-e36e-40fd-8893-2a1fde0d018b'
@@ -1285,7 +1317,7 @@ export function PoolDetail({
                 return [t]
               })
           : isLeaguePool
-            ? USER_TABS_DEFAULT.flatMap((t) => {
+            ? withShowdownFirst(isShowdown, USER_TABS_DEFAULT.flatMap((t) => {
                 // No Form tab. Table mode and Last Man Standing already dropped
                 // it; Pick'em and Showdown kept it and should not have, because
                 // it cannot render for ANY league pool — every one of its inputs
@@ -1301,13 +1333,8 @@ export function PoolDetail({
                 // one place it had not been applied.
                 if (t.key === 'analytics') return []
                 if (t.key === 'results') return [t, { key: 'standings' as Tab, label: 'Table' }]
-                // Beside the Leaderboard, because in Showdown the duel IS the
-                // competition and the totals are the tiebreak.
-                if (t.key === 'leaderboard' && isShowdown) {
-                  return [t, { key: 'duels' as Tab, label: 'Duels' }]
-                }
                 return [t]
-              })
+              }))
             : USER_TABS_DEFAULT,
     [isBracketPicker, isLeaguePool, isTableMode, isShowdown, isLms],
   )
@@ -2199,6 +2226,8 @@ export function PoolDetail({
                 ownEntryIds={showdownData.ownEntryIds}
                 openMatchweek={showdownData.openMatchweek}
                 inPlayMatchweek={showdownData.inPlayMatchweek}
+                sealedMatchweek={showdownData.sealedMatchweek}
+                sealedOpensAt={showdownData.sealedOpensAt}
                 duelPoints={showdownData.duelPoints}
               />
             )}

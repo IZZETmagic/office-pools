@@ -527,10 +527,23 @@ export async function readLeagueCardFacts(
 
   // ---- 2d. Showdown — the duel, the record, and who you play next ----------
   //
-  // Showdown pools only. `league_duels` IS the fixture list (migration 083):
-  // unsettled rows exist from pool creation, so the opponent is readable weeks
-  // ahead — which is the honest half of choosing a published round-robin over a
-  // weekly draw, and the reason a "This week" tile can exist at all.
+  // Showdown pools only. `league_duels` holds unsettled rows from pool creation
+  // because the draw is made once, up front — but those rows are SEALED until
+  // their matchweek opens for picks (migration 116, R1). The tile shows the OPEN
+  // matchweek's duel, which is revealed by definition, so what it displays needs
+  // no change.
+  //
+  // ⚠ GATE B — MIGRATION 116'S POLICY DOES NOT APPLY TO ANY ROW BELOW.
+  // This module reads with the SERVICE-ROLE client, which carries `bypassrls`
+  // (Supabase: a secret key "authorizes access through the service_role Postgres
+  // role, which has the bypassrls attribute"). RLS defends the anon and
+  // authenticated paths only. On this path the seal is real only if it is
+  // applied here, in TypeScript, and that is what `revealed()` below does.
+  //
+  // It is defence in depth rather than a fix: nothing downstream currently
+  // surfaces a sealed duel. The point is that it stays that way without anyone
+  // having to remember — a sealed row never enters the process, so a field added
+  // later cannot leak one by accident.
   const showdownPools = pools.filter((p) => p.leagueMode === 'showdown' && p.entryId)
   if (showdownPools.length > 0) {
     const showdownEntryIds = showdownPools.map((p) => p.entryId as string)
@@ -552,6 +565,26 @@ export async function readLeagueCardFacts(
         .map((r) => [r.entry_id, r.duel_points ?? 0]),
     )
 
+    // The TS half of `league_duel_is_revealed` (migration 116). Measured in LOCK
+    // TIME, never matchweek number: rounds are played out of numerical order —
+    // minimum gap −121 days across three real seasons (migration 101) — so a
+    // number comparison seals a matchweek being played and reveals one weeks
+    // away. `openByPool` already holds the open matchweek, from the same
+    // `openMatchweekId` that mirrors `league_open_matchweek`.
+    //
+    // No open matchweek means the season is over, and then everything that ever
+    // locked is revealed — the same COALESCE(..., now()) branch the SQL takes,
+    // and for the same reason: without it a finished season hides its own
+    // results.
+    const revealed = (pool: LeagueCardPool, matchweekNumber: number): boolean => {
+      if (!pool.seasonId) return false
+      const mw = (bySeason.get(pool.seasonId) ?? [])
+        .find((m) => m.matchweek_number === matchweekNumber)
+      if (!mw?.lock_at) return false
+      const through = openByPool.get(pool.poolId)?.lock_at
+      return new Date(mw.lock_at).getTime() <= (through ? new Date(through).getTime() : now)
+    }
+
     // Opponent names. Only the entries actually drawn against somebody on this
     // page, so the IN list stays the size of the page rather than the pool.
     const myDuels = new Map<string, Array<Record<string, unknown>>>()
@@ -562,6 +595,7 @@ export async function readLeagueCardFacts(
       for (const p of showdownPools) {
         if (p.poolId !== row.pool_id) continue
         if (a !== p.entryId && b !== p.entryId) continue
+        if (!revealed(p, row.matchweek_number as number)) continue
         const got = myDuels.get(p.poolId) ?? []
         got.push(row)
         myDuels.set(p.poolId, got)
