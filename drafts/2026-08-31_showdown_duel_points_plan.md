@@ -1,10 +1,17 @@
 # Showdown duel points — implementation plan
 
-**Date:** 2026-08-31 · **Status:** 🟠 **CODE WRITTEN, MIGRATION NOT APPLIED.** §1's bug is fixed and
-committed. Migration **121** is written and its two function bodies diff clean against their bases
-(100 and 087) — but it has NOT been run, and its `md5(prosrc)` pre-check against production is still
-owed because this session had no database access. The front end, the copy and the guards are done and
-ship WITH it, not before: they describe 500/250/0, which is not true until 121 runs. See §9.
+**Date:** 2026-08-31 · **Status:** 🔴 **MIGRATION APPLIED IN PRODUCTION — THE WEB CODE IS NOT
+DEPLOYED.** Migration 121 is live on `ujthamlehjyubbzxbnes`. The pre-check passed before applying:
+`league_score_duels` md5 `1dc84d45…` (3462 b) == migration 100, `league_finalize_ranks` md5
+`7e7f5f75…` (2375 b) == migration 087 — no drift. Both bodies now hash byte-identical to this repo's
+121. All 12 league pools re-ranked clean 1..n, 0 unranked entries.
+
+⚠ **THE ENGINE NOW PAYS 500 AND THE DEPLOYED SITE STILL READS 3.** `DuelsTab` on master classifies
+anything that is not exactly 3 or 1 as a LOSS, so the moment a duel settles a member who WON is shown
+a defeat, and the leaderboard ignores duel points entirely because the `final_rank` fix is not
+deployed either. Nothing is wrong until the first duel settles — MW2 does that tonight. **Deploy
+before then.** See §9.
+
 **Decision:** Ryan, 2026-08-31 — *"what if the duels produced more points? … if you win a showdown
 that's 500 points, that's a big movement and shift."* One leaderboard, one currency; the duel table
 becomes a record rather than a rival ranking.
