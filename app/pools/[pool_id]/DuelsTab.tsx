@@ -161,6 +161,43 @@ function Countdown({ to }: { to: string }) {
   return <>{text}</>
 }
 
+/** What a settled duel was, for the form guide. A bye is its own thing. */
+type DuelFormResult = 'won' | 'tied' | 'lost' | 'bye'
+
+/**
+ * Five dots of DUEL form, oldest on the left — the football convention.
+ *
+ * ⚠ Deliberately NOT `lib/design/formDots.ts`, and not the `FormDots` further
+ * down this file. Both of those colour PICK ACCURACY, on the tier ramp
+ * (exact / winner+GD / winner / miss). These are head-to-head results, and
+ * green-grey-red for won-tied-lost is the thing every football table already
+ * uses. Sharing a component would mean one strip of dots meaning two different
+ * things on the same tab.
+ *
+ * Tuned for the midnight card: the `-400` steps, since the `-500`s go muddy on
+ * near-black. A bye is hollow — nothing happened, and it should not read as a
+ * result somebody earned.
+ */
+function DuelFormDots({ form }: { form: DuelFormResult[] }) {
+  if (!form.length) {
+    return <span className="t-num text-white/20" aria-hidden="true">&mdash;</span>
+  }
+  return (
+    <span className="flex gap-0.5 sm:gap-1" aria-hidden="true">
+      {form.map((r, i) => (
+        <span
+          key={i}
+          className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${
+            r === 'won' ? 'bg-success-400'
+              : r === 'lost' ? 'bg-danger-400'
+                : r === 'tied' ? 'bg-white/35'
+                  : 'border border-white/30'}`}
+        />
+      ))}
+    </span>
+  )
+}
+
 /**
  * The standings, reduced from the duel rows themselves.
  *
@@ -451,6 +488,44 @@ export default function DuelsTab({
   const table = useMemo(() => buildDuelTable(duels, duelPoints), [duels, duelPoints])
 
   /**
+   * Each member's last five DUEL results, oldest first.
+   *
+   * ⚠ NOT the same thing as the Form column on the leaderboard, which is pick
+   * accuracy — `exact / winner_gd / winner / miss`. This is won / tied / lost,
+   * the head-to-head record, and it is the only form that means anything in a
+   * mode whose table is decided by duels. Two different truths about a week
+   * would be worse than one, so they get different colours and different dots.
+   *
+   * ⚠ ORDERED BY `settled_at`, NEVER by matchweek number. Rounds are played out
+   * of numerical order (101: a minimum gap of minus 121 days across three real
+   * seasons), so numbering them would put a form guide in an order the season
+   * was not played in. Settlement time is what "recent" actually means.
+   *
+   * ⚠ A BYE IS CHECKED STRUCTURALLY, before the points. It pays `DUEL_BYE`,
+   * which is exactly `DUEL_TIE`, so reading the number would call it a tie.
+   */
+  const duelForm = useMemo(() => {
+    const byEntry = new Map<string, Array<{ at: string; r: DuelFormResult }>>()
+    const push = (e: string | null, at: string, r: DuelFormResult) => {
+      if (!e) return
+      const list = byEntry.get(e) ?? []
+      list.push({ at, r })
+      byEntry.set(e, list)
+    }
+    for (const d of duels) {
+      if (!d.settled_at) continue
+      if (d.entry_b === null) { push(d.entry_a, d.settled_at, 'bye'); continue }
+      push(d.entry_a, d.settled_at, duelResult(d.points_a) ?? 'lost')
+      push(d.entry_b, d.settled_at, duelResult(d.points_b) ?? 'lost')
+    }
+    const out = new Map<string, DuelFormResult[]>()
+    for (const [e, list] of byEntry) {
+      out.set(e, list.sort((a, b) => a.at.localeCompare(b.at)).slice(-5).map((x) => x.r))
+    }
+    return out
+  }, [duels])
+
+  /**
    * How far each member moved when the last duel settled.
    *
    * ⚠ DERIVED, NOT STORED. `league_entry_totals.previous_final_rank` tracks the
@@ -467,10 +542,17 @@ export default function DuelsTab({
    */
   const movement = useMemo(() => {
     const out = new Map<string, number>()
-    const settled = duels.filter((d) => d.settled_at).map((d) => d.matchweek_number)
+    const settled = duels.filter((d) => d.settled_at)
     if (!settled.length) return out
-    const latest = Math.max(...settled)
-    const before = buildDuelTable(duels.filter((d) => d.matchweek_number < latest))
+    // ⚠ THE MOST RECENTLY SETTLED MATCHWEEK, NOT THE HIGHEST-NUMBERED ONE.
+    // Rounds are played out of numerical order — migration 101 measured a
+    // minimum gap of MINUS 121 days across three real seasons — so
+    // `max(matchweek_number)` picks a week that may not have happened yet, and
+    // the arrow would describe a movement nobody made.
+    const latest = settled.reduce((a, b) => (a.settled_at! > b.settled_at! ? a : b))
+    const before = buildDuelTable(
+      duels.filter((d) => d.matchweek_number !== latest.matchweek_number),
+    )
     // A member with no prior row is new to the table, not a riser — no arrow.
     const was = new Map(before.map((r, i) => [r.entry, i + 1]))
     table.forEach((r, i) => {
@@ -1190,6 +1272,10 @@ export default function DuelsTab({
               <tr className="t-caption text-white/40">
                 <th className="pt-5 pb-3.5 pl-2.5 pr-0.5 sm:pl-4 sm:pr-1 text-left w-8 sm:w-11">#</th>
                 <th className="pt-5 pb-3.5 px-1 sm:px-2 text-left">Member</th>
+                {/* Beside the name rather than out past the totals: identity,
+                    then recent shape, then the numbers. Same order as the
+                    leaderboard's own PLAYER / FORM / STATS. */}
+                <th className="pt-5 pb-3.5 px-1 sm:px-2 text-left w-[46px] sm:w-16">Form</th>
                 <th className="pt-5 pb-3.5 px-0.5 sm:px-2 text-right w-5 sm:w-9">W</th>
                 <th className="pt-5 pb-3.5 px-0.5 sm:px-2 text-right w-5 sm:w-9">T</th>
                 <th className="pt-5 pb-3.5 px-0.5 sm:px-2 text-right w-5 sm:w-9">L</th>
@@ -1240,6 +1326,9 @@ export default function DuelsTab({
                           {name(r.entry)}
                         </span>
                       </span>
+                    </td>
+                    <td className="py-2.5 px-1 sm:px-2">
+                      <DuelFormDots form={duelForm.get(r.entry) ?? []} />
                     </td>
                     <td className="py-2.5 px-0.5 sm:px-2 text-right t-num text-white/55">{r.w}</td>
                     <td className="py-2.5 px-0.5 sm:px-2 text-right t-num text-white/55">{r.d}</td>
