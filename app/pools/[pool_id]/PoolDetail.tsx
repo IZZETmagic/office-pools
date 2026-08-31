@@ -125,6 +125,9 @@ export type MatchweekFixture = {
   /** `league_clubs.crest_url`, carried through the view as `flag_url`. */
   homeCrest: string | null
   awayCrest: string | null
+  /** Goals. Null before kickoff; live and moving during the match. */
+  homeScore: number | null
+  awayScore: number | null
   kickoffAt: string
   isCompleted: boolean
   status: string

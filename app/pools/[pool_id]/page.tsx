@@ -477,6 +477,10 @@ export default async function PoolPage({
                 awayAbbr: mt.away_team?.country_code ?? '',
                 homeCrest: mt.home_team?.flag_url ?? null,
                 awayCrest: mt.away_team?.flag_url ?? null,
+                // The real result. Present while a match is LIVE too, which is
+                // what lets the breakdown carry a moving score.
+                homeScore: mt.home_score_ft,
+                awayScore: mt.away_score_ft,
                 kickoffAt: mt.match_date,
                 isCompleted: mt.is_completed,
                 status: mt.status,

@@ -483,6 +483,18 @@ export default function DuelsTab({
         awayAbbr: f.awayAbbr,
         homeCrest: f.homeCrest,
         awayCrest: f.awayCrest,
+        homeScore: f.homeScore,
+        awayScore: f.awayScore,
+        /**
+         * Who won the MATCH — a different question from who took the fixture
+         * in the duel. Both members can lose a game City won; that is the
+         * "different picks, neither scored" row, and seeing 2-2 beside it is
+         * what makes the tick pattern legible instead of arbitrary.
+         */
+        result:
+          f.homeScore === null || f.awayScore === null ? null
+            : f.homeScore > f.awayScore ? 'home'
+              : f.awayScore > f.homeScore ? 'away' : 'draw',
         outcome,
         scored,
         mine: mineP,
@@ -754,16 +766,35 @@ export default function DuelsTab({
                         "Man United". A crest beside "CRY" is unambiguous where a
                         clipped "Crystal Pal…" is just worse — and it is what a
                         broadcast scoreboard does at this size. */}
-                    <span className="flex items-center justify-end gap-2 min-w-0">
-                      <span className="t-body text-muted truncate md:hidden">{b.homeAbbr}</span>
-                      <span className="t-body text-muted truncate hidden md:inline">{b.homeName}</span>
+                    {/* ⚠ THE WINNING CLUB IS LIT, THE LOSER IS DIMMED — the
+                        score alone makes you read two digits and compare them.
+                        A draw dims neither. This is about the MATCH, and is a
+                        different question from who took the fixture in the
+                        duel: both members can lose a game City won. */}
+                    <span className={`flex items-center justify-end gap-2 min-w-0
+                      ${b.result === 'home' ? 'opacity-100' : b.result ? 'opacity-45' : ''}`}>
+                      <span className={`t-body truncate md:hidden ${b.result === 'home' ? 'text-ink font-bold' : 'text-muted'}`}>{b.homeAbbr}</span>
+                      <span className={`t-body truncate hidden md:inline ${b.result === 'home' ? 'text-ink font-bold' : 'text-muted'}`}>{b.homeName}</span>
                       <Crest url={b.homeCrest} name={b.homeName} />
                     </span>
-                    <span className="t-detail text-muted/40">v</span>
-                    <span className="flex items-center gap-2 min-w-0">
+
+                    {/* The score lives where the v was, which is what makes it
+                        affordable on a phone: it replaces a separator rather
+                        than adding a column. */}
+                    {b.homeScore !== null && b.awayScore !== null ? (
+                      <span className={`t-num t-num-extrabold text-sm whitespace-nowrap
+                        ${b.clock ? 'text-danger-600' : 'text-ink'}`}>
+                        {b.homeScore}<span className="text-muted/40 font-normal">&ndash;</span>{b.awayScore}
+                      </span>
+                    ) : (
+                      <span className="t-detail text-muted/40">v</span>
+                    )}
+
+                    <span className={`flex items-center gap-2 min-w-0
+                      ${b.result === 'away' ? 'opacity-100' : b.result ? 'opacity-45' : ''}`}>
                       <Crest url={b.awayCrest} name={b.awayName} />
-                      <span className="t-body text-muted truncate md:hidden">{b.awayAbbr}</span>
-                      <span className="t-body text-muted truncate hidden md:inline">{b.awayName}</span>
+                      <span className={`t-body truncate md:hidden ${b.result === 'away' ? 'text-ink font-bold' : 'text-muted'}`}>{b.awayAbbr}</span>
+                      <span className={`t-body truncate hidden md:inline ${b.result === 'away' ? 'text-ink font-bold' : 'text-muted'}`}>{b.awayName}</span>
                     </span>
                   </span>
                   {b.outcome === 'pending' && (
