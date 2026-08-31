@@ -216,12 +216,23 @@ export default async function PoolPage({
     if (pool.league_mode === 'last_man_standing') {
       const { readLmsState } = await import('@/lib/league/lms')
       const { readSeasonClubs } = await import('@/lib/league/table')
+      // ⚠ ADMIN for the totals. `league_entry_totals` is deny-all (migration
+      // 050), so the user-scoped read this used to do returned zero rows and no
+      // error — `roundsWon` was always an empty map, and SurvivorTab only paints
+      // its "N rounds won" badge when the count is > 0, so the badge could never
+      // appear. Invisible today because nobody has won a round in a two-week-old
+      // season; the moment somebody does, the POOLS CARD says "2 rounds won"
+      // (it already reads this column on admin, poolCards.ts:440) while the
+      // pool's own Survivor tab says nothing.
+      const { readEntryTotals: readLmsTotals } = await import('@/lib/league/duels')
+      const { createAdminClient: adminForLmsTotals } = await import('@/lib/supabase/server')
       const [state, { clubs, error: clubErr }, totalsRes] = await Promise.all([
         readLmsState(supabase, pool_id, userEntryIds),
         readSeasonClubs(supabase, pool.league_season_id),
-        supabase.from('league_entry_totals').select('entry_id, rounds_won').eq('pool_id', pool_id),
+        readLmsTotals(adminForLmsTotals(), pool_id),
       ])
       if (state.error) console.error('[pool page] lms state failed:', state.error)
+      if (totalsRes.error) console.error('[pool page] lms totals failed:', totalsRes.error)
       if (clubErr) console.error('[pool page] season clubs failed:', clubErr)
 
       const entryNames = new Map<string, string>()
@@ -243,8 +254,7 @@ export default async function PoolPage({
         fixtures: new Map(),
         pickFixtures: new Map(),
         roundsWon: new Map(
-          ((totalsRes.data ?? []) as Array<{ entry_id: string; rounds_won: number }>)
-            .map((r) => [r.entry_id, r.rounds_won]),
+          [...totalsRes.totals].map(([entryId, t]) => [entryId, t.roundsWon]),
         ),
       }
     }

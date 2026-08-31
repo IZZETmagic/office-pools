@@ -150,10 +150,16 @@ export type EntryTotals = {
   rank: number | null
   duelPoints: number
   correct: number
+  /** Last Man Standing. Zero for every other mode. */
+  roundsWon: number
 }
 
 /**
- * Season totals per entry — points, rank, duel points.
+ * Season totals per entry — points, rank, duel points, rounds won.
+ *
+ * Shared by Showdown and Last Man Standing: one row per entry carries both
+ * modes' currencies, so both read it here rather than each writing its own
+ * query against a deny-all table and getting the client wrong separately.
  *
  * ⚠ ADMIN CLIENT, for the same reason as `readMatchweekPoints`:
  * `league_entry_totals` is one of migration 050's four DENY-ALL engine tables,
@@ -171,20 +177,21 @@ export async function readEntryTotals(
 ): Promise<{ totals: Map<string, EntryTotals>; error: string | null }> {
   const { data, error } = await admin
     .from('league_entry_totals')
-    .select('entry_id, total_points, final_rank, duel_points, correct_count')
+    .select('entry_id, total_points, final_rank, duel_points, correct_count, rounds_won')
     .eq('pool_id', poolId)
   if (error) return { totals: new Map(), error: error.message }
 
   const totals = new Map<string, EntryTotals>()
   for (const r of (data ?? []) as Array<{
     entry_id: string; total_points: number | null; final_rank: number | null
-    duel_points: number | null; correct_count: number | null
+    duel_points: number | null; correct_count: number | null; rounds_won: number | null
   }>) {
     totals.set(r.entry_id, {
       totalPoints: r.total_points ?? 0,
       rank: r.final_rank,
       duelPoints: r.duel_points ?? 0,
       correct: r.correct_count ?? 0,
+      roundsWon: r.rounds_won ?? 0,
     })
   }
   return { totals, error: null }
