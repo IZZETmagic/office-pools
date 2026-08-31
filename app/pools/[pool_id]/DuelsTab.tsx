@@ -171,24 +171,54 @@ function Countdown({ to }: { to: string }) {
  * and must not guess.
  */
 function PickChip({
-  label, side, differ, align = 'left',
-}: { label: string | null; side: 'you' | 'them'; differ: boolean; align?: 'left' | 'right' }) {
+  label, side, outcome, align = 'left',
+}: {
+  label: string | null
+  side: 'you' | 'them'
+  /** Who took the fixture. Absolute — no chip flips it. */
+  outcome: 'same' | 'you' | 'them' | 'neither' | 'pending'
+  align?: 'left' | 'right'
+}) {
   if (label === null) {
     return (
-      <span className={`t-num t-num-medium text-xs text-muted/40 ${align === 'right' ? 'text-right' : ''}`}>
+      <span className={`t-num t-num-medium text-xs text-muted/40 block ${align === 'right' ? 'text-right' : ''}`}>
         &mdash;
       </span>
     )
   }
+  const won = outcome === side
+  const tone =
+    won ? (side === 'you' ? 'bg-primary-500 text-white' : 'bg-danger-500 text-white')
+      : outcome === 'same' ? 'bg-mist text-muted'
+        : side === 'you' ? 'border border-primary-500/40 text-primary-600'
+          : 'border border-danger-500/40 text-danger-600'
+
   return (
-    <span className={align === 'right' ? 'text-right' : ''}>
-      <span className={`inline-block t-detail uppercase tracking-wider text-center rounded-md px-1.5 sm:px-2 py-1 w-full sm:w-auto sm:min-w-[3.25rem]
-        ${differ
-          ? side === 'you' ? 'bg-primary-500 text-white' : 'bg-danger-500 text-white'
-          : 'bg-mist text-muted'}`}>
+    <span className={`block ${align === 'right' ? 'text-right' : ''}`}>
+      <span
+        className={`inline-flex items-center justify-center gap-1 t-detail uppercase tracking-wider rounded-md px-1.5 sm:px-2 py-1 w-full sm:w-auto sm:min-w-[3.25rem] ${tone}`}
+        title={won ? 'Took this one'
+          : outcome === 'same' ? 'Same pick — cannot separate you'
+            : outcome === 'neither' ? 'Different picks, neither scored'
+              : undefined}
+      >
         {label}
+        {/* The win marker. Colour alone cannot carry it: an outline means both
+            "waiting" and "did not take it", and a solid grey means "you picked
+            the same". The tick is the only unambiguous "this one was mine". */}
+        {won && <span aria-hidden="true" className="text-[0.9em] leading-none">&#10003;</span>}
       </span>
     </span>
+  )
+}
+
+/** A club crest, or nothing. Never a broken image and never a placeholder box. */
+function Crest({ url, name }: { url: string | null; name: string }) {
+  if (!url) return null
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={url} alt="" aria-hidden="true" title={name}
+      className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" loading="lazy" />
   )
 }
 
@@ -423,15 +453,42 @@ export default function DuelsTab({
       // it is over: the engine writes the row, and until it does there is
       // nothing to compare. Absent ≠ nil-nil.
       const scored = mine.has(f.number) || theirs.has(f.number)
+      const mineP = mine.get(f.number) ?? 0
+      const theirsP = theirs.get(f.number) ?? 0
+      const myPick = pickLabel(inPlay.you.entry, f.id)
+      const theirPick = inPlay.them ? pickLabel(inPlay.them.entry, f.id) : null
+      /**
+       * Who took THIS fixture. Named for the fixture, not for the viewer.
+       *
+       * ⚠ IT WAS 'won' | 'lost' AND THAT WAS WRONG. The opponent's chip flipped
+       * the viewer's value, so `lost` — which also means "two different picks,
+       * NEITHER scored" — inverted into a tick on their side. Liverpool v
+       * Nott'm Forest was 0-0 to both and rendered as Sarah taking it.
+       *
+       * `neither` is therefore a state in its own right, and no chip flips
+       * anything: each one asks whether it is the winner.
+       */
+      const outcome: 'same' | 'you' | 'them' | 'neither' | 'pending' =
+        !scored ? 'pending'
+          : myPick !== null && theirPick !== null && myPick === theirPick ? 'same'
+            : mineP > theirsP ? 'you'
+              : theirsP > mineP ? 'them'
+                : 'neither'
       return {
         n: f.number,
         id: f.id,
-        label: f.label,
+        homeName: f.homeName,
+        awayName: f.awayName,
+        homeAbbr: f.homeAbbr,
+        awayAbbr: f.awayAbbr,
+        homeCrest: f.homeCrest,
+        awayCrest: f.awayCrest,
+        outcome,
         scored,
-        mine: mine.get(f.number) ?? 0,
-        theirs: theirs.get(f.number) ?? 0,
-        myPick: pickLabel(inPlay.you.entry, f.id),
-        theirPick: inPlay.them ? pickLabel(inPlay.them.entry, f.id) : null,
+        mine: mineP,
+        theirs: theirsP,
+        myPick,
+        theirPick,
         clock: getLiveClock({
           status: f.status, livePeriod: f.livePeriod,
           liveMinute: f.liveMinute, liveAdded: f.liveAdded,
@@ -465,7 +522,7 @@ export default function DuelsTab({
     const differ = breakdown.filter((b) => b.myPick && b.theirPick && b.myPick !== b.theirPick)
     const same = breakdown.length - differ.length
     if (differ.length === 0) return `Identical sheets — all ${breakdown.length} picks the same.`
-    const names = differ.slice(0, 3).map((d) => d.label.split(' v ')[0])
+    const names = differ.slice(0, 3).map((d) => d.homeName)
     const tail = differ.length > 3 ? ` and ${differ.length - 3} more` : ''
     return `${same} of ${breakdown.length} are dead heat. This duel is ${names.join(', ')}${tail}.`
   }, [breakdown, anyPicksRevealed])
@@ -674,27 +731,45 @@ export default function DuelsTab({
           </div>
 
           <ul>
-            {breakdown.map((b) => {
-              const differ = b.myPick !== null && b.theirPick !== null && b.myPick !== b.theirPick
-              return (
-                <li key={b.n}
-                  className={`grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.5rem_1fr_4.5rem] items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 border-t border-border-default
-                    ${!b.scored ? 'bg-primary-50/40 dark:bg-primary-900/10' : ''}`}>
-                  <PickChip label={b.myPick} side="you" differ={differ} />
-                  <span className="min-w-0 text-center">
-                    <span className={`t-body block truncate ${differ ? 'text-ink' : 'text-muted'}`}>
-                      {b.label}
+            {breakdown.map((b) => (
+              <li key={b.n}
+                className={`grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.5rem_1fr_4.5rem] items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 border-t border-border-default
+                  ${b.outcome === 'pending' ? 'bg-primary-50/40 dark:bg-primary-900/10' : ''}`}>
+                <PickChip label={b.myPick} side="you" outcome={b.outcome} />
+
+                {/* [name][crest] v [crest][name] — mirrored about the v, so the
+                    two clubs carry the same weight and the eye lands in the
+                    middle rather than reading left to right. */}
+                <span className="min-w-0">
+                  <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+                    {/* ⚠ ABBREVIATION ON A PHONE, NAME ABOVE IT. Adding the
+                        crests cost the width that made the names fit: at 375px
+                        six of ten truncated, including "Crystal Palace" and
+                        "Man United". A crest beside "CRY" is unambiguous where a
+                        clipped "Crystal Pal…" is just worse — and it is what a
+                        broadcast scoreboard does at this size. */}
+                    <span className="flex items-center justify-end gap-1.5 min-w-0">
+                      <span className="t-body text-muted truncate sm:hidden">{b.homeAbbr}</span>
+                      <span className="t-body text-muted truncate hidden sm:inline">{b.homeName}</span>
+                      <Crest url={b.homeCrest} name={b.homeName} />
                     </span>
-                    {!b.scored && (
-                      <span className="t-detail text-primary-600 block mt-0.5">
-                        {b.clock ?? <LocalTime iso={b.kickoffAt} format={formatKickoff} />}
-                      </span>
-                    )}
+                    <span className="t-detail text-muted/40">v</span>
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <Crest url={b.awayCrest} name={b.awayName} />
+                      <span className="t-body text-muted truncate sm:hidden">{b.awayAbbr}</span>
+                      <span className="t-body text-muted truncate hidden sm:inline">{b.awayName}</span>
+                    </span>
                   </span>
-                  <PickChip label={b.theirPick} side="them" differ={differ} align="right" />
-                </li>
-              )
-            })}
+                  {b.outcome === 'pending' && (
+                    <span className="t-detail text-primary-600 block text-center mt-0.5">
+                      {b.clock ?? <LocalTime iso={b.kickoffAt} format={formatKickoff} />}
+                    </span>
+                  )}
+                </span>
+
+                <PickChip label={b.theirPick} side="them" outcome={b.outcome} align="right" />
+              </li>
+            ))}
           </ul>
 
           {/* What the sheet MEANS, in a sentence. Agreements cannot separate two

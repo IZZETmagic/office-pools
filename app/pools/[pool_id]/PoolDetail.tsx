@@ -117,7 +117,14 @@ export type MatchweekFixture = {
   /** `league_fixtures.fixture_id` — what predictions are keyed on. */
   id: string
   number: number
-  label: string
+  homeName: string
+  awayName: string
+  /** Three-letter code — what a 375px row shows instead of the name. */
+  homeAbbr: string
+  awayAbbr: string
+  /** `league_clubs.crest_url`, carried through the view as `flag_url`. */
+  homeCrest: string | null
+  awayCrest: string | null
   kickoffAt: string
   isCompleted: boolean
   status: string

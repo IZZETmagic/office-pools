@@ -461,12 +461,22 @@ export default async function PoolPage({
               .map((mt) => ({
                 id: mt.match_id,
                 number: mt.match_number,
-                // ⚠ SHORT names. The team sheet puts the fixture between two
-                // pick chips, and at 375px "Crystal Palace v Manchester City"
-                // truncated — eating the half that tells City from United.
-                // `shortClubName` was written for exactly this width, and the
-                // mockup uses the short forms too.
-                label: `${shortClubName(mt.home_team?.country_name ?? 'Home')} v ${shortClubName(mt.away_team?.country_name ?? 'Away')}`,
+                // ⚠ SHORT names, and the two sides kept APART rather than
+                // pre-joined into "A v B". The sheet renders them symmetrically
+                // around the v with a crest each, so a single string would have
+                // to be split back open at the call site.
+                //
+                // `shortClubName` because at 375px "Crystal Palace v Manchester
+                // City" truncated — eating the half that tells City from United.
+                homeName: shortClubName(mt.home_team?.country_name ?? 'Home'),
+                awayName: shortClubName(mt.away_team?.country_name ?? 'Away'),
+                // `country_code` carries the club's abbreviation on the league
+                // path — see `clubToTeam` in lib/league/read.ts, where the World
+                // Cup field names are reused positionally.
+                homeAbbr: mt.home_team?.country_code ?? '',
+                awayAbbr: mt.away_team?.country_code ?? '',
+                homeCrest: mt.home_team?.flag_url ?? null,
+                awayCrest: mt.away_team?.flag_url ?? null,
                 kickoffAt: mt.match_date,
                 isCompleted: mt.is_completed,
                 status: mt.status,
