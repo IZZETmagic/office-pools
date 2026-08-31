@@ -1056,10 +1056,23 @@ export default function DuelsTab({
             />
           </div>
           {mySheet.open.length === 0 ? (
-            /* ⚠ NO CTA WHEN THERE IS NOTHING TO DO. A "finish your picks"
-               button on a finished sheet is nagging, and the member has
-               already done the thing it would be asking for. */
-            <p className="t-body text-muted mt-3">Your sheet is in. Nothing left to pick.</p>
+            /* ⚠ A FINISHED SHEET GETS A WAY IN, NOT A TASK. The rule is still
+               that we do not ask for something already done — "Finish your
+               picks" on a full sheet is nagging — but reviewing is not asking,
+               and a member who wants to check what they put down should not
+               have to go hunting for the tab. So: a SECONDARY button, with the
+               primary reserved for the state that actually needs an action. */
+            <>
+              <p className="t-body text-muted mt-3">Your sheet is in. Nothing left to pick.</p>
+              <button
+                type="button"
+                onClick={() => router.push(`/pools/${poolId}?tab=predictions`)}
+                className="w-full rounded-pill border border-border-default text-ink t-caption
+                           py-3.5 mt-4 hover:bg-mist active:bg-silver/40 transition-colors"
+              >
+                See your picks
+              </button>
+            </>
           ) : (
             <>
               <p className="t-body text-muted mt-3">
