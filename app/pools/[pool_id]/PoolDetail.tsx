@@ -525,10 +525,15 @@ export function PoolDetail({
   const banterInitialLastReadAt = initialLastReadMap.get(initialPool.pool_id) ?? null
 
   useEffect(() => {
-    if (activeTab === 'community') {
+    // ⚠ THE SHEET COUNTS AS READING IT. This used to key on `activeTab` alone,
+    // which was complete while banter was only ever a tab. In one-page mode it
+    // is a sheet and `activeTab` never becomes 'community' — so the count would
+    // have sat there unread forever, however many times it was opened. Caught
+    // by wiring the FAB, not by anyone reading the effect.
+    if (activeTab === 'community' || banterOpen) {
       markAsRead(initialPool.pool_id)
     }
-  }, [activeTab, initialPool.pool_id, markAsRead])
+  }, [activeTab, banterOpen, initialPool.pool_id, markAsRead])
 
   const isAdminTab = ADMIN_TABS.some(t => t.key === activeTab) || activeTab === 'rounds' || activeTab === 'fees'
 
@@ -2928,6 +2933,38 @@ export function PoolDetail({
       </div>
 
       {/* Navigation Warning Modal */}
+      {/* ⚠ THE FLOATING BUTTON — a new pattern for this web app, on one mode.
+          Ryan's call, 2026-09-01. One-page deleted the tab strip, which was
+          banter's only door AND the only thing carrying the unread count; the
+          chevron menu can hold the door but not a count nobody opens a menu to
+          find. RN has had `BanterFab` all along and it works.
+          ⚠ Hidden while the sheet is open — a button that opens what is
+          already open is a button that does nothing. */}
+      {onePage && !banterOpen && (
+        <button
+          type="button"
+          onClick={() => setBanterOpen(true)}
+          aria-label={hasUnreadBanter
+            ? `Open banter, ${banterUnreadCount} unread`
+            : 'Open banter'}
+          className="fixed right-4 z-30 w-14 h-14 rounded-full grid place-items-center
+                     bg-primary-600 text-white shadow-lg
+                     hover:bg-primary-700 active:bg-primary-800 transition-colors
+                     bottom-[max(1rem,env(safe-area-inset-bottom))]"
+        >
+          <Icon name="bubble.left" size={22} weight="semibold" />
+          {hasUnreadBanter && (
+            /* Same badge the tab strip used — same shape, same threshold, so
+               the count does not change character when the layout does. */
+            <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-[20px] px-1
+                             rounded-full bg-danger-500 text-white text-[10px] font-bold
+                             flex items-center justify-center ring-2 ring-surface-secondary">
+              {banterUnreadCount > 99 ? '99+' : banterUnreadCount}
+            </span>
+          )}
+        </button>
+      )}
+
       {/* ⚠ ONE-PAGE ONLY. The tabbed layout keeps banter as a tab, unchanged —
           `CommunityTab` in full-page mode is correct there, because there it
           IS the page. Two shapes for one surface, deliberately, while one-page
