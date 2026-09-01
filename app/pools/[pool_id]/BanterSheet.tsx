@@ -50,8 +50,23 @@ export function BanterSheet({
   onClose,
   ...community
 }: { open: boolean; onClose: () => void } & Omit<CommunityTabProps, 'embedded'>) {
-  /** The visible viewport height. Null until measured, so nothing renders wrong once. */
-  const [visibleH, setVisibleH] = useState<number | null>(null)
+  /**
+   * Where the visible viewport IS, and how tall it is.
+   *
+   * ⚠ BOTH ARE NEEDED, and the prototype said otherwise for a reason worth
+   * recording. There, `offsetTop` made things worse and `none` was flush —
+   * because that page could still SCROLL, so iOS satisfied the focused input by
+   * scrolling the document, leaving the visual viewport at offset 0.
+   *
+   * This sheet locks the page, so iOS cannot scroll it. It PANS the visual
+   * viewport instead, `offsetTop` goes positive, and a `position: fixed`
+   * element painted against the layout viewport rides straight up out of sight.
+   * That is Ryan's "it shoots up off screen".
+   *
+   * So the answer flipped when the page stopped scrolling. The prototype was
+   * right about the page it was testing and wrong about this one.
+   */
+  const [box, setBox] = useState<{ top: number; height: number } | null>(null)
   /**
    * ⚠ TEMPORARY, behind `?banterdebug=1`. The sheet came out wrong on an
    * iPhone 17 Plus — composer at the top of the screen with the page showing
@@ -70,7 +85,9 @@ export function BanterSheet({
     const on = typeof window !== 'undefined'
       && new URLSearchParams(window.location.search).get('banterdebug') === '1'
     const fit = () => {
-      setVisibleH(vv ? vv.height : window.innerHeight)
+      setBox(vv
+        ? { top: vv.offsetTop, height: vv.height }
+        : { top: 0, height: window.innerHeight })
       if (!on) return
       const p = panelRef.current?.getBoundingClientRect()
       setDebug(
@@ -79,7 +96,8 @@ export function BanterSheet({
         `vv.offsetTop  ${vv ? Math.round(vv.offsetTop) : 'n/a'}\n` +
         `vv.pageTop    ${vv ? Math.round(vv.pageTop) : 'n/a'}\n` +
         `scrollY       ${Math.round(window.scrollY)}\n` +
-        `panel         ${p ? `${p.top.toFixed(0)}..${p.bottom.toFixed(0)} h${p.height.toFixed(0)}` : 'n/a'}`,
+        `panel         ${p ? `${p.top.toFixed(0)}..${p.bottom.toFixed(0)} h${p.height.toFixed(0)}` : 'n/a'}\n` +
+        `body.top      ${document.body.style.top || '—'}`,
       )
     }
     fit()
@@ -149,17 +167,26 @@ export function BanterSheet({
 
   return (
     <>
+      {/* The scrim tracks the visible area as well — pinned to `inset-0` it
+          would sit over the layout viewport and leave a bright strip beside the
+          sheet once the visual viewport pans. */}
       <div
-        className="fixed inset-0 z-40 bg-black/50"
+        className="fixed inset-x-0 z-40 bg-black/50"
+        style={box ? { top: box.top, height: box.height } : { top: 0, bottom: 0 }}
         onClick={onClose}
         aria-hidden="true"
       />
-      {/* ⚠ `top-0` with a measured height, NOT `bottom-0`. The layout
-          viewport's bottom is underneath the keyboard on iOS; this box is the
-          part of the screen the keyboard has left. */}
+      {/* ⚠ Placed and sized from the VISUAL viewport, never `bottom-0`: the
+          layout viewport's bottom sits underneath the keyboard on iOS. This box
+          is the part of the screen the keyboard has left, wherever that is. */}
       <div
-        className="fixed inset-x-0 top-0 z-40 flex flex-col justify-end pointer-events-none"
-        style={{ height: visibleH ?? '100dvh' }}
+        className="fixed inset-x-0 z-40 flex flex-col justify-end pointer-events-none"
+        /* ⚠ `top` from the visual viewport, NOT a transform — a transform
+           would make this a containing block for everything inside it, and the
+           chat has its own positioned descendants. */
+        style={box
+          ? { top: box.top, height: box.height }
+          : { top: 0, height: '100dvh' }}
         role="dialog"
         aria-modal="true"
         aria-label="Banter"
