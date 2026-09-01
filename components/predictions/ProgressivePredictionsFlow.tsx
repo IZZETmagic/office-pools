@@ -630,7 +630,11 @@ export default function ProgressivePredictionsFlow({
           member's last pick — the exact moment they most want to be told the
           thing is saved. With the submit button gone this bar IS the
           confirmation, so it has to survive completion. */}
-      {isRoundOpen && !isRoundPastDeadline && (
+      {/* ⚠ `chrome` TAKES THIS TOO — Ryan, on the one-page Showdown. The line is
+          the autosave confirmation everywhere else and stays there; on this
+          surface the band above is the only header, and a count of picks plus a
+          save clock under a sheet that saves itself is chrome about chrome. */}
+      {chrome && isRoundOpen && !isRoundPastDeadline && (
         <div className="flex items-center justify-between text-xs text-neutral-500 px-1">
           <span>
             {isAllRoundPredicted
