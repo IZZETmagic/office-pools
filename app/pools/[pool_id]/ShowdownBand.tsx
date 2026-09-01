@@ -157,9 +157,6 @@ const M = {
 
 const MW_SIZE_D = { fontSize: 'calc(16px - 4px * var(--p))' }
 
-/** See the note at the usage site: off-token on purpose, and only here. */
-const BAND_RADIUS = '44px'
-
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
   const v = n % 100
@@ -372,30 +369,6 @@ export function ShowdownBand({
           `radial-gradient(110% 100% at 10% 0%, color-mix(in srgb, ${youColour} 26%, transparent) 0%, transparent 60%),`
           + `radial-gradient(110% 100% at 90% 0%, color-mix(in srgb, ${themColour} 22%, transparent) 0%, transparent 60%),`
           + 'linear-gradient(180deg, #131A2C 0%, var(--sp-midnight) 100%)',
-        /* ⚠ ON THE ELEMENT, not in globals.css. Ryan, 2026-08-31: the bottom
-           corners should be rounded, "like welcoming in the bottom page". It
-           belongs to this element and nothing else, and keeping it here means
-           it travels with the component rather than depending on a stylesheet
-           rebuild — which is worth something in a checkout where Turbopack has
-           repeatedly served stale CSS while picking up TSX fine.
-
-           ⚠ OFF-TOKEN, DELIBERATELY, AND THE ONLY PLACE IN THE APP THAT IS.
-           The ladder ran 24px (radii.lg, "a card") then 32px (radii.xl, the
-           bottom sheet's corners) and Ryan asked for more at each step. 32 is
-           the largest radius the system defines, so this leaves the set rather
-           than pretending a bigger token exists.
-
-           It is defensible exactly once: the band is the only screen-width
-           surface in the product, and radii that read as generous on a 340px
-           card read as timid across 1200px. A radius is a proportion of the
-           thing it is on, and nothing else here is this wide.
-
-           ⚠ DO NOT PROMOTE THIS TO A TOKEN without deciding what else would
-           use it. A `--radius-2xl` that one element sets is a constant wearing
-           a token's clothes, and the token block already warns against
-           reshaping the scale by the back door. */
-        borderBottomLeftRadius: BAND_RADIUS,
-        borderBottomRightRadius: BAND_RADIUS,
       } as React.CSSProperties}
     >
       {header && <div className="relative z-10" ref={(el) => {
