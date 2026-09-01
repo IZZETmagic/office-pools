@@ -1953,6 +1953,16 @@ export function PoolDetail({
         </div>
       </div>
 
+      {/* ⚠ ONE MEASURE, ONE OWNER. The band's shell and <main> are siblings,
+          and each carried its own `max-w-[940px] mx-auto` — two copies of a
+          number that must agree, which is exactly the shape of thing that
+          drifts. It only takes one of them picking up an extra wrapper, or one
+          edit missing the other, for the duel and the picks to sit on different
+          grids. The measure lives here now and both inherit it.
+          The band still reaches the screen edges: `calc(50% - 50vw)` is
+          measured against this container, which is what that calc is for. */}
+      <div className={onePage ? 'max-w-[940px] mx-auto' : 'contents'}>
+
       {/* ⚠ THE BAND LIVES ABOVE <main>, ON EVERY SURFACE.
           Ryan's plan: the header persists across the pages you navigate to and
           back from. Inside <main> it would be the third pane in document order,
@@ -2033,7 +2043,7 @@ export function PoolDetail({
            ⚠ One max-width, not two: `max-w-6xl` and `max-w-[940px]` have equal
            specificity, so which wins would come down to generated-CSS order. */
         className={onePage
-          ? 'max-w-[940px] mx-auto px-4 sm:px-6 pt-5 pb-10'
+          ? 'px-4 sm:px-6 pt-5 pb-10'
           : `max-w-6xl mx-auto px-4 sm:px-6 ${
               activeTab === 'community'
                 ? 'pt-3 sm:py-8 pb-0 sm:pb-8'
@@ -2861,6 +2871,7 @@ export function PoolDetail({
             </>}
         </div>
       </main>
+      </div>
 
       {/* Navigation Warning Modal */}
       {/* ⚠ A MODAL, NOT A DROPDOWN. The band clips its own overflow to get

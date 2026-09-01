@@ -1221,7 +1221,7 @@ export default function DuelsTab({
          band from the `!showContent` branch, which has no wrapper at all.
          `space-y` still puts the gap between the band and the first card,
          which is the space that was actually wanted. */
-      ? 'px-4 sm:px-6 pb-10 space-y-4 md:space-y-5 max-w-[940px] mx-auto'
+      ? 'px-4 sm:px-6 pb-10 space-y-4 md:space-y-5'
       : 'space-y-4'}>
       {/* ⚠ ONE-PAGE: the band stands in for the two cards below it and nothing
           else changes. It takes DuelPanel's props verbatim — every number is
