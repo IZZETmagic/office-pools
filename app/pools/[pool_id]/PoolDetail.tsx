@@ -289,6 +289,23 @@ const TABS_NEEDING_BULK: Tab[] = ['community', 'results', 'members', 'duels']
  * fixture list, and since the draw was sealed (migration 116) there is no list
  * to browse anyway.
  */
+/**
+ * The tab a URL with no `?tab=` means, for this pool.
+ *
+ * ⚠ ONE DEFINITION, USED TWICE. It lived in two places that disagreed: the
+ * `activeTab` initialiser opened Showdown on the duel, while `switchTab`
+ * cleared the parameter only for `leaderboard`. So on a Showdown pool, opening
+ * the Leaderboard produced a URL with no `tab` at all — which the initialiser
+ * then read back as the DUEL. Reload, and you were somewhere you did not
+ * choose; share that link and it took the recipient somewhere else again.
+ */
+export function defaultTabFor(pool: { league_mode?: string | null }): Tab {
+  // Showdown opens on the duel. In every other mode the leaderboard is the
+  // thing you came to look at; in this one it is who you are playing, and a
+  // pool that opens on a totals table reads as pick'em with a duel attached.
+  return pool.league_mode === 'showdown' ? 'duels' : 'leaderboard'
+}
+
 function withShowdownFirst(
   isShowdown: boolean,
   tabs: { key: Tab; label: string }[],
@@ -461,13 +478,9 @@ export function PoolDetail({
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const urlTab = searchParams.get('tab') as Tab
     if (urlTab) return urlTab
-    // Showdown opens on the duel. In every other mode the leaderboard is the
-    // thing you came to look at; in this one it is who you are playing, and a
-    // pool that opens on a totals table reads as pick'em with a duel attached.
     // Read off `initialPool` rather than `isShowdown`, which is derived far
     // below this initialiser.
-    if (initialPool.league_mode === 'showdown') return 'duels'
-    return 'leaderboard'
+    return defaultTabFor(initialPool)
   })
   const isDemoPool = initialPool.pool_id === '66b67286-e36e-40fd-8893-2a1fde0d018b'
   const [showHowToPlayModal, setShowHowToPlayModal] = useState(!hasSeenHowToPlay || isDemoPool)
@@ -530,16 +543,47 @@ export function PoolDetail({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * What WE last wrote to `?tab=`. Null means "cleared, i.e. the default".
+   *
+   * ⚠ `switchTab` updates the URL with raw `history.pushState`, deliberately —
+   * a router navigation would re-run the page for every tab press. But Next
+   * does not observe pushState, so `useSearchParams()` goes stale the moment a
+   * tab is switched. This ref is how the sync effect below tells a URL change
+   * WE made from one that arrived some other way.
+   */
+  const urlTabRef = useRef<string | null>(searchParams.get('tab'))
+
   // Sync tab state on browser back/forward (popstate)
   useEffect(() => {
     const onPopState = () => {
       const params = new URLSearchParams(window.location.search)
-      const tab = (params.get('tab') as Tab) || 'leaderboard'
+      const tab = (params.get('tab') as Tab) || defaultTabFor(initialPool)
+      urlTabRef.current = params.get('tab')
       setActiveTab(tab)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [])
+  }, [initialPool])
+
+  /**
+   * ⚠ AND ON A ROUTER NAVIGATION, which is the half that was missing.
+   *
+   * `?tab=` was read once, in a `useState` initialiser, and re-read only on
+   * popstate. So a `router.push` to this same route with a different tab
+   * changed the address bar and nothing else — the bug behind the dead "See
+   * your picks" button (9d1c38f). Fixing that one call site left the CLASS
+   * intact for the next caller, and there are seven senders of these links.
+   *
+   * The ref guard is what makes this safe next to `switchTab`'s pushState: a
+   * value we wrote ourselves is ignored, so the two cannot fight.
+   */
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t === urlTabRef.current) return
+    urlTabRef.current = t
+    setActiveTab((t as Tab) ?? defaultTabFor(initialPool))
+  }, [searchParams, initialPool])
 
   const [pool, setPool] = useState(initialPool)
   const [members, setMembers] = useState(initialMembers)
@@ -1273,13 +1317,20 @@ export function PoolDetail({
     window.scrollTo({ top: 0 })
     // Update URL without full navigation so back/forward works
     const url = new URL(window.location.href)
-    if (tab === 'leaderboard') {
+    // ⚠ THIS POOL'S default, not a hardcoded one — see `defaultTabFor`. Other
+    // parameters are left alone, which is what keeps `?layout=onepage` alive
+    // across a tab switch.
+    const bare = defaultTabFor(pool)
+    if (tab === bare) {
       url.searchParams.delete('tab')
     } else {
       url.searchParams.set('tab', tab)
     }
+    // Remember what WE wrote, so the sync effect below can tell a URL change we
+    // made from one somebody else made.
+    urlTabRef.current = tab === bare ? null : tab
     window.history.pushState({}, '', url.toString())
-  }, [])
+  }, [pool])
 
   const handleTabSwitch = useCallback((tab: Tab) => {
     // If leaving predictions tab with unsaved changes, show warning
