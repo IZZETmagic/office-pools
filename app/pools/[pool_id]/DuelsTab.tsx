@@ -1208,6 +1208,14 @@ export default function DuelsTab({
   if (layout === 'onepage' && !showContent) return <>{bandNode}</>
 
   return (
+    <>
+    {/* ⚠ THE BAND IS A SIBLING OF THE CONTENT, NOT ITS FIRST CHILD.
+        Measured, not reasoned: inside the padded wrapper its content box came
+        out 908px against 940px on every other surface — a 32px shift, because
+        `padding: calc(50vw - 50%)` resolves that 50% against its PARENT, and
+        the parent here carries `px-4 sm:px-6` while elsewhere the band hangs
+        straight off the measure container. Same parent on both now. */}
+    {bandNode}
     <div className={layout === 'onepage'
       /* ⚠ CAPPED TO THE BAND'S OWN WIDTH. The band's gradient runs edge to
          edge but its CONTENTS stop at 940px; letting the cards beneath run to
@@ -1227,7 +1235,6 @@ export default function DuelsTab({
           else changes. It takes DuelPanel's props verbatim — every number is
           already computed for the card, and a band that derived its own would
           be a second opinion about the same duel. */}
-      {bandNode}
 
       {/* Being played now, then the one you are still picking. Both, because
           they are different weeks all weekend. */}
@@ -1944,6 +1951,7 @@ export default function DuelsTab({
       </div>
 
     </div>
+    </>
   )
 }
 
