@@ -20,6 +20,7 @@ import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
 import { LeagueScoringRulesTab, type LeagueScoringMode } from './LeagueScoringRulesTab'
 import { CommunityTab } from './CommunityTab'
+import { BanterSheet } from './BanterSheet'
 import { HowToPlayModal } from './HowToPlayModal'
 import type { LeagueMode } from '@/lib/leagueModeInfo'
 import { AnalyticsTab } from './AnalyticsTab'
@@ -1634,6 +1635,8 @@ export function PoolDetail({
   const onePage = isShowdown && searchParams.get('layout') === 'onepage'
   /** The pool menu behind the chevron — every surface the duel page does not show. */
   const [moreOpen, setMoreOpen] = useState(false)
+  /** Banter, as a sheet over the pool. One-page only — see BanterSheet.tsx. */
+  const [banterOpen, setBanterOpen] = useState(false)
 
   const canAdmin = isAdmin && !isArchived
   const tabs = canAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
@@ -2925,6 +2928,38 @@ export function PoolDetail({
       </div>
 
       {/* Navigation Warning Modal */}
+      {/* ⚠ ONE-PAGE ONLY. The tabbed layout keeps banter as a tab, unchanged —
+          `CommunityTab` in full-page mode is correct there, because there it
+          IS the page. Two shapes for one surface, deliberately, while one-page
+          is behind a flag. */}
+      {onePage && (
+        <BanterSheet
+          open={banterOpen}
+          onClose={() => setBanterOpen(false)}
+          poolId={pool.pool_id}
+          poolName={pool.pool_name}
+          currentUserId={currentUserId}
+          members={members}
+          isAdmin={isAdmin}
+          matches={matches}
+          teams={teams}
+          allPredictions={allPredictions}
+          entryStats={entryStats}
+          matchAccuracy={matchAccuracy}
+          userEntries={userEntries}
+          settings={settings!}
+          conductData={conductData}
+          predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
+          matchScores={matchScores}
+          onShowHowToPlay={() => setShowHowToPlayModal(true)}
+          allBPGroupRankings={allBPGroupRankings}
+          allBPThirdPlaceRankings={allBPThirdPlaceRankings}
+          allBPKnockoutPicks={allBPKnockoutPicks}
+          poolCreatedAt={pool.created_at}
+          initialLastReadAt={banterInitialLastReadAt}
+        />
+      )}
+
       {/* ⚠ A MODAL, NOT A DROPDOWN. The band clips its own overflow to get
           those rounded corners, so a menu opening inside it would be clipped
           too. `Modal` is the app's own sheet — bottom-anchored on a phone,
@@ -2945,7 +2980,15 @@ export function PoolDetail({
                 <li key={t.key}>
                   <button
                     type="button"
-                    onClick={() => { setMoreOpen(false); handleTabSwitch(t.key) }}
+                    onClick={() => {
+                      setMoreOpen(false)
+                      // ⚠ Banter is a SHEET here, not a surface. Switching to
+                      // it as a tab would mount the full-page CommunityTab,
+                      // which pins document.body and takes the band's scroll
+                      // with it — the whole reason the sheet exists.
+                      if (t.key === 'community') setBanterOpen(true)
+                      else handleTabSwitch(t.key)
+                    }}
                     className="w-full text-left t-body text-white/85 py-3.5 px-1
                                hover:text-white transition-colors"
                   >
