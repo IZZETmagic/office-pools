@@ -308,8 +308,10 @@ html.dark {
      body to Arial — see the base layer below. */
   --font-sans: var(--font-nunito);
   --font-mono: var(--font-geist-mono);
-  /* Showdown ceremony surfaces only — see `t-display` below for the rule. */
-  --font-display: var(--font-anton);
+  /* The display TREATMENT, not a second family — see `t-display` below. It
+     resolves to Nunito like everything else; the token is kept so the Tailwind
+     `font-display` utility still means something. */
+  --font-display: var(--font-nunito);
 
   /* Primary */
   --color-primary-50:  var(--primary-50);
@@ -666,13 +668,17 @@ html.dark {
 }
 
 /* ---------------------------------------------------------------------------
-   THE DISPLAY FACE — Showdown ceremony surfaces ONLY
+   THE DISPLAY TREATMENT — Showdown ceremony surfaces ONLY
    ---------------------------------------------------------------------------
-   Anton, condensed and single-weight, against Nunito everywhere else. It exists
-   because Showdown's duel card is meant to read as a broadcast graphic — two
-   names either side of a V — and Nunito is a rounded, friendly face that cannot
-   carry that. Ryan's call, 2026-08-30: a scoped display face rather than a
-   global one.
+   ⚠ THIS WAS A SECOND TYPEFACE FOR ONE DAY. Anton — condensed, single-weight,
+   uppercase — was added 2026-08-30 so the duel card would read as a broadcast
+   graphic. It was removed 2026-09-01: rendered beside the Nunito version, the
+   app having one voice won, and the second family was being downloaded on every
+   page in the product to serve three Showdown screens. Ryan's call both times.
+
+   What survives is the WEIGHT, not the family. Nunito 900 with tight tracking
+   is still a different register from anything else in the app, and the scope
+   rule below is unchanged — because the thing that leaks is the treatment.
 
    ⚠ THE SCOPE IS THE POINT, and it is narrow:
 
@@ -681,20 +687,27 @@ html.dark {
      NOT       headings, tab labels, buttons, tables, empty states, any other
                mode, or anything outside a Showdown surface.
 
-   A display face that leaks becomes the app's face by accident, one screen at a
-   time, and nobody makes that decision. If it starts appearing outside a duel,
-   the fix is to remove it there rather than to widen this comment.
+   If it starts appearing outside a duel, the fix is to remove it there rather
+   than to widen this comment. `leagueModeCopy.guard.test.ts` holds the
+   allowlist and fails on a fourth file.
+
+   ⚠ NO UPPERCASE. It went with Anton. A rounded face set in caps at this size
+   reads as shouting rather than as a graphic, and it made an opponent's name
+   look like a headline instead of a person's.
+
+   ⚠ MIRRORED IN remotion/DuelRecap.tsx, which draws the shareable version of
+   this card outside Next and so cannot use this class. The two are meant to
+   look the same; change them together.
 
    ⚠ NOT A PORT. Every other utility in this file is a 1:1 mirror of
    mobile/theme/typography.ts; this one has no RN counterpart, because Showdown
-   is not on mobile yet. When it is, the face has to be loaded there too or the
-   two platforms will disagree about what a duel looks like. */
+   is not on mobile yet. When it is, the treatment has to be carried there too
+   or the two platforms will disagree about what a duel looks like. */
 @utility t-display {
-  font-family: var(--font-anton), Impact, "Arial Narrow", sans-serif;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.012em;
-  line-height: 1;
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
 }
 
 /* Every number in the app — ranks, points, scores, levels — renders in a bold
@@ -1484,6 +1497,17 @@ html.dark .mode-pill {
                        height: calc(14px - 14px * var(--p)); overflow: hidden;
                        opacity: calc(1 - 1.6 * var(--p)); }
   .sd-band .sd-strip-d { max-width: 300px; margin: calc(14px - 6px * var(--p)) auto 0; }
+}
+
+/* The sticky rail beside the duel, on desktop.
+   ⚠ Its offset is the BAND'S OWN HEIGHT plus a gap, published by ShowdownBand
+   through `--sd-band-h`. It was a hardcoded 124px, estimated rather than
+   measured, and the table ended up flush against the band with no air between
+   them. The band is the only thing that knows how tall it is at any scroll
+   position, so it is the thing that says. The fallback covers the instant
+   before the observer's first callback. */
+@media (min-width: 768px) {
+  .sd-rail { position: sticky; top: calc(var(--sd-band-h, 7rem) + 20px); }
 }
 
 /* The collapse is spatial information, not decoration — with motion reduced the

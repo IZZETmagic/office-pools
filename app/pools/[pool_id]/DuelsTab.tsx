@@ -1796,7 +1796,7 @@ export default function DuelsTab({
           moves nothing — the rail is a wrapper around a contiguous range, not a
           reordering. */}
       <div className={layout === 'onepage'
-        ? 'space-y-4 md:space-y-5 md:sticky md:top-[124px] mt-4 md:mt-0'
+        ? 'space-y-4 md:space-y-5 sd-rail mt-4 md:mt-0'
         : 'space-y-4'}>
       {elsewhere.length > 0 && (
         <Card padding="none" className="overflow-hidden">

@@ -176,9 +176,32 @@ export function ShowdownBand({
     }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
+
+    /**
+     * ⚠ THE BAND PUBLISHES ITS OWN HEIGHT, so nothing else has to guess it.
+     *
+     * The sticky rail on the duel page has to sit BELOW the collapsed band, and
+     * it was doing that with a hardcoded `top-[124px]` — a number I estimated
+     * from the type sizes and got wrong, so the table slid up against the band
+     * with no gap. The band is the only thing that knows how tall it is.
+     *
+     * ⚠ A ResizeObserver, NOT a read in the scroll handler. `offsetHeight`
+     * inside the rAF would force a synchronous layout immediately after
+     * writing `--p` — a read-after-write on every frame, which is exactly the
+     * stall that made the collapse feel like a drawer. The observer's callback
+     * runs after layout, so `contentRect` is already known and costs nothing.
+     */
+    const publish = (h: number) =>
+      document.documentElement.style.setProperty('--sd-band-h', `${Math.round(h)}px`)
+    publish(el.getBoundingClientRect().height)
+    const ro = new ResizeObserver(([entry]) => publish(entry.contentRect.height))
+    ro.observe(el)
+
     return () => {
       window.removeEventListener('scroll', onScroll)
       if (frame) cancelAnimationFrame(frame)
+      ro.disconnect()
+      document.documentElement.style.removeProperty('--sd-band-h')
     }
   }, [])
 
