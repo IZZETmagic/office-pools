@@ -2043,6 +2043,36 @@ export function PoolDetail({
         onTouchEnd={handleTouchEnd}
       >
         <div key={activeTab} className="tab-transition">
+            {/* ⚠ THE ONE-PAGE SURFACE HEADER. With no tab strip, a member who
+                taps "See your picks" arrives on a sheet of fixtures with
+                nothing saying what it is or how to leave — the band above is
+                about the DUEL, not about where you have just gone.
+                Generic on purpose: it reads its title from the tab list, so
+                Leaderboard and Banter get the same treatment for free rather
+                than each needing their own header later. */}
+            {onePage && activeTab !== 'duels' && (
+              <div className="flex items-center justify-between gap-3 mb-5">
+                <button
+                  type="button"
+                  onClick={() => handleTabSwitch('duels')}
+                  className="flex items-center gap-1 -ml-1 pr-2 py-1 rounded-control
+                             t-caption text-primary-600 hover:text-primary-700
+                             hover:bg-primary-500/8 transition-colors"
+                >
+                  <Icon name="chevron.left" size={15} weight="semibold" />
+                  Duel
+                </button>
+                <h2 className="t-caption text-muted truncate">
+                  {activeTab === 'predictions' && isShowdown
+                    /* The button that gets you here says "See your picks"; the
+                       page you land on should agree with it, not fall back to
+                       the tab list's "Predictions". */
+                    ? 'Your picks'
+                    : tabs.find((t) => t.key === activeTab)?.label ?? ''}
+                </h2>
+              </div>
+            )}
+
             {/* Tabs built entirely from the pool-wide arrays wait for them rather
                 than rendering an empty state that reads as "your picks are gone". */}
             {needsBulk && bulkState !== 'ready' && (
