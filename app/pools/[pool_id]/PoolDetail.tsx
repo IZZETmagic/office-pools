@@ -521,6 +521,15 @@ export function PoolDetail({
   const singlePoolId = useMemo(() => [initialPool.pool_id], [initialPool.pool_id])
   const { unreadCounts, markAsRead, initialLastReadMap } = useUnreadBanter({ userId: currentUserId, poolIds: singlePoolId })
   const banterUnreadCount = unreadCounts.get(initialPool.pool_id) ?? 0
+  /**
+   * Banter, as a sheet over the pool. One-page only — see BanterSheet.tsx.
+   *
+   * ⚠ DECLARED HERE, beside the unread state, because the mark-as-read effect
+   * a few lines below reads it. It was originally declared ~1,100 lines lower
+   * next to the pool menu, which put a dependency array in front of its own
+   * `const` — a temporal dead zone, and a runtime crash on every pool page.
+   */
+  const [banterOpen, setBanterOpen] = useState(false)
   const hasUnreadBanter = banterUnreadCount > 0 && activeTab !== 'community'
   const banterInitialLastReadAt = initialLastReadMap.get(initialPool.pool_id) ?? null
 
@@ -1640,8 +1649,6 @@ export function PoolDetail({
   const onePage = isShowdown && searchParams.get('layout') === 'onepage'
   /** The pool menu behind the chevron — every surface the duel page does not show. */
   const [moreOpen, setMoreOpen] = useState(false)
-  /** Banter, as a sheet over the pool. One-page only — see BanterSheet.tsx. */
-  const [banterOpen, setBanterOpen] = useState(false)
 
   const canAdmin = isAdmin && !isArchived
   const tabs = canAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
