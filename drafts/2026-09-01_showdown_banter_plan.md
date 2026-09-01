@@ -116,7 +116,35 @@ Inside a sheet that measurement has to target the sheet rather than the document
 `window.visualViewport` — `resize` and `scroll` events give the real usable area with the keyboard
 up, without touching `document.body` at all.
 
-⚠ **This is the part to prototype first**, before any of the rest is built. If a sheet with a text
+### ✅ ANSWERED 2026-09-01 — it works
+
+Tested on Ryan's iPhone against dev.sportpool.io, keyboard up:
+
+```
+scrollY        529      preserved — the band is still at --p 1.000
+innerHeight    775
+visualViewport 428      offsetTop 347
+keyboard       347px    detected
+body.position  static   never pinned
+```
+
+**All four of the things that had to be true, are.** The composer sits above the
+keyboard, the message list still scrolls, the page behind does not jump, and
+`scrollY` survives — which is what the band needs and what the body-fixed hack
+would have destroyed. The plan stands and slice 1 is unblocked.
+
+⚠ **One imperfection, cosmetic:** the composer is not FLUSH on the keyboard —
+a strip of page content and Safari's own chrome shows between them. The cause
+is in the readout: iOS reports `offsetTop 347` rather than shrinking the
+viewport from the bottom, so the visual viewport is the LOWER slice of the
+page. `transform: translateY(offsetTop)` then double-counts a shift that
+`position: fixed` already receives on iOS. The fix is to stop translating and
+let fixed positioning do it, or to drive `top` from `offsetTop` instead — a
+one-line experiment, not a design change.
+
+---
+
+⚠ **This was the part to prototype first**, before any of the rest was built. If a sheet with a text
 input cannot behave with the keyboard up on iOS Safari, the whole plan changes, and it is much
 cheaper to learn that from a throwaway page than from a half-migrated component.
 
