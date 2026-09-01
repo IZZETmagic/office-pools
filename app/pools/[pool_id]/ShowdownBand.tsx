@@ -212,46 +212,88 @@ export function ShowdownBand({
    * phone and `py-4` from `sm`, so it is not one number.
    */
   const [barH, setBarH] = useState(56)
+  /**
+   * The band's own height open and shut, MEASURED — one pair per breakpoint.
+   *
+   * ⚠ These were assumed, and the assumption was the phone's. The spacer
+   * reserved `bar + 320` everywhere, but from `md` the duel is a short row
+   * (`.sd-m` is display:none and `.sd-d` takes over), so the desktop page sat
+   * under ~190px of reserved nothing. The same assumption was in the scroll
+   * divisor: a desktop band gives up about 70px, not 220, so the content was
+   * outrunning a collapse that finished long before it.
+   *
+   * Both come from the element now, so a breakpoint the layout gains later
+   * needs no numbers added here.
+   */
+  const [size, setSize] = useState<{ open: number; shut: number } | null>(null)
+  // The scroll handler is bound once; a ref is how it reads the current
+  // measurement without the effect re-subscribing on every resize.
+  const sizeRef = useRef<{ open: number; shut: number } | null>(null)
 
   useEffect(() => {
     const el = bandRef.current
     if (!el) return
     let frame = 0
+
+    /**
+     * The rail offsets from this, so it is the VISIBLE height — arithmetic off
+     * `--p`, never a layout read on the scroll path.
+     */
+    const publish = (p: number, open: number, shut: number) =>
+      document.documentElement.style.setProperty(
+        '--sd-band-h', `${Math.round(shut + (open - shut) * (1 - p))}px`)
+
+    /**
+     * Read the band open and shut in one frame, then restore.
+     *
+     * ⚠ MEASURED, NOT ASSUMED, AND THAT IS THE FIX. Both numbers were the
+     * PHONE's: the spacer reserved `bar + 320` at every width, but from `md`
+     * the duel is a short row (`.sd-m` goes display:none and `.sd-d` takes
+     * over), so the desktop page sat under ~190px of reserved nothing. The
+     * same assumption sat in the scroll divisor — a desktop band gives up far
+     * less than 220px, so the content outran a collapse that had already
+     * finished.
+     *
+     * ⚠ Two forced layouts, at mount and on resize ONLY. Never on the scroll
+     * path, where a read-after-write every frame is the stall that made the
+     * collapse feel like a drawer.
+     */
+    const measure = () => {
+      const before = el.style.getPropertyValue('--p')
+      el.style.setProperty('--p', '1')
+      const shut = el.getBoundingClientRect().height
+      el.style.setProperty('--p', '0')
+      const open = el.getBoundingClientRect().height
+      el.style.setProperty('--p', before || '0')
+      if (open > shut) {
+        const next = { open: Math.round(open), shut: Math.round(shut) }
+        sizeRef.current = next
+        setSize(next)
+      }
+    }
+
     const onScroll = () => {
       if (frame) return
       // One write per animation frame, not one per scroll event: a trackpad
       // fires far more of the latter than the screen can show.
       frame = requestAnimationFrame(() => {
         frame = 0
-        // ⚠ DIVIDED BY THE HEIGHT IT LOSES, not by a round number. See
-        // COLLAPSE_PX: this equality is what makes the content push the band
-        // rather than slide under it.
-        el.style.setProperty(
-          '--p', Math.min(1, Math.max(0, window.scrollY / COLLAPSE_PX)).toFixed(3))
+        // ⚠ DIVIDED BY THE HEIGHT IT ACTUALLY LOSES. That equality is what
+        // welds the content to the band's bottom edge through the collapse.
+        const s = sizeRef.current
+        const travel = s ? Math.max(s.open - s.shut, 1) : COLLAPSE_PX
+        const p = Math.min(1, Math.max(0, window.scrollY / travel))
+        el.style.setProperty('--p', p.toFixed(3))
+        if (s) publish(p, s.open, s.shut)
       })
     }
+
+    measure()
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
 
-    /**
-     * ⚠ THE BAND PUBLISHES ITS OWN HEIGHT, so nothing else has to guess it.
-     *
-     * The sticky rail on the duel page has to sit BELOW the collapsed band, and
-     * it was doing that with a hardcoded `top-[124px]` — a number I estimated
-     * from the type sizes and got wrong, so the table slid up against the band
-     * with no gap. The band is the only thing that knows how tall it is.
-     *
-     * ⚠ A ResizeObserver, NOT a read in the scroll handler. `offsetHeight`
-     * inside the rAF would force a synchronous layout immediately after
-     * writing `--p` — a read-after-write on every frame, which is exactly the
-     * stall that made the collapse feel like a drawer. The observer's callback
-     * runs after layout, so `contentRect` is already known and costs nothing.
-     */
-    const publish = (h: number) =>
-      document.documentElement.style.setProperty('--sd-band-h', `${Math.round(h)}px`)
-    publish(el.getBoundingClientRect().height)
-    const ro = new ResizeObserver(([entry]) => publish(entry.contentRect.height))
-    ro.observe(el)
+    const ro = new ResizeObserver(() => measure())
+    ro.observe(document.documentElement)
 
     return () => {
       window.removeEventListener('scroll', onScroll)
@@ -315,7 +357,7 @@ export function ShowdownBand({
         ⚠ `fixed`, NOT `sticky`. Sticky in a fixed-height spacer would unstick
         the moment the spacer scrolled past — the band would leave the screen
         instead of staying, which is the one thing it must never do. */}
-    <div style={{ height: barH + HERO }} aria-hidden="true" />
+    <div style={{ height: size?.open ?? barH + HERO }} aria-hidden="true" />
     <div
       ref={bandRef}
       className="sd-band"
