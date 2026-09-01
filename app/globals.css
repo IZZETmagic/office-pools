@@ -1433,7 +1433,19 @@ html.dark .mode-pill {
    `M` in ShowdownBand.tsx — see the note there. They belong together because
    the clock has to land on the faces' centre line and the label has to clear
    the clock; split across two files that relationship is invisible. */
-.sd-band .sd-m     { position: relative; transition: height 60ms linear; }
+/* ⚠ NO TRANSITION ON THE HEIGHT, AND THAT IS THE POINT.
+   It had `transition: height 60ms linear`, which sounds like smoothing and is
+   the opposite. `--p` already changes continuously — once per animation frame,
+   driven by the scroll position — so the height has a NEW TARGET before the
+   previous 60ms ease has finished. Every frame restarts an interpolation that
+   never lands, and the band trails the finger: it keeps moving after you stop,
+   then settles. Ryan: "a suction effect, like a kitchen drawer."
+   It hid on a fast machine in dev, where frames are close enough together that
+   60ms of lag is under a couple of them; a deployed build on a real device
+   spaces them out and the drag becomes the thing you notice.
+   A scroll-linked value must be driven, never eased. The scroll IS the timing
+   function. */
+.sd-band .sd-m     { position: relative; }
 .sd-band .sd-mw    { position: absolute; left: 0; right: 0; text-align: center; }
 .sd-band .sd-big   { position: absolute; left: 0; right: 0; text-align: center;
                      line-height: 1; }
