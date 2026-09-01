@@ -1323,8 +1323,8 @@ export function PoolDetail({
     // Update URL without full navigation so back/forward works
     const url = new URL(window.location.href)
     // ⚠ THIS POOL'S default, not a hardcoded one — see `defaultTabFor`. Other
-    // parameters are left alone, which is what keeps `?layout=onepage` alive
-    // across a tab switch.
+    // parameters are left alone, which is what keeps the `?layout=tabs`
+    // rollback alive across a tab switch.
     const bare = defaultTabFor(pool)
     if (tab === bare) {
       url.searchParams.delete('tab')
@@ -1625,18 +1625,36 @@ export function PoolDetail({
    * flag, which is what this is.
    */
   /**
-   * ONE-PAGE SHOWDOWN — off by default, reachable at `?layout=onepage`.
+   * ONE-PAGE SHOWDOWN — now the DEFAULT for Showdown. `?layout=tabs` rolls back.
    *
-   * Plan: drafts/2026-08-31_showdown_one_page_plan.md. The duel becomes the
-   * page: the tab strip goes, the band sticks to the top, and Predictions,
+   * Plan: drafts/2026-08-31_showdown_one_page_plan.md, step 7. The duel becomes
+   * the page: the tab strip goes, the band sticks to the top, and Predictions,
    * Leaderboard and Banter render as sections beneath it.
    *
-   * ⚠ BEHIND A PARAMETER UNTIL IT IS PROVEN, and only ever for Showdown. Every
-   * other mode — Table, LMS, Pick'em, the World Cup, bracket pools — reads this
-   * as false and is untouched, which is the whole reason it is a flag and not a
-   * rewrite of the tab list.
+   * ⚠ THE SENSE OF THIS PARAMETER IS INVERTED, NOT REMOVED. It read
+   * `=== 'onepage'` — opt in — and now reads `!== 'tabs'` — opt out. Ryan,
+   * 2026-09-01: *"flip the default but keep the default to roll it back"*. So
+   * the old layout is still one query parameter away on any pool, for as long
+   * as this line survives.
+   *
+   * ⚠ WHICH IS WHY THE SHOWDOWN TAB LIST IS STILL HERE. Step 7 of the plan also
+   * says to delete `withShowdownFirst` and the Showdown branch of `USER_TABS`.
+   * That is deliberately NOT done: deleting them makes `?layout=tabs` render a
+   * strip that no longer knows about the duel, which is a rollback that does not
+   * actually roll back. They come out when the flag does, together, and not
+   * before.
+   *
+   * ⚠ STILL ONLY EVER FOR SHOWDOWN. Every other mode — Table, LMS, Pick'em, the
+   * World Cup, bracket pools — reads this as false and is untouched.
+   *
+   * ⚠ THIS IS WHAT PUTS THE OPPONENT REVEAL IN FRONT OF MEMBERS. The Reveal
+   * button lives on the band, and the band renders in one-page only
+   * (DuelsTab's `bandNode`), so before this flip a normal Showdown pool had no
+   * way to open the ceremony at all. It also retires the second door: the tab
+   * layout's `DuelPanel state="picking"` shows the opponent's face and name
+   * ungated, and `!onePage` below stops rendering it.
    */
-  const onePage = isShowdown && searchParams.get('layout') === 'onepage'
+  const onePage = isShowdown && searchParams.get('layout') !== 'tabs'
   /** The pool menu behind the chevron — every surface the duel page does not show. */
   const [moreOpen, setMoreOpen] = useState(false)
 
