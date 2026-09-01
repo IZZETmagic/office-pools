@@ -59,49 +59,6 @@ export function BanterSheet({
    * the sheet ended up moving twice and leaving the screen faster.
    */
   const [box, setBox] = useState<{ top: number; height: number } | null>(null)
-  /**
-   * ⚠ TEMPORARY, behind `?banterdebug=1`. The sheet came out wrong on an
-   * iPhone 17 Plus — composer at the top of the screen with the page showing
-   * through — and reading the code produced three plausible causes and no way
-   * to choose between them. Numbers from the device settle it in one look,
-   * which is how the placement question got answered. Remove once it is fixed.
-   */
-  const panelRef = useRef<HTMLDivElement>(null)
-  const [debug, setDebug] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const vv = window.visualViewport
-    // ⚠ REPORTS ONLY. `box` belongs to the lock effect above — two effects
-    // writing one position is how the sheet ended up compensated twice.
-    const on = typeof window !== 'undefined'
-      && new URLSearchParams(window.location.search).get('banterdebug') === '1'
-    const fit = () => {
-      if (!on) return
-      const p = panelRef.current?.getBoundingClientRect()
-      setDebug(
-        `innerHeight   ${window.innerHeight}\n` +
-        `vv.height     ${vv ? Math.round(vv.height) : 'n/a'}\n` +
-        `vv.offsetTop  ${vv ? Math.round(vv.offsetTop) : 'n/a'}\n` +
-        `vv.pageTop    ${vv ? Math.round(vv.pageTop) : 'n/a'}\n` +
-        `scrollY       ${Math.round(window.scrollY)}\n` +
-        `panel         ${p ? `${p.top.toFixed(0)}..${p.bottom.toFixed(0)} h${p.height.toFixed(0)}` : 'n/a'}\n` +
-        `body.top      ${document.body.style.top || '—'}`,
-      )
-    }
-    fit()
-    const t = setInterval(fit, 250)
-    if (!on) clearInterval(t)
-    vv?.addEventListener('resize', fit)
-    vv?.addEventListener('scroll', fit)
-    window.addEventListener('resize', fit)
-    return () => {
-      clearInterval(t)
-      vv?.removeEventListener('resize', fit)
-      vv?.removeEventListener('scroll', fit)
-      window.removeEventListener('resize', fit)
-    }
-  }, [open])
 
   /**
    * Lock the page, and counteract iOS Safari's visual-viewport pan.
@@ -196,15 +153,7 @@ export function BanterSheet({
         aria-modal="true"
         aria-label="Banter"
       >
-        {debug && (
-          <div className="pointer-events-none absolute left-2 top-2 z-50 rounded-lg
-                          bg-black/85 px-2.5 py-2 font-mono text-[11px] leading-snug
-                          text-emerald-300 whitespace-pre">
-            {debug}
-          </div>
-        )}
         <div
-          ref={panelRef}
           className="pointer-events-auto flex flex-col min-h-0 max-h-full
                      bg-surface rounded-t-sheet border-t border-border-default
                      shadow-xl overflow-hidden"
