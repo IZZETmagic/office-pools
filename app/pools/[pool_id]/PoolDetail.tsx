@@ -2109,8 +2109,17 @@ export function PoolDetail({
            wrapper, so picks and duel do not sit on two different grids.
            ⚠ One max-width, not two: `max-w-6xl` and `max-w-[940px]` have equal
            specificity, so which wins would come down to generated-CSS order. */
+        /* ⚠ BANTER GETS NO BOTTOM PADDING ON A PHONE, and the tabbed layout
+           below has known that since it was written — `pb-0 sm:pb-8` on its
+           community branch. `CommunityTab` sizes itself to fill from its own
+           top to the bottom of the viewport, so 40px of padding underneath it
+           is 40px the composer is pushed past the edge. That is the
+           "unwieldy and not stable" input: it is being laid out below the area
+           the chat measured for itself.
+           One-page had `pb-10` unconditionally. The rule existed; this branch
+           just did not have it. */
         className={onePage
-          ? 'px-4 sm:px-6 pt-5 pb-10'
+          ? `px-4 sm:px-6 pt-5 ${activeTab === 'community' ? 'pb-0 sm:pb-8' : 'pb-10'}`
           : `max-w-6xl mx-auto px-4 sm:px-6 ${
               activeTab === 'community'
                 ? 'pt-3 sm:py-8 pb-0 sm:pb-8'
