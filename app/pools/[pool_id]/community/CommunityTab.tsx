@@ -567,6 +567,15 @@ export function CommunityTab({
 
   // Measure available desktop chat wrapper height (viewport minus wrapper top offset minus footer)
   useEffect(() => {
+    // ⚠ EMBEDDED MEASURES NOTHING. This computes
+    // `window.innerHeight - wrapperTop - footer`, which is right when the chat
+    // runs to the bottom of the PAGE and wrong inside a sheet: the wrapper's
+    // top is a few hundred pixels down, so the answer is taller than the sheet
+    // and the composer ends up below its bottom edge. With the keyboard up it
+    // is worse still, because `innerHeight` does not shrink for a keyboard —
+    // that is the whole reason the sheet reads `visualViewport` instead.
+    // The container owns the height here; the chat just fills it.
+    if (embedded) { setDesktopChatHeight(null); return }
     if (isMobile) return
     const measure = () => {
       const el = chatWrapperRef.current
@@ -580,7 +589,7 @@ export function CommunityTab({
     requestAnimationFrame(measure)
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
-  }, [isMobile, loading])
+  }, [isMobile, loading, embedded])
 
   // Prevent body scrolling on desktop — chat has its own scroll container
   useEffect(() => {
@@ -1293,8 +1302,16 @@ export function CommunityTab({
     <>
       <div
         ref={chatWrapperRef}
-        className={mobileChat ? 'flex flex-col overflow-hidden -mx-4' : 'flex flex-col overflow-hidden'}
-        style={mobileChat ? { height: `${mobileHeight}px` } : desktopChatHeight ? { height: `${desktopChatHeight}px` } : undefined}
+        className={`flex flex-col overflow-hidden${
+          embedded ? ' flex-1 min-h-0' : mobileChat ? ' -mx-4' : ''}`}
+        /* ⚠ NO EXPLICIT HEIGHT WHEN EMBEDDED — `flex-1 min-h-0` instead, so the
+           sheet's own measured height flows down to the composer. An explicit
+           pixel height here would be a second opinion about how tall the
+           available space is, and the sheet's is the one that knows about the
+           keyboard. */
+        style={embedded ? undefined
+          : mobileChat ? { height: `${mobileHeight}px` }
+            : desktopChatHeight ? { height: `${desktopChatHeight}px` } : undefined}
       >
         {/* Main content area */}
         <div className={`flex gap-0 md:gap-4 ${mobileChat ? 'flex-1 min-h-0 flex-col items-start' : 'flex-1 min-h-0 items-stretch'}`}>
