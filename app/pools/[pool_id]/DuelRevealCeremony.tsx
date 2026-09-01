@@ -63,11 +63,10 @@
 // =============================================================
 
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor } from '@/lib/design/avatarGradient'
-import { shareDuelVideo, useDuelVideo } from './useDuelVideo'
 
 /**
  * ⚠ LAZY, AND `ssr: false`. `three` is ~600KB gzipped and this ceremony is
@@ -109,29 +108,56 @@ export type RevealOpponent = {
  * In a ten-person pool the third clue usually gives it away, and that is the
  * design working, not a leak.
  */
-const LEAD_MS = 900
-const CLUE_MS = 1200
+const LEAD_MS = 1000
+/**
+ * ⚠ 1200ms WAS NOT LONG ENOUGH TO READ. Ryan, 2026-09-01: *"give it enough
+ * time for the user to read them"*. A clue has to be found on screen, parsed
+ * and then thought about — "1W 0T 0L" only means something once you have
+ * compared it to your own — and 1.2s covered the first of those three.
+ */
+const CLUE_MS = 1900
 const CLUES = 3
-/** 900 + 3×1200 = 4.5s. Long enough for the corridor to read; Skip is always there. */
+/** 1000 + 3×1900 = 6.7s. Longer than it was; Skip is always there for anyone who disagrees. */
 const WALK_MS = LEAD_MS + CLUES * CLUE_MS
+
+/**
+ * ⚠ MEASURED, NOT GUESSED. Centring the figure on the vanishing point removed
+ * the offset that used to hold it clear of the bottom-anchored name plate, so
+ * on a short window — a laptop at 700px, or this app's own browser pane — a
+ * fixed 280px disc and the plate ran into each other. The disc is capped
+ * against the real viewport height instead of being nudged off centre again.
+ */
+function subscribeViewport(onChange: () => void) {
+  window.addEventListener('resize', onChange)
+  return () => window.removeEventListener('resize', onChange)
+}
 
 export function DuelRevealCeremony({
   matchweek,
   opponent,
-  poolId,
-  duelId,
   onClose,
 }: {
   matchweek: number
   /** ⚠ NULL IS A BYE — structural everywhere in Showdown, including here. */
   opponent: RevealOpponent | null
-  /** Both needed to ask for the shareable render. */
+  /**
+   * ⚠ REQUIRED BUT UNREAD, ON PURPOSE. These addressed the shareable render,
+   * whose button Ryan removed on 2026-09-01. Both call sites still pass them
+   * and the render routes still work, so restoring the share is a hook call and
+   * a button here — not a prop-drilling exercise through DuelsTab and the dev
+   * harness. Delete them only if the video is being abandoned outright.
+   */
   poolId: string
   duelId: string
   onClose: () => void
 }) {
-  const video = useDuelVideo(poolId, 'duel-reveal')
-  const [shared, setShared] = useState<'shared' | 'copied' | null>(null)
+  // ⚠ 900 IS THE SERVER SNAPSHOT, not a real measurement — there is no window
+  // to measure during SSR. It only has to be a sane portrait height; the first
+  // client render replaces it.
+  const vh = useSyncExternalStore(subscribeViewport, () => window.innerHeight, () => 900)
+  /** Big enough to be the subject, small enough to clear the plate below it. */
+  const discMax = Math.max(160, Math.min(280, vh * 0.32))
+
   // 0 = walking in, 1..3 = a clue is up, 4 = revealed.
   const [clue, setClue] = useState(0)
   const [revealed, setRevealed] = useState(false)
@@ -203,6 +229,8 @@ export function DuelRevealCeremony({
   // The figure steps closer with each clue rather than making one jump, so the
   // corridor and the clues advance together.
   const t = revealed ? 1 : started ? clue / CLUES : 0
+  /** The figure's diameter right now, growing as they walk out. */
+  const disc = 130 + t * (discMax - 130)
 
   /**
    * The three clues, broad to narrow — EA's nationality → position → club.
@@ -252,22 +280,36 @@ export function DuelRevealCeremony({
       <div
         className="absolute inset-0 transition-[opacity,background] duration-[1200ms] ease-out"
         style={{
-          background: `radial-gradient(34% 20% at 50% 44%, rgba(255,255,255,${0.5 - t * 0.32}), transparent 70%)`,
+          /* ⚠ `50% 50%`, NOT `50% 44%`. This is the light at the end of the
+             tunnel, so it has to sit ON the vanishing point — at 44% it was a
+             third centre, disagreeing with both the rings and the figure. */
+          background: `radial-gradient(34% 20% at 50% 50%, rgba(255,255,255,${0.5 - t * 0.32}), transparent 70%)`,
         }}
       />
 
       {/* ---- who is coming ----
-          ⚠ Lifted off centre. The lower third is bottom-anchored and the figure
-          grows as it walks out, so a centred disc runs into the name plate at
-          the exact moment both are on screen — found by looking at it. */}
-      <div className="absolute inset-0 flex items-center justify-center -translate-y-[9%]">
+          ⚠ DEAD CENTRE, BECAUSE THAT IS WHERE THE TUNNEL CONVERGES. This block
+          used to carry `-translate-y-[9%]` to keep the growing disc off the
+          bottom-anchored name plate. It bought that clearance by putting the
+          figure 9% of the viewport ABOVE the vanishing point the corridor
+          converges on — so the rings closed on one spot and the person arrived
+          at another. Ryan: *"the player's avatar is not lined up with the moving
+          rings"*, and *"the ring getting bigger for the reveal should be
+          centered with the tunnel rings"*. Both are this.
+          
+          The corridor canvas is `inset-0`, its camera is on the world axis, so
+          its vanishing point is the exact centre of this box. Everything that
+          is meant to arrive out of the tunnel is now centred here and nowhere
+          else. The clearance the offset used to buy is bought below instead,
+          by capping the disc against viewport height. */}
+      <div className="absolute inset-0 flex items-center justify-center">
         {opponent ? (
           <div
             className="rounded-full flex items-center justify-center transition-all duration-[1200ms] ease-out"
             style={{
               // Grows as they walk toward you.
-              width: 130 + t * 150,
-              height: 130 + t * 150,
+              width: disc,
+              height: disc,
               // ⚠ NEUTRAL UNTIL THE FLASH. Before the reveal this is a plain
               // grey disc: no gradient, no rim in their colour. A member's
               // colour IS their identity everywhere else in the product, so a
@@ -286,12 +328,12 @@ export function DuelRevealCeremony({
 
                 The swap is instantaneous and that is fine: the flash covers it,
                 which is the frame it was put there for. */}
-            {revealed && <Avatar person={opponent.person} size={130 + t * 150} />}
+            {revealed && <Avatar person={opponent.person} size={disc} />}
           </div>
         ) : (
           <div
             className="rounded-full border-[6px] border-dashed border-white/15 transition-all duration-[1200ms] ease-out"
-            style={{ width: 130 + t * 150, height: 130 + t * 150 }}
+            style={{ width: disc, height: disc }}
           />
         )}
       </div>
@@ -307,10 +349,80 @@ export function DuelRevealCeremony({
         />
       )}
 
-      {/* ---- prompt / lower third ---- */}
-      <div className="absolute inset-x-0 bottom-0 p-8 pb-14 sm:pb-20">
-        {revealed ? (
-          <div className="max-w-xl mx-auto">
+      {/* ---- the clues: FRONT AND CENTRE ----
+          ⚠ THEY USED TO BE IN THE LOWER THIRD, and Ryan's note was *"in the
+          build up the players stats should be front and center and easy to
+          read"*. Down there they were the smallest thing on screen, below the
+          fold on a short window, and competing with the corridor's brightest
+          rings for attention. The buildup has no name plate to share the frame
+          with — nothing has been named yet — so the middle was free the whole
+          time.
+          ⚠ It sits on the SAME centre as the figure and the rings, so the clue
+          arrives out of the tunnel rather than beside it. */}
+      {!revealed && (
+        <div className="absolute inset-0 flex items-center justify-center px-8 pointer-events-none">
+          {/* ⚠ A SCRIM. The type sits over the brightest thing in the shot —
+              the gate rings are hard white — and white-on-white made the labels
+              vanish: legible in isolation, unreadable in place. */}
+          <div
+            className="absolute inset-0"
+            style={{ background: 'radial-gradient(closest-side, rgba(4,6,10,0.84), transparent 74%)' }}
+          />
+          <div className="relative text-center">
+            {clue === 0 || !opponent ? (
+              <p className="text-white/45 font-bold text-lg">
+                {opponent ? 'Someone is coming…' : 'Checking the tunnel…'}
+              </p>
+            ) : (
+              /* ⚠ KEYED ON THE CLUE so React remounts it — the fade has to
+                 restart for each one. Reusing the node just swaps the text and
+                 the third clue arrives with no animation at all. */
+              <div key={clue} className="animate-fade-up">
+                {/* ⚠ IT SAYS WHOSE FACTS THESE ARE. "1W 0T 0L" with no subject
+                    is a number flying at you, and at this point in the walk
+                    nobody has been named — so the card has to carry it. */}
+                <p className="text-[11px] font-extrabold tracking-[5px] text-white/40">
+                  YOUR NEXT OPPONENT
+                </p>
+                <p className="mt-7 text-[11px] font-extrabold tracking-[5px] text-white/55">
+                  {clues[clue - 1].label}
+                </p>
+                <p className="t-display text-6xl sm:text-7xl text-white mt-3">
+                  {clues[clue - 1].value}
+                </p>
+              </div>
+            )}
+
+            {/* How many clues are left. Not a loading bar — a countdown of
+                hints, which is the thing the member is actually tracking. */}
+            <div className="mt-9 flex items-center justify-center gap-2.5" aria-hidden>
+              {Array.from({ length: CLUES }).map((_, i) => (
+                <span
+                  key={i}
+                  className="h-2 rounded-pill transition-all duration-300"
+                  style={{
+                    width: i < clue ? 30 : 8,
+                    backgroundColor: i < clue ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)',
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- the name plate, only once they have arrived ---- */}
+      {revealed && (
+        <div className="absolute inset-x-0 bottom-0 p-8 pb-14 sm:pb-20">
+          {/* ⚠ A SCRIM UNDER THE PLATE. The figure is centred now rather than
+              lifted, so on a short window its lower edge comes close to this
+              block — a gradient means "close" reads as depth instead of a
+              collision. */}
+          <div
+            className="absolute inset-x-0 bottom-0 h-[70%] pointer-events-none"
+            style={{ background: 'linear-gradient(to top, #04060A 12%, rgba(4,6,10,0.72) 55%, transparent)' }}
+          />
+          <div className="relative max-w-xl mx-auto">
             <div className="h-2 rounded-pill mb-5" style={{ backgroundColor: accent }} />
             <p className="t-display text-4xl sm:text-5xl text-white">
               {opponent ? opponent.name : 'No opponent this week'}
@@ -328,83 +440,23 @@ export function DuelRevealCeremony({
                 </span>
               </p>
             )}
-            {/* ⚠ THE SHARE IS A TWO-STEP, and it has to be. The first press
-                renders the MP4 server-side (~30s in a sandbox, instant on a
-                cache hit); the second hands it over. They cannot be one press:
-                `navigator.share` must be called inside a real user gesture, and
-                a gesture does not survive a 30-second await. */}
-            <div className="mt-7 flex gap-3">
-              <button
-                onClick={(e) => { e.stopPropagation(); onClose() }}
-                className="flex-1 rounded-chip bg-white/10 hover:bg-white/15 text-white font-bold py-3.5"
-              >
-                Done
-              </button>
-              {opponent && (
-                <button
-                  disabled={video.state.status === 'working'}
-                  onClick={async (e) => {
-                    e.stopPropagation()
-                    if (video.state.url) {
-                      setShared(await shareDuelVideo(video.state.url, `Matchweek ${matchweek}`))
-                      return
-                    }
-                    await video.request(duelId)
-                  }}
-                  className="flex-1 rounded-chip font-bold py-3.5 text-midnight disabled:opacity-60"
-                  style={{ backgroundColor: accent }}
-                >
-                  {video.state.status === 'working'
-                    ? `${video.state.phase}… ${Math.round(video.state.progress * 100)}%`
-                    : video.state.url
-                      ? (shared === 'copied' ? 'Link copied' : shared === 'shared' ? 'Shared' : 'Share it')
-                      : 'Make a video'}
-                </button>
-              )}
-            </div>
-            {video.state.error && (
-              <p className="mt-3 text-center text-sm font-semibold text-danger-400">
-                {video.state.error}
-              </p>
-            )}
+            {/* ⚠ THE "MAKE A VIDEO" BUTTON WAS HERE AND RYAN REMOVED IT
+                (2026-09-01: *"there is no need for a make a video button"*).
+                ⚠ THAT LEAVES THE RENDER PIPELINE WITH NO CALLER AGAIN — the
+                routes, `useDuelVideo` and the Remotion compositions are all
+                still on disk and still work, but nothing in the product reaches
+                them. `poolId` and `duelId` are deliberately kept on the props
+                type, and both call sites still pass them, so putting the share
+                back is a button and a hook call rather than a re-wiring. */}
+            <button
+              onClick={(e) => { e.stopPropagation(); onClose() }}
+              className="mt-7 w-full rounded-chip bg-white/10 hover:bg-white/15 text-white font-bold py-3.5"
+            >
+              Done
+            </button>
           </div>
-        ) : (
-          <div className="max-w-xl mx-auto text-center">
-            {clue === 0 || !opponent ? (
-              <p className="text-white/45 font-bold text-lg">
-                {opponent ? 'Someone is coming…' : 'Checking the tunnel…'}
-              </p>
-            ) : (
-              /* ⚠ KEYED ON THE CLUE so React remounts it — the fade has to
-                 restart for each one. Reusing the node just swaps the text and
-                 the third clue arrives with no animation at all. */
-              <div key={clue} className="animate-fade-up">
-                <p className="text-[11px] font-extrabold tracking-[5px] text-white/40">
-                  {clues[clue - 1].label}
-                </p>
-                <p className="t-display text-4xl sm:text-5xl text-white mt-2">
-                  {clues[clue - 1].value}
-                </p>
-              </div>
-            )}
-
-            {/* How many clues are left. Not a loading bar — a countdown of
-                hints, which is the thing the member is actually tracking. */}
-            <div className="mt-6 flex items-center justify-center gap-2.5" aria-hidden>
-              {Array.from({ length: CLUES }).map((_, i) => (
-                <span
-                  key={i}
-                  className="h-2 rounded-pill transition-all duration-300"
-                  style={{
-                    width: i < clue ? 30 : 8,
-                    backgroundColor: i < clue ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)',
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ---- ⚠ SKIP: same weight, present from the first frame ---- */}
       {!revealed && (

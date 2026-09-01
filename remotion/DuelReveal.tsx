@@ -7,13 +7,17 @@
 //
 // ## The shape
 //
-//   0–44     THE WALK      dark corridor, camera cruising, you established
-//   44–170   THE GATES     three light gates, each carrying one clue
-//   170–200  THE CHARGE    camera accelerates, streaks, the mouth grows
-//   200–208  THE BLOWOUT   full white
-//   208–214  THE BREATH    black. the only still moment in the film
-//   214–244  THE REVEAL    them, and the whole corridor floods their colour
-//   244–270  THE VERDICT   what it means, held
+//   0–26     THE WALK      dark corridor, camera cruising, you established
+//   26–210   THE GATES     three light gates, each carrying one clue
+//   220–250  THE CHARGE    camera accelerates, streaks, the mouth grows
+//   250–258  THE BLOWOUT   full white
+//   258–264  THE BREATH    black. the only still moment in the film
+//   264–294  THE REVEAL    them, and the whole corridor floods their colour
+//   294–330  THE VERDICT   what it means, held
+//
+// ⚠ THESE ARE DERIVED FROM `BEAT`, NOT A SEPARATE SOURCE OF TRUTH. If you move
+// a beat, fix this map — a comment that describes the previous cut is worse
+// than no map at all.
 //
 // ⚠ THE BREATH IS NOT DEAD AIR. Six frames of black between the blowout and the
 // reveal is the cheapest thing in this file and it does more than any of the
@@ -94,7 +98,7 @@ export type DuelRevealProps = {
   them: RevealSide | null
 }
 
-export const DUEL_REVEAL_DURATION = 300
+export const DUEL_REVEAL_DURATION = 330
 export const DUEL_REVEAL_SIZE = { width: 1080, height: 1920 }
 
 /**
@@ -107,24 +111,25 @@ export const DUEL_REVEAL_SIZE = { width: 1080, height: 1920 }
  */
 const BEAT = {
   walk: 0,
-  gate1: 50,
-  gate2: 100,
-  gate3: 150,
-  charge: 190,
-  blowout: 220,
-  breath: 228,
-  reveal: 234,
-  verdict: 264,
+  gate1: 58,
+  gate2: 118,
+  gate3: 178,
+  charge: 220,
+  blowout: 250,
+  breath: 258,
+  reveal: 264,
+  verdict: 294,
 } as const
 
 /**
  * Where the gates sit in world space.
  *
- * ⚠ DERIVED FROM THE TRAVEL CURVE, not chosen. Cruise is 23.56 world units over
- * 190 frames = 0.124 a frame, so a gate at 6.2 is met at frame 50. Change one
- * and the other must change, or the clue arrives without its gate.
+ * ⚠ DERIVED FROM THE TRAVEL CURVE, not chosen. Cruise covers 23.56 world units
+ * over `BEAT.charge` frames — now 220, so 0.1071 a frame — and a gate's z is
+ * therefore `frame × 0.1071`. Change a gate frame and its z MUST be recomputed
+ * or the clue arrives without the gate it is supposed to ride in on.
  */
-const GATE_Z = [6.2, 12.4, 18.6]
+const GATE_Z = [6.21, 12.64, 19.06]
 
 export const DuelReveal: React.FC<DuelRevealProps> = ({
   poolName,
@@ -261,11 +266,18 @@ export const DuelReveal: React.FC<DuelRevealProps> = ({
           />
         </AbsoluteFill>
 
-        {/* ⚠ Lifted with the plate. The two move together or the gap between
-            the face and the name closes up as one of them shifts. */}
+        {/* ⚠ DEAD CENTRE, LIKE THE SHOCKWAVE AND THE TUNNEL. This carried
+            `paddingBottom: 260` to sit with the name plate, which on a centred
+            flex container lifts its contents 130px — so the face arrived 130px
+            above the point the corridor converges on and the shockwave expanded
+            from. The child below still says "CENTRED, WITH NO MARGIN NUDGE...
+            any offset here sits the face off-axis", which was true and which
+            this parent then did anyway.
+            Ryan, 2026-09-01: *"the ring getting bigger for the reveal should be
+            centered with the tunnel rings"*. One centre, no exceptions. */}
         <AbsoluteFill
           name="Opponent"
-          style={{ alignItems: 'center', justifyContent: 'center', paddingBottom: 260 }}
+          style={{ alignItems: 'center', justifyContent: 'center' }}
         >
           {them ? (
             <Interactive.Div
@@ -551,8 +563,10 @@ function ClueCard({
   at: number
   frame: number
 }) {
-  const IN = at - 30
-  const OUT = at + 16
+  // ⚠ WIDER THAN IT WAS (-30/+16). Ryan asked for enough time to actually read
+  // the number; this holds it still for ~1.5s inside a ~1.8s window.
+  const IN = at - 32
+  const OUT = at + 22
   if (frame < IN || frame > OUT + 10) return null
 
   return (
