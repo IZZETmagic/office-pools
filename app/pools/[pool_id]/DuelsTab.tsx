@@ -1236,7 +1236,12 @@ export default function DuelsTab({
           timestamp for "when the last game is played and scored" — a clock here
           would be counting to a number we invented. The gold line carries the
           same weight and says the true thing instead. */}
-      {inPlayMatchweek === null && sealedMatchweek !== null && (
+      {/* ⚠ NOT IN ONE-PAGE. The band at the top of the page is this card — same
+          matchweek, same countdown, same two faces — so rendering both puts
+          the identical thing on screen twice, once stuck to the top and once
+          scrolling under it. In tab mode it is still the whole sealed state
+          and is untouched. */}
+      {layout === 'tabs' && inPlayMatchweek === null && sealedMatchweek !== null && (
         <div className="rounded-card overflow-hidden bg-midnight relative">
           <div
             aria-hidden="true"
