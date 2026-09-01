@@ -128,6 +128,15 @@ const M = {
            width: 'calc(72px - 36px * var(--p))', height: 'calc(72px - 36px * var(--p))' },
   faceL: { left:  'calc(38px - 22px * var(--p))' },
   faceR: { right: 'calc(38px - 22px * var(--p))' },
+  // ⚠ THESE THREE WERE THE LAST PLACEMENTS LEFT IN globals.css, and they were
+  // the ones that broke: the served stylesheet had lost their `top` while the
+  // file still declared it, so the label, the V and both names fell back to
+  // their static position and stacked on each other at the top of the block.
+  // Every phone placement now lives here, which is the point of `M` — one
+  // owner, and no piece of this layout can be lost to a stale rebuild.
+  sub:   { top: '104px' },
+  vee:   { top: '170px' },
+  who:   { top: '232px' },
 } as const
 
 const MW_SIZE_D = { fontSize: 'calc(16px - 4px * var(--p))' }
@@ -339,9 +348,9 @@ export function ShowdownBand({
       <div className="sd-m" style={M.block}>
         <p className="sd-mw t-caption text-white/75" style={M.mw}>Matchweek {matchweek}</p>
         <p className="sd-big t-num t-num-black text-white" style={M.big}>{headline}</p>
-        {sub && <p className="sd-sub t-detail text-white/45">{sub}</p>}
+        {sub && <p className="sd-sub t-detail text-white/45" style={M.sub}>{sub}</p>}
         {liveNow && (
-          <p className="sd-sub t-detail">
+          <p className="sd-sub t-detail" style={M.sub}>
             <span className="inline-flex items-center gap-1.5 rounded-pill bg-danger-500/15 text-danger-500 px-2.5 py-1">
               <span className="w-1.5 h-1.5 rounded-full bg-danger-500 motion-safe:animate-pulse" aria-hidden="true" />
               Live
@@ -353,13 +362,13 @@ export function ShowdownBand({
         {sealed
           ? <Face p={null} colour={themColour} className="sd-face sd-face-them" style={{ ...M.face, ...M.faceR }} unknown />
           : <Face p={person(themEntry!)} colour={themColour} className="sd-face sd-face-them" style={{ ...M.face, ...M.faceR }} />}
-        {sealed && <p className="sd-vee t-caption text-accent-400 text-base select-none">V</p>}
+        {sealed && <p className="sd-vee t-caption text-accent-400 text-base select-none" style={M.vee}>V</p>}
 
-        <div className="sd-who sd-who-you">
+        <div className="sd-who sd-who-you" style={M.who}>
           <p className="t-caption text-white truncate">{name(youEntry)}</p>
           {meta(youEntry) && <p className="t-num text-[10px] text-white/40 mt-0.5">{meta(youEntry)}</p>}
         </div>
-        <div className="sd-who sd-who-them">
+        <div className="sd-who sd-who-them" style={M.who}>
           <p className="t-caption text-white truncate">
             {sealed ? 'Sealed' : name(themEntry!)}
           </p>
