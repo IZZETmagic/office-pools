@@ -2109,17 +2109,18 @@ export function PoolDetail({
            wrapper, so picks and duel do not sit on two different grids.
            ⚠ One max-width, not two: `max-w-6xl` and `max-w-[940px]` have equal
            specificity, so which wins would come down to generated-CSS order. */
-        /* ⚠ BANTER GETS NO BOTTOM PADDING ON A PHONE, and the tabbed layout
-           below has known that since it was written — `pb-0 sm:pb-8` on its
-           community branch. `CommunityTab` sizes itself to fill from its own
-           top to the bottom of the viewport, so 40px of padding underneath it
-           is 40px the composer is pushed past the edge. That is the
-           "unwieldy and not stable" input: it is being laid out below the area
-           the chat measured for itself.
-           One-page had `pb-10` unconditionally. The rule existed; this branch
-           just did not have it. */
-        className={onePage
-          ? `px-4 sm:px-6 pt-5 ${activeTab === 'community' ? 'pb-0 sm:pb-8' : 'pb-10'}`
+        /* ⚠ BANTER USES THE TABBED LAYOUT'S CONTAINER, EXACTLY.
+           `CommunityTab` measures its own top and sizes itself to the bottom of
+           the viewport, so every pixel of surrounding geometry is an input to
+           that calculation. It works in the tabbed layout and I have now broken
+           it twice in one-page by giving it a container that differs — first
+           `pb-10` where the tabbed branch has always had `pb-0`, then whatever
+           remains after that.
+           Rather than keep matching one property at a time, this surface takes
+           the whole container. If the chat is right there and wrong here, the
+           difference is no longer the box it sits in. */
+        className={onePage && activeTab !== 'community'
+          ? 'px-4 sm:px-6 pt-5 pb-10'
           : `max-w-6xl mx-auto px-4 sm:px-6 ${
               activeTab === 'community'
                 ? 'pt-3 sm:py-8 pb-0 sm:pb-8'
@@ -2136,7 +2137,12 @@ export function PoolDetail({
                 Generic on purpose: it reads its title from the tab list, so
                 Leaderboard and Banter get the same treatment for free rather
                 than each needing their own header later. */}
-            {onePage && activeTab !== 'duels' && (
+            {/* ⚠ NOT ON BANTER. The chat measures the distance from its own
+                top to the bottom of the viewport; a header above it is
+                geometry the tabbed layout never puts there. The way back is
+                CommunityTab's own chrome plus the browser's back button, and
+                a stable composer is worth more than a second exit. */}
+            {onePage && activeTab !== 'duels' && activeTab !== 'community' && (
               <div className="flex items-center justify-between gap-3 mb-5">
                 <button
                   type="button"
