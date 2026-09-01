@@ -96,6 +96,48 @@ export function BanterSheet({
     }
   }, [open])
 
+  /**
+   * ⚠ THE PAGE IS FROZEN WHILE THE SHEET IS OPEN — and I argued against this.
+   *
+   * iOS scrolls the document to bring a focused input into view. The sheet is
+   * `position: fixed`, which is anchored to the LAYOUT viewport, so that scroll
+   * takes the sheet with it — straight off the top of the screen the instant
+   * the keyboard appears. Ryan: "it does pop up, but as soon as I open the
+   * keyboard it goes off screen." No amount of `visualViewport` arithmetic
+   * fixes that, because the thing moving is the page underneath.
+   *
+   * ⚠ I RULED THIS OUT FOR THE WRONG REASON. The plan rejected pinning the body
+   * because it freezes the band's scroll-driven collapse — true, and the whole
+   * point of `embedded`. But that objection is about the band being WATCHED
+   * while pinned. Here the band is behind a full-screen scrim for exactly as
+   * long as the lock lasts, and the moment the sheet closes the scroll position
+   * is restored and the band resumes. A page-level concern applied to a moment
+   * when the page is not visible.
+   *
+   * What `embedded` still buys is that CommunityTab does not do this ITSELF,
+   * on its own schedule, for the whole time the tab is mounted.
+   *
+   * ⚠ `top: -y` rather than `scrollTo(0,0)`: the page must not visibly jump to
+   * the top behind the scrim, and the position has to come back exactly.
+   */
+  useEffect(() => {
+    if (!open) return
+    const y = window.scrollY
+    const b = document.body.style
+    const prev = { position: b.position, top: b.top, width: b.width, overflow: b.overflow }
+    b.position = 'fixed'
+    b.top = `-${y}px`
+    b.width = '100%'
+    b.overflow = 'hidden'
+    return () => {
+      b.position = prev.position
+      b.top = prev.top
+      b.width = prev.width
+      b.overflow = prev.overflow
+      window.scrollTo(0, y)
+    }
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
