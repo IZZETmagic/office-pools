@@ -220,26 +220,9 @@ export function ShowdownBand({
       className="sd-band"
       style={{
         '--p': 0,
-        /**
-         * ⚠ THE WASHES SIT BEHIND THE FACES, NOT IN THE CORNERS.
-         *
-         * They started at `at 10% 0%` — the top corners — which lit the header
-         * and left the two people in the dark half of the band. The colour is
-         * an identity, so it belongs under the person it identifies: each wash
-         * is centred on its own avatar, and tighter than before (60%×50%
-         * rather than 110%×100%) so it reads as a glow behind someone rather
-         * than as ambient lighting.
-         *
-         * The vertical centre tracks the collapse: the faces sit around 62% of
-         * the band expanded and a little lower once it is short, because the
-         * header keeps its height while the duel block loses two thirds of
-         * its own.
-         */
         background:
-          `radial-gradient(62% 52% at 21% calc(62% + 6% * var(--p)),`
-          + ` color-mix(in srgb, ${youColour} 34%, transparent) 0%, transparent 72%),`
-          + `radial-gradient(62% 52% at 79% calc(62% + 6% * var(--p)),`
-          + ` color-mix(in srgb, ${themColour} 30%, transparent) 0%, transparent 72%),`
+          `radial-gradient(110% 100% at 10% 0%, color-mix(in srgb, ${youColour} 26%, transparent) 0%, transparent 60%),`
+          + `radial-gradient(110% 100% at 90% 0%, color-mix(in srgb, ${themColour} 22%, transparent) 0%, transparent 60%),`
           + 'linear-gradient(180deg, #131A2C 0%, var(--sp-midnight) 100%)',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         /* ⚠ ON THE ELEMENT, not in globals.css. Ryan, 2026-08-31: the bottom
