@@ -82,3 +82,7 @@ scripts/*.sent
 
 # Local email preview output (scripts/preview-emails.ts)
 .preview-emails/
+
+# Remotion bundle, produced by scripts/create-snapshot.ts at build time
+.remotion
+.remotion-public

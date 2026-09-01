@@ -62,6 +62,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
+import { DuelRevealCeremony, type RevealOpponent } from './DuelRevealCeremony'
 import { DUEL_WIN, DUEL_TIE, duelResult } from '@/lib/league/duelPoints'
 import { Icon } from '@/components/ui/Icon'
 import { headToHead, type DuelRow } from '@/lib/league/duels'
@@ -71,6 +72,8 @@ import type { MatchweekFixture } from './PoolDetail'
 import { ShowdownBand } from './ShowdownBand'
 
 type Props = {
+  /** ⚠ Needed for the share render — the routes are per-pool. */
+  poolId: string
   duels: DuelRow[]
   /** entry_id → display name, for both sides of every duel. */
   entryNames: Map<string, string>
@@ -588,6 +591,7 @@ function ordinal(n: number): string {
 }
 
 export default function DuelsTab({
+  poolId,
   duels,
   entryNames,
   ownEntryIds,
@@ -683,6 +687,44 @@ export default function DuelsTab({
   // The duel table — everyone, by duel points. Built from the duels themselves
   // so it cannot disagree with the fixture list beside it.
   const table = useMemo(() => buildDuelTable(duels, duelPoints), [duels, duelPoints])
+
+  /**
+   * The opponent the walkout reveals, assembled from props this tab already has.
+   *
+   * ⚠ NO NEW SERVER WORK, DELIBERATELY. Everything the ceremony needs is already
+   * on the client: `entryPeople` has the face, `entryNames` the name, `totals`
+   * the rank and duel points, and `table` the W/T/L record that
+   * `buildDuelTable` computes for the standings anyway. Fetching any of it again
+   * would be a second source for numbers that already have one.
+   *
+   * ⚠ NULL IS THE NORMAL CASE. There is only an opponent to reveal when the
+   * open matchweek is not the one being played AND the viewer has a duel in it
+   * with somebody in it — a bye has no `them`, and a sealed week has no rows at
+   * all (migration 116 withholds them). The button is not rendered otherwise.
+   */
+  const revealOpponent = useMemo<RevealOpponent | null>(() => {
+    const themEntry = open?.them?.entry
+    if (!themEntry) return null
+    const person = entryPeople.get(themEntry)
+    if (!person) return null
+    const row = table.find((r) => r.entry === themEntry)
+    const t = totals.get(themEntry)
+    return {
+      name: entryNames.get(themEntry) ?? 'Unknown',
+      person,
+      record: { won: row?.w ?? 0, tied: row?.d ?? 0, lost: row?.l ?? 0 },
+      duelPoints: t?.duelPoints ?? 0,
+      rank: t?.rank ?? null,
+    }
+  }, [open, entryPeople, entryNames, table, totals])
+
+  /**
+   * ⚠ NO PERSISTENCE, AND THAT IS THE DESIGN. The recap needed
+   * `last_recap_seen_at` because it is news pushed at you once. This is opt-in
+   * and repeatable: press it whenever, or never. No column, no migration, and
+   * nothing that can leave a member unable to replay their own walkout.
+   */
+  const [ceremonyOpen, setCeremonyOpen] = useState(false)
 
   /**
    * Each member's last five DUEL results, oldest first.
@@ -1187,8 +1229,24 @@ export default function DuelsTab({
               themEntry={open.them?.entry ?? null}
               name={name} person={person}
               header={bandHeader}
-              headline={<span className="text-white/45">Not started</span>}
-              sub="Picks are open"
+              /* ⚠ THE SAME SLOT THE SEALED COUNTDOWN USED. The thing you were
+                 waiting for turns into the thing you press — no new surface, no
+                 modal arriving unbidden. And the band already shows their face
+                 and rank beside it, so the ceremony is never the only way to
+                 learn who you drew, which is the rule DuelRecapSheet sets. */
+              headline={
+                revealOpponent ? (
+                  <button
+                    onClick={() => setCeremonyOpen(true)}
+                    className="rounded-chip bg-white/15 hover:bg-white/25 px-5 py-2 text-2xl font-extrabold text-white transition"
+                  >
+                    Reveal
+                  </button>
+                ) : (
+                  <span className="text-white/45">Not started</span>
+                )
+              }
+              sub={revealOpponent ? 'Your opponent is in' : 'Picks are open'}
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
               points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
             />
@@ -1205,10 +1263,28 @@ export default function DuelsTab({
    * and stops — the duel's own cards belong to the duel PAGE, the band belongs
    * to the POOL. One instance either way, so the duel is computed once.
    */
-  if (layout === 'onepage' && !showContent) return <>{bandNode}</>
+  /**
+   * ⚠ RENDERED ONCE, ALONGSIDE THE BAND, so it survives the early return below.
+   * The band is returned on its own when the duel's cards belong to the duel
+   * PAGE rather than this tab — and a ceremony mounted only in the other branch
+   * would open on one surface and not the other.
+   */
+  const ceremony =
+    ceremonyOpen && revealOpponent && open ? (
+      <DuelRevealCeremony
+        matchweek={open.matchweek}
+        opponent={revealOpponent}
+        poolId={poolId}
+        duelId={open.duel.duel_id}
+        onClose={() => setCeremonyOpen(false)}
+      />
+    ) : null
+
+  if (layout === 'onepage' && !showContent) return <>{bandNode}{ceremony}</>
 
   return (
     <>
+    {ceremony}
     {/* ⚠ THE BAND IS A SIBLING OF THE CONTENT, NOT ITS FIRST CHILD.
         Measured, not reasoned: inside the padded wrapper its content box came
         out 908px against 940px on every other surface — a 32px shift, because

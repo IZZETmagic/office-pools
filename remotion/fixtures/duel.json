@@ -1,0 +1,25 @@
+{
+  "duelId": "836d1a02-4d05-4638-9b94-acae727d3c17",
+  "poolName": "Showdown Duels",
+  "matchweek": 2,
+  "settledAt": "2026-08-31T20:59:00.888309+00:00",
+  "you": {
+    "name": "Marcus Bell",
+    "person": {
+      "user_id": "b503b5a2-c817-4fbc-9707-9ccb37d0fc9f",
+      "full_name": "Marcus Bell",
+      "username": "Marcus"
+    },
+    "score": 400
+  },
+  "them": {
+    "name": "Mia Torres",
+    "person": {
+      "user_id": "39c4cc6c-da19-441b-92ee-b65a8c17e7d7",
+      "full_name": "Mia Torres",
+      "username": "Mia T"
+    },
+    "score": 0
+  },
+  "points": 500
+}

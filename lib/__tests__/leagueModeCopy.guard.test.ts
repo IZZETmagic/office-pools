@@ -154,17 +154,18 @@ describe('the sealed draw is described honestly', () => {
 })
 
 // =============================================================
-// The display face stays scoped
+// The display treatment stays scoped
 // =============================================================
-// `t-display` (Anton) is a SECOND typeface, added for Showdown's ceremony
-// surfaces only — Ryan's call 2026-08-30, choosing a scoped face over a global
-// one. Nunito is the app's voice and stays that way.
+// `t-display` was a SECOND typeface (Anton) for one day — added 2026-08-30 for
+// Showdown's ceremony surfaces, removed 2026-09-01 when the app having one
+// voice won against it. It is now a Nunito WEIGHT treatment, and the scope rule
+// is unchanged, because the thing that leaks is the treatment rather than the
+// family: it spreads one screen at a time, each use individually reasonable,
+// until it is the app's default register and nobody decided that.
 //
-// This is here because the failure mode is not a bug, it is drift: a display
-// face leaks one screen at a time, each use individually reasonable, until it
-// is the app's face and nobody decided that. The allowlist is the decision, and
-// widening it should be as deliberate as adding the font was.
-describe('the Showdown display face does not leak', () => {
+// The allowlist below IS the decision. Widening it should stay as deliberate as
+// adding a whole typeface was.
+describe('the Showdown display treatment does not leak', () => {
   // ⚠ WIDENED ONCE, 2026-08-31, and this is what widening it should look like:
   // a named surface with a reason, not a directory. `DuelRecapSheet` is the
   // one-time "how your duel went" ceremony — the same fight-night register as
@@ -177,6 +178,13 @@ describe('the Showdown display face does not leak', () => {
     // reason the face was added. Named individually, not by directory: the rule
     // is that widening this list stays as deliberate as adding the font was.
     'app/pools/[pool_id]/duel/[matchweek]/DuelDecision.tsx',
+    // ⚠ WIDENED AGAIN, 2026-09-01, and this guard is how it was noticed — the
+    // file was written, the suite went red, and the list was changed on purpose
+    // rather than the treatment quietly spreading. `DuelRevealCeremony` is the
+    // walkout: an opponent's name announced on a duel, which is the single
+    // clearest case the register was introduced for. Its Remotion twin cannot
+    // appear here because it bundles outside Next and has no Tailwind at all.
+    'app/pools/[pool_id]/DuelRevealCeremony.tsx',
   ]
 
   it('only Showdown surfaces use t-display', () => {
@@ -199,10 +207,23 @@ describe('the Showdown display face does not leak', () => {
     expect(css).toMatch(/NOT\s+headings, tab labels, buttons/i)
   })
 
-  it('Nunito is still the body face', () => {
-    // The scoped face must not have become the default by way of --font-sans.
+  it('Nunito is the body face AND the display one', () => {
     const css = readFileSync(resolve(root, 'app/globals.css'), 'utf8')
     expect(css).toMatch(/--font-sans:\s*var\(--font-nunito\)/)
-    expect(css).not.toMatch(/--font-sans:\s*var\(--font-anton\)/)
+    // ⚠ The treatment is a WEIGHT now. If someone reintroduces a second family
+    // here, that is a product decision and should not arrive as a CSS diff.
+    expect(css).toMatch(/@utility t-display\s*\{[^}]*--font-nunito/)
+  })
+
+  it('Anton is gone, and stays gone', () => {
+    // It was downloaded on every page in the app to serve three Showdown
+    // screens. Removing it is only worth anything if it does not creep back.
+    const layout = readFileSync(resolve(root, 'app/layout.tsx'), 'utf8')
+    const css = readFileSync(resolve(root, 'app/globals.css'), 'utf8')
+    const live = (src: string) =>
+      src.replace(/\/\*[\s\S]*?\*\//g, '')
+         .split('\n').filter((l) => !l.trim().startsWith('*') && !l.trim().startsWith('//')).join('\n')
+    expect(live(layout)).not.toMatch(/Anton/)
+    expect(live(css)).not.toMatch(/--font-anton/)
   })
 })

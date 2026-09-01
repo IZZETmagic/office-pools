@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Anton, Geist, Geist_Mono, Nunito } from "next/font/google";
+import { Geist, Geist_Mono, Nunito } from "next/font/google";
 import { GoogleTagManager } from "@next/third-parties/google";
 import "./globals.css";
 import Footer from "@/components/ui/Footer";
@@ -23,24 +23,16 @@ const nunito = Nunito({
   subsets: ["latin"],
 });
 
-/**
- * The DISPLAY face — Showdown's ceremony surfaces only.
+/*
+ * ⚠ ANTON IS GONE, 2026-09-01. Showdown's duel card carried a second, condensed
+ * display face for a day; Ryan's call after seeing it beside the Nunito version
+ * is that the app has one voice. `t-display` in globals.css is now a Nunito
+ * WEIGHT treatment rather than a second family, and the scoping rule on it
+ * still stands — the thing that leaks is the treatment, not just the font.
  *
- * ⚠ SCOPED ON PURPOSE. Nunito is the app's UI face and stays that way; this is
- * a second voice for one mode, because Showdown is the flagship and its duel
- * card is meant to read as a broadcast graphic rather than another panel. The
- * rule for where it may be used is on `t-display` in globals.css, and it is a
- * rule rather than a convention because a display face that leaks becomes the
- * app's face by accident.
- *
- * Anton ships one weight only, so `weight` is required — it is not a variable
- * font and next/font will not infer it.
+ * The saving is real and worth not giving back: Anton was downloaded on every
+ * page in the app to serve three Showdown screens.
  */
-const anton = Anton({
-  variable: "--font-anton",
-  weight: "400",
-  subsets: ["latin"],
-});
 
 export const viewport: Viewport = {
   // palette.primary from mobile/theme/colors.ts. Keep in step with `theme_color` in
@@ -123,7 +115,7 @@ export default function RootLayout({
         <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
       )}
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${nunito.variable} ${anton.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${nunito.variable} antialiased`}
       >
         <ThemeProvider>
           <ToastProvider>

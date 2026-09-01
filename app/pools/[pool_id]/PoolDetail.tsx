@@ -2038,6 +2038,7 @@ export function PoolDetail({
           `showContent` decides whether the duel's own cards come with it. */}
       {onePage && isShowdown && showdownData && (
         <DuelsTab
+          poolId={initialPool.pool_id}
           duels={showdownData.duels}
           entryNames={showdownData.entryNames}
           ownEntryIds={showdownData.ownEntryIds}
@@ -2653,6 +2654,7 @@ export function PoolDetail({
 
             {!onePage && activeTab === 'duels' && isShowdown && showdownData && (
               <DuelsTab
+                poolId={initialPool.pool_id}
                 duels={showdownData.duels}
                 entryNames={showdownData.entryNames}
                 ownEntryIds={showdownData.ownEntryIds}

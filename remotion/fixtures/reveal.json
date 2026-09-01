@@ -1,0 +1,35 @@
+{
+  "duelId": "176caff3-cad1-4a95-9104-5ef4176e52df",
+  "poolName": "Showdown: Exact Scores",
+  "matchweek": 3,
+  "you": {
+    "name": "Priya Nair",
+    "person": {
+      "user_id": "b95acab7-1e48-418e-8a77-2c084c30db94",
+      "full_name": "Priya Nair",
+      "username": "Priya"
+    },
+    "season": {
+      "duelPoints": 500,
+      "rank": 3,
+      "won": 1,
+      "tied": 0,
+      "lost": 0
+    }
+  },
+  "them": {
+    "name": "Sarah Chen",
+    "person": {
+      "user_id": "047b7f8a-be8a-4555-b632-d34e01845532",
+      "full_name": "Sarah Chen",
+      "username": "Sarah C"
+    },
+    "season": {
+      "duelPoints": 500,
+      "rank": 1,
+      "won": 1,
+      "tied": 0,
+      "lost": 0
+    }
+  }
+}
