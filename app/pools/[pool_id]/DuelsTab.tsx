@@ -1234,8 +1234,19 @@ export default function DuelsTab({
          page ABOVE the band. The band is a sibling now, so this is simply the
          gap beneath it — and it matches <main>'s `pt-5` on every other
          surface, so the duel and the picks start at the same height. */
-      ? 'px-4 sm:px-6 pt-5 pb-10 space-y-4 md:space-y-5'
+      /* ⚠ A COLUMN AND A RAIL FROM `md`. Below it, plain block flow with
+         `space-y`, so the two groups simply stack in source order and a phone
+         sees no change at all. `items-start` is what lets the rail be sticky —
+         stretched to the row height it would have nothing to stick within. */
+      ? 'px-4 sm:px-6 pt-5 pb-10 space-y-4 md:space-y-0'
+        + ' md:grid md:grid-cols-[minmax(0,1fr)_19rem] md:gap-5 md:items-start'
       : 'space-y-4'}>
+      {/* ⚠ TWO GROUPS, AND THE TABBED LAYOUT CANNOT TELL. Every gap here is
+          `space-y-4` — outer and inner alike — so in tab mode nesting the cards
+          in two divs produces exactly the spacing they had as one flat list.
+          That is what lets one-page get a rail without the live layout moving a
+          pixel, and without reordering a line of JSX. */}
+      <div className={layout === 'onepage' ? 'space-y-4 md:space-y-5 min-w-0' : 'space-y-4'}>
       {/* ⚠ ONE-PAGE: the band stands in for the two cards below it and nothing
           else changes. It takes DuelPanel's props verbatim — every number is
           already computed for the card, and a band that derived its own would
@@ -1765,6 +1776,19 @@ export default function DuelsTab({
           Deliberately the SAME shape as the team sheet above it: two sides
           mirrored about a centred score. Two cards on one screen that both
           compare two things should not be read two different ways. */}
+      </div>
+
+      {/* ⚠ THE RAIL. The standing things — the pool's other duels and the
+          season table — beside the week you are actually playing, rather than
+          a scroll below it.
+          `md:sticky` with `top-[124px]`: the band collapses to roughly that,
+          so the rail settles just beneath it instead of sliding under it.
+          These two blocks are ALREADY LAST in the file, which is why this split
+          moves nothing — the rail is a wrapper around a contiguous range, not a
+          reordering. */}
+      <div className={layout === 'onepage'
+        ? 'space-y-4 md:space-y-5 md:sticky md:top-[124px] mt-4 md:mt-0'
+        : 'space-y-4'}>
       {elsewhere.length > 0 && (
         <Card padding="none" className="overflow-hidden">
           <p className="t-caption text-muted px-4 sm:px-5 pt-5 pb-3.5">
@@ -1955,6 +1979,7 @@ export default function DuelsTab({
         </div>
       </div>
 
+      </div>
     </div>
     </>
   )
