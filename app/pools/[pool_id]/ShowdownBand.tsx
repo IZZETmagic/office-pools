@@ -81,17 +81,34 @@ export type ShowdownBandProps = {
 }
 
 /**
- * The matchweek label's size, INLINE.
+ * ⚠ THE PHONE BAND'S VERTICAL GEOMETRY LIVES HERE, NOT IN globals.css.
  *
- * ⚠ Inline rather than in globals.css because this checkout's dev server keeps
- * serving stale CSS while picking up TSX (see the radius note above) — and a
- * new Tailwind class would not help, since utilities are compiled into that
- * same stylesheet. A style attribute is the only change that cannot be missed.
+ * Two reasons, one practical and one that outlasts it. The practical one: this
+ * checkout's dev server keeps serving stale CSS while picking up TSX every
+ * time, so a stylesheet edit is a change you cannot be sure anyone will see.
+ * The lasting one: these numbers only make sense together. The clock has to
+ * land on the same centre line as the faces, and the matchweek has to clear the
+ * clock — split across two files, that relationship is invisible and the next
+ * person tunes one number and breaks two.
  *
- * It still interpolates: `--p` is set on the band and inherits down, so the
- * label shrinks with everything else on the way to collapsed.
+ * Each value is `expanded - travel * --p`. Expanded is the layout Ryan approved
+ * and is not being changed; only the collapsed end moves.
+ *
+ * Collapsed, the block is 100px and everything is arranged around the faces:
+ *   faces  36px at top 32  -> centre 50
+ *   clock  22px at top 39  -> centre 50   (same line, which is the ask)
+ *   label  12px at top 14  -> 13px of air beneath it before the clock
  */
-const MW_SIZE = { fontSize: 'calc(15px - 3px * var(--p))' }
+const M = {
+  block: { height: 'calc(320px - 220px * var(--p))' },
+  mw:    { top: 'calc(20px - 6px * var(--p))', fontSize: 'calc(15px - 3px * var(--p))' },
+  big:   { top: 'calc(50px - 11px * var(--p))', fontSize: 'calc(40px - 18px * var(--p))' },
+  face:  { top: 'calc(146px - 114px * var(--p))',
+           width: 'calc(72px - 36px * var(--p))', height: 'calc(72px - 36px * var(--p))' },
+  faceL: { left:  'calc(38px - 22px * var(--p))' },
+  faceR: { right: 'calc(38px - 22px * var(--p))' },
+} as const
+
 const MW_SIZE_D = { fontSize: 'calc(16px - 4px * var(--p))' }
 
 /** See the note at the usage site: off-token on purpose, and only here. */
@@ -105,22 +122,24 @@ function ordinal(n: number): string {
 
 /** One member's face, at whatever size the band is currently showing. */
 function Face({
-  p, colour, className, unknown = false,
+  p, colour, className, style, unknown = false,
 }: {
   p: AvatarPerson | null
   colour: string
   className: string
+  style?: React.CSSProperties
   unknown?: boolean
 }) {
   return (
     <span
       className={`${className} rounded-full shrink-0 grid place-items-center overflow-hidden`}
       style={unknown
-        ? { border: '2px dashed rgba(255,255,255,0.28)' }
+        ? { ...style, border: '2px dashed rgba(255,255,255,0.28)' }
         /* ⚠ The ring thins as the face shrinks. A fixed 3px is a hairline on a
            72px circle and a stripe on a 32px one — a ring is a proportion of
            what it rings. */
-        : { boxShadow: `0 0 0 calc(3px - 1px * var(--p)) color-mix(in srgb, ${colour} 42%, transparent)` }}
+        : { ...style,
+            boxShadow: `0 0 0 calc(3px - 1px * var(--p)) color-mix(in srgb, ${colour} 42%, transparent)` }}
     >
       {unknown
         ? <span className="t-num t-num-black text-white/40"
@@ -235,9 +254,9 @@ export function ShowdownBand({
       {header && <div className="relative z-10">{header}</div>}
 
       {/* ── phone: the pieces travel ─────────────────────────── */}
-      <div className="sd-m">
-        <p className="sd-mw t-caption text-white/75" style={MW_SIZE}>Matchweek {matchweek}</p>
-        <p className="sd-big t-num t-num-black text-white">{headline}</p>
+      <div className="sd-m" style={M.block}>
+        <p className="sd-mw t-caption text-white/75" style={M.mw}>Matchweek {matchweek}</p>
+        <p className="sd-big t-num t-num-black text-white" style={M.big}>{headline}</p>
         {sub && <p className="sd-sub t-detail text-white/45">{sub}</p>}
         {liveNow && (
           <p className="sd-sub t-detail">
@@ -248,10 +267,10 @@ export function ShowdownBand({
           </p>
         )}
 
-        <Face p={person(youEntry)} colour={youColour} className="sd-face sd-face-you" />
+        <Face p={person(youEntry)} colour={youColour} className="sd-face sd-face-you" style={{ ...M.face, ...M.faceL }} />
         {sealed
-          ? <Face p={null} colour={themColour} className="sd-face sd-face-them" unknown />
-          : <Face p={person(themEntry!)} colour={themColour} className="sd-face sd-face-them" />}
+          ? <Face p={null} colour={themColour} className="sd-face sd-face-them" style={{ ...M.face, ...M.faceR }} unknown />
+          : <Face p={person(themEntry!)} colour={themColour} className="sd-face sd-face-them" style={{ ...M.face, ...M.faceR }} />}
         {sealed && <p className="sd-vee t-caption text-accent-400 text-base select-none">V</p>}
 
         <div className="sd-who sd-who-you">

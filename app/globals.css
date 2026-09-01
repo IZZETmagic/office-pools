@@ -1428,27 +1428,17 @@ html.dark .mode-pill {
 
 /* Mobile: absolute placement, because the pieces travel — the avatars move up
    and inward to sit either side of the clock. */
-/* ⚠ THE HEADER IS A SIBLING ABOVE THIS, so every `top` here is measured from
-   the duel block, not from the band. Collapsed, the duel is 76px: the faces
-   shrink to 32 and sit at 18, which centres them on the score beside them. */
-.sd-band .sd-m {
-  position: relative;
-  height: calc(320px - 244px * var(--p));
-  transition: height 60ms linear;
-}
-.sd-band .sd-mw    { position: absolute; left: 0; right: 0; text-align: center;
-                     top: calc(20px - 8px * var(--p)); }  /* size: MW_SIZE */
+/* ⚠ PHONE HALF: POSITIONING ONLY. Every size and vertical offset lives in
+   `M` in ShowdownBand.tsx — see the note there. They belong together because
+   the clock has to land on the faces' centre line and the label has to clear
+   the clock; split across two files that relationship is invisible. */
+.sd-band .sd-m     { position: relative; transition: height 60ms linear; }
+.sd-band .sd-mw    { position: absolute; left: 0; right: 0; text-align: center; }
 .sd-band .sd-big   { position: absolute; left: 0; right: 0; text-align: center;
-                     top: calc(50px - 28px * var(--p));
-                     font-size: calc(40px - 20px * var(--p)); line-height: 1; }
+                     line-height: 1; }
 .sd-band .sd-sub   { position: absolute; left: 0; right: 0; text-align: center;
                      top: 104px; opacity: calc(1 - 2.4 * var(--p)); }
-.sd-band .sd-face  { position: absolute;
-                     width:  calc(72px - 40px * var(--p));
-                     height: calc(72px - 40px * var(--p));
-                     top: calc(146px - 128px * var(--p)); }
-.sd-band .sd-face-you  { left:  calc(38px - 22px * var(--p)); }
-.sd-band .sd-face-them { right: calc(38px - 22px * var(--p)); }
+.sd-band .sd-face  { position: absolute; }
 .sd-band .sd-vee   { position: absolute; left: 0; right: 0; text-align: center;
                      top: 170px; opacity: calc(1 - 2.4 * var(--p)); }
 .sd-band .sd-who   { position: absolute; top: 232px; width: 40%;
