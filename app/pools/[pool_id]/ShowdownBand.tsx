@@ -136,7 +136,23 @@ const M = {
   // owner, and no piece of this layout can be lost to a stale rebuild.
   sub:   { top: '104px' },
   vee:   { top: '170px' },
-  who:   { top: '232px' },
+  /**
+   * ⚠ EACH NAME SHARES ITS AVATAR'S EDGE, in the same units.
+   *
+   * They used to sit at `left: 2%` / `right: 2%` with `width: 40%` and centred
+   * text, while the faces are placed in PIXELS — so the two only agreed at one
+   * viewport width and drifted further apart at every other. On a wide phone
+   * the name sat well inside its own avatar.
+   *
+   * Now the name's outer edge is the avatar's outer edge, `calc()` for `calc()`,
+   * and the text is aligned to that edge rather than centred in a box that has
+   * nothing to do with the face above it. They cannot drift because they are
+   * the same expression.
+   */
+  whoYou:  { top: '232px', left:  'calc(38px - 22px * var(--p))',
+             width: '44%', textAlign: 'left' as const },
+  whoThem: { top: '232px', right: 'calc(38px - 22px * var(--p))',
+             width: '44%', textAlign: 'right' as const },
 } as const
 
 const MW_SIZE_D = { fontSize: 'calc(16px - 4px * var(--p))' }
@@ -364,11 +380,11 @@ export function ShowdownBand({
           : <Face p={person(themEntry!)} colour={themColour} className="sd-face sd-face-them" style={{ ...M.face, ...M.faceR }} />}
         {sealed && <p className="sd-vee t-caption text-accent-400 text-base select-none" style={M.vee}>V</p>}
 
-        <div className="sd-who sd-who-you" style={M.who}>
+        <div className="sd-who sd-who-you" style={M.whoYou}>
           <p className="t-caption text-white truncate">{name(youEntry)}</p>
           {meta(youEntry) && <p className="t-num text-[10px] text-white/40 mt-0.5">{meta(youEntry)}</p>}
         </div>
-        <div className="sd-who sd-who-them" style={M.who}>
+        <div className="sd-who sd-who-them" style={M.whoThem}>
           <p className="t-caption text-white truncate">
             {sealed ? 'Sealed' : name(themEntry!)}
           </p>
