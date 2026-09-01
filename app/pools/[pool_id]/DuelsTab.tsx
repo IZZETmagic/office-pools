@@ -1116,8 +1116,12 @@ export default function DuelsTab({
 
   return (
     <div className={layout === 'onepage'
-      /* The band is full-bleed; the cards under it keep the page's gutter. */
-      ? 'px-4 sm:px-6 pb-8 space-y-4'
+      /* ⚠ CAPPED TO THE BAND'S OWN WIDTH. The band's gradient runs edge to
+         edge but its CONTENTS stop at 940px; letting the cards beneath run to
+         1200px+ made the page read as two different documents stacked on each
+         other. Same measure, one column, centred — the gutter is on this
+         element because the band is deliberately full-bleed past it. */
+      ? 'px-4 sm:px-6 pt-4 pb-10 space-y-4 md:space-y-5 max-w-[940px] mx-auto'
       : 'space-y-4'}>
       {/* ⚠ ONE-PAGE: the band stands in for the two cards below it and nothing
           else changes. It takes DuelPanel's props verbatim — every number is
