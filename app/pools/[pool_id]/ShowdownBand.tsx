@@ -224,7 +224,6 @@ export function ShowdownBand({
           `radial-gradient(110% 100% at 10% 0%, color-mix(in srgb, ${youColour} 26%, transparent) 0%, transparent 60%),`
           + `radial-gradient(110% 100% at 90% 0%, color-mix(in srgb, ${themColour} 22%, transparent) 0%, transparent 60%),`
           + 'linear-gradient(180deg, #131A2C 0%, var(--sp-midnight) 100%)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
         /* ⚠ ON THE ELEMENT, not in globals.css. Ryan, 2026-08-31: the bottom
            corners should be rounded, "like welcoming in the bottom page". It
            belongs to this element and nothing else, and keeping it here means
