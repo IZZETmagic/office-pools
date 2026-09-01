@@ -1214,7 +1214,14 @@ export default function DuelsTab({
          1200px+ made the page read as two different documents stacked on each
          other. Same measure, one column, centred — the gutter is on this
          element because the band is deliberately full-bleed past it. */
-      ? 'px-4 sm:px-6 pt-4 pb-10 space-y-4 md:space-y-5 max-w-[940px] mx-auto'
+      /* ⚠ NO `pt-*`. The band is the FIRST CHILD of this wrapper on the duel
+         page, and it is full-bleed — it cancels the horizontal gutter with
+         negative margins but cannot cancel top padding, so `pt-4` showed as a
+         strip of page above it. Nowhere else did: every other surface gets the
+         band from the `!showContent` branch, which has no wrapper at all.
+         `space-y` still puts the gap between the band and the first card,
+         which is the space that was actually wanted. */
+      ? 'px-4 sm:px-6 pb-10 space-y-4 md:space-y-5 max-w-[940px] mx-auto'
       : 'space-y-4'}>
       {/* ⚠ ONE-PAGE: the band stands in for the two cards below it and nothing
           else changes. It takes DuelPanel's props verbatim — every number is
