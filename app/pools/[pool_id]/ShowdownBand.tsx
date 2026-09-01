@@ -205,6 +205,26 @@ export function ShowdownBand({
   const themColour = themEntry ? colourOf(themEntry) : 'var(--sp-slate)'
   const sealed = themEntry === null
 
+  /**
+   * The identity glow behind each face.
+   *
+   * ⚠ Drawn inside the block that HOLDS the faces, not on the band. The band
+   * includes the header, so anchoring here means the colour can never wash up
+   * into the top bar however short the band collapses — the failure Ryan spotted
+   * once it started shrinking.
+   *
+   * `centre` differs per layout because the faces do: on a phone they sit below
+   * the clock and rise as it collapses; on desktop they are vertically centred
+   * and stay there.
+   */
+  const wash = (centre: string) => ({
+    background:
+      `radial-gradient(62% 54% at 21% ${centre},`
+      + ` color-mix(in srgb, ${youColour} 34%, transparent) 0%, transparent 72%),`
+      + `radial-gradient(62% 54% at 79% ${centre},`
+      + ` color-mix(in srgb, ${themColour} 30%, transparent) 0%, transparent 72%)`,
+  })
+
   const meta = (e: string | null) => {
     const r = rank?.(e) ?? null
     const p = points?.(e) ?? null
@@ -220,27 +240,12 @@ export function ShowdownBand({
       className="sd-band"
       style={{
         '--p': 0,
-        /**
-         * ⚠ THE WASHES SIT BEHIND THE FACES, NOT IN THE CORNERS.
-         *
-         * They started at `at 10% 0%` — the top corners — which lit the header
-         * and left the two people in the dark half of the band. The colour is
-         * an identity, so it belongs under the person it identifies: each wash
-         * is centred on its own avatar, and tighter than before (60%×50%
-         * rather than 110%×100%) so it reads as a glow behind someone rather
-         * than as ambient lighting.
-         *
-         * The vertical centre tracks the collapse: the faces sit around 62% of
-         * the band expanded and a little lower once it is short, because the
-         * header keeps its height while the duel block loses two thirds of
-         * its own.
-         */
-        background:
-          `radial-gradient(62% 52% at 21% calc(62% + 6% * var(--p)),`
-          + ` color-mix(in srgb, ${youColour} 34%, transparent) 0%, transparent 72%),`
-          + `radial-gradient(62% 52% at 79% calc(62% + 6% * var(--p)),`
-          + ` color-mix(in srgb, ${themColour} 30%, transparent) 0%, transparent 72%),`
-          + 'linear-gradient(180deg, #131A2C 0%, var(--sp-midnight) 100%)',
+        /* ⚠ THE BAND CARRIES ONLY THE FLAT BASE. The two identity washes are
+           drawn INSIDE the duel block instead — see `wash` below — because the
+           header is part of this element, and a wash positioned against the
+           band reaches the top bar the moment the band gets short. Scoping it
+           to the duel block makes that impossible rather than tuned-around. */
+        background: 'linear-gradient(180deg, #131A2C 0%, var(--sp-midnight) 100%)',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         /* ⚠ ON THE ELEMENT, not in globals.css. Ryan, 2026-08-31: the bottom
            corners should be rounded, "like welcoming in the bottom page". It
@@ -272,6 +277,8 @@ export function ShowdownBand({
 
       {/* ── phone: the pieces travel ─────────────────────────── */}
       <div className="sd-m" style={M.block}>
+        <span aria-hidden="true" className="absolute inset-0 pointer-events-none"
+              style={wash('calc(57% - 7% * var(--p))')} />
         <p className="sd-mw t-caption text-white/75" style={M.mw}>Matchweek {matchweek}</p>
         <p className="sd-big t-num t-num-black text-white" style={M.big}>{headline}</p>
         {sub && <p className="sd-sub t-detail text-white/45">{sub}</p>}
@@ -305,7 +312,9 @@ export function ShowdownBand({
       </div>
 
       {/* ── md and up: nothing is hidden, everything eases down ── */}
-      <div className="sd-d">
+      <div className="sd-d" style={{ position: 'relative' }}>
+        <span aria-hidden="true" className="absolute inset-0 pointer-events-none"
+              style={wash('50%')} />
         <div className="sd-side">
           <Face p={person(youEntry)} colour={youColour} className="sd-face-d" />
           <span className="min-w-0">
