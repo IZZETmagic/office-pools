@@ -1795,9 +1795,23 @@ export default function DuelsTab({
           These two blocks are ALREADY LAST in the file, which is why this split
           moves nothing — the rail is a wrapper around a contiguous range, not a
           reordering. */}
-      <div className={layout === 'onepage'
-        ? 'space-y-4 md:space-y-5 sd-rail mt-4 md:mt-0'
-        : 'space-y-4'}>
+      <div
+        className={layout === 'onepage'
+          ? 'space-y-4 md:space-y-5 md:sticky mt-4 md:mt-0'
+          : 'space-y-4'}
+        /* ⚠ `md:sticky` STAYS A UTILITY, and only the OFFSET is inline.
+           Ryan liked that the table stays visible while you scroll; the ask was
+           only for a gap above it. I had moved both the stickiness and the
+           offset into a `.sd-rail` rule in globals.css — which would have made
+           "always visible" depend on the one file this checkout has served
+           stale three times today. A stale stylesheet would have silently
+           traded the behaviour he likes for the padding he asked for.
+           The offset reads `--sd-band-h`, which the band measures and
+           publishes, so the gap tracks the real collapsed height rather than a
+           guess. The fallback covers the first frame. */
+        style={layout === 'onepage'
+          ? { top: 'calc(var(--sd-band-h, 7rem) + 20px)' }
+          : undefined}>
       {elsewhere.length > 0 && (
         <Card padding="none" className="overflow-hidden">
           <p className="t-caption text-muted px-4 sm:px-5 pt-5 pb-3.5">

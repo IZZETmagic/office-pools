@@ -1499,17 +1499,6 @@ html.dark .mode-pill {
   .sd-band .sd-strip-d { max-width: 300px; margin: calc(14px - 6px * var(--p)) auto 0; }
 }
 
-/* The sticky rail beside the duel, on desktop.
-   ⚠ Its offset is the BAND'S OWN HEIGHT plus a gap, published by ShowdownBand
-   through `--sd-band-h`. It was a hardcoded 124px, estimated rather than
-   measured, and the table ended up flush against the band with no air between
-   them. The band is the only thing that knows how tall it is at any scroll
-   position, so it is the thing that says. The fallback covers the instant
-   before the observer's first callback. */
-@media (min-width: 768px) {
-  .sd-rail { position: sticky; top: calc(var(--sd-band-h, 7rem) + 20px); }
-}
-
 /* The collapse is spatial information, not decoration — with motion reduced the
    band simply stays at its full height rather than snapping between sizes. */
 @media (prefers-reduced-motion: reduce) {
