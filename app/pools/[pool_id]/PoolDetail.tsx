@@ -2025,13 +2025,20 @@ export function PoolDetail({
         /* ⚠ ONE-PAGE HAS NO HORIZONTAL PADDING AND NO TOP PADDING: the band is
            full-bleed and butts against the header. The duel tab's own cards
            below it bring their own. */
-        className={`max-w-6xl mx-auto ${onePage ? 'px-0 pt-0 pb-8' : 'px-4 sm:px-6'} ${
-          onePage
-            ? ''
-            : activeTab === 'community'
-              ? 'pt-3 sm:py-8 pb-0 sm:pb-8'
-              : 'py-6 sm:py-8'
-        }`}
+        /* ⚠ ONE-PAGE MATCHES THE DUEL'S OWN MEASURE AND GUTTER. The band is
+           rendered above <main>, so this is the surface UNDER it — and with no
+           top padding the first card butted straight into the band's 44px
+           radius. Same 940px cap and same gutter as DuelsTab's one-page
+           wrapper, so picks and duel do not sit on two different grids.
+           ⚠ One max-width, not two: `max-w-6xl` and `max-w-[940px]` have equal
+           specificity, so which wins would come down to generated-CSS order. */
+        className={onePage
+          ? 'max-w-[940px] mx-auto px-4 sm:px-6 pt-5 pb-10'
+          : `max-w-6xl mx-auto px-4 sm:px-6 ${
+              activeTab === 'community'
+                ? 'pt-3 sm:py-8 pb-0 sm:pb-8'
+                : 'py-6 sm:py-8'
+            }`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
