@@ -51,27 +51,6 @@ function broadcastRecord<T>(msg: unknown): T | undefined {
 }
 
 export function CommunityTab({
-  /**
-   * Rendered inside a container that already owns its own height — the
-   * Showdown banter sheet — rather than as a full page.
-   *
-   * ⚠ IT SWITCHES OFF THE DOCUMENT TAKEOVER, and that is the whole point.
-   * As a tab this component makes itself a chat SCREEN: it pins
-   * `document.body` to `position: fixed`, hides its overflow, scrolls to the
-   * top and then measures `window.innerHeight` in a rAF loop to size itself to
-   * what the keyboard leaves. That works when the chat IS the page.
-   *
-   * It cannot work inside the one-page Showdown. The band's collapse is driven
-   * by `window.scrollY`, and a pinned body means scrollY never moves — the band
-   * would freeze fully open and the rail would stop sticking. Slice 0 proved a
-   * sheet does not need any of it: sized from `visualViewport`, the composer
-   * sits above the keyboard with `body.position` left `static` and `scrollY`
-   * intact. Plan: drafts/2026-09-01_showdown_banter_plan.md.
-   *
-   * ⚠ Default FALSE, so every existing consumer — the World Cup, Table mode,
-   * LMS, Pick'em, and Showdown's own tabbed layout — is untouched.
-   */
-  embedded = false,
   poolId,
   poolName,
   currentUserId,
@@ -486,10 +465,7 @@ export function CommunityTab({
   }, [])
 
   useEffect(() => {
-    // ⚠ `embedded` bails BEFORE the takeover, not after. Everything below this
-    // line writes to `document.body`; there is no half-measure where the
-    // component pins the document and then tidies up.
-    if (embedded || !isMobile) {
+    if (!isMobile) {
       setMobileHeight(null)
       return
     }
@@ -556,7 +532,7 @@ export function CommunityTab({
       document.body.style.width = prevWidth
       document.body.style.top = prevTop
     }
-  }, [isMobile, embedded])
+  }, [isMobile])
 
   useEffect(() => {
     if (!isMobile || mobileHeight === null) return
@@ -567,15 +543,6 @@ export function CommunityTab({
 
   // Measure available desktop chat wrapper height (viewport minus wrapper top offset minus footer)
   useEffect(() => {
-    // ⚠ EMBEDDED MEASURES NOTHING. This computes
-    // `window.innerHeight - wrapperTop - footer`, which is right when the chat
-    // runs to the bottom of the PAGE and wrong inside a sheet: the wrapper's
-    // top is a few hundred pixels down, so the answer is taller than the sheet
-    // and the composer ends up below its bottom edge. With the keyboard up it
-    // is worse still, because `innerHeight` does not shrink for a keyboard —
-    // that is the whole reason the sheet reads `visualViewport` instead.
-    // The container owns the height here; the chat just fills it.
-    if (embedded) { setDesktopChatHeight(null); return }
     if (isMobile) return
     const measure = () => {
       const el = chatWrapperRef.current
@@ -589,7 +556,7 @@ export function CommunityTab({
     requestAnimationFrame(measure)
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
-  }, [isMobile, loading, embedded])
+  }, [isMobile, loading])
 
   // Prevent body scrolling on desktop — chat has its own scroll container
   useEffect(() => {
@@ -1302,16 +1269,8 @@ export function CommunityTab({
     <>
       <div
         ref={chatWrapperRef}
-        className={`flex flex-col overflow-hidden${
-          embedded ? ' flex-1 min-h-0' : mobileChat ? ' -mx-4' : ''}`}
-        /* ⚠ NO EXPLICIT HEIGHT WHEN EMBEDDED — `flex-1 min-h-0` instead, so the
-           sheet's own measured height flows down to the composer. An explicit
-           pixel height here would be a second opinion about how tall the
-           available space is, and the sheet's is the one that knows about the
-           keyboard. */
-        style={embedded ? undefined
-          : mobileChat ? { height: `${mobileHeight}px` }
-            : desktopChatHeight ? { height: `${desktopChatHeight}px` } : undefined}
+        className={mobileChat ? 'flex flex-col overflow-hidden -mx-4' : 'flex flex-col overflow-hidden'}
+        style={mobileChat ? { height: `${mobileHeight}px` } : desktopChatHeight ? { height: `${desktopChatHeight}px` } : undefined}
       >
         {/* Main content area */}
         <div className={`flex gap-0 md:gap-4 ${mobileChat ? 'flex-1 min-h-0 flex-col items-start' : 'flex-1 min-h-0 items-stretch'}`}>

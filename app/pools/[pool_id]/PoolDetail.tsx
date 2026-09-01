@@ -20,7 +20,6 @@ import { StandingsTab } from './StandingsTab'
 import { ScoringRulesTab } from './ScoringRulesTab'
 import { LeagueScoringRulesTab, type LeagueScoringMode } from './LeagueScoringRulesTab'
 import { CommunityTab } from './CommunityTab'
-import { BanterSheet } from './BanterSheet'
 import { HowToPlayModal } from './HowToPlayModal'
 import type { LeagueMode } from '@/lib/leagueModeInfo'
 import { AnalyticsTab } from './AnalyticsTab'
@@ -521,15 +520,6 @@ export function PoolDetail({
   const singlePoolId = useMemo(() => [initialPool.pool_id], [initialPool.pool_id])
   const { unreadCounts, markAsRead, initialLastReadMap } = useUnreadBanter({ userId: currentUserId, poolIds: singlePoolId })
   const banterUnreadCount = unreadCounts.get(initialPool.pool_id) ?? 0
-  /**
-   * Banter, as a sheet over the pool. One-page only — see BanterSheet.tsx.
-   *
-   * ⚠ DECLARED HERE, beside the unread state, because the mark-as-read effect
-   * a few lines below reads it. It was originally declared ~1,100 lines lower
-   * next to the pool menu, which put a dependency array in front of its own
-   * `const` — a temporal dead zone, and a runtime crash on every pool page.
-   */
-  const [banterOpen, setBanterOpen] = useState(false)
   const hasUnreadBanter = banterUnreadCount > 0 && activeTab !== 'community'
   const banterInitialLastReadAt = initialLastReadMap.get(initialPool.pool_id) ?? null
 
@@ -539,10 +529,10 @@ export function PoolDetail({
     // is a sheet and `activeTab` never becomes 'community' — so the count would
     // have sat there unread forever, however many times it was opened. Caught
     // by wiring the FAB, not by anyone reading the effect.
-    if (activeTab === 'community' || banterOpen) {
+    if (activeTab === 'community') {
       markAsRead(initialPool.pool_id)
     }
-  }, [activeTab, banterOpen, initialPool.pool_id, markAsRead])
+  }, [activeTab, initialPool.pool_id, markAsRead])
 
   const isAdminTab = ADMIN_TABS.some(t => t.key === activeTab) || activeTab === 'rounds' || activeTab === 'fees'
 
@@ -2036,7 +2026,17 @@ export function PoolDetail({
           panes had scrolled past — and it would vanish entirely the moment you
           opened anything that is not the duel.
           `showContent` decides whether the duel's own cards come with it. */}
-      {onePage && isShowdown && showdownData && (
+      {/* ⚠ THE BAND SITS OUT ON BANTER, and it is the one surface it does.
+          `CommunityTab` pins `document.body` to fill the screen, which stops
+          `window.scrollY` and freezes the band mid-collapse. Six attempts at a
+          keyboard-aware SHEET went the other way — keep the band alive, give
+          the chat a slice — and Safari won every one: it pans the visual
+          viewport to reveal a focused input, and a page cannot out-argue that.
+          A chat needs the whole viewport, so it gets it. Nothing is lost: the
+          band was behind a full-screen scrim in every one of those attempts,
+          which is to say invisible. I was protecting something nobody could
+          see. */}
+      {onePage && activeTab !== 'community' && isShowdown && showdownData && (
         <DuelsTab
           poolId={initialPool.pool_id}
           duels={showdownData.duels}
@@ -2949,10 +2949,10 @@ export function PoolDetail({
           find. RN has had `BanterFab` all along and it works.
           ⚠ Hidden while the sheet is open — a button that opens what is
           already open is a button that does nothing. */}
-      {onePage && !banterOpen && (
+      {onePage && activeTab !== 'community' && (
         <button
           type="button"
-          onClick={() => setBanterOpen(true)}
+          onClick={() => handleTabSwitch('community')}
           aria-label={hasUnreadBanter
             ? `Open banter, ${banterUnreadCount} unread`
             : 'Open banter'}
@@ -2972,38 +2972,6 @@ export function PoolDetail({
             </span>
           )}
         </button>
-      )}
-
-      {/* ⚠ ONE-PAGE ONLY. The tabbed layout keeps banter as a tab, unchanged —
-          `CommunityTab` in full-page mode is correct there, because there it
-          IS the page. Two shapes for one surface, deliberately, while one-page
-          is behind a flag. */}
-      {onePage && (
-        <BanterSheet
-          open={banterOpen}
-          onClose={() => setBanterOpen(false)}
-          poolId={pool.pool_id}
-          poolName={pool.pool_name}
-          currentUserId={currentUserId}
-          members={members}
-          isAdmin={isAdmin}
-          matches={matches}
-          teams={teams}
-          allPredictions={allPredictions}
-          entryStats={entryStats}
-          matchAccuracy={matchAccuracy}
-          userEntries={userEntries}
-          settings={settings!}
-          conductData={conductData}
-          predictionMode={pool.prediction_mode as 'full_tournament' | 'progressive' | 'bracket_picker'}
-          matchScores={matchScores}
-          onShowHowToPlay={() => setShowHowToPlayModal(true)}
-          allBPGroupRankings={allBPGroupRankings}
-          allBPThirdPlaceRankings={allBPThirdPlaceRankings}
-          allBPKnockoutPicks={allBPKnockoutPicks}
-          poolCreatedAt={pool.created_at}
-          initialLastReadAt={banterInitialLastReadAt}
-        />
       )}
 
       {/* ⚠ A MODAL, NOT A DROPDOWN. The band clips its own overflow to get
@@ -3028,12 +2996,7 @@ export function PoolDetail({
                     type="button"
                     onClick={() => {
                       setMoreOpen(false)
-                      // ⚠ Banter is a SHEET here, not a surface. Switching to
-                      // it as a tab would mount the full-page CommunityTab,
-                      // which pins document.body and takes the band's scroll
-                      // with it — the whole reason the sheet exists.
-                      if (t.key === 'community') setBanterOpen(true)
-                      else handleTabSwitch(t.key)
+                      handleTabSwitch(t.key)
                     }}
                     className="w-full text-left t-body text-white/85 py-3.5 px-1
                                hover:text-white transition-colors"
