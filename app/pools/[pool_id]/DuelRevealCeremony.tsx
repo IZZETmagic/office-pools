@@ -228,16 +228,15 @@ export function DuelRevealCeremony({
       style={{ backgroundColor: '#04060A' }}
       onClick={revealed ? onClose : skip}
     >
-      {/* ⚠ LETTERBOXED, NOT STRETCHED. The walkout is composed for a 9:16 frame
-          — it is the same shot that gets shared — and a corridor pulled across a
-          desktop monitor puts the vanishing point somewhere nobody is looking
-          while the lower third runs half a metre wide. `aspect-[9/16]` with a
-          height cap keeps ONE composition on every screen: full-bleed on a
-          phone, a centred portrait panel on a laptop. */}
-      <div
-        className="relative w-full h-full sm:h-[min(100vh,900px)] sm:w-auto sm:aspect-[9/16] sm:rounded-card sm:overflow-hidden sm:shadow-2xl"
-        style={{ backgroundColor: '#04060A' }}
-      >
+      {/* ⚠ FULL SCREEN ON EVERY SIZE. This was letterboxed to a 9:16 panel on
+          desktop to match the shareable video; Ryan's call, 2026-09-01, is that
+          a reveal should take the whole window. A centred portrait card reads
+          as a preview of something rather than the thing itself.
+          
+          ⚠ THE CORRIDOR FILLS, THE TYPE DOES NOT. The 3D adapts to any aspect
+          on its own, but a lower third left to run the width of a monitor puts
+          the name a foot from the stats. Text is capped below. */}
+      <div className="relative w-full h-full" style={{ backgroundColor: '#04060A' }}>
       {/* ---- the corridor ----
           ⚠ Real 3D now, lazily loaded. The CSS version this replaced could not
           work: scaled rectangles only grow, so nothing was ever further away —
@@ -309,7 +308,7 @@ export function DuelRevealCeremony({
       )}
 
       {/* ---- prompt / lower third ---- */}
-      <div className="absolute inset-x-0 bottom-0 p-8 pb-14">
+      <div className="absolute inset-x-0 bottom-0 p-8 pb-14 sm:pb-20">
         {revealed ? (
           <div className="max-w-xl mx-auto">
             <div className="h-2 rounded-pill mb-5" style={{ backgroundColor: accent }} />

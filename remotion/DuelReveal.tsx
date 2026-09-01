@@ -94,7 +94,7 @@ export type DuelRevealProps = {
   them: RevealSide | null
 }
 
-export const DUEL_REVEAL_DURATION = 270
+export const DUEL_REVEAL_DURATION = 300
 export const DUEL_REVEAL_SIZE = { width: 1080, height: 1920 }
 
 /**
@@ -107,18 +107,24 @@ export const DUEL_REVEAL_SIZE = { width: 1080, height: 1920 }
  */
 const BEAT = {
   walk: 0,
-  gate1: 44,
-  gate2: 86,
-  gate3: 128,
-  charge: 170,
-  blowout: 200,
-  breath: 208,
-  reveal: 214,
-  verdict: 244,
+  gate1: 50,
+  gate2: 100,
+  gate3: 150,
+  charge: 190,
+  blowout: 220,
+  breath: 228,
+  reveal: 234,
+  verdict: 264,
 } as const
 
-/** Where the gates sit in world space. Paired with the frames above. */
-const GATE_Z = [6.2, 12.1, 18.0]
+/**
+ * Where the gates sit in world space.
+ *
+ * ⚠ DERIVED FROM THE TRAVEL CURVE, not chosen. Cruise is 23.56 world units over
+ * 190 frames = 0.124 a frame, so a gate at 6.2 is met at frame 50. Change one
+ * and the other must change, or the clue arrives without its gate.
+ */
+const GATE_Z = [6.2, 12.4, 18.6]
 
 export const DuelReveal: React.FC<DuelRevealProps> = ({
   poolName,
@@ -138,8 +144,13 @@ export const DuelReveal: React.FC<DuelRevealProps> = ({
    * rather than a screensaver. A constant crawl down a corridor has no arrival
    * in it: cruise through the gates, then run at the doors.
    */
-  const travel = interpolate(frame, [0, BEAT.charge, BEAT.blowout], [0, 23.8, 62], {
-    easing: Easing.in(Easing.quad),
+  /**
+   * ⚠ LINEAR THROUGH THE GATES, THEN A STEP. An easing applied across the whole
+   * curve slows the early part, which slides the gates off the frames their
+   * clues are timed to. Cruise is flat so `GATE_Z` stays predictable; the
+   * acceleration is the second segment.
+   */
+  const travel = interpolate(frame, [0, BEAT.charge, BEAT.blowout], [0, 23.56, 62], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   })
@@ -192,7 +203,7 @@ export const DuelReveal: React.FC<DuelRevealProps> = ({
 
       {/* ---- one clue per gate, arriving and leaving with it ---- */}
       {!revealed &&
-        clues.map((c, i) => <ClueCard key={i} clue={c} at={gateFrames[i]} frame={frame} />)}
+        clues.map((c, i) => <ClueCard key={i} clue={c} index={i} at={gateFrames[i]} frame={frame} />)}
 
       {/* ---- who it is ----
           ⚠ NO `@remotion/effects` HERE, AND IT IS NOT AN OVERSIGHT. `zoomBlur`
@@ -250,7 +261,12 @@ export const DuelReveal: React.FC<DuelRevealProps> = ({
           />
         </AbsoluteFill>
 
-        <AbsoluteFill name="Opponent" style={{ alignItems: 'center', justifyContent: 'center' }}>
+        {/* ⚠ Lifted with the plate. The two move together or the gap between
+            the face and the name closes up as one of them shifts. */}
+        <AbsoluteFill
+          name="Opponent"
+          style={{ alignItems: 'center', justifyContent: 'center', paddingBottom: 260 }}
+        >
           {them ? (
             <Interactive.Div
               name="Face"
@@ -297,7 +313,17 @@ export const DuelReveal: React.FC<DuelRevealProps> = ({
           )}
         </AbsoluteFill>
 
-        <AbsoluteFill name="Lower third" style={{ justifyContent: 'flex-end', padding: 96 }}>
+        {/* ⚠ LIFTED OFF THE BOTTOM EDGE. `justifyContent: flex-end` with 96px
+            of padding put the name, the stats and the footer in the bottom ~15%
+            — precisely the band a story platform covers with its reply bar and
+            progress pips. Ryan's note: the stats were "at the bottom and hidden
+            and don't really show properly". `paddingBottom` now clears that
+            chrome, and the block is the same distance from the face as the
+            fixture line is from the top. */}
+        <AbsoluteFill
+          name="Lower third"
+          style={{ justifyContent: 'flex-end', paddingLeft: 96, paddingRight: 96, paddingBottom: 260 }}
+        >
           <div style={{ width: '100%' }}>
             <div
               style={{
@@ -416,7 +442,16 @@ function Corridor({
     <ThreeCanvas width={width} height={height}>
       <ambientLight intensity={0.16} />
       <pointLight position={[0, 0, -DEPTH]} intensity={220} distance={120} color="#FFFFFF" />
-      <fog attach="fog" args={['#04060A', 5, DEPTH * 0.85]} />
+      {/* ⚠ THE FAR PLANE MUST SIT BEYOND THE MOUTH. At `DEPTH * 0.85` the fog
+          ended at 61 and the mouth sat at 72 — fogged to solid black, so the
+          corridor led to NOTHING. That is most of why the walk did not read:
+          there was nowhere to be going. */}
+      {/* ⚠ THE FAR PLANE MUST SIT WELL BEYOND THE MOUTH. At `DEPTH * 0.85` the
+          fog ended at 61 with the mouth at 72 — fogged to solid black, so the
+          corridor led to NOTHING, which is most of why the walk did not read.
+          `1.35` was still not enough: at 66 units the mouth was ~65% fogged and
+          read as grey. Thin the fog AND bring the mouth forward. */}
+      <fog attach="fog" args={['#04060A', 8, DEPTH * 2.2]} />
 
       {/* The rings the camera flies through. */}
       {Array.from({ length: COUNT }).map((_, i) => {
@@ -473,9 +508,11 @@ function Corridor({
           )
         })}
 
-      {/* The mouth. What you are walking toward. */}
-      <mesh position={[0, 0, -DEPTH]}>
-        <circleGeometry args={[2.8, 64]} />
+      {/* The mouth: what you are walking toward, and it has to be VISIBLE.
+          Set inside the fog, and bright enough to read as an exit rather than a
+          pale disc. */}
+      <mesh position={[0, 0, -DEPTH * 0.78]}>
+        <circleGeometry args={[2.9, 64]} />
         <meshBasicMaterial color="#FFFFFF" toneMapped={false} />
       </mesh>
     </ThreeCanvas>
@@ -489,33 +526,52 @@ function Corridor({
 /**
  * One clue, arriving with its gate and leaving with it.
  *
+ * ⚠ IT HOLDS STILL IN THE MIDDLE. The first version scaled 0.72 → 2.4 across
+ * its whole life, so the number was moving the entire time you were trying to
+ * read it — three figures blowing past in 1.3s each. Ryan's note was "I'm
+ * confused, what happened", and this was most of it. It now rushes in, HOLDS
+ * for about a second at a readable size, and only then blows past the camera.
+ *
+ * ⚠ IT SAYS WHOSE FACTS THESE ARE. "1W 0T 0L" with no subject is a number
+ * flying at you. At this point in the film nobody has been named, so the card
+ * has to carry "YOUR NEXT OPPONENT" itself.
+ *
  * ⚠ THE TEXT IS HTML, NOT 3D. Type in the scene needs a texture and comes out
  * soft at this size; overlaying it lets the geometry carry the physical pass
- * while the words stay crisp. Both are locked to the same frame, which is what
- * makes them read as one object rather than a caption over a video.
+ * while the words stay crisp. Both are locked to the same frame.
  */
 function ClueCard({
   clue,
+  index,
   at,
   frame,
 }: {
   clue: { label: string; value: string }
+  index: number
   at: number
   frame: number
 }) {
-  const IN = at - 22
-  const OUT = at + 8
-  if (frame < IN || frame > OUT + 8) return null
+  const IN = at - 30
+  const OUT = at + 16
+  if (frame < IN || frame > OUT + 10) return null
 
   return (
     <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
+      {/* ⚠ A SCRIM, because the type sits over the brightest thing in the film.
+          The gate the clue rides in on is a hard white ring, and white-on-white
+          made the labels vanish — legible in isolation, unreadable in place. */}
+      <AbsoluteFill
+        style={{
+          background: 'radial-gradient(closest-side, rgba(4,6,10,0.86), transparent 72%)',
+          opacity: interpolate(frame, [IN, IN + 8, OUT, OUT + 10], [0, 1, 1, 0], CLAMP),
+        }}
+      />
       <Interactive.Div
         name="Clue"
         style={{
           textAlign: 'center',
-          opacity: interpolate(frame, [IN, IN + 8, OUT, OUT + 8], [0, 1, 1, 0], CLAMP),
-          // Scales past the camera, so the type travels with its gate.
-          scale: interpolate(frame, [IN, OUT + 8], [0.72, 2.4], {
+          opacity: interpolate(frame, [IN, IN + 8, OUT, OUT + 10], [0, 1, 1, 0], CLAMP),
+          scale: interpolate(frame, [IN, IN + 10, OUT, OUT + 10], [0.82, 1, 1.06, 2.6], {
             easing: Easing.in(Easing.quad),
             output: 'perceptual-scale',
             extrapolateLeft: 'clamp',
@@ -523,10 +579,28 @@ function ClueCard({
           }),
         }}
       >
-        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: 8, color: 'rgba(255,255,255,0.45)' }}>
+        <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: 7, color: 'rgba(255,255,255,0.62)' }}>
+          YOUR NEXT OPPONENT
+        </div>
+        <div style={{ marginTop: 26, fontSize: 28, fontWeight: 800, letterSpacing: 6, color: 'rgba(255,255,255,0.85)' }}>
           {clue.label}
         </div>
-        <div style={{ ...LOUD, fontSize: 132, color: '#FFFFFF', marginTop: 14 }}>{clue.value}</div>
+        <div style={{ ...LOUD, fontSize: 138, color: '#FFFFFF', marginTop: 10 }}>{clue.value}</div>
+        {/* How many clues are left — the thing a member watching this is
+            actually tracking, and what makes it a guess rather than a slideshow. */}
+        <div style={{ marginTop: 30, display: 'flex', gap: 10, justifyContent: 'center' }}>
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              style={{
+                width: i <= index ? 34 : 10,
+                height: 8,
+                borderRadius: 999,
+                backgroundColor: i <= index ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.22)',
+              }}
+            />
+          ))}
+        </div>
       </Interactive.Div>
     </AbsoluteFill>
   )
@@ -603,15 +677,15 @@ function StatLine({
         ),
       }}
     >
-      <span style={{ fontSize: 38, fontWeight: 800, color: 'rgba(255,255,255,0.66)' }}>
+      <span style={{ fontSize: 46, fontWeight: 800, color: 'rgba(255,255,255,0.74)' }}>
         {season.won}W {season.tied}T {season.lost}L
       </span>
-      <span style={{ ...LOUD, fontSize: 56, color: accent }}>
+      <span style={{ ...LOUD, fontSize: 68, color: accent }}>
         {Math.round(
           interpolate(frame, [BEAT.reveal + 18, BEAT.reveal + 44], [0, season.duelPoints], CLAMP),
         )}
       </span>
-      <span style={{ fontSize: 30, fontWeight: 700, color: 'rgba(255,255,255,0.42)' }}>
+      <span style={{ fontSize: 34, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>
         {season.rank === null ? 'unranked' : `#${season.rank} in the pool`}
       </span>
     </div>

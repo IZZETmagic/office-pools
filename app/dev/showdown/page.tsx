@@ -158,7 +158,7 @@ export default function Page() {
           <ul className="list-disc pl-5 space-y-1">
             <li><b>sealed</b> — the countdown, and how it reads at each horizon.</li>
             <li><b>revealed</b> — the countdown slot becomes <b>Reveal</b>. Press it.</li>
-            <li>Resize the window: the ceremony is full-bleed under 640px and a centred 9:16 panel above it.</li>
+            <li>Resize the window: the ceremony is full screen at every size, and the corridor re-fits the aspect.</li>
             <li><b>Make a video</b> hits the real route. It will refuse until MW3 opens (20:59 UTC, 2 Sep) — that is the gate working.</li>
           </ul>
         </div>
