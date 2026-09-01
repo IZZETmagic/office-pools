@@ -2259,6 +2259,8 @@ export function PoolDetail({
                       roundSubmissions={activeRoundSubmissions}
                       leagueDepth={leagueDepth}
                       existingOutcomes={leagueOutcomes}
+                  chrome={!onePage}
+
                     />
                   </div>
                 )

@@ -51,6 +51,16 @@ type Props = {
   existingOutcomes?: Map<string, LeagueOutcome>
   onUnsavedChangesRef?: React.RefObject<{ hasUnsaved: () => boolean; save: () => Promise<void> } | null>
   onStatusChange?: (status: { saveStatus: SaveStatus; lastSavedAt: string | null; predictedCount: number }) => void
+  /**
+   * Draw the round header — the matchweek selector, the state badge and the
+   * lock countdown.
+   *
+   * ⚠ FALSE FOR THE ONE-PAGE SHOWDOWN, where a persistent band above already
+   * names the matchweek, and a Showdown member picks for exactly ONE week, so
+   * a selector with arrows offers to move somewhere there is nothing to see.
+   * Everywhere else it is the only thing carrying that information and stays.
+   */
+  chrome?: boolean
 }
 
 export default function ProgressivePredictionsFlow({
@@ -67,6 +77,7 @@ export default function ProgressivePredictionsFlow({
   existingOutcomes,
   onUnsavedChangesRef,
   onStatusChange,
+  chrome = true,
 }: Props) {
   const { showToast } = useToast()
   const router = useRouter()
@@ -588,6 +599,7 @@ export default function ProgressivePredictionsFlow({
       )}
 
       {/* Round status card */}
+      {chrome && (
       <RoundStatusCard
         roundState={currentRoundState ?? {
           id: '', pool_id: poolId, round_key: selectedRound,
@@ -606,6 +618,7 @@ export default function ProgressivePredictionsFlow({
             : undefined
         }
       />
+      )}
 
       {/* Error */}
       {error && <Alert variant="error">{error}</Alert>}
