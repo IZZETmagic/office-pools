@@ -51,20 +51,12 @@ export function BanterSheet({
   ...community
 }: { open: boolean; onClose: () => void } & Omit<CommunityTabProps, 'embedded'>) {
   /**
-   * Where the visible viewport IS, and how tall it is.
+   * The slice of screen the keyboard has left.
    *
-   * ⚠ BOTH ARE NEEDED, and the prototype said otherwise for a reason worth
-   * recording. There, `offsetTop` made things worse and `none` was flush —
-   * because that page could still SCROLL, so iOS satisfied the focused input by
-   * scrolling the document, leaving the visual viewport at offset 0.
-   *
-   * This sheet locks the page, so iOS cannot scroll it. It PANS the visual
-   * viewport instead, `offsetTop` goes positive, and a `position: fixed`
-   * element painted against the layout viewport rides straight up out of sight.
-   * That is Ryan's "it shoots up off screen".
-   *
-   * So the answer flipped when the page stopped scrolling. The prototype was
-   * right about the page it was testing and wrong about this one.
+   * ⚠ `top` STAYS 0. The pan is corrected by moving the PAGE (see the lock
+   * effect), not the sheet — the body is fixed, so nudging its `top` by the pan
+   * brings everything back into view at once. Compensating here as well is how
+   * the sheet ended up moving twice and leaving the screen faster.
    */
   const [box, setBox] = useState<{ top: number; height: number } | null>(null)
   /**
@@ -80,14 +72,11 @@ export function BanterSheet({
   useEffect(() => {
     if (!open) return
     const vv = window.visualViewport
-    // ⚠ HEIGHT ONLY. See the header: `offsetTop` is a correction iOS has
-    // already applied to fixed elements, and applying it again is the gap.
+    // ⚠ REPORTS ONLY. `box` belongs to the lock effect above — two effects
+    // writing one position is how the sheet ended up compensated twice.
     const on = typeof window !== 'undefined'
       && new URLSearchParams(window.location.search).get('banterdebug') === '1'
     const fit = () => {
-      setBox(vv
-        ? { top: vv.offsetTop, height: vv.height }
-        : { top: 0, height: window.innerHeight })
       if (!on) return
       const p = panelRef.current?.getBoundingClientRect()
       setDebug(
@@ -115,39 +104,55 @@ export function BanterSheet({
   }, [open])
 
   /**
-   * ⚠ THE PAGE IS FROZEN WHILE THE SHEET IS OPEN — and I argued against this.
+   * Lock the page, and counteract iOS Safari's visual-viewport pan.
    *
-   * iOS scrolls the document to bring a focused input into view. The sheet is
-   * `position: fixed`, which is anchored to the LAYOUT viewport, so that scroll
-   * takes the sheet with it — straight off the top of the screen the instant
-   * the keyboard appears. Ryan: "it does pop up, but as soon as I open the
-   * keyboard it goes off screen." No amount of `visualViewport` arithmetic
-   * fixes that, because the thing moving is the page underneath.
+   * ⚠ THIS IS `CommunityTab`'s SOLUTION, NOT A NEW ONE. That component has
+   * carried it since the tab was built, with a comment describing Ryan's exact
+   * symptom: focusing the composer makes Safari slide the visual viewport up to
+   * clear the keyboard, it takes fixed chrome off screen with it, and it does
+   * not slide back. I spent four attempts rediscovering that badly — moving the
+   * SHEET by `offsetTop` — when the fix is to move the PAGE.
    *
-   * ⚠ I RULED THIS OUT FOR THE WRONG REASON. The plan rejected pinning the body
-   * because it freezes the band's scroll-driven collapse — true, and the whole
-   * point of `embedded`. But that objection is about the band being WATCHED
-   * while pinned. Here the band is behind a full-screen scrim for exactly as
-   * long as the lock lasts, and the moment the sheet closes the scroll position
-   * is restored and the band resumes. A page-level concern applied to a moment
-   * when the page is not visible.
+   * `document.body` is fixed, so nudging its `top` by the pan puts everything
+   * back where the user can see it, the sheet included. Chrome reaches the same
+   * place on its own (`interactiveWidget=resizes-content` keeps `offsetTop` at
+   * 0, making this a no-op there).
    *
-   * What `embedded` still buys is that CommunityTab does not do this ITSELF,
-   * on its own schedule, for the whole time the tab is mounted.
-   *
-   * ⚠ `top: -y` rather than `scrollTo(0,0)`: the page must not visibly jump to
-   * the top behind the scrim, and the position has to come back exactly.
+   * ⚠ `offsetTop - y`, not CommunityTab's plain `offsetTop`: it scrolls to the
+   * top first and accepts losing your place, which is fine for a tab that
+   * replaces the page. A sheet must give the page back exactly as it was, so
+   * the lock keeps `-y` and the pan is added to it.
    */
   useEffect(() => {
     if (!open) return
+    const vv = window.visualViewport
     const y = window.scrollY
     const b = document.body.style
     const prev = { position: b.position, top: b.top, width: b.width, overflow: b.overflow }
-    b.position = 'fixed'
-    b.top = `-${y}px`
-    b.width = '100%'
+
     b.overflow = 'hidden'
+    b.position = 'fixed'
+    b.width = '100%'
+
+    let raf = 0
+    const sync = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const pan = vv ? vv.offsetTop : 0
+        b.top = `${pan - y}px`
+        setBox({ top: 0, height: vv ? vv.height : window.innerHeight })
+      })
+    }
+    sync()
+    vv?.addEventListener('resize', sync)
+    vv?.addEventListener('scroll', sync)
+    window.addEventListener('resize', sync)
+
     return () => {
+      cancelAnimationFrame(raf)
+      vv?.removeEventListener('resize', sync)
+      vv?.removeEventListener('scroll', sync)
+      window.removeEventListener('resize', sync)
       b.position = prev.position
       b.top = prev.top
       b.width = prev.width
