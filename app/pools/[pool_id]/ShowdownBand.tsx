@@ -78,6 +78,16 @@ export type ShowdownBandProps = {
   rank?: (e: string | null) => number | null
   /** Season points, same. */
   points?: (e: string | null) => number | null
+  /**
+   * Open the rest of the pool — leaderboard, banter, rules, settings.
+   *
+   * ⚠ A CHEVRON, NOT A SECOND HAMBURGER. The one opposite it is `AppHeader`'s
+   * and means Dashboard/Pools/Profile on every page in the product; putting
+   * pool surfaces there would make one glyph mean two things. A chevron
+   * pointing down at the page says "there is more below this", which is what
+   * is true, and it cannot be confused with app navigation.
+   */
+  onMore?: () => void
 }
 
 /**
@@ -157,7 +167,7 @@ function Face({
 
 export function ShowdownBand({
   header, matchweek, youEntry, themEntry, name, person, headline, sub,
-  liveNow = false, strip = [], rank, points,
+  liveNow = false, strip = [], rank, points, onMore,
 }: ShowdownBandProps) {
   const bandRef = useRef<HTMLDivElement>(null)
 
@@ -217,7 +227,7 @@ export function ShowdownBand({
   return (
     <div
       ref={bandRef}
-      className="sd-band"
+      className="sd-band relative"
       style={{
         '--p': 0,
         background:
@@ -252,6 +262,26 @@ export function ShowdownBand({
       } as React.CSSProperties}
     >
       {header && <div className="relative z-10">{header}</div>}
+
+      {/* ⚠ OUTSIDE `.sd-m`, so it holds its place at the bottom of the band in
+          BOTH layouts and at every scroll position. It is the only way to the
+          rest of the pool once the tab strip is gone, so it may not fade out
+          with the collapse the way the decorative pieces do. */}
+      {onMore && (
+        <button
+          type="button"
+          onClick={onMore}
+          aria-label="More in this pool"
+          className="absolute left-1/2 -translate-x-1/2 bottom-1.5 z-20 w-11 h-7
+                     grid place-items-center rounded-pill text-white/45
+                     hover:text-white hover:bg-white/10 active:bg-white/15 transition-colors"
+        >
+          <svg width="16" height="10" viewBox="0 0 16 10" fill="none" aria-hidden="true">
+            <path d="M1.5 1.5 8 8l6.5-6.5" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
 
       {/* ── phone: the pieces travel ─────────────────────────── */}
       <div className="sd-m" style={M.block}>

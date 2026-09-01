@@ -60,6 +60,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
+import { Modal } from '@/components/ui/Modal'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
 import { DUEL_WIN, DUEL_TIE, duelResult } from '@/lib/league/duelPoints'
@@ -163,6 +164,9 @@ type Props = {
   layout?: 'tabs' | 'onepage'
   /** The app header, drawn INSIDE the band in one-page mode. */
   bandHeader?: React.ReactNode
+  /** Everything this page does not show, reachable from the band's chevron. */
+  moreTabs?: Array<{ key: string; label: string }>
+  onSelectTab?: (key: string) => void
   /** Your points and the pool's median, per matchweek (migration 124). */
   series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
 }
@@ -606,8 +610,11 @@ export default function DuelsTab({
   onGoToPicks,
   layout = 'tabs',
   bandHeader = null,
+  moreTabs = [],
+  onSelectTab,
   series,
 }: Props) {
+  const [moreOpen, setMoreOpen] = useState(false)
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
 
   /** Every duel the viewer is in, oriented so "you" is always the first side. */
@@ -1123,6 +1130,36 @@ export default function DuelsTab({
           else changes. It takes DuelPanel's props verbatim — every number is
           already computed for the card, and a band that derived its own would
           be a second opinion about the same duel. */}
+      {/* ⚠ A MODAL, NOT A DROPDOWN. The band sets `overflow: hidden` so its
+          rounded corners clip the gradient, which would clip a menu opening
+          inside it too. `Modal` is the app's own sheet — bottom-anchored on a
+          phone, centred on desktop — so this reaches for the component that
+          already solves it rather than a second, thinner one. */}
+      {layout === 'onepage' && moreOpen && (
+        <Modal isOpen onClose={() => setMoreOpen(false)} size="sm"
+               titleId="showdown-more-title" className="bg-midnight dark:border-white/10">
+          <div className="px-5 pt-6 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <p id="showdown-more-title" className="t-caption text-white/40 px-1 pb-3">
+              More in this pool
+            </p>
+            <ul className="divide-y divide-white/8">
+              {moreTabs.map((t) => (
+                <li key={t.key}>
+                  <button
+                    type="button"
+                    onClick={() => { setMoreOpen(false); onSelectTab?.(t.key) }}
+                    className="w-full text-left t-body text-white/85 py-3.5 px-1
+                               hover:text-white transition-colors"
+                  >
+                    {t.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Modal>
+      )}
+
       {layout === 'onepage' && (() => {
         /* ⚠ THE THREE STATES ARE CHOSEN HERE, not in the band, and each one
            reaches for the component this tab already has for it. In play: the
@@ -1145,6 +1182,7 @@ export default function DuelsTab({
               themEntry={inPlay.them?.entry ?? null}
               name={name} person={person}
               header={bandHeader}
+              onMore={moreTabs.length ? () => setMoreOpen(true) : undefined}
               headline={
                 <>
                   <span>{y}</span>
@@ -1171,6 +1209,7 @@ export default function DuelsTab({
               themEntry={null}
               name={name} person={person}
               header={bandHeader}
+              onMore={moreTabs.length ? () => setMoreOpen(true) : undefined}
               /* ⚠ YELLOW, and only here. The accent marks the thing you are
                  WAITING on — the same gold the sealed card already uses for its
                  line. A live score is white because it is a fact, not a
@@ -1193,6 +1232,7 @@ export default function DuelsTab({
               themEntry={open.them?.entry ?? null}
               name={name} person={person}
               header={bandHeader}
+              onMore={moreTabs.length ? () => setMoreOpen(true) : undefined}
               headline={<span className="text-white/45">Not started</span>}
               sub="Picks are open"
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}

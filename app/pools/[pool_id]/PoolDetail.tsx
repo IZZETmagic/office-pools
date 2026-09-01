@@ -2466,7 +2466,7 @@ export function PoolDetail({
               )
             )}
 
-            {(onePage || activeTab === 'duels') && isShowdown && showdownData && (
+            {activeTab === 'duels' && isShowdown && showdownData && (
               <DuelsTab
                 duels={showdownData.duels}
                 entryNames={showdownData.entryNames}
@@ -2512,6 +2512,8 @@ export function PoolDetail({
                 totals={showdownData.totals}
                 onGoToPicks={() => handleTabSwitch('predictions')}
                 layout={onePage ? 'onepage' : 'tabs'}
+                moreTabs={onePage ? tabs.filter((t) => t.key !== 'duels') : []}
+                onSelectTab={(k) => handleTabSwitch(k as Tab)}
                 bandHeader={onePage ? (
                   <AppHeader
                     overlay

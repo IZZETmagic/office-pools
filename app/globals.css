@@ -1412,6 +1412,7 @@ html.dark .mode-pill {
 --------------------------------------------------------------------------- */
 @utility sd-band {
   position: sticky;
+  /* the chevron is absolutely placed against this */
   top: 0;
   z-index: 30;
   overflow: hidden;
