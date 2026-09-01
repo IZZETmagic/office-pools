@@ -177,7 +177,7 @@
      the sheet floats above the keyboard with page content showing beneath it,
      which is exactly what the first run looked like.
      Tap MODE to cycle. Whichever puts the composer ON the keyboard wins. */
-  var MODES = ['transform', 'top', 'none']
+  var MODES = ['none', 'transform', 'top']   // 'none' won on device, 2026-09-01
   var mode = 0
   var vv = window.visualViewport
   function fit () {

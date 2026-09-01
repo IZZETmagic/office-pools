@@ -133,14 +133,29 @@ keyboard, the message list still scrolls, the page behind does not jump, and
 `scrollY` survives — which is what the band needs and what the body-fixed hack
 would have destroyed. The plan stands and slice 1 is unblocked.
 
-⚠ **One imperfection, cosmetic:** the composer is not FLUSH on the keyboard —
-a strip of page content and Safari's own chrome shows between them. The cause
-is in the readout: iOS reports `offsetTop 347` rather than shrinking the
-viewport from the bottom, so the visual viewport is the LOWER slice of the
-page. `transform: translateY(offsetTop)` then double-counts a shift that
-`position: fixed` already receives on iOS. The fix is to stop translating and
-let fixed positioning do it, or to drive `top` from `offsetTop` instead — a
-one-line experiment, not a design change.
+### The placement, settled
+
+Three candidates went on the device. **`none` won — flush, no gap.**
+
+| mode | what it does | result |
+| --- | --- | --- |
+| `transform` | `translateY(visualViewport.offsetTop)` | near the keyboard, gap beneath |
+| `top` | `top: visualViewport.offsetTop` | near the keyboard, gap beneath |
+| **`none`** | **no offset at all** | **flush** |
+
+So the recipe is smaller than expected:
+
+```js
+sheet.style.height = visualViewport.height + 'px'   // and nothing else
+```
+
+⚠ **iOS already shifts `position: fixed` with the visual viewport.** That is
+why `offsetTop` must NOT be applied — reading it and using it double-counts a
+correction the browser has made for you, which is exactly the gap Ryan saw. The
+only thing worth taking from `visualViewport` is the HEIGHT.
+
+That is worth writing down because the instinct is the opposite: `offsetTop` is
+non-zero and looks like something you are supposed to act on.
 
 ---
 
