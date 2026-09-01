@@ -87,16 +87,35 @@ export function BanterSheet({
     const b = document.body.style
     const prev = { position: b.position, top: b.top, width: b.width, overflow: b.overflow }
 
+    /**
+     * ⚠ SCROLL TO 0 FIRST, exactly as CommunityTab does.
+     *
+     * My previous version kept the page's scroll offset in the lock — `top:
+     * -y` — and added the pan to it. It worked once, and only by coincidence:
+     * the pan was 347 and the scroll was 347, so they cancelled to `top: 0`.
+     * At any other scroll position that arithmetic displaces the body by
+     * hundreds of pixels before Safari has even panned, and the sheet leaves
+     * the screen again.
+     *
+     * The proven version pins the page at zero and then applies the pan alone,
+     * so `top` only ever holds ONE quantity. The scroll position is remembered
+     * here and restored on close, which is the only thing CommunityTab does not
+     * need to do — it replaces the page, this covers it.
+     *
+     * ⚠ Behind a full-screen scrim, scrolling to 0 is invisible.
+     */
+    window.scrollTo(0, 0)
     b.overflow = 'hidden'
     b.position = 'fixed'
     b.width = '100%'
+    b.top = '0px'
 
     let raf = 0
     const sync = () => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
-        const pan = vv ? vv.offsetTop : 0
-        b.top = `${pan - y}px`
+        // ONE quantity: the pan. Nothing else lives in `top`.
+        b.top = `${vv ? vv.offsetTop : 0}px`
         setBox({ top: 0, height: vv ? vv.height : window.innerHeight })
       })
     }
