@@ -94,6 +94,10 @@
                    padding:0 18px;font-weight:700;cursor:pointer}
 
   /* ── live readout ── */
+  .mode{position:fixed;right:16px;z-index:41;border:none;border-radius:999px;
+        bottom:calc(84px + env(safe-area-inset-bottom));
+        background:#F5C518;color:#0B0F1A;font:700 11px/1 ui-monospace,monospace;
+        padding:9px 12px;cursor:pointer}
   .hud{position:fixed;left:8px;bottom:8px;z-index:40;background:rgba(0,0,0,.82);
        color:#9FE8A0;font:11px/1.45 ui-monospace,Menlo,monospace;padding:8px 10px;
        border-radius:8px;white-space:pre;pointer-events:none}
@@ -112,6 +116,7 @@
 <div class="page" id="page"></div>
 
 <button class="fab" id="fab" aria-label="Open banter">💬</button>
+<button class="mode" id="mode" aria-label="Cycle sheet placement">MODE</button>
 
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Banter">
@@ -165,15 +170,33 @@
   /* ── THE ACTUAL EXPERIMENT ────────────────────────────────
      The sheet is sized and positioned from visualViewport, so it tracks the
      area the keyboard leaves behind. NOTHING touches document.body. */
+  /* ⚠ THREE CANDIDATE PLACEMENTS, because the first device test could not tell
+     them apart. iOS reported `offsetTop 347` — the visual viewport is the LOWER
+     slice of the page, not a shorter one — and `position: fixed` may already be
+     shifted by that on iOS. If it is, translating by offsetTop double-counts and
+     the sheet floats above the keyboard with page content showing beneath it,
+     which is exactly what the first run looked like.
+     Tap MODE to cycle. Whichever puts the composer ON the keyboard wins. */
+  var MODES = ['transform', 'top', 'none']
+  var mode = 0
   var vv = window.visualViewport
   function fit () {
     if (!vv) {                                  // no support: fall back to the layout viewport
       sheet.style.height = window.innerHeight + 'px'
-      sheet.style.transform = 'none'
+      sheet.style.transform = 'none'; sheet.style.top = '0px'
       return
     }
     sheet.style.height = vv.height + 'px'
-    sheet.style.transform = 'translateY(' + vv.offsetTop + 'px)'
+    if (MODES[mode] === 'transform') {          // what the first test ran
+      sheet.style.top = '0px'
+      sheet.style.transform = 'translateY(' + vv.offsetTop + 'px)'
+    } else if (MODES[mode] === 'top') {         // place it, do not move it
+      sheet.style.top = vv.offsetTop + 'px'
+      sheet.style.transform = 'none'
+    } else {                                    // trust fixed to have shifted already
+      sheet.style.top = '0px'
+      sheet.style.transform = 'none'
+    }
   }
   if (vv) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit) }
   addEventListener('resize', fit)
@@ -183,6 +206,9 @@
                      list.scrollTop = list.scrollHeight }
   function close () { sheet.classList.remove('open'); scrim.classList.remove('open'); input.blur() }
   document.getElementById('fab').addEventListener('click', open)
+  document.getElementById('mode').addEventListener('click', function () {
+    mode = (mode + 1) % MODES.length; fit()
+  })
   scrim.addEventListener('click', close)
   addEventListener('keydown', function (e) { if (e.key === 'Escape') close() })
 
@@ -204,7 +230,8 @@
                               : 'UNSUPPORTED') + '\n' +
       'keyboard       <b>' + (vv ? Math.max(0, Math.round(window.innerHeight - vv.height)) : '?') + '</b>px\n' +
       'body.position  <b>' + (document.body.style.position || 'static') + '</b>  (must stay static)\n' +
-      'sheet          ' + (open ? 'OPEN' : 'closed')
+      'sheet          ' + (open ? 'OPEN' : 'closed') + '\n' +
+      'placement      <b>' + MODES[mode] + '</b>  (tap MODE to cycle)'
     requestAnimationFrame(hudTick)
   }
   hudTick()

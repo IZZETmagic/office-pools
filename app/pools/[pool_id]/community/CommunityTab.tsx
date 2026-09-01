@@ -51,6 +51,27 @@ function broadcastRecord<T>(msg: unknown): T | undefined {
 }
 
 export function CommunityTab({
+  /**
+   * Rendered inside a container that already owns its own height — the
+   * Showdown banter sheet — rather than as a full page.
+   *
+   * ⚠ IT SWITCHES OFF THE DOCUMENT TAKEOVER, and that is the whole point.
+   * As a tab this component makes itself a chat SCREEN: it pins
+   * `document.body` to `position: fixed`, hides its overflow, scrolls to the
+   * top and then measures `window.innerHeight` in a rAF loop to size itself to
+   * what the keyboard leaves. That works when the chat IS the page.
+   *
+   * It cannot work inside the one-page Showdown. The band's collapse is driven
+   * by `window.scrollY`, and a pinned body means scrollY never moves — the band
+   * would freeze fully open and the rail would stop sticking. Slice 0 proved a
+   * sheet does not need any of it: sized from `visualViewport`, the composer
+   * sits above the keyboard with `body.position` left `static` and `scrollY`
+   * intact. Plan: drafts/2026-09-01_showdown_banter_plan.md.
+   *
+   * ⚠ Default FALSE, so every existing consumer — the World Cup, Table mode,
+   * LMS, Pick'em, and Showdown's own tabbed layout — is untouched.
+   */
+  embedded = false,
   poolId,
   poolName,
   currentUserId,
@@ -465,7 +486,10 @@ export function CommunityTab({
   }, [])
 
   useEffect(() => {
-    if (!isMobile) {
+    // ⚠ `embedded` bails BEFORE the takeover, not after. Everything below this
+    // line writes to `document.body`; there is no half-measure where the
+    // component pins the document and then tidies up.
+    if (embedded || !isMobile) {
       setMobileHeight(null)
       return
     }
@@ -532,7 +556,7 @@ export function CommunityTab({
       document.body.style.width = prevWidth
       document.body.style.top = prevTop
     }
-  }, [isMobile])
+  }, [isMobile, embedded])
 
   useEffect(() => {
     if (!isMobile || mobileHeight === null) return

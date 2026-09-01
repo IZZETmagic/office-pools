@@ -153,6 +153,15 @@ export type ReplyPreview = {
 // =====================
 
 export type CommunityTabProps = {
+  /**
+   * Rendered inside a container that owns its own height — the Showdown banter
+   * sheet — instead of as a full page.
+   *
+   * ⚠ Switches off the `document.body` takeover. See the note at the
+   * destructure in CommunityTab.tsx. Default false: every existing consumer is
+   * untouched.
+   */
+  embedded?: boolean
   poolId: string
   poolName: string
   currentUserId: string
