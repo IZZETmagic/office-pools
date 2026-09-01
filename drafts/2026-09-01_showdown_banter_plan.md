@@ -54,13 +54,26 @@ something you open on top of it and dismiss.
 
 > **Banter becomes a sheet over the Showdown page, the way it already is on the phone.**
 
-### 1. The entry point
+### 1. The entry point — DECIDED 2026-09-01: a floating button
 
-A floating button, bottom-right, mirroring `BanterFab`. It carries the unread count, which the tab
-strip used to carry and which one-page currently drops on the floor.
+**A circular button, bottom-right, carrying the unread count, opening the sheet.** The web
+equivalent of `BanterFab`, and the same gesture on both platforms.
 
-⚠ It is **also** in the chevron menu, because that is where somebody who has not noticed a floating
-button will look. Two doors to one room; the FAB is the one you use, the menu is the one you find.
+Two things made it the answer rather than the chevron menu alone:
+
+**Unread had nowhere else to go.** The tab strip carried it and one-page deleted the strip. A count
+buried inside a closed menu is a count nobody sees, and losing it outright would be a regression
+from the tabbed layout rather than a simplification.
+
+**Banter is what the mode is *for*.** Two taps behind an invisible door is the wrong weight for the
+surface Ryan describes as the thing that drives the pool.
+
+⚠ **The chevron row stays.** Somebody who has not noticed a floating button looks in the menu, and
+it costs one line. Two doors to one room: the FAB is the one you use, the menu is the one you find.
+
+⚠ **A new pattern, and worth saying out loud.** The web app has never had a floating button
+anywhere. This introduces one, on one mode. If it earns its place here it is a candidate for the
+other league modes later; if it does not, it is one component to delete.
 
 ### 2. The sheet
 
@@ -123,15 +136,17 @@ cheaper to learn that from a throwaway page than from a half-migrated component.
 
 ---
 
-## Decisions this asks Ryan for
+## Decisions
 
-1. **A FAB on the web.** RN has one and it works; web has never had one. It is a new pattern for the
-   web app, on one mode.
-2. **Does banter stay a TAB for every other mode?** This plan changes Showdown only. Table, LMS,
-   Pick'em and the World Cup keep `CommunityTab` exactly as it is — which means two banter shapes
-   live side by side for a while.
-3. **Unread state.** The tab strip carried it; one-page has nowhere to put it but the FAB. If the
-   FAB is rejected, unread needs another home.
+1. ~~How banter is reached~~ — **SETTLED 2026-09-01: a floating button**, with the chevron row kept
+   as the discoverable second door. See §1.
+2. **Does banter stay a TAB for every other mode?** Open. This plan changes Showdown only, so Table,
+   LMS, Pick'em and the World Cup keep `CommunityTab` exactly as it is — which means two banter
+   shapes live side by side for a while. That is fine while one-page is behind a flag; it is a
+   question the moment it becomes the default.
+3. **Does the desktop rail get a banter card as well?** Open, and independent of the FAB — the rail
+   has the room and it would make the last two or three messages visible without opening anything.
+   Slice 4, easy to drop.
 
 ---
 
