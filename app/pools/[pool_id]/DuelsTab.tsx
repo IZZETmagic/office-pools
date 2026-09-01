@@ -1229,7 +1229,12 @@ export default function DuelsTab({
          band from the `!showContent` branch, which has no wrapper at all.
          `space-y` still puts the gap between the band and the first card,
          which is the space that was actually wanted. */
-      ? 'px-4 sm:px-6 pb-10 space-y-4 md:space-y-5'
+      /* ⚠ `pt-5` IS BACK, AND IS NOW SAFE. It was removed when the band was
+         this wrapper's first child, where top padding showed as a strip of
+         page ABOVE the band. The band is a sibling now, so this is simply the
+         gap beneath it — and it matches <main>'s `pt-5` on every other
+         surface, so the duel and the picks start at the same height. */
+      ? 'px-4 sm:px-6 pt-5 pb-10 space-y-4 md:space-y-5'
       : 'space-y-4'}>
       {/* ⚠ ONE-PAGE: the band stands in for the two cards below it and nothing
           else changes. It takes DuelPanel's props verbatim — every number is
