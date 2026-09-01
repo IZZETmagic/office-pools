@@ -58,7 +58,8 @@
 // matchweek is both fully played and fully scored.
 // =============================================================
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
@@ -70,6 +71,48 @@ import { getLiveClock } from '@/lib/matchStatus'
 import { LocalTime } from '@/components/LocalTime'
 import type { MatchweekFixture } from './PoolDetail'
 import { ShowdownBand } from './ShowdownBand'
+
+// -------------------------------------------------------------
+// HAS THIS BROWSER PLAYED THE WALKOUT FOR THIS DUEL?
+// -------------------------------------------------------------
+// ⚠ AN EXTERNAL STORE, READ WITH useSyncExternalStore, and both halves of that
+// are deliberate. Reading `localStorage` during render is not SSR-safe, and
+// reading it in an effect instead means the first paint says "not seen" and the
+// second says "seen" — which on this band is the opponent's face appearing and
+// then the button relabelling, a visible flicker on every load. The hook exists
+// for exactly this: a real snapshot on the client, a fixed one on the server.
+//
+// ⚠ THE IN-MEMORY SET IS NOT A CACHE, it is the fallback that keeps the promise.
+// Private browsing throws on `localStorage` access — not just writes — so a
+// member there could press Reveal, close it, and be handed the Reveal button
+// again forever, trapped behind an animation with no way past it. Remembering
+// it in memory costs nothing and means the worst case is losing it on reload.
+const seenReveals = new Set<string>()
+/** Fired on ourselves, because the `storage` event only fires in OTHER tabs. */
+const REVEAL_SEEN_EVENT = 'sp:duel-revealed'
+
+function revealKey(duelId: string) { return `sp:duel-revealed:${duelId}` }
+
+function hasSeenReveal(duelId: string): boolean {
+  if (seenReveals.has(duelId)) return true
+  try { return window.localStorage.getItem(revealKey(duelId)) === '1' } catch { return false }
+}
+
+function markSeenReveal(duelId: string) {
+  seenReveals.add(duelId)
+  try { window.localStorage.setItem(revealKey(duelId), '1') } catch { /* memory only; see above */ }
+  window.dispatchEvent(new Event(REVEAL_SEEN_EVENT))
+}
+
+function subscribeRevealSeen(onChange: () => void) {
+  window.addEventListener(REVEAL_SEEN_EVENT, onChange)
+  window.addEventListener('storage', onChange)
+  return () => {
+    window.removeEventListener(REVEAL_SEEN_EVENT, onChange)
+    window.removeEventListener('storage', onChange)
+  }
+}
+
 
 type Props = {
   /** ⚠ Needed for the share render — the routes are per-pool. */
@@ -182,13 +225,31 @@ type Side = { entry: string; points: number | null; accuracy: number | null }
  * client render, and React keeps the server text rather than reconciling it.
  * So it renders nothing until mounted, then ticks.
  */
-function Countdown({ to }: { to: string }) {
+function Countdown({ to, onExpire }: { to: string; onExpire?: () => void }) {
   const [text, setText] = useState('')
+  // ⚠ THE CALLBACK LIVES IN A REF, not the dependency array. Callers pass an
+  // inline arrow, which is a new function every render — in the deps it tears
+  // down and restarts the interval each time the parent re-renders, and a clock
+  // that keeps restarting never survives long enough to reach zero.
+  const expire = useRef(onExpire)
+  useEffect(() => { expire.current = onExpire })
   useEffect(() => {
     const target = new Date(to).getTime()
+    // ⚠ BOUNDED RETRIES, not one shot. The first fire is immediate; if the
+    // server still says sealed afterwards (clock skew between this browser and
+    // Postgres is real, and the window is derived from `lock_at`) it tries
+    // twice more, 30s apart, then stops. Three attempts is enough for skew and
+    // few enough that a wrong `to` cannot turn a page into a polling loop.
+    let fires = 0
+    let lastFire = 0
     const tick = () => {
       const ms = target - Date.now()
-      if (ms <= 0) { setText('any moment'); return }
+      if (ms <= 0) {
+        setText('any moment')
+        const now = Date.now()
+        if (fires < 3 && now - lastFire >= 30_000) { fires++; lastFire = now; expire.current?.() }
+        return
+      }
       const s = Math.floor(ms / 1000)
       // ⚠ HOURS, NOT DAYS. `1d 21:21:54` made the reader do arithmetic to
       // answer the only question they had — how long — and the two halves were
@@ -718,13 +779,69 @@ export default function DuelsTab({
     }
   }, [open, entryPeople, entryNames, table, totals])
 
-  /**
-   * ⚠ NO PERSISTENCE, AND THAT IS THE DESIGN. The recap needed
-   * `last_recap_seen_at` because it is news pushed at you once. This is opt-in
-   * and repeatable: press it whenever, or never. No column, no migration, and
-   * nothing that can leave a member unable to replay their own walkout.
-   */
   const [ceremonyOpen, setCeremonyOpen] = useState(false)
+
+  /**
+   * Has this viewer actually played the reveal for the open duel?
+   *
+   * ⚠ THIS NOW HIDES THE OPPONENT, which reverses how the band shipped. It used
+   * to show their face and rank BESIDE the Reveal button, on the reasoning that
+   * the ceremony should never be the only way to learn who you drew. Ryan,
+   * 2026-09-01: *"You can't see your opponent in their spot until after the
+   * reveal has happened."* He is right and the old note was wrong — a reveal
+   * button next to the answer reveals nothing.
+   *
+   * ⚠ WHICH IS WHY IT HAD TO GAIN PERSISTENCE. The previous comment here said
+   * "no persistence, and that is the design", and that held only while the face
+   * was visible anyway. Once pressing the button is the way you find out, a
+   * reload that forgets would re-hide an opponent you have already met.
+   *
+   * ⚠ CLOSING COUNTS AS SEEING, however you close it — finished, escaped, or
+   * bailed at two seconds. That is the accessibility floor the old note was
+   * protecting: if the corridor cannot render (no WebGL, reduced motion, a
+   * thrown error) you press Reveal, close it, and the band tells you. Nobody
+   * can be trapped behind an animation that will not play.
+   *
+   * ⚠ PER DEVICE, because it is `localStorage`. Revealing on a laptop and then
+   * opening a phone replays the walkout, which is a defensible v1 — but the
+   * durable home is a column beside `last_recap_seen_at`, which already tracks
+   * exactly this shape of "has this viewer been shown it" server-side.
+   */
+  const openDuelId = open?.duel.duel_id ?? null
+  const revealSeen = useSyncExternalStore(
+    subscribeRevealSeen,
+    () => (openDuelId ? hasSeenReveal(openDuelId) : false),
+    // ⚠ THE SERVER SNAPSHOT IS ALWAYS `false`, which is the safe direction: the
+    // markup that ships from the server withholds the opponent. If it guessed
+    // "seen" and the browser disagreed, the first paint would leak the face the
+    // whole feature exists to withhold.
+    () => false,
+  )
+
+  const markRevealSeen = useCallback(() => {
+    if (openDuelId) markSeenReveal(openDuelId)
+  }, [openDuelId])
+
+  const router = useRouter()
+  /**
+   * ⚠ THE CLOCK REACHING ZERO USED TO DO NOTHING AT ALL. It printed "any
+   * moment" and sat there forever: whether a matchweek is sealed or open is
+   * decided server-side in page.tsx, so the countdown could expire and the band
+   * would keep showing a dead clock until the member reloaded by hand. The
+   * journey Ryan describes — wait, it opens, press Reveal — was unreachable
+   * without a manual refresh.
+   *
+   * ⚠ JITTERED, AND THAT IS NOT OPTIONAL. A reveal window opens at ONE instant
+   * for every member of every pool on the season — `league_matchweeks` is keyed
+   * on `season_id` and 13 pools share it — so an unjittered refresh is every
+   * open browser re-running the pool query on the same second. Reads are
+   * already ~70% of this database's time, and simultaneity, not volume, is the
+   * documented failure mode. Spreading it over 20s costs nobody anything.
+   */
+  const onSealedExpired = useCallback(() => {
+    const jitterMs = 2_000 + Math.round(Math.random() * 18_000)
+    setTimeout(() => router.refresh(), jitterMs)
+  }, [router])
 
   /**
    * Each member's last five DUEL results, oldest first.
@@ -1212,7 +1329,7 @@ export default function DuelsTab({
                  line. A live score is white because it is a fact, not a
                  promise. */
               headline={sealedOpensAtLatest
-                ? <span className="text-accent-400"><Countdown to={sealedOpensAtLatest} /></span>
+                ? <span className="text-accent-400"><Countdown to={sealedOpensAtLatest} onExpire={onSealedExpired} /></span>
                 : <span className="text-white/45">Sealed</span>}
               sub="Until your opponent is revealed"
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
@@ -1226,27 +1343,36 @@ export default function DuelsTab({
             <ShowdownBand
               matchweek={open.matchweek}
               youEntry={open.you.entry}
-              themEntry={open.them?.entry ?? null}
+              /* ⚠ WITHHELD UNTIL THE WALKOUT HAS BEEN PLAYED. Passing the
+                 entry here put their face and name in the band NEXT TO a button
+                 marked Reveal, which meant the button revealed nothing — you
+                 had already read the answer above it. */
+              themEntry={revealSeen ? open.them?.entry ?? null : null}
               name={name} person={person}
               header={bandHeader}
               /* ⚠ THE SAME SLOT THE SEALED COUNTDOWN USED. The thing you were
                  waiting for turns into the thing you press — no new surface, no
-                 modal arriving unbidden. And the band already shows their face
-                 and rank beside it, so the ceremony is never the only way to
-                 learn who you drew, which is the rule DuelRecapSheet sets. */
+                 modal arriving unbidden.
+                 ⚠ AND IT STAYS A BUTTON AFTERWARDS, relabelled. The share and
+                 "Make a video" path lives INSIDE the ceremony, so a button that
+                 disappeared once used would take the only route to the video
+                 with it — you would get one chance, ever, to make the thing you
+                 are meant to want to send to someone. */
               headline={
                 revealOpponent ? (
                   <button
                     onClick={() => setCeremonyOpen(true)}
                     className="rounded-chip bg-white/15 hover:bg-white/25 px-5 py-2 text-2xl font-extrabold text-white transition"
                   >
-                    Reveal
+                    {revealSeen ? 'Replay' : 'Reveal'}
                   </button>
                 ) : (
                   <span className="text-white/45">Not started</span>
                 )
               }
-              sub={revealOpponent ? 'Your opponent is in' : 'Picks are open'}
+              /* ⚠ "Your opponent is in" ONLY BEFORE you have met them — after
+                 that the band is showing you who, so saying it is noise. */
+              sub={revealOpponent ? (revealSeen ? 'Picks are open' : 'Your opponent is in') : 'Picks are open'}
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
               points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
             />
@@ -1276,7 +1402,7 @@ export default function DuelsTab({
         opponent={revealOpponent}
         poolId={poolId}
         duelId={open.duel.duel_id}
-        onClose={() => setCeremonyOpen(false)}
+        onClose={() => { markRevealSeen(); setCeremonyOpen(false) }}
       />
     ) : null
 
