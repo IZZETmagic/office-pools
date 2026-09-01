@@ -33,7 +33,7 @@
 // costs nothing and the browser handles it.
 // =============================================================
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor } from '@/lib/design/avatarGradient'
@@ -99,8 +99,29 @@ export type ShowdownBandProps = {
  *   clock  22px at top 39  -> centre 50   (same line, which is the ask)
  *   label  12px at top 14  -> 13px of air beneath it before the clock
  */
+/**
+ * How much height the band gives up between open and collapsed.
+ *
+ * ⚠ IT IS ALSO THE SCROLL DISTANCE THE COLLAPSE TAKES, and that equality is
+ * the whole interaction. Ryan: "the page content should push the collapsing of
+ * the hero until where it was collapsing before, THEN scroll behind it."
+ *
+ * The band is pinned at the top, so during the collapse the content below rises
+ * at the scroll rate while the band's bottom edge rises at the COLLAPSE rate.
+ * Set those equal and the content's top edge stays welded to the band's bottom
+ * — the content appears to push the band shut. Make the collapse faster, as it
+ * was at 150px against 220px of height, and the band outruns the content, which
+ * then slides underneath it instead. Slower, and a gap opens.
+ *
+ * So this is one number used twice on purpose. Splitting it into a height and a
+ * separate scroll distance is what made it wrong in the first place.
+ */
+const COLLAPSE_PX = 220
+/** The duel block open, before any of COLLAPSE_PX has been given up. */
+const HERO = 320
+
 const M = {
-  block: { height: 'calc(320px - 220px * var(--p))' },
+  block: { height: `calc(320px - ${COLLAPSE_PX}px * var(--p))` },
   mw:    { top: 'calc(20px - 6px * var(--p))', fontSize: 'calc(15px - 3px * var(--p))' },
   big:   { top: 'calc(50px - 11px * var(--p))', fontSize: 'calc(40px - 18px * var(--p))' },
   face:  { top: 'calc(146px - 114px * var(--p))',
@@ -160,6 +181,12 @@ export function ShowdownBand({
   liveNow = false, strip = [], rank, points,
 }: ShowdownBandProps) {
   const bandRef = useRef<HTMLDivElement>(null)
+  /**
+   * The header row's height, measured — it feeds the spacer, so guessing it
+   * would leave a gap or an overlap under the band. AppHeader is `py-3` on a
+   * phone and `py-4` from `sm`, so it is not one number.
+   */
+  const [barH, setBarH] = useState(56)
 
   useEffect(() => {
     const el = bandRef.current
@@ -171,7 +198,11 @@ export function ShowdownBand({
       // fires far more of the latter than the screen can show.
       frame = requestAnimationFrame(() => {
         frame = 0
-        el.style.setProperty('--p', Math.min(1, Math.max(0, window.scrollY / 150)).toFixed(3))
+        // ⚠ DIVIDED BY THE HEIGHT IT LOSES, not by a round number. See
+        // COLLAPSE_PX: this equality is what makes the content push the band
+        // rather than slide under it.
+        el.style.setProperty(
+          '--p', Math.min(1, Math.max(0, window.scrollY / COLLAPSE_PX)).toFixed(3))
       })
     }
     onScroll()
@@ -238,10 +269,37 @@ export function ShowdownBand({
 
 
   return (
+    <>
+    {/* ⚠ THE SPACER IS WHAT MAKES THE CONTENT PUSH THE BAND.
+        Measured, not reasoned. While the band was `position: sticky` it stayed
+        IN FLOW, so every pixel of height it gave up as it collapsed was handed
+        straight back to the page — the content below rose from the shrink AND
+        from the scroll, at twice the rate, and slid underneath. No collapse
+        speed fixes that; the gap came out at exactly -scrollY at every step.
+
+        A constant-height spacer holds the flow while the band is taken out of
+        it, so the content rises at the scroll rate alone and the band's bottom
+        edge rises at the collapse rate. Set those equal (see COLLAPSE_PX) and
+        the two are welded together:
+
+          scrollY    0  bandBottom 376  contentTop 376   gap 0.0
+          scrollY  110  bandBottom 266  contentTop 266   gap 0.0
+          scrollY  220  bandBottom 156  contentTop 156   gap 0.0
+          scrollY  500  bandBottom 156  contentTop -124  behind ✓
+
+        ⚠ `fixed`, NOT `sticky`. Sticky in a fixed-height spacer would unstick
+        the moment the spacer scrolled past — the band would leave the screen
+        instead of staying, which is the one thing it must never do. */}
+    <div style={{ height: barH + HERO }} aria-hidden="true" />
     <div
       ref={bandRef}
       className="sd-band"
       style={{
+        // ⚠ Overrides `sd-band`'s sticky + full-bleed margins inline, because
+        // the served stylesheet still carries them and a fixed element with
+        // negative margins sits off-screen. Fixed already spans the viewport.
+        position: 'fixed', top: 0, left: 0, right: 0,
+        marginLeft: 0, marginRight: 0, paddingLeft: 0, paddingRight: 0,
         '--p': 0,
         background:
           `radial-gradient(110% 100% at 10% 0%, color-mix(in srgb, ${youColour} 26%, transparent) 0%, transparent 60%),`
@@ -273,7 +331,9 @@ export function ShowdownBand({
         borderBottomRightRadius: BAND_RADIUS,
       } as React.CSSProperties}
     >
-      {header && <div className="relative z-10">{header}</div>}
+      {header && <div className="relative z-10" ref={(el) => {
+        if (el) setBarH((h: number) => (Math.round(el.offsetHeight) || h))
+      }}>{header}</div>}
 
       {/* ── phone: the pieces travel ─────────────────────────── */}
       <div className="sd-m" style={M.block}>
@@ -362,5 +422,6 @@ export function ShowdownBand({
         </div>
       </div>
     </div>
+    </>
   )
 }
