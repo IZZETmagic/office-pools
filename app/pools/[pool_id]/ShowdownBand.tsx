@@ -33,7 +33,7 @@
 // costs nothing and the browser handles it.
 // =============================================================
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { avatarColor } from '@/lib/design/avatarGradient'
@@ -81,31 +81,6 @@ export type ShowdownBandProps = {
 }
 
 /**
- * ⚠ THE DUEL BLOCK'S HEIGHT IS FIXED, AND THAT IS THE WHOLE PATTERN.
- *
- * Ryan: "the hero should be pushed up by the content and then the content
- * starts to scroll behind it. Right now the content scrolls behind it as it is
- * collapsing."
- *
- * It used to shrink IN PLACE while pinned at the top, so the content below
- * moved up by the scroll AND by the height it was losing — it slid underneath
- * during the collapse instead of pushing it. Now the block keeps its full
- * height in flow and is pinned with a NEGATIVE offset, so it scrolls up with
- * the content like anything else, and stops once `COLLAPSED` of it is left
- * under the bar. Prototyped and measured before it was built:
- *
- *   at rest        duel visible 320   content BELOW  ✓
- *   mid-collapse   duel visible 210   content BELOW  ✓  (pushed, not covered)
- *   scrolled past  duel visible 100   content behind ✓  (pinned)
- *
- * The pieces inside therefore anchor to the BOTTOM, not the top: the bottom
- * edge is the part that stays on screen, so it is the only stable thing to
- * measure from.
- */
-const HERO = 320
-const COLLAPSED = 100
-
-/**
  * ⚠ THE PHONE BAND'S VERTICAL GEOMETRY LIVES HERE, NOT IN globals.css.
  *
  * Two reasons, one practical and one that outlasts it. The practical one: this
@@ -125,29 +100,16 @@ const COLLAPSED = 100
  *   label  12px at top 14  -> 13px of air beneath it before the clock
  */
 const M = {
-  // Fixed. The block no longer shrinks; it is pushed up and pinned.
-  block: { height: `${HERO}px` },
-  // ⚠ `bottom`, not `top`. Collapsed, only the last COLLAPSED px are on screen,
-  // so every piece is placed relative to the edge that survives.
-  // ⚠ EVERY BOTTOM-ANCHORED PIECE ALSO SETS `top: auto`, and it is not
-  // redundant. These used to be positioned from the TOP, and an absolutely
-  // positioned box given BOTH top and bottom stretches between them instead of
-  // sizing to its content — so a stylesheet still carrying the old `top` would
-  // not merely misplace the label, it would smear it down the band. The
-  // stylesheet in this checkout does still carry it. Inline `auto` cancels it
-  // whatever the CSS says, today or after a rebuild.
-  mw:    { top: 'auto', bottom: 'calc(266px - 202px * var(--p))', fontSize: 'calc(15px - 3px * var(--p))' },
-  big:   { top: 'auto', bottom: 'calc(230px - 191px * var(--p))', fontSize: 'calc(40px - 18px * var(--p))' },
-  face:  { top: 'auto', bottom: 'calc(102px - 70px * var(--p))',
+  block: { height: 'calc(320px - 220px * var(--p))' },
+  mw:    { top: 'calc(20px - 6px * var(--p))', fontSize: 'calc(15px - 3px * var(--p))' },
+  big:   { top: 'calc(50px - 11px * var(--p))', fontSize: 'calc(40px - 18px * var(--p))' },
+  face:  { top: 'calc(146px - 114px * var(--p))',
            width: 'calc(72px - 36px * var(--p))', height: 'calc(72px - 36px * var(--p))' },
   faceL: { left:  'calc(38px - 22px * var(--p))' },
   faceR: { right: 'calc(38px - 22px * var(--p))' },
-  sub:   { top: 'auto', bottom: 'calc(196px - 40px * var(--p))' },
-  who:   { top: 'auto', bottom: 'calc(30px - 30px * var(--p))' },
 } as const
 
 const MW_SIZE_D = { fontSize: 'calc(16px - 4px * var(--p))' }
-
 
 /** See the note at the usage site: off-token on purpose, and only here. */
 const BAND_RADIUS = '44px'
@@ -198,42 +160,18 @@ export function ShowdownBand({
   liveNow = false, strip = [], rank, points,
 }: ShowdownBandProps) {
   const bandRef = useRef<HTMLDivElement>(null)
-  const barRef = useRef<HTMLDivElement>(null)
-  /**
-   * The pinned bar's height, measured.
-   *
-   * ⚠ The duel block pins at `barHeight - (HERO - COLLAPSED)`, so this number
-   * decides where it comes to rest. AppHeader is `py-3` on a phone and `py-4`
-   * from `sm`, so it is not one number and guessing it would put the duel a few
-   * pixels under the bar or a few pixels adrift of it.
-   */
-  const [barH, setBarH] = useState(56)
 
   useEffect(() => {
     const el = bandRef.current
     if (!el) return
     let frame = 0
-    const barObservers: ResizeObserver[] = []
-    /**
-     * ⚠ THE VISIBLE HEIGHT, NOT THE FLOW HEIGHT. The duel block is now a fixed
-     * HERO tall and slides up behind the bar, so measuring the element would
-     * report 320 forever and park the rail 220px too low. What the rail needs
-     * is what is actually ON SCREEN: the bar, plus however much of the duel has
-     * not yet been pushed past it. Arithmetic off `--p`, so it costs no layout
-     * read in the scroll handler.
-     */
-    const publish = (p: number) =>
-      document.documentElement.style.setProperty(
-        '--sd-band-h', `${Math.round(barH + COLLAPSED + (HERO - COLLAPSED) * (1 - p))}px`)
     const onScroll = () => {
       if (frame) return
       // One write per animation frame, not one per scroll event: a trackpad
       // fires far more of the latter than the screen can show.
       frame = requestAnimationFrame(() => {
         frame = 0
-        const p = Math.min(1, Math.max(0, window.scrollY / (HERO - COLLAPSED)))
-        el.style.setProperty('--p', p.toFixed(3))
-        publish(p)
+        el.style.setProperty('--p', Math.min(1, Math.max(0, window.scrollY / 150)).toFixed(3))
       })
     }
     onScroll()
@@ -253,18 +191,16 @@ export function ShowdownBand({
      * stall that made the collapse feel like a drawer. The observer's callback
      * runs after layout, so `contentRect` is already known and costs nothing.
      */
-    const bar = barRef.current
-    if (bar) {
-      const barRo = new ResizeObserver(([e]) => setBarH(Math.round(e.contentRect.height)))
-      barRo.observe(bar)
-      barObservers.push(barRo)
-    }
-
+    const publish = (h: number) =>
+      document.documentElement.style.setProperty('--sd-band-h', `${Math.round(h)}px`)
+    publish(el.getBoundingClientRect().height)
+    const ro = new ResizeObserver(([entry]) => publish(entry.contentRect.height))
+    ro.observe(el)
 
     return () => {
       window.removeEventListener('scroll', onScroll)
       if (frame) cancelAnimationFrame(frame)
-      barObservers.forEach((o) => o.disconnect())
+      ro.disconnect()
       document.documentElement.style.removeProperty('--sd-band-h')
     }
   }, [])
@@ -302,40 +238,11 @@ export function ShowdownBand({
 
 
   return (
-    <div ref={bandRef} style={{ '--p': 0 } as React.CSSProperties}>
-
-      {/* ⚠ THE BAR IS ITS OWN STICKY ELEMENT, a SIBLING of the duel rather than
-          its child. A `position: sticky` child inside a sticky parent pins to
-          the PARENT's box, not the viewport — so nested, the bar would have
-          ridden the duel up and off the screen. Siblings is what lets the bar
-          hold the top while the duel is pushed past it.
-
-          ⚠ ITS STRUCTURE IS INLINE, NOT A CLASS. This checkout has served a
-          stale stylesheet four times today, and a bar that silently loses
-          `position: sticky` takes the pool name and the menu off the screen.
-          Inline cannot go stale. Solid background because the duel now travels
-          UNDERNEATH it — transparent, it would show the page through. */}
-      <div
-        ref={barRef}
-        style={{
-          position: 'sticky', top: 0, zIndex: 31,
-          background: '#131A2C',
-          marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)',
-          paddingLeft: 'calc(50vw - 50%)', paddingRight: 'calc(50vw - 50%)',
-        }}
-      >{header}</div>
-
-      {/* ⚠ STILL `sd-band`, deliberately. Every descendant rule in globals.css
-          is written `.sd-band .sd-*`; renaming this to `.sd-duel` would have
-          orphaned all twenty-two of them the moment the stylesheet lagged, and
-          it lags here. The utility's own `top: 0` is overridden inline below —
-          a stale copy of it is harmless. */}
-      <div
-        className="sd-band"
-        style={{
-          // Pinned so exactly COLLAPSED of it survives under the bar. Negative
-          // until it gets there, which is what makes the content push it.
-          top: `${barH - (HERO - COLLAPSED)}px`,
+    <div
+      ref={bandRef}
+      className="sd-band"
+      style={{
+        '--p': 0,
         background:
           `radial-gradient(110% 100% at 10% 0%, color-mix(in srgb, ${youColour} 26%, transparent) 0%, transparent 60%),`
           + `radial-gradient(110% 100% at 90% 0%, color-mix(in srgb, ${themColour} 22%, transparent) 0%, transparent 60%),`
@@ -366,11 +273,13 @@ export function ShowdownBand({
         borderBottomRightRadius: BAND_RADIUS,
       } as React.CSSProperties}
     >
+      {header && <div className="relative z-10">{header}</div>}
+
       {/* ── phone: the pieces travel ─────────────────────────── */}
       <div className="sd-m" style={M.block}>
         <p className="sd-mw t-caption text-white/75" style={M.mw}>Matchweek {matchweek}</p>
         <p className="sd-big t-num t-num-black text-white" style={M.big}>{headline}</p>
-        {sub && <p className="sd-sub t-detail text-white/45" style={M.sub}>{sub}</p>}
+        {sub && <p className="sd-sub t-detail text-white/45">{sub}</p>}
         {liveNow && (
           <p className="sd-sub t-detail">
             <span className="inline-flex items-center gap-1.5 rounded-pill bg-danger-500/15 text-danger-500 px-2.5 py-1">
@@ -386,11 +295,11 @@ export function ShowdownBand({
           : <Face p={person(themEntry!)} colour={themColour} className="sd-face sd-face-them" style={{ ...M.face, ...M.faceR }} />}
         {sealed && <p className="sd-vee t-caption text-accent-400 text-base select-none">V</p>}
 
-        <div className="sd-who sd-who-you" style={M.who}>
+        <div className="sd-who sd-who-you">
           <p className="t-caption text-white truncate">{name(youEntry)}</p>
           {meta(youEntry) && <p className="t-num text-[10px] text-white/40 mt-0.5">{meta(youEntry)}</p>}
         </div>
-        <div className="sd-who sd-who-them" style={M.who}>
+        <div className="sd-who sd-who-them">
           <p className="t-caption text-white truncate">
             {sealed ? 'Sealed' : name(themEntry!)}
           </p>
@@ -451,7 +360,6 @@ export function ShowdownBand({
             )}
           </span>
         </div>
-      </div>
       </div>
     </div>
   )
