@@ -1605,7 +1605,7 @@ export function PoolDetail({
   // still switches tabs, and landing on a stripless Predictions pane with no
   // way back would be a trap. Slice 4 puts the picks on the page as a card and
   // this goes away with it.
-  const showTabStrip = !onePage || activeTab !== 'duels'
+  const showTabStrip = !onePage
 
   // Swipe navigation for mobile — only swipe between primary tabs
   const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
@@ -1952,6 +1952,73 @@ export function PoolDetail({
         </div>
         </div>
       </div>
+
+      {/* ⚠ THE BAND LIVES ABOVE <main>, ON EVERY SURFACE.
+          Ryan's plan: the header persists across the pages you navigate to and
+          back from. Inside <main> it would be the third pane in document order,
+          so a `position: sticky` band would only begin sticking after two other
+          panes had scrolled past — and it would vanish entirely the moment you
+          opened anything that is not the duel.
+          `showContent` decides whether the duel's own cards come with it. */}
+      {onePage && isShowdown && showdownData && (
+        <DuelsTab
+          duels={showdownData.duels}
+          entryNames={showdownData.entryNames}
+          ownEntryIds={showdownData.ownEntryIds}
+          openMatchweek={showdownData.openMatchweek}
+          inPlayMatchweek={showdownData.inPlayMatchweek}
+          sealedMatchweek={showdownData.sealedMatchweek}
+          sealedOpensAtLatest={showdownData.sealedOpensAtLatest}
+          entryPeople={showdownData.entryPeople}
+          livePoints={duelPoints?.mw === showdownData.inPlayMatchweek
+            ? new Map(Object.entries(duelPoints.points))
+            : showdownData.livePoints}
+          perFixture={duelPoints?.mw === showdownData.inPlayMatchweek
+            ? new Map(Object.entries(duelPoints.perFixture).map(([e, byFx]) => [
+                e, new Map(Object.entries(byFx).map(([n, p]) => [Number(n), p])),
+              ]))
+            : showdownData.perFixture}
+          fixtures={showdownData.fixtures.map((f) => {
+            const live = duelFixtures?.mw === showdownData.inPlayMatchweek
+              ? duelFixtures.byNumber[f.number]
+              : undefined
+            return live ? { ...f, ...live, status: live.status ?? f.status } : f
+          })}
+          leagueOutcomes={allLeagueOutcomes}
+          allPredictions={allPredictions}
+          bulkState={bulkState}
+          totals={showdownData.totals}
+          form={leagueForm}
+          duelPoints={showdownData.duelPoints}
+          series={showdownData.series}
+          onGoToPicks={() => handleTabSwitch('predictions')}
+          layout="onepage"
+          showContent={activeTab === 'duels'}
+          bandHeader={
+            <AppHeader
+              overlay
+              sticky={false}
+              breadcrumbs={[{ label: pool.pool_name }]}
+              badges={
+                <button
+                  type="button"
+                  onClick={() => setMoreOpen(true)}
+                  aria-label="More in this pool"
+                  aria-haspopup="dialog"
+                  className="grid place-items-center w-6 h-6 rounded-control
+                             text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <svg width="13" height="8" viewBox="0 0 16 10" fill="none" aria-hidden="true">
+                    <path d="M1.5 1.5 8 8l6.5-6.5" stroke="currentColor" strokeWidth="2.2"
+                          strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              }
+              isSuperAdmin={isSuperAdmin}
+            />
+          }
+        />
+      )}
 
       {/* Tab content */}
       <main
@@ -2469,7 +2536,7 @@ export function PoolDetail({
               )
             )}
 
-            {activeTab === 'duels' && isShowdown && showdownData && (
+            {!onePage && activeTab === 'duels' && isShowdown && showdownData && (
               <DuelsTab
                 duels={showdownData.duels}
                 entryNames={showdownData.entryNames}
@@ -2769,7 +2836,11 @@ export function PoolDetail({
               {pool.pool_name}
             </p>
             <ul className="divide-y divide-white/10">
-              {tabs.filter((t) => t.key !== 'duels').map((t) => (
+              {/* ⚠ THE DUEL IS IN THE LIST. With no tab strip anywhere in
+                  one-page mode, this sheet is the only way back to it — and
+                  filtering it out was safe only while the strip reappeared off
+                  the duel. It does not any more. */}
+              {tabs.map((t) => (
                 <li key={t.key}>
                   <button
                     type="button"

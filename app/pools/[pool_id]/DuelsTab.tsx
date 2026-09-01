@@ -161,6 +161,8 @@ type Props = {
    * parameter away for as long as the rework is unproven.
    */
   layout?: 'tabs' | 'onepage'
+  /** One-page only: render the duel's cards, or just the persistent band. */
+  showContent?: boolean
   /** The app header, drawn INSIDE the band in one-page mode. */
   bandHeader?: React.ReactNode
   /** Your points and the pool's median, per matchweek (migration 124). */
@@ -605,6 +607,7 @@ export default function DuelsTab({
   duelPoints,
   onGoToPicks,
   layout = 'tabs',
+  showContent = true,
   bandHeader = null,
   series,
 }: Props) {
@@ -1114,20 +1117,7 @@ export default function DuelsTab({
     )
   }
 
-  return (
-    <div className={layout === 'onepage'
-      /* ⚠ CAPPED TO THE BAND'S OWN WIDTH. The band's gradient runs edge to
-         edge but its CONTENTS stop at 940px; letting the cards beneath run to
-         1200px+ made the page read as two different documents stacked on each
-         other. Same measure, one column, centred — the gutter is on this
-         element because the band is deliberately full-bleed past it. */
-      ? 'px-4 sm:px-6 pt-4 pb-10 space-y-4 md:space-y-5 max-w-[940px] mx-auto'
-      : 'space-y-4'}>
-      {/* ⚠ ONE-PAGE: the band stands in for the two cards below it and nothing
-          else changes. It takes DuelPanel's props verbatim — every number is
-          already computed for the card, and a band that derived its own would
-          be a second opinion about the same duel. */}
-      {layout === 'onepage' && (() => {
+  const bandNode = layout !== 'onepage' ? null : (() => {
         /* ⚠ THE THREE STATES ARE CHOSEN HERE, not in the band, and each one
            reaches for the component this tab already has for it. In play: the
            running score the card shows. Sealed: the same `Countdown` that has
@@ -1205,7 +1195,32 @@ export default function DuelsTab({
           )
         }
         return null
-      })()}
+  })()
+
+  /**
+   * ⚠ THE BAND IS A SHELL, NOT PART OF THE DUEL VIEW.
+   *
+   * Ryan's plan: the header persists across every surface you navigate to and
+   * back from. So when `showContent` is false this component renders the band
+   * and stops — the duel's own cards belong to the duel PAGE, the band belongs
+   * to the POOL. One instance either way, so the duel is computed once.
+   */
+  if (layout === 'onepage' && !showContent) return <>{bandNode}</>
+
+  return (
+    <div className={layout === 'onepage'
+      /* ⚠ CAPPED TO THE BAND'S OWN WIDTH. The band's gradient runs edge to
+         edge but its CONTENTS stop at 940px; letting the cards beneath run to
+         1200px+ made the page read as two different documents stacked on each
+         other. Same measure, one column, centred — the gutter is on this
+         element because the band is deliberately full-bleed past it. */
+      ? 'px-4 sm:px-6 pt-4 pb-10 space-y-4 md:space-y-5 max-w-[940px] mx-auto'
+      : 'space-y-4'}>
+      {/* ⚠ ONE-PAGE: the band stands in for the two cards below it and nothing
+          else changes. It takes DuelPanel's props verbatim — every number is
+          already computed for the card, and a band that derived its own would
+          be a second opinion about the same duel. */}
+      {bandNode}
 
       {/* Being played now, then the one you are still picking. Both, because
           they are different weeks all weekend. */}
