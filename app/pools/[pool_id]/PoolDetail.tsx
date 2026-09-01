@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { useTheme } from '@/components/ThemeProvider'
 import { AppHeader } from '@/components/ui/AppHeader'
+import { Modal } from '@/components/ui/Modal'
 import { LeaderboardTab } from './LeaderboardTab'
 import { DuelRecapSheet, type DuelRecap } from './DuelRecapSheet'
 import { ResultsTab } from './ResultsTab'
@@ -1580,6 +1581,8 @@ export function PoolDetail({
    * rewrite of the tab list.
    */
   const onePage = isShowdown && searchParams.get('layout') === 'onepage'
+  /** The pool menu behind the chevron — every surface the duel page does not show. */
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const canAdmin = isAdmin && !isArchived
   const tabs = canAdmin ? [...USER_TABS, ...adminTabs] : USER_TABS
@@ -2512,13 +2515,32 @@ export function PoolDetail({
                 totals={showdownData.totals}
                 onGoToPicks={() => handleTabSwitch('predictions')}
                 layout={onePage ? 'onepage' : 'tabs'}
-                moreTabs={onePage ? tabs.filter((t) => t.key !== 'duels') : []}
-                onSelectTab={(k) => handleTabSwitch(k as Tab)}
                 bandHeader={onePage ? (
                   <AppHeader
                     overlay
                     sticky={false}
                     breadcrumbs={[{ label: pool.pool_name }]}
+                    /* ⚠ THE POOL MENU RIDES IN `badges`, which AppHeader
+                       renders immediately after the breadcrumbs — so it lands
+                       beside the pool NAME without AppHeader needing to know
+                       what a pool menu is. Left of the bar is this pool, right
+                       is the app; the hamburger opposite keeps meaning
+                       Dashboard/Pools/Profile, as it does everywhere. */
+                    badges={
+                      <button
+                        type="button"
+                        onClick={() => setMoreOpen(true)}
+                        aria-label="More in this pool"
+                        aria-haspopup="dialog"
+                        className="grid place-items-center w-6 h-6 rounded-control
+                                   text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <svg width="13" height="8" viewBox="0 0 16 10" fill="none" aria-hidden="true">
+                          <path d="M1.5 1.5 8 8l6.5-6.5" stroke="currentColor" strokeWidth="2.2"
+                                strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    }
                     isSuperAdmin={isSuperAdmin}
                   />
                 ) : null}
@@ -2735,6 +2757,35 @@ export function PoolDetail({
       </main>
 
       {/* Navigation Warning Modal */}
+      {/* ⚠ A MODAL, NOT A DROPDOWN. The band clips its own overflow to get
+          those rounded corners, so a menu opening inside it would be clipped
+          too. `Modal` is the app's own sheet — bottom-anchored on a phone,
+          centred on desktop — and reusing it beats a second, thinner one. */}
+      {onePage && moreOpen && (
+        <Modal isOpen onClose={() => setMoreOpen(false)} size="sm"
+               titleId="pool-more-title" className="bg-midnight dark:border-white/10">
+          <div className="px-5 pt-6 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <p id="pool-more-title" className="t-caption text-white/40 px-1 pb-2">
+              {pool.pool_name}
+            </p>
+            <ul className="divide-y divide-white/10">
+              {tabs.filter((t) => t.key !== 'duels').map((t) => (
+                <li key={t.key}>
+                  <button
+                    type="button"
+                    onClick={() => { setMoreOpen(false); handleTabSwitch(t.key) }}
+                    className="w-full text-left t-body text-white/85 py-3.5 px-1
+                               hover:text-white transition-colors"
+                  >
+                    {t.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Modal>
+      )}
+
       {showNavWarning && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="fixed inset-0 bg-black/50" onClick={handleCancelNav} />
