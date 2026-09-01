@@ -1239,7 +1239,16 @@ export default function DuelsTab({
          sees no change at all. `items-start` is what lets the rail be sticky —
          stretched to the row height it would have nothing to stick within. */
       ? 'px-4 sm:px-6 pt-5 pb-10 space-y-4 md:space-y-0'
-        + ' md:grid md:grid-cols-[minmax(0,1fr)_19rem] md:gap-5 md:items-start'
+        /* ⚠ THE RAIL IS SIZED BY THE SEASON TABLE, not by taste. That table
+           shows #, member, form, W, T, L and points — and W/T/L appear from
+           `sm`, which is a VIEWPORT breakpoint, so on any desktop they are
+           there however narrow the column holding them is. At 19rem the points
+           column fell off the end and `overflow-x-auto` hid it behind a scroll
+           nobody would think to use. It needs ~380px; 25rem gives it room, and
+           22rem at `md` keeps the fixtures column usable on a small laptop
+           where 400px of rail would squeeze it. */
+        + ' md:grid md:gap-5 md:items-start'
+        + ' md:grid-cols-[minmax(0,1fr)_22rem] lg:grid-cols-[minmax(0,1fr)_25rem]'
       : 'space-y-4'}>
       {/* ⚠ TWO GROUPS, AND THE TABBED LAYOUT CANNOT TELL. Every gap here is
           `space-y-4` — outer and inner alike — so in tab mode nesting the cards
