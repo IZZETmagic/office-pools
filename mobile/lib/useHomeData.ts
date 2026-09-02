@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './auth';
 import { supabase } from './supabase';
-import { fetchHomeScoring, type EntryScoringSummary } from './api';
+import {
+  fetchHomeScoring,
+  type EntryScoringSummary,
+  type HomeScoring,
+  type HomeScoringPools,
+} from './api';
 
 // How long the home data is considered "fresh" before a focus-driven check
 // will actually refetch. Tab switches inside this window show the cached
@@ -24,6 +29,12 @@ export type PoolSummary = {
   status: string;
   predictionDeadline: string | null;
   tournamentId: string;
+  /**
+   * `tournaments.external_league_id` — the api-football id, which is the key
+   * the competition's colour and mark are both looked up by. Null for a
+   * tournament with no external id, which renders the unthemed slate.
+   */
+  externalLeagueId: number | null;
   memberCount: number;
   memberInitials: string[];
   currentRank: number | null;
@@ -51,6 +62,12 @@ export type PoolSummary = {
   needsPredictions: boolean;
   predictionsCompleted: number;
   predictionsTotal: number;
+  /**
+   * Table mode and Last Man Standing are ONE decision for the season, so their
+   * progress is a state and not a fraction — there is no "1 of 1" worth
+   * printing. False for every World Cup pool.
+   */
+  isSingleDecision: boolean;
   role: string;
   joinedAt: string;
   /** Mirrors pools.is_private. Drives the "non-admin members of a
@@ -195,6 +212,12 @@ export function useHomeDataInternal() {
         const entriesByPool: Record<string, number> = {};
         const tournamentMatchCount: Record<string, number> = {};
         const tournamentCompletedCount: Record<string, number> = {};
+        const externalLeagueByTournament: Record<string, number | null> = {};
+        // Per-pool facts the phone cannot work out for itself — the scoring
+        // gate and, for a league pool, the current decision's pick counts. NULL
+        // until the response is in, and stays null against an API that predates
+        // the field; every read of it below falls back accordingly.
+        let poolFacts: HomeScoringPools = null;
         const unreadByPool: Record<string, number> = {};
 
         const { data: memberReads } = await supabase
@@ -207,6 +230,30 @@ export function useHomeDataInternal() {
         }
 
         await Promise.all([
+          // The competition behind each pool, for the card's rail. ONE query
+          // for every tournament on the page — the counts below fan out per
+          // tournament because they are `head: true` counts, but this returns
+          // rows and `.in()` is cheaper than N round trips.
+          (async () => {
+            const { data, error } = await supabase
+              .from('tournaments')
+              .select('tournament_id, external_league_id')
+              .in('tournament_id', tournamentIds);
+            // ⚠ Surfaced, not discarded. `const { data } = await supabase...`
+            // hides a 400, and a selected column that does not exist comes back
+            // as null rather than an error — which is how the home screen's
+            // form, accuracy and streak were dead for weeks.
+            if (error) {
+              console.warn('[useHomeData] tournaments read failed:', error.message);
+              return;
+            }
+            for (const t of (data ?? []) as {
+              tournament_id: string;
+              external_league_id: number | null;
+            }[]) {
+              externalLeagueByTournament[t.tournament_id] = t.external_league_id ?? null;
+            }
+          })(),
           ...poolIds.map(async (pid) => {
             const { count } = await supabase
               .from('pool_members')
@@ -382,7 +429,9 @@ export function useHomeDataInternal() {
           // accuracy permanently empty. They are all just `score_type`.
           const [{ data: predRows }, scoringSummaries, bracketRes] = await Promise.all([
             supabase.from('predictions').select('entry_id').in('entry_id', allEntryIdsForPreds),
-            fetchHomeScoring(userData.user_id).catch(() => [] as EntryScoringSummary[]),
+            fetchHomeScoring(userData.user_id).catch(
+              () => ({ entries: [], pools: null }) as HomeScoring,
+            ),
             bracketPickerEntryIds.length > 0
               ? Promise.all([
                   supabase
@@ -410,7 +459,8 @@ export function useHomeDataInternal() {
               }
             }
           }
-          for (const summary of scoringSummaries) {
+          poolFacts = scoringSummaries.pools;
+          for (const summary of scoringSummaries.entries) {
             accuracyByEntry[summary.entry_id] = {
               totalCompleted: summary.total_completed,
               exactCount: summary.exact_count,
@@ -470,6 +520,7 @@ export function useHomeDataInternal() {
             status: pool.status,
             predictionDeadline: pool.prediction_deadline,
             tournamentId: pool.tournament_id,
+            externalLeagueId: externalLeagueByTournament[pool.tournament_id] ?? null,
             memberCount: counts[pool.pool_id] ?? 0,
             memberInitials: initialsByPool[pool.pool_id] ?? [],
             // "Best position" across all of this user's entries in the pool —
@@ -484,7 +535,24 @@ export function useHomeDataInternal() {
             })(),
             totalPoints: matchPoints + bonusPoints + adjustment,
             totalEntries: entriesByPool[pool.pool_id] ?? 0,
-            hasScoringStarted: (tournamentCompletedCount[pool.tournament_id] ?? 0) > 0,
+            // ⚠ READ, NOT DERIVED — and the phone cannot derive this one even
+            // if it wanted to. The rule is "has ANYONE in this pool scored",
+            // and the phone only ever holds its OWN entries: a member sitting
+            // last in a pool where everybody else has points would compute
+            // false and hide a rank that is real. The server answers it with
+            // the same rule the web card uses.
+            //
+            // ⚠ THE FALLBACK IS FOR A STALE API, NOT FOR MISSING DATA. Against
+            // an API deployed before `pools` existed the gate is null, and the
+            // old local count still gets World Cup pools right — a league pool
+            // was already dashed there, since its fixtures are in
+            // `league_fixtures` and this counts `matches`, so that count is 0
+            // for every league pool for ever. Delete the fallback once the API
+            // carrying `pools` is deployed; shipping this OTA first would blank
+            // the rank on every World Cup card.
+            hasScoringStarted:
+              poolFacts?.[pool.pool_id]?.hasScoringStarted ??
+              (tournamentCompletedCount[pool.tournament_id] ?? 0) > 0,
             hasSubmittedPredictions: entries.some((e) => e.has_submitted_predictions === true),
             // If the user has zero entries (e.g. an admin who deleted all
             // theirs), there is literally nothing to predict, so the
@@ -503,13 +571,32 @@ export function useHomeDataInternal() {
                 : pool.prediction_mode === 'progressive'
                   ? progressiveNeedsPredictions[pool.pool_id] ?? false
                   : !(best?.has_submitted_predictions ?? false),
-            predictionsCompleted: bestEntryId ? predictionsByEntry[bestEntryId] ?? 0 : 0,
+            // ⚠ THE UNIT DIFFERS BY COMPETITION, and the server decides it for
+            // a league. A World Cup ring counts the whole tournament; a league
+            // ring counts the OPEN MATCHWEEK, because "12 of 380" is true and
+            // useless. Table and Last Man Standing come back as 1-of-1.
+            //
+            // Both league numbers used to be counted here against World Cup
+            // tables — `predictions` rows and the `matches` count — and league
+            // picks are in `league_predictions` while league fixtures are in
+            // `league_fixtures`, so every league ring read 0 of 0 and rendered
+            // an empty grey circle. Neither read errored.
+            //
+            // ⚠ `?? ` NOT `||`: a genuine 0 made picks must not fall through to
+            // the local count, which would be 0 anyway but for the wrong reason.
+            predictionsCompleted:
+              poolFacts?.[pool.pool_id]?.madePicks ??
+              (bestEntryId ? predictionsByEntry[bestEntryId] ?? 0 : 0),
             // Bracket picker has a fixed 92-item slate (48 group + 12 third-place
             // + 32 knockout); pick'em modes use the tournament's match count.
             predictionsTotal:
-              pool.prediction_mode === 'bracket_picker'
+              poolFacts?.[pool.pool_id]?.totalPicks ??
+              (pool.prediction_mode === 'bracket_picker'
                 ? 92
-                : tournamentMatchCount[pool.tournament_id] ?? 0,
+                : tournamentMatchCount[pool.tournament_id] ?? 0),
+            // Table and Last Man Standing: one decision, so the ring shows a
+            // state rather than a count. False for every World Cup pool.
+            isSingleDecision: poolFacts?.[pool.pool_id]?.isSingleDecision ?? false,
             role: row.role,
             joinedAt: row.joined_at,
             isPrivate: !!pool.is_private,

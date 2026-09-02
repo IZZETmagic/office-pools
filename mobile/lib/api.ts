@@ -956,11 +956,69 @@ export type EntryScoringSummary = {
   level_name: string | null;
 };
 
-export async function fetchHomeScoring(userId: string): Promise<EntryScoringSummary[]> {
-  const res = await apiFetch<{ entries: EntryScoringSummary[] }>(
-    `/api/users/${userId}/home-scoring`,
-  );
-  return res.entries ?? [];
+/**
+ * The per-pool facts the home card cannot work out for itself.
+ *
+ * ⚠ `null` FOR THE WHOLE MAP MEANS THE SERVER DID NOT SAY, which is not the
+ * same as "nothing has scored" or "no picks". An API deployed before this
+ * existed returns no `pools` key, and treating that as zeros would blank a rank
+ * and a ring that both work today. The caller falls back to its own local
+ * counts when this is null.
+ */
+export type HomePoolFacts = {
+  /** Has ANYONE in this pool scored — the gate the rank sits behind. */
+  hasScoringStarted: boolean;
+  /**
+   * Picks in the CURRENT decision, not the season: the open matchweek for
+   * Pick'em and Showdown, and 1 for Table and Last Man Standing.
+   *
+   * ⚠ NULL on a World Cup pool, and null is not zero. Those are still counted
+   * on the phone from `predictions` against `matches`, which is correct — so a
+   * null here means "use your own numbers", not "there is nothing to pick".
+   */
+  totalPicks: number | null;
+  madePicks: number | null;
+  hasSubmitted: boolean | null;
+  /** Table and Last Man Standing: one decision, so the ring is a state. */
+  isSingleDecision: boolean | null;
+};
+
+export type HomeScoringPools = Record<string, HomePoolFacts> | null;
+
+export type HomeScoring = {
+  entries: EntryScoringSummary[];
+  pools: HomeScoringPools;
+};
+
+export async function fetchHomeScoring(userId: string): Promise<HomeScoring> {
+  const res = await apiFetch<{
+    entries: EntryScoringSummary[];
+    pools?: {
+      pool_id: string;
+      has_scoring_started: boolean;
+      total_picks: number | null;
+      made_picks: number | null;
+      has_submitted: boolean | null;
+      is_single_decision: boolean | null;
+    }[];
+  }>(`/api/users/${userId}/home-scoring`);
+
+  const pools: HomeScoringPools = res.pools
+    ? Object.fromEntries(
+        res.pools.map((p) => [
+          p.pool_id,
+          {
+            hasScoringStarted: p.has_scoring_started,
+            totalPicks: p.total_picks ?? null,
+            madePicks: p.made_picks ?? null,
+            hasSubmitted: p.has_submitted ?? null,
+            isSingleDecision: p.is_single_decision ?? null,
+          },
+        ]),
+      )
+    : null;
+
+  return { entries: res.entries ?? [], pools };
 }
 
 // ---------------------------------------------------------------------------
