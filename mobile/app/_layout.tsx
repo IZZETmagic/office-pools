@@ -13,6 +13,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { LogBox, useColorScheme } from 'react-native';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
@@ -44,6 +45,7 @@ import {
   useTournamentMatches,
 } from '@/lib/TournamentMatchesProvider';
 import { PendingActionsProvider } from '@/lib/usePendingActions';
+import { createQueryClient, wireAppStateFocus } from '@/lib/queryClient';
 import { initSentry, Sentry } from '@/lib/sentry';
 import {
   markNotificationsPrompted,
@@ -113,6 +115,15 @@ export default Sentry.wrap(RootLayout);
 
 function InnerLayout() {
   const colorScheme = useColorScheme();
+  // ⚠ Created ONCE, via the lazy initialiser. `new QueryClient()` inline would
+  // build a fresh cache on every render of this component and throw the old one
+  // away — which does not look like a bug, it looks like every screen refetching
+  // at random.
+  const [queryClient] = useState(createQueryClient);
+  // React Query's focus tracking is written for a browser. In React Native the
+  // signal is AppState, and without this `refetchOnWindowFocus` never fires at
+  // all — a phone that has been in a pocket for an hour shows hour-old data.
+  useEffect(() => wireAppStateFocus(), []);
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -206,6 +217,12 @@ function InnerLayout() {
     // the native safe-area module reports back. Our nested provider wins
     // for everything below; expo-router's outer one is harmless.
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+    {/* Outermost of the data providers on purpose: everything below may use a
+        query, and the client must outlive every one of them. Created once via
+        useState so a re-render never swaps the cache out from under a screen —
+        the classic React Query mistake, and it looks like a random refetch
+        storm rather than like a bug. */}
+    <QueryClientProvider client={queryClient}>
     <GestureHandlerRootView style={{ flex: 1 }}>
     <KeyboardProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -303,6 +320,7 @@ function InnerLayout() {
     </ThemeProvider>
     </KeyboardProvider>
     </GestureHandlerRootView>
+    </QueryClientProvider>
     </SafeAreaProvider>
   );
 }

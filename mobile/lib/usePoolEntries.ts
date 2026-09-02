@@ -98,40 +98,69 @@ export function usePoolEntries(poolId: string | undefined) {
     void load('initial');
   }, [load]);
 
-  // Live updates: subscribe to pool_entries changes for THIS user's
-  // member_id. Covers (a) the Stop Participating flow deleting all
-  // entries — the PredictionsTab empties immediately without waiting
-  // for a focus re-fetch — (b) another device adding/renaming an
-  // entry, and (c) points_total updates from server recalculation.
-  // Filter is by member_id (most specific) rather than pool_id so we
-  // don't fan out events for the whole pool's entry table. pool_entries
-  // is in the supabase_realtime publication and runs at REPLICA
-  // IDENTITY FULL, so the OLD row on DELETE carries member_id and the
-  // filter matches.
+  // ⚠ BROADCAST, NOT `postgres_changes` — changed 2026-09-02, and the reason is
+  // measured rather than stylistic.
+  //
+  // This used to subscribe to `pool_entries` changes filtered to the viewer's
+  // own `member_id`. The filter was doing less than it looked: PostgREST
+  // decodes the WAL for EVERY write to a replicated table and evaluates RLS
+  // per subscriber, then applies the filter — so the cost is paid whether or
+  // not a row matches. And `pool_entries` is written by the scoring path:
+  //
+  //   pool_entries   1,885,651 writes   32.9% of ALL replicated writes
+  //
+  // second only to presence, and the single largest thing mobile was keeping in
+  // the publication. Supabase's own guidance is unambiguous — Broadcast is "the
+  // recommended method for scalability and security"; `postgres_changes` "does
+  // not scale as well".
+  //
+  // ## What replaces each of the three things the old subscription did
+  //
+  //   (c) points from a recalculation → the `pool:{id}:leaderboard` broadcast,
+  //       which already carries totals and ranks in the payload (migration 060)
+  //       and which `usePoolDetail` has been reading since 2026-07-29.
+  //
+  //   (a) Stop Participating clearing entries, and
+  //   (b) another DEVICE adding or renaming an entry
+  //       → a focus refetch. Both are rare, deliberate actions, and this hook
+  //       already refreshes eagerly after the viewer's own mutations — so the
+  //       only case that changes is *another* device, which now updates when
+  //       the screen is focused rather than within the second.
+  //
+  // ⚠ THAT IS A REAL BEHAVIOUR CHANGE and it is the whole trade: a second-device
+  // entry rename is no longer instant. It buys a third of the realtime bill.
   const loadRef = useRef(load);
   loadRef.current = load;
   useEffect(() => {
-    if (!memberId) return;
-    const channelName = `pool-entries-${memberId}-${Math.random().toString(36).slice(2, 10)}`;
+    if (!poolId) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    // ⚠ `private: true` + `setAuth()` first. Without the JWT the channel's
+    // authorization policy never passes and no events arrive — SILENTLY. Same
+    // shape as `usePoolDetail`, and the reason that comment exists there.
     const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'pool_entries',
-          filter: `member_id=eq.${memberId}`,
-        },
-        () => {
-          void loadRef.current('refresh');
-        },
-      )
-      .subscribe();
+      .channel(`pool:${poolId}:leaderboard`, { config: { private: true } })
+      .on('broadcast', { event: 'leaderboard_update' }, () => {
+        // Debounced with jitter: one goal must not make every connected client
+        // refetch in the same second. The payload carries the leaderboard, not
+        // this hook's shape, so a refetch is still the honest way to get it.
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (active) void loadRef.current('refresh');
+        }, 1500 + Math.random() * 4000);
+      });
+
+    void Promise.resolve(supabase.realtime.setAuth()).then(() => {
+      if (active) channel.subscribe();
+    });
+
     return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
       void channel.unsubscribe();
     };
-  }, [memberId]);
+  }, [poolId]);
 
   async function addEntry(name: string) {
     if (!memberId) return { error: 'No membership' };
