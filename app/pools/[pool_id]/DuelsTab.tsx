@@ -1342,28 +1342,31 @@ export default function DuelsTab({
           )
         }
 
-        if (sealedMatchweek !== null) {
-          return (
-            <ShowdownBand
-              matchweek={sealedMatchweek}
-              youEntry={you}
-              themEntry={null}
-              name={name} person={person}
-              header={bandHeader}
-              /* ⚠ YELLOW, and only here. The accent marks the thing you are
-                 WAITING on — the same gold the sealed card already uses for its
-                 line. A live score is white because it is a fact, not a
-                 promise. */
-              headline={sealedOpensAtLatest
-                ? <span className="text-accent-400"><Countdown to={sealedOpensAtLatest} onExpire={onSealedExpired} /></span>
-                : <span className="text-white/45">Sealed</span>}
-              sub="Until your opponent is revealed"
-              rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
-              points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
-            />
-          )
-        }
+        /* ⚠ THE OPEN WEEK IS CHECKED BEFORE THE SEALED ONE, AND THAT ORDER IS
+           THE WHOLE FIX.
 
+           These two branches do not describe the same matchweek. `open` is the
+           week you are picking for; `sealedMatchweek` is the NEXT one after it,
+           and mid-season there is always a next one — so a chain that asked
+           "is anything sealed?" first could never reach the Reveal button at
+           all. Observed 2026-09-01: matchweek 3's draw opened at 10pm and the
+           band went straight from counting down to 3 to counting down to 4,
+           skipping the walkout entirely. It looked like a working clock, which
+           is why it survived: the countdown it switched to was correct, it was
+           just counting to the wrong week.
+
+           This is the same failure the note above `inPlay` records — "matchweek
+           2 was on screen, matchweek 4 was on screen as sealed, and matchweek 3
+           was nowhere" — which was fixed for the TAB layout by rendering both.
+           The band has one slot and cannot, so it orders them instead: the duel
+           you can act on outranks the one you can only wait for.
+
+           ⚠ NO NEW CONDITION IS NEEDED, because RLS already answers it (116). A
+           sealed week has no duel rows, so `open` is null while matchweek 3 is
+           sealed and this branch falls through to the countdown on its own. The
+           instant the reveal lands the rows arrive and it takes over. Guarding
+           this on a re-derived "is it revealed?" would be a fourth copy of the
+           reveal rule, and three have already drifted (123, 127, poolCards). */
         if (open) {
           return (
             <ShowdownBand
@@ -1399,6 +1402,28 @@ export default function DuelsTab({
               /* ⚠ "Your opponent is in" ONLY BEFORE you have met them — after
                  that the band is showing you who, so saying it is noise. */
               sub={revealOpponent ? (revealSeen ? 'Picks are open' : 'Your opponent is in') : 'Picks are open'}
+              rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
+              points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
+            />
+          )
+        }
+
+        if (sealedMatchweek !== null) {
+          return (
+            <ShowdownBand
+              matchweek={sealedMatchweek}
+              youEntry={you}
+              themEntry={null}
+              name={name} person={person}
+              header={bandHeader}
+              /* ⚠ YELLOW, and only here. The accent marks the thing you are
+                 WAITING on — the same gold the sealed card already uses for its
+                 line. A live score is white because it is a fact, not a
+                 promise. */
+              headline={sealedOpensAtLatest
+                ? <span className="text-accent-400"><Countdown to={sealedOpensAtLatest} onExpire={onSealedExpired} /></span>
+                : <span className="text-white/45">Sealed</span>}
+              sub="Until your opponent is revealed"
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
               points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
             />
