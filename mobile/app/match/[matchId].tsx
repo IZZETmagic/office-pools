@@ -196,8 +196,35 @@ function awayDisplayName(match: ResultsMatch): string {
 }
 
 function stageLabel(match: ResultsMatch): string {
-  const label = match.groupLetter ? `Group ${match.groupLetter}` : formatStageLabel(match.stage);
+  const label = match.groupLetter
+    ? `Group ${match.groupLetter}`
+    : formatStageLabel(match.stage, match.roundNumber);
+  // ⚠ NO "Match #" FOR A LEAGUE FIXTURE. `match_number` there is the season's
+  // own 1–380 counter, which is a database detail rather than something anybody
+  // says out loud — "Matchweek 12 · Match #118" reads as two competing
+  // numberings. Without the matchweek this line read "Regular Season · Match #1",
+  // which is the same raw-enum bug the web fixed in `MatchCard.tsx`.
+  if (match.roundNumber !== null) return label;
   return `${label} · Match #${match.matchNumber}`;
+}
+
+/**
+ * Is this a two-legged-or-single knockout tie, where the WINNER is what a pick
+ * is graded on?
+ *
+ * ⚠ IT USED TO BE `groupLetter === null`, AND A LEAGUE FIXTURE HAS NO GROUP. So
+ * every one of the 380 would have been graded as a knockout — the wrong result
+ * badge, and a query against `bracket_picker_knockout_picks` on a fixture id
+ * that cannot be in it.
+ *
+ * Not reachable today: a league fixture arrives with no `predictionInfos`, so
+ * neither caller renders. It is corrected anyway, because the thing that makes
+ * it reachable is the follow-up this screen already anticipates — showing a
+ * member their league pick — and a latent wrong answer waiting on a feature is
+ * worse than a wrong answer you can see.
+ */
+function isKnockoutTie(match: ResultsMatch): boolean {
+  return match.roundNumber === null && match.groupLetter === null;
 }
 
 function formattedFullDate(iso: string): string {
@@ -1219,11 +1246,19 @@ function YourPredictionsSection({
             ...theme.shadows.card,
           }}
         >
+          {/* ⚠ TWO DIFFERENT TRUTHS, AND THE WRONG ONE IS A CONFIDENT LIE. For a
+              league fixture the phone does not read picks at all — they are
+              pool-scoped and live in `league_predictions` — so "No predictions
+              yet · Join a pool" would tell a member who IS in a pool and HAS
+              predicted this game that they have not. Says what is actually so,
+              in the same words the pool's Predictions tab uses. */}
           <Text variant="cardTitle" align="center">
-            No predictions yet
+            {match.roundNumber !== null ? 'Your picks are on the web' : 'No predictions yet'}
           </Text>
           <Text variant="body" color="slate" align="center">
-            Join a pool and make your prediction for this match
+            {match.roundNumber !== null
+              ? "This competition's picks aren't on the phone yet. Everything else here is up to date."
+              : 'Join a pool and make your prediction for this match'}
           </Text>
         </View>
       ) : (
@@ -1276,7 +1311,7 @@ function PredictionRow({ match, info }: { match: ResultsMatch; info: MatchPredic
   const theme = useTheme();
   const isLive = match.status === 'live';
   const isFinished = match.status === 'completed';
-  const isKnockout = match.groupLetter === null;
+  const isKnockout = isKnockoutTie(match);
   const showResult = (isLive || isFinished) && info.prediction !== null;
   const pts = info.breakdownPoints ?? info.matchPoints;
 
@@ -1405,7 +1440,7 @@ function BracketPickerRow({ match, info }: { match: ResultsMatch; info: MatchPre
   const theme = useTheme();
   const isLive = match.status === 'live';
   const isFinished = match.status === 'completed';
-  const isKnockout = match.groupLetter === null;
+  const isKnockout = isKnockoutTie(match);
   const bp: BracketPickInfo | null = info.bracketPick;
 
   return (

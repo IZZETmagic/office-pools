@@ -10,6 +10,7 @@ import {
 } from './api';
 import { useHomeData } from './HomeDataProvider';
 import { supabase } from './supabase';
+import { useTournamentMatches } from './TournamentMatchesProvider';
 import {
   type ResultsMatch,
   type ResultsTeam,
@@ -133,6 +134,21 @@ export function useMatchDetail(matchId: string | undefined) {
   const appUserId = homeData?.appUserId ?? null;
   const pools = homeData?.pools ?? [];
 
+  // ⚠ A LEAGUE FIXTURE IS NOT IN `matches`, so step 1 below finds no row and the
+  // screen used to say "Unable to load match / Match not found" — for a game a
+  // member had just tapped in their own results list. `fixture_id` and
+  // `match_id` are both uuid, so it was a clean, well-formed query returning
+  // nothing, not a type error.
+  //
+  // It is taken from the list ALREADY IN MEMORY rather than fetched. The
+  // provider holds the whole season; re-requesting one fixture of it on every
+  // tap would be a round trip to learn something the app already knows.
+  const { matches: allMatches } = useTournamentMatches();
+  const leagueMatch = useMemo(
+    () => allMatches.find((m) => m.matchId === matchId && m.roundNumber !== null) ?? null,
+    [allMatches, matchId],
+  );
+
   const [match, setMatch] = useState<ResultsMatch | null>(null);
   const [predictionInfos, setPredictionInfos] = useState<MatchPredictionInfo[]>([]);
   const [matchStats, setMatchStats] = useState<MatchStatsResponse | null>(null);
@@ -155,6 +171,31 @@ export function useMatchDetail(matchId: string | undefined) {
     if (!matchId || !appUserId) return;
     setLoading(true);
     setError(null);
+
+    // ---- The league fixture, and everything it deliberately does not do ----
+    //
+    // Steps 1–8 below are World Cup machinery end to end: `predictions`,
+    // `bracket_picker_*`, three `/api/matches/:id/*` routes and a group
+    // standings table. None of them has a row or a route for a league fixture,
+    // and calling them on one would ask five questions whose answer is already
+    // known to be nothing.
+    //
+    // ⚠ SO THIS IS A HEADER, AND THAT IS THE STATED v1 BOUNDARY. A league pick
+    // is pool-scoped — it comes from `/api/pools/:id/league` — and a match
+    // opened from the global list has no pool in hand. Fanning out one contract
+    // call per pool per tap is the fetch-per-goal pattern the league read review
+    // exists to stop. Showing the game itself beats "Match not found"; showing
+    // the picks is its own piece of work.
+    if (leagueMatch) {
+      setMatch(leagueMatch);
+      setPredictionInfos([]);
+      setMatchStats(null);
+      setBracketStats(null);
+      setGroupStandings([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       // 1. Fetch the match.
       const { data: matchRow, error: matchErr } = await supabase
@@ -404,7 +445,7 @@ export function useMatchDetail(matchId: string | undefined) {
     }
     // matchId + appUserId + poolsKey are the inputs that actually matter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchId, appUserId, poolsKey]);
+  }, [matchId, appUserId, poolsKey, leagueMatch]);
 
   useEffect(() => {
     void load();
@@ -413,6 +454,12 @@ export function useMatchDetail(matchId: string | undefined) {
   // Realtime: subscribe to UPDATEs on this match only. Surgical patch.
   useEffect(() => {
     if (!matchId) return;
+    // ⚠ Not for a league fixture: this channel watches `matches`, and a league
+    // fixture has no row there to update. Opening it would be a subscription
+    // that can never fire — and mobile is already carrying more replicated-table
+    // consumers than it wants (Gate M3). Its live score arrives with the merged
+    // list instead.
+    if (leagueMatch) return;
     const channel = supabase
       .channel(`match-detail-${matchId}`)
       .on(
@@ -442,7 +489,7 @@ export function useMatchDetail(matchId: string | undefined) {
     return () => {
       void channel.unsubscribe();
     };
-  }, [matchId]);
+  }, [matchId, leagueMatch]);
 
   return {
     match,
