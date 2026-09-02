@@ -14,7 +14,7 @@
 // So the values are read out of the migration itself rather than restated here.
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { resolve } from 'path'
 
 import { DUEL_WIN, DUEL_TIE, DUEL_BYE, DUEL_LOSS, duelResult } from '../duelPoints'
@@ -117,5 +117,62 @@ describe('no consumer classifies a duel with a bare literal', () => {
     expect(fn).toMatch(/duelResult\(/)
     expect(fn, 'a win is not 3 any more').not.toMatch(/=== 3\b/)
     expect(fn, 'a tie is not 1 any more').not.toMatch(/=== 1\b/)
+  })
+
+  /**
+   * ⚠ WIDENED 2 SEPTEMBER, because pinning one function missed the next one.
+   *
+   * `lib/league/poolCards.ts` builds the DASHBOARD card's Showdown record and
+   * kept `=== 3` / `=== 1` right through the 121 sweep — this guard did not
+   * look at it, because it was written to pin `headToHead`. Checked in
+   * production that day: nine settled duels carrying 500/250/0, so every one of
+   * them was counted as a defeat on the surface most members open first, beside
+   * a Duel pts tile that read the stored 500 correctly.
+   *
+   * So the rule is structural now: ANY file that reads `points_a` or `points_b`
+   * is classifying a duel, and must ask `duelPoints` to do it. That is a rule a
+   * new call site cannot slip past by being somewhere nobody thought to pin.
+   */
+  /** A duel's points compared against the values migration 121 retired. */
+  const LITERAL = /\b(points?|pts|mine|theirs|yours|them)\w*\s*===\s*[13]\b/i
+
+  const READERS = [
+    'lib/league/poolCards.ts',
+    'lib/league/duels.ts',
+    'lib/league/duelVerdict.ts',
+    'app/pools/[pool_id]/DuelsTab.tsx',
+  ]
+
+  it.each(READERS)('%s classifies through duelPoints, not a literal', (rel) => {
+    const src = code(readFileSync(resolve(process.cwd(), rel), 'utf8'))
+    expect(src, `${rel} no longer reads points_a — drop it from READERS`).toMatch(/points_[ab]/)
+    expect(src, `${rel} must import from duelPoints`).toMatch(/from '(@\/lib\/league\/)?\.?\.?\/?duelPoints'/)
+    // ⚠ SCOPED TO A POINTS-SHAPED NAME, not to the digits. A blanket ban on
+    // `=== 1` fails on `rows.length === 1 ? 'week' : 'weeks'`, and a guard that
+    // punishes pluralisation gets switched off. The bug shape is a comparison
+    // whose LEFT side is the duel's points — `mine === 3`, `mineP === 3`.
+    expect(src, `${rel} still classifies a duel with a literal`).not.toMatch(LITERAL)
+  })
+
+  it('every file that reads points_a is in READERS', () => {
+    // The list above is only a guard while it is complete. A new consumer must
+    // land here rather than quietly becoming the third copy.
+    const roots = ['lib/league', 'lib/remotion', 'app/pools/[pool_id]']
+    const found: string[] = []
+    const walk = (dir: string) => {
+      for (const e of readdirSync(resolve(process.cwd(), dir), { withFileTypes: true })) {
+        const p = `${dir}/${e.name}`
+        if (e.isDirectory()) { if (e.name !== '__tests__') walk(p); continue }
+        if (!/\.tsx?$/.test(e.name) || e.name === 'duelPoints.ts') continue
+        const src = code(readFileSync(resolve(process.cwd(), p), 'utf8'))
+        // A file that only shapes a row for a video (`lib/remotion/*Props.ts`)
+        // passes the number through without ever asking what it means, so it is
+        // a reader without being a classifier. It is caught by the literal test
+        // below rather than forced to import the module.
+        if (/points_[ab]/.test(src) && LITERAL.test(src)) found.push(p)
+      }
+    }
+    roots.forEach(walk)
+    expect(found, 'these read a duel points value and classify it with a literal').toEqual([])
   })
 })

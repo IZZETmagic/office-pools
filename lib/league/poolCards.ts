@@ -33,6 +33,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { inPlayMatchweekId, openMatchweekId, type MatchweekRow } from './read'
 import { shortClubName } from './clubName'
+import { duelResult } from './duelPoints'
 
 type AdminClient = SupabaseClient
 
@@ -766,9 +767,27 @@ export async function readLeagueCardFacts(
         if (!d.settled_at) continue
 
         const mineP = (isA ? d.points_a : d.points_b) as number | null
-        if (mineP === 3) { won++; settled.push({ mw, outcome: 'won' }) }
-        else if (mineP === 1) { tied++; settled.push({ mw, outcome: 'tied' }) }
-        else { lost++; settled.push({ mw, outcome: 'lost' }) }
+        /* ⚠ ASK `duelPoints`, NEVER A LITERAL — and this file is why the guard
+           beside it now scans every reader rather than one function.
+
+           It tested `=== 3` and `=== 1` for four days after migration 121 made
+           a win 500 and a tie 250, so every settled duel fell through to the
+           else. Checked in production 2 Sep: nine duels settled, carrying
+           500/250/0. The card showed a member who had WON as a defeat, with a
+           red form dot, while the Duel pts tile beside it read the stored 500
+           and the leaderboard had them going up. Nothing errored.
+
+           The bye is already handled structurally above, which is the one case
+           `duelResult` cannot see — `DUEL_BYE` equals `DUEL_TIE` by design. */
+        const outcome = duelResult(mineP)
+        // A settled duel with an opponent always carries points. If one somehow
+        // does not, say nothing rather than paint a defeat onto it — that is
+        // precisely the failure this line replaces.
+        if (!outcome) continue
+        if (outcome === 'won') won++
+        else if (outcome === 'tied') tied++
+        else lost++
+        settled.push({ mw, outcome })
       }
 
       // Who you play next: the duel in the OPEN matchweek — the one this member
