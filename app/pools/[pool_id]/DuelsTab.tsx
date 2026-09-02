@@ -146,6 +146,17 @@ type Props = {
   sealedMatchweek: number | null
   /** WHEN the duel opens — read from `league_duel_reveals_at` (123). */
   sealedOpensAtLatest: string | null
+  /**
+   * The first KICKOFF of the open matchweek — what the post-reveal band counts
+   * down to.
+   *
+   * ⚠ NOT `lock_at`, and the difference is an hour of real football. Picks
+   * close before the first game, not at it: matchweek 3 locks 18:00 and kicks
+   * off 19:00, and only matchweeks 1 and 2 of this season happen to share an
+   * instant. Counting down to the deadline would say "first game in 0m" while
+   * nobody had kicked anything.
+   */
+  openFirstKickoff: string | null
   /** entry_id → the person behind it, for the faces in the corners. */
   entryPeople: Map<string, AvatarPerson>
   /**
@@ -661,6 +672,7 @@ export default function DuelsTab({
   inPlayMatchweek,
   sealedMatchweek,
   sealedOpensAtLatest,
+  openFirstKickoff,
   entryPeople,
   livePoints,
   perFixture,
@@ -839,7 +851,7 @@ export default function DuelsTab({
    * already ~70% of this database's time, and simultaneity, not volume, is the
    * documented failure mode. Spreading it over 20s costs nobody anything.
    */
-  const onSealedExpired = useCallback(() => {
+  const onBandClockExpired = useCallback(() => {
     const jitterMs = 2_000 + Math.round(Math.random() * 18_000)
     setTimeout(() => router.refresh(), jitterMs)
   }, [router])
@@ -1379,15 +1391,57 @@ export default function DuelsTab({
               themEntry={revealSeen ? open.them?.entry ?? null : null}
               name={name} person={person}
               header={bandHeader}
-              /* ⚠ THE SAME SLOT THE SEALED COUNTDOWN USED. The thing you were
-                 waiting for turns into the thing you press — no new surface, no
-                 modal arriving unbidden.
+              /* ⚠ NOTHING AT THE TOP UNTIL YOU HAVE MET THEM. Before the
+                 walkout the band is one question — who — and a scoreline above
+                 it is furniture around an empty circle. `null` here also picks
+                 the shorter phone layout, so the band closes up rather than
+                 leaving a hole where a reading would have gone.
+
+                 ⚠ AND AFTERWARDS IT IS 0–0, WRITTEN AS A FACT, NOT LOOKED UP.
+                 Ryan, 2026-09-02: *"after the reveal the 0-0 score should be
+                 up."* The open matchweek is BY DEFINITION the one that has not
+                 locked, so no fixture in it has kicked off and neither side has
+                 accrued anything — 0–0 is the only score it can have.
+
+                 It deliberately does NOT read `live()`. That map is scoped to
+                 the matchweek being PLAYED (`duelPoints?.mw === inPlayMatchweek`
+                 in PoolDetail), and while it happens to fall back to the open
+                 week when nothing is in play, it does not when the viewer has
+                 no duel in the live week — a late joiner, migration 100. Then
+                 `live()` would print LAST week's running score under this
+                 week's matchweek number. Reaching for a number that is only
+                 usually right is exactly the second-opinion bug this band's
+                 header warns about. */
+              headline={revealSeen ? (
+                <>
+                  <span>0</span>
+                  <span className="text-white/30 mx-2.5">–</span>
+                  <span>0</span>
+                </>
+              ) : null}
+              /* ⚠ THE FIRST GAME, NOT THE DEADLINE. Checked against the real
+                 fixture list: `lock_at` runs an hour BEFORE the first kickoff
+                 (matchweek 3 locks 18:00, kicks off 19:00), so counting down to
+                 the lock would promise football that is still an hour away.
+                 `openFirstKickoff` is `min(kickoff_at)` of the open matchweek,
+                 taken server-side.
+
+                 At zero the week starts being played and this branch stops
+                 being the right one, so it asks the server the same way the
+                 sealed clock does. */
+              sub={!revealSeen ? null : openFirstKickoff ? (
+                <>First game in <Countdown to={openFirstKickoff} onExpire={onBandClockExpired} /></>
+              ) : 'Picks are open'}
+              /* ⚠ THE BUTTON KEEPS ITS PLACE BETWEEN THE FACES and does not
+                 move back up now that the scoreline has one. What it does is
+                 put a person in the circle beside it.
+
                  ⚠ AND IT STAYS A BUTTON AFTERWARDS, relabelled. The share and
                  "Make a video" path lives INSIDE the ceremony, so a button that
                  disappeared once used would take the only route to the video
                  with it — you would get one chance, ever, to make the thing you
                  are meant to want to send to someone. */
-              headline={
+              action={
                 revealOpponent ? (
                   <button
                     onClick={() => setCeremonyOpen(true)}
@@ -1399,21 +1453,6 @@ export default function DuelsTab({
                   <span className="text-white/45">Not started</span>
                 )
               }
-              /* ⚠ ON THE V'S LINE, BETWEEN THE TWO FACES, not stacked above
-                 them. Everywhere else in the band the headline is something you
-                 READ — a countdown, a score — and reads belong at the top. Here
-                 it is something you PRESS, and what it does is put a person in
-                 the empty circle beside it, so it belongs next to that circle.
-                 Ryan, 2026-09-02. No effect from `md` up, where the desktop row
-                 already runs face | headline | face. */
-              headlineAt="between"
-              /* ⚠ NO SUB LINE BEFORE THE REVEAL. It used to read "Your opponent
-                 is in", which Ryan cut on 2026-09-02: the button now sits in
-                 the duel itself, against a dashed empty circle, and a caption
-                 explaining that is narrating what the picture already says.
-                 "Picks are open" survives AFTER the walkout, where the band has
-                 stopped being about the reveal and is back to being a duel. */
-              sub={revealOpponent && !revealSeen ? null : 'Picks are open'}
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
               points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
             />
@@ -1433,7 +1472,7 @@ export default function DuelsTab({
                  line. A live score is white because it is a fact, not a
                  promise. */
               headline={sealedOpensAtLatest
-                ? <span className="text-accent-400"><Countdown to={sealedOpensAtLatest} onExpire={onSealedExpired} /></span>
+                ? <span className="text-accent-400"><Countdown to={sealedOpensAtLatest} onExpire={onBandClockExpired} /></span>
                 : <span className="text-white/45">Sealed</span>}
               sub="Until your opponent is revealed"
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}

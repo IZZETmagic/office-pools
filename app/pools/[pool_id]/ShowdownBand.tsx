@@ -66,27 +66,38 @@ export type ShowdownBandProps = {
   themEntry: string | null
   name: (e: string | null) => string
   person: (e: string | null) => AvatarPerson | null
-  /** The big number, or the countdown, or whatever this state calls for. */
+  /**
+   * The big READING at the top — a score, a countdown. Null when this state has
+   * nothing to say up there, which shortens the phone band (see `M_BETWEEN`).
+   */
   headline: React.ReactNode
   /**
-   * WHERE the headline sits on a phone. `'top'` is the default and is what a
-   * number wants: above the faces, under the matchweek label.
+   * The thing you PRESS, on the V's line between the two faces.
    *
-   * `'between'` drops it onto the V's line, centred between the two faces.
+   * ⚠ A SECOND SLOT, NOT A PLACE THE HEADLINE MOVES TO. It began as
+   * `headlineAt: 'top' | 'between'` — one piece of content, two positions —
+   * which could not express the state Ryan asked for next: *"after the reveal
+   * the 0-0 score should be up and then under that a countdown until the first
+   * game"*. That wants a reading at the top AND a button between the faces, at
+   * the same time, and a single slot cannot hold both.
    *
-   * ⚠ THIS IS A PLACEMENT, NOT A STATE. The band still decides nothing — it is
-   * told where to put what it was handed. `DuelsTab` asks for `'between'` on
-   * the reveal, because there the headline is a BUTTON rather than a reading:
-   * a thing you press to put someone in the empty circle, which wants to be
-   * next to the circle it fills. Ryan, 2026-09-02: *"the reveal button on
-   * mobile is so high up — can we have it in between the two profiles?"*
+   * ⚠ IT TAKES THE V'S PLACE. Only one of the two is ever drawn — the V says
+   * "you against them" while the far corner is still a question mark; the
+   * button is how you fill that corner. Both at once stacks a 48px control on
+   * a 16px letter.
    *
-   * ⚠ NO EFFECT FROM `md` UP, where `.sd-d` already lays the headline out
-   * horizontally between the two faces. This only fixes the phone stack.
+   * ⚠ NO EFFECT FROM `md` UP, where `.sd-d` already runs face | middle | face
+   * and the button simply joins the middle column.
    */
-  headlineAt?: 'top' | 'between'
-  /** One quiet line under it. */
-  sub?: string | null
+  action?: React.ReactNode
+  /**
+   * One quiet line under the headline.
+   *
+   * ⚠ A NODE, NOT A STRING, since 2026-09-02: after the walkout this carries a
+   * ticking `Countdown` to the matchweek's first kickoff, which is a component
+   * rather than text.
+   */
+  sub?: React.ReactNode
   /** A ball is in play RIGHT NOW — not merely "the matchweek is in progress". */
   liveNow?: boolean
   /** One entry per fixture: who is taking it, and whether it is being played. */
@@ -284,8 +295,7 @@ function Face({
 }
 
 export function ShowdownBand({
-  header, matchweek, youEntry, themEntry, name, person, headline, sub,
-  headlineAt = 'top',
+  header, matchweek, youEntry, themEntry, name, person, headline, sub, action,
   liveNow = false, strip = [], rank, points,
 }: ShowdownBandProps) {
   const bandRef = useRef<HTMLDivElement>(null)
@@ -413,7 +423,7 @@ export function ShowdownBand({
    * The phone placements in force. One object, chosen once — so no element can
    * be laid out against a different layout's numbers than its neighbour.
    */
-  const L = headlineAt === 'between' ? { ...M, ...M_BETWEEN } : M
+  const L = headline ? M : { ...M, ...M_BETWEEN }
 
   const meta = (e: string | null) => {
     const r = rank?.(e) ?? null
@@ -470,7 +480,7 @@ export function ShowdownBand({
       {/* ── phone: the pieces travel ─────────────────────────── */}
       <div className="sd-m" style={L.block}>
         <p className="sd-mw t-caption text-white/75" style={L.mw}>Matchweek {matchweek}</p>
-        {headlineAt === 'top' &&
+        {headline &&
           <p className="sd-big t-num t-num-black text-white" style={L.big}>{headline}</p>}
         {sub && <p className="sd-sub t-detail text-white/45" style={L.sub}>{sub}</p>}
         {liveNow && (
@@ -490,13 +500,13 @@ export function ShowdownBand({
             is ever drawn. The V says "you against them" while the other corner
             is still a question mark; the button says "find out who". Rendering
             both stacks a 48px control on a 16px letter. */}
-        {sealed && headlineAt === 'top' &&
+        {sealed && !action &&
           <p className="sd-vee t-caption text-accent-400 text-base select-none" style={L.vee}>V</p>}
-        {headlineAt === 'between' && (
+        {action && (
           <div className="absolute grid place-items-center pointer-events-none" style={L.mid}>
             {/* ⚠ Re-enabled on the child. The wrapper spans the full band width
                 and would otherwise swallow taps meant for either face. */}
-            <div className="pointer-events-auto">{headline}</div>
+            <div className="pointer-events-auto">{action}</div>
           </div>
         )}
 
@@ -526,7 +536,12 @@ export function ShowdownBand({
 
         <div className="sd-mid">
           <p className="sd-mw-d t-caption text-white/75" style={MW_SIZE_D}>Matchweek {matchweek}</p>
-          <p className="sd-big-d t-num t-num-black text-white">{headline}</p>
+          {headline && <p className="sd-big-d t-num t-num-black text-white">{headline}</p>}
+          {/* ⚠ SAME COLUMN, no second position needed. The desktop row is
+              already face | middle | face, so "between the faces" is where this
+              column IS — the phone's absolute mid-slot exists only because the
+              phone stacks. */}
+          {action && <div className="sd-big-d">{action}</div>}
           {sub && <p className="sd-sub-d t-detail text-white/45">{sub}</p>}
           {liveNow && (
             <p className="sd-sub-d t-detail">

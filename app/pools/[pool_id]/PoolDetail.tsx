@@ -166,6 +166,17 @@ export type ShowdownData = {
   sealedMatchweek: number | null
   /** The LATEST it can open — 24h before its own lock. The only real instant. */
   sealedOpensAtLatest: string | null
+  /**
+   * The first KICKOFF of the open matchweek — what the post-reveal band counts
+   * down to.
+   *
+   * ⚠ NOT `lock_at`, and the difference is an hour of real football. Picks
+   * close before the first game, not at it: matchweek 3 locks 18:00 and kicks
+   * off 19:00, and only matchweeks 1 and 2 of this season happen to share an
+   * instant. Counting down to the deadline would say "first game in 0m" while
+   * nobody had kicked anything.
+   */
+  openFirstKickoff: string | null
   /** entry_id → the person behind it, for the faces in the corners. */
   entryPeople: Map<string, { user_id: string; full_name: string | null; username: string | null }>
   /**
@@ -2064,6 +2075,7 @@ export function PoolDetail({
           inPlayMatchweek={showdownData.inPlayMatchweek}
           sealedMatchweek={showdownData.sealedMatchweek}
           sealedOpensAtLatest={showdownData.sealedOpensAtLatest}
+          openFirstKickoff={showdownData.openFirstKickoff}
           entryPeople={showdownData.entryPeople}
           livePoints={duelPoints?.mw === showdownData.inPlayMatchweek
             ? new Map(Object.entries(duelPoints.points))
@@ -2695,6 +2707,7 @@ export function PoolDetail({
                 inPlayMatchweek={showdownData.inPlayMatchweek}
                 sealedMatchweek={showdownData.sealedMatchweek}
                 sealedOpensAtLatest={showdownData.sealedOpensAtLatest}
+          openFirstKickoff={showdownData.openFirstKickoff}
                 entryPeople={showdownData.entryPeople}
                 // ⚠ LIVE VALUES WIN, but only the three that move — and the
                 // two halves are now independent, because they arrive by

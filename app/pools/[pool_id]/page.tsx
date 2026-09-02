@@ -263,6 +263,7 @@ export default async function PoolPage({
         inPlayMatchweek: null,
         sealedMatchweek: null,
         sealedOpensAtLatest: null,
+        openFirstKickoff: null,
         duelPoints: new Map(
           [...totalsRes.totals].map(([entryId, t]) => [entryId, t.duelPoints]),
         ),
@@ -498,6 +499,34 @@ export default async function PoolPage({
           // rows for a sealed matchweek are not in the payload at all.
           showdownData.sealedMatchweek = view.sealedMatchweekNumber
           showdownData.sealedOpensAtLatest = view.sealedOpensAtLatest
+
+          /**
+           * The first kickoff of the OPEN matchweek — the band's post-reveal
+           * countdown.
+           *
+           * ⚠ MIN OF THE FIXTURES, NOT `lock_at`. The lock is the PICK
+           * deadline and runs an hour ahead of the football: verified against
+           * this season, matchweek 3 locks 18:00 and its earliest kickoff is
+           * 19:00, and only matchweeks 1 and 2 have the two coinciding. A
+           * countdown built on the lock would hit zero with the first game
+           * still an hour out.
+           *
+           * ⚠ COMPUTED OFF `view.matches` RATHER THAN `showdownData.fixtures`,
+           * which is the LIVE matchweek's list. Those two are the same rows
+           * only when nothing is in play (`liveMw` falls back to the open
+           * week), and they diverge for exactly the viewer this would mislead:
+           * one with no duel in the week being played — a late joiner (100) —
+           * whose band shows the open week while `fixtures` describes another.
+           *
+           * ISO strings from the same feed sort lexicographically, so `min` is
+           * a sort rather than a date parse per fixture.
+           */
+          showdownData.openFirstKickoff = mw === null ? null : (
+            view.matches
+              .filter((mt) => mt.round_number === mw && mt.match_date)
+              .map((mt) => mt.match_date as string)
+              .sort()[0] ?? null
+          )
 
           // The RUNNING score of the duel being played. `league_duels` carries
           // accuracy only once the matchweek settles, so through the weekend it

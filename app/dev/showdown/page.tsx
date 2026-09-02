@@ -47,6 +47,13 @@ const OPPONENT: RevealOpponent = {
 
 type State = 'sealed' | 'revealed' | 'inplay'
 
+/**
+ * What the post-reveal band counts down to. Fixed at mount rather than derived
+ * from the horizon buttons above: those drive the SEAL clock, and the first
+ * kickoff is a different instant that keeps running while the seal opens.
+ */
+const KICKOFF_HORIZON_MS = 2.5 * 24 * 3600_000
+
 /** How far out the countdown sits. The formatting changes across these. */
 type Horizon = { label: string; ms: number }
 /**
@@ -80,6 +87,9 @@ export default function Page() {
   // ⚠ Set once, not recomputed each render — a countdown whose target moves
   // every render never counts down.
   const [target, setTarget] = useState(() => new Date(Date.now() + DEFAULT_HORIZON.ms).toISOString())
+  /** The open week's first kickoff. Set once at mount so it keeps ticking down
+   *  independently of the seal horizon buttons. */
+  const [firstKickoff] = useState(() => new Date(Date.now() + KICKOFF_HORIZON_MS).toISOString())
 
   /**
    * Put it back to the top of the journey.
@@ -120,6 +130,17 @@ export default function Page() {
         themEntry={state === 'sealed' || bye || !seen ? null : 'them'}
         name={name}
         person={person}
+        /* ⚠ MIRRORS DuelsTab, WHICH IS THE ONLY REASON THIS PAGE IS WORTH
+           LOOKING AT. Three shapes, and the open week has two of them:
+
+             in play    a running score, nothing to press
+             sealed     a clock, nothing to press
+             open       BEFORE the walkout, nothing at the top and a Reveal
+                        button between the faces; AFTER it, 0–0 at the top with
+                        a countdown to the first game, and the button relabelled
+
+           Change one of these and change DuelsTab, or this page starts showing
+           a layout the pool page does not have. */
         headline={
           state === 'inplay' ? (
             <>
@@ -135,28 +156,32 @@ export default function Page() {
                   refresh would have caused. */}
               <Countdown to={target} onExpire={() => setState('revealed')} />
             </span>
-          ) : (
+          ) : seen ? (
+            /* The open week has not locked, so nobody has kicked anything. */
+            <>
+              <span>0</span>
+              <span className="text-white/30 mx-2.5">–</span>
+              <span>0</span>
+            </>
+          ) : null
+        }
+        action={
+          state === 'revealed' ? (
             <button
               onClick={() => setCeremonyOpen(true)}
               className="rounded-chip bg-white/15 hover:bg-white/25 px-5 py-2 text-2xl font-extrabold text-white transition"
             >
               {seen ? 'Replay' : 'Reveal'}
             </button>
-          )
+          ) : undefined
         }
-        /* ⚠ MIRRORS DuelsTab'S CHOICE, which is the only reason this harness
-           is worth looking at. The reveal headline is a BUTTON and sits on the
-           V's line between the faces; every other state is a reading and sits
-           at the top. Change one and change the other, or this page starts
-           showing a layout the pool page does not have. */
-        headlineAt={state === 'revealed' ? 'between' : 'top'}
         sub={
           state === 'inplay'
             ? '3 games still to play'
             : state === 'sealed'
               ? 'Until your opponent is revealed'
               : seen
-                ? 'Picks are open'
+                ? <>First game in <Countdown to={firstKickoff} /></>
                 : null
         }
         liveNow={state === 'inplay'}
