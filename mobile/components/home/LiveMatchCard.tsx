@@ -3,11 +3,11 @@ import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 
 import { getLiveClock } from '@/lib/matchStatus';
 import { formatStageLabel } from '@/lib/stage';
-import type { MatchSummary } from '@/lib/useHomeData';
+import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { useTheme, withOpacity } from '@/theme';
 
 type LiveMatchCardProps = {
-  match: MatchSummary;
+  match: ResultsMatch;
   onPress?: () => void;
 };
 
@@ -88,7 +88,7 @@ export function LiveMatchCard({ match, onPress }: LiveMatchCardProps) {
                 textTransform: 'uppercase',
               }}
             >
-              {formatStageLabel(match.stage)}
+              {formatStageLabel(match.stage, match.roundNumber)}
             </RNText>
           ) : null}
         </View>
@@ -105,7 +105,7 @@ export function LiveMatchCard({ match, onPress }: LiveMatchCardProps) {
             code={match.homeTeam?.countryCode ?? match.homeTeamPlaceholder ?? '?'}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-            <ScoreNumber value={match.homeScore} />
+            <ScoreNumber value={match.homeScoreFt} />
             <RNText
               style={{
                 fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
@@ -115,7 +115,7 @@ export function LiveMatchCard({ match, onPress }: LiveMatchCardProps) {
             >
               –
             </RNText>
-            <ScoreNumber value={match.awayScore} />
+            <ScoreNumber value={match.awayScoreFt} />
           </View>
           <TeamColumn
             flag={match.awayTeam?.flagUrl ?? null}

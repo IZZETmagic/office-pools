@@ -5,11 +5,11 @@ import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 import { MatchStatusBadge } from '@/components/MatchStatusBadge';
 import { getMatchStatusBadge } from '@/lib/matchStatus';
 import { formatStageLabel } from '@/lib/stage';
-import type { MatchSummary } from '@/lib/useHomeData';
+import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { useTheme, withOpacity } from '@/theme';
 
 type NextKickoffCardProps = {
-  match: MatchSummary;
+  match: ResultsMatch;
   matchesToday: number;
   onPress?: () => void;
 };
@@ -108,7 +108,7 @@ export function NextKickoffCard({ match, matchesToday, onPress }: NextKickoffCar
                 textTransform: 'uppercase',
               }}
             >
-              {formatStageLabel(match.stage)}
+              {formatStageLabel(match.stage, match.roundNumber)}
             </RNText>
           ) : null}
         </View>

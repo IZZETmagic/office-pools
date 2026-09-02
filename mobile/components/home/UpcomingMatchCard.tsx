@@ -1,17 +1,17 @@
 import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 
 import { Text } from '@/components/ui';
-import type { MatchSummary } from '@/lib/useHomeData';
+import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme } from '@/theme';
 
 type UpcomingMatchCardProps = {
-  match: MatchSummary;
+  match: ResultsMatch;
   onPress?: () => void;
 };
 
 export function UpcomingMatchCard({ match, onPress }: UpcomingMatchCardProps) {
   const theme = useTheme();
-  const hasScore = match.homeScore !== null && match.awayScore !== null;
+  const hasScore = match.homeScoreFt !== null && match.awayScoreFt !== null;
 
   return (
     <Pressable
@@ -38,7 +38,7 @@ export function UpcomingMatchCard({ match, onPress }: UpcomingMatchCardProps) {
               color: theme.colors.ink,
             }}
           >
-            {match.homeScore} - {match.awayScore}
+            {match.homeScoreFt} - {match.awayScoreFt}
           </RNText>
         ) : (
           <Text variant="body" color="slate">
@@ -80,7 +80,7 @@ function TeamSlot({
   team,
   placeholder,
 }: {
-  team: MatchSummary['homeTeam'];
+  team: ResultsMatch['homeTeam'];
   placeholder: string | null;
 }) {
   const theme = useTheme();

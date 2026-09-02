@@ -3,8 +3,25 @@
 // instead of the raw enum). Group matches show "Group X" only where the caller has
 // the group letter (match detail); the cards fall back to "Group Stage".
 
-export function formatStageLabel(stage: string | null | undefined): string {
+/**
+ * @param roundNumber the MATCHWEEK, for a league fixture — and without it this
+ *   function renders **"Regular Season"** on the Live and Next Kickoff cards and
+ *   in the match-detail header.
+ *
+ *   ⚠ That is not a cosmetic miss. `regular_season` is a value the league
+ *   adapter invents; `matches_stage_check` does not admit it and `STAGE_LABELS`
+ *   was never going to hold it, so it fell to the default branch and a member
+ *   read a database enum. The web hit exactly this and fixed it the same way —
+ *   `getStageLabel` in `app/pools/[pool_id]/results/MatchCard.tsx` — and the two
+ *   surfaces must say the same words: "Matchweek 12", on both.
+ */
+export function formatStageLabel(
+  stage: string | null | undefined,
+  roundNumber?: number | null,
+): string {
   switch (stage) {
+    case 'regular_season':
+      return roundNumber ? `Matchweek ${roundNumber}` : 'Regular Season';
     case 'group':
       return 'Group Stage';
     case 'round_32':

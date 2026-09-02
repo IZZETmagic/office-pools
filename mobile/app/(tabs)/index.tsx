@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,7 +25,10 @@ import {
   type PoolCreateJoinSheetHandle,
 } from '@/components/pools';
 import { useHomeData } from '@/lib/HomeDataProvider';
-import type { MatchSummary, PoolSummary } from '@/lib/useHomeData';
+import { homeMatchesFrom } from '@/lib/homeMatches';
+import { useTournamentMatches } from '@/lib/TournamentMatchesProvider';
+import type { PoolSummary } from '@/lib/useHomeData';
+import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { useNotificationPrompt } from '@/lib/useNotificationPrompt';
 import { useTheme } from '@/theme';
@@ -34,6 +37,12 @@ export default function HomeScreen() {
   const theme = useTheme();
   const { user } = useAuth();
   const { data, loading, error, refresh, refreshIfStale } = useHomeData();
+  // ⚠ The Home cards read the MERGED match list — World Cup matches and league
+  // fixtures — not `useHomeData`. Those two `matches` reads asked the wrong
+  // table for a league pool and returned nothing, silently. See
+  // `lib/homeMatches.ts` for the whole note.
+  const { matches } = useTournamentMatches();
+  const homeMatches = useMemo(() => homeMatchesFrom(matches), [matches]);
   // Pull-to-refresh: spinner is bound to user gesture only. Background
   // refreshes (focus, realtime, stale) trigger via `refresh` directly and
   // don't surface the OS-level spinner.
@@ -139,9 +148,9 @@ export default function HomeScreen() {
         ) : null}
 
         <HomeTournamentSection
-          liveMatches={data?.liveMatches ?? []}
-          nextMatch={data?.nextMatch ?? null}
-          matchesToday={data?.matchesToday ?? 0}
+          liveMatches={homeMatches.live}
+          nextMatch={homeMatches.next}
+          matchesToday={homeMatches.matchesToday}
           daysUntilKickoff={data?.daysUntilKickoff ?? 0}
         />
 
@@ -167,11 +176,11 @@ export default function HomeScreen() {
 
         {inviteTarget ? <InviteFriendsBanner pool={inviteTarget} /> : null}
 
-        {(data?.upcomingMatches.length ?? 0) > 0 ? (
+        {homeMatches.upcoming.length > 0 ? (
           <View style={{ gap: theme.spacing.md }}>
             <Text variant="sectionHeader">Upcoming Matches</Text>
             <View style={{ gap: theme.spacing.sm }}>
-              {(data?.upcomingMatches ?? []).map((m) => (
+              {homeMatches.upcoming.map((m) => (
                 <UpcomingMatchCard
                   key={m.matchId}
                   match={m}
@@ -224,8 +233,8 @@ function HomeTournamentSection({
   matchesToday,
   daysUntilKickoff,
 }: {
-  liveMatches: MatchSummary[];
-  nextMatch: MatchSummary | null;
+  liveMatches: ResultsMatch[];
+  nextMatch: ResultsMatch | null;
   matchesToday: number;
   daysUntilKickoff: number;
 }) {
@@ -248,7 +257,16 @@ function HomeTournamentSection({
     );
   }
 
-  if (daysUntilKickoff > 0) {
+  // ⚠ THE COUNTDOWN ONLY WINS IF THERE IS NOTHING SOONER, and that clause is
+  // new. `CountdownHero` hard-codes the date `2026-06-11` and the words "FIFA
+  // World Cup"; the branch is inert today only because that date has passed and
+  // `daysUntilKickoff` floors at 0. Without the extra test, any future
+  // competition given a kickoff constant would put a World-Cup-branded
+  // countdown in front of a member with a Premier League game on tonight.
+  //
+  // The hero is a World Cup hero. It should say so by yielding to a real
+  // fixture, not by relying on arithmetic to stay at zero.
+  if (daysUntilKickoff > 0 && !nextMatch) {
     return <CountdownHero daysUntilKickoff={daysUntilKickoff} />;
   }
 
