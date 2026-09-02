@@ -67,6 +67,7 @@ import { DuelRevealCeremony, type RevealOpponent } from './DuelRevealCeremony'
 import { DUEL_WIN, DUEL_TIE, duelResult } from '@/lib/league/duelPoints'
 import { Icon } from '@/components/ui/Icon'
 import { headToHead, type DuelRow } from '@/lib/league/duels'
+import { ownPickDirections } from '@/lib/league/ownPicks'
 import { getLiveClock } from '@/lib/matchStatus'
 import { LocalTime } from '@/components/LocalTime'
 import type { MatchweekFixture } from './PoolDetail'
@@ -952,42 +953,67 @@ export default function DuelsTab({
    * at yourself keeps the card and loses nothing, because a member reading
    * their own tendencies is the one who can act on them.
    *
-   * ⚠ `leagueOutcomes` spans the WHOLE SEASON and always includes your own
-   * entries — the bulk route withholds other members' picks until revealable,
-   * never yours (`bulk/route.ts:110`). So this needs no extra read.
+   * ⚠ Both read `myPicks` below, which spans the WHOLE SEASON and always
+   * includes your own entries — the bulk route withholds other members' picks
+   * until revealable, never yours (`bulk/route.ts:110`). So this needs no
+   * extra read.
    */
+  /**
+   * YOUR OWN PICKS, IN BOTH SHAPES, as a direction per fixture.
+   *
+   * ⚠ THE DEPTH IS NOT A PROP AND MUST NOT BECOME ONE. A Results pool files a
+   * tap that arrives in `leagueOutcomes`; a Scores pool files a scoreline that
+   * arrives in `allPredictions`. Migration 064 makes them mutually exclusive,
+   * so a Scores pool's `leagueOutcomes` is EMPTY, not partial.
+   *
+   * ⚠ THIS IS THE BUG THE TWO CARDS BELOW SHIPPED WITH. Both counted
+   * `leagueOutcomes` alone, so on `Showdown: Exact Scores` a member with all
+   * ten scorelines filed saw "0 / 10", an empty progress bar, every fixture
+   * listed as "still open" and a "Finish your picks" button — while the season
+   * card underneath read "0 of 0 picks" with no accuracy. Reported by Ryan,
+   * 2026-09-01, and reproduced in the data: 10 rows for matchweek 3, all
+   * score-shaped, zero outcome-shaped.
+   *
+   * The rule now has an owner (`lib/league/ownPicks.ts`) with its own test,
+   * because two components had independently got it wrong and a third copy
+   * here would have been the same bet a third time.
+   */
+  const myPicks = useMemo(
+    () => ownPickDirections(ownEntryIds[0], leagueOutcomes, allPredictions),
+    [leagueOutcomes, allPredictions, ownEntryIds],
+  )
+
   const mySheet = useMemo(() => {
     const myEntry = ownEntryIds[0]
     if (!myEntry || fixtures.length === 0) return null
-    const picked = new Set(
-      leagueOutcomes.filter((o) => o.entry_id === myEntry).map((o) => o.match_id),
-    )
-    const open = fixtures.filter((f) => !picked.has(f.id))
+    const open = fixtures.filter((f) => !myPicks.has(f.id))
     return { done: fixtures.length - open.length, total: fixtures.length, open }
-  }, [leagueOutcomes, fixtures, ownEntryIds])
+  }, [myPicks, fixtures, ownEntryIds])
 
   const mySeason = useMemo(() => {
     const myEntry = ownEntryIds[0]
     if (!myEntry) return null
     const t = totals.get(myEntry)
-    const picks = leagueOutcomes.filter((o) => o.entry_id === myEntry)
+    const picked = [...myPicks.values()]
     const share = (o: 'home' | 'draw' | 'away') =>
-      picks.length ? Math.round((picks.filter((p) => p.outcome === o).length / picks.length) * 100) : null
+      picked.length
+        ? Math.round((picked.filter((d) => d === o).length / picked.length) * 100)
+        : null
     const correct = t?.correct ?? 0
     return {
       points: t ? t.totalPoints + t.duelPoints : 0,
       correct,
-      picks: picks.length,
+      picks: picked.length,
       // ⚠ Against picks MADE, not fixtures played. A member who missed a week
       // did not get those wrong — they were not in them, and counting them as
       // misses would report somebody's holiday as bad form.
-      accuracy: picks.length ? Math.round((correct / picks.length) * 100) : null,
+      accuracy: picked.length ? Math.round((correct / picked.length) * 100) : null,
       // ⚠ Suppressed under ten picks. "100% home" off two picks is noise
       // wearing a percentage, and a tendency needs a season to be one.
-      home: picks.length >= 10 ? share('home') : null,
-      draw: picks.length >= 10 ? share('draw') : null,
+      home: picked.length >= 10 ? share('home') : null,
+      draw: picked.length >= 10 ? share('draw') : null,
     }
-  }, [leagueOutcomes, totals, ownEntryIds])
+  }, [myPicks, totals, ownEntryIds])
 
   const ownWash = (() => {
     const p = person(ownEntryIds[0] ?? null)
