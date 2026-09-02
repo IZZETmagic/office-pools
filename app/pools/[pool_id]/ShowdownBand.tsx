@@ -68,6 +68,23 @@ export type ShowdownBandProps = {
   person: (e: string | null) => AvatarPerson | null
   /** The big number, or the countdown, or whatever this state calls for. */
   headline: React.ReactNode
+  /**
+   * WHERE the headline sits on a phone. `'top'` is the default and is what a
+   * number wants: above the faces, under the matchweek label.
+   *
+   * `'between'` drops it onto the V's line, centred between the two faces.
+   *
+   * ⚠ THIS IS A PLACEMENT, NOT A STATE. The band still decides nothing — it is
+   * told where to put what it was handed. `DuelsTab` asks for `'between'` on
+   * the reveal, because there the headline is a BUTTON rather than a reading:
+   * a thing you press to put someone in the empty circle, which wants to be
+   * next to the circle it fills. Ryan, 2026-09-02: *"the reveal button on
+   * mobile is so high up — can we have it in between the two profiles?"*
+   *
+   * ⚠ NO EFFECT FROM `md` UP, where `.sd-d` already lays the headline out
+   * horizontally between the two faces. This only fixes the phone stack.
+   */
+  headlineAt?: 'top' | 'between'
   /** One quiet line under it. */
   sub?: string | null
   /** A ball is in play RIGHT NOW — not merely "the matchweek is in progress". */
@@ -137,6 +154,24 @@ const M = {
   sub:   { top: '104px' },
   vee:   { top: '170px' },
   /**
+   * The between-the-faces slot — the V's line, sized to hold something bigger.
+   *
+   * ⚠ IT TRAVELS ON THE FACES' OWN EXPRESSION, character for character, so the
+   * two cannot drift: `top` and `height` are copied from `M.face`, which puts
+   * this box's centre exactly on the faces' centre at every point of the
+   * collapse (open 146+36=182, shut 32+18=50). That is the same mistake the
+   * names note above records — a placement in different units from the thing
+   * it has to line up with agrees at exactly one viewport and nowhere else.
+   *
+   * Full width with the content centred, rather than a left/right inset: the
+   * faces are inset in PIXELS that shrink with `--p`, so any inset here would
+   * have to track them to stay centred. The midpoint of the band is the
+   * midpoint of the faces regardless, because they are symmetric.
+   */
+  mid:   { top: 'calc(146px - 114px * var(--p))',
+           height: 'calc(72px - 36px * var(--p))',
+           left: 0, right: 0 },
+  /**
    * ⚠ EACH NAME SHARES ITS AVATAR'S EDGE, in the same units.
    *
    * They used to sit at `left: 2%` / `right: 2%` with `width: 40%` and centred
@@ -152,6 +187,56 @@ const M = {
   whoYou:  { top: '232px', left:  'calc(38px - 22px * var(--p))',
              width: '44%', textAlign: 'left' as const },
   whoThem: { top: '232px', right: 'calc(38px - 22px * var(--p))',
+             width: '44%', textAlign: 'right' as const },
+} as const
+
+/**
+ * The same phone layout with the headline moved down onto the V's line.
+ *
+ * ⚠ THIS EXISTS BECAUSE MOVING A THING LEAVES A HOLE. Taking the headline out
+ * of the top slot — and the sub line with it — empties 54px between the
+ * matchweek label and the faces, and a band with a caption, a void, and then
+ * the duel reads as broken rather than as spacious. So the duel group moves up
+ * to close it and the block gets shorter by exactly the same amount.
+ *
+ * ⚠ ONLY THE OPEN END MOVES. Every expression here lands on the SAME collapsed
+ * value as the layout it replaces — faces 92−60 = 32 exactly as 146−114 = 32,
+ * block 266−166 = 100 exactly as 320−220 = 100. The collapsed band is 100px of
+ * carefully-tuned geometry (faces 36px at top 32, centre 50, the clock on that
+ * same line) and none of it is being renegotiated here; the two layouts differ
+ * while open and become identical as they shut.
+ *
+ * ⚠ AND THE SCROLL DISTANCE NEEDS NO EDIT, because `measure()` reads the band
+ * at `--p: 0` and `--p: 1` and divides by the difference. `COLLAPSE_PX` is only
+ * the fallback for the frame before that measurement lands. A layout that gives
+ * up 166px instead of 220px is welded to the content just as tightly, without a
+ * second constant to keep in step.
+ *
+ * The names carry no `--p` term in either layout — `.sd-who` fades out by
+ * `opacity: calc(1 - 3 * var(--p))`, so they are gone before their position
+ * could matter.
+ */
+const M_BETWEEN = {
+  block:   { height: 'calc(266px - 166px * var(--p))' },
+  /**
+   * ⚠ THE SUB MOVES INTO THE SLOT THE HEADLINE VACATED, or it lands ON the
+   * headline. At 104px it sat under a headline that started at 50; with the
+   * headline now spanning 92–164 that same 104 is straight through the middle
+   * of the button — which is exactly what it did on first render: "Picks are
+   * open" printed across the top of Replay.
+   *
+   * It cannot simply be dropped. Before the walkout there is no sub at all
+   * (Ryan cut "Your opponent is in"), but AFTER it the band is a duel again and
+   * "Picks are open" is the only thing telling you the week is still live.
+   */
+  sub:     { top: '54px' },
+  face:    { top: 'calc(92px - 60px * var(--p))',
+             width: 'calc(72px - 36px * var(--p))', height: 'calc(72px - 36px * var(--p))' },
+  mid:     { top: 'calc(92px - 60px * var(--p))',
+             height: 'calc(72px - 36px * var(--p))', left: 0, right: 0 },
+  whoYou:  { top: '178px', left:  'calc(38px - 22px * var(--p))',
+             width: '44%', textAlign: 'left' as const },
+  whoThem: { top: '178px', right: 'calc(38px - 22px * var(--p))',
              width: '44%', textAlign: 'right' as const },
 } as const
 
@@ -200,6 +285,7 @@ function Face({
 
 export function ShowdownBand({
   header, matchweek, youEntry, themEntry, name, person, headline, sub,
+  headlineAt = 'top',
   liveNow = false, strip = [], rank, points,
 }: ShowdownBandProps) {
   const bandRef = useRef<HTMLDivElement>(null)
@@ -323,6 +409,12 @@ export function ShowdownBand({
   const themColour = themEntry ? colourOf(themEntry) : 'var(--sp-slate)'
   const sealed = themEntry === null
 
+  /**
+   * The phone placements in force. One object, chosen once — so no element can
+   * be laid out against a different layout's numbers than its neighbour.
+   */
+  const L = headlineAt === 'between' ? { ...M, ...M_BETWEEN } : M
+
   const meta = (e: string | null) => {
     const r = rank?.(e) ?? null
     const p = points?.(e) ?? null
@@ -376,12 +468,13 @@ export function ShowdownBand({
       }}>{header}</div>}
 
       {/* ── phone: the pieces travel ─────────────────────────── */}
-      <div className="sd-m" style={M.block}>
-        <p className="sd-mw t-caption text-white/75" style={M.mw}>Matchweek {matchweek}</p>
-        <p className="sd-big t-num t-num-black text-white" style={M.big}>{headline}</p>
-        {sub && <p className="sd-sub t-detail text-white/45" style={M.sub}>{sub}</p>}
+      <div className="sd-m" style={L.block}>
+        <p className="sd-mw t-caption text-white/75" style={L.mw}>Matchweek {matchweek}</p>
+        {headlineAt === 'top' &&
+          <p className="sd-big t-num t-num-black text-white" style={L.big}>{headline}</p>}
+        {sub && <p className="sd-sub t-detail text-white/45" style={L.sub}>{sub}</p>}
         {liveNow && (
-          <p className="sd-sub t-detail" style={M.sub}>
+          <p className="sd-sub t-detail" style={L.sub}>
             <span className="inline-flex items-center gap-1.5 rounded-pill bg-danger-500/15 text-danger-500 px-2.5 py-1">
               <span className="w-1.5 h-1.5 rounded-full bg-danger-500 motion-safe:animate-pulse" aria-hidden="true" />
               Live
@@ -389,17 +482,29 @@ export function ShowdownBand({
           </p>
         )}
 
-        <Face p={person(youEntry)} colour={youColour} className="sd-face sd-face-you" style={{ ...M.face, ...M.faceL }} />
+        <Face p={person(youEntry)} colour={youColour} className="sd-face sd-face-you" style={{ ...L.face, ...L.faceL }} />
         {sealed
-          ? <Face p={null} colour={themColour} className="sd-face sd-face-them" style={{ ...M.face, ...M.faceR }} unknown />
-          : <Face p={person(themEntry!)} colour={themColour} className="sd-face sd-face-them" style={{ ...M.face, ...M.faceR }} />}
-        {sealed && <p className="sd-vee t-caption text-accent-400 text-base select-none" style={M.vee}>V</p>}
+          ? <Face p={null} colour={themColour} className="sd-face sd-face-them" style={{ ...L.face, ...L.faceR }} unknown />
+          : <Face p={person(themEntry!)} colour={themColour} className="sd-face sd-face-them" style={{ ...L.face, ...L.faceR }} />}
+        {/* ⚠ THE V AND THE BETWEEN-SLOT ARE THE SAME PLACE, so only one of them
+            is ever drawn. The V says "you against them" while the other corner
+            is still a question mark; the button says "find out who". Rendering
+            both stacks a 48px control on a 16px letter. */}
+        {sealed && headlineAt === 'top' &&
+          <p className="sd-vee t-caption text-accent-400 text-base select-none" style={L.vee}>V</p>}
+        {headlineAt === 'between' && (
+          <div className="absolute grid place-items-center pointer-events-none" style={L.mid}>
+            {/* ⚠ Re-enabled on the child. The wrapper spans the full band width
+                and would otherwise swallow taps meant for either face. */}
+            <div className="pointer-events-auto">{headline}</div>
+          </div>
+        )}
 
-        <div className="sd-who sd-who-you" style={M.whoYou}>
+        <div className="sd-who sd-who-you" style={L.whoYou}>
           <p className="t-caption text-white truncate">{name(youEntry)}</p>
           {meta(youEntry) && <p className="t-num text-[10px] text-white/40 mt-0.5">{meta(youEntry)}</p>}
         </div>
-        <div className="sd-who sd-who-them" style={M.whoThem}>
+        <div className="sd-who sd-who-them" style={L.whoThem}>
           <p className="t-caption text-white truncate">
             {sealed ? 'Sealed' : name(themEntry!)}
           </p>

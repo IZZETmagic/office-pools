@@ -144,6 +144,12 @@ export default function Page() {
             </button>
           )
         }
+        /* ⚠ MIRRORS DuelsTab'S CHOICE, which is the only reason this harness
+           is worth looking at. The reveal headline is a BUTTON and sits on the
+           V's line between the faces; every other state is a reading and sits
+           at the top. Change one and change the other, or this page starts
+           showing a layout the pool page does not have. */
+        headlineAt={state === 'revealed' ? 'between' : 'top'}
         sub={
           state === 'inplay'
             ? '3 games still to play'
@@ -151,7 +157,7 @@ export default function Page() {
               ? 'Until your opponent is revealed'
               : seen
                 ? 'Picks are open'
-                : 'Your opponent is in'
+                : null
         }
         liveNow={state === 'inplay'}
         rank={(e) => (e === 'them' ? 1 : 3)}

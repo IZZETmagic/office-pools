@@ -1399,9 +1399,21 @@ export default function DuelsTab({
                   <span className="text-white/45">Not started</span>
                 )
               }
-              /* ⚠ "Your opponent is in" ONLY BEFORE you have met them — after
-                 that the band is showing you who, so saying it is noise. */
-              sub={revealOpponent ? (revealSeen ? 'Picks are open' : 'Your opponent is in') : 'Picks are open'}
+              /* ⚠ ON THE V'S LINE, BETWEEN THE TWO FACES, not stacked above
+                 them. Everywhere else in the band the headline is something you
+                 READ — a countdown, a score — and reads belong at the top. Here
+                 it is something you PRESS, and what it does is put a person in
+                 the empty circle beside it, so it belongs next to that circle.
+                 Ryan, 2026-09-02. No effect from `md` up, where the desktop row
+                 already runs face | headline | face. */
+              headlineAt="between"
+              /* ⚠ NO SUB LINE BEFORE THE REVEAL. It used to read "Your opponent
+                 is in", which Ryan cut on 2026-09-02: the button now sits in
+                 the duel itself, against a dashed empty circle, and a caption
+                 explaining that is narrating what the picture already says.
+                 "Picks are open" survives AFTER the walkout, where the band has
+                 stopped being about the reveal and is back to being a duel. */
+              sub={revealOpponent && !revealSeen ? null : 'Picks are open'}
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
               points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
             />
