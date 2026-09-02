@@ -52,7 +52,25 @@ function stub(tables: Record<string, unknown[]>) {
     }
     return chain
   }
-  return { from: (t: string) => q(tables[t] ?? []) } as never
+  return {
+    from: (t: string) => q(tables[t] ?? []),
+    /**
+     * The reveal gate, which the module ASKS rather than mirrors (see the
+     * `openRevealed` note in poolCards.ts).
+     *
+     * ⚠ ANSWERS `true`, so these tests keep exercising the path where the open
+     * week's duel IS revealed — which is what every assertion here was written
+     * against back when a TypeScript mirror decided it. A stub returning false
+     * would silently empty `opponentName` and the mode/decision assertions
+     * below would still pass, which is the wrong kind of green.
+     */
+    rpc: (fn: string) =>
+      Promise.resolve(
+        fn === 'league_duel_is_revealed'
+          ? { data: true, error: null }
+          : { data: null, error: null },
+      ),
+  } as never
 }
 
 const pickemPool = {

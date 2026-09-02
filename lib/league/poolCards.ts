@@ -565,32 +565,43 @@ export async function readLeagueCardFacts(
         .map((r) => [r.entry_id, r.duel_points ?? 0]),
     )
 
-    // The TS half of `league_duel_is_revealed` (migration 119): a matchweek's
-    // duel opens once the matchweek BEFORE IT has settled, so exactly one duel
-    // is live at a time.
-    //
-    // Ordered by LOCK TIME, never matchweek number — rounds are played out of
-    // numerical order, minimum gap −121 days across three real seasons
-    // (migration 101). Keyed on `ranks_snapshot_at`, never on a fixture count:
-    // a postponed fixture leaves `completed < total` for the rest of the season
-    // and would stall the reveal forever (migration 094).
-    const revealed = (pool: LeagueCardPool, matchweekNumber: number): boolean => {
-      if (!pool.seasonId) return false
-      const inLockOrder = (bySeason.get(pool.seasonId) ?? [])
-        .filter((m) => m.lock_at !== null)
-        .sort((a, b) =>
-          new Date(a.lock_at!).getTime() - new Date(b.lock_at!).getTime()
-          || a.matchweek_number - b.matchweek_number)
-      const i = inLockOrder.findIndex((m) => m.matchweek_number === matchweekNumber)
-      if (i === -1) return false
-      // The season's first playable matchweek has no predecessor and is open —
-      // without that arm a new pool would show nothing, for ever.
-      if (i === 0 || inLockOrder[i - 1].ranks_snapshot_at !== null) return true
-      // The 24-hour floor (migration 120): a postponed matchweek settles only
-      // when the next one LOCKS (094), which would otherwise reveal the
-      // opponent at the moment picks close. Never fires in a normal week.
-      return new Date(inLockOrder[i].lock_at!).getTime() - 24 * 3600_000 <= now
-    }
+    /**
+     * Has this pool's duel for a matchweek opened? ASKED, not mirrored.
+     *
+     * ⚠ THIS WAS THE THIRD COPY OF THE REVEAL RULE, and like the other two it
+     * drifted. It implemented migration 119 — *a duel opens the moment the
+     * previous matchweek settles* — and stayed that way through 123 (a 48h
+     * hold) and 129 (24h). So from the instant matchweek 2 settled, the CARD
+     * named the matchweek-3 opponent while the pool PAGE correctly sealed it
+     * and RLS withheld the row. The dashboard spoiled the walk-out before you
+     * could reach it.
+     *
+     * 127 fixed exactly this in `lib/league/read.ts` and did not know this copy
+     * existed. There is now one owner: `league_duel_is_revealed`.
+     *
+     * ⚠ ONE CALL PER SHOWDOWN POOL, not per duel row. Only the OPEN matchweek
+     * needs asking — a SETTLED duel is revealed by construction, since its
+     * reveal instant is at the latest `lock_at - 24h` (120), which is before
+     * its own kickoff, which is before it could possibly settle. So the record
+     * (won/tied/lost) needs no gate at all, and the only thing the gate
+     * protects is `opponentName` for the week you are picking.
+     */
+    const openRevealed = new Map<string, boolean>()
+    await Promise.all(
+      showdownPools.map(async (p) => {
+        const mw = openByPool.get(p.poolId)?.matchweek_number
+        if (mw === undefined) return
+        const { data, error } = await admin.rpc('league_duel_is_revealed', {
+          p_pool_id: p.poolId,
+          p_matchweek_number: mw,
+        })
+        // ⚠ FALSE ON ERROR, deliberately. A failed gate must seal the draw, not
+        // open it — a card that leaks the opponent is worse than one that is
+        // briefly quiet, and 116 exists precisely to stop that.
+        if (error) console.error('[league] duel reveal gate failed:', error.message)
+        openRevealed.set(p.poolId, !error && data === true)
+      }),
+    )
 
     // Opponent names. Only the entries actually drawn against somebody on this
     // page, so the IN list stays the size of the page rather than the pool.
@@ -602,7 +613,26 @@ export async function readLeagueCardFacts(
       for (const p of showdownPools) {
         if (p.poolId !== row.pool_id) continue
         if (a !== p.entryId && b !== p.entryId) continue
-        if (!revealed(p, row.matchweek_number as number)) continue
+        /* ⚠ ALLOW-LIST, NOT A DENY-LIST, because `duelRows` came from the ADMIN
+           client and RLS never ran on it. Every duel in the season is in this
+           array including weeks still sealed — which is the whole reason a gate
+           has to exist in TypeScript at all.
+
+           Two ways in, and nothing else:
+             · SETTLED — revealed by construction. Its reveal instant is at the
+               latest `lock_at - 24h` (120), before its own kickoff, therefore
+               before it could possibly settle.
+             · THE OPEN WEEK — the one being picked, gated on the answer the
+               database gave.
+
+           An unsettled duel from the in-play week is deliberately excluded too.
+           The record below counts `settled_at` rows only and `next` reads the
+           open week only, so it was inert under the old mirror as well —
+           excluding it is the safe direction for a gate, and provably changes
+           nothing on the card. */
+        const openMw = openByPool.get(p.poolId)?.matchweek_number
+        const isOpenWeek = (row.matchweek_number as number) === openMw
+        if (!row.settled_at && !(isOpenWeek && openRevealed.get(p.poolId))) continue
         const got = myDuels.get(p.poolId) ?? []
         got.push(row)
         myDuels.set(p.poolId, got)

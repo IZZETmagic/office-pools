@@ -189,8 +189,38 @@ describe('the draw is sealed until its matchweek opens', () => {
     // seal is only real on that path if it is applied there.
     const cards = read('lib/league/poolCards.ts')
     expect(cards).toMatch(/GATE B/)
-    expect(cards).toMatch(/const revealed = \(pool: LeagueCardPool, matchweekNumber: number\): boolean/)
-    expect(cards).toMatch(/if \(!revealed\(p, row\.matchweek_number as number\)\) continue/)
+    // The gate is ASKED, not mirrored.
+    expect(cards).toMatch(/rpc\('league_duel_is_revealed'/)
+    // And it is an allow-list: a row gets in by being settled or by being the
+    // open week with the database's blessing. Anything else falls through.
+    expect(cards).toMatch(/if \(!row\.settled_at && !\(isOpenWeek && openRevealed\.get\(p\.poolId\)\)\) continue/)
+  })
+
+  it('⚠ poolCards must never RE-DERIVE the reveal rule — it has drifted three times', () => {
+    /*
+     * This file used to hold the third copy of the rule, and like the other two
+     * it rotted in place: it implemented migration 119 (*open the moment the
+     * previous matchweek settles*) and stayed there through 123's 48h hold and
+     * 129's 24h. The card named the next opponent while the pool page sealed
+     * it, so the dashboard spoiled the walk-out before you could reach it.
+     *
+     * The tell, every time, is arithmetic on the matchweek timestamps. Nothing
+     * in this module has any business computing WHEN a duel opens — one
+     * function owns that (`league_duel_reveals_at`) and one predicate exposes
+     * it. So the guard is not "does it call the RPC" (it might do both) but
+     * "does it do the sum itself".
+     */
+    const cards = read('lib/league/poolCards.ts')
+    // Strip comments — the note explaining the history legitimately mentions
+    // both, and a guard that trips on its own documentation is useless.
+    const code = cards
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+
+    expect(code, 'poolCards is deciding the reveal from ranks_snapshot_at again')
+      .not.toMatch(/ranks_snapshot_at\s*!==\s*null/)
+    expect(code, 'poolCards is re-deriving the 24h floor from lock_at again')
+      .not.toMatch(/lock_at.*24\s*\*\s*3600/)
   })
 })
 
