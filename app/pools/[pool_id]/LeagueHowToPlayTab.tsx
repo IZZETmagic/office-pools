@@ -47,7 +47,8 @@ export function LeagueHowToPlayTab({ poolName, maxEntries, mode, depth }: Props)
   const isTable = mode === 'table'
   const isLms = mode === 'last_man_standing'
   const isShowdown = mode === 'showdown'
-  const scores = depth === 'scores'
+  // ⚠ `!== 'results'` — NULL depth means Scores (066). See leagueModeInfo.ts.
+  const scores = depth !== 'results'
 
   return (
     <div>

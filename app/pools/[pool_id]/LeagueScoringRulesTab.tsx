@@ -389,7 +389,9 @@ function TieBreakerCard({ mode, depth }: { mode: LeagueScoringMode; depth: Props
 
   if (mode === 'pickem' || mode === 'showdown') {
     rungs.push(<><strong>Total points.</strong> Everything you have scored across the season.</>)
-    if (depth === 'scores') {
+    // ⚠ `!== 'results'` — a NULL-depth pool IS scored at Scores (066), so it
+    // does have an exact-scores tiebreak rung and must say so.
+    if (depth !== 'results') {
       rungs.push(<><strong>Most exact scores.</strong> The entry that called more scorelines exactly goes ahead.</>)
       rungs.push(<><strong>Most correct results.</strong> Then whoever got more results right, whatever the scoreline.</>)
     } else {

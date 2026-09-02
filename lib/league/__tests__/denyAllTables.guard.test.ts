@@ -67,7 +67,19 @@ function walk(dir: string, out: string[] = []): string[] {
 const root = process.cwd()
 // `scripts/` is excluded: those are operator tools that already run as
 // service_role by construction, and they are not shipped.
-const files = [...walk(resolve(root, 'app')), ...walk(resolve(root, 'lib'))]
+// ⚠ `mobile/` IS IN THE WALK — added 2026-09-02, with the first league screen.
+// It is the surface this guard exists for. Mobile is direct-to-PostgREST for
+// ~110 table reads, so it is the place most likely to reach a deny-all table by
+// habit — and the failure there is identical: `[]` with `error: null`, a
+// confident zero, nothing in a log. League data reaches the app through
+// `/api/pools/:id/league`, never through a table.
+const files = [
+  ...walk(resolve(root, 'app')),
+  ...walk(resolve(root, 'lib')),
+  ...walk(resolve(root, 'mobile/app')),
+  ...walk(resolve(root, 'mobile/lib')),
+  ...walk(resolve(root, 'mobile/components')),
+]
 
 /** The receiver of a `.from('table')` call — `admin` in `await admin.from(...)`. */
 function receiversOf(src: string, table: string): string[] {

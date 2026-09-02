@@ -87,7 +87,13 @@ export type LeagueModeInfo = {
  * a member arriving at Pool Info should be told which one they joined.
  */
 export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueModeInfo {
-  const scores = depth === 'scores'
+  // ⚠ `!== 'results'`, NOT `=== 'scores'`. A pool created before migration 077
+  // carries NULL depth and the ENGINE reads NULL as Scores, byte for byte (066).
+  // The losing form made such a pool describe itself as Results while being
+  // scored at Scores — the 2026-08-28 audit called it a deploy blocker, and two
+  // production pools are in exactly that state. Guarded by
+  // `leagueDepthPolarity.guard.test.ts`.
+  const scores = depth !== 'results'
 
   switch (mode) {
     case 'pickem':
