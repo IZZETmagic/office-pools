@@ -15,7 +15,8 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { readLeagueSeasonUncached, leagueSeasonCacheTag, invalidateLeagueSeason } from '../season'
+import { readLeagueSeasonUncached } from '../seasonRead'
+import { leagueSeasonCacheTag, invalidateLeagueSeason } from '../season'
 
 // The cache is Next's; what this file tests is the shape, the failure posture,
 // and the fallback. `cacheMode` lets a test choose which of those it is in.

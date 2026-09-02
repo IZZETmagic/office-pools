@@ -73,10 +73,11 @@
 import 'server-only'
 
 import { unstable_cache, revalidateTag } from 'next/cache'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/server'
 // ⚠ ONE DIRECTION ONLY: season.ts → read.ts. read.ts must never import this.
-import type { MatchweekRow, LeagueSeasonView } from './read'
+import type { LeagueSeasonView } from './read'
+// The one copy of the query. See seasonRead.ts for why it is not in this file.
+import { readLeagueSeasonUncached } from './seasonRead'
 
 /**
  * ⚠ Short, and a backstop rather than the mechanism. 30 seconds is the recorded
@@ -85,35 +86,6 @@ import type { MatchweekRow, LeagueSeasonView } from './read'
  * invalidation is ever missed, this is the longest anything can be wrong.
  */
 export const LEAGUE_SEASON_CACHE_TTL_SECONDS = 30
-
-export type SeasonClubRow = {
-  club_id: string
-  name: string
-  short_name: string
-  abbreviation: string
-  crest_url: string | null
-}
-
-export type SeasonFixtureRow = {
-  fixture_id: string
-  matchweek_id: string
-  fixture_number: number
-  home_club_id: string
-  away_club_id: string
-  kickoff_at: string
-  venue: string | null
-  status: string
-  home_goals: number | null
-  away_goals: number | null
-  is_completed: boolean
-  live_minute: number | null
-  live_period: string | null
-  live_added: number | null
-}
-
-/** Re-exported so callers have one place to import it from. Declared in
- *  `read.ts` because that file is the shared one — see the header. */
-export type { LeagueSeasonView }
 
 /**
  * One tag per season, so every pool playing it shares one cache entry and one
@@ -141,59 +113,6 @@ export function invalidateLeagueSeason(seasonId: string): void {
     revalidateTag(leagueSeasonCacheTag(seasonId), { expire: 0 })
   } catch (err) {
     console.warn(`[league/season] invalidate skipped for ${seasonId}:`, (err as Error)?.message)
-  }
-}
-
-/**
- * The three reads, unchanged in what they select — only in who runs them and
- * how often.
- *
- * ⚠ `throwOnError` is not optional here. `unstable_cache` caches whatever the
- * function returns, so swallowing a PostgREST error and returning `[]` would
- * cache an empty season for the TTL and render every pool on it as having no
- * fixtures. A thrown error is not cached; the next request simply retries. Same
- * reasoning as `getPoolDataCached`'s `throwOnFetchError`.
- */
-export async function readLeagueSeasonUncached(
-  admin: SupabaseClient,
-  seasonId: string,
-): Promise<LeagueSeasonView> {
-  const { data: clubs, error: clubErr } = await admin
-    .from('league_clubs')
-    .select('club_id, name, short_name, abbreviation, crest_url')
-    .eq('season_id', seasonId)
-    .order('name', { ascending: true })
-    .range(0, 999)
-  if (clubErr) throw new Error(`league_clubs: ${clubErr.message}`)
-
-  const { data: mws, error: mwErr } = await admin
-    .from('league_matchweeks')
-    .select('matchweek_id, matchweek_number, fixture_count, completed_fixture_count, lock_at, first_kickoff_at, ranks_snapshot_at')
-    .eq('season_id', seasonId)
-    .order('matchweek_number', { ascending: true })
-    .range(0, 999)
-  if (mwErr) throw new Error(`league_matchweeks: ${mwErr.message}`)
-
-  // Paged, and it has to be: 380 fixtures is inside PostgREST's 1,000-row cap
-  // today, and a two-season-per-row competition or a bigger league is not.
-  const fixtures: SeasonFixtureRow[] = []
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await admin
-      .from('league_fixtures')
-      .select('fixture_id, matchweek_id, fixture_number, home_club_id, away_club_id, kickoff_at, venue, status, home_goals, away_goals, is_completed, live_minute, live_period, live_added')
-      .eq('season_id', seasonId)
-      .order('fixture_number', { ascending: true })
-      .range(from, from + 999)
-    if (error) throw new Error(`league_fixtures: ${error.message}`)
-    const page = (data ?? []) as unknown as SeasonFixtureRow[]
-    fixtures.push(...page)
-    if (page.length < 1000) break
-  }
-
-  return {
-    clubs: (clubs ?? []) as unknown as SeasonClubRow[],
-    matchweeks: (mws ?? []) as unknown as MatchweekRow[],
-    fixtures,
   }
 }
 

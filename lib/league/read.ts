@@ -25,6 +25,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { readLeagueSeasonUncached } from './seasonRead'
 import type { Prediction } from '@/lib/tournament'
 import type { MatchData, TeamData, ExistingPrediction } from '@/app/pools/[pool_id]/types'
 import type { PoolRoundState, EntryRoundSubmission } from '@/app/pools/[pool_id]/types'
@@ -446,39 +447,19 @@ export async function readLeaguePoolView(
     fixtures = args.season.fixtures as unknown as FixtureRow[]
     matchweekRows = args.season.matchweeks
   } else {
-    const { data: clubRows, error: clubErr } = await supabase
-      .from('league_clubs')
-      .select('club_id, name, short_name, abbreviation, crest_url')
-      .eq('season_id', args.seasonId)
-      .order('name', { ascending: true })
-      .range(0, 999)
-    if (clubErr) return { view: null, error: `league_clubs: ${clubErr.message}` }
-
-    const { data: mws, error: mwErr } = await supabase
-      .from('league_matchweeks')
-      .select('matchweek_id, matchweek_number, fixture_count, completed_fixture_count, lock_at, first_kickoff_at, ranks_snapshot_at')
-      .eq('season_id', args.seasonId)
-      .order('matchweek_number', { ascending: true })
-      .range(0, 999)
-    if (mwErr) return { view: null, error: `league_matchweeks: ${mwErr.message}` }
-
-    const paged: FixtureRow[] = []
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabase
-        .from('league_fixtures')
-        .select('fixture_id, matchweek_id, fixture_number, home_club_id, away_club_id, kickoff_at, venue, status, home_goals, away_goals, is_completed, live_minute, live_period, live_added')
-        .eq('season_id', args.seasonId)
-        .order('fixture_number', { ascending: true })
-        .range(from, from + 999)
-      if (error) return { view: null, error: `league_fixtures: ${error.message}` }
-      const page = (data ?? []) as unknown as FixtureRow[]
-      paged.push(...page)
-      if (page.length < 1000) break
+    // ⚠ ONE COPY OF THE QUERY, in `seasonRead.ts`. It briefly lived here as well
+    // as there — two copies of the same three reads, which is two things to keep
+    // in step and exactly the duplication this codebase has a written bill for.
+    // `seasonRead.ts` holds no `next/cache` import, so it is safe for this file
+    // to reach; `season.ts`, which does, is not.
+    try {
+      const s = await readLeagueSeasonUncached(supabase, args.seasonId)
+      clubs = s.clubs
+      fixtures = s.fixtures as unknown as FixtureRow[]
+      matchweekRows = s.matchweeks
+    } catch (err) {
+      return { view: null, error: (err as Error).message }
     }
-
-    clubs = (clubRows ?? []) as unknown[]
-    fixtures = paged
-    matchweekRows = (mws ?? []) as unknown as MatchweekRow[]
   }
   const numberByMatchweekId = new Map(matchweekRows.map((m) => [m.matchweek_id, m.matchweek_number]))
 
