@@ -165,13 +165,16 @@ export default function Page() {
             </>
           ) : null
         }
+        /* ⚠ NOTHING BETWEEN THE FACES ONCE YOU HAVE MET THEM (Ryan,
+           2026-09-02). The reveal is a one-way door; after it the band is an
+           ordinary duel. */
         action={
-          state === 'revealed' ? (
+          state === 'revealed' && !seen ? (
             <button
               onClick={() => setCeremonyOpen(true)}
               className="rounded-chip bg-white/15 hover:bg-white/25 px-5 py-2 text-2xl font-extrabold text-white transition"
             >
-              {seen ? 'Replay' : 'Reveal'}
+              Reveal
             </button>
           ) : undefined
         }
@@ -218,7 +221,7 @@ export default function Page() {
             {state === 'sealed'
               ? 'Waiting — watch the clock reach zero.'
               : seen
-                ? 'Met them. The button says Replay and the band shows their face.'
+                ? 'Met them. No button left — 0–0 and a clock to the first game.'
                 : 'Open — press Reveal. Their spot is still empty.'}
           </span>
         </Row>
@@ -235,7 +238,7 @@ export default function Page() {
             <li>The clock counts down. <b>Their half of the band is empty</b> — no face, no name.</li>
             <li>At zero the clock becomes a <b>Reveal</b> button. Their spot is still empty.</li>
             <li>Press it. The walkout plays and ends on their face.</li>
-            <li>Close it. <b>Now</b> they appear in the band, and the button says <b>Replay</b>.</li>
+            <li>Close it. <b>Now</b> they appear in the band, the button is <b>gone</b>, and the score reads 0–0 with a clock to the first game.</li>
           </ol>
           <p className="font-bold text-ink mt-3 mb-1">Also worth checking</p>
           <ul className="list-disc pl-5 space-y-1">

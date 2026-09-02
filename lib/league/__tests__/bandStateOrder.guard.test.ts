@@ -76,10 +76,24 @@ describe('the showdown band picks its state in the right order', () => {
     const chain = bandChain()
     const openAt = chain.indexOf('if (open) {')
     const sealedAt = chain.indexOf('if (sealedMatchweek !== null) {')
-    const revealAt = chain.indexOf("{revealSeen ? 'Replay' : 'Reveal'}")
+    // ⚠ THE LABEL IS NOW JUST "Reveal". It used to read
+    // `{revealSeen ? 'Replay' : 'Reveal'}` — the button survived the walkout,
+    // relabelled, to keep a route to the share/video path. Ryan removed the
+    // video button from the ceremony on 2026-09-01 and the button itself on
+    // 2026-09-02, so after the reveal there is no action at all.
+    const revealAt = chain.indexOf('>\n                    Reveal\n')
 
-    expect(revealAt, 'the Reveal/Replay button is gone').toBeGreaterThan(-1)
+    expect(revealAt, 'the Reveal button is gone').toBeGreaterThan(-1)
     expect(revealAt).toBeGreaterThan(openAt)
     expect(revealAt).toBeLessThan(sealedAt)
+  })
+
+  it('offers no action once the walkout has been seen', () => {
+    // The whole of Ryan's 2026-09-02 ask, in one assertion: the action slot is
+    // gated on NOT having seen the reveal. Without this the band would keep
+    // rendering a button over a duel that has already been introduced.
+    const chain = bandChain()
+    expect(chain, 'the action slot is no longer gated on revealSeen')
+      .toMatch(/action=\{revealSeen \? undefined : \(/)
   })
 })

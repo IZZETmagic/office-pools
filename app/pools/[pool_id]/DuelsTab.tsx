@@ -1432,27 +1432,38 @@ export default function DuelsTab({
               sub={!revealSeen ? null : openFirstKickoff ? (
                 <>First game in <Countdown to={openFirstKickoff} onExpire={onBandClockExpired} /></>
               ) : 'Picks are open'}
-              /* ⚠ THE BUTTON KEEPS ITS PLACE BETWEEN THE FACES and does not
-                 move back up now that the scoreline has one. What it does is
-                 put a person in the circle beside it.
+              /* ⚠ THE BUTTON IS GONE ONCE YOU HAVE MET THEM. Ryan, 2026-09-02:
+                 *"once revealed there should be NO replay button."* The band
+                 stops being about the reveal the moment the reveal is over —
+                 what is left is a duel, and a duel shows a score and a clock.
 
-                 ⚠ AND IT STAYS A BUTTON AFTERWARDS, relabelled. The share and
-                 "Make a video" path lives INSIDE the ceremony, so a button that
-                 disappeared once used would take the only route to the video
-                 with it — you would get one chance, ever, to make the thing you
-                 are meant to want to send to someone. */
-              action={
+                 ⚠ THE OLD NOTE HERE SAID THIS BUTTON COULD NOT GO, because the
+                 share and "Make a video" path lived inside the ceremony and a
+                 button that vanished would take the only route to the video
+                 with it. THAT STOPPED BEING TRUE ON 2026-09-01, when Ryan
+                 removed the video button from the ceremony itself ("there is no
+                 need for a make a video button" — see the note at
+                 DuelRevealCeremony.tsx:443). The ceremony now ends on the
+                 opponent and a Done button, so Replay was guarding an empty
+                 room. The render pipeline still has no caller either way; that
+                 is recorded there, not here.
+
+                 ⚠ `undefined`, NOT A DISABLED BUTTON — with no action the V is
+                 not drawn either (the opponent is known, so `sealed` is false),
+                 and the space between the faces is simply empty, exactly as it
+                 is for a matchweek in play. */
+              action={revealSeen ? undefined : (
                 revealOpponent ? (
                   <button
                     onClick={() => setCeremonyOpen(true)}
                     className="rounded-chip bg-white/15 hover:bg-white/25 px-5 py-2 text-2xl font-extrabold text-white transition"
                   >
-                    {revealSeen ? 'Replay' : 'Reveal'}
+                    Reveal
                   </button>
                 ) : (
                   <span className="text-white/45">Not started</span>
                 )
-              }
+              )}
               rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
               points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
             />
