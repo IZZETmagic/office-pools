@@ -58,10 +58,11 @@
 // matchweek is both fully played and fully scored.
 // =============================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
+import { Countdown } from '@/components/ui/Countdown'
 import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
 import { DuelRevealCeremony, type RevealOpponent } from './DuelRevealCeremony'
 import { DUEL_WIN, DUEL_TIE, duelResult } from '@/lib/league/duelPoints'
@@ -229,61 +230,10 @@ type Props = {
 
 type Side = { entry: string; points: number | null; accuracy: number | null }
 
-/**
- * A ticking countdown to an instant.
- *
- * ⚠ CLIENT-ONLY, like `components/LocalTime` and for the same reason: a value
- * derived from `Date.now()` differs between the server render and the first
- * client render, and React keeps the server text rather than reconciling it.
- * So it renders nothing until mounted, then ticks.
- */
-export function Countdown({ to, onExpire }: { to: string; onExpire?: () => void }) {
-  const [text, setText] = useState('')
-  // ⚠ THE CALLBACK LIVES IN A REF, not the dependency array. Callers pass an
-  // inline arrow, which is a new function every render — in the deps it tears
-  // down and restarts the interval each time the parent re-renders, and a clock
-  // that keeps restarting never survives long enough to reach zero.
-  const expire = useRef(onExpire)
-  useEffect(() => { expire.current = onExpire })
-  useEffect(() => {
-    const target = new Date(to).getTime()
-    // ⚠ BOUNDED RETRIES, not one shot. The first fire is immediate; if the
-    // server still says sealed afterwards (clock skew between this browser and
-    // Postgres is real, and the window is derived from `lock_at`) it tries
-    // twice more, 30s apart, then stops. Three attempts is enough for skew and
-    // few enough that a wrong `to` cannot turn a page into a polling loop.
-    let fires = 0
-    let lastFire = 0
-    const tick = () => {
-      const ms = target - Date.now()
-      if (ms <= 0) {
-        setText('any moment')
-        const now = Date.now()
-        if (fires < 3 && now - lastFire >= 30_000) { fires++; lastFire = now; expire.current?.() }
-        return
-      }
-      const s = Math.floor(ms / 1000)
-      // ⚠ HOURS, NOT DAYS. `1d 21:21:54` made the reader do arithmetic to
-      // answer the only question they had — how long — and the two halves were
-      // in different units, so the number stopped being scannable at a glance.
-      // Hours carry all of it and keep one clock.
-      //
-      // It cannot run away: the hold is 48h, floored at 24h before lock (123),
-      // so this is two digits in every ordinary week. A postponement stalling
-      // settlement (094) can push it further, and `padStart(2)` widens rather
-      // than truncating — three digits is ugly and correct, which beats tidy
-      // and wrong.
-      const hh = String(Math.floor(s / 3600)).padStart(2, '0')
-      const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
-      const ss = String(s % 60).padStart(2, '0')
-      setText(`${hh}:${mm}:${ss}`)
-    }
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [to])
-  return <>{text}</>
-}
+// The clock moved to components/ui/Countdown.tsx when the pool card started
+// counting down too — a dashboard should not import this file to get a
+// `setInterval`. Re-exported because app/dev/showdown imports it from here.
+export { Countdown }
 
 /** What a settled duel was, for the form guide. A bye is its own thing. */
 type DuelFormResult = 'won' | 'tied' | 'lost' | 'bye'

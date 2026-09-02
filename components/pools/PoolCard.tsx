@@ -31,7 +31,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import { Icon } from '@/components/ui/Icon'
-import { AvatarStack } from '@/components/ui/Avatar'
+import { Avatar, AvatarStack } from '@/components/ui/Avatar'
+import { countdownText, countdownIsHours, useCountdown } from '@/components/ui/Countdown'
 import { LocalTime } from '@/components/LocalTime'
 import { CompetitionRail, type RailSize } from '@/components/competitions/CompetitionRail'
 import { getFormDotClass } from '@/lib/design/formDots'
@@ -255,7 +256,11 @@ export function PoolCard({
 export function PoolStripCard({ pool, unreadCount }: { pool: PoolCardPool; unreadCount: number }) {
   const action = poolCardAction(pool)
   const tiles = kpiTiles(pool)
-  const stats = tiles.filter((t) => t.kind === 'stat').slice(0, 3)
+  // ⚠ EVERYTHING THAT IS NOT DOTS, not just `stat`. A crest, a face and a clock
+  // are all values in a tile — filtering on the one shape that existed when this
+  // was written would have silently dropped Last Man Standing's club and
+  // Showdown's opponent off this card, leaving two tiles and a gap.
+  const stats = tiles.filter((t) => t.kind !== 'dots').slice(0, 3)
   const dotsTile = tiles.find((t) => t.kind === 'dots')
   // Whatever the big card puts last — a dot strip on most modes, a number on
   // Last Man Standing. 224px fits three tiles above it and this one below.
@@ -298,13 +303,7 @@ export function PoolStripCard({ pool, unreadCount }: { pool: PoolCardPool; unrea
               inherit every future mode without being edited again. */}
           <div className="mt-auto pt-3 grid grid-cols-3 gap-1">
             {stats.map((tile, i) => (
-              <div key={i} className={i === 2 ? 'text-right min-w-0' : i === 1 ? 'text-center min-w-0' : 'min-w-0'}>
-                <p className="text-[10px] font-medium text-muted mb-0.5 truncate">{tile.label}</p>
-                <p className={`t-num text-lg leading-tight truncate ${tile.tone === 'muted' ? 'text-muted' : tile.tone === 'accent' ? 'text-primary-600' : 'text-ink'}`}>
-                  {tile.value}
-                </p>
-                {tile.sub && <p className="text-[9px] text-muted leading-tight truncate">{tile.sub}</p>}
-              </div>
+              <StripTile key={i} tile={tile} align={i === 2 ? 'end' : i === 1 ? 'center' : 'start'} />
             ))}
           </div>
 
@@ -325,6 +324,52 @@ export function PoolStripCard({ pool, unreadCount }: { pool: PoolCardPool; unrea
         </div>
       </div>
     </Link>
+  )
+}
+
+/**
+ * One tile of the strip card, in whichever shape it arrived as.
+ *
+ * ⚠ 54px, MEASURED. The card is 224px, the compact rail takes 30, `p-3` takes
+ * 24 and the three columns share 4px of gap — which leaves 54px a tile, or five
+ * characters of Geist Mono at `text-lg`. That is the whole reason a club and an
+ * opponent are drawn rather than named here: "Arsenal" is 75.6px and every club
+ * in the league clipped mid-word. The two wide cards keep the words.
+ */
+function StripTile({ tile, align }: { tile: Exclude<KpiTile, { kind: 'dots' }>; align: 'start' | 'center' | 'end' }) {
+  const text = align === 'end' ? 'text-right' : align === 'center' ? 'text-center' : ''
+  const justify = align === 'end' ? 'justify-end' : align === 'center' ? 'justify-center' : ''
+  const mark = tile.kind === 'face' || (tile.kind === 'crest' && tile.crestUrl)
+  return (
+    <div className={`min-w-0 ${text}`}>
+      <p className="text-[10px] font-medium text-muted mb-0.5 truncate">{tile.label}</p>
+      {tile.kind === 'clock' ? (
+        // ⚠ ONE STEP DOWN FROM ITS SIBLINGS. `47:12` is exactly 54.0px at
+        // `text-lg` — the entire column, with nothing left for the rounding — and
+        // 48px at `text-base`, which fits. A clock is not a score, so reading a
+        // size smaller than the number beside it is honest as well as necessary.
+        <ClockValue tile={tile} size="text-base" subSize="text-[9px]" />
+      ) : (
+        <>
+          {mark ? (
+            <span
+              className={`flex items-center h-[22px] ${justify}`}
+              title={tile.kind === 'crest' || tile.kind === 'face' ? tile.value : undefined}
+            >
+              <TileMark tile={tile} size={22} standalone />
+            </span>
+          ) : (
+            /* `mark` is an aliased discriminant, so this branch is 'stat' | 'crest'
+               — both of which carry a tone. A crest reaches it only when the feed
+               had no badge for the club, which is the case the name still covers. */
+            <p className={`t-num text-lg leading-tight truncate ${tile.tone === 'muted' ? 'text-muted' : tile.tone === 'accent' ? 'text-primary-600' : 'text-ink'}`}>
+              {tile.value}
+            </p>
+          )}
+          {tile.sub && <p className="text-[9px] text-muted leading-tight truncate">{tile.sub}</p>}
+        </>
+      )}
+    </div>
   )
 }
 
@@ -400,9 +445,80 @@ function Tile({ tile, last }: { tile: KpiTile; last: boolean }) {
   return (
     <div className={`${tile.wide ? 'flex-[1.4]' : 'flex-1'} py-3 px-3 min-w-0 ${last ? 'text-right' : ''}`}>
       <p className="text-[10px] font-medium text-muted mb-1 tracking-wide">{tile.label}</p>
-      <p className={`text-xl font-bold leading-none truncate ${TONE[tile.tone]}`}>{tile.value}</p>
-      {tile.sub && <p className="text-[10px] text-muted mt-0.5 truncate">{tile.sub}</p>}
+      {tile.kind === 'clock' ? (
+        <ClockValue tile={tile} size="text-xl" subSize="text-[10px] mt-0.5" />
+      ) : tile.kind === 'crest' || tile.kind === 'face' ? (
+        /* ⚠ BADGE AND NAME, because this card can afford both — 124px of tile on
+           the pools list and 97px on the dashboard grid, against the strip
+           card's 54px. A badge alone asks the reader to know twenty crests; the
+           name alone is what clipped. The name drops to `text-base` to make room
+           for the mark, which is the only size at which "Nott'm Forest" and a
+           20px crest both fit the narrower of the two. */
+        <>
+          <div className={`flex items-center gap-1.5 min-w-0 ${last ? 'justify-end' : ''}`}>
+            <TileMark tile={tile} size={20} />
+            <p className={`font-bold leading-none truncate ${tile.kind === 'face' || tile.crestUrl ? 'text-base' : 'text-xl'} ${tile.kind === 'crest' ? TONE[tile.tone] : 'text-ink'}`}>
+              {tile.value}
+            </p>
+          </div>
+          {tile.sub && <p className="text-[10px] text-muted mt-0.5 truncate">{tile.sub}</p>}
+        </>
+      ) : (
+        <>
+          <p className={`text-xl font-bold leading-none truncate ${TONE[tile.tone]}`}>{tile.value}</p>
+          {tile.sub && <p className="text-[10px] text-muted mt-0.5 truncate">{tile.sub}</p>}
+        </>
+      )}
     </div>
+  )
+}
+
+/**
+ * The mark a `crest` or `face` tile leads with — a club badge or a person.
+ *
+ * A club with no `crest_url` (the feed's column is nullable) draws nothing and
+ * the name carries the tile on its own, which is what it did before.
+ */
+function TileMark({ tile, size, standalone = false }: { tile: KpiTile; size: number; standalone?: boolean }) {
+  if (tile.kind === 'face') {
+    return <Avatar person={tile.person} size={size} />
+  }
+  if (tile.kind === 'crest' && tile.crestUrl) {
+    // ⚠ The alt text depends on the surface. Beside the name it is decoration
+    // and must be empty, or a screen reader says the club twice; alone on the
+    // strip card it IS the content, and empty alt would read as nothing at all.
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={tile.crestUrl} alt={standalone ? tile.value : ''} className="object-contain shrink-0" style={{ width: size, height: size }} />
+  }
+  return null
+}
+
+/**
+ * A clock that ticks in place of a number.
+ *
+ * ⚠ THE CAPTION IS PART OF THE CLOCK, not decoration. `countdownText`'s compact
+ * format switches from hh:mm to mm:ss at the hour, and `45:00` cannot be read
+ * without knowing which band it is in — so the two captions come off the tile
+ * (they are written in lib/pools/card.ts, like every other sentence on the
+ * card) and the one that matches the current band is rendered.
+ *
+ * ⚠ `t-num`, unlike its sibling stats. The card's numbers are Nunito, whose
+ * digits are proportional — a clock in it jitters sideways once a second.
+ */
+function ClockValue({ tile, size, subSize }: { tile: Extract<KpiTile, { kind: 'clock' }>; size: string; subSize: string }) {
+  const msLeft = useCountdown(tile.to)
+  const text = countdownText(msLeft, 'compact')
+  return (
+    <>
+      {/* Empty until mounted — see the note on `useCountdown`. A non-breaking
+          space holds the row's height so the card does not jump on hydration. */}
+      <p className={`t-num ${size} leading-none truncate text-ink`}>{text || '\u00A0'}</p>
+      {text && (
+        <p className={`text-muted leading-tight truncate ${subSize}`}>
+          {countdownIsHours(msLeft) ? tile.subHours : tile.subMinutes}
+        </p>
+      )}
+    </>
   )
 }
 

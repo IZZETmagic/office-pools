@@ -172,9 +172,24 @@ export type LmsCardFacts = {
    */
   inPlayClubName: string | null
   inPlayMatchweek: number | null
+  /**
+   * That club's badge, and the reason the tile can be read on a phone at all.
+   *
+   * ⚠ MEASURED, like the rail widths in components/pools/PoolCard.tsx. The
+   * dashboard's strip card gives each tile 54px and its value is `t-num
+   * text-lg` — Geist Mono at 18px, which is 10.8px a character. "Arsenal" is
+   * 75.6px there and "Man Utd" the same, so EVERY club name in the league
+   * clipped mid-word. A crest is square, so it fits the column by construction
+   * and is the thing a supporter recognises fastest anyway.
+   *
+   * NULL is a real answer — the feed's `crest_url` is nullable — and the tile
+   * falls back to the name, which is what it always showed.
+   */
+  inPlayClubCrest: string | null
   /** The club picked for the week still OPEN — the next decision, not this one. */
   openClubName: string | null
   openMatchweek: number | null
+  openClubCrest: string | null
 }
 
 /** Everything a Showdown card's four tiles need. */
@@ -194,8 +209,35 @@ export type ShowdownCardFacts = {
   byes: number
   /** Who this member plays in the open matchweek. NULL on a bye. */
   opponentName: string | null
+  /**
+   * The person behind that entry, so the tile can carry a FACE.
+   *
+   * ⚠ Same 54px measurement as `LmsCardFacts.inPlayClubCrest`: an entry name is
+   * free text and the strip card's column fits five monospace characters, so
+   * the name was never going to survive there. The avatar's colour is hashed
+   * from `user_id` (see components/ui/Avatar.tsx), which is what makes the
+   * circle on the card the same circle as in the pool's chat — two letters and
+   * a colour a member already associates with a person.
+   *
+   * NULL on a bye, on a sealed draw, and when the opponent's user row could not
+   * be reached — all three cases the tile already had to handle.
+   */
+  opponent: { user_id: string; full_name: string | null; username: string | null } | null
   /** True when the open matchweek is this member's bye. */
   isBye: boolean
+  /**
+   * When the open matchweek's duel opens, IF it has not opened yet.
+   *
+   * ⚠ NOT RECOMPUTED HERE, and not a second copy of the reveal rule — read from
+   * `league_first_sealed_matchweek` (127), which is the same row the pool page
+   * counts down on. The card and the page therefore cannot disagree about which
+   * week is sealed, which they did for the whole of 30 Aug: this module
+   * implemented migration 119 and the page implemented 123.
+   *
+   * NULL whenever the open duel IS revealed — the tile shows the opponent then,
+   * not a clock.
+   */
+  revealsAt: string | null
   /** The matchweek that duel belongs to. */
   duelMatchweek: number | null
   /** The last five SETTLED duels, oldest first. */
@@ -464,16 +506,21 @@ export async function readLeagueCardFacts(
       // Club names for the picks on this page only.
       const clubIds = Array.from(new Set(pickRows.map((r) => r.club_id)))
       const clubNameById = new Map<string, string>()
+      // The badge, for the tile that cannot fit the name. See the note on
+      // `LmsCardFacts.inPlayClubCrest` — nullable in the feed, so a club with no
+      // crest falls back to its name rather than drawing a hole.
+      const clubCrestById = new Map<string, string>()
       if (clubIds.length > 0) {
         const { data: clubRows } = await admin
           .from('league_clubs')
           // `league_clubs` names the column `name`; aliased rather than renamed,
           // as every other league read does.
-          .select('club_id, club_name:name, short_name')
+          .select('club_id, club_name:name, short_name, crest_url')
           .in('club_id', clubIds)
-        for (const c of (clubRows ?? []) as Array<{ club_id: string; club_name: string | null; short_name: string | null }>) {
+        for (const c of (clubRows ?? []) as Array<{ club_id: string; club_name: string | null; short_name: string | null; crest_url: string | null }>) {
           const label = c.short_name || c.club_name
           if (label) clubNameById.set(c.club_id, shortClubName(label))
+          if (c.crest_url) clubCrestById.set(c.club_id, c.crest_url)
         }
       }
 
@@ -517,8 +564,10 @@ export async function readLeagueCardFacts(
             roundEntrants: entrantsByRound.get(round.round_id) ?? 0,
             inPlayClubName: inPlayPick ? (clubNameById.get(inPlayPick.club_id) ?? null) : null,
             inPlayMatchweek: inPlay?.matchweek_number ?? null,
+            inPlayClubCrest: inPlayPick ? (clubCrestById.get(inPlayPick.club_id) ?? null) : null,
             openClubName: openPick ? (clubNameById.get(openPick.club_id) ?? null) : null,
             openMatchweek: open.matchweek_number,
+            openClubCrest: openPick ? (clubCrestById.get(openPick.club_id) ?? null) : null,
           }
         }
       }
@@ -587,19 +636,45 @@ export async function readLeagueCardFacts(
      * protects is `opponentName` for the week you are picking.
      */
     const openRevealed = new Map<string, boolean>()
+    /**
+     * And WHEN it opens, for the weeks that are still sealed.
+     *
+     * ⚠ THE GATE ABOVE IS NOT REPLACED BY THIS, on purpose. `league_first_
+     * sealed_matchweek` (127) selects the same row — its own verify block says
+     * "the first `false` in lock order is the row this function returns" — but
+     * it filters `lock_at IS NOT NULL`, where the policy predicate returns FALSE
+     * for that case. Deriving the gate from a selection would therefore open a
+     * fixture-less matchweek that 116 seals, which is the one direction this
+     * must never fail in. So the boolean still comes from the predicate and this
+     * only supplies a clock, issued in the same wave rather than after it.
+     */
+    const openRevealsAt = new Map<string, string>()
     await Promise.all(
       showdownPools.map(async (p) => {
         const mw = openByPool.get(p.poolId)?.matchweek_number
         if (mw === undefined) return
-        const { data, error } = await admin.rpc('league_duel_is_revealed', {
-          p_pool_id: p.poolId,
-          p_matchweek_number: mw,
-        })
+        const [gate, sealed] = await Promise.all([
+          admin.rpc('league_duel_is_revealed', { p_pool_id: p.poolId, p_matchweek_number: mw }),
+          admin.rpc('league_first_sealed_matchweek', { p_pool_id: p.poolId }),
+        ])
         // ⚠ FALSE ON ERROR, deliberately. A failed gate must seal the draw, not
         // open it — a card that leaks the opponent is worse than one that is
         // briefly quiet, and 116 exists precisely to stop that.
-        if (error) console.error('[league] duel reveal gate failed:', error.message)
-        openRevealed.set(p.poolId, !error && data === true)
+        if (gate.error) console.error('[league] duel reveal gate failed:', gate.error.message)
+        openRevealed.set(p.poolId, !gate.error && gate.data === true)
+
+        // Swallowed to null rather than thrown, as lib/league/read.ts does with
+        // the same call: a missing clock is quieter than failing the dashboard.
+        if (sealed.error) { console.error('[league] first sealed matchweek failed:', sealed.error.message); return }
+        const row = ((sealed.data ?? []) as Array<{ matchweek_number: number; reveals_at: string | null }>)[0]
+        // ⚠ ONLY when it is the OPEN week's own duel. The function answers for
+        // the whole season, so on a revealed week it names a LATER one — showing
+        // that instant here would count down to a fortnight away under the words
+        // "This week".  `-infinity` is never a countdown target (127).
+        if (!row || row.matchweek_number !== mw) return
+        if (typeof row.reveals_at === 'string' && !row.reveals_at.startsWith('-infinity')) {
+          openRevealsAt.set(p.poolId, row.reveals_at)
+        }
       }),
     )
 
@@ -642,13 +717,30 @@ export async function readLeagueCardFacts(
     }
 
     const nameByEntry = new Map<string, string>()
+    // The PERSON behind the entry, for the tile that shows a face instead of a
+    // name. `pool_entries` carries no `user_id` — an entry belongs to a
+    // membership — so the user is two embeds away, the same walk the pool page
+    // makes through `members` to build its `entryPeople` map.
+    const personByEntry = new Map<string, { user_id: string; full_name: string | null; username: string | null }>()
     if (opponentIds.size > 0) {
-      const { data: nameRows } = await admin
+      // ⚠ THE ERROR IS READ. A `select` naming a column or an embed that does
+      // not exist comes back as a 400 with `data: null`, and destructuring only
+      // `data` renders the default — a card with no opponent — for ever. See
+      // lib/scoring/readSource.ts and the note this module's header points at.
+      const { data: nameRows, error: nameErr } = await admin
         .from('pool_entries')
-        .select('entry_id, entry_name')
+        .select('entry_id, entry_name, pool_members!inner(users!inner(user_id, full_name, username))')
         .in('entry_id', Array.from(opponentIds))
-      for (const r of (nameRows ?? []) as Array<{ entry_id: string; entry_name: string | null }>) {
+      if (nameErr) console.error('[league] duel opponent read failed:', nameErr.message)
+      type OpponentRow = {
+        entry_id: string
+        entry_name: string | null
+        pool_members: { users: { user_id: string; full_name: string | null; username: string | null } | null } | null
+      }
+      for (const r of (nameRows ?? []) as unknown as OpponentRow[]) {
         if (r.entry_name) nameByEntry.set(r.entry_id, r.entry_name)
+        const u = r.pool_members?.users
+        if (u?.user_id) personByEntry.set(r.entry_id, { user_id: u.user_id, full_name: u.full_name ?? null, username: u.username ?? null })
       }
     }
 
@@ -696,7 +788,14 @@ export async function readLeagueCardFacts(
           duelPoints: duelPointsByEntry.get(me) ?? 0,
           won, tied, lost, byes,
           opponentName: nextThem ? (nameByEntry.get(nextThem) ?? null) : null,
+          opponent: nextThem ? (personByEntry.get(nextThem) ?? null) : null,
           isBye: !!next && !nextThem,
+          // ⚠ Only while the duel is actually sealed. `openRevealsAt` is already
+          // scoped to the open matchweek, and `openRevealed` is the gate that
+          // decided whether `next` could be here at all — so the clock and the
+          // opponent are mutually exclusive by construction rather than by the
+          // tile remembering to check.
+          revealsAt: openRevealed.get(p.poolId) ? null : (openRevealsAt.get(p.poolId) ?? null),
           duelMatchweek: next ? (next.matchweek_number as number) : null,
           recentDuels: settled.slice(-5).map((r) => r.outcome),
         }

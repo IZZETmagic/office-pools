@@ -220,7 +220,9 @@ describe('byAttention — the dashboard order', () => {
 describe('kpiTiles — the mode-dependent slot', () => {
   const showdown = {
     duelPoints: 13, won: 4, tied: 1, lost: 2, byes: 0,
-    opponentName: 'Marcus', isBye: false, duelMatchweek: 3,
+    opponentName: 'Marcus',
+    opponent: { user_id: 'u-marcus', full_name: 'Marcus Bell', username: 'marcus' },
+    isBye: false, duelMatchweek: 3, revealsAt: null,
     recentDuels: ['won', 'tied', 'lost', 'won', 'won'] as DuelOutcome[],
   }
   const sdPool = (over = {}) =>
@@ -240,14 +242,45 @@ describe('kpiTiles — the mode-dependent slot', () => {
     expect(kpiTiles(sdPool())[0]).toMatchObject({ sub: '4W 1T 2L' })
   })
 
-  it('names the opponent and the matchweek that duel belongs to', () => {
-    expect(kpiTiles(sdPool())[2]).toMatchObject({ value: 'Marcus', sub: 'MW 3', tone: 'ink' })
+  it('carries the opponent as a FACE, and still says who and which week', () => {
+    // ⚠ The name has to survive alongside the avatar. The dashboard's strip card
+    // shows the circle alone in its 54px column; the two wide cards show both,
+    // and neither can if `kpiTiles` throws the name away.
+    expect(kpiTiles(sdPool())[2]).toMatchObject({
+      kind: 'face', value: 'Marcus', sub: 'MW 3',
+      person: { user_id: 'u-marcus' },
+    })
+  })
+
+  it('falls back to a plain name when the opponent has no user row', () => {
+    // The duel is drawn, so the answer is known; only the face is missing.
+    expect(kpiTiles(sdPool({ opponent: null }))[2])
+      .toMatchObject({ kind: 'stat', value: 'Marcus', sub: 'MW 3', tone: 'ink' })
+  })
+
+  it('counts down instead of naming anybody while the duel is still sealed', () => {
+    // ⚠ THE SEAL BEATS EVERY OTHER STATE. The draw is made once and opened a
+    // week at a time (116), so for the first stretch of each week there is no
+    // opponent to name — and a dash there reads as missing data rather than as
+    // the anticipation Ryan reversed the publishing for on 30 Aug.
+    const t = kpiTiles(sdPool({ revealsAt: '2026-09-04T20:59:00Z', opponentName: null, opponent: null }))[2]
+    expect(t).toMatchObject({ kind: 'clock', label: 'This week', to: '2026-09-04T20:59:00Z' })
+    // Both captions, because the format switches at the hour as it runs down and
+    // `45:00` cannot be read without being told which band it is in.
+    expect(t).toMatchObject({ subHours: 'hrs to reveal', subMinutes: 'min to reveal' })
+  })
+
+  it('does not leak a bye through the seal either', () => {
+    // A sealed week hides everything about the duel, and "you are sitting this
+    // one out" is something about the duel.
+    expect(kpiTiles(sdPool({ revealsAt: '2026-09-04T20:59:00Z', isBye: true, opponentName: null, opponent: null }))[2].kind)
+      .toBe('clock')
   })
 
   it('says Bye rather than showing a dash', () => {
     // With an odd number of members somebody sits out every matchweek. It is
     // not an error and must not read as one — migration 083.
-    const tiles = kpiTiles(sdPool({ isBye: true, opponentName: null }))
+    const tiles = kpiTiles(sdPool({ isBye: true, opponentName: null, opponent: null }))
     expect(tiles[2]).toMatchObject({ value: 'Bye', sub: 'sits out', tone: 'muted' })
   })
 
@@ -279,8 +312,8 @@ describe('kpiTiles — Last Man Standing', () => {
   const lms = {
     roundsWon: 2, roundNumber: 3, isEliminated: false, eliminatedMatchweek: null,
     survivorsLeft: 4, roundEntrants: 10,
-    inPlayClubName: 'Arsenal', inPlayMatchweek: 2,
-    openClubName: 'Hull City', openMatchweek: 3,
+    inPlayClubName: 'Arsenal', inPlayMatchweek: 2, inPlayClubCrest: 'https://x/arsenal.png',
+    openClubName: 'Hull City', openMatchweek: 3, openClubCrest: 'https://x/hull.png',
   }
   const lmsPool = (over = {}) =>
     pool({ league_mode: 'last_man_standing', totalMatches: 1, hasScoringStarted: true,
@@ -290,8 +323,11 @@ describe('kpiTiles — Last Man Standing', () => {
     // ⚠ 900 accuracy points, 2 rounds won. `league_finalize_ranks` sorts on
     // rounds_won ahead of everything — showing 900 would put a number in tile 1
     // unrelated to the rank in tile 2.
-    expect(kpiTiles(lmsPool()).map((t) => t.label)).toEqual(['Rounds won', 'Rank', 'This week', 'Still in'])
-    expect(kpiTiles(lmsPool())[0]).toMatchObject({ value: '2', sub: 'Round 3' })
+    expect(kpiTiles(lmsPool()).map((t) => t.label)).toEqual(['Rounds', 'Rank', 'This week', 'Still in'])
+    // ⚠ "Rounds won" measured 56.6px against a 54px column on the dashboard's
+    // strip card, so the tile carrying the season score read "Rounds wo…". The
+    // verb moved into the caption rather than off the card.
+    expect(kpiTiles(lmsPool())[0]).toMatchObject({ value: '2', sub: 'in round 3' })
   })
 
   it('names the club being PLAYED, not the one lined up for next week', () => {
@@ -301,7 +337,17 @@ describe('kpiTiles — Last Man Standing', () => {
     // off. The two weeks are the same from Monday night to Friday evening and
     // different for the three days the football is on, which are the days
     // somebody looks at the card.
-    expect(kpiTiles(lmsPool())[2]).toMatchObject({ value: 'Arsenal', sub: 'MW 2 in play', tone: 'ink' })
+    expect(kpiTiles(lmsPool())[2]).toMatchObject({
+      kind: 'crest', value: 'Arsenal', sub: 'MW 2 in play', tone: 'ink',
+      crestUrl: 'https://x/arsenal.png',
+    })
+  })
+
+  it('keeps the name when the feed has no badge for the club', () => {
+    // `league_clubs.crest_url` is nullable and a hole where a badge should be is
+    // worse than the clipping the badge was added to fix.
+    expect(kpiTiles(lmsPool({ inPlayClubCrest: null }))[2])
+      .toMatchObject({ kind: 'crest', value: 'Arsenal', crestUrl: null })
   })
 
   it('falls back to the open week between rounds', () => {
@@ -309,7 +355,7 @@ describe('kpiTiles — Last Man Standing', () => {
     // answer to "this week", and the matchweek is named so it cannot be
     // mistaken for one in progress.
     expect(kpiTiles(lmsPool({ inPlayClubName: null, inPlayMatchweek: null }))[2])
-      .toMatchObject({ value: 'Hull City', sub: 'MW 3', tone: 'ink' })
+      .toMatchObject({ value: 'Hull City', sub: 'MW 3', tone: 'ink', crestUrl: 'https://x/hull.png' })
   })
 
   it('falls back rather than accusing you when the round began after the week in play', () => {
@@ -407,8 +453,8 @@ describe('kpiTiles — every mode now has a branch', () => {
     // would silently drop one.
     const modes: Array<Partial<PoolCardPool>> = [
       { league_mode: 'pickem' },
-      { league_mode: 'showdown', showdown: { duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, opponentName: null, isBye: false, duelMatchweek: null, recentDuels: [] } },
-      { league_mode: 'last_man_standing', lms: { roundsWon: 0, roundNumber: 1, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 5, roundEntrants: 5, inPlayClubName: null, inPlayMatchweek: null, openClubName: null, openMatchweek: 1 } },
+      { league_mode: 'showdown', showdown: { duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, opponentName: null, opponent: null, isBye: false, duelMatchweek: null, revealsAt: null, recentDuels: [] } },
+      { league_mode: 'last_man_standing', lms: { roundsWon: 0, roundNumber: 1, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 5, roundEntrants: 5, inPlayClubName: null, inPlayMatchweek: null, inPlayClubCrest: null, openClubName: null, openMatchweek: 1, openClubCrest: null } },
       { league_mode: 'table', table: { spotOn: 0, clubCount: 20, averageOff: null, hasTable: true, isFinal: false } },
       { prediction_mode: 'full_tournament', league_mode: null },
     ]
@@ -425,8 +471,8 @@ describe('kpiTiles — tile order is a contract, because the dashboard drops the
   // construction.
   const cases: Array<[string, Partial<PoolCardPool>, string]> = [
     ['pickem', { league_mode: 'pickem', openMatchweekNumber: 3 }, 'Points'],
-    ['showdown', { league_mode: 'showdown', showdown: { duelPoints: 4, won: 1, tied: 1, lost: 0, byes: 0, opponentName: 'Ana', isBye: false, duelMatchweek: 3, recentDuels: [] } }, 'Duel pts'],
-    ['last_man_standing', { league_mode: 'last_man_standing', lms: { roundsWon: 1, roundNumber: 2, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 3, roundEntrants: 8, inPlayClubName: 'Arsenal', inPlayMatchweek: 4, openClubName: null, openMatchweek: 5 } }, 'Rounds won'],
+    ['showdown', { league_mode: 'showdown', showdown: { duelPoints: 4, won: 1, tied: 1, lost: 0, byes: 0, opponentName: 'Ana', opponent: null, isBye: false, duelMatchweek: 3, revealsAt: null, recentDuels: [] } }, 'Duel pts'],
+    ['last_man_standing', { league_mode: 'last_man_standing', lms: { roundsWon: 1, roundNumber: 2, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 3, roundEntrants: 8, inPlayClubName: 'Arsenal', inPlayMatchweek: 4, inPlayClubCrest: null, openClubName: null, openMatchweek: 5, openClubCrest: null } }, 'Rounds'],
     ['table', { league_mode: 'table', table: { spotOn: 4, clubCount: 20, averageOff: 1.2, hasTable: true, isFinal: false } }, 'Table pts'],
     ['full_tournament', { prediction_mode: 'full_tournament', league_mode: null }, 'Points'],
   ]

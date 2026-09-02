@@ -409,6 +409,58 @@ export type KpiTile =
       wide?: boolean
     }
   | { kind: 'dots'; label: string; dots: string[]; palette: 'form' | 'duel' }
+  /**
+   * A CLUB, drawn as its badge wherever the name will not fit.
+   *
+   * ⚠ THE NAME IS STILL HERE and is not decoration. The dashboard's strip card
+   * has 54px a tile and shows the crest alone; the two wide cards show the crest
+   * AND the name, because they have the room and a badge with a name beside it
+   * is unambiguous where a badge alone asks the reader to know every crest in
+   * the league. A club whose `crest_url` is null falls all the way back to the
+   * name, which is what the tile showed before this shape existed.
+   */
+  | {
+      kind: 'crest'
+      label: string
+      crestUrl: string | null
+      /** The club, shortened — the alt text, the caption and the fallback. */
+      value: string
+      sub?: string
+      tone: 'accent' | 'ink' | 'muted'
+      wide?: boolean
+    }
+  /**
+   * A PERSON, drawn as their avatar. Same measurement, same fallback: an entry
+   * name is free text, so it never had a chance in 54px.
+   */
+  | {
+      kind: 'face'
+      label: string
+      person: PoolCardMember
+      /** The entry name — the wide cards' caption, and the fallback. */
+      value: string
+      sub?: string
+      wide?: boolean
+    }
+  /**
+   * A TICKING CLOCK. The component owns the tick (components/ui/Countdown.tsx);
+   * this owns the instant and both captions, so the words still live here.
+   *
+   * ⚠ TWO CAPTIONS, because the format switches as it runs down. `45:00` is an
+   * hour band or a minute band and the reader cannot tell, so the tile says
+   * which — see `countdownText` for why the handover is at one hour.
+   */
+  | {
+      kind: 'clock'
+      label: string
+      /** ISO instant. */
+      to: string
+      /** Caption while the clock reads hh:mm. */
+      subHours: string
+      /** Caption once it has dropped to mm:ss. */
+      subMinutes: string
+      wide?: boolean
+    }
 
 export function kpiTiles(pool: PoolCardPool): KpiTile[] {
   if (pool.league_mode === 'showdown' && pool.showdown) return showdownTiles(pool.showdown, pool)
@@ -438,18 +490,56 @@ function showdownTiles(sd: ShowdownCardFacts, pool: PoolCardPool): KpiTile[] {
       tone: 'accent',
     },
     rankTile(pool),
-    {
-      kind: 'stat',
-      label: 'This week',
-      // A bye says so rather than showing a dash — with an odd number of members
-      // somebody sits out every matchweek, and it is not an error.
-      value: sd.isBye ? 'Bye' : (sd.opponentName ?? '—'),
-      sub: sd.isBye ? 'sits out' : sd.duelMatchweek != null ? `MW ${sd.duelMatchweek}` : undefined,
-      tone: sd.isBye || !sd.opponentName ? 'muted' : 'ink',
-      wide: true,
-    },
+    showdownWeekTile(sd),
     { kind: 'dots', label: 'Form', dots: sd.recentDuels, palette: 'duel' },
   ]
+}
+
+/**
+ * The third tile, in the four states this mode has.
+ *
+ * ⚠ THE SEALED WEEK COMES FIRST, and it is a clock rather than a dash. The draw
+ * is made once and opened a week at a time (116), so for the first stretch of
+ * every week there IS no opponent to name — the tile used to render "—" in that
+ * window, which reads as missing data rather than as the anticipation the seal
+ * exists to create. Ryan reversed the publishing on 30 Aug for exactly that
+ * feeling, and 123 gave it an instant worth watching.
+ *
+ * ⚠ A FACE, NOT A NAME, once it opens. An entry name is free text and the
+ * dashboard's strip card gives the tile 54px — see `KpiTile`'s `crest` note for
+ * the measurement. The avatar is the same circle, in the same hashed colour,
+ * that the member already sees beside this person in the pool's chat.
+ */
+function showdownWeekTile(sd: ShowdownCardFacts): KpiTile {
+  if (sd.revealsAt) {
+    return {
+      kind: 'clock',
+      label: 'This week',
+      to: sd.revealsAt,
+      subHours: 'hrs to reveal',
+      subMinutes: 'min to reveal',
+      wide: true,
+    }
+  }
+  // A bye says so rather than showing a dash — with an odd number of members
+  // somebody sits out every matchweek, and it is not an error.
+  const mw = sd.duelMatchweek != null ? `MW ${sd.duelMatchweek}` : undefined
+  if (sd.isBye) {
+    return { kind: 'stat', label: 'This week', value: 'Bye', sub: 'sits out', tone: 'muted', wide: true }
+  }
+  if (sd.opponent && sd.opponentName) {
+    return { kind: 'face', label: 'This week', person: sd.opponent, value: sd.opponentName, sub: mw, wide: true }
+  }
+  // The name without the person: the duel is drawn but the opponent's user row
+  // could not be reached. Rare, and the name is still the answer to the question.
+  return {
+    kind: 'stat',
+    label: 'This week',
+    value: sd.opponentName ?? '—',
+    sub: mw,
+    tone: sd.opponentName ? 'ink' : 'muted',
+    wide: true,
+  }
 }
 
 /**
@@ -469,9 +559,14 @@ function lmsTiles(lms: LmsCardFacts, pool: PoolCardPool): KpiTile[] {
   return [
     {
       kind: 'stat',
-      label: 'Rounds won',
+      // ⚠ "Rounds won" DID NOT FIT, measured: 56.6px of Nunito 500 at 10px in a
+      // 54px column, so the dashboard's strip card rendered "Rounds wo…" — the
+      // tile that carries the season score, illegible on the surface most
+      // members open first. The caption absorbs the verb instead, which reads
+      // better than the two halves did apart: Rounds · 2 · in round 3.
+      label: 'Rounds',
       value: formatNumber(lms.roundsWon),
-      sub: lms.roundNumber != null ? `Round ${lms.roundNumber}` : undefined,
+      sub: lms.roundNumber != null ? `in round ${lms.roundNumber}` : undefined,
       tone: 'accent',
     },
     rankTile(pool),
@@ -524,8 +619,13 @@ function lmsWeekTile(lms: LmsCardFacts): KpiTile {
   }
   if (lms.inPlayClubName) {
     return {
-      kind: 'stat',
+      // ⚠ A BADGE, because the name never fit. "Arsenal" is 75.6px of Geist Mono
+      // at 18px and the strip card's tile is 54px, so every club in the league
+      // clipped mid-word on the dashboard. See `KpiTile`'s `crest` note — the
+      // wide cards still show the name beside it.
+      kind: 'crest',
       label: 'This week',
+      crestUrl: lms.inPlayClubCrest,
       value: lms.inPlayClubName,
       sub: lms.inPlayMatchweek != null ? `MW ${lms.inPlayMatchweek} in play` : undefined,
       tone: 'ink',
@@ -534,8 +634,9 @@ function lmsWeekTile(lms: LmsCardFacts): KpiTile {
   }
   if (lms.openClubName) {
     return {
-      kind: 'stat',
+      kind: 'crest',
       label: 'This week',
+      crestUrl: lms.openClubCrest,
       value: lms.openClubName,
       sub: lms.openMatchweek != null ? `MW ${lms.openMatchweek}` : undefined,
       tone: 'ink',
