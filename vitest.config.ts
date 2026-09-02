@@ -19,11 +19,22 @@ export default defineConfig({
     // limit: pure functions and source-text guards only, no rendering. The
     // first one is the create-pool wizard's `withoutSeason`, which decides what
     // a member reads on the card they pick a competition from.
+    // mobile/** was added 2026-09-02, and it is the first coverage the Expo app
+    // has ever had — `mobile/` is a separate npm project with no test runner of
+    // its own, so until now zero of its logic was asserted anywhere.
+    //
+    // ⚠ THE SAME LIMIT, AND IT IS LOAD-BEARING HERE: pure modules only. Nothing
+    // under this glob may import `react-native`, `expo-router` or anything that
+    // reaches them — those resolve out of `mobile/node_modules`, which this
+    // config knows nothing about, and the failure is an unresolved import
+    // rather than anything informative. The way to test screen logic is to move
+    // the logic out of the screen, which is what `lib/resultsSections.ts` is.
     include: [
       'lib/**/*.test.ts',
       'lib/**/__tests__/**/*.test.ts',
       'app/**/__tests__/**/*.test.ts',
       'components/**/__tests__/**/*.test.ts',
+      'mobile/**/__tests__/**/*.test.ts',
     ],
     reporters: ['default'],
   },

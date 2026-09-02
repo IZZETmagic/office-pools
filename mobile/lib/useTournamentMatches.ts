@@ -1,5 +1,7 @@
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { apiFetch } from './api';
 import { useHomeData } from './HomeDataProvider';
 import { supabase } from './supabase';
 
@@ -28,6 +30,25 @@ export type ResultsMatch = {
   awayTeamPlaceholder: string | null;
   homeTeam: ResultsTeam | null;
   awayTeam: ResultsTeam | null;
+  /**
+   * The MATCHWEEK, for a league fixture. Null for every World Cup match, which
+   * groups by `stage` instead.
+   *
+   * ⚠ IT IS NOT OPTIONAL DECORATION. The league adapter stamps
+   * `stage = 'regular_season'` — a value `matches_stage_check` does not even
+   * admit — and puts the real grouping here. A screen that reaches for `stage`
+   * to name a section prints a database enum at a member, which is exactly what
+   * `regular_season · #1` did on the web before it was fixed.
+   */
+  roundNumber: number | null;
+  /**
+   * The competition's display name, e.g. "Premier League". Null for the World
+   * Cup, where there is only one thing being played.
+   *
+   * A member can be in a Premier League pool and a La Liga pool at once, and two
+   * crests with no caption cannot say which competition a game belongs to.
+   */
+  competition: string | null;
 };
 
 export type ResultsTeam = {
@@ -46,6 +67,16 @@ const MATCH_SELECT = `
 `;
 
 const STALE_AFTER_MS = 30_000;
+
+/** The shape of `GET /api/users/:user_id/fixtures`. */
+type LeagueFixturesResponse = {
+  seasons: Array<{
+    season_id: string;
+    competition: string | null;
+    /** Already in the World Cup match shape — the route does the mapping. */
+    matches: Record<string, unknown>[];
+  }>;
+};
 
 function normalizeTeam(raw: unknown): ResultsTeam | null {
   if (!raw) return null;
@@ -83,6 +114,12 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
     awayTeamPlaceholder: (row.away_team_placeholder as string | null) ?? null,
     homeTeam: normalizeTeam(row.home_team),
     awayTeam: normalizeTeam(row.away_team),
+    // Absent from MATCH_SELECT, so this is null for every World Cup row — which
+    // is correct: the World Cup groups by stage. The league route sends it.
+    roundNumber: (row.round_number as number | null) ?? null,
+    // Not a per-row field on either source. The league route carries it once
+    // per season and `leagueMatches` below stamps it on.
+    competition: null,
   };
 }
 
@@ -94,6 +131,11 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
  * Tournament IDs come from `HomeDataProvider`'s cached pools, so this hook
  * doesn't re-query memberships — it just fans out one query per tournament.
  *
+ * ⚠ IT RETURNS TWO COMPETITIONS' WORTH OF MATCHES, from two sources. World Cup
+ * matches come from the `matches` table below; league fixtures are NOT in that
+ * table and never will be, so they come from `/api/users/:id/fixtures` and are
+ * merged into the same array. Every consumer sees one list.
+ *
  * IMPORTANT: don't call this directly from screens. Use `useTournamentMatches`
  * from `TournamentMatchesProvider` instead — it shares one fetch across the
  * whole app and lets the splash gate wait on the load so the Results tab
@@ -101,6 +143,10 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
  */
 export function useTournamentMatchesInternal() {
   const { data: homeData } = useHomeData();
+  // The route resolves the member's seasons server-side from this id; the phone
+  // never sends a pool list. `useHomeData` does not select `league_season_id`,
+  // so it could not send an honest one anyway.
+  const appUserId = homeData?.appUserId ?? null;
   const tournamentIds = useMemo(() => {
     const set = new Set<string>();
     for (const pool of homeData?.pools ?? []) {
@@ -183,12 +229,73 @@ export function useTournamentMatchesInternal() {
     };
   }, [tournamentIds]);
 
-  const refresh = useCallback(() => load('refresh'), [load]);
+  // =============================================================
+  // THE LEAGUE HALF — the same list, a second source
+  // =============================================================
+  // League fixtures are not in `matches` and never will be: nothing on the
+  // league path writes a row there. They come from
+  // `GET /api/users/:id/fixtures`, which shapes them with the SAME adapter the
+  // web pool view uses, so what arrives here needs no mapping mobile could get
+  // wrong — see the route's own header for why that matters.
+  //
+  // ⚠ NO `refetchInterval`, and this is not an oversight. The payload is a
+  // SEASON. Live score and minute reach an open pool screen on the
+  // `pool:{id}:leaderboard` broadcast; polling a season for them would be the
+  // most expensive line in the app. React Query's 30 s staleTime plus the
+  // AppState focus wiring is what keeps this list current, and a results list
+  // is allowed to be a focus behind — a pool leaderboard is not.
+  const leagueQuery = useQuery({
+    queryKey: ['league-fixtures', appUserId],
+    enabled: !!appUserId,
+    queryFn: () => apiFetch<LeagueFixturesResponse>(`/api/users/${appUserId}/fixtures`),
+  });
+
+  const leagueMatches = useMemo(() => {
+    const out: ResultsMatch[] = [];
+    for (const season of leagueQuery.data?.seasons ?? []) {
+      for (const row of season.matches) {
+        // The competition is a fact about the season, sent once rather than
+        // repeated on 380 rows. Stamped on here so every consumer downstream
+        // reads it off the match like any other field.
+        out.push({ ...normalizeMatch(row), competition: season.competition });
+      }
+    }
+    return out;
+  }, [leagueQuery.data]);
+
+  const allMatches = useMemo(
+    () => (leagueMatches.length === 0 ? matches : [...matches, ...leagueMatches]),
+    [matches, leagueMatches],
+  );
+
+  const refresh = useCallback(async () => {
+    await Promise.all([load('refresh'), leagueQuery.refetch()]);
+  }, [load, leagueQuery]);
+
   const refreshIfStale = useCallback(() => {
     if (Date.now() - lastLoadedAtRef.current > STALE_AFTER_MS) {
       void load('refresh');
+      void leagueQuery.refetch();
     }
-  }, [load]);
+  }, [load, leagueQuery]);
 
-  return { matches, loading, refreshing, error, refresh, refreshIfStale };
+  return {
+    matches: allMatches,
+    // ⚠ `loading` IS THE WORLD CUP READ ONLY, AND MUST STAY THAT WAY. The splash
+    // gate in `app/_layout.tsx` waits on it, so folding the league round trip in
+    // here would put a network call on the COLD-START path — the thing the
+    // mobile perf work is trying to shorten. League loading is its own field,
+    // and the Results screen decides what to do with it.
+    loading,
+    leagueLoading: !!appUserId && leagueQuery.isPending,
+    refreshing,
+    // ⚠ The league error is surfaced, not swallowed. Without it a failed fetch
+    // leaves a league member on an empty list with no error and no explanation
+    // — "No Matches" stated confidently, which is the whole defect this feature
+    // exists to end.
+    error,
+    leagueError: leagueQuery.error ? (leagueQuery.error as Error).message : null,
+    refresh,
+    refreshIfStale,
+  };
 }

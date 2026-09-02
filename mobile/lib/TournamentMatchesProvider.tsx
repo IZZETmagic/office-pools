@@ -13,10 +13,19 @@ import {
 } from './useTournamentMatches';
 
 type TournamentMatchesValue = {
+  /** World Cup matches and league fixtures, merged. See the hook's header. */
   matches: ResultsMatch[];
+  /**
+   * ⚠ THE WORLD CUP READ ONLY. The splash gate below waits on this, so the
+   * league fetch is deliberately NOT folded in — that would put a network call
+   * on the cold-start path.
+   */
   loading: boolean;
+  /** The league fetch, separately. A screen may show data before this lands. */
+  leagueLoading: boolean;
   refreshing: boolean;
   error: string | null;
+  leagueError: string | null;
   refresh: () => Promise<void> | void;
   refreshIfStale: () => void;
 };

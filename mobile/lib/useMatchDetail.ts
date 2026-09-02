@@ -109,6 +109,11 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
     awayTeamPlaceholder: (row.away_team_placeholder as string | null) ?? null,
     homeTeam: normalizeTeam(row.home_team),
     awayTeam: normalizeTeam(row.away_team),
+    // Both null on this path by definition: it reads the `matches` table, which
+    // holds World Cup rows only. A league fixture never reaches this function —
+    // it is served from the list already in memory. See `leagueMatch` below.
+    roundNumber: null,
+    competition: null,
   };
 }
 

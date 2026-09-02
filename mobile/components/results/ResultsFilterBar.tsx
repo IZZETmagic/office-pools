@@ -9,6 +9,21 @@ type Props = {
   mode: FilterMode;
   selectedTeamName: string | null;
   selectedGroupLetter: string | null;
+  /**
+   * What the second pill is called. A World Cup has rounds; a league has
+   * matchweeks. The caller decides from what is actually in the list — see
+   * `roundPillLabel` in the Results screen.
+   */
+  roundLabel: string;
+  /**
+   * ⚠ Whether to show the Group pill at all, and it is not cosmetic.
+   *
+   * A club has no group. With a league-only list the pill was still there,
+   * filtered to nothing, and `GroupPickerSheet` has NO empty state — so tapping
+   * it opened a blank sheet, which reads as broken rather than as inapplicable.
+   * A control that does nothing is worse than one that is not there.
+   */
+  showGroup: boolean;
   onSelectDate: () => void;
   onSelectRound: () => void;
   onSelectTeam: () => void;
@@ -19,6 +34,8 @@ export function ResultsFilterBar({
   mode,
   selectedTeamName,
   selectedGroupLetter,
+  roundLabel,
+  showGroup,
   onSelectDate,
   onSelectRound,
   onSelectTeam,
@@ -48,7 +65,7 @@ export function ResultsFilterBar({
         style={{ flex: 1 }}
       >
         <Pill label="Date" active={mode === 'date'} onPress={onSelectDate} />
-        <Pill label="Round" active={mode === 'round'} onPress={onSelectRound} />
+        <Pill label={roundLabel} active={mode === 'round'} onPress={onSelectRound} />
         <Pill
           label={teamLabel}
           active={mode === 'team'}
@@ -61,18 +78,20 @@ export function ResultsFilterBar({
             )
           }
         />
-        <Pill
-          label={groupLabel}
-          active={mode === 'group'}
-          onPress={onSelectGroup}
-          suffix={
-            mode === 'group' && selectedGroupLetter ? (
-              <FilterIcon kind="clear" tint={theme.colors.primary} />
-            ) : (
-              <FilterIcon kind="chevron" tint={theme.colors.ink} />
-            )
-          }
-        />
+        {showGroup ? (
+          <Pill
+            label={groupLabel}
+            active={mode === 'group'}
+            onPress={onSelectGroup}
+            suffix={
+              mode === 'group' && selectedGroupLetter ? (
+                <FilterIcon kind="clear" tint={theme.colors.primary} />
+              ) : (
+                <FilterIcon kind="chevron" tint={theme.colors.ink} />
+              )
+            }
+          />
+        ) : null}
       </ScrollView>
     </View>
   );

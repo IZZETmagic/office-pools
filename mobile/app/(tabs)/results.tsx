@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   Text as RNText,
@@ -35,99 +36,35 @@ import { useManualRefresh } from '@/lib/useManualRefresh';
 // (lib/TournamentMatchesProvider.tsx) so first-visit Results renders with
 // data already loaded — no more empty-state + arrival jump.
 import { useTournamentMatches } from '@/lib/TournamentMatchesProvider';
+import {
+  anchorSectionIndex,
+  dateSections,
+  dayLabel,
+  EXPAND_STEP,
+  parsedDate,
+  ROW_BUDGET,
+  roundSections,
+  startOfDay,
+  windowSections,
+  type MatchSection,
+} from '@/lib/resultsSections';
 import { type ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
-
-// ---- Section model ----
-
-type MatchSection = {
-  id: string;
-  label: string;
-  matches: ResultsMatch[];
-};
-
-const ROUND_ORDER: Array<{ keys: string[]; label: string }> = [
-  { keys: ['group'], label: 'Group Stage' },
-  { keys: ['round_32', 'round_of_32'], label: 'Round of 32' },
-  { keys: ['round_16', 'round_of_16'], label: 'Round of 16' },
-  { keys: ['quarter_final'], label: 'Quarter Finals' },
-  { keys: ['semi_final'], label: 'Semi Finals' },
-  { keys: ['third_place'], label: 'Third Place' },
-  { keys: ['final'], label: 'Final' },
-];
-
-function parsedDate(iso: string): Date | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function dayLabel(dayStart: Date): string {
-  const today = startOfDay(new Date());
-  const target = startOfDay(dayStart);
-  const diffDays = Math.round(
-    (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-  );
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Tomorrow';
-  if (diffDays === -1) return 'Yesterday';
-  return target.toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
-function dateSections(matchList: ResultsMatch[]): MatchSection[] {
-  const buckets = new Map<number, ResultsMatch[]>();
-  for (const m of matchList) {
-    const d = parsedDate(m.matchDate);
-    const key = d ? startOfDay(d).getTime() : -1;
-    const arr = buckets.get(key) ?? [];
-    arr.push(m);
-    buckets.set(key, arr);
-  }
-  const keys = Array.from(buckets.keys()).sort((a, b) => a - b);
-  return keys.map((key) => {
-    const dayMatches = (buckets.get(key) ?? []).sort((a, b) => {
-      const ad = parsedDate(a.matchDate)?.getTime() ?? 0;
-      const bd = parsedDate(b.matchDate)?.getTime() ?? 0;
-      return ad - bd;
-    });
-    const label = key < 0 ? 'Date TBD' : dayLabel(new Date(key));
-    return {
-      id: `day-${key}`,
-      label,
-      matches: dayMatches,
-    };
-  });
-}
-
-function roundSections(matchList: ResultsMatch[]): MatchSection[] {
-  return ROUND_ORDER.map((round) => {
-    const roundMatches = matchList
-      .filter((m) => round.keys.includes(m.stage))
-      .sort((a, b) => {
-        const ad = parsedDate(a.matchDate)?.getTime() ?? 0;
-        const bd = parsedDate(b.matchDate)?.getTime() ?? 0;
-        return ad - bd;
-      });
-    return roundMatches.length > 0
-      ? { id: round.label, label: round.label, matches: roundMatches }
-      : null;
-  }).filter((s): s is MatchSection => s !== null);
-}
 
 // ---- Screen ----
 
 export default function ResultsScreen() {
   const theme = useTheme();
-  const { matches, loading, error, refresh, refreshIfStale } =
+  const { matches, loading, leagueLoading, error, leagueError, refresh, refreshIfStale } =
     useTournamentMatches();
+  // ⚠ BOTH SOURCES, or a league member is told the wrong thing. `loading` is the
+  // World Cup read alone (the splash gate waits on it); without `leagueLoading`
+  // here the screen renders its empty state for the length of the league fetch
+  // and a member reads "No Matches" a moment before their season arrives. Same
+  // for the error: a failed league fetch with no World Cup pool would otherwise
+  // be indistinguishable from a season with no football in it.
+  const anyLoading = loading || leagueLoading;
+  const anyError = error ?? leagueError;
   // Pull-to-refresh: spinner driven by real user-pull gesture only.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
   const [filterMode, setFilterMode] = useState<FilterMode>('date');
@@ -181,6 +118,23 @@ export default function ResultsScreen() {
     }
   }, [filterMode, matches, selectedTeam, selectedGroupLetter]);
 
+  // How far the member has asked to see beyond the default window, in sections.
+  // Reset whenever the filter changes, because "twelve more matchweeks" means
+  // nothing once the list is a different list.
+  const [expandBefore, setExpandBefore] = useState(0);
+  const [expandAfter, setExpandAfter] = useState(0);
+  useEffect(() => {
+    setExpandBefore(0);
+    setExpandAfter(0);
+  }, [filterMode, selectedTeam, selectedGroupLetter]);
+
+  const visible = useMemo(() => {
+    const base = windowSections(sections, anchorSectionIndex(sections), ROW_BUDGET);
+    const start = Math.max(0, base.start - expandBefore);
+    const end = Math.min(sections.length, base.end + expandAfter);
+    return { start, end, sections: sections.slice(start, end) };
+  }, [sections, expandBefore, expandAfter]);
+
   // Available teams across the full match list, sorted alphabetically.
   const availableTeams = useMemo<TeamOption[]>(() => {
     const seen = new Set<string>();
@@ -206,6 +160,17 @@ export default function ResultsScreen() {
     out.sort((a, b) => a.name.localeCompare(b.name));
     return out;
   }, [matches]);
+
+  // ---- What this list is made of, which decides which pills exist ----
+  //
+  // Asked of the MATCHES rather than of the member's pools. `useHomeData` does
+  // not select `league_season_id`, so the pool list cannot answer it — and the
+  // matches can, exactly and without another read.
+  const hasGroupStage = useMemo(() => matches.some((m) => m.stage === 'group'), [matches]);
+  const hasMatchweeks = useMemo(() => matches.some((m) => m.roundNumber !== null), [matches]);
+  // "Round" is World Cup wording. With nothing but a league in the list the
+  // pill says what a member would say out loud.
+  const roundPillLabel = hasMatchweeks && !hasGroupStage ? 'Matchweek' : 'Round';
 
   // Available group letters, sorted, with match count per group.
   const availableGroups = useMemo<GroupOption[]>(() => {
@@ -259,16 +224,18 @@ export default function ResultsScreen() {
   useEffect(() => {
     if (autoScrollDoneRef.current) return;
     if (filterMode !== 'date') return;
-    if (sections.length === 0) return;
+    if (visible.sections.length === 0) return;
     // Wait a frame so onLayout has populated section offsets.
     const handle = setTimeout(() => {
-      const liveSection = sections.find((s) =>
+      // ⚠ Searched within the WINDOW, not the whole list. Only mounted sections
+      // have a layout offset, so a target outside it silently does nothing.
+      const liveSection = visible.sections.find((s) =>
         s.matches.some((m) => m.status === 'live'),
       );
       const targetId = liveSection
         ? liveSection.id
-        : sections.find((s) => s.matches.some((m) => m.status === 'scheduled'))?.id ??
-          sections.find((s) => s.label === 'Today')?.id;
+        : visible.sections.find((s) => s.matches.some((m) => m.status === 'scheduled'))?.id ??
+          visible.sections.find((s) => s.label === 'Today')?.id;
       if (!targetId) return;
       const y = sectionYRef.current[targetId];
       if (typeof y === 'number') {
@@ -281,7 +248,7 @@ export default function ResultsScreen() {
 
   // ---- Render ----
 
-  if (loading && matches.length === 0) {
+  if (anyLoading && matches.length === 0) {
     return (
       <SafeAreaView
         edges={['top', 'left', 'right']}
@@ -300,7 +267,7 @@ export default function ResultsScreen() {
     );
   }
 
-  if (error && matches.length === 0) {
+  if (anyError && matches.length === 0) {
     return (
       <SafeAreaView
         edges={['top', 'left', 'right']}
@@ -325,7 +292,7 @@ export default function ResultsScreen() {
             Unable to Load
           </Text>
           <Text variant="body" color="slate" align="center">
-            {error}
+            {anyError}
           </Text>
         </View>
       </SafeAreaView>
@@ -349,6 +316,8 @@ export default function ResultsScreen() {
         mode={filterMode}
         selectedTeamName={selectedTeam?.name ?? null}
         selectedGroupLetter={selectedGroupLetter}
+        roundLabel={roundPillLabel}
+        showGroup={hasGroupStage}
         onSelectDate={handleSelectDate}
         onSelectRound={handleSelectRound}
         onSelectTeam={handleSelectTeam}
@@ -374,7 +343,14 @@ export default function ResultsScreen() {
         {empty || sections.length === 0 ? (
           <EmptyState filterMode={filterMode} />
         ) : (
-          sections.map((section) => (
+          <>
+          {visible.start > 0 ? (
+            <MoreButton
+              label="Show earlier"
+              onPress={() => setExpandBefore((n) => n + EXPAND_STEP)}
+            />
+          ) : null}
+          {visible.sections.map((section) => (
             <View
               key={section.id}
               onLayout={(e) => {
@@ -417,7 +393,14 @@ export default function ResultsScreen() {
                   ))}
               <View style={{ height: 4 }} />
             </View>
-          ))
+          ))}
+          {visible.end < sections.length ? (
+            <MoreButton
+              label="Show more"
+              onPress={() => setExpandAfter((n) => n + EXPAND_STEP)}
+            />
+          ) : null}
+          </>
         )}
       </ScrollView>
 
@@ -439,6 +422,36 @@ export default function ResultsScreen() {
       />
       <JoinPoolSheet ref={joinPoolSheetRef} />
     </SafeAreaView>
+  );
+}
+
+/**
+ * The way out of the window. Plain and unstyled on purpose — it is a seam in the
+ * list, not a call to action, and a season has two of them.
+ */
+function MoreButton({ label, onPress }: { label: string; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderRadius: theme.radii.lg,
+        backgroundColor: withOpacity(theme.colors.ink, 0.04),
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <RNText
+        style={{
+          fontFamily: fontFamilies.semibold,
+          fontSize: 13,
+          color: theme.colors.primary,
+        }}
+      >
+        {label}
+      </RNText>
+    </Pressable>
   );
 }
 
