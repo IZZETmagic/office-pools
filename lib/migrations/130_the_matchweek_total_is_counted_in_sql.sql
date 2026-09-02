@@ -4,46 +4,38 @@
 -- ⚠ ADDITIVE ONLY. One new function; nothing is replaced, so there is no
 -- `md5(prosrc)` pre-check to run.
 --
--- ⚠⚠ APPLY THIS BEFORE THE CODE THAT NAMES IT. ✅ Done — 130 went in on
--- 2026-09-02, ahead of the deploy, which is the safe direction. `readMatchweekPoints` calls
--- `league_matchweek_points` from this change onward, so a deploy that lands
--- ahead of the migration makes every call fail with "function does not exist"
--- — on the pool page, the duel recap page and /api/pools/[id]/duel-live. All
--- three log it now, but what a member SEES is a duel card reading 0 - 0 and a
--- recap of a duel that never happened.
+-- ✅ APPLIED TO PRODUCTION 2026-09-02 (ujthamlehjyubbzxbnes), ahead of the code
+-- that names it — which was the whole ordering constraint, and it is discharged.
 --
--- This is the R14 ordering constraint, second time of asking: the same shape as
--- `entry_xp_state.highest_level_reached`, where code shipped ahead of migration
--- 026 and PostgREST rejected every upsert for seven hours in silence. Order is:
--- **apply 130, then deploy.** There is no reverse dependency — 130 is additive
--- and harmless on its own, so applying it early costs nothing.
+-- ## What was checked, because applying is not verifying
 --
--- ✅ APPLIED TO PRODUCTION 2026-09-02 (ujthamlehjyubbzxbnes) and verified against
--- real data, not just applied:
---   * a matchweek WITH scores — 9 entries, 0 mismatches vs a plain GROUP BY
---   * the EMPTY matchweek — returns {"totals":{},"per_fixture":{}}, not NULL,
---     which is the COALESCE trap below doing its job
+-- It was written with no database access and no local Postgres (only `libpq`),
+-- so none of the care in these comments was evidence it ran. These are:
+--
+--   * a matchweek WITH scores — 9 entries, **0 mismatches** against a plain
+--     GROUP BY over the same rows
+--   * the EMPTY matchweek — returns `{"totals":{},"per_fixture":{}}`, NOT null,
+--     which is the COALESCE below doing its job. This is the normal state of
+--     every matchweek until the first goal, so it is the case that mattered
 --   * a pool id that does not exist — same, no error
---   * per-fixture inner map byte-identical to jsonb_object_agg over the rows,
---     with ZEROS PRESERVED (a wrong pick scores 0 and must render as 0)
---   * grants: authenticated=false, anon=false, service_role=true
+--   * the per-fixture inner map byte-identical to `jsonb_object_agg` over the
+--     rows, with **zeros preserved** (a wrong pick scores 0 and must render 0,
+--     not vanish)
+--   * grants — `authenticated` false, `anon` false, `service_role` true
 --
--- It was written with no database access and no local Postgres, so none of the
--- care in these comments was evidence it ran — the checks above are.
+-- ⚠ THE ORDERING MATTERED AND STILL DOES IF THIS IS EVER REBUILT.
+-- `readMatchweekPoints` calls this function from `6aa2831` onward, so a deploy
+-- landing ahead of the migration fails every call with "function does not
+-- exist" — on the pool page, the duel recap and /api/pools/[id]/duel-live. All
+-- three log it, but what a member SEES is a duel card reading 0 - 0 and a recap
+-- of a duel that never happened. Same shape as migration 026, where code
+-- shipped ahead of the column and PostgREST rejected every upsert for seven
+-- hours in silence (R14).
 --
--- It is `LANGUAGE sql`, which is the one thing in our favour: unlike `plpgsql`
--- — where names resolve at RUN time and a clean apply proves nothing, the
--- 081->082 lesson — a SQL function body is parsed and its columns resolved at
--- CREATE time. So `CREATE OR REPLACE` succeeding IS the check here, and it
--- costs one statement in a transaction you can roll back:
---
---   BEGIN;  \i 130_the_matchweek_total_is_counted_in_sql.sql
---   SELECT league_matchweek_points('<a real pool>'::uuid, 2);
---   ROLLBACK;
---
--- Run it against a matchweek that HAS scores and one that has none — the empty
--- case is the one with a real trap in it (see the COALESCE note below), and it
--- is also the normal state of every matchweek until the first goal.
+-- `LANGUAGE sql` is what made the check cheap: unlike `plpgsql` — where names
+-- resolve at RUN time and a clean apply proves nothing, the 081->082 lesson —
+-- a SQL body is parsed and its columns resolved at CREATE time, so
+-- `CREATE OR REPLACE` succeeding is itself most of the verification.
 -- =============================================================
 --
 -- `readMatchweekPoints` (lib/league/duels.ts) pulled every `league_match_scores`
