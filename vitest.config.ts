@@ -31,6 +31,17 @@ export default defineConfig({
     alias: {
       // Mirrors tsconfig.json paths: "@/*" → repo root.
       '@': path.resolve(__dirname, '.'),
+      // `server-only` is a build-time boundary marker: it throws the moment it
+      // is imported outside a Server Component, which is exactly what makes it
+      // useful in the app and useless here. Vitest is neither a client nor a
+      // server bundle, so it always throws.
+      //
+      // Aliased to a no-op rather than removed from the modules that use it —
+      // `lib/league/season.ts` imports it BECAUSE a client component once
+      // reached that file transitively and put `revalidateTag` in the browser
+      // bundle, failing the build. Dropping the marker to make tests pass would
+      // trade a real guard for a green tick.
+      'server-only': path.resolve(__dirname, 'lib/__mocks__/server-only.ts'),
     },
   },
 })

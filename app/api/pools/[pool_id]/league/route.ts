@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { readLeaguePoolView, readLeaguePredictions, deriveRoundSubmissions } from '@/lib/league/read'
 import { readEntryTotals } from '@/lib/league/duels'
+import { getLeagueSeasonCached } from '@/lib/league/season'
 
 // =============================================================
 // /api/pools/:pool_id/league — ONE READ, TWO SURFACES
@@ -90,11 +91,23 @@ export async function GET(
     return NextResponse.json({ error: 'Not a league pool' }, { status: 404 })
   }
 
-  // The season + the derived matchweek numbers. Reads the shared cache.
+  // ⚠ THE CACHED SEASON IS PASSED IN, not fetched inside `readLeaguePoolView`.
+  // That helper is imported by client components, so it cannot import
+  // `next/cache` itself — the caching decision belongs to server callers, which
+  // is what this is. Omit `season` and it silently falls back to three uncached
+  // reads per request, which is the thing this whole contract exists to stop.
+  let season
+  try {
+    season = await getLeagueSeasonCached(pool.league_season_id)
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 502 })
+  }
+
   const { view, error: viewErr } = await readLeaguePoolView(supabase, {
     poolId: pool_id,
     seasonId: pool.league_season_id,
     tournamentId: pool.tournament_id as string,
+    season,
   })
   // ⚠ Surfaced, never swallowed. Every number below is derived from this, so a
   // failed read that returned 200 would render an empty season as a real one —

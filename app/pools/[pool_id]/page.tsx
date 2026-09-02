@@ -471,10 +471,24 @@ export default async function PoolPage({
       }
     }
 
+    // ⚠ THE CACHED SEASON IS PASSED IN. `readLeaguePoolView` is imported by
+    // client components too, so it cannot reach `next/cache` itself — the
+    // caching belongs to server callers like this one. Omit `season` and it
+    // silently falls back to three uncached reads per viewer per load, which is
+    // the 175 kB this contract exists to stop paying.
+    const { getLeagueSeasonCached } = await import('@/lib/league/season')
+    let season
+    try {
+      season = await getLeagueSeasonCached(pool.league_season_id)
+    } catch (err) {
+      console.error('[pool page] season read failed:', (err as Error).message)
+    }
+
     const { view, error: leagueErr } = await readLeaguePoolView(supabase, {
       poolId: pool_id,
       seasonId: pool.league_season_id,
       tournamentId: pool.tournament_id,
+      season,
     })
     if (leagueErr) {
       // Loud. A league pool rendering an empty fixture list is exactly the

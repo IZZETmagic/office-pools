@@ -56,10 +56,27 @@
 // how you serve a 0–0 through a goal.
 // =============================================================
 
+// ⚠ THE FIRST LINE, AND IT IS LOad-BEARING. This module imports `next/cache`,
+// which cannot exist in a browser bundle. `lib/league/read.ts` is imported by
+// CLIENT components — `PoolDetail.tsx` dynamically imports `readLeaguePredictions`,
+// and `SurvivorTab`/`LeagueTableTab` import from it too — so when the first
+// version of this file was wired the other way round (read.ts importing this
+// one), Turbopack pulled `revalidateTag` into the client bundle and the build
+// failed outright:
+//
+//     You're importing a component that needs "revalidateTag"
+//
+// `tsc --noEmit` was clean the whole time. A module-boundary problem is a
+// bundler concern, not a type one — which is why `server-only` is here: it turns
+// the next such mistake into an immediate, named error at the import site
+// rather than a build failure three files away.
+import 'server-only'
+
 import { unstable_cache, revalidateTag } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/server'
-import type { MatchweekRow } from './read'
+// ⚠ ONE DIRECTION ONLY: season.ts → read.ts. read.ts must never import this.
+import type { MatchweekRow, LeagueSeasonView } from './read'
 
 /**
  * ⚠ Short, and a backstop rather than the mechanism. 30 seconds is the recorded
@@ -94,12 +111,9 @@ export type SeasonFixtureRow = {
   live_added: number | null
 }
 
-/** Everything about a season that is the same for every viewer. */
-export type LeagueSeasonView = {
-  clubs: SeasonClubRow[]
-  matchweeks: MatchweekRow[]
-  fixtures: SeasonFixtureRow[]
-}
+/** Re-exported so callers have one place to import it from. Declared in
+ *  `read.ts` because that file is the shared one — see the header. */
+export type { LeagueSeasonView }
 
 /**
  * One tag per season, so every pool playing it shares one cache entry and one
@@ -187,16 +201,20 @@ export async function readLeagueSeasonUncached(
  * ⚠ `unstable_cache` NEEDS A REQUEST CONTEXT, and this function has callers that
  * do not have one.
  *
- * `readLeaguePoolView` is called from `scripts/verify-league-pool-member-view.ts`
- * as well as from the page and the API route, and a script runs outside Next
- * entirely. There it throws:
+ * Every caller today is a request — the pool page and the league route — so this
+ * branch is insurance rather than a live path, and it is kept because it has
+ * already earned its place once. The first version of this contract had
+ * `readLeaguePoolView` fetch the cached season itself, which put this function
+ * on the path of `scripts/verify-league-pool-member-view.ts`, and a script runs
+ * outside Next entirely. It threw:
  *
  *     Invariant: incrementalCache missing in unstable_cache
  *
- * which is not a data problem and must not be reported as one — it means "there
- * is no cache here", and the honest answer to that is to read directly. Found by
- * running the script rather than by reasoning about it: the first version of
- * this file broke all 36 of its checks.
+ * and broke all 36 of that script's checks. That is not a data problem and must
+ * not be reported as one — it means "there is no cache here", and the honest
+ * answer is to read directly. The caching has since moved out to the server
+ * callers, so scripts no longer reach this at all; the next non-request caller
+ * that does will get a slow read rather than a failure.
  *
  * Same posture as `invalidatePoolCache` in `lib/poolData.ts`, whose comment
  * records the mirror image of this — *"revalidateTag only runs in a
