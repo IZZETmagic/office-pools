@@ -3167,6 +3167,57 @@ The full rule, now written down once:
 - **Per-competition branding** `Multi-sport` — theme/copy per sport. (The existing `branded-pools` feature is per-**pool** white-label — a different axis.)
 - **Monetization model** `Multi-sport` — free vs freemium vs paid. Tracked under 💎.
 
+### Decision 14 — The phone reads a level, it never derives one
+
+Settled 2026-09-02 with Ryan: *"I am not prepared to begin the RN development, but I do want to move
+all the current paths to read only and no calculations."*
+
+**The picker built the day before was reverted.** Wiring RN's read paths is not the same as building
+RN screens, and the picker was the second: a 266-line write surface with a control that has no web
+counterpart to match. What survives is the rule it was wrapped around — a league pool never reaches
+the World Cup wizard (`mobile/lib/leagueSurface.ts`), because that wizard reads `predictions` and a
+league pool's picks are in `league_predictions`, so it rendered an **empty screen with nothing on it
+to explain why**. ⚠ The discriminant is `isLeague`, **not `leagueMode`**: two production pools carry a
+season id with a NULL mode and fall straight through a mode check.
+
+**Then the audit found the phone was computing a score-shaped number.** `PoolListItem` ran
+`getLevel(pool.totalPoints)` against a private table in `mobile/lib/levels.ts`. Three faults, none of
+which failed loudly:
+
+| | |
+|---|---|
+| **Wrong input** | It read `scored_total_points`. The level is **XP** — `entry_xp_state.current_level`, which counts badges and streaks. The two numbers are unrelated |
+| **Wrong names** | Its table said L2 *"Beginner"*, L5 *"Competitor"*. `lib/levelNames.ts` says *"Matchday Fan"* and *"Stadium Regular"*. The same member saw a different level **and** a different name depending on the device |
+| **Wrong on leagues** | It ran for **every** pool. XP is World Cup machinery end to end, so the web card shows the matchweek there and **no level at all** — the phone invented one for a Premier League pool |
+
+**Measured on production** (`scripts/verify-home-level-read.ts`): of 4,976 scored entries the phone
+disagreed with the stored level on **3,976 — 80%**. An entry on 5,750 points was shown *"Legend"*; it
+is a **Scout**. One on 1,650 was shown *"Competitor"*; it is a **Rookie**. **62** league entries were
+shown a level that does not exist. Nothing errored, on any of them.
+
+- **The fix is a read.** `/api/users/:id/home-scoring` now returns `current_level` + `level_name` out
+  of `entry_xp_state`, **NULL for a league entry**, on a request the home screen already makes — no
+  new round trip. `mobile/lib/levels.ts` is deleted.
+- ⚠ **This partly rehabilitates a claim Decision 12 corrected.** That correction was right on its own
+  terms — the XP level was *not* a reason to build the league read contract, and citing it there was
+  reaching. But the divergence itself was real, and larger than the analogy suggested. Both things
+  hold: wrong argument, real bug.
+- **The guard written alongside it found a second copy within a minute.**
+  `useEntryBracketAnalytics` held hand-mirrored copies of the badge catalogue **and** the full XP
+  ladder — names and thresholds — behind a fallback its own comment justified with *"the server (on
+  older deployments) still returns a 404"*. It does not: the route returns a shaped zero state, ladder
+  included, and **nothing in the repo emits** the string the fallback matched on. Unreachable, and
+  stale. 77 lines removed. *The lesson is the cheap one — a guard that scans for the **names** finds
+  copies that a guard scanning for the function name never would.*
+- **What was deliberately left alone:** the pool-list sort, the accuracy percentage on the profile
+  row, the rank colour bucket. Those order and format numbers the server already computed, which is
+  what a front end is **for**. The rule is *no calculation of a score*, not *no arithmetic*.
+
+⚠ **Still standing:** `mobile/lib/useHomeData.ts` rolls up a cross-pool `totalPoints` with a client
+`reduce`. It is an aggregate over ~15 rows already in memory, so it is on the right side of the line
+today — but it is the shape that belongs in SQL if the pool count ever grows.
+
+
 ## 💎 Later — monetization & cosmetics
 
 ### Sponsored pools `Feature` `Monetization`
