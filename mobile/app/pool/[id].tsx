@@ -38,6 +38,7 @@ import {
   type PoolTabKey,
 } from '@/components/pool-detail';
 import { Button, Text } from '@/components/ui';
+import { predictionSurfaceFor } from '@/lib/leagueSurface';
 import { useReportActivePool } from '@/lib/PresenceProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { usePendingActions } from '@/lib/usePendingActions';
@@ -330,7 +331,26 @@ export default function PoolDetailScreen() {
             matchdayInfo={matchdayInfo}
           />
         );
-      case 'predictions':
+      case 'predictions': {
+        // The rule lives in `lib/leagueSurface.ts`. A league pool must never
+        // reach the World Cup wizard — its picks are in `league_predictions`,
+        // which that wizard never touches, so it rendered empty with nothing to
+        // explain why. Picking on a phone is not built and is not being built
+        // yet (Ryan, 2026-09-02); this says so rather than showing a broken
+        // screen.
+        const surface = predictionSurfaceFor({
+          isLeague: pool.isLeague,
+          leagueMode: pool.leagueMode,
+        });
+        if (surface === 'league-read-only') {
+          return (
+            <TabPlaceholder
+              icon="iphone.and.arrow.forward"
+              title="Make your picks on the web"
+              caption="This pool's picking screen isn't on the phone yet. Everything else here is up to date."
+            />
+          );
+        }
         return (
           <MemoPredictionsTab
             poolId={pool.poolId}
@@ -340,6 +360,7 @@ export default function PoolDetailScreen() {
             isAdmin={pool.isAdmin}
           />
         );
+      }
       case 'form':
         return pool.predictionMode === 'bracket_picker' ? (
           <MemoBPFormTab poolId={pool.poolId} />

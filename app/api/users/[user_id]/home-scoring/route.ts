@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
 import { getShadowReadPools, readEntryScoring } from '@/lib/scoring/readSource'
+import { getLevelName } from '@/lib/levelNames'
 
 // GET /api/users/:user_id/home-scoring
 //
@@ -50,6 +51,19 @@ export type EntryScoringSummary = {
   point_adjustment: number
   scored_total_points: number
   current_rank: number | null
+  /**
+   * The STORED XP level from `entry_xp_state`, never a client-side derivation —
+   * and NULL for a league entry, matching the web pools page.
+   *
+   * ⚠ NULL is meaningful twice over. XP is World Cup machinery end to end:
+   * `entry_xp_state` is written by World Cup scoring, so a league entry has no
+   * row and a level would be 1 for everyone. The web card shows the matchweek
+   * in that space instead; the phone must not invent a number where the web
+   * deliberately shows none.
+   */
+  current_level: number | null
+  /** Paired here so the name can never drift from the number. */
+  level_name: string | null
 }
 
 /** An entry with no scored matches — bracket_picker entries are always this. */
@@ -66,6 +80,8 @@ function emptySummary(entryId: string): EntryScoringSummary {
     point_adjustment: 0,
     scored_total_points: 0,
     current_rank: null,
+    current_level: null,
+    level_name: null,
   }
 }
 
@@ -122,13 +138,33 @@ async function handleGET(
   type MemberRow = { pool_id: string; pool_entries?: Array<{ entry_id: string }> | null }
   const memberships = (rows ?? []) as MemberRow[]
 
+  // Which of the user's pools are leagues — asked as a flat list of ids rather
+  // than embedded in the membership select, because PostgREST types an embedded
+  // relation as an array and the shape fight is not worth a join we can do as an
+  // indexed lookup on ids we already hold.
+  const poolIds = [...new Set(memberships.map((m) => m.pool_id))]
+  const { data: leaguePoolRows, error: leagueErr } = await admin
+    .from('pools')
+    .select('pool_id')
+    .in('pool_id', poolIds)
+    .not('league_season_id', 'is', null)
+    .returns<Array<{ pool_id: string }>>()
+  if (leagueErr) {
+    return NextResponse.json({ error: leagueErr.message }, { status: 500 })
+  }
+  const leaguePools = new Set((leaguePoolRows ?? []).map((r) => r.pool_id))
+
   const shadowPools = await getShadowReadPools(admin)
   const shadowIds: string[] = []
   const prodIds: string[] = []
+  // Entries whose pool is a league — they get NO level, see `current_level`.
+  const leagueEntryIds = new Set<string>()
   for (const m of memberships) {
     const target = shadowPools.has(m.pool_id) ? shadowIds : prodIds
     for (const e of m.pool_entries ?? []) {
-      if (e.entry_id) target.push(e.entry_id)
+      if (!e.entry_id) continue
+      target.push(e.entry_id)
+      if (leaguePools.has(m.pool_id)) leagueEntryIds.add(e.entry_id)
     }
   }
 
@@ -137,12 +173,21 @@ async function handleGET(
     return NextResponse.json({ entries: [] })
   }
 
-  const [shadowSummaries, prodSummaries, shadowTotals, prodTotals] = await Promise.all([
-    fetchSummaries(admin, shadowIds, 'shadow'),
-    fetchSummaries(admin, prodIds, 'prod'),
-    readEntryScoring(admin, shadowIds, 'shadow'),
-    readEntryScoring(admin, prodIds, 'prod'),
-  ])
+  const [shadowSummaries, prodSummaries, shadowTotals, prodTotals, levelRows] =
+    await Promise.all([
+      fetchSummaries(admin, shadowIds, 'shadow'),
+      fetchSummaries(admin, prodIds, 'prod'),
+      readEntryScoring(admin, shadowIds, 'shadow'),
+      readEntryScoring(admin, prodIds, 'prod'),
+      // Two named columns, keyed by the entries already resolved above. The
+      // level is READ, never derived — the phone used to run its own points →
+      // level table, against `scored_total_points`, which is not XP at all.
+      admin
+        .from('entry_xp_state')
+        .select('entry_id, current_level')
+        .in('entry_id', allIds)
+        .returns<Array<{ entry_id: string; current_level: number | null }>>(),
+    ])
 
   // Seed every requested entry, then overlay. The RPC omits entries with no
   // scored matches rather than returning zero rows, so the seed is what makes a
@@ -172,6 +217,18 @@ async function handleGET(
     summary.point_adjustment = totals.point_adjustment
     summary.scored_total_points = totals.scored_total_points
     summary.current_rank = totals.current_rank
+  }
+
+  // ⚠ A discarded PostgREST error here would silently blank every level, which
+  // is the exact shape of bug that left form and accuracy empty for months.
+  if (levelRows.error) {
+    return NextResponse.json({ error: levelRows.error.message }, { status: 500 })
+  }
+  for (const row of levelRows.data ?? []) {
+    const summary = byEntry.get(row.entry_id)
+    if (!summary || leagueEntryIds.has(row.entry_id)) continue
+    summary.current_level = row.current_level ?? 1
+    summary.level_name = getLevelName(summary.current_level)
   }
 
   return NextResponse.json({ entries: [...byEntry.values()] })

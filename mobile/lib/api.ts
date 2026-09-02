@@ -947,6 +947,13 @@ export type EntryScoringSummary = {
   point_adjustment: number;
   scored_total_points: number;
   current_rank: number | null;
+  /**
+   * STORED XP level from `entry_xp_state` — resolved server-side, never here.
+   * NULL for a league entry: XP is World Cup machinery, so a league pool has no
+   * row and the web card deliberately shows the matchweek instead of a level.
+   */
+  current_level: number | null;
+  level_name: string | null;
 };
 
 export async function fetchHomeScoring(userId: string): Promise<EntryScoringSummary[]> {

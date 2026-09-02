@@ -28,6 +28,12 @@ export type PoolSummary = {
   memberInitials: string[];
   currentRank: number | null;
   totalPoints: number;
+  /**
+   * READ from the server, not derived. NULL means "show no level" — a league
+   * pool, where XP does not apply. The card used to run a local points → level
+   * table over `totalPoints`, which is not XP and never was.
+   */
+  level: { number: number; name: string } | null;
   totalEntries: number;
   // True once the pool's tournament has at least one completed match —
   // i.e. scoring has started. Pre-tournament every entry has 0 points
@@ -580,6 +586,10 @@ export function useHomeDataInternal() {
             isPrivate: !!pool.is_private,
             formResults: bestEntryId ? formByEntry[bestEntryId] ?? [] : [],
             accuracyStats: bestEntryId ? accuracyByEntry[bestEntryId] ?? null : null,
+            level:
+              bestScoring?.current_level != null && bestScoring.level_name != null
+                ? { number: bestScoring.current_level, name: bestScoring.level_name }
+                : null,
             unreadBanterCount: unreadByPool[pool.pool_id] ?? 0,
           };
         });

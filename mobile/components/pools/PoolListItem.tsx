@@ -2,7 +2,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ActionSheetIOS, Alert, Image, Platform, Pressable, Share, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
-import { getLevel } from '@/lib/levels';
 import { isPoolFinished, poolStatusDisplay } from '@/lib/poolStatus';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import type { FormResult, PoolSummary } from '@/lib/useHomeData';
@@ -76,7 +75,6 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
   // migration 025b forbids outright.
   const isFinished = isPoolFinished(pool);
   const finishedLabel = poolStatusDisplay(pool).label;
-  const level = getLevel(pool.totalPoints);
   const progress =
     pool.predictionsTotal > 0
       ? Math.min(1, pool.predictionsCompleted / pool.predictionsTotal)
@@ -257,8 +255,15 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
             />
             <Divider />
             <StatBlock label="Points" value={pool.totalPoints.toLocaleString()} />
-            <Divider />
-            <LevelBlock levelNumber={level.number} levelName={level.name} />
+            {/* No level on a league pool — `pool.level` is NULL there because
+                XP is World Cup machinery and does not apply. Its Divider goes
+                with it so the row does not end up with two rules in a row. */}
+            {pool.level ? (
+              <>
+                <Divider />
+                <LevelBlock levelNumber={pool.level.number} levelName={pool.level.name} />
+              </>
+            ) : null}
             <Divider />
             <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
               <FormSparkline results={pool.formResults} />

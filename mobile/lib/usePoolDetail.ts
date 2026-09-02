@@ -17,6 +17,19 @@ export type PoolDetailInfo = {
   poolCode: string;
   description: string | null;
   predictionMode: string | null;
+  /**
+   * The league mode, or null for a World Cup pool.
+   *
+   * ⚠ `isLeague` is the discriminant, not this. A pool can carry a season id
+   * with a NULL mode — two production pools do, created before migration 077 —
+   * and treating a NULL mode as "not a league" would send them back down the
+   * World Cup path this field exists to stop them taking.
+   */
+  leagueMode: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null;
+  /** ⚠ NULL is a real state and means SCORES (066). Derive with `=== 'results'`. */
+  leagueDepth: 'results' | 'scores' | null;
+  /** True when `league_season_id` is set — the gate every web league branch uses. */
+  isLeague: boolean;
   brandName: string | null;
   brandEmoji: string | null;
   brandColor: string | null;
@@ -71,7 +84,7 @@ export function usePoolDetail(poolId: string | undefined) {
             supabase
               .from('pools')
               .select(
-                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, accepting_members, max_participants, max_entries_per_user, is_private, admin_user_id, created_at, entry_fee, entry_fee_currency',
+                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, accepting_members, max_participants, max_entries_per_user, is_private, admin_user_id, created_at, entry_fee, entry_fee_currency, league_mode, league_depth, league_season_id',
               )
               .eq('pool_id', poolId)
               .maybeSingle(),
@@ -105,6 +118,18 @@ export function usePoolDetail(poolId: string | undefined) {
           pool_code: string;
           description: string | null;
           prediction_mode: string | null;
+          // ⚠ THE APP HAD NO IDEA LEAGUE POOLS EXISTED until 2026-09-02. Without
+          // these three columns a Premier League pool rendered the World Cup
+          // prediction flow — against picks that live in `league_predictions`,
+          // a table that flow never touches — so it showed an empty wizard with
+          // nothing wrong on screen to explain it.
+          //
+          // `league_season_id` is the discriminant everything else keys on: it
+          // is the column every league branch on the web is gated on, and a pool
+          // carrying it is a league pool whatever else it says.
+          league_mode: string | null;
+          league_depth: string | null;
+          league_season_id: string | null;
           brand_name: string | null;
           brand_emoji: string | null;
           brand_color: string | null;
@@ -129,6 +154,14 @@ export function usePoolDetail(poolId: string | undefined) {
             poolCode: poolRow.pool_code,
             description: poolRow.description,
             predictionMode: poolRow.prediction_mode,
+            leagueMode: poolRow.league_mode as
+              'pickem' | 'showdown' | 'last_man_standing' | 'table' | null,
+            // ⚠ Passed through RAW. NULL is a real state — a pool created before
+            // migration 077 has it, and the ENGINE reads NULL as Scores (066).
+            // Anything deriving the pair must do it as `depth === 'results'`;
+            // `leagueDepthPolarity.guard.test.ts` fails the build otherwise.
+            leagueDepth: poolRow.league_depth as 'results' | 'scores' | null,
+            isLeague: Boolean(poolRow.league_season_id),
             brandName: poolRow.brand_name,
             brandEmoji: poolRow.brand_emoji,
             brandColor: poolRow.brand_color,
