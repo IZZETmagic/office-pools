@@ -50,18 +50,47 @@ export type DuelRow = {
   settled_at: string | null
 }
 
-/** Every duel in a pool — the fixture list and the results are the same rows. */
+/**
+ * Every duel in a pool — the fixture list and the results are the same rows.
+ *
+ * ⚠ PAGED, AND IT HAS TO BE. A round-robin draws `ceil(n/2)` duels a matchweek
+ * across 38 matchweeks, so the row count is `ceil(n/2) × 38` and crosses
+ * PostgREST's 1,000-row cap at **53 members**. The World Cup's largest pool had
+ * 192 entries, so this is not a hypothetical size.
+ *
+ * The cap does not error. It returns exactly 1,000 rows with `error: null`, and
+ * every consumer downstream renders a confident wrong answer: the season table
+ * loses whole matchweeks, `headToHead` under-counts a rivalry, and the movement
+ * arrows describe a table nobody is looking at. Same failure as the email
+ * segment that silently resolved to 146 recipients of 3,958.
+ *
+ * ⚠ The order matters to the page, not only to the paging. `range()` without an
+ * `order()` has no defined row order, so a second page could repeat rows from
+ * the first. `matchweek_number` alone is not unique across a pool — several
+ * duels share one — so `duel_id` breaks the tie and makes the sequence total.
+ */
 export async function readPoolDuels(
   supabase: SupabaseClient,
   poolId: string,
 ): Promise<{ duels: DuelRow[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from('league_duels')
-    .select('duel_id, matchweek_number, entry_a, entry_b, accuracy_a, accuracy_b, points_a, points_b, settled_at')
-    .eq('pool_id', poolId)
-    .order('matchweek_number')
-  if (error) return { duels: [], error: error.message }
-  return { duels: (data ?? []) as DuelRow[], error: null }
+  const PAGE = 1000
+  const duels: DuelRow[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('league_duels')
+      .select('duel_id, matchweek_number, entry_a, entry_b, accuracy_a, accuracy_b, points_a, points_b, settled_at')
+      .eq('pool_id', poolId)
+      .order('matchweek_number', { ascending: true })
+      .order('duel_id', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) return { duels: [], error: error.message }
+    const page = (data ?? []) as DuelRow[]
+    duels.push(...page)
+    // A short page is the last page. A full one might not be, so ask again —
+    // an exact-1,000 result is the shape that used to mean "truncated".
+    if (page.length < PAGE) break
+  }
+  return { duels, error: null }
 }
 
 /**
@@ -95,6 +124,13 @@ export function headToHead(duels: DuelRow[], entryA: string, entryB: string) {
   return { won, drawn, lost }
 }
 
+/** What `league_matchweek_points` (migration 130) returns, before shaping. */
+type MatchweekPointsPayload = {
+  totals?: Record<string, number> | null
+  /** ⚠ The inner key is TEXT — JSON object keys always are. */
+  per_fixture?: Record<string, Record<string, number>> | null
+}
+
 /**
  * Live points per entry for one matchweek — the running duel score.
  *
@@ -103,21 +139,34 @@ export function headToHead(duels: DuelRow[], entryA: string, entryB: string) {
  * watching — they are NULL. Reading them is why the duel card showed two names
  * and no numbers while the games were being played.
  *
+ * ⚠ AGGREGATED IN SQL — migration 130. This used to select the raw score rows
+ * and sum them in a `for` loop here, which was two problems wearing one coat:
+ *
+ *   1. It broke the scoring architecture rule (settled 2026-07-29, *"aggregates
+ *      belong in SQL"*) in the file next door to migration 124, whose header
+ *      states that rule.
+ *   2. The row count is entries × fixtures, so it crossed PostgREST's 1,000-row
+ *      cap at **100 members** — and over the cap PostgREST returns exactly 1,000
+ *      rows with `error: null`, so the duel card would have rendered a
+ *      plausible, wrong scoreline rather than failing. The World Cup's largest
+ *      pool had 192 entries.
+ *
+ * The RPC returns ONE row whatever the pool size, so neither can recur. The
+ * per-fixture breakdown comes back with it rather than as a second read — the
+ * team sheet needs a number per entry per fixture and that is real data, not an
+ * aggregate anyone can avoid; what it does not need is those numbers as N rows.
+ *
  * ⚠ TAKES THE ADMIN CLIENT, AND MUST. `league_match_scores` is DENY-ALL — RLS
  * on, zero policies — and migration 050 lists it as one of exactly four engine
  * tables deliberately closed to clients (with `league_entry_totals`,
  * `league_fixture_state`, `league_score_events`). A user-scoped read returns
  * ZERO ROWS AND NO ERROR, so the duel card renders 0 – 0 and looks like a pool
- * where nobody has scored. Found exactly that way.
+ * where nobody has scored. Found exactly that way. 130 keeps the same posture:
+ * `service_role` holds EXECUTE and `authenticated` does not, so calling this
+ * with a user client now fails LOUDLY instead of returning an empty map.
  *
  * Safe because this is a server component that has already established the
  * viewer is a member of the pool, and the query is scoped to that pool.
- *
- * Summed in TypeScript rather than SQL because PostgREST has no GROUP BY. The
- * row count is entries × fixtures — 100 for a ten-person Premier League pool —
- * so it is nowhere near the 1,000-row cap, but it does grow with both, and a
- * 40-entry pool would be 400. If that ever becomes a real shape this wants to be
- * an RPC rather than a bigger `.range()`.
  */
 export async function readMatchweekPoints(
   admin: SupabaseClient,
@@ -129,22 +178,23 @@ export async function readMatchweekPoints(
   perFixture: Map<string, Map<number, number>>
   error: string | null
 }> {
-  const { data, error } = await admin
-    .from('league_match_scores')
-    .select('entry_id, total_points, fixture_number')
-    .eq('pool_id', poolId)
-    .eq('matchweek_number', matchweekNumber)
+  const { data, error } = await admin.rpc('league_matchweek_points', {
+    p_pool_id: poolId,
+    p_matchweek_number: matchweekNumber,
+  })
   if (error) {
     return { points: new Map(), perFixture: new Map(), error: error.message }
   }
 
-  const points = new Map<string, number>()
+  const payload = (data ?? {}) as MatchweekPointsPayload
+  const points = new Map<string, number>(Object.entries(payload.totals ?? {}))
   const perFixture = new Map<string, Map<number, number>>()
-  for (const r of (data ?? []) as Array<{ entry_id: string; total_points: number | null; fixture_number: number }>) {
-    points.set(r.entry_id, (points.get(r.entry_id) ?? 0) + (r.total_points ?? 0))
-    const byFixture = perFixture.get(r.entry_id) ?? new Map<number, number>()
-    byFixture.set(r.fixture_number, r.total_points ?? 0)
-    perFixture.set(r.entry_id, byFixture)
+  for (const [entryId, byFixture] of Object.entries(payload.per_fixture ?? {})) {
+    // ⚠ `Number(fx)`, and it is load-bearing. JSON object keys are text, so the
+    // fixture number arrives as `"3"`. A Map keyed by `"3"` reads identically
+    // to one keyed by `3` in a debugger and misses every numeric lookup — the
+    // team sheet would render every fixture as blank with nothing in a log.
+    perFixture.set(entryId, new Map(Object.entries(byFixture ?? {}).map(([fx, pts]) => [Number(fx), pts])))
   }
   return { points, perFixture, error: null }
 }

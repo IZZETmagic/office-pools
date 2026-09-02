@@ -286,16 +286,37 @@ function DuelFormDots({ form, align = 'left' }: {
  * movement arrows come from. Two copies of this loop would be two chances for
  * the arrow to describe a table nobody is looking at.
  *
- * `enginePoints` is `league_entry_totals.duel_points` when the caller has it.
- * Without it the points are counted from the duels, which agrees with the
- * engine only because `duelPoints.guard.test.ts` holds the constants to the
- * migration that writes them.
+ * ⚠ NOTHING HERE COMPUTES A SCORE — corrected 2026-09-02, and the distinction
+ * is the whole point of the change.
+ *
+ * It used to finish with `enginePoints?.get(e) ?? r.w * DUEL_WIN + r.d *
+ * DUEL_TIE`, and that right-hand side was **a second scoring engine, in the
+ * browser**: it re-derived from constants a number migration 121 had already
+ * written down, and it was "correct" only for as long as a guard test held two
+ * literals equal to a migration. That is the divergence the architecture rule
+ * exists to prevent, and this project has already paid for it once — a stale
+ * `points === 3` shipped for four days and told every winner they had lost.
+ *
+ * What it does now is ADD UP what the engine stored. `league_duels.points_a/
+ * points_b` are engine output, and migration 121 defines `duel_points` as
+ * exactly `SUM(points_a or points_b) over settled duels` — so the sum below is
+ * not an agreeing re-derivation, it is the same quantity by construction.
+ * `enginePoints` (`league_entry_totals.duel_points`) is still preferred where
+ * the caller has it, because that is the number the leaderboard adds to
+ * `total_points` and the two must not disagree on screen; the `??` is now a
+ * missing-row guard, not a second formula.
+ *
+ * `enginePoints` is deliberately absent for the "before the last matchweek
+ * settled" table — the engine stores today's total and has no historical one —
+ * which is exactly why the fallback had to stop being arithmetic.
  */
 function buildDuelTable(
   duels: DuelRow[],
   enginePoints?: Map<string, number>,
 ): Array<{ entry: string; w: number; d: number; l: number; pts: number }> {
   const rows = new Map<string, { entry: string; w: number; d: number; l: number; pts: number }>()
+  /** Σ of the engine's own per-duel points — kept beside the rows, not on them. */
+  const stored = new Map<string, number>()
   const ensure = (e: string) => {
     if (!rows.has(e)) rows.set(e, { entry: e, w: 0, d: 0, l: 0, pts: 0 })
     return rows.get(e)!
@@ -307,14 +328,14 @@ function buildDuelTable(
     for (const [e, p] of [[duel.entry_a, duel.points_a], [duel.entry_b, duel.points_b]] as const) {
       if (!e || p === null) continue
       const r = ensure(e)
+      stored.set(e, (stored.get(e) ?? 0) + p)
       const o = duelResult(p)
       if (o === 'won') r.w++
       else if (o === 'tied') r.d++
       else r.l++
     }
   }
-  for (const r of rows.values())
-    r.pts = enginePoints?.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE
+  for (const r of rows.values()) r.pts = enginePoints?.get(r.entry) ?? stored.get(r.entry) ?? 0
   return [...rows.values()].sort((a, b) => b.pts - a.pts || b.w - a.w)
 }
 
@@ -854,8 +875,12 @@ export default function DuelsTab({
    * memory.
    *
    * ⚠ The prior table cannot use `duelPoints`, which is today's total from the
-   * engine. It falls back to counting the duels, which is only correct because
-   * `DUEL_WIN`/`DUEL_TIE` are guarded against the migration that writes them.
+   * engine — there is no stored historical one. It sums the engine's own
+   * per-duel `points_a`/`points_b` off the rows instead, which is the same
+   * quantity migration 121 defines `duel_points` as. It used to re-derive
+   * `w * DUEL_WIN + d * DUEL_TIE` here, correct only while a guard test held
+   * two literals equal to a migration; that was the browser's second scoring
+   * engine and it is gone (2026-09-02).
    *
    * Positive is UP the table.
    */
@@ -2161,9 +2186,15 @@ export default function DuelsTab({
 
             ⚠ IT ALSO CARRIED TWO STALE SUMS. It computed `won * 3 + drawn`,
             which is the pre-121 rate, and it never counted BYES at all —
-            worth a point since migration 100 and 250 since 121. Both are gone:
-            the engine's own `duel_points` is the number, and the fallback only
-            runs for an entry the engine has no row for. */}
+            worth a point since migration 100 and 250 since 121.
+
+            ⚠ AND ITS REPLACEMENT WAS STILL ARITHMETIC — fixed 2026-09-02. It
+            read `duelPoints.get(you) ?? record.won * DUEL_WIN + (record.drawn +
+            record.byes) * DUEL_TIE`, which is the same re-derivation
+            `buildDuelTable` has just stopped doing, in a second place, needing
+            the bye rule restated to stay right. It now reads the viewer's row
+            out of `table` — one place decides what an entry's duel points are,
+            and this displays it. */}
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between
                         gap-3 px-4 pt-5 pb-4">
           <p className="t-caption text-white/45">The season</p>
@@ -2174,8 +2205,7 @@ export default function DuelsTab({
             {record.byes > 0 && <Stat label="Byes" value={record.byes} tone="dark" />}
             <span className="flex flex-col pl-3 sm:pl-4 border-l border-white/10">
               <span className="t-num t-num-black text-2xl text-white">
-                {duelPoints.get(youEntry ?? '')
-                  ?? record.won * DUEL_WIN + (record.drawn + record.byes) * DUEL_TIE}
+                {table.find((r) => r.entry === youEntry)?.pts ?? 0}
               </span>
               <span className="t-detail text-white/40 uppercase tracking-widest mt-0.5">duel points</span>
             </span>

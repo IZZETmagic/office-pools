@@ -103,6 +103,54 @@ describe('deny-all league tables are never read with a user-scoped client', () =
     })
   }
 
+  /**
+   * ⚠ A `.from()` IS NOT THE ONLY DOOR — added 2026-09-02.
+   *
+   * Migration 130 moved one deny-all read (`readMatchweekPoints`) behind a
+   * `SECURITY DEFINER` RPC, which is an improvement — it aggregates in SQL and
+   * it is granted to `service_role` only, so a user-scoped call fails loudly
+   * instead of returning an empty array. But it also moves the read out of
+   * everything the scan above can see: `admin.rpc('league_matchweek_points')`
+   * contains no `.from(...)` at all.
+   *
+   * So the RPCs that read a deny-all table get the same treatment as the
+   * tables. The list is maintained by hand, deliberately: a function reading an
+   * engine table is a decision somebody makes on purpose, and having to add a
+   * line here is the moment to notice.
+   *
+   * ⚠ If one of these is ever granted to `authenticated` on purpose, REMOVE it
+   * from this list in the same change. Leaving it makes this test lie.
+   */
+  const DENY_ALL_RPCS = ['league_matchweek_points'] as const
+
+  /** The receiver of a `.rpc('name')` call. */
+  function rpcReceiversOf(src: string, fn: string): string[] {
+    const out: string[] = []
+    const re = new RegExp(`([A-Za-z_$][\\w$]*)\\s*(?:\\(\\))?\\s*\\n?\\s*\\.rpc\\(\\s*['"\`]${fn}['"\`]`, 'g')
+    for (const m of src.matchAll(re)) out.push(m[1])
+    return out
+  }
+
+  for (const fn of DENY_ALL_RPCS) {
+    it(`${fn}() is only called through an admin client`, () => {
+      const offenders: string[] = []
+      let found = 0
+      for (const file of files) {
+        const src = readFileSync(file, 'utf8')
+        for (const receiver of rpcReceiversOf(src, fn)) {
+          found++
+          if (!/admin/i.test(receiver)) {
+            offenders.push(`${file.replace(root + '/', '')} — ${receiver}.rpc('${fn}')`)
+          }
+        }
+      }
+      // Same vacuous-pass trap as the tables above: if the RPC is renamed and
+      // this list is not, every assertion below becomes true of nothing.
+      expect(found, `no call site found for ${fn} — renamed without updating this list?`).toBeGreaterThan(0)
+      expect(offenders, offenders.join('\n')).toEqual([])
+    })
+  }
+
   it('the deny-all list still matches what migration 050 says it closed', () => {
     // If 050's list and this one drift, the guard is protecting the wrong set —
     // and a table quietly given a policy later should be REMOVED from here on

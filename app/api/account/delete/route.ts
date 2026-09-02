@@ -8,6 +8,61 @@ async function handleDELETE() {
   if (auth.error) return auth.error
   const { supabase, user, userData } = auth.data
 
+  // Use admin client for the ownership check and the deletions (bypasses RLS,
+  // and can delete auth users).
+  const adminSupabase = createAdminClient()
+
+  // ⚠ THIS CHECK RUNS FIRST, AND THE ORDER IS THE WHOLE POINT.
+  //
+  // Pool ownership blocks deletion: pools.admin_user_id is NOT NULL with NO
+  // ACTION on the FK to users.user_id. Deleting an admin would orphan their
+  // pool for every other member, so we require ownership transfer first.
+  //
+  // Until 2026-09-02 this check sat at the END of the function, after every
+  // delete below had already run. So a pool admin who tapped Delete Account
+  // got a 400 telling them to transfer admin first — having already lost every
+  // prediction, every score and every entry in every pool they were ever in,
+  // irreversibly, while keeping the account. The 400 read like a refusal and
+  // was actually a receipt.
+  //
+  // It is also the one door in the destruction class that `pool_entries.
+  // retired_at` (migrations 056/057) does NOT defend, because this route hard-
+  // deletes rather than retiring. That is a separate, open question — see
+  // Gate A2 in SPORTPOOL_PROGRAMME.md, which asks whether account deletion
+  // needs a different answer from the other three doors. Nothing here decides
+  // it; this only stops the destruction happening BEFORE we know we are
+  // allowed to destroy anything.
+  //
+  // ⚠ Not transactional: a pool could be handed to this user between the check
+  // and the deletes. That window is milliseconds and the failure is the old
+  // orphaned-pool one, not data loss. Closing it properly means doing the whole
+  // delete in one Postgres function, which is the same fix R1's "proper fix"
+  // asks for and is not this change.
+  const { data: ownedPools, error: ownedErr } = await adminSupabase
+    .from('pools')
+    .select('pool_id, pool_name')
+    .eq('admin_user_id', userData.user_id)
+    .returns<{ pool_id: string; pool_name: string }[]>()
+  // ⚠ A FAILED CHECK MUST NOT READ AS "OWNS NOTHING". The discarded-error
+  // pattern (`const { data } = await …`) is how this codebase has shipped
+  // silent 400s before; here it would mean an unreadable `pools` table opens
+  // the delete path for everyone.
+  if (ownedErr) {
+    return NextResponse.json(
+      { error: 'Could not verify pool ownership. Nothing was deleted.' },
+      { status: 500 },
+    )
+  }
+  if (ownedPools && ownedPools.length > 0) {
+    return NextResponse.json(
+      {
+        error: 'You still administer one or more pools. Transfer admin to another member before deleting your account.',
+        ownedPools: ownedPools.map((p) => ({ poolId: p.pool_id, poolName: p.pool_name })),
+      },
+      { status: 400 },
+    )
+  }
+
   // Collect all member_ids for this user across all pools
   const { data: members } = await supabase
     .from('pool_members')
@@ -25,9 +80,6 @@ async function handleDELETE() {
       .in('member_id', memberIds)
     entryIds = entries ? entries.map((e: any) => e.entry_id) : []
   }
-
-  // Use admin client for deletions (bypasses RLS, can delete auth users)
-  const adminSupabase = createAdminClient()
 
   // Delete in FK-safe order: entry-level data first, then entries, then members
   if (entryIds.length > 0) {
@@ -84,23 +136,8 @@ async function handleDELETE() {
     .eq('user_id', userData.user_id)
   if (e7) return NextResponse.json({ error: 'Failed to delete pool memberships' }, { status: 500 })
 
-  // Pool ownership blocks deletion: pools.admin_user_id is NOT NULL with
-  // NO ACTION on the FK to users.user_id. Deleting an admin would orphan
-  // their pool for every other member, so require ownership transfer first.
-  const { data: ownedPools } = await adminSupabase
-    .from('pools')
-    .select('pool_id, pool_name')
-    .eq('admin_user_id', userData.user_id)
-    .returns<{ pool_id: string; pool_name: string }[]>()
-  if (ownedPools && ownedPools.length > 0) {
-    return NextResponse.json(
-      {
-        error: 'You still administer one or more pools. Transfer admin to another member before deleting your account.',
-        ownedPools: ownedPools.map((p) => ({ poolId: p.pool_id, poolName: p.pool_name })),
-      },
-      { status: 400 },
-    )
-  }
+  // (The pool-ownership guard used to live here, after everything above had
+  // already been destroyed. It is now the first thing this route does.)
 
   // Clear nullable NO-ACTION refs that would otherwise block the users delete.
   // (notification_log.user_id, broadcast_log.sent_by, match_reset_log.reset_by_user_id,

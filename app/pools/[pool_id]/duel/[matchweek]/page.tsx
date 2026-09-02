@@ -107,7 +107,24 @@ export default async function DuelDecisionPage({
   // gate: the matchweek is settled, so it is long past lock and there is
   // nothing left to withhold.
   const admin = createAdminClient()
-  const { points, perFixture } = await readMatchweekPoints(admin, pool_id, matchweekNumber)
+  const { points, perFixture, error: pointsErr } = await readMatchweekPoints(admin, pool_id, matchweekNumber)
+  // ⚠ LOGGED, NOT DISCARDED. This read used to be `const { points, perFixture }
+  // = await …`, which threw the error away — and every number on this page is
+  // derived from `perFixture`, so a failed read renders a confident recap of a
+  // duel that reads 0–0 with no decisive fixture and no best call. That is the
+  // discarded-PostgREST-error pattern this codebase has paid for repeatedly.
+  //
+  // It matters more since migration 130 moved the read behind an RPC: if the
+  // code deploys before the migration is applied, EVERY call fails with
+  // "function does not exist" and this is the page where it would have been
+  // invisible. The two sibling callers (the pool page and /duel-live) already
+  // log; this one now does too.
+  //
+  // ⚠ It still RENDERS after logging, which is a deliberate half-measure and
+  // worth naming: a recap with no numbers is arguably not a recap and should
+  // probably say so rather than draw zeros. That is a product call, not a
+  // logging one, so it is surfaced rather than made here.
+  if (pointsErr) console.error('[duel recap] matchweek points failed:', pointsErr)
 
   // ⚠ THE POSITION CHANGE IS READ, NOT DERIVED. `previous_final_rank` is frozen
   // by the matchweek snapshot (059/061/094) at the moment a matchweek settles,
