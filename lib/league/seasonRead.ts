@@ -43,6 +43,15 @@ export type SeasonFixtureRow = {
   kickoff_at: string
   venue: string | null
   status: string
+  /**
+   * The feed's own words for an abnormal state — `postponed`, `cancelled`,
+   * `suspended`, `abandoned`. Read because `getMatchStatusBadge` keys on it on
+   * BOTH surfaces, and without it a postponed fixture renders its original
+   * kickoff time as though the game were still on.
+   */
+  status_detail: string | null
+  /** Set when the kickoff has MOVED (L11). The badge reads it as "Delayed". */
+  original_kickoff_at: string | null
   home_goals: number | null
   away_goals: number | null
   is_completed: boolean
@@ -91,7 +100,7 @@ export async function readLeagueSeasonUncached(
   for (let from = 0; ; from += 1000) {
     const { data, error } = await admin
       .from('league_fixtures')
-      .select('fixture_id, matchweek_id, fixture_number, home_club_id, away_club_id, kickoff_at, venue, status, home_goals, away_goals, is_completed, live_minute, live_period, live_added')
+      .select('fixture_id, matchweek_id, fixture_number, home_club_id, away_club_id, kickoff_at, venue, status, status_detail, original_kickoff_at, home_goals, away_goals, is_completed, live_minute, live_period, live_added')
       .eq('season_id', seasonId)
       .order('fixture_number', { ascending: true })
       .range(from, from + 999)

@@ -100,6 +100,11 @@ type FixtureRow = {
   kickoff_at: string
   venue: string | null
   status: string
+  // Why these two are read at all: `getMatchStatusBadge` keys on them, and a
+  // postponed fixture without them renders its original kickoff time as though
+  // the game were still on. See `seasonRead.ts` for the full note.
+  status_detail: string | null
+  original_kickoff_at: string | null
   home_goals: number | null
   away_goals: number | null
   is_completed: boolean
@@ -215,8 +220,13 @@ function fixtureToMatch(
     winner_team_id: null,
     is_completed: f.is_completed,
     completed_at: null,
-    status_detail: null,
-    original_match_date: null,
+    // ⚠ These were hard-coded `null` until 2026-09-02, which meant a POSTPONED
+    // league fixture rendered a kickoff time on both surfaces as though the
+    // game were still on. `getMatchStatusBadge` reads exactly these two fields
+    // and the columns have existed on `league_fixtures` since migration 050 —
+    // they were simply never carried across the adapter.
+    status_detail: f.status_detail,
+    original_match_date: f.original_kickoff_at,
     live_minute: f.live_minute,
     live_period: f.live_period,
     live_added: f.live_added,
@@ -1089,6 +1099,64 @@ export async function readMatchweekFixtureByClub(
  * Liga pool now sees both leagues' fixtures in one list, and two crests with no
  * caption cannot say which competition a game belongs to.
  */
+/**
+ * Every fixture of a season, in the World Cup match shape — the not-pool-scoped
+ * reader.
+ *
+ * ⚠ WHY THIS EXISTS SEPARATELY FROM `readLeaguePoolView`. That one answers
+ * "what does this POOL look like": round states, the open matchweek, the sealed
+ * duel. A phone's Results tab is asking a different question — *what football is
+ * there* — and has no pool in hand. Handing it the pool view would mean picking
+ * an arbitrary pool to ask on behalf of, and paying for round states nobody
+ * renders.
+ *
+ * ⚠ AND WHY IT IS NOT `readLeagueDashboardFixtures` EITHER. That returns live +
+ * upcoming, bounded, for a decorative panel. A results list is mostly the PAST,
+ * and its date, matchweek and team filters each need the whole set — a windowed
+ * read would make two of the three lie.
+ *
+ * The shaping — club name into `country_name`, abbreviation into `country_code`,
+ * crest into `flag_url`, matchweek into `round_number` — is `fixtureToMatch`'s,
+ * shared with the pool view. That is the half where a mis-mapped key renders a
+ * crestless card reading "TBD" rather than throwing, so it has exactly one
+ * owner. The two Maps below are rebuilt rather than shared, which is cheap and
+ * keeps this off the pool page's path entirely.
+ *
+ * Takes the season rather than reading it: the caller holds the cached copy
+ * (`getLeagueSeasonCached`), and this module must never import `next/cache` —
+ * it is reachable from client components. See the header of `season.ts`.
+ */
+export function readLeagueSeasonMatches(
+  season: LeagueSeasonView,
+  tournamentId: string,
+): { teams: TeamData[]; matches: MatchData[]; error: string | null } {
+  const fixtures = season.fixtures as unknown as FixtureRow[]
+  const numberByMatchweekId = new Map(season.matchweeks.map((m) => [m.matchweek_id, m.matchweek_number]))
+
+  // ⚠ Surfaced, not dropped. A fixture whose matchweek is missing cannot be
+  // placed in a round, and quietly skipping it shows a short matchweek with no
+  // explanation — the same call `readLeaguePoolView` makes.
+  const orphans = fixtures.filter((f) => !numberByMatchweekId.has(f.matchweek_id))
+  if (orphans.length > 0) {
+    return {
+      teams: [],
+      matches: [],
+      error: `${orphans.length} fixture(s) reference a matchweek not in this season`,
+    }
+  }
+
+  const teams = (season.clubs as unknown as ClubRow[]).map(clubToTeam)
+  const clubById = new Map(teams.map((t) => [t.team_id, t]))
+
+  return {
+    teams,
+    matches: fixtures.map((f) =>
+      fixtureToMatch(f, numberByMatchweekId.get(f.matchweek_id)!, tournamentId, clubById),
+    ),
+    error: null,
+  }
+}
+
 export type DashboardFixture = {
   match_id: string
   match_number: number
