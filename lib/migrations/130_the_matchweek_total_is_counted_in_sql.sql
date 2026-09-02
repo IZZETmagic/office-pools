@@ -4,7 +4,8 @@
 -- ⚠ ADDITIVE ONLY. One new function; nothing is replaced, so there is no
 -- `md5(prosrc)` pre-check to run.
 --
--- ⚠⚠ APPLY THIS BEFORE THE CODE THAT NAMES IT. `readMatchweekPoints` calls
+-- ⚠⚠ APPLY THIS BEFORE THE CODE THAT NAMES IT. ✅ Done — 130 went in on
+-- 2026-09-02, ahead of the deploy, which is the safe direction. `readMatchweekPoints` calls
 -- `league_matchweek_points` from this change onward, so a deploy that lands
 -- ahead of the migration makes every call fail with "function does not exist"
 -- — on the pool page, the duel recap page and /api/pools/[id]/duel-live. All
@@ -17,10 +18,18 @@
 -- **apply 130, then deploy.** There is no reverse dependency — 130 is additive
 -- and harmless on its own, so applying it early costs nothing.
 --
--- ⚠⚠ THIS SQL HAS NOT BEEN EXECUTED ANYWHERE. The session that wrote it had no
--- production access and no local Postgres server (only `libpq`, the client), so
--- it has never been through a parser. Do not read the care in the comments as
--- evidence it runs.
+-- ✅ APPLIED TO PRODUCTION 2026-09-02 (ujthamlehjyubbzxbnes) and verified against
+-- real data, not just applied:
+--   * a matchweek WITH scores — 9 entries, 0 mismatches vs a plain GROUP BY
+--   * the EMPTY matchweek — returns {"totals":{},"per_fixture":{}}, not NULL,
+--     which is the COALESCE trap below doing its job
+--   * a pool id that does not exist — same, no error
+--   * per-fixture inner map byte-identical to jsonb_object_agg over the rows,
+--     with ZEROS PRESERVED (a wrong pick scores 0 and must render as 0)
+--   * grants: authenticated=false, anon=false, service_role=true
+--
+-- It was written with no database access and no local Postgres, so none of the
+-- care in these comments was evidence it ran — the checks above are.
 --
 -- It is `LANGUAGE sql`, which is the one thing in our favour: unlike `plpgsql`
 -- — where names resolve at RUN time and a clean apply proves nothing, the
