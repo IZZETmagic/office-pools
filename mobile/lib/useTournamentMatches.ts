@@ -268,16 +268,22 @@ export function useTournamentMatchesInternal() {
     [matches, leagueMatches],
   );
 
+  // ⚠ `refetch` ALONE IN THE DEPS, NOT `leagueQuery`. React Query returns a new
+  // result object on every render, so depending on the whole thing would give
+  // `refresh` a new identity each time — and these are handed to screens that
+  // hold them in refs and effects. `refetch` is stable across renders.
+  const refetchLeague = leagueQuery.refetch;
+
   const refresh = useCallback(async () => {
-    await Promise.all([load('refresh'), leagueQuery.refetch()]);
-  }, [load, leagueQuery]);
+    await Promise.all([load('refresh'), refetchLeague()]);
+  }, [load, refetchLeague]);
 
   const refreshIfStale = useCallback(() => {
     if (Date.now() - lastLoadedAtRef.current > STALE_AFTER_MS) {
       void load('refresh');
-      void leagueQuery.refetch();
+      void refetchLeague();
     }
-  }, [load, leagueQuery]);
+  }, [load, refetchLeague]);
 
   return {
     matches: allMatches,
