@@ -25,6 +25,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getLeagueSeasonCached, type LeagueSeasonView } from './season'
 import type { Prediction } from '@/lib/tournament'
 import type { MatchData, TeamData, ExistingPrediction } from '@/app/pools/[pool_id]/types'
 import type { PoolRoundState, EntryRoundSubmission } from '@/app/pools/[pool_id]/types'
@@ -396,37 +397,29 @@ export async function readLeaguePoolView(
 ): Promise<{ view: LeaguePoolView | null; error: string | null }> {
   const now = args.now ?? Date.now()
 
-  const { data: clubs, error: clubErr } = await supabase
-    .from('league_clubs')
-    .select('club_id, name, short_name, abbreviation, crest_url')
-    .eq('season_id', args.seasonId)
-    .order('name', { ascending: true })
-    .range(0, 999)
-  if (clubErr) return { view: null, error: `league_clubs: ${clubErr.message}` }
-
-  const { data: mws, error: mwErr } = await supabase
-    .from('league_matchweeks')
-    .select('matchweek_id, matchweek_number, fixture_count, completed_fixture_count, lock_at, first_kickoff_at, ranks_snapshot_at')
-    .eq('season_id', args.seasonId)
-    .order('matchweek_number', { ascending: true })
-    .range(0, 999)
-  if (mwErr) return { view: null, error: `league_matchweeks: ${mwErr.message}` }
-
-  const fixtures: FixtureRow[] = []
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase
-      .from('league_fixtures')
-      .select('fixture_id, matchweek_id, fixture_number, home_club_id, away_club_id, kickoff_at, venue, status, home_goals, away_goals, is_completed, live_minute, live_period, live_added')
-      .eq('season_id', args.seasonId)
-      .order('fixture_number', { ascending: true })
-      .range(from, from + 999)
-    if (error) return { view: null, error: `league_fixtures: ${error.message}` }
-    const page = (data ?? []) as unknown as FixtureRow[]
-    fixtures.push(...page)
-    if (page.length < 1000) break
+  // ⚠ THE SEASON IS READ ONCE FOR EVERYONE — Decision 12, migration-free.
+  //
+  // This used to be three reads made here, per viewer, through RLS, outside any
+  // cache: clubs, matchweeks, and every fixture of the season paged — 175 kB of
+  // fixtures alone, on every league page load whichever tab was open.
+  //
+  // `lib/league/season.ts` now owns them, behind one per-season cache entry that
+  // every pool on that season shares and that the fixture sync invalidates when
+  // something actually moves. Nothing about WHAT is selected changed; only who
+  // runs it and how often. The `supabase` argument is still taken because
+  // everything below this line is pool- and viewer-scoped and must stay so.
+  let season: LeagueSeasonView
+  try {
+    season = await getLeagueSeasonCached(args.seasonId)
+  } catch (err) {
+    // The cached reader throws rather than returning empties, precisely so a
+    // PostgREST failure is never cached as "this season has no fixtures".
+    return { view: null, error: (err as Error).message }
   }
+  const clubs = season.clubs
+  const fixtures = season.fixtures as unknown as FixtureRow[]
 
-  const matchweekRows = (mws ?? []) as unknown as MatchweekRow[]
+  const matchweekRows = season.matchweeks
   const numberByMatchweekId = new Map(matchweekRows.map((m) => [m.matchweek_id, m.matchweek_number]))
 
   // A fixture whose matchweek we did not read cannot be placed in a round, and

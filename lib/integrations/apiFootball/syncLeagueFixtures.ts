@@ -26,6 +26,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { invalidateLeagueSeason } from '@/lib/league/season'
 import { syncLeagueStandings } from './syncLeagueStandings'
 import { getFixturesAllPages } from './client'
 import {
@@ -446,6 +447,25 @@ export async function syncLeagueFixtures(
   }
   result.seen = res.seen ?? 0
   result.written = res.changed?.length ?? 0
+
+  // ------------------------------------------------ 6b. the season cache
+  // ⚠ OFF `changed`, NEVER A TIMER. `league_apply_fixture_sync` already returns
+  // exactly which fixtures the database moved, and that array is the only
+  // honest invalidation signal we have: a TTL long enough to be worth having
+  // would serve a 0–0 through a goal, and the live-standings guarantee is the
+  // one thing this product does not get to be late about.
+  //
+  // One tag per SEASON, so a single goal refreshes every pool playing it at
+  // once rather than per pool — Decision 12, and the reason the season is the
+  // cacheable object where the pool payload is not.
+  //
+  // Placed here, before the scoring and standings work below, so a failure in
+  // either cannot leave a stale season behind. `invalidateLeagueSeason` swallows
+  // its own errors: losing a fixture write to protect a cache would be exactly
+  // the wrong way round.
+  if ((res.changed?.length ?? 0) > 0) {
+    invalidateLeagueSeason(target.seasonId)
+  }
 
   // ------------------------------------------------- 7a. reschedules confirmed
   // A move is only real once the row comes back carrying it. Both SQL guards —
