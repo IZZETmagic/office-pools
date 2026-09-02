@@ -10,33 +10,104 @@ items roll up into.
 
 ## Where this stands
 
-The World Cup shipped, completed, and is nearly wound down — what's left of it is one ops send and a
-handful of residual bugs. The record itself is current again: the two things this document was
-missing, the shadow read-path cutover of 2026-07-19 with its rollback and the ~324k-point podium
-remediation of 2026-07-21, are now written down, so the programme and the code broadly agree for the
-first time since the final. A second full audit against prod and code on **2026-07-30 closed three
-risks outright** (R17 the ledger, R4 shadow's podium, R13 the XP writers — all three prod-verified)
-and opened one (**R19**). The picture that leaves is still not comfortable. **Three 🔴 risks are live
-and unmitigated.** Two of them are the same structural failure: **this product has no soft-delete
-anywhere**, and `pool_entries` carries 21 cascading children — so an admin tapping *Delete Pool*
-destroys every member's predictions (two surfaces, six pools already gone), and *any* membership
-exit — leaving, being removed, deleting an account, stop-participating — permanently purges the
-entry, every prediction, every derived score and the append-only badge history, with **no application
-code involved in three of the four paths** and **no count of how often it has already happened**. The
-third **was** that any Premier League pool would score zero silently — ✅ **CLOSED 2026-08-23.** That
-diagnosis described the pre-pivot design, in which leagues were bolted into the World Cup's engine.
-Under Ryan's 2026-08-15 split the league has its **own** engine over its **own** tables
-(`league_score_fixture`, migration 055), and the World Cup engine was restored to World-Cup-only at
-L0. A league pool now scores correctly — verified against production. Behind them sit **eight 🟠**, including one Ryan knowingly
-accepted (empty-bracket bonus inflation, ~243k pts) on the condition it be fixed *before the next
-competition* — **that condition is now due**.
+> **Rewritten 2026-09-02** from a full audit against the working tree, git and the migration set.
+> The paragraph this replaces described three live 🔴 risks, two of which turn on the claim that
+> *"this product has no soft-delete anywhere."* **That claim is no longer true**, and leaving it
+> standing was making the register point at the wrong things. What is written below is what the code
+> says today.
 
-## 🟠 Premier League 2026/27 — LIVE, but running 24 Aug code (updated 2026-08-28)
+**The World Cup is closed. The programme is now a Premier League programme**, and its shape has
+changed since the 2026-08-28 audit: what was then a backend with no front end is now a substantially
+finished product — Showdown as a one-page arena with a sealed draw and a walkout reveal, duel points
+feeding the season leaderboard, Last Man Standing, Table mode, avatars, banter as its own surface,
+and a live engine that scores while a game is being played. **1,178 tests pass** across 82 files, up
+from 625 on 2026-08-28.
 
-> The heading said **DEPLOYED AND LIVE** until 2026-08-28. It is now known that `origin/master` is
-> 32 commits behind, so what is live is the 24 Aug app: Pick'em at Scores depth, no wizard, no
-> notifications. Everything built since is on Ryan's machine. Read the audit block first — the ✅s
-> further down describe the branch, not production.
+**None of it is in production, and that is now the single largest risk in this document.**
+`origin/master` is still **`6dc5710`, 24 August**. `Development` is **225 commits ahead** — the
+2026-08-28 audit said 32 — and roughly **thirty migrations have been applied to the shared production
+database** past the code that is serving members. Two live Premier League pools are being run by real
+people against the 24 August app. This is not a backlog item; it is a state the product is in every
+minute it stays there. See **R21**.
+
+**Two 🔴 risks closed in code since this section was last written, and the register had not caught
+up:**
+
+- **R1 — *Delete Pool*.** The button is **gone from both surfaces** (`app/pools/[pool_id]/admin/
+  SettingsTab.tsx:1297`, `mobile/components/pool-detail/SettingsTab.tsx:128`), replaced by a
+  reversible archive: migrations **040/041/044**, routes `/api/pools/[id]/archive` and `/restore`.
+- **R12 — membership exit.** Soft delete exists: `pool_entries.retired_at` (migrations **056/057**),
+  `lib/entries/retire.ts`, **35 references** across the tree and two guard tests. Leaving a pool
+  detaches the entry rather than cascading 21 tables.
+
+**What survives of them is narrower and still 🔴**, and is now tracked as **R22**: `app/api/account/
+delete/route.ts` deletes match scores, bonus scores, predictions, group predictions, special
+predictions, player scores, entries and memberships at **lines 36–85**, and only checks *"do you
+still administer a pool?"* at **line 94**. A pool admin who tries to delete their account **keeps the
+account and loses everything, everywhere, irreversibly.** That is door 3 of the destruction class,
+unmitigated, in exactly the shape R1 described a year of incidents in.
+
+**Two more 🔴 are open and both are consequences of the deploy gap rather than of the code:**
+
+- **R23 — the league read path is the product's cost.** A review on 2026-08-31
+  (`drafts/2026-08-31_league_read_path_and_cost_review.md`) measured it before it carries load and
+  listed seven fixes. **Re-checked 2026-09-02: none of the seven have been made.** The three the
+  review said to do *before* Premier League opens are six hours of work.
+- **R24 — the React Native app cannot read league data at all.** Not "has no league screens" — cannot
+  read. Mobile is direct-to-PostgREST for ~110 table reads and consumes only 14 API routes, all of
+  them writes or notifications; four league engine tables are **deny-all**, so a mobile read returns
+  an empty array with `error: null`. See *📱 The RN league build — how far away* below.
+
+Behind these sit the 🟠s carried forward, including the one Ryan knowingly accepted (empty-bracket
+bonus inflation, ~243k pts) on condition it be fixed *before the next competition* — **the next
+competition is running now, so that condition is not merely due, it has passed.** A league has no
+group standings, so nothing is being inflated today; the condition survives to the next cup.
+
+## 🔴 Premier League 2026/27 — LIVE, still running 24 Aug code (updated 2026-09-02)
+
+> The heading said **DEPLOYED AND LIVE** until 2026-08-28, then *"32 commits behind"*. **As of
+> 2026-09-02 it is 225 commits behind** and the number has been growing for nine days without a
+> single production deploy. What members are using is the 24 Aug app: Pick'em at Scores depth, no
+> mode wizard, no notifications, no Showdown, no Table mode, no Last Man Standing. Read the
+> 2026-09-02 block first — the ✅s further down describe the branch, not production.
+
+### 🔴 AUDIT 2026-09-02 — the deploy gap is now the product risk
+
+Re-run against git and the working tree. **Nothing in the 2026-08-28 audit below has been deployed;
+what has changed is how much is waiting.**
+
+| | 2026-08-28 | 2026-09-02 |
+|---|---|---|
+| `origin/master` | `6dc5710` (24 Aug) | **`6dc5710` (24 Aug) — unmoved** |
+| `origin/Development` → dev.sportpool.io | — | `c98a037` (2 Sep) |
+| Commits ahead of production | 32 | **225** |
+| Highest migration in the repo | 118 (unapplied) | **129** |
+| Tests | 625 | **1,178 across 82 files, all green** |
+| `readSource` league stubs | 5 `leagueNotImplemented` arms | **3** — two are now real arms |
+
+**Why this is worse than a delayed release.** The database and the code are diverging in the
+*dangerous* direction and have been for nine days. Migrations are being applied to production —
+**121 pays a duel 500 points; the deployed `DuelsTab` classifies anything that is not exactly 3 or 1
+as a LOSS** (`drafts/2026-08-31_showdown_duel_points_plan.md` §9 raised this before matchweek 2
+settled). Migration **110 dropped** `pools.league_table_revealed_at`, its index and two functions.
+Every one of these is a live instance of the failure recorded in *DROP COLUMN outage + the column
+guard*: deployed code and applied schema disagreeing, at HTTP 200, with nothing in a log.
+
+✅ **The migrations HAVE run — corrected against the Premier League Build Board, probed in production
+2026-09-02.** That pass confirmed 099's reminder stamp, 105's `original_kickoff_at`, 110's
+`DROP COLUMN` having taken effect, 115's fixture on the LMS pick, and 127's
+`league_first_sealed_matchweek` answering for both live Showdown pools. 111, 116, 117, 118, 121 and
+122 additionally carry apply records in their own files or plans.
+
+⚠ **That is five probes spanning 099–127, not a per-migration verification.** 119, 120, 123, 124,
+125, 126, 128 and 129 are not individually attested anywhere this repo can see. **Do not read the
+absence of a record as "not applied" — that assumption is exactly what produced R19**, and do not
+read these five probes as covering all eleven either. Before the deploy, hash `prosrc` for every
+function 119–129 replaces, the way 105/106 were checked.
+
+**The one thing to do next is a production deploy**, and it is not a routine one: 225 commits, a
+schema that has moved underneath the code, and two live pools with real members. It needs a written
+order the way the R13 release did.
 
 ### 🔴 AUDIT 2026-08-28 — the Pick'em season, verified against production
 
@@ -44,7 +115,9 @@ Asked by Ryan: *"finish up the Pick'em logic and flow for the season."* This blo
 found. **It corrects the ✅s below it**, which describe the branch on this machine rather than what
 members are using. Full working: `drafts/2026-08-28_pickem_season_audit.md`.
 
-**The one fact everything else follows from: the web app is 32 commits behind.** `origin/master` is
+**The one fact everything else follows from: the web app is 32 commits behind.** *(**225** as of
+2026-09-02 — see the block above; the rest of this section is kept as the dated 2026-08-28 record.)*
+`origin/master` is
 `6dc5710` (24 Aug). The database has moved ~40 migrations past it. Everything from the league UI/UX
 pass onward — the mode wizard, the matchweek stepper, Results-depth screens, the league table tab,
 the weekly reveal, Showdown, Last Man Standing, Table mode, and **both cron routes** — exists only
@@ -279,7 +352,33 @@ firing every minute** — in **pg_cron**, not `vercel.json`, which is why the re
 — writing the very columns R13 just closed (**R19**). It is benign only because no competition is
 running.
 
-**Last updated:** 2026-07-25 · Renamed from `ROADMAP.md`; absorbed the product-decision record from
+**Last updated: 2026-09-02** — full review against the working tree, git and the migration set, at
+Ryan's request. What changed:
+· ***Where this stands* rewritten.** Its three-🔴 framing rested on *"this product has no soft-delete
+anywhere"*, which is **false**: `pool_entries.retired_at` (056/057) and `lib/entries/retire.ts` ship
+with 35 references and two guard tests, and *Delete Pool* is gone from **both** surfaces (040/041/044
++ archive/restore routes). **R1 and R12 are corrected from 🔴 to closed/🟠.**
+· **Four risks opened.** **R21** the deploy gap (`origin/master` unmoved since 24 Aug, now **225**
+commits and ~30 migrations behind, with **121 applied while the deployed `DuelsTab` still reads the
+old 3/1 scale**) · **R22** account deletion destroying everything at `:36–85` before checking pool
+ownership at `:94` — carved out of R1, which is otherwise closed, and the cheapest 🔴 in the register
+· **R23** the league read path, from `drafts/2026-08-31_league_read_path_and_cost_review.md`, whose
+seven items were **all re-verified as still open** · **R24** the RN app cannot *read* league data —
+mobile is direct-to-PostgREST and migration 050's four engine tables are deny-all.
+· **New section *📱 The RN league build — how far away***, answering Ryan's question directly: the
+distance is a read API, not screens; four gates M0–M3; and a mistake-by-mistake check against the
+World Cup's measured cost table — `SELECT *` and `postgres_changes` **genuinely avoided**, embeddings
+and client-side computation **repeated**.
+· **New ✅ *Showdown, end to end*** — ~150 commits over four days that this document had no entry for.
+· **Counts refreshed:** tests 625 → **1,178 across 82 files**; migrations 118 → **129**; `readSource`
+league stubs 5 → **3**; the modes grid now carries per-migration apply status, **marked unknown where
+it is unknown**.
+· **A 2026-09-02 delivery order** added above the 2026-07-26 one, which is superseded and kept.
+· ⚠️ **Provenance:** this pass had **no production access**. Everything above is verified against
+code, git and migrations; every claim about what is *applied* or *deployed* is inherited from the
+files that record it and is marked where it is not.
+
+**Previously updated:** 2026-07-25 · Renamed from `ROADMAP.md`; absorbed the product-decision record from
 the multi-sport planning session (8 settled decisions, now under *Project: Multi-sport platform*).
 · **2026-07-12:** full audit against the codebase — completed items moved to per-section **✅
 Completed** tables; PARTIAL items annotated with what the code actually shows; post-deadline
@@ -334,11 +433,13 @@ unlanded.**
 
 | Project | What it is | Status |
 |---|---|---|
-| **Multi-sport platform** | Generalise the single World Cup product into a reusable multi-competition platform. Product decisions settled 2026-07-25; foundations still TODO. | 🔵 Designing |
-| **Showdown / EPL launch** | H2H duels, persistent rivalries, and the first league season. Target Aug 2026. | 🔵 Designing |
+| **Ship what is built** | 225 commits and ~30 migrations sit between `Development` and production, and the schema has moved past the deployed code. **The largest single item in the programme, and it is not a build.** | 🔴 **Blocking everything** (**R21**) |
+| **Multi-sport platform** | Generalise the single World Cup product into a reusable multi-competition platform. Product decisions settled 2026-07-25. **Migration 111 (a pool names one competition) is the first foundation applied**; La Liga is planned (`drafts/2026-08-28_la_liga_plan.md`) and unstarted. | 🔵 Designing |
+| **Showdown / EPL launch** | H2H duels, persistent rivalries, and the first league season. ⚠️ **Status corrected 2026-09-02: this is BUILT, not designing** — four modes, sealed draw, walkout reveal, duel points on the season leaderboard, recap. It is undeployed, not unbuilt. | 🟡 **Built, ⛔ undeployed** |
+| **The RN league build** | Bring the Expo app to parity with the league product. ⚠️ **Not started, and gated on a read API rather than on screens** — mobile is direct-to-PostgREST and four league engine tables are deny-all, so it cannot read league data at all (**R24**). | 🔴 Blocked — see *📱 The RN league build* |
 | **Scale & scoring integrity** | Shadow engine, leaderboard precompute, IO reduction, scoring correctness. | 🟢 In flight |
-| **Performance & caching** | Stop over-fetching, stop recomputing, then cache what's left — web + mobile. Opened 2026-07-26; ~~three fixes written locally, none landed~~ — **steps 2, 3 and most of 7 shipped 2026-07-29** (payload 7,721 kB → 457 kB, `/live` delta, analytics read flip); steps 1, 4, 5, 6, 8–11 open. | 🟢 In flight |
-| **World Cup wind-down** | Residual bugs, feedback surveys, knockout ops. | 🟡 Closing out |
+| **Performance & caching** | Stop over-fetching, stop recomputing, then cache what's left — web + mobile. Opened 2026-07-26; **steps 2, 3 and most of 7 shipped 2026-07-29** (payload 7,721 kB → 457 kB, `/live` delta, analytics read flip); steps 1, 4, 5, 6, 8–11 open. ⚠️ **A second front opened 2026-08-31**: the league read path has its own review and **none of its seven items are done** (**R23**). | 🟢 In flight |
+| **World Cup wind-down** | Residual bugs, feedback surveys, knockout ops. ⚠️ Still carries the un-sent feedback survey (**R8**), now ~6 weeks past its own time box. | 🟡 Closing out |
 | **Live match & rich football data** | Squads, line-ups, events, player pages. | ⚪ Not started |
 | **Monetisation & cosmetics** | Sponsored pools, premium analytics, avatar IAP. | ⚪ Gated |
 
@@ -394,10 +495,10 @@ segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 
 | # | Risk | Level | Blast radius | Trigger | Mitigation status | Ryan's call | Backlog item |
 |---|---|---|---|---|---|---|---|
-| **R1** | **"Delete Pool" destroys members' predictions.** Web runs five un-transactional deletes from the browser against an asymmetric RLS pair; **mobile is a second, separate door** — a single `supabase.from('pools').delete()` (`mobile/components/pool-detail/SettingsTab.tsx:223`). Scope of this row is **pool destruction**; membership exit is **R12** | 🔴 | **6 pools / 41 entries already destroyed**, earliest in June. Pools with an admin, one tap away: **458** (2026-07-21 draft) vs **535** (2026-07-30 re-count — distinct `pool_id` having a `role='admin'` row), of 623 live. ⚠️ **Two numbers, two methods, unreconciled** — the earlier figure's counting rule was never written down. Plan against the larger until someone reconciles them | One admin tap, on **either** platform. Elevated now — post-tournament tidying | **None applied.** The zero-deploy policy drop is identified, not run — and it covers the **web** door only | Documented-only 2026-07-21; *archive, not delete* decided 2026-07-25 — **not implemented** | *"Delete Pool" destroys every member's predictions* (🔥 Now) |
+| **R1** | ✅ **CLOSED IN CODE 2026-09-02 — the button is gone from both surfaces.** Was: `app/pools/[pool_id]/admin/SettingsTab.tsx` ran five un-transactional PostgREST deletes from the browser against an asymmetric RLS pair, and `mobile/components/pool-detail/SettingsTab.tsx:223` was a second, separate door. **Both are now removed and replaced by a reversible archive** — web `SettingsTab.tsx:1297` and mobile `SettingsTab.tsx:128` each carry the comment recording the removal; migrations **040** `pool_archive_columns`, **041** `pool_archive_policies`, **044** `archived_pools_read_only`; routes `/api/pools/[id]/archive` and `/restore`. ⚠ **This row does NOT cover account deletion.** The third bullet of the old item — the account-delete route destroying everything before it checks pool ownership — is **still live** and is now **R22** | 🔴 → ✅ (with **R22** carved out) | Was 6 pools / 41 entries destroyed, 458–535 pools one tap away. Now zero reachable through this door | — | **Archive shipped.** ⚠ Closed on the **code**, not on a production query: this session had no prod access, and the archive path is on `Development`, not `origin/master` (**R21**). The 24 Aug production build is the one that matters, and it predates none of 040/041/044 — those are database-side and applied | **Decision honoured** — *archive, not delete* (2026-07-25) is what shipped | *"Delete Pool" destroys every member's predictions* (🔥 Now) — item to be retired, see **R22** |
 | **R17** | ✅ **CLOSED 2026-07-30 — prod-verified. The ledger reconciles.** Was: 29 of 4,985 entries with `scored_total_points ≠ Σmatch_scores + Σbonus_scores + point_adjustment` — 26 over by 149,525 pts, 3 under by 4,975, 3 carrying points with no line items; max delta 9,825 (V1, 2026-07-26). **Re-ran the identical check 2026-07-30: 0 mismatched of 4,981 entries, 0 over, 0 under, 0 carrying points with no line items.** No decision was needed and none was recorded — the shadow C1 fix and the 164 verified point adjustments of 2026-07-29 are the likeliest cause, but **that attribution is inference, not evidence** | 🟠 → ✅ | Was 29 entries / ~154,500 pts. **Now zero** | — | ⚠️ **Closed on the data, not on the mechanism.** There is still **no continuous reconciliation check**: this was found by asking, fixed as a side effect, and confirmed by asking again. If it drifts a third time nothing will say so | **New — no call made.** The open question this leaves is whether P1's *"checked continuously"* invariant gets built | **None yet.** **P1** is satisfied today and unmonitored |
 | **R18** | **The parity alarm detects into a table nothing reads.** `shadow_detect_diffs()` runs every 15 min (jobid 21, 192 runs/48 h, all succeeding) and writes `shadow_score_diffs` — and **nothing in `app/`, `lib/` or `mobile/` reads that table**; the only readers are `drafts/*.sql`. ⚠️ **Rewritten 2026-07-30 — the alarming half of the original framing was wrong.** `shadow_detect_diffs` **DELETEs then re-INSERTs** `diff_kind='entry_total_mismatch'` on every run, so for that kind it is a **current-state table, not an append-only log** — the row count *is* the verdict. **Today's verdict is 0 mismatches: prod and shadow agree exactly on totals.** The 431 rows present are fossils of two kinds the function does not manage — `only_in_live` (341) and `value_mismatch` (90) — all stamped **2026-07-02**, none newer than that, 0 in the last 24 h. The earlier "849 rows, 418 in the last 24 h" reading (V2) counted a re-written table as an accumulating one | 🟠 | **Not "discrepancies nobody is receiving"** — there are none right now. The exposure is the **next** one: whenever totals do diverge, the only thing that notices is a table with no reader, no alert and no admin surface. Compounded by the alarm's known blind spot — it compares **totals only** and cannot see rank drift (Node-retirement gate 1) | The next real divergence. Nothing surfaces it | **None.** Detection exists; consumption doesn't. Building a reader is unblocked and small | **New — no call made** | *Shadow scoring engine*. Violates **P3** |
-| **R12** | **Every membership-exit path permanently purges the entry.** Leaving a pool, being removed, deleting an account, or "stop participating" all end in a hard delete that cascades through **21 tables** — predictions, all derived scores, `point_adjustments`, and `badge_unlocks`. **Three of the four doors contain no delete of entries or predictions in application code at all**; the destruction is entirely the DB cascade, which is why it is invisible from the route. `badge_unlocks` is designed as an **append-only permanent record** and cascades away with the entry — the permanent record is not permanent | 🔴 | ⚠️ **Still uncounted as of 2026-07-30.** Unlike R1 there is **no documented incident**, which is not evidence it hasn't been happening. What the 2026-07-30 audit could establish: `pool_membership_events` holds **293 rows total**, and there are **0 orphan predictions** and **0 entries without a member row** in prod. ⚠️ **That is not reassurance — it is the shape of the problem.** Zero orphans means the cascade leaves *nothing behind*, which is exactly why the loss is unrecoverable and why the count can't be reconstructed after the fact. Structurally the exposure is *every member who has ever left, been removed, or deleted their account*, across 623 pools | Four doors: **(1)** self-leave · **(2)** admin removes a member · **(3)** account deletion (cascades from `users`) · **(4)** "stop participating". Doors 1–3 are ordinary product actions available to any user | **None.** No soft-delete exists anywhere (0 `deleted_at`/`is_deleted` references in `app/`, `lib/`, `mobile/` — verified 2026-07-26) | **New — no call made.** Ryan's stated position 2026-07-26 is that this *should not happen either*. That is a direction, not yet a decision: see the open question in *Order of deliveries* → Gate A2 | **None** — this risk has no backlog item yet |
+| **R12** | ✅ **LARGELY CLOSED IN CODE 2026-09-02 — soft delete exists.** Was: every membership exit ended in a hard delete cascading 21 tables, with *"no soft-delete anywhere (0 `deleted_at`/`is_deleted` references)"*. **That is no longer true.** `pool_entries.retired_at` ships in migrations **056** `soft_delete_entries` and **057** `retired_entries_stop_scoring`, with `lib/entries/retire.ts` owning both directions (retire is idempotent — `.is('retired_at', null)` so a second call never rewrites the first stamp) and **35 references** across `lib/`, `app/` and `mobile/`, guarded by `lib/entries/__tests__/retire.test.ts` and `retired-filter-guard.test.ts`. Leaving a pool now **detaches** the entry | 🔴 → 🟠 | Was: structurally every member who has ever left, across 623 pools, uncounted. Now bounded to the residual below | The residual, not the original | ⚠ **Two residuals, both verified 2026-09-02.** **(a)** `lib/scoring/recalculate.ts` and `lib/auto-submit.ts` contain **zero** `retired_at` references, so a retired **World Cup** entry is still scored and still auto-submitted — 057 stops the *league* engine, not the Node one. **(b)** The filter is deliberately narrow: only `lib/poolData.ts:199` and `league_score_fixture` carry it, and widening it is not a free change. **(c)** Door 3, account deletion, is untouched — **R22** | **Direction honoured.** Ryan's 2026-07-26 position (entries should not be purged on exit) is what shipped. **Gate A2 is answered by the implementation**: soft-delete the entry, keep it out of the leaderboard | *Entry soft delete (056/057)*; residual (a) needs an item |
 | **R2** | **A league pool scores zero, silently — two bugs, gate first.** ⚠️ **Mechanism corrected 2026-07-30 by tracing a `regular_season` fixture through the *live* `shadow_score_match`; the earlier "the price lookup, not just the gate" had the causality backwards.** **(1) The team-matching gate is what zeroes it:** not group stage → not progressive mode → teams *are* set (a league fixture has real teams from day one) → so it compares predicted teams from `shadow_entry_bracket`, which has **no rows** for a league → `teams_match = false` → `WHEN stage <> 'group' AND NOT teams_match THEN 'miss'` → **0 points**. **(2) Behind that the prices are wrong anyway:** `CASE WHEN m.stage='group' THEN group_exact_score ELSE knockout_exact_score END` bills every league fixture at **knockout** rates. ⚠️ **It is in the SQL, not only in Node.** Shadow: gate `drafts/2026-07-17_shadow_phaseA_1_widen_match_scores.sql:145`, price `:91`. Node: gate `lib/scoring/core.ts:142` (fed by `checkKnockoutTeamsMatch` at `:88`, with `full.ts:88` / `progressive.ts:105` sourcing teams from a WC-shaped `knockoutTeamMap`), price `core.ts:153-155`. Bonuses iterate 12 hardcoded groups (`lib/tournament.ts:137`), so a league pool has no bonus path either. ✅ **Prospective, not live:** zero `stage='regular_season'` rows in prod (V6, re-confirmed 2026-07-30) — **level unchanged**, because the trigger is one `tournaments` row away | 🔴 | **100% of points** in every EPL pool; scoring trust in the flagship next season. Currently **0 pools affected** | Creating an EPL `tournaments` row — **both create-pool wizards list tournaments unfiltered** (`components/pools/CreatePoolModal.tsx:107`, `mobile/app/create-pool.tsx:144`), so the row alone makes league pools creatable | ⚠️ **Mitigation restated 2026-07-30 — the previous entry was false in the dangerous direction.** It read *"migration 024 staying uncommitted is the only thing holding the door shut"*. **024 is not uncommitted:** `lib/migrations/024_multi_competition_league_support.sql`, `lib/integrations/apiFootball/importLeagueSeason.ts` and `scripts/import-league-season.ts` are **tracked on `origin/master`** (swept in by `b80395e`). **The real catch is the production CHECK constraints:** `tournaments_tournament_type_check` still allows only `('world_cup','euros','copa_america')` and `matches_stage_check` still has no `regular_season`, so **the database rejects a league tournament regardless of what is in the repo** (024 confirmed **not applied**, 2026-07-30). That is a safety catch, not a plan — and it is one `ALTER TABLE` from gone | Recognised in the item; not scoped or scheduled | *League ingestion (Premier League)* (Multi-sport → Foundational) |
 | **R3** | **Three scoring default sets disagree; "Reset to defaults" rescales a live pool ~20×.** create = `group_exact_score: 100`, reset button = `5`, `bonus_champion_correct` stays `1000` | 🟠 | Any of **623 live pools**; one click turns 103 fixtures into decoration. Reset ladder is also non-monotonic (SF < QF) | An admin presses **Reset to defaults** on a live pool | None | **Decided 2026-07-25** (100/75/50 canonical, delete the dead bonuses, fix the ladder) — unimplemented, ~half a day | *Scoring config is internally inconsistent* (🔥 Now); Decision 6 |
 | **R4** | ✅ **CLOSED 2026-07-30 — prod-verified. Shadow's podium now uses the derived view.** Was: prod *derives* the podium from completed matches (`lib/podium.ts`) while the shadow bonus SQL still `JOIN`ed `tournament_awards` — the same root cause prod paid ~324k points to fix. **Migrations 027 `tournament_podium_view` (20260727155217) and 028 `shadow_podium_use_view` (20260727160124) are both applied**, and podium bonuses are stored at full strength: `champion_correct` 837 entries / 729,270 pts · `second_place_correct` 738 / 42,740 · `third_place_correct` 167 / 7,470 | 🟠 → ✅ | Was **669 rows / ~324,375 pts** across ~73 pools; 50 changed rank, 13 changed their #1. Now zero | — | ⚠️ **The "latent, not live" reasoning recorded on 2026-07-26 was obsolete in the *opposite* direction and should be read as a warning, not a comfort.** By 2026-07-29 shadow was the read source for **all 623 pools**, so this divergence would have been **live for every member**, not latent. It isn't, only because it was fixed first — two days before the read widening, not because of it | No call recorded; none now needed | *Shadow scoring engine*; *Podium bonus remediation* (✅ Recently shipped). Clears **Node-retirement gate 2** |
@@ -414,6 +515,10 @@ segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 | **R16** | **Cross-competition unscoped reads — one deliberate blocker, plus the audit scripts.** `app/api/admin/advance-teams/route.ts:56` reads `matches`, `teams` **and** `match_conduct` tournament-wide with no scope and no pagination. Unscoped `matches` means the advancement cascade would resolve knockout placeholders **across competitions**; unscoped conduct is capped at 1,000 rows. Left unfixed on purpose (blocker comment in-file) because scoping it means threading a tournament id through the cascade — a design change, not a query change. Separately, four `scripts/*.ts` still read the whole conduct table, including `scripts/audit-bonuses.ts:78` — **the recurring end-of-competition bonus audit is itself subject to the truncation it exists to catch** | 🟠 | Wrong advancement and wrong conduct tiebreaks across competitions; a bonus audit that silently passes on partial data. Conduct today = 206 rows; PL 2026/27 adds ~760 → 966; the competition after that crosses 1,000 | Ingesting a **second competition** — the EPL, mid-August. A fixed external date | **13 of 14 app call sites fixed** via `lib/matchConduct.ts` (scoped through the `match_conduct → matches` FK, paginated). ⚠️ **"Uncommitted" is stale — `lib/matchConduct.ts` is on `origin/master`** (`db4daf3`, checked 2026-07-30); *whether all 13 call sites went with it was not re-verified*. What is **confirmed still unscoped** is `advance-teams` — `route.ts:62` matches, `:63` teams, `:65` match_conduct, all tournament-wide, blocker comment at `:55` — plus the four `scripts/*.ts` | **New — no call made.** Must precede league ingestion (3d in the delivery order) | *⚡ Performance & caching*; *League ingestion*; **R2**, **R5** |
 | **R20** | ✅ **RESOLVED IN SHADOW 2026-08-15 — full re-score run.** Migration 042 removed `knockout_*` as a *second, parallel base* in the Node engine and folded the group→knockout ratio into the stage multipliers; the shadow engine was never updated, so it read `knockout_*` as a base **and** applied the folded multiplier, double-counting. Fixed in the function by **046d**; the **stored rows** were the remaining half and have now been re-scored — all 104 World Cup matches through `shadow_score_match`, then `shadow_finalize_totals`. Shadow is no longer half on one formula and half on another | 🟠 → 🟢 (shadow) / 🟠 (prod) | **Measured against a full pre-change snapshot.** 286,872 rows: `score_type` changed on **0** — no member's exact/GD/winner/miss judgement moved. `base_points` changed on 21,304 and `multiplier` on 55,036, but `total_points` on only **855**, which is exactly what 042's fold was designed to achieve. Net **+11,453** across **7 pools / 126 entries**. Ranks: **52 entries in 4 pools** moved, and **no pool's winner changed** (0 gained, 0 lost). Every affected pool has a per-tier ratio that differs between exact and winner (2.00 vs 1.67, 3.00 vs 1.00, 6.00 vs 2.00 …) — precisely 042's documented *"sixteen pools whose ratio differed per tier and could not be preserved exactly"* | Discharged. The remaining trigger is a **prod** recalc of the 7 affected pools, which would converge them | **Reversible:** `backup_shadow_match_scores_pre_r20` and `backup_shadow_entry_totals_pre_r20` hold the exact pre-change rows. Drop them once this is accepted | ⏳ **One consequence needs a call.** Option 1 was chosen knowing it *"widens the shadow↔Node gap until Node is also re-scored"*, and it did: the diff alarm went from **66 to 126** mismatched entries across 6 pools. Members are unaffected — `readSource` serves shadow for all 623 pools — but the monitor meant to catch future problems now sits permanently red. ⚠ **Do NOT clear it with `recalculatePool`:** that fires `fanOutResultPushes` and `detectAndPushBadgesForPool`, which would push badge/level notifications to members of finished pools — a notification with no sporting cause, failing the disclosure gate on its face. The safe fix is a targeted write of `pool_entries.scored_total_points` from shadow for those 126 entries | *League platform plan*; *Shadow scoring engine*; migration 042 |
 | **R11** | **Dead scoring knobs are editable on mobile.** `bonus_best_player_correct` / `bonus_top_scorer_correct` are read by zero scoring code | 🟢 | A mobile admin can set a value that can never pay out; members see it in the pool's rules | Any admin opening mobile scoring config | Web is honest (greyed *"Coming Soon"*); **mobile is not** (`mobile/app/pool/[id]/scoring-config.tsx:442`) | Covered by the Decision-6 deletion, unimplemented | *Scoring config is internally inconsistent*, defect 4 |
+| **R21** | **Production is 225 commits and ~30 migrations behind the code, and the gap is nine days old.** ⚠️ **New 2026-09-02.** `origin/master` = `6dc5710` (24 Aug), unmoved; `origin/Development` = `c98a037` (2 Sep). Migrations have been applied to the **shared** production database past the deployed code — **121 makes a duel worth 500 while the deployed `DuelsTab` treats anything that is not 3 or 1 as a LOSS**, and **110 DROPPED** `pools.league_table_revealed_at` plus two functions. This is the exact shape of the 2026-08-22 outage recorded under *DROP COLUMN outage + the column guard*: schema and code disagreeing at HTTP 200 | 🔴 | **Everything.** Two real Premier League pools with real members are running the 24 Aug app: Scores depth they did not choose, no wizard, no notifications, no Showdown/LMS/Table, and a duel scoreline that will read as a defeat to whoever won. Every ✅ in this document below the Premier League heading describes code no member can reach | **Already triggered**, and compounding daily. It resolves only by deploying | **None.** No deploy has been attempted. ⚠ The migrations **have** run — the Premier League Build Board probed production 2026-09-02 and confirmed 099, 105, 110, 115 and 127. **But that is five probes spanning 099–127, not eleven verifications**: 119, 120, 123–126, 128 and 129 are individually unattested, and *absence of a record is not evidence of non-application* (that inference is what produced **R19**). Hash `prosrc` before the deploy | ⏳ **NEEDS RYAN — this is a timing call, not an engineering one.** 225 commits over a moved schema is not a routine push; it wants a written order like the R13 release had, and `npx tsx scripts/verify-select-columns.ts` run first | *Premier League 2026/27* → AUDIT 2026-09-02 |
+| **R22** | **Account deletion destroys everything before it checks whether it is allowed to.** ⚠️ **New 2026-09-02 — carved out of R1, which is otherwise closed.** `app/api/account/delete/route.ts` deletes `match_scores` (`:36`), `bonus_scores` (`:42`), `predictions` (`:48`), `group_predictions` (`:54`), `special_predictions` (`:60`), `player_scores` (`:66`), `pool_entries` (`:75`) and `pool_members` (`:83`) with the **admin client**, and only at **`:94`** asks *"do you still administer a pool?"* — returning 400 if so. **The 400 comes after the destruction.** A pool admin who tries to delete their account keeps the account and loses every prediction and every score in every pool they were ever in | 🔴 | Any user who administers at least one pool and taps Delete Account. Irreversible, silent to everyone else in those pools, and the user is told only that they must transfer admin first — not that their history has just gone. It also **bypasses `retired_at` entirely**, so R12's soft delete does not protect this door | One tap in account settings, by anyone who is a pool admin — **535 accounts** by the R1 count | **None.** The fix is to move the ownership check above line 36. It is a **five-line reordering**, and it is the cheapest 🔴 mitigation in this register | **New — no call made.** The old R1 item recorded this defect in a sub-bullet and it was never scoped; it is promoted here so it stops riding on a row that is now closed | *"Delete Pool" destroys every member's predictions* (🔥 Now) — this is what remains of that item |
+| **R23** | **The league read path repeats the World Cup's three most expensive habits, and the review that measured it has not been actioned.** ⚠️ **New 2026-09-02.** `drafts/2026-08-31_league_read_path_and_cost_review.md` measured `pg_stat_statements` and found 71.7% of all DB time in three patterns; it then checked the league code and found `SELECT *` **absent** and `postgres_changes` **absent** (both genuinely avoided), but three new instances of the same class: **(1)** `readLeaguePoolView` pages **all 380 fixtures / 175 kB** on every league page load, per viewer, through RLS, outside `getPoolDataCached`, on a `force-dynamic` page, whichever tab is open; **(2)** `lib/league/duels.ts:122` sums `league_match_scores` in a Node `for` loop, which is the rule migration 124 was written to state; **(3)** `DuelsTab.tsx:317` carries `enginePoints?.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE` — **a second scoring engine, in the browser**. Plus two unbounded reads with dated fuses: `readPoolDuels` truncates at **~53 members**, `readMatchweekPoints` at **100** | 🟠 | Cost and silent wrongness together. The truncations return exactly 1,000 rows with `error: null` and render a plausible wrong table — the failure mode in *PostgREST 1,000-row cap*. The browser fallback is one bad `duelPoints` read from two screens disagreeing about the same number, **which already happened** (`readEntryTotals`' own comment records four instances found in one afternoon on 2026-08-30) | A pool over ~53 members, or Premier League carrying real concurrent load. Neither has happened yet — `league_*` is **0.01% of 354 DB-hours** today | **None of the seven items in §5 have been done — re-verified in code 2026-09-02.** There is still no `unstable_cache`, `revalidate` or cache tag anywhere in `lib/league/`; `readPoolDuels` and `readMatchweekPoints` still have no `.range()`; `buildDuelTable`'s fallback is still at `DuelsTab.tsx:317` and again at `:2178`. ⚠ `readMatchweekPoints`' comment was *updated* to argue the current size is safe — the fuse is now documented rather than defused | **New — no call made.** The review's own recommendation: items **1–3 are six hours** and should precede Premier League opening | *⚡ The league read path* (new section below) |
+| **R24** | **The React Native app cannot read league data — not "has no screens", cannot read.** ⚠️ **New 2026-09-02.** Mobile's architecture is direct-to-PostgREST: **~110 `.from()` table reads** across `mobile/lib`, `mobile/app` and `mobile/components`, against only **14 API routes**, every one of which is a write or a notification (`create`, `join`, `leave`, `stop-participating`, `account/delete`, the six `notifications/*`). Migration **050** closes four league engine tables to clients — `league_match_scores`, `league_entry_totals`, `league_fixture_state`, `league_score_events` — RLS on, **zero policies**. A user-scoped read of those returns an **empty array with `error: null`**. So the entire mobile data-access pattern returns confident zeroes for every league number that matters: the leaderboard, duel points, rounds won, form | 🟠 | The whole second surface. It also means the RN build is **not** a port of the web screens: the web reads these tables with the **admin client from a server component**, which RN has no equivalent of. And the failure is silent — `denyAllTables.guard.test.ts` records **four** instances of exactly this bug found in one afternoon on the *web*, where the pattern is better understood | Starting the RN league build. Not dated; entirely ours | **None, and the gap is structural rather than missing work.** `/api/pools/[id]/live` and `/leaderboard` have **zero** league references; `/bulk` has 16; `duel-live`, `duel-recap`, `duel-reveal`, `lms-pick`, `table-prediction` exist but are deltas and actions, not a pool read. There is **no read API a second surface can consume** | **New — no call made.** See *📱 The RN league build — how far away* below, which prices the two options | *📱 The RN league build*; **R23** (same section) |
 
 **Why R13 is 🟠 and not 🔴.** It meets the 🔴 wording — it is live and it is misleading users right
 now. It is held at 🟠 because the wrongness is confined to a **displayed gamification level**: no
@@ -448,6 +553,22 @@ claim in this document that a job is unregistered has to name both mechanisms an
 generalisation is the more durable half of R19; the cron itself is a ruling away from settled.
 
 ### The destruction class — four doors to one purge (R1 · R12)
+
+> ✅ **THREE OF THE FOUR DOORS ARE CLOSED, verified in code 2026-09-02.** This section is kept in
+> full because it is the record of how the product failed, and because **door 3 is still open**.
+>
+> | Door | Then | Now |
+> |---|---|---|
+> | **1. Self-leave** | hard delete → 21-table cascade | ✅ `retired_at` soft delete (056/057, `lib/entries/retire.ts`) |
+> | **2. Admin removes a member** | same cascade | ✅ same path |
+> | **3. Account deletion** | cascade from `users` | 🔴 **STILL OPEN, and worse than described** — the route destroys everything at `:36–85` and only checks pool ownership at `:94`. See **R22** |
+> | **4. Stop participating** | deleted `pool_entries` directly | ✅ retires the entry |
+>
+> ⚠ **Two things the closure does not cover.** The **"12 cascade children"** comments at
+> `stop-participating/route.ts:15` and `:52` were already 43% low when this was written and the
+> number is still not corrected. And `lib/scoring/recalculate.ts` / `lib/auto-submit.ts` contain
+> **zero** `retired_at` references, so the World Cup engine still scores and auto-submits a retired
+> entry — 057 stops the *league* engine only.
 
 Recorded 2026-07-26. **Provenance matters here and is marked per line:** the schema facts were verified
 against the production schema (`pg_constraint`) by Ryan's side and **cannot be re-verified from this
@@ -547,6 +668,189 @@ ingestion.
 
 ---
 
+---
+
+## 📱 The RN league build — how far away, and what must not be repeated
+
+> **Added 2026-09-02** on Ryan's instruction: *how far are we from starting the RN build to match the
+> features we have built on the web, and have we avoided the World Cup's mistakes?* Both halves are
+> answered from the code, not from the plans. **Nothing here is a decision.**
+
+### The short answer
+
+**The distance is not screens. It is a read API that does not exist.**
+
+Mobile today has **zero** league code — one comment in `mobile/app/create-pool.tsx:148` explaining
+why league competitions are hidden from the picker, and nothing else. But porting the web screens is
+not the work, because **the way mobile reads data cannot reach league data at all**, and no amount of
+UI closes that. Until that is fixed, "start the RN build" means "start building something that
+renders zeroes."
+
+### Why mobile cannot read league data (R24)
+
+Three facts, each verified in the tree on 2026-09-02:
+
+1. **Mobile is direct-to-PostgREST.** ~110 `.from()` table reads across `mobile/lib`, `mobile/app`
+   and `mobile/components` — `pool_members` ×23, `users` ×17, `pool_entries` ×14, `matches` ×11,
+   `predictions` ×7. It consumes **14 API routes**, and every one is a write or a notification:
+   `pools/create`, `pools/join`, `[id]/leave`, `[id]/stop-participating`, `account/delete`, the six
+   `notifications/*`, `matches/`, `users/`.
+2. **Four league engine tables are deny-all.** Migration **050** put RLS on `league_match_scores`,
+   `league_entry_totals`, `league_fixture_state` and `league_score_events` with **zero policies**, on
+   purpose. Those hold every number a league screen shows: points, rank, duel points, rounds won.
+3. **The failure is silent.** RLS with no policy is not a 403. PostgREST returns `[]` with
+   `error: null`, so the read "succeeds", the map is empty and the screen renders a confident zero.
+   `lib/league/__tests__/denyAllTables.guard.test.ts` exists because this bug was found **four times
+   in one afternoon on 2026-08-30 — on the web**, where the pattern is better understood than it
+   would be in a new RN file.
+
+**So the web does not read those tables the way mobile would.** `app/pools/[pool_id]/page.tsx` is a
+`force-dynamic` **server component** that calls `readEntryTotals(adminForTotals(), …)` and
+`readMatchweekPoints(admin, …)` with the **service-role client**, having already established the
+viewer is a member. RN has no server component and must never hold a service-role key. There is no
+port of this; there is only a new server surface both can call.
+
+⚠ **And the existing narrow endpoints do not cover it.** `/api/pools/[id]/live` and
+`/api/pools/[id]/leaderboard` contain **zero** league references; `/bulk` has 16. `duel-live`,
+`duel-recap`, `duel-reveal`, `lms-pick`, `table-prediction` and `table-deadline` exist, but they are
+deltas and actions — there is no *"give me this league pool"* read for a second surface to call.
+
+### What the web actually has, so the gap is a number and not a feeling
+
+| Surface | Lines | Mobile equivalent |
+|---|---:|---|
+| `lib/league/*` — the shared read/write/derivation layer | **4,930** | none |
+| `DuelsTab.tsx` — fight card, tale of the tape, season table | 2,616 | none |
+| `PoolDetail.tsx` (mode dispatch, all four modes) | 3,191 | mobile `pool/[id].tsx` is WC-only |
+| `TablePredictionTab` + `TableBreakdownView` + `TableEntryModal` | 1,307 | none |
+| `ShowdownBand` + `DuelRevealCeremony` + `DuelRevealCorridor` + `DuelRecapSheet` | 1,388 | none |
+| `SurvivorTab` (Last Man Standing) | 552 | none |
+| `LeagueTableTab` + `LeagueScoringRulesTab` + `LeagueHowToPlayTab` | 1,117 | none |
+
+Roughly **13,000 lines of league-specific web surface, and 4,930 lines of league library**, against
+30 mobile screens / 94 components / 42 hooks that know nothing about any of it.
+
+### The four gates, in the order they bind
+
+**Gate M0 · Deploy what exists.** `origin/master` is 225 commits and ~30 migrations behind
+(**R21**). Building RN against web behaviour that no member has ever seen means verifying against a
+moving target and shipping an OTA into a mismatch. **Nothing else on this list should start first.**
+
+**Gate M1 · One read, two surfaces.** A server-owned read API for a league pool, returning what a
+screen renders and nothing else. This is the single largest item and the one that decides whether
+the RN build is a port or a rewrite. It is also the thing that **fixes R23 for the web at the same
+time** — the season read, the SQL aggregate and the removal of the browser-side duel table are the
+same work, done once, behind one contract.
+
+**Gate M2 · Give mobile a cache.** Decided **2026-07-26** (react-query, *Decisions settled
+2026-07-26 (infrastructure)* #2) and **still not started** — verified 2026-09-02: no
+`@tanstack`, `react-query` or `swr` in `mobile/package.json`. Six surfaces refetch on
+`useFocusEffect`, so every tab switch re-runs a full load. Adding league screens on top of that
+multiplies the World Cup's read bill by however many league tabs there are.
+
+**Gate M3 · Retire mobile's `postgres_changes`.** Realtime WAL decoding is **25.0% of all database
+time** (`drafts/2026-08-31_league_read_path_and_cost_review.md` §1) and **four of the five remaining
+consumers are mobile**: `usePoolEntries.ts`, `usePoolDetail.ts`, `useMemberRoster.ts`,
+`HomeDataProvider.tsx`. Web is already clean. League itself went Broadcast-from-database from the
+start (060, 125), so this does not grow with league traffic — **but adding RN league screens on the
+old pattern would put it back.**
+
+Only after those does the screen work — Pick'em first (smallest, and the only mode a member can
+reach today), then Table, then Last Man Standing, then Showdown (largest by an order of magnitude:
+the band, the walkout, the recap).
+
+⚠ **The estimate is deliberately not given as a date.** M1 is the one that decides everything and it
+has not been designed yet. What can be said: **M0 is days, M2 and M3 are each a few days and were
+both decided over a month ago, and M1 is the piece that needs a plan before anyone can size it.**
+Per *Plan before executing*, M1 wants a written plan Ryan approves before code.
+
+### ⚠ Have we repeated the World Cup's mistakes? — checked, one by one
+
+The World Cup is a **measured** record of what this product costs at 3,652 concurrent people, so
+this is not guesswork. Three patterns were 71.7% of all database time. Here is where each stands in
+the league code, checked in the tree 2026-09-02:
+
+| World Cup mistake | Measured cost | League code today |
+|---|---:|---|
+| **`SELECT *`** on `predictions` / `match_scores` | **39.3%** of all DB time, 22.1M calls | ✅ **Not repeated. Zero `select('*')` in `lib/league/`** — every read names its columns |
+| **`postgres_changes`** replication | **25.0%** | ✅ **Not repeated for league.** No `league_*` table is in the `supabase_realtime` publication; league went Broadcast-from-database from migration 060. ⚠ But the 25% has not *shrunk* — ten tables are still replicated and four of the five consumers are mobile (**Gate M3**) |
+| **PostgREST resource embedding** — 0.45–0.50 s **per call** | **7.4%** | ⚠ **Repeated three times**, all in `lib/league/notify.ts` (`:85`, `:392`, `:499`) — the same `users!inner(...)`, `pool_entries(...)` shape. Cron/notification paths only, so the blast radius is small **today**; Showdown's notification ecosystem is not built yet, so fix it before it is |
+| **Clients computing what the backend already knows** | the 26,770-row leaderboard that motivated the architecture rule | 🔴 **Repeated.** `DuelsTab.tsx:317` — `enginePoints?.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE` — is a second scoring engine in the browser, and `DuelsTab` carries **23 `useMemo` blocks** deriving verdicts, form, streaks and movement from rows shipped for that purpose. Migration **121** made `league_score_duels` the owner of that arithmetic |
+| **Aggregating in Node instead of SQL** | the rule settled 2026-07-29 | 🔴 **Repeated.** `lib/league/duels.ts:122` sums `league_match_scores` in a `for` loop — and migration **124**, written to state exactly this rule, is the file next door |
+| **Unbounded reads against the 1,000-row cap** | 155 entries of inflated bonuses; a survey that silently sent to 146 of 3,958 | 🟠 **Repeated with a dated fuse.** `readPoolDuels` truncates at **~53 members**, `readMatchweekPoints` at **100**. The World Cup's biggest pool had **192**. Neither errors — both return exactly 1,000 rows and render a plausible wrong answer |
+| **Fetching per-request what is shared** | pool payload 7,721 kB → 457 kB, step 3 | 🔴 **Repeated, in a new shape.** `readLeaguePoolView` pages **all 380 fixtures — 175 kB —** on every league page load, per viewer, through RLS, outside `getPoolDataCached`, on a `force-dynamic` page, **whichever tab is open**. One matchweek is 4.6 kB |
+| **No cache anywhere** | the 2026-07-26 caching decisions | 🔴 **Repeated.** No `unstable_cache`, `revalidate` or cache tag exists anywhere in `lib/league/` |
+
+**The honest summary: the two habits that cost the most were genuinely avoided, and the architecture
+rule was honoured by the engines and quietly ignored by the read path.** That is not carelessness —
+as written the rule is a principle, not a test, and a principle cannot fail a diff.
+
+### The one place caching genuinely applies — and it is not the pool
+
+The 2026-07-26 finding stands and should not be re-litigated: **CDN is never for pool detail**
+(median pool = 1 member ⇒ ~0% hit rate), and per-pool payloads are viewer-shaped. **But that
+conclusion was reached about a per-pool object.** The 175 kB of fixtures is not per-pool — it is per
+**season**, identical for every viewer of every pool playing it, ~197 kB with clubs, matchweeks and
+standings, comfortably inside Vercel Runtime Cache's 2 MB item cap, and written by exactly one
+writer.
+
+```
+unstable_cache(readSeasonView, ['league-season', seasonId], { tags: [`league-season:${seasonId}`] })
+revalidateTag(`league-season:${seasonId}`)   ← from the sync, on changed.length > 0
+```
+
+⚠ **Invalidate off the sync's own `changed` array, never a TTL.** A TTL either serves a stale score
+during a match — breaking the live-standings guarantee outright — or is short enough to be
+pointless. `league_apply_fixture_sync` already returns which fixtures moved (105); that value is the
+invalidation signal, already computed and currently unused.
+
+⚠ **The live half must not go through the cache.** Migration 125 already carries score, status and
+minute over the broadcast. Cache the *stable* season — who plays whom, when, where — and let the
+broadcast own everything that moves. **Caching what moves is how you serve a 0–0 through a goal.**
+
+### Make the rule checkable, or it will be ignored again
+
+*Scoring engines → the rule* is honoured by every engine and broken by the read path, because as
+written it cannot fail a code review. Four questions that can be answered about a diff:
+
+> **1. Is this number stored, or is it being worked out?** If a component computes it, the engine
+> should have written it. One owner per number.
+> **2. Does this read name its columns, and can it name fewer rows?** `SELECT *` is banned outright.
+> "The whole season" needs a reason beyond "it was easier".
+> **3. What is the row count at 200 members, week 38?** Over 1,000 with no `.range()` means already
+> broken — it just has not happened yet.
+> **4. Is this read per-user, per-pool, or per-season?** Per-season data read per-user is the most
+> expensive mistake available and the easiest to fix.
+
+And two guards, because this codebase has a good record of turning a lesson into a test
+(`verify-select-columns.ts`, `denyAllTables.guard.test.ts`) and a poor record of remembering rules
+that live only in a document:
+
+1. A lint-level guard failing on `select('*')` and on `.eq('pool_id', …)` without `.range()` inside
+   `lib/league/`. Both are mechanically detectable.
+2. Extend `scripts/verify-read-paths.ts` with a league branch asserting **row counts per page load**
+   against a seeded **60-member** pool — the size at which `readPoolDuels` breaks.
+3. Re-run the `pg_stat_statements` table after Premier League's first full matchweek. If `league_*`
+   is not the top line by then, nothing has gone wrong.
+
+### The work, ordered by cost avoided per hour spent
+
+From the review's §5, re-verified as **all still open** on 2026-09-02:
+
+| # | Change | Size | Why |
+|---|---|---:|---|
+| **1** | `.range()` on `readPoolDuels` + `readMatchweekPoints` | 1 h | Two dated bombs. Silent wrong answers, not errors |
+| **2** | `league_matchweek_points()` in SQL; delete the Node loop | 2 h | The rule, applied where we broke it |
+| **3** | Duel standings from the engine — kill the `?? w*DUEL_WIN + d*DUEL_TIE` fallback | 3 h | Removes the second scoring engine |
+| **4** | Cache the season read (above) | 4 h | 175 kB × every load × every viewer → once per feed write |
+| **5** | Scope `readLeaguePoolView` to the tab that needs it | 4 h | The duel tab needs 1 matchweek, not 38 |
+| **6** | Replace the 3 `notify.ts` embeddings with explicit joins | 2 h | 0.5 s/call, before Showdown notifications ship |
+| **7** | Retire the 5 remaining `postgres_changes` consumers | 2 d | 25% of DB time; needs a mobile OTA — **this is Gate M3** |
+
+**Items 1–3 are six hours and should precede Premier League carrying load.** Items 4–5 are the
+substance of Gate M1 and should be designed as the shared read contract rather than as web-only
+patches, so the RN build inherits them instead of re-deriving them.
+
 ## 🧭 Order of deliveries — **proposed**
 
 > **Proposed, not committed.** This is a recommendation for Ryan, derived from what this document
@@ -561,7 +865,47 @@ ingestion.
 `(blast radius × likelihood) ÷ effort` for defects and `(what it unlocks) ÷ effort` for features.
 Where two items are genuinely interchangeable, that is stated rather than resolved into a fake order.
 
-### The sequence
+### ⚠️ The 2026-09-02 sequence — supersedes the one below
+
+> The sequence that follows was written on 2026-07-26, before the league existed as a product. Its
+> steps 1 and 3 are substantially delivered and its framing (a World Cup winding down, an EPL that is
+> *"not reachable"*) no longer describes anything. **It is kept as the dated record.** This is the
+> order that applies now, derived by the same rule.
+
+**A · Deploy.** `Bug` `Data-loss` `Infra` — **R21**. First because it is the only item where the
+*absence* of action is itself producing wrong data: 121 is applied and pays 500, the deployed
+`DuelsTab` reads 3, and a member who won is shown a defeat. Nothing else on this list is worth doing
+before the thing already built reaches somebody. **Needs a written order** — hash `prosrc` for every
+function 119–129 replace, run `npx tsx scripts/verify-select-columns.ts`, deploy, then verify in a
+browser rather than on a green build.
+
+**B · Reorder five lines in `app/api/account/delete/route.ts`.** `Bug` `Data-loss` — **R22**. The
+cheapest 🔴 in the register: move the pool-ownership check above line 36. Second only because it is
+one user action away rather than already happening.
+
+**C · The six-hour read-path block.** `Infra` — **R23** items 1–3. `.range()` on the two duel reads,
+the matchweek sum into SQL, and delete the browser's second scoring engine. Before Premier League
+carries load, and cheap enough that it competes with nothing.
+
+**D · The season cache and the scoped read.** `Infra` — **R23** items 4–5. Design these **as the
+shared read contract (Gate M1)**, not as web-only patches, so the RN build inherits them instead of
+re-deriving them. This is the fork in the road: done as a contract it is also step E; done as a
+patch it has to be done twice.
+
+**E · The RN read API, then RN screens.** `Mobile` — **R24**, gates M1→M3. See *📱 The RN league
+build*. M2 (react-query) and M3 (retire mobile's `postgres_changes`) were both **decided over a month
+ago** and neither has started; M3 is also 25% of the database bill.
+
+**F · Everything the old sequence still holds open** — the feedback survey (**R8**, ~6 weeks past its
+time box), the scoring-defaults collapse (**R3**, carries **R11**), the empty-bracket gate (**R6**),
+admin churn instrumentation (**R7**, whose measurement window has now closed), and the R19 ruling.
+None of these have moved since 2026-07-30, and none of them are blocked on anything but a decision.
+
+**Unchanged and still true:** R9 (move the repo off iCloud, ~1 hour, competes with nothing) and R16
+(`advance-teams` scoping) — the latter now genuinely urgent, because **La Liga is planned** and R16
+must precede a second competition being ingested.
+
+### The sequence *(written 2026-07-26 — superseded by the block above, kept as the record)*
 
 **0 · Send or drop the feedback survey** `Ops` — **R8**, independent of everything below.
 Not a dependency of anything; it sits first only because its value decays and it is already past its
@@ -885,10 +1229,10 @@ surface:
 | **Analytics / XP writer** — `lib/analytics/entryAnalytics.ts`, called by `lib/push/badges.ts` | Computes and stores hit rate, exact count, streak, last-five, crowd stats, XP and the ratcheted level into `entry_xp_state` | The per-entry statistics every surface reads instead of deriving | ✅ live, on the scoring path. ⚠ implements 11 of 12 badges — skips `dark_horse`. ⚠⚠ **ITS TRIGGER IS THE NODE ENGINE**: called directly by `recalculatePool`, and the standalone sweep (jobid15) fires off `pool_entries.last_rank_update`, a column **only Node writes**. Verified 2026-07-29: none of the 19 `shadow_*` functions touch `pool_entries` |
 | **Per-match aggregates** — migrations 038/039, `pool_match_prediction_accuracy()` | Counts, per match: how the pool split home/draw/away, how many were right, the most popular scoreline | Any pool-wide aggregate a screen needs — Matchday Pulse, Form's crowd section | ✅ live. Takes `p_submitted_only` because its two callers count different populations |
 | **Podium** — `lib/podium.ts` **+ `tournament_podium_view`** (migration 027) | Derives the actual and predicted tournament podium | Champion / runner-up / third bonuses | ✅ **Now in SQL as well as Node — prod-verified 2026-07-30.** Migrations **027** `tournament_podium_view` (20260727155217) and **028** `shadow_podium_use_view` (20260727160124) are applied and shadow reads the view; bonuses stored at full strength (837 champion / 738 runner-up / 167 third). **Retirement gate 2 cleared.** `lib/podium.ts` still runs in Node while `prod_scoring_enabled = true`. Closes **R4** |
-| **Bracket-picker provisional** — `lib/bracketPickerScoring.ts` | Client-side scoring of bracket picks for live display | Provisional standings before official scoring lands | ⚠️ still computed in the browser — the last real violation of the rule above, and a **blocker on Node retirement** (2026-07-30) |
+| **Bracket-picker provisional** — `lib/bracketPickerScoring.ts` | Client-side scoring of bracket picks for live display | Provisional standings before official scoring lands | ⚠️ still computed in the browser, and a **blocker on Node retirement** (2026-07-30). ⚠ **It is no longer "the last real violation" — corrected 2026-09-02.** `buildDuelTable` in `DuelsTab.tsx:317` is a second one, newer, and on the league side. See the row below |
 | **League engine** — `league_score_fixture` + `league_finalize_ranks` + `league_snapshot_matchweek_ranks`, over the `league_*` tables | Set-based, DB-native, per fixture: judges every pick against the result, recomputes each affected entry's totals from its score rows (never increments — a correction has to be able to take points away), then ranks the pool and queues an outbox event | **The league's engine, and only ever that.** Premier League today, other leagues later. Under Ryan's 2026-08-15 split it must never learn about the World Cup, and the shadow engine must never learn about leagues | ✅ **LIVE since 2026-08-24 — this row previously said NOT BUILT and was stale.** Migrations **055** (the engine), **057** (a retired entry stops scoring), **059** (ranks, the weekly movement snapshot, and an outbox producer), **060** (realtime broadcast on `league_entry_totals`), **061** (the arrow waits for the whole matchweek to be *scored*, not merely finished), **062** (outbox claim, FOR UPDATE SKIP LOCKED), **063** (**scores a LIVE fixture** — the table moves on the goal, not the whistle). Flat `group_*` prices, no multipliers. ⚠ **Updated 2026-08-28: it has still scored 0 real entries, for a new reason.** `league_predictions` now holds 240 rows, but every one of them is for matchweek 2 — matchweek 1 finished before the first pick existed, so `league_match_scores` is empty. The first contact between this engine and a real member's pick is matchweek 2, locking 2026-08-28 19:00 UTC. Until then every assertion about it rests on scratch-data verification (`scripts/verify-league-leaderboard.ts`, `verify-soft-delete.ts`), never on a member. Helper functions: `league_finalize_ranks`, `league_snapshot_matchweek_ranks`, `league_claim_score_events`. ⚠ **No reconciler** — the World Cup has `shadow_reconcile_matches()` every minute to catch what the engine missed; the league has nothing equivalent and no phase asked for one |
 | **Table-mode engine** — `league_score_table` + `league_snapshot_final_standings`, over `league_table_predictions` and `league_standings` | Set-based, DB-native, per pool: prices one entry's whole finishing order against the real table — a distance-decayed positional term plus champion / top-N / relegation bonuses scored **as sets** — and writes the result to `league_entry_totals.bonus_points`, which the fixture engine already leaves alone. Recomputed whenever the table moves, so it composes with `league_score_fixture` without either function knowing about the other | **Table mode, and only Table mode.** It returns `not a table pool` for anything else, so a Pick'em pool cannot be scored by it by accident | ✅ **LIVE since 2026-08-24.** Migrations **077** (`league_mode`, the mode/depth CHECK, the profile and the immutable pool-level deadline), **078** (`league_table_predictions`, RLS, the silent-skip lock), **079** (`league_pool_settings`), **080** (the engine + the season-end snapshot), **081/082** (`league_table_breakdown` — the per-club formula, defined once and read by the screen). ⚠ It has scored **0 real entries**: no pool has `league_mode='table'`, because no wizard can create one yet (phase 9). Verified against scratch data by `scripts/verify-table-mode.ts`. ⚠ **The snapshot is the load-bearing part** — `league_standings` is upserted current state, so without freezing it a feed correction would silently restate an award already paid. ⚠ Shares the league engine's gap: **no reconciler** |
-| **Showdown layer** — `league_score_duels` + `league_generate_duel_schedule`, over `league_duels` | Set-based, DB-native, per pool per matchweek: reads ONE number — the entry's `SUM(league_match_scores.total_points)` for that matchweek — compares the two sides of each duel, and pays 3 / 1 / 0 into `league_entry_totals.duel_points`, which then LEADS the shared rank cascade | **A layer, not a peer engine.** Because both depths price into the same column, it never learns whether it is sitting over Results or Scores — which is exactly what Decision 9 means by a layer. It refuses any pool whose `league_mode` is not `showdown` | ✅ **LIVE since 2026-08-24.** Migrations **083** (the fixture list + circle-method generator), **084** (scoring, the leading rank key, the settle trigger), **085** (a totals row for every entry). 🔴 **The pairing is a ROUND-ROBIN, overturning the concept note's random draw on gate 5** — who you happen to draw is our randomness, not the sport's. Ryan's call 2026-08-24. 🔴 **The draw is now SEALED, not published** — Ryan reversed the publishing half 2026-08-30; it opens one matchweek at a time (migrations **116–118**, committed `6d141b9`, ⛔ **NOT APPLIED**). The round-robin stands, so gate 5 is untouched; what changed is disclosure, and that resolves to a copy rule. 116 gates `league_duels` on `league_duel_is_revealed()` in LOCK time; 117 makes the generator call `league_open_matchweek` so the reveal line and the redraw line are one line; 118 permutes the round order per cycle, hashed from `(pool_id, cycle)`, never `random()`. ⚠ RLS defends the authenticated path only — `lib/league/poolCards.ts` reads duels with the service-role client and filters explicitly. Plan: `drafts/2026-08-30_showdown_sealed_draw_plan.md`. ⚠ It has scored **0 real entries**: no pool has `league_mode='showdown'`. ⚠ The concept's second tiebreak (lifetime H2H between tied players) is **not implemented** — it is pairwise and cannot be a sort key over one row. Verified by `scripts/verify-showdown.ts`, which asserts the round-robin property itself |
+| **Showdown layer** — `league_score_duels` + `league_generate_duel_schedule`, over `league_duels` | Set-based, DB-native, per pool per matchweek: reads ONE number — the entry's `SUM(league_match_scores.total_points)` for that matchweek — compares the two sides of each duel, and pays into `league_entry_totals.duel_points`, which then LEADS the shared rank cascade | **A layer, not a peer engine.** Because both depths price into the same column, it never learns whether it is sitting over Results or Scores — which is exactly what Decision 9 means by a layer. It refuses any pool whose `league_mode` is not `showdown` | ✅ **LIVE since 2026-08-24, materially extended through 2026-09-01.** Migrations **083** (the fixture list + circle-method generator), **084** (scoring, the leading rank key, the settle trigger), **085** (a totals row for every entry), **100** (a bye pays 1 and the absent side scores NULL), **116–118 ✅ APPLIED AND VERIFIED IN PRODUCTION 2026-08-30** (the sealed draw), **119** (one duel at a time), **120** (a postponement must not cost the reveal), **121 ✅ APPLIED** (⚠ **the scale changed: a duel is worth half a perfect week — 500/250/0, not 3/1/0**, and duel points now feed the season leaderboard), **122 ✅ APPLIED** (`pool_entries.last_recap_seen_at`), **123** (the reveal holds 48 h, later a day — 129), **127** (one answer to which duel is sealed), **128/129** (reveal timing). 🔴 **The pairing is a ROUND-ROBIN, overturning the concept note's random draw on gate 5** — who you happen to draw is our randomness, not the sport's. Ryan's call 2026-08-24. 🔴 **The draw is SEALED, not published** — Ryan reversed the publishing half 2026-08-30. 116 gates `league_duels` on `league_duel_is_revealed()` in LOCK time; 117 makes the generator call `league_open_matchweek` so the reveal line and the redraw line are one line; 118 permutes the round order per cycle, hashed from `(pool_id, cycle)`, never `random()`. Plan: `drafts/2026-08-30_showdown_sealed_draw_plan.md`. ⚠ RLS defends the authenticated path only — `lib/league/poolCards.ts` reads duels with the service-role client and filters explicitly. 🔴 **NEVER read the scale as a literal.** `headToHead` in `lib/league/duels.ts` compared `mine === 3` / `=== 1` until 2026-08-31 — the pre-121 scale — so from the first settled duel it would have scored **every meeting as a loss**, silently, and the Tale of the Tape would have read 0-0-N for everybody. Use `duelResult()`. 🔴 **And a second implementation still exists in the browser** — `DuelsTab.tsx:317`, `enginePoints?.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE`. 121 made this function the owner of that arithmetic; the fallback is the divergence the architecture rule exists to prevent. **R23**. ⚠ It has scored **0 real entries**: no production pool has `league_mode='showdown'`, because the wizard that creates one is undeployed (**R21**). Verified by `scripts/verify-showdown.ts`, which asserts the round-robin property itself. ⚠ The concept's second tiebreak (lifetime H2H between tied players) is **not implemented** — it is pairwise and cannot be a sort key over one row |
 | **Last Man Standing engine** — `league_lms_settle` + `league_lms_open_round`, over `league_lms_rounds` / `_survivors` / `_picks` | Set-based, DB-native, per pool per matchweek: judges one club per entry — WIN survives, draw or loss is out, no pick is out, and a fixture that never completed survives because you were not beaten. When one player is left the round closes, winners are stamped, `rounds_won` is recomputed from the record, and the next round opens with **everybody back in** | **Its own pick shape and no depth axis** (Decision 9). Repeating rounds are the design, not a variant: a single elimination is over in five or six matchweeks of thirty-eight, and a pool dead in September fails the purpose clause | ✅ **LIVE since 2026-08-24.** Migrations **086** (schema + the club-once-per-round rule + a MATCHWEEK-level lock), **087** (the engine, `rounds_won` leading the cascade, the settle trigger), **088** (the lock was guarding the engine's own result write — every eliminated pick stayed `result = NULL`). ⚠ It has scored **0 real entries**. ⚠ A late joiner enters the NEXT round, never the one running. Verified by `scripts/verify-last-man-standing.ts`, which plays all five outcomes against one set of fixtures |
 
 ### ⬜ Rename: "shadow" → World Cup scoring
@@ -1004,6 +1348,49 @@ registers are not decoration.
 ## ✅ Recently shipped
 
 > Completed and deployed to production. Kept here for visibility, then pruned once it's old news.
+>
+> ⚠️ **Read this heading carefully as of 2026-09-02.** *Deployed to production* means `origin/master`,
+> and `origin/master` has not moved since 24 August. Everything in the block immediately below is
+> **built, tested and on `Development`** — it is on this list because it is finished work, not
+> because a member can reach it. **R21** is the gap.
+
+### 🟡 Showdown, end to end — BUILT 2026-08-30 → 2026-09-02, ⛔ NOT DEPLOYED
+
+> Added 2026-09-02. **~150 commits in four days**, and this document had no entry for any of it. The
+> 2026-08-28 audit described a league backend with no front end; that is no longer the shape.
+
+- **The duel is the page.** One-page layout is the default (`?layout=tabs` rolls it back), headed by
+  a persistent `ShowdownBand` shell that survives every surface and collapses on scroll.
+- **The sealed draw, and a reveal worth waiting for.** You cannot see your opponent until you press
+  Reveal; the reveal is a **one-way door**; it holds a day after the last game (129) and lands at a
+  watchable hour (128). `DuelRevealCeremony` + `DuelRevealCorridor` are the walkout — out of the
+  tunnel, then 0-0 and a clock to the first game.
+- **A duel is worth half a perfect week** (121) — 500/250/0, replacing 3/1/0, and duel points now
+  feed the **season leaderboard** rather than a side table.
+- **The recap** — `DuelRecapSheet` + a decision page: the news headline, the banter quote (their last
+  word before kickoff), four lines on what decided it, shown once (122).
+- **Live without a deploy.** Migration **126** lets the engine score a live fixture without waiting
+  for one; **125** has the match tell the pool it moved, over broadcast; `/api/pools/[id]/duel-live`
+  is a purpose-built delta so the duel card's numbers move during a match instead of freezing at page
+  load. **124** is a SQL aggregate for the season charts — written the right way round.
+- **Banter became its own surface**, not a sheet — a floating button with an unread count, the page
+  frozen behind it, and the keyboard problem solved by moving the *page* rather than the sheet.
+- **Avatars, partially.** `components/ui/Avatar.tsx` is the shared circle, hashed from `user_id` so a
+  person is the same colour in the chat and on the card; faces are on the pool cards and the duel.
+  ⚠ This is **not** *Avatars v1* — there is still no Storage bucket, no `avatar_url` column and no
+  upload. It is the initials-and-gradient half, done once instead of four times.
+- **Last Man Standing** — the pick remembers the fixture it was judged on (115), and the card leads
+  with the week **in play** rather than the week open.
+- **A tester gate in the app, not at the edge** (`lib/testerGate.ts`) — dev.sportpool.io shares the
+  **production** Supabase project, so an unrecognised signup would create pools in the live database.
+  The load-bearing line is that it **refuses to arm on production** whatever the env var says.
+- **Verification:** the suite is **1,178 tests across 82 files, all green** (was 625 on 2026-08-28),
+  including new guards `denyAllTables.guard.test.ts`, `duelPoints.guard.test.ts`,
+  `bandStateOrder.guard.test.ts` and `duelRecap.guard.test.ts`.
+- ⚠ **What "built" does not cover, and it is the same caveat every time:** none of it has been
+  exercised by a member, because none of it is deployed. The three things this section is *known* to
+  be carrying are **R21** (the deploy gap), **R23** (the read path) and the 121-vs-`DuelsTab` scale
+  mismatch that is live in production right now.
 
 ### Shadow read-path cutover — all 623 pools `Infra` `Scoring` — SHIPPED 2026-07-28/29
 > Added 2026-07-30. **This document had no entry for it** — the largest change since the podium
@@ -1042,7 +1429,24 @@ registers are not decoration.
 
 ## 🔥 Now — active, can't wait
 
-### "Delete Pool" destroys every member's predictions `Bug` `Data-loss` 🔥
+### Account deletion destroys everything before it checks `Bug` `Data-loss` 🔥
+> ⚠️ **Retitled 2026-09-02. The Delete Pool half of this item is DONE** — the button is gone from
+> web (`app/pools/[pool_id]/admin/SettingsTab.tsx:1297`) and mobile
+> (`mobile/components/pool-detail/SettingsTab.tsx:128`), replaced by a reversible archive
+> (migrations 040/041/044, routes `/archive` and `/restore`), which is exactly the *archive, not
+> delete* decision of 2026-07-25. **R1 is closed.**
+>
+> 🔴 **What is left is the third bullet below, and it is a five-line fix that nobody has made.**
+> `app/api/account/delete/route.ts` destroys match scores, bonus scores, predictions, group
+> predictions, special predictions, player scores, entries and memberships at **lines 36–85**, and
+> only asks *"do you still administer a pool?"* at **line 94** — returning 400 **after** the
+> destruction. A pool admin who tries to delete their account keeps the account and loses every
+> prediction and every score in every pool. It also **bypasses `retired_at` entirely**, so R12's soft
+> delete does not defend this door. **Move the ownership check above line 36.** Tracked as **R22**.
+>
+> The original item is kept below as the record of the incident it came from.
+
+#### *(historic)* "Delete Pool" destroys every member's predictions
 - **Is:** `app/pools/[pool_id]/admin/SettingsTab.tsx:232-302` runs five un-transactional PostgREST deletes from the **browser**, predictions first. An RLS asymmetry makes it catastrophic: `predictions` DELETE is `is_pool_admin(pool_id)` (an admin can delete **everyone's**) while `pool_entries` has **no** admin DELETE policy, so step 2 silently deletes only the admin's own entry and **returns no error**. Any abort after step 1 leaves the pool alive with every member's predictions gone.
 - **Impact:** **6 pools / 41 entries already destroyed**, the earliest in June — this has been happening quietly for weeks. **Pools with an admin, one click away: 458 or 535** — 458 comes from the 2026-07-21 draft, 535 from a 2026-07-30 re-count (distinct `pool_id` with a `role='admin'` row). ⚠️ **The methods differ and the earlier one was never written down; both are recorded until someone reconciles them.** Risk is elevated post-tournament, when people tidy up pools.
 - ⚠️ **There is a second door, on mobile (added 2026-07-26; line corrected 2026-07-30).** `mobile/components/pool-detail/SettingsTab.tsx:223` runs its own `supabase.from('pools').delete().eq('pool_id', …)` — a different shape (one statement, relying on FK cascades) reached from the same admin Settings screen. It is **not** covered by the zero-deploy mitigation below, and "remove Delete Pool from admins entirely" is therefore **two** removals, not one. Whether the cascade completes or errors depends on FK definitions that are prod state — unverified.
@@ -1930,20 +2334,31 @@ must pass the disclosure gate in `CLAUDE.md` and the five gates in *Multi-sport 
 8*, of which the fifth is the binding one here: **all uncertainty must be inherited from the sporting
 event.** A mechanic that adds randomness of our own is gambling design whether or not money moves.
 
-**What is actually BUILT — updated 2026-08-28.** The whole grid is built and migrated. The column
-that matters now is not *built* but *deployed*: `origin/master` is 32 commits behind, so **every ✅
-below is running only on Ryan's machine.**
+**What is actually BUILT — updated 2026-09-02.** The whole grid is built and migrated. The column
+that matters is not *built* but *deployed*: `origin/master` is **225 commits behind** (was 32 on
+2026-08-28), so **every ✅ below is running only on `Development`.**
 
 | | Results (H/D/A) | Scores (exact goals) | Migrations |
 |---|---|---|---|
 | **Pick'em** | ✅ built, ⛔ undeployed | ✅ **LIVE in production** | 055/057/059/063, 064–066 |
-| **Showdown** | ✅ built, ⛔ undeployed | ✅ built, ⛔ undeployed | 083–085, 095, 100, **116–118 (sealed draw, unapplied)** |
-| **Last Man Standing** | ✅ built, ⛔ undeployed — its own pick shape, no depth axis | | 086–088, 097 |
-| **Table** | ✅ built, ✅ deadline rules LIVE | | 077–082, 089–093, ⛔098, 099, 104, 107 |
+| **Showdown** | ✅ built, ⛔ undeployed | ✅ built, ⛔ undeployed | 083–085, 095, 100, 116–118 (sealed draw, **applied**), 119, 120, **121** (duel points, applied), **122** (recap marker, applied), 123, 127, 128, 129 |
+| **Last Man Standing** | ✅ built, ⛔ undeployed — its own pick shape, no depth axis | | 086–088, 097, 115 |
+| **Table** | ✅ built, ✅ deadline rules LIVE | | 077–082, 089–093, ⛔098, 099, 104, 107, 109, 110, 112, 113, 114 |
 
 Only the **Scores** cell of Pick'em is reachable by a member today, and only because it is what the
 24 Aug code already did. Table is a standalone MODE, not the add-on this section originally called
 it — Decision 9 amended 2026-08-24.
+
+⚠ **The migration column now records apply status unevenly, and that is the honest state.** 111,
+116, 117, 118, 121 and 122 carry apply records; **119, 120, 123–129 do not, and this repo cannot
+tell you.** Establish it by hashing `prosrc` before the deploy — *"a migration file saying it was
+dumped from `pg_get_functiondef` is a claim, not evidence"* (*Migration files drift from
+production*), and *"absence of a record is not evidence of non-application"* (**R19**).
+
+🔴 **One of them is already biting.** Migration **121** makes a duel worth **500** and is applied in
+production; the deployed `DuelsTab` classifies anything that is not exactly **3 or 1** as a LOSS. The
+moment a duel settles, a member who won is shown a defeat. Raised in
+`drafts/2026-08-31_showdown_duel_points_plan.md` §9 **before** matchweek 2 settled; still true.
 
 🆕 **Full Table Prediction — added by Ryan 2026-08-24, ❌ not built.** Rank all 20 clubs before the
 season locks, set for the season, shown live against the real table. ⚠ It contradicts Decision 9's
@@ -2297,6 +2712,13 @@ The rest of Decision 7 stands, including the override log.
   failed at the RPC. ⚠ **Still unreachable in practice — no league cron is scheduled** (`cron.job` has
   no `league-notices`, `league-outbox` or `league-standings` entry). The producer works; nothing calls
   it. That is now the single highest-value thing left in this section.
+  > ⚠ **Still true 2026-09-02, and there is now a fourth.** `vercel.json` is still `{}`, and
+  > `app/api/cron/` holds **four** unscheduled league routes — `league-notices`, `league-outbox`,
+  > `league-standings` and `league-reconcile` (added 2026-08-28 for rescheduling). A route cannot be
+  > scheduled in `pg_cron` before it is **deployed**, so every one of these is downstream of **R21**.
+  > The schedule itself is drafted in `drafts/2026-08-28_league_cron_schedule.sql`; suggested
+  > `20 3 * * *` for `league-reconcile`. ⚠ Per **R19**, check **both** mechanisms before asserting any
+  > of them is unregistered.
 - ✅ **108 — APPLIED 2026-08-28.** `league_queue_matchweek_notices` had no `league_mode` predicate and
   none of the three consumers added one, so scheduling `league-notices` would have given every Table
   and Last Man Standing pool 38 weeks of *"you haven't picked yet"* — a reminder those modes can never
