@@ -140,20 +140,24 @@ export function LiveMatchCard({ match, onPress }: LiveMatchCardProps) {
   );
 }
 
+// ⚠ Square box + `contain`. `flag` also carries a club CREST, which is not 3:2
+// (150×150 usually, 78×150 for Liverpool), and the old 36×26 box cropped to fill
+// sliced the top and bottom off it. Full reasoning on `MatchResultRow`'s
+// `TeamMark`.
 function TeamColumn({ flag, code }: { flag: string | null; code: string }) {
   return (
     <View style={{ alignItems: 'center', gap: 4, width: 56 }}>
       {flag ? (
         <Image
           source={{ uri: flag }}
-          style={{ width: 36, height: 26, borderRadius: 2 }}
-          resizeMode="cover"
+          style={{ width: 36, height: 36 }}
+          resizeMode="contain"
         />
       ) : (
         <View
           style={{
             width: 36,
-            height: 26,
+            height: 36,
             borderRadius: 2,
             backgroundColor: 'rgba(255,255,255,0.1)',
           }}

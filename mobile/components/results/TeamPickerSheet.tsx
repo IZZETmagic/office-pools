@@ -220,18 +220,22 @@ export const TeamPickerSheet = forwardRef<TeamPickerSheetHandle, Props>(function
                 backgroundColor: pressed ? withOpacity(theme.colors.ink, 0.04) : 'transparent',
               })}
             >
+              {/* ⚠ Square box + `contain` — `flagUrl` also carries a club
+                  CREST, which is not 3:2, and the old 30×20 box cropped to fill
+                  cut the top and bottom off it. Reasoning in full on
+                  `MatchResultRow`'s `TeamMark`. */}
               {item.flagUrl ? (
                 <Image
                   source={{ uri: item.flagUrl }}
-                  style={{ width: 30, height: 20, borderRadius: 3 }}
-                  contentFit="cover"
+                  style={{ width: 30, height: 30 }}
+                  contentFit="contain"
                   cachePolicy="memory-disk"
                 />
               ) : (
                 <View
                   style={{
                     width: 30,
-                    height: 20,
+                    height: 30,
                     borderRadius: 3,
                     backgroundColor: theme.colors.mist,
                   }}

@@ -251,22 +251,29 @@ function formattedShortDate(iso: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function FlagView({ url, size = 64 }: { url: string | null | undefined; size?: number }) {
+/**
+ * The header's team mark — a flag or a club crest, both from `flagUrl`.
+ *
+ * ⚠ Square box + `contain`, for the reason written out in full on
+ * `components/results/MatchResultRow.tsx`'s `TeamMark`: a league fixture puts a
+ * crest that is not 3:2 through a field named after a flag, and a `cover` fit
+ * cropped it. At 64 this is the biggest mark in the app, so it was also the most
+ * obviously beheaded one.
+ */
+function TeamMark({ url, size = 64 }: { url: string | null | undefined; size?: number }) {
   const theme = useTheme();
-  const w = size;
-  const h = Math.round(size * 0.67);
   if (!url) {
     return (
       <View
-        style={{ width: w, height: h, borderRadius: 4, backgroundColor: theme.colors.mist }}
+        style={{ width: size, height: size, borderRadius: 4, backgroundColor: theme.colors.mist }}
       />
     );
   }
   return (
     <Image
       source={{ uri: url }}
-      style={{ width: w, height: h, borderRadius: 4 }}
-      contentFit="cover"
+      style={{ width: size, height: size }}
+      contentFit="contain"
       cachePolicy="memory-disk"
     />
   );
@@ -293,7 +300,7 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {/* Home team */}
         <View style={{ flex: 1, alignItems: 'center', gap: 8 }}>
-          <FlagView url={match.homeTeam?.flagUrl} />
+          <TeamMark url={match.homeTeam?.flagUrl} />
           <RNText
             numberOfLines={2}
             style={{
@@ -364,7 +371,7 @@ function MatchHeader({ match }: { match: ResultsMatch }) {
 
         {/* Away team */}
         <View style={{ flex: 1, alignItems: 'center', gap: 8 }}>
-          <FlagView url={match.awayTeam?.flagUrl} />
+          <TeamMark url={match.awayTeam?.flagUrl} />
           <RNText
             numberOfLines={2}
             style={{

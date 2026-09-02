@@ -86,17 +86,20 @@ function TeamSlot({
   const theme = useTheme();
   return (
     <View style={{ width: 48, alignItems: 'center', gap: 4 }}>
+      {/* ⚠ Square box + `contain` — `flagUrl` also carries a club CREST, which
+          is not 3:2, and the old 32×22 box cropped to fill cut the top and
+          bottom off it. Reasoning in full on `MatchResultRow`'s `TeamMark`. */}
       {team?.flagUrl ? (
         <Image
           source={{ uri: team.flagUrl }}
-          style={{ width: 32, height: 22, borderRadius: 3 }}
-          resizeMode="cover"
+          style={{ width: 32, height: 32 }}
+          resizeMode="contain"
         />
       ) : (
         <View
           style={{
             width: 32,
-            height: 22,
+            height: 32,
             borderRadius: 3,
             backgroundColor: theme.colors.mist,
             alignItems: 'center',
