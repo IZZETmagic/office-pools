@@ -254,7 +254,62 @@ Deliberately order-of-magnitude, and **B1 is the one that cannot be sized until 
 
 ---
 
+## Part C — Last Man Standing settles a week late
+
+Added 2026-09-02 after walking the flow mode by mode. **LMS is the one mode whose timing does not
+match the spec.** Table, Pick'em and Showdown all do.
+
+**Today:** `trg_league_settle_lms` fires on `league_matchweeks.ranks_snapshot_at`, which only goes
+non-NULL when every fixture in the matchweek is played *and* scored. So a member whose club lost at
+3pm on Saturday is told on Monday night.
+
+**Wanted:** judged at the final whistle of their own club's game.
+
+### The rule is already right — except one case
+
+Read from `league_lms_settle`:
+
+| Case | Code | Spec |
+|---|---|---|
+| No pick | out | — |
+| Picked club has no completed fixture this matchweek | **survives** (*"not beaten"*) | ✅ still in |
+| Picked club won | survives | ✅ still in |
+| Picked club lost | out | ✅ out |
+| Picked club **drew** | **out** | ⚠ **not stated — needs a ruling** |
+
+A draw is a legitimate football result, and at the ~65–70% weekly survival rate the design assumes,
+eliminating on draws roughly doubles the weekly cull. Whichever way it goes it should be written down,
+because it is the difference between a round lasting four weeks and eight.
+
+### ⚠ The trap: elimination and round-closure are not the same event
+
+`league_lms_settle` also **closes the round** when one player is left (`IF v_left <= 1`), stamps
+winners, recomputes `rounds_won`, and opens the next round with everybody back in.
+
+Judge progressively and a Saturday 3pm result can take the field from 3 to 1 — **closing the round and
+crowning a winner whose own club plays on Monday.** That is worse than settling late.
+
+So the change is **not** moving the trigger. It is splitting one function into two events:
+
+| Event | When | Does |
+|---|---|---|
+| **Eliminate** | each fixture's final whistle | judges only the entries whose picked club played in *that* fixture |
+| **Close the round** | matchweek complete — where it is today | counts survivors, stamps winners, opens the next round |
+
+Which also means the elimination arm can hang off `league_fixtures` directly (alongside
+`score_league_fixture_on_change`) rather than off the matchweek snapshot, and the closure arm stays on
+`ranks_snapshot_at`.
+
+⚠ Keep the two existing guards when splitting: a matchweek with **no fixtures** must not eliminate
+anybody (migration 106 — it once eliminated all ten members of a pool in production), and a matchweek
+**before the pool existed** must not either (`IF p_matchweek < v_first`).
+
+**Size:** ~1 day, plus the draw ruling. Independent of the deploy and of Part B.
+
+---
+
 ## What I need from you
+
 
 1. **A3 — full-time or a live overlay for Table mode?** Recommendation: ship full-time now, decide the
    overlay separately.

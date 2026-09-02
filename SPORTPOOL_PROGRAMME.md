@@ -1267,6 +1267,73 @@ surface:
 | **Showdown layer** — `league_score_duels` + `league_generate_duel_schedule`, over `league_duels` | Set-based, DB-native, per pool per matchweek: reads ONE number — the entry's `SUM(league_match_scores.total_points)` for that matchweek — compares the two sides of each duel, and pays into `league_entry_totals.duel_points`, which then LEADS the shared rank cascade | **A layer, not a peer engine.** Because both depths price into the same column, it never learns whether it is sitting over Results or Scores — which is exactly what Decision 9 means by a layer. It refuses any pool whose `league_mode` is not `showdown` | ✅ **LIVE since 2026-08-24, materially extended through 2026-09-01.** Migrations **083** (the fixture list + circle-method generator), **084** (scoring, the leading rank key, the settle trigger), **085** (a totals row for every entry), **100** (a bye pays 1 and the absent side scores NULL), **116–118 ✅ APPLIED AND VERIFIED IN PRODUCTION 2026-08-30** (the sealed draw), **119** (one duel at a time), **120** (a postponement must not cost the reveal), **121 ✅ APPLIED** (⚠ **the scale changed: a duel is worth half a perfect week — 500/250/0, not 3/1/0**, and duel points now feed the season leaderboard), **122 ✅ APPLIED** (`pool_entries.last_recap_seen_at`), **123** (the reveal holds 48 h, later a day — 129), **127** (one answer to which duel is sealed), **128/129** (reveal timing). 🔴 **The pairing is a ROUND-ROBIN, overturning the concept note's random draw on gate 5** — who you happen to draw is our randomness, not the sport's. Ryan's call 2026-08-24. 🔴 **The draw is SEALED, not published** — Ryan reversed the publishing half 2026-08-30. 116 gates `league_duels` on `league_duel_is_revealed()` in LOCK time; 117 makes the generator call `league_open_matchweek` so the reveal line and the redraw line are one line; 118 permutes the round order per cycle, hashed from `(pool_id, cycle)`, never `random()`. Plan: `drafts/2026-08-30_showdown_sealed_draw_plan.md`. ⚠ RLS defends the authenticated path only — `lib/league/poolCards.ts` reads duels with the service-role client and filters explicitly. 🔴 **NEVER read the scale as a literal.** `headToHead` in `lib/league/duels.ts` compared `mine === 3` / `=== 1` until 2026-08-31 — the pre-121 scale — so from the first settled duel it would have scored **every meeting as a loss**, silently, and the Tale of the Tape would have read 0-0-N for everybody. Use `duelResult()`. ⚠ **A THIRD site, found 2026-09-02 and uncommitted in the working tree at the time of writing:** `lib/league/poolCards.ts` tested `=== 3` / `=== 1` for four days after 121, so the pool card showed a member who had **won** as a defeat with a red form dot, while the Duel pts tile beside it read the stored 500 and the leaderboard had them going up. Nine duels had settled in production carrying 500/250/0. **Nothing errored.** That is three sites for one constant — the guard beside `duelPoints` now scans every reader rather than one function. 🔴 **And a second implementation still exists in the browser** — `DuelsTab.tsx:317`, `enginePoints?.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE`. 121 made this function the owner of that arithmetic; the fallback is the divergence the architecture rule exists to prevent. **R23**. ⚠ It has scored **0 real entries**: no production pool has `league_mode='showdown'`, because the wizard that creates one is undeployed (**R21**). Verified by `scripts/verify-showdown.ts`, which asserts the round-robin property itself. ⚠ The concept's second tiebreak (lifetime H2H between tied players) is **not implemented** — it is pairwise and cannot be a sort key over one row |
 | **Last Man Standing engine** — `league_lms_settle` + `league_lms_open_round`, over `league_lms_rounds` / `_survivors` / `_picks` | Set-based, DB-native, per pool per matchweek: judges one club per entry — WIN survives, draw or loss is out, no pick is out, and a fixture that never completed survives because you were not beaten. When one player is left the round closes, winners are stamped, `rounds_won` is recomputed from the record, and the next round opens with **everybody back in** | **Its own pick shape and no depth axis** (Decision 9). Repeating rounds are the design, not a variant: a single elimination is over in five or six matchweeks of thirty-eight, and a pool dead in September fails the purpose clause | ✅ **LIVE since 2026-08-24.** Migrations **086** (schema + the club-once-per-round rule + a MATCHWEEK-level lock), **087** (the engine, `rounds_won` leading the cascade, the settle trigger), **088** (the lock was guarding the engine's own result write — every eliminated pick stayed `result = NULL`). ⚠ It has scored **0 real entries**. ⚠ A late joiner enters the NEXT round, never the one running. Verified by `scripts/verify-last-man-standing.ts`, which plays all five outcomes against one set of fixtures |
 
+### 🔁 Update flow, mode by mode — what the code does (2026-09-02)
+
+> Written after Ryan set out the expected flow per mode. Every row is read from the live function
+> bodies in production, not from this document. **Three of four match the spec; one does not.**
+
+**The shared spine.** A goal reaches us through `api-football-sync` (jobid 8, every minute), which
+writes `league_fixtures`. Everything below hangs off that one write:
+
+```
+league_fixtures UPDATE
+├─ score_league_fixture_upd  → league_score_fixture      ⟵ fires on a GOAL (063: "every goal re-scores it")
+│   ├─ league_match_scores                                 per-fixture points, live
+│   ├─ league_finalize_ranks                               rank cascade, live
+│   └─ league_snapshot_matchweek_ranks                     ONLY when the mw is fully played AND fully scored
+│        └─ league_matchweeks.ranks_snapshot_at → trg_league_settle_duels + trg_league_settle_lms
+├─ broadcast_league_fixtures → score/status/minute pushed, no fetch
+└─ (on completion) syncLeagueStandings → league_standings → 131 → league_after_standings_change
+                                                                   └─ league_score_table
+league_entry_totals UPDATE → broadcast_pool_leaderboard → totals + ranks pushed, no fetch
+```
+
+| Mode | Expected | What the code does | |
+|---|---|---|---|
+| **Table** (drag the 20 into finishing order) | Recalculate at the **final whistle of each game**, off the new table positions | Standings are re-fetched only when a fixture **completes** (`res.changed.some(c => c.is_completed)`), which fires migration **131** → `league_after_standings_change` → `league_score_table` for every table pool in that season | ✅ **matches** |
+| **Pick'em** (Results or Scores) | **Live** — goal → recalculate → leaderboard moves | `league_score_fixture` accepts `status IN ('live','completed')` and re-scores on every goal; `league_finalize_ranks` runs in the same call; both totals and ranks go out on the broadcast payload | ✅ **matches** |
+| **Showdown** | Same as Pick'em — live | Identical, plus the duel: the **running scoreline is live** (summed from `league_match_scores`), and the **500 / 250 / 0 settles at matchweek end**, which is the earliest the result exists | ✅ **matches** |
+| **Last Man Standing** | At the **final whistle of each game**, judge that game's pickers | Settles **once per matchweek**, when every fixture in it is played *and* scored (`trg_league_settle_lms` on `ranks_snapshot_at`) | ❌ **does not match** |
+
+#### The LMS gap, and the trap inside it
+
+The elimination rule itself already agrees with the spec — read from `league_lms_settle`:
+
+| Case | Code | Spec |
+|---|---|---|
+| No pick | out | — |
+| Picked club has **no completed fixture** this matchweek | **survives** — *"not beaten"* | ✅ still in |
+| Picked club **won** | survives | ✅ still in |
+| Picked club **lost** | out | ✅ out |
+| Picked club **drew** | **OUT** | ⚠ not stated |
+
+⚠ **The draw is the one genuinely open rule.** The code eliminates on a draw; the spec named only won
+and lost. It is a real product call — a draw is a legitimate football result, and at ~65–70% weekly
+survival the difference compounds fast over a 38-week season.
+
+⚠⚠ **And per-whistle settling has a trap that matchweek-settling does not.** `league_lms_settle`
+closes the round when one player is left (`IF v_left <= 1`), stamps the winners, and opens the next
+round with everybody back in. Judge progressively and a Saturday 3pm result can take the field from 3
+to 1 — **closing the round and crowning a winner whose own club plays on Monday.**
+
+So the change is **not** "move the trigger". It is:
+
+- **eliminate** progressively, at each fixture's final whistle — which is the drama the spec is asking
+  for, and is what makes a Saturday afternoon mean something;
+- **close the round** only when the matchweek is complete, exactly where it happens today.
+
+Two events out of one function, which is why this needs its own slice rather than a one-line trigger
+move.
+
+#### One delivery gap, on a mode that otherwise matches
+
+Showdown's **per-fixture breakdown** — *"that fixture leans toward you"* — is the one number that does
+not ride the broadcast. `broadcast_pool_leaderboard` carries totals and ranks; per-fixture points come
+from a debounced `/api/pools/:id/duel-live` fetch, 1.5–5.5 s after the goal, **per viewer**. It works,
+and it is the last per-goal round trip in the league path. The engine has just computed those numbers,
+so carrying them in the existing message removes the fetch from web and RN at once — and it should
+land **before** RN ships, or RN inherits the round trip.
+
 ### 🔬 Engine audit — 2026-09-02: is every engine in Supabase, and does it move on a goal?
 
 > Asked by Ryan: *"check all of the scoring engines and that they are all on supabase like the shadow
@@ -2956,9 +3023,15 @@ in-flight fixture deltas onto the ingested standings.
 
 - **Full time is what ships.** A table pool's score moves when games finish, which is what every
   league table anyone has ever looked at does.
-- ⚠ **This is not the same as saying nothing is live.** The pool's *leaderboard* still moves on the
-  goal, because Pick'em accuracy and duel points do. It is the **table-derived bonus** that waits for
-  the whistle.
+- ⚠ **Table is a STANDALONE MODE, not a bonus on top of something.** Decision 9's "add-on" framing was
+  overturned 2026-08-24 and must not creep back — a table pool has no fixtures to be right about and
+  no accuracy score; its *only* points are the finishing-order ones. The column that stores them is
+  named `bonus_points`, which is a schema artefact of reusing rung 4 of the shared cascade, **not** a
+  statement about the product. Corrected 2026-09-02 after this decision was first written with the
+  old wording.
+- **So "full time" is the whole mode, not part of it.** Nothing in a table pool moves on a goal,
+  because nothing in a table pool is about a goal. This is unlike Pick'em and Showdown, where the
+  leaderboard genuinely does move mid-match.
 - **The overlay is not rejected, it is deferred**, and it is a mode design change rather than a fix.
   If it is ever built, the shape is already set by Showdown: keep the **ingested** table as the source
   of truth — *Decision 9's league standings are ingested, not derived, because a derived table cannot
@@ -2981,9 +3054,12 @@ needs it) could be done as **web patches** or as a **shared read contract**. Rya
   optimisation on the way to the RN build, it **is** the RN build's first step.
 - **It fixes the web at the same time.** `readLeaguePoolView` pages all 380 fixtures — 175 kB — per
   request, per viewer, outside the cache, whichever tab is open. Done once, both surfaces get it.
-- *Why the alternative was rejected:* two surfaces solving the same problem separately is precisely
-  how they came to disagree about a member's level (fixed 2026-07-29), and that bug is described in
-  this document as **structural, not a slip**.
+- *Why the alternative was rejected:* the contract is not an optimisation with a nice-to-have second
+  consumer — **without it there is no RN league build at all**, so building the web half twice means
+  building the wrong half first. ⚠ An earlier draft of this decision justified it by pointing at the
+  two surfaces disagreeing about a member's XP **level**; that was a World Cup Form-tab number and has
+  no bearing on any league mode. Corrected 2026-09-02 — the reason above is the real one and it needs
+  no analogy.
 - **The season is the cacheable object, not the pool** — ~197 kB, identical for every viewer of every
   pool on that season, invalidated from the sync's own `changed` array and **never a TTL**. The
   per-viewer half stays uncached: the median pool has one member, so there is nobody to share it with.
