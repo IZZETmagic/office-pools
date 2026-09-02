@@ -22,6 +22,7 @@ import { notFound } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ShowdownBand } from '../../pools/[pool_id]/ShowdownBand'
+import { Countdown } from '../../pools/[pool_id]/DuelsTab'
 import { DuelRevealCeremony, type RevealOpponent } from '../../pools/[pool_id]/DuelRevealCeremony'
 import type { AvatarPerson } from '@/components/ui/Avatar'
 
@@ -156,27 +157,27 @@ export default function Page() {
                   refresh would have caused. */}
               <Countdown to={target} onExpire={() => setState('revealed')} />
             </span>
-          ) : seen ? (
+          ) : null
+        }
+        /* ⚠ ONE SLOT, TWO TENANTS: the button that fills the empty circle
+           before the walkout, the scoreline between two known faces after it.
+           The reveal is a one-way door — no Replay (Ryan, 2026-09-02). */
+        between={
+          state !== 'revealed' ? undefined : seen ? (
             /* The open week has not locked, so nobody has kicked anything. */
-            <>
+            <span className="t-num t-num-black text-white whitespace-nowrap">
               <span>0</span>
               <span className="text-white/30 mx-2.5">–</span>
               <span>0</span>
-            </>
-          ) : null
-        }
-        /* ⚠ NOTHING BETWEEN THE FACES ONCE YOU HAVE MET THEM (Ryan,
-           2026-09-02). The reveal is a one-way door; after it the band is an
-           ordinary duel. */
-        action={
-          state === 'revealed' && !seen ? (
+            </span>
+          ) : (
             <button
               onClick={() => setCeremonyOpen(true)}
               className="rounded-chip bg-white/15 hover:bg-white/25 px-5 py-2 text-2xl font-extrabold text-white transition"
             >
               Reveal
             </button>
-          ) : undefined
+          )
         }
         sub={
           state === 'inplay'
@@ -280,30 +281,3 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   )
 }
 
-/**
- * ⚠ A LOCAL COPY, and only because `Countdown` is not exported from DuelsTab.
- * The shipped one is the authority; this exists so the harness can show the
- * shape of the sealed state without exporting something for a dev page's sake.
- */
-function Countdown({ to, onExpire }: { to: string; onExpire?: () => void }) {
-  const [now, setNow] = useState(() => Date.now())
-  const expire = useRef(onExpire)
-  useEffect(() => { expire.current = onExpire })
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [])
-  // ⚠ Fired from an effect, not from the render body — calling a parent's
-  // setState while rendering is the "Cannot update a component while rendering
-  // a different component" warning, and eslint stops it here anyway.
-  const done = new Date(to).getTime() - now <= 0
-  useEffect(() => { if (done) expire.current?.() }, [done])
-  const left = Math.max(0, new Date(to).getTime() - now)
-  const d = Math.floor(left / 86_400_000)
-  const h = Math.floor((left % 86_400_000) / 3_600_000)
-  const m = Math.floor((left % 3_600_000) / 60_000)
-  const sec = Math.floor((left % 60_000) / 1000)
-  if (d > 0) return <>{d}d {h}h</>
-  if (h > 0) return <>{h}h {m}m</>
-  return <>{m}m {String(sec).padStart(2, '0')}s</>
-}

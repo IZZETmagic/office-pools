@@ -72,24 +72,27 @@ export type ShowdownBandProps = {
    */
   headline: React.ReactNode
   /**
-   * The thing you PRESS, on the V's line between the two faces.
+   * Whatever belongs ON THE LINE BETWEEN THE TWO FACES.
    *
-   * ⚠ A SECOND SLOT, NOT A PLACE THE HEADLINE MOVES TO. It began as
-   * `headlineAt: 'top' | 'between'` — one piece of content, two positions —
-   * which could not express the state Ryan asked for next: *"after the reveal
-   * the 0-0 score should be up and then under that a countdown until the first
-   * game"*. That wants a reading at the top AND a button between the faces, at
-   * the same time, and a single slot cannot hold both.
+   * ⚠ NAMED FOR THE POSITION, NOT THE PURPOSE, and that was a correction. It
+   * was `action` while the only thing it held was a Reveal button, which read
+   * as "the thing you press" — then Ryan, 2026-09-02: *"the scores should be
+   * between the two avatars."* A scoreline is not an action. The band places;
+   * it does not know what it is placing.
    *
    * ⚠ IT TAKES THE V'S PLACE. Only one of the two is ever drawn — the V says
-   * "you against them" while the far corner is still a question mark; the
-   * button is how you fill that corner. Both at once stacks a 48px control on
-   * a 16px letter.
+   * "you against them" while the far corner is still a question mark, and both
+   * at once stacks a scoreline on a 16px letter.
+   *
+   * ⚠ IT INHERITS THE HEADLINE'S TYPE SCALE (see `M.mid.fontSize`), so a score
+   * dropped in here is the same size it would be at the top and shrinks with
+   * the collapse. A child carrying its own size — the Reveal button's
+   * `text-2xl` — overrides that and is unaffected.
    *
    * ⚠ NO EFFECT FROM `md` UP, where `.sd-d` already runs face | middle | face
-   * and the button simply joins the middle column.
+   * and this simply joins the middle column.
    */
-  action?: React.ReactNode
+  between?: React.ReactNode
   /**
    * One quiet line under the headline.
    *
@@ -181,7 +184,11 @@ const M = {
    */
   mid:   { top: 'calc(146px - 114px * var(--p))',
            height: 'calc(72px - 36px * var(--p))',
-           left: 0, right: 0 },
+           left: 0, right: 0,
+           // ⚠ THE SAME SCALE AS `big`, so a scoreline is the same size here as
+           // it would be at the top and shrinks identically on collapse. The
+           // Reveal button sets its own `text-2xl` and ignores this.
+           fontSize: 'calc(40px - 18px * var(--p))' },
   /**
    * ⚠ EACH NAME SHARES ITS AVATAR'S EDGE, in the same units.
    *
@@ -244,7 +251,8 @@ const M_BETWEEN = {
   face:    { top: 'calc(92px - 60px * var(--p))',
              width: 'calc(72px - 36px * var(--p))', height: 'calc(72px - 36px * var(--p))' },
   mid:     { top: 'calc(92px - 60px * var(--p))',
-             height: 'calc(72px - 36px * var(--p))', left: 0, right: 0 },
+             height: 'calc(72px - 36px * var(--p))', left: 0, right: 0,
+             fontSize: 'calc(40px - 18px * var(--p))' },
   whoYou:  { top: '178px', left:  'calc(38px - 22px * var(--p))',
              width: '44%', textAlign: 'left' as const },
   whoThem: { top: '178px', right: 'calc(38px - 22px * var(--p))',
@@ -295,7 +303,7 @@ function Face({
 }
 
 export function ShowdownBand({
-  header, matchweek, youEntry, themEntry, name, person, headline, sub, action,
+  header, matchweek, youEntry, themEntry, name, person, headline, sub, between,
   liveNow = false, strip = [], rank, points,
 }: ShowdownBandProps) {
   const bandRef = useRef<HTMLDivElement>(null)
@@ -500,13 +508,13 @@ export function ShowdownBand({
             is ever drawn. The V says "you against them" while the other corner
             is still a question mark; the button says "find out who". Rendering
             both stacks a 48px control on a 16px letter. */}
-        {sealed && !action &&
+        {sealed && !between &&
           <p className="sd-vee t-caption text-accent-400 text-base select-none" style={L.vee}>V</p>}
-        {action && (
+        {between && (
           <div className="absolute grid place-items-center pointer-events-none" style={L.mid}>
             {/* ⚠ Re-enabled on the child. The wrapper spans the full band width
                 and would otherwise swallow taps meant for either face. */}
-            <div className="pointer-events-auto">{action}</div>
+            <div className="pointer-events-auto">{between}</div>
           </div>
         )}
 
@@ -541,7 +549,7 @@ export function ShowdownBand({
               already face | middle | face, so "between the faces" is where this
               column IS — the phone's absolute mid-slot exists only because the
               phone stacks. */}
-          {action && <div className="sd-big-d">{action}</div>}
+          {between && <div className="sd-big-d">{between}</div>}
           {sub && <p className="sd-sub-d t-detail text-white/45">{sub}</p>}
           {liveNow && (
             <p className="sd-sub-d t-detail">

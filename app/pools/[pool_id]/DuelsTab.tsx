@@ -237,7 +237,7 @@ type Side = { entry: string; points: number | null; accuracy: number | null }
  * client render, and React keeps the server text rather than reconciling it.
  * So it renders nothing until mounted, then ticks.
  */
-function Countdown({ to, onExpire }: { to: string; onExpire?: () => void }) {
+export function Countdown({ to, onExpire }: { to: string; onExpire?: () => void }) {
   const [text, setText] = useState('')
   // ⚠ THE CALLBACK LIVES IN A REF, not the dependency array. Callers pass an
   // inline arrow, which is a new function every render — in the deps it tears
@@ -1391,13 +1391,19 @@ export default function DuelsTab({
               themEntry={revealSeen ? open.them?.entry ?? null : null}
               name={name} person={person}
               header={bandHeader}
-              /* ⚠ NOTHING AT THE TOP UNTIL YOU HAVE MET THEM. Before the
-                 walkout the band is one question — who — and a scoreline above
-                 it is furniture around an empty circle. `null` here also picks
-                 the shorter phone layout, so the band closes up rather than
-                 leaving a hole where a reading would have gone.
+              /* ⚠ NOTHING AT THE TOP IN THIS STATE, EITHER SIDE OF THE WALKOUT.
+                 Before it the band is one question — who — and a scoreline
+                 above an empty circle is furniture. After it the scoreline
+                 exists but belongs BETWEEN the faces, not over them: Ryan,
+                 2026-09-02, on the first build of this, *"post reveal this has
+                 gone awry — the scores should be between the two avatars."* A
+                 score with a name either side of it is a scoreboard; the same
+                 score stacked above two faces is a caption.
 
-                 ⚠ AND AFTERWARDS IT IS 0–0, WRITTEN AS A FACT, NOT LOOKED UP.
+                 `null` also picks the shorter phone layout, so the band closes
+                 up instead of holding 54px open for a reading that moved.
+
+                 ⚠ THE 0–0 ITSELF IS WRITTEN AS A FACT, NOT LOOKED UP.
                  Ryan, 2026-09-02: *"after the reveal the 0-0 score should be
                  up."* The open matchweek is BY DEFINITION the one that has not
                  locked, so no fixture in it has kicked off and neither side has
@@ -1412,13 +1418,7 @@ export default function DuelsTab({
                  week's matchweek number. Reaching for a number that is only
                  usually right is exactly the second-opinion bug this band's
                  header warns about. */
-              headline={revealSeen ? (
-                <>
-                  <span>0</span>
-                  <span className="text-white/30 mx-2.5">–</span>
-                  <span>0</span>
-                </>
-              ) : null}
+              headline={null}
               /* ⚠ THE FIRST GAME, NOT THE DEADLINE. Checked against the real
                  fixture list: `lock_at` runs an hour BEFORE the first kickoff
                  (matchweek 3 locks 18:00, kicks off 19:00), so counting down to
@@ -1452,7 +1452,17 @@ export default function DuelsTab({
                  not drawn either (the opponent is known, so `sealed` is false),
                  and the space between the faces is simply empty, exactly as it
                  is for a matchweek in play. */
-              action={revealSeen ? undefined : (
+              /* ⚠ ONE SLOT, TWO TENANTS, NEVER BOTH — and they cannot collide
+                 because they are the same state before and after the walkout.
+                 Before: the button that fills the empty circle. After: the
+                 score between two known faces. */
+              between={revealSeen ? (
+                <span className="t-num t-num-black text-white whitespace-nowrap">
+                  <span>0</span>
+                  <span className="text-white/30 mx-2.5">–</span>
+                  <span>0</span>
+                </span>
+              ) : (
                 revealOpponent ? (
                   <button
                     onClick={() => setCeremonyOpen(true)}

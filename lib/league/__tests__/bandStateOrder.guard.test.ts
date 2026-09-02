@@ -88,12 +88,16 @@ describe('the showdown band picks its state in the right order', () => {
     expect(revealAt).toBeLessThan(sealedAt)
   })
 
-  it('offers no action once the walkout has been seen', () => {
-    // The whole of Ryan's 2026-09-02 ask, in one assertion: the action slot is
-    // gated on NOT having seen the reveal. Without this the band would keep
-    // rendering a button over a duel that has already been introduced.
+  it('replaces the button with the scoreline once the walkout has been seen', () => {
+    // Ryan's 2026-09-02 asks, in one place: no Replay after the reveal, and the
+    // score sits BETWEEN the two avatars rather than stacked above them. Both
+    // land on the same slot, so both are checked here.
     const chain = bandChain()
-    expect(chain, 'the action slot is no longer gated on revealSeen')
-      .toMatch(/action=\{revealSeen \? undefined : \(/)
+    expect(chain, 'the between slot is no longer keyed on revealSeen')
+      .toMatch(/between=\{revealSeen \? \(/)
+    // And what it holds after the walkout is a SCORE, not another button.
+    const after = chain.slice(chain.indexOf('between={revealSeen ? ('))
+    expect(after.slice(0, after.indexOf(') : (')), 'a button came back after the reveal')
+      .not.toMatch(/<button/)
   })
 })
