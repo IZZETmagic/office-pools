@@ -23,13 +23,13 @@
 // leaderboard.
 // =============================================================
 
-import { useState, useCallback, useMemo, useId, useRef, useEffect } from 'react'
+import { useState, useCallback, useMemo, useId, useRef, useEffect, type ReactNode, type MouseEventHandler } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -152,20 +152,42 @@ type RowProps = {
   conferenceTo: number | null
 }
 
-/** The row's appearance, with no drag wiring — safe to render on the server. */
-function ClubRowInner({ club, position, band }: { club: SeasonClub; position: number; band: string | null }) {
+/**
+ * The grip's box. Shared by the inert row and the live one so nothing shifts
+ * when the list becomes draggable at mount.
+ *
+ * ⚠ WHY THERE IS A HANDLE AT ALL. The whole row used to be the drag activator,
+ * with `touch-none` on it — and twenty rows are taller than a phone, so every
+ * touch on the screen landed on an element the browser had been told never to
+ * scroll from. Dragging was excellent and scrolling was impossible. Now
+ * `touch-none` lives on the grip alone (see SortableClubRow): a finger on the
+ * grip drags, a finger anywhere else scrolls, and the browser decides which at
+ * touchstart from the element under it.
+ *
+ * The icon stays 16px, but the box is the full row height and 40px wide — the
+ * padding is pulled back in with negative margins, so the icon sits where a
+ * plain icon would and the extra is all hit area. A thumb needs that; a 16px
+ * target is a coin toss.
+ */
+const HANDLE_BASE = 'shrink-0 flex items-center self-stretch -my-2.5 px-3 -mx-2.5 rounded-lg text-neutral-400 select-none'
+
+/**
+ * The row's appearance, with no drag wiring — safe to render on the server.
+ * `handle` is the grip: an inert span before mount, a real button after.
+ */
+function ClubRowInner({ club, position, band, handle }: { club: SeasonClub; position: number; band: string | null; handle: ReactNode }) {
   return (
     <>
       <span className={`w-[3px] h-7 rounded-full shrink-0 ${band ? BAND_STRIPE[band] : 'bg-transparent'}`} aria-hidden="true" />
       <span className="w-6 text-sm font-bold text-neutral-900 tabular-nums shrink-0">{position}</span>
       {club.crest_url && <img src={club.crest_url} alt="" className="w-6 h-6 object-contain shrink-0" />}
       <span className="flex-1 min-w-0 text-sm font-semibold text-neutral-900 truncate">{club.club_name}</span>
-      <Icon name="grip.vertical" size={16} className="text-neutral-300 shrink-0" />
+      {handle}
     </>
   )
 }
 
-const ROW_BASE = 'flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl border transition-colors touch-none'
+const ROW_BASE = 'flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl border transition-colors'
 
 /**
  * The server-rendered row: identical to look at, inert.
@@ -188,14 +210,40 @@ function StaticClubRow({ club, position, clubCount, topN, relegationN, europaFro
   const band = bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo, conferenceFrom, conferenceTo)
   return (
     <div className={`${ROW_BASE} ${band ? BAND_ROW[band] : 'bg-surface-raised border-border-default'}`}>
-      <ClubRowInner club={club} position={position} band={band} />
+      <ClubRowInner
+        club={club}
+        position={position}
+        band={band}
+        handle={
+          <span className={HANDLE_BASE} aria-hidden="true">
+            <Icon name="grip.vertical" size={16} />
+          </span>
+        }
+      />
     </div>
   )
 }
 
 function SortableClubRow({ club, position, clubCount, topN, relegationN, europaFrom, europaTo, conferenceFrom, conferenceTo }: RowProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: club.club_id })
+
+  /**
+   * ⚠ THE ACTIVATORS ARE SPLIT BY INPUT, AND THIS IS THE WHOLE FIX.
+   *
+   * `listeners` is one handler per sensor, keyed by event name — onMouseDown
+   * from MouseSensor, onTouchStart from TouchSensor, onKeyDown from
+   * KeyboardSensor. The mouse handler stays on the row, so at a desk you still
+   * grab a club anywhere along it (a wheel scrolls; there was never a conflict).
+   * Touch and keyboard go on the grip, which is the only element with
+   * `touch-none`: on a phone the grip drags and the rest of the row scrolls.
+   *
+   * `attributes` (role, tabIndex, the aria-describedby that points at dnd-kit's
+   * screen-reader instructions) belong with the keyboard handler, on the grip,
+   * and `setActivatorNodeRef` tells dnd-kit that is where focus returns to
+   * after a keyboard move.
+   */
+  const { onMouseDown, ...handleListeners } = listeners ?? {}
 
   const band = bandOf(position, clubCount, topN, relegationN, europaFrom, europaTo, conferenceFrom, conferenceTo)
 
@@ -205,10 +253,25 @@ function SortableClubRow({ club, position, clubCount, topN, relegationN, europaF
       style={{ transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : undefined }}
       className={`${ROW_BASE}
         ${isDragging ? 'bg-primary-50 border-primary-300 shadow-lg opacity-90' : band ? BAND_ROW[band] : 'bg-surface-raised border-border-default'}`}
-      {...attributes}
-      {...listeners}
+      onMouseDown={onMouseDown as MouseEventHandler<HTMLDivElement> | undefined}
     >
-      <ClubRowInner club={club} position={position} band={band} />
+      <ClubRowInner
+        club={club}
+        position={position}
+        band={band}
+        handle={
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            className={`${HANDLE_BASE} touch-none cursor-grab active:cursor-grabbing hover:text-neutral-600`}
+            aria-label={`Reorder ${club.club_name}`}
+            {...attributes}
+            {...handleListeners}
+          >
+            <Icon name="grip.vertical" size={16} />
+          </button>
+        }
+      />
     </div>
   )
 }
@@ -321,9 +384,23 @@ export default function TablePredictionTab({
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
 
+  /**
+   * ⚠ MOUSE AND TOUCH ARE SEPARATE SENSORS ON PURPOSE.
+   *
+   * This was PointerSensor + TouchSensor. PointerSensor never looks at
+   * pointerType, so on a phone it fired on the same touch: 4px of finger travel
+   * activated it and the TouchSensor's 250ms hold beneath it never ran. That is
+   * why dragging on mobile felt instant — and, with `touch-none` on every row,
+   * why the page could not be scrolled at all. Two sensors let the row take the
+   * mouse and the grip take the finger; see SortableClubRow.
+   *
+   * No hold delay on touch: the grip has `touch-none`, so a touch there cannot
+   * be the start of a scroll and there is nothing to wait and disambiguate. The
+   * 4px keeps a tap from registering as a zero-length drag.
+   */
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
