@@ -299,6 +299,26 @@ export default function PoolDetailScreen() {
   // why it is here rather than inside `DuelTab`: the header renders outside
   // the pager, above the tab that shows the same bout.
   const duel = useDuel(leagueMode === 'showdown' ? id : null);
+  /**
+   * Where each member sits, for the `position · PTS` line under their name.
+   *
+   * ⚠ From the LEADERBOARD, which is the engine's stored order — never
+   * recomputed from points here. `league_finalize_ranks` already resolves ties
+   * through a seven-key cascade, and a second ordering on this screen would
+   * disagree with the Leaderboard tab one swipe away.
+   *
+   * ⚠ `total_points` ALREADY INCLUDES the duel points since migration 121 —
+   * they are one number now, not a base plus a bonus. Adding `duelPoints` to it
+   * here would double-count every win.
+   */
+  const duelStandings = useMemo(() => {
+    const m = new Map<string, { rank: number | null; points: number }>();
+    for (const e of data?.leagueLeaderboard ?? []) {
+      m.set(e.entry_id, { rank: e.current_rank ?? null, points: e.total_points ?? 0 });
+    }
+    return m;
+  }, [data?.leagueLeaderboard]);
+
   const pickemDeadline = (() => {
     const season = pickemLeague.data?.season;
     const open = season?.openMatchweekNumber ?? null;
@@ -659,8 +679,10 @@ export default function PoolDetailScreen() {
       {isShowdownPool ? (
         <ShowdownDuelHeader
           poolName={pool.poolName}
+          poolCode={pool.poolCode ?? null}
           bout={duel.current}
           sealed={duel.sealed}
+          standings={duelStandings}
           scrollY={scrollY}
         >
           {tabBar}
