@@ -1,8 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiFetch } from './api';
+import { applyFixturesUpdate, type FixturesUpdateMessage } from './fixturesBroadcast';
 import { useHomeData } from './HomeDataProvider';
+import { leaseBroadcast } from './realtimeLease';
 import { supabase } from './supabase';
 
 // Mirrors iOS `ResultsViewModel` + `Match` shape. Selects every field the
@@ -135,6 +137,17 @@ type LeagueFixturesResponse = {
     competition: string | null;
     /** `league_seasons.external_league_id` — the api-football league id. */
     competition_id: number | null;
+    /**
+     * One of the member's pools on this season — the `pool:{id}:leaderboard`
+     * topic to listen on for live score, status and minute.
+     *
+     * ⚠ OPTIONAL, and for the reason `standings` below is: react-query serves
+     * the previously cached response until the next fetch, so on the build
+     * where this ships the first render reads a season object with no
+     * `pool_id` key at all. A missing one means no subscription for that
+     * season, which is exactly the behaviour that shipped before it existed.
+     */
+    pool_id?: string | null;
     /** Already in the World Cup match shape — the route does the mapping. */
     matches: Record<string, unknown>[];
     /** Optional: absent from a response cached before this field existed. */
@@ -311,16 +324,93 @@ export function useTournamentMatchesInternal() {
   // wrong — see the route's own header for why that matters.
   //
   // ⚠ NO `refetchInterval`, and this is not an oversight. The payload is a
-  // SEASON. Live score and minute reach an open pool screen on the
+  // SEASON. Live score and minute reach an open screen on the
   // `pool:{id}:leaderboard` broadcast; polling a season for them would be the
   // most expensive line in the app. React Query's 30 s staleTime plus the
   // AppState focus wiring is what keeps this list current, and a results list
   // is allowed to be a focus behind — a pool leaderboard is not.
+  //
+  // ⚠ THAT SENTENCE WAS ASPIRATIONAL UNTIL 2026-09-03. Nothing on the phone
+  // subscribed to the broadcast, so "it's pushed, don't poll" described a push
+  // with no listener: a fixture that kicked off while the app was open never
+  // went live on any screen. The subscription below is what makes the comment
+  // true. Do not add an interval — fix the ear, not the clock.
+  const leagueQueryKey = useMemo(() => ['league-fixtures', appUserId] as const, [appUserId]);
   const leagueQuery = useQuery({
-    queryKey: ['league-fixtures', appUserId],
+    queryKey: leagueQueryKey,
     enabled: !!appUserId,
     queryFn: () => apiFetch<LeagueFixturesResponse>(`/api/users/${appUserId}/fixtures`),
   });
+
+  // =============================================================
+  // THE LIVE HALF — migration 125's `fixtures_update`, at last heard
+  // =============================================================
+  // The World Cup has had this since it shipped: a match going live writes a
+  // `matches` row and the `postgres_changes` channel above pushes it to every
+  // open screen with no fetch. A league fixture is not in `matches`, so the
+  // league needs its own ear — and the message it needs is already being sent,
+  // every sync tick, to `pool:{id}:leaderboard`.
+  //
+  // ⚠ ONE CHANNEL PER SEASON, NOT PER POOL. Every pool playing a season gets
+  // the identical message, so a member with twelve league pools across five
+  // seasons needs five sockets, not twelve. The route picks the pool — see
+  // `poolBySeason` there for why it has to, and why a stable choice matters.
+  const queryClient = useQueryClient();
+  // ⚠ A STRING FIRST, THEN THE LIST. `leagueQuery.data` is a NEW object on
+  // every refetch and on every message this very subscription applies, so
+  // depending on it directly would tear down and rebuild all five channels
+  // each time a minute ticked — dropping whatever arrived mid-rebuild, and
+  // producing a live card that flickered instead of one that updated.
+  const seasonTopicsKey = useMemo(
+    () =>
+      (leagueQuery.data?.seasons ?? [])
+        .filter((s) => s.pool_id)
+        .map((s) => `${s.season_id}:${s.pool_id}`)
+        .sort()
+        .join(','),
+    [leagueQuery.data],
+  );
+  const seasonTopics = useMemo(
+    () =>
+      seasonTopicsKey
+        .split(',')
+        .filter(Boolean)
+        .map((pair) => {
+          const [seasonId, poolId] = pair.split(':');
+          return { seasonId, poolId };
+        }),
+    [seasonTopicsKey],
+  );
+
+  // ⚠ LEASED, NOT SUBSCRIBED DIRECTLY, AND THAT IS LOAD-BEARING. This feed
+  // lives at the root for the whole session while a pool screen — which holds
+  // the SAME topic — comes and goes underneath it. `supabase.channel(topic)`
+  // returns one shared object, so `usePoolEntries` unmounting would otherwise
+  // have killed Home's live cards until the app was restarted. See
+  // `realtimeLease.ts`, which is where that was measured.
+  useEffect(() => {
+    if (!appUserId || seasonTopics.length === 0) return;
+
+    const releases = seasonTopics.map(({ seasonId, poolId }) =>
+      leaseBroadcast(`pool:${poolId}:leaderboard`, 'fixtures_update', (msg) => {
+        const payload = msg.payload as FixturesUpdateMessage | undefined;
+        if (!payload || payload.season_id !== seasonId) return;
+        // ⚠ APPLIED, NOT A DOORBELL. The payload carries every value the card
+        // renders, so refetching a 300 kB season to learn a minute we were
+        // just handed is the pattern migration 060's comment exists to mock:
+        // "it was a doorbell, and then everyone fetched over HTTP anyway".
+        // `applyFixturesUpdate` returns the same object when nothing moved, so
+        // a repeat costs no render.
+        queryClient.setQueryData<LeagueFixturesResponse>(leagueQueryKey, (prev) =>
+          applyFixturesUpdate(prev, payload),
+        );
+      }),
+    );
+
+    return () => {
+      for (const release of releases) release();
+    };
+  }, [appUserId, seasonTopics, queryClient, leagueQueryKey]);
 
   const leagueMatches = useMemo(() => {
     const out: ResultsMatch[] = [];

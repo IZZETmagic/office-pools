@@ -107,6 +107,13 @@ type StandingsRow = {
 // payload with no fetch. This is what a screen needs when it OPENS. A
 // `refetchInterval` on a season payload would be the most expensive line in the
 // app — the same warning `/api/pools/:id/league` carries.
+//
+// ⚠ AND THAT WARNING ONLY HOLDS BECAUSE THE PHONE CAN NOW ACTUALLY HEAR THE
+// BROADCAST. Until 2026-09-03 no mobile surface subscribed to `fixtures_update`
+// at all, so "don't poll, it's pushed" described a push nothing was receiving:
+// a fixture that kicked off while the app was open never went live, on any
+// screen, and the Results tab only looked right because pulling it refetched.
+// `pool_id` below is what closed that — see `poolBySeason`.
 // =============================================================
 
 export const dynamic = 'force-dynamic'
@@ -173,6 +180,32 @@ async function handleGET(
     }
   }
 
+  // ⚠ ONE POOL PER SEASON, AND IT IS AN ADDRESS, NOT DATA. Migration 125 sends
+  // live fixture state as a `fixtures_update` event on `pool:{id}:leaderboard`
+  // — a fixture belongs to a season but a realtime topic belongs to a POOL, so
+  // a client that wants the live half has to name one of its own pools to
+  // listen on. It cannot work that out for itself: `useHomeData` never selects
+  // `league_season_id`, which is why this route resolves the member's seasons
+  // server-side in the first place.
+  //
+  // Any of the member's pools on the season will do — every pool playing it
+  // receives the identical message — so ONE is enough and twelve subscriptions
+  // where five would do is just socket cost.
+  //
+  // ⚠ SORTED, so the same member gets the same pool on every request. The
+  // topic name is a subscription key on the client: an unstable one would tear
+  // the channel down and build a new one on every refetch, dropping whatever
+  // arrived in between.
+  //
+  // ⚠ AND `realtime.messages` AUTHORIZES BY POOL MEMBERSHIP (060's policy), so
+  // this is not a capability being handed out — it names a pool the caller is
+  // already a member of, and the socket would reject anything else.
+  const poolBySeason = new Map<string, string>()
+  for (const m of [...active].sort((a, b) => a.pool_id.localeCompare(b.pool_id))) {
+    const seasonId = m.pools!.league_season_id!
+    if (!poolBySeason.has(seasonId)) poolBySeason.set(seasonId, m.pool_id)
+  }
+
   if (tournamentBySeason.size === 0) {
     return NextResponse.json({ seasons: [] })
   }
@@ -199,6 +232,8 @@ async function handleGET(
     season_id: string
     competition: string | null
     competition_id: number | null
+    /** A pool of the member's on this season — the realtime topic to listen on. */
+    pool_id: string | null
     matches: unknown[]
     standings: StandingsRow[]
     standings_fetched_at: string | null
@@ -244,6 +279,10 @@ async function handleGET(
       // The same competition, as the id everything is themed on. Nullable only
       // because the map lookup is — the column itself is `integer NOT NULL`.
       competition_id: leagueIdBySeason.get(seasonId) ?? null,
+      // Where the live half arrives. See `poolBySeason` above for why a season
+      // is addressed by one of its pools. Nullable only because the map lookup
+      // is — a season is only in this loop because a pool put it there.
+      pool_id: poolBySeason.get(seasonId) ?? null,
       matches,
       // ⚠ ORDERED FIRST, THEN SHAPED. `orderStandings` moves clubs between
       // places and carries each place's own `rank` and `description` with the

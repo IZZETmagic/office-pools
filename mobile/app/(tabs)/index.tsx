@@ -41,12 +41,32 @@ export default function HomeScreen() {
   // fixtures — not `useHomeData`. Those two `matches` reads asked the wrong
   // table for a league pool and returned nothing, silently. See
   // `lib/homeMatches.ts` for the whole note.
-  const { matches } = useTournamentMatches();
+  const {
+    matches,
+    refresh: refreshMatches,
+    refreshIfStale: refreshMatchesIfStale,
+  } = useTournamentMatches();
   const homeMatches = useMemo(() => homeMatchesFrom(matches), [matches]);
+  // ⚠ BOTH FEEDS, AND THAT IS THE FIX. This screen renders two things that
+  // come from two different hooks — pools and stats from `useHomeData`, the
+  // match cards from the shared match feed — and until 2026-09-03 every
+  // refresh on it, pull and focus alike, drove only the first.
+  //
+  // So Home held whatever the match list looked like when the app started.
+  // On a phone opened before kick-off that is a fixture still marked
+  // `scheduled`: "next kickoff" and "upcoming" for a game already being
+  // played, and no Live Now card at all. The Results tab was right about the
+  // same fixture at the same moment, for the single reason that it wires its
+  // pull and its focus to THIS feed (`results.tsx`) — which is how the
+  // asymmetry was found.
+  const refreshAll = useCallback(
+    () => Promise.all([refresh(), refreshMatches()]),
+    [refresh, refreshMatches],
+  );
   // Pull-to-refresh: spinner is bound to user gesture only. Background
   // refreshes (focus, realtime, stale) trigger via `refresh` directly and
   // don't surface the OS-level spinner.
-  const { refreshing, onRefresh } = useManualRefresh(refresh);
+  const { refreshing, onRefresh } = useManualRefresh(refreshAll);
   // One-shot notification soft-ask. Surfaces a custom ConfirmDialog the
   // first time the user lands here with permission still 'undetermined'.
   // Tapping "Enable" triggers the OS prompt; tapping "Not now" dismisses
@@ -62,6 +82,11 @@ export default function HomeScreen() {
   // the unconditional `refresh`.
   const refreshIfStaleRef = useRef(refreshIfStale);
   refreshIfStaleRef.current = refreshIfStale;
+  // The match feed keeps its own 30 s clock, so this is a second staleness
+  // question and not a duplicate of the one above — coming back to Home after
+  // a while has to be able to answer "has the football moved?" too.
+  const refreshMatchesIfStaleRef = useRef(refreshMatchesIfStale);
+  refreshMatchesIfStaleRef.current = refreshMatchesIfStale;
 
   useFocusEffect(
     useCallback(() => {
@@ -70,6 +95,7 @@ export default function HomeScreen() {
         return;
       }
       refreshIfStaleRef.current();
+      refreshMatchesIfStaleRef.current();
     }, []),
   );
 
