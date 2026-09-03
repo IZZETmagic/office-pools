@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   fixturesForWeek,
-  initialWeek,
+  defaultWeek,
   pickedCount,
   stepWeek,
   weekState,
@@ -108,23 +108,35 @@ describe('fixturesForWeek', () => {
   })
 })
 
-describe('initialWeek', () => {
+describe('defaultWeek', () => {
   it('opens on the week you can act on', () => {
-    expect(initialWeek(WEEKS, 3, NOW)).toBe(3)
+    expect(defaultWeek(WEEKS, 3, null, NOW)).toBe(3)
   })
 
-  it('with nothing open, opens on the last week that locked', () => {
+  it('⚠ OPEN BEATS IN-PLAY — this is a picker, not a viewer', () => {
+    // The matchday case, and the one rule that separates this from the LMS
+    // leaderboard's. On a Saturday matchweek 2 is being played while 3 is the
+    // one you can still pick for; opening on 2 shows ten locked fixtures and no
+    // way to make the picks the member came to make.
+    expect(defaultWeek(WEEKS, 3, 2, NOW)).toBe(3)
+  })
+
+  it('follows the football when nothing is open', () => {
+    expect(defaultWeek(WEEKS, null, 2, NOW)).toBe(2)
+  })
+
+  it('with nothing open or in play, opens on the last week that locked', () => {
     const seasonOver = Date.parse('2027-06-01T00:00:00Z')
-    expect(initialWeek(WEEKS, null, seasonOver)).toBe(4)
+    expect(defaultWeek(WEEKS, null, null, seasonOver)).toBe(4)
   })
 
   it('before a ball is kicked, opens on the first week rather than nothing', () => {
     const preSeason = Date.parse('2026-08-01T00:00:00Z')
-    expect(initialWeek(WEEKS, null, preSeason)).toBe(1)
+    expect(defaultWeek(WEEKS, null, null, preSeason)).toBe(1)
   })
 
   it('an empty season yields null rather than NaN', () => {
-    expect(initialWeek([], null, NOW)).toBeNull()
+    expect(defaultWeek([], null, null, NOW)).toBeNull()
   })
 })
 

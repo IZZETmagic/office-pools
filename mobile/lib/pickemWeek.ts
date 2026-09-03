@@ -96,19 +96,37 @@ export function fixturesForWeek(matches: LeagueMatch[], weekNumber: number): Lea
 }
 
 /**
- * Which week the screen should open on.
+ * Which week the wizard opens on — the ACTIVE one.
  *
- * The open one when there is one — that is the week a member came to act on.
- * Otherwise the last one that locked, because a season with nothing open is
- * either finished or between weeks, and the most recent football is the
- * interesting thing rather than an empty screen.
+ * Ryan, 2026-09-03: *"should default to the active or inplay matchweek."*
+ *
+ * ⚠⚠ OPEN LEADS, IN-PLAY FOLLOWS — and that is the opposite order to the LMS
+ * leaderboard's, deliberately, because this is a PICKER and that is a viewer.
+ *
+ * From Friday to Monday the week being WATCHED and the week you can still PICK
+ * for are different weeks. A viewer should name the football happening now; a
+ * picker opening on that week presents ten locked fixtures and no way to enter
+ * the picks the member came to make. `LeaguePickemTab` recorded the same rule
+ * before it was reverted: *"it picks for the OPEN matchweek, not the in-play
+ * one — a screen using the wrong one offers picks on games in progress."*
+ *
+ * They coincide whenever no week is being played, which is most of the time and
+ * is the case today (MW3 open, nothing in play), so this ordering only shows
+ * itself on a matchday. If the wizard should instead follow the football when
+ * the two diverge, swap the first two clauses — nothing else depends on it.
+ *
+ * Falls back to the last week that LOCKED, because a season with nothing open
+ * is either finished or between weeks and the most recent football beats an
+ * empty screen; then to the first week, before a ball is kicked.
  */
-export function initialWeek(
+export function defaultWeek(
   matchweeks: LeagueMatchweek[],
   openMatchweekNumber: number | null,
+  inPlayMatchweekNumber: number | null,
   now: number,
 ): number | null {
   if (openMatchweekNumber !== null) return openMatchweekNumber
+  if (inPlayMatchweekNumber !== null) return inPlayMatchweekNumber
   const locked = matchweeks
     .filter((m) => m.lock_at !== null && Date.parse(m.lock_at) <= now)
     .map((m) => m.number)

@@ -144,9 +144,23 @@ export type LeagueMatchweek = {
   first_kickoff_at: string | null
 }
 
-/** One Scores-depth pick. */
+/**
+ * One Scores-depth pick.
+ *
+ * ⚠⚠ THE KEY IS `match_id`, NOT `fixture_id`, AND THAT COST A WHOLE SCREEN.
+ * The row in the database is keyed `fixture_id`, but `readLeaguePredictions`
+ * maps it to `match_id` on the way out so a league pick can travel through the
+ * World Cup's `ExistingPrediction` type. This copy said `fixture_id` for one
+ * commit, so every lookup was `scores[undefined]` — no error, no empty array to
+ * notice, just a picker that opened blank over ten saved scorelines.
+ *
+ * ⚠ Results-depth picks do NOT come through here. They arrive in `outcomes`,
+ * keyed by fixture id, which is why Results looked fine while Scores did not —
+ * the two halves of the same payload disagree about the name of one column.
+ */
 export type LeaguePrediction = {
-  fixture_id: string
+  /** The FIXTURE this pick is for. Named `match_id` by the contract — see above. */
+  match_id: string
   predicted_home_score: number | null
   predicted_away_score: number | null
 }

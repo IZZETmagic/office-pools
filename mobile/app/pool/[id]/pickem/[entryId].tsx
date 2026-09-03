@@ -8,7 +8,7 @@ import { OutcomePicker, type Outcome } from '@/components/pool-detail/OutcomePic
 import { TapScoreField } from '@/components/pool-detail/TapScoreField';
 import { Icon, Text } from '@/components/ui';
 import { saveLeaguePicks, type LeaguePickBody } from '@/lib/api';
-import { fixturesForWeek, weekState } from '@/lib/pickemWeek';
+import { defaultWeek, fixturesForWeek, stepWeek, weekState } from '@/lib/pickemWeek';
 import {
   leaguePoolQueryKey,
   useLeaguePool,
@@ -80,8 +80,25 @@ export default function PickemPickScreen() {
   // and tells members they are playing a game they are not being scored at.
   const isResults = depth === 'results';
 
-  const week = mw ? Number(mw) : (season?.openMatchweekNumber ?? null);
-  const matchweek = season?.matchweeks.find((m) => m.number === week);
+  // ---- which week is on screen -------------------------------------------
+  // ⚠ THE SWITCHER LIVES HERE, not on the predictions tab. Ryan moved it on
+  // 2026-09-03: the tab answers "whose picks", this screen answers "which week",
+  // and a control that spans both belongs to the one it actually governs.
+  //
+  // ⚠ It DEFAULTS rather than being told. The tab passes no `mw`, so the
+  // wizard resolves the active week itself and the two screens cannot drift —
+  // and a member who left the app on matchweek 12 does not come back to it.
+  // `mw` is still honoured when something deep-links a specific week.
+  const matchweeks = useMemo(() => season?.matchweeks ?? [], [season]);
+  const fallback = defaultWeek(
+    matchweeks,
+    season?.openMatchweekNumber ?? null,
+    season?.inPlayMatchweekNumber ?? null,
+    now,
+  );
+  const [chosen, setChosen] = useState<number | null>(mw ? Number(mw) : null);
+  const week = chosen ?? fallback;
+  const matchweek = matchweeks.find((m) => m.number === week);
   const state = weekState(matchweek, season?.openMatchweekNumber ?? null, now);
 
   const ownEntry = league.data?.you.entries.find((e) => e.entry_id === entryId) ?? null;
@@ -110,7 +127,8 @@ export default function PickemPickScreen() {
     if (isOwn && ownEntry) {
       const s: Record<string, { home: number | null; away: number | null }> = {};
       for (const p of ownEntry.predictions) {
-        s[p.fixture_id] = { home: p.predicted_home_score, away: p.predicted_away_score };
+        // ⚠ `match_id`. The contract renames the column — see `LeaguePrediction`.
+        s[p.match_id] = { home: p.predicted_home_score, away: p.predicted_away_score };
       }
       setScores(s);
       setOutcomes({ ...ownEntry.outcomes });
@@ -223,12 +241,29 @@ export default function PickemPickScreen() {
             {title}
           </Text>
           <Text variant="detail" color="slate">
-            Matchweek {week ?? '—'}
-            {canEdit ? ' · tap to pick' : state === 'locked' ? ' · locked' : ''}
+            {canEdit ? 'Tap to pick' : state === 'locked' ? 'Locked' : 'Not open yet'}
           </Text>
         </View>
         {save.isPending ? <ActivityIndicator size="small" color={theme.colors.primary} /> : null}
       </View>
+
+      {week !== null ? (
+        <WeekBar
+          week={week}
+          state={state}
+          lockAt={matchweek?.lock_at ?? null}
+          onPrev={() => {
+            const p = stepWeek(matchweeks, week, -1);
+            if (p !== null) setChosen(p);
+          }}
+          onNext={() => {
+            const n = stepWeek(matchweeks, week, 1);
+            if (n !== null) setChosen(n);
+          }}
+          hasPrev={stepWeek(matchweeks, week, -1) !== null}
+          hasNext={stepWeek(matchweeks, week, 1) !== null}
+        />
+      ) : null}
 
       {error ? <SaveError message={error} /> : null}
 
@@ -300,6 +335,110 @@ function SaveError({ message }: { message: string }) {
       </Text>
     </View>
   );
+}
+
+/**
+ * ‹ Matchweek 3 › — the season, browsed from inside the wizard.
+ *
+ * ⚠ The chip states what the WEEK is, not what you have done in it. "Picks
+ * close Fri 7:00 pm" is a fact about the pool; a progress count belongs on the
+ * predictions tab, where it is about one entry.
+ */
+function WeekBar({
+  week,
+  state,
+  lockAt,
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
+}: {
+  week: number;
+  state: 'open' | 'locked' | 'future';
+  lockAt: string | null;
+  onPrev: () => void;
+  onNext: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
+}) {
+  const theme = useTheme();
+  const tone = state === 'open' ? theme.colors.green : theme.colors.slate;
+  const label =
+    state === 'open'
+      ? lockAt
+        ? `Closes ${shortWhen(lockAt)}`
+        : 'Open'
+      : state === 'locked'
+        ? 'Locked'
+        : 'Not open yet';
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.sm,
+        paddingHorizontal: theme.spacing.lg,
+        paddingBottom: theme.spacing.sm,
+      }}
+    >
+      <WeekArrow icon="chevron.left" onPress={onPrev} enabled={hasPrev} />
+      <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+        <Text variant="cardTitle">Matchweek {week}</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            paddingHorizontal: 9,
+            paddingVertical: 3,
+            borderRadius: theme.radii.pill,
+            backgroundColor: withOpacity(tone, 0.12),
+          }}
+        >
+          <Icon
+            name={(state === 'open' ? 'lock.open' : state === 'locked' ? 'lock' : 'clock') as never}
+            color={state === 'open' ? 'green' : 'slate'}
+            size={9}
+          />
+          <Text variant="detail" style={{ color: tone }}>
+            {label}
+          </Text>
+        </View>
+      </View>
+      <WeekArrow icon="chevron.right" onPress={onNext} enabled={hasNext} />
+    </View>
+  );
+}
+
+function WeekArrow({ icon, onPress, enabled }: { icon: string; onPress: () => void; enabled: boolean }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!enabled}
+      hitSlop={8}
+      style={({ pressed }) => ({
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.surface,
+        opacity: !enabled ? 0.3 : pressed ? 0.7 : 1,
+        ...theme.shadows.card,
+      })}
+    >
+      <Icon name={icon as never} color="slate" size={13} />
+    </Pressable>
+  );
+}
+
+/** A short, device-local "when" — the same shape the predictions tab uses. */
+function shortWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
 function Empty({ message }: { message: string }) {
