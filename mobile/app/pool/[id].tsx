@@ -15,7 +15,6 @@ import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
 } from 'react-native-reanimated';
-import { ScrollViewContainer } from 'react-native-reorderable-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -485,21 +484,32 @@ export default function PoolDetailScreen() {
         style={{ flex: 1 }}
       >
         {visibleTabs.map((key) => {
-          // ⚠ ONE TAB NEEDS A DIFFERENT SCROLLER, and only one.
+          // ⚠ THE PICKER OWNS ITS OWN SCROLLER, so this page must give it HEIGHT
+          // rather than a second one.
           //
-          // Table mode's picker is a `NestedReorderableList`, which the library
-          // requires to sit inside its own `ScrollViewContainer` — a plain
-          // ScrollView leaves it unable to scroll or auto-scroll while dragging.
+          // Same shape as `BracketPickerWizard`, which is the World Cup answer
+          // to the identical problem: it renders a `ScrollViewContainer` with
+          // `flex: 1` and puts a `NestedReorderableList` inside. That only works
+          // if its parent has real height — wrapped in a ScrollView instead,
+          // `flex: 1` collapses to the content and nothing scrolls.
           //
-          // `ScrollViewContainer` spreads its props onto an Animated.ScrollView
-          // so it is a drop-in, but it also wraps everything in a
-          // `GestureDetector`. This screen's pager is itself a horizontal
-          // ScrollView, so that extra native gesture is scoped to the one tab
-          // that needs it rather than applied to all six.
-          const Scroller =
-            key === 'predictions' && showsTablePicker ? ScrollViewContainer : ScrollView;
+          // The wizard gets that for free by living on its own route. The table
+          // picker stays in the tab (one prediction, and the tab that holds
+          // predictions is where it belongs), so the tab hands it a plain
+          // full-height View.
+          //
+          // ⚠ Pull-to-refresh goes with the ScrollView on this one tab. It
+          // autosaves and refetches on focus, so there is nothing a pull would
+          // recover.
+          if (key === 'predictions' && showsTablePicker) {
+            return (
+              <View key={key} style={{ width, flex: 1 }}>
+                {renderTab(key)}
+              </View>
+            );
+          }
           return (
-          <Scroller
+          <ScrollView
             key={key}
             style={{ width }}
             contentContainerStyle={{ paddingBottom: theme.spacing.xxxl, flexGrow: 1 }}
@@ -512,7 +522,7 @@ export default function PoolDetailScreen() {
             }
           >
             {renderTab(key)}
-          </Scroller>
+          </ScrollView>
           );
         })}
       </Animated.ScrollView>

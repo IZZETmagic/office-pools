@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 import {
   NestedReorderableList,
+  ScrollViewContainer,
   reorderItems,
   useReorderableDrag,
   type ReorderableListReorderEvent,
@@ -40,6 +41,21 @@ import { fontFamilies, useTheme } from '@/theme';
 // stops accepting drags, because a member looking at twenty clubs the database
 // does not have is the exact failure the silent skip creates.
 // =============================================================
+
+/**
+ * ⚠ THE ROW HEIGHT IS FIXED, AND THE LIST'S HEIGHT IS COMPUTED FROM IT.
+ *
+ * A `NestedReorderableList` with `scrollable={false}` does not size itself to
+ * its content — without an explicit height it lays out short, so the parent
+ * has nothing to scroll and the list reads as frozen. `BracketPickerWizard`
+ * has always passed `GROUP_ROW_HEIGHT * items` for exactly this reason; this
+ * screen did not, which is why twenty clubs would not scroll.
+ *
+ * So the row must actually BE this tall. It is set explicitly rather than
+ * left to padding, because the arithmetic above is only true if it holds.
+ */
+const ROW_HEIGHT = 58;
+const ROW_GAP = 6;
 
 type Props = {
   poolId: string;
@@ -128,18 +144,20 @@ export function TablePicker({
   );
 
   return (
-    <View>
-      <View
-        style={{
-          paddingHorizontal: theme.spacing.lg,
-          paddingTop: theme.spacing.md,
-          paddingBottom: theme.spacing.sm,
-          gap: 4,
-        }}
-      >
+    // Its own scroller, like the wizard's — and it needs a parent with real
+    // height, which `app/pool/[id].tsx` gives this one tab.
+    <ScrollViewContainer
+      style={{ flex: 1 }}
+      contentContainerStyle={{
+        paddingHorizontal: theme.spacing.lg,
+        paddingTop: theme.spacing.md,
+        paddingBottom: theme.spacing.xxxl,
+      }}
+    >
+      <View style={{ gap: 4, paddingBottom: theme.spacing.md }}>
         <Text variant="cardTitle">Order every club</Text>
         <Text variant="detail" color="slate">
-          Drag to where you think each one finishes. It saves as you go — there is nothing to
+          Long press a club to pick it up, then drag. It saves as you go — there is nothing to
           submit.
         </Text>
         <StatusLine
@@ -151,38 +169,16 @@ export function TablePicker({
         />
       </View>
 
-      {/*
-        ⚠ NESTED, AND `scrollable={false}`. Every tab on this screen is already
-        inside a vertical ScrollView, and a plain `ReorderableList` is a
-        VirtualizedList — nesting one in a ScrollView is the "VirtualizedLists
-        should never be nested" warning and a list that will not scroll.
-        `NestedReorderableList` is the library's answer, and it requires the
-        parent to be its `ScrollViewContainer`, which `app/pool/[id].tsx`
-        supplies for THIS TAB ONLY.
-
-        `scrollable={false}` because the parent does the scrolling: twenty rows
-        need no virtualisation, and a fixed-height inner scroller inside an
-        outer one is two scrollbars fighting.
-      */}
       <NestedReorderableList
         data={rows}
         scrollable={false}
-        // ⚠ AND `scrollEnabled={false}` ON TOP OF IT. `scrollable` tells the
-        // library this list has no fixed height; it does NOT disable the inner
-        // FlatList's own scrolling, which defaults to true
-        // (ReorderableListCore: `rest.scrollEnabled ?? true`). Left on, that
-        // FlatList captures the vertical pan and — being full height, with
-        // nothing to scroll — moves nowhere, so the PARENT never sees the
-        // gesture and the whole list reads as frozen. Autoscroll while
-        // dragging is unaffected: a nested list scrolls its
-        // `scrollViewContainerRef`, not itself.
-        scrollEnabled={false}
         keyExtractor={(r) => r.club.club_id}
         onReorder={handleReorder}
-        contentContainerStyle={{
-          paddingHorizontal: theme.spacing.lg,
-          paddingBottom: theme.spacing.lg,
-        }}
+        // The library's own way to refuse a drag — not an absent handler.
+        dragEnabled={!locked}
+        // ⚠ See ROW_HEIGHT. This is what makes the content tall enough for the
+        // container above to scroll.
+        style={{ height: (ROW_HEIGHT + ROW_GAP) * rows.length }}
         renderItem={({ item }) => (
           <PickerRow
             club={item.club}
@@ -193,7 +189,7 @@ export function TablePicker({
           />
         )}
       />
-    </View>
+    </ScrollViewContainer>
   );
 }
 
@@ -267,9 +263,13 @@ function PickerRow({
         flexDirection: 'row',
         alignItems: 'center',
         gap: theme.spacing.sm,
-        paddingVertical: theme.spacing.md,
+        // ⚠ FIXED, not derived from padding. The list's height is
+        // `(ROW_HEIGHT + ROW_GAP) * rows`, and that is only true if a row is
+        // exactly this tall — a row that grows by a pixel leaves twenty pixels
+        // of the list unreachable.
+        height: ROW_HEIGHT,
         paddingHorizontal: theme.spacing.sm,
-        marginBottom: 6,
+        marginBottom: ROW_GAP,
         borderRadius: theme.radii.lg,
         backgroundColor: theme.colors.surface,
         // The stripe belongs to the POSITION — it is what dragging a club into
