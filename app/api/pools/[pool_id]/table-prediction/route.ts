@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { invalidatePoolCache } from '@/lib/poolData'
 import { saveTablePrediction, readTablePrediction, readTableBreakdown } from '@/lib/league/table'
+import { summariseTable } from '@/lib/league/tableSummary'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // =============================================================
@@ -41,14 +42,94 @@ export async function GET(
   const entryId = requestedEntry ?? (await firstEntryId(supabase, membership.member_id))
   if (!entryId) return NextResponse.json({ error: 'No entry in this pool' }, { status: 404 })
 
-  const [{ order, savedAt, error: orderErr }, { rows, error: rowsErr }] = await Promise.all([
-    readTablePrediction(supabase, entryId),
-    readTableBreakdown(supabase, entryId),
-  ])
+  const [{ order, savedAt, error: orderErr }, { rows, error: rowsErr }, settings] =
+    await Promise.all([
+      readTablePrediction(supabase, entryId),
+      readTableBreakdown(supabase, entryId),
+      readTableSettings(supabase, pool_id),
+    ])
   const error = orderErr ?? rowsErr
   if (error) return NextResponse.json({ error }, { status: 500 })
+  if (!settings) return NextResponse.json({ error: 'Not a table pool' }, { status: 404 })
 
-  return NextResponse.json({ entryId, order, savedAt, breakdown: rows })
+  // ⚠ ADDED FOR REACT NATIVE, and computed HERE rather than there. The web page
+  // is a server component that reads the pool's prices and bands itself and
+  // hands them to a component; RN has no such thing, and the two alternatives
+  // were a second round of table reads from the phone or a second copy of the
+  // band-bonus formula in `mobile/`. Both are worse than one answer computed
+  // once — the same reason the leaderboard reads stored totals.
+  //
+  // Harmless to the web, which already has all of this and ignores the extra
+  // fields.
+  const summary = summariseTable(rows, settings.topN, settings.prices)
+
+  return NextResponse.json({ entryId, order, savedAt, breakdown: rows, settings, summary })
+}
+
+/**
+ * The pool's own prices and bands — what a hit is worth here, and which places
+ * count as which band.
+ *
+ * ⚠ Bands come from the COMPETITION, never from 4 and 3. Those are Premier
+ * League numbers, and a league that relegates one club would shade three. An
+ * explicit pool setting still wins, exactly as it does in the engine; the
+ * defaults below mirror the engine's own COALESCE (migrations 093/113), so the
+ * screen and `league_score_table` cannot quote different prices.
+ */
+async function readTableSettings(supabase: SupabaseClient, poolId: string) {
+  const { data: pool } = await supabase
+    .from('pools')
+    .select('league_season_id, league_mode, league_table_lock_at, league_table_profile')
+    .eq('pool_id', poolId)
+    .maybeSingle()
+  if (!pool?.league_season_id || pool.league_mode !== 'table') return null
+
+  const [settingsRes, bandsRes] = await Promise.all([
+    supabase
+      .from('league_pool_settings')
+      // ⚠ One literal, not a concatenation — postgrest-js infers the row shape
+      // from the string, and `'a, ' + 'b'` collapses it to GenericStringError.
+      .select('table_top_n, table_relegation_n, table_exact_points, table_step_penalty, table_champion_bonus, table_top_four_bonus, table_relegation_bonus, table_perfect_top_four_bonus, table_europa_bonus, table_conference_bonus')
+      .eq('pool_id', poolId)
+      .maybeSingle(),
+    supabase.rpc('league_default_bands', { p_season_id: pool.league_season_id }),
+  ])
+  if (bandsRes.error) console.error('[table-prediction] bands failed:', bandsRes.error)
+
+  const s = settingsRes.data
+  const bands = (bandsRes.data ?? {}) as {
+    top_n?: number; relegation_n?: number
+    europa_from?: number | null; europa_to?: number | null
+    conference_from?: number | null; conference_to?: number | null
+  }
+  const lockAt = (pool.league_table_lock_at as string | null) ?? null
+
+  return {
+    lockAt,
+    isLocked: lockAt ? new Date(lockAt) <= new Date() : false,
+    topN: s?.table_top_n ?? bands.top_n ?? 4,
+    relegationN: s?.table_relegation_n ?? bands.relegation_n ?? 3,
+    // Bounds, not a count — and null is a real answer: a competition without
+    // Europa places must not shade a band it does not have.
+    europaFrom: bands.europa_from ?? null,
+    europaTo: bands.europa_to ?? null,
+    conferenceFrom: bands.conference_from ?? null,
+    conferenceTo: bands.conference_to ?? null,
+    // 'headline_only' scores the bands alone, so a screen must not promise
+    // per-place points this pool never awards.
+    profile: pool.league_table_profile === 'headline_only' ? 'headline_only' : 'full_table',
+    prices: {
+      exactPoints: s?.table_exact_points ?? 100,
+      stepPenalty: s?.table_step_penalty ?? 20,
+      championBonus: s?.table_champion_bonus ?? 500,
+      topFourBonus: s?.table_top_four_bonus ?? 100,
+      relegationBonus: s?.table_relegation_bonus ?? 100,
+      perfectTopFourBonus: s?.table_perfect_top_four_bonus ?? 250,
+      europaBonus: s?.table_europa_bonus ?? 50,
+      // Migration 113: half the Europa band, which is half the top band.
+      conferenceBonus: s?.table_conference_bonus ?? 25,
+    },
+  }
 }
 
 export async function POST(

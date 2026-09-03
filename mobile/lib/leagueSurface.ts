@@ -12,10 +12,21 @@ export type PoolShape = {
 
 export type PredictionSurface =
   /**
-   * A league pool. The phone shows what it can READ and sends picking to the
-   * web — Ryan's call 2026-09-02: the RN build has not begun, and a picking
-   * control is a product decision that deserves its own design pass rather than
-   * arriving behind a read contract.
+   * Table mode's own screen: the ordering you filed, priced against the real
+   * table. Still READ-ONLY — it does not drag — but it has real content to
+   * show, which is why it is not the placeholder below.
+   *
+   * ⚠ It stays under the PREDICTIONS tab rather than getting one of its own.
+   * The pool asks for exactly one prediction, so the tab that holds predictions
+   * is where it belongs; a second tab beside an empty one would be describing
+   * our data model rather than the game.
+   */
+  | 'league-table'
+  /**
+   * Every other league pool. The phone shows what it can READ and sends picking
+   * to the web — Ryan's call 2026-09-02: the RN build has not begun, and a
+   * picking control is a product decision that deserves its own design pass
+   * rather than arriving behind a read contract.
    */
   | 'league-read-only'
   /** The World Cup wizard. */
@@ -39,5 +50,9 @@ export type PredictionSurface =
  * it is closed by READING the pool correctly, not by building a picker.
  */
 export function predictionSurfaceFor(pool: PoolShape): PredictionSurface {
-  return pool.isLeague ? 'league-read-only' : 'world-cup'
+  if (!pool.isLeague) return 'world-cup'
+  // ⚠ Reached ONLY after `isLeague` — rule 1 above. The mode is allowed to
+  // choose between league surfaces; it is never allowed to decide whether this
+  // is a league at all, which is the distinction a NULL mode turns on.
+  return pool.leagueMode === 'table' ? 'league-table' : 'league-read-only'
 }

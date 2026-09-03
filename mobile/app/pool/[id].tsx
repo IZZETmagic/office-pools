@@ -25,6 +25,7 @@ import {
   FeesTab,
   FormTab,
   LeaderboardTab,
+  LeagueMyTableTab,
   MembersTab,
   PoolDetailHeader,
   PoolInfoTab,
@@ -72,6 +73,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
 // redundant parent-triggered re-render.
 const MemoPoolDetailHeader = memo(PoolDetailHeader);
 const MemoLeaderboardTab = memo(LeaderboardTab);
+const MemoLeagueMyTableTab = memo(LeagueMyTableTab);
 const MemoPredictionsTab = memo(PredictionsTab);
 const MemoFormTab = memo(FormTab);
 const MemoBPFormTab = memo(BPFormTab);
@@ -311,6 +313,13 @@ export default function PoolDetailScreen() {
     matchdayInfo,
   } = data;
 
+  // The viewer's own entry in a league pool, taken from the leaderboard rows
+  // rather than fetched — they are already loaded and already scoped to this
+  // pool. `/table-prediction` falls back to the caller's first entry when this
+  // is null, so a miss is a slower path, never a wrong one.
+  const ownLeagueEntryId =
+    leagueLeaderboard?.find((e) => e.user_id === pool.currentUserId)?.entry_id ?? null;
+
   function handleTabTap(next: PoolTabKey) {
     setTab(next);
   }
@@ -353,6 +362,11 @@ export default function PoolDetailScreen() {
           isLeague: pool.isLeague,
           leagueMode: pool.leagueMode,
         });
+        // Table mode keeps this tab and this name. The pool asks for exactly
+        // one prediction, and this is it — see `leagueSurface.ts`.
+        if (surface === 'league-table') {
+          return <MemoLeagueMyTableTab poolId={pool.poolId} entryId={ownLeagueEntryId} />;
+        }
         if (surface === 'league-read-only') {
           return (
             <TabPlaceholder

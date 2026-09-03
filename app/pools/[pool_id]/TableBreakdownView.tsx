@@ -19,6 +19,12 @@
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import type { TableBreakdownRow } from '@/lib/league/table'
+// One owner for this arithmetic, in a module React Native can also reach —
+// see `lib/league/tableSummary.ts`. Re-exported so the call sites that grew up
+// importing them from here (TablePredictionTab, TableEntryModal, the tests)
+// keep working: moving the code is the point, churning six files is not.
+import { bandBonuses, deltaHeatRatio, zeroAtFor, type TablePrices } from '@/lib/league/tableSummary'
+export { bandBonuses, deltaHeatRatio, type TablePrices }
 import { shortClubName } from '@/lib/league/clubName'
 
 /**
@@ -36,34 +42,6 @@ import { shortClubName } from '@/lib/league/clubName'
  * over four instead. On the default 100/20 it is exactly the five the scoring
  * ladder prints on the Scoring Rules tab, which is the point: the two screens
  * describe one scale.
- */
-/**
- * How far along the ramp this club sits: 0 exact, 1 worth nothing.
- *
- * Kept separate from the colour so the progression can be tested as a number
- * rather than by string-matching a CSS expression.
- */
-export function deltaHeatRatio(delta: number, zeroAt: number): number {
-  if (zeroAt <= 0) return 0
-  return Math.min(1, Math.abs(delta) / zeroAt)
-}
-
-/**
- * The heat colour, mixed from the theme's OWN semantic tokens.
- *
- * ⚠ WHY NOT TAILWIND SHADES. The first version stepped
- * success-600 → warning-500 → warning-600 → danger-500 → danger-600, and it
- * failed in both themes for different reasons. In light mode danger-500
- * (#F15757) and danger-600 (#EF4444) are the same red to the eye, so 4 and 5
- * were indistinguishable — which is what Ryan saw. In DARK mode the ramps are
- * inverted, higher numbers being lighter: warning-600 (#FCCE52) is a paler
- * yellow than warning-500 (#FBBF24), so step 3 looked LESS severe than step 2.
- *
- * A shade ladder cannot escalate in both themes at once, because the palette
- * deliberately flips direction between them. Mixing does: green → amber → red
- * are the same three meanings in either theme, and `color-mix` walks between
- * whatever those tokens currently are. Two segments rather than one, because a
- * direct green-to-red mix passes through mud.
  */
 export function deltaHeatColor(delta: number, zeroAt: number): string {
   // No decay configured: nothing is "more wrong" than anything else, so there
@@ -91,56 +69,7 @@ export function Delta({ delta, zeroAt }: { delta: number | null; zeroAt: number 
   )
 }
 
-export type TablePrices = {
-  /** What a club placed exactly right is worth, and what each place out costs. */
-  exactPoints: number
-  stepPenalty: number
-  championBonus: number
-  topFourBonus: number
-  perfectTopFourBonus: number
-  relegationBonus: number
-  europaBonus: number
-  conferenceBonus: number
-}
 
-/**
- * The band bonuses, counted from the same per-row flags the engine counted.
- *
- * ⚠ THIS MIRRORS SQL, AND THE COUPLING IS THE RISK. The authority is
- * `league_score_table` (migration 093):
- *
- *     champion_hit * champ
- *   + top_hits     * top_bonus
- *   + (top_hits = top_n AND top_n > 0 ? perfect : 0)
- *   + releg_hits   * releg_bonus
- *   + europa_hits  * eur_bonus
- *   + conference_hits * conf_bonus
- *
- * It is repeated here rather than returned by the RPC because the breakdown is
- * per club and the bonuses are per entry. If the engine's formula changes, this
- * must change with it — and the way you will find out is the total below no
- * longer matching the leaderboard, which is exactly the symptom that made this
- * necessary in the first place: a modal saying 700 beside a leaderboard saying
- * 1,240, with nothing on screen to explain the 540.
- */
-export function bandBonuses(rows: TableBreakdownRow[], topN: number, prices: TablePrices) {
-  const championHits = rows.filter((r) => r.champion_hit).length
-  const topHits = rows.filter((r) => r.top_hit).length
-  const relegHits = rows.filter((r) => r.releg_hit).length
-  const europaHits = rows.filter((r) => r.europa_hit).length
-  const conferenceHits = rows.filter((r) => r.conference_hit).length
-  const perfectTop = topN > 0 && topHits === topN
-
-  const lines: Array<{ label: string; points: number }> = []
-  if (championHits > 0) lines.push({ label: 'Champion called right', points: championHits * prices.championBonus })
-  if (topHits > 0) lines.push({ label: `Top ${topN} named — ${topHits}`, points: topHits * prices.topFourBonus })
-  if (perfectTop) lines.push({ label: `All ${topN}, as a set`, points: prices.perfectTopFourBonus })
-  if (europaHits > 0) lines.push({ label: `Europa places named — ${europaHits}`, points: europaHits * prices.europaBonus })
-  if (conferenceHits > 0) lines.push({ label: `Conference places named — ${conferenceHits}`, points: conferenceHits * prices.conferenceBonus })
-  if (relegHits > 0) lines.push({ label: `Relegation named — ${relegHits}`, points: relegHits * prices.relegationBonus })
-
-  return { lines, total: lines.reduce((sum, l) => sum + l.points, 0) }
-}
 
 type Props = {
   breakdown: TableBreakdownRow[]
@@ -170,7 +99,7 @@ export function TableBreakdownView({
 }: Props) {
   // The first distance worth nothing — the same arithmetic the Scoring Rules
   // ladder uses, so the colours and the printed rungs cannot disagree.
-  const zeroAt = prices.stepPenalty > 0 ? Math.ceil(prices.exactPoints / prices.stepPenalty) : 0
+  const zeroAt = zeroAtFor(prices)
 
   const positional = breakdown.reduce((sum, r) => sum + (r.points ?? 0), 0)
   const bonuses = bandBonuses(breakdown, topN, prices)

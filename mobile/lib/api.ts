@@ -216,6 +216,89 @@ export function fetchLeaderboard(poolId: string) {
   return apiFetch<LeaderboardResponse>(`/api/pools/${poolId}/leaderboard`);
 }
 
+// ---------------------------------------------------------------------------
+// Table mode — one prediction, then a season of watching it
+// ---------------------------------------------------------------------------
+
+/** One club in the entry's ordering, priced against where it actually sits. */
+export type TableBreakdownRow = {
+  club_id: string;
+  club_name: string;
+  crest_url: string | null;
+  predicted_position: number;
+  /** NULL until the club has a standings row — i.e. before a ball is kicked. */
+  actual_position: number | null;
+  delta: number | null;
+  points: number | null;
+  champion_hit: boolean;
+  top_hit: boolean;
+  releg_hit: boolean;
+  europa_hit: boolean;
+  conference_hit: boolean;
+  is_final: boolean;
+};
+
+/**
+ * The pool's own prices and bands.
+ *
+ * ⚠ Band bounds, not counts, and null is a real answer — a competition without
+ * Europa places must not shade a band it does not have.
+ */
+export type TableSettings = {
+  lockAt: string | null;
+  isLocked: boolean;
+  topN: number;
+  relegationN: number;
+  europaFrom: number | null;
+  europaTo: number | null;
+  conferenceFrom: number | null;
+  conferenceTo: number | null;
+  /** 'headline_only' scores the bands alone — no per-place points at all. */
+  profile: 'full_table' | 'headline_only';
+  prices: {
+    exactPoints: number;
+    stepPenalty: number;
+    championBonus: number;
+    topFourBonus: number;
+    relegationBonus: number;
+    perfectTopFourBonus: number;
+    europaBonus: number;
+    conferenceBonus: number;
+  };
+};
+
+/**
+ * ⚠ COMPUTED SERVER-SIDE, deliberately. The band-bonus formula mirrors
+ * `league_score_table`, and a copy in `mobile/` would be its third — see
+ * `lib/league/tableSummary.ts`. This screen renders these numbers; it does not
+ * derive them.
+ */
+export type TableSummary = {
+  positional: number;
+  lines: Array<{ label: string; points: number }>;
+  bonusTotal: number;
+  total: number;
+  exact: number;
+  isFinal: boolean;
+  /** The distance at which a club stops being worth anything. */
+  zeroAt: number;
+};
+
+export type TablePredictionResponse = {
+  entryId: string;
+  /** club_ids in predicted finishing order. Empty means they never filed. */
+  order: string[];
+  savedAt: string | null;
+  breakdown: TableBreakdownRow[];
+  settings: TableSettings;
+  summary: TableSummary;
+};
+
+export function fetchTablePrediction(poolId: string, entryId?: string) {
+  const q = entryId ? `?entryId=${encodeURIComponent(entryId)}` : '';
+  return apiFetch<TablePredictionResponse>(`/api/pools/${poolId}/table-prediction${q}`);
+}
+
 export type LevelInfo = {
   level: number;
   name: string;
