@@ -347,43 +347,40 @@ function StateChip({ lms, isCurrentUser }: { lms: LeagueLeaderboardEntry['lms'];
 }
 
 /**
- * The club carrying them this matchweek.
+ * The club carrying them this matchweek — the crest alone.
  *
- * ⚠ The crest can be null — it is nullable in the feed — so the name is the
- * fallback and never the other way round. A row with a blank where a badge
- * should be says nothing at all.
+ * Ryan, 3 Sep: no pill and no name. The green pill was saying "still in" a
+ * second time; the dot at the head of the row already does that, and a badge
+ * carries its own club faster than a name does to anyone who follows football.
+ *
+ * ⚠ `crest_url` is NULLABLE in the feed, so the name is the fallback and never
+ * the other way round. Without it a club with no badge is a blank cell, which
+ * reads as a member who has not picked — the one thing this chip must never be
+ * confused with.
  */
 function ClubChip({ club }: { club: { club_name: string; crest_url: string | null } }) {
   const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        maxWidth: 118,
-        paddingLeft: club.crest_url ? 5 : 8,
-        paddingRight: 8,
-        paddingVertical: 3,
-        borderRadius: theme.radii.pill,
-        backgroundColor: withOpacity(theme.colors.green, 0.12),
-      }}
-    >
-      {club.crest_url ? (
-        <Image source={{ uri: club.crest_url }} style={{ width: 16, height: 16 }} resizeMode="contain" />
-      ) : null}
+
+  if (!club.crest_url) {
+    return (
       <RNText
         numberOfLines={1}
-        style={{
-          fontFamily: fontFamilies.bold,
-          fontSize: 10,
-          color: theme.colors.ink,
-          flexShrink: 1,
-        }}
+        style={{ fontFamily: fontFamilies.bold, fontSize: 10, color: theme.colors.ink, maxWidth: 92 }}
       >
         {club.club_name}
       </RNText>
-    </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: club.crest_url }}
+      style={{ width: 26, height: 26 }}
+      resizeMode="contain"
+      // The badge IS the label once the name is gone, so it has to be one to
+      // anything that cannot see it.
+      accessibilityLabel={club.club_name}
+    />
   );
 }
 

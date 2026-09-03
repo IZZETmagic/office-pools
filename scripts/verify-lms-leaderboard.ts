@@ -145,7 +145,9 @@ async function main() {
         : s.eliminated_matchweek !== null
           ? `OUT · MW${s.eliminated_matchweek}`
           : s.pick
-            ? `[crest] ${s.pick.club_name}`
+            ? // Crest only on screen — the name here is the accessibility label,
+              // and the fallback if the feed ever hands us a club with no badge.
+              `[${s.pick.crest_url ? 'crest' : 'no crest!'}] ${s.pick.club_name}`
             : s.pick_sealed
               ? '🔒 HIDDEN'
               : 'NO PICK'
