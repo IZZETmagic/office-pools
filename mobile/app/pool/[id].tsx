@@ -376,6 +376,8 @@ export default function PoolDetailScreen() {
             matchdayInfo={matchdayInfo}
             league={league}
             leagueEntries={leagueLeaderboard}
+            // The same lock the picker switches on — one fact, one source.
+            tableIsLocked={tableIsLocked}
           />
         );
       case 'predictions': {

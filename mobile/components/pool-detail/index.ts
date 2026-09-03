@@ -30,6 +30,8 @@ export { LeaderboardTab } from './LeaderboardTab';
 export { LeagueMyTableTab } from './LeagueMyTableTab';
 export { LeagueTableScoring } from './LeagueTableScoring';
 export { LeagueTableLeaderboard } from './LeagueTableLeaderboard';
+export { TableBreakdownList } from './TableBreakdownList';
+export { TableEntrySheet, type TableEntrySheetTarget } from './TableEntrySheet';
 export { MatchdayInfoBar } from './MatchdayInfoBar';
 export { MatchdayMVPBanner } from './MatchdayMVPBanner';
 export { MatchPredictionRow } from './MatchPredictionRow';

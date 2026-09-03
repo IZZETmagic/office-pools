@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { LeaderboardLegend } from './LeaderboardLegend';
 import { LeaderboardPodium } from './LeaderboardPodium';
 import { LeaderboardRow } from './LeaderboardRow';
 import { LeagueTableLeaderboard } from './LeagueTableLeaderboard';
+import { TableEntrySheet, type TableEntrySheetTarget } from './TableEntrySheet';
 import { MatchdayInfoBar } from './MatchdayInfoBar';
 import { MatchdayMVPBanner } from './MatchdayMVPBanner';
 import { SuperlativesSection } from './SuperlativesSection';
@@ -33,6 +34,12 @@ type LeaderboardTabProps = {
   league?: LeagueLeaderboardMeta | null;
   /** League rows. Null for a World Cup pool, where `entries` carries them. */
   leagueEntries?: LeagueLeaderboardEntry[] | null;
+  /**
+   * Table mode: has the deadline passed? Gates whether a RIVAL's table can be
+   * opened at all. The database enforces the same rule (RLS 078/104); this is
+   * what lets the sheet explain rather than come back empty.
+   */
+  tableIsLocked?: boolean;
 };
 
 export function LeaderboardTab({
@@ -45,8 +52,12 @@ export function LeaderboardTab({
   matchdayInfo,
   league = null,
   leagueEntries = null,
+  tableIsLocked = false,
 }: LeaderboardTabProps) {
   const theme = useTheme();
+  // Which table is open, if any. Held here rather than in the list so the
+  // sheet is a sibling of it and not a child of a row that can unmount.
+  const [openTable, setOpenTable] = useState<TableEntrySheetTarget | null>(null);
 
   const awardsByEntry = useMemo(() => {
     const map: Record<string, PoolAward[]> = {};
@@ -80,15 +91,26 @@ export function LeaderboardTab({
   // guessing at what a Showdown row should say.
   if (league?.mode === 'table' && leagueEntries) {
     return (
-      <LeagueTableLeaderboard
-        entries={leagueEntries}
-        league={league}
-        currentUserId={currentUserId}
-        // Points to the World Cup breakdown, which holds nothing for a table
-        // entry. Left unwired until that screen has a table arm — a tap that
-        // opens an empty page is worse than a row that does not respond.
-        onEntryPress={undefined}
-      />
+      <>
+        <LeagueTableLeaderboard
+          entries={leagueEntries}
+          league={league}
+          currentUserId={currentUserId}
+          onEntryPress={(entry) =>
+            setOpenTable({
+              entryId: entry.entry_id,
+              displayName: entry.entry_name?.trim() ? entry.entry_name : entry.full_name,
+              isOwnEntry: entry.user_id === currentUserId,
+            })
+          }
+        />
+        <TableEntrySheet
+          poolId={poolId}
+          target={openTable}
+          isLocked={tableIsLocked}
+          onClose={() => setOpenTable(null)}
+        />
+      </>
     );
   }
 
