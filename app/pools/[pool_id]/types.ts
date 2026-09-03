@@ -244,6 +244,17 @@ export type TeamData = {
   group_letter: string
   fifa_ranking_points: number
   flag_url: string | null
+  /**
+   * A shorter label for narrow rows, when one is worth having.
+   *
+   * ⚠ PRESENTATIONAL ONLY — never match, group or key on it. `team_id` is the
+   * identity, and `lib/league/clubName.ts` says the same thing at the source.
+   *
+   * Optional and normally absent: a national team has no short form worth
+   * computing, and every existing consumer reads `country_name`. Only the
+   * league adapter fills it.
+   */
+  short_name?: string | null
 }
 
 export type PlayerScoreData = {

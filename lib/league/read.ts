@@ -30,6 +30,7 @@ import type { Prediction } from '@/lib/tournament'
 import type { MatchData, TeamData, ExistingPrediction } from '@/app/pools/[pool_id]/types'
 import type { PoolRoundState, EntryRoundSubmission } from '@/app/pools/[pool_id]/types'
 import { matchweekKey } from '@/lib/competitionRounds'
+import { shortClubName } from './clubName'
 
 /** Everything the prediction flow needs for one league pool. */
 export type LeaguePoolView = {
@@ -165,6 +166,14 @@ function clubToTeam(c: ClubRow): TeamData {
     group_letter: '',
     fifa_ranking_points: 0,
     flag_url: c.crest_url,
+    // ⚠ CARRIED, NOT SUBSTITUTED. `country_name` keeps the full name, because
+    // a surface with room for it should show it — the phone's match header
+    // gives a name two lines at 16px and "Manchester City" belongs there.
+    // This is the SAME `shortClubName` the web renders through, so the two
+    // clients cannot drift into two different ideas of what Forest is called;
+    // a hand-kept copy under `mobile/` is exactly what this route's header
+    // says the shaping exists to avoid.
+    short_name: shortClubName(c.name),
   }
 }
 

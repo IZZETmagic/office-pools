@@ -46,12 +46,33 @@ function matchTimeParts(iso: string): { clock: string; period: string | null } {
   return { clock: split[1], period: split[2] };
 }
 
+/**
+ * The label for one side of the row, at the narrowest this screen ever renders
+ * a team.
+ *
+ * ⚠ `shortName` FIRST. It is the league adapter's `shortClubName` output — the
+ * web's own rules, measured against real club names rather than guessed — and
+ * without it this row was handed "Manchester City" for a slot that fits about
+ * fourteen characters and ellipsed away the half that distinguishes it from
+ * United. `displayTeamName` stays as the fallback: it is the World Cup's
+ * country map, and it is still the only thing that knows about "Bosnia and
+ * Herzegovina".
+ */
+function sideName(
+  team: ResultsMatch['homeTeam'],
+  placeholder: string | null,
+  fallback: string,
+): string {
+  if (team?.shortName) return team.shortName;
+  return displayTeamName(team?.countryName ?? placeholder ?? fallback);
+}
+
 function homeDisplayName(match: ResultsMatch): string {
-  return displayTeamName(match.homeTeam?.countryName ?? match.homeTeamPlaceholder ?? 'Home');
+  return sideName(match.homeTeam, match.homeTeamPlaceholder, 'Home');
 }
 
 function awayDisplayName(match: ResultsMatch): string {
-  return displayTeamName(match.awayTeam?.countryName ?? match.awayTeamPlaceholder ?? 'Away');
+  return sideName(match.awayTeam, match.awayTeamPlaceholder, 'Away');
 }
 
 /**
@@ -206,11 +227,23 @@ export function MatchResultRow({ match, onPress }: Props) {
         ) : null}
       </View>
 
-      {/* Home name — fixed width, right-aligned toward the score */}
+      {/* Home name — takes its share of whatever the screen has, right-aligned
+          toward the score.
+
+          ⚠ `flex: 1` ON BOTH SIDES, not a fixed width. It used to be 84px on
+          every phone, which spent 24pt of a 390pt screen on nothing and clipped
+          names that would have fit. Equal flex is what keeps the score centred
+          — the property the old fixed width was there to guarantee — so this
+          keeps that guarantee and stops leaving the slack unused.
+
+          ⚠ `minWidth: 0` is load-bearing. A flex child's default minimum is its
+          content, so without it a long name refuses to shrink, pushes the row
+          wide and truncates the OPPOSITE side instead. */}
       <RNText
         numberOfLines={1}
         style={{
-          width: 84,
+          flex: 1,
+          minWidth: 0,
           textAlign: 'right',
           fontFamily: fontFamilies.medium,
           fontSize: 14,
@@ -334,12 +367,14 @@ export function MatchResultRow({ match, onPress }: Props) {
         )}
       </View>
 
-      {/* Away name — fixed width, left-aligned toward the score */}
+      {/* Away name — the mirror of the home side above; see its note on why
+          this is `flex: 1` and not a fixed width. */}
       <TeamMark url={match.awayTeam?.flagUrl} />
       <RNText
         numberOfLines={1}
         style={{
-          width: 84,
+          flex: 1,
+          minWidth: 0,
           textAlign: 'left',
           fontFamily: fontFamilies.medium,
           fontSize: 14,

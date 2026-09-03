@@ -83,6 +83,11 @@ function normalizeTeam(raw: unknown): ResultsTeam | null {
     countryName: obj.country_name ?? '',
     countryCode: obj.country_code ?? null,
     flagUrl: obj.flag_url ?? null,
+    // Always null here, and stated rather than read: this path selects from
+    // `matches`/`teams`, which is World Cup only, and a country has no
+    // club-style short form. A league fixture never reaches this function — it
+    // short-circuits through `leagueMatch` below, already carrying its own.
+    shortName: null,
   };
 }
 

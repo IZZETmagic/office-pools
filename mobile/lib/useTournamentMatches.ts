@@ -55,6 +55,16 @@ export type ResultsTeam = {
   countryName: string;
   countryCode: string | null;
   flagUrl: string | null;
+  /**
+   * A shorter label for a narrow row, or null when there is no better form.
+   *
+   * ⚠ NULL FOR EVERY WORLD CUP TEAM, and that is correct — `MATCH_SELECT`
+   * below does not ask for it, because a country has no club-style short form.
+   * Only `/api/users/:id/fixtures` sends it, computed by the web's own
+   * `shortClubName` so the phone and the browser cannot end up calling Forest
+   * two different things. A consumer must fall back, never assume.
+   */
+  shortName: string | null;
 };
 
 const MATCH_SELECT = `
@@ -82,11 +92,17 @@ function normalizeTeam(raw: unknown): ResultsTeam | null {
   if (!raw) return null;
   const t = Array.isArray(raw) ? raw[0] : raw;
   if (!t) return null;
-  const obj = t as { country_name?: string; country_code?: string | null; flag_url?: string | null };
+  const obj = t as {
+    country_name?: string;
+    country_code?: string | null;
+    flag_url?: string | null;
+    short_name?: string | null;
+  };
   return {
     countryName: obj.country_name ?? '',
     countryCode: obj.country_code ?? null,
     flagUrl: obj.flag_url ?? null,
+    shortName: obj.short_name ?? null,
   };
 }
 
