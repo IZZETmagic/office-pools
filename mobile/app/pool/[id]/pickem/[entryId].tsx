@@ -561,7 +561,8 @@ function FixtureRow({
           than one word and breaks across two lines instead.
         */
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Club team={home} side="home" />
+          <ClubName team={home} />
+          <Crest team={home} />
           <TapScoreField
             value={score.home}
             onChange={(v) => onScore('home', v)}
@@ -570,8 +571,8 @@ function FixtureRow({
           />
           {/* ⚠ Back by request. It reads as a scoreline rather than as two
               unrelated boxes — the thing the crests either side do not quite
-              say on their own. Its cost is real (about 7pt plus a gap) and is
-              paid for out of the score fields, not out of the names. */}
+              say on their own. Its cost is paid out of the score fields, not
+              out of the names. */}
           <Text variant="detail" color="slate">
             –
           </Text>
@@ -581,7 +582,8 @@ function FixtureRow({
             disabled={!canEdit}
             width={40}
           />
-          <Club team={away} side="away" />
+          <Crest team={away} />
+          <ClubName team={away} />
         </View>
       )}
     </View>
@@ -589,66 +591,77 @@ function FixtureRow({
 }
 
 /**
- * A club beside its score box: the name on the outside, the crest against the
- * number.
+ * The crest, in a slot of its own.
  *
- * ⚠ THE SHORT NAME, not the full one and not the three-letter code. Ryan,
- * 2026-09-03: *"it doesn't have to be the three-letter acronym — it could be
- * Man United, Man City."* Those forms are exactly what `shortClubName` already
- * produces, and the contract carries them in `short_name`; the code is right
- * for the Results control, where three buttons share a row, and wrong here.
+ * ⚠⚠ A FIXED-WIDTH SIBLING, not a child of the name. Ryan, 2026-09-03: *"the
+ * logos should all be aligned straight down on either side of the scores."*
+ * They were not, and could not be: the crest lived inside a `flex: 1` box with
+ * the name, so its x drifted with the length of the word beside it and no two
+ * rows agreed. Everything except the two names is now a fixed width, which
+ * makes the row symmetric BY CONSTRUCTION — the score block lands dead centre
+ * and both crests land on the same x on every card in the list.
+ */
+function Crest({ team }: { team: LeagueMatch['home_team'] }) {
+  const theme = useTheme();
+  return team?.flag_url ? (
+    <Image source={{ uri: team.flag_url }} style={{ width: 26, height: 26 }} resizeMode="contain" />
+  ) : (
+    <View
+      style={{
+        width: 26,
+        height: 26,
+        borderRadius: theme.radii.pill,
+        backgroundColor: withOpacity(theme.colors.slate, 0.15),
+      }}
+    />
+  );
+}
+
+/**
+ * The club's name, outboard of its crest.
+ *
+ * ⚠ THE SHORT NAME, not the full one and not the three-letter code. Ryan:
+ * *"it doesn't have to be the three-letter acronym — it could be Man United,
+ * Man City."* Those forms are exactly what `shortClubName` already produces,
+ * and the contract carries them in `short_name`; the code is right for the
+ * Results control, where three buttons share a row, and wrong here.
  *
  * ⚠ `country_name` is the FULL name and the fallback — the World Cup field
- * names again (`lib/league/read.ts`). Every fixture in the three live seasons
- * carries a `short_name`, so the fallback should never fire.
+ * names again. Every fixture in the three live seasons carries a `short_name`,
+ * so the fallback should never fire.
  *
- * ⚠ TWO LINES ALLOWED. "Crystal Palace" and "Nott'm Forest" do not fit a
- * ~81pt column on one line at this size, and truncating them is the failure
- * the Results control avoids by using a code. Here there is room to wrap, so
- * they wrap; only a single long word can still truncate, and the longest that
- * exists is "Bournemouth", which fits.
+ * ⚠ CENTRED, and the two slots are the only flexible things in the row. Equal
+ * flex on both sides is what holds the scores in the middle; centring the text
+ * inside them is what stops a short name like "Leeds" hanging off one edge
+ * while a long one fills its slot.
  */
-function Club({ team, side }: { team: LeagueMatch['home_team']; side: 'home' | 'away' }) {
+function ClubName({ team }: { team: LeagueMatch['home_team'] }) {
   const theme = useTheme();
   const label = team?.short_name?.trim() || team?.country_name || 'TBD';
   return (
-    <View
+    /*
+      ⚠ SHRINKS BEFORE IT TRUNCATES. A name gets ~78pt here and "Bournemouth" —
+      the longest club name across the three live seasons that cannot wrap,
+      being one word — wants 72-79 at this size. An ellipsis is a failure a
+      member has to decode ("Bournemou…"); 12pt instead of 13 on one row is
+      not. `minimumFontScale` floors it at 0.85, and the two-line allowance
+      still does the work for every multi-word name.
+    */
+    <Text
+      variant="body"
+      numberOfLines={2}
+      adjustsFontSizeToFit
+      minimumFontScale={0.85}
       style={{
         flex: 1,
-        // Home reads name-then-crest, away crest-then-name.
-        flexDirection: side === 'home' ? 'row-reverse' : 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        gap: 6,
+        fontSize: 13,
+        lineHeight: 16,
+        color: theme.colors.ink,
+        textAlign: 'center',
       }}
     >
-      {team?.flag_url ? (
-        <Image source={{ uri: team.flag_url }} style={{ width: 26, height: 26 }} resizeMode="contain" />
-      ) : null}
-      {/*
-        ⚠ SHRINKS BEFORE IT TRUNCATES. With the dash restored a name gets ~76pt
-        and "Bournemouth" wants 72-79 — a coin toss on the real font. An
-        ellipsis is a failure a member has to decode ("Bournemou…"); 12pt
-        instead of 13 on one row of one card is not. `minimumFontScale` floors
-        it at 0.85 so nothing can shrink into illegibility, and the two-line
-        allowance still does the work for every multi-word name.
-      */}
-      <Text
-        variant="body"
-        numberOfLines={2}
-        adjustsFontSizeToFit
-        minimumFontScale={0.85}
-        style={{
-          flexShrink: 1,
-          fontSize: 13,
-          lineHeight: 16,
-          color: theme.colors.ink,
-          textAlign: side === 'home' ? 'right' : 'left',
-        }}
-      >
-        {label}
-      </Text>
-    </View>
+      {label}
+    </Text>
   );
 }
 
