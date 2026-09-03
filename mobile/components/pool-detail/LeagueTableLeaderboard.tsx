@@ -30,7 +30,13 @@ type Props = {
   entries: LeagueLeaderboardEntry[];
   league: LeagueLeaderboardMeta;
   currentUserId: string | null;
-  onEntryPress?: (entryId: string) => void;
+  /**
+   * Open somebody's table. ⚠ The CALLER decides whether a rival's is openable —
+   * before the deadline only your own is, which is enforced in the database by
+   * RLS (078/104) and stated by the sheet rather than discovered as an empty
+   * result.
+   */
+  onEntryPress?: (entry: LeagueLeaderboardEntry) => void;
 };
 
 export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntryPress }: Props) {
@@ -71,7 +77,7 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
             bgTint={withOpacity(theme.colors.silver, 0.15)}
             medalIcon="medal.fill"
             isCurrentUser={entries[1].user_id === currentUserId}
-            onPress={onEntryPress ? () => onEntryPress(entries[1].entry_id) : undefined}
+            onPress={onEntryPress ? () => onEntryPress(entries[1]) : undefined}
           />
           <PodiumColumn
             entry={entries[0]}
@@ -80,7 +86,7 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
             bgTint={withOpacity(theme.colors.accent, 0.1)}
             medalIcon="trophy.fill"
             isCurrentUser={entries[0].user_id === currentUserId}
-            onPress={onEntryPress ? () => onEntryPress(entries[0].entry_id) : undefined}
+            onPress={onEntryPress ? () => onEntryPress(entries[0]) : undefined}
           />
           <PodiumColumn
             entry={entries[2]}
@@ -89,7 +95,7 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
             bgTint={withOpacity(theme.colors.bronze, 0.1)}
             medalIcon="medal.fill"
             isCurrentUser={entries[2].user_id === currentUserId}
-            onPress={onEntryPress ? () => onEntryPress(entries[2].entry_id) : undefined}
+            onPress={onEntryPress ? () => onEntryPress(entries[2]) : undefined}
           />
         </View>
       ) : null}
@@ -100,7 +106,7 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
           entry={entry}
           rank={entry.current_rank ?? ((hasPodium ? 4 : 1) + i)}
           isCurrentUser={entry.user_id === currentUserId}
-          onPress={onEntryPress ? () => onEntryPress(entry.entry_id) : undefined}
+          onPress={onEntryPress ? () => onEntryPress(entry) : undefined}
         />
       ))}
     </View>
