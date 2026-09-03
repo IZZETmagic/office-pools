@@ -33,13 +33,24 @@ export type PredictionSurface =
    */
   | 'league-lms'
   /**
-   * Every other league pool. The phone shows what it can READ and sends picking
-   * to the web — Ryan's call 2026-09-02: the RN build has not begun, and a
-   * picking control is a product decision that deserves its own design pass
-   * rather than arriving behind a read contract.
+   * Pick'em. The landing is a MATCHWEEK — the entries in it, yours first — and
+   * the picking is a route away at `pool/[id]/pickem/[entryId]`, the same shape
+   * Table and LMS use and for the same layout reason.
    *
-   * ⚠ Now only Pick'em and Showdown. Each gets a picker when it has had its own
-   * design pass, not before.
+   * ⚠ It is the only mode whose landing has a week dimension. Table asks for one
+   * prediction a season and LMS asks one a week within a round; Pick'em asks for
+   * ten a week, thirty-eight times, and every one of those weeks reveals on its
+   * OWN clock. So the switcher is not a convenience — without it, thirty-seven
+   * weeks of the season are unreachable.
+   */
+  | 'league-pickem'
+  /**
+   * Every other league pool. The phone shows what it can READ and sends picking
+   * to the web — Ryan's call 2026-09-02: a picking control is a product decision
+   * that deserves its own design pass rather than arriving behind a read
+   * contract.
+   *
+   * ⚠ Now only Showdown, which is the largest of the four to design.
    */
   | 'league-read-only'
   /** The World Cup wizard. */
@@ -69,5 +80,6 @@ export function predictionSurfaceFor(pool: PoolShape): PredictionSurface {
   // is a league at all, which is the distinction a NULL mode turns on.
   if (pool.leagueMode === 'table') return 'league-table'
   if (pool.leagueMode === 'last_man_standing') return 'league-lms'
+  if (pool.leagueMode === 'pickem') return 'league-pickem'
   return 'league-read-only'
 }

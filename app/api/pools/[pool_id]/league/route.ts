@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { matchweekNumber } from '@/lib/competitionRounds'
 
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -183,6 +184,30 @@ export async function GET(
     season: {
       teams: view.teams,
       matches: view.matches,
+      /**
+       * When each matchweek CLOSES for picks, and when its football starts.
+       *
+       * ⚠ SHIPPED NARROW, ON PURPOSE. `view.roundStates` carries a `state`
+       * string too, and sending it would invite the client to read it — but in
+       * this vocabulary `'locked'` means BOTH *"its deadline passed"* and
+       * *"its turn has not come"* (read.ts:508). A screen reading the string
+       * would call matchweek 30 revealed in August. The reveal question is a
+       * CLOCK question, which is exactly how `computeReveal` answers it, so
+       * only the clock crosses the wire.
+       *
+       * ⚠ `lock_at` is NOT the first kickoff. Migration 101 closes picks an
+       * HOUR before the first game. Deriving one from the other is a live bug
+       * on the web today (`LeagueScoringRulesTab` still says picks close "at
+       * the moment the first match starts"), so both are sent rather than
+       * computed.
+       */
+      matchweeks: view.roundStates.map((r) => ({
+        number: matchweekNumber(r.round_key),
+        lock_at: r.deadline,
+        first_kickoff_at: r.opened_at,
+      })).filter((m): m is { number: number; lock_at: string | null; first_kickoff_at: string | null } =>
+        m.number !== null,
+      ),
       matchweekCount: view.matchweekCount,
       openMatchweekNumber: view.openMatchweekNumber,
       inPlayMatchweekNumber: view.inPlayMatchweekNumber,

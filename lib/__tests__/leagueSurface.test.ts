@@ -47,11 +47,16 @@ describe('predictionSurfaceFor', () => {
     // whether this is a league at all, which is what `isLeague` is for.
     expect(predictionSurfaceFor({ isLeague: true, leagueMode: 'table' })).toBe('league-table')
     expect(predictionSurfaceFor({ isLeague: true, leagueMode: 'last_man_standing' })).toBe('league-lms')
+    expect(predictionSurfaceFor({ isLeague: true, leagueMode: 'pickem' })).toBe('league-pickem')
 
-    // ⚠ Pick'em and Showdown are read-only because neither has had its pass, NOT
-    // because read-only is what a league defaults to. When one of them gets a
-    // picker this line moves deliberately, the way LMS's just did.
-    for (const m of [null, 'pickem', 'showdown'] as const) {
+    // ⚠ Showdown is read-only because it has not had its pass, NOT because
+    // read-only is what a league defaults to. When it gets a picker this line
+    // moves deliberately, the way Table's, LMS's and Pick'em's each did.
+    //
+    // ⚠ A NULL mode stays here too, and that is not an oversight. Three
+    // production pools carry a season with no mode; there is no game to offer
+    // them a picker for, so the honest surface is the one that says so.
+    for (const m of [null, 'showdown'] as const) {
       expect(
         predictionSurfaceFor({ isLeague: true, leagueMode: m }),
         `leagueMode=${m} has had no picker design pass`,

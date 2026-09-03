@@ -297,6 +297,18 @@ function InnerLayout() {
             gestureEnabled: false,
           }}
         />
+        {/* Pick'em's picker, and the read-back of somebody else's week. Declared
+            for the same reason as the two above: undeclared it still renders,
+            but with the stack's own header, titled from the FILE PATH and
+            carrying a second back button over the one the screen draws. */}
+        <Stack.Screen
+          name="pool/[id]/pickem/[entryId]"
+          options={{
+            headerShown: false,
+            presentation: 'fullScreenModal',
+            gestureEnabled: false,
+          }}
+        />
         <Stack.Screen
           name="pool/[id]/scoring-config"
           options={{

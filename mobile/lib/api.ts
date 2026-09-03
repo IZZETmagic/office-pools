@@ -1452,3 +1452,43 @@ export function saveLmsPick(
 ) {
   return apiFetch<{ saved: true }>(`/api/pools/${poolId}/lms-pick`, { method: 'POST', body });
 }
+
+// ============================================================
+// League Pick'em — saving picks
+// ============================================================
+
+/**
+ * Save a matchweek's picks.
+ *
+ * ⚠ THE SHAPE IS DECIDED BY THE POOL'S DEPTH AND THE ROUTE ENFORCES IT. A
+ * Scores pool sends `{homeScore, awayScore}`; a Results pool sends `{outcome}`.
+ * Sending the wrong one is a 400 with copy naming the game — and that check is
+ * not pedantry: a scoreline reaching a Results pool would satisfy the database
+ * CHECK perfectly and then score ZERO forever, because the engine's Results arm
+ * compares `predicted_outcome` and a NULL comparison is never true. The member
+ * would be silently unscoreable with no error anywhere.
+ *
+ * ⚠ NEVER ENCODE AN OUTCOME AS A SENTINEL SCORELINE. home/draw/away as
+ * 1-0/0-0/0-1 would score as a genuine EXACT and show the member a "you
+ * predicted 1-0" they never picked. Migration 064 built a separate column to
+ * make that impossible; do not route around it.
+ *
+ * ⚠ A REJECTION IS A 409, NOT A SILENT SUCCESS. The matchweek lock is a
+ * silent-skip database trigger, so a refused write would otherwise return
+ * success having stored nothing — the member finds out a week later that their
+ * picks were never there. `apiFetch` throws the route's message, which names how
+ * many of the batch were refused.
+ */
+export type LeaguePickBody =
+  | { matchId: string; homeScore: number; awayScore: number }
+  | { matchId: string; outcome: 'home' | 'draw' | 'away' };
+
+export function saveLeaguePicks(
+  poolId: string,
+  body: { entryId: string; predictions: LeaguePickBody[] },
+) {
+  return apiFetch<{ saved: boolean; progress?: { predicted: number }; lastSaved?: string }>(
+    `/api/pools/${poolId}/predictions`,
+    { method: 'POST', body },
+  );
+}

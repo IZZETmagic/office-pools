@@ -26,6 +26,7 @@ import {
   FeesTab,
   FormTab,
   LeaderboardTab,
+  LeaguePickemEntriesTab,
   LeagueTableEntriesTab,
   LmsEntriesTab,
   LmsScoring,
@@ -80,6 +81,7 @@ const MemoPoolDetailHeader = memo(PoolDetailHeader);
 const MemoLeaderboardTab = memo(LeaderboardTab);
 const MemoLeagueTableEntriesTab = memo(LeagueTableEntriesTab);
 const MemoLmsEntriesTab = memo(LmsEntriesTab);
+const MemoLeaguePickemEntriesTab = memo(LeaguePickemEntriesTab);
 const MemoLmsScoring = memo(LmsScoring);
 const MemoLeagueTableScoring = memo(LeagueTableScoring);
 const MemoPredictionsTab = memo(PredictionsTab);
@@ -439,6 +441,18 @@ export default function PoolDetailScreen() {
                   : null
               }
               currentUserId={pool.currentUserId}
+            />
+          );
+        }
+        // Pick'em's landing is a MATCHWEEK, then the entries in it — the only
+        // league mode whose landing needs a week, because its reveal is
+        // per-matchweek rather than one deadline a season. The picking is a
+        // route away, like Table's and LMS's and for the same layout reason.
+        if (surface === 'league-pickem') {
+          return (
+            <MemoLeaguePickemEntriesTab
+              poolId={pool.poolId}
+              entries={leagueLeaderboard ?? []}
             />
           );
         }
