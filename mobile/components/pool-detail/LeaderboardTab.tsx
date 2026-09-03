@@ -6,6 +6,7 @@ import { LeaderboardLegend } from './LeaderboardLegend';
 import { LeaderboardPodium } from './LeaderboardPodium';
 import { LeaderboardRow } from './LeaderboardRow';
 import { LeagueTableLeaderboard } from './LeagueTableLeaderboard';
+import { LmsLeaderboard } from './LmsLeaderboard';
 import { TableEntrySheet, type TableEntrySheetTarget } from './TableEntrySheet';
 import { MatchdayInfoBar } from './MatchdayInfoBar';
 import { MatchdayMVPBanner } from './MatchdayMVPBanner';
@@ -85,10 +86,20 @@ export function LeaderboardTab({
   // rather than storing zeros), so for a league pool every one of them rendered
   // a confident zero over the top of scores it never read.
   //
-  // ⚠ Table mode is the only league mode built here so far. The others fall
-  // through to the World Cup list on purpose: it is wrong for them too, but it
-  // is the wrongness that is already shipped, and replacing it blind would be
-  // guessing at what a Showdown row should say.
+  // ⚠ Pick'em and Showdown still fall through to the World Cup list on purpose:
+  // it is wrong for them too, but it is the wrongness that is already shipped,
+  // and replacing it blind would be guessing at what a Showdown row should say.
+  //
+  // Last Man Standing needed its own list for a reason the other modes do not
+  // share — it has no points at all, so a score column is a column of zeros by
+  // design, and its stored rank is entry_id order (see `LeagueLeaderboardEntry
+  // .lms`). The question the mode asks is who is still in.
+  if (league?.mode === 'last_man_standing' && leagueEntries) {
+    return (
+      <LmsLeaderboard entries={leagueEntries} league={league} currentUserId={currentUserId} />
+    );
+  }
+
   if (league?.mode === 'table' && leagueEntries) {
     return (
       <>

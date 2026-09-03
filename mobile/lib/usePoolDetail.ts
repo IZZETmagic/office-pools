@@ -339,6 +339,20 @@ export function usePoolDetail(poolId: string | undefined) {
           // payload also carries `match_points` and `bonus_points`, which a
           // league row does not have and must not acquire by being spread into —
           // that is how "0 + 840 bonus" got onto a screen in the first place.
+          //
+          // ⚠ LAST MAN STANDING TAKES NONE OF IT, and the reason is not the
+          // fields — it is the RE-SORT. `byRankThenPoints` orders on
+          // `current_rank`, which in LMS is entry_id order (see the note on
+          // `LeagueLeaderboardEntry.lms`); applying it would throw away the
+          // survival ordering the route just built and shuffle survivors in
+          // among the eliminated. The payload also carries no survival state at
+          // all, so there is nothing here worth merging: every number it brings
+          // is either withheld in this mode or zero. The debounced refresh
+          // below — which every branch already schedules — is what makes an LMS
+          // leaderboard live, a second or two later and correct.
+          if (prev.leagueLeaderboard && prev.league?.mode === 'last_man_standing') {
+            return prev;
+          }
           if (prev.leagueLeaderboard) {
             let leagueChanged = false;
             const mergedLeague = prev.leagueLeaderboard.map((row) => {

@@ -112,7 +112,9 @@ async function handleGET(
     return NextResponse.json({
       pool_id,
       prediction_mode: pool.prediction_mode,
-      league: { mode: leaderboard.mode, is_final: leaderboard.is_final },
+      // `lms` is null in every other mode — the round context a survival
+      // leaderboard needs, and nothing for a leaderboard that scores points.
+      league: { mode: leaderboard.mode, is_final: leaderboard.is_final, lms: leaderboard.lms },
       entries: leaderboard.rows,
       awards: [],
       superlatives: [],

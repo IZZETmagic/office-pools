@@ -139,6 +139,27 @@ export type LeagueLeaderboardEntry = LeaderboardEntryCore & {
     crest_url: string | null;
     actual_rank: number | null;
   } | null;
+  /**
+   * Last Man Standing only; null in every other mode.
+   *
+   * ⚠ In this mode `current_rank` and `previous_rank` arrive NULL on purpose.
+   * The stored rank is entry_id order there — every rung of the shared cascade
+   * is zero, so it decides nothing — and the server withholds it rather than
+   * hand over a wrong answer that looks like a right one. Read this instead.
+   */
+  lms: {
+    /** NULL means still standing. Otherwise the matchweek that knocked them out. */
+    eliminated_matchweek: number | null;
+    /** Took this round. Only true once the round has closed. */
+    is_round_winner: boolean;
+    /**
+     * FALSE for someone not in this round at all — they joined after it opened
+     * and enter the next one. ⚠ NOT the same as being eliminated.
+     */
+    in_round: boolean;
+    /** Rounds taken this season, and the only memory a closed round leaves. */
+    rounds_won: number;
+  } | null;
 };
 
 /** Present only for a league pool; `null` means render the World Cup shape. */
@@ -146,6 +167,19 @@ export type LeagueLeaderboardMeta = {
   mode: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null;
   /** False until the season-end snapshot exists — every total is provisional. */
   is_final: boolean;
+  /**
+   * The round every row's `lms` block describes. Null in every other mode, and
+   * null in an LMS pool whose first round has not opened yet.
+   */
+  lms: {
+    round_number: number;
+    first_matchweek: number;
+    /** NULL while the round is still running. */
+    last_matchweek: number | null;
+    standing: number;
+    /** Everybody in the round — NOT the member count, which can be higher. */
+    in_round: number;
+  } | null;
 };
 
 export type LeaderboardEntry = LeaderboardEntryCore & {

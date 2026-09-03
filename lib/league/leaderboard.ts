@@ -43,6 +43,65 @@ export type ChampionPick = {
 }
 
 /**
+ * Where one entry stands in Last Man Standing.
+ *
+ * ⚠ THE STORED RANK IS USELESS IN THIS MODE, AND THAT IS WHY THIS BLOCK EXISTS.
+ * `league_finalize_ranks` (121) is the one rank writer for all four modes and
+ * orders on `rounds_won → duel_points → total_points → exact_count →
+ * correct_count → bonus_points → first league_prediction → entry_id`. In LMS
+ * every rung is zero — there are no points in the mode — and the "first pick"
+ * rung is `infinity`, because LMS picks live in `league_lms_picks`, not in
+ * `league_predictions`. The whole cascade falls through to `entry_id ASC`.
+ *
+ * Verified on production 2026-09-03: all ten ranks in the LMS pool matched
+ * entry_id order exactly, which put three eliminated members above a survivor.
+ * A leaderboard built on `current_rank` would have shipped that, so this mode
+ * carries its own state and `current_rank` is nulled out below.
+ */
+export type LmsRowState = {
+  /**
+   * NULL means still standing. Otherwise the matchweek whose RESULT knocked them
+   * out — not the one they failed to pick in, so the record reads as a football
+   * event rather than an administrative one (086:64).
+   */
+  eliminated_matchweek: number | null
+  /**
+   * Took the round `LmsRoundMeta` describes. Only ever true once that round has
+   * closed, and a closing round opens the next one in the SAME transaction
+   * (087:266) — so in practice this is true only at the end of a season.
+   */
+  is_round_winner: boolean
+  /**
+   * FALSE for someone who is not in this round at all: they joined after it
+   * opened and enter the next one, because everybody already in it has spent
+   * clubs and a newcomer with a full twenty would have an advantage nobody else
+   * had. ⚠ That is NOT being eliminated and must not render as one.
+   */
+  in_round: boolean
+  /**
+   * Rounds taken this season — `league_entry_totals.rounds_won`, the season
+   * score for this mode.
+   *
+   * ⚠ It is the ENTIRE memory of a round. Closing a round opens the next one in
+   * the same transaction, so survival resets to "everybody back in" immediately
+   * and nothing else on this screen records that the round ever happened.
+   */
+  rounds_won: number
+}
+
+/** The round that every `LmsRowState` on this leaderboard is describing. */
+export type LmsRoundMeta = {
+  round_number: number
+  first_matchweek: number
+  /** NULL while the round is still running. */
+  last_matchweek: number | null
+  /** Still standing. */
+  standing: number
+  /** Everybody in the round — NOT the pool's member count, which can be higher. */
+  in_round: number
+}
+
+/**
  * One league leaderboard row.
  *
  * ⚠ It deliberately carries NONE of the World Cup extras — `match_points`,
@@ -60,6 +119,11 @@ export type LeagueLeaderboardRow = {
   full_name: string
   username: string
   total_points: number
+  /**
+   * ⚠ NULL IN LAST MAN STANDING, deliberately. The stored `final_rank` is
+   * entry_id order there (see `LmsRowState`), so handing it over would be
+   * handing over a wrong answer that looks like a right one. Read `lms` instead.
+   */
   current_rank: number | null
   previous_rank: number | null
   /**
@@ -70,6 +134,8 @@ export type LeagueLeaderboardRow = {
   has_filed: boolean
   /** Table mode only; null in every other mode and for an entry that never filed. */
   champion: ChampionPick | null
+  /** Last Man Standing only; null in every other mode. */
+  lms: LmsRowState | null
 }
 
 export type LeagueLeaderboard = {
@@ -80,6 +146,12 @@ export type LeagueLeaderboard = {
    * provisional, and a screen that does not say so is claiming a result.
    */
   is_final: boolean
+  /**
+   * Last Man Standing only. NULL in every other mode, and null in an LMS pool
+   * that has no round yet — which is a real state (the pool is created before
+   * `league_lms_open_round` runs) and not a failure.
+   */
+  lms: LmsRoundMeta | null
   rows: LeagueLeaderboardRow[]
 }
 
@@ -100,6 +172,7 @@ export async function readLeagueLeaderboard(
   pool: { league_season_id: string; league_mode: string | null },
 ): Promise<{ leaderboard: LeagueLeaderboard | null; error: string | null }> {
   const isTable = pool.league_mode === 'table'
+  const isLms = pool.league_mode === 'last_man_standing'
 
   const { data: memberRows, error: memberErr } = await admin
     .from('pool_members')
@@ -112,7 +185,10 @@ export async function readLeagueLeaderboard(
     members.set(m.member_id, m)
   }
   if (members.size === 0) {
-    return { leaderboard: { mode: normaliseMode(pool.league_mode), is_final: false, rows: [] }, error: null }
+    return {
+      leaderboard: { mode: normaliseMode(pool.league_mode), is_final: false, lms: null, rows: [] },
+      error: null,
+    }
   }
 
   // ⚠ `retired_at` filtered. Only two filters in the product carry it and this
@@ -130,17 +206,20 @@ export async function readLeagueLeaderboard(
   }>
   const entryIds = entries.map((e) => e.entry_id)
   if (entryIds.length === 0) {
-    return { leaderboard: { mode: normaliseMode(pool.league_mode), is_final: false, rows: [] }, error: null }
+    return {
+      leaderboard: { mode: normaliseMode(pool.league_mode), is_final: false, lms: null, rows: [] },
+      error: null,
+    }
   }
 
-  const [totalsRes, finalRes, champions] = await Promise.all([
+  const [totalsRes, finalRes, champions, lmsRound] = await Promise.all([
     // The engine's own output. `previous_final_rank` is what draws the movement
     // arrow, and is why this does not reuse `readEntryTotals` from duels.ts —
     // that one does not select it, and widening a shared helper for one caller
     // is how a column nobody wanted ends up in every duel card.
     admin
       .from('league_entry_totals')
-      .select('entry_id, total_points, final_rank, previous_final_rank')
+      .select('entry_id, total_points, rounds_won, final_rank, previous_final_rank')
       .eq('pool_id', poolId),
     // Existence only — `head: true` sends no rows back.
     admin
@@ -148,14 +227,16 @@ export async function readLeagueLeaderboard(
       .select('season_id', { count: 'exact', head: true })
       .eq('season_id', pool.league_season_id),
     isTable ? readChampionPicks(admin, entryIds, pool.league_season_id) : Promise.resolve(new Map()),
+    isLms ? readLmsRound(admin, poolId) : Promise.resolve(null),
   ])
 
   if (totalsRes.error) return { leaderboard: null, error: `entry totals: ${totalsRes.error.message}` }
   if (finalRes.error) return { leaderboard: null, error: `final standings: ${finalRes.error.message}` }
+  if (lmsRound?.error) return { leaderboard: null, error: lmsRound.error }
 
   const totals = new Map(
     ((totalsRes.data ?? []) as Array<{
-      entry_id: string; total_points: number | null
+      entry_id: string; total_points: number | null; rounds_won: number | null
       final_rank: number | null; previous_final_rank: number | null
     }>).map((t) => [t.entry_id, t]),
   )
@@ -166,6 +247,7 @@ export async function readLeagueLeaderboard(
     if (!member) continue
     const t = totals.get(entry.entry_id)
     const champion = champions.get(entry.entry_id) ?? null
+    const survivor = lmsRound?.survivors.get(entry.entry_id)
 
     rows.push({
       entry_id: entry.entry_id,
@@ -176,40 +258,173 @@ export async function readLeagueLeaderboard(
       full_name: member.users?.full_name ?? 'Unknown',
       username: member.users?.username ?? '',
       total_points: t?.total_points ?? 0,
-      current_rank: t?.final_rank ?? null,
-      previous_rank: t?.previous_final_rank ?? null,
+      // ⚠ Withheld in LMS. See `LmsRowState` — the stored rank there is entry_id
+      // order, and passing it on is passing on a wrong answer that looks right.
+      current_rank: isLms ? null : t?.final_rank ?? null,
+      previous_rank: isLms ? null : t?.previous_final_rank ?? null,
       // In table mode the ordering IS the entry, so having one is the whole of
       // "has this person played". Other modes pick weekly and the question does
       // not apply, so it is true rather than a false accusation.
       has_filed: isTable ? champion !== null : true,
       champion,
+      lms: isLms
+        ? {
+            eliminated_matchweek: survivor?.eliminated_matchweek ?? null,
+            is_round_winner: survivor?.is_winner ?? false,
+            // No survivor row means they are not in this round — see the type.
+            in_round: survivor !== undefined,
+            rounds_won: t?.rounds_won ?? 0,
+          }
+        : null,
     })
   }
 
-  // Ordered by the engine's rank, which already carries its tiebreaks. Points
-  // are the fallback for a pool that has not been scored yet, where every rank
-  // is null and any order is as good as any other.
-  rows.sort((a, b) => {
-    if (a.current_rank != null && b.current_rank != null && a.current_rank !== b.current_rank) {
-      return a.current_rank - b.current_rank
-    }
-    return b.total_points - a.total_points
-  })
+  rows.sort(isLms ? compareLms : compareByRank)
 
   return {
     leaderboard: {
       mode: normaliseMode(pool.league_mode),
       is_final: (finalRes.count ?? 0) > 0,
+      lms: lmsRound?.meta ? { ...lmsRound.meta, standing: countStanding(rows), in_round: countInRound(rows) } : null,
       rows,
     },
     error: null,
   }
 }
 
+/**
+ * Ordered by the engine's rank, which already carries its tiebreaks. Points are
+ * the fallback for a pool that has not been scored yet, where every rank is null
+ * and any order is as good as any other.
+ */
+function compareByRank(a: LeagueLeaderboardRow, b: LeagueLeaderboardRow): number {
+  if (a.current_rank != null && b.current_rank != null && a.current_rank !== b.current_rank) {
+    return a.current_rank - b.current_rank
+  }
+  return b.total_points - a.total_points
+}
+
+/**
+ * Last Man Standing's own ordering. Ryan's call, 2026-09-03: **the season leads
+ * and the round's state rides on the row.**
+ *
+ *   1. `rounds_won` DESC — the season score, and the only thing that survives a
+ *      round closing. A two-time winner leads the pool even in a week they are
+ *      out; the row says `OUT · MW6` so that cannot read as a claim to be alive.
+ *   2. Still standing, then eliminated, then not in this round. Someone who
+ *      joined mid-round has not played it and sits below those who have — they
+ *      are not eliminated and the screen says so.
+ *   3. Later elimination first. Lasting to MW9 beat going out in MW3.
+ *   4. Name, then `entry_id` for a total order — so an unrelated re-score never
+ *      reshuffles the list.
+ *
+ * ⚠ In round one every `rounds_won` is 0, so this collapses to pure survival
+ * order. That is the common case and it is meant to look like the simple thing.
+ *
+ * ⚠ It does NOT re-rank anything: no number is computed from another number.
+ * This is a presentation order over stored state, which is why nothing here
+ * writes back and why `league_finalize_ranks` is left alone — it is the one rank
+ * writer for four modes and giving LMS a survival rung restates rank in all of
+ * them. That is its own change, deliberately not made here.
+ */
+export function compareLms(a: LeagueLeaderboardRow, b: LeagueLeaderboardRow): number {
+  const x = a.lms
+  const y = b.lms
+  if (!x || !y) return 0
+
+  if (x.rounds_won !== y.rounds_won) return y.rounds_won - x.rounds_won
+
+  const group = (s: LmsRowState) => (!s.in_round ? 2 : s.eliminated_matchweek === null ? 0 : 1)
+  const gx = group(x)
+  const gy = group(y)
+  if (gx !== gy) return gx - gy
+
+  // Both out: whoever lasted longer is above. Both alive or both absent: 0.
+  const mx = x.eliminated_matchweek ?? 0
+  const my = y.eliminated_matchweek ?? 0
+  if (mx !== my) return my - mx
+
+  const nameA = (a.entry_name?.trim() || a.full_name).toLowerCase()
+  const nameB = (b.entry_name?.trim() || b.full_name).toLowerCase()
+  if (nameA !== nameB) return nameA < nameB ? -1 : 1
+  return a.entry_id < b.entry_id ? -1 : 1
+}
+
+function countStanding(rows: LeagueLeaderboardRow[]): number {
+  return rows.filter((r) => r.lms?.in_round && r.lms.eliminated_matchweek === null).length
+}
+
+function countInRound(rows: LeagueLeaderboardRow[]): number {
+  return rows.filter((r) => r.lms?.in_round).length
+}
+
 function normaliseMode(mode: string | null): LeagueLeaderboard['mode'] {
   return mode === 'pickem' || mode === 'showdown' || mode === 'last_man_standing' || mode === 'table'
     ? mode
     : null
+}
+
+/**
+ * The round this leaderboard describes, and who is left in it.
+ *
+ * ⚠ "The round" is the OPEN one — `last_matchweek IS NULL` — and falls back to
+ * the highest-numbered one when none is open. That fallback is not a between-
+ * rounds case: `league_lms_settle` opens the next round in the same transaction
+ * that closes one (087:266), so the only pool with no open round is one whose
+ * season has run out of matchweeks, or one created but never opened. Both want
+ * the last round that was actually played rather than an empty screen.
+ *
+ * ⚠ A member with no row here is NOT eliminated — they joined after the round
+ * opened and enter the next one. Reading a missing row as "out" would accuse
+ * somebody of losing a round they were never allowed to play.
+ */
+async function readLmsRound(
+  admin: SupabaseClient,
+  poolId: string,
+): Promise<{
+  meta: Omit<LmsRoundMeta, 'standing' | 'in_round'> | null
+  survivors: Map<string, { eliminated_matchweek: number | null; is_winner: boolean }>
+  error: string | null
+}> {
+  const empty = { meta: null, survivors: new Map(), error: null }
+
+  const { data: rounds, error: rErr } = await admin
+    .from('league_lms_rounds')
+    .select('round_id, round_number, first_matchweek, last_matchweek')
+    .eq('pool_id', poolId)
+    .order('round_number', { ascending: false })
+  // Surfaced, not swallowed: an empty survivor map renders as "nobody is in this
+  // round", which is the confident-zero shape this codebase keeps paying for.
+  if (rErr) return { ...empty, error: `lms rounds: ${rErr.message}` }
+
+  const all = (rounds ?? []) as Array<{
+    round_id: string; round_number: number; first_matchweek: number; last_matchweek: number | null
+  }>
+  const round = all.find((r) => r.last_matchweek === null) ?? all[0]
+  if (!round) return empty
+
+  const { data: survivorRows, error: sErr } = await admin
+    .from('league_lms_survivors')
+    .select('entry_id, eliminated_matchweek, is_winner')
+    .eq('round_id', round.round_id)
+  if (sErr) return { ...empty, error: `lms survivors: ${sErr.message}` }
+
+  const survivors = new Map<string, { eliminated_matchweek: number | null; is_winner: boolean }>()
+  for (const s of (survivorRows ?? []) as Array<{
+    entry_id: string; eliminated_matchweek: number | null; is_winner: boolean
+  }>) {
+    survivors.set(s.entry_id, { eliminated_matchweek: s.eliminated_matchweek, is_winner: s.is_winner })
+  }
+
+  return {
+    meta: {
+      round_number: round.round_number,
+      first_matchweek: round.first_matchweek,
+      last_matchweek: round.last_matchweek,
+    },
+    survivors,
+    error: null,
+  }
 }
 
 /**
