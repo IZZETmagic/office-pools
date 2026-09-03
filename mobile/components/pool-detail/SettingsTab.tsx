@@ -518,9 +518,15 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
             color: theme.colors.slate,
           }}
         >
+          {/* ⚠ THESE TWO USED TO SAY THE SAME THING — "only people with the
+              pool code" and "anyone with the pool code" — so the control
+              described no difference at all. `is_private` is what Discover
+              filters on (`useDiscoverPools` and `/api/pools/search` both
+              `.eq('is_private', false)`), so PUBLIC means findable WITHOUT a
+              code. The web has always said so; this now matches it. */}
           {edit.isPrivate
-            ? 'Only people with the pool code can join.'
-            : 'Anyone with the pool code can join.'}
+            ? 'Only people with the pool code can join. It stays out of Discover.'
+            : 'Listed in Discover, so people can find and join it without a code.'}
         </RNText>
       </Card>
 
