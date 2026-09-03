@@ -32,6 +32,13 @@ export type PoolDetailInfo = {
   leagueDepth: 'results' | 'scores' | null;
   /** True when `league_season_id` is set — the gate every web league branch uses. */
   isLeague: boolean;
+  /**
+   * When table-mode picking closes. ⚠ NOT `predictionDeadline`, which on a
+   * league pool holds the season end and is months or years later.
+   */
+  leagueTableLockAt: string | null;
+  /** "Premier League", "Serie A" — null for a World Cup pool. */
+  competitionName: string | null;
   brandName: string | null;
   brandEmoji: string | null;
   brandColor: string | null;
@@ -110,7 +117,7 @@ export function usePoolDetail(poolId: string | undefined) {
             supabase
               .from('pools')
               .select(
-                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, accepting_members, max_participants, max_entries_per_user, is_private, admin_user_id, created_at, entry_fee, entry_fee_currency, league_mode, league_depth, league_season_id',
+                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, accepting_members, max_participants, max_entries_per_user, is_private, admin_user_id, created_at, entry_fee, entry_fee_currency, league_mode, league_depth, league_season_id, league_table_lock_at, league_seasons(competition_name)',
               )
               .eq('pool_id', poolId)
               .maybeSingle(),
@@ -156,6 +163,22 @@ export function usePoolDetail(poolId: string | undefined) {
           league_mode: string | null;
           league_depth: string | null;
           league_season_id: string | null;
+          // ⚠ Table mode's REAL deadline. `prediction_deadline` on a league
+          // pool carries the SEASON END — 27 Aug 2027 on one of the seeded
+          // pools — so the Info tab was telling members their deadline was a
+          // year away and still open when picking had closed five days ago.
+          league_table_lock_at: string | null;
+          // Embedded through `pools_league_season_id_fkey`. World-readable, so
+          // no route needed for one caption.
+          //
+          // ⚠ postgrest-js INFERS THIS AS AN ARRAY even though the foreign key
+          // makes it to-one, and it types other embeds as objects. Declaring
+          // only one shape fails the cast; the reader below normalises both,
+          // which is why that is not paranoia.
+          league_seasons:
+            | { competition_name: string | null }
+            | { competition_name: string | null }[]
+            | null;
           brand_name: string | null;
           brand_emoji: string | null;
           brand_color: string | null;
@@ -188,6 +211,13 @@ export function usePoolDetail(poolId: string | undefined) {
             // `leagueDepthPolarity.guard.test.ts` fails the build otherwise.
             leagueDepth: poolRow.league_depth as 'results' | 'scores' | null,
             isLeague: Boolean(poolRow.league_season_id),
+            leagueTableLockAt: poolRow.league_table_lock_at,
+            // PostgREST types a to-one embed either way depending on how it
+            // infers the relationship — normalise rather than trust.
+            competitionName:
+              (Array.isArray(poolRow.league_seasons)
+                ? poolRow.league_seasons[0]?.competition_name
+                : poolRow.league_seasons?.competition_name) ?? null,
             brandName: poolRow.brand_name,
             brandEmoji: poolRow.brand_emoji,
             brandColor: poolRow.brand_color,

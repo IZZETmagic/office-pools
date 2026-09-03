@@ -26,6 +26,7 @@ import {
   FormTab,
   LeaderboardTab,
   LeagueMyTableTab,
+  LeagueTableScoring,
   MembersTab,
   PoolDetailHeader,
   PoolInfoTab,
@@ -74,6 +75,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
 const MemoPoolDetailHeader = memo(PoolDetailHeader);
 const MemoLeaderboardTab = memo(LeaderboardTab);
 const MemoLeagueMyTableTab = memo(LeagueMyTableTab);
+const MemoLeagueTableScoring = memo(LeagueTableScoring);
 const MemoPredictionsTab = memo(PredictionsTab);
 const MemoFormTab = memo(FormTab);
 const MemoBPFormTab = memo(BPFormTab);
@@ -408,6 +410,12 @@ export default function PoolDetailScreen() {
           <MemoFormTab poolId={pool.poolId} />
         );
       case 'scoring':
+        // ⚠ The World Cup Scoring tab lists group bonuses, bracket pairings and
+        // a top scorer. A table pool awards none of them and pays for things
+        // that list names nowhere, so it was describing a different game.
+        if (pool.leagueMode === 'table') {
+          return <MemoLeagueTableScoring poolId={pool.poolId} entryId={ownLeagueEntryId} />;
+        }
         return (
           <MemoScoringTab
             poolId={pool.poolId}

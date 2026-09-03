@@ -247,6 +247,13 @@ export type TableBreakdownRow = {
 export type TableSettings = {
   /** The competition this pool plays, for linking to its table. */
   seasonId: string;
+  /**
+   * The per-place rungs a Scoring screen prints, computed server-side.
+   * ⚠ Not derived here: `placeLadder` lives in the web's `lib/`, which this
+   * project cannot import, and two screens quoting different ladders for one
+   * pool is the drift that shaping exists to prevent.
+   */
+  ladder: Array<{ label: string; value: number }>;
   lockAt: string | null;
   isLocked: boolean;
   topN: number;

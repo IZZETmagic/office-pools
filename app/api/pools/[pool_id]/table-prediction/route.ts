@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { invalidatePoolCache } from '@/lib/poolData'
 import { saveTablePrediction, readTablePrediction, readTableBreakdown } from '@/lib/league/table'
-import { summariseTable } from '@/lib/league/tableSummary'
+import { summariseTable, placeLadder } from '@/lib/league/tableSummary'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // =============================================================
@@ -104,10 +104,27 @@ async function readTableSettings(supabase: SupabaseClient, poolId: string) {
   }
   const lockAt = (pool.league_table_lock_at as string | null) ?? null
 
+  const prices = {
+    exactPoints: s?.table_exact_points ?? 100,
+    stepPenalty: s?.table_step_penalty ?? 20,
+    championBonus: s?.table_champion_bonus ?? 500,
+    topFourBonus: s?.table_top_four_bonus ?? 100,
+    relegationBonus: s?.table_relegation_bonus ?? 100,
+    perfectTopFourBonus: s?.table_perfect_top_four_bonus ?? 250,
+    europaBonus: s?.table_europa_bonus ?? 50,
+    // Migration 113: half the Europa band, which is half the top band.
+    conferenceBonus: s?.table_conference_bonus ?? 25,
+  }
+
   return {
     // Sent so a screen can link to THIS competition's table rather than
     // whichever one Match Centre happens to open on.
     seasonId: pool.league_season_id as string,
+    // ⚠ The per-place rungs, computed HERE for the same reason the band
+    // bonuses are: `placeLadder` lives in `lib/`, mobile is a separate npm
+    // project that cannot reach it, and a hand-kept copy would be two screens
+    // quoting different ladders for one pool.
+    ladder: placeLadder(prices.exactPoints, prices.stepPenalty),
     lockAt,
     isLocked: lockAt ? new Date(lockAt) <= new Date() : false,
     topN: s?.table_top_n ?? bands.top_n ?? 4,
@@ -121,17 +138,7 @@ async function readTableSettings(supabase: SupabaseClient, poolId: string) {
     // 'headline_only' scores the bands alone, so a screen must not promise
     // per-place points this pool never awards.
     profile: pool.league_table_profile === 'headline_only' ? 'headline_only' : 'full_table',
-    prices: {
-      exactPoints: s?.table_exact_points ?? 100,
-      stepPenalty: s?.table_step_penalty ?? 20,
-      championBonus: s?.table_champion_bonus ?? 500,
-      topFourBonus: s?.table_top_four_bonus ?? 100,
-      relegationBonus: s?.table_relegation_bonus ?? 100,
-      perfectTopFourBonus: s?.table_perfect_top_four_bonus ?? 250,
-      europaBonus: s?.table_europa_bonus ?? 50,
-      // Migration 113: half the Europa band, which is half the top band.
-      conferenceBonus: s?.table_conference_bonus ?? 25,
-    },
+    prices,
   }
 }
 

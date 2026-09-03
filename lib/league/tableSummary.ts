@@ -129,3 +129,46 @@ export function summariseTable(
     zeroAt: zeroAtFor(prices),
   }
 }
+
+/**
+ * The per-place ladder a Scoring screen prints — "exactly right", a couple of
+ * rungs down, then the first distance worth nothing.
+ *
+ * Moved here from `LeagueScoringRulesTab` so React Native can print the same
+ * rungs. It is the same arithmetic `zeroAtFor` does, and two screens quoting
+ * different ladders for one pool is the drift this module exists to prevent.
+ */
+export function placeLadder(exact: number, step: number): Array<{ label: string; value: number }> {
+  const rungs = [{ label: 'Exactly right', value: exact }]
+
+  // No decay: there is no ladder to climb down, and dividing by it would not
+  // terminate. The paragraph below says so in words instead.
+  if (step <= 0) return rungs
+
+  // The first distance worth nothing. Everything beyond it is also nothing, so
+  // the ladder ends there rather than running to twenty.
+  const zeroAt = Math.ceil(exact / step)
+
+  // A long ladder is worse than the rate it replaces — a pool priced 100/5
+  // would print twenty rows. Show where it starts, where it ends, and let the
+  // sentence carry the middle.
+  const detailed = zeroAt <= 6 ? zeroAt - 1 : 2
+
+  for (let out = 1; out <= detailed; out++) {
+    rungs.push({
+      label: out === 1 ? '1 place out' : `${out} places out`,
+      value: Math.max(0, exact - step * out),
+    })
+  }
+
+  // A penalty at or above the full value zeroes a club the moment it is out of
+  // position, so there is no ladder — just a cliff, and it should say so rather
+  // than print "1 or more places out" next to nothing else.
+  rungs.push(
+    zeroAt === 1
+      ? { label: 'Anywhere else', value: 0 }
+      : { label: `${zeroAt} or more places out`, value: 0 },
+  )
+
+  return rungs
+}

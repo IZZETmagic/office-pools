@@ -28,6 +28,7 @@ export { LeaderboardPodium } from './LeaderboardPodium';
 export { LeaderboardRow } from './LeaderboardRow';
 export { LeaderboardTab } from './LeaderboardTab';
 export { LeagueMyTableTab } from './LeagueMyTableTab';
+export { LeagueTableScoring } from './LeagueTableScoring';
 export { LeagueTableLeaderboard } from './LeagueTableLeaderboard';
 export { MatchdayInfoBar } from './MatchdayInfoBar';
 export { MatchdayMVPBanner } from './MatchdayMVPBanner';

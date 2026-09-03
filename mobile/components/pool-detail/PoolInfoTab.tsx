@@ -35,6 +35,20 @@ const MODE_LABEL: Record<string, string> = {
   bracket_picker: 'Bracket Picker',
 };
 
+/**
+ * ⚠ A LEAGUE POOL MUST BE NAMED BY ITS `league_mode`, NEVER `prediction_mode`.
+ * Every league pool carries `prediction_mode = 'league_pickem'` whatever it
+ * actually plays, so `MODE_LABEL` fell through its `?? predictionMode` fallback
+ * and printed the raw database enum — "league_pickem" — on screen, in a badge,
+ * to a member playing Predict the Table.
+ */
+const LEAGUE_MODE_LABEL: Record<string, string> = {
+  table: 'Predict the Table',
+  pickem: 'Matchweek Pick’em',
+  showdown: 'Showdown',
+  last_man_standing: 'Last Man Standing',
+};
+
 type Props = {
   pool: PoolDetailInfo;
 };
@@ -92,9 +106,27 @@ export function PoolInfoTab({ pool }: Props) {
     }
   }
 
-  const modeLabelText = pool.predictionMode
-    ? MODE_LABEL[pool.predictionMode] ?? pool.predictionMode
-    : '—';
+  const modeLabelText = pool.isLeague
+    // `isLeague` first, then the mode — a pool can carry a season with a NULL
+    // mode (two in production do), and those get the competition rather than a
+    // guess at which league game they play.
+    ? (pool.leagueMode ? LEAGUE_MODE_LABEL[pool.leagueMode] : null) ?? 'League'
+    : pool.predictionMode
+      ? MODE_LABEL[pool.predictionMode] ?? pool.predictionMode
+      : '—';
+
+  /**
+   * ⚠ TABLE MODE HAS ITS OWN DEADLINE, AND IT IS NOT `predictionDeadline`.
+   * Every league pool carries the SEASON END in that column — 27 Aug 2027 on one
+   * of the seeded pools — so this card told a member their deadline was a year
+   * away and still Open when picking had closed five days earlier.
+   *
+   * Only table mode is corrected here. Pick'em, Showdown and LMS lock per
+   * MATCHWEEK, so a single date cannot describe them at all; that needs its own
+   * copy rather than a different column.
+   */
+  const tableLockAt = pool.leagueMode === 'table' ? pool.leagueTableLockAt : null;
+  const deadlineAt = tableLockAt ?? pool.predictionDeadline;
   const entryFee = pool.entryFee ?? 0;
   const currency = pool.entryFeeCurrency || 'USD';
   const showFeesCard = entryFee > 0;
@@ -102,8 +134,8 @@ export function PoolInfoTab({ pool }: Props) {
   // For non-progressive pools we compute past-deadline locally so we can
   // surface an Open / Closed badge alongside the single deadline. Mirrors
   // the web component's `isPastDeadline` prop.
-  const isPastDeadline = pool.predictionDeadline
-    ? new Date(pool.predictionDeadline).getTime() < Date.now()
+  const isPastDeadline = deadlineAt
+    ? new Date(deadlineAt).getTime() < Date.now()
     : false;
 
   return (
@@ -134,7 +166,7 @@ export function PoolInfoTab({ pool }: Props) {
 
       {/* Deadlines */}
       <Card>
-        <Caption>Deadlines</Caption>
+        <Caption>{tableLockAt ? 'Table deadline' : 'Deadlines'}</Caption>
         <RNText style={{ fontFamily: fontFamilies.regular, fontSize: 11, color: theme.colors.slate }}>
           When predictions lock
         </RNText>
@@ -172,7 +204,7 @@ export function PoolInfoTab({ pool }: Props) {
               </View>
             ))}
           </View>
-        ) : pool.predictionDeadline ? (
+        ) : deadlineAt ? (
           <View
             style={{
               flexDirection: 'row',
@@ -184,7 +216,7 @@ export function PoolInfoTab({ pool }: Props) {
             <RNText
               style={{ fontFamily: fontFamilies.semibold, fontSize: 14, color: theme.colors.ink }}
             >
-              {formatDeadline(pool.predictionDeadline)}
+              {formatDeadline(deadlineAt)}
             </RNText>
             <Badge tone={isPastDeadline ? 'neutral' : 'green'}>
               {isPastDeadline ? 'Closed' : 'Open'}
@@ -214,6 +246,12 @@ export function PoolInfoTab({ pool }: Props) {
           <InfoRow label="Prediction mode">
             <Badge tone="blue">{modeLabelText}</Badge>
           </InfoRow>
+          {/* Which football this pool is actually about. A World Cup pool has
+              exactly one competition and never needed saying; a member can be in
+              a Premier League pool and a Serie A one at the same time. */}
+          {pool.competitionName ? (
+            <InfoRow label="Competition" value={pool.competitionName} />
+          ) : null}
           <InfoRow
             label="Entries per player"
             value={String(pool.maxEntriesPerUser)}
