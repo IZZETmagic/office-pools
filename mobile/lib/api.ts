@@ -126,9 +126,13 @@ export type LeaderboardEntryCore = {
 
 /**
  * A league row. The World Cup extras below are ABSENT, not zero — nothing in the
- * league engine writes form, hit rate, XP or a base/bonus split, and a zero on
- * screen is a claim rather than a blank. Keeping them off the type is what makes
- * a component that reaches for one fail to compile.
+ * league engine writes hit rate, XP or a base/bonus split, and a zero on screen
+ * is a claim rather than a blank. Keeping them off the type is what makes a
+ * component that reaches for one fail to compile.
+ *
+ * ⚠ Form and exact counts are the exception and they live inside `pickem`, not
+ * on the row. They are real in exactly one mode; promoting them would hand Table
+ * and Last Man Standing a zero apiece, which is the thing this shape prevents.
  */
 export type LeagueLeaderboardEntry = LeaderboardEntryCore & {
   /** Table mode: did they file an ordering before the deadline? */
@@ -168,11 +172,46 @@ export type LeagueLeaderboardEntry = LeaderboardEntryCore & {
      */
     pick_sealed: boolean;
   } | null;
+  /**
+   * Pick'em only; null in every other mode. The one league mode scored against
+   * individual fixtures every week, so the one with a weekly record to plot.
+   */
+  pickem: {
+    /** Fixtures called right. Real at BOTH depths. */
+    correct_count: number;
+    /**
+     * ⚠ NULL AT RESULTS DEPTH — the mode has no scoreline to be exact about, so
+     * the engine writes only `winner` or `miss` there. Render the null as
+     * nothing, never as "0 exact": that accuses somebody of failing at
+     * something the game never asked them to do.
+     */
+    exact_count: number | null;
+    /**
+     * The last five settled fixtures, OLDEST FIRST — the same vocabulary
+     * `FormDots` already renders. Shorter than five early in a season, and
+     * deliberately not padded.
+     *
+     * ⚠ At Results depth only `winner` and `miss` can occur, so the legend above
+     * the list must shrink to match — see `LeagueLeaderboardMeta.depth`.
+     */
+    last_five: Array<'exact' | 'winner_gd' | 'winner' | 'miss' | 'no_pick'>;
+  } | null;
 };
 
 /** Present only for a league pool; `null` means render the World Cup shape. */
 export type LeagueLeaderboardMeta = {
   mode: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null;
+  /**
+   * How the pool is scored. Non-null for Pick'em and Showdown, NULL for Table
+   * and Last Man Standing.
+   *
+   * ⚠ READ IT AS `depth === 'results'` AND NOTHING ELSE. A NULL depth is scored
+   * as Scores, byte for byte — the opposite reading has shipped three times on
+   * web and was called a deploy blocker, because it does not fail: members get
+   * told they are playing one game while being scored at the other. Guarded by
+   * `lib/__tests__/leagueDepthPolarity.guard.test.ts`, which walks `mobile/` too.
+   */
+  depth: 'results' | 'scores' | null;
   /** False until the season-end snapshot exists — every total is provisional. */
   is_final: boolean;
   /**

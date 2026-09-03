@@ -1,55 +1,75 @@
-import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Pressable, Text as RNText, View } from 'react-native';
 
-import { MovementPill, rankColor } from './leaderboard-shared';
+import { LeagueFormLegend } from './LeaderboardLegend';
+import { FormDots, MovementPill, rankColor } from './leaderboard-shared';
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry, LeagueLeaderboardMeta } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
-// TABLE MODE — the leaderboard for a pool with no matchweeks
+// PICK'EM — the league mode that actually has a weekly record
 // =============================================================
-// The World Cup leaderboard states nine things per row, and in Table mode seven
-// of them are unwritable: there is no base/bonus split (the engine files the
-// whole score under one column), no form (one prediction, made in August), no
-// hit rate or exact count (there are no fixture picks at all), and no XP or
-// level (the league outbox BLOCKS both rather than storing zeros). Rendering
-// them anyway is not a cosmetic problem — it is seven confident zeros.
+// Before this file, a Pick'em pool on the phone said **"No Entries Yet — the
+// leaderboard will appear once entries are submitted."** Not zeros: a flat
+// denial that anybody was playing. `usePoolDetail` empties the World Cup list
+// for every league pool, and only Table and Last Man Standing had a list of
+// their own, so Pick'em fell through to the empty state while production held
+// eight scored entries ranked 1–8 on 500/400/300/300/200/100/100/100 points.
 //
-// What is left is what the mode is actually about: where you are, what you
-// scored, and who you backed to win it. The champion pick is the sub-line
-// because it is the one fact people argue about in November, and it is stored
-// state — position 1 of the saved ordering — not something computed here.
+// ## Why it is not just the World Cup row with fewer fields
 //
-// ⚠ Nothing in this file does arithmetic on points. Rank, movement and total all
-// arrive from `league_entry_totals` via the route; the champion's actual
-// position is the ingested `league_standings.rank`, never re-derived from points
-// (a derived table cannot see a points deduction).
+// Pick'em is the RICHEST league mode, and the opposite problem to Table. Table
+// had to drop seven facts; here most of them are real:
+//
+//   rank + movement   real — the engine ranks Pick'em properly, unlike LMS where
+//                     every rung of the cascade is zero and rank is entry_id order
+//   total             real
+//   form dots         real — `league_match_scores.score_type` already speaks the
+//                     exact vocabulary `FormDots` renders
+//   correct / exact   real, and `exact` ONLY at Scores depth
+//
+// What stays off: the base/bonus split (`bonus_points` is structurally 0 in this
+// mode — the total IS the match points, so "500 + 0" is noise dressed as
+// detail), hit rate, XP, level and awards (the league outbox BLOCKS the XP
+// writer rather than running it against zero rows, so there is nothing to show
+// and a "Level 1" pill would be unearned).
+//
+// ## ⚠ The depth fork is real, not cosmetic
+//
+// Pick'em ships at two depths and BOTH are in production. At Scores depth the
+// engine emits `exact` / `winner_gd` / `winner` / `miss`; at Results depth it
+// emits `winner` / `miss` and nothing else. So the legend shrinks and the exact
+// count disappears — `exact_count` arrives NULL rather than 0 for exactly this
+// reason. A "0 exact" under a Results pool reads as failing at something the
+// game never asked for.
+//
+// ⚠ Every depth test is `=== 'results'`. NULL depth is Scores.
 // =============================================================
 
 type Props = {
   entries: LeagueLeaderboardEntry[];
   league: LeagueLeaderboardMeta;
   currentUserId: string | null;
-  /**
-   * Open somebody's table. ⚠ The CALLER decides whether a rival's is openable —
-   * before the deadline only your own is, which is enforced in the database by
-   * RLS (078/104) and stated by the sheet rather than discovered as an empty
-   * result.
-   */
   onEntryPress?: (entry: LeagueLeaderboardEntry) => void;
 };
 
-export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntryPress }: Props) {
+export function LeaguePickemLeaderboard({ entries, league, currentUserId, onEntryPress }: Props) {
   const theme = useTheme();
 
   if (entries.length === 0) {
     return (
-      <View style={{ paddingVertical: theme.spacing.hero, paddingHorizontal: theme.spacing.xl, gap: theme.spacing.md }}>
+      <View
+        style={{
+          paddingVertical: theme.spacing.hero,
+          paddingHorizontal: theme.spacing.xl,
+          gap: theme.spacing.md,
+        }}
+      >
         <Text variant="sectionHeader" align="center">
           No Entries Yet
         </Text>
         <Text variant="body" color="slate" align="center">
-          The leaderboard fills up once people predict the table.
+          The leaderboard fills up once the first matchweek is scored.
         </Text>
       </View>
     );
@@ -69,7 +89,14 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
       <SettlementNote isFinal={league.is_final} />
 
       {hasPodium ? (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.sm, paddingTop: theme.spacing.sm }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            gap: theme.spacing.sm,
+            paddingTop: theme.spacing.sm,
+          }}
+        >
           <PodiumColumn
             entry={entries[1]}
             pedestalHeight={110}
@@ -100,11 +127,13 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
         </View>
       ) : null}
 
+      <LeagueFormLegend depth={league.depth} />
+
       {rest.map((entry, i) => (
-        <TableRow
+        <PickemRow
           key={entry.entry_id}
           entry={entry}
-          rank={entry.current_rank ?? ((hasPodium ? 4 : 1) + i)}
+          rank={entry.current_rank ?? (hasPodium ? 4 : 1) + i}
           isCurrentUser={entry.user_id === currentUserId}
           onPress={onEntryPress ? () => onEntryPress(entry) : undefined}
         />
@@ -114,10 +143,9 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
 }
 
 /**
- * ⚠ The one thing this screen MUST say. `league_standings` is upserted current
- * state, so every total here moves as the real table moves and is not a result
- * until the season-end snapshot freezes it. A leaderboard that shows a winner in
- * November without saying "so far" is claiming an outcome.
+ * ⚠ Same rule as Table mode. Pick'em scores every matchweek for 38 weeks, so a
+ * leaderboard in October is a position, not a result. Saying so is the
+ * difference between reporting and claiming.
  */
 function SettlementNote({ isFinal }: { isFinal: boolean }) {
   const theme = useTheme();
@@ -136,6 +164,40 @@ function SettlementNote({ isFinal }: { isFinal: boolean }) {
         {isFinal ? 'Final — the season is settled' : 'Standing so far — settles when the season ends'}
       </Text>
     </View>
+  );
+}
+
+/**
+ * How they have actually been picking.
+ *
+ * ⚠ THE TWO DEPTHS SAY DIFFERENT SENTENCES, and the null is what decides it —
+ * not a re-derivation from the pool's depth here, because that is the polarity
+ * that has been got wrong three times. The server already made the call.
+ *
+ * ⚠ Nothing renders when they have not been scored yet. "0 correct" before a
+ * ball is kicked is the confident zero this whole surface exists to avoid.
+ */
+function ScoreLine({
+  entry,
+  align = 'left',
+}: {
+  entry: LeagueLeaderboardEntry;
+  align?: 'left' | 'center';
+}) {
+  const p = entry.pickem;
+  if (!p || p.last_five.length === 0) return null;
+
+  const exact = p.exact_count !== null ? ` · ${p.exact_count} exact` : '';
+  return (
+    <Text
+      variant="detail"
+      color="slate"
+      align={align === 'center' ? 'center' : undefined}
+      numberOfLines={1}
+    >
+      {p.correct_count} correct
+      {exact}
+    </Text>
   );
 }
 
@@ -193,6 +255,10 @@ function PodiumColumn({
       <Text variant="detail" color="slate" numberOfLines={1}>
         @{entry.username}
       </Text>
+      {/* ⚠ No streak passed. `current_streak` is World Cup analytics and is never
+          written for a league entry — an absent prop draws nothing, where a
+          zeroed one would draw a cold streak nobody is on. */}
+      <FormDots results={entry.pickem?.last_five ?? []} size={7} />
 
       <View
         style={{
@@ -216,13 +282,13 @@ function PodiumColumn({
         >
           {entry.total_points.toLocaleString()}
         </RNText>
-        <ChampionLine entry={entry} align="center" />
+        <ScoreLine entry={entry} align="center" />
       </View>
     </Pressable>
   );
 }
 
-function TableRow({
+function PickemRow({
   entry,
   rank,
   isCurrentUser,
@@ -309,95 +375,29 @@ function TableRow({
         <Text variant="detail" color="slate">
           @{entry.username}
         </Text>
-        <ChampionLine entry={entry} />
+        <FormDots results={entry.pickem?.last_five ?? []} />
       </View>
 
-      <RNText
-        style={{
-          fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 17,
-          fontWeight: '900',
-          color: theme.colors.primary,
-        }}
-      >
-        {entry.total_points.toLocaleString()}
-      </RNText>
+      <View style={{ alignItems: 'flex-end', gap: 2 }}>
+        <RNText
+          style={{
+            fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
+            fontSize: 17,
+            fontWeight: '900',
+            color: theme.colors.primary,
+          }}
+        >
+          {entry.total_points.toLocaleString()}
+        </RNText>
+        <ScoreLine entry={entry} />
+      </View>
 
-      <Icon name="chevron.right" color="slate" size={11} />
+      {/* ⚠ Only when there is somewhere to go. `/pool/[id]/breakdown` is
+          World-Cup-only — it reads `matches` and `match_conduct` for the pool's
+          placeholder tournament — so a chevron on a league row would promise a
+          screen that answers zero. The affordance appears when the destination
+          does, not before. */}
+      {onPress ? <Icon name="chevron.right" color="slate" size={11} /> : null}
     </Pressable>
   );
-}
-
-/**
- * Who they backed to win it, and where that club sits today.
- *
- * ⚠ "Never filed" and "backed the club sitting 12th" deserve different
- * sentences. Someone who joined after the deadline scores nothing through no
- * fault of their own, and a blank sub-line under a 0 reads as playing badly.
- */
-function ChampionLine({
-  entry,
-  align = 'left',
-}: {
-  entry: LeagueLeaderboardEntry;
-  align?: 'left' | 'center';
-}) {
-  const theme = useTheme();
-
-  if (!entry.has_filed || !entry.champion) {
-    return (
-      <Text
-        variant="detail"
-        color="slate"
-        align={align === 'center' ? 'center' : undefined}
-        numberOfLines={1}
-      >
-        No table filed
-      </Text>
-    );
-  }
-
-  const { club_name, crest_url, actual_rank } = entry.champion;
-  // Right so far — the club they picked for first is top of the real table.
-  const leading = actual_rank === 1;
-
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        justifyContent: align === 'center' ? 'center' : 'flex-start',
-      }}
-    >
-      {crest_url ? (
-        <Image source={{ uri: crest_url }} style={{ width: 13, height: 13 }} resizeMode="contain" />
-      ) : null}
-      <Text variant="detail" color="slate" numberOfLines={1} style={{ flexShrink: 1 }}>
-        {club_name}
-      </Text>
-      {leading ? (
-        <Icon name="checkmark.circle.fill" color="green" size={10} />
-      ) : actual_rank !== null ? (
-        <Text variant="detail" color="slate">
-          {ordinal(actual_rank)}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function ordinal(n: number): string {
-  const rem100 = n % 100;
-  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
-  switch (n % 10) {
-    case 1:
-      return `${n}st`;
-    case 2:
-      return `${n}nd`;
-    case 3:
-      return `${n}rd`;
-    default:
-      return `${n}th`;
-  }
 }

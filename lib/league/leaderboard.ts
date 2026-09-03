@@ -33,7 +33,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { inPlayMatchweekId, openMatchweekId, type MatchweekRow } from './read'
+import { inPlayMatchweekId, openMatchweekId, readLeagueFormByEntry, type MatchweekRow } from './read'
 
 /** The champion an entry backed, and where that club actually sits today. */
 export type ChampionPick = {
@@ -141,13 +141,59 @@ export type LmsRoundMeta = {
 }
 
 /**
+ * Where one entry stands in Pick'em — the only league mode that scores a member
+ * against individual fixtures every week.
+ *
+ * ⚠ THIS IS THE MODE WHERE THE WORLD CUP FIELDS ARE REAL, and it is why they
+ * live in a block of their own rather than being promoted onto the row. Table
+ * has one prediction for the season and Last Man Standing has no points at all,
+ * so both would carry a `pickem` of `null` — absent, in the same discipline as
+ * `champion` and `lms`, so a component that reaches for form in the wrong mode
+ * fails to compile rather than drawing five grey dots.
+ */
+export type PickemRowState = {
+  /** Fixtures called right — `league_entry_totals.correct_count`. Real at BOTH depths. */
+  correct_count: number
+  /**
+   * ⚠ NULL AT RESULTS DEPTH, and that null is the whole point.
+   *
+   * At Results depth the engine writes only `winner` or `miss` (066:184) — a
+   * member taps a W/D/L outcome and there is no scoreline to be exact about. So
+   * `exact_count` is not a low number there, it is a question the mode never
+   * asks, and "0 exact" reads as having failed at something nobody attempted.
+   *
+   * ⚠ Derived with `depth === 'results'`, never `=== 'scores'`. A NULL depth is
+   * Scores, byte for byte with 066 — see `leagueDepthPolarity.guard.test.ts`.
+   */
+  exact_count: number | null
+  /**
+   * The last five settled fixtures, OLDEST FIRST — `league_match_scores
+   * .score_type`, which already speaks the vocabulary `FormDots` renders:
+   * `exact` / `winner_gd` / `winner` / `miss`.
+   *
+   * ⚠ At Results depth only `winner` and `miss` can ever appear, so a legend
+   * promising four tiers is promising two that cannot happen.
+   *
+   * Shorter than five — or empty — for an entry whose pool has not played five
+   * fixtures yet. That is a real state and NOT padded with `no_pick`, which
+   * would accuse somebody of missing weeks that have not happened.
+   */
+  last_five: Array<'exact' | 'winner_gd' | 'winner' | 'miss' | 'no_pick'>
+}
+
+/**
  * One league leaderboard row.
  *
  * ⚠ It deliberately carries NONE of the World Cup extras — `match_points`,
- * `bonus_points`, `last_five`, `level`, `hit_rate`, `exact_count`. They are not
- * zero for a league entry, they are absent: nothing writes them, and a zero on
- * screen is a claim. The mobile type mirrors this, so a component that reaches
- * for one fails to compile rather than rendering it.
+ * `bonus_points`, `level`, `hit_rate`, XP. They are not zero for a league entry,
+ * they are absent: nothing writes them, and a zero on screen is a claim. The
+ * mobile type mirrors this, so a component that reaches for one fails to compile
+ * rather than rendering it.
+ *
+ * ⚠ Form and exact counts are the exception, and they are NOT on this row —
+ * they are inside `pickem`, because they are real in exactly one mode. Hoisting
+ * them up here would hand Table and LMS a zero apiece, which is the failure this
+ * whole file exists to stop.
  */
 export type LeagueLeaderboardRow = {
   entry_id: string
@@ -175,10 +221,22 @@ export type LeagueLeaderboardRow = {
   champion: ChampionPick | null
   /** Last Man Standing only; null in every other mode. */
   lms: LmsRowState | null
+  /** Pick'em only; null in every other mode. */
+  pickem: PickemRowState | null
 }
 
 export type LeagueLeaderboard = {
   mode: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null
+  /**
+   * How this pool is scored. Pick'em and Showdown always carry one (083:66
+   * constrains it NOT NULL for both); Table and LMS always carry NULL.
+   *
+   * ⚠ It ships to the client because the CLIENT cannot derive it and gets it
+   * wrong when it guesses: at Results depth the four-tier Exact/W+GD/Winner/Miss
+   * legend promises two tiers the engine can never emit. Read it as
+   * `depth === 'results'` and nothing else.
+   */
+  depth: 'results' | 'scores' | null
   /**
    * True once the season-end snapshot exists — the same test
    * `league_table_breakdown` makes (081:81). Until then every total is
@@ -211,11 +269,23 @@ type MemberRow = {
 export async function readLeagueLeaderboard(
   admin: SupabaseClient,
   poolId: string,
-  pool: { league_season_id: string; league_mode: string | null },
+  pool: { league_season_id: string; league_mode: string | null; league_depth?: string | null },
   viewerMemberId: string | null = null,
 ): Promise<{ leaderboard: LeagueLeaderboard | null; error: string | null }> {
   const isTable = pool.league_mode === 'table'
   const isLms = pool.league_mode === 'last_man_standing'
+  const isPickem = pool.league_mode === 'pickem'
+  // ⚠ ONE POLARITY, EVERYWHERE. NULL depth is Scores — 066 scores it that way
+  // byte for byte, and the opposite reading has shipped three times on web and
+  // been called a deploy blocker, because it does not fail: members are told
+  // they are playing one game and scored at the other. See
+  // `leagueDepthPolarity.guard.test.ts`.
+  const depth: 'results' | 'scores' | null =
+    isPickem || pool.league_mode === 'showdown'
+      ? pool.league_depth === 'results'
+        ? 'results'
+        : 'scores'
+      : null
 
   const { data: memberRows, error: memberErr } = await admin
     .from('pool_members')
@@ -229,7 +299,7 @@ export async function readLeagueLeaderboard(
   }
   if (members.size === 0) {
     return {
-      leaderboard: { mode: normaliseMode(pool.league_mode), is_final: false, lms: null, rows: [] },
+      leaderboard: { mode: normaliseMode(pool.league_mode), depth, is_final: false, lms: null, rows: [] },
       error: null,
     }
   }
@@ -250,19 +320,19 @@ export async function readLeagueLeaderboard(
   const entryIds = entries.map((e) => e.entry_id)
   if (entryIds.length === 0) {
     return {
-      leaderboard: { mode: normaliseMode(pool.league_mode), is_final: false, lms: null, rows: [] },
+      leaderboard: { mode: normaliseMode(pool.league_mode), depth, is_final: false, lms: null, rows: [] },
       error: null,
     }
   }
 
-  const [totalsRes, finalRes, champions, lmsRound] = await Promise.all([
+  const [totalsRes, finalRes, champions, lmsRound, form] = await Promise.all([
     // The engine's own output. `previous_final_rank` is what draws the movement
     // arrow, and is why this does not reuse `readEntryTotals` from duels.ts —
     // that one does not select it, and widening a shared helper for one caller
     // is how a column nobody wanted ends up in every duel card.
     admin
       .from('league_entry_totals')
-      .select('entry_id, total_points, rounds_won, final_rank, previous_final_rank')
+      .select('entry_id, total_points, rounds_won, final_rank, previous_final_rank, exact_count, correct_count')
       .eq('pool_id', poolId),
     // Existence only — `head: true` sends no rows back.
     admin
@@ -280,16 +350,33 @@ export async function readLeagueLeaderboard(
           new Set(entries.filter((e) => e.member_id === viewerMemberId).map((e) => e.entry_id)),
         )
       : Promise.resolve(null),
+    // Pick'em is the one mode with a weekly record to plot.
+    //
+    // ⚠ REUSED, NOT REWRITTEN. `readLeagueFormByEntry` already solves the part
+    // that is easy to get wrong: `league_match_scores` reaches (entries ×
+    // fixtures) rows and PostgREST truncates at 1,000 SILENTLY, so it orders by
+    // `fixture_number DESC` and takes the newest slice. A second copy here is
+    // how the same query ends up with two answers — and this table has already
+    // cost a season of empty form columns once, by being read with the wrong
+    // client. It takes admin because it is deny-all (050).
+    isPickem ? readLeagueFormByEntry(admin, poolId) : Promise.resolve(null),
   ])
 
   if (totalsRes.error) return { leaderboard: null, error: `entry totals: ${totalsRes.error.message}` }
   if (finalRes.error) return { leaderboard: null, error: `final standings: ${finalRes.error.message}` }
   if (lmsRound?.error) return { leaderboard: null, error: lmsRound.error }
+  // Non-fatal, and deliberately the same call `readChampionPicks` makes: the
+  // scores are the leaderboard, form is texture on top of them. Five missing
+  // dots is a worse screen; a 502 is no screen at all. Logged so it is not
+  // silent — the last time this table was read wrongly it stayed wrong for a
+  // season precisely because nothing said so.
+  if (form?.error) console.error('[league leaderboard] pickem form failed:', form.error)
 
   const totals = new Map(
     ((totalsRes.data ?? []) as Array<{
       entry_id: string; total_points: number | null; rounds_won: number | null
       final_rank: number | null; previous_final_rank: number | null
+      exact_count: number | null; correct_count: number | null
     }>).map((t) => [t.entry_id, t]),
   )
 
@@ -339,6 +426,19 @@ export async function readLeagueLeaderboard(
               entry.member_id !== viewerMemberId,
           }
         : null,
+      pickem: isPickem
+        ? {
+            correct_count: t?.correct_count ?? 0,
+            // ⚠ NULL, NOT ZERO, at Results depth — the mode has no scoreline to
+            // be exact about, so a 0 accuses somebody of failing at something
+            // the game never asked them to do. Polarity per the guard.
+            exact_count: depth === 'results' ? null : t?.exact_count ?? 0,
+            // Fewer than five early in a season, and deliberately NOT padded:
+            // a `no_pick` dot for a week that has not been played yet would
+            // report a miss nobody had the chance to make.
+            last_five: narrowForm(form?.form.get(entry.entry_id)),
+          }
+        : null,
     })
   }
 
@@ -347,6 +447,7 @@ export async function readLeagueLeaderboard(
   return {
     leaderboard: {
       mode: normaliseMode(pool.league_mode),
+      depth,
       is_final: (finalRes.count ?? 0) > 0,
       lms: lmsRound?.meta ? { ...lmsRound.meta, standing: countStanding(rows), in_round: countInRound(rows) } : null,
       rows,
@@ -599,4 +700,22 @@ async function readChampionPicks(
     })
   }
   return out
+}
+
+/**
+ * `league_match_scores.score_type` is a text column, so it arrives as `string[]`.
+ * The four values the engine writes are exactly the ones the form dots render,
+ * but a text column can hold anything and an unrecognised value would render as
+ * a transparent dot — a gap in the row that looks like a rendering bug.
+ *
+ * ⚠ Anything unknown becomes `no_pick`, the one value that renders grey and
+ * claims nothing about how the member did.
+ */
+function narrowForm(raw: string[] | undefined): PickemRowState['last_five'] {
+  if (!raw) return []
+  return raw.map((r) =>
+    r === 'exact' || r === 'winner_gd' || r === 'winner' || r === 'miss' || r === 'no_pick'
+      ? r
+      : 'no_pick',
+  )
 }

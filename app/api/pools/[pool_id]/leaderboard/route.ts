@@ -74,7 +74,7 @@ async function handleGET(
   // 3. Fetch pool info
   const { data: pool } = await adminClient
     .from('pools')
-    .select('pool_id, tournament_id, prediction_mode, league_season_id, league_mode')
+    .select('pool_id, tournament_id, prediction_mode, league_season_id, league_mode, league_depth')
     .eq('pool_id', pool_id)
     .single()
 
@@ -105,6 +105,10 @@ async function handleGET(
       {
         league_season_id: pool.league_season_id as string,
         league_mode: (pool.league_mode as string | null) ?? null,
+        // ⚠ The client cannot derive this and gets it wrong when it guesses —
+        // at Results depth the four-tier legend promises two tiers the engine
+        // never emits. Read as `=== 'results'`, never `=== 'scores'`.
+        league_depth: (pool.league_depth as string | null) ?? null,
       },
       // ⚠ Last Man Standing needs to know WHO is asking. A rival's club is
       // sealed until that matchweek locks, and the admin client above bypasses
@@ -124,7 +128,12 @@ async function handleGET(
       prediction_mode: pool.prediction_mode,
       // `lms` is null in every other mode — the round context a survival
       // leaderboard needs, and nothing for a leaderboard that scores points.
-      league: { mode: leaderboard.mode, is_final: leaderboard.is_final, lms: leaderboard.lms },
+      league: {
+        mode: leaderboard.mode,
+        depth: leaderboard.depth,
+        is_final: leaderboard.is_final,
+        lms: leaderboard.lms,
+      },
       entries: leaderboard.rows,
       awards: [],
       superlatives: [],

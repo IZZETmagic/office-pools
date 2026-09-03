@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { LeaderboardLegend } from './LeaderboardLegend';
 import { LeaderboardPodium } from './LeaderboardPodium';
 import { LeaderboardRow } from './LeaderboardRow';
+import { LeaguePickemLeaderboard } from './LeaguePickemLeaderboard';
 import { LeagueTableLeaderboard } from './LeagueTableLeaderboard';
 import { LmsLeaderboard } from './LmsLeaderboard';
 import { TableEntrySheet, type TableEntrySheetTarget } from './TableEntrySheet';
@@ -86,9 +87,9 @@ export function LeaderboardTab({
   // rather than storing zeros), so for a league pool every one of them rendered
   // a confident zero over the top of scores it never read.
   //
-  // ⚠ Pick'em and Showdown still fall through to the World Cup list on purpose:
-  // it is wrong for them too, but it is the wrongness that is already shipped,
-  // and replacing it blind would be guessing at what a Showdown row should say.
+  // ⚠ Showdown still falls through on purpose: it is wrong for it too, but it is
+  // the wrongness that is already shipped, and guessing at what a duel row should
+  // say is worse than its own pass. Pick'em no longer does — see below.
   //
   // Last Man Standing needed its own list for a reason the other modes do not
   // share — it has no points at all, so a score column is a column of zeros by
@@ -97,6 +98,23 @@ export function LeaderboardTab({
   if (league?.mode === 'last_man_standing' && leagueEntries) {
     return (
       <LmsLeaderboard entries={leagueEntries} league={league} currentUserId={currentUserId} />
+    );
+  }
+
+  // ⚠ Pick'em was NOT showing zeros — it was showing "No Entries Yet". Every
+  // league pool gets an empty World Cup list (`usePoolDetail` narrows the union
+  // there), so a mode without its own branch fell to the empty state and denied
+  // that anybody was playing, over the top of a fully scored pool.
+  //
+  // It is also the one league mode where rank, movement and form are all real,
+  // which is why it gets the podium rather than a bare list.
+  if (league?.mode === 'pickem' && leagueEntries) {
+    return (
+      <LeaguePickemLeaderboard
+        entries={leagueEntries}
+        league={league}
+        currentUserId={currentUserId}
+      />
     );
   }
 

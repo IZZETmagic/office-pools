@@ -33,6 +33,10 @@ function row(name: string, lms: Partial<LmsRowState>): LeagueLeaderboardRow {
     previous_rank: null,
     has_filed: true,
     champion: null,
+    // Absent in this mode, like `champion` above — an LMS pool has no fixture
+    // form to plot. That this line is REQUIRED is the type discipline working:
+    // adding the block to the row broke every fixture that had not considered it.
+    pickem: null,
     lms: {
       eliminated_matchweek: null,
       is_round_winner: false,
