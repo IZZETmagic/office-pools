@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text as RNText, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TableBreakdownList, TablePicker } from '@/components/pool-detail';
 import { Icon, Text } from '@/components/ui';
@@ -40,6 +40,7 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export default function TableEntryScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { id, entryId, viewAs, owner } = useLocalSearchParams<{
     id: string;
     entryId: string;
@@ -60,7 +61,17 @@ export default function TableEntryScreen() {
   const title = spectate && ownerName ? `${ownerName}’s table` : 'Your table';
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.snow }}>
+    // ⚠ `edges={[]}` PLUS AN EXPLICIT `paddingTop`, not `edges={['top']}`.
+    //
+    // This is a `fullScreenModal`, and the edge inset did not apply — the
+    // header drew UNDER the status bar, back button behind the clock. The same
+    // file it was copied from does it manually in its loading and error states
+    // for what is presumably the same reason; only its main render uses the
+    // edge, and that is the one line that did not survive the presentation.
+    <SafeAreaView
+      edges={[]}
+      style={{ flex: 1, backgroundColor: theme.colors.snow, paddingTop: insets.top }}
+    >
       <View
         style={{
           flexDirection: 'row',
