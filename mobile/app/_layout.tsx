@@ -285,6 +285,18 @@ function InnerLayout() {
             gestureEnabled: false,
           }}
         />
+        {/* Last Man Standing's picker. Declared for the same reason as the one
+            above: undeclared it still renders, but with the stack's own header,
+            titled from the FILE PATH and carrying a second back button over the
+            one the screen draws itself. */}
+        <Stack.Screen
+          name="pool/[id]/survivor/[entryId]"
+          options={{
+            headerShown: false,
+            presentation: 'fullScreenModal',
+            gestureEnabled: false,
+          }}
+        />
         <Stack.Screen
           name="pool/[id]/scoring-config"
           options={{

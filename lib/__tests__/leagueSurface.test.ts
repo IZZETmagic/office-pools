@@ -42,11 +42,16 @@ describe('predictionSurfaceFor', () => {
     }
   })
 
-  it('table mode gets its own picker; every other league mode is read-only', () => {
+  it('a mode gets its own surface once it has had a design pass', () => {
     // The mode may choose BETWEEN league surfaces — it just may never decide
     // whether this is a league at all, which is what `isLeague` is for.
     expect(predictionSurfaceFor({ isLeague: true, leagueMode: 'table' })).toBe('league-table')
-    for (const m of [null, 'pickem', 'showdown', 'last_man_standing'] as const) {
+    expect(predictionSurfaceFor({ isLeague: true, leagueMode: 'last_man_standing' })).toBe('league-lms')
+
+    // ⚠ Pick'em and Showdown are read-only because neither has had its pass, NOT
+    // because read-only is what a league defaults to. When one of them gets a
+    // picker this line moves deliberately, the way LMS's just did.
+    for (const m of [null, 'pickem', 'showdown'] as const) {
       expect(
         predictionSurfaceFor({ isLeague: true, leagueMode: m }),
         `leagueMode=${m} has had no picker design pass`,

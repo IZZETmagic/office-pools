@@ -1,4 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -26,6 +27,7 @@ import {
   FormTab,
   LeaderboardTab,
   LeagueTableEntriesTab,
+  LmsEntriesTab,
   LeagueTableScoring,
   MembersTab,
   PoolDetailHeader,
@@ -40,6 +42,7 @@ import {
   type PoolTabKey,
 } from '@/components/pool-detail';
 import { Button, Text } from '@/components/ui';
+import { fetchLmsState } from '@/lib/api';
 import { predictionSurfaceFor } from '@/lib/leagueSurface';
 import { useReportActivePool } from '@/lib/PresenceProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
@@ -75,6 +78,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
 const MemoPoolDetailHeader = memo(PoolDetailHeader);
 const MemoLeaderboardTab = memo(LeaderboardTab);
 const MemoLeagueTableEntriesTab = memo(LeagueTableEntriesTab);
+const MemoLmsEntriesTab = memo(LmsEntriesTab);
 const MemoLeagueTableScoring = memo(LeagueTableScoring);
 const MemoPredictionsTab = memo(PredictionsTab);
 const MemoFormTab = memo(FormTab);
@@ -233,6 +237,22 @@ export default function PoolDetailScreen() {
   const tableIsLocked = data?.pool.leagueTableLockAt
     ? new Date(data.pool.leagueTableLockAt).getTime() <= Date.now()
     : false;
+  // Last Man Standing's round, fetched only for a pool that plays it.
+  //
+  // ⚠ A SEPARATE READ, not a widening of `usePoolDetail`. That hook serves every
+  // pool type, and hanging a mode's payload off it would make all 623 World Cup
+  // pools carry a shape only one league mode ever uses. The picker route reads
+  // the same key, so opening it from here costs nothing.
+  //
+  // ⚠ Its picks are gated by RLS on the CALLER's client server-side, which is
+  // why nothing on the phone filters them: a rival's club is absent until the
+  // matchweek locks, and absence is the gate rather than a flag to respect.
+  const isLms = isLeague && data?.pool.leagueMode === 'last_man_standing';
+  const lmsQuery = useQuery({
+    queryKey: ['lms', id],
+    queryFn: () => fetchLmsState(id),
+    enabled: isLms,
+  });
   // Implicit toggle: fee tracking is "on" iff the admin has set a
   // positive entry fee in Settings. Drives both the Fees tab visibility
   // in the tab bar and the Fees & Prize Pool card in PoolInfoTab.
@@ -400,6 +420,23 @@ export default function PoolDetailScreen() {
               currentUserId={pool.currentUserId}
               isLocked={tableIsLocked}
               lockAt={pool.leagueTableLockAt}
+            />
+          );
+        }
+        if (surface === 'league-lms') {
+          return (
+            <MemoLmsEntriesTab
+              poolId={pool.poolId}
+              state={lmsQuery.data ?? null}
+              loading={lmsQuery.isPending}
+              error={
+                lmsQuery.isError
+                  ? lmsQuery.error instanceof Error
+                    ? lmsQuery.error.message
+                    : 'The round could not be loaded.'
+                  : null
+              }
+              currentUserId={pool.currentUserId}
             />
           );
         }

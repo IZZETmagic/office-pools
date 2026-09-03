@@ -1314,3 +1314,93 @@ export type RestorePoolResponse = {
 export function restorePool(poolId: string) {
   return apiFetch<RestorePoolResponse>(`/api/pools/${poolId}/restore`, { method: 'POST' });
 }
+
+// ---------------------------------------------------------------------------
+// Last Man Standing — one club a matchweek, to win
+// ---------------------------------------------------------------------------
+
+/** One cell of the picks wall. Absent entirely when the caller may not see it. */
+export type LmsPickCell = {
+  entry_id: string;
+  matchweek_number: number;
+  club_id: string;
+  club_name: string;
+  crest_url: string | null;
+  /** NULL until the matchweek settles. */
+  result: 'survived' | 'eliminated' | null;
+};
+
+export type LmsMember = {
+  entry_id: string;
+  user_id: string | null;
+  display_name: string;
+  username: string;
+  /** NULL means still standing. */
+  eliminated_matchweek: number | null;
+  /** ⚠ FALSE means they joined after the round opened — NOT that they are out. */
+  in_round: boolean;
+  is_round_winner: boolean;
+  rounds_won: number;
+};
+
+export type LmsClub = {
+  club_id: string;
+  club_name: string;
+  crest_url: string | null;
+  /** The matchweek you already spent this club in. One club per round. */
+  used_in_matchweek: number | null;
+};
+
+export type LmsFixture = {
+  club_id: string;
+  opponent_name: string;
+  opponent_crest: string | null;
+  /** True when the club in question is at home — "v" rather than "at". */
+  is_home: boolean;
+  kickoff_at: string;
+};
+
+/**
+ * Everything both Last Man Standing screens read.
+ *
+ * ⚠ `picks` holds ONLY what this caller may see. The server reads that table
+ * with the caller's own client so RLS does the gating (086: your own always,
+ * everyone else's once the matchweek locks). A club missing from the wall is
+ * therefore either sealed or never picked, and the screen must not guess which
+ * — `locked_matchweeks` is what tells them apart.
+ */
+export type LmsState = {
+  round: { round_id: string; round_number: number; first_matchweek: number } | null;
+  /** The week a pick can still be WRITTEN for. Never the one to narrate with. */
+  open_matchweek: number | null;
+  /** The week being PLAYED. Null between rounds — an answer, not a gap. */
+  in_play_matchweek: number | null;
+  /** The wall's columns, ascending. Only weeks this round covers. */
+  matchweeks: number[];
+  locked_matchweeks: number[];
+  my_entry_id: string | null;
+  members: LmsMember[];
+  picks: LmsPickCell[];
+  clubs: LmsClub[];
+  /** For the OPEN matchweek only — who each club plays, if anyone. */
+  fixtures: LmsFixture[];
+};
+
+export function fetchLmsState(poolId: string) {
+  return apiFetch<LmsState>(`/api/pools/${poolId}/lms`);
+}
+
+/**
+ * Back a club for a matchweek. Replaces an earlier choice for the same week —
+ * changing your mind before the lock is allowed and expected.
+ *
+ * ⚠ The route READS BACK after writing. The post-kickoff lock is a silent-skip
+ * database trigger, so a refused write returns 200 with nothing changed unless
+ * somebody asks; a 403 from here means the week closed or you are already out.
+ */
+export function saveLmsPick(
+  poolId: string,
+  body: { roundId: string; entryId: string; matchweekNumber: number; clubId: string },
+) {
+  return apiFetch<{ saved: true }>(`/api/pools/${poolId}/lms-pick`, { method: 'POST', body });
+}

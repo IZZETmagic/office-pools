@@ -23,10 +23,23 @@ export type PredictionSurface =
    */
   | 'league-table'
   /**
+   * Last Man Standing. The landing is the round — your own state, then the wall
+   * of everybody's picks across its matchweeks — and the picking is a route away
+   * at `pool/[id]/survivor/[entryId]`, exactly as Table mode does it.
+   *
+   * ⚠ A separate ROUTE, not a branch inside the tab. Anything scrollable
+   * rendered in the tab pager cannot get a height; `LeagueTableEntriesTab` paid
+   * for that lesson first and its header records it.
+   */
+  | 'league-lms'
+  /**
    * Every other league pool. The phone shows what it can READ and sends picking
    * to the web — Ryan's call 2026-09-02: the RN build has not begun, and a
    * picking control is a product decision that deserves its own design pass
    * rather than arriving behind a read contract.
+   *
+   * ⚠ Now only Pick'em and Showdown. Each gets a picker when it has had its own
+   * design pass, not before.
    */
   | 'league-read-only'
   /** The World Cup wizard. */
@@ -54,5 +67,7 @@ export function predictionSurfaceFor(pool: PoolShape): PredictionSurface {
   // ⚠ Reached ONLY after `isLeague` — rule 1 above. The mode is allowed to
   // choose between league surfaces; it is never allowed to decide whether this
   // is a league at all, which is the distinction a NULL mode turns on.
-  return pool.leagueMode === 'table' ? 'league-table' : 'league-read-only'
+  if (pool.leagueMode === 'table') return 'league-table'
+  if (pool.leagueMode === 'last_man_standing') return 'league-lms'
+  return 'league-read-only'
 }
