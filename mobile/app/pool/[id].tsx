@@ -8,11 +8,13 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   RefreshControl,
-  ScrollView,
+  type RefreshControlProps,
   View,
   useWindowDimensions,
 } from 'react-native';
 import Animated, {
+  type SharedValue,
+  useAnimatedReaction,
   useAnimatedScrollHandler,
   useSharedValue,
 } from 'react-native-reanimated';
@@ -35,6 +37,7 @@ import {
   LeagueTableScoring,
   MembersTab,
   PoolDetailHeader,
+  ShowdownDuelHeader,
   PoolInfoTab,
   RoundsTab,
   PoolTabBar,
@@ -48,6 +51,7 @@ import {
 import { Button, Text } from '@/components/ui';
 import { fetchLmsState } from '@/lib/api';
 import { predictionSurfaceFor } from '@/lib/leagueSurface';
+import { useDuel } from '@/lib/useDuel';
 import { useLeaguePool } from '@/lib/useLeaguePool';
 import { useReportActivePool } from '@/lib/PresenceProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
@@ -142,6 +146,20 @@ export default function PoolDetailScreen() {
   // thread with no React re-render, and PoolTabBar reads it via
   // useAnimatedReaction to drive its pill slide.
   const pageOffset = useSharedValue(0);
+  /**
+   * Vertical scroll of whichever tab is on screen, so the Showdown matchup
+   * header can collapse as you read down.
+   *
+   * ⚠ IT LIVES HERE BECAUSE NOTHING ELSE COULD OWN IT. The header sits
+   * outside the pager and every tab is its own ScrollView, so no single
+   * scroll position existed — which is why the header could not collapse at
+   * all before this. Each page writes its own offset in and hands it over
+   * when it becomes the active page (see `TabPage`); a plain shared handler
+   * would leave the header collapsed after swiping to a tab sitting at top.
+   *
+   * Written from the UI thread, read by an animated style. No re-render.
+   */
+  const scrollY = useSharedValue(0);
   const { width } = useWindowDimensions();
   const pagerRef = useRef<Animated.ScrollView | null>(null);
   // When a tab change originates from a swipe, the pager has already
@@ -276,6 +294,11 @@ export default function PoolDetailScreen() {
    * earlier, and the two differ on every matchweek from 3 onward.
    */
   const pickemLeague = useLeaguePool(data?.pool.leagueMode === 'pickem' ? id : null);
+  // ⚠ Null for every other mode — the payload is the whole season, and a pool
+  // with no duels has no reason to pull it. The HEADER needs this, which is
+  // why it is here rather than inside `DuelTab`: the header renders outside
+  // the pager, above the tab that shows the same bout.
+  const duel = useDuel(leagueMode === 'showdown' ? id : null);
   const pickemDeadline = (() => {
     const season = pickemLeague.data?.season;
     const open = season?.openMatchweekNumber ?? null;
@@ -598,6 +621,22 @@ export default function PoolDetailScreen() {
     }
   }
 
+  const isShowdownPool = isLeague && leagueMode === 'showdown';
+  const tabBar = (
+    <PoolTabBar
+      active={tab}
+      onChange={handleTabTap}
+      isAdmin={pool.isAdmin}
+      isProgressive={!!isProgressive}
+      feesEnabled={feesEnabled}
+      isLeague={isLeague}
+      pageOffset={pageOffset}
+      accentColor={accentColor}
+      poolId={pool.poolId}
+      leagueMode={leagueMode}
+    />
+  );
+
   return (
     <SafeAreaView
       edges={['left', 'right']}
@@ -607,19 +646,31 @@ export default function PoolDetailScreen() {
           light icons so the clock/battery stay legible. Unmounts when the
           screen leaves and the root-layout's "auto" style takes over again. */}
       {accentColor ? <StatusBar style="light" animated /> : null}
-      <MemoPoolDetailHeader pool={pool} />
-      <PoolTabBar
-        active={tab}
-        onChange={handleTabTap}
-        isAdmin={pool.isAdmin}
-        isProgressive={!!isProgressive}
-        feesEnabled={feesEnabled}
-        isLeague={isLeague}
-        pageOffset={pageOffset}
-        accentColor={accentColor}
-        poolId={pool.poolId}
-        leagueMode={leagueMode}
-      />
+      {/*
+        ⚠ SHOWDOWN GETS A DIFFERENT HEADER, and the tab strip moves INSIDE it.
+        Every other mode renders exactly what it did before — same header, same
+        sibling strip — so this is additive rather than a rewrite of a surface
+        four other modes depend on.
+
+        The strip is the same `PoolTabBar` in both branches. It is passed as a
+        child rather than duplicated, because two copies of the pill list is how
+        the pager and the pills start disagreeing about tab order.
+      */}
+      {isShowdownPool ? (
+        <ShowdownDuelHeader
+          poolName={pool.poolName}
+          bout={duel.current}
+          sealed={duel.sealed}
+          scrollY={scrollY}
+        >
+          {tabBar}
+        </ShowdownDuelHeader>
+      ) : (
+        <>
+          <MemoPoolDetailHeader pool={pool} />
+          {tabBar}
+        </>
+      )}
       <Animated.ScrollView
         ref={pagerRef}
         horizontal
@@ -631,11 +682,14 @@ export default function PoolDetailScreen() {
         keyboardShouldPersistTaps="handled"
         style={{ flex: 1 }}
       >
-        {visibleTabs.map((key) => (
-          <ScrollView
+        {visibleTabs.map((key, i) => (
+          <TabPage
             key={key}
-            style={{ width }}
-            contentContainerStyle={{ paddingBottom: theme.spacing.xxxl, flexGrow: 1 }}
+            index={i}
+            width={width}
+            pageOffset={pageOffset}
+            scrollY={scrollY}
+            paddingBottom={theme.spacing.xxxl}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -645,7 +699,7 @@ export default function PoolDetailScreen() {
             }
           >
             {renderTab(key)}
-          </ScrollView>
+          </TabPage>
         ))}
       </Animated.ScrollView>
 
@@ -666,5 +720,75 @@ export default function PoolDetailScreen() {
         poolName={pool.poolName}
       />
     </SafeAreaView>
+  );
+}
+
+/**
+ * One page of the horizontal pager: a vertical scroll view that reports its
+ * offset to the screen's shared `scrollY`.
+ *
+ * ⚠ WHY EACH PAGE KEEPS ITS OWN OFFSET TOO.
+ *
+ * The naive version — one handler on every page writing straight to `scrollY` —
+ * looks right until you swipe. Only the visible page emits scroll events, so
+ * `scrollY` keeps whatever the PREVIOUS tab left there: swipe from a tab you
+ * had scrolled 300pt down to one sitting at the top and the header stays
+ * collapsed over a screen that is not scrolled, until you touch it.
+ *
+ * So each page remembers `mine` and pushes it into the shared value at the
+ * moment it BECOMES the active page. `pageOffset` is already a shared value
+ * driven by the pager, so the whole exchange happens on the UI thread with no
+ * re-render — the same reason the tab pills read it instead of React state.
+ *
+ * ⚠ The guard inside `onScroll` matters as much as the reaction. A page that is
+ * scrolled programmatically while off-screen (a refresh, a keyboard) would
+ * otherwise write over the visible page's offset.
+ */
+function TabPage({
+  index,
+  width,
+  pageOffset,
+  scrollY,
+  paddingBottom,
+  refreshControl,
+  children,
+}: {
+  index: number;
+  width: number;
+  pageOffset: SharedValue<number>;
+  scrollY: SharedValue<number>;
+  paddingBottom: number;
+  refreshControl: React.ReactElement<RefreshControlProps>;
+  children: React.ReactNode;
+}) {
+  const mine = useSharedValue(0);
+
+  const handler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      'worklet';
+      mine.value = e.contentOffset.y;
+      if (Math.round(pageOffset.value) === index) scrollY.value = mine.value;
+    },
+  });
+
+  useAnimatedReaction(
+    () => Math.round(pageOffset.value) === index,
+    (isActive, wasActive) => {
+      'worklet';
+      if (isActive && !wasActive) scrollY.value = mine.value;
+    },
+    [index],
+  );
+
+  return (
+    <Animated.ScrollView
+      style={{ width }}
+      contentContainerStyle={{ paddingBottom, flexGrow: 1 }}
+      onScroll={handler}
+      scrollEventThrottle={16}
+      refreshControl={refreshControl}
+    >
+      {children}
+    </Animated.ScrollView>
   );
 }

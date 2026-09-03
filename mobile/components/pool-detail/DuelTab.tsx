@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import { duelResult, DUEL_WIN, DUEL_TIE } from '@/lib/duelPoints';
-import { useLeaguePool, type DuelRow } from '@/lib/useLeaguePool';
+import { useDuel, type Bout, type DuelRecord } from '@/lib/useDuel';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -15,16 +15,22 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // Here it is a tab, because Ryan's call 2026-09-03 was to keep the tab strip on
 // the phone and put the matchup in a collapsing header above it.
 //
+// ## ⚠ IT DERIVES NOTHING — `useDuel` DOES
+//
+// The matchup header sits directly above this tab and names the same opponent
+// at the same moment. When both worked it out for themselves they could drift;
+// now they read one hook. If you are about to add a `useMemo` over
+// `showdown.duels` in this file, put it in `lib/useDuel.ts` instead.
+//
 // ## ⚠ A MISSING MATCHWEEK IS SEALED, NOT EMPTY
 //
-// This is the one thing to get right in this file. Migration 116 seals the draw
-// in RLS and the contract reads it with the VIEWER's client, so
-// `showdown.duels` holds the weeks this member may see and no others. Three
-// states look identical if you only count rows:
+// Migration 116 seals the draw in RLS and the contract reads it with the
+// VIEWER's client, so `showdown.duels` holds the weeks this member may see and
+// no others. Three states look identical if you only count rows:
 //
 //   · a BYE      — a row exists, `entry_b === null`. Nobody was drawn.
-//   · a SEALED   — NO ROW. `season.sealedMatchweekNumber` names it and
-//                  `sealedOpensAtLatest` is when it opens.
+//   · a SEALED   — NO ROW. `sealed.matchweek` names it and `sealed.opensAt`
+//                  is when it opens.
 //   · past the end of the season — no row and nothing sealed.
 //
 // Reading "no row" as "no opponent" would show the bye card to somebody whose
@@ -43,112 +49,11 @@ type Props = {
   poolId: string;
 };
 
-/** One side of a duel, oriented so "you" is always the first. */
-type Side = {
-  entryId: string;
-  name: string;
-  /** What their picks scored that week. Null until the duel settles. */
-  accuracy: number | null;
-  /** The duel's own points — 500/250/0. Null until it settles. */
-  points: number | null;
-};
-
-type Bout = {
-  duel: DuelRow;
-  matchweek: number;
-  you: Side;
-  /** `null` is a BYE — a row that exists with nobody on the other side. */
-  them: Side | null;
-  settled: boolean;
-};
-
 export function DuelTab({ poolId }: Props) {
   const theme = useTheme();
-  const league = useLeaguePool(poolId);
+  const { loading, error, isShowdown, bouts, current, record, sealed } = useDuel(poolId);
 
-  const data = league.data;
-  const showdown = data?.showdown ?? null;
-  const ownEntryIds = useMemo(
-    () => new Set((data?.you.entries ?? []).map((e) => e.entry_id)),
-    [data],
-  );
-
-  /**
-   * Every revealed duel the viewer is in, oriented so they are always side A.
-   *
-   * ⚠ The orientation is presentational only. `entry_a` / `entry_b` are the
-   * schedule's own sides and carry no meaning about who is "home" — flipping
-   * them for display is safe, reading anything into them would not be.
-   */
-  const bouts = useMemo<Bout[]>(() => {
-    if (!showdown) return [];
-    const name = (id: string) => showdown.names[id] ?? 'Unknown';
-    const out: Bout[] = [];
-
-    for (const d of showdown.duels) {
-      const iAmA = ownEntryIds.has(d.entry_a);
-      const iAmB = d.entry_b !== null && ownEntryIds.has(d.entry_b);
-      if (!iAmA && !iAmB) continue;
-
-      const you: Side = iAmA
-        ? { entryId: d.entry_a, name: name(d.entry_a), accuracy: d.accuracy_a, points: d.points_a }
-        : {
-            entryId: d.entry_b as string,
-            name: name(d.entry_b as string),
-            accuracy: d.accuracy_b,
-            points: d.points_b,
-          };
-
-      const them: Side | null = iAmA
-        ? d.entry_b === null
-          ? null
-          : { entryId: d.entry_b, name: name(d.entry_b), accuracy: d.accuracy_b, points: d.points_b }
-        : { entryId: d.entry_a, name: name(d.entry_a), accuracy: d.accuracy_a, points: d.points_a };
-
-      out.push({ duel: d, matchweek: d.matchweek_number, you, them, settled: !!d.settled_at });
-    }
-    return out.sort((a, b) => a.matchweek - b.matchweek);
-  }, [showdown, ownEntryIds]);
-
-  /**
-   * The duel to lead with: the first one not yet settled, else the most recent
-   * result.
-   *
-   * ⚠ NOT `inPlayMatchweekNumber`. A duel can be revealed and waiting several
-   * days before its football starts, and during that window there is no
-   * in-play week at all — leading on it would leave the tab headless for the
-   * most anticipatory part of the cycle, which is the part this mode is for.
-   */
-  const current = useMemo(
-    () => bouts.find((b) => !b.settled) ?? bouts[bouts.length - 1] ?? null,
-    [bouts],
-  );
-
-  /** Your record across settled duels. A bye is counted separately, never as a tie. */
-  const record = useMemo(() => {
-    let won = 0;
-    let tied = 0;
-    let lost = 0;
-    let byes = 0;
-    let points = 0;
-    for (const b of bouts) {
-      if (!b.settled) continue;
-      points += b.you.points ?? 0;
-      if (!b.them) {
-        // ⚠ Structural, not by value: DUEL_BYE === DUEL_TIE on purpose, so this
-        // is the ONLY way to tell a free week from a drawn one.
-        byes += 1;
-        continue;
-      }
-      const r = duelResult(b.you.points);
-      if (r === 'won') won += 1;
-      else if (r === 'tied') tied += 1;
-      else if (r === 'lost') lost += 1;
-    }
-    return { won, tied, lost, byes, points };
-  }, [bouts]);
-
-  if (league.isPending) {
+  if (loading) {
     return (
       <View style={{ paddingVertical: theme.spacing.xxxl, alignItems: 'center' }}>
         <ActivityIndicator color={theme.colors.primary} />
@@ -156,7 +61,7 @@ export function DuelTab({ poolId }: Props) {
     );
   }
 
-  if (league.isError || !data) {
+  if (error) {
     return (
       <Empty
         icon="exclamationmark.triangle"
@@ -168,15 +73,12 @@ export function DuelTab({ poolId }: Props) {
 
   // Not a Showdown pool at all. The tab should not have been offered, so this is
   // a guard rather than a state anybody is meant to reach.
-  if (!showdown) {
+  if (!isShowdown) {
     return <Empty icon="person.2.fill" title="This pool has no duels" caption="" />;
   }
 
-  const sealedNumber = data.season.sealedMatchweekNumber;
-  const sealedAt = data.season.sealedOpensAtLatest;
-
   // Two members are needed before a schedule exists at all.
-  if (bouts.length === 0 && sealedNumber === null) {
+  if (bouts.length === 0 && sealed === null) {
     return (
       <Empty
         icon="person.2.fill"
@@ -196,8 +98,8 @@ export function DuelTab({ poolId }: Props) {
         being played, and the next one is still counting down. Showing only one
         is what made the web card name the wrong matchweek.
       */}
-      {sealedNumber !== null ? (
-        <SealedCard matchweek={sealedNumber} opensAt={sealedAt} />
+      {sealed !== null ? (
+        <SealedCard matchweek={sealed.matchweek} opensAt={sealed.opensAt} />
       ) : null}
 
       <RecordCard record={record} />
@@ -436,7 +338,7 @@ function useCountdown(iso: string | null): string | null {
 function RecordCard({
   record,
 }: {
-  record: { won: number; tied: number; lost: number; byes: number; points: number };
+  record: DuelRecord;
 }) {
   const theme = useTheme();
   return (
