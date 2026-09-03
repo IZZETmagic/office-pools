@@ -550,8 +550,8 @@ function FixtureRow({
           `name · crest · [ ] · [ ] · crest · name`
 
           The budget, measured at 375pt: 319 after screen and card padding, less
-          80 for the two score fields, 52 for the crests, 26 of gaps and the
-          dash itself leaves ~76 a name.
+          103 for the scoreline block, 52 for the crests and 32 of gaps leaves
+          ~66 a name.
 
           ⚠ THAT IS MARGINAL, and it is handled rather than hoped. "Bournemouth"
           is the longest club name across the three live seasons that CANNOT
@@ -560,28 +560,36 @@ function FixtureRow({
           `Club`. Everything longer ("Crystal Palace", "Nott'm Forest") is more
           than one word and breaks across two lines instead.
         */
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ClubName team={home} />
           <Crest team={home} />
-          <TapScoreField
-            value={score.home}
-            onChange={(v) => onScore('home', v)}
-            disabled={!canEdit}
-            width={40}
-          />
-          {/* ⚠ Back by request. It reads as a scoreline rather than as two
-              unrelated boxes — the thing the crests either side do not quite
-              say on their own. Its cost is paid out of the score fields, not
-              out of the names. */}
-          <Text variant="detail" color="slate">
-            –
-          </Text>
-          <TapScoreField
-            value={score.away}
-            onChange={(v) => onScore('away', v)}
-            disabled={!canEdit}
-            width={40}
-          />
+          {/*
+            ⚠ THE SCORELINE IS ONE THING, so it is one box with its own tighter
+            spacing. Ryan asked for more air between the score inputs and the
+            crests; giving the whole row that gap would have pushed the two
+            numbers apart as well, and they belong together — the dash is
+            between them precisely to say so.
+
+            Fixed width by construction (44 + 4 + dash + 4 + 44), which is what
+            keeps the block centred and both crests on the same x down the list.
+          */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <TapScoreField
+              value={score.home}
+              onChange={(v) => onScore('home', v)}
+              disabled={!canEdit}
+              width={44}
+            />
+            <Text variant="detail" color="slate">
+              –
+            </Text>
+            <TapScoreField
+              value={score.away}
+              onChange={(v) => onScore('away', v)}
+              disabled={!canEdit}
+              width={44}
+            />
+          </View>
           <Crest team={away} />
           <ClubName team={away} />
         </View>
@@ -640,12 +648,19 @@ function ClubName({ team }: { team: LeagueMatch['home_team'] }) {
   const label = team?.short_name?.trim() || team?.country_name || 'TBD';
   return (
     /*
-      ⚠ SHRINKS BEFORE IT TRUNCATES. A name gets ~78pt here and "Bournemouth" —
-      the longest club name across the three live seasons that cannot wrap,
-      being one word — wants 72-79 at this size. An ellipsis is a failure a
-      member has to decode ("Bournemou…"); 12pt instead of 13 on one row is
-      not. `minimumFontScale` floors it at 0.85, and the two-line allowance
-      still does the work for every multi-word name.
+      ⚠ 12pt, NOT 13, AND THE POINT IS UNIFORMITY. Squaring the inputs and
+      widening the gaps cost the names 12pt of slot — they get ~66 now. At 13pt
+      "Bournemouth" (the longest club name across the three live seasons that
+      cannot wrap, being one word) needed to shrink to 0.84, under the 0.85
+      floor, so it would have truncated anyway — and every other name would
+      have rendered at 13 beside it, which is the inconsistency Ryan would see
+      before he saw the ellipsis. At 12 it fits at ~0.90-1.0 and the whole list
+      renders at one size.
+
+      ⚠ The shrink net stays as the backstop for a competition with a longer
+      name than any of the 58 measured here. Floored at 0.85 so nothing can
+      shrink into illegibility, and the two-line allowance still does the work
+      for every multi-word name.
     */
     <Text
       variant="body"
@@ -654,8 +669,8 @@ function ClubName({ team }: { team: LeagueMatch['home_team'] }) {
       minimumFontScale={0.85}
       style={{
         flex: 1,
-        fontSize: 13,
-        lineHeight: 16,
+        fontSize: 12,
+        lineHeight: 15,
         color: theme.colors.ink,
         textAlign: 'center',
       }}
