@@ -15,6 +15,7 @@ import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
 } from 'react-native-reanimated';
+import { ScrollViewContainer } from 'react-native-reorderable-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -225,6 +226,7 @@ export default function PoolDetailScreen() {
   const isAdmin = data?.pool.isAdmin ?? false;
   const isProgressive = data?.pool.predictionMode === 'progressive';
   const isLeague = data?.pool.isLeague ?? false;
+  const isTableMode = isLeague && data?.pool.leagueMode === 'table';
   // Implicit toggle: fee tracking is "on" iff the admin has set a
   // positive entry fee in Settings. Drives both the Fees tab visibility
   // in the tab bar and the Fees & Prize Pool card in PoolInfoTab.
@@ -473,8 +475,21 @@ export default function PoolDetailScreen() {
         keyboardShouldPersistTaps="handled"
         style={{ flex: 1 }}
       >
-        {visibleTabs.map((key) => (
-          <ScrollView
+        {visibleTabs.map((key) => {
+          // ⚠ ONE TAB NEEDS A DIFFERENT SCROLLER, and only one.
+          //
+          // Table mode's picker is a `NestedReorderableList`, which the library
+          // requires to sit inside its own `ScrollViewContainer` — a plain
+          // ScrollView leaves it unable to scroll or auto-scroll while dragging.
+          //
+          // `ScrollViewContainer` spreads its props onto an Animated.ScrollView
+          // so it is a drop-in, but it also wraps everything in a
+          // `GestureDetector`. This screen's pager is itself a horizontal
+          // ScrollView, so that extra native gesture is scoped to the one tab
+          // that needs it rather than applied to all six.
+          const Scroller = key === 'predictions' && isTableMode ? ScrollViewContainer : ScrollView;
+          return (
+          <Scroller
             key={key}
             style={{ width }}
             contentContainerStyle={{ paddingBottom: theme.spacing.xxxl, flexGrow: 1 }}
@@ -487,8 +502,9 @@ export default function PoolDetailScreen() {
             }
           >
             {renderTab(key)}
-          </ScrollView>
-        ))}
+          </Scroller>
+          );
+        })}
       </Animated.ScrollView>
 
       <BanterFab

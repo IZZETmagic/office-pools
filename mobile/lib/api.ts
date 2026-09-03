@@ -293,6 +293,14 @@ export type TableSummary = {
   zeroAt: number;
 };
 
+/** A club in the competition, for the picker. */
+export type SeasonClub = {
+  club_id: string;
+  club_name: string;
+  crest_url: string | null;
+  short_name: string | null;
+};
+
 export type TablePredictionResponse = {
   entryId: string;
   /** club_ids in predicted finishing order. Empty means they never filed. */
@@ -301,7 +309,31 @@ export type TablePredictionResponse = {
   breakdown: TableBreakdownRow[];
   settings: TableSettings;
   summary: TableSummary;
+  /** Every club in the competition — the picker's raw material. */
+  clubs: SeasonClub[];
+  /**
+   * What an unfiled table starts from: alphabetical, so it cannot be mistaken
+   * for a suggestion. Decision 12 as revised by 17.
+   */
+  seededOrder: string[];
 };
+
+/**
+ * Save an ordering.
+ *
+ * ⚠ THE LOCK IS A SILENT-SKIP TRIGGER. `enforce_league_table_before_lock`
+ * RETURN NULLs rather than raising, which is the house pattern for every
+ * prediction lock in this codebase — so a write after the deadline "succeeds"
+ * having stored nothing. The route turns that into a 403 with a readable
+ * message, and an ignored rejection is how a member ends up looking at twenty
+ * clubs the database does not have.
+ */
+export function saveTablePrediction(poolId: string, entryId: string, order: string[]) {
+  return apiFetch<{ stored: number; savedAt: string | null }>(
+    `/api/pools/${poolId}/table-prediction`,
+    { method: 'POST', body: { entryId, order } },
+  );
+}
 
 /**
  * Table mode's deadline, and who has filed against it.

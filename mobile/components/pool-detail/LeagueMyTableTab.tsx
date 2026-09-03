@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
+import { TablePicker } from './TablePicker';
 import {
   fetchTablePrediction,
   type TableBreakdownRow,
@@ -73,28 +74,37 @@ export function LeagueMyTableTab({ poolId, entryId }: Props) {
     );
   }
 
-  const { breakdown, settings, summary, savedAt } = query.data;
+  const { breakdown, settings, summary, savedAt, order, clubs, seededOrder } = query.data;
   const filed = breakdown.length > 0;
 
-  // ⚠ THREE STATES, NOT TWO. "Never got the chance" and "had the chance and
-  // skipped it" score the same nothing and deserve different sentences —
-  // Decision 11. A blank screen under a 0 reads as having played badly.
+  // ⚠ BEFORE THE LOCK YOU DRAG; AFTER IT YOU WATCH. One screen at two points in
+  // time — and the lock is the ONLY switch, because it is the same fact the
+  // database trigger enforces. Deciding this on "have they filed" instead would
+  // strand someone who filed early with no way to change their mind.
+  if (!settings.isLocked) {
+    return (
+      <TablePicker
+        poolId={poolId}
+        entryId={entryId}
+        clubs={clubs}
+        // Their own order if they have one, else the alphabetical seed.
+        initialOrder={order.length > 0 ? order : seededOrder}
+        settings={settings}
+        savedAt={savedAt}
+        initiallySaved={order.length > 0}
+      />
+    );
+  }
+
+  // Locked and never filed. ⚠ Decision 11: "never got the chance" and "had the
+  // chance and skipped it" score the same nothing and deserve different
+  // sentences — a blank screen under a 0 reads as having played badly.
   if (!filed) {
-    return settings.isLocked ? (
+    return (
       <EmptyState
         icon="lock.fill"
         title="You didn’t predict the table"
         caption="It scores nothing, and everything else in the pool counts as normal."
-      />
-    ) : (
-      <EmptyState
-        icon="iphone.and.arrow.forward"
-        title="Predict the table on the web"
-        caption={
-          settings.lockAt
-            ? `Twenty clubs, one order, one deadline — ${formatDeadline(settings.lockAt)}. Picking isn’t on the phone yet.`
-            : 'Twenty clubs, one order, one deadline. Picking isn’t on the phone yet.'
-        }
       />
     );
   }
@@ -339,7 +349,7 @@ function ClubList({
         <View style={{ flex: 1 }}>
           <Text variant="caption" color="slate">Club</Text>
         </View>
-        <HeadCell width={32} align="right">Now</HeadCell>
+        <HeadCell width={38} align="right">Now</HeadCell>
         <HeadCell width={46} align="right">Diff</HeadCell>
         <HeadCell width={40} align="right">Pts</HeadCell>
       </View>
@@ -418,7 +428,7 @@ function ClubRow({
         </Text>
       </View>
 
-      <View style={{ width: 32, alignItems: 'flex-end' }}>
+      <View style={{ width: 38, alignItems: 'flex-end' }}>
         <Text variant="body" color="slate">
           {row.actual_position ?? '—'}
         </Text>

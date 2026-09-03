@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { invalidatePoolCache } from '@/lib/poolData'
-import { saveTablePrediction, readTablePrediction, readTableBreakdown } from '@/lib/league/table'
+import {
+  saveTablePrediction,
+  readTablePrediction,
+  readTableBreakdown,
+  readSeasonClubs,
+  seedOrder,
+} from '@/lib/league/table'
 import { summariseTable, placeLadder } from '@/lib/league/tableSummary'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -63,7 +69,27 @@ export async function GET(
   // fields.
   const summary = summariseTable(rows, settings.topN, settings.prices)
 
-  return NextResponse.json({ entryId, order, savedAt, breakdown: rows, settings, summary })
+  // ⚠ THE CLUB LIST, for the PICKER. Before the deadline an entry that has not
+  // filed has no `order` and no `breakdown` — nothing to render — so the screen
+  // needs every club in the competition and something to start from. The web
+  // page reads these itself as a server component; React Native has no such
+  // thing, and reading `league_clubs` from the phone would mean a second copy
+  // of the alphabetical seed that decides what an unfiled table looks like.
+  const { clubs, error: clubsErr } = await readSeasonClubs(supabase, settings.seasonId)
+  if (clubsErr) return NextResponse.json({ error: clubsErr }, { status: 500 })
+
+  return NextResponse.json({
+    entryId,
+    order,
+    savedAt,
+    breakdown: rows,
+    settings,
+    summary,
+    clubs,
+    // Decision 12 as revised by 17: alphabetical. An unfiled table opens in an
+    // order nobody can mistake for a suggestion.
+    seededOrder: seedOrder(clubs),
+  })
 }
 
 /**
