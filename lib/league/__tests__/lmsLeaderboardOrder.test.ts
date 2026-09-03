@@ -33,7 +33,18 @@ function row(name: string, lms: Partial<LmsRowState>): LeagueLeaderboardRow {
     previous_rank: null,
     has_filed: true,
     champion: null,
-    lms: { eliminated_matchweek: null, is_round_winner: false, in_round: true, rounds_won: 0, ...lms },
+    lms: {
+      eliminated_matchweek: null,
+      is_round_winner: false,
+      in_round: true,
+      rounds_won: 0,
+      // The club chip plays no part in the ORDER — deliberately. Who you are
+      // backing is not a ranking fact, and if it ever starts affecting position
+      // the last test in this file fails.
+      pick: null,
+      pick_sealed: false,
+      ...lms,
+    },
   }
 }
 

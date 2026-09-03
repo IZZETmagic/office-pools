@@ -159,6 +159,14 @@ export type LeagueLeaderboardEntry = LeaderboardEntryCore & {
     in_round: boolean;
     /** Rounds taken this season, and the only memory a closed round leaves. */
     rounds_won: number;
+    /** The club they are backing in `LeagueLeaderboardMeta.lms.pick_matchweek`. */
+    pick: { club_name: string; crest_url: string | null } | null;
+    /**
+     * ⚠ Their club is hidden from you because the matchweek has not locked —
+     * migration 086, so the pool cannot copy the best player. NOT the same as
+     * having no pick, and the screen must not render it as one.
+     */
+    pick_sealed: boolean;
   } | null;
 };
 
@@ -179,6 +187,15 @@ export type LeagueLeaderboardMeta = {
     standing: number;
     /** Everybody in the round — NOT the member count, which can be higher. */
     in_round: number;
+    /**
+     * The matchweek every row's `pick` is for — the one being PLAYED if there is
+     * one, otherwise the one still open. Null when the season has run out.
+     */
+    pick_matchweek: number | null;
+    /** True when that week is being played rather than waiting to be picked. */
+    pick_in_play: boolean;
+    /** True once that week has locked, which is when every club becomes public. */
+    pick_revealed: boolean;
   } | null;
 };
 

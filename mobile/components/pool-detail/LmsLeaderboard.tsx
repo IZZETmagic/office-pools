@@ -1,4 +1,4 @@
-import { Platform, Text as RNText, View } from 'react-native';
+import { Image, Platform, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry, LeagueLeaderboardMeta } from '@/lib/api';
@@ -116,23 +116,45 @@ function RoundStrip({ round }: { round: LeagueLeaderboardMeta['lms'] }) {
   return (
     <View
       style={{
-        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
+        gap: 2,
         paddingVertical: theme.spacing.sm,
         paddingHorizontal: theme.spacing.md,
         borderRadius: theme.radii.md,
         backgroundColor: withOpacity(theme.colors.primary, 0.07),
       }}
     >
-      <Icon name={isOver ? 'checkmark.seal.fill' : 'flame.fill'} color={isOver ? 'green' : 'primary'} size={12} />
-      <Text variant="caption" color="ink" style={{ textTransform: 'none', letterSpacing: 0 }}>
-        {isOver
-          ? `Round ${round.round_number} is over`
-          : `Round ${round.round_number} · ${round.standing} still standing of ${round.in_round}`}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Icon name={isOver ? 'checkmark.seal.fill' : 'flame.fill'} color={isOver ? 'green' : 'primary'} size={12} />
+        <Text variant="caption" color="ink" style={{ textTransform: 'none', letterSpacing: 0 }}>
+          {isOver
+            ? `Round ${round.round_number} is over`
+            : `Round ${round.round_number} · ${round.standing} still standing of ${round.in_round}`}
+        </Text>
+      </View>
+      <PickWeekNote round={round} />
     </View>
+  );
+}
+
+/**
+ * Which matchweek the crests on the rows belong to.
+ *
+ * ⚠ Without this the badges are ambiguous, and dangerously so. From Friday to
+ * Monday the week being PLAYED and the week you can still PICK for are
+ * different weeks — a crest with no caption reads as "the club playing for them
+ * right now" whichever one it actually is. The row shows one club; this says
+ * which question it answers.
+ */
+function PickWeekNote({ round }: { round: NonNullable<LeagueLeaderboardMeta['lms']> }) {
+  if (round.pick_matchweek === null || round.last_matchweek !== null) return null;
+
+  return (
+    <Text variant="detail" color="slate" align="center" style={{ textTransform: 'none' }}>
+      {round.pick_in_play
+        ? `Backing these clubs in MW${round.pick_matchweek}, in play now`
+        : `Backing these clubs in MW${round.pick_matchweek} — hidden until it locks`}
+    </Text>
   );
 }
 
@@ -211,7 +233,7 @@ function SurvivorRow({
       </View>
 
       <RoundsWon count={lms?.rounds_won ?? 0} />
-      <StateChip lms={lms} />
+      <StateChip lms={lms} isCurrentUser={isCurrentUser} />
     </View>
   );
 }
@@ -267,24 +289,106 @@ function RoundsWon({ count }: { count: number }) {
 }
 
 /**
- * Three states, not two.
+ * What the row says about this round.
  *
- * ⚠ "Joined late" is NOT an elimination. Somebody who came in after the round
- * opened enters the next one — everybody already in it has spent clubs, and a
- * newcomer with a full twenty would have an advantage nobody else had. Painting
- * them the same red as the eliminated would accuse them of losing a round they
- * were never allowed to play.
+ * ⚠ THREE STATES, NOT TWO. "Joined late" is NOT an elimination. Somebody who
+ * came in after the round opened enters the next one — everybody already in it
+ * has spent clubs, and a newcomer with a full twenty would have an advantage
+ * nobody else had. Painting them the same red as the eliminated would accuse
+ * them of losing a round they were never allowed to play.
+ *
+ * ⚠ THE ELIMINATED KEEP THEIR MATCHWEEK. Ryan, 3 Sep: knowing WHEN somebody
+ * went out is the useful half — a name with no week is just a loser, a name with
+ * MW2 is a story. It stays where "STILL IN" used to be for survivors.
+ *
+ * A survivor shows the club they are backing instead, which is the same
+ * information told forwards: still in, and here is what is carrying you.
  */
-function StateChip({ lms }: { lms: LeagueLeaderboardEntry['lms'] }) {
+function StateChip({ lms, isCurrentUser }: { lms: LeagueLeaderboardEntry['lms']; isCurrentUser: boolean }) {
   const theme = useTheme();
   if (!lms) return null;
 
-  const { label, color } = !lms.in_round
-    ? { label: 'NEXT ROUND', color: theme.colors.slate }
-    : lms.eliminated_matchweek === null
-      ? { label: 'STILL IN', color: theme.colors.green }
-      : { label: `OUT · MW${lms.eliminated_matchweek}`, color: theme.colors.red };
+  if (!lms.in_round) return <Chip label="NEXT ROUND" color={theme.colors.slate} />;
+  if (lms.eliminated_matchweek !== null) {
+    return <Chip label={`OUT · MW${lms.eliminated_matchweek}`} color={theme.colors.red} />;
+  }
 
+  // Still in — the club is the chip.
+  if (lms.pick) return <ClubChip club={lms.pick} />;
+
+  // ⚠ Sealed is not "no pick". Their matchweek has not locked, so their club is
+  // hidden from everybody but them (086 — otherwise the pool copies the best
+  // player). The padlock says which of the two this is; a blank would let it be
+  // read as a member who has not bothered.
+  if (lms.pick_sealed) {
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: theme.radii.pill,
+          backgroundColor: withOpacity(theme.colors.slate, 0.12),
+        }}
+      >
+        <Icon name="lock.fill" color="slate" size={9} />
+        <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 9, color: theme.colors.slate, letterSpacing: 0.5 }}>
+          HIDDEN
+        </RNText>
+      </View>
+    );
+  }
+
+  // Nothing picked, and nothing hiding it. On your own row that is a real nudge;
+  // on somebody else's it is a fact the whole pool can already see.
+  return <Chip label="NO PICK" color={isCurrentUser ? theme.colors.red : theme.colors.slate} />;
+}
+
+/**
+ * The club carrying them this matchweek.
+ *
+ * ⚠ The crest can be null — it is nullable in the feed — so the name is the
+ * fallback and never the other way round. A row with a blank where a badge
+ * should be says nothing at all.
+ */
+function ClubChip({ club }: { club: { club_name: string; crest_url: string | null } }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        maxWidth: 118,
+        paddingLeft: club.crest_url ? 5 : 8,
+        paddingRight: 8,
+        paddingVertical: 3,
+        borderRadius: theme.radii.pill,
+        backgroundColor: withOpacity(theme.colors.green, 0.12),
+      }}
+    >
+      {club.crest_url ? (
+        <Image source={{ uri: club.crest_url }} style={{ width: 16, height: 16 }} resizeMode="contain" />
+      ) : null}
+      <RNText
+        numberOfLines={1}
+        style={{
+          fontFamily: fontFamilies.bold,
+          fontSize: 10,
+          color: theme.colors.ink,
+          flexShrink: 1,
+        }}
+      >
+        {club.club_name}
+      </RNText>
+    </View>
+  );
+}
+
+function Chip({ label, color }: { label: string; color: string }) {
+  const theme = useTheme();
   return (
     <View
       style={{
@@ -294,14 +398,7 @@ function StateChip({ lms }: { lms: LeagueLeaderboardEntry['lms'] }) {
         backgroundColor: withOpacity(color, 0.14),
       }}
     >
-      <RNText
-        style={{
-          fontFamily: fontFamilies.bold,
-          fontSize: 9,
-          color,
-          letterSpacing: 0.5,
-        }}
-      >
+      <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 9, color, letterSpacing: 0.5 }}>
         {label}
       </RNText>
     </View>

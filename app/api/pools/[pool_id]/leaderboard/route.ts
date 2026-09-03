@@ -99,10 +99,20 @@ async function handleGET(
   // never writes and an empty list is the honest version of "no such thing here".
   if (pool.league_season_id) {
     const { readLeagueLeaderboard } = await import('@/lib/league/leaderboard')
-    const { leaderboard, error } = await readLeagueLeaderboard(adminClient, pool_id, {
-      league_season_id: pool.league_season_id as string,
-      league_mode: (pool.league_mode as string | null) ?? null,
-    })
+    const { leaderboard, error } = await readLeagueLeaderboard(
+      adminClient,
+      pool_id,
+      {
+        league_season_id: pool.league_season_id as string,
+        league_mode: (pool.league_mode as string | null) ?? null,
+      },
+      // ⚠ Last Man Standing needs to know WHO is asking. A rival's club is
+      // sealed until that matchweek locks, and the admin client above bypasses
+      // the RLS policies that would otherwise enforce it — so the caller's own
+      // membership, already proven at the top of this handler, is what decides
+      // whose pick may be shown.
+      membership.member_id as string,
+    )
     // Surfaced, never swallowed. Returning 200 with an empty list here would
     // render as "nobody has scored" — the discarded-PostgREST-error shape this
     // codebase has paid for repeatedly.

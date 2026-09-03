@@ -33,6 +33,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { inPlayMatchweekId, openMatchweekId, type MatchweekRow } from './read'
 
 /** The champion an entry backed, and where that club actually sits today. */
 export type ChampionPick = {
@@ -87,6 +88,24 @@ export type LmsRowState = {
    * and nothing else on this screen records that the round ever happened.
    */
   rounds_won: number
+  /**
+   * The club they are backing in the matchweek named by `LmsRoundMeta`.
+   *
+   * NULL means one of two different things, and `pick_sealed` is what tells
+   * them apart: sealed, or genuinely not picked.
+   */
+  pick: { club_name: string; crest_url: string | null } | null
+  /**
+   * ⚠ THE SEAL. Migration 086: *"showing it early would let the pool copy the
+   * best player."* A rival's club is visible only once that matchweek has
+   * LOCKED; your own always is.
+   *
+   * The database enforces this with two SELECT policies on `league_lms_picks`,
+   * but this reader runs on the ADMIN client — which walks straight past them.
+   * So the rule is applied here in code, and getting it wrong leaks every live
+   * pick in the pool. See `readLmsRound`.
+   */
+  pick_sealed: boolean
 }
 
 /** The round that every `LmsRowState` on this leaderboard is describing. */
@@ -99,6 +118,26 @@ export type LmsRoundMeta = {
   standing: number
   /** Everybody in the round — NOT the pool's member count, which can be higher. */
   in_round: number
+  /**
+   * The matchweek every row's `pick` is for. NULL when the season has no
+   * matchweek left to play.
+   *
+   * ⚠ IN PLAY LEADS, OPEN FOLLOWS — the same rule `matchweekTile` applies, and
+   * the reason it exists. From Friday to Monday the week being WATCHED and the
+   * week you can still PICK for are different weeks, and a leaderboard that
+   * names next weekend's club while this weekend decides who survives is
+   * describing the wrong game. Reproduced in production once already: a card
+   * read "Hull City" while Arsenal was the club actually playing.
+   */
+  pick_matchweek: number | null
+  /** True when `pick_matchweek` is being played rather than waiting to be picked. */
+  pick_in_play: boolean
+  /**
+   * Whether `pick_matchweek` has locked. Once it has, every pick in it is
+   * public — which is why a leaderboard fills with crests during the football
+   * and shows mostly padlocks between matchweeks.
+   */
+  pick_revealed: boolean
 }
 
 /**
@@ -164,12 +203,16 @@ type MemberRow = {
 /**
  * Assemble a league pool's leaderboard from stored rows.
  *
- * @param admin  service-role client — the totals table is deny-all (see header)
+ * @param admin           service-role client — the totals table is deny-all (see header)
+ * @param viewerMemberId  who is asking. ⚠ Last Man Standing only, and load-bearing
+ *                        there: it is what decides whose sealed pick may be shown,
+ *                        a rule the admin client cannot enforce for itself.
  */
 export async function readLeagueLeaderboard(
   admin: SupabaseClient,
   poolId: string,
   pool: { league_season_id: string; league_mode: string | null },
+  viewerMemberId: string | null = null,
 ): Promise<{ leaderboard: LeagueLeaderboard | null; error: string | null }> {
   const isTable = pool.league_mode === 'table'
   const isLms = pool.league_mode === 'last_man_standing'
@@ -227,7 +270,16 @@ export async function readLeagueLeaderboard(
       .select('season_id', { count: 'exact', head: true })
       .eq('season_id', pool.league_season_id),
     isTable ? readChampionPicks(admin, entryIds, pool.league_season_id) : Promise.resolve(new Map()),
-    isLms ? readLmsRound(admin, poolId) : Promise.resolve(null),
+    isLms
+      ? readLmsRound(
+          admin,
+          poolId,
+          pool.league_season_id,
+          // The viewer's own entries. A pool can hold more than one per member,
+          // and every one of them is theirs to see.
+          new Set(entries.filter((e) => e.member_id === viewerMemberId).map((e) => e.entry_id)),
+        )
+      : Promise.resolve(null),
   ])
 
   if (totalsRes.error) return { leaderboard: null, error: `entry totals: ${totalsRes.error.message}` }
@@ -274,6 +326,17 @@ export async function readLeagueLeaderboard(
             // No survivor row means they are not in this round — see the type.
             in_round: survivor !== undefined,
             rounds_won: t?.rounds_won ?? 0,
+            pick: lmsRound?.picks.get(entry.entry_id) ?? null,
+            // ⚠ Sealed is about the WEEK and about WHOSE row this is — never
+            // about the row happening to have no pick. A rival with nothing to
+            // show and a rival who has not picked are the same blank to you, and
+            // that IS the seal. But your own blank is never sealed: you can
+            // always see your own pick, so its absence means you have not made
+            // one, and telling you it is "hidden" would hide it from yourself.
+            pick_sealed:
+              (lmsRound?.meta?.pick_matchweek ?? null) !== null &&
+              lmsRound?.meta?.pick_revealed === false &&
+              entry.member_id !== viewerMemberId,
           }
         : null,
     })
@@ -381,12 +444,15 @@ function normaliseMode(mode: string | null): LeagueLeaderboard['mode'] {
 async function readLmsRound(
   admin: SupabaseClient,
   poolId: string,
+  seasonId: string,
+  ownEntryIds: Set<string>,
 ): Promise<{
   meta: Omit<LmsRoundMeta, 'standing' | 'in_round'> | null
   survivors: Map<string, { eliminated_matchweek: number | null; is_winner: boolean }>
+  picks: Map<string, { club_name: string; crest_url: string | null }>
   error: string | null
 }> {
-  const empty = { meta: null, survivors: new Map(), error: null }
+  const empty = { meta: null, survivors: new Map(), picks: new Map(), error: null }
 
   const { data: rounds, error: rErr } = await admin
     .from('league_lms_rounds')
@@ -403,28 +469,83 @@ async function readLmsRound(
   const round = all.find((r) => r.last_matchweek === null) ?? all[0]
   if (!round) return empty
 
-  const { data: survivorRows, error: sErr } = await admin
-    .from('league_lms_survivors')
-    .select('entry_id, eliminated_matchweek, is_winner')
-    .eq('round_id', round.round_id)
-  if (sErr) return { ...empty, error: `lms survivors: ${sErr.message}` }
+  const [survivorsRes, weeksRes] = await Promise.all([
+    admin
+      .from('league_lms_survivors')
+      .select('entry_id, eliminated_matchweek, is_winner')
+      .eq('round_id', round.round_id),
+    // The same columns `openMatchweekId` and `inPlayMatchweekId` read. Both are
+    // imported rather than re-derived: "the next one by number" is wrong — a
+    // whole round can be moved, so round N is not always played before N+1.
+    admin
+      .from('league_matchweeks')
+      .select(
+        'matchweek_id, matchweek_number, fixture_count, completed_fixture_count, lock_at, first_kickoff_at, ranks_snapshot_at',
+      )
+      .eq('season_id', seasonId),
+  ])
+  if (survivorsRes.error) return { ...empty, error: `lms survivors: ${survivorsRes.error.message}` }
+  if (weeksRes.error) return { ...empty, error: `matchweeks: ${weeksRes.error.message}` }
 
   const survivors = new Map<string, { eliminated_matchweek: number | null; is_winner: boolean }>()
-  for (const s of (survivorRows ?? []) as Array<{
+  for (const s of (survivorsRes.data ?? []) as Array<{
     entry_id: string; eliminated_matchweek: number | null; is_winner: boolean
   }>) {
     survivors.set(s.entry_id, { eliminated_matchweek: s.eliminated_matchweek, is_winner: s.is_winner })
   }
 
-  return {
-    meta: {
-      round_number: round.round_number,
-      first_matchweek: round.first_matchweek,
-      last_matchweek: round.last_matchweek,
-    },
-    survivors,
-    error: null,
+  // ---- which matchweek the crests are for ---------------------------------
+  const weeks = (weeksRes.data ?? []) as MatchweekRow[]
+  const now = Date.now()
+  const inPlay = weeks.find((w) => w.matchweek_id === inPlayMatchweekId(weeks, now)) ?? null
+  const open = weeks.find((w) => w.matchweek_id === openMatchweekId(weeks, now)) ?? null
+
+  // ⚠ FALL BACK, NEVER ACCUSE. A round can open on the week AFTER the one still
+  // being played — 106's re-homing makes that ordinary — and in that case nobody
+  // in the round has an in-play pick and none of them missed anything. Naming a
+  // week the round does not cover would paint every survivor as having failed to
+  // pick, so it is skipped rather than reported empty.
+  const showInPlay = inPlay !== null && inPlay.matchweek_number >= round.first_matchweek
+  const week = showInPlay ? inPlay : open
+  const meta = {
+    round_number: round.round_number,
+    first_matchweek: round.first_matchweek,
+    last_matchweek: round.last_matchweek,
+    pick_matchweek: week?.matchweek_number ?? null,
+    pick_in_play: showInPlay,
+    // In play means locked, by definition — the two can never be the same week.
+    pick_revealed: showInPlay,
   }
+  if (!week) return { meta, survivors, picks: new Map(), error: null }
+
+  const { data: pickRows, error: pErr } = await admin
+    .from('league_lms_picks')
+    .select('entry_id, club_id, league_clubs(name, crest_url)')
+    .eq('round_id', round.round_id)
+    .eq('matchweek_number', week.matchweek_number)
+  if (pErr) return { ...empty, error: `lms picks: ${pErr.message}` }
+
+  const picks = new Map<string, { club_name: string; crest_url: string | null }>()
+  for (const p of (pickRows ?? []) as unknown as Array<{
+    entry_id: string
+    league_clubs: { name: string | null; crest_url: string | null } | null
+  }>) {
+    // ⚠⚠ THE SEAL, APPLIED IN CODE BECAUSE ADMIN BYPASSES RLS. Migration 086
+    // gives `league_lms_picks` two SELECT policies — your own always, everyone
+    // else's only once the matchweek has locked — and this client honours
+    // neither. Dropping this line publishes every live pick in the pool to
+    // everybody in it, which is the one thing the mode cannot survive.
+    if (!meta.pick_revealed && !ownEntryIds.has(p.entry_id)) continue
+    // PostgREST types an embedded to-one either way depending on how it infers
+    // the relationship — normalise rather than trust.
+    const club = Array.isArray(p.league_clubs) ? p.league_clubs[0] ?? null : p.league_clubs
+    picks.set(p.entry_id, {
+      club_name: club?.name ?? 'Unknown club',
+      crest_url: club?.crest_url ?? null,
+    })
+  }
+
+  return { meta, survivors, picks, error: null }
 }
 
 /**
