@@ -19,10 +19,31 @@ function parsedDate(iso: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function matchTime(iso: string): string {
+/**
+ * The kickoff time split into its clock and its day period, so the row can
+ * stack them:
+ *
+ *     4:00
+ *      PM
+ *
+ * ⚠ SPLIT ON THE LAST RUN OF WHITESPACE, NOT `' '`. iOS 17 changed
+ * `toLocaleTimeString` to separate the period with U+202F NARROW NO-BREAK
+ * SPACE, so `.split(' ')` finds nothing on a current phone and the row quietly
+ * stops stacking. `\s` does cover U+202F (it is Unicode Zs), and the class is
+ * spelled out anyway so a reader does not have to know that to trust it.
+ *
+ * ⚠ `period` IS NULLABLE, AND THAT IS NOT AN EDGE CASE. A 24-hour locale
+ * formats "16:00" with no period at all, and a few locales lead with it
+ * ("下午4:00"). Both fall through to a single line rather than rendering an
+ * empty second one. Nothing here assumes the device is on a 12-hour clock.
+ */
+function matchTimeParts(iso: string): { clock: string; period: string | null } {
   const d = parsedDate(iso);
-  if (!d) return '--:--';
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  if (!d) return { clock: '--:--', period: null };
+  const text = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const split = /^(.*\S)[\s\u202F\u00A0]+(\S+)$/.exec(text);
+  if (!split) return { clock: text, period: null };
+  return { clock: split[1], period: split[2] };
 }
 
 function homeDisplayName(match: ResultsMatch): string {
@@ -80,6 +101,45 @@ function TeamMark({ url, size = 26 }: { url: string | null | undefined; size?: n
       contentFit="contain"
       cachePolicy="memory-disk"
     />
+  );
+}
+
+/**
+ * Kickoff time, clock over period. Two `Text`s rather than one with a `\n`
+ * because they take different sizes, and an explicit `lineHeight` on each so
+ * the pair stacks to 25px — still under the 26px team mark beside it, which is
+ * what keeps the row exactly as tall as it was before the time wrapped.
+ */
+function KickoffTime({ iso }: { iso: string }) {
+  const theme = useTheme();
+  const { clock, period } = matchTimeParts(iso);
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <RNText
+        style={{
+          fontFamily: fontFamilies.medium,
+          fontSize: 13,
+          lineHeight: 15,
+          color: theme.colors.slate,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {clock}
+      </RNText>
+      {period ? (
+        <RNText
+          style={{
+            fontFamily: fontFamilies.medium,
+            fontSize: 10,
+            lineHeight: 10,
+            letterSpacing: 0.4,
+            color: theme.colors.slate,
+          }}
+        >
+          {period}
+        </RNText>
+      ) : null}
+    </View>
   );
 }
 
@@ -267,26 +327,10 @@ export function MatchResultRow({ match, onPress }: Props) {
             >
               {badge.label}
             </RNText>
-            <RNText
-              style={{
-                fontFamily: fontFamilies.medium,
-                fontSize: 12,
-                color: theme.colors.slate,
-              }}
-            >
-              {matchTime(match.matchDate)}
-            </RNText>
+            <KickoffTime iso={match.matchDate} />
           </View>
         ) : (
-          <RNText
-            style={{
-              fontFamily: fontFamilies.medium,
-              fontSize: 12,
-              color: theme.colors.slate,
-            }}
-          >
-            {matchTime(match.matchDate)}
-          </RNText>
+          <KickoffTime iso={match.matchDate} />
         )}
       </View>
 
