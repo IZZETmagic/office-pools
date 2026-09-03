@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { InitialsAvatar } from './leaderboard-shared';
-import { lastLockedWeek } from '@/lib/pickemWeek';
+import { lastLockedWeek, ownWeekState, type OwnWeekState } from '@/lib/pickemWeek';
 import { useLeaguePool } from '@/lib/useLeaguePool';
-import { useTheme } from '@/theme';
+import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
 // THE PREDICTIONS TAB FOR A PICK'EM POOL — a door, and nothing else
@@ -58,6 +58,26 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
   // Not WHICH week — that question belongs to the wizard.
   const lastLocked = lastLockedWeek(league.data?.season.matchweeks ?? [], now);
   const revealed = lastLocked !== null;
+
+  /**
+   * Whether there is anything to do, on YOUR row only.
+   *
+   * Ryan's reason, 2026-09-03: without it the only way to learn the week is
+   * shut is to open the wizard and come back out. ⚠ It resolves the week the
+   * WIZARD will land on — same function, same arguments — so the chip cannot
+   * promise something the next screen does not deliver.
+   *
+   * ⚠ Own row only. A rival's card carries no chip: their state is not news,
+   * and a row of "In progress" beside every member would repeat one fact about
+   * the pool once per person.
+   */
+  const own = ownWeekState(
+    league.data?.season.matchweeks ?? [],
+    league.data?.season.matches ?? [],
+    league.data?.season.openMatchweekNumber ?? null,
+    league.data?.season.inPlayMatchweekNumber ?? null,
+    now,
+  );
 
   const ownEntryIds = useMemo(
     () => new Set((league.data?.you.entries ?? []).map((e) => e.entry_id)),
@@ -128,7 +148,13 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
            your own face on it, not by a label above it and not by a tint. One
            heading on the screen, and it belongs to the list that needs one. */
         mine.map((entry) => (
-          <EntryCard key={entry.entry_id} entry={entry} openable onPress={() => open(entry)} />
+          <EntryCard
+            key={entry.entry_id}
+            entry={entry}
+            openable
+            chip={own}
+            onPress={() => open(entry)}
+          />
         ))
       )}
 
@@ -179,10 +205,13 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
 function EntryCard({
   entry,
   openable,
+  chip,
   onPress,
 }: {
   entry: LeagueLeaderboardEntry;
   openable: boolean;
+  /** Own row only — null on everybody else's. */
+  chip?: OwnWeekState | null;
   onPress?: () => void;
 }) {
   const theme = useTheme();
@@ -221,6 +250,7 @@ function EntryCard({
         <Text variant="detail" color="slate" numberOfLines={1}>
           @{entry.username}
         </Text>
+        {chip ? <StateChip state={chip} /> : null}
       </View>
 
       {openable ? (
@@ -229,5 +259,47 @@ function EntryCard({
         <Icon name="lock.fill" color="slate" size={11} />
       )}
     </Pressable>
+  );
+}
+
+/**
+ * Can I pick right now?
+ *
+ * ⚠ It names no matchweek. The number was removed from this screen twice and
+ * both times it came back through something that needed one; this answers the
+ * question a member actually has without reopening "which week".
+ */
+function StateChip({ state }: { state: OwnWeekState }) {
+  const theme = useTheme();
+  const spec: Record<OwnWeekState, { label: string; tone: string; icon: string }> = {
+    open: { label: 'Open for predictions', tone: theme.colors.green, icon: 'lock.open' },
+    in_progress: { label: 'In progress', tone: theme.colors.amber, icon: 'sportscourt' },
+    closed: { label: 'Matchweek closed', tone: theme.colors.slate, icon: 'lock' },
+    not_open: { label: 'Not open yet', tone: theme.colors.slate, icon: 'clock' },
+  };
+  const { label, tone, icon } = spec[state];
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 4,
+        marginTop: 2,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: theme.radii.pill,
+        backgroundColor: withOpacity(tone, 0.12),
+      }}
+    >
+      <Icon
+        name={icon as never}
+        color={state === 'open' ? 'green' : state === 'in_progress' ? 'amber' : 'slate'}
+        size={9}
+      />
+      <RNText style={{ fontFamily: fontFamilies.semibold, fontSize: 10.5, color: tone }}>
+        {label}
+      </RNText>
+    </View>
   );
 }

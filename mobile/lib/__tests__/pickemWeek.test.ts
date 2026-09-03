@@ -10,6 +10,7 @@ import {
   fixturesForWeek,
   defaultWeek,
   lastLockedWeek,
+  ownWeekState,
   stepWeek,
   weekState,
 } from '../pickemWeek'
@@ -186,5 +187,37 @@ describe('lastLockedWeek', () => {
 
   it('an empty season is null rather than -Infinity', () => {
     expect(lastLockedWeek([], NOW)).toBeNull()
+  })
+})
+
+describe('ownWeekState', () => {
+  const played = (week: number, done: boolean) => ({ ...match(`f${week}-${done}`, week, null), is_completed: done })
+
+  it('says OPEN when there is a week to pick in', () => {
+    expect(ownWeekState(WEEKS, [played(3, false)], 3, null, NOW)).toBe('open')
+  })
+
+  it('says IN PROGRESS when the week it lands on is locked with football left', () => {
+    // Nothing open, matchweek 2 being played.
+    expect(ownWeekState(WEEKS, [played(2, false), played(2, true)], null, 2, NOW)).toBe('in_progress')
+  })
+
+  it('⚠ says CLOSED once every fixture is finished, not "in progress"', () => {
+    // The distinction is fixture completion, never the clock — telling somebody
+    // their week is in progress on a Tuesday is wrong in a way they can see.
+    expect(ownWeekState(WEEKS, [played(2, true), played(2, true)], null, 2, NOW)).toBe('closed')
+  })
+
+  it('an empty matchweek is closed rather than in progress', () => {
+    expect(ownWeekState(WEEKS, [], null, 2, NOW)).toBe('closed')
+  })
+
+  it('says NOT OPEN for a week whose turn has not come', () => {
+    const preSeason = Date.parse('2026-08-01T00:00:00Z')
+    expect(ownWeekState(WEEKS, [], null, null, preSeason)).toBe('not_open')
+  })
+
+  it('a season with no matchweeks is null, not a guess', () => {
+    expect(ownWeekState([], [], null, null, NOW)).toBeNull()
   })
 })

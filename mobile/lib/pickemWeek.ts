@@ -179,3 +179,61 @@ export function stepWeek(
   const next = numbers[i + direction]
   return next ?? null
 }
+
+/**
+ * What the member can DO right now — the one thing the predictions tab says
+ * about time.
+ *
+ * Ryan, 2026-09-03: *"it might be helpful to put an 'open for predictions' or
+ * 'in progress' chip on only the user's entry. That way they at least know it's
+ * open to start predicting by looking at it, before going in and being like, oh
+ * it's not open yet, let me leave."*
+ *
+ * ⚠ IT DESCRIBES THE WEEK THE WIZARD WILL ACTUALLY OPEN ON, which is why it
+ * takes the same three arguments `defaultWeek` does and calls it. A chip
+ * resolved any other way is a promise the next screen does not keep.
+ *
+ * ⚠ It names NO matchweek, deliberately. The number was removed from that
+ * screen twice; this answers "can I pick" without reopening "which week", which
+ * is the question that dragged the whole selector back both times.
+ *
+ * ⚠ `in_progress` is distinguished from `closed` by FIXTURE COMPLETION, not by
+ * the clock. A locked week with games still to play is being watched; one whose
+ * games are all done is history, and telling a member their week is "in
+ * progress" on a Tuesday would be wrong in a way they can see out the window.
+ */
+export type OwnWeekState =
+  /** Picks are open. The only state in which anything can be written. */
+  | 'open'
+  /** Locked, with football still to play. */
+  | 'in_progress'
+  /** Locked, every fixture finished — nothing to do until the next week opens. */
+  | 'closed'
+  /** Its turn has not come. Rare: exactly one week is open at a time (058). */
+  | 'not_open'
+
+export function ownWeekState(
+  matchweeks: LeagueMatchweek[],
+  matches: LeagueMatch[],
+  openMatchweekNumber: number | null,
+  inPlayMatchweekNumber: number | null,
+  now: number,
+): OwnWeekState | null {
+  const week = defaultWeek(matchweeks, openMatchweekNumber, inPlayMatchweekNumber, now)
+  if (week === null) return null
+
+  const state = weekState(
+    matchweeks.find((m) => m.number === week),
+    openMatchweekNumber,
+    now,
+  )
+  if (state === 'open') return 'open'
+  if (state === 'future') return 'not_open'
+
+  const fixtures = fixturesForWeek(matches, week)
+  // ⚠ An empty week is CLOSED, not in progress. A matchweek can legitimately
+  // hold no fixtures — re-homing empties one about once a season — and
+  // `every` over an empty list is true, which happens to be the right answer
+  // here rather than by luck: there is nothing left to play.
+  return fixtures.every((f) => f.is_completed) ? 'closed' : 'in_progress'
+}
