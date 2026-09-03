@@ -24,6 +24,12 @@ import type { LeagueSeasonView } from '../read'
 const CLUBS = [
   { club_id: 'c-ars', name: 'Arsenal', short_name: 'Arsenal', abbreviation: 'ARS', crest_url: 'https://x/ars.png' },
   { club_id: 'c-whu', name: 'West Ham United', short_name: 'West Ham', abbreviation: 'WHU', crest_url: null },
+  // ⚠ `short_name` HERE IS THE FEED'S, and it is deliberately set to the full
+  // name — which is what api-football actually ships for every Premier League
+  // club, as `clubName.ts` documents. It is the discriminating case: reading
+  // `c.short_name` gives "Manchester City" and only `shortClubName(c.name)`
+  // gives "Man City", so the test below can tell the two wirings apart.
+  { club_id: 'c-mci', name: 'Manchester City', short_name: 'Manchester City', abbreviation: 'MCI', crest_url: 'https://x/mci.png' },
 ]
 
 const MATCHWEEKS = [
@@ -61,7 +67,27 @@ describe('readLeagueSeasonMatches', () => {
       country_name: 'Arsenal',
       country_code: 'ARS',
       flag_url: 'https://x/ars.png',
+      // Unchanged by the shortener — no rule matches "Arsenal", which is the
+      // right answer for it. Present rather than omitted so this assertion
+      // keeps pinning the WHOLE embedded shape: the embed picks its fields by
+      // hand, and a field dropped there reaches the phone as `undefined` with
+      // nothing raised on either side.
+      short_name: 'Arsenal',
     })
+  })
+
+  it('sends the COMPUTED short name, not the feed column of the same name', () => {
+    const { matches } = readLeagueSeasonMatches(
+      season([fixture({ home_club_id: 'c-mci' })]),
+      't1',
+    )
+    // The feed says "Manchester City". `shortClubName` says "Man City", and the
+    // phone's Results row fits about fourteen characters — which is the whole
+    // reason this field exists.
+    expect(matches[0].home_team?.short_name).toBe('Man City')
+    // ⚠ And the full name still travels, because a surface with room should use
+    // it. This is carried ALONGSIDE `country_name`, never substituted for it.
+    expect(matches[0].home_team?.country_name).toBe('Manchester City')
   })
 
   it('leaves a missing crest null rather than inventing one', () => {
