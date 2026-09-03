@@ -125,13 +125,23 @@ export default function ResultsScreen() {
   const refreshIfStaleRef = useRef(refreshIfStale);
   refreshIfStaleRef.current = refreshIfStale;
   const initialFocus = useRef(true);
+  // Set by the effect further down, once it exists. Held in a ref so this
+  // handler can be declared before it and still stay identity-stable —
+  // `useFocusEffect` re-subscribes whenever its callback changes.
+  const reAnchorRef = useRef<(() => void) | null>(null);
   useFocusEffect(
     useCallback(() => {
       if (initialFocus.current) {
+        // The first focus is the mount, and the mount effect already anchors.
         initialFocus.current = false;
         return;
       }
       refreshIfStaleRef.current();
+      // ⚠ EVERY RETURN, not just the first. Coming back from another tab or
+      // from a match detail puts the member back on what is next — which is
+      // the question this screen exists to answer, and the answer moves while
+      // they are away.
+      reAnchorRef.current?.();
     }, []),
   );
 
@@ -301,33 +311,71 @@ export default function ResultsScreen() {
     setFilterMode(competition ? 'competition' : 'date');
   }
 
-  // ---- Auto-scroll to live or next match on first content render ----
+  // ---- Anchor on what is next, on arrival and on every return ----
+  //
+  // ⚠ THIS USED TO HAPPEN ONCE PER APP LAUNCH, and that was the bug.
+  // `autoScrollDoneRef` latched true after the first successful scroll and was
+  // never reset, while the tab screens stay MOUNTED (`enableScreens(false)` is
+  // load-bearing for the tab-switch jump fix). So a member who scrolled back
+  // into September, went to Home and came back was still in September — and
+  // coming back from a match never re-anchored either.
+  //
+  // Match Centre's job is to answer "what is on"; the answer changes while you
+  // are away, so arriving is the moment to re-answer it.
   const autoScrollDoneRef = useRef(false);
   const sectionYRef = useRef<Record<string, number>>({});
+
+  // ⚠ The window lives in a ref so the focus handler below can stay identity-
+  // stable. `useFocusEffect` re-subscribes whenever its callback changes, and a
+  // callback rebuilt on every render would re-run this on every render too.
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+
+  const scrollToAnchor = useCallback((animated: boolean) => {
+    // ⚠ Searched within the WINDOW, not the whole list. Only mounted sections
+    // have a layout offset, so a target outside it silently does nothing.
+    const secs = visibleRef.current.sections;
+    if (secs.length === 0) return false;
+    const liveSection = secs.find((s) => s.matches.some((m) => m.status === 'live'));
+    const targetId = liveSection
+      ? liveSection.id
+      : secs.find((s) => s.matches.some((m) => m.status === 'scheduled'))?.id ??
+        secs.find((s) => s.label === 'Today')?.id;
+    if (!targetId) return false;
+    const y = sectionYRef.current[targetId];
+    if (typeof y !== 'number') return false;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated });
+    return true;
+  }, []);
+
+  // First content render. Still one-shot: this fires as sections arrive, and
+  // without the latch it would fight the member's own scrolling every time the
+  // league fetch or a broadcast changed the list.
   useEffect(() => {
     if (autoScrollDoneRef.current) return;
-    if (filterMode !== 'date') return;
+    if (view !== 'matches') return;
     if (visible.sections.length === 0) return;
     // Wait a frame so onLayout has populated section offsets.
     const handle = setTimeout(() => {
-      // ⚠ Searched within the WINDOW, not the whole list. Only mounted sections
-      // have a layout offset, so a target outside it silently does nothing.
-      const liveSection = visible.sections.find((s) =>
-        s.matches.some((m) => m.status === 'live'),
-      );
-      const targetId = liveSection
-        ? liveSection.id
-        : visible.sections.find((s) => s.matches.some((m) => m.status === 'scheduled'))?.id ??
-          visible.sections.find((s) => s.label === 'Today')?.id;
-      if (!targetId) return;
-      const y = sectionYRef.current[targetId];
-      if (typeof y === 'number') {
-        scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
-        autoScrollDoneRef.current = true;
-      }
+      if (scrollToAnchor(true)) autoScrollDoneRef.current = true;
     }, 200);
     return () => clearTimeout(handle);
-  }, [sections, filterMode]);
+  }, [sections, view, scrollToAnchor, visible.sections.length]);
+
+  // What the focus handler above calls. Wired through a ref because it has to
+  // reset STATE — the window the member may have expanded — and that reset has
+  // to land before the scroll, since the mounted sections decide the offsets.
+  reAnchorRef.current = () => {
+    if (view !== 'matches') return;
+    // ⚠ Collapse "Show earlier"/"Show more" back to the default window. Without
+    // this a member who had paged back through August returns to a list still
+    // holding August, and the anchor is a long way down it.
+    setExpandBefore(0);
+    setExpandAfter(0);
+    // Two frames' grace: the state reset re-renders, `onLayout` re-runs, and
+    // only then are the offsets the scroll needs correct.
+    setTimeout(() => scrollToAnchor(true), 200);
+  };
 
   // ---- Render ----
 
