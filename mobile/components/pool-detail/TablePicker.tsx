@@ -167,6 +167,16 @@ export function TablePicker({
       <NestedReorderableList
         data={rows}
         scrollable={false}
+        // ⚠ AND `scrollEnabled={false}` ON TOP OF IT. `scrollable` tells the
+        // library this list has no fixed height; it does NOT disable the inner
+        // FlatList's own scrolling, which defaults to true
+        // (ReorderableListCore: `rest.scrollEnabled ?? true`). Left on, that
+        // FlatList captures the vertical pan and — being full height, with
+        // nothing to scroll — moves nowhere, so the PARENT never sees the
+        // gesture and the whole list reads as frozen. Autoscroll while
+        // dragging is unaffected: a nested list scrolls its
+        // `scrollViewContainerRef`, not itself.
+        scrollEnabled={false}
         keyExtractor={(r) => r.club.club_id}
         onReorder={handleReorder}
         contentContainerStyle={{

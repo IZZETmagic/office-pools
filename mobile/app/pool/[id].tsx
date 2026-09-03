@@ -227,6 +227,15 @@ export default function PoolDetailScreen() {
   const isProgressive = data?.pool.predictionMode === 'progressive';
   const isLeague = data?.pool.isLeague ?? false;
   const isTableMode = isLeague && data?.pool.leagueMode === 'table';
+  // ⚠ THE PICKER IS THE ONLY THING THAT NEEDS THE SPECIAL SCROLLER, and
+  // scoping it to `isTableMode` alone wrapped the LOCKED scored view in a
+  // `ScrollViewContainer` it never needed — a table nobody can drag, inside a
+  // scroller built for dragging. The lock is the same switch the tab itself
+  // uses, and the pool row already carries it, so no query is needed here.
+  const tableIsLocked = data?.pool.leagueTableLockAt
+    ? new Date(data.pool.leagueTableLockAt).getTime() <= Date.now()
+    : false;
+  const showsTablePicker = isTableMode && !tableIsLocked;
   // Implicit toggle: fee tracking is "on" iff the admin has set a
   // positive entry fee in Settings. Drives both the Fees tab visibility
   // in the tab bar and the Fees & Prize Pool card in PoolInfoTab.
@@ -487,7 +496,8 @@ export default function PoolDetailScreen() {
           // `GestureDetector`. This screen's pager is itself a horizontal
           // ScrollView, so that extra native gesture is scoped to the one tab
           // that needs it rather than applied to all six.
-          const Scroller = key === 'predictions' && isTableMode ? ScrollViewContainer : ScrollView;
+          const Scroller =
+            key === 'predictions' && showsTablePicker ? ScrollViewContainer : ScrollView;
           return (
           <Scroller
             key={key}
