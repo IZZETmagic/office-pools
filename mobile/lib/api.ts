@@ -303,6 +303,56 @@ export type TablePredictionResponse = {
   summary: TableSummary;
 };
 
+/**
+ * Table mode's deadline, and who has filed against it.
+ *
+ * ⚠ `missingEntryIds` carries IDS ONLY, never orderings — migration 104 closed
+ * the admin read on `league_table_predictions` so that an admin who also plays
+ * cannot see rivals' tables before the reveal. "Who is missing" is answerable
+ * without "what did they put".
+ */
+export type TableDeadlineStatus = {
+  lockAt: string | null;
+  /** Passed IS revealed since migration 110 — there is no separate flag. */
+  hasPassed: boolean;
+  total: number;
+  filed: number;
+  missingEntryIds: string[];
+};
+
+export function fetchTableDeadline(poolId: string) {
+  return apiFetch<TableDeadlineStatus>(`/api/pools/${poolId}/table-deadline`);
+}
+
+export type TableDeadlineMoveResult = {
+  lockAt: string;
+  /** The deadline had already passed — "your table is open again", not "moved". */
+  wasReopened: boolean;
+  /** False when the move landed but the pool could not be told. */
+  announced: boolean;
+  error?: string;
+};
+
+/**
+ * Move it. ⚠ THROUGH THE ROUTE, NEVER A DIRECT `pools` UPDATE.
+ *
+ * The route awaits the announcement rather than firing and forgetting it — a
+ * deadline that moves in silence is the unfair version of an extension, because
+ * the members who filed on time are the only ones who never learn they may
+ * revise. It also knows whether this REOPENS a passed deadline, which the client
+ * cannot know for certain after the write.
+ *
+ * The rules themselves live in a database trigger, so its refusals ("a table
+ * deadline cannot be set in the past") arrive as readable sentences and are
+ * shown to the admin unchanged.
+ */
+export function updateTableDeadline(poolId: string, deadline: Date) {
+  return apiFetch<TableDeadlineMoveResult>(`/api/pools/${poolId}/table-deadline`, {
+    method: 'PATCH',
+    body: { deadline: deadline.toISOString() },
+  });
+}
+
 export function fetchTablePrediction(poolId: string, entryId?: string) {
   const q = entryId ? `?entryId=${encodeURIComponent(entryId)}` : '';
   return apiFetch<TablePredictionResponse>(`/api/pools/${poolId}/table-prediction${q}`);

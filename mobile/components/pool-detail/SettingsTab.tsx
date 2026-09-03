@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import {
   Alert,
   Modal,
@@ -13,7 +13,13 @@ import QRCode from 'react-native-qrcode-svg';
 import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import { router } from 'expo-router';
 
-import { archivePool, stopParticipating } from '@/lib/api';
+import {
+  archivePool,
+  fetchTableDeadline,
+  stopParticipating,
+  updateTableDeadline,
+  type TableDeadlineStatus,
+} from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { usePoolEntries } from '@/lib/usePoolEntries';
 import type { PoolDetailInfo } from '@/lib/usePoolDetail';
@@ -112,13 +118,20 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
       isPrivate: pool.isPrivate,
       maxEntries: pool.maxEntriesPerUser,
       maxParticipants: pool.maxParticipants ?? 0,
-      deadline: pool.predictionDeadline ? new Date(pool.predictionDeadline) : new Date(),
+      // ⚠ WHICH COLUMN THIS EDITS DEPENDS ON THE POOL — see `handleSave`.
+      deadline: (pool.leagueMode === 'table' ? pool.leagueTableLockAt : pool.predictionDeadline)
+        ? new Date((pool.leagueMode === 'table' ? pool.leagueTableLockAt : pool.predictionDeadline)!)
+        : new Date(),
       feesEnabled: (pool.entryFee ?? 0) > 0,
       entryFee: pool.entryFee != null && pool.entryFee > 0 ? String(pool.entryFee) : '',
       entryFeeCurrency: pool.entryFeeCurrency || 'USD',
     }),
     [pool],
   );
+
+  // ⚠ `leagueMode`, but only after `isLeague` has already decided the card is
+  // shown at all — a pool can carry a season with a NULL mode.
+  const isTableMode = pool.isLeague && pool.leagueMode === 'table';
 
   const [edit, setEdit] = useState<EditableState>(initial);
   const [saving, setSaving] = useState(false);
@@ -196,7 +209,25 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         is_private: edit.isPrivate,
         max_entries_per_user: edit.maxEntries,
         max_participants: edit.maxParticipants > 0 ? edit.maxParticipants : null,
-        prediction_deadline: edit.deadline.toISOString(),
+        // ⚠ NEVER ON A LEAGUE POOL, AND THIS IS NOT TIDINESS.
+        //
+        // `prediction_deadline` is a real deadline for a World Cup pool. On a
+        // LEAGUE pool it is a SENTINEL: the create route sets it to the season's
+        // last kickoff because the column is NOT NULL and a league locks per
+        // matchweek, and it sits there so `isDeadlinePassed` reads false all
+        // season.
+        //
+        // `computeReveal` turns a PASSED `prediction_deadline` into
+        // `{ revealed: true, scope: 'all' }` (lib/predictions/revealGate.ts) —
+        // every member's entire entry, every matchweek, shown to the whole pool.
+        // So an admin nudging this field on a league pool could open everybody's
+        // picks. The web stopped writing it here for that reason; mobile was
+        // still doing it.
+        //
+        // Table mode's real deadline goes through `/table-deadline` below, which
+        // announces the move. Every other league mode has no single deadline to
+        // edit at all — it locks per matchweek — so the card is hidden.
+        ...(pool.isLeague ? {} : { prediction_deadline: edit.deadline.toISOString() }),
         // Implicit toggle: a positive entry_fee means fee tracking is on;
         // null means it's off (Fees tab hides, Pool Info card hides). The
         // currency is always persisted so re-enabling later remembers
@@ -543,7 +574,25 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         </SettingsRow>
       </Card>
 
-      {/* Deadline */}
+      {/*
+        ⚠ THE DEADLINE CARD IS NOT UNIVERSAL.
+        · World Cup — `prediction_deadline`, edited here, as always.
+        · Table mode — its own card below, writing `league_table_lock_at`
+          through a route that announces the move.
+        · Pick'em / Showdown / LMS — HIDDEN. They lock per MATCHWEEK, so there
+          is no single date to edit; the field that looks like one is the
+          sentinel described in `handleSave`, and offering it invites the exact
+          edit that reveals everybody's picks.
+      */}
+      {isTableMode ? (
+        <TableDeadlineCard
+          poolId={pool.poolId}
+          lockAt={pool.leagueTableLockAt}
+          onMoved={onSaved}
+        />
+      ) : null}
+
+      {pool.isLeague ? null : (
       <Card>
         <Caption>
           {pool.predictionMode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}
@@ -619,9 +668,16 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         </View>
         <DeadlineCountdown deadline={pool.predictionDeadline} />
       </Card>
+      )}
 
-      {/* Scoring Configuration */}
-      <ScoringConfigCard onPress={onOpenScoring} />
+      {/*
+        ⚠ `pool_settings` IS THE WORLD CUP'S TABLE. This screen edits group
+        bonuses, bracket pairings and a top scorer; a league pool's prices live
+        in `league_pool_settings` and are read by `league_score_table`. Offering
+        it on a league pool is offering an admin controls that change nothing —
+        worse than absent, because they appear to work.
+      */}
+      {pool.isLeague ? null : <ScoringConfigCard onPress={onOpenScoring} />}
 
       {/* Entry Fees — explicit toggle on top of the entry_fee column.
           Disabled clears the fee on save and hides the Fees tab in the
@@ -1264,6 +1320,147 @@ function QuickDeadlineButton({ label, onPress }: { label: string; onPress: () =>
         {label}
       </RNText>
     </Pressable>
+  );
+}
+
+/**
+ * Table mode's deadline — the one genuine deadline decision in the product.
+ *
+ * ⚠ IT SAVES ON ITS OWN, not with the rest of the form. Moving it announces
+ * itself to the pool, and the route AWAITS that announcement: a deadline that
+ * moves in silence is the unfair version of an extension, because the members
+ * who filed on time are the only ones who never learn they may revise. Bundling
+ * it into the pool UPDATE is what made the announcement optional on the web.
+ *
+ * ⚠ NO "Tournament Start" PRESETS. Those are World Cup constants and mean
+ * nothing to a league. What an admin needs here instead is how many people have
+ * filed — which comes from `league_table_filing_status`, returning booleans and
+ * no orderings, because migration 104 closed the admin's read on rivals' tables.
+ */
+function TableDeadlineCard({
+  poolId,
+  lockAt,
+  onMoved,
+}: {
+  poolId: string;
+  lockAt: string | null;
+  onMoved?: () => void;
+}) {
+  const theme = useTheme();
+  const [status, setStatus] = useState<TableDeadlineStatus | null>(null);
+  const [pending, setPending] = useState<Date | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const s = await fetchTableDeadline(poolId);
+        if (!cancelled) setStatus(s);
+      } catch {
+        // Non-fatal. The field still works without the count, and failing loudly
+        // would block an admin from moving a deadline because we could not tell
+        // them how many had filed.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [poolId, lockAt]);
+
+  const current = pending ?? (lockAt ? new Date(lockAt) : null);
+  const hasPassed = status?.hasPassed ?? false;
+
+  async function commit(next: Date) {
+    setBusy(true);
+    try {
+      const res = await updateTableDeadline(poolId, next);
+      setPending(null);
+      // `announced: false` means the move LANDED but nobody was told. The admin
+      // is the only person who can fix that, so it is said plainly rather than
+      // folded into a success toast.
+      Alert.alert(
+        res.wasReopened ? 'Table reopened' : 'Deadline moved',
+        res.announced
+          ? 'Everyone in the pool has been told.'
+          : (res.error ?? 'The pool could not be told — let them know yourself.'),
+      );
+      onMoved?.();
+    } catch (err) {
+      // The trigger's own words: "a table deadline cannot be set in the past",
+      // "the tables in this pool were revealed at …". Written to be read by a
+      // person, so they are shown unchanged rather than replaced.
+      Alert.alert("Couldn't move the deadline", err instanceof Error ? err.message : 'Unknown error');
+      setPending(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <Caption>Table deadline</Caption>
+      <InfoBox>
+        One prediction rides on this date. Moving it forward reopens the pool and tells everyone;
+        it cannot be set in the past.
+      </InfoBox>
+
+      <Pressable
+        onPress={() => {
+          if (!DateTimePicker) {
+            Alert.alert('Rebuild needed', 'The date picker needs a native rebuild of the app.');
+            return;
+          }
+          setShowPicker(true);
+        }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: theme.spacing.sm,
+        }}
+      >
+        <Text variant="body" color="slate">Locks at</Text>
+        <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>
+          {current ? formatDeadline(current) : 'Not set'}
+        </RNText>
+      </Pressable>
+
+      {showPicker && DateTimePicker ? (
+        <DateTimePicker
+          value={current ?? new Date()}
+          mode="datetime"
+          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          onChange={(_e: unknown, picked?: Date) => {
+            if (Platform.OS !== 'ios') setShowPicker(false);
+            if (picked) setPending(picked);
+          }}
+        />
+      ) : null}
+
+      {status ? (
+        <Text variant="detail" color="slate">
+          {status.filed} of {status.total} {status.total === 1 ? 'entry has' : 'entries have'} filed
+          a table
+          {hasPassed ? ' · the deadline has passed and tables are revealed' : ''}
+        </Text>
+      ) : null}
+
+      {pending ? (
+        <View style={{ flexDirection: 'row', gap: theme.spacing.sm, justifyContent: 'flex-end' }}>
+          <QuickDeadlineButton label="Cancel" onPress={() => setPending(null)} />
+          <QuickDeadlineButton
+            label={busy ? 'Saving…' : hasPassed ? 'Reopen the table' : 'Move the deadline'}
+            onPress={() => {
+              if (!busy) void commit(pending);
+            }}
+          />
+        </View>
+      ) : null}
+
+      <DeadlineCountdown deadline={lockAt} />
+    </Card>
   );
 }
 
