@@ -255,7 +255,10 @@ export default function PickemPickScreen() {
           gap: theme.spacing.md,
           paddingHorizontal: theme.spacing.xl,
           paddingTop: theme.spacing.md,
-          paddingBottom: theme.spacing.sm,
+          // Ryan, 2026-09-03: the title and the week bar were sitting on top of
+          // each other. They are two different things — WHOSE picks, and WHICH
+          // week — and the gap is what says so.
+          paddingBottom: theme.spacing.lg,
         }}
       >
         <Pressable onPress={() => router.back()} hitSlop={10}>
@@ -398,7 +401,7 @@ function WeekBar({
         alignItems: 'center',
         gap: theme.spacing.sm,
         paddingHorizontal: theme.spacing.lg,
-        paddingBottom: theme.spacing.sm,
+        paddingBottom: theme.spacing.lg,
       }}
     >
       <WeekArrow icon="chevron.left" onPress={onPrev} enabled={hasPrev} />
@@ -517,9 +520,31 @@ function FixtureRow({
         ) : null}
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-        <Club team={home} align="left" />
-        {isResults ? null : (
+      {/*
+        ⚠ TWO LAYOUTS, AND RESULTS DOES NOT DRAW THE CLUBS TWICE. At Scores the
+        clubs label two steppers, so they are their own row. At Results the
+        clubs ARE the buttons — rendering a name row above them would print
+        every fixture twice and push the control off the card.
+      */}
+      {isResults ? (
+        <OutcomePicker
+          value={outcome}
+          onChange={onOutcome}
+          home={{
+            name: home?.country_name ?? 'Home',
+            abbr: home?.country_code ?? null,
+            crestUrl: home?.flag_url ?? null,
+          }}
+          away={{
+            name: away?.country_name ?? 'Away',
+            abbr: away?.country_code ?? null,
+            crestUrl: away?.flag_url ?? null,
+          }}
+          disabled={!canEdit}
+        />
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+          <Club team={home} align="left" />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <TapScoreField value={score.home} onChange={(v) => onScore('home', v)} disabled={!canEdit} />
             <Text variant="detail" color="slate">
@@ -527,19 +552,9 @@ function FixtureRow({
             </Text>
             <TapScoreField value={score.away} onChange={(v) => onScore('away', v)} disabled={!canEdit} />
           </View>
-        )}
-        <Club team={away} align="right" />
-      </View>
-
-      {isResults ? (
-        <OutcomePicker
-          value={outcome}
-          onChange={onOutcome}
-          homeLabel={home?.country_code ?? home?.country_name ?? 'Home'}
-          awayLabel={away?.country_code ?? away?.country_name ?? 'Away'}
-          disabled={!canEdit}
-        />
-      ) : null}
+          <Club team={away} align="right" />
+        </View>
+      )}
     </View>
   );
 }
