@@ -137,8 +137,9 @@ type LeagueFixturesResponse = {
     competition_id: number | null;
     /** Already in the World Cup match shape — the route does the mapping. */
     matches: Record<string, unknown>[];
-    standings: LeagueStandingRow[];
-    standings_fetched_at: string | null;
+    /** Optional: absent from a response cached before this field existed. */
+    standings?: LeagueStandingRow[];
+    standings_fetched_at?: string | null;
   }>;
 };
 
@@ -354,12 +355,18 @@ export function useTournamentMatchesInternal() {
   const leagueTables = useMemo<LeagueSeasonTable[]>(
     () =>
       (leagueQuery.data?.seasons ?? [])
-        .filter((s) => s.standings.length > 0)
+        // ⚠ `?? []`, AND IT IS NOT DEFENSIVE PROGRAMMING FOR ITS OWN SAKE.
+        // `standings` is a NEW field on this route, and react-query serves the
+        // previously cached response until the next fetch — so on the build
+        // where this ships, the first render reads a season object that has no
+        // `standings` key at all and `.length` throws. The same applies to any
+        // client running an older bundle against a newer server, or the reverse.
+        .filter((s) => (s.standings ?? []).length > 0)
         .map((s) => ({
           season_id: s.season_id,
           competition: s.competition,
           competition_id: s.competition_id ?? null,
-          standings: s.standings,
+          standings: s.standings ?? [],
           standings_fetched_at: s.standings_fetched_at ?? null,
         })),
     [leagueQuery.data],
