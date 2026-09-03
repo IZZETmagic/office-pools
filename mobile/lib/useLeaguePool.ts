@@ -83,7 +83,22 @@ export type LeaguePoolPayload = {
     inPlayMatchweekNumber: number | null
     sealedMatchweekNumber: number | null
     sealedOpensAfterMatchweek: number | null
+    /**
+     * The instant the sealed duel opens — the sealed card's countdown target.
+     *
+     * ⚠ NEVER DERIVE THIS. Not from `lock_at`, not from the previous
+     * matchweek's settle time, not from a 48-hour offset applied here. The rule
+     * has already changed twice (119 → 123) and the last hand-rolled copy of it
+     * shipped a countdown to the wrong matchweek that looked entirely correct.
+     * `league_duel_reveals_at` is the single owner; this is its answer.
+     */
+    sealedOpensAtLatest: string | null
   }
+  /**
+   * Showdown only. `null` in every other mode — the signal to render no duel
+   * surface, rather than an empty one.
+   */
+  showdown: ShowdownPayload | null
   you: {
     entries: {
       entry_id: string
@@ -115,6 +130,50 @@ export type LeaguePoolPayload = {
  * fail — it would silently render "TBD" with no crest, because the adapter
  * picks fields explicitly and anything it does not name arrives `undefined`.
  */
+/**
+ * One head-to-head duel, as the contract sends it.
+ *
+ * ⚠⚠ THE ABSENCE OF A ROW IS INFORMATION. Migration 116 seals the draw in RLS,
+ * and the route reads these with the VIEWER's client — so this array holds the
+ * duels this member is allowed to see and nothing else. A matchweek with no row
+ * here is SEALED, not empty and not a bye. The two are told apart structurally:
+ *
+ *   · a BYE is a row that exists with `entry_b === null`
+ *   · a SEALED week has no row at all, and `season.sealedMatchweekNumber`
+ *     names it with `sealedOpensAtLatest` as its countdown
+ *
+ * Reading a missing row as "no opponent this week" would show a member the bye
+ * card for a duel that is simply still hidden.
+ */
+export type DuelRow = {
+  duel_id: string
+  matchweek_number: number
+  entry_a: string
+  /** `null` is a BYE — nobody was drawn against this entry that week. */
+  entry_b: string | null
+  /** What each side's picks scored that week. Written when the duel settles. */
+  accuracy_a: number | null
+  accuracy_b: number | null
+  /**
+   * The duel's own points: 500 a win, 250 a tie or a bye, 0 a loss.
+   *
+   * ⚠ NEVER COMPARE AGAINST 3 OR 1. Migration 121 raised the scale from 3/1/0,
+   * and `headToHead()` on the web read `=== 3` for a week afterwards — which
+   * scored every meeting as a loss, silently, for everybody. Use `duelResult`
+   * in `mobile/lib/duelPoints.ts`, which mirrors the web's single owner.
+   */
+  points_a: number | null
+  points_b: number | null
+  settled_at: string | null
+}
+
+export type ShowdownPayload = {
+  /** Revealed duels only — see `DuelRow`. Ordered by matchweek. */
+  duels: DuelRow[]
+  /** entry_id → display name, for both sides of every revealed duel. */
+  names: Record<string, string>
+}
+
 export type LeagueTeam = {
   team_id: string
   country_name: string

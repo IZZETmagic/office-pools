@@ -27,6 +27,7 @@ export { LeaderboardLegend } from './LeaderboardLegend';
 export { LeaderboardPodium } from './LeaderboardPodium';
 export { LeaderboardRow } from './LeaderboardRow';
 export { LeaderboardTab } from './LeaderboardTab';
+export { DuelTab } from './DuelTab';
 export { LeaguePickemEntriesTab } from './LeaguePickemEntriesTab';
 export { LeaguePickemScoring } from './LeaguePickemScoring';
 export { LeagueTableEntriesTab } from './LeagueTableEntriesTab';

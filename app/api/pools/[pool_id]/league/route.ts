@@ -4,7 +4,7 @@ import { matchweekNumber } from '@/lib/competitionRounds'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { readLeaguePoolView, readLeaguePredictions, deriveRoundSubmissions } from '@/lib/league/read'
-import { readEntryTotals } from '@/lib/league/duels'
+import { readEntryTotals, readPoolDuels } from '@/lib/league/duels'
 import { getLeagueSeasonCached } from '@/lib/league/season'
 
 // =============================================================
@@ -189,6 +189,71 @@ export async function GET(
     .eq('pool_id', pool_id)
     .maybeSingle()
 
+  /**
+   * SHOWDOWN — the duel rows, and the names on them.
+   *
+   * ⚠⚠ `supabase`, THE VIEWER'S CLIENT. NEVER `admin`.
+   *
+   * This is the one read in this route where the client choice is a security
+   * boundary rather than a workaround. Migration 116 seals the draw in RLS:
+   * `league_duels` is readable only where `league_duel_is_revealed()` says that
+   * matchweek has opened. A user-scoped read therefore returns exactly the
+   * duels this member is allowed to see, and the seal enforces itself with no
+   * filtering here at all.
+   *
+   * Swapping in the admin client — the reflex everywhere else in this file,
+   * because migration 050's four engine tables are deny-all — would bypass the
+   * gate completely and ship every member their whole season's opponents in one
+   * JSON payload. The seal would still LOOK like it was holding: the web page
+   * would be unchanged, the RLS policy would still be there, and only the phone
+   * would quietly know the future. That is the same shape as the LMS
+   * admin-client warning, and it is why this comment is longer than the code.
+   *
+   * Names come second and are scoped to entries that actually appear in those
+   * revealed rows, so a sealed opponent's name cannot arrive early either.
+   */
+  type DuelPayload = {
+    duels: Awaited<ReturnType<typeof readPoolDuels>>['duels']
+    /** entry_id → display name, for both sides of every revealed duel. */
+    names: Record<string, string>
+  }
+  let showdown: DuelPayload | null = null
+  if (pool.league_mode === 'showdown') {
+    const { duels, error: duelErr } = await readPoolDuels(supabase, pool_id)
+    if (duelErr) {
+      return NextResponse.json({ error: `duels: ${duelErr}` }, { status: 502 })
+    }
+
+    const seen = new Set<string>()
+    for (const d of duels) {
+      seen.add(d.entry_a)
+      if (d.entry_b) seen.add(d.entry_b)
+    }
+
+    const names: Record<string, string> = {}
+    if (seen.size > 0) {
+      // The join shape `lib/league/poolCards.ts` already uses for exactly this.
+      const { data: roster, error: nameErr } = await admin
+        .from('pool_entries')
+        .select('entry_id, entry_name, pool_members!inner(users!inner(username, full_name))')
+        .in('entry_id', [...seen])
+      // Logged, not swallowed: names failing is a card full of "Unknown", which
+      // is survivable — a 502 for the whole pool is not.
+      if (nameErr) console.error('[league] duel names failed:', nameErr.message)
+      type RosterRow = {
+        entry_id: string
+        entry_name: string | null
+        pool_members: { users: { username: string | null; full_name: string | null } } | null
+      }
+      for (const r of (roster ?? []) as unknown as RosterRow[]) {
+        names[r.entry_id] =
+          r.entry_name || r.pool_members?.users?.username || r.pool_members?.users?.full_name || 'Entry'
+      }
+    }
+
+    showdown = { duels, names }
+  }
+
   return NextResponse.json({
     pool: {
       pool_id: pool.pool_id,
@@ -239,7 +304,30 @@ export async function GET(
       inPlayMatchweekNumber: view.inPlayMatchweekNumber,
       sealedMatchweekNumber: view.sealedMatchweekNumber,
       sealedOpensAfterMatchweek: view.sealedOpensAfterMatchweek,
+      /**
+       * WHEN the sealed duel opens — the countdown target on the sealed card.
+       *
+       * ⚠ Read from `league_duel_reveals_at` via `league_first_sealed_matchweek`
+       * (127), never recomputed. Migration 127 exists because `read.ts` mirrored
+       * the reveal rule in TypeScript and the mirror still implemented 119
+       * (*open when the previous week settles*) after 123 replaced it with a
+       * 48-hour hold — so the card skipped a week and counted down to the wrong
+       * one, accurately. The web already reads this; sending it means the phone
+       * cannot start a second mirror.
+       */
+      sealedOpensAtLatest: view.sealedOpensAtLatest,
     },
+    /**
+     * Showdown only; `null` for every other mode, which is the signal to render
+     * no duel surface at all rather than an empty one.
+     *
+     * ⚠ `duels` HAS ALREADY BEEN THROUGH THE SEAL. It holds the revealed rows
+     * and nothing else, because it was read with the viewer's client and
+     * migration 116's policy did the filtering. A matchweek missing from here is
+     * missing on purpose — pair it with `season.sealedMatchweekNumber` and the
+     * countdown, never with "no fixture this week".
+     */
+    showdown,
     you: {
       entries: (entries ?? []).map((e) => {
         const mine = picks.find((p) => p.entry_id === e.entry_id)

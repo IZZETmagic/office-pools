@@ -176,3 +176,73 @@ describe('no consumer classifies a duel with a bare literal', () => {
     expect(found, 'these read a duel points value and classify it with a literal').toEqual([])
   })
 })
+
+/**
+ * ⚠ THE PHONE HOLDS A SECOND COPY, AND IT CANNOT IMPORT THE FIRST.
+ *
+ * `mobile/tsconfig.json` maps `@/*` to `mobile/` and nothing reaches outside
+ * it, so React Native restates the values in `mobile/lib/duelPoints.ts`. That
+ * copy is only safe while something reads both against the migration — which is
+ * this, and it is the same arrangement `leagueDepthPolarity.guard.test.ts`
+ * already uses to walk `mobile/`.
+ *
+ * A drift here is invisible in exactly the way the web drift was: the phone
+ * reads a settled 500, classifies it with a retired `=== 3`, and shows a member
+ * who won their duel a defeat — while the leaderboard on the same screen, whose
+ * order comes from SQL, has them climbing.
+ */
+describe('the phone agrees with the engine about what a duel is worth', () => {
+  const c = pointsACase()
+  const mobileSrc = readFileSync(resolve(process.cwd(), 'mobile/lib/duelPoints.ts'), 'utf8')
+
+  // Restated rather than shared: the web arm's copies live inside its own
+  // `describe`. Kept identical on purpose — if one is loosened the other should
+  // be too, deliberately, in the same edit.
+  const code = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, '')
+       .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+  const LITERAL = /\b(points?|pts|mine|theirs|yours|them)\w*\s*===\s*[13]\b/i
+
+  /** `export const NAME = 123` out of the mobile copy. */
+  const constant = (name: string): number | null => {
+    const m = mobileSrc.match(new RegExp(`export const ${name} = (\\d+)`))
+    return m ? +m[1] : null
+  }
+
+  it.each([
+    ['DUEL_WIN', 'win'],
+    ['DUEL_TIE', 'tie'],
+    ['DUEL_BYE', 'bye'],
+    ['DUEL_LOSS', 'loss'],
+  ] as const)('mobile %s matches the engine', (name, key) => {
+    expect(constant(name), `${name} is missing from the mobile copy`).not.toBeNull()
+    expect(constant(name)).toBe(c![key])
+  })
+
+  it('mobile and web hold the same values, so neither can be updated alone', () => {
+    expect(constant('DUEL_WIN')).toBe(DUEL_WIN)
+    expect(constant('DUEL_TIE')).toBe(DUEL_TIE)
+    expect(constant('DUEL_BYE')).toBe(DUEL_BYE)
+    expect(constant('DUEL_LOSS')).toBe(DUEL_LOSS)
+  })
+
+  it('no mobile file classifies a duel with a literal', () => {
+    // Same structural rule as the web arm: reading `points_a`/`points_b` IS
+    // classifying a duel, so the file must ask `duelPoints` to do it.
+    const found: string[] = []
+    const walk = (dir: string) => {
+      for (const e of readdirSync(resolve(process.cwd(), dir), { withFileTypes: true })) {
+        const p = `${dir}/${e.name}`
+        if (e.isDirectory()) {
+          if (e.name !== '__tests__' && e.name !== 'node_modules') walk(p)
+          continue
+        }
+        if (!/\.tsx?$/.test(e.name) || e.name === 'duelPoints.ts') continue
+        const src = code(readFileSync(resolve(process.cwd(), p), 'utf8'))
+        if (/points_[ab]/.test(src) && LITERAL.test(src)) found.push(p)
+      }
+    }
+    ;['mobile/lib', 'mobile/components', 'mobile/app'].forEach(walk)
+    expect(found, 'these read a duel points value and classify it with a literal').toEqual([])
+  })
+})

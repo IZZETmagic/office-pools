@@ -38,6 +38,7 @@ function colorDistance(a: string, b: string): number {
 }
 
 export type PoolTabKey =
+  | 'duel'
   | 'leaderboard'
   | 'predictions'
   | 'form'
@@ -59,6 +60,10 @@ type TabDef = {
 // becomes the natural "end-of-strip" surface for non-admins. Admins
 // then continue into the admin-only Rounds / Members / Settings.
 const ALL_TABS: TabDef[] = [
+  // ⚠ FIRST, and only in Showdown. The mode is named after the duel, so the
+  // duel is the landing — everything else in the pool is how you train for it.
+  // Filtered out everywhere else, so no other mode's tab order moves.
+  { key: 'duel', label: 'Duel', icon: 'flame.fill' },
   { key: 'leaderboard', label: 'Leaderboard', icon: 'trophy.fill' },
   { key: 'predictions', label: 'Predictions', icon: 'pencil.line' },
   { key: 'form', label: 'Form', icon: 'chart.bar.xaxis' },
@@ -102,6 +107,8 @@ type PoolTabBarProps = {
    * (e.g., transitional render) the tab bar renders without dots.
    */
   poolId?: string;
+  /** Which league mode, so Showdown can be given its Duel tab. Null elsewhere. */
+  leagueMode?: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null;
 };
 
 export function getVisiblePoolTabs(
@@ -109,8 +116,24 @@ export function getVisiblePoolTabs(
   isProgressive: boolean,
   feesEnabled: boolean,
   isLeague = false,
+  /**
+   * ⚠ READ THE `isLeague` WARNING BELOW BEFORE USING THIS.
+   *
+   * The rule there is that `leagueMode` must never decide whether a pool IS a
+   * league — two production pools carry a season id with a NULL mode and would
+   * be thrown back to the World Cup flow. It does NOT say the mode can never be
+   * read: choosing between league SURFACES by mode is exactly what
+   * `lib/leagueSurface.ts` does, and this is the same question one level up.
+   *
+   * So: `isLeague` gates the league-ness, `leagueMode` gates a single mode's
+   * own tab. A NULL-mode league pool simply gets no Duel tab, which is right —
+   * it has no duels.
+   */
+  leagueMode: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null = null,
 ): PoolTabKey[] {
   return ALL_TABS.filter((t) => {
+    // The duel is Showdown's whole subject and meaningless anywhere else.
+    if (t.key === 'duel') return isLeague && leagueMode === 'showdown';
     if (t.key === 'rounds') return isAdmin && isProgressive;
     if (t.key === 'fees') return isAdmin && feesEnabled;
     if (t.key === 'members' || t.key === 'settings') return isAdmin;
@@ -234,11 +257,12 @@ export function PoolTabBar({
   pageOffset,
   accentColor,
   poolId,
+  leagueMode = null,
 }: PoolTabBarProps) {
   const theme = useTheme();
   const pending = usePendingActionsOptional();
   const { width: screenWidth } = useWindowDimensions();
-  const visible = getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled, isLeague);
+  const visible = getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled, isLeague, leagueMode);
   const tabs = ALL_TABS.filter((t) => visible.includes(t.key));
 
   // Per-tab dot predicate. Form tab surfaces badge unlocks + level ups;

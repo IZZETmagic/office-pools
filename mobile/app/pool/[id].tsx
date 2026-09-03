@@ -26,6 +26,7 @@ import {
   FeesTab,
   FormTab,
   LeaderboardTab,
+  DuelTab,
   LeaguePickemEntriesTab,
   LeaguePickemScoring,
   LeagueTableEntriesTab,
@@ -59,6 +60,10 @@ import { useTheme } from '@/theme';
 // silently falls back to the leaderboard default — keeps an admin from
 // landing on an unknown tab via a stale or malformed link.
 const TAB_PARAM_VALUES: PoolTabKey[] = [
+  // Showdown only. A pool without duels never offers the tab, so a stale
+  // `?tab=duel` on another mode falls through to the leaderboard default
+  // below — the same way `?tab=form` does on a league pool.
+  'duel',
   'leaderboard',
   'predictions',
   'form',
@@ -80,6 +85,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
 // doesn't block a panel's own data updates or internal state — only the
 // redundant parent-triggered re-render.
 const MemoPoolDetailHeader = memo(PoolDetailHeader);
+const MemoDuelTab = memo(DuelTab);
 const MemoLeaderboardTab = memo(LeaderboardTab);
 const MemoLeagueTableEntriesTab = memo(LeagueTableEntriesTab);
 const MemoLmsEntriesTab = memo(LmsEntriesTab);
@@ -237,6 +243,11 @@ export default function PoolDetailScreen() {
   const isProgressive = data?.pool.predictionMode === 'progressive';
   const isLeague = data?.pool.isLeague ?? false;
   const isTableMode = isLeague && data?.pool.leagueMode === 'table';
+  // ⚠ Read off `data`, like every flag around it — NOT off `pool`, which is
+  // destructured ~150 lines below. `useMemo` evaluates both its factory and its
+  // dependency array during render, so reaching for `pool` up here is a
+  // ReferenceError before the early returns have even run.
+  const leagueMode = data?.pool.leagueMode ?? null;
   // Has table picking closed? Drives what the Predictions tab offers and
   // whether rivals' tables can be opened. The pool row already carries it, so
   // no query is needed — and it is the same fact the database trigger and RLS
@@ -288,12 +299,18 @@ export default function PoolDetailScreen() {
       ? rawBrandColor
       : `#${rawBrandColor}`
     : null;
-  // ⚠ Same four arguments as the tab bar's own call, and they have to stay that
+  // ⚠ Same FIVE arguments as the tab bar's own call, and they have to stay that
   // way: this list orders the PAGER PAGES and that one orders the PILLS. If they
   // disagree, tapping a pill scrolls to somebody else's tab.
+  //
+  // ⚠ `pool.leagueMode` is in the dependency array, and it is load-bearing. It
+  // decides whether the Duel tab exists, so leaving it out would let the pager
+  // keep a page list from before the mode was known while the pill strip — which
+  // has no memo — already showed Duel. Every pill would then open the tab to its
+  // left.
   const visibleTabs = useMemo(
-    () => getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled, isLeague),
-    [isAdmin, isProgressive, feesEnabled, isLeague],
+    () => getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled, isLeague, leagueMode),
+    [isAdmin, isProgressive, feesEnabled, isLeague, leagueMode],
   );
   const tabIndex = Math.max(0, visibleTabs.indexOf(tab));
 
@@ -407,6 +424,10 @@ export default function PoolDetailScreen() {
 
   function renderTab(key: PoolTabKey) {
     switch (key) {
+      // Showdown only — `getVisiblePoolTabs` never offers this key elsewhere,
+      // so reaching it means the pool has duels.
+      case 'duel':
+        return <MemoDuelTab poolId={pool.poolId} />;
       case 'leaderboard':
         return (
           <MemoLeaderboardTab
@@ -597,6 +618,7 @@ export default function PoolDetailScreen() {
         pageOffset={pageOffset}
         accentColor={accentColor}
         poolId={pool.poolId}
+        leagueMode={leagueMode}
       />
       <Animated.ScrollView
         ref={pagerRef}
