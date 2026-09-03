@@ -375,7 +375,10 @@ function ClubChip({ club }: { club: { club_name: string; crest_url: string | nul
   return (
     <Image
       source={{ uri: club.crest_url }}
-      style={{ width: 26, height: 26 }}
+      // 34 is the ceiling that keeps rows the height they are: the name and
+      // handle beside it stack to 36 (cardTitle 20 + gap 3 + detail 13), and a
+      // crest taller than that starts driving the row instead of sitting in it.
+      style={{ width: 34, height: 34 }}
       resizeMode="contain"
       // The badge IS the label once the name is gone, so it has to be one to
       // anything that cannot see it.
