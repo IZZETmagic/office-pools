@@ -83,12 +83,18 @@ export function OutcomePicker({ value, onChange, home, away, disabled }: Props) 
         accessibilityState={{ selected: value === 'draw', disabled: Boolean(disabled) }}
         accessibilityLabel="Draw"
         style={{
-          // ⚠ Still fixed, just less cramped. It is one outcome of three but it
-          // is not a team, so it must not flex with the clubs — left to do that
-          // it becomes a third slab and the control reads as three things of
-          // equal weight. 64 is the width the web settled on for the same
-          // control at the same job.
-          width: 64,
+          // ⚠ Still FIXED, just no longer cramped. It is one outcome of three
+          // but it is not a team, so it must not flex with the clubs — left to
+          // do that it becomes a third slab and the control reads as three
+          // things of equal weight.
+          //
+          // The budget, measured at 375pt (the narrowest phone worth building
+          // for): 375 − 32 screen padding − 24 card padding − 12 of gaps = 307
+          // for all three. A club needs ~74 (8+8 padding, 22 crest, 6 gap, ~28
+          // for a three-letter code, 2 border), so 148 of that is spoken for and
+          // Draw could take up to ~159 before anything truncates. At 80 the
+          // clubs get 113 each — comfortable, with room to grow this again.
+          width: 80,
           minHeight: 48,
           alignItems: 'center',
           justifyContent: 'center',
