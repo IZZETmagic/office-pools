@@ -148,13 +148,24 @@ export function TablePicker({
     // height, which `app/pool/[id].tsx` gives this one tab.
     <ScrollViewContainer
       style={{ flex: 1 }}
+      // ⚠ NO `paddingHorizontal` HERE, and that is the whole reason the dragged
+      // row was clipped.
+      //
+      // The library scales the active cell to 1.025 while you hold it. With the
+      // inset on this content container, the FlatList inside is only
+      // `pageWidth - 32` wide — and a FlatList is a ScrollView, so it CLIPS its
+      // children. The grown row needed ~9px more than the list had and got cut
+      // flat on both sides.
+      //
+      // The inset lives on the rows instead (`marginHorizontal` in PickerRow).
+      // The list now spans the full page width, so the scale grows into that
+      // margin rather than into a clip.
       contentContainerStyle={{
-        paddingHorizontal: theme.spacing.lg,
         paddingTop: theme.spacing.md,
         paddingBottom: theme.spacing.xxxl,
       }}
     >
-      <View style={{ gap: 4, paddingBottom: theme.spacing.md }}>
+      <View style={{ gap: 4, paddingBottom: theme.spacing.md, paddingHorizontal: theme.spacing.lg }}>
         <Text variant="cardTitle">Order every club</Text>
         <Text variant="detail" color="slate">
           Long press a club to pick it up, then drag. It saves as you go — there is nothing to
@@ -271,6 +282,9 @@ function PickerRow({
         // of the list unreachable.
         height: ROW_HEIGHT,
         paddingHorizontal: theme.spacing.sm,
+        // The list's own inset, moved here so the 1.025 drag scale has somewhere
+        // to grow. See the note on ScrollViewContainer above.
+        marginHorizontal: theme.spacing.lg,
         marginBottom: ROW_GAP,
         borderRadius: theme.radii.lg,
         backgroundColor: theme.colors.surface,
