@@ -5,12 +5,15 @@ import { View } from 'react-native';
 import { LeaderboardLegend } from './LeaderboardLegend';
 import { LeaderboardPodium } from './LeaderboardPodium';
 import { LeaderboardRow } from './LeaderboardRow';
+import { LeagueTableLeaderboard } from './LeagueTableLeaderboard';
 import { MatchdayInfoBar } from './MatchdayInfoBar';
 import { MatchdayMVPBanner } from './MatchdayMVPBanner';
 import { SuperlativesSection } from './SuperlativesSection';
 import { Icon, Text } from '@/components/ui';
 import type {
   LeaderboardEntry,
+  LeagueLeaderboardEntry,
+  LeagueLeaderboardMeta,
   MatchdayInfo,
   MatchdayMvp,
   PoolAward,
@@ -26,6 +29,10 @@ type LeaderboardTabProps = {
   superlatives: Superlative[];
   matchdayMvp: MatchdayMvp | null;
   matchdayInfo: MatchdayInfo | null;
+  /** Non-null for a league pool; its rows are in `leagueEntries`. */
+  league?: LeagueLeaderboardMeta | null;
+  /** League rows. Null for a World Cup pool, where `entries` carries them. */
+  leagueEntries?: LeagueLeaderboardEntry[] | null;
 };
 
 export function LeaderboardTab({
@@ -36,6 +43,8 @@ export function LeaderboardTab({
   superlatives,
   matchdayMvp,
   matchdayInfo,
+  league = null,
+  leagueEntries = null,
 }: LeaderboardTabProps) {
   const theme = useTheme();
 
@@ -55,6 +64,33 @@ export function LeaderboardTab({
     },
     [poolId],
   );
+
+  // ---- LEAGUE ------------------------------------------------------------
+  // A league pool's rows carry a different set of facts, so it gets its own
+  // list rather than a set of flags threaded through this one. Everything below
+  // — the podium, the Exact/W+GD/Winner/Miss legend, the matchday MVP banner,
+  // the superlatives, the "N of M matches" bar — is computed from analytics the
+  // league engine deliberately does not write (the outbox BLOCKS XP and badges
+  // rather than storing zeros), so for a league pool every one of them rendered
+  // a confident zero over the top of scores it never read.
+  //
+  // ⚠ Table mode is the only league mode built here so far. The others fall
+  // through to the World Cup list on purpose: it is wrong for them too, but it
+  // is the wrongness that is already shipped, and replacing it blind would be
+  // guessing at what a Showdown row should say.
+  if (league?.mode === 'table' && leagueEntries) {
+    return (
+      <LeagueTableLeaderboard
+        entries={leagueEntries}
+        league={league}
+        currentUserId={currentUserId}
+        // Points to the World Cup breakdown, which holds nothing for a table
+        // entry. Left unwired until that screen has a table arm — a tap that
+        // opens an empty page is worse than a row that does not respond.
+        onEntryPress={undefined}
+      />
+    );
+  }
 
   if (entries.length === 0) {
     return (

@@ -44,7 +44,12 @@ import {
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import { Icon, Text } from '@/components/ui';
-import { fetchLeaderboard, type BadgeInfo, type LeaderboardEntry } from '@/lib/api';
+import {
+  fetchLeaderboard,
+  type BadgeInfo,
+  type LeaderboardEntry,
+  type LeaderboardEntryCore,
+} from '@/lib/api';
 import {
   buildFlexBadgeOptions,
   buildFlexBadgePayload,
@@ -224,7 +229,10 @@ export default function BanterScreen() {
         Alert.alert('Nothing to share yet', 'No leaderboard entries.');
         return;
       }
-      const top5 = lb.entries.slice(0, 5).map((e: LeaderboardEntry, i: number) => ({
+      // Core fields only — `/leaderboard` returns league rows for a league pool
+      // and this card needs only who and what they scored, which both shapes
+      // carry. See the matching note in BanterSheet's `sendStandings`.
+      const top5 = lb.entries.slice(0, 5).map((e: LeaderboardEntryCore, i: number) => ({
         rank: i + 1,
         user_id: e.user_id,
         name: e.full_name || e.username || e.entry_name,
@@ -287,8 +295,17 @@ export default function BanterScreen() {
     let own: LeaderboardEntry | undefined;
     try {
       const lb = await fetchLeaderboard(id);
-      own = (lb.entries ?? []).find(
-        (e: LeaderboardEntry) => e.user_id === banter.appUserId,
+      // ⚠ Badges and levels do not exist in a league pool, and this is not an
+      // oversight to route around: the league outbox BLOCKS the XP and badge
+      // writers rather than running them against zero rows, so `entry_xp_state`
+      // holds nothing. A league row has no `level` to flex, and casting one into
+      // the World Cup shape would print "Level 1" as if it had been earned.
+      if (lb.league) {
+        Alert.alert('No badges here yet', 'Badges and levels are a World Cup thing for now.');
+        return;
+      }
+      own = (lb.entries as LeaderboardEntry[]).find(
+        (e) => e.user_id === banter.appUserId,
       );
     } catch (err) {
       Alert.alert(

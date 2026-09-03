@@ -79,7 +79,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
-import { fetchLeaderboard, type LeaderboardEntry } from '@/lib/api';
+import { fetchLeaderboard, type LeaderboardEntryCore } from '@/lib/api';
 import {
   buildFlexBadgeOptions,
   buildFlexBadgePayload,
@@ -2201,7 +2201,11 @@ async function sendStandings(poolId: string, sendMessage: SendMessage) {
       Alert.alert('Nothing to share yet', 'No leaderboard entries.');
       return;
     }
-    const top5 = lb.entries.slice(0, 5).map((e: LeaderboardEntry, i: number) => ({
+    // `LeaderboardEntryCore`, not `LeaderboardEntry`: `/leaderboard` returns
+    // league rows for a league pool, and every field this card needs — who, and
+    // what they scored — is in the half both shapes share. Sharing the standings
+    // is as meaningful in a Premier League pool as in a World Cup one.
+    const top5 = lb.entries.slice(0, 5).map((e: LeaderboardEntryCore, i: number) => ({
       rank: i + 1,
       user_id: e.user_id,
       name: e.full_name || e.username || e.entry_name,

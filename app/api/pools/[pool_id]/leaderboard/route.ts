@@ -74,11 +74,52 @@ async function handleGET(
   // 3. Fetch pool info
   const { data: pool } = await adminClient
     .from('pools')
-    .select('pool_id, tournament_id, prediction_mode')
+    .select('pool_id, tournament_id, prediction_mode, league_season_id, league_mode')
     .eq('pool_id', pool_id)
     .single()
 
   if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
+
+  // ---- LEAGUE ------------------------------------------------------------
+  // Everything below this branch reads `matches`, `teams` and `match_conduct`
+  // for `pool.tournament_id`, then builds rows out of `pool_entries`. A league
+  // pool's tournament row is a placeholder holding zero matches, and the league
+  // engine writes none of those entry columns — so a league pool fell all the
+  // way through and every member came back as 0 points, rank null, "0 + 0",
+  // "0 exact · 0%" and five grey form dots, while its real scores sat unread in
+  // `league_entry_totals`.
+  //
+  // ⚠ `league_season_id`, not `league_mode`, is the discriminant. Two production
+  // pools carry a season with a NULL mode, and reading a NULL mode as "not a
+  // league" is what would send exactly those back down the path this closes.
+  //
+  // The response keeps the same envelope. `league` being non-null is how a
+  // client knows the row shape changed; the World Cup collections come back
+  // empty rather than absent, because they are computed from analytics a league
+  // never writes and an empty list is the honest version of "no such thing here".
+  if (pool.league_season_id) {
+    const { readLeagueLeaderboard } = await import('@/lib/league/leaderboard')
+    const { leaderboard, error } = await readLeagueLeaderboard(adminClient, pool_id, {
+      league_season_id: pool.league_season_id as string,
+      league_mode: (pool.league_mode as string | null) ?? null,
+    })
+    // Surfaced, never swallowed. Returning 200 with an empty list here would
+    // render as "nobody has scored" — the discarded-PostgREST-error shape this
+    // codebase has paid for repeatedly.
+    if (error || !leaderboard) {
+      return NextResponse.json({ error: error ?? 'league leaderboard unavailable' }, { status: 502 })
+    }
+    return NextResponse.json({
+      pool_id,
+      prediction_mode: pool.prediction_mode,
+      league: { mode: leaderboard.mode, is_final: leaderboard.is_final },
+      entries: leaderboard.rows,
+      awards: [],
+      superlatives: [],
+      matchday_mvp: null,
+      matchday_info: null,
+    })
+  }
 
   // 4. Fetch all needed data in parallel
   const [

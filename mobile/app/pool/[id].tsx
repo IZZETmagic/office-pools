@@ -300,7 +300,16 @@ export default function PoolDetailScreen() {
     );
   }
 
-  const { pool, leaderboard, awards, superlatives, matchdayMvp, matchdayInfo } = data;
+  const {
+    pool,
+    leaderboard,
+    league,
+    leagueLeaderboard,
+    awards,
+    superlatives,
+    matchdayMvp,
+    matchdayInfo,
+  } = data;
 
   function handleTabTap(next: PoolTabKey) {
     setTab(next);
@@ -329,6 +338,8 @@ export default function PoolDetailScreen() {
             superlatives={superlatives}
             matchdayMvp={matchdayMvp}
             matchdayInfo={matchdayInfo}
+            league={league}
+            leagueEntries={leagueLeaderboard}
           />
         );
       case 'predictions': {

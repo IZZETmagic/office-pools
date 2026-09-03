@@ -4,6 +4,8 @@ import { useAuth } from './auth';
 import {
   fetchLeaderboard,
   type LeaderboardEntry,
+  type LeagueLeaderboardEntry,
+  type LeagueLeaderboardMeta,
   type MatchdayInfo,
   type MatchdayMvp,
   type PoolAward,
@@ -57,12 +59,36 @@ export type PoolDetailInfo = {
 
 export type PoolDetailData = {
   pool: PoolDetailInfo;
+  /**
+   * World Cup rows. EMPTY for a league pool — its rows are in
+   * `leagueLeaderboard` instead, because they carry a different set of facts and
+   * folding them together would mean a nullable hole in every World Cup field.
+   */
   leaderboard: LeaderboardEntry[];
+  /** Non-null for a league pool; the mode and whether the season is settled. */
+  league: LeagueLeaderboardMeta | null;
+  /** League rows. Null for a World Cup pool. */
+  leagueLeaderboard: LeagueLeaderboardEntry[] | null;
   awards: PoolAward[];
   superlatives: Superlative[];
   matchdayMvp: MatchdayMvp | null;
   matchdayInfo: MatchdayInfo | null;
 };
+
+/**
+ * The route's own ordering, restated so a live merge lands rows where a refresh
+ * would put them. Rank first because it carries the engine's tiebreaks; points
+ * only as the fallback for a pool nothing has scored yet.
+ */
+function byRankThenPoints(
+  a: { current_rank: number | null; total_points: number },
+  b: { current_rank: number | null; total_points: number },
+) {
+  if (a.current_rank != null && b.current_rank != null && a.current_rank !== b.current_rank) {
+    return a.current_rank - b.current_rank;
+  }
+  return b.total_points - a.total_points;
+}
 
 export function usePoolDetail(poolId: string | undefined) {
   const { user } = useAuth();
@@ -180,7 +206,15 @@ export function usePoolDetail(poolId: string | undefined) {
             entryFeeCurrency: poolRow.entry_fee_currency,
             totalEntries: entryCount ?? 0,
           },
-          leaderboard: lb.entries ?? [],
+          // ⚠ THE ONE PLACE THE UNION IS NARROWED. `/leaderboard` returns either
+          // shape in `entries`, and `league` being non-null is the route's own
+          // signal of which. Doing it here rather than in each component means a
+          // single cast, next to the field that justifies it.
+          leaderboard: lb.league ? [] : ((lb.entries ?? []) as LeaderboardEntry[]),
+          league: lb.league ?? null,
+          leagueLeaderboard: lb.league
+            ? ((lb.entries ?? []) as LeagueLeaderboardEntry[])
+            : null,
           awards: lb.awards ?? [],
           superlatives: lb.superlatives ?? [],
           matchdayMvp: lb.matchday_mvp ?? null,
@@ -262,6 +296,42 @@ export function usePoolDetail(poolId: string | undefined) {
         const byEntry = new Map(entries.map((e) => [e.entry_id, e]));
         setData((prev) => {
           if (!prev) return prev;
+
+          // ⚠ THE SAME TRIGGER SERVES BOTH. `broadcast_pool_leaderboard` is
+          // attached to `shadow_entry_totals` AND to `league_entry_totals`, and
+          // the payload names its fields after the World Cup's — `current_rank`
+          // is a league's `final_rank`, `previous_rank` its
+          // `previous_final_rank`. So a league pool is already live; it just had
+          // no rows to apply the message to, because `leaderboard` is empty for
+          // one and the league rows sit in their own array.
+          //
+          // ⚠ Only the THREE shared numbers are merged into a league row. The
+          // payload also carries `match_points` and `bonus_points`, which a
+          // league row does not have and must not acquire by being spread into —
+          // that is how "0 + 840 bonus" got onto a screen in the first place.
+          if (prev.leagueLeaderboard) {
+            let leagueChanged = false;
+            const mergedLeague = prev.leagueLeaderboard.map((row) => {
+              const update = byEntry.get(row.entry_id);
+              if (!update) return row;
+              const total = update.total_points ?? row.total_points;
+              const rank = update.current_rank ?? row.current_rank;
+              const prevRank = update.previous_rank ?? row.previous_rank;
+              if (
+                total === row.total_points &&
+                rank === row.current_rank &&
+                prevRank === row.previous_rank
+              ) {
+                return row;
+              }
+              leagueChanged = true;
+              return { ...row, total_points: total, current_rank: rank, previous_rank: prevRank };
+            });
+            if (!leagueChanged) return prev;
+            mergedLeague.sort(byRankThenPoints);
+            return { ...prev, leagueLeaderboard: mergedLeague };
+          }
+
           let changed = false;
           const merged = prev.leaderboard.map((row) => {
             const update = byEntry.get(row.entry_id);
@@ -282,12 +352,7 @@ export function usePoolDetail(poolId: string | undefined) {
           // The route returns rows already sorted by rank, and a score change
           // reorders them — re-sort so the table matches what a refresh would
           // show rather than leaving rows in their pre-goal positions.
-          merged.sort((a, b) => {
-            if (a.current_rank != null && b.current_rank != null && a.current_rank !== b.current_rank) {
-              return a.current_rank - b.current_rank;
-            }
-            return b.total_points - a.total_points;
-          });
+          merged.sort(byRankThenPoints);
           return { ...prev, leaderboard: merged };
         });
 

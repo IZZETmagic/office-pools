@@ -110,7 +110,8 @@ export function fetchEntryPredictionsView(poolId: string, entryId: string) {
   );
 }
 
-export type LeaderboardEntry = {
+/** Who a row belongs to and what it scored — true of every pool type. */
+export type LeaderboardEntryCore = {
   entry_id: string;
   entry_name: string;
   entry_number: number;
@@ -118,12 +119,39 @@ export type LeaderboardEntry = {
   user_id: string;
   full_name: string;
   username: string;
-  match_points: number;
-  bonus_points: number;
-  point_adjustment: number;
   total_points: number;
   current_rank: number | null;
   previous_rank: number | null;
+};
+
+/**
+ * A league row. The World Cup extras below are ABSENT, not zero — nothing in the
+ * league engine writes form, hit rate, XP or a base/bonus split, and a zero on
+ * screen is a claim rather than a blank. Keeping them off the type is what makes
+ * a component that reaches for one fail to compile.
+ */
+export type LeagueLeaderboardEntry = LeaderboardEntryCore & {
+  /** Table mode: did they file an ordering before the deadline? */
+  has_filed: boolean;
+  /** Table mode: who they backed to win it, and where that club sits today. */
+  champion: {
+    club_name: string;
+    crest_url: string | null;
+    actual_rank: number | null;
+  } | null;
+};
+
+/** Present only for a league pool; `null` means render the World Cup shape. */
+export type LeagueLeaderboardMeta = {
+  mode: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null;
+  /** False until the season-end snapshot exists — every total is provisional. */
+  is_final: boolean;
+};
+
+export type LeaderboardEntry = LeaderboardEntryCore & {
+  match_points: number;
+  bonus_points: number;
+  point_adjustment: number;
   has_submitted_predictions: boolean;
   last_five: Array<'exact' | 'winner_gd' | 'winner' | 'miss' | 'no_pick'>;
   current_streak: { type: 'hot' | 'cold' | 'none'; length: number };
@@ -171,7 +199,13 @@ export type MatchdayInfo = {
 export type LeaderboardResponse = {
   pool_id: string;
   prediction_mode: string;
-  entries: LeaderboardEntry[];
+  /**
+   * Non-null for a league pool, and the signal that `entries` carries
+   * `LeagueLeaderboardEntry` rows instead. The route guarantees the pairing;
+   * `usePoolDetail` is the one place that narrows on it.
+   */
+  league: LeagueLeaderboardMeta | null;
+  entries: LeaderboardEntry[] | LeagueLeaderboardEntry[];
   awards: PoolAward[];
   superlatives: Superlative[];
   matchday_mvp: MatchdayMvp | null;
