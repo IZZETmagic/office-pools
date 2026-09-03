@@ -543,38 +543,92 @@ function FixtureRow({
           disabled={!canEdit}
         />
       ) : (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-          <Club team={home} align="left" />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <TapScoreField value={score.home} onChange={(v) => onScore('home', v)} disabled={!canEdit} />
-            <Text variant="detail" color="slate">
-              –
-            </Text>
-            <TapScoreField value={score.away} onChange={(v) => onScore('away', v)} disabled={!canEdit} />
-          </View>
-          <Club team={away} align="right" />
+        /*
+          ⚠ NAMES OUTBOARD, CRESTS INBOARD — the order Ryan specified, and it
+          reads better than the mirror: each crest sits against the number it
+          belongs to, so which box is whose needs no working out.
+          `name · crest · [ ] · [ ] · crest · name`
+
+          ⚠ NO "–" between the boxes. It separated two numbers that the two
+          crests now separate more clearly, and the row has no width to spare.
+
+          The budget, measured at 375pt: 319 after screen and card padding, less
+          84 for the two score fields, 52 for the crests and 20 of gaps, leaves
+          ~81 a name. "Bournemouth" is the longest club name across the three
+          live seasons that CANNOT wrap — one word, 11 characters — and needs
+          about 75 at this size. Everything longer ("Crystal Palace", "Nott'm
+          Forest") breaks across two lines instead.
+        */
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Club team={home} side="home" />
+          <TapScoreField
+            value={score.home}
+            onChange={(v) => onScore('home', v)}
+            disabled={!canEdit}
+            width={42}
+          />
+          <TapScoreField
+            value={score.away}
+            onChange={(v) => onScore('away', v)}
+            disabled={!canEdit}
+            width={42}
+          />
+          <Club team={away} side="away" />
         </View>
       )}
     </View>
   );
 }
 
-function Club({ team, align }: { team: LeagueMatch['home_team']; align: 'left' | 'right' }) {
+/**
+ * A club beside its score box: the name on the outside, the crest against the
+ * number.
+ *
+ * ⚠ THE SHORT NAME, not the full one and not the three-letter code. Ryan,
+ * 2026-09-03: *"it doesn't have to be the three-letter acronym — it could be
+ * Man United, Man City."* Those forms are exactly what `shortClubName` already
+ * produces, and the contract carries them in `short_name`; the code is right
+ * for the Results control, where three buttons share a row, and wrong here.
+ *
+ * ⚠ `country_name` is the FULL name and the fallback — the World Cup field
+ * names again (`lib/league/read.ts`). Every fixture in the three live seasons
+ * carries a `short_name`, so the fallback should never fire.
+ *
+ * ⚠ TWO LINES ALLOWED. "Crystal Palace" and "Nott'm Forest" do not fit a
+ * ~81pt column on one line at this size, and truncating them is the failure
+ * the Results control avoids by using a code. Here there is room to wrap, so
+ * they wrap; only a single long word can still truncate, and the longest that
+ * exists is "Bournemouth", which fits.
+ */
+function Club({ team, side }: { team: LeagueMatch['home_team']; side: 'home' | 'away' }) {
   const theme = useTheme();
+  const label = team?.short_name?.trim() || team?.country_name || 'TBD';
   return (
     <View
       style={{
         flex: 1,
-        flexDirection: align === 'left' ? 'row' : 'row-reverse',
+        // Home reads name-then-crest, away crest-then-name.
+        flexDirection: side === 'home' ? 'row-reverse' : 'row',
         alignItems: 'center',
+        justifyContent: 'flex-end',
         gap: 6,
       }}
     >
       {team?.flag_url ? (
-        <Image source={{ uri: team.flag_url }} style={{ width: 20, height: 20 }} resizeMode="contain" />
+        <Image source={{ uri: team.flag_url }} style={{ width: 26, height: 26 }} resizeMode="contain" />
       ) : null}
-      <Text variant="detail" numberOfLines={1} style={{ flexShrink: 1, color: theme.colors.ink }}>
-        {team?.country_name ?? 'TBD'}
+      <Text
+        variant="body"
+        numberOfLines={2}
+        style={{
+          flexShrink: 1,
+          fontSize: 13,
+          lineHeight: 16,
+          color: theme.colors.ink,
+          textAlign: side === 'home' ? 'right' : 'left',
+        }}
+      >
+        {label}
       </Text>
     </View>
   );

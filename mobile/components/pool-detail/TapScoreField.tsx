@@ -8,9 +8,18 @@ type Props = {
   value: number | null;
   onChange: (next: number) => void;
   disabled?: boolean;
+  /**
+   * Narrower than the World Cup's 48 where the row has more to carry.
+   *
+   * ⚠ Optional with the original default, so no World Cup screen moves. The
+   * league's Scores card puts a club name AND a crest either side of these two
+   * fields, and "Bournemouth" — the longest club name that cannot wrap, at 11
+   * characters — needs the six points this gives back.
+   */
+  width?: number;
 };
 
-export function TapScoreField({ value, onChange, disabled }: Props) {
+export function TapScoreField({ value, onChange, disabled, width = 48 }: Props) {
   const theme = useTheme();
   const filled = value !== null;
   const pulse = useRef(new Animated.Value(0.4)).current;
@@ -70,7 +79,7 @@ export function TapScoreField({ value, onChange, disabled }: Props) {
       disabled={disabled}
       delayLongPress={400}
       style={({ pressed }) => ({
-        width: 48,
+        width,
         height: 44,
         borderRadius: 10,
         backgroundColor: filled
