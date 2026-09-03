@@ -130,25 +130,31 @@ export function LeagueTablesView({ tables, initialSeasonId = null }: Props) {
 /**
  * ⚠ ONE SOURCE FOR THE COLUMN WIDTHS. The header and the rows are separate
  * components with no shared layout, so a width changed in one and not the other
- * silently un-aligns the whole table — and at these sizes a 2px drift is
- * visible down twenty rows.
+ * silently un-aligns the whole table — and a 2px drift is visible down twenty
+ * rows.
  *
- * Nine columns on a 375pt phone is genuinely tight. The numbers are 11px mono
- * and the club leans on `short_name` (resolved server-side by the same helper
- * the web uses) to keep the flexible column readable rather than truncating
- * into "Manchester Unit…".
+ * Budgeted for a 375pt phone: 343 after the screen's own padding, 320 inside
+ * the card. Rank 22 + crest 26 + these 177 leaves ~95 for the club, which is
+ * what the longest shortened name needs — "Nott'm Forest", 13 characters at
+ * 13px. Anything longer than that does not exist: `shortClubName` turns
+ * "Borussia Mönchengladbach" into "Gladbach" and "Wolverhampton Wanderers"
+ * into "Wolves".
  */
 const COL = {
-  rank: 20,
-  pl: 20,
-  w: 18,
-  d: 18,
-  l: 18,
-  /** Goals for:against — "45:23" is five characters. */
-  ga: 36,
+  rank: 22,
+  pl: 22,
+  w: 20,
+  d: 20,
+  l: 20,
+  /** Goals for and against — "45-23" is the widest this gets. */
+  ga: 40,
   gd: 26,
-  pts: 28,
+  pts: 29,
 } as const;
+
+/** Both rows read from this, so a header can never sit off its own column. */
+const ROW_PAD_LEFT = 8;
+const ROW_PAD_RIGHT = 12;
 
 function HeaderRow() {
   const theme = useTheme();
@@ -157,15 +163,15 @@ function HeaderRow() {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingLeft: theme.spacing.sm,
-        paddingRight: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
+        paddingLeft: ROW_PAD_LEFT,
+        paddingRight: ROW_PAD_RIGHT,
+        paddingVertical: 10,
         backgroundColor: theme.colors.mist,
       }}
     >
       <View style={{ width: COL.rank }} />
-      <View style={{ flex: 1 }}>
-        <Text variant="caption" color="slate">Club</Text>
+      <View style={{ flex: 1, paddingLeft: 26 }}>
+        <Head align="left">Club</Head>
       </View>
       <Head width={COL.pl}>PL</Head>
       <Head width={COL.w}>W</Head>
@@ -178,10 +184,32 @@ function HeaderRow() {
   );
 }
 
-function Head({ children, width }: { children: string; width: number }) {
+/**
+ * ⚠ NOT `Text variant="caption"`. That carries `letterSpacing: 1.5`, which adds
+ * 4.5px to "PTS" — enough to push a centred header off the column it labels.
+ */
+function Head({
+  children,
+  width,
+  align = 'center',
+}: {
+  children: string;
+  width?: number;
+  align?: 'left' | 'center';
+}) {
+  const theme = useTheme();
   return (
-    <View style={{ width, alignItems: 'flex-end' }}>
-      <Text variant="caption" color="slate">{children}</Text>
+    <View style={{ width, alignItems: align === 'left' ? 'flex-start' : 'center' }}>
+      <RNText
+        style={{
+          fontFamily: fontFamilies.bold,
+          fontSize: 11,
+          letterSpacing: 0.4,
+          color: theme.colors.slate,
+        }}
+      >
+        {children}
+      </RNText>
     </View>
   );
 }
@@ -193,9 +221,9 @@ function ClubRow({ row }: { row: LeagueStandingRow }) {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingLeft: theme.spacing.sm,
-        paddingRight: theme.spacing.md,
-        paddingVertical: theme.spacing.sm + 1,
+        paddingLeft: ROW_PAD_LEFT,
+        paddingRight: ROW_PAD_RIGHT,
+        paddingVertical: theme.spacing.md,
         borderTopWidth: 1,
         borderTopColor: theme.colors.mist,
         // The stripe belongs to the PLACE, not the club standing in it.
@@ -207,7 +235,7 @@ function ClubRow({ row }: { row: LeagueStandingRow }) {
         <RNText
           style={{
             fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: '700',
             color: theme.colors.slate,
           }}
@@ -216,18 +244,26 @@ function ClubRow({ row }: { row: LeagueStandingRow }) {
         </RNText>
       </View>
 
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, paddingRight: 4 }}>
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 4 }}>
         {row.crest_url ? (
-          <Image source={{ uri: row.crest_url }} style={{ width: 16, height: 16 }} resizeMode="contain" />
+          <Image source={{ uri: row.crest_url }} style={{ width: 20, height: 20 }} resizeMode="contain" />
         ) : (
-          <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: theme.colors.mist }} />
+          <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.mist }} />
         )}
         {/* `short_name`, resolved server-side by the same helper the web uses.
             Truncating the full name would eat the half that tells two clubs
             apart — "Manchester Unit…" beside "Manchester Cit…". */}
-        <Text variant="detail" numberOfLines={1} style={{ flexShrink: 1, color: theme.colors.ink }}>
+        <RNText
+          numberOfLines={1}
+          style={{
+            fontFamily: fontFamilies.semibold,
+            fontSize: 13,
+            color: theme.colors.ink,
+            flexShrink: 1,
+          }}
+        >
           {row.short_name}
-        </Text>
+        </RNText>
       </View>
 
       <Num width={COL.pl} muted>{row.played}</Num>
@@ -237,7 +273,7 @@ function ClubRow({ row }: { row: LeagueStandingRow }) {
       {/* Goals for and against — the PAIR, not the difference. GD is its own
           column, and printing the same number twice would spend width this
           table has none of. */}
-      <Num width={COL.ga} muted>{`${row.goals_for}:${row.goals_against}`}</Num>
+      <Num width={COL.ga} muted>{`${row.goals_for}-${row.goals_against}`}</Num>
       <Num width={COL.gd} muted>
         {row.goals_diff > 0 ? `+${row.goals_diff}` : String(row.goals_diff)}
       </Num>
@@ -259,11 +295,11 @@ function Num({
 }) {
   const theme = useTheme();
   return (
-    <View style={{ width, alignItems: 'flex-end' }}>
+    <View style={{ width, alignItems: 'center' }}>
       <RNText
         style={{
           fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 11,
+          fontSize: bold ? 13 : 12,
           fontWeight: bold ? '900' : '600',
           color: muted ? theme.colors.slate : theme.colors.ink,
         }}
