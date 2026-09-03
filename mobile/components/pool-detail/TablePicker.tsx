@@ -10,7 +10,7 @@ import {
 
 import { Icon, Text } from '@/components/ui';
 import { saveTablePrediction, type SeasonClub, type TableSettings } from '@/lib/api';
-import { fontFamilies, useTheme } from '@/theme';
+import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
 // TWENTY CLUBS, ONE ORDER — the pre-deadline half of table mode
@@ -243,23 +243,25 @@ function PickerRow({
   disabled: boolean;
 }) {
   const theme = useTheme();
-  // The library's own hook, and it only works inside a list item. Long press is
-  // the documented trigger — the whole row, so the target is the size of the
-  // thing being moved rather than a 34px grip.
+  // The library's own hook — it only works inside a list item, which is why
+  // this is a component rather than an inline renderItem. It is handed to the
+  // GRIP below, not to the row.
   const drag = useReorderableDrag();
   const band = bandOf(position, settings, clubCount);
 
   return (
-    <Pressable
-      onLongPress={disabled ? undefined : drag}
-      // ⚠ The lock is enforced by simply never starting a drag. There is no
-      // "disabled" prop on the list to reach for, and there should not be: the
-      // real gate is a database trigger, and this is only stopping the member
-      // from arranging something that will not save.
-      delayLongPress={180}
-      accessibilityRole="button"
-      accessibilityLabel={`${club.club_name}, position ${position}. Long press to move.`}
-      style={({ pressed }) => ({
+    // ⚠ THE ROW IS NOT THE DRAG TRIGGER — the grip is.
+    //
+    // With the whole row long-pressable, a finger that pauses even slightly
+    // while starting a scroll picks a club up and flings it somewhere else. The
+    // list is the thing you scroll and the grip is the thing you grab, and they
+    // have to be different targets or scrolling twenty clubs is a minefield.
+    //
+    // (`BracketPickerWizard` long-presses the whole row, but its groups are four
+    // rows and never scroll — the conflict cannot arise there.)
+    <View
+      accessibilityLabel={`${club.club_name}, position ${position}`}
+      style={{
         flexDirection: 'row',
         alignItems: 'center',
         gap: theme.spacing.sm,
@@ -276,9 +278,9 @@ function PickerRow({
         // this row would earn, which is the point of showing it while picking.
         borderLeftWidth: 3,
         borderLeftColor: band ? bandColor(band, theme) : 'transparent',
-        opacity: disabled ? 0.5 : pressed ? 0.9 : 1,
+        opacity: disabled ? 0.5 : 1,
         ...theme.shadows.card,
-      })}
+      }}
     >
       <View style={{ width: 24, alignItems: 'center' }}>
         <RNText
@@ -311,10 +313,34 @@ function PickerRow({
         {club.club_name}
       </RNText>
 
-      {/* Not a handle — the whole row is. It is here so the row LOOKS movable,
-          which a list of twenty otherwise does not. */}
-      <Icon name="line.3.horizontal" color="silver" size={15} />
-    </Pressable>
+      {/*
+        THE HANDLE. Long press rather than press, and that delay IS the
+        protection Ryan asked for: a flick that grazes this icon is over in well
+        under 200ms, so it scrolls; a deliberate hold picks the club up.
+
+        `hitSlop` widens the target beyond the 34px box without widening the
+        area that steals a scroll, because hitSlop only extends the touch
+        region, not the visual one.
+      */}
+      <Pressable
+        onLongPress={disabled ? undefined : drag}
+        delayLongPress={220}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={`Move ${club.club_name}. Currently ${position}.`}
+        hitSlop={{ top: 8, bottom: 8, left: 10, right: 10 }}
+        style={({ pressed }) => ({
+          width: 38,
+          height: 38,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: theme.radii.pill,
+          backgroundColor: pressed ? withOpacity(theme.colors.primary, 0.15) : 'transparent',
+        })}
+      >
+        <Icon name="line.3.horizontal" color={disabled ? 'silver' : 'slate'} size={17} />
+      </Pressable>
+    </View>
   );
 }
 

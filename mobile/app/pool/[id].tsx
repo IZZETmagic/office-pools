@@ -503,7 +503,13 @@ export default function PoolDetailScreen() {
           // recover.
           if (key === 'predictions' && showsTablePicker) {
             return (
-              <View key={key} style={{ width, flex: 1 }}>
+              // ⚠ `width` ALONE — NOT `flex: 1`. This sits in a HORIZONTAL
+              // ScrollView, where flex is a MAIN-AXIS instruction: `flex: 1`
+              // sets `flexBasis: 0%` and grows the page sideways, fighting the
+              // `width` that makes it one page. Height comes free from the row
+              // container's default `alignItems: 'stretch'`, which is how every
+              // other page has always been full height.
+              <View key={key} style={{ width }}>
                 {renderTab(key)}
               </View>
             );
