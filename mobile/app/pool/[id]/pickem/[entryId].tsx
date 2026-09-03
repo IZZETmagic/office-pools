@@ -549,15 +549,16 @@ function FixtureRow({
           belongs to, so which box is whose needs no working out.
           `name · crest · [ ] · [ ] · crest · name`
 
-          ⚠ NO "–" between the boxes. It separated two numbers that the two
-          crests now separate more clearly, and the row has no width to spare.
-
           The budget, measured at 375pt: 319 after screen and card padding, less
-          84 for the two score fields, 52 for the crests and 20 of gaps, leaves
-          ~81 a name. "Bournemouth" is the longest club name across the three
-          live seasons that CANNOT wrap — one word, 11 characters — and needs
-          about 75 at this size. Everything longer ("Crystal Palace", "Nott'm
-          Forest") breaks across two lines instead.
+          80 for the two score fields, 52 for the crests, 26 of gaps and the
+          dash itself leaves ~76 a name.
+
+          ⚠ THAT IS MARGINAL, and it is handled rather than hoped. "Bournemouth"
+          is the longest club name across the three live seasons that CANNOT
+          wrap — one word, 11 characters — and it wants 72-79 at this size. So
+          the name is allowed to SHRINK a little rather than truncate; see
+          `Club`. Everything longer ("Crystal Palace", "Nott'm Forest") is more
+          than one word and breaks across two lines instead.
         */
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Club team={home} side="home" />
@@ -565,13 +566,20 @@ function FixtureRow({
             value={score.home}
             onChange={(v) => onScore('home', v)}
             disabled={!canEdit}
-            width={42}
+            width={40}
           />
+          {/* ⚠ Back by request. It reads as a scoreline rather than as two
+              unrelated boxes — the thing the crests either side do not quite
+              say on their own. Its cost is real (about 7pt plus a gap) and is
+              paid for out of the score fields, not out of the names. */}
+          <Text variant="detail" color="slate">
+            –
+          </Text>
           <TapScoreField
             value={score.away}
             onChange={(v) => onScore('away', v)}
             disabled={!canEdit}
-            width={42}
+            width={40}
           />
           <Club team={away} side="away" />
         </View>
@@ -617,9 +625,19 @@ function Club({ team, side }: { team: LeagueMatch['home_team']; side: 'home' | '
       {team?.flag_url ? (
         <Image source={{ uri: team.flag_url }} style={{ width: 26, height: 26 }} resizeMode="contain" />
       ) : null}
+      {/*
+        ⚠ SHRINKS BEFORE IT TRUNCATES. With the dash restored a name gets ~76pt
+        and "Bournemouth" wants 72-79 — a coin toss on the real font. An
+        ellipsis is a failure a member has to decode ("Bournemou…"); 12pt
+        instead of 13 on one row of one card is not. `minimumFontScale` floors
+        it at 0.85 so nothing can shrink into illegibility, and the two-line
+        allowance still does the work for every multi-word name.
+      */}
       <Text
         variant="body"
         numberOfLines={2}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
         style={{
           flexShrink: 1,
           fontSize: 13,
