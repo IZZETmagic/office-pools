@@ -561,7 +561,7 @@ function FixtureRow({
           than one word and breaks across two lines instead.
         */
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <ClubName team={home} />
+          <ClubName team={home} side="home" />
           <Crest team={home} />
           {/*
             ⚠ THE SCORELINE IS ONE THING, so it is one box with its own tighter
@@ -591,7 +591,7 @@ function FixtureRow({
             />
           </View>
           <Crest team={away} />
-          <ClubName team={away} />
+          <ClubName team={away} side="away" />
         </View>
       )}
     </View>
@@ -638,12 +638,24 @@ function Crest({ team }: { team: LeagueMatch['home_team'] }) {
  * names again. Every fixture in the three live seasons carries a `short_name`,
  * so the fallback should never fire.
  *
- * ⚠ CENTRED, and the two slots are the only flexible things in the row. Equal
- * flex on both sides is what holds the scores in the middle; centring the text
- * inside them is what stops a short name like "Leeds" hanging off one edge
- * while a long one fills its slot.
+ * ⚠⚠ HOME IS RIGHT-ALIGNED, AWAY IS LEFT-ALIGNED — both toward their crest.
+ *
+ * This was CENTRED for one commit, on the reasoning that a short name like
+ * "Leeds" would otherwise hang off an edge. That was backwards. Centring is
+ * what made it hang: in a 66pt slot "Leeds" floated in the middle while
+ * "Bournemouth" filled it, so the gap between a name and its own crest changed
+ * on every row and nothing lined up down the list.
+ *
+ * Aligned toward the crest, the slot's inner edge is fixed — so every home
+ * name ENDS on the same x and every away name BEGINS on the same x, all the
+ * way down. Ryan, 2026-09-03: *"the last letter of the names matches all the
+ * way down… the first letter of all the teams matches."*
+ *
+ * ⚠ The two slots stay the only flexible things in the row. Equal flex is what
+ * holds the scoreline in the middle; the alignment only decides where the text
+ * sits inside a slot whose edges are already fixed.
  */
-function ClubName({ team }: { team: LeagueMatch['home_team'] }) {
+function ClubName({ team, side }: { team: LeagueMatch['home_team']; side: 'home' | 'away' }) {
   const theme = useTheme();
   const label = team?.short_name?.trim() || team?.country_name || 'TBD';
   return (
@@ -672,7 +684,9 @@ function ClubName({ team }: { team: LeagueMatch['home_team'] }) {
         fontSize: 12,
         lineHeight: 15,
         color: theme.colors.ink,
-        textAlign: 'center',
+        // Toward the crest: the home name ends against it, the away name
+        // starts against it. That inner edge is fixed, so the column lines up.
+        textAlign: side === 'home' ? 'right' : 'left',
       }}
     >
       {label}
