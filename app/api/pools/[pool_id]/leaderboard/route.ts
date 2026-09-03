@@ -367,6 +367,10 @@ async function handleGET(
   return NextResponse.json({
     pool_id,
     prediction_mode: pool.prediction_mode,
+    // Stated rather than omitted. `league` is what a client narrows the row
+    // shape on, and "absent" and "null" reading the same is the kind of
+    // agreement that holds until one of them changes.
+    league: null,
     entries: leaderboard,
     awards,
     superlatives,
