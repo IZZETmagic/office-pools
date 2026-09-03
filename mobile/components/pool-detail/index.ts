@@ -33,6 +33,7 @@ export { LeagueTableScoring } from './LeagueTableScoring';
 export { LeagueTableLeaderboard } from './LeagueTableLeaderboard';
 export { LmsLeaderboard } from './LmsLeaderboard';
 export { LmsEntriesTab } from './LmsEntriesTab';
+export { LmsScoring } from './LmsScoring';
 export { TableBreakdownList } from './TableBreakdownList';
 export { TableEntrySheet, type TableEntrySheetTarget } from './TableEntrySheet';
 export { MatchdayInfoBar } from './MatchdayInfoBar';

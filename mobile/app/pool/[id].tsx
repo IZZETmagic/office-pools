@@ -28,6 +28,7 @@ import {
   LeaderboardTab,
   LeagueTableEntriesTab,
   LmsEntriesTab,
+  LmsScoring,
   LeagueTableScoring,
   MembersTab,
   PoolDetailHeader,
@@ -79,6 +80,7 @@ const MemoPoolDetailHeader = memo(PoolDetailHeader);
 const MemoLeaderboardTab = memo(LeaderboardTab);
 const MemoLeagueTableEntriesTab = memo(LeagueTableEntriesTab);
 const MemoLmsEntriesTab = memo(LmsEntriesTab);
+const MemoLmsScoring = memo(LmsScoring);
 const MemoLeagueTableScoring = memo(LeagueTableScoring);
 const MemoPredictionsTab = memo(PredictionsTab);
 const MemoFormTab = memo(FormTab);
@@ -472,6 +474,24 @@ export default function PoolDetailScreen() {
         if (pool.leagueMode === 'table') {
           return <MemoLeagueTableScoring poolId={pool.poolId} entryId={ownLeagueEntryId} />;
         }
+        // ⚠ And Last Man Standing awards nothing at all — no points exist in the
+        // mode — so the World Cup tab's group bonuses and exact-scoreline prices
+        // were not merely unfinished, they were another game's rules.
+        if (pool.leagueMode === 'last_man_standing') {
+          return (
+            <MemoLmsScoring
+              state={lmsQuery.data ?? null}
+              loading={lmsQuery.isPending}
+              error={
+                lmsQuery.isError
+                  ? lmsQuery.error instanceof Error
+                    ? lmsQuery.error.message
+                    : 'The rules could not be loaded.'
+                  : null
+              }
+            />
+          );
+        }
         return (
           <MemoScoringTab
             poolId={pool.poolId}
@@ -479,7 +499,19 @@ export default function PoolDetailScreen() {
           />
         );
       case 'info':
-        return <MemoPoolInfoTab pool={pool} />;
+        return (
+          <MemoPoolInfoTab
+            pool={pool}
+            // ⚠ Without this the card reads the league SENTINEL — the season's
+            // last kickoff, 269 days out on the live pool — under an "Open"
+            // badge, while picking actually closes this week.
+            lms={
+              lmsQuery.data?.open_matchweek != null && lmsQuery.data.open_locks_at
+                ? { matchweek: lmsQuery.data.open_matchweek, locksAt: lmsQuery.data.open_locks_at }
+                : null
+            }
+          />
+        );
       case 'rounds':
         return <MemoRoundsTab poolId={pool.poolId} />;
       case 'members':

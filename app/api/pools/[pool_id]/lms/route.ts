@@ -229,6 +229,16 @@ export async function GET(
       : null,
     /** The week a pick can still be WRITTEN for. Never the one to narrate with. */
     open_matchweek: inRound(openWeek?.matchweek_number) ? openWeek!.matchweek_number : null,
+    /**
+     * When that week stops accepting picks.
+     *
+     * ⚠ `lock_at`, NOT `first_kickoff_at`. Migration 101 moved the deadline to an
+     * hour BEFORE the first kickoff and backfilled it — measured on production
+     * 2026-09-03: MW3 onward run a 60-minute gap, while MW1 and MW2 sit at zero
+     * because they had already locked when 101 ran and a passed deadline is
+     * never moved. Anything that says "it locks at kickoff" is an hour wrong.
+     */
+    open_locks_at: inRound(openWeek?.matchweek_number) ? (openWeek!.lock_at as string | null) : null,
     /** The week being PLAYED. Null between rounds — an answer, not a gap. */
     in_play_matchweek: inRound(inPlayWeek?.matchweek_number) ? inPlayWeek!.matchweek_number : null,
     matchweeks: columns,

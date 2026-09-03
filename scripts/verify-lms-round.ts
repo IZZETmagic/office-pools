@@ -168,6 +168,36 @@ async function main() {
       console.log('  no open matchweek in this round — the picker says so rather than showing a grid')
     }
 
+    // ---- the Info tab's deadline -------------------------------------------
+    // ⚠ The card used to print `prediction_deadline`, which on EVERY league pool
+    // is a sentinel holding the season's last kickoff. Measured 2026-09-03: 269
+    // days out, under an "Open" badge, while picking closed the next evening.
+    if (open && inRound(open.matchweek_number)) {
+      const { data: poolRow } = await admin
+        .from('pools')
+        .select('prediction_deadline')
+        .eq('pool_id', pool.pool_id)
+        .single()
+      const sentinel = poolRow?.prediction_deadline ? new Date(poolRow.prediction_deadline).getTime() : null
+      const lock = new Date(open.lock_at as string).getTime()
+      const kickoff = new Date(open.first_kickoff_at as string).getTime()
+
+      check(
+        sentinel !== null && lock < sentinel,
+        'the matchweek lock is nearer than the season sentinel',
+        sentinel !== null
+          ? `lock in ${Math.round((lock - now) / 86400000)}d vs sentinel in ${Math.round((sentinel - now) / 86400000)}d`
+          : 'no prediction_deadline',
+      )
+      // ⚠ `lock_at`, not `first_kickoff_at`. 101 moved the deadline an hour
+      // earlier and backfilled it; copy saying "locks at kickoff" is an hour out.
+      check(
+        lock <= kickoff,
+        'the lock is at or before the first kickoff, never after',
+        `${Math.round((kickoff - lock) / 60000)} min before`,
+      )
+    }
+
     // 4. ⚠⚠ The seal is the database's, so prove the database still has it.
     const { data: anonPicks, error: anonErr } = await anon
       .from('league_lms_picks')

@@ -1373,6 +1373,15 @@ export type LmsState = {
   round: { round_id: string; round_number: number; first_matchweek: number } | null;
   /** The week a pick can still be WRITTEN for. Never the one to narrate with. */
   open_matchweek: number | null;
+  /**
+   * When that week stops accepting picks.
+   *
+   * ⚠ An hour BEFORE the first kickoff, not at it. Migration 101 moved the
+   * deadline and backfilled it; copy that says "locks at kickoff" is an hour
+   * wrong. (MW1 and MW2 of this season sit at zero because they had already
+   * locked when 101 ran — a passed deadline is never moved.)
+   */
+  open_locks_at: string | null;
   /** The week being PLAYED. Null between rounds — an answer, not a gap. */
   in_play_matchweek: number | null;
   /** The wall's columns, ascending. Only weeks this round covers. */

@@ -51,9 +51,18 @@ const LEAGUE_MODE_LABEL: Record<string, string> = {
 
 type Props = {
   pool: PoolDetailInfo;
+  /**
+   * Last Man Standing's real deadline: the OPEN matchweek and when it locks.
+   *
+   * ⚠ Passed in rather than read here. `prediction_deadline` on a league pool is
+   * a SENTINEL holding the season's last kickoff — 269 days out on the live LMS
+   * pool — so without this the card says "Open" against a date most of a year
+   * away while picking closes tomorrow. Null for every other mode.
+   */
+  lms?: { matchweek: number; locksAt: string } | null;
 };
 
-export function PoolInfoTab({ pool }: Props) {
+export function PoolInfoTab({ pool, lms = null }: Props) {
   const theme = useTheme();
   const { refresh: refreshHomeData } = useHomeData();
 
@@ -126,7 +135,23 @@ export function PoolInfoTab({ pool }: Props) {
    * copy rather than a different column.
    */
   const tableLockAt = pool.leagueMode === 'table' ? pool.leagueTableLockAt : null;
-  const deadlineAt = tableLockAt ?? pool.predictionDeadline;
+  /**
+   * ⚠ LAST MAN STANDING LOCKS PER MATCHWEEK, and the sentinel was 269 DAYS OUT.
+   * Measured on production 2026-09-03: this pool's `prediction_deadline` read
+   * 30 May 2027 — the season's last kickoff — and the card said "Open" while the
+   * real next deadline was the following evening. Same bug the table pass fixed;
+   * it was fixed only for `leagueMode === 'table'`, and the comment above said so.
+   *
+   * ⚠ The value is the matchweek's `lock_at`, which migration 101 moved to an
+   * HOUR BEFORE the first kickoff. `first_kickoff_at` would be an hour late.
+   */
+  const lmsLockAt = lms?.locksAt ?? null;
+  const deadlineAt = tableLockAt ?? lmsLockAt ?? pool.predictionDeadline;
+  // A league pool whose deadline we cannot name honestly. Pick'em and Showdown
+  // also lock per matchweek and nothing here knows which week they are on, so
+  // the sentinel would still be showing — it is suppressed rather than printed.
+  const deadlineIsSentinel =
+    pool.isLeague && !tableLockAt && !lmsLockAt;
   const entryFee = pool.entryFee ?? 0;
   const currency = pool.entryFeeCurrency || 'USD';
   const showFeesCard = entryFee > 0;
@@ -166,9 +191,13 @@ export function PoolInfoTab({ pool }: Props) {
 
       {/* Deadlines */}
       <Card>
-        <Caption>{tableLockAt ? 'Table deadline' : 'Deadlines'}</Caption>
+        <Caption>
+          {tableLockAt ? 'Table deadline' : lmsLockAt ? `Matchweek ${lms?.matchweek} deadline` : 'Deadlines'}
+        </Caption>
         <RNText style={{ fontFamily: fontFamilies.regular, fontSize: 11, color: theme.colors.slate }}>
-          When predictions lock
+          {lmsLockAt
+            ? 'Picks lock an hour before the first kickoff — then the next matchweek opens on its own'
+            : 'When predictions lock'}
         </RNText>
         {isProgressive && roundsData && roundsData.rounds.length > 0 ? (
           <View style={{ marginTop: theme.spacing.sm, gap: theme.spacing.xs }}>
@@ -204,6 +233,22 @@ export function PoolInfoTab({ pool }: Props) {
               </View>
             ))}
           </View>
+        ) : deadlineIsSentinel ? (
+          // ⚠ SAY NOTHING RATHER THAN SAY THE SENTINEL. Pick'em and Showdown
+          // lock per matchweek too, and nothing on this card knows which week
+          // they are on — so printing `prediction_deadline` would put the
+          // season's last kickoff on screen under an "Open" badge, which is the
+          // exact defect this branch exists to stop.
+          <RNText
+            style={{
+              fontFamily: fontFamilies.regular,
+              fontSize: 13,
+              color: theme.colors.slate,
+              marginTop: theme.spacing.sm,
+            }}
+          >
+            Picks lock per matchweek, an hour before its first kickoff.
+          </RNText>
         ) : deadlineAt ? (
           <View
             style={{
