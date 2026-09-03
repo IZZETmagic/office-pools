@@ -11,6 +11,7 @@ export {
   type GroupOption,
 } from './GroupPickerSheet';
 export { CompetitionHeader } from './CompetitionHeader';
+export { LeagueTablesView } from './LeagueTablesView';
 export {
   CompetitionPickerSheet,
   type CompetitionPickerSheetHandle,

@@ -89,6 +89,46 @@ const MATCH_SELECT = `
 const STALE_AFTER_MS = 30_000;
 
 /** The shape of `GET /api/users/:user_id/fixtures`. */
+/**
+ * One league table, as the competition has it.
+ *
+ * ⚠ EVERY FIELD IS ALREADY RESOLVED. The route orders the rows (clubs the feed
+ * leaves genuinely level go alphabetically, matching the official app), keeps
+ * each place's `rank` and band ON THE PLACE rather than letting them ride along
+ * with a club that moved, and classifies `band` with the phrases migration 113
+ * scores against. `league_standings` is world-readable so the phone COULD read
+ * it directly — and would then order the same season differently from the web.
+ */
+export type LeagueStandingRow = {
+  club_id: string;
+  club_name: string;
+  /** Shortened for a narrow column — "Man City", not "Manchester City". */
+  short_name: string;
+  crest_url: string | null;
+  rank: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goals_for: number;
+  goals_against: number;
+  goals_diff: number;
+  points: number;
+  /** Last five as the feed writes it, e.g. "WWDLW". Null before any football. */
+  form: string | null;
+  movement: 'up' | 'down' | 'same' | null;
+  band: 'champions' | 'europa' | 'conference' | 'relegation' | null;
+};
+
+/** A competition the member actually has football in, with its table. */
+export type LeagueSeasonTable = {
+  season_id: string;
+  competition: string | null;
+  competition_id: number | null;
+  standings: LeagueStandingRow[];
+  standings_fetched_at: string | null;
+};
+
 type LeagueFixturesResponse = {
   seasons: Array<{
     season_id: string;
@@ -97,6 +137,8 @@ type LeagueFixturesResponse = {
     competition_id: number | null;
     /** Already in the World Cup match shape — the route does the mapping. */
     matches: Record<string, unknown>[];
+    standings: LeagueStandingRow[];
+    standings_fetched_at: string | null;
   }>;
 };
 
@@ -301,6 +343,28 @@ export function useTournamentMatchesInternal() {
     [matches, leagueMatches],
   );
 
+  /**
+   * The member's competitions and their tables — same query, no second fetch.
+   *
+   * ⚠ Seasons with NO table are dropped. A season carries an empty `standings`
+   * until its first matches are played, and a competition pill leading to an
+   * empty screen is worse than no pill: the Results screen's existing rule is
+   * that a control is only offered when it has something to offer.
+   */
+  const leagueTables = useMemo<LeagueSeasonTable[]>(
+    () =>
+      (leagueQuery.data?.seasons ?? [])
+        .filter((s) => s.standings.length > 0)
+        .map((s) => ({
+          season_id: s.season_id,
+          competition: s.competition,
+          competition_id: s.competition_id ?? null,
+          standings: s.standings,
+          standings_fetched_at: s.standings_fetched_at ?? null,
+        })),
+    [leagueQuery.data],
+  );
+
   // ⚠ `refetch` ALONE IN THE DEPS, NOT `leagueQuery`. React Query returns a new
   // result object on every render, so depending on the whole thing would give
   // `refresh` a new identity each time — and these are handed to screens that
@@ -320,6 +384,10 @@ export function useTournamentMatchesInternal() {
 
   return {
     matches: allMatches,
+    // The tables, for Match Centre's Tables view. Empty for a World Cup-only
+    // member, which is what hides the toggle rather than showing them a
+    // control that leads nowhere.
+    leagueTables,
     // ⚠ `loading` IS THE WORLD CUP READ ONLY, AND MUST STAY THAT WAY. The splash
     // gate in `app/_layout.tsx` waits on it, so folding the league round trip in
     // here would put a network call on the COLD-START path — the thing the

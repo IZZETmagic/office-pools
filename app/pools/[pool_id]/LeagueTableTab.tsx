@@ -53,6 +53,10 @@ import { LocalTime } from '@/components/LocalTime'
 import type { NextFixture } from '@/lib/league/read'
 import { shortClubName } from '@/lib/league/clubName'
 import { orderStandings } from '@/lib/league/standingsOrder'
+// One owner, in a module the fixtures route can also reach — the phrases match
+// migration 113's SQL, so a second copy is a table shaded one way and scored
+// another. See lib/league/standingsBand.ts.
+import { bandOf } from '@/lib/league/standingsBand'
 
 export type LeagueStandingRow = {
   club_id: string
@@ -81,27 +85,6 @@ type Props = {
   nextByClub?: Map<string, NextFixture>
   /** When the feed was last read. Shown so nobody wonders if it is stale. */
   fetchedAt: string | null
-}
-
-/**
- * The feed's `description` is free text and varies by competition — "Promotion -
- * Champions League (League phase)", "Relegation", and so on. Matching on a
- * couple of keywords is deliberately loose: an unrecognised band simply gets no
- * stripe, which is a missing decoration rather than a wrong one.
- */
-function bandOf(description: string | null): 'champions' | 'europa' | 'conference' | 'relegation' | null {
-  if (!description) return null
-  const d = description.toLowerCase()
-  if (d.includes('relegation')) return 'relegation'
-  if (d.includes('champions league')) return 'champions'
-  // ⚠ CONFERENCE BEFORE EUROPA. The 2023/24 vintage of this feed reads
-  // "Promotion - Europa Conference League (Qualification: )", which contains
-  // both words; testing Conference first is what keeps it out of the Europa
-  // band. The phrases match migration 113's SQL exactly, so a row shaded as
-  // Europa here is a row the engine counts as Europa.
-  if (d.includes('conference league')) return 'conference'
-  if (d.includes('europa league')) return 'europa'
-  return null
 }
 
 /**

@@ -3,8 +3,51 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
-import { readLeagueSeasonMatches } from '@/lib/league/read'
+import { readLeagueSeasonMatches, readLeagueStandings } from '@/lib/league/read'
 import { getLeagueSeasonCached } from '@/lib/league/season'
+import { orderStandings } from '@/lib/league/standingsOrder'
+import { bandOf, type StandingsBand } from '@/lib/league/standingsBand'
+import { shortClubName } from '@/lib/league/clubName'
+
+/**
+ * A table row, shaped for rendering and nothing left to work out.
+ *
+ * ⚠ EVERY DERIVED FIELD IS RESOLVED HERE, and that is the point of sending it
+ * rather than letting the phone read `league_standings` directly — which RLS
+ * would allow, since the table is world-readable. Three rules would otherwise
+ * have to be reimplemented in `mobile/`, and each has already been got wrong
+ * once:
+ *
+ *   · `orderStandings` — clubs the feed leaves genuinely level are ordered
+ *     alphabetically, matching the official app. The web does this; a phone
+ *     reading the table raw would list the same season in a different order.
+ *   · the BAND STAYS WITH THE PLACE. `orderStandings` re-homes `rank` and
+ *     `description` onto the positions, because "18th is a relegation place" is
+ *     a fact about the place, not the club. Letting the band ride along with
+ *     the club is what drew the relegation bar on 17, 19 and 20 on 2026-08-28.
+ *   · `bandOf` matches migration 113's phrases exactly, so a row shaded Europa
+ *     is a row the engine counts as Europa.
+ */
+type StandingsRow = {
+  club_id: string
+  club_name: string
+  /** The shortened form, for a narrow phone column. */
+  short_name: string
+  crest_url: string | null
+  rank: number
+  played: number
+  won: number
+  drawn: number
+  lost: number
+  goals_for: number
+  goals_against: number
+  goals_diff: number
+  points: number
+  /** Last five, as the feed writes it — e.g. "WWDLW". Null before any football. */
+  form: string | null
+  movement: 'up' | 'down' | 'same' | null
+  band: StandingsBand | null
+}
 
 // =============================================================
 // /api/users/:user_id/fixtures — THE FOOTBALL, FOR A PHONE
@@ -157,6 +200,8 @@ async function handleGET(
     competition: string | null
     competition_id: number | null
     matches: unknown[]
+    standings: StandingsRow[]
+    standings_fetched_at: string | null
   }> = []
   for (const [seasonId, tournamentId] of tournamentBySeason) {
     let season
@@ -173,6 +218,23 @@ async function handleGET(
       return NextResponse.json({ error: `season ${seasonId}: ${shapeErr}` }, { status: 502 })
     }
 
+    // ⚠ NOT ON THE SEASON CACHE, deliberately. `getLeagueSeasonCached` holds
+    // clubs, matchweeks and 380 fixtures — things that change when the schedule
+    // does. A table changes when a match FINISHES, which is a different clock,
+    // and caching it beside the fixtures would serve yesterday's table through
+    // a result. Twenty rows a season is small enough to read every time.
+    const { rows: rawStandings, fetchedAt, error: standingsErr } = await readLeagueStandings(
+      admin,
+      seasonId,
+    )
+    // A season with no table yet is normal — it appears once the first matches
+    // are played — so an empty list is a valid answer. A FAILED read is not,
+    // and returning it as empty would render "the table isn't in yet" over a
+    // season in April.
+    if (standingsErr) {
+      return NextResponse.json({ error: `season ${seasonId}: ${standingsErr}` }, { status: 502 })
+    }
+
     seasons.push({
       season_id: seasonId,
       // The caption. Two crests with no wording cannot say which competition a
@@ -183,6 +245,29 @@ async function handleGET(
       // because the map lookup is — the column itself is `integer NOT NULL`.
       competition_id: leagueIdBySeason.get(seasonId) ?? null,
       matches,
+      // ⚠ ORDERED FIRST, THEN SHAPED. `orderStandings` moves clubs between
+      // places and carries each place's own `rank` and `description` with the
+      // POSITION; classifying the band before that would staple the old row's
+      // band to a club that has just moved.
+      standings: orderStandings(rawStandings).map((r) => ({
+        club_id: r.club_id,
+        club_name: r.club_name,
+        short_name: shortClubName(r.club_name),
+        crest_url: r.crest_url,
+        rank: r.rank,
+        played: r.played,
+        won: r.won,
+        drawn: r.drawn,
+        lost: r.lost,
+        goals_for: r.goals_for,
+        goals_against: r.goals_against,
+        goals_diff: r.goals_diff,
+        points: r.points,
+        form: r.form,
+        movement: r.movement,
+        band: bandOf(r.description),
+      })),
+      standings_fetched_at: fetchedAt,
     })
   }
 

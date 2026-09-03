@@ -9,12 +9,22 @@ import { createContext, useContext, type ReactNode } from 'react';
 
 import {
   useTournamentMatchesInternal,
+  type LeagueSeasonTable,
   type ResultsMatch,
 } from './useTournamentMatches';
 
 type TournamentMatchesValue = {
   /** World Cup matches and league fixtures, merged. See the hook's header. */
   matches: ResultsMatch[];
+  /**
+   * The member's competitions and their tables — from the SAME fetch as the
+   * fixtures, so Match Centre's Tables view costs no extra round trip.
+   *
+   * ⚠ Empty for a World Cup-only member and for a season whose first matches
+   * have not been played. That emptiness is load-bearing: it is what hides the
+   * Tables toggle rather than offering a control that leads to a blank screen.
+   */
+  leagueTables: LeagueSeasonTable[];
   /**
    * ⚠ THE WORLD CUP READ ONLY. The splash gate below waits on this, so the
    * league fetch is deliberately NOT folded in — that would put a network call

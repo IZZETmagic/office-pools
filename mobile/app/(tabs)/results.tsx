@@ -22,6 +22,7 @@ import {
 import {
   CompetitionHeader,
   CompetitionPickerSheet,
+  LeagueTablesView,
   type CompetitionPickerSheetHandle,
   type CompetitionOption,
   GroupPickerSheet,
@@ -60,7 +61,7 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export default function ResultsScreen() {
   const theme = useTheme();
-  const { matches, loading, leagueLoading, error, leagueError, refresh, refreshIfStale } =
+  const { matches, leagueTables, loading, leagueLoading, error, leagueError, refresh, refreshIfStale } =
     useTournamentMatches();
   // ⚠ BOTH SOURCES, or a league member is told the wrong thing. `loading` is the
   // World Cup read alone (the splash gate waits on it); without `leagueLoading`
@@ -79,6 +80,29 @@ export default function ResultsScreen() {
   const teamSheetRef = useRef<TeamPickerSheetHandle | null>(null);
   const groupSheetRef = useRef<GroupPickerSheetHandle | null>(null);
   const competitionSheetRef = useRef<CompetitionPickerSheetHandle | null>(null);
+
+  // Match Centre's two views. A table is a fact about the SEASON, so it lives
+  // here beside the football rather than inside each pool — thirteen Premier
+  // League pools would otherwise carry thirteen copies of one table.
+  const [view, setView] = useState<'matches' | 'tables'>('matches');
+
+  /**
+   * The header control, or null.
+   *
+   * ⚠ NOTHING TO SHOW, NO CONTROL. `leagueTables` is empty for a World Cup-only
+   * member — `league_standings` is league data and there is no World Cup table
+   * — and for a league season whose first matches have not been played. Either
+   * way the toggle would lead to a blank screen, so the "+" stays instead,
+   * which also keeps create-and-join in front of the people still joining.
+   *
+   * The label names WHERE THE TAP GOES. See PoolsHeader's `toggle`.
+   */
+  const headerToggle =
+    leagueTables.length === 0
+      ? null
+      : view === 'matches'
+        ? { label: 'Tables', icon: 'list.number', onPress: () => setView('tables') }
+        : { label: 'Matches', icon: 'sportscourt', onPress: () => setView('matches') };
   const scrollRef = useRef<ScrollView | null>(null);
   // Create / Join pool sheet refs — opened by the "+" button in the
   // header. Same pattern as the Home and Pools tabs so the user can
@@ -308,6 +332,7 @@ export default function ResultsScreen() {
           titleAccent="Centre"
           subtitle="Where predictions meet reality"
           onMenuPress={() => createJoinSheetRef.current?.open()}
+          toggle={headerToggle}
         />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={theme.colors.primary} />
@@ -327,6 +352,7 @@ export default function ResultsScreen() {
           titleAccent="Centre"
           subtitle="Where predictions meet reality"
           onMenuPress={() => createJoinSheetRef.current?.open()}
+          toggle={headerToggle}
         />
         <View
           style={{
@@ -360,7 +386,12 @@ export default function ResultsScreen() {
         titleAccent="Centre"
         subtitle="Where predictions meet reality"
         onMenuPress={() => createJoinSheetRef.current?.open()}
+        toggle={headerToggle}
       />
+      {view === 'tables' ? (
+        <LeagueTablesView tables={leagueTables} />
+      ) : (
+      <>
       <ResultsFilterBar
         mode={filterMode}
         selectedTeamName={selectedTeam?.name ?? null}
@@ -468,6 +499,8 @@ export default function ResultsScreen() {
           </>
         )}
       </ScrollView>
+      </>
+      )}
 
       <TeamPickerSheet
         ref={teamSheetRef}
