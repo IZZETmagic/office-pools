@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { lastLockedWeek } from '@/lib/pickemWeek';
 import { useLeaguePool } from '@/lib/useLeaguePool';
-import { useTheme, withOpacity } from '@/theme';
+import { useTheme } from '@/theme';
 
 // =============================================================
 // THE PREDICTIONS TAB FOR A PICK'EM POOL — a door, and nothing else
@@ -127,7 +127,6 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
             <EntryCard
               key={entry.entry_id}
               entry={entry}
-              isOwn
               openable
               onPress={() => open(entry)}
             />
@@ -146,16 +145,22 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
             <Text variant="cardTitle">Everyone&apos;s picks</Text>
             {!revealed ? <Icon name="lock.fill" color="slate" size={13} /> : null}
           </View>
-          <Text variant="detail" color="slate">
-            {revealed
-              ? "Read-only, and only as far as the last matchweek to lock. Nobody's open picks are visible — including yours."
-              : "Everyone's picks unlock as each matchweek closes. Until the first one does, the only picks you can see are your own — including if you run the pool."}
-          </Text>
+          {/* ⚠ ONLY when the rows are inert. Ryan removed the revealed-state
+              explainer on 2026-09-03 — once the cards open, the behaviour
+              explains itself and the sentence was restating the obvious.
+              This one survives because a greyed card with no reason reads as a
+              loading state rather than a rule, which is the note the survivor
+              picker also carries: greyed AND labelled, never just greyed. */}
+          {!revealed ? (
+            <Text variant="detail" color="slate">
+              Everyone&apos;s picks unlock as each matchweek closes. Until the first one does, the
+              only picks you can see are your own — including if you run the pool.
+            </Text>
+          ) : null}
           {others.map((entry) => (
             <EntryCard
               key={entry.entry_id}
               entry={entry}
-              isOwn={false}
               openable={revealed}
               onPress={revealed ? () => open(entry) : undefined}
             />
@@ -175,12 +180,10 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
  */
 function EntryCard({
   entry,
-  isOwn,
   openable,
   onPress,
 }: {
   entry: LeagueLeaderboardEntry;
-  isOwn: boolean;
   openable: boolean;
   onPress?: () => void;
 }) {
@@ -197,20 +200,13 @@ function EntryCard({
         gap: theme.spacing.md,
         padding: theme.spacing.md + 2,
         borderRadius: theme.radii.lg,
-        // Matches LeaderboardRow's current-user treatment exactly, including the
-        // pre-blended Android hexes — see the note there for why alpha over
-        // elevation reads as a double ring on Android.
-        backgroundColor: isOwn
-          ? Platform.OS === 'android'
-            ? '#E2E6FA'
-            : withOpacity(theme.colors.primary, 0.08)
-          : theme.colors.surface,
-        borderWidth: isOwn ? (Platform.OS === 'android' ? 2 : theme.borders.accent) : 0,
-        borderColor: isOwn
-          ? Platform.OS === 'android'
-            ? '#B1BDF1'
-            : withOpacity(theme.colors.primary, 0.25)
-          : 'transparent',
+        // ⚠ NO current-user tint, unlike `LeaderboardRow`. Ryan, 2026-09-03:
+        // *"it doesn't need to be blue or highlighted, it's already under that
+        // title."* He is right and the distinction is worth keeping straight —
+        // the leaderboard mixes everyone into one ranked list, so a highlight is
+        // the only thing that finds you in it. Here the heading above already
+        // separates yours from theirs, and tinting it says the same thing twice.
+        backgroundColor: theme.colors.surface,
         opacity: !openable ? 0.55 : pressed ? 0.85 : 1,
         ...theme.shadows.card,
       })}
