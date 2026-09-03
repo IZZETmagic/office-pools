@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { deleteEntry as deleteEntryAPI } from './api';
 import { useAuth } from './auth';
+import { leaseBroadcast } from './realtimeLease';
 import { supabase } from './supabase';
 
 export type PoolEntry = {
@@ -136,12 +137,20 @@ export function usePoolEntries(poolId: string | undefined) {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    // ⚠ `private: true` + `setAuth()` first. Without the JWT the channel's
-    // authorization policy never passes and no events arrive — SILENTLY. Same
-    // shape as `usePoolDetail`, and the reason that comment exists there.
-    const channel = supabase
-      .channel(`pool:${poolId}:leaderboard`, { config: { private: true } })
-      .on('broadcast', { event: 'leaderboard_update' }, () => {
+    // ⚠ LEASED — `channel.unsubscribe()` HERE USED TO END THE TOPIC FOR
+    // EVERYONE. `supabase.channel(topic)` hands back one shared object, and
+    // this hook is not the only holder of `pool:{id}:leaderboard`: so does
+    // `usePoolDetail`, and since 2026-09-03 so does the root match feed, which
+    // reads live fixture state off it for Home and Results. Closing a pool
+    // screen would have taken the live match cards down with it, silently,
+    // until the app was restarted. `realtimeLease.ts` records the measurement.
+    //
+    // The lease also handles `setAuth()`: without the JWT the topic's policy
+    // never passes and no events arrive at all.
+    const release = leaseBroadcast(
+      `pool:${poolId}:leaderboard`,
+      'leaderboard_update',
+      () => {
         // Debounced with jitter: one goal must not make every connected client
         // refetch in the same second. The payload carries the leaderboard, not
         // this hook's shape, so a refetch is still the honest way to get it.
@@ -149,16 +158,13 @@ export function usePoolEntries(poolId: string | undefined) {
         timer = setTimeout(() => {
           if (active) void loadRef.current('refresh');
         }, 1500 + Math.random() * 4000);
-      });
-
-    void Promise.resolve(supabase.realtime.setAuth()).then(() => {
-      if (active) channel.subscribe();
-    });
+      },
+    );
 
     return () => {
       active = false;
       if (timer) clearTimeout(timer);
-      void channel.unsubscribe();
+      release();
     };
   }, [poolId]);
 

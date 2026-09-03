@@ -11,6 +11,7 @@ import {
   type PoolAward,
   type Superlative,
 } from './api';
+import { leaseBroadcast } from './realtimeLease';
 import { supabase } from './supabase';
 
 export type PoolDetailInfo = {
@@ -315,9 +316,16 @@ export function usePoolDetail(poolId: string | undefined) {
     let active = true;
     let statsTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const channel = supabase
-      .channel(`pool:${poolId}:leaderboard`, { config: { private: true } })
-      .on('broadcast', { event: 'leaderboard_update' }, (msg) => {
+    // ⚠ LEASED, NOT SUBSCRIBED. `supabase.channel(topic)` returns one shared
+    // object per topic, so the `unsubscribe()` that used to be in this
+    // cleanup ended `pool:{id}:leaderboard` for every other holder — and
+    // since 2026-09-03 the root match feed is one, reading live fixture state
+    // off this same topic for Home and Results. The lease reference-counts
+    // holders and handles `setAuth()`; see `realtimeLease.ts`.
+    const release = leaseBroadcast(
+      `pool:${poolId}:leaderboard`,
+      'leaderboard_update',
+      (msg) => {
         const entries = (
           msg as { payload?: { entries?: Array<Partial<LeaderboardEntry> & { entry_id: string }> } }
         )?.payload?.entries;
@@ -402,20 +410,19 @@ export function usePoolDetail(poolId: string | undefined) {
 
         if (statsTimer) clearTimeout(statsTimer);
         statsTimer = setTimeout(() => {
-          void loadRef.current('refresh');
+          // ⚠ `active` GUARDS THE LATE ONE. It used to gate `subscribe()`; the
+          // lease owns that now, and this is the other thing it was for — a
+          // debounced refresh can still be in flight up to 5.5 s after the
+          // screen closes, and `usePoolEntries` has always guarded its own.
+          if (active) void loadRef.current('refresh');
         }, 1500 + Math.random() * 4000);
-      });
-
-    // Private channels need the socket to carry the user's JWT; setAuth() is
-    // async, so subscribe only after it resolves and only if still mounted.
-    void Promise.resolve(supabase.realtime.setAuth()).then(() => {
-      if (active) channel.subscribe();
-    });
+      },
+    );
 
     return () => {
       active = false;
       if (statsTimer) clearTimeout(statsTimer);
-      void channel.unsubscribe();
+      release();
     };
   }, [poolId]);
 
