@@ -202,9 +202,21 @@ function fixtureToMatch(
   tournamentId: string,
   clubById: Map<string, TeamData>,
 ): MatchData {
+  // ⚠ THIS PICKS FIELDS EXPLICITLY, SO ADDING ONE TO `TeamData` IS NOT ENOUGH.
+  // A field left out here is not a type error and not a runtime error — the
+  // client simply receives `undefined` and renders its fallback forever, which
+  // is the same positional-mapping failure the route header warns about. When
+  // you add to `clubToTeam`, add here too.
   const asEmbedded = (id: string) => {
     const c = clubById.get(id)
-    return c ? { country_name: c.country_name, country_code: c.country_code, flag_url: c.flag_url } : null
+    return c
+      ? {
+          country_name: c.country_name,
+          country_code: c.country_code,
+          flag_url: c.flag_url,
+          short_name: c.short_name ?? null,
+        }
+      : null
   }
   return {
     match_id: f.fixture_id,
