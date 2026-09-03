@@ -76,11 +76,6 @@ export function OutcomePicker({ value, onChange, home, away, disabled }: Props) 
         onSelect={() => onChange('home')}
       />
 
-      {/*
-        ⚠ FIXED AND NARROW, deliberately. Left to flex alongside the clubs it
-        grew into a third slab and the control read as three things of equal
-        weight — a draw is one outcome of three, but it is not a team.
-      */}
       <Pressable
         onPress={() => !disabled && onChange('draw')}
         disabled={disabled}
@@ -88,11 +83,20 @@ export function OutcomePicker({ value, onChange, home, away, disabled }: Props) 
         accessibilityState={{ selected: value === 'draw', disabled: Boolean(disabled) }}
         accessibilityLabel="Draw"
         style={{
-          width: 52,
+          // ⚠ Still fixed, just less cramped. It is one outcome of three but it
+          // is not a team, so it must not flex with the clubs — left to do that
+          // it becomes a third slab and the control reads as three things of
+          // equal weight. 64 is the width the web settled on for the same
+          // control at the same job.
+          width: 64,
           minHeight: 48,
           alignItems: 'center',
           justifyContent: 'center',
-          borderRadius: 10,
+          // ⚠ A TOKEN, not a number. This was a hardcoded 10 — a value that
+          // exists nowhere in `theme.radii` (6 / 12 / 18 / 24 / 32 / 999), so it
+          // matched nothing else on the screen and could not follow the system
+          // if it moved. `md` is the same corner the two club buttons take.
+          borderRadius: theme.radii.md,
           borderWidth: 1,
           backgroundColor:
             value === 'draw' ? withOpacity(theme.colors.primary, 0.15) : theme.colors.snow,
@@ -156,7 +160,9 @@ function ClubChoice({
         justifyContent: 'center',
         gap: 6,
         paddingHorizontal: 8,
-        borderRadius: 10,
+        // ⚠ `theme.radii.md`, matching the Draw beside it — see the note there
+        // for why the hardcoded 10 had to go.
+        borderRadius: theme.radii.md,
         borderWidth: 1,
         backgroundColor: selected ? withOpacity(theme.colors.primary, 0.15) : theme.colors.snow,
         borderColor: selected ? theme.colors.primary : withOpacity(theme.colors.slate, 0.2),
@@ -174,7 +180,9 @@ function ClubChoice({
           style={{
             width: 22,
             height: 22,
-            borderRadius: 11,
+            // `pill` on a square is the token system's circle — the same shape
+            // a hardcoded 11 gave, said in the vocabulary the rest uses.
+            borderRadius: theme.radii.pill,
             backgroundColor: withOpacity(theme.colors.slate, 0.15),
           }}
         />
