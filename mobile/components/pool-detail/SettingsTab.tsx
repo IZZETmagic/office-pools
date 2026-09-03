@@ -132,6 +132,9 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
   // ⚠ `leagueMode`, but only after `isLeague` has already decided the card is
   // shown at all — a pool can carry a season with a NULL mode.
   const isTableMode = pool.isLeague && pool.leagueMode === 'table';
+  // ⚠ `isLeague` first, then the mode — two production pools carry a season with
+  // a NULL mode, and a NULL must never be read as "this is Last Man Standing".
+  const isLmsMode = pool.isLeague && pool.leagueMode === 'last_man_standing';
 
   const [edit, setEdit] = useState<EditableState>(initial);
   const [saving, setSaving] = useState(false);
@@ -608,6 +611,22 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
           onMoved={onSaved}
         />
       ) : null}
+
+      {/*
+        ⚠ THE ABSENCE NEEDS A SENTENCE. Three cards an admin has seen on every
+        other pool — the deadline, prediction entries, scoring config — are gone
+        from this screen, and nothing said why. An admin hunting a setting that
+        does not exist is a support question, and "it isn't there" is a worse
+        answer than the reason.
+
+        Nothing here is editable, deliberately: this mode has no prices
+        (`league_pool_settings` holds `table_*` columns only), no date to set
+        (the lock is each matchweek's own), and no round length to choose (a
+        round ends when one player is left). Saying so plainly is the whole
+        card — it is the mechanism written out, not a placeholder for controls
+        that are coming.
+      */}
+      {isLmsMode ? <LmsRulesCard /> : null}
 
       {pool.isLeague ? null : (
       <Card>
@@ -1354,6 +1373,62 @@ function QuickDeadlineButton({ label, onPress }: { label: string; onPress: () =>
  * filed — which comes from `league_table_filing_status`, returning booleans and
  * no orderings, because migration 104 closed the admin's read on rivals' tables.
  */
+/**
+ * What a Last Man Standing admin does NOT control, and why.
+ *
+ * Read-only on purpose. Every line here is a rule the database owns:
+ *
+ *   the lock      `league_matchweeks.lock_at` — per matchweek, and migration 101
+ *                 moved it to an hour before that week's first kickoff. There is
+ *                 no single season date an admin could set.
+ *   the round     `league_lms_settle` closes it when one player is left and
+ *                 opens the next in the SAME transaction. Nobody opens rounds.
+ *   the prices    there are none. `league_pool_settings` holds `table_*` columns
+ *                 only, because this mode scores nothing.
+ *
+ * ⚠ It replaces three cards that are hidden on this screen, not two. The
+ * deadline card would offer the league SENTINEL — editing which is what could
+ * reveal every member's picks (see `handleSave`) — Prediction Entries is forced
+ * to one for any league pool, and Scoring Config edits `pool_settings`, which is
+ * the World Cup's table and changes nothing here.
+ */
+function LmsRulesCard() {
+  const theme = useTheme();
+  const lines: Array<[string, string]> = [
+    ['Picks lock per matchweek', 'An hour before that week’s first kickoff — there is no date to set.'],
+    ['Rounds run themselves', 'A round ends when one player is left, and the next opens straight away with everybody back in.'],
+    ['Nothing is priced', 'There are no points in this mode. Members are ranked by rounds won.'],
+  ];
+
+  return (
+    <Card>
+      <Caption>How this pool runs</Caption>
+      <RNText style={{ fontFamily: fontFamilies.regular, fontSize: 11, color: theme.colors.slate }}>
+        Set by the fixture list, not by you
+      </RNText>
+      <View style={{ marginTop: theme.spacing.sm, gap: theme.spacing.sm }}>
+        {lines.map(([lead, rest]) => (
+          <View key={lead} style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            <Icon name="checkmark.circle.fill" color="slate" size={13} />
+            <RNText
+              style={{
+                flex: 1,
+                fontFamily: fontFamilies.regular,
+                fontSize: 12.5,
+                lineHeight: 18,
+                color: theme.colors.slate,
+              }}
+            >
+              <RNText style={{ fontFamily: fontFamilies.bold, color: theme.colors.ink }}>{lead}.</RNText>{' '}
+              {rest}
+            </RNText>
+          </View>
+        ))}
+      </View>
+    </Card>
+  );
+}
+
 function TableDeadlineCard({
   poolId,
   lockAt,
