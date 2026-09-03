@@ -266,6 +266,25 @@ function InnerLayout() {
             gestureEnabled: false,
           }}
         />
+        {/* ⚠ DECLARED, OR IT GETS THE DEFAULT NATIVE HEADER. An undeclared route
+            still renders — it just arrives with the stack's own chrome, which
+            titles itself from the FILE PATH: "pool/[id]" beside
+            "pool/[id]/table/[entryId]", and a second back button above the one
+            the screen draws itself.
+
+            Same options as the wizard above, deliberately: Ryan asked for this
+            to feel like the World Cup prediction flow, and that flow is a
+            full-screen modal whose only way out is its own back button. The
+            table picker autosaves, so `gestureEnabled: false` protects nothing
+            here — it is matched for consistency, not for safety. */}
+        <Stack.Screen
+          name="pool/[id]/table/[entryId]"
+          options={{
+            headerShown: false,
+            presentation: 'fullScreenModal',
+            gestureEnabled: false,
+          }}
+        />
         <Stack.Screen
           name="pool/[id]/scoring-config"
           options={{
