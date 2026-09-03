@@ -163,8 +163,31 @@ export type MatchData = {
   live_period: string | null
   /** Stoppage minutes on top of `live_minute` — the "+8" in "90+8'". */
   live_added: number | null
-  home_team: { country_name: string; country_code: string; flag_url: string | null } | null
-  away_team: { country_name: string; country_code: string; flag_url: string | null } | null
+  /**
+   * The embedded team, as the UI reads it positionally.
+   *
+   * ⚠ `short_name` IS OPTIONAL BECAUSE THE SOURCE DECIDES. The league adapter
+   * fills it (`clubToTeam` → `shortClubName`); the World Cup's PostgREST embed
+   * of `teams` has no such column and never will. A consumer must fall back to
+   * `country_name`, never assume.
+   *
+   * ⚠ AND IT MUST BE DECLARED HERE TO BE READABLE. `asEmbedded` builds this
+   * object by naming fields, so a field present at runtime but missing from
+   * this type is invisible to every typed caller — which is how it read as
+   * absent to the season test while being right there in the JSON.
+   */
+  home_team: {
+    country_name: string
+    country_code: string
+    flag_url: string | null
+    short_name?: string | null
+  } | null
+  away_team: {
+    country_name: string
+    country_code: string
+    flag_url: string | null
+    short_name?: string | null
+  } | null
 }
 
 export type SettingsData = {

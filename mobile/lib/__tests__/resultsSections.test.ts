@@ -18,7 +18,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   anchorSectionIndex,
+  competitionBlocks,
   dateSections,
+  distinctCompetitions,
   roundSections,
   windowSections,
   ROW_BUDGET,
@@ -51,6 +53,7 @@ const match = (o: Partial<ResultsMatch> = {}): ResultsMatch => ({
   awayTeam: null,
   roundNumber: null,
   competition: null,
+  competitionId: null,
   ...o,
 });
 
@@ -61,6 +64,7 @@ const fixture = (matchweek: number, o: Partial<ResultsMatch> = {}) =>
     groupLetter: null,
     roundNumber: matchweek,
     competition: 'Premier League',
+    competitionId: 39,
     ...o,
   });
 
@@ -68,6 +72,9 @@ const section = (id: string, rows: number, o: Partial<ResultsMatch> = {}): Match
   id,
   label: id,
   matches: Array.from({ length: rows }, (_, i) => match({ matchId: `${id}-${i}`, ...o })),
+  // Windowing and anchoring read `matches`, never `blocks`; an empty one here
+  // keeps those tests honest about which field they actually depend on.
+  blocks: [],
 });
 
 describe('roundSections', () => {
@@ -189,5 +196,121 @@ describe('windowSections', () => {
   it('always mounts at least the anchor, even if it alone blows the budget', () => {
     const sections = [section('huge', 500)];
     expect(windowSections(sections, 0, ROW_BUDGET)).toEqual({ start: 0, end: 1 });
+  });
+});
+
+describe('competitionBlocks', () => {
+  const LA_LIGA = { competition: 'La Liga', competitionId: 140 };
+
+  it('splits a day into one block per competition', () => {
+    const blocks = competitionBlocks([
+      fixture(3, { matchId: 'pl-1' }),
+      fixture(3, { matchId: 'll-1', ...LA_LIGA }),
+      fixture(3, { matchId: 'pl-2' }),
+    ]);
+    expect(blocks).toHaveLength(2);
+    expect(blocks.map((b) => b.competition).sort()).toEqual(['La Liga', 'Premier League']);
+  });
+
+  it('loses nothing — the blocks hold every match the section does', () => {
+    const matches = [
+      fixture(3, { matchId: 'a' }),
+      fixture(3, { matchId: 'b', ...LA_LIGA }),
+      fixture(3, { matchId: 'c' }),
+      match({ matchId: 'wc' }),
+    ];
+    const ids = competitionBlocks(matches)
+      .flatMap((b) => b.matches.map((m) => m.matchId))
+      .sort();
+    expect(ids).toEqual(['a', 'b', 'c', 'wc']);
+  });
+
+  it('keys on the id, so one league under two spellings stays one block', () => {
+    const blocks = competitionBlocks([
+      fixture(3, { matchId: 'a', competition: 'Premier League', competitionId: 39 }),
+      fixture(3, { matchId: 'b', competition: 'English Premier League', competitionId: 39 }),
+    ]);
+    expect(blocks).toHaveLength(1);
+  });
+
+  it('orders blocks by first kickoff, not alphabetically', () => {
+    // La Liga alphabetises first; the Premier League kicks off first.
+    const blocks = competitionBlocks([
+      fixture(3, { matchId: 'll', matchDate: '2026-09-05T14:00:00.000Z', ...LA_LIGA }),
+      fixture(3, { matchId: 'pl', matchDate: '2026-09-05T11:30:00.000Z' }),
+    ]);
+    expect(blocks.map((b) => b.competition)).toEqual(['Premier League', 'La Liga']);
+  });
+
+  it('collects World Cup matches into one unnamed block rather than dropping them', () => {
+    const blocks = competitionBlocks([match({ matchId: 'wc1' }), match({ matchId: 'wc2' })]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].competition).toBeNull();
+    expect(blocks[0].matches).toHaveLength(2);
+  });
+});
+
+describe('dateSections blocks', () => {
+  it('gives each day its own competition split', () => {
+    const sections = dateSections([
+      fixture(3, { matchId: 'a', matchDate: '2026-09-05T11:30:00.000Z' }),
+      fixture(3, { matchId: 'b', matchDate: '2026-09-05T14:00:00.000Z', competition: 'La Liga', competitionId: 140 }),
+      fixture(3, { matchId: 'c', matchDate: '2026-09-06T14:00:00.000Z', competition: 'La Liga', competitionId: 140 }),
+    ]);
+    expect(sections).toHaveLength(2);
+    expect(sections[0].blocks).toHaveLength(2);
+    expect(sections[1].blocks).toHaveLength(1);
+  });
+
+  it('keeps blocks and matches in step, so neither can drift', () => {
+    const sections = dateSections([
+      fixture(3, { matchId: 'a' }),
+      fixture(3, { matchId: 'b', competition: 'La Liga', competitionId: 140 }),
+    ]);
+    for (const s of sections) {
+      const fromBlocks = s.blocks.flatMap((b) => b.matches.map((m) => m.matchId)).sort();
+      expect(fromBlocks).toEqual(s.matches.map((m) => m.matchId).sort());
+    }
+  });
+});
+
+describe('roundSections blocks', () => {
+  it('splits a MERGED matchweek by competition — two leagues share the number', () => {
+    // ⚠ The bucket is keyed on `roundNumber` alone, so both leagues' Matchweek 3
+    // lands in one section. The blocks are what stop it rendering as one
+    // shuffled list of ten games from two competitions.
+    const sections = roundSections([
+      fixture(3, { matchId: 'pl' }),
+      fixture(3, { matchId: 'll', competition: 'La Liga', competitionId: 140 }),
+    ]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe('Matchweek 3');
+    expect(sections[0].blocks).toHaveLength(2);
+  });
+});
+
+describe('distinctCompetitions', () => {
+  it('lists each competition once, with its count', () => {
+    const list = distinctCompetitions([
+      fixture(3, { matchId: 'a' }),
+      fixture(3, { matchId: 'b' }),
+      fixture(3, { matchId: 'c', competition: 'La Liga', competitionId: 140 }),
+    ]);
+    expect(list).toEqual([
+      { id: 39, name: 'Premier League', count: 2 },
+      { id: 140, name: 'La Liga', count: 1 },
+    ]);
+  });
+
+  it('omits the World Cup, so a World-Cup-only member gets no pill', () => {
+    expect(distinctCompetitions([match(), match()])).toEqual([]);
+  });
+
+  it('orders by first kickoff, matching the block order', () => {
+    const list = distinctCompetitions([
+      fixture(3, { matchDate: '2026-09-05T14:00:00.000Z', competition: 'La Liga', competitionId: 140 }),
+      fixture(3, { matchDate: '2026-09-05T11:30:00.000Z' }),
+    ]);
+    expect(list.map((c) => c.name)).toEqual(['Premier League', 'La Liga']);
   });
 });

@@ -135,17 +135,29 @@ async function handleGET(
   }
 
   const seasonIds = [...tournamentBySeason.keys()]
+  // ⚠ `external_league_id` COMES WITH THE NAME, and it is not decoration. It is
+  // the key the whole competition design system is cut on — colour, mark and
+  // crest URL are all `Record<number, …>` on this id, on both clients, so that
+  // they cannot come apart (`lib/design/competitionColor.ts`). A caption alone
+  // would force the phone to map a display STRING back to a brand, which is the
+  // kind of positional guess this route exists to stop.
   const { data: seasonRows, error: seasonErr } = await admin
     .from('league_seasons')
-    .select('season_id, competition_name')
+    .select('season_id, competition_name, external_league_id')
     .in('season_id', seasonIds)
-    .returns<Array<{ season_id: string; competition_name: string }>>()
+    .returns<Array<{ season_id: string; competition_name: string; external_league_id: number }>>()
   if (seasonErr) {
     return NextResponse.json({ error: seasonErr.message }, { status: 500 })
   }
   const competitionBySeason = new Map((seasonRows ?? []).map((s) => [s.season_id, s.competition_name]))
+  const leagueIdBySeason = new Map((seasonRows ?? []).map((s) => [s.season_id, s.external_league_id]))
 
-  const seasons: Array<{ season_id: string; competition: string | null; matches: unknown[] }> = []
+  const seasons: Array<{
+    season_id: string
+    competition: string | null
+    competition_id: number | null
+    matches: unknown[]
+  }> = []
   for (const [seasonId, tournamentId] of tournamentBySeason) {
     let season
     try {
@@ -167,6 +179,9 @@ async function handleGET(
       // game belongs to, and a member can be in a Premier League pool and a La
       // Liga one at the same time.
       competition: competitionBySeason.get(seasonId) ?? null,
+      // The same competition, as the id everything is themed on. Nullable only
+      // because the map lookup is — the column itself is `integer NOT NULL`.
+      competition_id: leagueIdBySeason.get(seasonId) ?? null,
       matches,
     })
   }

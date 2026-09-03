@@ -120,6 +120,10 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
     // it is served from the list already in memory. See `leagueMatch` below.
     roundNumber: null,
     competition: null,
+    // As above: this path is the `matches` table, which is World Cup only and
+    // has no league id. A league fixture arrives already stamped, through
+    // `leagueMatch`.
+    competitionId: null,
   };
 }
 

@@ -16,10 +16,32 @@
 
 import type { ResultsMatch } from './useTournamentMatches';
 
+/**
+ * One competition's games inside a section.
+ *
+ * ⚠ THE SECTION KEEPS ITS FLAT `matches` TOO, and both are load-bearing.
+ * `windowSections` budgets in ROWS and `anchorSectionIndex` scans for a live
+ * game; both read `matches`. `blocks` is the RENDER shape and nothing else.
+ * They hold the same fixtures — `resultsSections.test.ts` pins that they cannot
+ * drift, because a block list that quietly dropped a game would look like a
+ * fixture that was never scheduled.
+ */
+export type CompetitionBlock = {
+  id: string;
+  /** The caption, or null for a World Cup match, which carries none. */
+  competition: string | null;
+  /** `external_league_id`, for the colour and mark. Null for the World Cup. */
+  competitionId: number | null;
+  matches: ResultsMatch[];
+};
+
 export type MatchSection = {
   id: string;
   label: string;
+  /** Every match in the section, in kickoff order. The row-count source. */
   matches: ResultsMatch[];
+  /** The same matches, split by competition, in first-kickoff order. */
+  blocks: CompetitionBlock[];
 };
 
 export const ROUND_ORDER: Array<{ keys: string[]; label: string }> = [
@@ -62,6 +84,52 @@ const byKickoff = (a: ResultsMatch, b: ResultsMatch) =>
   (parsedDate(a.matchDate)?.getTime() ?? 0) - (parsedDate(b.matchDate)?.getTime() ?? 0);
 
 /**
+ * Split one section's matches into one block per competition.
+ *
+ * ⚠ KEYED ON `competitionId`, NOT ON THE NAME. The id is what the colour and
+ * the mark are cut on, and a display string is the wrong identity for anything:
+ * two seasons of the same league share an id and could ship different wording,
+ * and a renamed competition would silently become a second block mid-season.
+ *
+ * ⚠ ORDERED BY FIRST KICKOFF, not alphabetically and not by id. A member
+ * scanning a Saturday reads down the day in the order the football happens, so
+ * the 12:30 league comes before the 15:00 one. Alphabetical would put Bundesliga
+ * above Premier League on a day the Premier League kicks off first, which reads
+ * as an arbitrary list rather than as a schedule.
+ *
+ * World Cup matches carry no competition at all and collect into a single null
+ * block, which the screen renders WITHOUT a header — there is nothing truthful
+ * to write on it, and inferring "World Cup" from the absence of a league id is
+ * the kind of derivation Decision 14 exists to stop.
+ */
+export function competitionBlocks(matchList: ResultsMatch[]): CompetitionBlock[] {
+  const buckets = new Map<string, CompetitionBlock>();
+  for (const m of matchList) {
+    // `null` and `0` are different keys from any real league id, and String()
+    // keeps the Map homogeneous so the null bucket cannot collide with one.
+    const key = m.competitionId === null ? 'none' : String(m.competitionId);
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.matches.push(m);
+    } else {
+      buckets.set(key, {
+        id: `comp-${key}`,
+        competition: m.competition,
+        competitionId: m.competitionId,
+        matches: [m],
+      });
+    }
+  }
+  const blocks = Array.from(buckets.values());
+  for (const b of blocks) b.matches.sort(byKickoff);
+  return blocks.sort(
+    (a, b) =>
+      (parsedDate(a.matches[0]?.matchDate ?? '')?.getTime() ?? 0) -
+      (parsedDate(b.matches[0]?.matchDate ?? '')?.getTime() ?? 0),
+  );
+}
+
+/**
  * One section per calendar day. Competition-agnostic — it reads the kickoff and
  * nothing else, which is why it was the only mode that worked for a league on
  * the day league fixtures first arrived.
@@ -76,11 +144,15 @@ export function dateSections(matchList: ResultsMatch[]): MatchSection[] {
     buckets.set(key, arr);
   }
   const keys = Array.from(buckets.keys()).sort((a, b) => a - b);
-  return keys.map((key) => ({
-    id: `day-${key}`,
-    label: key < 0 ? 'Date TBD' : dayLabel(new Date(key)),
-    matches: (buckets.get(key) ?? []).sort(byKickoff),
-  }));
+  return keys.map((key) => {
+    const matches = (buckets.get(key) ?? []).sort(byKickoff);
+    return {
+      id: `day-${key}`,
+      label: key < 0 ? 'Date TBD' : dayLabel(new Date(key)),
+      matches,
+      blocks: competitionBlocks(matches),
+    };
+  });
 }
 
 /**
@@ -101,7 +173,12 @@ export function roundSections(matchList: ResultsMatch[]): MatchSection[] {
   const worldCup = ROUND_ORDER.map((round) => {
     const roundMatches = matchList.filter((m) => round.keys.includes(m.stage)).sort(byKickoff);
     return roundMatches.length > 0
-      ? { id: round.label, label: round.label, matches: roundMatches }
+      ? {
+          id: round.label,
+          label: round.label,
+          matches: roundMatches,
+          blocks: competitionBlocks(roundMatches),
+        }
       : null;
   }).filter((s): s is MatchSection => s !== null);
 
@@ -114,16 +191,63 @@ export function roundSections(matchList: ResultsMatch[]): MatchSection[] {
   }
   const league = Array.from(byMatchweek.keys())
     .sort((a, b) => a - b)
-    .map((n) => ({
-      id: `mw-${n}`,
-      label: `Matchweek ${n}`,
-      matches: (byMatchweek.get(n) ?? []).sort(byKickoff),
-    }));
+    .map((n) => {
+      const matches = (byMatchweek.get(n) ?? []).sort(byKickoff);
+      return {
+        id: `mw-${n}`,
+        label: `Matchweek ${n}`,
+        matches,
+        // ⚠ THIS IS WHAT MAKES A MERGED MATCHWEEK READABLE. The bucket above is
+        // keyed on `roundNumber` ALONE, so with two leagues in the list the
+        // Premier League's Matchweek 3 and La Liga's land in this one section —
+        // a real defect at multi-league scale, since the two have nothing to do
+        // with each other. Splitting into competition blocks means the section
+        // at least renders as two named groups rather than as one shuffled
+        // list. It does not make the LABEL true, and the honest fix is to scope
+        // the mode to a chosen competition.
+        blocks: competitionBlocks(matches),
+      };
+    });
 
   // A member can hold both — a finished World Cup pool and a live league one.
   // The World Cup's ladder first, then the season, rather than interleaving two
   // orderings that have nothing to say to each other.
   return [...worldCup, ...league];
+}
+
+/**
+ * Every competition in the list, in first-kickoff order, with how many games
+ * each has. Feeds the Competition pill and its picker.
+ *
+ * ⚠ A NULL-COMPETITION ENTRY IS OMITTED. World Cup matches have no league id
+ * and nothing truthful to label a picker row with, so they are not offerable —
+ * and a member holding only a World Cup pool therefore gets a list of length
+ * zero, which is what hides the pill entirely. Same rule as the Group pill: a
+ * control that filters to nothing is worse than one that is not there.
+ */
+export function distinctCompetitions(
+  matchList: ResultsMatch[],
+): { id: number; name: string; count: number }[] {
+  const seen = new Map<number, { id: number; name: string; count: number; first: number }>();
+  for (const m of matchList) {
+    if (m.competitionId === null || !m.competition) continue;
+    const kickoff = parsedDate(m.matchDate)?.getTime() ?? 0;
+    const existing = seen.get(m.competitionId);
+    if (existing) {
+      existing.count += 1;
+      if (kickoff < existing.first) existing.first = kickoff;
+    } else {
+      seen.set(m.competitionId, {
+        id: m.competitionId,
+        name: m.competition,
+        count: 1,
+        first: kickoff,
+      });
+    }
+  }
+  return Array.from(seen.values())
+    .sort((a, b) => a.first - b.first)
+    .map(({ id, name, count }) => ({ id, name, count }));
 }
 
 // ---- What actually gets mounted ----

@@ -20,6 +20,10 @@ import {
   PoolsHeader,
 } from '@/components/pools';
 import {
+  CompetitionHeader,
+  CompetitionPickerSheet,
+  type CompetitionPickerSheetHandle,
+  type CompetitionOption,
   GroupPickerSheet,
   type GroupPickerSheetHandle,
   MatchResultRow,
@@ -40,6 +44,7 @@ import {
   anchorSectionIndex,
   dateSections,
   dayLabel,
+  distinctCompetitions,
   EXPAND_STEP,
   parsedDate,
   ROW_BUDGET,
@@ -70,8 +75,10 @@ export default function ResultsScreen() {
   const [filterMode, setFilterMode] = useState<FilterMode>('date');
   const [selectedTeam, setSelectedTeam] = useState<TeamOption | null>(null);
   const [selectedGroupLetter, setSelectedGroupLetter] = useState<string | null>(null);
+  const [selectedCompetition, setSelectedCompetition] = useState<CompetitionOption | null>(null);
   const teamSheetRef = useRef<TeamPickerSheetHandle | null>(null);
   const groupSheetRef = useRef<GroupPickerSheetHandle | null>(null);
+  const competitionSheetRef = useRef<CompetitionPickerSheetHandle | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   // Create / Join pool sheet refs — opened by the "+" button in the
   // header. Same pattern as the Home and Pools tabs so the user can
@@ -115,8 +122,17 @@ export default function ResultsScreen() {
           groupMatches.filter((m) => m.groupLetter === selectedGroupLetter),
         );
       }
+      case 'competition': {
+        // Narrow, then section by day — the same shape as `team` above, so a
+        // member moving between the two pills gets the same list rearranged
+        // rather than a different screen.
+        if (!selectedCompetition) return dateSections(matches);
+        return dateSections(
+          matches.filter((m) => m.competitionId === selectedCompetition.id),
+        );
+      }
     }
-  }, [filterMode, matches, selectedTeam, selectedGroupLetter]);
+  }, [filterMode, matches, selectedTeam, selectedGroupLetter, selectedCompetition]);
 
   // How far the member has asked to see beyond the default window, in sections.
   // Reset whenever the filter changes, because "twelve more matchweeks" means
@@ -126,7 +142,7 @@ export default function ResultsScreen() {
   useEffect(() => {
     setExpandBefore(0);
     setExpandAfter(0);
-  }, [filterMode, selectedTeam, selectedGroupLetter]);
+  }, [filterMode, selectedTeam, selectedGroupLetter, selectedCompetition]);
 
   const visible = useMemo(() => {
     const base = windowSections(sections, anchorSectionIndex(sections), ROW_BUDGET);
@@ -184,6 +200,29 @@ export default function ResultsScreen() {
       .sort((a, b) => a.letter.localeCompare(b.letter));
   }, [matches]);
 
+  /**
+   * The competitions in the member's own football, for the pill and its sheet.
+   *
+   * ⚠ DERIVED FROM THE LIST, not from a static table of leagues. The list is
+   * already scoped to the pools the member is in, so this is exactly what they
+   * hold — which is what makes `.length > 1` the right test for showing the
+   * pill at all. A member in one Premier League pool never sees a control
+   * offering to narrow their football to the Premier League.
+   */
+  const availableCompetitions = useMemo<CompetitionOption[]>(
+    () => distinctCompetitions(matches),
+    [matches],
+  );
+
+  /**
+   * ⚠ Whether the competition BANDS appear, which is a different question from
+   * whether the pill does — and it is answered from the whole list rather than
+   * per section on purpose. Per-section, a Saturday with two leagues would show
+   * headers and the Sunday with one would not, so the bands would blink in and
+   * out as a member scrolled. One list, one answer.
+   */
+  const showCompetitionBands = availableCompetitions.length > 1;
+
   // ---- Filter handlers ----
 
   function handleSelectDate() {
@@ -216,6 +255,16 @@ export default function ResultsScreen() {
   function handleGroupPicked(letter: string) {
     setSelectedGroupLetter(letter);
     setFilterMode('group');
+  }
+  function handleSelectCompetition() {
+    // Unlike Team and Group, tapping an active pill REOPENS the sheet rather
+    // than clearing — the sheet carries its own "All competitions" row, so the
+    // undo lives where the choice was made and this tap can mean "change it".
+    competitionSheetRef.current?.open();
+  }
+  function handleCompetitionPicked(competition: CompetitionOption | null) {
+    setSelectedCompetition(competition);
+    setFilterMode(competition ? 'competition' : 'date');
   }
 
   // ---- Auto-scroll to live or next match on first content render ----
@@ -318,10 +367,13 @@ export default function ResultsScreen() {
         selectedGroupLetter={selectedGroupLetter}
         roundLabel={roundPillLabel}
         showGroup={hasGroupStage}
+        selectedCompetitionName={selectedCompetition?.name ?? null}
+        showCompetition={availableCompetitions.length > 1}
         onSelectDate={handleSelectDate}
         onSelectRound={handleSelectRound}
         onSelectTeam={handleSelectTeam}
         onSelectGroup={handleSelectGroup}
+        onSelectCompetition={handleSelectCompetition}
       />
 
       <ScrollView
@@ -382,15 +434,28 @@ export default function ResultsScreen() {
                   backgroundColor: theme.colors.mist,
                 }}
               />
-              {filterMode === 'round'
-                ? renderRoundMatches(section.matches, theme)
-                : section.matches.map((m) => (
-                    <MatchResultRow
-                      key={m.matchId}
-                      match={m}
-                      onPress={() => router.push(`/match/${m.matchId}`)}
+              {section.blocks.map((block, i) => (
+                <View key={block.id}>
+                  {showCompetitionBands ? (
+                    <CompetitionHeader
+                      competition={block.competition}
+                      competitionId={block.competitionId}
+                      // No rule above the first band — the section's own header
+                      // and its hairline are already there.
+                      divided={i > 0}
                     />
-                  ))}
+                  ) : null}
+                  {filterMode === 'round'
+                    ? renderRoundMatches(block.matches, theme)
+                    : block.matches.map((m) => (
+                        <MatchResultRow
+                          key={m.matchId}
+                          match={m}
+                          onPress={() => router.push(`/match/${m.matchId}`)}
+                        />
+                      ))}
+                </View>
+              ))}
               <View style={{ height: 4 }} />
             </View>
           ))}
@@ -413,6 +478,12 @@ export default function ResultsScreen() {
         ref={groupSheetRef}
         groups={availableGroups}
         onSelect={handleGroupPicked}
+      />
+      <CompetitionPickerSheet
+        ref={competitionSheetRef}
+        competitions={availableCompetitions}
+        selectedId={selectedCompetition?.id ?? null}
+        onSelect={handleCompetitionPicked}
       />
       <PoolCreateJoinSheet
         ref={createJoinSheetRef}

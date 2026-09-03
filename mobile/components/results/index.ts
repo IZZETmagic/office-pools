@@ -10,3 +10,9 @@ export {
   type GroupPickerSheetHandle,
   type GroupOption,
 } from './GroupPickerSheet';
+export { CompetitionHeader } from './CompetitionHeader';
+export {
+  CompetitionPickerSheet,
+  type CompetitionPickerSheetHandle,
+  type CompetitionOption,
+} from './CompetitionPickerSheet';

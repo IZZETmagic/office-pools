@@ -49,6 +49,16 @@ export type ResultsMatch = {
    * crests with no caption cannot say which competition a game belongs to.
    */
   competition: string | null;
+  /**
+   * The same competition as an id — `tournaments.external_league_id`, the
+   * api-football league id.
+   *
+   * ⚠ THE NAME IS THE CAPTION; THIS IS THE KEY. Colour, mark and crest are all
+   * `Record<number, …>` on this id, on the phone and the web alike, so a header
+   * that wants a competition's brand reads THIS and never maps the display
+   * string back to one. Null for every World Cup match, which has no league id.
+   */
+  competitionId: number | null;
 };
 
 export type ResultsTeam = {
@@ -83,6 +93,8 @@ type LeagueFixturesResponse = {
   seasons: Array<{
     season_id: string;
     competition: string | null;
+    /** `league_seasons.external_league_id` — the api-football league id. */
+    competition_id: number | null;
     /** Already in the World Cup match shape — the route does the mapping. */
     matches: Record<string, unknown>[];
   }>;
@@ -133,9 +145,10 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
     // Absent from MATCH_SELECT, so this is null for every World Cup row — which
     // is correct: the World Cup groups by stage. The league route sends it.
     roundNumber: (row.round_number as number | null) ?? null,
-    // Not a per-row field on either source. The league route carries it once
-    // per season and `leagueMatches` below stamps it on.
+    // Not per-row fields on either source. The league route carries both once
+    // per season and `leagueMatches` below stamps them on.
     competition: null,
+    competitionId: null,
   };
 }
 
@@ -273,7 +286,11 @@ export function useTournamentMatchesInternal() {
         // The competition is a fact about the season, sent once rather than
         // repeated on 380 rows. Stamped on here so every consumer downstream
         // reads it off the match like any other field.
-        out.push({ ...normalizeMatch(row), competition: season.competition });
+        out.push({
+          ...normalizeMatch(row),
+          competition: season.competition,
+          competitionId: season.competition_id ?? null,
+        });
       }
     }
     return out;

@@ -41,6 +41,7 @@ const m = (o: Partial<ResultsMatch> & { matchId: string; matchDate: string }): R
   awayTeam: null,
   roundNumber: 13,
   competition: 'Premier League',
+  competitionId: 39,
   ...o,
 });
 

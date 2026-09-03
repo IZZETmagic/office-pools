@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
-export type FilterMode = 'date' | 'round' | 'team' | 'group';
+export type FilterMode = 'date' | 'round' | 'team' | 'group' | 'competition';
 
 type Props = {
   mode: FilterMode;
@@ -24,10 +24,23 @@ type Props = {
    * A control that does nothing is worse than one that is not there.
    */
   showGroup: boolean;
+  /** The chosen competition's name, when one is chosen. */
+  selectedCompetitionName: string | null;
+  /**
+   * ⚠ Whether to show the Competition pill, on the same rule as the Group one.
+   *
+   * The list is scoped to the member's own pools, so most members hold exactly
+   * one competition and a control offering to narrow it to that one answers a
+   * question they do not have. The caller passes `distinctCompetitions(...)
+   * .length > 1` — not "is this a league", which would show the pill to every
+   * single-league member.
+   */
+  showCompetition: boolean;
   onSelectDate: () => void;
   onSelectRound: () => void;
   onSelectTeam: () => void;
   onSelectGroup: () => void;
+  onSelectCompetition: () => void;
 };
 
 export function ResultsFilterBar({
@@ -36,14 +49,19 @@ export function ResultsFilterBar({
   selectedGroupLetter,
   roundLabel,
   showGroup,
+  selectedCompetitionName,
+  showCompetition,
   onSelectDate,
   onSelectRound,
   onSelectTeam,
   onSelectGroup,
+  onSelectCompetition,
 }: Props) {
   const theme = useTheme();
   const teamLabel = mode === 'team' && selectedTeamName ? selectedTeamName : 'Team';
   const groupLabel = mode === 'group' && selectedGroupLetter ? `Group ${selectedGroupLetter}` : 'Group';
+  const competitionLabel =
+    mode === 'competition' && selectedCompetitionName ? selectedCompetitionName : 'Competition';
 
   return (
     <View
@@ -65,6 +83,26 @@ export function ResultsFilterBar({
         style={{ flex: 1 }}
       >
         <Pill label="Date" active={mode === 'date'} onPress={onSelectDate} />
+        {/* ⚠ SECOND, ahead of the matchweek pill, and that is a judgement about
+            order of questions rather than about importance. A member holding
+            several leagues asks "which league" before "which week" — and the
+            matchweek pill is the one that most needs a competition chosen
+            first, since its sections are keyed on the number alone and two
+            leagues' Matchweek 3 merge into one. */}
+        {showCompetition ? (
+          <Pill
+            label={competitionLabel}
+            active={mode === 'competition'}
+            onPress={onSelectCompetition}
+            suffix={
+              mode === 'competition' && selectedCompetitionName ? (
+                <FilterIcon kind="clear" tint={theme.colors.primary} />
+              ) : (
+                <FilterIcon kind="chevron" tint={theme.colors.ink} />
+              )
+            }
+          />
+        ) : null}
         <Pill label={roundLabel} active={mode === 'round'} onPress={onSelectRound} />
         <Pill
           label={teamLabel}
