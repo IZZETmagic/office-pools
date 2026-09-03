@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest'
 import {
   fixturesForWeek,
   defaultWeek,
-  pickedCount,
+  lastLockedWeek,
   stepWeek,
   weekState,
 } from '../pickemWeek'
@@ -162,14 +162,29 @@ describe('stepWeek', () => {
   })
 })
 
-describe('pickedCount', () => {
-  it('counts against this week only', () => {
-    const week = [match('a', 3, null), match('b', 3, null), match('c', 3, null)]
-    const picked = new Set(['a', 'c'])
-    expect(pickedCount(week, (id) => picked.has(id))).toBe(2)
+describe('lastLockedWeek', () => {
+  it('is the ceiling on what a rival may show', () => {
+    // MW1 and MW2 have locked, MW3 is open. A rival's picks are browsable up to
+    // 2 and no further — 3 is the week they can still change.
+    expect(lastLockedWeek(WEEKS, NOW)).toBe(2)
   })
 
-  it('an unpicked week is 0, not a crash', () => {
-    expect(pickedCount([match('a', 3, null)], () => false)).toBe(0)
+  it('⚠ NULL before the first lock — no rival card should open at all', () => {
+    const preSeason = Date.parse('2026-08-01T00:00:00Z')
+    expect(lastLockedWeek(WEEKS, preSeason)).toBeNull()
+  })
+
+  it('⚠ takes the MAX, not "the one before open"', () => {
+    // A whole round can be moved, so the highest locked number is not reliably
+    // one below the open week. Here 4 locked while 3 is still to come.
+    const moved: LeagueMatchweek[] = [
+      { number: 3, lock_at: '2026-12-01T12:00:00Z', first_kickoff_at: null },
+      { number: 4, lock_at: '2026-08-20T12:00:00Z', first_kickoff_at: null },
+    ]
+    expect(lastLockedWeek(moved, NOW)).toBe(4)
+  })
+
+  it('an empty season is null rather than -Infinity', () => {
+    expect(lastLockedWeek([], NOW)).toBeNull()
   })
 })

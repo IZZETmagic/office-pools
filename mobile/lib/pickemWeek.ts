@@ -135,6 +135,32 @@ export function defaultWeek(
 }
 
 /**
+ * The most recently LOCKED matchweek — the furthest anybody may see of somebody
+ * else's picks.
+ *
+ * Ryan, 2026-09-03: *"for other member predictions, these should be readonly and
+ * only ever up to the most recent lock date."*
+ *
+ * ⚠ It is a CEILING, not a single week. A rival's history is browsable back
+ * through the season; what it may never cross is the last lock, because past it
+ * lies the week they can still change — and seeing that is the one thing this
+ * mode cannot allow.
+ *
+ * ⚠ NULL before the first lock of the season, which is a real state and not an
+ * error: nobody has anything to show yet, so no rival card should open at all.
+ *
+ * ⚠ MAX, not "the one before open". A whole round can be moved — three real
+ * seasons contain a matchweek played out of order — so the highest-numbered
+ * unlocked week is not reliably the one after the highest locked one.
+ */
+export function lastLockedWeek(matchweeks: LeagueMatchweek[], now: number): number | null {
+  const locked = matchweeks
+    .filter((m) => m.lock_at !== null && Date.parse(m.lock_at) <= now)
+    .map((m) => m.number)
+  return locked.length > 0 ? Math.max(...locked) : null
+}
+
+/**
  * Step to the previous or next matchweek that actually exists.
  *
  * ⚠ Walks the LIST rather than doing `n ± 1`. A season's matchweeks are not
@@ -152,17 +178,4 @@ export function stepWeek(
   if (i === -1) return null
   const next = numbers[i + direction]
   return next ?? null
-}
-
-/**
- * How many of this week's fixtures the entry has actually picked.
- *
- * ⚠ Counts against the week's OWN fixture count, never the season's. "7 of 10"
- * is the sentence a member needs before a deadline; "7 of 380" is noise.
- */
-export function pickedCount(
-  weekFixtures: LeagueMatch[],
-  hasPick: (fixtureId: string) => boolean,
-): number {
-  return weekFixtures.reduce((n, f) => (hasPick(f.match_id) ? n + 1 : n), 0)
 }

@@ -1,49 +1,45 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
-import {
-  defaultWeek,
-  fixturesForWeek,
-  pickedCount,
-  weekState,
-  type WeekState,
-} from '@/lib/pickemWeek';
-import { useLeaguePool, useLeaguePoolPicks } from '@/lib/useLeaguePool';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { lastLockedWeek } from '@/lib/pickemWeek';
+import { useLeaguePool } from '@/lib/useLeaguePool';
+import { useTheme, withOpacity } from '@/theme';
 
 // =============================================================
-// THE PREDICTIONS TAB FOR A PICK'EM POOL — entries, and only entries
+// THE PREDICTIONS TAB FOR A PICK'EM POOL — a door, and nothing else
 // =============================================================
-// Ryan, 2026-09-03: *"on the predictions tab it should just be your entries
-// listed and the other members there once predictions lock for that match
-// week."* So this is `LeagueTableEntriesTab`'s shape unchanged: own entries
-// first, everybody else's behind the lock.
+// Ryan, 2026-09-03: *"the predictions landing page should not have a matchweek
+// on it. It is just a simple way to get into your predictions, and once into
+// your predictions you will automatically be presented with the current active
+// or in-play predictions."*
 //
-// ## ⚠ THE WEEK SWITCHER MOVED OUT, deliberately
+// ## ⚠ THE MATCHWEEK IS GONE FROM HERE ENTIRELY — twice now
 //
-// It lived here for one commit and Ryan moved it into the wizard. The tab is
-// about WHO — a list of entries — and the wizard is about WHICH WEEK. Mixing the
-// two put a navigation control above a list it only partly governed: stepping to
-// matchweek 30 changed the count on every card while the cards themselves still
-// answered "whose picks are these", a question the week has no bearing on.
+// First the switcher moved to the wizard; now the caption and the per-week
+// counts go too. The reason they kept creeping back is worth writing down: a
+// count like "7/10" is inherently matchweek-scoped, so the moment this screen
+// shows one it has to say WHICH week, and then it needs a way to change it, and
+// then it is the wizard again with a worse layout. **A list of entries has no
+// week.** The wizard owns the season; this owns the door.
 //
-// What stays is a STATIC caption naming the week these counts describe. Without
-// it "7/10" is a number with no denominator anybody can see. It is a label, not
-// a control — the season is browsed inside the wizard.
+// ⚠ It no longer fetches `/bulk` at all. The counts were the only thing that
+// needed every pick in the pool, so the tab dropped a payload that reaches
+// ~3,800 rows by May. It reads the league contract only — which the wizard
+// fetches anyway, so React Query serves the next screen from cache.
 //
-// ## ⚠⚠ WHAT MAY BE SHOWN IS DECIDED BY THE SERVER, NOT HERE
+// ## ⚠ A RIVAL'S PICKS STOP AT THE LAST LOCK
 //
-// `/bulk` runs `computeReveal` + `gatePoolPredictions` and strips other members'
-// unlocked picks BEFORE they cross the wire. This screen asks for them only for
-// a week it believes is locked, but that belief is a display decision — if the
-// two disagree the server wins and the list comes back short. Filtering here
-// instead would ship every unlocked pick to the phone and merely hide it, which
-// is the bug the member-predictions feature was designed not to have.
+// Ryan, same message: *"for other member predictions, these should be readonly
+// and only ever up to the most recent lock date."* So a rival card opens only
+// once SOMETHING has locked, and the wizard it opens is both defaulted and
+// BOUNDED to that week — see `lastLockedWeek`. Past it lies the week they can
+// still change, and that is the one thing this mode cannot show.
 //
-// ⚠ And "locked" is the CLOCK, never a state string — see `pickemWeek.ts`.
+// The server enforces it regardless: `/bulk` strips unlocked picks before they
+// cross the wire. This decides what a member is OFFERED, never what they get.
 // =============================================================
 
 type Props = {
@@ -57,70 +53,21 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
   const league = useLeaguePool(poolId);
   const now = Date.now();
 
-  const season = league.data?.season;
-  const matchweeks = useMemo(() => season?.matchweeks ?? [], [season]);
-
-  // The week this list describes. ⚠ The SAME function the wizard opens on, so
-  // the two can never disagree about which week a card's count refers to.
-  const current = defaultWeek(
-    matchweeks,
-    season?.openMatchweekNumber ?? null,
-    season?.inPlayMatchweekNumber ?? null,
-    now,
-  );
-  const mw = matchweeks.find((m) => m.number === current);
-  const state = weekState(mw, season?.openMatchweekNumber ?? null, now);
-
-  // ⚠ Only asked for once the week is genuinely locked — the payload is every
-  // revealed pick in the pool and reaches ~3,800 rows by May.
-  const picks = useLeaguePoolPicks(poolId, state === 'locked');
-
-  const weekFixtures = useMemo(
-    () => (current === null ? [] : fixturesForWeek(season?.matches ?? [], current)),
-    [season, current],
-  );
-
-  /**
-   * Which fixtures each entry has picked, for THIS week.
-   *
-   * ⚠ Both shapes are merged, because a pool is one depth or the other and this
-   * list should not have to know which: Scores picks arrive in `predictions`
-   * keyed `match_id`, Results taps in `outcomes` keyed by fixture id.
-   */
-  const pickedByEntry = useMemo(() => {
-    const ids = new Set(weekFixtures.map((f) => f.match_id));
-    const map = new Map<string, Set<string>>();
-    const add = (entryId: string, matchId: string) => {
-      if (!ids.has(matchId)) return;
-      const s = map.get(entryId) ?? new Set<string>();
-      s.add(matchId);
-      map.set(entryId, s);
-    };
-    for (const p of picks.data?.predictions ?? []) add(p.entry_id, p.match_id);
-    for (const o of picks.data?.outcomes ?? []) add(o.entry_id, o.match_id);
-    // Your own come from the league contract rather than `/bulk`, because they
-    // are readable at any time and `/bulk` is not fetched for an open week.
-    for (const e of league.data?.you.entries ?? []) {
-      // ⚠ `match_id`, NOT `fixture_id` — the contract renames the column on the
-      // way out. Reading the wrong one is `undefined`: no error, no empty array
-      // to notice, and it showed 0/10 over ten saved scorelines.
-      for (const p of e.predictions) add(e.entry_id, p.match_id);
-      for (const fixtureId of Object.keys(e.outcomes)) add(e.entry_id, fixtureId);
-    }
-    return map;
-  }, [picks.data, league.data, weekFixtures]);
+  // The only thing this screen needs to know about time: has anything locked?
+  // Not WHICH week — that question belongs to the wizard.
+  const lastLocked = lastLockedWeek(league.data?.season.matchweeks ?? [], now);
+  const revealed = lastLocked !== null;
 
   const ownEntryIds = useMemo(
     () => new Set((league.data?.you.entries ?? []).map((e) => e.entry_id)),
     [league.data],
   );
-
   const mine = entries.filter((e) => ownEntryIds.has(e.entry_id));
   const others = entries.filter((e) => !ownEntryIds.has(e.entry_id));
 
-  // ⚠ No `mw` param. The wizard resolves its own default so the two screens
-  // cannot drift apart, and pinning a week here would freeze the wizard on
-  // whatever this tab happened to be showing when it was tapped.
+  // ⚠ No `mw`. The wizard resolves the week itself — for your own entry the
+  // active one, for a rival the last that locked — so the two screens cannot
+  // drift and a member who left on matchweek 12 does not return to it.
   const open = (entry: LeagueLeaderboardEntry) =>
     router.navigate(
       `/pool/${poolId}/pickem/${entry.entry_id}?name=${encodeURIComponent(
@@ -136,7 +83,7 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
     );
   }
 
-  if (league.isError || current === null) {
+  if (league.isError) {
     return (
       <View
         style={{
@@ -146,10 +93,10 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
         }}
       >
         <Text variant="sectionHeader" align="center">
-          Matchweeks unavailable
+          Predictions unavailable
         </Text>
         <Text variant="body" color="slate" align="center">
-          {league.error instanceof Error ? league.error.message : 'The season could not be loaded.'}
+          {league.error instanceof Error ? league.error.message : 'This pool could not be loaded.'}
         </Text>
       </View>
     );
@@ -160,188 +107,89 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
       style={{
         paddingHorizontal: theme.spacing.lg,
         paddingVertical: theme.spacing.md,
-        gap: theme.spacing.lg,
+        gap: theme.spacing.md,
       }}
     >
-      <WeekCaption week={current} state={state} lockAt={mw?.lock_at ?? null} />
-
-      {mine.length > 0 ? (
-        <View style={{ gap: theme.spacing.sm }}>
-          <SectionLabel>Your picks</SectionLabel>
-          {mine.map((e) => (
+      {mine.length === 0 ? (
+        <View style={{ alignItems: 'center', gap: theme.spacing.md, paddingVertical: theme.spacing.xxl }}>
+          <Icon name="pencil.line" color="primary" size={40} />
+          <Text variant="cardTitle" align="center">
+            No entry in this pool
+          </Text>
+          <Text variant="body" color="slate" align="center">
+            You are looking at this pool without playing in it.
+          </Text>
+        </View>
+      ) : (
+        <>
+          <Text variant="cardTitle">Your picks</Text>
+          {mine.map((entry) => (
             <EntryCard
-              key={e.entry_id}
-              entry={e}
+              key={entry.entry_id}
+              entry={entry}
               isOwn
-              state={state}
-              total={weekFixtures.length}
-              picked={pickedCount(weekFixtures, (id) => pickedByEntry.get(e.entry_id)?.has(id) ?? false)}
-              onPress={() => open(e)}
+              openable
+              onPress={() => open(entry)}
+            />
+          ))}
+        </>
+      )}
+
+      {/*
+        Everyone else's, on the same terms Table mode uses: the section is
+        always present so the promise is visible before it pays out, and the
+        rows are inert until something has locked.
+      */}
+      {others.length > 0 ? (
+        <View style={{ gap: theme.spacing.md, paddingTop: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Text variant="cardTitle">Everyone&apos;s picks</Text>
+            {!revealed ? <Icon name="lock.fill" color="slate" size={13} /> : null}
+          </View>
+          <Text variant="detail" color="slate">
+            {revealed
+              ? "Read-only, and only as far as the last matchweek to lock. Nobody's open picks are visible — including yours."
+              : "Everyone's picks unlock as each matchweek closes. Until the first one does, the only picks you can see are your own — including if you run the pool."}
+          </Text>
+          {others.map((entry) => (
+            <EntryCard
+              key={entry.entry_id}
+              entry={entry}
+              isOwn={false}
+              openable={revealed}
+              onPress={revealed ? () => open(entry) : undefined}
             />
           ))}
         </View>
       ) : null}
-
-      {others.length > 0 ? (
-        <View style={{ gap: theme.spacing.sm }}>
-          <SectionLabel>
-            {state === 'locked' ? "Everyone's picks" : `Everyone else · ${others.length}`}
-          </SectionLabel>
-
-          {state === 'locked' ? (
-            picks.isPending ? (
-              <View style={{ paddingVertical: theme.spacing.xl, alignItems: 'center' }}>
-                <ActivityIndicator color={theme.colors.primary} />
-              </View>
-            ) : (
-              others.map((e) => (
-                <EntryCard
-                  key={e.entry_id}
-                  entry={e}
-                  isOwn={false}
-                  state={state}
-                  total={weekFixtures.length}
-                  picked={pickedCount(weekFixtures, (id) => pickedByEntry.get(e.entry_id)?.has(id) ?? false)}
-                  onPress={() => open(e)}
-                />
-              ))
-            )
-          ) : (
-            /* ⚠ The reason, not just a locked door. A member who cannot see the
-               others should be told the rule protects them too — nobody can see
-               theirs either — because the alternative reading is that everyone
-               else is hidden from them specifically. */
-            <LockedNote state={state} lockAt={mw?.lock_at ?? null} count={others.length} />
-          )}
-        </View>
-      ) : null}
     </View>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <Text variant="caption" color="slate" style={{ letterSpacing: 0.6 }}>
-      {children}
-    </Text>
   );
 }
 
 /**
- * Which week these counts are about — a LABEL, not a control.
+ * A name and a way in. No progress, no week, no score.
  *
- * ⚠ The switcher lives in the wizard now. This exists only so "7/10" has a
- * visible denominator; the moment it becomes tappable it is the thing Ryan
- * asked to move.
+ * ⚠ Every one of those was tried and removed: each is matchweek-scoped, so
+ * showing one drags the whole week-selection problem back onto a screen whose
+ * job is to list people.
  */
-function WeekCaption({
-  week,
-  state,
-  lockAt,
-}: {
-  week: number;
-  state: WeekState;
-  lockAt: string | null;
-}) {
-  const theme = useTheme();
-  const sub =
-    state === 'open'
-      ? lockAt
-        ? `Picks close ${shortWhen(lockAt)}`
-        : 'Picks open'
-      : state === 'locked'
-        ? 'Locked — everyone’s picks are in'
-        : 'Not open yet';
-  const tone = state === 'open' ? theme.colors.green : theme.colors.slate;
-  return (
-    <View style={{ alignItems: 'center', gap: 3 }}>
-      <Text variant="cardTitle">Matchweek {week}</Text>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 5,
-          paddingHorizontal: 10,
-          paddingVertical: 4,
-          borderRadius: theme.radii.pill,
-          backgroundColor: withOpacity(tone, 0.12),
-        }}
-      >
-        <Icon
-          name={(state === 'open' ? 'lock.open' : state === 'locked' ? 'lock' : 'clock') as never}
-          color={state === 'open' ? 'green' : 'slate'}
-          size={10}
-        />
-        <RNText style={{ fontFamily: fontFamilies.semibold, fontSize: 11, color: tone }}>
-          {sub}
-        </RNText>
-      </View>
-    </View>
-  );
-}
-
-function LockedNote({
-  state,
-  lockAt,
-  count,
-}: {
-  state: WeekState;
-  lockAt: string | null;
-  count: number;
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        padding: theme.spacing.lg,
-        borderRadius: theme.radii.lg,
-        backgroundColor: theme.colors.surface,
-        gap: 6,
-        ...theme.shadows.card,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Icon name="eye.slash" color="slate" size={12} />
-        <Text variant="cardTitle">
-          {count} {count === 1 ? 'other entry' : 'other entries'}, hidden
-        </Text>
-      </View>
-      <Text variant="detail" color="slate">
-        {state === 'open'
-          ? `Nobody can see anybody's picks while the week is open — including yours.${
-              lockAt ? ` They all appear ${shortWhen(lockAt)}.` : ''
-            }`
-          : 'This matchweek has not opened yet, so there is nothing to show.'}
-      </Text>
-    </View>
-  );
-}
-
 function EntryCard({
   entry,
   isOwn,
-  state,
-  picked,
-  total,
+  openable,
   onPress,
 }: {
   entry: LeagueLeaderboardEntry;
   isOwn: boolean;
-  state: WeekState;
-  picked: number;
-  total: number;
-  onPress: () => void;
+  openable: boolean;
+  onPress?: () => void;
 }) {
   const theme = useTheme();
   const name = entry.entry_name?.trim() ? entry.entry_name : entry.full_name;
-  // ⚠ Your own card always opens — the wizard is where the season is browsed, so
-  // it has to be reachable even on a week you cannot pick in. A rival's opens
-  // only once the week has locked; before that there is nothing to show.
-  const openable = isOwn || state === 'locked';
 
   return (
     <Pressable
-      onPress={openable ? onPress : undefined}
+      onPress={onPress}
       disabled={!openable}
       style={({ pressed }) => ({
         flexDirection: 'row',
@@ -349,6 +197,9 @@ function EntryCard({
         gap: theme.spacing.md,
         padding: theme.spacing.md + 2,
         borderRadius: theme.radii.lg,
+        // Matches LeaderboardRow's current-user treatment exactly, including the
+        // pre-blended Android hexes — see the note there for why alpha over
+        // elevation reads as a double ring on Android.
         backgroundColor: isOwn
           ? Platform.OS === 'android'
             ? '#E2E6FA'
@@ -360,7 +211,7 @@ function EntryCard({
             ? '#B1BDF1'
             : withOpacity(theme.colors.primary, 0.25)
           : 'transparent',
-        opacity: pressed ? 0.85 : 1,
+        opacity: !openable ? 0.55 : pressed ? 0.85 : 1,
         ...theme.shadows.card,
       })}
     >
@@ -373,66 +224,11 @@ function EntryCard({
         </Text>
       </View>
 
-      <PickProgress picked={picked} total={total} state={state} isOwn={isOwn} />
-
-      {openable ? <Icon name="chevron.right" color="slate" size={11} /> : null}
+      {openable ? (
+        <Icon name="chevron.right" color="slate" size={11} />
+      ) : (
+        <Icon name="lock.fill" color="slate" size={11} />
+      )}
     </Pressable>
   );
-}
-
-/**
- * "7/10" — and nothing at all when the number would be a lie.
- *
- * ⚠ A rival's count is only knowable once the week has locked, because until
- * then their picks are not on this device. Rendering "0/10" for them would
- * accuse everyone in the pool of not turning up, which is the confident-zero
- * shape this surface keeps having to design around.
- */
-function PickProgress({
-  picked,
-  total,
-  state,
-  isOwn,
-}: {
-  picked: number;
-  total: number;
-  state: WeekState;
-  isOwn: boolean;
-}) {
-  const theme = useTheme();
-  if (total === 0) return null;
-  if (!isOwn && state !== 'locked') return null;
-
-  const complete = picked === total;
-  const none = picked === 0;
-  return (
-    <View style={{ alignItems: 'flex-end', gap: 2 }}>
-      <RNText
-        style={{
-          fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 14,
-          fontWeight: '800',
-          color: complete ? theme.colors.green : none ? theme.colors.slate : theme.colors.ink,
-        }}
-      >
-        {picked}/{total}
-      </RNText>
-      <Text variant="detail" color="slate">
-        {/* Past tense once the week is shut — "to pick" on a locked week offers
-            something that is no longer possible. */}
-        {state === 'locked' ? (none ? 'no picks' : 'picked') : complete ? 'all picked' : 'picked'}
-      </Text>
-    </View>
-  );
-}
-
-/** A short, device-local "when" — the same shape the rest of the app uses. */
-function shortWhen(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString(undefined, {
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 }

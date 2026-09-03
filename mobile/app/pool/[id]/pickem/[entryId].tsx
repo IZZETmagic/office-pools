@@ -8,7 +8,7 @@ import { OutcomePicker, type Outcome } from '@/components/pool-detail/OutcomePic
 import { TapScoreField } from '@/components/pool-detail/TapScoreField';
 import { Icon, Text } from '@/components/ui';
 import { saveLeaguePicks, type LeaguePickBody } from '@/lib/api';
-import { defaultWeek, fixturesForWeek, stepWeek, weekState } from '@/lib/pickemWeek';
+import { defaultWeek, fixturesForWeek, lastLockedWeek, stepWeek, weekState } from '@/lib/pickemWeek';
 import {
   leaguePoolQueryKey,
   useLeaguePool,
@@ -80,30 +80,55 @@ export default function PickemPickScreen() {
   // and tells members they are playing a game they are not being scored at.
   const isResults = depth === 'results';
 
+  const ownEntry = league.data?.you.entries.find((e) => e.entry_id === entryId) ?? null;
+  const isOwn = ownEntry !== null;
+
   // ---- which week is on screen -------------------------------------------
   // ⚠ THE SWITCHER LIVES HERE, not on the predictions tab. Ryan moved it on
   // 2026-09-03: the tab answers "whose picks", this screen answers "which week",
   // and a control that spans both belongs to the one it actually governs.
   //
-  // ⚠ It DEFAULTS rather than being told. The tab passes no `mw`, so the
-  // wizard resolves the active week itself and the two screens cannot drift —
-  // and a member who left the app on matchweek 12 does not come back to it.
-  // `mw` is still honoured when something deep-links a specific week.
+  // ⚠ It DEFAULTS rather than being told. The tab passes no `mw`, so the wizard
+  // resolves the week itself and the two screens cannot drift — and a member who
+  // left the app on matchweek 12 does not come back to it. `mw` is still
+  // honoured when something deep-links a specific week.
   const matchweeks = useMemo(() => season?.matchweeks ?? [], [season]);
-  const fallback = defaultWeek(
-    matchweeks,
-    season?.openMatchweekNumber ?? null,
-    season?.inPlayMatchweekNumber ?? null,
-    now,
-  );
+
+  /**
+   * ⚠⚠ THE CEILING ON A RIVAL'S PICKS. Ryan, 2026-09-03: *"for other member
+   * predictions, these should be readonly and only ever up to the most recent
+   * lock date."* Past the last lock lies the week they can still change, and
+   * showing that is the one thing this mode cannot survive.
+   *
+   * ⚠ It bounds BOTH the default and the forward arrow. Defaulting correctly
+   * and leaving the arrow free would put the same week one tap away.
+   */
+  const ceiling = lastLockedWeek(matchweeks, now);
+
+  // Your own opens on the ACTIVE week — the one you came to pick in. A rival's
+  // opens on the last one that locked, because that is the newest of theirs that
+  // exists to be seen.
+  const fallback = isOwn
+    ? defaultWeek(
+        matchweeks,
+        season?.openMatchweekNumber ?? null,
+        season?.inPlayMatchweekNumber ?? null,
+        now,
+      )
+    : ceiling;
+
   const [chosen, setChosen] = useState<number | null>(mw ? Number(mw) : null);
   const week = chosen ?? fallback;
   const matchweek = matchweeks.find((m) => m.number === week);
   const state = weekState(matchweek, season?.openMatchweekNumber ?? null, now);
 
-  const ownEntry = league.data?.you.entries.find((e) => e.entry_id === entryId) ?? null;
-  const isOwn = ownEntry !== null;
   const canEdit = isOwn && state === 'open';
+
+  const prevWeek = week === null ? null : stepWeek(matchweeks, week, -1);
+  const rawNext = week === null ? null : stepWeek(matchweeks, week, 1);
+  // ⚠ A rival's forward arrow stops at the last lock. Your own runs to the end
+  // of the season — a future week of your own is empty, not secret.
+  const nextWeek = !isOwn && rawNext !== null && ceiling !== null && rawNext > ceiling ? null : rawNext;
 
   // A rival's picks live behind the reveal gate, so they come from `/bulk` and
   // only for a locked week. Your own always come from the league contract.
@@ -252,16 +277,10 @@ export default function PickemPickScreen() {
           week={week}
           state={state}
           lockAt={matchweek?.lock_at ?? null}
-          onPrev={() => {
-            const p = stepWeek(matchweeks, week, -1);
-            if (p !== null) setChosen(p);
-          }}
-          onNext={() => {
-            const n = stepWeek(matchweeks, week, 1);
-            if (n !== null) setChosen(n);
-          }}
-          hasPrev={stepWeek(matchweeks, week, -1) !== null}
-          hasNext={stepWeek(matchweeks, week, 1) !== null}
+          onPrev={() => prevWeek !== null && setChosen(prevWeek)}
+          onNext={() => nextWeek !== null && setChosen(nextWeek)}
+          hasPrev={prevWeek !== null}
+          hasNext={nextWeek !== null}
         />
       ) : null}
 
