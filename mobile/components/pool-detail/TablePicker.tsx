@@ -15,8 +15,8 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // =============================================================
 // TWENTY CLUBS, ONE ORDER — the pre-deadline half of table mode
 // =============================================================
-// The other half of `LeagueMyTableTab`: before the lock you drag, after it you
-// watch. Two screens that are really one screen at two points in time.
+// The pre-lock half of `app/pool/[id]/table/[entryId]`: before the lock you
+// drag, after it you watch. One screen at two points in time.
 //
 // ## Autosave, coalesced — NOT debounced
 //

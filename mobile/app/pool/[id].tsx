@@ -25,7 +25,7 @@ import {
   FeesTab,
   FormTab,
   LeaderboardTab,
-  LeagueMyTableTab,
+  LeagueTableEntriesTab,
   LeagueTableScoring,
   MembersTab,
   PoolDetailHeader,
@@ -74,7 +74,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
 // redundant parent-triggered re-render.
 const MemoPoolDetailHeader = memo(PoolDetailHeader);
 const MemoLeaderboardTab = memo(LeaderboardTab);
-const MemoLeagueMyTableTab = memo(LeagueMyTableTab);
+const MemoLeagueTableEntriesTab = memo(LeagueTableEntriesTab);
 const MemoLeagueTableScoring = memo(LeagueTableScoring);
 const MemoPredictionsTab = memo(PredictionsTab);
 const MemoFormTab = memo(FormTab);
@@ -226,15 +226,13 @@ export default function PoolDetailScreen() {
   const isProgressive = data?.pool.predictionMode === 'progressive';
   const isLeague = data?.pool.isLeague ?? false;
   const isTableMode = isLeague && data?.pool.leagueMode === 'table';
-  // ⚠ THE PICKER IS THE ONLY THING THAT NEEDS THE SPECIAL SCROLLER, and
-  // scoping it to `isTableMode` alone wrapped the LOCKED scored view in a
-  // `ScrollViewContainer` it never needed — a table nobody can drag, inside a
-  // scroller built for dragging. The lock is the same switch the tab itself
-  // uses, and the pool row already carries it, so no query is needed here.
+  // Has table picking closed? Drives what the Predictions tab offers and
+  // whether rivals' tables can be opened. The pool row already carries it, so
+  // no query is needed — and it is the same fact the database trigger and RLS
+  // both key on, rather than a second definition of "closed".
   const tableIsLocked = data?.pool.leagueTableLockAt
     ? new Date(data.pool.leagueTableLockAt).getTime() <= Date.now()
     : false;
-  const showsTablePicker = isTableMode && !tableIsLocked;
   // Implicit toggle: fee tracking is "on" iff the admin has set a
   // positive entry fee in Settings. Drives both the Fees tab visibility
   // in the tab bar and the Fees & Prize Pool card in PoolInfoTab.
@@ -391,10 +389,19 @@ export default function PoolDetailScreen() {
           isLeague: pool.isLeague,
           leagueMode: pool.leagueMode,
         });
-        // Table mode keeps this tab and this name. The pool asks for exactly
-        // one prediction, and this is it — see `leagueSurface.ts`.
+        // Table mode keeps this tab and this name, and lists ENTRIES like the
+        // World Cup does — the picking itself is a route away. See
+        // `leagueSurface.ts` and `LeagueTableEntriesTab`.
         if (surface === 'league-table') {
-          return <MemoLeagueMyTableTab poolId={pool.poolId} entryId={ownLeagueEntryId} />;
+          return (
+            <MemoLeagueTableEntriesTab
+              poolId={pool.poolId}
+              entries={leagueLeaderboard ?? []}
+              currentUserId={pool.currentUserId}
+              isLocked={tableIsLocked}
+              lockAt={pool.leagueTableLockAt}
+            />
+          );
         }
         if (surface === 'league-read-only') {
           return (
@@ -485,38 +492,7 @@ export default function PoolDetailScreen() {
         keyboardShouldPersistTaps="handled"
         style={{ flex: 1 }}
       >
-        {visibleTabs.map((key) => {
-          // ⚠ THE PICKER OWNS ITS OWN SCROLLER, so this page must give it HEIGHT
-          // rather than a second one.
-          //
-          // Same shape as `BracketPickerWizard`, which is the World Cup answer
-          // to the identical problem: it renders a `ScrollViewContainer` with
-          // `flex: 1` and puts a `NestedReorderableList` inside. That only works
-          // if its parent has real height — wrapped in a ScrollView instead,
-          // `flex: 1` collapses to the content and nothing scrolls.
-          //
-          // The wizard gets that for free by living on its own route. The table
-          // picker stays in the tab (one prediction, and the tab that holds
-          // predictions is where it belongs), so the tab hands it a plain
-          // full-height View.
-          //
-          // ⚠ Pull-to-refresh goes with the ScrollView on this one tab. It
-          // autosaves and refetches on focus, so there is nothing a pull would
-          // recover.
-          if (key === 'predictions' && showsTablePicker) {
-            return (
-              // ⚠ `width` ALONE — NOT `flex: 1`. This sits in a HORIZONTAL
-              // ScrollView, where flex is a MAIN-AXIS instruction: `flex: 1`
-              // sets `flexBasis: 0%` and grows the page sideways, fighting the
-              // `width` that makes it one page. Height comes free from the row
-              // container's default `alignItems: 'stretch'`, which is how every
-              // other page has always been full height.
-              <View key={key} style={{ width }}>
-                {renderTab(key)}
-              </View>
-            );
-          }
-          return (
+        {visibleTabs.map((key) => (
           <ScrollView
             key={key}
             style={{ width }}
@@ -531,8 +507,7 @@ export default function PoolDetailScreen() {
           >
             {renderTab(key)}
           </ScrollView>
-          );
-        })}
+        ))}
       </Animated.ScrollView>
 
       <BanterFab

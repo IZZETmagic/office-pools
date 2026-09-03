@@ -44,7 +44,7 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // ## It computes nothing
 //
 // Per-club points, deltas and the total come from `/table-prediction`, the same
-// call `LeagueMyTableTab` makes, rendered by the same `TableBreakdownList`. Two
+// call the table screen makes, rendered by the same `TableBreakdownList`. Two
 // copies of a scoring breakdown is how the screen a member checks and the screen
 // they compare against start disagreeing.
 // =============================================================

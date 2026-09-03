@@ -7,7 +7,7 @@ import { fontFamilies, useTheme } from '@/theme';
 // =============================================================
 // ONE TABLE PREDICTION, PRICED — the rendering, for anybody's entry
 // =============================================================
-// Extracted from `LeagueMyTableTab` when the same thing was needed for OTHER
+// Extracted from the table screen when the same thing was needed for OTHER
 // members' tables in the leaderboard sheet. Two copies of a scoring breakdown is
 // how the screen a member checks and the screen they compare against start
 // disagreeing — the web keeps one copy for the same reason
