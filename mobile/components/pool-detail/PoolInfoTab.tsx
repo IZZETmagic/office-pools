@@ -59,10 +59,18 @@ type Props = {
    * pool — so without this the card says "Open" against a date most of a year
    * away while picking closes tomorrow. Null for every other mode.
    */
-  lms?: { matchweek: number; locksAt: string } | null;
+  /**
+   * The open matchweek and when it locks, for a mode that locks weekly.
+   *
+   * ⚠ RENAMED FROM `lms` when Pick'em became the second caller. The concept was
+   * never LMS's — it is "this pool locks per matchweek, here is the one that
+   * matters" — and a prop named after the first mode to need it is how the
+   * third one ends up with its own near-identical prop beside it.
+   */
+  matchweekDeadline?: { matchweek: number; locksAt: string } | null;
 };
 
-export function PoolInfoTab({ pool, lms = null }: Props) {
+export function PoolInfoTab({ pool, matchweekDeadline = null }: Props) {
   const theme = useTheme();
   const { refresh: refreshHomeData } = useHomeData();
 
@@ -145,13 +153,13 @@ export function PoolInfoTab({ pool, lms = null }: Props) {
    * ⚠ The value is the matchweek's `lock_at`, which migration 101 moved to an
    * HOUR BEFORE the first kickoff. `first_kickoff_at` would be an hour late.
    */
-  const lmsLockAt = lms?.locksAt ?? null;
-  const deadlineAt = tableLockAt ?? lmsLockAt ?? pool.predictionDeadline;
+  const weeklyLockAt = matchweekDeadline?.locksAt ?? null;
+  const deadlineAt = tableLockAt ?? weeklyLockAt ?? pool.predictionDeadline;
   // A league pool whose deadline we cannot name honestly. Pick'em and Showdown
   // also lock per matchweek and nothing here knows which week they are on, so
   // the sentinel would still be showing — it is suppressed rather than printed.
   const deadlineIsSentinel =
-    pool.isLeague && !tableLockAt && !lmsLockAt;
+    pool.isLeague && !tableLockAt && !weeklyLockAt;
   const entryFee = pool.entryFee ?? 0;
   const currency = pool.entryFeeCurrency || 'USD';
   const showFeesCard = entryFee > 0;
@@ -192,10 +200,10 @@ export function PoolInfoTab({ pool, lms = null }: Props) {
       {/* Deadlines */}
       <Card>
         <Caption>
-          {tableLockAt ? 'Table deadline' : lmsLockAt ? `Matchweek ${lms?.matchweek} deadline` : 'Deadlines'}
+          {tableLockAt ? 'Table deadline' : weeklyLockAt ? `Matchweek ${matchweekDeadline?.matchweek} deadline` : 'Deadlines'}
         </Caption>
         <RNText style={{ fontFamily: fontFamilies.regular, fontSize: 11, color: theme.colors.slate }}>
-          {lmsLockAt
+          {weeklyLockAt
             ? 'Picks lock an hour before the first kickoff — then the next matchweek opens on its own'
             : 'When predictions lock'}
         </RNText>

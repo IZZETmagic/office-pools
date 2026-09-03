@@ -28,6 +28,7 @@ export { LeaderboardPodium } from './LeaderboardPodium';
 export { LeaderboardRow } from './LeaderboardRow';
 export { LeaderboardTab } from './LeaderboardTab';
 export { LeaguePickemEntriesTab } from './LeaguePickemEntriesTab';
+export { LeaguePickemScoring } from './LeaguePickemScoring';
 export { LeagueTableEntriesTab } from './LeagueTableEntriesTab';
 export { TablePicker } from './TablePicker';
 export { LeagueTableScoring } from './LeagueTableScoring';

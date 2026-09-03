@@ -168,11 +168,37 @@ export async function GET(
     })
   }
 
+  /**
+   * What a fixture pays, READ from the same columns the engine COALESCEs
+   * against so this can never describe scoring nobody is using.
+   *
+   * ⚠⚠ AT RESULTS DEPTH A CORRECT TAP IS CHARGED AT `group_exact_score` — the
+   * pool's TOP price — not at `group_correct_result`. Migration 066: *"getting
+   * the outcome right is the most that can be achieved, so the top price is the
+   * semantically right one to charge it at."* The World Cup scoring screen
+   * showed that same number under "Exact Score" and then "Correct Result — 50"
+   * beneath it, so a member who called Arsenal to win read that their pick was
+   * worth 50. It is worth 100. Shipping the raw three and letting ONE place
+   * decide what they mean is how that stays fixed.
+   *
+   * Defaults mirror 066 exactly: 100 / 75 / 50.
+   */
+  const { data: settings } = await admin
+    .from('pool_settings')
+    .select('group_exact_score, group_correct_difference, group_correct_result')
+    .eq('pool_id', pool_id)
+    .maybeSingle()
+
   return NextResponse.json({
     pool: {
       pool_id: pool.pool_id,
       pool_name: pool.pool_name,
       league_mode: pool.league_mode,
+      prices: {
+        exact: settings?.group_exact_score ?? 100,
+        goalDifference: settings?.group_correct_difference ?? 75,
+        result: settings?.group_correct_result ?? 50,
+      },
       // ⚠ `?? null`, and the polarity matters. A pool created before migration
       // 077 has NULL depth, the engine reads NULL as Scores (066, deliberately),
       // and three copy sites once read it as Results — telling members they were

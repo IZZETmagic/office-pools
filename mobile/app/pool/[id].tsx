@@ -27,6 +27,7 @@ import {
   FormTab,
   LeaderboardTab,
   LeaguePickemEntriesTab,
+  LeaguePickemScoring,
   LeagueTableEntriesTab,
   LmsEntriesTab,
   LmsScoring,
@@ -46,6 +47,7 @@ import {
 import { Button, Text } from '@/components/ui';
 import { fetchLmsState } from '@/lib/api';
 import { predictionSurfaceFor } from '@/lib/leagueSurface';
+import { useLeaguePool } from '@/lib/useLeaguePool';
 import { useReportActivePool } from '@/lib/PresenceProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { usePendingActions } from '@/lib/usePendingActions';
@@ -83,6 +85,7 @@ const MemoLeagueTableEntriesTab = memo(LeagueTableEntriesTab);
 const MemoLmsEntriesTab = memo(LmsEntriesTab);
 const MemoLeaguePickemEntriesTab = memo(LeaguePickemEntriesTab);
 const MemoLmsScoring = memo(LmsScoring);
+const MemoLeaguePickemScoring = memo(LeaguePickemScoring);
 const MemoLeagueTableScoring = memo(LeagueTableScoring);
 const MemoPredictionsTab = memo(PredictionsTab);
 const MemoFormTab = memo(FormTab);
@@ -252,6 +255,24 @@ export default function PoolDetailScreen() {
   // why nothing on the phone filters them: a rival's club is absent until the
   // matchweek locks, and absence is the gate rather than a flag to respect.
   const isLms = isLeague && data?.pool.leagueMode === 'last_man_standing';
+  /**
+   * Pick'em's open matchweek and its real lock, for the Info card.
+   *
+   * ⚠ The same `useLeaguePool` the Pick'em tabs call, so React Query serves it
+   * from one cache rather than fetching the 165 kB season twice.
+   *
+   * ⚠ `lock_at`, NOT the first kickoff — migration 101 closes picks an hour
+   * earlier, and the two differ on every matchweek from 3 onward.
+   */
+  const pickemLeague = useLeaguePool(data?.pool.leagueMode === 'pickem' ? id : null);
+  const pickemDeadline = (() => {
+    const season = pickemLeague.data?.season;
+    const open = season?.openMatchweekNumber ?? null;
+    if (open === null) return null;
+    const mw = season?.matchweeks.find((m) => m.number === open);
+    return mw?.lock_at ? { matchweek: open, locksAt: mw.lock_at } : null;
+  })();
+
   const lmsQuery = useQuery({
     queryKey: ['lms', id],
     queryFn: () => fetchLmsState(id),
@@ -506,6 +527,14 @@ export default function PoolDetailScreen() {
             />
           );
         }
+        // ⚠ And Pick'em's World Cup tab carried one line that was WRONG rather
+        // than merely irrelevant: at Results depth the engine charges a correct
+        // tap at the pool's TOP price (066), and that screen printed "Correct
+        // Result — 50" beneath it. A member who called Arsenal to win read that
+        // their pick was worth half what it pays.
+        if (pool.leagueMode === 'pickem') {
+          return <MemoLeaguePickemScoring poolId={pool.poolId} />;
+        }
         return (
           <MemoScoringTab
             poolId={pool.poolId}
@@ -519,10 +548,15 @@ export default function PoolDetailScreen() {
             // ⚠ Without this the card reads the league SENTINEL — the season's
             // last kickoff, 269 days out on the live pool — under an "Open"
             // badge, while picking actually closes this week.
-            lms={
+            // ⚠ BOTH weekly modes now. Pick'em's date was SUPPRESSED rather
+            // than corrected when LMS was fixed — the card had no idea which
+            // matchweek it was on, and a blank beat a confident wrong date.
+            // The league contract carries the matchweeks now, so it can be
+            // right instead of absent.
+            matchweekDeadline={
               lmsQuery.data?.open_matchweek != null && lmsQuery.data.open_locks_at
                 ? { matchweek: lmsQuery.data.open_matchweek, locksAt: lmsQuery.data.open_locks_at }
-                : null
+                : pickemDeadline
             }
           />
         );

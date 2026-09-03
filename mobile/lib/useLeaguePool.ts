@@ -53,6 +53,17 @@ export type LeaguePoolPayload = {
      */
     league_depth: 'results' | 'scores' | null
     league_table_lock_at: string | null
+    /**
+     * What a fixture pays. Read from the same `pool_settings` columns the
+     * engine COALESCEs against, so a screen cannot quote scoring nobody uses.
+     *
+     * ⚠⚠ AT RESULTS DEPTH A CORRECT TAP COSTS `exact`, NOT `result`. Migration
+     * 066 charges a correct outcome at the pool's TOP price, because getting
+     * the outcome right is the most that can be achieved there. The World Cup
+     * screen printed `result` next to it and told members their pick was worth
+     * half what it pays. Read the depth before reading these.
+     */
+    prices: { exact: number; goalDifference: number; result: number }
   }
   season: {
     teams: LeagueTeam[]
