@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text as RNText, View } from 'react-native';
 
+import { initialsOf } from './leaderboard-shared';
 import { ActionMenu, Button, ConfirmDialog, Icon, PromptDialog, Text } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { useMemberRoster } from '@/lib/useMemberRoster';
@@ -592,13 +593,6 @@ function EntryRow({
       <Icon name="chevron.right" color="slate" size={12} weight="semibold" />
     </Pressable>
   );
-}
-
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 // A single "Everyone's predictions" row — one entry, labelled by its owner.

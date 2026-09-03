@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
+import { InitialsAvatar } from './leaderboard-shared';
 import { lastLockedWeek } from '@/lib/pickemWeek';
 import { useLeaguePool } from '@/lib/useLeaguePool';
 import { useTheme } from '@/theme';
@@ -121,17 +122,14 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
           </Text>
         </View>
       ) : (
-        <>
-          <Text variant="cardTitle">Your picks</Text>
-          {mine.map((entry) => (
-            <EntryCard
-              key={entry.entry_id}
-              entry={entry}
-              openable
-              onPress={() => open(entry)}
-            />
-          ))}
-        </>
+        /* ⚠ NO HEADING. Ryan, 2026-09-03: *"'Your Picks' doesn't need to be
+           there either — it's just gonna be the top, and the list underneath is
+           gonna be everyone's picks."* So yours is identified by POSITION and by
+           your own face on it, not by a label above it and not by a tint. One
+           heading on the screen, and it belongs to the list that needs one. */
+        mine.map((entry) => (
+          <EntryCard key={entry.entry_id} entry={entry} openable onPress={() => open(entry)} />
+        ))
       )}
 
       {/*
@@ -211,6 +209,11 @@ function EntryCard({
         ...theme.shadows.card,
       })}
     >
+      {/* ⚠ Initials, not a photo, and not for want of trying: the product
+          stores no avatar on any table. This is the same mark the World Cup
+          predictions list uses, from the same function. */}
+      <InitialsAvatar name={entry.full_name} />
+
       <View style={{ flex: 1, gap: 3 }}>
         <Text variant="cardTitle" numberOfLines={1}>
           {name}

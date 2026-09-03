@@ -238,3 +238,49 @@ export function MovementPill({
     </View>
   );
 }
+
+/**
+ * Two letters for a person, when there is no picture of them.
+ *
+ * ⚠ There is no avatar to show — the product stores none, on any table. So this
+ * is not a fallback waiting for images, it is the identity mark itself, and the
+ * moment `users` grows an avatar column this is the one place both surfaces
+ * reach for.
+ *
+ * First and LAST initial for a multi-word name, so "Sarah Connor" is SC rather
+ * than SA; the first two letters for a single word; "?" for nothing, which is
+ * better than an empty circle that reads as a failed image.
+ */
+export function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/** The World Cup's member mark: initials in a primary-tinted pill. */
+export function InitialsAvatar({ name, size = 34 }: { name: string; size?: number }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: theme.radii.pill,
+        backgroundColor: withOpacity(theme.colors.primary, 0.12),
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <RNText
+        style={{
+          fontFamily: fontFamilies.bold,
+          fontSize: Math.round(size * 0.35),
+          color: theme.colors.primary,
+        }}
+      >
+        {initialsOf(name)}
+      </RNText>
+    </View>
+  );
+}
