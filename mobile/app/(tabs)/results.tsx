@@ -331,6 +331,41 @@ export default function ResultsScreen() {
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
 
+  /**
+   * Anchor as soon as the layout can answer, rather than at one guessed moment.
+   *
+   * ⚠ THE SINGLE `setTimeout(…, 200)` WAS THE FRAGILE PART, and it failed in the
+   * way that looks exactly like "it does nothing": if `onLayout` has not run for
+   * the target section yet, `scrollToAnchor` finds no offset, returns false, and
+   * the list simply stays where it is. 200 ms is fine on a warm 30-row list and
+   * not obviously fine on a freshly mounted 120-row one.
+   *
+   * So it retries on a short interval and gives up after a second — bounded, so
+   * a list that genuinely has no anchor (a finished season) costs a handful of
+   * cheap checks rather than spinning.
+   */
+  const anchorAttemptRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const anchorSoon = useCallback(() => {
+    if (anchorAttemptRef.current) clearInterval(anchorAttemptRef.current);
+    let attempts = 0;
+    anchorAttemptRef.current = setInterval(() => {
+      attempts += 1;
+      // Stop on success, or once a second of layout has plainly not produced
+      // the offset we need.
+      if (scrollToAnchorRef.current?.(true) || attempts >= 12) {
+        if (anchorAttemptRef.current) clearInterval(anchorAttemptRef.current);
+        anchorAttemptRef.current = null;
+      }
+    }, 80);
+  }, []);
+
+  // Cleared on unmount so a backgrounded screen is not left holding a timer.
+  useEffect(() => () => {
+    if (anchorAttemptRef.current) clearInterval(anchorAttemptRef.current);
+  }, []);
+
+  const scrollToAnchorRef = useRef<((animated: boolean) => boolean) | null>(null);
+
   const scrollToAnchor = useCallback((animated: boolean) => {
     // ⚠ Searched within the WINDOW, not the whole list. Only mounted sections
     // have a layout offset, so a target outside it silently does nothing.
@@ -347,6 +382,7 @@ export default function ResultsScreen() {
     scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated });
     return true;
   }, []);
+  scrollToAnchorRef.current = scrollToAnchor;
 
   // First content render. Still one-shot: this fires as sections arrive, and
   // without the latch it would fight the member's own scrolling every time the
@@ -355,12 +391,11 @@ export default function ResultsScreen() {
     if (autoScrollDoneRef.current) return;
     if (view !== 'matches') return;
     if (visible.sections.length === 0) return;
-    // Wait a frame so onLayout has populated section offsets.
-    const handle = setTimeout(() => {
-      if (scrollToAnchor(true)) autoScrollDoneRef.current = true;
-    }, 200);
-    return () => clearTimeout(handle);
-  }, [sections, view, scrollToAnchor, visible.sections.length]);
+    // Latch immediately: `anchorSoon` retries on its own, and without the latch
+    // this effect would restart it on every list change.
+    autoScrollDoneRef.current = true;
+    anchorSoon();
+  }, [sections, view, anchorSoon, visible.sections.length]);
 
   // What the focus handler above calls. Wired through a ref because it has to
   // reset STATE — the window the member may have expanded — and that reset has
@@ -372,10 +407,29 @@ export default function ResultsScreen() {
     // holding August, and the anchor is a long way down it.
     setExpandBefore(0);
     setExpandAfter(0);
-    // Two frames' grace: the state reset re-renders, `onLayout` re-runs, and
-    // only then are the offsets the scroll needs correct.
-    setTimeout(() => scrollToAnchor(true), 200);
+    // The state reset has to re-render and `onLayout` re-run before the offsets
+    // are right, so this waits for them rather than guessing how long that takes.
+    anchorSoon();
   };
+
+  // ---- Coming back from Tables ----
+  //
+  // ⚠ A THIRD DOOR, and it does not go through either of the two above.
+  // Switching to Tables swaps out the whole fragment — `ScrollView` included —
+  // so coming back MOUNTS A NEW ONE, at offset 0. That is the "shoots to the
+  // very top" report: not a failure to scroll, a brand-new list starting where
+  // every list starts.
+  //
+  // `useFocusEffect` cannot see it — the screen never lost focus, only its
+  // children were swapped — and the first-render effect is latched by then. So
+  // the toggle has to say so itself.
+  const prevViewRef = useRef(view);
+  useEffect(() => {
+    const previous = prevViewRef.current;
+    prevViewRef.current = view;
+    if (previous === view || view !== 'matches') return;
+    reAnchorRef.current?.();
+  }, [view]);
 
   // ---- Render ----
 
