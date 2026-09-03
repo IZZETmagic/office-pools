@@ -33,11 +33,18 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
   tables: LeagueSeasonTable[];
+  /**
+   * Which competition to open on, when something linked here asking for a
+   * specific one — the "See the full table" row on a pool's My Table screen.
+   * Ignored if that season is not among the member's, which is the honest
+   * fallback: showing a table they do have beats an empty screen.
+   */
+  initialSeasonId?: string | null;
 };
 
-export function LeagueTablesView({ tables }: Props) {
+export function LeagueTablesView({ tables, initialSeasonId = null }: Props) {
   const theme = useTheme();
-  const [seasonId, setSeasonId] = useState<string | null>(null);
+  const [seasonId, setSeasonId] = useState<string | null>(initialSeasonId);
 
   // Falls back rather than tracking the list: a season can vanish between
   // renders (a pool archived, a refetch) and a dangling id would blank a screen
@@ -120,6 +127,29 @@ export function LeagueTablesView({ tables }: Props) {
   );
 }
 
+/**
+ * ⚠ ONE SOURCE FOR THE COLUMN WIDTHS. The header and the rows are separate
+ * components with no shared layout, so a width changed in one and not the other
+ * silently un-aligns the whole table — and at these sizes a 2px drift is
+ * visible down twenty rows.
+ *
+ * Nine columns on a 375pt phone is genuinely tight. The numbers are 11px mono
+ * and the club leans on `short_name` (resolved server-side by the same helper
+ * the web uses) to keep the flexible column readable rather than truncating
+ * into "Manchester Unit…".
+ */
+const COL = {
+  rank: 20,
+  pl: 20,
+  w: 18,
+  d: 18,
+  l: 18,
+  /** Goals for:against — "45:23" is five characters. */
+  ga: 36,
+  gd: 26,
+  pts: 28,
+} as const;
+
 function HeaderRow() {
   const theme = useTheme();
   return (
@@ -133,13 +163,25 @@ function HeaderRow() {
         backgroundColor: theme.colors.mist,
       }}
     >
-      <View style={{ width: 26 }} />
+      <View style={{ width: COL.rank }} />
       <View style={{ flex: 1 }}>
         <Text variant="caption" color="slate">Club</Text>
       </View>
-      <Num>Pl</Num>
-      <Num>GD</Num>
-      <Num wide>Pts</Num>
+      <Head width={COL.pl}>PL</Head>
+      <Head width={COL.w}>W</Head>
+      <Head width={COL.d}>D</Head>
+      <Head width={COL.l}>L</Head>
+      <Head width={COL.ga}>+/-</Head>
+      <Head width={COL.gd}>GD</Head>
+      <Head width={COL.pts}>PTS</Head>
+    </View>
+  );
+}
+
+function Head({ children, width }: { children: string; width: number }) {
+  return (
+    <View style={{ width, alignItems: 'flex-end' }}>
+      <Text variant="caption" color="slate">{children}</Text>
     </View>
   );
 }
@@ -156,16 +198,16 @@ function ClubRow({ row }: { row: LeagueStandingRow }) {
         paddingVertical: theme.spacing.sm + 1,
         borderTopWidth: 1,
         borderTopColor: theme.colors.mist,
-        // The stripe belongs to the PLACE. See the header.
+        // The stripe belongs to the PLACE, not the club standing in it.
         borderLeftWidth: 3,
         borderLeftColor: row.band ? bandColor(row.band, theme) : 'transparent',
       }}
     >
-      <View style={{ width: 23, alignItems: 'center' }}>
+      <View style={{ width: COL.rank, alignItems: 'center' }}>
         <RNText
           style={{
             fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: '700',
             color: theme.colors.slate,
           }}
@@ -174,51 +216,54 @@ function ClubRow({ row }: { row: LeagueStandingRow }) {
         </RNText>
       </View>
 
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, paddingRight: 4 }}>
         {row.crest_url ? (
-          <Image source={{ uri: row.crest_url }} style={{ width: 18, height: 18 }} resizeMode="contain" />
+          <Image source={{ uri: row.crest_url }} style={{ width: 16, height: 16 }} resizeMode="contain" />
         ) : (
-          <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: theme.colors.mist }} />
+          <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: theme.colors.mist }} />
         )}
-        {/* The shortened name, resolved server-side by the same helper the web
-            uses — truncation would eat the half that tells two clubs apart. */}
-        <Text variant="body" numberOfLines={1} style={{ flexShrink: 1 }}>
+        {/* `short_name`, resolved server-side by the same helper the web uses.
+            Truncating the full name would eat the half that tells two clubs
+            apart — "Manchester Unit…" beside "Manchester Cit…". */}
+        <Text variant="detail" numberOfLines={1} style={{ flexShrink: 1, color: theme.colors.ink }}>
           {row.short_name}
         </Text>
       </View>
 
-      <Num muted>{row.played}</Num>
-      <Num muted>{row.goals_diff > 0 ? `+${row.goals_diff}` : String(row.goals_diff)}</Num>
-      <Num wide bold>{row.points}</Num>
+      <Num width={COL.pl} muted>{row.played}</Num>
+      <Num width={COL.w} muted>{row.won}</Num>
+      <Num width={COL.d} muted>{row.drawn}</Num>
+      <Num width={COL.l} muted>{row.lost}</Num>
+      {/* Goals for and against — the PAIR, not the difference. GD is its own
+          column, and printing the same number twice would spend width this
+          table has none of. */}
+      <Num width={COL.ga} muted>{`${row.goals_for}:${row.goals_against}`}</Num>
+      <Num width={COL.gd} muted>
+        {row.goals_diff > 0 ? `+${row.goals_diff}` : String(row.goals_diff)}
+      </Num>
+      <Num width={COL.pts} bold>{row.points}</Num>
     </View>
   );
 }
 
 function Num({
   children,
-  wide = false,
+  width,
   bold = false,
   muted = false,
 }: {
   children: React.ReactNode;
-  wide?: boolean;
+  width: number;
   bold?: boolean;
   muted?: boolean;
 }) {
   const theme = useTheme();
-  if (typeof children === 'string' && !bold && !muted) {
-    return (
-      <View style={{ width: wide ? 34 : 30, alignItems: 'flex-end' }}>
-        <Text variant="caption" color="slate">{children}</Text>
-      </View>
-    );
-  }
   return (
-    <View style={{ width: wide ? 34 : 30, alignItems: 'flex-end' }}>
+    <View style={{ width, alignItems: 'flex-end' }}>
       <RNText
         style={{
           fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: bold ? '900' : '600',
           color: muted ? theme.colors.slate : theme.colors.ink,
         }}

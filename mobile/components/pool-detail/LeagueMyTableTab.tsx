@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { Image, Platform, Text as RNText, View } from 'react-native';
+import { router } from 'expo-router';
+import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import {
@@ -119,12 +120,58 @@ export function LeagueMyTableTab({ poolId, entryId }: Props) {
 
       <ClubList rows={breakdown} settings={settings} summary={summary} />
 
+      {/*
+        The doorway, at the moment the intent forms: they have just read twenty
+        `Now` values and the next thought is "what does the real table look
+        like". The table itself lives in Match Centre rather than in this pool —
+        it is a fact about the SEASON, and thirteen Premier League pools would
+        otherwise carry thirteen copies of it.
+
+        ⚠ Carries the season, so it opens on THIS competition rather than
+        whichever one Match Centre happens to list first.
+      */}
+      <SeeFullTable seasonId={settings.seasonId} />
+
       <Text variant="detail" color="slate">
         {summary.isFinal
           ? 'The season is over — these are the final positions.'
           : 'Positions move every matchweek, so this total is provisional until the season ends.'}
       </Text>
     </View>
+  );
+}
+
+function SeeFullTable({ seasonId }: { seasonId: string }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={() =>
+        router.navigate({
+          pathname: '/(tabs)/results',
+          params: { view: 'tables', season: seasonId },
+        })
+      }
+      accessibilityRole="link"
+      accessibilityLabel="See the full league table"
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: theme.spacing.sm,
+        paddingHorizontal: theme.spacing.lg,
+        paddingVertical: theme.spacing.md,
+        borderRadius: theme.radii.lg,
+        backgroundColor: theme.colors.surface,
+        opacity: pressed ? 0.7 : 1,
+        ...theme.shadows.card,
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, flexShrink: 1 }}>
+        <Icon name="list.number" color="primary" size={16} />
+        <Text variant="body" style={{ flexShrink: 1 }}>See the full table</Text>
+      </View>
+      <Icon name="chevron.right" color="slate" size={11} />
+    </Pressable>
   );
 }
 

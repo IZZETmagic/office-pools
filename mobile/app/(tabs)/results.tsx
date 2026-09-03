@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -84,7 +84,17 @@ export default function ResultsScreen() {
   // Match Centre's two views. A table is a fact about the SEASON, so it lives
   // here beside the football rather than inside each pool — thirteen Premier
   // League pools would otherwise carry thirteen copies of one table.
-  const [view, setView] = useState<'matches' | 'tables'>('matches');
+  //
+  // ⚠ Read ONCE, on first render. After that the member navigates freely — a
+  // param re-applied on every render would snap them back to Tables every time
+  // this screen re-rendered for any other reason.
+  const { view: viewParam, season: seasonParam } = useLocalSearchParams<{
+    view?: string;
+    season?: string;
+  }>();
+  const [view, setView] = useState<'matches' | 'tables'>(
+    viewParam === 'tables' ? 'tables' : 'matches',
+  );
 
   /**
    * The header control, or null.
@@ -389,7 +399,7 @@ export default function ResultsScreen() {
         toggle={headerToggle}
       />
       {view === 'tables' ? (
-        <LeagueTablesView tables={leagueTables} />
+        <LeagueTablesView tables={leagueTables} initialSeasonId={seasonParam ?? null} />
       ) : (
       <>
       <ResultsFilterBar

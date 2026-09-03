@@ -105,6 +105,9 @@ async function readTableSettings(supabase: SupabaseClient, poolId: string) {
   const lockAt = (pool.league_table_lock_at as string | null) ?? null
 
   return {
+    // Sent so a screen can link to THIS competition's table rather than
+    // whichever one Match Centre happens to open on.
+    seasonId: pool.league_season_id as string,
     lockAt,
     isLocked: lockAt ? new Date(lockAt) <= new Date() : false,
     topN: s?.table_top_n ?? bands.top_n ?? 4,

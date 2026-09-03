@@ -245,6 +245,8 @@ export type TableBreakdownRow = {
  * Europa places must not shade a band it does not have.
  */
 export type TableSettings = {
+  /** The competition this pool plays, for linking to its table. */
+  seasonId: string;
   lockAt: string | null;
   isLocked: boolean;
   topN: number;
