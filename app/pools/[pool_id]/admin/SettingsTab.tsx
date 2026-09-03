@@ -318,7 +318,21 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
   // So: table mode edits `league_table_lock_at`, which is a real member-facing
   // deadline (migration 098 lets it move while it is still open). Every other
   // league mode has nothing here to edit — the card is hidden below.
-  const isLeaguePool = pool.league_mode !== null && pool.league_mode !== undefined
+  // ⚠⚠ `league_season_id`, NOT `league_mode` — and this was live for THREE pools.
+  //
+  // A pool can carry a season with a NULL mode: `galacticoco`, `uffff` and the
+  // archived `MFWs PL Pool` do, counted in production on 2026-09-03. Keyed on
+  // `league_mode` this read FALSE for all three, so they were offered the
+  // deadline card and this form wrote `prediction_deadline` on save — the exact
+  // write the comment above forbids, on the exact pools it was written to
+  // protect. Their deadline is 2027, so nothing has been revealed yet; an admin
+  // dragging it backwards is all it would take.
+  //
+  // The rule is already recorded in `mobile/lib/leagueSurface.ts`: `isLeague` is
+  // the discriminant, never the mode. The mode may then choose BETWEEN league
+  // behaviours — which is what `isTableMode` below does — but it may never
+  // decide whether this is a league at all.
+  const isLeaguePool = pool.league_season_id !== null && pool.league_season_id !== undefined
   const isTableMode = pool.league_mode === 'table'
   const deadlineSource = isTableMode ? pool.league_table_lock_at : pool.prediction_deadline
 
@@ -541,7 +555,10 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
     }
 
     // Validate max entries
-    const maxE = parseInt(maxEntries) || 1
+    // ⚠ Forced, not merely un-offered. Hiding a control does not stop it
+    // submitting the state it already held, and a pool that BECAME a league
+    // would otherwise keep whatever it was set to.
+    const maxE = isLeaguePool ? 1 : parseInt(maxEntries) || 1
     if (maxE < 1 || maxE > 10) {
       setError('Max entries must be between 1 and 10.')
       return
@@ -1212,7 +1229,18 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
           </SettingsRow>
         </Card>
 
-        {/* ── Prediction Entries ── */}
+        {/* ── Prediction Entries ──
+            ⚠ A LEAGUE POOL IS ONE ENTRY PER MEMBER, AND THE CONTROL IS NOT
+            OFFERED. Nothing pinned it before: an admin could set 3 on a table
+            pool, and the second entry would be unreachable for ever — both the
+            picker and `/table-prediction` resolve to the member's FIRST entry,
+            so entry 2 could never be filled and would sit at 0 all season.
+            Showdown is worse again: the draw is per entry, so a member would be
+            drawn against people twice with only one of them playable.
+
+            Every league pool in production is already at 1; this stops it being
+            raised rather than fixing anything existing. */}
+        {isLeaguePool ? null : (
         <Card padding="sm">
           <Caption>Prediction Entries</Caption>
           <p className="t-body text-muted mb-4">
@@ -1234,6 +1262,7 @@ export function SettingsTab({ pool, setPool, members, currentUserId, onDirtyChan
             )}
           </div>
         </Card>
+        )}
 
         {/* ── Entry Fees ── */}
         <Card padding="sm">

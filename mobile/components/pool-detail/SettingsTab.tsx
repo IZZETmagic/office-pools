@@ -207,7 +207,9 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         status: edit.status,
         accepting_members: edit.acceptingMembers,
         is_private: edit.isPrivate,
-        max_entries_per_user: edit.maxEntries,
+        // Forced, not merely un-offered: hiding a control does not stop it
+        // submitting the state it was already holding.
+        max_entries_per_user: pool.isLeague ? 1 : edit.maxEntries,
         max_participants: edit.maxParticipants > 0 ? edit.maxParticipants : null,
         // ⚠ NEVER ON A LEAGUE POOL, AND THIS IS NOT TIDINESS.
         //
@@ -530,7 +532,15 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         </RNText>
       </Card>
 
-      {/* Prediction Entries */}
+      {/* Prediction Entries
+          ⚠ NOT OFFERED ON A LEAGUE POOL — one entry per member, always.
+          Nothing pinned it before: an admin could set 3 on a table pool and the
+          second entry would be unreachable for ever, because the picker and
+          `/table-prediction` both resolve to the member's FIRST entry. It would
+          sit at 0 all season. Showdown is worse — the draw is per entry, so a
+          member would be drawn against people twice with one side unplayable.
+          Every league pool in production is already at 1. */}
+      {pool.isLeague ? null : (
       <Card>
         <Caption>Prediction Entries</Caption>
         <RNText
@@ -562,6 +572,7 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
           </InfoBox>
         ) : null}
       </Card>
+      )}
 
       {/* Max members */}
       <Card>

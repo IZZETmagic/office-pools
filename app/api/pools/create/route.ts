@@ -262,7 +262,19 @@ export async function POST(request: NextRequest) {
       // visibility decision.
       is_private: is_private ?? true,
       max_participants: max_participants > 0 ? max_participants : null,
-      max_entries_per_user: Math.max(1, Math.min(10, max_entries_per_user || 1)),
+      // ⚠ A LEAGUE POOL IS ALWAYS ONE ENTRY PER MEMBER, whatever the client
+      // sends. Both Settings screens stop it being raised later; this stops it
+      // arriving that way in the first place, because a route is the only door
+      // a future client cannot go around.
+      //
+      // A second entry is unreachable by construction: the table picker and
+      // `/table-prediction` both resolve to the member's FIRST entry, so entry 2
+      // could never be filled and would score 0 all season. Showdown is worse —
+      // its draw is per entry, so a member would be drawn against people twice
+      // with one side unplayable.
+      max_entries_per_user: league_season_id
+        ? 1
+        : Math.max(1, Math.min(10, max_entries_per_user || 1)),
     })
     .select()
     .single()
