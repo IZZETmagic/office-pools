@@ -81,6 +81,8 @@ type PoolTabBarProps = {
    * (entry_fee cleared to null), the tab disappears on next render.
    */
   feesEnabled: boolean;
+  /** Hides the Form tab — a league pool has no analytics to put in it. */
+  isLeague?: boolean;
   /**
    * Current fractional page offset of the swipe pager (0 = first page, 1 = second, etc).
    * Wired as a Reanimated SharedValue so the pool detail screen can write
@@ -106,11 +108,27 @@ export function getVisiblePoolTabs(
   isAdmin: boolean,
   isProgressive: boolean,
   feesEnabled: boolean,
+  isLeague = false,
 ): PoolTabKey[] {
   return ALL_TABS.filter((t) => {
     if (t.key === 'rounds') return isAdmin && isProgressive;
     if (t.key === 'fees') return isAdmin && feesEnabled;
     if (t.key === 'members' || t.key === 'settings') return isAdmin;
+    // ⚠ FORM CANNOT RENDER FOR A LEAGUE POOL — every one of its inputs is
+    // missing, and deliberately so. It reads `entry_xp_state` (form dots,
+    // streak, hit rate, level, XP), which the league outbox route BLOCKS rather
+    // than skipping: `computePoolEntryAnalytics` goes through `readMatchScores`,
+    // which has no league arm, so running it would compute accuracy and streak
+    // from zero rows and then STORE the zeros — "worse than blank".
+    //
+    // So the tab showed a confident 0% accuracy and no streak under a heading
+    // promising form. Hidden until Form is built for a league, which is a
+    // product decision rather than a rendering one (Ryan, 2026-09-02). The web
+    // dropped this tab for league pools already; this is mobile catching up.
+    //
+    // ⚠ `isLeague`, never `leagueMode` — two production pools carry a season id
+    // with a NULL mode, and their analytics are just as empty.
+    if (t.key === 'form') return !isLeague;
     return true;
   }).map((t) => t.key);
 }
@@ -212,6 +230,7 @@ export function PoolTabBar({
   isAdmin,
   isProgressive,
   feesEnabled,
+  isLeague = false,
   pageOffset,
   accentColor,
   poolId,
@@ -219,7 +238,7 @@ export function PoolTabBar({
   const theme = useTheme();
   const pending = usePendingActionsOptional();
   const { width: screenWidth } = useWindowDimensions();
-  const visible = getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled);
+  const visible = getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled, isLeague);
   const tabs = ALL_TABS.filter((t) => visible.includes(t.key));
 
   // Per-tab dot predicate. Form tab surfaces badge unlocks + level ups;

@@ -222,6 +222,7 @@ export default function PoolDetailScreen() {
 
   const isAdmin = data?.pool.isAdmin ?? false;
   const isProgressive = data?.pool.predictionMode === 'progressive';
+  const isLeague = data?.pool.isLeague ?? false;
   // Implicit toggle: fee tracking is "on" iff the admin has set a
   // positive entry fee in Settings. Drives both the Fees tab visibility
   // in the tab bar and the Fees & Prize Pool card in PoolInfoTab.
@@ -232,11 +233,25 @@ export default function PoolDetailScreen() {
       ? rawBrandColor
       : `#${rawBrandColor}`
     : null;
+  // ⚠ Same four arguments as the tab bar's own call, and they have to stay that
+  // way: this list orders the PAGER PAGES and that one orders the PILLS. If they
+  // disagree, tapping a pill scrolls to somebody else's tab.
   const visibleTabs = useMemo(
-    () => getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled),
-    [isAdmin, isProgressive, feesEnabled],
+    () => getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled, isLeague),
+    [isAdmin, isProgressive, feesEnabled, isLeague],
   );
   const tabIndex = Math.max(0, visibleTabs.indexOf(tab));
+
+  // A tab that is no longer offered leaves the screen in two minds: `tab` still
+  // says 'form', but `indexOf` returns -1 so the pager sits on page 0 and no
+  // pill is lit. Reachable via `?tab=form` on a league pool, and via a pool
+  // whose visible set changes under the viewer (an admin losing rights, fee
+  // tracking switched off). Snap to the first real tab instead.
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.includes(tab)) {
+      setTab(visibleTabs[0]);
+    }
+  }, [visibleTabs, tab]);
 
   // Stable identity so the memoized Settings panel isn't re-rendered on every
   // tab switch by a fresh inline closure. Reads pool via `data` (optional) so
@@ -434,6 +449,7 @@ export default function PoolDetailScreen() {
         isAdmin={pool.isAdmin}
         isProgressive={!!isProgressive}
         feesEnabled={feesEnabled}
+        isLeague={isLeague}
         pageOffset={pageOffset}
         accentColor={accentColor}
         poolId={pool.poolId}
