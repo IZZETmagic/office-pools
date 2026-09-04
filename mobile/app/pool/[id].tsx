@@ -160,6 +160,15 @@ export default function PoolDetailScreen() {
    * Written from the UI thread, read by an animated style. No re-render.
    */
   const scrollY = useSharedValue(0);
+  /**
+   * How tall the Showdown band is when expanded.
+   *
+   * ⚠ The band FLOATS over the pager — that is what lets it slide up without a
+   * layout pass — so nothing reserves its space automatically. Every page pads
+   * by this or its first screenful sits underneath the header. Zero for every
+   * other mode, where the header is an ordinary sibling above the pager.
+   */
+  const [bandHeight, setBandHeight] = useState(0);
   const { width } = useWindowDimensions();
   const pagerRef = useRef<Animated.ScrollView | null>(null);
   // When a tab change originates from a swipe, the pager has already
@@ -691,19 +700,12 @@ export default function PoolDetailScreen() {
         child rather than duplicated, because two copies of the pill list is how
         the pager and the pills start disagreeing about tab order.
       */}
-      {isShowdownPool ? (
-        <ShowdownDuelHeader
-          poolName={pool.poolName}
-          poolCode={pool.poolCode ?? null}
-          bout={duel.current}
-          sealed={duel.sealed}
-          standings={duelStandings}
-          kickoffAt={duel.currentKickoff}
-          scrollY={scrollY}
-        >
-          {tabBar}
-        </ShowdownDuelHeader>
-      ) : (
+      {/*
+        ⚠ NOT RENDERED HERE FOR SHOWDOWN. Its band floats OVER the pager and is
+        drawn after it, further down — see the note by the header itself. Every
+        other mode keeps the ordinary arrangement: header, strip, then pager.
+      */}
+      {isShowdownPool ? null : (
         <>
           <MemoPoolDetailHeader pool={pool} />
           {tabBar}
@@ -727,6 +729,7 @@ export default function PoolDetailScreen() {
             width={width}
             pageOffset={pageOffset}
             scrollY={scrollY}
+            paddingTop={bandHeight}
             paddingBottom={theme.spacing.xxxl}
             refreshControl={
               <RefreshControl
@@ -740,6 +743,30 @@ export default function PoolDetailScreen() {
           </TabPage>
         ))}
       </Animated.ScrollView>
+
+      {/*
+        ⚠ AFTER THE PAGER, AND THAT IS THE WHOLE TRICK. The band is absolutely
+        positioned and floats over the content, so sliding it up UNCOVERS what
+        was already underneath — no height animates, nothing re-lays out, and it
+        runs on the compositor.
+
+        Rendering it before the pager would put the scrolling content on top of
+        it. It reports its expanded height back so every page can pad by it.
+      */}
+      {isShowdownPool ? (
+        <ShowdownDuelHeader
+          poolName={pool.poolName}
+          poolCode={pool.poolCode ?? null}
+          bout={duel.current}
+          sealed={duel.sealed}
+          standings={duelStandings}
+          kickoffAt={duel.currentKickoff}
+          scrollY={scrollY}
+          onExpandedHeight={setBandHeight}
+        >
+          {tabBar}
+        </ShowdownDuelHeader>
+      ) : null}
 
       <BanterFab
         unreadCount={banter.unreadCount}
@@ -787,6 +814,7 @@ function TabPage({
   width,
   pageOffset,
   scrollY,
+  paddingTop,
   paddingBottom,
   refreshControl,
   children,
@@ -795,6 +823,7 @@ function TabPage({
   width: number;
   pageOffset: SharedValue<number>;
   scrollY: SharedValue<number>;
+  paddingTop: number;
   paddingBottom: number;
   refreshControl: React.ReactElement<RefreshControlProps>;
   children: React.ReactNode;
@@ -821,7 +850,7 @@ function TabPage({
   return (
     <Animated.ScrollView
       style={{ width }}
-      contentContainerStyle={{ paddingBottom, flexGrow: 1 }}
+      contentContainerStyle={{ paddingTop, paddingBottom, flexGrow: 1 }}
       onScroll={handler}
       scrollEventThrottle={16}
       refreshControl={refreshControl}

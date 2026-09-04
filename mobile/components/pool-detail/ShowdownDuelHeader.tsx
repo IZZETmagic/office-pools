@@ -86,8 +86,8 @@ const AVATAR = 80;
  */
 const BAND = resolveColors('dark');
 
-/** How far you scroll before the matchup is fully folded away. */
-const COLLAPSE_DISTANCE = 90;
+/** Height of the fixed chrome row — back, pool name, share. */
+const CHROME_ROW = 34;
 
 /**
  * A member, as the corner needs them.
@@ -114,6 +114,15 @@ type Props = {
   scrollY: SharedValue<number>;
   /** The tab strip. Rendered inside this component — see the header note. */
   children: ReactNode;
+  /**
+   * Reports the band's expanded height, so the pager can pad its pages by it.
+   *
+   * ⚠ The header FLOATS over the pager rather than sitting above it in the
+   * flow — that is what lets it slide up without a layout pass. Which means
+   * nothing reserves its space automatically and the padding is not optional:
+   * without it the first screenful of every tab sits underneath the band.
+   */
+  onExpandedHeight?: (h: number) => void;
 };
 
 export function ShowdownDuelHeader({
@@ -125,32 +134,20 @@ export function ShowdownDuelHeader({
   kickoffAt,
   scrollY,
   children,
+  onExpandedHeight,
 }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Natural height of the matchup block, reported by the block itself.
-  const [naturalHeight, setNaturalHeight] = useState(0);
-
-  const matchupStyle = useAnimatedStyle(() => {
-    // ⚠ Not measured yet — render at natural height. This is what makes the
-    // header expanded on first paint rather than dependent on a constant.
-    if (naturalHeight === 0) return {};
-    const p = interpolate(scrollY.value, [0, COLLAPSE_DISTANCE], [0, 1], Extrapolation.CLAMP);
-    return {
-      height: naturalHeight * (1 - p),
-      opacity: interpolate(p, [0, 0.7], [1, 0], Extrapolation.CLAMP),
-    };
-  });
-
-  const collapsedStyle = useAnimatedStyle(() => {
-    if (naturalHeight === 0) return { height: 0, opacity: 0 };
-    const p = interpolate(scrollY.value, [0, COLLAPSE_DISTANCE], [0, 1], Extrapolation.CLAMP);
-    return {
-      height: interpolate(p, [0, 1], [0, 34], Extrapolation.CLAMP),
-      opacity: interpolate(p, [0.55, 1], [0, 1], Extrapolation.CLAMP),
-    };
-  });
+  /**
+   * The matchup's own height, reported by the matchup.
+   *
+   * ⚠ IT IS ALSO THE SLIDE DISTANCE AND THE SCROLL RANGE. Measuring rather than
+   * guessing is what stopped the header rendering permanently collapsed the
+   * first time round — a constant that has to match what the content needs is a
+   * guess, and a short guess folds it away before anybody scrolls.
+   */
+  const [matchupH, setMatchupH] = useState(0);
 
   /**
    * The two colours the band is lit with — each corner's own light stop, the
@@ -171,42 +168,194 @@ export function ShowdownDuelHeader({
     await Share.share({ message: `Join "${poolName}" on SportPool!\n\n${url}`, url });
   }
 
+  const chromeH = insets.top + theme.spacing.xs + CHROME_ROW;
+
+  /**
+   * ⚠ TRANSFORM ONLY — NOTHING HERE ANIMATES A LAYOUT PROPERTY.
+   *
+   * The first version interpolated `height`, and on this app's stack (New
+   * Architecture + Reanimated 4) a layout prop driven from `useAnimatedStyle`
+   * is the slow path: every frame asks React Native to lay the subtree out
+   * again. It is also why it barely moved.
+   *
+   * So nothing shrinks. The whole band SLIDES UP by exactly the matchup's
+   * height, out from under a chrome row pinned on top of it. Because the band
+   * floats ABOVE the pager rather than sitting in the flow above it, sliding it
+   * up uncovers the content that was always there — the space is reclaimed
+   * without a single layout pass. `translateY` and `opacity` are compositor
+   * properties, so this runs at display rate.
+   */
+  const slide = useAnimatedStyle(() => {
+    if (matchupH === 0) return {};
+    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    return { transform: [{ translateY: -p * matchupH }] };
+  });
+
+  /** The matchup fades as it goes behind the chrome, so it never shows through. */
+  const matchupFade = useAnimatedStyle(() => {
+    if (matchupH === 0) return {};
+    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    return { opacity: interpolate(p, [0, 0.75], [1, 0], Extrapolation.CLAMP) };
+  });
+
+  /**
+   * The chrome row cross-fades: pool name out, the duel in one line in.
+   *
+   * ⚠ THIS IS WHAT KEEPS THE MATCHUP "ALWAYS PRESENT" — Ryan's original ask.
+   * Sliding the band away on its own would take the fight off the screen
+   * entirely; the scoreline moving into the chrome means it is never gone, only
+   * smaller. Both layers are absolutely positioned in the same row, so the
+   * swap costs no layout.
+   */
+  const nameOut = useAnimatedStyle(() => {
+    if (matchupH === 0) return {};
+    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    return { opacity: interpolate(p, [0, 0.5], [1, 0], Extrapolation.CLAMP) };
+  });
+  const lineIn = useAnimatedStyle(() => {
+    if (matchupH === 0) return { opacity: 0 };
+    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    return { opacity: interpolate(p, [0.55, 1], [0, 1], Extrapolation.CLAMP) };
+  });
+
   return (
-    <View
-      style={{
-        backgroundColor: BAND.snow,
-        paddingTop: insets.top + theme.spacing.xs,
-        borderBottomWidth: 1,
-        borderBottomColor: BAND.silver,
-        // The glow is painted inside these bounds, so it must not spill past
-        // the header's own edge into the pager below it.
-        overflow: 'hidden',
-      }}
-    >
+    <>
       {/*
-        THE BAND — two lights, thrown from opposite edges, meeting in the middle.
+        THE BAND — everything below the chrome, and the part that moves.
 
-        Ryan: "there is still a small strip in the middle that still looks like
-        the glow does not reach there ... it would be cool if the shadows
-        slightly mixed in the middle almost like they are fighting".
-
-        ⚠ TWO STACKED GRADIENTS, NOT ONE WITH FOUR STOPS — and the difference is
-        the whole point. A single gradient INTERPOLATES between adjacent stops:
-        it can only ever be one colour at a given x, so the best it could do at
-        the centre was fade both to nothing, which is precisely the dead strip
-        Ryan is looking at. Two translucent layers COMPOSITE instead, so across
-        the overlap both colours are genuinely present at once and the middle is
-        a real mix of the two rather than an absence of either.
-
-        Each throw runs past the centre and dies at the far quarter, so the
-        overlap is the middle half of the band. Nowhere is unlit.
-
-        ⚠ Behind everything, `pointerEvents="none"` on both. They span the chrome
-        row and the tab strip and must never intercept a tap meant for either.
+        ⚠ `zIndex: 1`, under the chrome layer. It slides up behind it.
       */}
+      <Animated.View
+        style={[
+          { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 },
+          slide,
+        ]}
+      >
+        <View
+          onLayout={(e) => {
+            // The band's full expanded height. The pager pads by it so its
+            // content starts below the header rather than under it.
+            const h = Math.round(e.nativeEvent.layout.height);
+            if (h > 0) onExpandedHeight?.(h);
+          }}
+          style={{
+            backgroundColor: BAND.snow,
+            paddingTop: chromeH,
+            borderBottomWidth: 1,
+            borderBottomColor: BAND.silver,
+          }}
+        >
+          <Glow leftGlow={leftGlow} rightGlow={rightGlow} alpha={glowAlpha} />
+
+          {/* rows 2-3: the matchup. Measured, because its height IS the slide. */}
+          <Animated.View style={matchupFade}>
+            <View
+              onLayout={(e) => {
+                const h = Math.round(e.nativeEvent.layout.height);
+                // Guarded: onLayout fires on every re-render, and writing the
+                // same number back would loop.
+                if (h > 0 && h !== matchupH) setMatchupH(h);
+              }}
+            >
+              <Matchup bout={bout} sealed={sealed} standings={standings} kickoffAt={kickoffAt} />
+            </View>
+          </Animated.View>
+
+          {/* row 4: the tab strip. Rides up with the band and ends level with
+              the chrome — it never moves relative to what is above it. */}
+          {children}
+        </View>
+      </Animated.View>
+
+      {/*
+        THE CHROME — pinned, and drawn OVER the band so the matchup disappears
+        behind it rather than through it.
+
+        ⚠ It carries its own copy of the glow. That is seamless only because the
+        gradients are purely HORIZONTAL: two stacked boxes painting the same
+        left-to-right sweep read as one continuous field. A vertical component
+        would show the join immediately.
+      */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 2,
+          backgroundColor: BAND.snow,
+          paddingTop: insets.top + theme.spacing.xs,
+        }}
+      >
+        <Glow leftGlow={leftGlow} rightGlow={rightGlow} alpha={glowAlpha} />
+        <View
+          style={{
+            height: CHROME_ROW,
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing.lg,
+          }}
+        >
+          <RoundButton icon="chevron.left" label="Back" onPress={() => router.back()} />
+          <View style={{ flex: 1, minWidth: 0, paddingHorizontal: theme.spacing.sm }}>
+            <Animated.View style={nameOut}>
+              <BandText
+                variant="cardTitle"
+                numberOfLines={1}
+                align="center"
+                style={{ fontSize: 15, color: BAND.ink }}
+              >
+                {poolName}
+              </BandText>
+            </Animated.View>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+                lineIn,
+              ]}
+            >
+              <CollapsedLine bout={bout} sealed={sealed} standings={standings} />
+            </Animated.View>
+          </View>
+          {poolCode ? (
+            <RoundButton icon="square.and.arrow.up" label="Share pool" onPress={handleShare} />
+          ) : (
+            <View style={{ width: 32 }} />
+          )}
+        </View>
+      </View>
+    </>
+  );
+}
+
+/**
+ * The two lights, thrown from opposite edges and mixing across the middle.
+ *
+ * ⚠ TWO STACKED GRADIENTS, NOT ONE WITH FOUR STOPS. A single gradient
+ * INTERPOLATES between adjacent stops — it can only ever be one colour at a
+ * given x — so the closest it gets at the centre is both fading to nothing,
+ * which reads as a dead strip. Two translucent layers COMPOSITE instead, so
+ * across the overlap both colours are genuinely present and the middle is a mix
+ * rather than an absence.
+ *
+ * ⚠ Drawn in BOTH header layers. Seamless only because the sweep is purely
+ * horizontal; a vertical component would show the join.
+ */
+function Glow({
+  leftGlow,
+  rightGlow,
+  alpha,
+}: {
+  leftGlow: string;
+  rightGlow: string;
+  alpha: number;
+}) {
+  return (
+    <>
       <LinearGradient
         pointerEvents="none"
-        colors={[withOpacity(leftGlow, glowAlpha), withOpacity(leftGlow, 0)]}
+        colors={[withOpacity(leftGlow, alpha), withOpacity(leftGlow, 0)]}
         locations={[0, 0.78]}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
@@ -214,68 +363,13 @@ export function ShowdownDuelHeader({
       />
       <LinearGradient
         pointerEvents="none"
-        colors={[withOpacity(rightGlow, 0), withOpacity(rightGlow, glowAlpha)]}
+        colors={[withOpacity(rightGlow, 0), withOpacity(rightGlow, alpha)]}
         locations={[0.22, 1]}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
-
-      {/* ---------- row 1: chrome, always visible ---------- */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: theme.spacing.lg,
-          paddingBottom: theme.spacing.xs,
-        }}
-      >
-        <RoundButton icon="chevron.left" label="Back" onPress={() => router.back()} />
-
-        {/* Centred by construction: both flanks are the same fixed width, so the
-            name sits on the true centre of the screen whatever its length. */}
-        <View style={{ flex: 1, minWidth: 0, paddingHorizontal: theme.spacing.sm }}>
-          <BandText
-            variant="cardTitle"
-            numberOfLines={1}
-            align="center"
-            style={{ fontSize: 15, color: BAND.ink }}
-          >
-            {poolName}
-          </BandText>
-        </View>
-
-        {poolCode ? (
-          <RoundButton icon="square.and.arrow.up" label="Share pool" onPress={handleShare} />
-        ) : (
-          <View style={{ width: 32 }} />
-        )}
-      </View>
-
-      {/* ---------- rows 2–3: the matchup, collapsing ---------- */}
-      <Animated.View style={[{ overflow: 'hidden' }, matchupStyle]}>
-        {/* The measured child. `onLayout` reports what the content actually
-            needs, which is what the animation above interpolates from. */}
-        <View
-          onLayout={(e) => {
-            const h = Math.round(e.nativeEvent.layout.height);
-            // Guard the set: onLayout fires on every re-render, and writing the
-            // same number back would re-render forever.
-            if (h > 0 && h !== naturalHeight) setNaturalHeight(h);
-          }}
-        >
-          <Matchup bout={bout} sealed={sealed} standings={standings} kickoffAt={kickoffAt} />
-        </View>
-      </Animated.View>
-
-      {/* ---------- the collapsed line ---------- */}
-      <Animated.View style={[{ overflow: 'hidden', justifyContent: 'center' }, collapsedStyle]}>
-        <CollapsedLine bout={bout} sealed={sealed} standings={standings} />
-      </Animated.View>
-
-      {/* ---------- row 4: the tab strip, inside the header ---------- */}
-      {children}
-    </View>
+    </>
   );
 }
 
