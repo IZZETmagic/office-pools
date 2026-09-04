@@ -158,38 +158,38 @@ export function ShowdownDuelHeader({
       }}
     >
       {/*
-        THE BAND — lit from BOTH SIDES, fading out toward the middle.
+        THE BAND — two lights, thrown from opposite edges, meeting in the middle.
 
-        Ryan, with the web band as reference: "that should be coming from the
-        sides of the phone ... more from each side fading as it gets closer to
-        the middle".
+        Ryan: "there is still a small strip in the middle that still looks like
+        the glow does not reach there ... it would be cool if the shadows
+        slightly mixed in the middle almost like they are fighting".
 
-        One horizontal sweep with FOUR stops rather than two: your colour hard
-        against the left edge, theirs hard against the right, and BOTH fading to
-        nothing at the exact centre.
+        ⚠ TWO STACKED GRADIENTS, NOT ONE WITH FOUR STOPS — and the difference is
+        the whole point. A single gradient INTERPOLATES between adjacent stops:
+        it can only ever be one colour at a given x, so the best it could do at
+        the centre was fade both to nothing, which is precisely the dead strip
+        Ryan is looking at. Two translucent layers COMPOSITE instead, so across
+        the overlap both colours are genuinely present at once and the middle is
+        a real mix of the two rather than an absence of either.
 
-        ⚠ Four stops, not two, even though the middle pair are both transparent.
-        A two-stop gradient would blend one player's colour directly into the
-        other and paint a muddy seam down the middle of the matchup, right where
-        the scoreline sits. Meeting at zero instead means each side is its own
-        light source and the centre stays clean.
+        Each throw runs past the centre and dies at the far quarter, so the
+        overlap is the middle half of the band. Nowhere is unlit.
 
-        ⚠ Behind everything and `pointerEvents="none"`. It sits under the chrome
-        row and the tab strip, and must never intercept a tap meant for them.
+        ⚠ Behind everything, `pointerEvents="none"` on both. They span the chrome
+        row and the tab strip and must never intercept a tap meant for either.
       */}
       <LinearGradient
         pointerEvents="none"
-        colors={[
-          withOpacity(leftGlow, glowAlpha),
-          withOpacity(leftGlow, 0),
-          withOpacity(rightGlow, 0),
-          withOpacity(rightGlow, glowAlpha),
-        ]}
-        // ⚠ THE FADE RUNS THE FULL HALF — both sides reach zero exactly at the
-        // centre rather than dying early into a flat dead zone. They meet at
-        // nothing, so there is still no seam where the two colours would
-        // otherwise blend across the scoreline.
-        locations={[0, 0.5, 0.5, 1]}
+        colors={[withOpacity(leftGlow, glowAlpha), withOpacity(leftGlow, 0)]}
+        locations={[0, 0.78]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={[withOpacity(rightGlow, 0), withOpacity(rightGlow, glowAlpha)]}
+        locations={[0.22, 1]}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
