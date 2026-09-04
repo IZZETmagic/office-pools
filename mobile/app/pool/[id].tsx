@@ -38,6 +38,7 @@ import {
   MembersTab,
   PoolDetailHeader,
   ShowdownDuelHeader,
+  ShowdownLeaderboard,
   PoolInfoTab,
   RoundsTab,
   PoolTabBar,
@@ -91,6 +92,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
 // redundant parent-triggered re-render.
 const MemoPoolDetailHeader = memo(PoolDetailHeader);
 const MemoDuelTab = memo(DuelTab);
+const MemoShowdownLeaderboard = memo(ShowdownLeaderboard);
 const MemoLeaderboardTab = memo(LeaderboardTab);
 const MemoLeagueTableEntriesTab = memo(LeagueTableEntriesTab);
 const MemoLmsEntriesTab = memo(LmsEntriesTab);
@@ -276,6 +278,14 @@ export default function PoolDetailScreen() {
   // dependency array during render, so reaching for `pool` up here is a
   // ReferenceError before the early returns have even run.
   const leagueMode = data?.pool.leagueMode ?? null;
+  /**
+   * ⚠ DEFINED WITH THE OTHER FLAGS, not beside the JSX that reads it. It used
+   * to sit just above the `return`, which worked only because `renderTab` is
+   * not CALLED until then — a const in the temporal dead zone that happens to
+   * be initialised in time. The same shape already cost a ReferenceError once
+   * on this screen; this is not the place to rely on call order.
+   */
+  const isShowdownPool = isLeague && leagueMode === 'showdown';
   // Has table picking closed? Drives what the Predictions tab offers and
   // whether rivals' tables can be opened. The pool row already carries it, so
   // no query is needed — and it is the same fact the database trigger and RLS
@@ -491,6 +501,19 @@ export default function PoolDetailScreen() {
       case 'duel':
         return <MemoDuelTab poolId={pool.poolId} standings={duelStandings} />;
       case 'leaderboard':
+        // ⚠ Showdown gets its OWN board. The shared one shows a single total,
+        // and the whole point here is the split — picks and duels are one
+        // number since migration 121, and seeing them apart is the reason the
+        // Duels view exists at all.
+        if (isShowdownPool) {
+          return (
+            <MemoShowdownLeaderboard
+              poolId={pool.poolId}
+              entries={leagueLeaderboard ?? []}
+              currentUserId={pool.currentUserId}
+            />
+          );
+        }
         return (
           <MemoLeaderboardTab
             poolId={pool.poolId}
@@ -670,7 +693,6 @@ export default function PoolDetailScreen() {
     }
   }
 
-  const isShowdownPool = isLeague && leagueMode === 'showdown';
   const tabBar = (
     <PoolTabBar
       active={tab}
