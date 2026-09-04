@@ -762,6 +762,26 @@ function Middle({
       ? liveScore
       : null;
 
+  /**
+   * ⚠ THE SCORE HAS TO FIT `MIDDLE_COL`, AND IT CAN BE FOUR DIGITS A SIDE.
+   *
+   * `MIDDLE_COL` is 160pt with `flex: 1` corners either side, so a score wider
+   * than it does not clip — it SQUEEZES THE AVATARS INWARD, and only on the
+   * weeks somebody played well, which is exactly when nobody would think to
+   * look. Widening the column is not the escape hatch: `columnCentre` derives
+   * the collapsed avatar positions from it.
+   *
+   * A matchweek pays 100 a fixture at Results depth, so a perfect ten is 1000 —
+   * reachable, not hypothetical. Eight digits plus the spaces around the dash
+   * needs about 153pt at 26 and about 188pt at 32.
+   *
+   * Stepped on the digit COUNT rather than measured: `adjustsFontSizeToFit` is
+   * the RN way to do this and it re-measures on every score change, which is
+   * a size that shifts under a number that is already moving.
+   */
+  const liveSize =
+    String(score?.you ?? 0).length + String(score?.them ?? 0).length >= 7 ? 26 : 32;
+
   const tint = showLive
     // Red while a ball is in play — the same red the team sheet's clock and the
     // LIVE badge above use, so one colour means one thing on this screen.
@@ -808,23 +828,18 @@ function Middle({
             // the countdown it replaced was: the one number between the corners
             // that changes while you watch. A settled scoreline is a record and
             // sits back at 22.
-            //
-            // ⚠ 32 IS THE CEILING, not a preference. `MIDDLE_COL` is 160pt and
-            // the corners either side are `flex: 1`, so anything wider than it
-            // squeezes them instead of growing. A worst-case "500–500" is seven
-            // tabular glyphs — about 130pt at this size, which clears it; at 36
-            // it does not, and the avatars start moving inward on high-scoring
-            // weeks only. Widening `MIDDLE_COL` is not the escape hatch either:
-            // `columnCentre` derives the collapsed avatar positions from it.
-            fontSize: showLive ? 32 : 22,
+            fontSize: showLive ? liveSize : 22,
             // ⚠ WITH THE SIZE. Variant 'body' caps `lineHeight` at 20 and
             // shears the tops off anything larger.
-            lineHeight: showLive ? 40 : 28,
+            lineHeight: showLive ? liveSize + 8 : 28,
             color: tint,
             fontVariant: ['tabular-nums'],
           }}
         >
-          {score.you}–{score.them}
+          {/* ⚠ SPACES, NOT `letterSpacing` — Ryan wants air around the dash and
+              only around the dash. Letter-spacing would push the digits apart
+              too, and these are tabular digits whose whole job is to line up. */}
+          {score.you} – {score.them}
         </BandText>
       ) : null}
       {/*
