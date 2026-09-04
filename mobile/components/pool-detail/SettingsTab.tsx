@@ -505,6 +505,33 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
             ? 'Anyone with the code can join.'
             : 'No new members can join. The pool stays visible to existing members.'}
         </RNText>
+        {/*
+          ⚠ IN SHOWDOWN THIS CONTROL HAS A CONSEQUENCE NO OTHER MODE HAS. The
+          join route calls `regenerateDuelSchedule` (verified: join/route.ts),
+          so accepting a member REDRAWS every duel that has not been played. An
+          admin toggling this is deciding whether the season's fixture list
+          stays as it is.
+
+          The two protections are worth stating because they are what make it
+          safe: a settled duel is never rewritten, and migration 100 leaves the
+          matchweek in progress alone — so nobody's opponent changes after they
+          have picked.
+        */}
+        {isShowdownMode && edit.acceptingMembers ? (
+          <RNText
+            style={{
+              fontFamily: fontFamilies.regular,
+              fontSize: 12,
+              lineHeight: 17,
+              color: theme.colors.slate,
+              marginTop: theme.spacing.sm,
+            }}
+          >
+            Accepting a new member redraws every duel that has not been played yet. Results
+            already settled are never rewritten, and the matchweek in progress is left alone —
+            a joiner starts from the following one.
+          </RNText>
+        ) : null}
       </Card>
 
       {/* Visibility */}
@@ -594,6 +621,31 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
             onChange={(v) => setEdit({ ...edit, maxParticipants: v })}
           />
         </SettingsRow>
+        {/*
+          ⚠ AN ODD ROSTER MEANS A BYE, EVERY WEEK, FOR SOMEBODY. The circle
+          method pads an odd entry count with a NULL partner (migration 083) and
+          rotates it, so the cap an admin chooses decides whether byes exist at
+          all. Worth saying at the moment they choose it rather than leaving
+          them to notice in November.
+
+          ⚠ It reads the CAP, which is what the admin controls here — the live
+          roster can be odd under an even cap. Saying "you have an odd number
+          today" would be a different claim from a different source.
+        */}
+        {isShowdownMode && edit.maxParticipants > 0 && edit.maxParticipants % 2 === 1 ? (
+          <RNText
+            style={{
+              fontFamily: fontFamilies.regular,
+              fontSize: 12,
+              lineHeight: 17,
+              color: theme.colors.slate,
+              marginTop: theme.spacing.sm,
+            }}
+          >
+            An odd number of members means one person sits out each matchweek. The bye rotates so
+            everybody gets the same number, and it is worth the same as a tie.
+          </RNText>
+        ) : null}
       </Card>
 
       {/*
