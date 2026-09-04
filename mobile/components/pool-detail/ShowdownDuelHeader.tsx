@@ -127,6 +127,18 @@ export function ShowdownDuelHeader({
     };
   });
 
+  /**
+   * The two colours the band is lit with — each corner's own light stop, the
+   * same value their ring and glow already use, so the background agrees with
+   * the avatars instead of being a third opinion about who is who.
+   */
+  const youUserId = bout ? standings.get(bout.you.entryId)?.userId ?? null : null;
+  const themUserId = bout?.them ? standings.get(bout.them.entryId)?.userId ?? null : null;
+  const leftGlow = youUserId ? gradientForUser(youUserId)[0] : theme.colors.primary;
+  const rightGlow = themUserId ? gradientForUser(themUserId)[0] : theme.colors.slate;
+  // Restrained on light, where a tint over a pale surface goes muddy fast.
+  const glowAlpha = theme.mode === 'dark' ? 0.28 : 0.16;
+
   async function handleShare() {
     if (!poolCode) return;
     const url = `https://sportpool.io/join/${poolCode}`;
@@ -140,8 +152,42 @@ export function ShowdownDuelHeader({
         paddingTop: insets.top + theme.spacing.xs,
         borderBottomWidth: 1,
         borderBottomColor: theme.colors.silver,
+        // The glow is painted inside these bounds, so it must not spill past
+        // the header's own edge into the pager below it.
+        overflow: 'hidden',
       }}
     >
+      {/*
+        THE BAND — lit from BOTH SIDES, fading out toward the middle.
+
+        Ryan, with the web band as reference: "that should be coming from the
+        sides of the phone ... more from each side fading as it gets closer to
+        the middle".
+
+        So it is one horizontal sweep with FOUR stops rather than two: your
+        colour hard against the left edge, their colour hard against the right,
+        and a transparent plateau across the centre third. A plain two-stop
+        gradient would blend one colour into the other and paint a muddy seam
+        down the middle of the matchup — the plateau is what keeps the middle
+        clean and makes each side read as its own light source.
+
+        ⚠ Behind everything and `pointerEvents="none"`. It sits under the chrome
+        row and the tab strip, and must never intercept a tap meant for them.
+      */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          withOpacity(leftGlow, glowAlpha),
+          withOpacity(leftGlow, 0),
+          withOpacity(rightGlow, 0),
+          withOpacity(rightGlow, glowAlpha),
+        ]}
+        locations={[0, 0.38, 0.62, 1]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+
       {/* ---------- row 1: chrome, always visible ---------- */}
       <View
         style={{
