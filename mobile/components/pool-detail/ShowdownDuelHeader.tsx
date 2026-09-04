@@ -228,7 +228,17 @@ export function ShowdownDuelHeader({
    * Both halves are `translateY`, so this is still compositor-only. Nothing
    * here measures or lays out per frame.
    */
-  const avatarCentreY = cornersY + AVATAR / 2;
+  // ⚠ `chromeH +` IS LOAD-BEARING, AND LEAVING IT OUT IS WHY THE AVATARS
+  // SHRANK WITHOUT ARRIVING. `onLayout` reports a position RELATIVE TO THE
+  // PARENT, so `cornersY` is measured from the top of the matchup block — about
+  // 40 — while `chromeCentreY` below is measured from the top of the SCREEN.
+  // Subtracting the two without this term mixes coordinate spaces and
+  // undershoots the travel by the whole height of the chrome row plus the
+  // status bar, which on a notched phone is nearly 100pt.
+  //
+  // The band's content starts at `chromeH` (its own paddingTop), so that is the
+  // offset between the two spaces.
+  const avatarCentreY = chromeH + cornersY + AVATAR / 2;
   const chromeCentreY = insets.top + theme.spacing.xs + CHROME_ROW / 2;
   const wantedY = avatarCentreY - chromeCentreY;
   const avatarScale = COLLAPSED_AVATAR / AVATAR;
