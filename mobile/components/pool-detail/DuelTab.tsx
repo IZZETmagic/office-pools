@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Image, View } from 'react-native';
 
 import { Button, Card, Icon, Text } from '@/components/ui';
 import { useDuel, type Opponent, type Season, type Sheet } from '@/lib/useDuel';
@@ -220,6 +220,15 @@ function OpponentCard({
 }) {
   const theme = useTheme();
   const met = opponent.met.won + opponent.met.drawn + opponent.met.lost;
+  /**
+   * ⚠ Joined HERE, from two sources on purpose: the numerator is the engine's
+   * `correct_count` off the leaderboard row, the denominator is how many
+   * revealed picks they have made. Neither hook holds both, and fetching the
+   * leaderboard twice to keep the pair together is the worse trade.
+   */
+  const accuracy = opponent.picks
+    ? Math.round(((standing?.correct ?? 0) / opponent.picks) * 100)
+    : null;
 
   return (
     <Card bordered>
@@ -234,11 +243,71 @@ function OpponentCard({
         </Text>
       </Row>
 
+      {/* Their last five duels — against anyone, oldest first. */}
+      {opponent.form.length > 0 ? (
+        <View style={{ marginTop: theme.spacing.md }}>
+          <Text variant="caption" color="slate">
+            Last {opponent.form.length} duel{opponent.form.length === 1 ? '' : 's'}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.xs, marginTop: theme.spacing.sm }}>
+            {opponent.form.map((r, i) => (
+              <FormPip key={i} result={r} />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginTop: theme.spacing.lg }}>
+        <Stat
+          label="Accuracy"
+          value={accuracy === null ? '—' : `${accuracy}%`}
+          sub={`${standing?.correct ?? 0} of ${opponent.picks} picks`}
+        />
+        {opponent.agreement !== null ? (
+          <Stat
+            label="You agree"
+            value={`${opponent.agreement}%`}
+            sub="on fixtures you both picked"
+          />
+        ) : null}
+      </View>
+
+      {/* Who they keep backing. */}
+      {opponent.topClub ? (
+        <View style={{ marginTop: theme.spacing.lg }}>
+          <Text variant="caption" color="slate">
+            Backs most often
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.sm,
+              marginTop: theme.spacing.sm,
+            }}
+          >
+            {opponent.topClub.crest ? (
+              <Image
+                source={{ uri: opponent.topClub.crest }}
+                style={{ width: theme.spacing.xl, height: theme.spacing.xl }}
+                resizeMode="contain"
+              />
+            ) : null}
+            <Text variant="cardTitle" numberOfLines={1} style={{ flex: 1 }}>
+              {opponent.topClub.name}
+            </Text>
+            <Text variant="body" color="slate" style={{ fontVariant: ['tabular-nums'] }}>
+              {opponent.topClub.times}×
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
       {/*
         ⚠ TWO ZEROES UNDER "FIRST MEETING" IS NOISE PRETENDING TO BE DATA. There
         is no record yet, so the card says so rather than showing 0–0–0.
       */}
-      <Text variant="body" color="slate" style={{ marginTop: theme.spacing.md }}>
+      <Text variant="body" color="slate" style={{ marginTop: theme.spacing.lg }}>
         {met === 0
           ? 'You have not met yet.'
           : `Met ${met} time${met === 1 ? '' : 's'} — you have ${opponent.met.won} win${
@@ -345,6 +414,41 @@ function TendencyBar({ home, draw, away }: { home: number; draw: number; away: n
         <Key color={theme.colors.accent} label="Away" value={away} />
       </View>
     </>
+  );
+}
+
+/**
+ * One duel result as a dot.
+ *
+ * ⚠ A BYE IS ITS OWN THING, not a draw. It scores the same 250, which is
+ * exactly why it cannot be told from a tie by value — so it is told apart
+ * structurally and shown as neither.
+ */
+function FormPip({ result }: { result: 'won' | 'tied' | 'lost' | 'bye' }) {
+  const theme = useTheme();
+  const color =
+    result === 'won'
+      ? theme.colors.green
+      : result === 'lost'
+        ? theme.colors.red
+        : result === 'tied'
+          ? theme.colors.accent
+          : theme.colors.silver;
+  return (
+    <View
+      style={{
+        width: theme.spacing.lg,
+        height: theme.spacing.lg,
+        borderRadius: theme.radii.pill,
+        backgroundColor: color,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Text variant="detail" style={{ color: theme.colors.midnight }}>
+        {result === 'won' ? 'W' : result === 'lost' ? 'L' : result === 'tied' ? 'T' : '–'}
+      </Text>
+    </View>
   );
 }
 

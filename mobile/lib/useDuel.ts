@@ -160,6 +160,35 @@ export type Opponent = {
   away: number | null;
   /** Your lifetime record against THEM: wins, draws, losses, from your side. */
   met: { won: number; drawn: number; lost: number };
+  /**
+   * Their last five DUELS, oldest first — not their last five fixtures.
+   *
+   * ⚠ These are their duels against ANYONE, not just you. It is a read on the
+   * member you are about to play, so their whole recent form is the point.
+   */
+  form: ('won' | 'tied' | 'lost' | 'bye')[];
+  /**
+   * How many revealed picks they have made — the DENOMINATOR for accuracy.
+   *
+   * ⚠ The numerator is not here. `correct_count` comes from the leaderboard,
+   * which is not in this hook's payload, so the card joins the two. Fetching
+   * the leaderboard again to keep the pair together would give the header and
+   * this tab two sources for one number.
+   */
+  picks: number;
+  /**
+   * The club they back most often, and how many times.
+   *
+   * ⚠ A DRAW BACKS NOBODY, so draws are excluded from the count rather than
+   * filed against the home side. Null under three backings — one club picked
+   * twice is not a favourite, it is a coincidence with a crest.
+   */
+  topClub: { name: string; crest: string | null; times: number } | null;
+  /**
+   * How often the two of you called the same fixture the same way, as a whole
+   * percent of the fixtures you BOTH picked. Null under five in common.
+   */
+  agreement: number | null;
 };
 
 export type Sheet = {
@@ -302,16 +331,23 @@ export function useDuel(poolId: string | null | undefined): DuelState {
    * reverse is forbidden: filing "home" as a sentinel 1-0 would score as a
    * genuine exact. Nothing here writes.
    */
-  const season = useMemo<Season | null>(() => {
+  /**
+   * YOUR OWN picks as fixture → direction, read ONCE.
+   *
+   * Both the season card and the agreement stat need this, and two readings of
+   * the same two shapes is how one of them ends up counting a Scores pool as
+   * empty while the other does not.
+   */
+  const myDirections = useMemo(() => {
+    const out = new Map<string, string>();
     const mine = data?.you.entries[0];
-    if (!mine) return null;
-
-    const directions: string[] = Object.values(mine.outcomes);
-    const tapped = new Set(Object.keys(mine.outcomes));
+    if (!mine) return out;
+    for (const [fixtureId, d] of Object.entries(mine.outcomes)) out.set(fixtureId, d);
     for (const p of mine.predictions) {
-      if (tapped.has(p.match_id)) continue; // a tap wins over a scoreline
+      if (out.has(p.match_id)) continue; // a tap wins over a scoreline
       if (p.predicted_home_score === null || p.predicted_away_score === null) continue;
-      directions.push(
+      out.set(
+        p.match_id,
         p.predicted_home_score > p.predicted_away_score
           ? 'home'
           : p.predicted_home_score < p.predicted_away_score
@@ -319,7 +355,14 @@ export function useDuel(poolId: string | null | undefined): DuelState {
             : 'draw',
       );
     }
+    return out;
+  }, [data]);
 
+  const season = useMemo<Season | null>(() => {
+    const mine = data?.you.entries[0];
+    if (!mine) return null;
+
+    const directions = [...myDirections.values()];
     const picks = directions.length;
     const correct = mine.totals?.correct ?? 0;
     const share = (d: string) =>
@@ -345,7 +388,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
       // lets them add up to 99 or 101 and the bar leaves a gap.
       away: home === null || draw === null ? null : 100 - home - draw,
     };
-  }, [data]);
+  }, [data, myDirections]);
 
   /**
    * The opponent's picks, from weeks that have already LOCKED.
@@ -376,16 +419,15 @@ export function useDuel(poolId: string | null | undefined): DuelState {
      * way `season` and the web's `ownPickDirections` resolve it. Two readers
      * disagreeing about one row is worse than either answer.
      */
-    const directions: string[] = [];
-    const seen = new Set<string>();
+    const theirs = new Map<string, string>();
     for (const o of picks.data?.outcomes ?? []) {
       if (o.entry_id !== them.entryId) continue;
-      seen.add(o.match_id);
-      directions.push(o.outcome);
+      theirs.set(o.match_id, o.outcome);
     }
     for (const p of picks.data?.predictions ?? []) {
-      if (p.entry_id !== them.entryId || seen.has(p.match_id)) continue;
-      directions.push(
+      if (p.entry_id !== them.entryId || theirs.has(p.match_id)) continue;
+      theirs.set(
+        p.match_id,
         p.predicted_home_score > p.predicted_away_score
           ? 'home'
           : p.predicted_home_score < p.predicted_away_score
@@ -394,6 +436,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
       );
     }
 
+    const directions = [...theirs.values()];
     const n = directions.length;
     const share = (d: string) =>
       n ? Math.round((directions.filter((x) => x === d).length / n) * 100) : 0;
@@ -421,6 +464,76 @@ export function useDuel(poolId: string | null | undefined): DuelState {
       else if (r === 'lost') lost += 1;
     }
 
+    /**
+     * Their last five DUELS, oldest first — against anyone, not just you.
+     *
+     * ⚠ Read from `showdown.duels`, which the contract already reveal-gates, so
+     * a sealed week simply is not in it. ⚠ And classified with `duelResult`
+     * from the side THEY were on: a duel stores two entries and two point
+     * values, and reading the wrong column reports their opponent's result as
+     * theirs.
+     */
+    const form: Opponent['form'] = [];
+    for (const d of showdown?.duels ?? []) {
+      if (!d.settled_at) continue;
+      const isA = d.entry_a === them.entryId;
+      const isB = d.entry_b === them.entryId;
+      if (!isA && !isB) continue;
+      // A bye has no opponent at all — it is not a result they earned.
+      if (d.entry_b === null) {
+        form.push('bye');
+        continue;
+      }
+      const r = duelResult(isA ? d.points_a : d.points_b);
+      if (r) form.push(r);
+    }
+
+    /**
+     * The club they back most often.
+     *
+     * ⚠ A DRAW BACKS NOBODY. Filing one against the home side would invent a
+     * loyalty out of a member hedging, and hedging is the opposite of one.
+     */
+    const backed = new Map<string, number>();
+    const byFixture = new Map(data?.season.matches.map((m) => [m.match_id, m]) ?? []);
+    for (const [fixtureId, d] of theirs) {
+      const m = byFixture.get(fixtureId);
+      if (!m || d === 'draw') continue;
+      const teamId = d === 'home' ? m.home_team_id : m.away_team_id;
+      backed.set(teamId, (backed.get(teamId) ?? 0) + 1);
+    }
+    let topId: string | null = null;
+    let topTimes = 0;
+    for (const [id, times] of backed) {
+      if (times > topTimes) {
+        topId = id;
+        topTimes = times;
+      }
+    }
+    const team = data?.season.teams.find((t) => t.team_id === topId) ?? null;
+    // ⚠ Three is the floor. One club picked twice is not a favourite, it is a
+    // coincidence with a crest on it.
+    const topClub =
+      team && topTimes >= 3
+        ? { name: team.country_name, crest: team.flag_url, times: topTimes }
+        : null;
+
+    /**
+     * How often the two of you called the same fixture the same way.
+     *
+     * ⚠ Over the fixtures you BOTH picked, not over the season. A week one of
+     * you missed is not a disagreement, and counting it as one would report
+     * somebody's holiday as a difference of opinion.
+     */
+    let shared = 0;
+    let same = 0;
+    for (const [fixtureId, d] of theirs) {
+      const mine = myDirections.get(fixtureId);
+      if (!mine) continue;
+      shared += 1;
+      if (mine === d) same += 1;
+    }
+
     return {
       name: them.name,
       entryId: them.entryId,
@@ -428,8 +541,14 @@ export function useDuel(poolId: string | null | undefined): DuelState {
       draw,
       away: home === null || draw === null ? null : 100 - home - draw,
       met: { won, drawn, lost },
+      form: form.slice(-5),
+      picks: n,
+      topClub,
+      // Five in common is the floor — below that a percentage is two picks
+      // wearing a statistic.
+      agreement: shared >= 5 ? Math.round((same / shared) * 100) : null,
     };
-  }, [current, picks.data, bouts]);
+  }, [current, picks.data, bouts, showdown, data, myDirections]);
 
   return {
     // ⚠ A DISABLED query reports `isPending` forever. React Query has no

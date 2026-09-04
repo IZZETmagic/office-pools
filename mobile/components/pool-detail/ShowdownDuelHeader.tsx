@@ -146,7 +146,19 @@ const COLLAPSED_ROW = 56;
  * here — key it on `entry_id` and somebody's rival changes colour between two
  * screens of the same app.
  */
-export type Standing = { userId: string | null; rank: number | null; points: number };
+export type Standing = {
+  userId: string | null;
+  rank: number | null;
+  points: number;
+  /**
+   * Fixtures called right, from the engine.
+   *
+   * ⚠ The header does not render this — the Duel tab's scouting card does, and
+   * it rides in this map because it is the SAME leaderboard row. A second read
+   * for one number is how two surfaces start disagreeing about a season.
+   */
+  correct: number;
+};
 
 type Props = {
   poolName: string;

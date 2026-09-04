@@ -50,6 +50,7 @@ import {
 } from '@/components/pool-detail';
 import { Button, Text } from '@/components/ui';
 import { fetchLmsState } from '@/lib/api';
+import type { Standing } from '@/components/pool-detail/ShowdownDuelHeader';
 import { predictionSurfaceFor } from '@/lib/leagueSurface';
 import { useDuel } from '@/lib/useDuel';
 import { useLeaguePool } from '@/lib/useLeaguePool';
@@ -321,7 +322,7 @@ export default function PoolDetailScreen() {
    * here would double-count every win.
    */
   const duelStandings = useMemo(() => {
-    const m = new Map<string, { userId: string | null; rank: number | null; points: number }>();
+    const m = new Map<string, Standing>();
     for (const e of data?.leagueLeaderboard ?? []) {
       m.set(e.entry_id, {
         // The avatar gradient is keyed on the PERSON, not the entry — that is what
@@ -329,6 +330,8 @@ export default function PoolDetailScreen() {
         userId: e.user_id ?? null,
         rank: e.current_rank ?? null,
         points: e.total_points ?? 0,
+        // For the scouting card's accuracy — same row, no second read.
+        correct: e.pickem?.correct_count ?? 0,
       });
     }
     return m;
