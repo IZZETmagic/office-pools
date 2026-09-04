@@ -34,6 +34,24 @@ export const shadows = {
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
+  /**
+   * The DARK-MODE counterpart to `avatar`.
+   *
+   * ⚠ A dark shadow on a near-black surface is invisible — it was applied to
+   * both duel avatars and rendered nothing, which read as the effect only
+   * working on one of them. On dark, depth has to come from LIGHT: a centred
+   * coloured glow rather than an offset drop shadow.
+   *
+   * Callers set `shadowColor` to the subject's own colour; black here is only a
+   * fallback for a subject that has none.
+   */
+  avatarGlow: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.6,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 12,
+  },
   none: {
     shadowColor: 'transparent',
     shadowOpacity: 0,

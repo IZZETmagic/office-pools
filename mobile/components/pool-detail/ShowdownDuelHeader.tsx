@@ -368,12 +368,17 @@ function Corner({
           height: AVATAR,
           borderRadius: theme.radii.pill,
           backgroundColor: theme.colors.snow,
-          ...theme.shadows.avatar,
-          // The lift is tinted with the person's own colour rather than plain
-          // black — it reads as the avatar being lit from above instead of a
-          // sticker dropped on the page. Falls back to the shadow token's black
-          // when nobody is there.
-          shadowColor: userId ? gradientForUser(userId)[1] : '#000000',
+          // ⚠ THE LIFT IS DIFFERENT IN THE TWO THEMES, and it has to be. A dark
+          // drop shadow on a near-black surface is invisible — it was on BOTH
+          // avatars and rendering nothing, which looked like the effect only
+          // applying to one of them. On dark the depth is a centred coloured
+          // GLOW; on light it stays a shadow.
+          ...(theme.mode === 'dark' ? theme.shadows.avatarGlow : theme.shadows.avatar),
+          // Tinted with the person's own colour, so the avatar reads as lit
+          // rather than as a sticker dropped on the page. The LIGHTER stop —
+          // the darker one is what made the glow disappear into the background
+          // it was supposed to lift off.
+          shadowColor: userId ? gradientForUser(userId)[0] : theme.colors.slate,
         }}
       >
         <View
