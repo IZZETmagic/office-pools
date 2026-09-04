@@ -195,7 +195,9 @@ function Matchup({
   const matchweek = bout?.matchweek ?? sealed?.matchweek ?? null;
 
   return (
-    <View style={{ paddingBottom: theme.spacing.md }}>
+    // ⚠ Generous on purpose. This is the screen the mode is named after, and
+    // a cramped matchup reads as a summary of the duel rather than the duel.
+    <View style={{ paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.xl }}>
       {/* ---------- row 2: matchweek ---------- */}
       {matchweek !== null ? (
         <Text
@@ -206,7 +208,7 @@ function Matchup({
             letterSpacing: 1.6,
             textTransform: 'uppercase',
             color: theme.colors.slate,
-            marginBottom: theme.spacing.sm,
+            marginBottom: theme.spacing.lg,
           }}
         >
           Matchweek {matchweek}
@@ -220,7 +222,7 @@ function Matchup({
           style={{
             flexDirection: 'row',
             alignItems: 'flex-start',
-            paddingHorizontal: theme.spacing.lg,
+            paddingHorizontal: theme.spacing.md,
           }}
         >
           <Corner
@@ -266,7 +268,7 @@ function Middle({ bout }: { bout: Bout }) {
         : theme.colors.ink;
 
   return (
-    <View style={{ minWidth: 64, alignItems: 'center', paddingTop: 16 }}>
+    <View style={{ minWidth: 72, alignItems: 'center', paddingTop: 22, gap: 5 }}>
       {settled && them ? (
         <Text
           style={{
@@ -297,7 +299,6 @@ function Middle({ bout }: { bout: Bout }) {
           letterSpacing: 1,
           textTransform: 'uppercase',
           color: theme.colors.slate,
-          marginTop: 3,
         }}
       >
         {!them ? 'no opponent' : settled ? (result ?? '') : 'to play'}
@@ -327,11 +328,11 @@ function Corner({
         : theme.colors.slate;
 
   return (
-    <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 5 }}>
+    <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 9 }}>
       <View
         style={{
-          width: 56,
-          height: 56,
+          width: 68,
+          height: 68,
           borderRadius: theme.radii.pill,
           borderWidth: 2,
           borderColor: color,
@@ -340,12 +341,12 @@ function Corner({
           justifyContent: 'center',
         }}
       >
-        <Text style={{ fontFamily: fontFamilies.black, fontSize: 18, color }}>
+        <Text style={{ fontFamily: fontFamilies.black, fontSize: 22, color }}>
           {initials(name)}
         </Text>
       </View>
 
-      <Text variant="cardTitle" numberOfLines={1} align="center" style={{ fontSize: 14 }}>
+      <Text variant="cardTitle" numberOfLines={1} align="center" style={{ fontSize: 15 }}>
         {name}
       </Text>
 
@@ -358,7 +359,7 @@ function Corner({
           align="center"
           style={{
             fontFamily: fontFamilies.bold,
-            fontSize: 11,
+            fontSize: 12,
             color: theme.colors.slate,
             fontVariant: ['tabular-nums'],
           }}
