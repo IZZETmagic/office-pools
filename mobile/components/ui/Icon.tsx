@@ -28,6 +28,7 @@ import {
   Attachment01Icon,
   BarChartIcon,
   Bookmark02Icon,
+  BoxingGloveIcon,
   BubbleChatIcon,
   Calendar02Icon,
   Calendar03Icon,
@@ -353,6 +354,10 @@ const ICON_MAP: Record<string, IconConstant> = {
   'trash.fill': Delete02Icon,
   'trophy': ChampionIcon,
   'trophy.circle.fill': ChampionIcon,
+  // ⚠ SF's own name for this idea, so the call sites keep reading as SF Symbols
+  // like every other key here. Mapped 2026-09-04 for Showdown's Room tab — it
+  // was reached for once before that and fell through to the fallback Circle.
+  'figure.boxing': BoxingGloveIcon,
   'trophy.fill': ChampionIcon,
   'volleyball': FootballIcon,
   'xmark': Cancel01Icon,

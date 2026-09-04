@@ -70,7 +70,7 @@ const ALL_TABS: TabDef[] = [
   // A Showdown member picks from the Duel tab's Your Sheet card; this tab is
   // where they read the week back — their duels, everybody else's, and what
   // each was decided on.
-  { key: 'room', label: 'The Room', icon: 'person.3.fill' },
+  { key: 'room', label: 'The Room', icon: 'figure.boxing' },
   { key: 'predictions', label: 'Predictions', icon: 'pencil.line' },
   { key: 'form', label: 'Form', icon: 'chart.bar.xaxis' },
   { key: 'scoring', label: 'Scoring', icon: 'list.number' },
