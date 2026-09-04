@@ -96,12 +96,15 @@ const CHROME_ROW = 34;
  * What an avatar shrinks to once the band is fully collapsed.
  *
  * ⚠ Kept generous on purpose — the members ARE the event, and a duel that
- * collapses into two dots beside a number stops being about two people. 32 in a
- * 44pt row leaves 6pt of air top and bottom, and still clears the score between
- * them: `2 × COLLAPSED_SPREAD − COLLAPSED_AVATAR` is 84pt of gap, against a
- * scoreline that renders around 60.
+ * collapses into two dots beside a number stops being about two people.
+ *
+ * ⚠ IT IS NOW UP AGAINST BOTH OF ITS NEIGHBOURS. At 40 in a 44pt row there is
+ * 2pt of air top and bottom, and the gap left for the score is
+ * `2 × COLLAPSED_SPREAD − COLLAPSED_AVATAR` = 76pt against a line that renders
+ * around 60. Going further means moving one of them too: `COLLAPSED_ROW` for
+ * the height, `COLLAPSED_SPREAD` for the width.
  */
-const COLLAPSED_AVATAR = 32;
+const COLLAPSED_AVATAR = 40;
 /** How far from the screen's centre a collapsed avatar settles. */
 const COLLAPSED_SPREAD = 58;
 /**
