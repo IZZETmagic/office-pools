@@ -63,6 +63,9 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
  */
 const AVATAR = 80;
 
+/** Thickness of the lit edge showing under the avatar. */
+const RIM = 2;
+
 /** How far you scroll before the matchup is fully folded away. */
 const COLLAPSE_DISTANCE = 90;
 
@@ -344,6 +347,8 @@ function Corner({
         ? theme.colors.red
         : theme.colors.slate;
   const userId = standing?.userId ?? null;
+  // Brighter on light, where a white rim has less to work against.
+  const rimColor = theme.mode === 'dark' ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.75)';
 
   return (
     <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 9 }}>
@@ -381,10 +386,50 @@ function Corner({
           shadowColor: userId ? gradientForUser(userId)[0] : theme.colors.slate,
         }}
       >
+        {/*
+          THE RIM LIGHT — the thing that actually makes the avatar look raised.
+
+          Ryan spotted it on his own avatar before it was deliberate: his ring is
+          a FLAT primary blue while the gradient beneath runs light at the top to
+          dark at the bottom, so the ring vanishes into the crown and stands
+          lighter than the base. The eye reads that lit bottom edge as the disc
+          lifting off the page.
+
+          ⚠ IT CANNOT BE `borderBottomColor`. That was the first attempt and it
+          renders as a hard-edged half circle — per-side colours over a pill
+          radius are four ARCS that stop dead where they meet, so the light does
+          not fade out, it just ends.
+
+          So the rim is a circle filled with a vertical fade sitting BEHIND the
+          avatar, which is inset by `RIM` on top of it. What stays visible is a
+          2pt annulus of that fade: nothing at the crown, brightest at the base,
+          and no edge to cut off.
+        */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0)', rimColor]}
+          locations={[0, 0.4, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            borderRadius: theme.radii.pill,
+          }}
+        />
+
         <View
           style={{
-            width: AVATAR,
-            height: AVATAR,
+            // INSET BY `RIM`, on BOTH corners — this is what leaves the fade
+            // behind it showing as a lit ring. Insetting one avatar and not the
+            // other is the mistake that made the two circles different sizes.
+            position: 'absolute',
+            top: RIM,
+            left: RIM,
+            right: RIM,
+            bottom: RIM,
             borderRadius: theme.radii.pill,
             overflow: 'hidden',
             alignItems: 'center',
@@ -431,40 +476,6 @@ function Corner({
           </Text>
         </View>
 
-        {/*
-          THE RIM LIGHT — the bit that actually makes the avatar look raised.
-
-          Ryan spotted it on his own avatar before it was deliberate: his ring is
-          a FLAT primary blue while the gradient beneath runs light at the top to
-          dark at the bottom, so the ring vanishes into the crown and stands
-          slightly lighter than the base. The eye reads that lit bottom edge as
-          the disc lifting off the page — which is the depth the drop shadow was
-          never delivering.
-
-          So it becomes a real component, on BOTH avatars: a ring that is
-          transparent on three sides and faintly light along the bottom. Per-side
-          border colours over a pill radius render as four arcs, and only the
-          base one is painted.
-
-          ⚠ `borderBottomColor` after `borderColor` is not stylistic ordering —
-          RN resolves the specific side over the general one, which is what
-          leaves the other three arcs invisible.
-        */}
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            borderRadius: theme.radii.pill,
-            borderWidth: 2,
-            borderColor: 'transparent',
-            borderBottomColor:
-              theme.mode === 'dark' ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.55)',
-          }}
-        />
 
         {/*
           ⚠ THE RING IS AN OVERLAY, NOT A BORDER ON THE CIRCLE — Ryan, and it
