@@ -109,6 +109,16 @@ type PoolTabBarProps = {
   poolId?: string;
   /** Which league mode, so Showdown can be given its Duel tab. Null elsewhere. */
   leagueMode?: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null;
+  /**
+   * Drop the strip's own background so whatever is behind it shows through.
+   *
+   * ⚠ Only for a header that paints something worth seeing — the Showdown duel
+   * band is lit from both edges and the strip sits INSIDE it, so an opaque
+   * `snow` here cut the light off in a straight line right where the tabs
+   * start. Everywhere else the strip keeps its background: it scrolls over page
+   * content and needs to stay legible.
+   */
+  transparent?: boolean;
 };
 
 export function getVisiblePoolTabs(
@@ -258,6 +268,7 @@ export function PoolTabBar({
   accentColor,
   poolId,
   leagueMode = null,
+  transparent = false,
 }: PoolTabBarProps) {
   const theme = useTheme();
   const pending = usePendingActionsOptional();
@@ -351,7 +362,7 @@ export function PoolTabBar({
         flexGrow: 0,
         flexShrink: 0,
         flexBasis: 'auto',
-        backgroundColor: theme.colors.snow,
+        backgroundColor: transparent ? 'transparent' : theme.colors.snow,
       }}
     >
       {tabs.map((tab, i) => (

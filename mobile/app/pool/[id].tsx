@@ -660,6 +660,10 @@ export default function PoolDetailScreen() {
       accentColor={accentColor}
       poolId={pool.poolId}
       leagueMode={leagueMode}
+      // The Showdown header is lit from both edges and the strip sits inside
+      // it — an opaque background here would cut the light off in a straight
+      // line exactly where the tabs begin.
+      transparent={isShowdownPool}
     />
   );
 
