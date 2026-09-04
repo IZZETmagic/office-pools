@@ -64,6 +64,21 @@ export type LeaguePoolPayload = {
      * half what it pays. Read the depth before reading these.
      */
     prices: { exact: number; goalDifference: number; result: number }
+    /**
+     * What this mode asks of a player — RESOLVED ON THE SERVER.
+     *
+     * ⚠ Deliberately not a mobile copy of `lib/leagueModeInfo.ts`. That prose
+     * already lives in four places on the web and `leagueModeCopy.guard.test.ts`
+     * keeps them in step; a fifth copy over here would be the one the guard
+     * cannot see, and it would go stale silently — nothing fails when a phone
+     * describes last month's rules.
+     */
+    modeInfo: {
+      label: string
+      summary: string
+      description: string
+      points: string[]
+    } | null
   }
   season: {
     teams: LeagueTeam[]

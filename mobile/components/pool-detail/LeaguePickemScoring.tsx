@@ -1,6 +1,7 @@
 import { ActivityIndicator, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
+import { DUEL_BYE, DUEL_LOSS, DUEL_TIE, DUEL_WIN } from '@/lib/duelPoints';
 import { useLeaguePool } from '@/lib/useLeaguePool';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -44,9 +45,25 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // this screen can drift into describing scoring nobody is using.
 // =============================================================
 
-type Props = { poolId: string };
+type Props = {
+  poolId: string;
+  /**
+   * Add the duel layer — Showdown only.
+   *
+   * ⚠ SHOWDOWN IS A PICK'EM WITH A LAYER ON TOP (Decision 9), not a separate
+   * game, so it gets this whole screen and one more card rather than a screen
+   * of its own. `league_score_duels` reads the same weekly total this page
+   * prices; it never learns which depth produced it.
+   *
+   * Until now a Showdown pool fell through to the WORLD CUP scoring tab —
+   * group bonuses, a ×8 Final multiplier, penalty shootouts and a 1,000-point
+   * Champion bonus, none of which it can score, over the Results-depth pricing
+   * error this screen exists to fix.
+   */
+  showDuel?: boolean;
+};
 
-export function LeaguePickemScoring({ poolId }: Props) {
+export function LeaguePickemScoring({ poolId, showDuel = false }: Props) {
   const theme = useTheme();
   const league = useLeaguePool(poolId);
 
@@ -115,6 +132,60 @@ export function LeaguePickemScoring({ poolId }: Props) {
           pays the same as backing a win.
         </Note>
       )}
+
+      {/*
+        THE DUEL LAYER — Showdown only.
+
+        ⚠ THE VALUES ARE IMPORTED, NEVER TYPED OUT. They are fixed in
+        `league_score_duels` (migration 121) rather than being a pool setting,
+        and `duelPoints.guard.test.ts` reads both the web and mobile copies
+        against the migration — so a screen quoting a literal would drift
+        silently the next time the scale moves. It has moved once already:
+        3/1/0 became 500/250/0.
+      */}
+      {showDuel ? (
+        <Card
+          title="Your weekly duel"
+          caption="Every matchweek you are drawn against one other member. Whoever scored more that week wins the duel."
+        >
+          <PointsRow label="Beat your opponent" value={DUEL_WIN} />
+          <PointsRow label="Tie with them" value={DUEL_TIE} />
+          <PointsRow label="No opponent this week" value={DUEL_BYE} />
+          <PointsRow label="Lose" value={DUEL_LOSS} />
+        </Card>
+      ) : null}
+
+      {showDuel ? (
+        <>
+          {/*
+            ⚠ ONE TABLE, NOT TWO. Migration 121 changed `league_finalize_ranks`
+            from ranking duel points AHEAD of accuracy to ADDING them to it. The
+            old sentence — "duel points decide the table, the weekly score is
+            the tiebreak" — describes a cascade that no longer exists.
+          */}
+          <Note>
+            There is one table. Your duel points are added to what your picks scored, so a heavy
+            week still counts even if you lost the head-to-head — and a win, at about half a
+            perfect matchweek, moves you further than any single result can.
+          </Note>
+          {/*
+            ⚠ THE COPY MUST NEVER SAY A PAIRING HAPPENS EACH WEEK. The whole
+            season is drawn at pool creation; only the SHOWING is weekly. That
+            is the one sentence here that would fail the disclosure gate,
+            because it is a claim about something we did not do.
+          */}
+          <Note>
+            The whole season is drawn when the pool is created, and each opponent is revealed two
+            days after the previous duel is decided — one duel at a time. The draw rotates, so
+            everybody meets everybody. With an odd number of entries somebody sits out each week
+            and takes {fmt(DUEL_BYE)}: there was no opponent, so there was no defeat.
+          </Note>
+          <Note>
+            Joining after the season has started means fewer duels than the members who were here
+            from the start, and fewer points to show for them.
+          </Note>
+        </>
+      ) : null}
 
       <Card
         title="Picks close an hour before kickoff"

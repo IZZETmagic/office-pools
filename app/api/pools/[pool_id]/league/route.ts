@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { readLeaguePoolView, readLeaguePredictions, deriveRoundSubmissions } from '@/lib/league/read'
 import { readEntryTotals, readPoolDuels } from '@/lib/league/duels'
 import { getLeagueSeasonCached } from '@/lib/league/season'
+import { leagueModeInfo, type LeagueMode } from '@/lib/leagueModeInfo'
 
 // =============================================================
 // /api/pools/:pool_id/league — ONE READ, TWO SURFACES
@@ -303,6 +304,23 @@ export async function GET(
       // one place decide what it means.
       league_depth: pool.league_depth ?? null,
       league_table_lock_at: pool.league_table_lock_at ?? null,
+      /**
+       * What this mode asks of a player, in the product's own words.
+       *
+       * ⚠⚠ SENT, NOT MIRRORED. The obvious alternative was a copy of
+       * `leagueModeInfo` under `mobile/`, and it would have been the fifth
+       * place this prose lives — `LeagueScoringRulesTab`, `LeagueHowToPlayTab`,
+       * `DuelsTab` and this file already say the same things, and
+       * `leagueModeCopy.guard.test.ts` exists to stop them drifting. A copy the
+       * guard cannot see is the one that goes stale, and it would go stale
+       * SILENTLY: nothing fails when a phone describes last month's rules.
+       *
+       * Shipping the resolved copy means one owner, one guard, and a phone that
+       * cannot be out of date with the web by construction.
+       */
+      modeInfo: pool.league_mode
+        ? leagueModeInfo(pool.league_mode as LeagueMode, pool.league_depth ?? null)
+        : null,
     },
     season: {
       teams: view.teams,

@@ -615,8 +615,18 @@ export default function PoolDetailScreen() {
         // tap at the pool's TOP price (066), and that screen printed "Correct
         // Result — 50" beneath it. A member who called Arsenal to win read that
         // their pick was worth half what it pays.
-        if (pool.leagueMode === 'pickem') {
-          return <MemoLeaguePickemScoring poolId={pool.poolId} />;
+        // ⚠ SHOWDOWN TOO, and it was falling through to the World Cup tab —
+        // group bonuses, a ×8 Final multiplier, penalty shootouts and a
+        // 1,000-point Champion bonus, none of which it can score. It is a
+        // PICK'EM WITH A LAYER (Decision 9), so it gets the same screen plus
+        // the duel card rather than a screen of its own.
+        if (pool.leagueMode === 'pickem' || pool.leagueMode === 'showdown') {
+          return (
+            <MemoLeaguePickemScoring
+              poolId={pool.poolId}
+              showDuel={pool.leagueMode === 'showdown'}
+            />
+          );
         }
         return (
           <MemoScoringTab

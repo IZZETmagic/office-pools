@@ -135,6 +135,8 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
   // ⚠ `isLeague` first, then the mode — two production pools carry a season with
   // a NULL mode, and a NULL must never be read as "this is Last Man Standing".
   const isLmsMode = pool.isLeague && pool.leagueMode === 'last_man_standing';
+  // ⚠ `isLeague` first, then the mode — same rule as the two above.
+  const isShowdownMode = pool.isLeague && pool.leagueMode === 'showdown';
 
   const [edit, setEdit] = useState<EditableState>(initial);
   const [saving, setSaving] = useState(false);
@@ -627,6 +629,21 @@ export function SettingsTab({ pool, onSaved, onOpenScoring }: Props) {
         that are coming.
       */}
       {isLmsMode ? <LmsRulesCard /> : null}
+
+      {/*
+        ⚠ THE SAME ABSENCE, AND IT NEEDED THE SAME SENTENCE. A Showdown admin
+        loses the deadline card, the entries card and scoring config exactly as
+        an LMS admin does, and until now only LMS said why. An admin hunting a
+        setting that does not exist is a support question, and "it isn't there"
+        is a worse answer than the reason.
+
+        ⚠ THE DRAW IS THE POINT OF THIS CARD. It is the one thing an admin might
+        reasonably expect to control and must not: it is made at pool creation
+        by the circle method, and regenerating it is something JOINING and
+        LEAVING do, not something a person does. Saying so also forecloses the
+        support question that follows — "can you tell me who I've got next".
+      */}
+      {isShowdownMode ? <ShowdownRulesCard /> : null}
 
       {pool.isLeague ? null : (
       <Card>
@@ -1392,6 +1409,58 @@ function QuickDeadlineButton({ label, onPress }: { label: string; onPress: () =>
  * to one for any league pool, and Scoring Config edits `pool_settings`, which is
  * the World Cup's table and changes nothing here.
  */
+function ShowdownRulesCard() {
+  const theme = useTheme();
+  const lines: Array<[string, string]> = [
+    [
+      'The draw is already made',
+      'The whole season was drawn when the pool was created, and it rotates so everybody meets everybody. Members see one opponent at a time — you cannot change it, and you cannot open it early.',
+    ],
+    [
+      'Picks lock per matchweek',
+      'An hour before that week’s first kickoff — there is no date to set.',
+    ],
+    [
+      'A duel is priced by the engine',
+      'A win, a tie and a bye are fixed values added to what the picks scored. They are not pool settings.',
+    ],
+    [
+      'Joining and leaving redraw it',
+      'The remaining fixtures are redrawn when somebody joins or leaves. A duel already played is never rewritten, and the week in progress is left alone.',
+    ],
+  ];
+
+  return (
+    <Card>
+      <Caption>How this pool runs</Caption>
+      <RNText style={{ fontFamily: fontFamilies.regular, fontSize: 11, color: theme.colors.slate }}>
+        Set by the fixture list and the draw, not by you
+      </RNText>
+      <View style={{ marginTop: theme.spacing.sm, gap: theme.spacing.sm }}>
+        {lines.map(([lead, rest]) => (
+          <View key={lead} style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            <Icon name="checkmark.circle.fill" color="slate" size={13} />
+            <RNText
+              style={{
+                flex: 1,
+                fontFamily: fontFamilies.regular,
+                fontSize: 12.5,
+                lineHeight: 18,
+                color: theme.colors.slate,
+              }}
+            >
+              <RNText style={{ fontFamily: fontFamilies.bold, color: theme.colors.ink }}>
+                {lead}
+              </RNText>
+              {` — ${rest}`}
+            </RNText>
+          </View>
+        ))}
+      </View>
+    </Card>
+  );
+}
+
 function LmsRulesCard() {
   const theme = useTheme();
   const lines: Array<[string, string]> = [

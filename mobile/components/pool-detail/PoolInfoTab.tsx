@@ -25,6 +25,7 @@ import { useHomeData } from '@/lib/HomeDataProvider';
 import { useMemberRoster } from '@/lib/useMemberRoster';
 import type { PoolDetailInfo } from '@/lib/usePoolDetail';
 import { usePoolEntries } from '@/lib/usePoolEntries';
+import { useLeaguePool } from '@/lib/useLeaguePool';
 import { usePoolRounds, roundLabel } from '@/lib/usePoolRounds';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 import { poolStatusDisplay } from '@/lib/poolStatus';
@@ -123,6 +124,13 @@ export function PoolInfoTab({ pool, matchweekDeadline = null }: Props) {
     }
   }
 
+  /**
+   * ⚠ Null for a non-league pool, so the query is disabled rather than firing a
+   * league read on a World Cup screen.
+   */
+  const league = useLeaguePool(pool.isLeague ? pool.poolId : null);
+  const modeInfo = league.data?.pool.modeInfo ?? null;
+
   const modeLabelText = pool.isLeague
     // `isLeague` first, then the mode — a pool can carry a season with a NULL
     // mode (two in production do), and those get the competition rather than a
@@ -180,6 +188,47 @@ export function PoolInfoTab({ pool, matchweekDeadline = null }: Props) {
         gap: theme.spacing.lg,
       }}
     >
+      {/*
+        HOW IT PLAYS — the mode, in the product's own words.
+
+        ⚠ THE COPY COMES OVER THE CONTRACT, resolved by `lib/leagueModeInfo.ts`
+        on the server. It is not restated here: that prose already lives in four
+        web surfaces with a guard keeping them in step, and a fifth copy on the
+        phone would be the one the guard cannot see. A phone describing last
+        month's rules fails nothing and tells nobody.
+      */}
+      {modeInfo ? (
+        <View
+          style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.radii.lg,
+            padding: theme.spacing.xl,
+            marginBottom: theme.spacing.lg,
+            ...theme.shadows.card,
+          }}
+        >
+          <Text variant="caption" color="slate">
+            How {modeInfo.label} plays
+          </Text>
+          <Text variant="body" style={{ marginTop: theme.spacing.sm }}>
+            {modeInfo.summary}
+          </Text>
+          <View style={{ marginTop: theme.spacing.md, gap: theme.spacing.sm }}>
+            {modeInfo.points.map((point) => (
+              <View key={point} style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+                <Icon name="checkmark.circle.fill" color="slate" size={13} />
+                <Text variant="body" color="slate" style={{ flex: 1 }}>
+                  {point}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <Text variant="body" color="slate" style={{ marginTop: theme.spacing.md }}>
+            {modeInfo.description}
+          </Text>
+        </View>
+      ) : null}
+
       {/* About — description only, hidden when no description set */}
       {pool.description ? (
         <Card>
