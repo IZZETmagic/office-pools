@@ -105,6 +105,22 @@ const CHROME_ROW = 34;
  * the height, `COLLAPSED_SPREAD` for the width.
  */
 const COLLAPSED_AVATAR = 40;
+/**
+ * Width of the middle column, and the row's outer padding.
+ *
+ * ⚠⚠ BOTH ARE USED TWICE: by the LAYOUT that places the corners and by the
+ * MORPH ARITHMETIC that works out how far each avatar has to travel. They were
+ * literals in three places and a `theme.spacing` lookup in two, which means a
+ * nudge to the layout would have left the collapse aiming at where the avatars
+ * used to be — silently, since the numbers stay plausible. Same class of bug as
+ * mixing parent-space and screen-space, and the same cost.
+ *
+ * Wider middle and tighter padding both push the corners OUTWARD, which is what
+ * Ryan asked for: "move the avatars a bit closer to the edges".
+ */
+const MIDDLE_COL = 160;
+const ROW_PAD = 8;
+
 /** How far from the screen's centre a collapsed avatar settles. */
 const COLLAPSED_SPREAD = 58;
 /**
@@ -267,7 +283,7 @@ export function ShowdownDuelHeader({
   const avatarScale = COLLAPSED_AVATAR / AVATAR;
 
   /** Half the gap between the two expanded avatar centres. */
-  const columnCentre = (theme.spacing.md + (width - theme.spacing.md * 2 - 112) / 4);
+  const columnCentre = ROW_PAD + (width - ROW_PAD * 2 - MIDDLE_COL) / 4;
   const wantedX = width / 2 - COLLAPSED_SPREAD - columnCentre;
 
   // ⚠ Two named hooks, not one factory called twice. A hook inside a helper is
@@ -550,7 +566,7 @@ function Matchup({
           style={{
             flexDirection: 'row',
             alignItems: 'flex-start',
-            paddingHorizontal: theme.spacing.md,
+            paddingHorizontal: ROW_PAD,
           }}
         >
           <Corner
@@ -560,7 +576,7 @@ function Matchup({
             avatarStyle={leftCorner}
             labelFade={labelFade}
           />
-          <Animated.View style={[{ minWidth: 112, alignItems: 'center' }, middleStyle]}>
+          <Animated.View style={[{ minWidth: MIDDLE_COL, alignItems: 'center' }, middleStyle]}>
             <Middle bout={bout} kickoffAt={kickoffAt} />
           </Animated.View>
           <Corner
@@ -604,14 +620,14 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
   const countdown = them ? remaining : null;
 
   return (
-    // ⚠ 112 WIDE, and measured rather than guessed: `HH:MM:SS` at 24pt Nunito
-    // Black is about 103pt of tabular digits. Too narrow and the clock wraps
-    // mid-time; the corners are `flex: 1` so they simply take what is left.
+    // ⚠ THE `v` IS GONE — Ryan, and the clock is the middle column now. It was
+    // saying the same thing as two avatars either side of a scoreline already
+    // say, and it was competing with the one number here that moves.
     //
-    // `paddingTop` drops from 27 to 12 because the stack is taller now — 27 was
-    // centring a lone `v` against an 80pt avatar, and centring the pair needs
-    // less.
-    <View style={{ minWidth: 112, alignItems: 'center', paddingTop: 12, gap: 5 }}>
+    // `MIDDLE_COL` still has to clear `HH:MM:SS`, which is about 103pt of
+    // tabular digits at 24pt Nunito Black. Too narrow and the clock wraps
+    // mid-time; the corners are `flex: 1` and simply take what is left.
+    <View style={{ minWidth: MIDDLE_COL, alignItems: 'center', paddingTop: 12, gap: 5 }}>
       {settled && them ? (
         <BandText
           style={{
@@ -624,18 +640,7 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
         >
           {you.accuracy ?? 0}–{them.accuracy ?? 0}
         </BandText>
-      ) : (
-        <BandText
-          style={{
-            fontFamily: fontFamilies.black,
-            fontSize: 20,
-            lineHeight: 26, // see the initials above — 'body' caps it at 20
-            color: BAND.slate,
-          }}
-        >
-          {them ? 'v' : '—'}
-        </BandText>
-      )}
+      ) : null}
       {/*
         ⚠ THE COUNTDOWN REPLACES "TO PLAY", it does not sit beside it. Both say
         the same thing about the same week, and the clock says it with a number.
