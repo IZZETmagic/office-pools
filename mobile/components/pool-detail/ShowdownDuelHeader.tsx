@@ -283,6 +283,7 @@ function Middle({ bout }: { bout: Bout }) {
           style={{
             fontFamily: fontFamilies.black,
             fontSize: 22,
+            lineHeight: 28, // see the initials above — 'body' caps it at 20
             color: tint,
             fontVariant: ['tabular-nums'],
           }}
@@ -294,6 +295,7 @@ function Middle({ bout }: { bout: Bout }) {
           style={{
             fontFamily: fontFamilies.black,
             fontSize: 20,
+            lineHeight: 26, // see the initials above — 'body' caps it at 20
             color: theme.colors.slate,
           }}
         >
@@ -353,8 +355,16 @@ function Corner({
           width: 68,
           height: 68,
           borderRadius: theme.radii.pill,
+          // ⚠ THE RING IS YOURS ALONE — Ryan, 2026-09-03. It marks which corner
+          // is you, so putting one on your opponent as well says nothing and
+          // fights their gradient. Their identity is the avatar itself.
+          //
+          // ⚠ The border stays 2.5 and goes TRANSPARENT rather than dropping to
+          // 0. A border insets the content, so a ringless avatar would render
+          // its gradient 5pt wider than yours and the two circles would no
+          // longer match. Same geometry, one of them invisible.
           borderWidth: 2.5,
-          borderColor: color,
+          borderColor: tone === 'primary' ? color : 'transparent',
           overflow: 'hidden',
           alignItems: 'center',
           justifyContent: 'center',
@@ -373,6 +383,12 @@ function Corner({
           style={{
             fontFamily: fontFamilies.black,
             fontSize: 22,
+            // ⚠ SET WITH THE FONT SIZE, ALWAYS. `Text` defaults to variant
+            // 'body', which carries `lineHeight: 20` — an inline `fontSize`
+            // above that leaves 22pt glyphs in a 20pt line box and the tops of
+            // the initials are clipped off. Nothing errors; the letters just
+            // lose their heads.
+            lineHeight: 28,
             color: userId ? '#FFFFFF' : color,
           }}
         >
