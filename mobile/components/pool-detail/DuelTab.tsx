@@ -153,20 +153,11 @@ function SheetCard({
       the screen just does not feel like the rest of the app.
     */
     <Card bordered>
-      <Row>
-        {/* `caption` IS the token for an uppercase label — bold 11 at 1.5
-            tracking. The hand-rolled 9pt at 1.3 was a near-miss of it. */}
-        <Text variant="caption" color="slate">
-          Your sheet
-        </Text>
-        <Text variant="cardTitle" style={{ fontVariant: ['tabular-nums'] }}>
-          {sheet.done}
-          <Text variant="cardTitle" color="slate" style={{ fontVariant: ['tabular-nums'] }}>
-            {' / '}
-            {sheet.total}
-          </Text>
-        </Text>
-      </Row>
+      <CardHeader
+        title="Your sheet"
+        meta={`${sheet.done} / ${sheet.total}`}
+        subtitle={finished ? 'Your sheet is in. Nothing left to pick.' : openList(sheet.open)}
+      />
 
       {/* The bar. Two flexed children rather than a percentage width, so the
           fill cannot disagree with its own track by a rounding error. */}
@@ -189,10 +180,6 @@ function SheetCard({
         />
         <View style={{ flex: Math.max(sheet.total - sheet.done, 0) }} />
       </View>
-
-      <Text variant="body" color="slate" style={{ marginTop: theme.spacing.md }}>
-        {finished ? 'Your sheet is in. Nothing left to pick.' : openList(sheet.open)}
-      </Text>
 
       {/*
         ⚠ THE SAME BLUE BUTTON IN BOTH STATES. A finished sheet gets a way IN,
@@ -231,12 +218,11 @@ function DecidedOnCard({ fixtures }: { fixtures: LeagueMatch[] }) {
 
   return (
     <Card bordered>
-      <Row>
-        <Text variant="cardTitle">What it will be decided on</Text>
-        <Text variant="caption" color="slate">
-          {fixtures.length} fixture{fixtures.length === 1 ? '' : 's'}
-        </Text>
-      </Row>
+      <CardHeader
+        title="What it will be decided on"
+        meta={`${fixtures.length} fixture${fixtures.length === 1 ? '' : 's'}`}
+        subtitle="Where you agree, nothing can separate you. Where you differ is the duel."
+      />
 
       <View style={{ marginTop: theme.spacing.md }}>
         {fixtures.map((f, i) => (
@@ -294,6 +280,8 @@ function Side({
   );
   const badge = crest ? (
     <Image
+      // Decorative — the club's name is the label right next to it.
+      alt=""
       source={{ uri: crest }}
       style={{ width: theme.spacing.lg, height: theme.spacing.lg }}
       resizeMode="contain"
@@ -360,16 +348,13 @@ function OpponentCard({
 
   return (
     <Card bordered>
-      <Row>
-        <Text variant="caption" color="slate">
-          Scouting {opponent.name}
-        </Text>
-        <Text variant="cardTitle" color="slate" style={{ fontVariant: ['tabular-nums'] }}>
-          {standing?.rank != null ? ordinal(standing.rank) : '—'}
-          {' · '}
-          {(standing?.points ?? 0).toLocaleString()} pts
-        </Text>
-      </Row>
+      <CardHeader
+        title={`Scouting ${opponent.name}`}
+        meta={`${standing?.rank != null ? ordinal(standing.rank) : '—'} · ${(
+          standing?.points ?? 0
+        ).toLocaleString()} pts`}
+        subtitle="How they have been playing, from weeks already revealed."
+      />
 
       {/* Their last five duels — against anyone, oldest first. */}
       {opponent.form.length > 0 ? (
@@ -416,6 +401,9 @@ function OpponentCard({
           >
             {opponent.topClub.crest ? (
               <Image
+                // Decorative — the club's name sits beside it, so announcing
+                // the crest as well would read the same thing twice.
+                alt=""
                 source={{ uri: opponent.topClub.crest }}
                 style={{ width: theme.spacing.xl, height: theme.spacing.xl }}
                 resizeMode="contain"
@@ -485,15 +473,11 @@ function AgainstTheRoomCard({ series }: { series: DuelState['series'] }) {
 
   return (
     <Card bordered>
-      <Row>
-        <Text variant="cardTitle">Against the room</Text>
-        <Text variant="caption" color="slate">
-          {beat} of {rows.length} {rows.length === 1 ? 'week' : 'weeks'}
-        </Text>
-      </Row>
-      <Text variant="body" color="slate" style={{ marginTop: theme.spacing.xs }}>
-        How far above or below the pool&rsquo;s median you finished each matchweek.
-      </Text>
+      <CardHeader
+        title="Against the room"
+        meta={`${beat} of ${rows.length} ${rows.length === 1 ? 'week' : 'weeks'}`}
+        subtitle="How far above or below the pool’s median you finished each matchweek."
+      />
 
       <View
         style={{
@@ -596,9 +580,11 @@ function ScoutingCard({ season }: { season: Season }) {
 
   return (
     <Card bordered>
-      <Text variant="caption" color="slate">
-        Your season
-      </Text>
+      <CardHeader
+        title="Your season"
+        meta={season.rank != null ? ordinal(season.rank) : undefined}
+        subtitle="How you have been playing, across every week you picked in."
+      />
 
       <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginTop: theme.spacing.md }}>
         <Stat label="Points" value={season.points.toLocaleString()} />
@@ -793,9 +779,11 @@ function TapeCard({
 
   return (
     <Card bordered>
-      <Text variant="caption" color="slate">
-        Tale of the tape
-      </Text>
+      <CardHeader
+        title="Tale of the tape"
+        meta={met === 0 ? 'First meeting' : `Met ${met}×`}
+        subtitle={`How you and ${opponent.name} compare this season.`}
+      />
 
       <TapeRow label="Season points" you={season.points} them={them?.points ?? 0} first />
       <TapeRow label="Correct picks" you={season.correct} them={them?.correct ?? 0} />
@@ -962,6 +950,50 @@ function FormDots({ types, align = 'left' }: { types: string[]; align?: 'left' |
 }
 
 // -------------------------------------------------------------- furniture
+
+/**
+ * Every card on this tab opens the same way.
+ *
+ * Ryan, 2026-09-04, on "Against the room": that header shape — a title, a
+ * figure hard right, and one line saying what the card is for — is the one the
+ * others should wear. Six cards each inventing their own heading is how a tab
+ * reads as six screens that happen to be stacked.
+ *
+ * ⚠ `meta` and `subtitle` are BOTH optional and both earn their place when
+ * present. A card with no natural figure gets no chip rather than a padded one,
+ * and a title that already says everything gets no second sentence. Uniform
+ * does not mean identical.
+ */
+function CardHeader({
+  title,
+  meta,
+  subtitle,
+}: {
+  title: string;
+  meta?: string;
+  subtitle?: string;
+}) {
+  const theme = useTheme();
+  return (
+    <>
+      <Row>
+        <Text variant="cardTitle" numberOfLines={1} style={{ flex: 1 }}>
+          {title}
+        </Text>
+        {meta ? (
+          <Text variant="caption" color="slate">
+            {meta}
+          </Text>
+        ) : null}
+      </Row>
+      {subtitle ? (
+        <Text variant="body" color="slate" style={{ marginTop: theme.spacing.xs }}>
+          {subtitle}
+        </Text>
+      ) : null}
+    </>
+  );
+}
 
 function Row({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
