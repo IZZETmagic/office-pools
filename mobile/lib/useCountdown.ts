@@ -52,7 +52,15 @@ export function formatHms(ms: number): string {
   return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 }
 
-/** `2d 04:11:09` — for waits long enough that a raw hour count stops meaning much. */
+/**
+ * `2d 04:11:09` — for waits long enough that a raw hour count stops meaning much.
+ *
+ * ⚠ UNUSED RIGHT NOW, on purpose. Its caller was the Duel tab's sealed card,
+ * which came out when the tab was stripped back to Your Sheet (2026-09-03). It
+ * is kept rather than deleted because the sealed card is on the list to come
+ * back and a reveal can be a week out — but if that stops being true, this
+ * should go with it rather than sit here looking sanctioned.
+ */
 export function formatDhms(ms: number): string {
   const s = Math.floor(ms / 1000);
   const d = Math.floor(s / 86400);

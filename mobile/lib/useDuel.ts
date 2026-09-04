@@ -59,7 +59,14 @@ export type DuelState = {
   error: boolean;
   /** Null when this is not a Showdown pool at all. */
   isShowdown: boolean;
-  /** Every revealed duel the viewer is in, oldest first. */
+  /**
+   * Every revealed duel the viewer is in, oldest first.
+   *
+   * ⚠ Nothing renders this today. The Duel tab was stripped back to Your Sheet
+   * on 2026-09-03 and the season list is on the list to come back; the header
+   * only needs `current`. Kept because the derivation is the shared one — if
+   * the list does not return, this and `record` should go together.
+   */
   bouts: Bout[];
   /** The one to lead with. Null before the draw exists. */
   current: Bout | null;
