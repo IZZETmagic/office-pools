@@ -332,6 +332,7 @@ export default function PoolDetailScreen() {
         points: e.total_points ?? 0,
         // For the scouting card's accuracy — same row, no second read.
         correct: e.pickem?.correct_count ?? 0,
+        lastFive: e.pickem?.last_five ?? [],
       });
     }
     return m;

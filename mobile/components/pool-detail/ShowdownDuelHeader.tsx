@@ -158,6 +158,15 @@ export type Standing = {
    * for one number is how two surfaces start disagreeing about a season.
    */
   correct: number;
+  /**
+   * Their last five settled FIXTURES, oldest first — the leaderboard's own form
+   * vocabulary, so a member sees the same five results in both places rather
+   * than two different truths about a week.
+   *
+   * ⚠ Not the same as the scouting card's duel form, which is last five DUELS.
+   * Two different questions that both fit the word "form".
+   */
+  lastFive: string[];
 };
 
 type Props = {

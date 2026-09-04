@@ -5,7 +5,7 @@ import { Button, Card, Icon, Text } from '@/components/ui';
 import { useDuel, type DuelState, type Opponent, type Season, type Sheet } from '@/lib/useDuel';
 import type { LeagueMatch } from '@/lib/useLeaguePool';
 import type { Standing } from './ShowdownDuelHeader';
-import { useTheme } from '@/theme';
+import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
 // THE DUEL TAB — being rebuilt, one card at a time
@@ -105,6 +105,14 @@ export function DuelTab({ poolId, standings }: Props) {
       {fixtures.length > 0 ? <DecidedOnCard fixtures={fixtures} /> : null}
       {series.length > 0 ? <AgainstTheRoomCard series={series} /> : null}
       {season ? <ScoutingCard season={season} /> : null}
+      {opponent && season && ownEntryId ? (
+        <TapeCard
+          opponent={opponent}
+          season={season}
+          you={standings.get(ownEntryId) ?? null}
+          them={standings.get(opponent.entryId) ?? null}
+        />
+      ) : null}
     </View>
   );
 }
@@ -753,6 +761,198 @@ function openList(open: Sheet['open']): string {
   const first = open.slice(0, 2).map(name).join(' and ');
   const rest = open.length > 2 ? ` and ${open.length - 2} more` : '';
   return `${first}${rest} still open.`;
+}
+
+// ---------------------------------------------------------- tale of the tape
+
+/**
+ * The two of you, measured against each other.
+ *
+ * ⚠ EVERY ROW IS A COMPARISON, so the winning side is BOLDED rather than
+ * labelled — the shape of the card is the comparison. Adding a "leader" chip to
+ * each row would say the same thing twice and take the width to say it.
+ */
+function TapeCard({
+  opponent,
+  season,
+  you,
+  them,
+}: {
+  opponent: Opponent;
+  season: Season;
+  you: Standing | null;
+  them: Standing | null;
+}) {
+  const met = opponent.met.won + opponent.met.drawn + opponent.met.lost;
+
+  return (
+    <Card bordered>
+      <Text variant="caption" color="slate">
+        Tale of the tape
+      </Text>
+
+      <TapeRow label="Season points" you={season.points} them={them?.points ?? 0} first />
+      <TapeRow label="Correct picks" you={season.correct} them={them?.correct ?? 0} />
+      {/* ⚠ Lower is better here, and only here — 2nd beats 5th. */}
+      <TapeRow label="Table" you={season.rank} them={them?.rank ?? null} lowerIsBetter />
+      <TapeRow label="Duel points" you={season.duelPoints} them={opponent.duelPoints} />
+
+      {/* Form, in the leaderboard's own vocabulary so a week does not have two
+          different truths across two screens. */}
+      <TapeLine>
+        <FormDots types={you?.lastFive ?? []} />
+        <TapeLabel>Form</TapeLabel>
+        <FormDots types={them?.lastFive ?? []} align="right" />
+      </TapeLine>
+
+      {/*
+        ⚠ TWO ZEROES UNDER "FIRST MEETING" IS NOISE PRETENDING TO BE DATA. There
+        is no record yet, so the row says so and shows nothing on either side.
+      */}
+      <TapeLine>
+        <TapeNumber value={met === 0 ? null : opponent.met.won} strong={met > 0} />
+        <TapeLabel>{met === 0 ? 'First meeting' : `Met ${met}× · W–D–L`}</TapeLabel>
+        <TapeNumber value={met === 0 ? null : opponent.met.lost} strong={met > 0} align="right" />
+      </TapeLine>
+    </Card>
+  );
+}
+
+function TapeRow({
+  label,
+  you,
+  them,
+  lowerIsBetter = false,
+  first = false,
+}: {
+  label: string;
+  you: number | null;
+  them: number | null;
+  lowerIsBetter?: boolean;
+  first?: boolean;
+}) {
+  // ⚠ Level is NOT a win for either side. A tie bolds neither, which is the
+  // honest rendering of a comparison with no answer.
+  const better =
+    you === null || them === null || you === them
+      ? null
+      : lowerIsBetter
+        ? you < them
+          ? 'you'
+          : 'them'
+        : you > them
+          ? 'you'
+          : 'them';
+
+  return (
+    <TapeLine first={first}>
+      <TapeNumber value={you} strong={better === 'you'} />
+      <TapeLabel>{label}</TapeLabel>
+      <TapeNumber value={them} strong={better === 'them'} align="right" />
+    </TapeLine>
+  );
+}
+
+function TapeLine({ children, first = false }: { children: React.ReactNode; first?: boolean }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.md,
+        paddingVertical: theme.spacing.sm,
+        borderTopWidth: first ? 0 : theme.borders.thin,
+        borderTopColor: theme.colors.silver,
+        marginTop: first ? theme.spacing.sm : 0,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+function TapeLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text variant="detail" color="slate" style={{ letterSpacing: 1 }}>
+      {children}
+    </Text>
+  );
+}
+
+function TapeNumber({
+  value,
+  strong,
+  align = 'left',
+}: {
+  value: number | null;
+  strong: boolean;
+  align?: 'left' | 'right';
+}) {
+  const theme = useTheme();
+  return (
+    <Text
+      variant="cardTitle"
+      style={{
+        flex: 1,
+        textAlign: align,
+        color: strong ? theme.colors.ink : theme.colors.slate,
+        fontFamily: strong ? fontFamilies.black : fontFamilies.medium,
+        fontVariant: ['tabular-nums'],
+      }}
+    >
+      {value === null ? '—' : value.toLocaleString()}
+    </Text>
+  );
+}
+
+/**
+ * The leaderboard's form dots, at duel scale.
+ *
+ * ⚠ THE SAME `score_type` VOCABULARY the leaderboard reads, so a member sees the
+ * same five results in both places. ⚠ At Results depth the engine only ever
+ * writes `winner` or `miss` (066), so `exact` and `winner_gd` simply never
+ * occur there — the palette covers them rather than the screen promising them.
+ */
+function FormDots({ types, align = 'left' }: { types: string[]; align?: 'left' | 'right' }) {
+  const theme = useTheme();
+  if (types.length === 0) {
+    return (
+      <Text variant="detail" color="slate" style={{ flex: 1, textAlign: align }}>
+        —
+      </Text>
+    );
+  }
+  const tint = (t: string) =>
+    t === 'exact'
+      ? theme.colors.tierExact
+      : t === 'winner_gd'
+        ? theme.colors.tierWinnerGd
+        : t === 'winner'
+          ? theme.colors.tierWinner
+          : theme.colors.tierMiss;
+  return (
+    <View
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        gap: theme.spacing.xxs,
+        justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+      }}
+    >
+      {types.map((t, i) => (
+        <View
+          key={i}
+          style={{
+            width: theme.spacing.sm,
+            height: theme.spacing.sm,
+            borderRadius: theme.radii.pill,
+            backgroundColor: tint(t),
+          }}
+        />
+      ))}
+    </View>
+  );
 }
 
 // -------------------------------------------------------------- furniture

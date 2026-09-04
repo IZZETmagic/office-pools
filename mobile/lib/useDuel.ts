@@ -139,6 +139,14 @@ export type Season = {
   points: number;
   /** Where you sit, from the engine's stored order. */
   rank: number | null;
+  /**
+   * Your duel points alone.
+   *
+   * ⚠ `points` above ALREADY includes these — migration 121 made them one
+   * total. This is the split, for a comparison that wants to show them
+   * separately; adding the two together would double-count every win.
+   */
+  duelPoints: number;
   correct: number;
   /** How many picks you have made all season, at either depth. */
   picks: number;
@@ -185,6 +193,15 @@ export type Opponent = {
    * member you are about to play, so their whole recent form is the point.
    */
   form: ('won' | 'tied' | 'lost' | 'bye')[];
+  /**
+   * Their duel points, summed from settled duels.
+   *
+   * ⚠ NOT on the leaderboard row. Since migration 121 `total_points` ALREADY
+   * includes duel points, so there is no separate column to read for another
+   * member — but every settled duel carries its own award, and summing those is
+   * the same number by construction.
+   */
+  duelPoints: number;
   /**
    * How many revealed picks they have made — the DENOMINATOR for accuracy.
    *
@@ -400,6 +417,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
       // duel points, so adding `duelPoints` again would double-count every win.
       points: mine.totals?.totalPoints ?? 0,
       rank: mine.totals?.rank ?? null,
+      duelPoints: mine.totals?.duelPoints ?? 0,
       correct,
       picks,
       // ⚠ Against picks MADE, not fixtures played. A member who missed a week
@@ -509,6 +527,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
      * theirs.
      */
     const form: Opponent['form'] = [];
+    let theirDuelPoints = 0;
     for (const d of showdown?.duels ?? []) {
       if (!d.settled_at) continue;
       const isA = d.entry_a === them.entryId;
@@ -516,9 +535,13 @@ export function useDuel(poolId: string | null | undefined): DuelState {
       if (!isA && !isB) continue;
       // A bye has no opponent at all — it is not a result they earned.
       if (d.entry_b === null) {
+        // ⚠ A bye still PAYS — 250, same as a tie — so it counts toward their
+        // duel points even though it is not a result they earned.
+        theirDuelPoints += d.points_a ?? 0;
         form.push('bye');
         continue;
       }
+      theirDuelPoints += (isA ? d.points_a : d.points_b) ?? 0;
       const r = duelResult(isA ? d.points_a : d.points_b);
       if (r) form.push(r);
     }
@@ -578,6 +601,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
       met: { won, drawn, lost },
       form: form.slice(-5),
       picks: n,
+      duelPoints: theirDuelPoints,
       topClub,
       // Five in common is the floor — below that a percentage is two picks
       // wearing a statistic.
