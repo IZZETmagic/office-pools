@@ -96,6 +96,15 @@ const CHROME_ROW = 34;
 const COLLAPSED_AVATAR = 24;
 /** How far from the screen's centre a collapsed avatar settles. */
 const COLLAPSED_SPREAD = 58;
+/**
+ * The strip of band that survives the collapse, holding the shrunken duel.
+ *
+ * ⚠ The chrome row is NOT where the duel lands. Ryan: the pool name "should not
+ * move or change and remain the same throughout ... a permanent item like the
+ * back and share button". So the collapsed matchup gets a row of its own
+ * underneath rather than sharing one with a name it would sit on top of.
+ */
+const COLLAPSED_ROW = 34;
 
 /**
  * A member, as the corner needs them.
@@ -203,27 +212,24 @@ export function ShowdownDuelHeader({
    * without a single layout pass. `translateY` and `opacity` are compositor
    * properties, so this runs at display rate.
    */
+  /** How far the band travels: everything except the strip that stays. */
+  const slideBy = Math.max(0, matchupH - COLLAPSED_ROW);
+
   const slide = useAnimatedStyle(() => {
-    if (matchupH === 0) return {};
-    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
-    return { transform: [{ translateY: -p * matchupH }] };
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
+    return { transform: [{ translateY: -p * slideBy }] };
   });
 
-  /** The matchup fades as it goes behind the chrome, so it never shows through. */
-  const matchupFade = useAnimatedStyle(() => {
-    if (matchupH === 0) return {};
-    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
-    return { opacity: interpolate(p, [0, 0.75], [1, 0], Extrapolation.CLAMP) };
-  });
 
   /**
    * ⚠ EVERY PIECE MOVES TO ITS OWN COLLAPSED POSITION — Ryan, and it is the
    * difference between a morph and a slide. The band still travels up by
-   * `matchupH` to reclaim the space; each avatar then travels back DOWN by the
+   * `slideBy` to reclaim the space; each avatar then travels back DOWN by the
    * part of that it should not have made, so its NET movement is exactly the
    * distance from where it sits to the chrome row.
    *
-   *     net = -matchupH + (matchupH - wanted) = -wanted
+   *     net = -slideBy + (slideBy - wanted) = -wanted
    *
    * Both halves are `translateY`, so this is still compositor-only. Nothing
    * here measures or lays out per frame.
@@ -239,8 +245,9 @@ export function ShowdownDuelHeader({
   // The band's content starts at `chromeH` (its own paddingTop), so that is the
   // offset between the two spaces.
   const avatarCentreY = chromeH + cornersY + AVATAR / 2;
-  const chromeCentreY = insets.top + theme.spacing.xs + CHROME_ROW / 2;
-  const wantedY = avatarCentreY - chromeCentreY;
+  /** Screen-space centre of the strip the duel collapses into. */
+  const collapsedCentreY = chromeH + COLLAPSED_ROW / 2;
+  const wantedY = avatarCentreY - collapsedCentreY;
   const avatarScale = COLLAPSED_AVATAR / AVATAR;
 
   /** Half the gap between the two expanded avatar centres. */
@@ -251,22 +258,22 @@ export function ShowdownDuelHeader({
   // a rules-of-hooks violation waiting for somebody to call it conditionally,
   // and the only thing that differs between the corners is the sign of X.
   const leftCorner = useAnimatedStyle(() => {
-    if (matchupH === 0) return {};
-    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
     return {
       transform: [
-        { translateY: p * (matchupH - wantedY) },
+        { translateY: p * (slideBy - wantedY) },
         { translateX: p * wantedX },
         { scale: 1 - p * (1 - avatarScale) },
       ],
     };
   });
   const rightCorner = useAnimatedStyle(() => {
-    if (matchupH === 0) return {};
-    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
     return {
       transform: [
-        { translateY: p * (matchupH - wantedY) },
+        { translateY: p * (slideBy - wantedY) },
         { translateX: -p * wantedX },
         { scale: 1 - p * (1 - avatarScale) },
       ],
@@ -279,18 +286,18 @@ export function ShowdownDuelHeader({
    * information, it is an unreadable one.
    */
   const labelFade = useAnimatedStyle(() => {
-    if (matchupH === 0) return {};
-    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
     return { opacity: interpolate(p, [0, 0.45], [1, 0], Extrapolation.CLAMP) };
   });
 
   /** The score and clock ride up to sit between the two shrunken avatars. */
   const middleStyle = useAnimatedStyle(() => {
-    if (matchupH === 0) return {};
-    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
     return {
       transform: [
-        { translateY: p * (matchupH - wantedY) },
+        { translateY: p * (slideBy - wantedY) },
         { scale: 1 - p * 0.42 },
       ],
     };
@@ -305,11 +312,6 @@ export function ShowdownDuelHeader({
    * smaller. Both layers are absolutely positioned in the same row, so the
    * swap costs no layout.
    */
-  const nameOut = useAnimatedStyle(() => {
-    if (matchupH === 0) return {};
-    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
-    return { opacity: interpolate(p, [0, 0.5], [1, 0], Extrapolation.CLAMP) };
-  });
 
   return (
     <>
@@ -340,8 +342,17 @@ export function ShowdownDuelHeader({
         >
           <Glow leftGlow={leftGlow} rightGlow={rightGlow} alpha={glowAlpha} />
 
-          {/* rows 2-3: the matchup. Measured, because its height IS the slide. */}
-          <Animated.View style={matchupFade}>
+          {/*
+            rows 2-3: the matchup. Measured, because its height decides the
+            slide.
+
+            ⚠ NO OPACITY ON THIS WRAPPER. It used to carry a fade, from when the
+            matchup slid away behind the chrome and had to not show through —
+            and that fade was taking the AVATARS with it. They are meant to
+            survive the collapse, shrunken, so only the pieces that genuinely
+            leave (names, standings, the matchweek label) carry `labelFade`.
+          */}
+          <View>
             <View
               onLayout={(e) => {
                 const h = Math.round(e.nativeEvent.layout.height);
@@ -362,7 +373,7 @@ export function ShowdownDuelHeader({
                 onCornersY={setCornersY}
               />
             </View>
-          </Animated.View>
+          </View>
 
           {/* row 4: the tab strip. Rides up with the band and ends level with
               the chrome — it never moves relative to what is above it. */}
@@ -401,8 +412,7 @@ export function ShowdownDuelHeader({
         >
           <RoundButton icon="chevron.left" label="Back" onPress={() => router.back()} />
           <View style={{ flex: 1, minWidth: 0, paddingHorizontal: theme.spacing.sm }}>
-            <Animated.View style={nameOut}>
-              <BandText
+            <BandText
                 variant="cardTitle"
                 numberOfLines={1}
                 align="center"
@@ -410,7 +420,6 @@ export function ShowdownDuelHeader({
               >
                 {poolName}
               </BandText>
-            </Animated.View>
           </View>
           {poolCode ? (
             <RoundButton icon="square.and.arrow.up" label="Share pool" onPress={handleShare} />
