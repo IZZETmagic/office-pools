@@ -30,6 +30,7 @@ import {
   Attachment01Icon,
   BarChartIcon,
   Bookmark02Icon,
+  BoxingGloveIcon,
   BubbleChatIcon,
   Calendar02Icon,
   Calendar03Icon,
@@ -284,6 +285,11 @@ const ICON_MAP: Record<string, IconConstant> = {
   'eye': ViewIcon,
   'eye.fill': ViewIcon,
   'eye.slash': ViewOffIcon,
+  // ⚠ Paired with `mobile/components/ui/Icon.tsx` — `iconMap.test.ts` fails if
+  // one map carries an SF name the other does not, and if either map falls out
+  // of alphabetical order. Added for the Showdown Room tab on RN; the web has
+  // no consumer yet, and the pairing is the point.
+  'figure.boxing': BoxingGloveIcon,
   'flame.fill': Fire03Icon,
   'gear': Settings02Icon,
   'gearshape.fill': Settings02Icon,
@@ -360,6 +366,8 @@ const ICON_MAP: Record<string, IconConstant> = {
   'trash.fill': Delete02Icon,
   'trophy': ChampionIcon,
   'trophy.circle.fill': ChampionIcon,
+  // ⚠ Paired with `mobile/components/ui/Icon.tsx` — `iconMap.test.ts` fails if
+  // one map carries an SF name the other does not. Added for the Showdown Room
   'trophy.fill': ChampionIcon,
   'volleyball': FootballIcon,
   'xmark': Cancel01Icon,

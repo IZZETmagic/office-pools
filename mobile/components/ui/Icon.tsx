@@ -283,6 +283,11 @@ const ICON_MAP: Record<string, IconConstant> = {
   'eye': ViewIcon,
   'eye.fill': ViewIcon,
   'eye.slash': ViewOffIcon,
+  // The SF Symbol name for the same idea, so call sites keep reading as SF
+  // Symbols like every other key here. Mapped 2026-09-04 for the Showdown Room
+  // tab; it was reached for once before that and fell through to the fallback
+  // Circle.
+  'figure.boxing': BoxingGloveIcon,
   'flame.fill': Fire03Icon,
   'gear': Settings02Icon,
   'gearshape.fill': Settings02Icon,
@@ -354,10 +359,9 @@ const ICON_MAP: Record<string, IconConstant> = {
   'trash.fill': Delete02Icon,
   'trophy': ChampionIcon,
   'trophy.circle.fill': ChampionIcon,
-  // ⚠ SF's own name for this idea, so the call sites keep reading as SF Symbols
-  // like every other key here. Mapped 2026-09-04 for Showdown's Room tab — it
-  // was reached for once before that and fell through to the fallback Circle.
-  'figure.boxing': BoxingGloveIcon,
+  // The SF Symbol name for the same idea, so call sites keep reading as SF
+  // Symbols like every other key here. Mapped 2026-09-04 for the Showdown Room
+  // tab; it was reached for once before that and fell through to the fallback
   'trophy.fill': ChampionIcon,
   'volleyball': FootballIcon,
   'xmark': Cancel01Icon,
