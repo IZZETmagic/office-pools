@@ -560,6 +560,35 @@ export function LeaderboardTab({
     })
   }, [leaderboardEntries, computedBPBonusMap, bonusScores, predictionMode])
 
+  // Position within `sorted`, precomputed. Replaces `sorted.indexOf(entry)`
+  // inside the row maps, which was O(n²) and re-ran on every live tick.
+  const positionByEntry = useMemo(() => {
+    const m = new Map<string, number>()
+    sorted.forEach((e, i) => m.set(e.entry_id, i))
+    return m
+  }, [sorted])
+
+  /**
+   * The rank to DISPLAY.
+   *
+   * ⚠ NOT the array position. The engine writes `RANK() OVER (…)` — not
+   * `ROW_NUMBER()` — so genuine ties legitimately share a rank (1, 1, 3).
+   * Deriving the number from `sorted.indexOf(entry) + 1` silently broke every
+   * tie into an arbitrary order and disagreed with the RN league boards, which
+   * read the stored rank: the same two entries showed as joint-4th on a phone
+   * and as 4th and 5th on the web. The delta chip beside it is computed from
+   * the server's `previous_rank - current_rank`, so it could read "no change"
+   * next to a number that had just moved.
+   *
+   * This is the scoring rule at its last inch — the frontend must display the
+   * rank the backend computed, not re-derive one. The sort above already
+   * prefers `current_rank`; only the printed number did not.
+   *
+   * Falls back to position for a pool the server has not ranked yet.
+   */
+  const displayRank = (entry: { entry_id: string; current_rank?: number | null }) =>
+    entry.current_rank ?? (positionByEntry.get(entry.entry_id) ?? 0) + 1
+
   // =============================================
   // PER-ENTRY STATS (XP, streaks, form, hit rate)
   // =============================================
@@ -1373,7 +1402,7 @@ export function LeaderboardTab({
           >
             <div className="flex items-end justify-center gap-1 sm:gap-4">
               {podiumOrder.map((entry) => {
-                const actualRank = sorted.indexOf(entry) + 1
+                const actualRank = displayRank(entry)
                 const stats = entryStatsMap.get(entry.entry_id)
                 const isFirst = actualRank === 1
                 const delta = getRankDelta(entry, actualRank)
@@ -1564,7 +1593,7 @@ export function LeaderboardTab({
       {/* Desktop leaderboard rows */}
       <div className="hidden sm:block rounded-card border border-border-default overflow-hidden bg-surface">
         {visibleEntries.map((entry, i) => {
-          const rank = sorted.indexOf(entry) + 1
+          const rank = displayRank(entry)
           const ps = getPlayerScore(entry.entry_id)
           const stats = entryStatsMap.get(entry.entry_id)
           const isCurrentUser = entry.users?.user_id === currentUserId
@@ -1710,7 +1739,7 @@ export function LeaderboardTab({
       {/* Mobile leaderboard rows (rank 4+) */}
       <div className="sm:hidden space-y-2">
         {visibleEntries.map((entry, i) => {
-          const rank = sorted.indexOf(entry) + 1
+          const rank = displayRank(entry)
           const ps = getPlayerScore(entry.entry_id)
           const stats = entryStatsMap.get(entry.entry_id)
           const isCurrentUser = entry.users?.user_id === currentUserId

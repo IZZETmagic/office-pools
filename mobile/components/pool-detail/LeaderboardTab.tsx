@@ -177,7 +177,20 @@ export function LeaderboardTab({
     );
   }
 
-  const hasPodium = entries.length >= 3;
+  /**
+   * The podium waits until there is something to rank.
+   *
+   * ⚠ `entries.length >= 3` alone was not enough. Before anyone has scored,
+   * every entry is on 0 and the server ranks them all equal, so the podium
+   * crowned a winner at random and handed two other members a silver and a
+   * bronze they had not earned — from the moment a pool reached three people.
+   * In a league that state lasts from pool creation until the first matchweek
+   * is scored. Ranking people by nothing is exactly the "bad feelings" the
+   * product sets out not to create. Web already refuses to do this; this is
+   * the same guard.
+   */
+  const anyoneHasScored = entries.some((e) => e.total_points !== 0);
+  const hasPodium = entries.length >= 3 && anyoneHasScored;
   const restStart = hasPodium ? 3 : 0;
   const rest = entries.slice(restStart);
 
@@ -206,7 +219,13 @@ export function LeaderboardTab({
         <LeaderboardRow
           key={entry.entry_id}
           entry={entry}
-          rank={restStart + i + 1}
+          // ⚠ The engine writes RANK() OVER (…), not ROW_NUMBER(), so ties
+          // legitimately share a rank (1, 1, 3). Deriving the number from the
+          // array position broke every tie apart and disagreed with the league
+          // boards two tabs away, which already read the stored rank — the same
+          // two entries showed joint-4th there and 4th/5th here. Position is
+          // only a fallback for a pool the server has not ranked yet.
+          rank={entry.current_rank ?? restStart + i + 1}
           isCurrentUser={entry.user_id === currentUserId}
           awards={awardsByEntry[entry.entry_id] ?? []}
           onPress={() => openBreakdown(entry.entry_id)}
