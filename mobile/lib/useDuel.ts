@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 
 import { duelResult } from './duelPoints';
-import { useLeaguePool, type DuelRow } from './useLeaguePool';
+import { fixturesForWeek } from './pickemWeek';
+import { useLeaguePool, type DuelRow, type LeagueMatch } from './useLeaguePool';
 
 // =============================================================
 // ONE ANSWER TO "WHO AM I PLAYING"
@@ -79,6 +80,22 @@ export type DuelState = {
    * labelled first game must use the kickoff.
    */
   currentKickoff: string | null;
+  /**
+   * Your picks for the matchweek that is open, and what is still missing.
+   *
+   * Null when there is no open matchweek, or it has no fixtures — there is no
+   * sheet to be part-way through.
+   */
+  sheet: Sheet | null;
+  /** The viewer's own entry, for the route into the picker. */
+  ownEntryId: string | null;
+};
+
+export type Sheet = {
+  done: number;
+  total: number;
+  /** The fixtures with no pick on them yet, in fixture order. */
+  open: LeagueMatch[];
 };
 
 /**
@@ -169,6 +186,33 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     return mw?.first_kickoff_at ?? null;
   }, [current, data]);
 
+  /**
+   * ⚠ THE OPEN MATCHWEEK, not the one being played. This card is the one thing
+   * a member can DO while the next opponent is still sealed, so it has to
+   * describe the week they can still change.
+   *
+   * ⚠⚠ A PICK LIVES IN ONE OF TWO PLACES DEPENDING ON DEPTH. Results-depth taps
+   * arrive in `outcomes` keyed by fixture id; Scores-depth scorelines arrive in
+   * `predictions` keyed by `match_id`, which IS the fixture id under the World
+   * Cup's name for it. Checking only one of them counts a full sheet as empty
+   * for half the pools — and silently, since both shapes are legitimately
+   * present on the type.
+   */
+  const sheet = useMemo<Sheet | null>(() => {
+    const week = data?.season.openMatchweekNumber ?? null;
+    const mine = data?.you.entries[0];
+    if (week === null || !mine || !data) return null;
+
+    const fixtures = fixturesForWeek(data.season.matches, week);
+    if (fixtures.length === 0) return null;
+
+    const picked = new Set<string>(Object.keys(mine.outcomes));
+    for (const p of mine.predictions) picked.add(p.match_id);
+
+    const open = fixtures.filter((f) => !picked.has(f.match_id));
+    return { done: fixtures.length - open.length, total: fixtures.length, open };
+  }, [data]);
+
   return {
     // ⚠ A DISABLED query reports `isPending` forever. React Query has no
     // "idle" status any more, so a null poolId — every non-Showdown pool —
@@ -181,5 +225,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     record,
     sealed,
     currentKickoff,
+    sheet,
+    ownEntryId: data?.you.entries[0]?.entry_id ?? null,
   };
 }

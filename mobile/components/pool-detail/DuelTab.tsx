@@ -1,9 +1,11 @@
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import { duelResult, DUEL_WIN, DUEL_TIE } from '@/lib/duelPoints';
 import { formatDhms, useCountdown } from '@/lib/useCountdown';
-import { useDuel, type Bout, type DuelRecord } from '@/lib/useDuel';
+import { router } from 'expo-router';
+
+import { useDuel, type Bout, type DuelRecord, type Sheet } from '@/lib/useDuel';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -51,7 +53,8 @@ type Props = {
 
 export function DuelTab({ poolId }: Props) {
   const theme = useTheme();
-  const { loading, error, isShowdown, bouts, current, record, sealed } = useDuel(poolId);
+  const { loading, error, isShowdown, bouts, current, record, sealed, sheet, ownEntryId } =
+    useDuel(poolId);
 
   if (loading) {
     return (
@@ -93,6 +96,16 @@ export function DuelTab({ poolId }: Props) {
       {current ? <BoutCard bout={current} /> : null}
 
       {/*
+        YOUR SHEET — the one thing a member can DO while the next opponent is
+        still sealed. Picks stay open for the whole wait, which is the design
+        rather than an accident: a progress bar and the games still missing turn
+        dead time into preparation.
+      */}
+      {sheet && ownEntryId ? (
+        <SheetCard poolId={poolId} entryId={ownEntryId} sheet={sheet} />
+      ) : null}
+
+      {/*
         The sealed card sits UNDER the current duel, never instead of it. Both
         are true at once for most of a week: this week's opponent is known and
         being played, and the next one is still counting down. Showing only one
@@ -107,6 +120,133 @@ export function DuelTab({ poolId }: Props) {
       {bouts.some((b) => b.settled) ? <SeasonList bouts={bouts} /> : null}
     </View>
   );
+}
+
+// --------------------------------------------------------------- your sheet
+
+function SheetCard({
+  poolId,
+  entryId,
+  sheet,
+}: {
+  poolId: string;
+  entryId: string;
+  sheet: Sheet;
+}) {
+  const theme = useTheme();
+  const finished = sheet.open.length === 0;
+
+  /**
+   * ⚠ No `mw` on the route. The picker resolves the week itself, so the two
+   * screens cannot drift and a member does not land on a week they cannot
+   * change — the same call `LeaguePickemEntriesTab` makes.
+   */
+  const openPicker = () => router.navigate(`/pool/${poolId}/pickem/${entryId}`);
+
+  return (
+    <Card>
+      <Row>
+        <Label>Your sheet</Label>
+        <Text
+          style={{
+            fontFamily: fontFamilies.black,
+            fontSize: 15,
+            lineHeight: 20,
+            color: theme.colors.ink,
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {sheet.done}
+          <Text
+            style={{
+              fontFamily: fontFamilies.black,
+              fontSize: 15,
+              lineHeight: 20,
+              color: theme.colors.slate,
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {' / '}
+            {sheet.total}
+          </Text>
+        </Text>
+      </Row>
+
+      {/* The bar. `flex` rather than a percentage width string so it cannot
+          disagree with its own track by a rounding error. */}
+      <View
+        style={{
+          height: 8,
+          borderRadius: theme.radii.pill,
+          backgroundColor: theme.colors.mist,
+          overflow: 'hidden',
+          marginTop: theme.spacing.sm,
+          flexDirection: 'row',
+        }}
+      >
+        <View
+          style={{
+            flex: Math.max(sheet.done, 0),
+            backgroundColor: theme.colors.primary,
+            borderRadius: theme.radii.pill,
+          }}
+        />
+        <View style={{ flex: Math.max(sheet.total - sheet.done, 0) }} />
+      </View>
+
+      <Text variant="body" color="slate" style={{ marginTop: theme.spacing.md }}>
+        {finished ? 'Your sheet is in. Nothing left to pick.' : openList(sheet.open)}
+      </Text>
+
+      {/*
+        ⚠ THE SAME BLUE BUTTON IN BOTH STATES. A finished sheet gets a way IN,
+        not a task — we do not ask for something already done — but reviewing is
+        not asking, and demoting it to an outline just made the card look like it
+        had nothing to offer. Ryan's call on the web; kept here so the two agree.
+      */}
+      <Pressable
+        onPress={openPicker}
+        accessibilityRole="button"
+        style={({ pressed }) => ({
+          marginTop: theme.spacing.md,
+          backgroundColor: theme.colors.primary,
+          borderRadius: theme.radii.pill,
+          paddingVertical: 13,
+          alignItems: 'center',
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <Text
+          style={{
+            fontFamily: fontFamilies.black,
+            fontSize: 12,
+            lineHeight: 16,
+            letterSpacing: 1.2,
+            textTransform: 'uppercase',
+            color: '#FFFFFF',
+          }}
+        >
+          {finished ? 'See your picks' : 'Finish your picks'}
+        </Text>
+      </Pressable>
+    </Card>
+  );
+}
+
+/** "Arsenal v Forest and Chelsea v Fulham and 3 more still open." */
+function openList(open: Sheet['open']): string {
+  // ⚠ `country_name` IS THE CLUB'S NAME, and `country_code` its abbreviation —
+  // a league fixture travels through types written for national teams, so the
+  // field names lie. Name first, to match the web card; the code is the
+  // fallback rather than the preference, because "ARS v NFO" is a worse
+  // sentence than the one the web already says.
+  const name = (m: Sheet['open'][number]) =>
+    `${m.home_team?.country_name ?? m.home_team?.country_code ?? 'TBD'} v ${
+      m.away_team?.country_name ?? m.away_team?.country_code ?? 'TBD'
+    }`;
+  const first = open.slice(0, 2).map(name).join(' and ');
+  const rest = open.length > 2 ? ` and ${open.length - 2} more` : '';
+  return `${first}${rest} still open.`;
 }
 
 // ---------------------------------------------------------------- the bout
