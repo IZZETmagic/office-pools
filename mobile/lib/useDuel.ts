@@ -896,8 +896,21 @@ export function useDuel(poolId: string | null | undefined): DuelState {
       // fixture travels through types written for national teams.
       homeName: f.home_team?.country_name ?? null,
       awayName: f.away_team?.country_name ?? null,
-      homeAbbr: f.home_team?.short_name ?? null,
-      awayAbbr: f.away_team?.short_name ?? null,
+      /**
+       * ⚠⚠ `country_code`, NOT `short_name`. Both sound like the answer and only
+       * one is: `short_name` is `shortClubName(name)` — a SHORTENED NAME, which
+       * is why a sheet asking for three-letter codes rendered "Crystal Palace"
+       * and "Nott'm Forest". The code lives in `league_clubs.abbreviation`
+       * (char(3), NOT NULL) and `clubToTeam` carries it as `country_code`;
+       * `MatchweekResultsForm` on the web already reads it that way.
+       *
+       * ⚠ TRIMMED, because `char(3)` is blank-padded by Postgres. Nothing in the
+       * league uses a two-letter code today, so this has never shown — but a
+       * trailing space inside a fixed-width column is the kind of thing that
+       * turns up as one club sitting a pixel off the others.
+       */
+      homeAbbr: f.home_team?.country_code?.trim() || null,
+      awayAbbr: f.away_team?.country_code?.trim() || null,
       homeCrest: f.home_team?.flag_url ?? null,
       awayCrest: f.away_team?.flag_url ?? null,
       kickoffAt: f.match_date,

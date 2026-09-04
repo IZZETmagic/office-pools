@@ -586,10 +586,18 @@ function TeamSheetCard({
  * narrowest this product runs on: each club side lands at 53pt, which holds a
  * 26pt crest and a three-letter code with room to spare.
  */
-const CHIP_W = 46;
+const CHIP_W = 44;
 
-/** The crest, now that it is the club's main identifier rather than decoration. */
-const CREST = 26;
+/**
+ * The crest, now that it is the club's main identifier rather than decoration.
+ *
+ * ⚠ IT IS THE EXPENSIVE ONE. Every point here comes off the club code beside
+ * it, and the code is the thing that has to stay legible — three letters that
+ * ellipsize to two are worse than a slightly smaller badge. 30 is what a 375pt
+ * phone affords next to a 13pt code; below that (a 360pt mini) the code
+ * compresses rather than the layout breaking.
+ */
+const CREST = 30;
 
 /**
  * The middle column: a scoreline, or the day over the kickoff.
@@ -600,6 +608,18 @@ const CREST = 26;
  * down the card as kickoff times changed length.
  */
 const CENTRE_W = 54;
+
+/**
+ * Guaranteed air either side of the middle column — Ryan, 2026-09-04.
+ *
+ * ⚠ A MARGIN, NOT SPARE FLEX. Letting the club groups pool their leftover space
+ * around the centre would have made the gap track the screen: about 4pt on a
+ * 375 and nearly 40 on a Pro Max, so the crests would drift away from the
+ * kickoff they belong to on exactly the phones with room to look nice. A fixed
+ * margin reads the same on every device, and the leftover goes where it is
+ * harmless — out by the chips.
+ */
+const CENTRE_AIR = 8;
 
 /**
  * One member's pick for one fixture.
@@ -706,15 +726,19 @@ function Club({
   align?: 'left' | 'right';
 }) {
   const theme = useTheme();
-  // `short_name` is resolved server-side by `shortClubName`, so this fallback
-  // should never fire — but rendering "TBD" for a club we can name would be a
-  // worse failure than three letters of its own name.
+  // `league_clubs.abbreviation` is NOT NULL, so this should never fire — but
+  // rendering "TBD" for a club we can name would be a worse failure than three
+  // letters taken off the front of its own name.
   const code = abbr ?? (name ? name.slice(0, 3).toUpperCase() : 'TBD');
 
   const badge = crest ? (
     <Image
       alt=""
       source={{ uri: crest }}
+      // ⚠ NO `flexShrink: 0` HERE, DELIBERATELY — this is the half that gives.
+      // On a phone too narrow for both (a 360pt mini), `contain` lets the box
+      // narrow and renders the crest smaller inside it, undistorted. A crest
+      // one step down is still the club; "AR…" is not.
       style={{ width: CREST, height: CREST }}
       resizeMode="contain"
     />
@@ -726,8 +750,11 @@ function Club({
         fontFamily: fontFamilies.bold,
         fontSize: 13,
         lineHeight: 18,
-        letterSpacing: 0.3,
         color: theme.colors.ink,
+        // ⚠ THE CODE NEVER SHRINKS. It is three letters carrying the whole
+        // club now that the name is gone, and flex would happily ellipsize it
+        // to two before touching the image beside it.
+        flexShrink: 0,
       }}
     >
       {code}
@@ -782,7 +809,7 @@ function Centre({ row }: { row: SheetRow }) {
 
   if (hasScore) {
     return (
-      <View style={{ width: CENTRE_W, alignItems: 'center' }}>
+      <View style={{ width: CENTRE_W, marginHorizontal: CENTRE_AIR, alignItems: 'center' }}>
         <Scoreline home={row.homeScore} away={row.awayScore} live={row.clock !== null} />
         {row.clock ? (
           <SubLine tone={theme.colors.red}>{row.clock}</SubLine>
@@ -795,7 +822,7 @@ function Centre({ row }: { row: SheetRow }) {
 
   const { day, time } = formatKickoff(row.kickoffAt);
   return (
-    <View style={{ width: CENTRE_W, alignItems: 'center' }}>
+    <View style={{ width: CENTRE_W, marginHorizontal: CENTRE_AIR, alignItems: 'center' }}>
       <SubLine tone={theme.colors.slate}>{day}</SubLine>
       <Text
         numberOfLines={1}
