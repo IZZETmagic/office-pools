@@ -627,7 +627,25 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
     // `MIDDLE_COL` still has to clear `HH:MM:SS`, which is about 103pt of
     // tabular digits at 24pt Nunito Black. Too narrow and the clock wraps
     // mid-time; the corners are `flex: 1` and simply take what is left.
-    <View style={{ minWidth: MIDDLE_COL, alignItems: 'center', paddingTop: 12, gap: 5 }}>
+    <View
+      style={{
+        minWidth: MIDDLE_COL,
+        // ⚠ `height: AVATAR` + centred, NOT a hand-tuned `paddingTop`. The row
+        // is `flex-start`, so an avatar's centre is exactly `AVATAR / 2` from
+        // the top — giving this column the same height and centring inside it
+        // puts the clock on that line by construction. A padding would have to
+        // be re-derived every time the clock's size or line height changed, and
+        // would be wrong the moment it did.
+        //
+        // It also fixes the collapse for free: `wantedY` is measured from the
+        // avatar's centre, and the clock now shares it, so the same translate
+        // lands both on the same line in the collapsed row too.
+        height: AVATAR,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+      }}
+    >
       {settled && them ? (
         <BandText
           style={{
