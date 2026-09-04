@@ -11,9 +11,19 @@ import { AVATAR_GRADIENTS, hashUserIdToIndex, avatarGradient } from '../avatarGr
 // renders in a different colour on each platform. The RN file is read as text
 // rather than imported — it pulls in react-native, which is not a root
 // dependency, and the runner is environment: 'node'.
+//
+// ⚠ MOVED 2026-09-03. The RN palette used to live inside `BanterSheet.tsx`, and
+// this guard read it there. It now has its own file, because the Showdown duel
+// header needed the same colours and a third copy was the alternative. The
+// mobile file is the mirror of THIS directory's `avatarGradient.ts` — same name
+// on both sides, which is what the pairing should have looked like all along.
+//
+// ⚠ `mobile/components/home/PoolCard.tsx` has a SEPARATE three-colour array
+// under the same name. It is positional decoration, not identity, and is not
+// what this guard is about — do not point it there.
 
 const rnSource = readFileSync(
-  new URL('../../../mobile/components/pool-detail/BanterSheet.tsx', import.meta.url),
+  new URL('../../../mobile/lib/avatarGradient.ts', import.meta.url),
   'utf8',
 )
 
@@ -31,7 +41,7 @@ describe('avatar palette matches the RN app', () => {
   const rn = rnGradients()
 
   it('the RN AVATAR_GRADIENTS block was found and parsed', () => {
-    expect(rn, 'could not parse AVATAR_GRADIENTS from mobile/…/BanterSheet.tsx').not.toBeNull()
+    expect(rn, 'could not parse AVATAR_GRADIENTS from mobile/lib/avatarGradient.ts').not.toBeNull()
     expect(rn!.length).toBeGreaterThan(0)
   })
 
