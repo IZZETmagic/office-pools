@@ -388,13 +388,12 @@ export function ShowdownDuelHeader({
       {/*
         THE BAND — everything below the chrome, and the part that moves.
 
-        ⚠ `zIndex: 1`, under the chrome layer. It slides up behind it.
+        ⚠ NO `zIndex` — it renders BEFORE the chrome layer, which is what puts
+        the chrome on top. See the note there; an explicit z-index here was
+        putting the whole header above the Banter sheet.
       */}
       <Animated.View
-        style={[
-          { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 },
-          slide,
-        ]}
+        style={[{ position: 'absolute', top: 0, left: 0, right: 0 }, slide]}
       >
         <View
           onLayout={(e) => {
@@ -460,6 +459,17 @@ export function ShowdownDuelHeader({
         gradients are purely HORIZONTAL: two stacked boxes painting the same
         left-to-right sweep read as one continuous field. A vertical component
         would show the join immediately.
+
+        ⚠⚠ IT SITS ON TOP BY TREE ORDER, NOT BY `zIndex`. Both layers used to
+        carry one (1 and 2), which ordered them correctly against each other and
+        WRONGLY against everything else: in React Native a sibling with an
+        explicit z-index paints above siblings that have none, whatever the tree
+        order. The Banter sheet has none, so it opened BEHIND the header.
+
+        Rendering the chrome after the band gets the same result between these
+        two and leaves the rest of the screen alone — the sheet and the FAB come
+        later still, so they paint above both. Do not reintroduce a z-index here
+        to "make sure": it is what broke the sheet.
       */}
       <View
         style={{
@@ -467,7 +477,6 @@ export function ShowdownDuelHeader({
           top: 0,
           left: 0,
           right: 0,
-          zIndex: 2,
           backgroundColor: BAND.snow,
           paddingTop: insets.top + theme.spacing.xs,
         }}
