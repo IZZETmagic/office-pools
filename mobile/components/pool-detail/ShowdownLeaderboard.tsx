@@ -159,34 +159,42 @@ function Row({
           borderColor: isYou ? withOpacity(theme.colors.primary, 0.4) : theme.colors.silver,
         }}
       >
-        {/* `cardTitle` for the SIZE, black for the WEIGHT — the type scale has
-            the 16/20 step but not a display face at it. */}
-        <Text
-          variant="cardTitle"
+        {/*
+          ⚠ POSITION AND MOVEMENT ARE ONE BLOCK, not two children of the row.
+          As siblings they each took the row's `gap` on both sides, so the arrow
+          arrived with 12pt either side of it and pushed the avatar a long way
+          off the number. Grouped, the row's gap applies ONCE — between the
+          block and the avatar — and the two numbers sit together where they
+          belong.
+
+          ⚠ Both halves stay FIXED WIDTH, which is what keeps the column
+          readable down the list: the arrow slot is held open even when a member
+          has not moved, or their avatar would sit left of everybody else's.
+        */}
+        <View
           style={{
-            width: theme.spacing.xl,
-            fontFamily: fontFamilies.black,
-            color: leader ? theme.colors.accent : theme.colors.slate,
-            fontVariant: ['tabular-nums'],
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.xxs,
           }}
         >
-          {position}
-        </Text>
-
-        {/*
-          ⚠ THE MOVEMENT SITS HERE, IN ITS OWN FIXED-WIDTH SLOT — Ryan, and both
-          halves matter. It used to trail the NAME, where it started at a
-          different x on every row because names are different lengths, so a
-          column of arrows read as scatter. A fixed slot between the position
-          and the avatar puts every arrow on the same line down the list, and
-          fills the gap those two had between them.
-
-          The slot is reserved whether or not there is an arrow to draw, or the
-          avatars of members who did not move would sit further left than
-          everybody else's.
-        */}
-        <View style={{ width: theme.spacing.xl, alignItems: 'center' }}>
-          <Movement current={entry.current_rank} previous={entry.previous_rank} />
+          {/* `cardTitle` for the SIZE, black for the WEIGHT — the type scale has
+              the 16/20 step but not a display face at it. */}
+          <Text
+            variant="cardTitle"
+            style={{
+              width: theme.spacing.lg,
+              textAlign: 'right',
+              fontFamily: fontFamilies.black,
+              color: leader ? theme.colors.accent : theme.colors.slate,
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {position}
+          </Text>
+          <View style={{ width: theme.spacing.lg, alignItems: 'center' }}>
+            <Movement current={entry.current_rank} previous={entry.previous_rank} />
+          </View>
         </View>
 
         <Avatar userId={entry.user_id} name={name} />
