@@ -327,9 +327,15 @@ export default function PoolDetailScreen() {
    * through a seven-key cascade, and a second ordering on this screen would
    * disagree with the Leaderboard tab one swipe away.
    *
-   * ⚠ `total_points` ALREADY INCLUDES the duel points since migration 121 —
-   * they are one number now, not a base plus a bonus. Adding `duelPoints` to it
-   * here would double-count every win.
+   * ⚠⚠ `total_points` IS THE PICKING HALF ONLY. Migration 121: *"`total_points`
+   * is what your picking scored; `duel_points` ... lives beside it"* — two
+   * columns, summed by the ranker's ORDER BY and by nothing else. `points` here
+   * therefore carries the picks, and anything showing a member's SEASON total
+   * has to add `duel_points` itself.
+   *
+   * The header reads this map for a corner's `· N pts`, which is the picking
+   * figure. That is the honest label for it there; the Leaderboard sums the two
+   * because a leaderboard is about the rank.
    */
   const duelStandings = useMemo(() => {
     const m = new Map<string, Standing>();

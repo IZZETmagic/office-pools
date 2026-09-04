@@ -18,13 +18,17 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // how far you are from the member above you. A standings table tells you where
 // you sit; a gap tells you what to do about it.
 //
-// ## ⚠⚠ THE TOTAL ALREADY INCLUDES THE DUEL POINTS
+// ## ⚠⚠ TWO CURRENCIES, ADDED HERE — `total_points` IS PICKS ONLY
 //
-// Migration 121 changed `league_finalize_ranks` from ranking duel points AHEAD
-// of accuracy to `(total_points + duel_points) DESC`, and `total_points` now
-// carries both. So the split shown on each row is `total − duel`, NEVER
-// `total + duel` — adding them is double-counting every win, which is the
-// mistake this file exists to not make in public.
+// Migration 121's header says it plainly: *"`total_points` is what your picking
+// scored; `duel_points` is ... and lives beside it"*. The ranking sums them in
+// its ORDER BY — `(t.total_points + t.duel_points) DESC` — and no column
+// carries both.
+//
+// So a row's headline number is `total_points + duelPoints`, and the split is
+// those two as they come. This file first shipped with the opposite belief and
+// showed `total − duel`, which gave a member who TIED their duel 250 points and
+// 0 for picks: the subtraction cancelled a sum that had never happened.
 //
 // ## ⚠ TWO ORDERS, AND ONLY ONE OF THEM IS OURS
 //
@@ -55,11 +59,15 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
   const rows = useMemo(() => {
     const shaped = entries.map((e) => {
       const duel = duelTable.get(e.entry_id) ?? EMPTY;
+      // ⚠ `total_points` IS THE PICKING HALF. The two are separate columns and
+      // the engine sums them only in its ORDER BY, so the headline number has
+      // to be summed here too.
+      const picksPoints = e.total_points ?? 0;
       return {
         entry: e,
         duel,
-        // ⚠ MINUS, not plus. `total_points` already contains `duelPoints`.
-        picksPoints: Math.max(0, (e.total_points ?? 0) - duel.duelPoints),
+        picksPoints,
+        combined: picksPoints + duel.duelPoints,
         isYou: e.user_id === currentUserId,
       };
     });
@@ -80,7 +88,7 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
       (a, b) =>
         b.duel.duelPoints - a.duel.duelPoints ||
         b.duel.won - a.duel.won ||
-        (b.entry.total_points ?? 0) - (a.entry.total_points ?? 0),
+        b.combined - a.combined,
     );
   }, [entries, duelTable, board, currentUserId]);
 
@@ -129,12 +137,13 @@ function Row({
     entry: LeagueLeaderboardEntry;
     duel: DuelRecordRow;
     picksPoints: number;
+    combined: number;
     isYou: boolean;
   };
   board: Board;
 }) {
   const theme = useTheme();
-  const { entry, duel, picksPoints, isYou } = row;
+  const { entry, duel, picksPoints, combined, isYou } = row;
   const name = displayName(entry);
   // ⚠ Gold for first, because `accent` is already the belt colour in the duel
   // band — the same idea should not arrive in a second colour two screens on.
@@ -204,7 +213,7 @@ function Row({
             {name}
           </Text>
           {board === 'table' ? (
-            /* ⚠ `total − duel`. The total ALREADY includes the duel points. */
+            /* The two halves as they come — no arithmetic between them. */
             <Text variant="detail" color="slate">
               {picksPoints.toLocaleString()} picks · {duel.duelPoints.toLocaleString()} duels
             </Text>
@@ -239,7 +248,7 @@ function Row({
             fontVariant: ['tabular-nums'],
           }}
         >
-          {(board === 'table' ? entry.total_points ?? 0 : duel.duelPoints).toLocaleString()}
+          {(board === 'table' ? combined : duel.duelPoints).toLocaleString()}
         </Text>
       </View>
 

@@ -350,8 +350,9 @@ function OpponentCard({
     <Card bordered>
       <CardHeader
         title={`Scouting ${opponent.name}`}
+        // Their SEASON total — both currencies, the way the leaderboard shows it.
         meta={`${standing?.rank != null ? ordinal(standing.rank) : '—'} · ${(
-          standing?.points ?? 0
+          (standing?.points ?? 0) + opponent.duelPoints
         ).toLocaleString()} pts`}
         subtitle="How they have been playing, from weeks already revealed."
       />
@@ -785,7 +786,18 @@ function TapeCard({
         subtitle={`How you and ${opponent.name} compare this season.`}
       />
 
-      <TapeRow label="Season points" you={season.points} them={them?.points ?? 0} first />
+      {/*
+        ⚠ LIKE FOR LIKE. `season.points` is the SUM of both currencies, while a
+        `Standing`'s `points` is `total_points` — the picking half alone. Putting
+        one against the other compares a member's whole season with their
+        opponent's picking, and hands the row to whoever is on the left.
+      */}
+      <TapeRow
+        label="Season points"
+        you={season.points}
+        them={(them?.points ?? 0) + opponent.duelPoints}
+        first
+      />
       <TapeRow label="Correct picks" you={season.correct} them={them?.correct ?? 0} />
       {/* ⚠ Lower is better here, and only here — 2nd beats 5th. */}
       <TapeRow label="Table" you={season.rank} them={them?.rank ?? null} lowerIsBetter />

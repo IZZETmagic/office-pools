@@ -143,17 +143,24 @@ export type DuelState = {
 };
 
 export type Season = {
-  /** Season total, INCLUDING duel points — they are one number since 121. */
+  /** Season total: picks PLUS duels, the sum the engine ranks on. */
   points: number;
   /** Where you sit, from the engine's stored order. */
   rank: number | null;
   /**
-   * Your duel points alone.
+   * ⚠⚠ TWO CURRENCIES, SIDE BY SIDE — NOT ONE TOTAL.
    *
-   * ⚠ `points` above ALREADY includes these — migration 121 made them one
-   * total. This is the split, for a comparison that wants to show them
-   * separately; adding the two together would double-count every win.
+   * Migration 121's own header: *"`total_points` is what your picking scored;
+   * `duel_points` is ... and lives beside it"*. The ranking ADDS them —
+   * `ORDER BY (t.total_points + t.duel_points) DESC` — which is a sum performed
+   * in the ORDER BY, not a column that carries both.
+   *
+   * So `points` above is the SUM, computed here; `pickPoints` and `duelPoints`
+   * are the two halves. Reading `total_points` as if it already contained the
+   * duel and subtracting is what showed a member who tied their duel 0 points
+   * for picks: 250 − 250.
    */
+  pickPoints: number;
   duelPoints: number;
   correct: number;
   /** How many picks you have made all season, at either depth. */
@@ -431,9 +438,10 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     const draw = enough ? share('draw') : null;
 
     return {
-      // ⚠ One number since migration 121 — `total_points` already INCLUDES the
-      // duel points, so adding `duelPoints` again would double-count every win.
-      points: mine.totals?.totalPoints ?? 0,
+      // ⚠ THE SUM, because that is what the engine ranks on. `totalPoints` is
+      // the picking half alone.
+      points: (mine.totals?.totalPoints ?? 0) + (mine.totals?.duelPoints ?? 0),
+      pickPoints: mine.totals?.totalPoints ?? 0,
       rank: mine.totals?.rank ?? null,
       duelPoints: mine.totals?.duelPoints ?? 0,
       correct,
