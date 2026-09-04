@@ -452,23 +452,30 @@ function TeamSheetCard({
       {/* The two column heads carry the same colours as the chips beneath them,
           which is what makes the sheet readable without a key — and they are the
           header's colours, so "you" is the same blue in both places. */}
+      {/*
+        ⚠ NOT `width: CHIP_W`. The heads were pinned to the chip width beneath
+        them, which truncated "Marcus" to "MARC…" for no reason — the row is
+        otherwise empty, so the name had the whole card to sit in and was being
+        clipped against a column it does not belong to. It is a LABEL for the
+        column, not a cell in it: `flex: 1` and right-aligned gives it
+        everything spare while keeping it on one line.
+      */}
       <View
         style={{
           flexDirection: 'row',
-          alignItems: 'center',
+          alignItems: 'baseline',
           gap: theme.spacing.sm,
           marginTop: theme.spacing.md,
-          marginBottom: theme.spacing.xs,
+          marginBottom: theme.spacing.sm,
         }}
       >
-        <Text variant="caption" style={{ width: CHIP_W, color: theme.colors.primary }}>
+        <Text variant="caption" style={{ color: theme.colors.primary }}>
           You
         </Text>
-        <View style={{ flex: 1 }} />
         <Text
           variant="caption"
           numberOfLines={1}
-          style={{ width: CHIP_W, textAlign: 'right', color: theme.colors.red }}
+          style={{ flex: 1, textAlign: 'right', color: theme.colors.red }}
         >
           {themName ?? '—'}
         </Text>
@@ -489,55 +496,33 @@ function TeamSheetCard({
           >
             <PickChip label={r.myPick} won={r.outcome === 'you'} outcome={r.outcome} tone="primary" />
 
-            <View style={{ flex: 1, minWidth: 0, gap: theme.spacing.xs }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Club
-                  abbr={r.homeAbbr}
-                  name={r.homeName}
-                  crest={r.homeCrest}
-                  faded={r.result !== null && r.result !== 'home'}
-                  align="right"
-                />
-                <Scoreline home={r.homeScore} away={r.awayScore} live={r.clock !== null} />
-                <Club
-                  abbr={r.awayAbbr}
-                  name={r.awayName}
-                  crest={r.awayCrest}
-                  faded={r.result !== null && r.result !== 'away'}
-                />
-              </View>
+            {/*
+              ⚠ THE CLUB NAMES ARE GONE AND THE ROW IS BIGGER FOR IT — Ryan,
+              2026-09-04. "Nott'm Forest" and "Bournemouth" were spending the
+              width on strings a crest already says, and paying for it with a
+              14pt crest and a 10pt code nobody could read at arm's length. The
+              code and the crest both grow into the space the names left.
 
-              {/*
-                ⚠ HUNG OFF THE MATCH, NOT OFF WHO IS WINNING THE DUEL. The web
-                rendered this on `outcome === 'pending'`, which worked only
-                while "not scored" and "not started" were the same state — and
-                the moment a live fixture stopped being `pending`, the ticking
-                clock vanished from the one row that most needs it.
-              */}
-              {!r.isCompleted ? (
-                <View style={{ alignItems: 'center' }}>
-                  <View
-                    style={{
-                      borderRadius: theme.radii.pill,
-                      paddingHorizontal: theme.spacing.sm,
-                      paddingVertical: theme.spacing.xxs,
-                      backgroundColor: r.clock ? theme.colors.redLight : theme.colors.primaryLight,
-                    }}
-                  >
-                    <Text
-                      variant="detail"
-                      style={{
-                        fontFamily: fontFamilies.bold,
-                        letterSpacing: 0.6,
-                        textTransform: 'uppercase',
-                        color: r.clock ? theme.colors.red : theme.colors.primary,
-                      }}
-                    >
-                      {r.clock ?? formatKickoff(r.kickoffAt)}
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
+              ⚠ AND THE KICKOFF MOVES INTO THE MIDDLE, where the `v` was. It
+              used to be a pill on a second line under the fixture, which made
+              every unplayed row two rows tall — ten of those is a lot of card
+              for information that fits between two crests.
+            */}
+            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' }}>
+              <Club
+                abbr={r.homeAbbr}
+                name={r.homeName}
+                crest={r.homeCrest}
+                faded={r.result !== null && r.result !== 'home'}
+                align="right"
+              />
+              <Centre row={r} />
+              <Club
+                abbr={r.awayAbbr}
+                name={r.awayName}
+                crest={r.awayCrest}
+                faded={r.result !== null && r.result !== 'away'}
+              />
             </View>
 
             <PickChip
@@ -591,8 +576,30 @@ function TeamSheetCard({
   );
 }
 
-/** Wide enough for "2-1" and "HOME"; fixed, so the fixtures never jitter. */
-const CHIP_W = 52;
+/**
+ * Wide enough for "HOME ✓" and a "2-1" scoreline; fixed, so the fixtures never
+ * jitter as picks land.
+ *
+ * ⚠ 46, NOT 52. Every point taken from the two chips is a point the club codes
+ * and crests get back, and "DRAW" is only about 25pt of text at this size — the
+ * old width was padding, not need. Budgeted against a 360pt phone, the
+ * narrowest this product runs on: each club side lands at 53pt, which holds a
+ * 26pt crest and a three-letter code with room to spare.
+ */
+const CHIP_W = 46;
+
+/** The crest, now that it is the club's main identifier rather than decoration. */
+const CREST = 26;
+
+/**
+ * The middle column: a scoreline, or the day over the kickoff.
+ *
+ * ⚠ FIXED, AND THAT IS WHAT KEEPS THE COLUMN STRAIGHT. Sized so the widest
+ * thing it ever holds — "10:00 AM" at 11pt, about 48pt — clears it. An `auto`
+ * width would size per row, and the crests either side would step in and out
+ * down the card as kickoff times changed length.
+ */
+const CENTRE_W = 54;
 
 /**
  * One member's pick for one fixture.
@@ -668,13 +675,22 @@ function PickChip({
 }
 
 /**
- * One club on a team-sheet row: crest and abbreviation, mirrored about the
- * score so the two sides carry the same weight.
+ * One club on a team-sheet row: three-letter code and crest, mirrored about the
+ * middle column so the two sides carry the same weight.
  *
- * ⚠ THE WINNER IS LIT AND THE LOSER DIMMED, at full time only — `faded` is
- * computed from `result`, which the sheet builder leaves null until the match
- * is completed. Fading a side at 1-0 in the twelfth minute states an outcome
- * the game has not reached.
+ * ⚠ CODE ONLY — the full name is gone. On a phone the crest IS the club, and
+ * the name was spending the row's width to repeat it; "CRY" beside the Palace
+ * badge is unambiguous where a clipped "Crystal Pal…" is just worse. It is also
+ * what a broadcast scoreboard does at this size.
+ *
+ * ⚠ SO THE NAME STILL HAS TO REACH A SCREEN READER. A crest with no accessible
+ * name beside a three-letter code is an unlabelled image where the content is —
+ * hence `accessibilityLabel` carrying the real name.
+ *
+ * ⚠ THE WINNER IS LIT AND THE LOSER DIMMED, at full time only — `faded` comes
+ * from `result`, which the sheet builder leaves null until the match is
+ * completed. Fading a side at 1-0 in the twelfth minute states an outcome the
+ * game has not reached.
  */
 function Club({
   abbr,
@@ -690,22 +706,38 @@ function Club({
   align?: 'left' | 'right';
 }) {
   const theme = useTheme();
+  // `short_name` is resolved server-side by `shortClubName`, so this fallback
+  // should never fire — but rendering "TBD" for a club we can name would be a
+  // worse failure than three letters of its own name.
+  const code = abbr ?? (name ? name.slice(0, 3).toUpperCase() : 'TBD');
+
   const badge = crest ? (
     <Image
       alt=""
       source={{ uri: crest }}
-      style={{ width: 20, height: 20 }}
+      style={{ width: CREST, height: CREST }}
       resizeMode="contain"
     />
   ) : null;
   const label = (
-    <Text variant="detail" numberOfLines={1} style={{ fontFamily: fontFamilies.bold }}>
-      {abbr ?? name ?? 'TBD'}
+    <Text
+      numberOfLines={1}
+      style={{
+        fontFamily: fontFamilies.bold,
+        fontSize: 13,
+        lineHeight: 18,
+        letterSpacing: 0.3,
+        color: theme.colors.ink,
+      }}
+    >
+      {code}
     </Text>
   );
 
   return (
     <View
+      accessible
+      accessibilityLabel={name ?? code}
       style={{
         flex: 1,
         minWidth: 0,
@@ -732,6 +764,73 @@ function Club({
 }
 
 /**
+ * The middle column of a fixture row: what there is to say about the match
+ * itself, stacked.
+ *
+ * A played or running game shows its scoreline over its clock; one still to
+ * come shows the day over the kickoff. Two lines either way, so the rows keep
+ * one rhythm down the card instead of growing a second line only sometimes.
+ *
+ * ⚠ THE CLOCK HANGS OFF THE MATCH, NOT OFF WHO IS WINNING THE DUEL. The web
+ * rendered it on `outcome === 'pending'`, which worked only while "not scored"
+ * and "not started" were the same state — and the moment a live fixture stopped
+ * being `pending`, the ticking minute vanished from the row that most needs it.
+ */
+function Centre({ row }: { row: SheetRow }) {
+  const theme = useTheme();
+  const hasScore = row.homeScore !== null && row.awayScore !== null;
+
+  if (hasScore) {
+    return (
+      <View style={{ width: CENTRE_W, alignItems: 'center' }}>
+        <Scoreline home={row.homeScore} away={row.awayScore} live={row.clock !== null} />
+        {row.clock ? (
+          <SubLine tone={theme.colors.red}>{row.clock}</SubLine>
+        ) : row.isCompleted ? (
+          <SubLine tone={theme.colors.slate}>FT</SubLine>
+        ) : null}
+      </View>
+    );
+  }
+
+  const { day, time } = formatKickoff(row.kickoffAt);
+  return (
+    <View style={{ width: CENTRE_W, alignItems: 'center' }}>
+      <SubLine tone={theme.colors.slate}>{day}</SubLine>
+      <Text
+        numberOfLines={1}
+        style={{
+          fontFamily: fontFamilies.bold,
+          fontSize: 11,
+          lineHeight: 15,
+          color: theme.colors.primary,
+        }}
+      >
+        {time}
+      </Text>
+    </View>
+  );
+}
+
+/** The small line under a scoreline or over a kickoff. */
+function SubLine({ tone, children }: { tone: string; children: React.ReactNode }) {
+  return (
+    <Text
+      numberOfLines={1}
+      style={{
+        fontFamily: fontFamilies.bold,
+        fontSize: 9,
+        lineHeight: 13,
+        letterSpacing: 0.8,
+        color: tone,
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/**
  * Two numbers either side of a fixed dash.
  *
  * The dash lands in the same place on every row and the digits grow outwards
@@ -747,7 +846,7 @@ function Club({
  * fixture's 46pt a three-digit duel score clips its own hundreds column.
  */
 const SCORELINE = {
-  fixture: { width: 46, size: 11 },
+  fixture: { width: CENTRE_W, size: 13 },
   duel: { width: 76, size: 15 },
 } as const;
 
@@ -804,16 +903,21 @@ function Scoreline({
   );
 }
 
-/** Kickoff, in the DEVICE's timezone — `match_date` is timestamptz. */
-function formatKickoff(iso: string | null): string {
-  if (!iso) return 'TBC';
+/**
+ * Kickoff as its two lines, in the DEVICE's timezone — `match_date` is
+ * timestamptz and every surface in this app shows it device-local.
+ *
+ * Split rather than one string because the two stack: the day is the quiet
+ * qualifier, the time is the thing being read.
+ */
+function formatKickoff(iso: string | null): { day: string; time: string } {
+  if (!iso) return { day: '', time: 'TBC' };
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'TBC';
-  return d.toLocaleDateString(undefined, {
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  if (Number.isNaN(d.getTime())) return { day: '', time: 'TBC' };
+  return {
+    day: d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase(),
+    time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+  };
 }
 
 // ------------------------------------------------------------ next week's sheet
