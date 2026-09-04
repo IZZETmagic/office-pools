@@ -180,6 +180,28 @@ type Props = {
   standings: Map<string, Standing>;
   /** First kickoff of the current duel's matchweek — the countdown's target. */
   kickoffAt: string | null;
+  /**
+   * The running duel scoreline while the matchweek is being played.
+   *
+   * ⚠ IT REPLACES THE CLOCK, and only once the clock has run out. Picks close
+   * an hour before the first kickoff (migration 101), so there is a window
+   * where the matchweek is locked — the tab has already swapped to the team
+   * sheet — and no football has started. Showing 0-0 through that hour would
+   * be a scoreline for a game nobody is playing; the countdown is the truer
+   * thing to show, and it hands over by itself the moment it expires.
+   */
+  liveScore: { you: number; them: number } | null;
+  /**
+   * Is a ball in play AT THIS MOMENT — not merely "is the matchweek open".
+   *
+   * ⚠ THE TWO ARE DAYS APART. Matchweek 3 is in progress from Friday night
+   * until Monday, but for most of that window nothing is being played. A LIVE
+   * dot that pulsed the whole time would be claiming something untrue, and by
+   * Saturday at 3pm — when it means the most — it would mean nothing at all.
+   */
+  liveNow: boolean;
+  /** Fixtures the engine has not scored yet, for the line under the score. */
+  remaining: number;
   /** Shared vertical scroll offset of whichever tab is on screen. */
   scrollY: SharedValue<number>;
   /** The tab strip. Rendered inside this component — see the header note. */
@@ -202,6 +224,9 @@ export function ShowdownDuelHeader({
   sealed,
   standings,
   kickoffAt,
+  liveScore,
+  liveNow,
+  remaining,
   scrollY,
   children,
   onExpandedHeight,
@@ -435,6 +460,9 @@ export function ShowdownDuelHeader({
                 sealed={sealed}
                 standings={standings}
                 kickoffAt={kickoffAt}
+                liveScore={liveScore}
+                liveNow={liveNow}
+                remaining={remaining}
                 leftMove={leftMove}
                 rightMove={rightMove}
                 avatarShrink={avatarShrink}
@@ -563,6 +591,9 @@ function Matchup({
   sealed,
   standings,
   kickoffAt,
+  liveScore,
+  liveNow,
+  remaining,
   leftMove,
   rightMove,
   avatarShrink,
@@ -574,6 +605,9 @@ function Matchup({
   sealed: Props['sealed'];
   standings: Map<string, Standing>;
   kickoffAt: string | null;
+  liveScore: Props['liveScore'];
+  liveNow: boolean;
+  remaining: number;
   leftMove: AnimatedStyle;
   rightMove: AnimatedStyle;
   avatarShrink: AnimatedStyle;
@@ -591,21 +625,57 @@ function Matchup({
     <View style={{ paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.xl }}>
       {/* ---------- row 2: matchweek ---------- */}
       {matchweek !== null ? (
-        <Animated.View style={labelFade}>
-        <BandText
-          align="center"
-          style={{
-            fontFamily: fontFamilies.bold,
-            fontSize: 10,
-            letterSpacing: 1.6,
-            textTransform: 'uppercase',
-            color: BAND.slate,
-            marginBottom: theme.spacing.lg,
-          }}
+        <Animated.View
+          style={[
+            labelFade,
+            {
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: theme.spacing.sm,
+              marginBottom: theme.spacing.lg,
+            },
+          ]}
         >
-          Matchweek {matchweek}
-          {!bout && sealed ? ' · sealed' : ''}
-        </BandText>
+          <BandText
+            style={{
+              fontFamily: fontFamilies.bold,
+              fontSize: 10,
+              letterSpacing: 1.6,
+              textTransform: 'uppercase',
+              color: BAND.slate,
+            }}
+          >
+            Matchweek {matchweek}
+            {!bout && sealed ? ' · sealed' : ''}
+          </BandText>
+          {/*
+            ⚠ THE SAME BADGE AS `LiveMatchCard`, down to the 7pt dot and the
+            letter-spacing — deliberately, and not a new one. "Live" already has
+            a look in this app; a second dialect of it on the one screen a
+            member watches football on would read as two different claims.
+
+            ⚠ AND IT DOES NOT PULSE, for the same reason `liveNow` exists at
+            all: this badge is only on screen while a ball is actually in play,
+            so the honesty is in WHEN it appears, not in it moving.
+          */}
+          {liveNow ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <View
+                style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: BAND.red }}
+              />
+              <BandText
+                style={{
+                  fontFamily: fontFamilies.black,
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  color: BAND.red,
+                }}
+              >
+                LIVE
+              </BandText>
+            </View>
+          ) : null}
         </Animated.View>
       ) : null}
 
@@ -628,7 +698,13 @@ function Matchup({
             labelFade={labelFade}
           />
           <Animated.View style={[{ minWidth: MIDDLE_COL, alignItems: 'center' }, middleStyle]}>
-            <Middle bout={bout} kickoffAt={kickoffAt} />
+            <Middle
+              bout={bout}
+              kickoffAt={kickoffAt}
+              liveScore={liveScore}
+              liveNow={liveNow}
+              remaining={remaining}
+            />
           </Animated.View>
           <Corner
             name={bout.them ? bout.them.name : 'Nobody'}
@@ -658,18 +734,52 @@ function Matchup({
  * migration 121 left behind on the web for a week — it would tint a win as a
  * defeat while the leaderboard had the member climbing.
  */
-function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
+function Middle({
+  bout,
+  kickoffAt,
+  liveScore,
+  liveNow,
+  remaining,
+}: {
+  bout: Bout;
+  kickoffAt: string | null;
+  liveScore: Props['liveScore'];
+  liveNow: boolean;
+  remaining: number;
+}) {
   const { you, them, settled } = bout;
   const result = settled && them ? duelResult(you.points) : null;
-  const tint =
-    result === 'won'
+  // Nothing to count once the duel is decided — the week it belonged to is over.
+  const untilKickoff = useCountdown(settled ? null : kickoffAt);
+  const countdown = them ? untilKickoff : null;
+
+  /**
+   * ⚠ THE CLOCK GETS THE LOCK HOUR, THE SCORE GETS EVERYTHING AFTER IT.
+   *
+   * `liveScore` arrives the moment the matchweek LOCKS, which migration 101
+   * puts an hour before the first kickoff — so for that hour there is a
+   * scoreline available and no football being played, and showing it would put
+   * a 0-0 on the header for a game nobody has started. The countdown is still
+   * counting to a real event, so it keeps the column until it expires and then
+   * hands over on its own. No second condition, and no second clock read.
+   */
+  const showLive = !settled && liveScore !== null && countdown === null;
+
+  const score = settled && them
+    ? { you: you.accuracy ?? 0, them: them.accuracy ?? 0 }
+    : showLive
+      ? liveScore
+      : null;
+
+  const tint = showLive
+    // Red while a ball is in play — the same red the team sheet's clock and the
+    // LIVE badge above use, so one colour means one thing on this screen.
+    ? (liveNow ? BAND.red : BAND.ink)
+    : result === 'won'
       ? BAND.green
       : result === 'lost'
         ? BAND.red
         : BAND.ink;
-  // Nothing to count once the duel is decided — the week it belonged to is over.
-  const remaining = useCountdown(settled ? null : kickoffAt);
-  const countdown = them ? remaining : null;
 
   return (
     // ⚠ THE `v` IS GONE — Ryan, and the clock is the middle column now. It was
@@ -698,17 +808,23 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
         gap: 5,
       }}
     >
-      {settled && them ? (
+      {score ? (
         <BandText
           style={{
             fontFamily: fontFamilies.black,
-            fontSize: 22,
-            lineHeight: 28, // see the initials above — 'body' caps it at 20
+            // ⚠ THE LIVE SCORE IS THE LOUDEST THING HERE, because it is what
+            // the countdown it replaced was: the one number between the corners
+            // that changes while you watch. A settled scoreline is a record and
+            // sits back at 22.
+            fontSize: showLive ? 26 : 22,
+            // ⚠ WITH THE SIZE. Variant 'body' caps `lineHeight` at 20 and
+            // shears the tops off anything larger.
+            lineHeight: showLive ? 32 : 28,
             color: tint,
             fontVariant: ['tabular-nums'],
           }}
         >
-          {you.accuracy ?? 0}–{them.accuracy ?? 0}
+          {score.you}–{score.them}
         </BandText>
       ) : null}
       {/*
@@ -753,7 +869,16 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
             color: BAND.slate,
           }}
         >
-          {!them ? 'no opponent' : settled ? (result ?? '') : 'to play'}
+          {!them
+            ? 'no opponent'
+            : settled
+              ? (result ?? '')
+              : showLive
+                // What is left of the week, under the score it will change.
+                ? remaining > 0
+                  ? `${remaining} to play`
+                  : 'all played'
+                : 'to play'}
         </BandText>
       )}
     </View>
