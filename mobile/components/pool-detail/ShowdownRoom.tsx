@@ -55,10 +55,27 @@ export function ShowdownRoom({ poolId }: Props) {
    */
   const ownEntryIds = useMemo(() => new Set(bouts.map((b) => b.you.entryId)), [bouts]);
 
-  // Opens on the LATEST revealed week — the one people are actually talking
-  // about — rather than on matchweek one.
+  /**
+   * Opens on the week being PLAYED — Ryan. That is the one people are talking
+   * about while they are talking about it.
+   *
+   * ⚠ Falls back to the latest revealed week, and it has to: `inPlayMatchweekNumber`
+   * is NULL between matchweeks, which is most of any given week. It is also
+   * checked against `revealedWeeks` rather than trusted — a week can be in play
+   * with its duels still sealed, and landing there would open the switcher on a
+   * matchweek with nothing in it.
+   *
+   * ⚠ `week` stays null until the member taps an arrow, so the default keeps
+   * following the football as the payload loads. Seeding state from data would
+   * pin it to whatever was true on the first render.
+   */
+  const inPlay = league.data?.season.inPlayMatchweekNumber ?? null;
   const [week, setWeek] = useState<number | null>(null);
-  const shown = week ?? revealedWeeks[revealedWeeks.length - 1] ?? null;
+  const shown =
+    week ??
+    (inPlay !== null && revealedWeeks.includes(inPlay)
+      ? inPlay
+      : revealedWeeks[revealedWeeks.length - 1] ?? null);
 
   const [openDuel, setOpenDuel] = useState<string | null>(null);
 
