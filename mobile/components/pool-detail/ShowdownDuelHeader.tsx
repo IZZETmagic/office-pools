@@ -114,6 +114,11 @@ const COLLAPSED_SPREAD = 58;
  * move or change and remain the same throughout ... a permanent item like the
  * back and share button". So the collapsed matchup gets a row of its own
  * underneath rather than sharing one with a name it would sit on top of.
+ *
+ * ⚠ IT IS THE AVATAR PLUS ITS AIR: 40 + 8 above + 8 below. At 44 the avatars had
+ * 2pt either side and it read as cramped. If `COLLAPSED_AVATAR` grows again this
+ * grows with it, or the padding is silently eaten — the two are only
+ * independent on paper.
  */
 const COLLAPSED_ROW = 56;
 
