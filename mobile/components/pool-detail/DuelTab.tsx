@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Button, Card, Icon, Text } from '@/components/ui';
 import { useDuel, type Sheet } from '@/lib/useDuel';
-import { fontFamilies, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 
 // =============================================================
 // THE DUEL TAB — being rebuilt, one card at a time
@@ -109,28 +109,23 @@ function SheetCard({
   const openPicker = () => router.navigate(`/pool/${poolId}/pickem/${entryId}`);
 
   return (
-    <Card>
+    /*
+      ⚠ THE APP'S `Card`, NOT A HAND-ROLLED ONE. This was a local `View` on
+      `radii.md` with a hard 1pt border — 18pt corners and no shadow, against the
+      24pt and `shadows.card` every other card in the product uses. It read as
+      almost-right, which is the worst way to be wrong: nothing looks broken,
+      the screen just does not feel like the rest of the app.
+    */
+    <Card bordered>
       <Row>
-        <Label>Your sheet</Label>
-        <Text
-          style={{
-            fontFamily: fontFamilies.black,
-            fontSize: 15,
-            lineHeight: 20,
-            color: theme.colors.ink,
-            fontVariant: ['tabular-nums'],
-          }}
-        >
+        {/* `caption` IS the token for an uppercase label — bold 11 at 1.5
+            tracking. The hand-rolled 9pt at 1.3 was a near-miss of it. */}
+        <Text variant="caption" color="slate">
+          Your sheet
+        </Text>
+        <Text variant="cardTitle" style={{ fontVariant: ['tabular-nums'] }}>
           {sheet.done}
-          <Text
-            style={{
-              fontFamily: fontFamilies.black,
-              fontSize: 15,
-              lineHeight: 20,
-              color: theme.colors.slate,
-              fontVariant: ['tabular-nums'],
-            }}
-          >
+          <Text variant="cardTitle" color="slate" style={{ fontVariant: ['tabular-nums'] }}>
             {' / '}
             {sheet.total}
           </Text>
@@ -141,11 +136,11 @@ function SheetCard({
           fill cannot disagree with its own track by a rounding error. */}
       <View
         style={{
-          height: 8,
+          height: theme.spacing.sm,
           borderRadius: theme.radii.pill,
           backgroundColor: theme.colors.mist,
           overflow: 'hidden',
-          marginTop: theme.spacing.sm,
+          marginTop: theme.spacing.md,
           flexDirection: 'row',
         }}
       >
@@ -168,32 +163,17 @@ function SheetCard({
         not a task — we do not ask for something already done — but reviewing is
         not asking, and demoting it to an outline just made the card look like it
         had nothing to offer. Ryan's call on the web; kept here so the two agree.
+
+        ⚠ The pill radius is an explicit override of the `Button` primitive,
+        which is `radii.md`. It matches the web card this one is a port of, and
+        it is still a TOKEN — never a magic number.
       */}
-      <Pressable
+      <Button
+        title={finished ? 'See your picks' : 'Finish your picks'}
         onPress={openPicker}
-        accessibilityRole="button"
-        style={({ pressed }) => ({
-          marginTop: theme.spacing.md,
-          backgroundColor: theme.colors.primary,
-          borderRadius: theme.radii.pill,
-          paddingVertical: 13,
-          alignItems: 'center',
-          opacity: pressed ? 0.85 : 1,
-        })}
-      >
-        <Text
-          style={{
-            fontFamily: fontFamilies.black,
-            fontSize: 12,
-            lineHeight: 16,
-            letterSpacing: 1.2,
-            textTransform: 'uppercase',
-            color: '#FFFFFF',
-          }}
-        >
-          {finished ? 'See your picks' : 'Finish your picks'}
-        </Text>
-      </Pressable>
+        fullWidth
+        style={{ marginTop: theme.spacing.lg, borderRadius: theme.radii.pill }}
+      />
     </Card>
   );
 }
@@ -216,48 +196,15 @@ function openList(open: Sheet['open']): string {
 
 // -------------------------------------------------------------- furniture
 
-function Card({ children }: { children: React.ReactNode }) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radii.md,
-        borderWidth: 1,
-        borderColor: theme.colors.silver,
-        padding: theme.spacing.lg,
-      }}
-    >
-      {children}
-    </View>
-  );
-}
-
-function Label({ children }: { children: React.ReactNode }) {
-  const theme = useTheme();
-  return (
-    <Text
-      style={{
-        fontFamily: fontFamilies.bold,
-        fontSize: 9,
-        letterSpacing: 1.3,
-        textTransform: 'uppercase',
-        color: theme.colors.slate,
-      }}
-    >
-      {children}
-    </Text>
-  );
-}
-
 function Row({ children }: { children: React.ReactNode }) {
+  const theme = useTheme();
   return (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 8,
+        gap: theme.spacing.sm,
       }}
     >
       {children}
