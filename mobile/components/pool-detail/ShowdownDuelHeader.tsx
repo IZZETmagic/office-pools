@@ -104,7 +104,7 @@ const COLLAPSED_SPREAD = 58;
  * back and share button". So the collapsed matchup gets a row of its own
  * underneath rather than sharing one with a name it would sit on top of.
  */
-const COLLAPSED_ROW = 34;
+const COLLAPSED_ROW = 44;
 
 /**
  * A member, as the corner needs them.
