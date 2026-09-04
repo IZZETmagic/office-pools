@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { Button, Card, Icon, Text } from '@/components/ui';
-import { useDuel, type Sheet } from '@/lib/useDuel';
+import { useDuel, type Season, type Sheet } from '@/lib/useDuel';
 import { useTheme } from '@/theme';
 
 // =============================================================
@@ -44,7 +44,7 @@ type Props = {
 
 export function DuelTab({ poolId }: Props) {
   const theme = useTheme();
-  const { loading, error, isShowdown, sheet, ownEntryId } = useDuel(poolId);
+  const { loading, error, isShowdown, sheet, season, ownEntryId } = useDuel(poolId);
 
   if (loading) {
     return (
@@ -70,7 +70,9 @@ export function DuelTab({ poolId }: Props) {
     return <Empty icon="person.2.fill" title="This pool has no duels" caption="" />;
   }
 
-  if (!sheet || !ownEntryId) {
+  // Nothing to pick AND nothing played — a brand new entry in a pool that has
+  // not started. Anything else has at least one card to show.
+  if (!season && !sheet) {
     return (
       <Empty
         icon="pencil.line"
@@ -82,7 +84,10 @@ export function DuelTab({ poolId }: Props) {
 
   return (
     <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
-      <SheetCard poolId={poolId} entryId={ownEntryId} sheet={sheet} />
+      {sheet && ownEntryId ? (
+        <SheetCard poolId={poolId} entryId={ownEntryId} sheet={sheet} />
+      ) : null}
+      {season ? <ScoutingCard season={season} /> : null}
     </View>
   );
 }
@@ -175,6 +180,118 @@ function SheetCard({
         style={{ marginTop: theme.spacing.lg, borderRadius: theme.radii.pill }}
       />
     </Card>
+  );
+}
+
+// ----------------------------------------------------------- your scouting
+
+/**
+ * How the reader has been playing.
+ *
+ * ⚠ IT SCOUTS THE READER, NOT THE OPPONENT, and that is forced rather than
+ * chosen. The mockup's version reads "Priya backs the home side 68% of the
+ * time" — which cannot exist while the draw is sealed, because the whole point
+ * of the window is that nobody knows who Priya is yet. Pointing the same stats
+ * at the member keeps the card and loses nothing: they are the one who can act
+ * on their own tendencies.
+ *
+ * ⚠ If this ever DOES scout the opponent once a duel is revealed, it needs
+ * their picks — which the reveal gate withholds until the matchweek locks. That
+ * is a contract change, not a component one.
+ */
+function ScoutingCard({ season }: { season: Season }) {
+  const theme = useTheme();
+
+  return (
+    <Card bordered>
+      <Text variant="caption" color="slate">
+        Your season
+      </Text>
+
+      <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginTop: theme.spacing.md }}>
+        <Stat label="Points" value={season.points.toLocaleString()} />
+        <Stat
+          label="Accuracy"
+          value={season.accuracy === null ? '—' : `${season.accuracy}%`}
+          sub={`${season.correct} of ${season.picks} picks`}
+        />
+      </View>
+
+      {/*
+        ⚠ THE TENDENCY IS SUPPRESSED UNDER TEN PICKS, in `useDuel`. "100% home"
+        off two picks is noise wearing a percentage, and a tendency needs a
+        season to be one. Null here means not enough to say, never zero.
+      */}
+      {season.home !== null && season.draw !== null && season.away !== null ? (
+        <View style={{ marginTop: theme.spacing.lg }}>
+          <Text variant="caption" color="slate">
+            How you call them
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              height: theme.spacing.sm,
+              borderRadius: theme.radii.pill,
+              overflow: 'hidden',
+              marginTop: theme.spacing.sm,
+              backgroundColor: theme.colors.mist,
+            }}
+          >
+            {/* Flexed by percentage so the three always fill the track exactly
+                — the values are derived to total 100 for the same reason. */}
+            <View style={{ flex: season.home, backgroundColor: theme.colors.primary }} />
+            <View style={{ flex: season.draw, backgroundColor: theme.colors.slate }} />
+            <View style={{ flex: season.away, backgroundColor: theme.colors.accent }} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginTop: theme.spacing.sm }}>
+            <Key color={theme.colors.primary} label="Home" value={season.home} />
+            <Key color={theme.colors.slate} label="Draw" value={season.draw} />
+            <Key color={theme.colors.accent} label="Away" value={season.away} />
+          </View>
+        </View>
+      ) : null}
+    </Card>
+  );
+}
+
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  const theme = useTheme();
+  return (
+    <View style={{ flex: 1, minWidth: 0 }}>
+      <Text variant="caption" color="slate">
+        {label}
+      </Text>
+      <Text
+        variant="pageTitle"
+        style={{ marginTop: theme.spacing.xs, fontVariant: ['tabular-nums'] }}
+      >
+        {value}
+      </Text>
+      {sub ? (
+        <Text variant="detail" color="slate" style={{ marginTop: theme.spacing.xxs }}>
+          {sub}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function Key({ color, label, value }: { color: string; label: string; value: number }) {
+  const theme = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+      <View
+        style={{
+          width: theme.spacing.sm,
+          height: theme.spacing.sm,
+          borderRadius: theme.radii.pill,
+          backgroundColor: color,
+        }}
+      />
+      <Text variant="detail" color="slate">
+        {label} {value}%
+      </Text>
+    </View>
   );
 }
 

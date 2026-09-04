@@ -94,8 +94,40 @@ export type DuelState = {
    * sheet to be part-way through.
    */
   sheet: Sheet | null;
+  /**
+   * How the viewer has been playing — the self-scouting card.
+   *
+   * ⚠ SELF-scouting, and that is forced rather than chosen. Scouting the
+   * OPPONENT is what the mockup asked for, and it cannot exist while the draw
+   * is sealed: the whole point of the window is that nobody knows who they are
+   * yet. Pointing the same stats at the reader keeps the card and loses
+   * nothing, because the member reading their own tendencies is the one who
+   * can act on them.
+   */
+  season: Season | null;
   /** The viewer's own entry, for the route into the picker. */
   ownEntryId: string | null;
+};
+
+export type Season = {
+  /** Season total, INCLUDING duel points — they are one number since 121. */
+  points: number;
+  /** Where you sit, from the engine's stored order. */
+  rank: number | null;
+  correct: number;
+  /** How many picks you have made all season, at either depth. */
+  picks: number;
+  /** Correct as a share of picks MADE. Null under one pick. */
+  accuracy: number | null;
+  /**
+   * Share of picks that backed home / draw / away, as whole percents.
+   *
+   * ⚠ NULL UNDER TEN PICKS. "100% home" off two picks is noise wearing a
+   * percentage, and a tendency needs a season to be one.
+   */
+  home: number | null;
+  draw: number | null;
+  away: number | null;
 };
 
 export type Sheet = {
@@ -220,6 +252,69 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     return { done: fixtures.length - open.length, total: fixtures.length, open };
   }, [data]);
 
+  /**
+   * ⚠⚠ BOTH PICK SHAPES, AGAIN. Migration 064 gave a league pool two mutually
+   * exclusive pick shapes: a Results pool files a tap, a Scores pool files a
+   * scoreline, and a row carrying both is refused by a CHECK. So for a Scores
+   * pool the outcomes map is EMPTY, not partial — counting it alone reports a
+   * member who picked every game as having picked none.
+   *
+   * That is not hypothetical. The web's "Your sheet" and "Your season" cards
+   * both shipped with it, and on `Showdown: Exact Scores` a full sheet of ten
+   * scorelines rendered as 0/10 with a button asking the member to finish picks
+   * they had already made. Ryan found it 2026-09-01; `lib/league/ownPicks.ts`
+   * owns the rule on the web and this mirrors it.
+   *
+   * ⚠ THE DERIVATION ONLY RUNS ONE WAY. A stored scoreline can be READ as a
+   * direction — 2-1 backed the home side, and saying so invents nothing. The
+   * reverse is forbidden: filing "home" as a sentinel 1-0 would score as a
+   * genuine exact. Nothing here writes.
+   */
+  const season = useMemo<Season | null>(() => {
+    const mine = data?.you.entries[0];
+    if (!mine) return null;
+
+    const directions: string[] = Object.values(mine.outcomes);
+    const tapped = new Set(Object.keys(mine.outcomes));
+    for (const p of mine.predictions) {
+      if (tapped.has(p.match_id)) continue; // a tap wins over a scoreline
+      if (p.predicted_home_score === null || p.predicted_away_score === null) continue;
+      directions.push(
+        p.predicted_home_score > p.predicted_away_score
+          ? 'home'
+          : p.predicted_home_score < p.predicted_away_score
+            ? 'away'
+            : 'draw',
+      );
+    }
+
+    const picks = directions.length;
+    const correct = mine.totals?.correct ?? 0;
+    const share = (d: string) =>
+      picks ? Math.round((directions.filter((x) => x === d).length / picks) * 100) : 0;
+    const enough = picks >= 10;
+    const home = enough ? share('home') : null;
+    const draw = enough ? share('draw') : null;
+
+    return {
+      // ⚠ One number since migration 121 — `total_points` already INCLUDES the
+      // duel points, so adding `duelPoints` again would double-count every win.
+      points: mine.totals?.totalPoints ?? 0,
+      rank: mine.totals?.rank ?? null,
+      correct,
+      picks,
+      // ⚠ Against picks MADE, not fixtures played. A member who missed a week
+      // did not get those wrong — they were not in them, and counting them as
+      // misses reports somebody's holiday as bad form.
+      accuracy: picks ? Math.round((correct / picks) * 100) : null,
+      home,
+      draw,
+      // Derived so the three always total 100 — rounding each independently
+      // lets them add up to 99 or 101 and the bar leaves a gap.
+      away: home === null || draw === null ? null : 100 - home - draw,
+    };
+  }, [data]);
+
   return {
     // ⚠ A DISABLED query reports `isPending` forever. React Query has no
     // "idle" status any more, so a null poolId — every non-Showdown pool —
@@ -233,6 +328,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     sealed,
     currentKickoff,
     sheet,
+    season,
     ownEntryId: data?.you.entries[0]?.entry_id ?? null,
   };
 }
