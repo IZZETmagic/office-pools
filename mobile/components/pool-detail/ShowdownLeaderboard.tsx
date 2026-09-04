@@ -218,9 +218,26 @@ function Row({
 
         {board === 'duels' ? <Form form={duel.form} /> : null}
 
+        {/*
+          ⚠ FIXED WIDTH, AND IT IS WHAT ALIGNS THE FORM STRIP. Nothing after the
+          name column had a width of its own, so the row packed to the right and
+          every element's x depended on how many digits the TOTAL happened to
+          have: a member on 250 pushed their dots ~55pt left of a member on 0.
+          The strip was internally aligned the whole time and still could not be
+          read down the list.
+
+          `minWidth`, not `width`, so a five-figure season total grows the column
+          rather than being clipped — every row grows with it, so the alignment
+          holds either way.
+        */}
         <Text
           variant="cardTitle"
-          style={{ fontFamily: fontFamilies.black, fontVariant: ['tabular-nums'] }}
+          style={{
+            minWidth: theme.spacing.hero,
+            textAlign: 'right',
+            fontFamily: fontFamilies.black,
+            fontVariant: ['tabular-nums'],
+          }}
         >
           {(board === 'table' ? entry.total_points ?? 0 : duel.duelPoints).toLocaleString()}
         </Text>
