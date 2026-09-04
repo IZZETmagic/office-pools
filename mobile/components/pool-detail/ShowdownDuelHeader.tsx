@@ -200,8 +200,6 @@ type Props = {
    * Saturday at 3pm — when it means the most — it would mean nothing at all.
    */
   liveNow: boolean;
-  /** Fixtures the engine has not scored yet, for the line under the score. */
-  remaining: number;
   /** Shared vertical scroll offset of whichever tab is on screen. */
   scrollY: SharedValue<number>;
   /** The tab strip. Rendered inside this component — see the header note. */
@@ -226,7 +224,6 @@ export function ShowdownDuelHeader({
   kickoffAt,
   liveScore,
   liveNow,
-  remaining,
   scrollY,
   children,
   onExpandedHeight,
@@ -462,7 +459,6 @@ export function ShowdownDuelHeader({
                 kickoffAt={kickoffAt}
                 liveScore={liveScore}
                 liveNow={liveNow}
-                remaining={remaining}
                 leftMove={leftMove}
                 rightMove={rightMove}
                 avatarShrink={avatarShrink}
@@ -593,7 +589,6 @@ function Matchup({
   kickoffAt,
   liveScore,
   liveNow,
-  remaining,
   leftMove,
   rightMove,
   avatarShrink,
@@ -607,7 +602,6 @@ function Matchup({
   kickoffAt: string | null;
   liveScore: Props['liveScore'];
   liveNow: boolean;
-  remaining: number;
   leftMove: AnimatedStyle;
   rightMove: AnimatedStyle;
   avatarShrink: AnimatedStyle;
@@ -703,7 +697,6 @@ function Matchup({
               kickoffAt={kickoffAt}
               liveScore={liveScore}
               liveNow={liveNow}
-              remaining={remaining}
             />
           </Animated.View>
           <Corner
@@ -739,13 +732,11 @@ function Middle({
   kickoffAt,
   liveScore,
   liveNow,
-  remaining,
 }: {
   bout: Bout;
   kickoffAt: string | null;
   liveScore: Props['liveScore'];
   liveNow: boolean;
-  remaining: number;
 }) {
   const { you, them, settled } = bout;
   const result = settled && them ? duelResult(you.points) : null;
@@ -810,16 +801,25 @@ function Middle({
     >
       {score ? (
         <BandText
+          numberOfLines={1}
           style={{
             fontFamily: fontFamilies.black,
             // ⚠ THE LIVE SCORE IS THE LOUDEST THING HERE, because it is what
             // the countdown it replaced was: the one number between the corners
             // that changes while you watch. A settled scoreline is a record and
             // sits back at 22.
-            fontSize: showLive ? 26 : 22,
+            //
+            // ⚠ 32 IS THE CEILING, not a preference. `MIDDLE_COL` is 160pt and
+            // the corners either side are `flex: 1`, so anything wider than it
+            // squeezes them instead of growing. A worst-case "500–500" is seven
+            // tabular glyphs — about 130pt at this size, which clears it; at 36
+            // it does not, and the avatars start moving inward on high-scoring
+            // weeks only. Widening `MIDDLE_COL` is not the escape hatch either:
+            // `columnCentre` derives the collapsed avatar positions from it.
+            fontSize: showLive ? 32 : 22,
             // ⚠ WITH THE SIZE. Variant 'body' caps `lineHeight` at 20 and
             // shears the tops off anything larger.
-            lineHeight: showLive ? 32 : 28,
+            lineHeight: showLive ? 40 : 28,
             color: tint,
             fontVariant: ['tabular-nums'],
           }}
@@ -837,7 +837,16 @@ function Middle({
         hour earlier, so a clock labelled "first game" that used `lock_at` would
         run out while the football had not started.
       */}
-      {countdown ? (
+      {/*
+        ⚠ NOTHING UNDER THE LIVE SCORE — Ryan, 2026-09-04, and it is what puts
+        the score on the avatars' centre line rather than above it. This column
+        is `height: AVATAR` and centred, so a SINGLE child lands exactly on that
+        line by construction; the "9 to play" beneath it made the pair centre
+        instead, which pushed the number that matters upward. The count is not
+        lost — it is the team sheet's own heading, on the card that lists the
+        games it is counting.
+      */}
+      {showLive ? null : countdown ? (
         <BandText
           align="center"
           style={{
@@ -869,16 +878,7 @@ function Middle({
             color: BAND.slate,
           }}
         >
-          {!them
-            ? 'no opponent'
-            : settled
-              ? (result ?? '')
-              : showLive
-                // What is left of the week, under the score it will change.
-                ? remaining > 0
-                  ? `${remaining} to play`
-                  : 'all played'
-                : 'to play'}
+          {!them ? 'no opponent' : settled ? (result ?? '') : 'to play'}
         </BandText>
       )}
     </View>

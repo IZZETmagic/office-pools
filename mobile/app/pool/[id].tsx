@@ -838,7 +838,6 @@ export default function PoolDetailScreen() {
           kickoffAt={duel.currentKickoff}
           liveScore={duel.liveScore}
           liveNow={duel.liveNow}
-          remaining={duel.remaining}
           scrollY={scrollY}
           onExpandedHeight={setBandHeight}
         >
