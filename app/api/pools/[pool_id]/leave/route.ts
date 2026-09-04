@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { retireEntries } from '@/lib/entries/retire'
+import { recalculatePool } from '@/lib/scoring'
 
 // POST /api/pools/:pool_id/leave
 //
@@ -90,6 +91,25 @@ export async function POST(
     .eq('member_id', membership.member_id)
   if (deleteError) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
+  }
+
+  // Rescore the pool now that this member's entries are retired, so the
+  // leaderboard the others are looking at stops including them.
+  //
+  // ⚠ THIS BELONGS HERE, NOT IN THE CLIENT. PoolDetail used to POST
+  // /recalculate straight after this route returned — by which point the
+  // membership row above was already deleted, so the caller was no longer a
+  // member of the pool they were asking to rescore. That only worked because
+  // /recalculate authorized nobody; now that it checks membership, the call
+  // would 403. Doing it here also removes a silent failure: the client never
+  // checked the response, so a failed rescore left stale ranks with no signal.
+  //
+  // Non-fatal: the member HAS left, and reporting otherwise would be wrong.
+  // A failure leaves ranks stale until the next scoring event, which is the
+  // same exposure the unchecked client call had.
+  const recalc = await recalculatePool({ poolId: pool_id })
+  if (!recalc.success) {
+    console.error(`[leave] rescore after leave failed for pool ${pool_id}:`, recalc.error)
   }
 
   return NextResponse.json({ left: true })

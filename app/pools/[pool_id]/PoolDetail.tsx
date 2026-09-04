@@ -1215,7 +1215,10 @@ export function PoolDetail({
       return
     }
 
-    await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
+    // The rescore now happens inside /leave, which still holds proof of
+    // membership at that point. Calling /recalculate from here posted AFTER
+    // the membership row had been deleted, so it is no longer authorized —
+    // and its result was never checked, so a failure was invisible.
 
     router.push('/pools')
   }
