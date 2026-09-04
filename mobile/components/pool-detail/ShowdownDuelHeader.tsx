@@ -98,11 +98,9 @@ const CHROME_ROW = 34;
  * ⚠ Kept generous on purpose — the members ARE the event, and a duel that
  * collapses into two dots beside a number stops being about two people.
  *
- * ⚠ IT IS NOW UP AGAINST BOTH OF ITS NEIGHBOURS. At 40 in a 44pt row there is
- * 2pt of air top and bottom, and the gap left for the score is
- * `2 × COLLAPSED_SPREAD − COLLAPSED_AVATAR` = 76pt against a line that renders
- * around 60. Going further means moving one of them too: `COLLAPSED_ROW` for
- * the height, `COLLAPSED_SPREAD` for the width.
+ * ⚠ IT IS UP AGAINST BOTH OF ITS NEIGHBOURS. `COLLAPSED_ROW` owns the height
+ * either side of it; `COLLAPSED_SPREAD` owns the width. Growing this without
+ * one of them is how the avatars ended up under the score.
  */
 const COLLAPSED_AVATAR = 40;
 /**
@@ -132,8 +130,33 @@ const MIDDLE_COL = 160;
 const SCORE_GAP = 8;
 const ROW_PAD = 8;
 
-/** How far from the screen's centre a collapsed avatar settles. */
-const COLLAPSED_SPREAD = 58;
+/**
+ * How far from the screen's centre a collapsed avatar settles.
+ *
+ * ⚠ IT IS SIZED BY THE SCORE, NOT BY TASTE — Ryan, 2026-09-04: at 58 the
+ * scoreline ran underneath the avatars once it went from 22pt to 32.
+ *
+ * ⚠⚠ AND THE BINDING CONSTRAINT IS THE WIDEST HALF, not the whole line. The
+ * dash is pinned to the screen's centre and the digits grow outward from it, so
+ * "100 – 0" is 73pt to the left of centre and 35pt to the right: it collided
+ * with the LEFT avatar and cleared the right one by a comfortable margin.
+ * Budgeting on the total width would have called that line 108pt wide, fitted
+ * it into a 76pt gap on paper, and left the overlap exactly where it was.
+ *
+ * The widest half the type rule permits is four tabular digits at 26pt —
+ * `4 × 15.6` plus `SCORE_GAP` plus half a dash, about 77pt. Add the avatar's
+ * own radius (20) and air that reads as deliberate (≈11), and the avatar's
+ * centre has to sit 108 from the middle. That leaves
+ * `2 × COLLAPSED_SPREAD − COLLAPSED_AVATAR` = 176pt of clear gap for a line
+ * whose widest rendering is about 153.
+ *
+ * ⚠ IT IS A CONSTANT ON PURPOSE, not a measurement of the current score.
+ * Deriving it live would shift both avatars sideways the moment somebody's
+ * score gained a digit — a jump, mid-match, on the two elements the row is
+ * arranged around. A fixed spread that always clears the worst case is worth
+ * more than a snug one that moves.
+ */
+const COLLAPSED_SPREAD = 108;
 /**
  * The strip of band that survives the collapse, holding the shrunken duel.
  *
@@ -774,24 +797,26 @@ function Middle({
       : null;
 
   /**
-   * ⚠ THE SCORE HAS TO FIT `MIDDLE_COL`, AND IT CAN BE FOUR DIGITS A SIDE.
-   *
-   * `MIDDLE_COL` is 160pt with `flex: 1` corners either side, so a score wider
-   * than it does not clip — it SQUEEZES THE AVATARS INWARD, and only on the
-   * weeks somebody played well, which is exactly when nobody would think to
-   * look. Widening the column is not the escape hatch: `columnCentre` derives
-   * the collapsed avatar positions from it.
-   *
+   * ⚠ THE SCORE HAS TO CLEAR TWO THINGS, AND IT CAN BE FOUR DIGITS A SIDE.
    * A matchweek pays 100 a fixture at Results depth, so a perfect ten is 1000 —
-   * reachable, not hypothetical. Eight digits plus the spaces around the dash
-   * needs about 153pt at 26 and about 188pt at 32.
+   * reachable, not hypothetical.
    *
-   * Stepped on the digit COUNT rather than measured: `adjustsFontSizeToFit` is
-   * the RN way to do this and it re-measures on every score change, which is
-   * a size that shifts under a number that is already moving.
+   * Expanded, the whole line has to fit `MIDDLE_COL`: 160pt with `flex: 1`
+   * corners either side, so an over-wide score does not clip, it SQUEEZES THE
+   * AVATARS INWARD. Collapsed, each HALF has to clear its own avatar — see
+   * `COLLAPSED_SPREAD`.
+   *
+   * ⚠ SO IT STEPS ON THE WIDEST SIDE, NOT THE TOTAL. Both constraints are about
+   * a half, and the total hides the case that matters: "1000 – 0" is only five
+   * digits, which a total-based rule leaves at full size — and its left half is
+   * the widest thing this component can render.
+   *
+   * Stepped on the digit COUNT rather than measured, because
+   * `adjustsFontSizeToFit` re-measures on every change: a size that shifts
+   * under a number that is already moving.
    */
   const liveSize =
-    String(score?.you ?? 0).length + String(score?.them ?? 0).length >= 7 ? 26 : 32;
+    Math.max(String(score?.you ?? 0).length, String(score?.them ?? 0).length) >= 4 ? 26 : 32;
 
   const tint = showLive
     // Red while a ball is in play — the same red the team sheet's clock and the
