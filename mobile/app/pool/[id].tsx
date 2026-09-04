@@ -660,10 +660,10 @@ export default function PoolDetailScreen() {
       accentColor={accentColor}
       poolId={pool.poolId}
       leagueMode={leagueMode}
-      // The Showdown header is lit from both edges and the strip sits inside
-      // it — an opaque background here would cut the light off in a straight
-      // line exactly where the tabs begin.
-      transparent={isShowdownPool}
+      // The Showdown band is lit from both edges, stays dark in both app
+      // themes, and the strip sits inside it — so the strip goes transparent
+      // AND dark, from the one flag that says where it is.
+      onDarkBand={isShowdownPool}
     />
   );
 
@@ -675,7 +675,12 @@ export default function PoolDetailScreen() {
       {/* Branded headers paint a dark color band behind the status bar; force
           light icons so the clock/battery stay legible. Unmounts when the
           screen leaves and the root-layout's "auto" style takes over again. */}
-      {accentColor ? <StatusBar style="light" animated /> : null}
+      {/*
+        ⚠ Also for Showdown, and not only for a branded pool. The duel band is
+        dark in BOTH app themes, so in light mode the OS would still be drawing
+        a dark clock and battery over it.
+      */}
+      {accentColor || isShowdownPool ? <StatusBar style="light" animated /> : null}
       {/*
         ⚠ SHOWDOWN GETS A DIFFERENT HEADER, and the tab strip moves INSIDE it.
         Every other mode renders exactly what it did before — same header, same

@@ -15,7 +15,7 @@ import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { formatHms, useCountdown } from '@/lib/useCountdown';
 import { duelResult } from '@/lib/duelPoints';
 import type { Bout } from '@/lib/useDuel';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { fontFamilies, resolveColors, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
 // THE MATCHUP IS THE HEADER
@@ -64,6 +64,27 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
  */
 const AVATAR = 80;
 
+
+/**
+ * ⚠ THE BAND IS ALWAYS DARK, IN BOTH APP THEMES.
+ *
+ * Ryan, 2026-09-03: *"this header section must remain darkmode ... when I switch
+ * to light mode the shadows/glows look so washed like they are not even there
+ * and does not look good at all. Also having this permanent dark mode means it
+ * will always be attention grabbing."*
+ *
+ * The whole band is lit — two coloured throws from the edges, a ring on each
+ * avatar in the member's own colour. All of that is additive light, and additive
+ * light needs somewhere dark to land. On a `#F7F8FC` surface the same values
+ * read as smudges.
+ *
+ * So this is a deliberate island rather than a theme bug: the band resolves the
+ * DARK palette whatever the device is set to, and the page below it stays in the
+ * user's chosen theme. Anything inside the band must take its colours from here
+ * — `useTheme()` inside a child will hand back light values and put light text
+ * on a dark ground.
+ */
+const BAND = resolveColors('dark');
 
 /** How far you scroll before the matchup is fully folded away. */
 const COLLAPSE_DISTANCE = 90;
@@ -138,10 +159,11 @@ export function ShowdownDuelHeader({
    */
   const youUserId = bout ? standings.get(bout.you.entryId)?.userId ?? null : null;
   const themUserId = bout?.them ? standings.get(bout.them.entryId)?.userId ?? null : null;
-  const leftGlow = youUserId ? gradientForUser(youUserId)[0] : theme.colors.primary;
-  const rightGlow = themUserId ? gradientForUser(themUserId)[0] : theme.colors.slate;
-  // Restrained on light, where a tint over a pale surface goes muddy fast.
-  const glowAlpha = theme.mode === 'dark' ? 0.28 : 0.16;
+  const leftGlow = youUserId ? gradientForUser(youUserId)[0] : BAND.primary;
+  const rightGlow = themUserId ? gradientForUser(themUserId)[0] : BAND.slate;
+  // ⚠ One value, not a light/dark pair: the band is dark in BOTH app themes, so
+  // there is no pale surface for this to be restrained against any more.
+  const glowAlpha = 0.28;
 
   async function handleShare() {
     if (!poolCode) return;
@@ -152,10 +174,10 @@ export function ShowdownDuelHeader({
   return (
     <View
       style={{
-        backgroundColor: theme.colors.snow,
+        backgroundColor: BAND.snow,
         paddingTop: insets.top + theme.spacing.xs,
         borderBottomWidth: 1,
-        borderBottomColor: theme.colors.silver,
+        borderBottomColor: BAND.silver,
         // The glow is painted inside these bounds, so it must not spill past
         // the header's own edge into the pager below it.
         overflow: 'hidden',
@@ -282,7 +304,7 @@ function Matchup({
             fontSize: 10,
             letterSpacing: 1.6,
             textTransform: 'uppercase',
-            color: theme.colors.slate,
+            color: BAND.slate,
             marginBottom: theme.spacing.lg,
           }}
         >
@@ -332,15 +354,14 @@ function Matchup({
  * defeat while the leaderboard had the member climbing.
  */
 function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
-  const theme = useTheme();
   const { you, them, settled } = bout;
   const result = settled && them ? duelResult(you.points) : null;
   const tint =
     result === 'won'
-      ? theme.colors.green
+      ? BAND.green
       : result === 'lost'
-        ? theme.colors.red
-        : theme.colors.ink;
+        ? BAND.red
+        : BAND.ink;
   // Nothing to count once the duel is decided — the week it belonged to is over.
   const remaining = useCountdown(settled ? null : kickoffAt);
   const countdown = them ? remaining : null;
@@ -372,7 +393,7 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
             fontFamily: fontFamilies.black,
             fontSize: 20,
             lineHeight: 26, // see the initials above — 'body' caps it at 20
-            color: theme.colors.slate,
+            color: BAND.slate,
           }}
         >
           {them ? 'v' : '—'}
@@ -401,7 +422,7 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
             // shears the tops off anything larger — at 24 that is the whole top
             // third of every digit.
             lineHeight: 30,
-            color: theme.colors.accent,
+            color: BAND.accent,
             // ⚠ Load-bearing at this size: without it the digits are
             // proportional and the whole clock jitters sideways once a second.
             fontVariant: ['tabular-nums'],
@@ -417,7 +438,7 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
             fontSize: 8,
             letterSpacing: 1,
             textTransform: 'uppercase',
-            color: theme.colors.slate,
+            color: BAND.slate,
           }}
         >
           {!them ? 'no opponent' : settled ? (result ?? '') : 'to play'}
@@ -442,10 +463,10 @@ function Corner({
   const theme = useTheme();
   const color =
     tone === 'primary'
-      ? theme.colors.primary
+      ? BAND.primary
       : tone === 'red'
-        ? theme.colors.red
-        : theme.colors.slate;
+        ? BAND.red
+        : BAND.slate;
   const userId = standing?.userId ?? null;
   /**
    * The ring, and the glow behind it: the LIGHT STOP of this person's own
@@ -575,7 +596,7 @@ function Corner({
           style={{
             fontFamily: fontFamilies.bold,
             fontSize: 12,
-            color: theme.colors.slate,
+            color: BAND.slate,
             fontVariant: ['tabular-nums'],
           }}
         >
@@ -621,10 +642,10 @@ function CollapsedLine({
   const result = settled && them ? duelResult(you.points) : null;
   const tint =
     result === 'won'
-      ? theme.colors.green
+      ? BAND.green
       : result === 'lost'
-        ? theme.colors.red
-        : theme.colors.ink;
+        ? BAND.red
+        : BAND.ink;
   const youUser = standings.get(you.entryId)?.userId ?? null;
   const themUser = them ? standings.get(them.entryId)?.userId ?? null : null;
 
@@ -685,7 +706,7 @@ function RoundButton({
         width: 32,
         height: 32,
         borderRadius: theme.radii.pill,
-        backgroundColor: theme.colors.mist,
+        backgroundColor: BAND.mist,
         alignItems: 'center',
         justifyContent: 'center',
         opacity: pressed ? 0.6 : 1,
@@ -708,10 +729,10 @@ function Dot({
   const theme = useTheme();
   const color =
     tone === 'primary'
-      ? theme.colors.primary
+      ? BAND.primary
       : tone === 'red'
-        ? theme.colors.red
-        : theme.colors.slate;
+        ? BAND.red
+        : BAND.slate;
   return (
     <View
       style={{

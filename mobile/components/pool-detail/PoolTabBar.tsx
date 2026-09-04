@@ -16,7 +16,7 @@ import Animated, {
 
 import { Icon, NotificationDot } from '@/components/ui';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { fontFamilies, resolveColors, useTheme, withOpacity } from '@/theme';
 
 /**
  * Euclidean RGB distance between two #RRGGBB hex strings (0..~441).
@@ -110,15 +110,20 @@ type PoolTabBarProps = {
   /** Which league mode, so Showdown can be given its Duel tab. Null elsewhere. */
   leagueMode?: 'pickem' | 'showdown' | 'last_man_standing' | 'table' | null;
   /**
-   * Drop the strip's own background so whatever is behind it shows through.
+   * Render for a permanently DARK surface: no background of its own, and dark
+   * colours whatever the device theme says.
    *
-   * ⚠ Only for a header that paints something worth seeing — the Showdown duel
-   * band is lit from both edges and the strip sits INSIDE it, so an opaque
-   * `snow` here cut the light off in a straight line right where the tabs
-   * start. Everywhere else the strip keeps its background: it scrolls over page
-   * content and needs to stay legible.
+   * ⚠ ONE FLAG, BECAUSE IT IS ONE FACT. The Showdown duel band is lit from both
+   * edges and stays dark in both app themes, and the strip sits INSIDE it. Two
+   * separate props — "be transparent" and "be dark" — could be set apart from
+   * each other, and either half alone is broken: an opaque strip cuts the band's
+   * light off in a straight line where the tabs start, and a light-themed strip
+   * on a dark band is grey text on near-black.
+   *
+   * Everywhere else the strip keeps its own background and the user's theme: it
+   * scrolls over page content there, where both are what keep it legible.
    */
-  transparent?: boolean;
+  onDarkBand?: boolean;
 };
 
 export function getVisiblePoolTabs(
@@ -270,9 +275,14 @@ export function PoolTabBar({
   accentColor,
   poolId,
   leagueMode = null,
-  transparent = false,
+  onDarkBand = false,
 }: PoolTabBarProps) {
-  const theme = useTheme();
+  const appTheme = useTheme();
+  // ⚠ Colours only. Spacing, radii and typography are theme-independent, so the
+  // strip keeps taking those from the app's theme either way.
+  const theme = onDarkBand
+    ? { ...appTheme, colors: resolveColors('dark') }
+    : appTheme;
   const pending = usePendingActionsOptional();
   const { width: screenWidth } = useWindowDimensions();
   const visible = getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled, isLeague, leagueMode);
@@ -311,7 +321,7 @@ export function PoolTabBar({
    * Everywhere else it stays solid: the strip scrolls over page content there,
    * and a see-through pill would pick up whatever happened to be behind it.
    */
-  const inactiveBg = transparent ? withOpacity(theme.colors.mist, 0.45) : theme.colors.mist;
+  const inactiveBg = onDarkBand ? withOpacity(theme.colors.mist, 0.45) : theme.colors.mist;
   const activeIndex = tabs.findIndex((t) => t.key === active);
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
@@ -374,7 +384,7 @@ export function PoolTabBar({
         flexGrow: 0,
         flexShrink: 0,
         flexBasis: 'auto',
-        backgroundColor: transparent ? 'transparent' : theme.colors.snow,
+        backgroundColor: onDarkBand ? 'transparent' : theme.colors.snow,
       }}
     >
       {tabs.map((tab, i) => (
