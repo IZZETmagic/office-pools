@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, View } from 'react-native';
 
 import { Button, Card, Icon, Text } from '@/components/ui';
 import { useDuel, type Opponent, type Season, type Sheet } from '@/lib/useDuel';
+import type { LeagueMatch } from '@/lib/useLeaguePool';
 import type { Standing } from './ShowdownDuelHeader';
 import { useTheme } from '@/theme';
 
@@ -54,7 +55,7 @@ type Props = {
 
 export function DuelTab({ poolId, standings }: Props) {
   const theme = useTheme();
-  const { loading, error, isShowdown, sheet, season, opponent, ownEntryId } =
+  const { loading, error, isShowdown, sheet, fixtures, season, opponent, ownEntryId } =
     useDuel(poolId);
 
   if (loading) {
@@ -101,6 +102,7 @@ export function DuelTab({ poolId, standings }: Props) {
       {opponent ? (
         <OpponentCard opponent={opponent} standing={standings.get(opponent.entryId) ?? null} />
       ) : null}
+      {fixtures.length > 0 ? <DecidedOnCard fixtures={fixtures} /> : null}
       {season ? <ScoutingCard season={season} /> : null}
     </View>
   );
@@ -194,6 +196,117 @@ function SheetCard({
         style={{ marginTop: theme.spacing.lg, borderRadius: theme.radii.pill }}
       />
     </Card>
+  );
+}
+
+// ------------------------------------------------------ what it rides on
+
+/**
+ * The fixtures this duel will be decided on.
+ *
+ * ⚠ THE WHOLE WEEK, picked or not — not `sheet.open`. The question this answers
+ * is what the duel rides on, which does not change as a member works through
+ * their sheet. `Your sheet` above already says what is left to do.
+ *
+ * ⚠ No extra read: these are the open matchweek's fixtures, which the league
+ * contract already carries for the sheet.
+ */
+function DecidedOnCard({ fixtures }: { fixtures: LeagueMatch[] }) {
+  const theme = useTheme();
+
+  return (
+    <Card bordered>
+      <Row>
+        <Text variant="cardTitle">What it will be decided on</Text>
+        <Text variant="caption" color="slate">
+          {fixtures.length} fixture{fixtures.length === 1 ? '' : 's'}
+        </Text>
+      </Row>
+
+      <View style={{ marginTop: theme.spacing.md }}>
+        {fixtures.map((f, i) => (
+          <View
+            key={f.match_id}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.sm,
+              paddingVertical: theme.spacing.sm,
+              // A rule between rows, never above the first — a line under the
+              // heading would read as a second border on the card.
+              borderTopWidth: i === 0 ? 0 : theme.borders.thin,
+              borderTopColor: theme.colors.silver,
+            }}
+          >
+            <Side name={f.home_team?.country_name} crest={f.home_team?.flag_url} />
+            <Text variant="detail" color="slate">
+              v
+            </Text>
+            <Side name={f.away_team?.country_name} crest={f.away_team?.flag_url} align="right" />
+          </View>
+        ))}
+      </View>
+    </Card>
+  );
+}
+
+/**
+ * One club on a fixture row.
+ *
+ * ⚠ `country_name` and `flag_url` ARE the club's name and crest. A league
+ * fixture travels through types written for national teams, so the field names
+ * lie — renaming them would not fail, it would silently render "TBD" with no
+ * crest, because the adapter picks fields explicitly.
+ */
+function Side({
+  name,
+  crest,
+  align = 'left',
+}: {
+  name?: string | null;
+  crest?: string | null;
+  align?: 'left' | 'right';
+}) {
+  const theme = useTheme();
+  const label = (
+    <Text
+      variant="body"
+      numberOfLines={1}
+      style={{ flex: 1, textAlign: align === 'right' ? 'right' : 'left' }}
+    >
+      {name ?? 'TBD'}
+    </Text>
+  );
+  const badge = crest ? (
+    <Image
+      source={{ uri: crest }}
+      style={{ width: theme.spacing.lg, height: theme.spacing.lg }}
+      resizeMode="contain"
+    />
+  ) : null;
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.sm,
+      }}
+    >
+      {align === 'right' ? (
+        <>
+          {label}
+          {badge}
+        </>
+      ) : (
+        <>
+          {badge}
+          {label}
+        </>
+      )}
+    </View>
   );
 }
 

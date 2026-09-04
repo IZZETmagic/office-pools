@@ -112,6 +112,14 @@ export type DuelState = {
   season: Season | null;
   /** Who you are playing, and what is known about them. Null while sealed. */
   opponent: Opponent | null;
+  /**
+   * Every fixture of the OPEN matchweek — what the duel will be decided on.
+   *
+   * ⚠ Not `sheet.open`, which is only the ones with no pick on them yet. This
+   * is the whole week, picked or not: the question the card answers is what the
+   * duel rides on, not what is left to do.
+   */
+  fixtures: LeagueMatch[];
   /** The viewer's own entry, for the route into the picker. */
   ownEntryId: string | null;
 };
@@ -298,6 +306,12 @@ export function useDuel(poolId: string | null | undefined): DuelState {
    * for half the pools — and silently, since both shapes are legitimately
    * present on the type.
    */
+  const fixtures = useMemo<LeagueMatch[]>(() => {
+    const week = data?.season.openMatchweekNumber ?? null;
+    if (week === null || !data) return [];
+    return fixturesForWeek(data.season.matches, week);
+  }, [data]);
+
   const sheet = useMemo<Sheet | null>(() => {
     const week = data?.season.openMatchweekNumber ?? null;
     const mine = data?.you.entries[0];
@@ -563,6 +577,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     sealed,
     currentKickoff,
     sheet,
+    fixtures,
     season,
     opponent,
     ownEntryId: data?.you.entries[0]?.entry_id ?? null,
