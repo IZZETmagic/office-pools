@@ -235,9 +235,14 @@ export function ShowdownDuelHeader({
         {/* Centred by construction: both flanks are the same fixed width, so the
             name sits on the true centre of the screen whatever its length. */}
         <View style={{ flex: 1, minWidth: 0, paddingHorizontal: theme.spacing.sm }}>
-          <Text variant="cardTitle" numberOfLines={1} align="center" style={{ fontSize: 15 }}>
+          <BandText
+            variant="cardTitle"
+            numberOfLines={1}
+            align="center"
+            style={{ fontSize: 15, color: BAND.ink }}
+          >
             {poolName}
-          </Text>
+          </BandText>
         </View>
 
         {poolCode ? (
@@ -297,7 +302,7 @@ function Matchup({
     <View style={{ paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.xl }}>
       {/* ---------- row 2: matchweek ---------- */}
       {matchweek !== null ? (
-        <Text
+        <BandText
           align="center"
           style={{
             fontFamily: fontFamilies.bold,
@@ -310,7 +315,7 @@ function Matchup({
         >
           Matchweek {matchweek}
           {!bout && sealed ? ' · sealed' : ''}
-        </Text>
+        </BandText>
       ) : null}
 
       {/* ---------- row 3: the two corners and the v ---------- */}
@@ -336,11 +341,11 @@ function Matchup({
           />
         </View>
       ) : (
-        <Text align="center" variant="body" color="slate" style={{ paddingHorizontal: 24 }}>
+        <BandText align="center" variant="body" style={{ paddingHorizontal: 24, color: BAND.slate }}>
           {sealed
             ? 'Your opponent opens one week at a time.'
             : 'The draw is made once there are two members.'}
-        </Text>
+        </BandText>
       )}
     </View>
   );
@@ -376,7 +381,7 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
     // less.
     <View style={{ minWidth: 112, alignItems: 'center', paddingTop: 12, gap: 5 }}>
       {settled && them ? (
-        <Text
+        <BandText
           style={{
             fontFamily: fontFamilies.black,
             fontSize: 22,
@@ -386,9 +391,9 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
           }}
         >
           {you.accuracy ?? 0}–{them.accuracy ?? 0}
-        </Text>
+        </BandText>
       ) : (
-        <Text
+        <BandText
           style={{
             fontFamily: fontFamilies.black,
             fontSize: 20,
@@ -397,7 +402,7 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
           }}
         >
           {them ? 'v' : '—'}
-        </Text>
+        </BandText>
       )}
       {/*
         ⚠ THE COUNTDOWN REPLACES "TO PLAY", it does not sit beside it. Both say
@@ -410,7 +415,7 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
         run out while the football had not started.
       */}
       {countdown ? (
-        <Text
+        <BandText
           align="center"
           style={{
             fontFamily: fontFamilies.black,
@@ -429,9 +434,9 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
           }}
         >
           {formatHms(countdown)}
-        </Text>
+        </BandText>
       ) : (
-        <Text
+        <BandText
           align="center"
           style={{
             fontFamily: fontFamilies.bold,
@@ -442,7 +447,7 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
           }}
         >
           {!them ? 'no opponent' : settled ? (result ?? '') : 'to play'}
-        </Text>
+        </BandText>
       )}
     </View>
   );
@@ -548,7 +553,7 @@ function Corner({
               }}
             />
           ) : null}
-          <Text
+          <BandText
             style={{
               fontFamily: fontFamilies.black,
               fontSize: 26,
@@ -559,7 +564,7 @@ function Corner({
             }}
           >
             {getInitials(name)}
-          </Text>
+          </BandText>
         </View>
 
         {/*
@@ -582,16 +587,21 @@ function Corner({
         />
       </View>
 
-      <Text variant="cardTitle" numberOfLines={1} align="center" style={{ fontSize: 15 }}>
+      <BandText
+        variant="cardTitle"
+        numberOfLines={1}
+        align="center"
+        style={{ fontSize: 15, color: BAND.ink }}
+      >
         {name}
-      </Text>
+      </BandText>
 
       {subtitle ? (
-        <Text variant="detail" color="slate" align="center">
+        <BandText variant="detail" align="center" style={{ color: BAND.slate }}>
           {subtitle}
-        </Text>
+        </BandText>
       ) : (
-        <Text
+        <BandText
           align="center"
           style={{
             fontFamily: fontFamilies.bold,
@@ -605,7 +615,7 @@ function Corner({
           {standing?.rank != null ? `${ordinal(standing.rank)}` : '—'}
           {' · '}
           {standing ? standing.points.toLocaleString() : '0'} pts
-        </Text>
+        </BandText>
       )}
     </View>
   );
@@ -626,15 +636,14 @@ function CollapsedLine({
 
   if (!bout) {
     return (
-      <Text
+      <BandText
         align="center"
         variant="body"
-        color="slate"
         numberOfLines={1}
-        style={{ paddingHorizontal: theme.spacing.lg }}
+        style={{ paddingHorizontal: theme.spacing.lg, color: BAND.slate }}
       >
         {sealed ? `Matchweek ${sealed.matchweek} · sealed` : 'No duel yet'}
-      </Text>
+      </BandText>
     );
   }
 
@@ -659,10 +668,14 @@ function CollapsedLine({
       }}
     >
       <Dot name={you.name} userId={youUser} tone="primary" />
-      <Text variant="body" numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.bold }}>
+      <BandText
+        variant="body"
+        numberOfLines={1}
+        style={{ flex: 1, fontFamily: fontFamilies.bold, color: BAND.ink }}
+      >
         {you.name}
-      </Text>
-      <Text
+      </BandText>
+      <BandText
         style={{
           fontFamily: fontFamilies.black,
           fontSize: 14,
@@ -671,20 +684,39 @@ function CollapsedLine({
         }}
       >
         {settled && them ? `${you.accuracy ?? 0}–${them.accuracy ?? 0}` : them ? 'v' : 'bye'}
-      </Text>
-      <Text
+      </BandText>
+      <BandText
         variant="body"
         numberOfLines={1}
-        style={{ flex: 1, textAlign: 'right', fontFamily: fontFamilies.bold }}
+        style={{ flex: 1, textAlign: 'right', fontFamily: fontFamilies.bold, color: BAND.ink }}
       >
         {them ? them.name : 'Nobody'}
-      </Text>
+      </BandText>
       <Dot name={them ? them.name : '—'} userId={themUser} tone={them ? 'red' : 'muted'} />
     </View>
   );
 }
 
 // -------------------------------------------------------------- furniture
+
+/**
+ * `Text`, pinned to the band's palette.
+ *
+ * ⚠⚠ USE THIS, NEVER THE SHARED `Text`, anywhere in this file. The shared one
+ * resolves its colour through `useTheme()` — so its default (`ink`) and its
+ * `color` token prop both follow the DEVICE theme. On a band that is dark in
+ * BOTH themes that means near-black text on near-black, and it fails silently:
+ * the pool name and both usernames vanished in light mode exactly this way,
+ * while every colour that had been written out explicitly stayed correct.
+ *
+ * Defaulting the colour here is what makes the next `<BandText>` safe without
+ * anybody having to remember this note. Override with
+ * `style={{ color: BAND.x }}`.
+ */
+function BandText({ style, ...rest }: React.ComponentProps<typeof Text>) {
+  return <Text {...rest} style={[{ color: BAND.ink }, style]} />;
+}
+
 
 function RoundButton({
   icon,
@@ -712,7 +744,10 @@ function RoundButton({
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <Icon name={icon} color="slate" size={15} weight="semibold" />
+      {/* ⚠ `tint`, not `color`. The `color` prop is a TOKEN and `Icon` resolves
+          it through `useTheme()`, which is the light palette in light mode —
+          the same leak that lost the pool name and the usernames. */}
+      <Icon name={icon} tint={BAND.slate} size={15} weight="semibold" />
     </Pressable>
   );
 }
@@ -762,7 +797,7 @@ function Dot({
           }}
         />
       ) : null}
-      <Text
+      <BandText
         style={{
           fontFamily: fontFamilies.black,
           fontSize: 8,
@@ -770,7 +805,7 @@ function Dot({
         }}
       >
         {getInitials(name)}
-      </Text>
+      </BandText>
     </View>
   );
 }
