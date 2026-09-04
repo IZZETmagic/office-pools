@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import { duelResult, DUEL_WIN, DUEL_TIE } from '@/lib/duelPoints';
+import { formatDhms, useCountdown } from '@/lib/useCountdown';
 import { useDuel, type Bout, type DuelRecord } from '@/lib/useDuel';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -269,7 +269,11 @@ function Corner({
  */
 function SealedCard({ matchweek, opensAt }: { matchweek: number; opensAt: string | null }) {
   const theme = useTheme();
-  const remaining = useCountdown(opensAt);
+  // ⚠ Shared with the duel header's kickoff clock — see `lib/useCountdown`.
+  // Day granularity here because a reveal can be a week out; the header counts
+  // hours because a kickoff never is.
+  const ms = useCountdown(opensAt);
+  const remaining = ms === null ? null : formatDhms(ms);
 
   return (
     <Card accent>
@@ -300,38 +304,6 @@ function SealedCard({ matchweek, opensAt }: { matchweek: number; opensAt: string
   );
 }
 
-/**
- * A ticking `d h m s` until `iso`, or null once it has passed.
- *
- * ⚠ It ticks on a timer but it does not DERIVE the target — the instant comes
- * from `league_duel_reveals_at` over the contract. That distinction is the
- * whole of migration 127: the front end may count down to the answer, it may
- * not work out what the answer is.
- */
-function useCountdown(iso: string | null): string | null {
-  const target = iso === null ? null : Date.parse(iso);
-  const [, tick] = useState(0);
-
-  useEffect(() => {
-    if (target === null || Number.isNaN(target)) return;
-    // One second, and cleared on unmount. A tab the member has swiped away from
-    // must not keep a timer alive behind the pager.
-    const id = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, [target]);
-
-  if (target === null || Number.isNaN(target)) return null;
-  const ms = target - Date.now();
-  if (ms <= 0) return null;
-
-  const s = Math.floor(ms / 1000);
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return d > 0 ? `${d}d ${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(h)}:${pad(m)}:${pad(sec)}`;
-}
 
 // ------------------------------------------------------------- the record
 

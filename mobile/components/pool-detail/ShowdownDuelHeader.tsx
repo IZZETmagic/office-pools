@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
+import { formatHms, useCountdown } from '@/lib/useCountdown';
 import { duelResult } from '@/lib/duelPoints';
 import type { Bout } from '@/lib/useDuel';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -86,6 +87,8 @@ type Props = {
   sealed: { matchweek: number; opensAt: string | null } | null;
   /** entry_id → where they sit on the leaderboard. */
   standings: Map<string, Standing>;
+  /** First kickoff of the current duel's matchweek — the countdown's target. */
+  kickoffAt: string | null;
   /** Shared vertical scroll offset of whichever tab is on screen. */
   scrollY: SharedValue<number>;
   /** The tab strip. Rendered inside this component — see the header note. */
@@ -98,6 +101,7 @@ export function ShowdownDuelHeader({
   bout,
   sealed,
   standings,
+  kickoffAt,
   scrollY,
   children,
 }: Props) {
@@ -233,7 +237,7 @@ export function ShowdownDuelHeader({
             if (h > 0 && h !== naturalHeight) setNaturalHeight(h);
           }}
         >
-          <Matchup bout={bout} sealed={sealed} standings={standings} />
+          <Matchup bout={bout} sealed={sealed} standings={standings} kickoffAt={kickoffAt} />
         </View>
       </Animated.View>
 
@@ -254,10 +258,12 @@ function Matchup({
   bout,
   sealed,
   standings,
+  kickoffAt,
 }: {
   bout: Bout | null;
   sealed: Props['sealed'];
   standings: Map<string, Standing>;
+  kickoffAt: string | null;
 }) {
   const theme = useTheme();
 
@@ -299,7 +305,7 @@ function Matchup({
             standing={standings.get(bout.you.entryId) ?? null}
             tone="primary"
           />
-          <Middle bout={bout} />
+          <Middle bout={bout} kickoffAt={kickoffAt} />
           <Corner
             name={bout.them ? bout.them.name : 'Nobody'}
             standing={bout.them ? standings.get(bout.them.entryId) ?? null : null}
@@ -325,7 +331,7 @@ function Matchup({
  * migration 121 left behind on the web for a week — it would tint a win as a
  * defeat while the leaderboard had the member climbing.
  */
-function Middle({ bout }: { bout: Bout }) {
+function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
   const theme = useTheme();
   const { you, them, settled } = bout;
   const result = settled && them ? duelResult(you.points) : null;
@@ -335,6 +341,9 @@ function Middle({ bout }: { bout: Bout }) {
       : result === 'lost'
         ? theme.colors.red
         : theme.colors.ink;
+  // Nothing to count once the duel is decided — the week it belonged to is over.
+  const remaining = useCountdown(settled ? null : kickoffAt);
+  const countdown = them ? remaining : null;
 
   return (
     <View style={{ minWidth: 72, alignItems: 'center', paddingTop: 27, gap: 5 }}>
@@ -362,18 +371,46 @@ function Middle({ bout }: { bout: Bout }) {
           {them ? 'v' : '—'}
         </Text>
       )}
-      <Text
-        align="center"
-        style={{
-          fontFamily: fontFamilies.bold,
-          fontSize: 8,
-          letterSpacing: 1,
-          textTransform: 'uppercase',
-          color: theme.colors.slate,
-        }}
-      >
-        {!them ? 'no opponent' : settled ? (result ?? '') : 'to play'}
-      </Text>
+      {/*
+        ⚠ THE COUNTDOWN REPLACES "TO PLAY", it does not sit beside it. Both say
+        the same thing about the same week, and the clock says it with a number.
+        It falls back to the words the moment there is nothing left to count —
+        kickoff passed, no fixture, or a duel that is already settled.
+
+        Counting to the KICKOFF, not the lock: migration 101 closes picks an
+        hour earlier, so a clock labelled "first game" that used `lock_at` would
+        run out while the football had not started.
+      */}
+      {countdown ? (
+        <Text
+          align="center"
+          style={{
+            fontFamily: fontFamilies.black,
+            fontSize: 13,
+            // ⚠ With the size — variant 'body' caps `lineHeight` at 20 and
+            // shears the tops off anything larger. Harmless at 13, set anyway
+            // so the next person to grow it does not rediscover that.
+            lineHeight: 17,
+            color: theme.colors.accent,
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {formatHms(countdown)}
+        </Text>
+      ) : (
+        <Text
+          align="center"
+          style={{
+            fontFamily: fontFamilies.bold,
+            fontSize: 8,
+            letterSpacing: 1,
+            textTransform: 'uppercase',
+            color: theme.colors.slate,
+          }}
+        >
+          {!them ? 'no opponent' : settled ? (result ?? '') : 'to play'}
+        </Text>
+      )}
     </View>
   );
 }

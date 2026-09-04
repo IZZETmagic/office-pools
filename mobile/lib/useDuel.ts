@@ -70,6 +70,15 @@ export type DuelState = {
    * seal, not an empty week. Never render it as "no opponent".
    */
   sealed: { matchweek: number; opensAt: string | null } | null;
+  /**
+   * When the CURRENT duel's football starts — its matchweek's first kickoff.
+   *
+   * ⚠ NOT `lock_at`. Migration 101 closes picks an HOUR before the first game,
+   * so the two are an hour apart and mean different things: one is "you can no
+   * longer change this", the other is "this is now being played". A countdown
+   * labelled first game must use the kickoff.
+   */
+  currentKickoff: string | null;
 };
 
 /**
@@ -154,6 +163,12 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     return { matchweek: n, opensAt: data?.season.sealedOpensAtLatest ?? null };
   }, [data]);
 
+  const currentKickoff = useMemo(() => {
+    if (!current) return null;
+    const mw = data?.season.matchweeks.find((m) => m.number === current.matchweek);
+    return mw?.first_kickoff_at ?? null;
+  }, [current, data]);
+
   return {
     // ⚠ A DISABLED query reports `isPending` forever. React Query has no
     // "idle" status any more, so a null poolId — every non-Showdown pool —
@@ -165,5 +180,6 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     current,
     record,
     sealed,
+    currentKickoff,
   };
 }

@@ -693,6 +693,7 @@ export default function PoolDetailScreen() {
           bout={duel.current}
           sealed={duel.sealed}
           standings={duelStandings}
+          kickoffAt={duel.currentKickoff}
           scrollY={scrollY}
         >
           {tabBar}
