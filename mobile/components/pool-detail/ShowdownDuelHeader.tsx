@@ -376,7 +376,20 @@ function Corner({
             colors={[...gradientForUser(userId)]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              // ⚠ THE GRADIENT ROUNDS ITSELF. The parent's `overflow: 'hidden'`
+              // does not reliably clip an absolutely-positioned child to a
+              // border radius, and an OPAQUE ring hides that by drawing the
+              // round outline on top. Ryan's opponent — whose ring is
+              // transparent — came out an octagon while his own was a perfect
+              // circle, which is the same bug with the mask taken away.
+              borderRadius: theme.radii.pill,
+            }}
           />
         ) : null}
         <Text
@@ -564,7 +577,16 @@ function Dot({
           colors={[...gradientForUser(userId)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            // Rounds itself — see the corner avatar for why the parent's clip
+            // is not enough on its own.
+            borderRadius: theme.radii.pill,
+          }}
         />
       ) : null}
       <Text
