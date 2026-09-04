@@ -432,6 +432,41 @@ function Corner({
         </View>
 
         {/*
+          THE RIM LIGHT — the bit that actually makes the avatar look raised.
+
+          Ryan spotted it on his own avatar before it was deliberate: his ring is
+          a FLAT primary blue while the gradient beneath runs light at the top to
+          dark at the bottom, so the ring vanishes into the crown and stands
+          slightly lighter than the base. The eye reads that lit bottom edge as
+          the disc lifting off the page — which is the depth the drop shadow was
+          never delivering.
+
+          So it becomes a real component, on BOTH avatars: a ring that is
+          transparent on three sides and faintly light along the bottom. Per-side
+          border colours over a pill radius render as four arcs, and only the
+          base one is painted.
+
+          ⚠ `borderBottomColor` after `borderColor` is not stylistic ordering —
+          RN resolves the specific side over the general one, which is what
+          leaves the other three arcs invisible.
+        */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            borderRadius: theme.radii.pill,
+            borderWidth: 2,
+            borderColor: 'transparent',
+            borderBottomColor:
+              theme.mode === 'dark' ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.55)',
+          }}
+        />
+
+        {/*
           ⚠ THE RING IS AN OVERLAY, NOT A BORDER ON THE CIRCLE — Ryan, and it
           took three goes to get here. A border insets its content, so putting
           one only on your own avatar made the two circles different sizes;
