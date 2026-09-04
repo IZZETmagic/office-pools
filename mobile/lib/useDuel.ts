@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { duelResult } from './duelPoints';
-import { fixturesForWeek, lastLockedWeek } from './pickemWeek';
+import { fixturesForWeek } from './pickemWeek';
 import {
   useLeaguePool,
   useLeaguePoolPicks,
@@ -120,6 +120,16 @@ export type DuelState = {
    * duel rides on, not what is left to do.
    */
   fixtures: LeagueMatch[];
+  /**
+   * Your points against the room's MEDIAN, per matchweek — the season chart.
+   *
+   * ⚠ Median, not mean: one member who forgets to pick scores 0 and drags a
+   * mean down far enough to flatter everybody else.
+   *
+   * ⚠ A week you did not pick in is a ZERO here, not a missing row. Dropping it
+   * would close the gap and draw a season you did not play.
+   */
+  series: { matchweek_number: number; your_points: number; median_points: number }[];
   /** The viewer's own entry, for the route into the picker. */
   ownEntryId: string | null;
 };
@@ -415,8 +425,19 @@ export function useDuel(poolId: string | null | undefined): DuelState {
    * season of picks to render a card nobody can see yet.
    */
   const opponentEntryId = current?.them?.entryId ?? null;
-  const somethingLocked =
-    lastLockedWeek(data?.season.matchweeks ?? [], Date.now()) !== null;
+  /**
+   * Has anything locked — i.e. is there a revealed pick to read at all?
+   *
+   * ⚠ NO `Date.now()`. Calling it during render is impure: the answer changes
+   * between two renders that React is entitled to treat as identical, and the
+   * lint rule catches it. The open matchweek is the one being PICKED, so every
+   * matchweek before it has locked by definition — and the server already
+   * worked that out against its own clock, which is the one that matters.
+   */
+  const openWeek = data?.season.openMatchweekNumber ?? null;
+  const somethingLocked = (data?.season.matchweeks ?? []).some(
+    (m) => openWeek !== null && m.number < openWeek,
+  );
   const picks = useLeaguePoolPicks(poolId, Boolean(opponentEntryId) && somethingLocked);
 
   const opponent = useMemo<Opponent | null>(() => {
@@ -578,6 +599,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     currentKickoff,
     sheet,
     fixtures,
+    series: showdown?.series ?? [],
     season,
     opponent,
     ownEntryId: data?.you.entries[0]?.entry_id ?? null,

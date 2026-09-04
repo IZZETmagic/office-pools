@@ -172,6 +172,17 @@ export type ShowdownPayload = {
   duels: DuelRow[]
   /** entry_id → display name, for both sides of every revealed duel. */
   names: Record<string, string>
+  /**
+   * Your points and the room's MEDIAN, per matchweek — migration 124.
+   *
+   * ⚠ Median, not mean. One member who forgets to pick scores 0 and drags a
+   * mean down far enough to flatter everybody else; a median is what the room
+   * actually did.
+   *
+   * ⚠ A matchweek the viewer did not pick in is present as a ZERO, not absent.
+   * Dropping the row would close the gap and draw a season they did not play.
+   */
+  series: { matchweek_number: number; your_points: number; median_points: number }[]
 }
 
 export type LeagueTeam = {

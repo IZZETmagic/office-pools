@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { ActivityIndicator, Image, View } from 'react-native';
 
 import { Button, Card, Icon, Text } from '@/components/ui';
-import { useDuel, type Opponent, type Season, type Sheet } from '@/lib/useDuel';
+import { useDuel, type DuelState, type Opponent, type Season, type Sheet } from '@/lib/useDuel';
 import type { LeagueMatch } from '@/lib/useLeaguePool';
 import type { Standing } from './ShowdownDuelHeader';
 import { useTheme } from '@/theme';
@@ -55,7 +55,7 @@ type Props = {
 
 export function DuelTab({ poolId, standings }: Props) {
   const theme = useTheme();
-  const { loading, error, isShowdown, sheet, fixtures, season, opponent, ownEntryId } =
+  const { loading, error, isShowdown, sheet, fixtures, series, season, opponent, ownEntryId } =
     useDuel(poolId);
 
   if (loading) {
@@ -103,6 +103,7 @@ export function DuelTab({ poolId, standings }: Props) {
         <OpponentCard opponent={opponent} standing={standings.get(opponent.entryId) ?? null} />
       ) : null}
       {fixtures.length > 0 ? <DecidedOnCard fixtures={fixtures} /> : null}
+      {series.length > 0 ? <AgainstTheRoomCard series={series} /> : null}
       {season ? <ScoutingCard season={season} /> : null}
     </View>
   );
@@ -440,6 +441,107 @@ function OpponentCard({
           Not enough played weeks to read their habits yet.
         </Text>
       )}
+    </Card>
+  );
+}
+
+// -------------------------------------------------------- against the room
+
+/**
+ * Every matchweek as a contest against the room: how far ABOVE or BELOW the
+ * pool's median you finished.
+ *
+ * ⚠ THE MEDIAN IS THE AXIS, NOT A SECOND BAR. Two bars of absolute points ask
+ * the reader to do the comparison themselves, and the interesting number was
+ * never "400" — it was "100 clear of the room". Ryan made that call on the web
+ * on 2026-08-31 and it holds here.
+ *
+ * ⚠ THE MAGNITUDE IS DELIBERATELY GONE. A 700 in a big week and a 200 in a thin
+ * one can both be +100 on the room, and on this chart they look the same —
+ * because for a head-to-head pool they ARE the same. The absolute total is the
+ * Your Season card; this answers a different question.
+ */
+function AgainstTheRoomCard({ series }: { series: DuelState['series'] }) {
+  const theme = useTheme();
+  const rows = series.map((r) => ({ ...r, gap: r.your_points - r.median_points }));
+  // ⚠ Symmetric scale. Fitted to whichever side happens to be bigger, one bad
+  // week would make every good one look modest.
+  const reach = Math.max(...rows.map((r) => Math.abs(r.gap)), 1);
+  const beat = rows.filter((r) => r.gap > 0).length;
+
+  return (
+    <Card bordered>
+      <Row>
+        <Text variant="cardTitle">Against the room</Text>
+        <Text variant="caption" color="slate">
+          {beat} of {rows.length} {rows.length === 1 ? 'week' : 'weeks'}
+        </Text>
+      </Row>
+      <Text variant="body" color="slate" style={{ marginTop: theme.spacing.xs }}>
+        How far above or below the pool&rsquo;s median you finished each matchweek.
+      </Text>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'stretch',
+          gap: theme.spacing.xs,
+          height: theme.spacing.heroLg,
+          marginTop: theme.spacing.lg,
+        }}
+      >
+        {rows.map((r) => (
+          <View key={r.matchweek_number} style={{ flex: 1 }}>
+            {/* Two equal halves with the rule between them: the room's line is
+                the middle of the column, so a bar grows from it either way. */}
+            <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+              {r.gap > 0 ? (
+                <View
+                  style={{
+                    height: `${(r.gap / reach) * 100}%`,
+                    backgroundColor: theme.colors.green,
+                    borderTopLeftRadius: theme.radii.xs,
+                    borderTopRightRadius: theme.radii.xs,
+                  }}
+                />
+              ) : null}
+            </View>
+            <View style={{ height: theme.borders.thin, backgroundColor: theme.colors.silver }} />
+            <View style={{ flex: 1 }}>
+              {r.gap < 0 ? (
+                <View
+                  style={{
+                    height: `${(Math.abs(r.gap) / reach) * 100}%`,
+                    backgroundColor: theme.colors.red,
+                    borderBottomLeftRadius: theme.radii.xs,
+                    borderBottomRightRadius: theme.radii.xs,
+                  }}
+                />
+              ) : null}
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* ⚠ Only the ENDS are labelled. Thirty-eight numbers under a chart this
+          tall is a ruler, and one week labelled at both ends reads as a pairing
+          it is not. */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.spacing.sm }}>
+        {rows.length > 1 ? (
+          <>
+            <Text variant="detail" color="slate">
+              MW {rows[0].matchweek_number}
+            </Text>
+            <Text variant="detail" color="slate">
+              MW {rows[rows.length - 1].matchweek_number}
+            </Text>
+          </>
+        ) : (
+          <Text variant="detail" color="slate">
+            Matchweek {rows[0].matchweek_number}
+          </Text>
+        )}
+      </View>
     </Card>
   );
 }

@@ -216,6 +216,8 @@ export async function GET(
     duels: Awaited<ReturnType<typeof readPoolDuels>>['duels']
     /** entry_id → display name, for both sides of every revealed duel. */
     names: Record<string, string>
+    /** Your points and the room's median, per matchweek (migration 124). */
+    series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
   }
   let showdown: DuelPayload | null = null
   if (pool.league_mode === 'showdown') {
@@ -251,7 +253,37 @@ export async function GET(
       }
     }
 
-    showdown = { duels, names }
+    /**
+     * Your points and the room's MEDIAN, per matchweek — migration 124.
+     *
+     * ⚠ AGGREGATED IN SQL, and it has to be. The raw `league_match_scores` is
+     * ~3,800 rows for a ten-member season, well over PostgREST's 1,000-row cap,
+     * to produce 38. Reading it here would truncate silently and draw a season
+     * that stops in February.
+     *
+     * ⚠ SECURITY DEFINER, because that table is deny-all (050). It takes the
+     * entry id as a PARAMETER and does not check who is asking, so the caller
+     * must pass the VIEWER'S OWN entry — passing somebody else's would hand
+     * over a member's week-by-week record. That is why `entryIds[0]` is used
+     * and never an id from the request.
+     */
+    let series: Array<{
+      matchweek_number: number
+      your_points: number
+      median_points: number
+    }> = []
+    if (entryIds[0]) {
+      const { data: rows, error: seriesErr } = await supabase.rpc('league_matchweek_series', {
+        p_pool_id: pool_id,
+        p_entry_id: entryIds[0],
+      })
+      // Logged, never swallowed: an empty chart and a failed read look
+      // identical on screen, and one of them is a bug.
+      if (seriesErr) console.error('[league] matchweek series failed:', seriesErr.message)
+      else series = (rows ?? []) as typeof series
+    }
+
+    showdown = { duels, names, series }
   }
 
   return NextResponse.json({
