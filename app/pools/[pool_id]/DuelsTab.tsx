@@ -2197,7 +2197,24 @@ export default function DuelsTab({
             and this displays it. */}
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between
                         gap-3 px-4 pt-5 pb-4">
-          <p className="t-caption text-white/45">The season</p>
+          {/* ⚠ "Duel record", NOT "The season" — this board is not the pool's
+              standing and must not claim to be.
+
+              Every column here is a duel statistic: W / T / L, duel form, and
+              Pts = `league_entry_totals.duel_points`. The sort is duel points
+              then wins, which is OURS — nothing in the database ranks by duel
+              points alone. The pool's actual order is the engine's
+              `(total_points + duel_points) DESC, total_points DESC`, and it is
+              on the Leaderboard tab.
+
+              Headed "The season" with a # column and movement arrows, this read
+              as the pool standing, so the two tabs crowned different winners of
+              the same pool with nothing on screen saying which was right:
+              Alice 2 wins (1000) + 600 picks = 1600 leads here; Bob 1 win and a
+              tie (750) + 900 picks = 1650 leads there. Both numbers were true;
+              only one was the standing. The board stays — it is the mode's own
+              record and the phone shows the same one — it just says what it is. */}
+          <p className="t-caption text-white/45">Duel record</p>
           <div className="flex items-baseline gap-4 sm:gap-5">
             <Stat label="Won" value={record.won} tone="dark" />
             <Stat label="Tied" value={record.drawn} tone="dark" />

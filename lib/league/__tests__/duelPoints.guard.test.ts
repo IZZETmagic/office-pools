@@ -299,4 +299,13 @@ describe('duel points reach the display layer', () => {
     ).toMatch(/totalPoints: \(t\?\.total_points \?\? 0\) \+ \(t\?\.duel_points \?\? 0\)/)
   })
 
+  it('the Duels tab does not present its duel-points board as the pool standing', () => {
+    // The board itself is legitimate — it is the mode's own record, and the
+    // phone shows the same one. Titling it "The season" beside a # column is
+    // what made two tabs crown different winners of the same pool.
+    const src = read('app/pools/[pool_id]/DuelsTab.tsx')
+    const withoutComments = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    expect(withoutComments).not.toMatch(/>\s*The season\s*</)
+  })
+
 })
