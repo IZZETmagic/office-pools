@@ -200,13 +200,20 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
       let ersOffset = 0
       let ersHasMore = true
       while (ersHasMore) {
-        const { data: page } = await adminClient
+        const { data: page, error: ersError } = await adminClient
           .from('entry_round_submissions')
           .select('id, entry_id')
           .in('entry_id', allEntryIds)
           .eq('has_submitted', true)
           .order('id', { ascending: true })
           .range(ersOffset, ersOffset + ersPageSize - 1)
+        // A swallowed error here silently shrinks the submitted set, which
+        // excludes progressive entries from scoring altogether. Abort rather
+        // than score a partial pool.
+        if (ersError) {
+          console.error(`[scoring] entry_round_submissions page@${ersOffset} failed for pool ${poolId}:`, ersError.message)
+          return { success: false, poolId, predictionMode: pool.prediction_mode, entriesProcessed: 0, matchScoresWritten: 0, bonusScoresWritten: 0, error: `Failed to fetch round submissions: ${ersError.message}` }
+        }
         if (!page || page.length === 0) {
           ersHasMore = false
         } else {
@@ -240,13 +247,25 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
         // nondeterministic under concurrent writes — page seams silently
         // dropped entries' predictions, scoring them as if they predicted
         // nothing (108 entries in large pools after match 1).
-        const { data: page } = await adminClient
+        const { data: page, error: predError } = await adminClient
           .from('predictions')
           .select('entry_id, match_id, predicted_home_score, predicted_away_score, predicted_home_pso, predicted_away_pso, predicted_winner_team_id')
           .in('entry_id', entryIds)
           .order('entry_id', { ascending: true })
           .order('match_id', { ascending: true })
           .range(offset, offset + pageSize - 1)
+
+        // This error MUST abort the recalculation. Swallowing it exits the
+        // loop early with a partial prediction set, and legacyWriteScores
+        // below deletes match_scores unconditionally while only inserting
+        // what was computed — so an affected entry loses its entire scoring
+        // history and is written back as 0 points at the bottom of the pool,
+        // under a success:true response. predictions is the heaviest table in
+        // the product, so a statement timeout here is not hypothetical.
+        if (predError) {
+          console.error(`[scoring] predictions page@${offset} failed for pool ${poolId}:`, predError.message)
+          return { success: false, poolId, predictionMode: pool.prediction_mode, entriesProcessed: 0, matchScoresWritten: 0, bonusScoresWritten: 0, error: `Failed to fetch predictions: ${predError.message}` }
+        }
 
         if (!page || page.length === 0) {
           hasMore = false
