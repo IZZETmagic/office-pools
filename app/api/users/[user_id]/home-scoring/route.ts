@@ -51,7 +51,15 @@ export type EntryScoringSummary = {
   match_points: number
   bonus_points: number
   point_adjustment: number
+  /** ⚠ The PICKING half in Showdown — add `duel_points` for the season total. */
   scored_total_points: number
+  /**
+   * Showdown's second currency (migration 121), 0 in every other mode.
+   *
+   * Sent so the phone's Home card can show the same number as the pool's own
+   * Showdown board. Without it the card read 3,200 where the board read 5,200.
+   */
+  duel_points: number
   current_rank: number | null
   /**
    * The STORED XP level from `entry_xp_state`, never a client-side derivation —
@@ -81,6 +89,7 @@ function emptySummary(entryId: string): EntryScoringSummary {
     bonus_points: 0,
     point_adjustment: 0,
     scored_total_points: 0,
+    duel_points: 0,
     current_rank: null,
     current_level: null,
     level_name: null,
@@ -332,6 +341,7 @@ async function handleGET(
     summary.bonus_points = totals.bonus_points
     summary.point_adjustment = totals.point_adjustment
     summary.scored_total_points = totals.scored_total_points
+    summary.duel_points = totals.duel_points
     summary.current_rank = totals.current_rank
   }
 

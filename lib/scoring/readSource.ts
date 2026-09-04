@@ -47,9 +47,48 @@ export type EntryScoring = {
   match_points: number
   bonus_points: number
   point_adjustment: number
+  /**
+   * ⚠ THE PICKING HALF ONLY. This is `match_points + bonus_points +
+   * point_adjustment` and it is NOT the number to print beside a rank in a
+   * Showdown pool — see `duel_points` below and use `seasonTotalPoints()`.
+   *
+   * Deliberately left as the picking total rather than widened to include
+   * duels: ~15 call sites read this, several of which itemise the three parts
+   * and would silently stop adding up.
+   */
   scored_total_points: number
+  /**
+   * Showdown's second currency, 0 in every other mode.
+   *
+   * Migration 121 keeps it in its own column and sums it ONLY inside
+   * `league_finalize_ranks`' ORDER BY — `(t.total_points + t.duel_points)
+   * DESC, t.total_points DESC`. No column anywhere carries both, so any
+   * surface printing a season total beside a rank has to perform that sum
+   * itself. Four of them forgot, which is why `seasonTotalPoints()` exists.
+   */
+  duel_points: number
   current_rank: number | null
   previous_rank: number | null
+}
+
+/**
+ * The season total to DISPLAY beside a rank — the sum the engine performs in
+ * its ORDER BY and stores nowhere.
+ *
+ * ⚠ USE THIS ANYWHERE A HEADLINE TOTAL SITS BESIDE A RANK. Printing
+ * `scored_total_points` there is correct in every mode except Showdown, which
+ * is exactly why it kept shipping: the web leaderboard rendered `#1 Alice 800`
+ * above `#2 Bob 900`, and the gap line then told Bob he was 100 points ahead of
+ * the leader. The weekly email and the phone's Home card said the same.
+ *
+ * Do NOT use it where the three parts are itemised — a breakdown that shows
+ * match + bonus + adjustment must still add up to `scored_total_points`.
+ */
+export function seasonTotalPoints(
+  s: { scored_total_points: number; duel_points?: number | null } | null | undefined,
+): number {
+  if (!s) return 0
+  return s.scored_total_points + (s.duel_points ?? 0)
 }
 
 const SHADOW_READ_FLAG = 'shadow_read_enabled_pools'
@@ -133,6 +172,7 @@ const ZERO_SCORING = (entryId: string): EntryScoring => ({
   bonus_points: 0,
   point_adjustment: 0,
   scored_total_points: 0,
+  duel_points: 0,
   current_rank: null,
   previous_rank: null,
 })
@@ -158,13 +198,14 @@ export async function readEntryScoring(
       bonus_points: number | null
       point_adjustment: number | null
       total_points: number | null
+      duel_points: number | null
       final_rank: number | null
       previous_final_rank: number | null
     }
     const rows = await paginateByEntry<LeagueRow>(
       admin,
       'league_entry_totals',
-      'entry_id, match_points, bonus_points, point_adjustment, total_points, final_rank, previous_final_rank',
+      'entry_id, match_points, bonus_points, point_adjustment, total_points, duel_points, final_rank, previous_final_rank',
       entryIds,
       ['entry_id'],
     )
@@ -176,7 +217,16 @@ export async function readEntryScoring(
         // Stored directly, unlike shadow's, which folds it into the total and
         // has to be recovered by subtraction.
         point_adjustment: r.point_adjustment ?? 0,
+        // ⚠ PICKS ONLY — `league_entry_totals.total_points` is
+        // match + bonus + adjustment and excludes duels. Not widened here on
+        // purpose: the breakdown surfaces itemise those three and must keep
+        // adding up. Callers printing a headline beside a rank use
+        // `seasonTotalPoints()`.
         scored_total_points: r.total_points ?? 0,
+        // 0 in every mode but Showdown. Read so the sum can happen at all —
+        // this column was simply not selected before, which is why four
+        // surfaces showed the picking half beside a combined rank.
+        duel_points: r.duel_points ?? 0,
         current_rank: r.final_rank ?? null,
         previous_rank: r.previous_final_rank ?? null,
       })
@@ -209,6 +259,9 @@ export async function readEntryScoring(
         // prod's stored point_adjustment for every scored entry).
         point_adjustment: tp - mp - bp,
         scored_total_points: tp,
+        // World Cup scoring has no duels. Explicit so `seasonTotalPoints()` is
+        // a safe no-op here rather than something callers must branch on.
+        duel_points: 0,
         current_rank: r.final_rank ?? null,
         previous_rank: r.previous_final_rank ?? null,
       })
@@ -237,6 +290,8 @@ export async function readEntryScoring(
         bonus_points: r.bonus_points ?? 0,
         point_adjustment: r.point_adjustment ?? 0,
         scored_total_points: r.scored_total_points ?? 0,
+        // World Cup scoring has no duels — see the shadow arm above.
+        duel_points: 0,
         current_rank: r.current_rank ?? null,
         previous_rank: r.previous_rank ?? null,
       })

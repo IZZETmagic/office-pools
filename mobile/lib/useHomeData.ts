@@ -506,6 +506,12 @@ export function useHomeDataInternal() {
           const matchPoints = bestScoring?.match_points ?? best?.match_points ?? 0;
           const bonusPoints = bestScoring?.bonus_points ?? best?.bonus_points ?? 0;
           const adjustment = bestScoring?.point_adjustment ?? best?.point_adjustment ?? 0;
+          // ⚠ SHOWDOWN HAS TWO CURRENCIES. `duel_points` is a separate column
+          // and the engine adds it to the picking total only inside its
+          // ORDER BY, so a card that sums the three parts above shows the
+          // picking half alone — 3,200 here against 5,200 on the pool's own
+          // Showdown board, for the same member on the same day.
+          const duelPoints = bestScoring?.duel_points ?? 0;
           const bestEntryId = best?.entry_id;
 
           return {
@@ -533,7 +539,7 @@ export function useHomeDataInternal() {
                 .filter((r): r is number => r != null);
               return ranks.length > 0 ? Math.min(...ranks) : null;
             })(),
-            totalPoints: matchPoints + bonusPoints + adjustment,
+            totalPoints: matchPoints + bonusPoints + adjustment + duelPoints,
             totalEntries: entriesByPool[pool.pool_id] ?? 0,
             // ⚠ READ, NOT DERIVED — and the phone cannot derive this one even
             // if it wanted to. The rule is "has ANYONE in this pool scored",

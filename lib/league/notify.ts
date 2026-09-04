@@ -292,7 +292,11 @@ export async function notifyMatchweekCompleted(
       .select('entry_id, total_points')
       .in('entry_id', entryIds).eq('matchweek_number', ctx.matchweekNumber),
     admin.from('league_entry_totals')
-      .select('entry_id, total_points, final_rank, previous_final_rank')
+      // ⚠ duel_points IS PART OF THE SEASON TOTAL. `total_points` is the
+      // picking half; the engine ranks on `(total_points + duel_points)` and
+      // stores the sum nowhere. Without this column the Showdown recap told a
+      // member "you're 1st with 800 points" while another sat 2nd on 900.
+      .select('entry_id, total_points, duel_points, final_rank, previous_final_rank')
       .in('entry_id', entryIds),
   ])
 
@@ -301,7 +305,7 @@ export async function notifyMatchweekCompleted(
     weekByEntry.set(r.entry_id, (weekByEntry.get(r.entry_id) ?? 0) + (r.total_points ?? 0))
   }
   const totalByEntry = new Map(
-    ((totals ?? []) as Array<{ entry_id: string; total_points: number; final_rank: number | null; previous_final_rank: number | null }>)
+    ((totals ?? []) as Array<{ entry_id: string; total_points: number; duel_points: number | null; final_rank: number | null; previous_final_rank: number | null }>)
       .map((t) => [t.entry_id, t]),
   )
   const memberCount = totalByEntry.size
@@ -314,7 +318,9 @@ export async function notifyMatchweekCompleted(
         poolName: ctx.poolName,
         matchweekName: ctx.matchweekName,
         pointsThisWeek: weekByEntry.get(e.entry_id) ?? 0,
-        totalPoints: t?.total_points ?? 0,
+        // Picks + duels — the sum the engine performs in its ORDER BY and
+        // keeps in no column. See the select above.
+        totalPoints: (t?.total_points ?? 0) + (t?.duel_points ?? 0),
         rank: t?.final_rank ?? null,
         previousRank: t?.previous_final_rank ?? null,
         memberCount,

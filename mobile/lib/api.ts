@@ -1243,7 +1243,17 @@ export type EntryScoringSummary = {
   match_points: number;
   bonus_points: number;
   point_adjustment: number;
+  /** ⚠ The PICKING half in Showdown — add `duel_points` for the season total. */
   scored_total_points: number;
+  /**
+   * Showdown's second currency (migration 121), 0 in every other mode.
+   *
+   * ⚠ OPTIONAL FOR A STALE API, not because it can be missing in principle. An
+   * app running against an API deployed before this field existed gets
+   * undefined, and `?? 0` then reproduces the old picks-only number rather than
+   * crashing. Once the API is deployed it is always present.
+   */
+  duel_points?: number;
   current_rank: number | null;
   /**
    * STORED XP level from `entry_xp_state` — resolved server-side, never here.

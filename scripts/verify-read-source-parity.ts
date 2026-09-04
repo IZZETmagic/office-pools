@@ -58,6 +58,7 @@ const scoringEq = (a: EntryScoring, b: EntryScoring) =>
   a.bonus_points === b.bonus_points &&
   a.point_adjustment === b.point_adjustment &&
   a.scored_total_points === b.scored_total_points &&
+  a.duel_points === b.duel_points &&
   (a.current_rank ?? null) === (b.current_rank ?? null) &&
   (a.previous_rank ?? null) === (b.previous_rank ?? null)
 
@@ -113,6 +114,8 @@ async function verifyPool(admin: Admin, poolId: string) {
       bonus_points: e.bonus_points ?? 0,
       point_adjustment: e.point_adjustment ?? 0,
       scored_total_points: e.scored_total_points ?? 0,
+      // World Cup entries have no duels; the prod arm hard-codes 0.
+      duel_points: 0,
       current_rank: e.current_rank ?? null,
       previous_rank: e.previous_rank ?? null,
     }
@@ -160,6 +163,9 @@ async function verifyPool(admin: Admin, poolId: string) {
     return [row.entry_id, {
       entry_id: row.entry_id, match_points: mp, bonus_points: bp,
       point_adjustment: tp - mp - bp, scored_total_points: tp,
+      // Explicit, NOT left to the `as` cast below: undefined here would compare
+      // unequal to the shadow arm's 0 and report every entry as a mismatch.
+      duel_points: 0,
       current_rank: row.final_rank ?? null, previous_rank: row.previous_final_rank ?? null,
     } as EntryScoring]
   }))
@@ -167,7 +173,7 @@ async function verifyPool(admin: Admin, poolId: string) {
   for (const id of entryIds) {
     const expected = shadowRows.get(id) ?? {
       entry_id: id, match_points: 0, bonus_points: 0, point_adjustment: 0,
-      scored_total_points: 0, current_rank: null, previous_rank: null,
+      scored_total_points: 0, duel_points: 0, current_rank: null, previous_rank: null,
     }
     const actual = shadowMap.get(id)
     if (!actual || !scoringEq(actual, expected)) shadowMismatch++

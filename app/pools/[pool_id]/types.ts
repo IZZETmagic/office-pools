@@ -117,7 +117,17 @@ export type EntryData = {
   // Stored scoring engine values
   match_points: number | null
   bonus_points: number | null
+  /** ⚠ PICKS ONLY in a Showdown pool — add `duel_points`, or call
+   *  `seasonTotalPoints()`, before printing this beside a rank. */
   scored_total_points: number | null
+  /**
+   * Showdown's second currency (migration 121), 0 or null in every other mode.
+   *
+   * The engine sums it with `total_points` only inside its ORDER BY, so a row's
+   * headline number is the two added together. Rendering `scored_total_points`
+   * alone put `#1 Alice 800` above `#2 Bob 900`.
+   */
+  duel_points: number | null
   // Per-entry fee tracking
   fee_paid: boolean
   fee_paid_at: string | null
@@ -284,7 +294,17 @@ export type PlayerScoreData = {
   entry_id: string
   match_points: number
   bonus_points: number
+  /**
+   * ⚠ THE PICKING TOTAL — match + bonus + adjustment, and it stays that way.
+   *
+   * The leaderboard prints this directly above a "{match} + {bonus} bonus"
+   * sub-line, so folding Showdown's duel points in here would render 1,800
+   * above "800 + 0 bonus". The headline number is `total_points + duel_points`
+   * and is computed at the display site.
+   */
   total_points: number
+  /** Showdown only (migration 121); 0 in every other mode. */
+  duel_points: number
 }
 
 // A single podium finisher (actual result OR an entry's prediction), trimmed to

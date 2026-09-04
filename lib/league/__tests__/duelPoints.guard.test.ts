@@ -246,3 +246,57 @@ describe('the phone agrees with the engine about what a duel is worth', () => {
     expect(found, 'these read a duel points value and classify it with a literal').toEqual([])
   })
 })
+
+// =============================================================
+// The SUM the engine performs must reach the screen
+// =============================================================
+// `league_finalize_ranks` ranks on `(total_points + duel_points)` and NO COLUMN
+// STORES THAT SUM. So every surface printing a season total beside a rank has
+// to add the two itself, and four of them did not: the web leaderboard rendered
+// `#1 Alice 800` above `#2 Bob 900` (and the gap line then told Bob he was 100
+// points AHEAD of the leader), the Duels tab ranked a second table on duel
+// points alone under the heading "The season", the weekly recap email said
+// "you're 1st with 800 points", and the phone's Home card read 3,200 where the
+// pool's own Showdown board read 5,200.
+//
+// The tests above pin the SQL. These pin the path from that SQL to the screen —
+// the half that was actually broken, and that a green SQL guard said nothing
+// about.
+
+describe('duel points reach the display layer', () => {
+  const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8')
+
+  it('the league arm of readEntryScoring SELECTS duel_points', () => {
+    // It did not. `total_points` is picks only, so the column simply never left
+    // the database and every consumer below was summing an absent number.
+    const src = read('lib/scoring/readSource.ts')
+    const select = src.match(/'entry_id, match_points, bonus_points, point_adjustment, total_points[^']*'/)
+    expect(select, 'the league_entry_totals select changed shape').not.toBeNull()
+    expect(select![0]).toContain('duel_points')
+  })
+
+  it('EntryScoring carries duel_points, so a consumer cannot silently omit it', () => {
+    expect(read('lib/scoring/readSource.ts')).toMatch(/duel_points: number\b/)
+  })
+
+  it('seasonTotalPoints adds the two currencies', async () => {
+    const { seasonTotalPoints } = await import('../../scoring/readSource')
+    expect(seasonTotalPoints({ scored_total_points: 800, duel_points: 1000 })).toBe(1800)
+    // Every non-Showdown mode leaves duel_points at 0 — the helper must be a
+    // no-op there rather than something callers branch on.
+    expect(seasonTotalPoints({ scored_total_points: 900, duel_points: 0 })).toBe(900)
+    // A stale API / missing column must degrade to the picking total, not NaN.
+    expect(seasonTotalPoints({ scored_total_points: 900 })).toBe(900)
+    expect(seasonTotalPoints(null)).toBe(0)
+  })
+
+  it('the weekly recap email adds duel points to the total it prints', () => {
+    const src = read('lib/league/notify.ts')
+    expect(src, 'notify.ts stopped selecting duel_points').toMatch(/duel_points/)
+    expect(
+      src,
+      'the recap is printing the picking half beside a combined rank again',
+    ).toMatch(/totalPoints: \(t\?\.total_points \?\? 0\) \+ \(t\?\.duel_points \?\? 0\)/)
+  })
+
+})

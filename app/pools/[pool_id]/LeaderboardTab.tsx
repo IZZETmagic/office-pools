@@ -526,6 +526,8 @@ export function LeaderboardTab({
           match_points: picksPts,
           bonus_points: bonusPts,
           total_points: picksPts + bonusPts + adjustment,
+          // Bracket picker is a World Cup mode; it has no duels.
+          duel_points: 0,
         }
       }
     }
@@ -539,7 +541,24 @@ export function LeaderboardTab({
       match_points: matchPts,
       bonus_points: bonusPts,
       total_points: entry?.scored_total_points ?? (matchPts + bonusPts + adjustment),
+      duel_points: entry?.duel_points ?? 0,
     }
+  }
+
+  /**
+   * The number that belongs beside a rank — picks PLUS duels.
+   *
+   * ⚠ `getPlayerScore().total_points` is the PICKING half. In a Showdown pool
+   * the engine ranks on `(total_points + duel_points) DESC` and stores that sum
+   * nowhere, so the board rendered `#1 Alice 800` above `#2 Bob 900` and the gap
+   * line below then told Bob he was 100 points ahead of the leader.
+   *
+   * Use this for the headline, the sort fallback and the gap. Do NOT use it for
+   * the "{match} + {bonus} bonus" sub-line, which itemises the picking half.
+   */
+  const getSeasonTotal = (entryId: string): number => {
+    const ps = getPlayerScore(entryId)
+    return ps.total_points + ps.duel_points
   }
 
   // Sort entries by server-computed current_rank (which includes all tiebreakers:
@@ -554,8 +573,8 @@ export function LeaderboardTab({
         if (aRank !== bRank) return aRank - bRank
       }
       // Fallback: sort by total points
-      const aScore = getPlayerScore(a.entry_id).total_points
-      const bScore = getPlayerScore(b.entry_id).total_points
+      const aScore = getSeasonTotal(a.entry_id)
+      const bScore = getSeasonTotal(b.entry_id)
       return bScore - aScore
     })
   }, [leaderboardEntries, computedBPBonusMap, bonusScores, predictionMode])
@@ -790,7 +809,7 @@ export function LeaderboardTab({
     const idx = sorted.findIndex(e => e.users?.user_id === currentUserId)
     if (idx < 0) return null
 
-    const userPts = getPlayerScore(sorted[idx].entry_id).total_points
+    const userPts = getSeasonTotal(sorted[idx].entry_id)
     let ptsBehind: number | null = null
     let personAboveName: string | null = null
     let ptsAhead: number | null = null
@@ -798,14 +817,14 @@ export function LeaderboardTab({
 
     if (idx > 0) {
       const above = sorted[idx - 1]
-      ptsBehind = getPlayerScore(above.entry_id).total_points - userPts
+      ptsBehind = getSeasonTotal(above.entry_id) - userPts
       personAboveName = isMultiEntry
         ? (above.entry_name || `Entry ${above.entry_number}`)
         : (above.users?.full_name || above.users?.username || 'Unknown')
     }
     if (idx < sorted.length - 1) {
       const below = sorted[idx + 1]
-      ptsAhead = userPts - getPlayerScore(below.entry_id).total_points
+      ptsAhead = userPts - getSeasonTotal(below.entry_id)
       personBelowName = isMultiEntry
         ? (below.entry_name || `Entry ${below.entry_number}`)
         : (below.users?.full_name || below.users?.username || 'Unknown')
@@ -1145,7 +1164,7 @@ export function LeaderboardTab({
     let hasNew = false
 
     for (const entry of sorted) {
-      const newPts = getPlayerScore(entry.entry_id).total_points
+      const newPts = getSeasonTotal(entry.entry_id)
       const oldPts = prev.get(entry.entry_id)
       if (oldPts !== undefined && oldPts !== newPts) {
         newAnimations.set(entry.entry_id, { from: oldPts, to: newPts, current: oldPts })
@@ -1329,7 +1348,7 @@ export function LeaderboardTab({
    * Ranking people by nothing is precisely the "bad feelings" the product sets
    * out not to create, so the podium waits until there is something to rank.
    */
-  const anyoneHasScored = sorted.some((e) => getPlayerScore(e.entry_id).total_points !== 0)
+  const anyoneHasScored = sorted.some((e) => getSeasonTotal(e.entry_id) !== 0)
 
   // Entries after podium (rank 4+)
   const podiumCount = anyoneHasScored ? Math.min(3, sorted.length) : 0
@@ -1481,11 +1500,11 @@ export function LeaderboardTab({
                         className="t-num text-xl sm:text-2xl text-primary-600"
                         style={animatingPoints.has(entry.entry_id) ? { animation: 'pointsPulse 1.8s ease-in-out' } : undefined}
                       >
-                        {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
+                        {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points + ps.duel_points)}
                       </div>
                       {showBonus && (
                         <div className="text-[10px] sm:text-xs text-muted mt-1">
-                          {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
+                          {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus{ps.duel_points !== 0 ? ` + ${formatNumber(ps.duel_points)} duel` : ''}
                         </div>
                       )}
                       <div className="text-[10px] sm:text-xs text-muted">
@@ -1710,11 +1729,11 @@ export function LeaderboardTab({
                   className="t-num text-base text-primary-600"
                   style={animatingPoints.has(entry.entry_id) ? { animation: 'pointsPulse 1.8s ease-in-out' } : undefined}
                 >
-                  {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
+                  {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points + ps.duel_points)}
                 </div>
                 {showBonus && (
                   <div className="text-[10px] text-muted">
-                    {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
+                    {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus{ps.duel_points !== 0 ? ` + ${formatNumber(ps.duel_points)} duel` : ''}
                   </div>
                 )}
                 {!isBracketPicker && !isLeague && stats && (
@@ -1854,11 +1873,11 @@ export function LeaderboardTab({
                     className="t-num text-base text-primary-600"
                     style={animatingPoints.has(entry.entry_id) ? { animation: 'pointsPulse 1.8s ease-in-out' } : undefined}
                   >
-                    {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points)}
+                    {formatNumber(animatingPoints.get(entry.entry_id)?.current ?? ps.total_points + ps.duel_points)}
                   </div>
                   {showBonus && (
                     <div className="text-[10px] text-muted">
-                      {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus
+                      {formatNumber(ps.match_points)} + {formatNumber(ps.bonus_points)} bonus{ps.duel_points !== 0 ? ` + ${formatNumber(ps.duel_points)} duel` : ''}
                     </div>
                   )}
                   {!isBracketPicker && !isLeague && stats && (

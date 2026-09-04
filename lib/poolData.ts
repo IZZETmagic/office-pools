@@ -285,6 +285,10 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
       e.bonus_points = s.bonus_points
       e.point_adjustment = s.point_adjustment
       e.scored_total_points = s.scored_total_points
+      // Showdown's second currency, 0 elsewhere. Carried so the leaderboard can
+      // print the total that matches the rank beside it — see
+      // `seasonTotalPoints`.
+      e.duel_points = s.duel_points
       e.current_rank = s.current_rank
       e.previous_rank = s.previous_rank
     }
@@ -300,13 +304,17 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
   // correct rank sat unread in `league_entry_totals`.
   //
   // For three of the four modes the fallback happened to agree, which is why it
-  // survived: `league_finalize_ranks` cascades `total_points` immediately after
-  // `duel_points`, so with no duels settled the two orders match. SHOWDOWN is
-  // where they part. That function leads on `duel_points` — the mode's whole
-  // promise, "duel points decide the table; the weekly score is the tiebreak" —
-  // so the first time a duel settles, the Leaderboard tab and the Duel tab name
-  // different people as winning the same pool, with nothing on screen saying
-  // which is right. Found 2026-08-31, hours before MW2 settled.
+  // survived: those modes leave `duel_points` at 0, so ordering by points alone
+  // matches the engine. SHOWDOWN is where they part — the first time a duel
+  // settles, the Leaderboard tab and the Duel tab name different people as
+  // winning the same pool, with nothing on screen saying which is right. Found
+  // 2026-08-31, hours before MW2 settled.
+  //
+  // ⚠ THE CASCADE DESCRIBED HERE CHANGED IN MIGRATION 121. This comment used to
+  // say `league_finalize_ranks` "leads on duel_points" — that was the 084/087
+  // cascade. 121 replaced it with `(t.total_points + t.duel_points) DESC,
+  // t.total_points DESC`: the two currencies are ADDED, not ranked one before
+  // the other. `duelPoints.guard.test.ts` pins that ORDER BY.
   //
   // It also restores the RANK ARROWS, which need `previous_rank` and had none.
   //
