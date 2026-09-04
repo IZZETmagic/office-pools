@@ -485,13 +485,28 @@ function AgainstTheRoomCard({ series }: { series: DuelState['series'] }) {
         style={{
           flexDirection: 'row',
           alignItems: 'stretch',
+          // ⚠ `flex-start`, so capped columns sit together at the left rather
+          // than spreading across the card with gaps between them.
+          justifyContent: 'flex-start',
           gap: theme.spacing.xs,
           height: theme.spacing.heroLg,
           marginTop: theme.spacing.lg,
         }}
       >
         {rows.map((r) => (
-          <View key={r.matchweek_number} style={{ flex: 1 }}>
+          <View
+            key={r.matchweek_number}
+            style={{
+              flex: 1,
+              // ⚠ CAPPED, AND THAT IS THE WHOLE FIX. `flex: 1` alone divides the
+              // width between however many weeks exist, so ONE week became a
+              // 300pt slab — a bar has to stay a bar whether the season is one
+              // week old or thirty-eight. The floor stops a full season from
+              // thinning to invisible threads.
+              maxWidth: theme.spacing.xxl,
+              minWidth: theme.spacing.md,
+            }}
+          >
             {/* Two equal halves with the rule between them: the room's line is
                 the middle of the column, so a bar grows from it either way. */}
             <View style={{ flex: 1, justifyContent: 'flex-end' }}>
