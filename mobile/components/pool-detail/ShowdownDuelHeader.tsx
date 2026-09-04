@@ -57,6 +57,12 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // your own record unreadable at a glance.
 // =============================================================
 
+/**
+ * The corner avatar. Big on purpose — it is the subject of the screen, and
+ * everything under it (name 15, standing 12) is sized to stay subordinate.
+ */
+const AVATAR = 80;
+
 /** How far you scroll before the matchup is fully folded away. */
 const COLLAPSE_DISTANCE = 90;
 
@@ -277,7 +283,7 @@ function Middle({ bout }: { bout: Bout }) {
         : theme.colors.ink;
 
   return (
-    <View style={{ minWidth: 72, alignItems: 'center', paddingTop: 22, gap: 5 }}>
+    <View style={{ minWidth: 72, alignItems: 'center', paddingTop: 27, gap: 5 }}>
       {settled && them ? (
         <Text
           style={{
@@ -347,66 +353,83 @@ function Corner({
         still find yourself at a glance: the gradient says WHO, the ring says
         WHICH SIDE.
 
-        ⚠ No `userId` means nobody is there (a bye). A gradient would invent a
-        person, so that case gets a flat muted circle instead.
+        ⚠ TWO VIEWS, AND IT HAS TO BE TWO. A shadow is clipped by
+        `overflow: 'hidden'` on the same element, and the avatar needs that clip
+        to stay round — so the outer view carries the lift and the inner one
+        carries the circle. Collapsing them loses the shadow silently.
+
+        ⚠ The outer view needs a solid `backgroundColor` or Android draws no
+        elevation at all. It takes the header's own colour, so nothing shows
+        around the circle it sits behind.
       */}
       <View
         style={{
-          width: 68,
-          height: 68,
+          width: AVATAR,
+          height: AVATAR,
           borderRadius: theme.radii.pill,
-          // ⚠ THE RING IS YOURS ALONE — Ryan, 2026-09-03. It marks which corner
-          // is you, so putting one on your opponent as well says nothing and
-          // fights their gradient. Their identity is the avatar itself.
-          //
-          // ⚠ The border stays 2.5 and goes TRANSPARENT rather than dropping to
-          // 0. A border insets the content, so a ringless avatar would render
-          // its gradient 5pt wider than yours and the two circles would no
-          // longer match. Same geometry, one of them invisible.
-          borderWidth: 2.5,
-          borderColor: tone === 'primary' ? color : 'transparent',
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: withOpacity(color, 0.12),
+          backgroundColor: theme.colors.snow,
+          ...theme.shadows.avatar,
+          // The lift is tinted with the person's own colour rather than plain
+          // black — it reads as the avatar being lit from above instead of a
+          // sticker dropped on the page. Falls back to the shadow token's black
+          // when nobody is there.
+          shadowColor: userId ? gradientForUser(userId)[1] : '#000000',
         }}
       >
-        {userId ? (
-          <LinearGradient
-            colors={[...gradientForUser(userId)]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              // ⚠ THE GRADIENT ROUNDS ITSELF. The parent's `overflow: 'hidden'`
-              // does not reliably clip an absolutely-positioned child to a
-              // border radius, and an OPAQUE ring hides that by drawing the
-              // round outline on top. Ryan's opponent — whose ring is
-              // transparent — came out an octagon while his own was a perfect
-              // circle, which is the same bug with the mask taken away.
-              borderRadius: theme.radii.pill,
-            }}
-          />
-        ) : null}
-        <Text
+        <View
           style={{
-            fontFamily: fontFamilies.black,
-            fontSize: 22,
-            // ⚠ SET WITH THE FONT SIZE, ALWAYS. `Text` defaults to variant
-            // 'body', which carries `lineHeight: 20` — an inline `fontSize`
-            // above that leaves 22pt glyphs in a 20pt line box and the tops of
-            // the initials are clipped off. Nothing errors; the letters just
-            // lose their heads.
-            lineHeight: 28,
-            color: userId ? '#FFFFFF' : color,
+            width: AVATAR,
+            height: AVATAR,
+            borderRadius: theme.radii.pill,
+            // ⚠ THE RING IS YOURS ALONE — Ryan, 2026-09-03. It marks which
+            // corner is you, so putting one on your opponent as well says
+            // nothing and fights their gradient.
+            //
+            // ⚠ It stays 3 and goes TRANSPARENT rather than dropping to 0. A
+            // border insets its content, so a ringless avatar would render its
+            // gradient 6pt wider than yours and the two would stop matching.
+            borderWidth: 3,
+            borderColor: tone === 'primary' ? color : 'transparent',
+            overflow: 'hidden',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: withOpacity(color, 0.12),
           }}
         >
-          {getInitials(name)}
-        </Text>
+          {userId ? (
+            <LinearGradient
+              colors={[...gradientForUser(userId)]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                // ⚠ THE GRADIENT ROUNDS ITSELF. The parent's `overflow` does
+                // not reliably clip an absolutely-positioned child to a border
+                // radius, and an OPAQUE ring hides that by drawing the outline
+                // on top — which is why the opponent came out an octagon the
+                // moment their ring went transparent.
+                borderRadius: theme.radii.pill,
+              }}
+            />
+          ) : null}
+          <Text
+            style={{
+              fontFamily: fontFamilies.black,
+              fontSize: 26,
+              // ⚠ SET WITH THE FONT SIZE, ALWAYS. `Text` defaults to variant
+              // 'body' and its `lineHeight: 20` shears the tops off anything
+              // larger.
+              lineHeight: 32,
+              color: userId ? '#FFFFFF' : color,
+            }}
+          >
+            {getInitials(name)}
+          </Text>
+        </View>
       </View>
 
       <Text variant="cardTitle" numberOfLines={1} align="center" style={{ fontSize: 15 }}>
