@@ -73,6 +73,79 @@ export type PoolLiveResponse = {
   }>
 }
 
+/**
+ * The fixture rows this endpoint compares against what the client holds.
+ *
+ * ⚠ A LEAGUE POOL DOES NOT USE `matches`. Its `tournament_id` points at a
+ * placeholder row carrying zero matches (see page.tsx, which reassigns
+ * `matches` from `readLeaguePoolView`), so reading `matches` for a league pool
+ * returned an empty array and therefore `completed_matches: 0` — for ever.
+ * The client compares that against its own league fixtures in
+ * `needsFullRefresh`, got `0 !== 30`, and fell back to a FULL router.refresh()
+ * on every single poll: ~25-30 DB round trips per viewer every 30s during a
+ * matchweek, plus a re-download of the multi-MB bulk payload for anyone not on
+ * the Leaderboard. The delta endpoint was dead code for the entire league
+ * product.
+ *
+ * The mapping below must stay identical to `fixtureToMatch` in
+ * lib/league/read.ts — same id, same status field — because the client counts
+ * `status === 'completed'` over rows that mapper produced. Comparing a
+ * different field (e.g. `is_completed`) would reintroduce the mismatch the
+ * moment the two disagree.
+ */
+async function readLiveMatchRows(
+  admin: ReturnType<typeof createAdminClient>,
+  pool: { tournament_id: string; league_season_id: string | null },
+): Promise<PoolLiveResponse['matches']> {
+  if (!pool.league_season_id) {
+    const { data, error } = await admin
+      .from('matches')
+      .select('match_id, status, home_score_ft, away_score_ft')
+      .eq('tournament_id', pool.tournament_id)
+    if (error) {
+      console.error('[live] matches read failed:', error.message)
+      return []
+    }
+    return (data ?? []) as PoolLiveResponse['matches']
+  }
+
+  // Paged, because a silent 1000-row cut here would understate
+  // `completed_matches` and put the client back into permanent full-refresh.
+  // A 20-club season is 380 fixtures, so this is one iteration in practice.
+  const out: PoolLiveResponse['matches'] = []
+  const pageSize = 1000
+  let offset = 0
+  for (;;) {
+    const { data, error } = await admin
+      .from('league_fixtures')
+      .select('fixture_id, status, home_goals, away_goals')
+      .eq('season_id', pool.league_season_id)
+      .order('fixture_id', { ascending: true })
+      .range(offset, offset + pageSize - 1)
+    if (error) {
+      console.error('[live] league_fixtures read failed:', error.message)
+      return []
+    }
+    const page = (data ?? []) as Array<{
+      fixture_id: string
+      status: string
+      home_goals: number | null
+      away_goals: number | null
+    }>
+    for (const f of page) {
+      out.push({
+        match_id: f.fixture_id,
+        status: f.status,
+        home_score_ft: f.home_goals,
+        away_score_ft: f.away_goals,
+      })
+    }
+    if (page.length < pageSize) break
+    offset += page.length
+  }
+  return out
+}
+
 async function handleGET(
   _request: NextRequest,
   { params }: { params: Promise<{ pool_id: string }> },
@@ -99,20 +172,17 @@ async function handleGET(
 
   const { data: pool } = await admin
     .from('pools')
-    .select('pool_id, tournament_id, prediction_mode')
+    .select('pool_id, tournament_id, prediction_mode, league_season_id')
     .eq('pool_id', pool_id)
     .maybeSingle()
   if (!pool) return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
 
-  const [{ data: matchRows }, { data: memberRows }] = await Promise.all([
-    admin
-      .from('matches')
-      .select('match_id, status, home_score_ft, away_score_ft')
-      .eq('tournament_id', pool.tournament_id),
+  const [matchRows, { data: memberRows }] = await Promise.all([
+    readLiveMatchRows(admin, pool as { tournament_id: string; league_season_id: string | null }),
     admin.from('pool_members').select('pool_entries(entry_id)').eq('pool_id', pool_id),
   ])
 
-  const matches = (matchRows ?? []) as PoolLiveResponse['matches']
+  const matches = matchRows
   const completed = matches.filter((m) => m.status === 'completed')
 
   // Score rows exist only for matches that are completed or live — see
