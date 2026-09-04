@@ -1,8 +1,13 @@
 import { useMemo } from 'react';
 
 import { duelResult } from './duelPoints';
-import { fixturesForWeek } from './pickemWeek';
-import { useLeaguePool, type DuelRow, type LeagueMatch } from './useLeaguePool';
+import { fixturesForWeek, lastLockedWeek } from './pickemWeek';
+import {
+  useLeaguePool,
+  useLeaguePoolPicks,
+  type DuelRow,
+  type LeagueMatch,
+} from './useLeaguePool';
 
 // =============================================================
 // ONE ANSWER TO "WHO AM I PLAYING"
@@ -105,6 +110,8 @@ export type DuelState = {
    * can act on them.
    */
   season: Season | null;
+  /** Who you are playing, and what is known about them. Null while sealed. */
+  opponent: Opponent | null;
   /** The viewer's own entry, for the route into the picker. */
   ownEntryId: string | null;
 };
@@ -128,6 +135,31 @@ export type Season = {
   home: number | null;
   draw: number | null;
   away: number | null;
+};
+
+/**
+ * The member on the other side of the current duel, as far as we may look.
+ *
+ * ⚠ THIS IS ONLY POSSIBLE ONCE THE DUEL IS REVEALED, and only from matchweeks
+ * that have LOCKED. The seal hides who you play NEXT; it never hid the picks of
+ * weeks already played, which are public to the pool. So scouting an opponent
+ * you can already see is not a hole in the gate — it is the gate working.
+ */
+export type Opponent = {
+  name: string;
+  /**
+   * ⚠ Their entry id, so a caller can look their STANDING up in the map the
+   * screen already builds for the header. It is deliberately not carried here:
+   * the leaderboard is not in this hook's payload, and fetching it a second
+   * time would give the two surfaces two sources for one number.
+   */
+  entryId: string;
+  /** Their season tendency, from revealed weeks. Null under ten picks. */
+  home: number | null;
+  draw: number | null;
+  away: number | null;
+  /** Your lifetime record against THEM: wins, draws, losses, from your side. */
+  met: { won: number; drawn: number; lost: number };
 };
 
 export type Sheet = {
@@ -315,6 +347,90 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     };
   }, [data]);
 
+  /**
+   * The opponent's picks, from weeks that have already LOCKED.
+   *
+   * ⚠ LAZY, AND THAT IS A SIZE DECISION RATHER THAN A TIDINESS ONE. The bulk
+   * payload is every revealed pick in the pool — ~200 rows today, ~3,800 for a
+   * ten-person pool by May. It is fetched only when there is a revealed
+   * opponent AND a locked matchweek to read, which is exactly the gate
+   * `useLeaguePoolPicks` documents. Anything looser and the phone pulls a
+   * season of picks to render a card nobody can see yet.
+   */
+  const opponentEntryId = current?.them?.entryId ?? null;
+  const somethingLocked =
+    lastLockedWeek(data?.season.matchweeks ?? [], Date.now()) !== null;
+  const picks = useLeaguePoolPicks(poolId, Boolean(opponentEntryId) && somethingLocked);
+
+  const opponent = useMemo<Opponent | null>(() => {
+    const them = current?.them;
+    if (!them) return null;
+
+    /**
+     * ⚠⚠ BOTH SHAPES, for the third time in this file. A Results pool sends
+     * `outcomes` and no scores; a Scores pool sends `predictions` and NO
+     * `outcomes` key at all. Reading one reports a member who picked every game
+     * as having picked none — see the note on `season`.
+     *
+     * ⚠ A tap wins over a scoreline where a row somehow carried both, the same
+     * way `season` and the web's `ownPickDirections` resolve it. Two readers
+     * disagreeing about one row is worse than either answer.
+     */
+    const directions: string[] = [];
+    const seen = new Set<string>();
+    for (const o of picks.data?.outcomes ?? []) {
+      if (o.entry_id !== them.entryId) continue;
+      seen.add(o.match_id);
+      directions.push(o.outcome);
+    }
+    for (const p of picks.data?.predictions ?? []) {
+      if (p.entry_id !== them.entryId || seen.has(p.match_id)) continue;
+      directions.push(
+        p.predicted_home_score > p.predicted_away_score
+          ? 'home'
+          : p.predicted_home_score < p.predicted_away_score
+            ? 'away'
+            : 'draw',
+      );
+    }
+
+    const n = directions.length;
+    const share = (d: string) =>
+      n ? Math.round((directions.filter((x) => x === d).length / n) * 100) : 0;
+    // Same ten-pick floor as your own tendency — a habit needs a season.
+    const enough = n >= 10;
+    const home = enough ? share('home') : null;
+    const draw = enough ? share('draw') : null;
+
+    /**
+     * Your record against THIS opponent, from your own settled duels.
+     *
+     * ⚠ No extra read: `bouts` already holds every duel you are in, and a
+     * head-to-head is a filter over it. ⚠ And `duelResult`, never a literal —
+     * a win has been 500 since migration 121, and `=== 3` would score every
+     * meeting as a defeat.
+     */
+    let won = 0;
+    let drawn = 0;
+    let lost = 0;
+    for (const b of bouts) {
+      if (!b.settled || b.them?.entryId !== them.entryId) continue;
+      const r = duelResult(b.you.points);
+      if (r === 'won') won += 1;
+      else if (r === 'tied') drawn += 1;
+      else if (r === 'lost') lost += 1;
+    }
+
+    return {
+      name: them.name,
+      entryId: them.entryId,
+      home,
+      draw,
+      away: home === null || draw === null ? null : 100 - home - draw,
+      met: { won, drawn, lost },
+    };
+  }, [current, picks.data, bouts]);
+
   return {
     // ⚠ A DISABLED query reports `isPending` forever. React Query has no
     // "idle" status any more, so a null poolId — every non-Showdown pool —
@@ -329,6 +445,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     currentKickoff,
     sheet,
     season,
+    opponent,
     ownEntryId: data?.you.entries[0]?.entry_id ?? null,
   };
 }

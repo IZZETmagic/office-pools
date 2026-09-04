@@ -2,7 +2,8 @@ import { router } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { Button, Card, Icon, Text } from '@/components/ui';
-import { useDuel, type Season, type Sheet } from '@/lib/useDuel';
+import { useDuel, type Opponent, type Season, type Sheet } from '@/lib/useDuel';
+import type { Standing } from './ShowdownDuelHeader';
 import { useTheme } from '@/theme';
 
 // =============================================================
@@ -40,11 +41,21 @@ import { useTheme } from '@/theme';
 
 type Props = {
   poolId: string;
+  /**
+   * entry_id → where they sit. The SAME map the header uses.
+   *
+   * ⚠ Passed in rather than fetched: the leaderboard is not in the league
+   * contract, and a second read would give the header and this tab two sources
+   * for one number — which is how a card ends up disagreeing with the row above
+   * it about somebody's rank.
+   */
+  standings: Map<string, Standing>;
 };
 
-export function DuelTab({ poolId }: Props) {
+export function DuelTab({ poolId, standings }: Props) {
   const theme = useTheme();
-  const { loading, error, isShowdown, sheet, season, ownEntryId } = useDuel(poolId);
+  const { loading, error, isShowdown, sheet, season, opponent, ownEntryId } =
+    useDuel(poolId);
 
   if (loading) {
     return (
@@ -72,7 +83,7 @@ export function DuelTab({ poolId }: Props) {
 
   // Nothing to pick AND nothing played — a brand new entry in a pool that has
   // not started. Anything else has at least one card to show.
-  if (!season && !sheet) {
+  if (!season && !sheet && !opponent) {
     return (
       <Empty
         icon="pencil.line"
@@ -86,6 +97,9 @@ export function DuelTab({ poolId }: Props) {
     <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
       {sheet && ownEntryId ? (
         <SheetCard poolId={poolId} entryId={ownEntryId} sheet={sheet} />
+      ) : null}
+      {opponent ? (
+        <OpponentCard opponent={opponent} standing={standings.get(opponent.entryId) ?? null} />
       ) : null}
       {season ? <ScoutingCard season={season} /> : null}
     </View>
@@ -183,6 +197,71 @@ function SheetCard({
   );
 }
 
+// ------------------------------------------------------- scouting the other
+
+/**
+ * What is known about the member you are playing.
+ *
+ * ⚠ THIS ONLY EXISTS ONCE THE DUEL IS REVEALED, and everything in it comes from
+ * matchweeks that have already LOCKED. Migration 116 hides who you play NEXT;
+ * it never hid the picks of weeks already played, which are public to the pool.
+ * So this is not a hole in the seal — it is the seal working as designed.
+ *
+ * The web's equivalent card scouts the READER instead, because it renders only
+ * during the sealed window when there is no opponent to scout. Here the header
+ * has already named them, so the mockup's original version becomes possible.
+ */
+function OpponentCard({
+  opponent,
+  standing,
+}: {
+  opponent: Opponent;
+  standing: Standing | null;
+}) {
+  const theme = useTheme();
+  const met = opponent.met.won + opponent.met.drawn + opponent.met.lost;
+
+  return (
+    <Card bordered>
+      <Row>
+        <Text variant="caption" color="slate">
+          Scouting {opponent.name}
+        </Text>
+        <Text variant="cardTitle" color="slate" style={{ fontVariant: ['tabular-nums'] }}>
+          {standing?.rank != null ? ordinal(standing.rank) : '—'}
+          {' · '}
+          {(standing?.points ?? 0).toLocaleString()} pts
+        </Text>
+      </Row>
+
+      {/*
+        ⚠ TWO ZEROES UNDER "FIRST MEETING" IS NOISE PRETENDING TO BE DATA. There
+        is no record yet, so the card says so rather than showing 0–0–0.
+      */}
+      <Text variant="body" color="slate" style={{ marginTop: theme.spacing.md }}>
+        {met === 0
+          ? 'You have not met yet.'
+          : `Met ${met} time${met === 1 ? '' : 's'} — you have ${opponent.met.won} win${
+              opponent.met.won === 1 ? '' : 's'
+            }, ${opponent.met.drawn} tied and ${opponent.met.lost} lost.`}
+      </Text>
+
+      {opponent.home !== null && opponent.draw !== null && opponent.away !== null ? (
+        <View style={{ marginTop: theme.spacing.lg }}>
+          <Text variant="caption" color="slate">
+            How they call them
+          </Text>
+          <TendencyBar home={opponent.home} draw={opponent.draw} away={opponent.away} />
+        </View>
+      ) : (
+        <Text variant="detail" color="slate" style={{ marginTop: theme.spacing.sm }}>
+          Not enough played weeks to read their habits yet.
+        </Text>
+      )}
+    </Card>
+  );
+}
+
 // ----------------------------------------------------------- your scouting
 
 /**
@@ -227,31 +306,62 @@ function ScoutingCard({ season }: { season: Season }) {
           <Text variant="caption" color="slate">
             How you call them
           </Text>
-          <View
-            style={{
-              flexDirection: 'row',
-              height: theme.spacing.sm,
-              borderRadius: theme.radii.pill,
-              overflow: 'hidden',
-              marginTop: theme.spacing.sm,
-              backgroundColor: theme.colors.mist,
-            }}
-          >
-            {/* Flexed by percentage so the three always fill the track exactly
-                — the values are derived to total 100 for the same reason. */}
-            <View style={{ flex: season.home, backgroundColor: theme.colors.primary }} />
-            <View style={{ flex: season.draw, backgroundColor: theme.colors.slate }} />
-            <View style={{ flex: season.away, backgroundColor: theme.colors.accent }} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginTop: theme.spacing.sm }}>
-            <Key color={theme.colors.primary} label="Home" value={season.home} />
-            <Key color={theme.colors.slate} label="Draw" value={season.draw} />
-            <Key color={theme.colors.accent} label="Away" value={season.away} />
-          </View>
+          <TendencyBar home={season.home} draw={season.draw} away={season.away} />
         </View>
       ) : null}
     </Card>
   );
+}
+
+/**
+ * Home / draw / away as one track.
+ *
+ * ⚠ Flexed by the percentages themselves, not by width strings — and the three
+ * are derived to total 100 (`away = 100 - home - draw`) so the track is always
+ * exactly filled. Rounding each independently lets them come to 99 and leaves a
+ * gap at the end of the bar.
+ */
+function TendencyBar({ home, draw, away }: { home: number; draw: number; away: number }) {
+  const theme = useTheme();
+  return (
+    <>
+      <View
+        style={{
+          flexDirection: 'row',
+          height: theme.spacing.sm,
+          borderRadius: theme.radii.pill,
+          overflow: 'hidden',
+          marginTop: theme.spacing.sm,
+          backgroundColor: theme.colors.mist,
+        }}
+      >
+        <View style={{ flex: home, backgroundColor: theme.colors.primary }} />
+        <View style={{ flex: draw, backgroundColor: theme.colors.slate }} />
+        <View style={{ flex: away, backgroundColor: theme.colors.accent }} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginTop: theme.spacing.sm }}>
+        <Key color={theme.colors.primary} label="Home" value={home} />
+        <Key color={theme.colors.slate} label="Draw" value={draw} />
+        <Key color={theme.colors.accent} label="Away" value={away} />
+      </View>
+    </>
+  );
+}
+
+/** 1 → 1st, 2 → 2nd, 11 → 11th. */
+function ordinal(n: number): string {
+  const rem100 = n % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
 }
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
