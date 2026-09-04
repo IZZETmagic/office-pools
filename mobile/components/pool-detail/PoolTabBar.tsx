@@ -179,6 +179,7 @@ function TabPill({
   showDot,
   activeColor,
   activeBg,
+  inactiveBg,
   pageOffset,
   activeIndex,
   onPress,
@@ -190,18 +191,19 @@ function TabPill({
   showDot: boolean;
   activeColor: string;
   activeBg: string;
+  /** Fill for a pill that is not the current tab. */
+  inactiveBg: string;
   pageOffset?: SharedValue<number>;
   activeIndex: number;
   onPress: () => void;
   onLayout: (e: LayoutChangeEvent) => void;
   theme: ReturnType<typeof useTheme>;
 }) {
-  const mistColor = theme.colors.mist;
   const slateColor = theme.colors.slate;
 
   const bgStyle = useAnimatedStyle(() => {
     const offset = pageOffset?.value ?? activeIndex;
-    return { backgroundColor: Math.round(offset) === index ? activeBg : mistColor };
+    return { backgroundColor: Math.round(offset) === index ? activeBg : inactiveBg };
   });
   const labelStyle = useAnimatedStyle(() => {
     const offset = pageOffset?.value ?? activeIndex;
@@ -300,6 +302,16 @@ export function PoolTabBar({
   const activeColor =
     colorDistance(proposed, theme.colors.snow) < 80 ? theme.colors.accent : proposed;
   const activeBg = withOpacity(activeColor, 0.12);
+  /**
+   * ⚠ TRANSLUCENT ONLY OVER A LIT HEADER. `mist` is a solid fill, and on the
+   * Showdown band it reads as a row of flat patches punched out of the glow.
+   * Dropping it to 45% lets the light through so the pills sit IN the band
+   * rather than on top of it.
+   *
+   * Everywhere else it stays solid: the strip scrolls over page content there,
+   * and a see-through pill would pick up whatever happened to be behind it.
+   */
+  const inactiveBg = transparent ? withOpacity(theme.colors.mist, 0.45) : theme.colors.mist;
   const activeIndex = tabs.findIndex((t) => t.key === active);
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
@@ -373,6 +385,7 @@ export function PoolTabBar({
           showDot={tabHasIndicator(tab.key)}
           activeColor={activeColor}
           activeBg={activeBg}
+          inactiveBg={inactiveBg}
           pageOffset={pageOffset}
           activeIndex={activeIndex}
           onPress={() => onChange(tab.key)}
