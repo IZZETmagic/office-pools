@@ -34,6 +34,9 @@ import BottomSheet, {
 } from '@gorhom/bottom-sheet';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+// ⚠ Moved to `lib/avatarGradient` so the Showdown duel corners can draw the
+// SAME person in the SAME colour. The array's order is frozen — the warning
+// that used to sit here moved with it.
 import {
   forwardRef,
   memo,
@@ -79,6 +82,11 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
+import {
+  AVATAR_GRADIENTS,
+  getInitials,
+  hashUserIdToIndex,
+} from '@/lib/avatarGradient';
 import { fetchLeaderboard, type LeaderboardEntryCore } from '@/lib/api';
 import {
   buildFlexBadgeOptions,
@@ -2488,32 +2496,7 @@ function AvatarSlot({
 // with enough contrast for white text. Length and order
 // intentionally fixed so existing users keep their assigned color
 // across app updates.
-const AVATAR_GRADIENTS: readonly [string, string][] = [
-  ['#FF6B6B', '#EE5A6F'], // coral / rose
-  ['#4ECDC4', '#44A08D'], // teal / sea
-  ['#5B8AFF', '#3B6EFF'], // sky / primary blue
-  ['#FFB347', '#FF8C42'], // peach / amber
-  ['#A855F7', '#7C3AED'], // violet / purple
-  ['#10B981', '#059669'], // emerald
-  ['#F472B6', '#EC4899'], // pink
-  ['#6366F1', '#4F46E5'], // indigo
-  ['#FB7185', '#E11D48'], // rose / red
-  ['#06B6D4', '#0891B2'], // cyan
-];
 
 // Deterministic hash → palette index. Same userId always lands on
 // the same gradient. djb2 variant — small, stable, no crypto needed.
-function hashUserIdToIndex(userId: string, count: number): number {
-  let h = 5381;
-  for (let i = 0; i < userId.length; i++) {
-    h = ((h << 5) + h + userId.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h) % count;
-}
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}

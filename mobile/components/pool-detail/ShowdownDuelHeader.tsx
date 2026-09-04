@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { type ReactNode, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, Share, View } from 'react-native';
 import Animated, {
   Extrapolation,
@@ -10,6 +11,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
+import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { duelResult } from '@/lib/duelPoints';
 import type { Bout } from '@/lib/useDuel';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -58,8 +60,15 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 /** How far you scroll before the matchup is fully folded away. */
 const COLLAPSE_DISTANCE = 90;
 
-/** A member's standing, for the `position · PTS` line under each name. */
-export type Standing = { rank: number | null; points: number };
+/**
+ * A member, as the corner needs them.
+ *
+ * ⚠ `userId` is here for the AVATAR, not the standing. The gradient is
+ * `hash(userId)`, which is how the same person is the same colour in Banter and
+ * here — key it on `entry_id` and somebody's rival changes colour between two
+ * screens of the same app.
+ */
+export type Standing = { userId: string | null; rank: number | null; points: number };
 
 type Props = {
   poolName: string;
@@ -170,7 +179,7 @@ export function ShowdownDuelHeader({
 
       {/* ---------- the collapsed line ---------- */}
       <Animated.View style={[{ overflow: 'hidden', justifyContent: 'center' }, collapsedStyle]}>
-        <CollapsedLine bout={bout} sealed={sealed} />
+        <CollapsedLine bout={bout} sealed={sealed} standings={standings} />
       </Animated.View>
 
       {/* ---------- row 4: the tab strip, inside the header ---------- */}
@@ -326,23 +335,48 @@ function Corner({
       : tone === 'red'
         ? theme.colors.red
         : theme.colors.slate;
+  const userId = standing?.userId ?? null;
 
   return (
     <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 9 }}>
+      {/*
+        The shaded avatar the rest of the app uses — gradient keyed on the
+        person, white initials. The ring stays in the CORNER colour so you can
+        still find yourself at a glance: the gradient says WHO, the ring says
+        WHICH SIDE.
+
+        ⚠ No `userId` means nobody is there (a bye). A gradient would invent a
+        person, so that case gets a flat muted circle instead.
+      */}
       <View
         style={{
           width: 68,
           height: 68,
           borderRadius: theme.radii.pill,
-          borderWidth: 2,
+          borderWidth: 2.5,
           borderColor: color,
-          backgroundColor: withOpacity(color, 0.12),
+          overflow: 'hidden',
           alignItems: 'center',
           justifyContent: 'center',
+          backgroundColor: withOpacity(color, 0.12),
         }}
       >
-        <Text style={{ fontFamily: fontFamilies.black, fontSize: 22, color }}>
-          {initials(name)}
+        {userId ? (
+          <LinearGradient
+            colors={[...gradientForUser(userId)]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+        ) : null}
+        <Text
+          style={{
+            fontFamily: fontFamilies.black,
+            fontSize: 22,
+            color: userId ? '#FFFFFF' : color,
+          }}
+        >
+          {getInitials(name)}
         </Text>
       </View>
 
@@ -377,7 +411,15 @@ function Corner({
 
 // ---------------------------------------------------------- collapsed line
 
-function CollapsedLine({ bout, sealed }: { bout: Bout | null; sealed: Props['sealed'] }) {
+function CollapsedLine({
+  bout,
+  sealed,
+  standings,
+}: {
+  bout: Bout | null;
+  sealed: Props['sealed'];
+  standings: Map<string, Standing>;
+}) {
   const theme = useTheme();
 
   if (!bout) {
@@ -402,6 +444,8 @@ function CollapsedLine({ bout, sealed }: { bout: Bout | null; sealed: Props['sea
       : result === 'lost'
         ? theme.colors.red
         : theme.colors.ink;
+  const youUser = standings.get(you.entryId)?.userId ?? null;
+  const themUser = them ? standings.get(them.entryId)?.userId ?? null : null;
 
   return (
     <View
@@ -412,7 +456,7 @@ function CollapsedLine({ bout, sealed }: { bout: Bout | null; sealed: Props['sea
         paddingHorizontal: theme.spacing.lg,
       }}
     >
-      <Dot name={you.name} tone="primary" />
+      <Dot name={you.name} userId={youUser} tone="primary" />
       <Text variant="body" numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.bold }}>
         {you.name}
       </Text>
@@ -433,7 +477,7 @@ function CollapsedLine({ bout, sealed }: { bout: Bout | null; sealed: Props['sea
       >
         {them ? them.name : 'Nobody'}
       </Text>
-      <Dot name={them ? them.name : '—'} tone={them ? 'red' : 'muted'} />
+      <Dot name={them ? them.name : '—'} userId={themUser} tone={them ? 'red' : 'muted'} />
     </View>
   );
 }
@@ -471,7 +515,15 @@ function RoundButton({
   );
 }
 
-function Dot({ name, tone }: { name: string; tone: 'primary' | 'red' | 'muted' }) {
+function Dot({
+  name,
+  userId,
+  tone,
+}: {
+  name: string;
+  userId: string | null;
+  tone: 'primary' | 'red' | 'muted';
+}) {
   const theme = useTheme();
   const color =
     tone === 'primary'
@@ -485,23 +537,33 @@ function Dot({ name, tone }: { name: string; tone: 'primary' | 'red' | 'muted' }
         width: 22,
         height: 22,
         borderRadius: theme.radii.pill,
+        overflow: 'hidden',
         backgroundColor: withOpacity(color, 0.14),
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <Text style={{ fontFamily: fontFamilies.black, fontSize: 8, color }}>{initials(name)}</Text>
+      {userId ? (
+        <LinearGradient
+          colors={[...gradientForUser(userId)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+      ) : null}
+      <Text
+        style={{
+          fontFamily: fontFamilies.black,
+          fontSize: 8,
+          color: userId ? '#FFFFFF' : color,
+        }}
+      >
+        {getInitials(name)}
+      </Text>
     </View>
   );
 }
 
-/** First letters of the first two words — "Priya Nair" → "PN". */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
-}
 
 /** 1 → 1st, 2 → 2nd, 11 → 11th. */
 function ordinal(n: number): string {

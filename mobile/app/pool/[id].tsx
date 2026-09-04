@@ -312,9 +312,15 @@ export default function PoolDetailScreen() {
    * here would double-count every win.
    */
   const duelStandings = useMemo(() => {
-    const m = new Map<string, { rank: number | null; points: number }>();
+    const m = new Map<string, { userId: string | null; rank: number | null; points: number }>();
     for (const e of data?.leagueLeaderboard ?? []) {
-      m.set(e.entry_id, { rank: e.current_rank ?? null, points: e.total_points ?? 0 });
+      m.set(e.entry_id, {
+        // The avatar gradient is keyed on the PERSON, not the entry — that is what
+        // makes a member the same colour here as in Banter.
+        userId: e.user_id ?? null,
+        rank: e.current_rank ?? null,
+        points: e.total_points ?? 0,
+      });
     }
     return m;
   }, [data?.leagueLeaderboard]);
