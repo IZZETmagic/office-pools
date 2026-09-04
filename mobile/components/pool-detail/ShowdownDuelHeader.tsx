@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, Share, View } from 'react-native';
+import { Pressable, Share, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -86,8 +86,16 @@ const AVATAR = 80;
  */
 const BAND = resolveColors('dark');
 
+/** What `useAnimatedStyle` hands back — passed down so each piece animates itself. */
+type AnimatedStyle = ReturnType<typeof useAnimatedStyle>;
+
 /** Height of the fixed chrome row — back, pool name, share. */
 const CHROME_ROW = 34;
+
+/** What an avatar shrinks to once the band is fully collapsed. */
+const COLLAPSED_AVATAR = 24;
+/** How far from the screen's centre a collapsed avatar settles. */
+const COLLAPSED_SPREAD = 58;
 
 /**
  * A member, as the corner needs them.
@@ -148,6 +156,16 @@ export function ShowdownDuelHeader({
    * guess, and a short guess folds it away before anybody scrolls.
    */
   const [matchupH, setMatchupH] = useState(0);
+  /**
+   * Where the corners row starts inside the band.
+   *
+   * ⚠ Measured, because it is what the morph AIMS AT. Each avatar has to end up
+   * in the chrome row, and knowing how far that is means knowing where it
+   * started. A constant here would drift the moment the matchweek label wraps
+   * or the type scale changes.
+   */
+  const [cornersY, setCornersY] = useState(0);
+  const { width } = useWindowDimensions();
 
   /**
    * The two colours the band is lit with — each corner's own light stop, the
@@ -199,6 +217,76 @@ export function ShowdownDuelHeader({
   });
 
   /**
+   * ⚠ EVERY PIECE MOVES TO ITS OWN COLLAPSED POSITION — Ryan, and it is the
+   * difference between a morph and a slide. The band still travels up by
+   * `matchupH` to reclaim the space; each avatar then travels back DOWN by the
+   * part of that it should not have made, so its NET movement is exactly the
+   * distance from where it sits to the chrome row.
+   *
+   *     net = -matchupH + (matchupH - wanted) = -wanted
+   *
+   * Both halves are `translateY`, so this is still compositor-only. Nothing
+   * here measures or lays out per frame.
+   */
+  const avatarCentreY = cornersY + AVATAR / 2;
+  const chromeCentreY = insets.top + theme.spacing.xs + CHROME_ROW / 2;
+  const wantedY = avatarCentreY - chromeCentreY;
+  const avatarScale = COLLAPSED_AVATAR / AVATAR;
+
+  /** Half the gap between the two expanded avatar centres. */
+  const columnCentre = (theme.spacing.md + (width - theme.spacing.md * 2 - 112) / 4);
+  const wantedX = width / 2 - COLLAPSED_SPREAD - columnCentre;
+
+  // ⚠ Two named hooks, not one factory called twice. A hook inside a helper is
+  // a rules-of-hooks violation waiting for somebody to call it conditionally,
+  // and the only thing that differs between the corners is the sign of X.
+  const leftCorner = useAnimatedStyle(() => {
+    if (matchupH === 0) return {};
+    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    return {
+      transform: [
+        { translateY: p * (matchupH - wantedY) },
+        { translateX: p * wantedX },
+        { scale: 1 - p * (1 - avatarScale) },
+      ],
+    };
+  });
+  const rightCorner = useAnimatedStyle(() => {
+    if (matchupH === 0) return {};
+    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    return {
+      transform: [
+        { translateY: p * (matchupH - wantedY) },
+        { translateX: -p * wantedX },
+        { scale: 1 - p * (1 - avatarScale) },
+      ],
+    };
+  });
+
+  /**
+   * Names and standings fade rather than travel. At the collapsed scale they
+   * would be four-point type — shrinking them is not a smaller version of the
+   * information, it is an unreadable one.
+   */
+  const labelFade = useAnimatedStyle(() => {
+    if (matchupH === 0) return {};
+    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    return { opacity: interpolate(p, [0, 0.45], [1, 0], Extrapolation.CLAMP) };
+  });
+
+  /** The score and clock ride up to sit between the two shrunken avatars. */
+  const middleStyle = useAnimatedStyle(() => {
+    if (matchupH === 0) return {};
+    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
+    return {
+      transform: [
+        { translateY: p * (matchupH - wantedY) },
+        { scale: 1 - p * 0.42 },
+      ],
+    };
+  });
+
+  /**
    * The chrome row cross-fades: pool name out, the duel in one line in.
    *
    * ⚠ THIS IS WHAT KEEPS THE MATCHUP "ALWAYS PRESENT" — Ryan's original ask.
@@ -211,11 +299,6 @@ export function ShowdownDuelHeader({
     if (matchupH === 0) return {};
     const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
     return { opacity: interpolate(p, [0, 0.5], [1, 0], Extrapolation.CLAMP) };
-  });
-  const lineIn = useAnimatedStyle(() => {
-    if (matchupH === 0) return { opacity: 0 };
-    const p = interpolate(scrollY.value, [0, matchupH], [0, 1], Extrapolation.CLAMP);
-    return { opacity: interpolate(p, [0.55, 1], [0, 1], Extrapolation.CLAMP) };
   });
 
   return (
@@ -257,7 +340,17 @@ export function ShowdownDuelHeader({
                 if (h > 0 && h !== matchupH) setMatchupH(h);
               }}
             >
-              <Matchup bout={bout} sealed={sealed} standings={standings} kickoffAt={kickoffAt} />
+              <Matchup
+                bout={bout}
+                sealed={sealed}
+                standings={standings}
+                kickoffAt={kickoffAt}
+                leftCorner={leftCorner}
+                rightCorner={rightCorner}
+                middleStyle={middleStyle}
+                labelFade={labelFade}
+                onCornersY={setCornersY}
+              />
             </View>
           </Animated.View>
 
@@ -307,15 +400,6 @@ export function ShowdownDuelHeader({
               >
                 {poolName}
               </BandText>
-            </Animated.View>
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-                lineIn,
-              ]}
-            >
-              <CollapsedLine bout={bout} sealed={sealed} standings={standings} />
             </Animated.View>
           </View>
           {poolCode ? (
@@ -380,11 +464,21 @@ function Matchup({
   sealed,
   standings,
   kickoffAt,
+  leftCorner,
+  rightCorner,
+  middleStyle,
+  labelFade,
+  onCornersY,
 }: {
   bout: Bout | null;
   sealed: Props['sealed'];
   standings: Map<string, Standing>;
   kickoffAt: string | null;
+  leftCorner: AnimatedStyle;
+  rightCorner: AnimatedStyle;
+  middleStyle: AnimatedStyle;
+  labelFade: AnimatedStyle;
+  onCornersY: (y: number) => void;
 }) {
   const theme = useTheme();
 
@@ -396,6 +490,7 @@ function Matchup({
     <View style={{ paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.xl }}>
       {/* ---------- row 2: matchweek ---------- */}
       {matchweek !== null ? (
+        <Animated.View style={labelFade}>
         <BandText
           align="center"
           style={{
@@ -410,11 +505,13 @@ function Matchup({
           Matchweek {matchweek}
           {!bout && sealed ? ' · sealed' : ''}
         </BandText>
+        </Animated.View>
       ) : null}
 
       {/* ---------- row 3: the two corners and the v ---------- */}
       {bout ? (
         <View
+          onLayout={(e) => onCornersY(Math.round(e.nativeEvent.layout.y))}
           style={{
             flexDirection: 'row',
             alignItems: 'flex-start',
@@ -425,13 +522,19 @@ function Matchup({
             name={bout.you.name}
             standing={standings.get(bout.you.entryId) ?? null}
             tone="primary"
+            avatarStyle={leftCorner}
+            labelFade={labelFade}
           />
-          <Middle bout={bout} kickoffAt={kickoffAt} />
+          <Animated.View style={[{ minWidth: 112, alignItems: 'center' }, middleStyle]}>
+            <Middle bout={bout} kickoffAt={kickoffAt} />
+          </Animated.View>
           <Corner
             name={bout.them ? bout.them.name : 'Nobody'}
             standing={bout.them ? standings.get(bout.them.entryId) ?? null : null}
             tone={bout.them ? 'red' : 'muted'}
             subtitle={bout.them ? undefined : 'Bye week'}
+            avatarStyle={rightCorner}
+            labelFade={labelFade}
           />
         </View>
       ) : (
@@ -553,11 +656,17 @@ function Corner({
   standing,
   tone,
   subtitle,
+  avatarStyle,
+  labelFade,
 }: {
   name: string;
   standing: Standing | null;
   tone: 'primary' | 'red' | 'muted';
   subtitle?: string;
+  /** Shrinks and travels to this corner's collapsed position. */
+  avatarStyle: AnimatedStyle;
+  /** The name and standing fade rather than shrink — see the header. */
+  labelFade: AnimatedStyle;
 }) {
   const theme = useTheme();
   const color =
@@ -609,12 +718,11 @@ function Corner({
         The wrapper stays because the ring is an OVERLAY and needs something to
         be absolute against.
       */}
-      <View
-        style={{
-          width: AVATAR,
-          height: AVATAR,
-          borderRadius: theme.radii.pill,
-        }}
+      <Animated.View
+        style={[
+          { width: AVATAR, height: AVATAR, borderRadius: theme.radii.pill },
+          avatarStyle,
+        ]}
       >
         <View
           style={{
@@ -679,16 +787,20 @@ function Corner({
             borderColor: ringColor,
           }}
         />
-      </View>
+      </Animated.View>
 
-      <BandText
-        variant="cardTitle"
-        numberOfLines={1}
-        align="center"
-        style={{ fontSize: 15, color: BAND.ink }}
-      >
-        {name}
-      </BandText>
+      {/* Names and standings FADE rather than travel — at the collapsed scale
+          they would be four-point type, which is not a smaller version of the
+          information but an unreadable one. */}
+      <Animated.View style={[{ width: '100%' }, labelFade]}>
+        <BandText
+          variant="cardTitle"
+          numberOfLines={1}
+          align="center"
+          style={{ fontSize: 15, color: BAND.ink }}
+        >
+          {name}
+        </BandText>
 
       {subtitle ? (
         <BandText variant="detail" align="center" style={{ color: BAND.slate }}>
@@ -711,82 +823,7 @@ function Corner({
           {standing ? standing.points.toLocaleString() : '0'} pts
         </BandText>
       )}
-    </View>
-  );
-}
-
-// ---------------------------------------------------------- collapsed line
-
-function CollapsedLine({
-  bout,
-  sealed,
-  standings,
-}: {
-  bout: Bout | null;
-  sealed: Props['sealed'];
-  standings: Map<string, Standing>;
-}) {
-  const theme = useTheme();
-
-  if (!bout) {
-    return (
-      <BandText
-        align="center"
-        variant="body"
-        numberOfLines={1}
-        style={{ paddingHorizontal: theme.spacing.lg, color: BAND.slate }}
-      >
-        {sealed ? `Matchweek ${sealed.matchweek} · sealed` : 'No duel yet'}
-      </BandText>
-    );
-  }
-
-  const { you, them, settled } = bout;
-  const result = settled && them ? duelResult(you.points) : null;
-  const tint =
-    result === 'won'
-      ? BAND.green
-      : result === 'lost'
-        ? BAND.red
-        : BAND.ink;
-  const youUser = standings.get(you.entryId)?.userId ?? null;
-  const themUser = them ? standings.get(them.entryId)?.userId ?? null : null;
-
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.sm,
-        paddingHorizontal: theme.spacing.lg,
-      }}
-    >
-      <Dot name={you.name} userId={youUser} tone="primary" />
-      <BandText
-        variant="body"
-        numberOfLines={1}
-        style={{ flex: 1, fontFamily: fontFamilies.bold, color: BAND.ink }}
-      >
-        {you.name}
-      </BandText>
-      <BandText
-        style={{
-          fontFamily: fontFamilies.black,
-          fontSize: 14,
-          color: tint,
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {settled && them ? `${you.accuracy ?? 0}–${them.accuracy ?? 0}` : them ? 'v' : 'bye'}
-      </BandText>
-      <BandText
-        variant="body"
-        numberOfLines={1}
-        style={{ flex: 1, textAlign: 'right', fontFamily: fontFamilies.bold, color: BAND.ink }}
-      >
-        {them ? them.name : 'Nobody'}
-      </BandText>
-      <Dot name={them ? them.name : '—'} userId={themUser} tone={them ? 'red' : 'muted'} />
+      </Animated.View>
     </View>
   );
 }
@@ -846,63 +883,6 @@ function RoundButton({
   );
 }
 
-function Dot({
-  name,
-  userId,
-  tone,
-}: {
-  name: string;
-  userId: string | null;
-  tone: 'primary' | 'red' | 'muted';
-}) {
-  const theme = useTheme();
-  const color =
-    tone === 'primary'
-      ? BAND.primary
-      : tone === 'red'
-        ? BAND.red
-        : BAND.slate;
-  return (
-    <View
-      style={{
-        width: 22,
-        height: 22,
-        borderRadius: theme.radii.pill,
-        overflow: 'hidden',
-        backgroundColor: withOpacity(color, 0.14),
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      {userId ? (
-        <LinearGradient
-          colors={[...gradientForUser(userId)]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            // Rounds itself — see the corner avatar for why the parent's clip
-            // is not enough on its own.
-            borderRadius: theme.radii.pill,
-          }}
-        />
-      ) : null}
-      <BandText
-        style={{
-          fontFamily: fontFamilies.black,
-          fontSize: 8,
-          color: userId ? '#FFFFFF' : color,
-        }}
-      >
-        {getInitials(name)}
-      </BandText>
-    </View>
-  );
-}
 
 
 /** 1 → 1st, 2 → 2nd, 11 → 11th. */
