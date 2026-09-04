@@ -92,8 +92,16 @@ type AnimatedStyle = ReturnType<typeof useAnimatedStyle>;
 /** Height of the fixed chrome row — back, pool name, share. */
 const CHROME_ROW = 34;
 
-/** What an avatar shrinks to once the band is fully collapsed. */
-const COLLAPSED_AVATAR = 24;
+/**
+ * What an avatar shrinks to once the band is fully collapsed.
+ *
+ * ⚠ Kept generous on purpose — the members ARE the event, and a duel that
+ * collapses into two dots beside a number stops being about two people. 32 in a
+ * 44pt row leaves 6pt of air top and bottom, and still clears the score between
+ * them: `2 × COLLAPSED_SPREAD − COLLAPSED_AVATAR` is 84pt of gap, against a
+ * scoreline that renders around 60.
+ */
+const COLLAPSED_AVATAR = 32;
 /** How far from the screen's centre a collapsed avatar settles. */
 const COLLAPSED_SPREAD = 58;
 /**
