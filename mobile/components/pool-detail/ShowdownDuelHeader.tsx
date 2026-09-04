@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, Share, useWindowDimensions, View } from 'react-native';
+import { Pressable, Share, useWindowDimensions, View, type TextStyle } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -119,6 +119,17 @@ const COLLAPSED_AVATAR = 40;
  * Ryan asked for: "move the avatars a bit closer to the edges".
  */
 const MIDDLE_COL = 160;
+
+/**
+ * Air either side of the dash in a scoreline.
+ *
+ * ⚠ PADDING ON THE DASH, NOT SPACES IN THE STRING. A space is a glyph and it
+ * belongs to whichever side of the dash it was typed next to, so a centred
+ * string with spaces still moves the dash when the two numbers have different
+ * digit counts. This is the gap as LAYOUT, which is the only version of it the
+ * dash's own position does not depend on.
+ */
+const SCORE_GAP = 8;
 const ROW_PAD = 8;
 
 /** How far from the screen's centre a collapsed avatar settles. */
@@ -792,6 +803,25 @@ function Middle({
         ? BAND.red
         : BAND.ink;
 
+  /**
+   * ⚠ ONE STYLE FOR ALL THREE PARTS. The dash has to sit on the same baseline
+   * and the same optical weight as the digits either side of it; giving it its
+   * own smaller size is what makes a split scoreline read as three things
+   * rather than one number.
+   */
+  const scoreType: TextStyle = {
+    fontFamily: fontFamilies.black,
+    // ⚠ THE LIVE SCORE IS THE LOUDEST THING HERE, because it is what the
+    // countdown it replaced was: the one number between the corners that
+    // changes while you watch. A settled scoreline is a record and sits back.
+    fontSize: showLive ? liveSize : 22,
+    // ⚠ WITH THE SIZE. Variant 'body' caps `lineHeight` at 20 and shears the
+    // tops off anything larger.
+    lineHeight: showLive ? liveSize + 8 : 28,
+    color: tint,
+    fontVariant: ['tabular-nums'],
+  };
+
   return (
     // ⚠ THE `v` IS GONE — Ryan, and the clock is the middle column now. It was
     // saying the same thing as two avatars either side of a scoreline already
@@ -820,27 +850,46 @@ function Middle({
       }}
     >
       {score ? (
-        <BandText
-          numberOfLines={1}
+        /*
+          ⚠ THE DASH IS THE AXIS, NOT THE MIDDLE OF THE STRING — Ryan,
+          2026-09-04.
+
+          A single centred "100 – 0" centres the STRING, so the dash sits
+          wherever the digit counts leave it: right of centre at 100–0, dead
+          centre at 100–100, left of centre at 0–100. It moves every time
+          somebody scores, on the one element the two avatars are arranged
+          around.
+
+          Two `flex: 1` halves with the dash between them fix it by
+          construction: equal halves put the dash's centre at the row's centre
+          whatever the numbers do, and the digits grow OUTWARD from it. The row
+          stretches to the middle column, the column is centred between two
+          `flex: 1` corners inside symmetric padding — so the row's centre is
+          the screen's centre, and it stays there even if a wide score pushes
+          the column wider, because both corners then give up the same width.
+
+          This is the same construction as `DuelTab`'s `Scoreline`, for the same
+          reason. Two surfaces showing the same scoreline should not disagree
+          about where its dash lives.
+        */
+        <View
           style={{
-            fontFamily: fontFamilies.black,
-            // ⚠ THE LIVE SCORE IS THE LOUDEST THING HERE, because it is what
-            // the countdown it replaced was: the one number between the corners
-            // that changes while you watch. A settled scoreline is a record and
-            // sits back at 22.
-            fontSize: showLive ? liveSize : 22,
-            // ⚠ WITH THE SIZE. Variant 'body' caps `lineHeight` at 20 and
-            // shears the tops off anything larger.
-            lineHeight: showLive ? liveSize + 8 : 28,
-            color: tint,
-            fontVariant: ['tabular-nums'],
+            alignSelf: 'stretch',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          {/* ⚠ SPACES, NOT `letterSpacing` — Ryan wants air around the dash and
-              only around the dash. Letter-spacing would push the digits apart
-              too, and these are tabular digits whose whole job is to line up. */}
-          {score.you} – {score.them}
-        </BandText>
+          <BandText numberOfLines={1} style={[scoreType, { flex: 1, textAlign: 'right' }]}>
+            {score.you}
+          </BandText>
+          <BandText numberOfLines={1} style={[scoreType, { paddingHorizontal: SCORE_GAP }]}>
+            –
+          </BandText>
+          <BandText numberOfLines={1} style={[scoreType, { flex: 1, textAlign: 'left' }]}>
+            {score.them}
+          </BandText>
+        </View>
       ) : null}
       {/*
         ⚠ THE COUNTDOWN REPLACES "TO PLAY", it does not sit beside it. Both say
