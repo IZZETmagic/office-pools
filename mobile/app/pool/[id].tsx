@@ -406,6 +406,34 @@ export default function PoolDetailScreen() {
     }
   }, [visibleTabs, tab]);
 
+  /**
+   * The tab a pool OPENS on is the first one it offers.
+   *
+   * Ryan: a Showdown pool should land on Duel, not Leaderboard. It could not
+   * simply be a different literal in `useState` — that initialiser runs on the
+   * FIRST render, before `usePoolDetail` has resolved, so the mode is not known
+   * yet. Hence an effect, once the visible set exists.
+   *
+   * ⚠ IT IS `visibleTabs[0]`, NOT `'duel'`. The first tab a mode offers is
+   * already the right landing for every mode — Showdown filters Duel in at the
+   * front, everything else filters it out and leads with Leaderboard, which is
+   * exactly where they landed before. One rule instead of a mode check that
+   * would need editing again for the next mode.
+   *
+   * ⚠ ONCE, AND NEVER OVER A CHOICE. The ref makes this a landing rather than a
+   * correction: without it, any later change to the visible set — an admin
+   * losing rights mid-session — would yank a member back to the first tab from
+   * wherever they were reading. A `?tab=` deep link counts as a choice and is
+   * left alone.
+   */
+  const landedRef = useRef(false);
+  useEffect(() => {
+    if (landedRef.current || visibleTabs.length === 0) return;
+    landedRef.current = true;
+    if (tabParam && TAB_PARAM_VALUES.includes(tabParam as PoolTabKey)) return;
+    setTab(visibleTabs[0]);
+  }, [visibleTabs, tabParam]);
+
   // Stable identity so the memoized Settings panel isn't re-rendered on every
   // tab switch by a fresh inline closure. Reads pool via `data` (optional) so
   // it can sit above the loading/error early-returns without breaking the
