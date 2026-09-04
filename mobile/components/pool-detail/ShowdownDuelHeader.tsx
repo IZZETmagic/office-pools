@@ -289,27 +289,44 @@ export function ShowdownDuelHeader({
   // ⚠ Two named hooks, not one factory called twice. A hook inside a helper is
   // a rules-of-hooks violation waiting for somebody to call it conditionally,
   // and the only thing that differs between the corners is the sign of X.
-  const leftCorner = useAnimatedStyle(() => {
+  /**
+   * ⚠ TRANSLATE AND SCALE ARE ON DIFFERENT NODES, on purpose.
+   *
+   * The COLUMN translates — avatar, username and standing together — so the
+   * labels follow the avatar out instead of standing still while it leaves.
+   * The AVATAR alone scales, because a scale applies about its node's own
+   * centre: shrinking the whole column would pivot around the centre of
+   * avatar-plus-two-lines-of-text, which is well below the avatar, and the
+   * landing position `wantedY` aims at would no longer be where it arrives.
+   *
+   * Splitting them keeps the arithmetic aimed at the avatar's centre while the
+   * labels come along for the ride.
+   */
+  const leftMove = useAnimatedStyle(() => {
     if (slideBy === 0) return {};
     const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
     return {
       transform: [
         { translateY: p * (slideBy - wantedY) },
         { translateX: p * wantedX },
-        { scale: 1 - p * (1 - avatarScale) },
       ],
     };
   });
-  const rightCorner = useAnimatedStyle(() => {
+  const rightMove = useAnimatedStyle(() => {
     if (slideBy === 0) return {};
     const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
     return {
       transform: [
         { translateY: p * (slideBy - wantedY) },
         { translateX: -p * wantedX },
-        { scale: 1 - p * (1 - avatarScale) },
       ],
     };
+  });
+  /** The shrink, on the avatar box alone. Same for both corners. */
+  const avatarShrink = useAnimatedStyle(() => {
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
+    return { transform: [{ scale: 1 - p * (1 - avatarScale) }] };
   });
 
   /**
@@ -398,8 +415,9 @@ export function ShowdownDuelHeader({
                 sealed={sealed}
                 standings={standings}
                 kickoffAt={kickoffAt}
-                leftCorner={leftCorner}
-                rightCorner={rightCorner}
+                leftMove={leftMove}
+                rightMove={rightMove}
+                avatarShrink={avatarShrink}
                 middleStyle={middleStyle}
                 labelFade={labelFade}
                 onCornersY={setCornersY}
@@ -515,8 +533,9 @@ function Matchup({
   sealed,
   standings,
   kickoffAt,
-  leftCorner,
-  rightCorner,
+  leftMove,
+  rightMove,
+  avatarShrink,
   middleStyle,
   labelFade,
   onCornersY,
@@ -525,8 +544,9 @@ function Matchup({
   sealed: Props['sealed'];
   standings: Map<string, Standing>;
   kickoffAt: string | null;
-  leftCorner: AnimatedStyle;
-  rightCorner: AnimatedStyle;
+  leftMove: AnimatedStyle;
+  rightMove: AnimatedStyle;
+  avatarShrink: AnimatedStyle;
   middleStyle: AnimatedStyle;
   labelFade: AnimatedStyle;
   onCornersY: (y: number) => void;
@@ -573,7 +593,8 @@ function Matchup({
             name={bout.you.name}
             standing={standings.get(bout.you.entryId) ?? null}
             tone="primary"
-            avatarStyle={leftCorner}
+            moveStyle={leftMove}
+            avatarShrink={avatarShrink}
             labelFade={labelFade}
           />
           <Animated.View style={[{ minWidth: MIDDLE_COL, alignItems: 'center' }, middleStyle]}>
@@ -584,7 +605,8 @@ function Matchup({
             standing={bout.them ? standings.get(bout.them.entryId) ?? null : null}
             tone={bout.them ? 'red' : 'muted'}
             subtitle={bout.them ? undefined : 'Bye week'}
-            avatarStyle={rightCorner}
+            moveStyle={rightMove}
+            avatarShrink={avatarShrink}
             labelFade={labelFade}
           />
         </View>
@@ -714,16 +736,19 @@ function Corner({
   standing,
   tone,
   subtitle,
-  avatarStyle,
+  moveStyle,
+  avatarShrink,
   labelFade,
 }: {
   name: string;
   standing: Standing | null;
   tone: 'primary' | 'red' | 'muted';
   subtitle?: string;
-  /** Shrinks and travels to this corner's collapsed position. */
-  avatarStyle: AnimatedStyle;
-  /** The name and standing fade rather than shrink — see the header. */
+  /** Travels the whole column to this corner's collapsed position. */
+  moveStyle: AnimatedStyle;
+  /** Shrinks the avatar box alone — see the header for why it is separate. */
+  avatarShrink: AnimatedStyle;
+  /** The name and standing fade on the way out. */
   labelFade: AnimatedStyle;
 }) {
   const theme = useTheme();
@@ -743,7 +768,9 @@ function Corner({
   const ringColor = userId ? gradientForUser(userId)[0] : color;
 
   return (
-    <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 9 }}>
+    <Animated.View
+      style={[{ flex: 1, minWidth: 0, alignItems: 'center', gap: 9 }, moveStyle]}
+    >
       {/*
         The shaded avatar the rest of the app uses — gradient keyed on the
         person, white initials, and a ring in a LIGHTER SHADE OF THEIR OWN
@@ -779,7 +806,7 @@ function Corner({
       <Animated.View
         style={[
           { width: AVATAR, height: AVATAR, borderRadius: theme.radii.pill },
-          avatarStyle,
+          avatarShrink,
         ]}
       >
         <View
@@ -882,7 +909,7 @@ function Corner({
         </BandText>
       )}
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 
