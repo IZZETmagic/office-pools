@@ -103,23 +103,6 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
             position={i + 1}
             row={r}
             board={board}
-            /**
-             * ⚠ THE GAP IS TO THE ROW ABOVE IN THE ORDER BEING SHOWN, so on the
-             * Duels board it is a gap in DUEL points, not season points.
-             * Measuring one board with the other's numbers is how a line says
-             * "250 to catch Marcus" beside a row that is already ahead of him.
-             */
-            chasing={
-              i > 0 && r.isYou
-                ? {
-                    name: displayName(rows[i - 1].entry),
-                    by:
-                      board === 'table'
-                        ? (rows[i - 1].entry.total_points ?? 0) - (r.entry.total_points ?? 0)
-                        : rows[i - 1].duel.duelPoints - r.duel.duelPoints,
-                  }
-                : null
-            }
           />
         ))}
       </View>
@@ -140,7 +123,6 @@ function Row({
   position,
   row,
   board,
-  chasing,
 }: {
   position: number;
   row: {
@@ -150,7 +132,6 @@ function Row({
     isYou: boolean;
   };
   board: Board;
-  chasing: { name: string; by: number } | null;
 }) {
   const theme = useTheme();
   const { entry, duel, picksPoints, isYou } = row;
@@ -192,15 +173,28 @@ function Row({
           {position}
         </Text>
 
+        {/*
+          ⚠ THE MOVEMENT SITS HERE, IN ITS OWN FIXED-WIDTH SLOT — Ryan, and both
+          halves matter. It used to trail the NAME, where it started at a
+          different x on every row because names are different lengths, so a
+          column of arrows read as scatter. A fixed slot between the position
+          and the avatar puts every arrow on the same line down the list, and
+          fills the gap those two had between them.
+
+          The slot is reserved whether or not there is an arrow to draw, or the
+          avatars of members who did not move would sit further left than
+          everybody else's.
+        */}
+        <View style={{ width: theme.spacing.xl, alignItems: 'center' }}>
+          <Movement current={entry.current_rank} previous={entry.previous_rank} />
+        </View>
+
         <Avatar userId={entry.user_id} name={name} />
 
         <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-            <Text variant="cardTitle" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {name}
-            </Text>
-            <Movement current={entry.current_rank} previous={entry.previous_rank} />
-          </View>
+          <Text variant="cardTitle" numberOfLines={1}>
+            {name}
+          </Text>
           {board === 'table' ? (
             /* ⚠ `total − duel`. The total ALREADY includes the duel points. */
             <Text variant="detail" color="slate">
@@ -224,31 +218,6 @@ function Row({
         </Text>
       </View>
 
-      {/*
-        THE GAP — the line that makes this a ladder rather than a table.
-
-        ⚠ Only under YOUR row, and only when somebody is above you. On every
-        other row it would be trivia; on the leader's there is nobody to chase.
-        A gap of zero says "level with", because "0 to catch" reads as a bug.
-      */}
-      {chasing ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: theme.spacing.xs,
-            paddingLeft: theme.spacing.hero,
-            paddingTop: theme.spacing.xs,
-          }}
-        >
-          <Icon name="arrow.up" color="slate" size={11} weight="semibold" />
-          <Text variant="detail" color="slate">
-            {chasing.by <= 0
-              ? `Level with ${chasing.name}`
-              : `${chasing.by.toLocaleString()} to catch ${chasing.name}`}
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -337,9 +306,26 @@ function Movement({ current, previous }: { current: number | null; previous: num
   );
 }
 
+/** How many duels the strip shows. Fixed, so every row is the same width. */
+const FORM_SLOTS = 5;
+
+/**
+ * The last five duels, as a COLUMN-ALIGNED strip.
+ *
+ * ⚠ ALWAYS FIVE SLOTS, PADDED AT THE FRONT. Ryan: "can they all be aligned
+ * vertically? Otherwise it's going to be hard to read." Rendering only the
+ * results a member has makes each row a different width, so the fourth duel
+ * sits at a different x on every line and the strip cannot be read DOWN. With a
+ * fixed grid the rightmost column is always the most recent duel and the one
+ * beside it always the one before, for everybody.
+ *
+ * ⚠ Padded at the FRONT, not the back. The strip is anchored on the LATEST
+ * duel, so a member with three results has two empty slots on the left rather
+ * than trailing gaps that would push their most recent result out of the
+ * column everybody else's sits in.
+ */
 function Form({ form }: { form: DuelRecordRow['form'] }) {
   const theme = useTheme();
-  if (form.length === 0) return null;
   const tint = (r: DuelRecordRow['form'][number]) =>
     r === 'won'
       ? theme.colors.green
@@ -348,16 +334,24 @@ function Form({ form }: { form: DuelRecordRow['form'] }) {
         : r === 'tied'
           ? theme.colors.accent
           : theme.colors.silver;
+
+  const slots: (DuelRecordRow['form'][number] | null)[] = [
+    ...Array<null>(Math.max(0, FORM_SLOTS - form.length)).fill(null),
+    ...form.slice(-FORM_SLOTS),
+  ];
+
   return (
-    <View style={{ flexDirection: 'row', gap: theme.spacing.xxs }}>
-      {form.map((r, i) => (
+    <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
+      {slots.map((r, i) => (
         <View
           key={i}
           style={{
             width: theme.spacing.sm,
             height: theme.spacing.sm,
             borderRadius: theme.radii.pill,
-            backgroundColor: tint(r),
+            // An empty slot is a faint track, not a missing dot — it holds the
+            // column open and reads as "no duel here" rather than as a result.
+            backgroundColor: r ? tint(r) : withOpacity(theme.colors.slate, 0.18),
           }}
         />
       ))}
