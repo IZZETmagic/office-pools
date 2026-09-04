@@ -63,8 +63,6 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
  */
 const AVATAR = 80;
 
-/** Thickness of the lit edge showing under the avatar. */
-const RIM = 2;
 
 /** How far you scroll before the matchup is fully folded away. */
 const COLLAPSE_DISTANCE = 90;
@@ -347,25 +345,38 @@ function Corner({
         ? theme.colors.red
         : theme.colors.slate;
   const userId = standing?.userId ?? null;
-  // Brighter on light, where a white rim has less to work against.
-  const rimColor = theme.mode === 'dark' ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.75)';
+  /**
+   * The ring, and the glow behind it: the LIGHT STOP of this person's own
+   * gradient. Lighter than the bottom of the circle it surrounds, which is what
+   * makes it read as raised. Falls back to the corner colour when nobody is
+   * there — a bye has no person and so no colour of their own.
+   */
+  const ringColor = userId ? gradientForUser(userId)[0] : color;
 
   return (
     <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 9 }}>
       {/*
         The shaded avatar the rest of the app uses — gradient keyed on the
-        person, white initials. The ring stays in the CORNER colour so you can
-        still find yourself at a glance: the gradient says WHO, the ring says
-        WHICH SIDE.
+        person, white initials, and a ring in a LIGHTER SHADE OF THEIR OWN
+        COLOUR.
+
+        ⚠ THE RING IS THE PERSON'S LIGHT STOP. Every gradient in the palette
+        runs light → dark, so `gradientForUser(u)[0]` is lighter than the bottom
+        of the circle it surrounds. That is the whole effect: the ring
+        disappears into the crown and stands proud of the base, and the eye
+        reads it as raised.
+
+        It was an accident on Ryan's avatar first — his ring happened to be
+        `colors.primary`, which IS the light stop of the blue gradient. Chasing
+        it as a shadow, then a glow, then a white fade all missed the point: it
+        is not lighting, it is the subject's own colour one shade up.
 
         ⚠ TWO VIEWS, AND IT HAS TO BE TWO. A shadow is clipped by
         `overflow: 'hidden'` on the same element, and the avatar needs that clip
-        to stay round — so the outer view carries the lift and the inner one
-        carries the circle. Collapsing them loses the shadow silently.
+        to stay round — outer carries the lift, inner carries the circle.
 
         ⚠ The outer view needs a solid `backgroundColor` or Android draws no
-        elevation at all. It takes the header's own colour, so nothing shows
-        around the circle it sits behind.
+        elevation at all. It takes the header's own colour.
       */}
       <View
         style={{
@@ -373,72 +384,22 @@ function Corner({
           height: AVATAR,
           borderRadius: theme.radii.pill,
           backgroundColor: theme.colors.snow,
-          // ⚠ THE LIFT IS DIFFERENT IN THE TWO THEMES, and it has to be. A dark
-          // drop shadow on a near-black surface is invisible — it was on BOTH
-          // avatars and rendering nothing, which looked like the effect only
-          // applying to one of them. On dark the depth is a centred coloured
-          // GLOW; on light it stays a shadow.
+          // On a near-black surface a dark drop shadow is invisible, so dark
+          // mode lifts with a centred coloured glow instead.
           ...(theme.mode === 'dark' ? theme.shadows.avatarGlow : theme.shadows.avatar),
-          // Tinted with the person's own colour, so the avatar reads as lit
-          // rather than as a sticker dropped on the page. The LIGHTER stop —
-          // the darker one is what made the glow disappear into the background
-          // it was supposed to lift off.
-          shadowColor: userId ? gradientForUser(userId)[0] : theme.colors.slate,
+          shadowColor: ringColor,
         }}
       >
-        {/*
-          THE RIM LIGHT — the thing that actually makes the avatar look raised.
-
-          Ryan spotted it on his own avatar before it was deliberate: his ring is
-          a FLAT primary blue while the gradient beneath runs light at the top to
-          dark at the bottom, so the ring vanishes into the crown and stands
-          lighter than the base. The eye reads that lit bottom edge as the disc
-          lifting off the page.
-
-          ⚠ IT CANNOT BE `borderBottomColor`. That was the first attempt and it
-          renders as a hard-edged half circle — per-side colours over a pill
-          radius are four ARCS that stop dead where they meet, so the light does
-          not fade out, it just ends.
-
-          So the rim is a circle filled with a vertical fade sitting BEHIND the
-          avatar, which is inset by `RIM` on top of it. What stays visible is a
-          2pt annulus of that fade: nothing at the crown, brightest at the base,
-          and no edge to cut off.
-        */}
-        <LinearGradient
-          colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0)', rimColor]}
-          locations={[0, 0.4, 1]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            borderRadius: theme.radii.pill,
-          }}
-        />
-
         <View
           style={{
-            // INSET BY `RIM`, on BOTH corners — this is what leaves the fade
-            // behind it showing as a lit ring. Insetting one avatar and not the
-            // other is the mistake that made the two circles different sizes.
-            position: 'absolute',
-            top: RIM,
-            left: RIM,
-            right: RIM,
-            bottom: RIM,
+            width: AVATAR,
+            height: AVATAR,
             borderRadius: theme.radii.pill,
             overflow: 'hidden',
             alignItems: 'center',
             justifyContent: 'center',
-            // ⚠ TRANSPARENT WHEN THERE IS A GRADIENT, and that is not a
-            // tidy-up. A `backgroundColor` paints UNDER a border, so the
-            // previous tint bled through the opponent's transparent ring as a
-            // faint red halo — a ring we had just removed, back again in a
-            // paler shade. Only the empty case needs a fill.
+            // Only the empty case needs a fill — a `backgroundColor` paints
+            // under a border, and that is what bled through as a halo once.
             backgroundColor: userId ? 'transparent' : withOpacity(color, 0.12),
           }}
         >
@@ -455,8 +416,7 @@ function Corner({
                 bottom: 0,
                 // ⚠ THE GRADIENT ROUNDS ITSELF. The parent's `overflow` does
                 // not reliably clip an absolutely-positioned child to a border
-                // radius — the opponent came out an octagon the moment their
-                // ring stopped drawing the outline for them.
+                // radius.
                 borderRadius: theme.radii.pill,
               }}
             />
@@ -465,9 +425,8 @@ function Corner({
             style={{
               fontFamily: fontFamilies.black,
               fontSize: 26,
-              // ⚠ SET WITH THE FONT SIZE, ALWAYS. `Text` defaults to variant
-              // 'body' and its `lineHeight: 20` shears the tops off anything
-              // larger.
+              // ⚠ SET WITH THE FONT SIZE. `Text` defaults to variant 'body',
+              // whose `lineHeight: 20` shears the tops off anything larger.
               lineHeight: 32,
               color: userId ? '#FFFFFF' : color,
             }}
@@ -476,32 +435,24 @@ function Corner({
           </Text>
         </View>
 
-
         {/*
-          ⚠ THE RING IS AN OVERLAY, NOT A BORDER ON THE CIRCLE — Ryan, and it
-          took three goes to get here. A border insets its content, so putting
-          one only on your own avatar made the two circles different sizes;
-          keeping it transparent on theirs fixed the size and let the background
-          bleed through as a halo instead.
-
-          Drawn on top, at the same bounds, it changes NO geometry: both avatars
-          are the same circle, and only one of them is wearing anything.
+          ⚠ AN OVERLAY, NOT A BORDER ON THE CIRCLE. A border insets its content,
+          so putting one on the circle itself made the two avatars different
+          sizes. Drawn on top at the same bounds it changes no geometry.
         */}
-        {tone === 'primary' ? (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              borderRadius: theme.radii.pill,
-              borderWidth: 3,
-              borderColor: color,
-            }}
-          />
-        ) : null}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            borderRadius: theme.radii.pill,
+            borderWidth: 3,
+            borderColor: ringColor,
+          }}
+        />
       </View>
 
       <Text variant="cardTitle" numberOfLines={1} align="center" style={{ fontSize: 15 }}>
