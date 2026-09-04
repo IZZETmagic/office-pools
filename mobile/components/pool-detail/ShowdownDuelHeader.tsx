@@ -346,7 +346,14 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
   const countdown = them ? remaining : null;
 
   return (
-    <View style={{ minWidth: 72, alignItems: 'center', paddingTop: 27, gap: 5 }}>
+    // ⚠ 112 WIDE, and measured rather than guessed: `HH:MM:SS` at 24pt Nunito
+    // Black is about 103pt of tabular digits. Too narrow and the clock wraps
+    // mid-time; the corners are `flex: 1` so they simply take what is left.
+    //
+    // `paddingTop` drops from 27 to 12 because the stack is taller now — 27 was
+    // centring a lone `v` against an 80pt avatar, and centring the pair needs
+    // less.
+    <View style={{ minWidth: 112, alignItems: 'center', paddingTop: 12, gap: 5 }}>
       {settled && them ? (
         <Text
           style={{
@@ -386,12 +393,17 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
           align="center"
           style={{
             fontFamily: fontFamilies.black,
-            fontSize: 13,
-            // ⚠ With the size — variant 'body' caps `lineHeight` at 20 and
-            // shears the tops off anything larger. Harmless at 13, set anyway
-            // so the next person to grow it does not rediscover that.
-            lineHeight: 17,
+            // Ryan: "this is the countdown to game time (fight time)". It is
+            // the only number on the header that is going to change while you
+            // watch it, so it gets to be the loudest thing between the corners.
+            fontSize: 24,
+            // ⚠ WITH THE SIZE. Variant 'body' caps `lineHeight` at 20 and
+            // shears the tops off anything larger — at 24 that is the whole top
+            // third of every digit.
+            lineHeight: 30,
             color: theme.colors.accent,
+            // ⚠ Load-bearing at this size: without it the digits are
+            // proportional and the whole clock jitters sideways once a second.
             fontVariant: ['tabular-nums'],
           }}
         >
