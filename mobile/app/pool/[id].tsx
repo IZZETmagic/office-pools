@@ -39,6 +39,7 @@ import {
   PoolDetailHeader,
   ShowdownDuelHeader,
   ShowdownLeaderboard,
+  ShowdownRoom,
   PoolInfoTab,
   RoundsTab,
   PoolTabBar,
@@ -70,6 +71,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
   // `?tab=duel` on another mode falls through to the leaderboard default
   // below — the same way `?tab=form` does on a league pool.
   'duel',
+  'room',
   'leaderboard',
   'predictions',
   'form',
@@ -93,6 +95,7 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
 const MemoPoolDetailHeader = memo(PoolDetailHeader);
 const MemoDuelTab = memo(DuelTab);
 const MemoShowdownLeaderboard = memo(ShowdownLeaderboard);
+const MemoShowdownRoom = memo(ShowdownRoom);
 const MemoLeaderboardTab = memo(LeaderboardTab);
 const MemoLeagueTableEntriesTab = memo(LeagueTableEntriesTab);
 const MemoLmsEntriesTab = memo(LmsEntriesTab);
@@ -506,6 +509,8 @@ export default function PoolDetailScreen() {
       // so reaching it means the pool has duels.
       case 'duel':
         return <MemoDuelTab poolId={pool.poolId} standings={duelStandings} />;
+      case 'room':
+        return <MemoShowdownRoom poolId={pool.poolId} />;
       case 'leaderboard':
         // ⚠ Showdown gets its OWN board. The shared one shows a single total,
         // and the whole point here is the split — picks and duels are one

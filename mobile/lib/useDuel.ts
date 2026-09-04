@@ -138,6 +138,26 @@ export type DuelState = {
    * seal costs it nothing.
    */
   duelTable: Map<string, DuelRecordRow>;
+  /**
+   * Every duel this member may see, whoever is in it — the Room.
+   *
+   * ⚠ REVEAL-GATED UPSTREAM, so a sealed week is simply absent. That absence is
+   * the boundary the matchweek switcher stops at: you can walk back through
+   * what has been played and no further.
+   */
+  duels: DuelRow[];
+  /** entry_id → display name, for both sides of every revealed duel. */
+  names: Record<string, string>;
+  /** Matchweeks with duels in them, ascending — what the switcher can reach. */
+  revealedWeeks: number[];
+  /**
+   * Everyone's picks, entry → fixture → direction.
+   *
+   * ⚠ EMPTY FOR A MATCHWEEK STILL OPEN. `/bulk` withholds picks until the week
+   * locks, so a rival's column is genuinely absent rather than empty — the
+   * screen must read that as "not yet", never as "they did not pick".
+   */
+  pickDirections: Map<string, Map<string, string>>;
   /** The viewer's own entry, for the route into the picker. */
   ownEntryId: string | null;
 };
@@ -482,7 +502,14 @@ export function useDuel(poolId: string | null | undefined): DuelState {
   const somethingLocked = (data?.season.matchweeks ?? []).some(
     (m) => openWeek !== null && m.number < openWeek,
   );
-  const picks = useLeaguePoolPicks(poolId, Boolean(opponentEntryId) && somethingLocked);
+  /**
+   * ⚠ The gate is now `somethingLocked` ALONE, not "and there is an opponent".
+   * The Room reads every member's picks, so it needs the payload whether or not
+   * the viewer's own duel has opened. Still lazy: nothing is fetched before the
+   * first matchweek locks, because before that there is nothing revealed to
+   * fetch.
+   */
+  const picks = useLeaguePoolPicks(poolId, somethingLocked);
 
   const opponent = useMemo<Opponent | null>(() => {
     const them = current?.them;
@@ -689,6 +716,46 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     return out;
   }, [showdown]);
 
+  /**
+   * Everyone's revealed picks, folded into one map.
+   *
+   * ⚠⚠ BOTH SHAPES, as everywhere else in this file: a Results pool sends
+   * `outcomes` and no scores, a Scores pool sends `predictions` and no
+   * `outcomes` key at all. ⚠ And a tap wins over a scoreline, the same way the
+   * other three readers resolve it — two readers disagreeing about one row is
+   * worse than either answer.
+   */
+  const pickDirections = useMemo(() => {
+    const out = new Map<string, Map<string, string>>();
+    const forEntry = (id: string) => {
+      let m = out.get(id);
+      if (!m) {
+        m = new Map<string, string>();
+        out.set(id, m);
+      }
+      return m;
+    };
+    for (const o of picks.data?.outcomes ?? []) forEntry(o.entry_id).set(o.match_id, o.outcome);
+    for (const p of picks.data?.predictions ?? []) {
+      const m = forEntry(p.entry_id);
+      if (m.has(p.match_id)) continue;
+      m.set(
+        p.match_id,
+        p.predicted_home_score > p.predicted_away_score
+          ? 'home'
+          : p.predicted_home_score < p.predicted_away_score
+            ? 'away'
+            : 'draw',
+      );
+    }
+    return out;
+  }, [picks.data]);
+
+  const revealedWeeks = useMemo(() => {
+    const weeks = new Set((showdown?.duels ?? []).map((d) => d.matchweek_number));
+    return [...weeks].sort((a, b) => a - b);
+  }, [showdown]);
+
   return {
     // ⚠ A DISABLED query reports `isPending` forever. React Query has no
     // "idle" status any more, so a null poolId — every non-Showdown pool —
@@ -705,6 +772,10 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     fixtures,
     series: showdown?.series ?? [],
     duelTable,
+    duels: showdown?.duels ?? [],
+    names: showdown?.names ?? {},
+    revealedWeeks,
+    pickDirections,
     season,
     opponent,
     ownEntryId: data?.you.entries[0]?.entry_id ?? null,

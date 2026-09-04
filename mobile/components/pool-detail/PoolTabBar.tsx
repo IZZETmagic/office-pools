@@ -39,6 +39,7 @@ function colorDistance(a: string, b: string): number {
 
 export type PoolTabKey =
   | 'duel'
+  | 'room'
   | 'leaderboard'
   | 'predictions'
   | 'form'
@@ -65,6 +66,11 @@ const ALL_TABS: TabDef[] = [
   // Filtered out everywhere else, so no other mode's tab order moves.
   { key: 'duel', label: 'Duel', icon: 'flame.fill' },
   { key: 'leaderboard', label: 'Leaderboard', icon: 'trophy.fill' },
+  // ⚠ Showdown only, and it REPLACES Predictions there rather than joining it.
+  // A Showdown member picks from the Duel tab's Your Sheet card; this tab is
+  // where they read the week back — their duels, everybody else's, and what
+  // each was decided on.
+  { key: 'room', label: 'The Room', icon: 'person.3.fill' },
   { key: 'predictions', label: 'Predictions', icon: 'pencil.line' },
   { key: 'form', label: 'Form', icon: 'chart.bar.xaxis' },
   { key: 'scoring', label: 'Scoring', icon: 'list.number' },
@@ -149,6 +155,12 @@ export function getVisiblePoolTabs(
   return ALL_TABS.filter((t) => {
     // The duel is Showdown's whole subject and meaningless anywhere else.
     if (t.key === 'duel') return isLeague && leagueMode === 'showdown';
+    if (t.key === 'room') return isLeague && leagueMode === 'showdown';
+    // ⚠ AND SHOWDOWN LOSES `predictions`. Its placeholder said "make your picks
+    // on the web", which stopped being true the moment the Duel tab started
+    // routing into the RN picker — and The Room answers the question that tab
+    // was standing in for.
+    if (t.key === 'predictions') return !(isLeague && leagueMode === 'showdown');
     if (t.key === 'rounds') return isAdmin && isProgressive;
     if (t.key === 'fees') return isAdmin && feesEnabled;
     if (t.key === 'members' || t.key === 'settings') return isAdmin;
