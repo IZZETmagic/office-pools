@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ActivityIndicator, Image, Pressable, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, View, type TextStyle } from 'react-native';
 
 import { Button, Card, Icon, Text } from '@/components/ui';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
@@ -739,51 +739,65 @@ function Club({
  * cannot do that — it centres the STRING, and a longer one shifts its own
  * digits sideways.
  */
+/**
+ * ⚠ TWO SIZES, BECAUSE IT CARRIES TWO DIFFERENT NUMBERS. A fixture's score is
+ * one digit a side and sits between two pick chips, so it is small and narrow.
+ * A duel's score is three digits a side — 400-250 — and is the whole point of
+ * an "elsewhere" row, so it is bigger and needs the width to match. At the
+ * fixture's 46pt a three-digit duel score clips its own hundreds column.
+ */
+const SCORELINE = {
+  fixture: { width: 46, size: 11 },
+  duel: { width: 76, size: 15 },
+} as const;
+
 function Scoreline({
   home,
   away,
   live = false,
+  kind = 'fixture',
 }: {
   home: number | null;
   away: number | null;
   live?: boolean;
+  kind?: keyof typeof SCORELINE;
 }) {
   const theme = useTheme();
+  const { width, size } = SCORELINE[kind];
+
   if (home === null || away === null) {
     return (
-      <Text variant="detail" color="slate" style={{ width: 46, textAlign: 'center', opacity: 0.5 }}>
+      <Text variant="detail" color="slate" style={{ width, textAlign: 'center', opacity: 0.5 }}>
         v
       </Text>
     );
   }
+
   const tint = live ? theme.colors.red : theme.colors.ink;
+  const digit: TextStyle = {
+    fontFamily: fontFamilies.black,
+    fontSize: size,
+    // ⚠ WITH THE SIZE. The `detail` variant caps `lineHeight` at 13 and shears
+    // the tops off anything larger.
+    lineHeight: size + 5,
+    color: tint,
+    fontVariant: ['tabular-nums'],
+    flex: 1,
+  };
+
   return (
-    <View style={{ width: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-      <Text
-        variant="detail"
-        style={{
-          fontFamily: fontFamilies.black,
-          color: tint,
-          fontVariant: ['tabular-nums'],
-          textAlign: 'right',
-          flex: 1,
-        }}
-      >
+    <View style={{ width, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+      <Text variant="detail" style={[digit, { textAlign: 'right' }]}>
         {home}
       </Text>
-      <Text variant="detail" color="slate" style={{ paddingHorizontal: 3, opacity: 0.6 }}>
-        –
-      </Text>
       <Text
         variant="detail"
-        style={{
-          fontFamily: fontFamilies.black,
-          color: tint,
-          fontVariant: ['tabular-nums'],
-          textAlign: 'left',
-          flex: 1,
-        }}
+        color="slate"
+        style={{ paddingHorizontal: 3, fontSize: size, lineHeight: size + 5, opacity: 0.6 }}
       >
+        –
+      </Text>
+      <Text variant="detail" style={[digit, { textAlign: 'left' }]}>
         {away}
       </Text>
     </View>
@@ -916,7 +930,7 @@ function ElsewhereCard({
                 leading={lead === 'a'}
                 dimmed={lead === 'b'}
               />
-              <Scoreline home={d.pa} away={d.pb} />
+              <Scoreline home={d.pa} away={d.pb} kind="duel" />
               <Fighter
                 name={d.bName}
                 userId={standings.get(d.b)?.userId ?? null}
