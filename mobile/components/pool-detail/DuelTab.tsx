@@ -96,6 +96,20 @@ export function DuelTab({ poolId, standings }: Props) {
 
   return (
     <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
+      {/*
+        ⚠ THE TAPE LEADS — Ryan, 2026-09-03. The header names your opponent and
+        this is the first thing that says anything ABOUT them, so it belongs
+        against the header rather than four cards down. Everything below it is
+        preparation; this is the reason to prepare.
+      */}
+      {opponent && season && ownEntryId ? (
+        <TapeCard
+          opponent={opponent}
+          season={season}
+          you={standings.get(ownEntryId) ?? null}
+          them={standings.get(opponent.entryId) ?? null}
+        />
+      ) : null}
       {sheet && ownEntryId ? (
         <SheetCard poolId={poolId} entryId={ownEntryId} sheet={sheet} />
       ) : null}
@@ -105,14 +119,6 @@ export function DuelTab({ poolId, standings }: Props) {
       {fixtures.length > 0 ? <DecidedOnCard fixtures={fixtures} /> : null}
       {series.length > 0 ? <AgainstTheRoomCard series={series} /> : null}
       {season ? <ScoutingCard season={season} /> : null}
-      {opponent && season && ownEntryId ? (
-        <TapeCard
-          opponent={opponent}
-          season={season}
-          you={standings.get(ownEntryId) ?? null}
-          them={standings.get(opponent.entryId) ?? null}
-        />
-      ) : null}
     </View>
   );
 }
