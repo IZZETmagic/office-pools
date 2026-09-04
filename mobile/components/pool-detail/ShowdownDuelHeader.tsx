@@ -381,19 +381,15 @@ function Corner({
             width: AVATAR,
             height: AVATAR,
             borderRadius: theme.radii.pill,
-            // ⚠ THE RING IS YOURS ALONE — Ryan, 2026-09-03. It marks which
-            // corner is you, so putting one on your opponent as well says
-            // nothing and fights their gradient.
-            //
-            // ⚠ It stays 3 and goes TRANSPARENT rather than dropping to 0. A
-            // border insets its content, so a ringless avatar would render its
-            // gradient 6pt wider than yours and the two would stop matching.
-            borderWidth: 3,
-            borderColor: tone === 'primary' ? color : 'transparent',
             overflow: 'hidden',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: withOpacity(color, 0.12),
+            // ⚠ TRANSPARENT WHEN THERE IS A GRADIENT, and that is not a
+            // tidy-up. A `backgroundColor` paints UNDER a border, so the
+            // previous tint bled through the opponent's transparent ring as a
+            // faint red halo — a ring we had just removed, back again in a
+            // paler shade. Only the empty case needs a fill.
+            backgroundColor: userId ? 'transparent' : withOpacity(color, 0.12),
           }}
         >
           {userId ? (
@@ -409,9 +405,8 @@ function Corner({
                 bottom: 0,
                 // ⚠ THE GRADIENT ROUNDS ITSELF. The parent's `overflow` does
                 // not reliably clip an absolutely-positioned child to a border
-                // radius, and an OPAQUE ring hides that by drawing the outline
-                // on top — which is why the opponent came out an octagon the
-                // moment their ring went transparent.
+                // radius — the opponent came out an octagon the moment their
+                // ring stopped drawing the outline for them.
                 borderRadius: theme.radii.pill,
               }}
             />
@@ -430,6 +425,32 @@ function Corner({
             {getInitials(name)}
           </Text>
         </View>
+
+        {/*
+          ⚠ THE RING IS AN OVERLAY, NOT A BORDER ON THE CIRCLE — Ryan, and it
+          took three goes to get here. A border insets its content, so putting
+          one only on your own avatar made the two circles different sizes;
+          keeping it transparent on theirs fixed the size and let the background
+          bleed through as a halo instead.
+
+          Drawn on top, at the same bounds, it changes NO geometry: both avatars
+          are the same circle, and only one of them is wearing anything.
+        */}
+        {tone === 'primary' ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderRadius: theme.radii.pill,
+              borderWidth: 3,
+              borderColor: color,
+            }}
+          />
+        ) : null}
       </View>
 
       <Text variant="cardTitle" numberOfLines={1} align="center" style={{ fontSize: 15 }}>
