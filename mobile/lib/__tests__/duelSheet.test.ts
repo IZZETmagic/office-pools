@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   anyFixtureLive,
   buildSheet,
+  pickMissed,
   duelVerdict,
   remainingFixtures,
   sheetSummary,
@@ -274,5 +275,84 @@ describe('duelVerdict', () => {
       themEntry: THEM,
     });
     expect(duelVerdict(rows, 0, 300)).toEqual({ safe: true, leader: 'them', lead: 300 });
+  });
+});
+
+
+describe('pickMissed — a wrong pick is wrong on its own terms', () => {
+  it('is false before the fixture is scored', () => {
+    // No verdict yet. Dimming here would call a pick wrong before kickoff.
+    const [row] = build();
+    expect(pickMissed(row, 'you')).toBe(false);
+    expect(pickMissed(row, 'them')).toBe(false);
+  });
+
+  it('dims the loser and not the winner', () => {
+    const [row] = build({
+      mine: new Map([[1, 100]]),
+      theirs: new Map([[1, 0]]),
+      label: (e) => (e === YOU ? 'HOME' : 'AWAY'),
+    });
+    expect(row.outcome).toBe('you');
+    expect(pickMissed(row, 'you')).toBe(false);
+    expect(pickMissed(row, 'them')).toBe(true);
+  });
+
+  it('⭐ dims BOTH when both were wrong — the bug this exists for', () => {
+    // Different picks, neither scored. `outcome` is `neither`, so a rule keyed
+    // on the outcome left both chips bright and the row read as undecided
+    // rather than as two misses.
+    const [row] = build({
+      mine: new Map([[1, 0]]),
+      theirs: new Map([[1, 0]]),
+      label: (e) => (e === YOU ? 'HOME' : 'AWAY'),
+    });
+    expect(row.outcome).toBe('neither');
+    expect(pickMissed(row, 'you')).toBe(true);
+    expect(pickMissed(row, 'them')).toBe(true);
+  });
+
+  it('⭐ dims neither when two DIFFERENT picks both scored — Scores depth', () => {
+    // Two scorelines that both land the correct result pay the same tier, so
+    // `outcome` is `neither` here too. Same label, opposite meaning: nobody was
+    // wrong. This is why the rule reads points and not the outcome.
+    const [row] = build({
+      mine: new Map([[1, 100]]),
+      theirs: new Map([[1, 100]]),
+      label: (e) => (e === YOU ? '2-1' : '3-2'),
+    });
+    expect(row.outcome).toBe('neither');
+    expect(pickMissed(row, 'you')).toBe(false);
+    expect(pickMissed(row, 'them')).toBe(false);
+  });
+
+  it('dims both on a shared pick that missed', () => {
+    const [row] = build({
+      mine: new Map([[1, 0]]),
+      theirs: new Map([[1, 0]]),
+      label: () => 'DRAW',
+    });
+    expect(row.outcome).toBe('same');
+    expect(pickMissed(row, 'you')).toBe(true);
+    expect(pickMissed(row, 'them')).toBe(true);
+  });
+
+  it('dims neither on a shared pick that landed', () => {
+    const [row] = build({
+      mine: new Map([[1, 100]]),
+      theirs: new Map([[1, 100]]),
+      label: () => 'HOME',
+    });
+    expect(row.outcome).toBe('same');
+    expect(pickMissed(row, 'you')).toBe(false);
+    expect(pickMissed(row, 'them')).toBe(false);
+  });
+
+  it('treats a bye\'s absent opponent as unscored, not wrong', () => {
+    const [row] = build({ themEntry: null, mine: new Map([[1, 100]]), label: () => 'HOME' });
+    expect(pickMissed(row, 'you')).toBe(false);
+    // Nobody to be wrong. `theirs` is 0 because there is no opponent, and the
+    // chip renders a dash rather than a faded label.
+    expect(row.theirPick).toBeNull();
   });
 });

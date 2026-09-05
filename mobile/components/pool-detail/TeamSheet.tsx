@@ -1,7 +1,7 @@
 import { Image, View, type TextStyle } from 'react-native';
 
 import { Text } from '@/components/ui';
-import type { FixtureOutcome, SheetRow } from '@/lib/duelSheet';
+import { pickMissed, type FixtureOutcome, type SheetRow } from '@/lib/duelSheet';
 import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
@@ -51,7 +51,13 @@ export function TeamSheetRows({
             borderTopColor: theme.colors.silver,
           }}
         >
-          <PickChip label={r.myPick} won={r.outcome === 'you'} outcome={r.outcome} tone="primary" />
+          <PickChip
+            label={r.myPick}
+            won={r.outcome === 'you'}
+            missed={pickMissed(r, 'you')}
+            outcome={r.outcome}
+            tone="primary"
+          />
 
           <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' }}>
             <Club
@@ -73,6 +79,7 @@ export function TeamSheetRows({
           <PickChip
             label={r.theirPick}
             won={r.outcome === 'them'}
+            missed={pickMissed(r, 'them')}
             outcome={r.outcome}
             tone="red"
             align="right"
@@ -145,12 +152,21 @@ const CENTRE_AIR = 8;
 function PickChip({
   label,
   won,
+  missed,
   outcome,
   tone,
   align = 'left',
 }: {
   label: string | null;
   won: boolean;
+  /**
+   * Did this pick score nothing on a fixture that HAS been scored?
+   *
+   * ⚠ COMPUTED BY `pickMissed`, which both chips call — one rule applied twice,
+   * not a boolean a caller is free to invent. That is the guarantee the
+   * absolute `outcome` buys above, kept for the half it cannot answer.
+   */
+  missed: boolean;
   outcome: FixtureOutcome;
   tone: 'primary' | 'red';
   align?: 'left' | 'right';
@@ -172,27 +188,29 @@ function PickChip({
 
   const same = outcome === 'same';
   /**
-   * ⚠ THE LOSING CHIP RECEDES — Ryan, 2026-09-05: "much easier to see what I
-   * won, what my opponent won, and what we've tied on."
+   * ⚠ A WRONG PICK IS DIM, FULL STOP — Ryan, 2026-09-05: "when the prediction
+   * is wrong it should still be dimmed even if the opponent also did not
+   * predict correctly."
    *
-   * The row used to make you COMPARE two chips to learn one fact. Both sides
-   * were equally loud — a filled chip against an outlined one, ten times down
-   * the card — so the outcome was a two-element pattern you decoded rather than
-   * a thing you saw. Fading the side that did not take the fixture leaves
-   * exactly one loud element in a decided row, and none in an undecided one, so
-   * the column can be scanned instead of read:
+   * This first shipped as `decided && !won` — dim the side that did not TAKE
+   * the fixture — which left both chips bright whenever `outcome` was
+   * `neither`, the state two members reach by scoring EQUALLY. Equally is
+   * usually nil each, so the row where both were wrong was the one row that
+   * stayed loud.
    *
-   *   one loud chip   → somebody took it, and it is obvious which side
-   *   two medium chips → different picks, neither scored
-   *   two grey chips   → same pick, nothing can separate them
+   * `pickMissed` asks the question the outcome cannot: the label compares the
+   * two members, and "was I right" is about one of them. See its own note for
+   * the two states that prove it — `neither` also covers two different picks
+   * that BOTH scored, and `same` covers a shared pick that was wrong.
    *
-   * ⚠ DERIVED, NOT PASSED. `outcome` already names the fixture's winner
-   * absolutely, so a `dimmed` prop would be a second place for the two chips to
-   * disagree about who won — which is the bug the absolute outcome exists to
-   * prevent.
+   * What the column reads as now, top to bottom: anything faint is a miss.
+   *
+   *   filled chip      took the fixture
+   *   outlined, solid  scored, but did not beat the other side
+   *   faded            scored nothing
+   *   grey             same pick — faded too if that shared pick missed
    */
-  const decided = outcome === 'you' || outcome === 'them';
-  const dimmed = decided && !won;
+  const dimmed = missed;
 
   /**
    * ⚠ THE TICK IS GONE — Ryan, 2026-09-05 — and the FILL carries it alone now.

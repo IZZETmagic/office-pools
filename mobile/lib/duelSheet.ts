@@ -204,6 +204,31 @@ export function buildSheet(input: BuildSheetInput): SheetRow[] {
   });
 }
 
+/**
+ * Did this side's pick score NOTHING on a fixture that has been scored?
+ *
+ * ⚠ THIS IS NOT `outcome !== side`, and that distinction is the whole reason it
+ * is a function. The outcome names who took a fixture RELATIVE to the other
+ * member, and two of its values say nothing about whether either pick was right:
+ *
+ *   `neither`  fires whenever the two scored EQUALLY — which is 0 = 0 (both
+ *              wrong) but also equal-and-nonzero, reachable at Scores depth
+ *              when two different scorelines both land the correct result.
+ *   `same`     means the two picked identically. Identical and both right, or
+ *              identical and both wrong — the label cannot tell you which.
+ *
+ * So "was I wrong" is a per-side question the comparison cannot answer, and
+ * only the points can. Ryan, 2026-09-05: a wrong prediction should read as
+ * wrong whether or not the opponent also missed.
+ *
+ * ⚠ `scored` GATES IT. A fixture with no score row yet has no verdict, and
+ * dimming an unplayed pick would call it wrong before kickoff.
+ */
+export function pickMissed(row: SheetRow, side: 'you' | 'them'): boolean {
+  if (!row.scored) return false;
+  return (side === 'you' ? row.mine : row.theirs) === 0;
+}
+
 /** How many fixtures the engine has not scored yet. */
 export function remainingFixtures(rows: SheetRow[]): number {
   return rows.filter((r) => !r.scored).length;
