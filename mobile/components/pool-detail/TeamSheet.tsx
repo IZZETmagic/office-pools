@@ -386,6 +386,14 @@ const SCORELINE = {
 } as const;
 
 /**
+ * The duel scoreline's width, for callers that must reserve the same column.
+ *
+ * ⚠ A bye has no scoreline and still has to sit on the SAME AXIS, or a column
+ * of duel cards has its dashes lined up and one row's "bye" wandering.
+ */
+export const DUEL_SCORE_W = SCORELINE.duel.width;
+
+/**
  * Air either side of the dash.
  *
  * ⚠ PADDING ON THE DASH, NOT SPACES IN THE STRING. A space is a glyph belonging

@@ -8,7 +8,7 @@ import { fixturesForWeek } from '@/lib/pickemWeek';
 import { toSheetFixtures, useDuel } from '@/lib/useDuel';
 import { useDuelLive, type DuelLive } from '@/lib/useDuelLive';
 import { useLeaguePool } from '@/lib/useLeaguePool';
-import { Scoreline, TeamSheetRows } from './TeamSheet';
+import { DUEL_SCORE_W, Scoreline, TeamSheetRows } from './TeamSheet';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -179,6 +179,9 @@ export function ShowdownRoom({ poolId }: Props) {
   );
 }
 
+/** The disclosure chevron, and the spacer that balances it. */
+const CHEVRON = 12;
+
 // -------------------------------------------------------------- one duel
 
 function DuelRow({
@@ -232,6 +235,24 @@ function DuelRow({
     <Card bordered style={isYours ? { borderColor: withOpacity(theme.colors.primary, 0.5) } : null}>
       <Pressable onPress={onToggle} accessibilityRole="button">
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+          {/*
+            ⚠ A SPACER THE SIZE OF THE CHEVRON — Ryan, 2026-09-05: centre the
+            dash on the page.
+
+            It already sat dead centre of its own `Scoreline`, and the scoreline
+            still landed left of the card's middle, because the chevron is 12pt
+            of real layout on the right with nothing answering it on the left.
+            Both names are `flex: 1`, so they split whatever is left over — and
+            what is left over was 20pt shorter on one side.
+
+            Balancing it in the FLOW rather than positioning the chevron
+            absolutely: an absolute chevron needs the row's height to centre
+            against, and would sit over the end of a long name instead of
+            pushing it. Twenty points of matching inset reads as padding; an
+            off-centre axis reads as a mistake.
+          */}
+          <View style={{ width: CHEVRON }} />
+
           <Text
             variant="cardTitle"
             numberOfLines={1}
@@ -241,7 +262,15 @@ function DuelRow({
           </Text>
 
           {duel.entry_b === null ? (
-            <Text variant="cardTitle" color="slate" style={{ fontFamily: fontFamilies.black }}>
+            // ⚠ THE SCORELINE'S OWN WIDTH, so a bye sits on the same axis every
+            // other row's dash does. Left to size itself it pulled the two names
+            // inward and broke the column.
+            <Text
+              variant="cardTitle"
+              color="slate"
+              align="center"
+              style={{ width: DUEL_SCORE_W, fontFamily: fontFamilies.black }}
+            >
               bye
             </Text>
           ) : (
@@ -283,7 +312,7 @@ function DuelRow({
             {name(duel.entry_b)}
           </Text>
 
-          <Icon name={open ? 'chevron.up' : 'chevron.down'} color="slate" size={12} />
+          <Icon name={open ? 'chevron.up' : 'chevron.down'} color="slate" size={CHEVRON} />
         </View>
       </Pressable>
 
