@@ -31,7 +31,9 @@ export function TeamSheetRows({
   gap?: number;
 }) {
   const theme = useTheme();
-  const pad = gap ?? theme.spacing.sm;
+  // ⚠ `md`, not `sm`. Ten fixtures at 8pt read as a wall; the card is a little
+  // taller at 12 and the rows stop running into each other.
+  const pad = gap ?? theme.spacing.md;
 
   return (
     <View>
@@ -169,6 +171,28 @@ function PickChip({
   }
 
   const same = outcome === 'same';
+  /**
+   * ⚠ THE LOSING CHIP RECEDES — Ryan, 2026-09-05: "much easier to see what I
+   * won, what my opponent won, and what we've tied on."
+   *
+   * The row used to make you COMPARE two chips to learn one fact. Both sides
+   * were equally loud — a filled chip against an outlined one, ten times down
+   * the card — so the outcome was a two-element pattern you decoded rather than
+   * a thing you saw. Fading the side that did not take the fixture leaves
+   * exactly one loud element in a decided row, and none in an undecided one, so
+   * the column can be scanned instead of read:
+   *
+   *   one loud chip   → somebody took it, and it is obvious which side
+   *   two medium chips → different picks, neither scored
+   *   two grey chips   → same pick, nothing can separate them
+   *
+   * ⚠ DERIVED, NOT PASSED. `outcome` already names the fixture's winner
+   * absolutely, so a `dimmed` prop would be a second place for the two chips to
+   * disagree about who won — which is the bug the absolute outcome exists to
+   * prevent.
+   */
+  const decided = outcome === 'you' || outcome === 'them';
+  const dimmed = decided && !won;
 
   /**
    * ⚠ THE TICK IS GONE — Ryan, 2026-09-05 — and the FILL carries it alone now.
@@ -205,6 +229,8 @@ function PickChip({
         backgroundColor: won ? colour : same ? theme.colors.mist : 'transparent',
         borderWidth: won || same ? 0 : theme.borders.thin,
         borderColor: colour,
+        // Same value the faded club uses on the other half of this row.
+        opacity: dimmed ? 0.45 : 1,
       }}
     >
       <Text
@@ -337,11 +363,13 @@ function Centre({ row }: { row: SheetRow }) {
     return (
       <View style={{ width: CENTRE_W, marginHorizontal: CENTRE_AIR, alignItems: 'center' }}>
         <Scoreline home={row.homeScore} away={row.awayScore} live={row.clock !== null} />
-        {row.clock ? (
-          <SubLine tone={theme.colors.red}>{row.clock}</SubLine>
-        ) : row.isCompleted ? (
-          <SubLine tone={theme.colors.slate}>FT</SubLine>
-        ) : null}
+        {/*
+          ⚠ NO "FT" — Ryan, 2026-09-05. It sat under eight scorelines in ten and
+          distinguished none of them: a score that is not ticking is finished,
+          and the row already fades the losing club to say so. The one thing
+          this slot is worth keeping for is a clock that is actually running.
+        */}
+        {row.clock ? <SubLine tone={theme.colors.red}>{row.clock}</SubLine> : null}
       </View>
     );
   }
