@@ -82,8 +82,14 @@ export function TeamSheetRows({
 }
 
 /**
- * Wide enough for "HOME ✓" and a "2-1" scoreline; fixed, so the fixtures never
+ * Wide enough for "DRAW" and a "2-1" scoreline; fixed, so the fixtures never
  * jitter as picks land.
+ *
+ * ⚠ IT KEPT 44 WHEN THE TICK WENT. The widest label is about 30pt now, so
+ * there is room here to give the club codes — but the chips are what the rest
+ * of the row is measured against, and Ryan has been tuning this row by eye.
+ * Narrowing it is a change to make deliberately, not as a side effect of
+ * deleting a glyph.
  *
  * ⚠ 46, NOT 52. Every point taken from the two chips is a point the club codes
  * and crests get back, and "DRAW" is only about 25pt of text at this size — the
@@ -163,8 +169,31 @@ function PickChip({
   }
 
   const same = outcome === 'same';
+
+  /**
+   * ⚠ THE TICK IS GONE — Ryan, 2026-09-05 — and the FILL carries it alone now.
+   *
+   * The comment that used to sit here argued colour could not carry the win.
+   * That was about HUE, and these three states were never separated by hue: a
+   * taken fixture is SOLID, an untaken one is an outline, a shared pick is a
+   * grey slab. Fill-versus-outline survives any colour vision, so the tick was
+   * restating what the shape already said — inside a 44pt chip, where it cost
+   * the label most of its air.
+   *
+   * ⚠ IT DID CARRY ONE THING THE SHAPE DOES NOT: a name for a screen reader.
+   * "AWAY" on its own does not say who took the fixture, so that moves to
+   * `accessibilityLabel` rather than leaving with the glyph.
+   */
   return (
     <View
+      accessible
+      accessibilityLabel={
+        won
+          ? `${label} — took this one`
+          : same
+            ? `${label} — same pick, cannot separate them`
+            : label
+      }
       style={{
         width: CHIP_W,
         borderRadius: theme.radii.xs,
@@ -187,14 +216,6 @@ function PickChip({
       >
         {label}
       </Text>
-      {/* The win marker. Colour alone cannot carry it: an outline means both
-          "waiting" and "did not take it", and grey means "you picked the same".
-          The tick is the only unambiguous "this one was mine". */}
-      {won ? (
-        <Text variant="detail" style={{ color: '#FFFFFF', fontFamily: fontFamilies.bold }}>
-          ✓
-        </Text>
-      ) : null}
     </View>
   );
 }
