@@ -377,8 +377,22 @@ function SubLine({ tone, children }: { tone: string; children: React.ReactNode }
  */
 const SCORELINE = {
   fixture: { width: CENTRE_W, size: 13 },
-  duel: { width: 76, size: 15 },
+  // ⚠ 94, NOT 76. A duel scoreline is a MATCHWEEK's points, and a matchweek
+  // pays 100 a fixture at Results depth — so a perfect ten is 1000 and
+  // "1000 – 1000" is eight tabular digits, about 91pt once the dash has real
+  // air either side. At 76 it overflowed its own column and shoved the two
+  // members apart, on the weeks somebody played best.
+  duel: { width: 94, size: 15 },
 } as const;
+
+/**
+ * Air either side of the dash.
+ *
+ * ⚠ PADDING ON THE DASH, NOT SPACES IN THE STRING. A space is a glyph belonging
+ * to whichever side it was typed next to, so it would push the digits off the
+ * fixed axis the three-part layout exists to hold.
+ */
+const DASH_AIR = 6;
 
 export function Scoreline({
   home,
@@ -427,10 +441,24 @@ export function Scoreline({
       <Text variant="detail" style={[digit, { textAlign: 'right' }]}>
         {home}
       </Text>
+      {/*
+        ⚠ THE DASH IS THE SAME INK AS THE DIGITS — Ryan, 2026-09-05. It was
+        slate at 60% and read as a separator between two numbers rather than
+        part of one scoreline.
+
+        ⚠ `tint`, NEVER a literal white. Ryan sees this on the dark theme where
+        ink IS near-white, but these cards render in both — a hardcoded #FFFFFF
+        would be an invisible dash on the light theme's white card, and only
+        somebody switching themes would ever find it.
+      */}
       <Text
-        variant="detail"
-        color="slate"
-        style={{ paddingHorizontal: 3, fontSize: size, lineHeight: size + 5, opacity: 0.6 }}
+        style={{
+          paddingHorizontal: DASH_AIR,
+          fontFamily: fontFamilies.black,
+          fontSize: size,
+          lineHeight: size + 5,
+          color: tint,
+        }}
       >
         –
       </Text>
