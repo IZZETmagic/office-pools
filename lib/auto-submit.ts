@@ -74,6 +74,21 @@ export async function autoSubmitDraftEntries(poolId?: string): Promise<AutoSubmi
         .eq('has_submitted_predictions', false)
         .eq('auto_submitted', false)
         .eq('predictions_locked', false)
+        // ⚠ A RETIRED ENTRY MUST NOT BE SWEPT BACK INTO SCORING.
+        //
+        // This does more than skip a submission. The sweep sets
+        // `has_submitted_predictions: true`, and that flag is one of the only
+        // two doors into the World Cup scoring selectors — so auto-submitting a
+        // retired entry re-enters it into the scoring population that migration
+        // 057 removed it from, and emails the member about a pool they left.
+        //
+        // ⚠ THE LEAGUE LANDMINE. Pools are selected on
+        // `prediction_deadline < now()`, and league pools are excluded today
+        // only because their deadline sits at the season's last kickoff
+        // (2027-05-30). When that date passes, every league entry becomes
+        // eligible for this sweep. This predicate is what stops retired league
+        // entries being caught by it.
+        .is('retired_at', null)
 
       if (entriesError) {
         result.errors.push(`Pool ${pool.pool_id}: failed to fetch entries: ${entriesError.message}`)
@@ -247,6 +262,9 @@ export async function autoSubmitProgressiveRounds(): Promise<AutoSubmitResult> {
         .from('pool_entries')
         .select('entry_id, entry_name, member_id')
         .in('member_id', (members ?? []).map(m => m.member_id))
+        // Same rule as the full-tournament sweep above — this is the
+        // progressive/per-round path, and it writes the same door-opening flag.
+        .is('retired_at', null)
 
       if (!entries || entries.length === 0) continue
 

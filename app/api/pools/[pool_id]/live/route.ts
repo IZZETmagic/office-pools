@@ -179,7 +179,14 @@ async function handleGET(
 
   const [matchRows, { data: memberRows }] = await Promise.all([
     readLiveMatchRows(admin, pool as { tournament_id: string; league_season_id: string | null }),
-    admin.from('pool_members').select('pool_entries(entry_id)').eq('pool_id', pool_id),
+    admin
+      .from('pool_members')
+      .select('pool_entries(entry_id)')
+      .eq('pool_id', pool_id)
+      // Matches getPoolDataUncached and getPoolBulkDataUncached, which both
+      // carry this. Without it the 30s poll read and ranked retired entries on
+      // every tick for every viewer of every live pool.
+      .is('pool_entries.retired_at', null),
   ])
 
   const matches = matchRows

@@ -50,7 +50,12 @@ function buildDeleteChain(table: string) {
   const record: DeleteCall = { table, filters: [] }
   deleteCalls.push(record)
   const chain: any = {}
-  const filterMethods = ['eq', 'in', 'neq', 'gt', 'gte', 'lt', 'lte']
+  // `is` is here because the entry read filters `.is('retired_at', null)`. A
+  // filter method missing from this list is not a chaining error you can see —
+  // the chain returns undefined, the read yields no data, and recalculatePool
+  // bails with success:false, which reads like a product bug rather than a
+  // harness gap. Keep this list in step with the query builder.
+  const filterMethods = ['eq', 'in', 'is', 'neq', 'gt', 'gte', 'lt', 'lte']
   for (const method of filterMethods) {
     chain[method] = (...args: unknown[]) => {
       record.filters.push({ method, args })
@@ -69,7 +74,7 @@ function buildDeleteChain(table: string) {
 function buildReadChain(table: string) {
   const chain: any = {}
   // All filter methods return chain for chaining
-  const filterMethods = ['eq', 'in', 'neq', 'gt', 'gte', 'lt', 'lte', 'order', 'range']
+  const filterMethods = ['eq', 'in', 'is', 'neq', 'gt', 'gte', 'lt', 'lte', 'order', 'range']
   for (const method of filterMethods) {
     chain[method] = () => chain
   }

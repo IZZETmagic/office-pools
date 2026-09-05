@@ -78,7 +78,11 @@ export function FeesTab({ pool }: Props) {
         .select(
           'member_id, users:user_id(username, full_name), pool_entries(entry_id, entry_name, entry_number, fee_paid, fee_paid_at, created_at)',
         )
-        .eq('pool_id', pool.poolId);
+        .eq('pool_id', pool.poolId)
+        // ⚠ MONEY — see the web FeesTab. A retired entry owes nothing, so it
+        // must leave the expected total and the unpaid count. Embedded and NOT
+        // `!inner`: the member stays with an empty entries array.
+        .is('pool_entries.retired_at', null);
       if (error) throw error;
       const rows = (data as DbRow[] | null) ?? [];
       const list: Member[] = rows.map((r) => {

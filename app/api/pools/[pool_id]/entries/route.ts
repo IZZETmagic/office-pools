@@ -216,6 +216,13 @@ async function handleDELETE(
     .from('pool_entries')
     .select('*', { count: 'exact', head: true })
     .eq('member_id', entry.member_id)
+    // ⚠ COUNT COMPETING ENTRIES, NOT ROWS. Retired entries kept their
+    // membership (the "stopped" door), so they still answer this count — and
+    // this guard exists precisely to stop a member reaching zero. One active
+    // entry beside two retired ones counted 3, the guard passed, and the member
+    // retired the only entry they were still competing with: exactly the state
+    // the guard is here to prevent.
+    .is('retired_at', null)
 
   if ((count ?? 0) <= 1) {
     return NextResponse.json({ error: 'Cannot delete your only entry' }, { status: 400 })

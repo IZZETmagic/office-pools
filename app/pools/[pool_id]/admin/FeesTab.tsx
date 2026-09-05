@@ -75,6 +75,17 @@ export function FeesTab({ pool, members, setMembers, currentUserId }: FeesTabPro
       .from('pool_members')
       .select('*, users!inner(user_id, username, full_name, email), pool_entries(*)')
       .eq('pool_id', pool.pool_id)
+      // ⚠ MONEY. A retired entry owes nothing and is owed nothing, so it must
+      // not sit in "expected" or in the unpaid count — `lib/poolData.ts` filters
+      // it two files away and this refetch did not, so ticking a single fee
+      // brought every retired entry back into the totals. A 20-entry pool at £10
+      // where three unpaid members left then read "£200 expected, 3 unpaid"
+      // forever, and the admin chased people who had gone.
+      //
+      // ⚠ EMBEDDED AND NOT `!inner` — deliberately. An inner embed would drop
+      // the MEMBER as well as the entry; this returns the member with an empty
+      // entries array, which is the shape every consumer already handles.
+      .is('pool_entries.retired_at', null)
     if (error) {
       showToast('Failed to refresh member list', 'error')
       return

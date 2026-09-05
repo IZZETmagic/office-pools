@@ -181,6 +181,17 @@ async function handleGET(
     .from('pool_entries')
     .select('entry_id, member_id, entry_name, entry_number, has_submitted_predictions, total_points, point_adjustment, current_rank, previous_rank, match_points, bonus_points, scored_total_points')
     .in('member_id', memberIds)
+    // ⚠ RETIRED ENTRIES ARE NOT COMPETITORS. `lib/poolData.ts` carries this for
+    // the web page; this route is the PHONE's leaderboard and had no equivalent,
+    // so "stop participating" left a member on the board with their frozen total.
+    //
+    // Retirement via leave/remove/spare detaches the entry (member_id → NULL) and
+    // it falls out of the `.in('member_id', …)` above on its own. The "stopped"
+    // door deliberately KEEPS the membership, so only this predicate stops it.
+    //
+    // It also decides the trophies below: MVP is `leaderboard[0]`, so without
+    // this a member who led when they retired won the pool's MVP award.
+    .is('retired_at', null)
 
   if (!entries) {
     return NextResponse.json({ error: 'Failed to fetch entries' }, { status: 500 })

@@ -107,6 +107,10 @@ async function handleGET(
       .from('pool_entries')
       .select('entry_id')
       .in('member_id', poolMemberIds?.map(m => m.member_id) ?? [])
+      // `totalEntries` is the DENOMINATOR of the admin's Submitted/Pending
+      // badge, and a retired entry can no longer submit — so counting it made a
+      // fully-submitted round read "11 of 12" and never complete.
+      .is('retired_at', null)
 
     const totalEntries = allEntries?.length ?? 0
     const entryIds = (allEntries ?? []).map(e => e.entry_id)

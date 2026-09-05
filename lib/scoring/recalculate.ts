@@ -175,6 +175,20 @@ export async function recalculatePool(options: RecalculateOptions): Promise<Reca
       .from('pool_entries')
       .select('entry_id, member_id, has_submitted_predictions, point_adjustment, predictions_submitted_at, match_points, bonus_points, scored_total_points, current_rank')
       .in('member_id', memberIds)
+      // ⚠ A RETIRED ENTRY IS NOT SCORED AND DOES NOT CONSUME A RANK.
+      //
+      // Migration 057 gave the league engine this predicate; this is the World
+      // Cup half, which never got it. Without it `rankMap` sorted the whole pool
+      // including retirees and wrote `current_rank` to every one, so the board —
+      // which DOES hide them — rendered 1, 2, 4, 5 with a permanent gap, and
+      // everyone below the retiree displayed one rank worse than they were.
+      //
+      // ⚠ THIS MUST NOT DELETE THEIR SCORE ROWS. It does not: `allEntryIds`
+      // (the delete batch in legacyWriteScores) is derived from the calculator's
+      // own output, so an entry filtered out here is never in the delete at all.
+      // Decision 15 restores a season IN FULL, so the points have to survive —
+      // retiring freezes a total, it does not zero it.
+      .is('retired_at', null)
 
     if (!entries) {
       return { success: false, poolId, predictionMode: pool.prediction_mode, entriesProcessed: 0, matchScoresWritten: 0, bonusScoresWritten: 0, error: 'Failed to fetch entries' }
