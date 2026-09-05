@@ -3,9 +3,12 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Card, Icon, Text } from '@/components/ui';
 import { duelResult } from '@/lib/duelPoints';
+import { buildSheet, sheetSummary, type SheetFixture } from '@/lib/duelSheet';
 import { fixturesForWeek } from '@/lib/pickemWeek';
-import { useDuel } from '@/lib/useDuel';
-import { useLeaguePool, type LeagueMatch } from '@/lib/useLeaguePool';
+import { toSheetFixtures, useDuel } from '@/lib/useDuel';
+import { useDuelLive, type DuelLive } from '@/lib/useDuelLive';
+import { useLeaguePool } from '@/lib/useLeaguePool';
+import { TeamSheetRows } from './TeamSheet';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -43,7 +46,7 @@ type Props = {
 export function ShowdownRoom({ poolId }: Props) {
   const theme = useTheme();
   const league = useLeaguePool(poolId);
-  const { duels, names, revealedWeeks, pickDirections, bouts } = useDuel(poolId);
+  const { duels, names, revealedWeeks, pickLabels, bouts } = useDuel(poolId);
 
   /**
    * Your own entries, so your duel can be anchored in the week.
@@ -84,9 +87,29 @@ export function ShowdownRoom({ poolId }: Props) {
     [duels, shown],
   );
   const fixtures = useMemo(
-    () => (shown === null ? [] : fixturesForWeek(league.data?.season.matches ?? [], shown)),
+    () =>
+      shown === null
+        ? []
+        : toSheetFixtures(fixturesForWeek(league.data?.season.matches ?? [], shown)),
     [league.data, shown],
   );
+
+  /**
+   * The per-fixture points for the week on screen, so an expanded duel can show
+   * WHO TOOK each fixture rather than only who picked what.
+   *
+   * ⚠ IT MUST COME FROM THE SERVER. Both picks and the final score are already
+   * here, so it is tempting to work out who was right on the phone — that is
+   * exactly the client-side scoring the architecture rule forbids, and at Scores
+   * depth it would have to reimplement the exact/result tiers to get it wrong
+   * quietly. `/duel-live` already computes it for every entry in a matchweek.
+   *
+   * ⚠ ANY REVEALED WEEK, not just the live one — the route takes the matchweek
+   * as a parameter and its own header explains why that is safe: the seal
+   * withholds who you are PLAYING, never what was scored in a week already
+   * played. Polling is off unless this week is the one in progress.
+   */
+  const live = useDuelLive(poolId, shown, shown !== null && shown === inPlay);
 
   if (league.isPending) {
     return (
@@ -147,7 +170,8 @@ export function ShowdownRoom({ poolId }: Props) {
             open={openDuel === d.duel_id}
             onToggle={() => setOpenDuel(openDuel === d.duel_id ? null : d.duel_id)}
             fixtures={fixtures}
-            pickDirections={pickDirections}
+            pickLabels={pickLabels}
+            live={live}
           />
         );
       })}
@@ -164,15 +188,17 @@ function DuelRow({
   open,
   onToggle,
   fixtures,
-  pickDirections,
+  pickLabels,
+  live,
 }: {
   duel: ReturnType<typeof useDuel>['duels'][number];
   names: Record<string, string>;
   isYours: boolean;
   open: boolean;
   onToggle: () => void;
-  fixtures: LeagueMatch[];
-  pickDirections: Map<string, Map<string, string>>;
+  fixtures: SheetFixture[];
+  pickLabels: Map<string, Map<string, string>>;
+  live: DuelLive;
 }) {
   const theme = useTheme();
   const name = (id: string | null) => (id ? names[id] ?? 'Unknown' : 'Bye');
@@ -230,12 +256,7 @@ function DuelRow({
       </Pressable>
 
       {open ? (
-        <Sheets
-          duel={duel}
-          fixtures={fixtures}
-          pickDirections={pickDirections}
-          names={names}
-        />
+        <Sheets duel={duel} fixtures={fixtures} pickLabels={pickLabels} live={live} names={names} />
       ) : null}
     </Card>
   );
@@ -255,15 +276,36 @@ function DuelRow({
 function Sheets({
   duel,
   fixtures,
-  pickDirections,
+  pickLabels,
+  live,
   names,
 }: {
   duel: ReturnType<typeof useDuel>['duels'][number];
-  fixtures: LeagueMatch[];
-  pickDirections: Map<string, Map<string, string>>;
+  fixtures: SheetFixture[];
+  pickLabels: Map<string, Map<string, string>>;
+  live: DuelLive;
   names: Record<string, string>;
 }) {
   const theme = useTheme();
+
+  const a = pickLabels.get(duel.entry_a);
+  const b = duel.entry_b ? pickLabels.get(duel.entry_b) : undefined;
+
+  const rows = useMemo(
+    () =>
+      buildSheet({
+        fixtures,
+        live: new Map(live.fixtures.map((f) => [f.number, f])),
+        mine: live.perFixture.get(duel.entry_a) ?? new Map(),
+        theirs: duel.entry_b ? live.perFixture.get(duel.entry_b) ?? new Map() : new Map(),
+        label: (entryId, fixtureId) => pickLabels.get(entryId)?.get(fixtureId) ?? null,
+        youEntry: duel.entry_a,
+        themEntry: duel.entry_b,
+      }),
+    [fixtures, live, pickLabels, duel.entry_a, duel.entry_b],
+  );
+
+  const summary = sheetSummary(rows);
 
   if (duel.entry_b === null) {
     return (
@@ -272,9 +314,6 @@ function Sheets({
       </Text>
     );
   }
-
-  const a = pickDirections.get(duel.entry_a);
-  const b = pickDirections.get(duel.entry_b);
 
   // ⚠ NO PICKS AT ALL means the matchweek has not locked, not that nobody
   // picked — `/bulk` withholds an open week. Saying "not yet" is the only
@@ -287,80 +326,55 @@ function Sheets({
     );
   }
 
-  const differing = fixtures.filter(
-    (f) => a?.get(f.match_id) !== b?.get(f.match_id),
-  ).length;
-
   return (
     <View style={{ marginTop: theme.spacing.md }}>
-      <Text variant="detail" color="slate" style={{ marginBottom: theme.spacing.sm }}>
-        {differing === 0
-          ? 'Identical sheets — nothing can separate them.'
-          : `${fixtures.length - differing} of ${fixtures.length} the same. This duel is ${differing} fixture${
-              differing === 1 ? '' : 's'
-            }.`}
-      </Text>
+      {/*
+        ⚠ THE SAME SHEET THE DUEL TAB SHOWS — Ryan, 2026-09-05. This used to be
+        a thinner version of it: a chip either side of "ARS v CHE" as one grey
+        string, with no crest, no scoreline and no kickoff. It drifted the
+        moment the Duel tab's row grew, and a member switching between the two
+        tabs is comparing them directly.
 
-      {fixtures.map((f) => {
-        const pa = a?.get(f.match_id) ?? null;
-        const pb = b?.get(f.match_id) ?? null;
-        const same = pa !== null && pa === pb;
-        return (
-          <View
-            key={f.match_id}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: theme.spacing.sm,
-              paddingVertical: theme.spacing.xs,
-              // Agreement is dimmed, not hidden: seeing that six of ten cancel
-              // is what makes the remaining four mean something.
-              opacity: same ? 0.4 : 1,
-            }}
-          >
-            <Pick direction={pa} />
-            <Text variant="detail" color="slate" numberOfLines={1} style={{ flex: 1 }}>
-              {f.home_team?.country_code ?? f.home_team?.country_name ?? 'TBD'} v{' '}
-              {f.away_team?.country_code ?? f.away_team?.country_name ?? 'TBD'}
-            </Text>
-            <Pick direction={pb} align="right" />
-          </View>
-        );
-      })}
-    </View>
-  );
-}
+        ⚠ AND `buildSheet`, NOT A SECOND DERIVATION. The outcome rule — who took
+        a fixture, and the difference between "not started" and "nobody is ahead
+        yet" — has three shipped bugs behind it and 21 tests holding it. A
+        Room-shaped copy would have had none of them.
 
-/** One member's call on one fixture. `null` is no pick, which is not a draw. */
-function Pick({
-  direction,
-  align = 'left',
-}: {
-  direction: string | null;
-  align?: 'left' | 'right';
-}) {
-  const theme = useTheme();
-  const label = direction === 'home' ? 'H' : direction === 'away' ? 'A' : direction === 'draw' ? 'D' : '·';
-  return (
-    <View
-      style={{
-        width: theme.spacing.xl,
-        paddingVertical: theme.spacing.xxs,
-        borderRadius: theme.radii.xs,
-        backgroundColor: direction ? theme.colors.mist : 'transparent',
-        alignItems: 'center',
-      }}
-    >
-      <Text
-        variant="detail"
+        ⚠ WHOSE COLUMN IS WHICH: `entry_a` on the left in blue, `entry_b` on the
+        right in red, matching the two names in the header above. Orientation is
+        presentational — the circle method's sides carry no meaning — but the
+        colours must agree with the names or the sheet is unreadable.
+      */}
+      <View
         style={{
-          color: direction ? theme.colors.ink : theme.colors.slate,
-          fontFamily: fontFamilies.bold,
-          textAlign: align,
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          gap: theme.spacing.sm,
+          marginBottom: theme.spacing.xs,
         }}
       >
-        {label}
-      </Text>
+        <Text variant="caption" numberOfLines={1} style={{ color: theme.colors.primary }}>
+          {names[duel.entry_a] ?? 'Unknown'}
+        </Text>
+        <Text
+          variant="caption"
+          numberOfLines={1}
+          style={{ flex: 1, textAlign: 'right', color: theme.colors.red }}
+        >
+          {names[duel.entry_b] ?? 'Unknown'}
+        </Text>
+      </View>
+
+      <TeamSheetRows rows={rows} />
+
+      {/* Agreement is dead weight by definition: a fixture both called the same
+          way cannot separate them whatever it finishes. Saying how many is what
+          makes the rest mean something. */}
+      {summary ? (
+        <Text variant="detail" color="slate" style={{ marginTop: theme.spacing.sm }}>
+          {summary}
+        </Text>
+      ) : null}
     </View>
   );
 }

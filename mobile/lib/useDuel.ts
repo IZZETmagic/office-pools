@@ -210,6 +210,17 @@ export type DuelState = {
    * window; the picking still has to be reachable.
    */
   openMatchweek: number | null;
+  /**
+   * Every member's pick as a SHORT LABEL — "HOME" at Results depth, "2-1" at
+   * Scores. Keyed entry → fixture.
+   *
+   * ⚠ Exposed for THE ROOM, which renders the same team sheet for duels that
+   * are not yours. The reveal gate is upstream in `/bulk`, so a week that has
+   * not locked simply has no entries here — this map cannot leak it.
+   */
+  pickLabels: Map<string, Map<string, string>>;
+  /** The matchweek being played, or null between them. */
+  inPlayMatchweek: number | null;
   /** Every OTHER duel in the live matchweek — the rest of the card. */
   elsewhere: {
     id: string;
@@ -343,6 +354,45 @@ export type Sheet = {
  *   payload is the whole season (~165 kB) and there is no reason to pull it
  *   for a mode with no duels. `useLeaguePool` is disabled on a null id.
  */
+/**
+ * A matchweek's fixtures in the shape `buildSheet` takes.
+ *
+ * ⚠ EXPORTED because THE ROOM builds sheets too, for any revealed week rather
+ * than only the live one. Two copies of this mapping is two chances to reach
+ * for the wrong field, and there are two fields here that punish exactly that.
+ */
+export function toSheetFixtures(matches: LeagueMatch[]): SheetFixture[] {
+  return matches.map((f) => ({
+    // ⚠ `match_number` IS `league_fixtures.fixture_number` — `read.ts` maps it
+    // across — which is what the live payload keys on. A season-wide index here
+    // would miss every lookup silently.
+    number: f.match_number,
+    id: f.match_id,
+    // ⚠ `country_name` / `flag_url` ARE the club's name and crest. A league
+    // fixture travels through types written for national teams.
+    homeName: f.home_team?.country_name ?? null,
+    awayName: f.away_team?.country_name ?? null,
+    /**
+     * ⚠⚠ `country_code`, NOT `short_name`. Both sound like the answer and only
+     * one is: `short_name` is `shortClubName(name)` — a SHORTENED NAME, which
+     * is why a sheet asking for three-letter codes rendered "Crystal Palace"
+     * and "Nott'm Forest". The code lives in `league_clubs.abbreviation`
+     * (char(3), NOT NULL) and `clubToTeam` carries it as `country_code`;
+     * `MatchweekResultsForm` on the web already reads it that way.
+     *
+     * ⚠ TRIMMED, because `char(3)` is blank-padded by Postgres.
+     */
+    homeAbbr: f.home_team?.country_code?.trim() || null,
+    awayAbbr: f.away_team?.country_code?.trim() || null,
+    homeCrest: f.home_team?.flag_url ?? null,
+    awayCrest: f.away_team?.flag_url ?? null,
+    kickoffAt: f.match_date,
+    homeScoreFt: f.home_score_ft,
+    awayScoreFt: f.away_score_ft,
+    isCompletedFt: f.is_completed,
+  }));
+}
+
 export function useDuel(poolId: string | null | undefined): DuelState {
   const league = useLeaguePool(poolId);
   const data = league.data;
@@ -884,41 +934,13 @@ export function useDuel(poolId: string | null | undefined): DuelState {
   }, [data, picks.data]);
 
   /** The live matchweek's fixtures, in the shape the sheet builder takes. */
-  const sheetFixtures = useMemo<SheetFixture[]>(() => {
-    if (!isInPlay || inPlayWeek === null || !data) return [];
-    return fixturesForWeek(data.season.matches, inPlayWeek).map((f) => ({
-      // ⚠ `match_number` IS `league_fixtures.fixture_number` — `read.ts` maps it
-      // across — which is what the live payload keys on. A season-wide index
-      // here would miss every lookup silently.
-      number: f.match_number,
-      id: f.match_id,
-      // ⚠ `country_name` / `flag_url` ARE the club's name and crest. A league
-      // fixture travels through types written for national teams.
-      homeName: f.home_team?.country_name ?? null,
-      awayName: f.away_team?.country_name ?? null,
-      /**
-       * ⚠⚠ `country_code`, NOT `short_name`. Both sound like the answer and only
-       * one is: `short_name` is `shortClubName(name)` — a SHORTENED NAME, which
-       * is why a sheet asking for three-letter codes rendered "Crystal Palace"
-       * and "Nott'm Forest". The code lives in `league_clubs.abbreviation`
-       * (char(3), NOT NULL) and `clubToTeam` carries it as `country_code`;
-       * `MatchweekResultsForm` on the web already reads it that way.
-       *
-       * ⚠ TRIMMED, because `char(3)` is blank-padded by Postgres. Nothing in the
-       * league uses a two-letter code today, so this has never shown — but a
-       * trailing space inside a fixed-width column is the kind of thing that
-       * turns up as one club sitting a pixel off the others.
-       */
-      homeAbbr: f.home_team?.country_code?.trim() || null,
-      awayAbbr: f.away_team?.country_code?.trim() || null,
-      homeCrest: f.home_team?.flag_url ?? null,
-      awayCrest: f.away_team?.flag_url ?? null,
-      kickoffAt: f.match_date,
-      homeScoreFt: f.home_score_ft,
-      awayScoreFt: f.away_score_ft,
-      isCompletedFt: f.is_completed,
-    }));
-  }, [isInPlay, inPlayWeek, data]);
+  const sheetFixtures = useMemo<SheetFixture[]>(
+    () =>
+      !isInPlay || inPlayWeek === null || !data
+        ? []
+        : toSheetFixtures(fixturesForWeek(data.season.matches, inPlayWeek)),
+    [isInPlay, inPlayWeek, data],
+  );
 
   const sheetRows = useMemo<SheetRow[]>(() => {
     if (!isInPlay || !current || sheetFixtures.length === 0) return [];
@@ -1022,5 +1044,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     verdict,
     elsewhere,
     openMatchweek: openWeek,
+    pickLabels,
+    inPlayMatchweek: inPlayWeek,
   };
 }

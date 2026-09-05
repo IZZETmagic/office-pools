@@ -83,6 +83,16 @@ const EMPTY: DuelLive = { points: new Map(), perFixture: new Map(), fixtures: []
 export function useDuelLive(
   poolId: string | null | undefined,
   matchweek: number | null,
+  /**
+   * Is this week still being played?
+   *
+   * ⚠ THE ROOM ASKS FOR SETTLED WEEKS TOO, and a settled matchweek cannot
+   * change — polling one every minute buys nothing and holds a subscription for
+   * a scoreline that was final in August. The route is happy to serve any week
+   * (its own header says so: what people scored in a past week is already on
+   * the team sheet), so the fetch stays and only the refresh goes.
+   */
+  live = true,
 ): DuelLive {
   const queryClient = useQueryClient();
   const enabled = Boolean(poolId) && matchweek !== null;
@@ -93,11 +103,11 @@ export function useDuelLive(
       apiFetch<DuelLiveResponse>(`/api/pools/${poolId}/duel-live?matchweek=${matchweek}`),
     enabled,
     // See the header: the fallback, not the mechanism.
-    refetchInterval: 60_000,
+    refetchInterval: live ? 60_000 : false,
   });
 
   useEffect(() => {
-    if (!enabled || !poolId || matchweek === null) return;
+    if (!enabled || !live || !poolId || matchweek === null) return;
     // ⚠ `leaseBroadcast`, never `supabase.channel` directly. Channels dedupe by
     // topic, so a raw `unsubscribe()` here would end `pool:{id}:leaderboard`
     // for the live leaderboard holding the same topic — silently, and only for
@@ -107,7 +117,7 @@ export function useDuelLive(
         queryKey: duelLiveQueryKey(poolId, matchweek),
       });
     });
-  }, [enabled, poolId, matchweek, queryClient]);
+  }, [enabled, live, poolId, matchweek, queryClient]);
 
   return useMemo(() => {
     const data = query.data;
