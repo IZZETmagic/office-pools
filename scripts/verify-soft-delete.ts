@@ -49,11 +49,45 @@
 // Exits 1 on any failure.
 // =============================================================
 
-import { readFileSync } from 'fs'
-import { resolve } from 'path'
+import { existsSync, readFileSync } from 'fs'
+import { execSync } from 'child_process'
+import { dirname, resolve } from 'path'
+
+/**
+ * `.env.local` is gitignored, so a git WORKTREE does not get one — and this
+ * script is exactly the kind of thing you run from a worktree while working on
+ * the migration it verifies. Reading it from cwd alone threw ENOENT on line one
+ * with a stack trace that says nothing about worktrees.
+ *
+ * Falls back to the main checkout, found via `--git-common-dir`: in a worktree
+ * that resolves to <main>/.git, whose parent is the checkout holding the real
+ * file. In a normal clone it resolves to the same directory as cwd, so this
+ * costs nothing there.
+ */
+function envPath(): string {
+  const local = resolve(process.cwd(), '.env.local')
+  if (existsSync(local)) return local
+  try {
+    const commonDir = execSync('git rev-parse --git-common-dir', { encoding: 'utf8' }).trim()
+    const shared = resolve(dirname(resolve(commonDir)), '.env.local')
+    if (existsSync(shared)) return shared
+  } catch {
+    // not a git checkout — fall through to the original error, which is clearer
+  }
+  return local
+}
 
 ;(() => {
-  const envContent = readFileSync(resolve(process.cwd(), '.env.local'), 'utf8')
+  const path = envPath()
+  if (!existsSync(path)) {
+    console.error(`\n  This script needs .env.local (service-role credentials).`)
+    console.error(`  Looked in ${process.cwd()} and the main checkout, found neither.\n`)
+    process.exit(1)
+  }
+  if (path !== resolve(process.cwd(), '.env.local')) {
+    console.log(`  · using .env.local from the main checkout — ${path}`)
+  }
+  const envContent = readFileSync(path, 'utf8')
   for (const line of envContent.split('\n')) {
     const t = line.trim()
     if (!t || t.startsWith('#')) continue
@@ -75,6 +109,7 @@ const admin = createAdminClient()
 // --- scratch namespace: every id starts dd056 so strays are greppable -------
 const S = 'dd056000-0000-4000-8000-'
 const SEASON = `${S}000000000001`
+const TOURNAMENT = `${S}000000000008`
 const POOL = `${S}000000000002`
 const MEMBER1 = `${S}000000000003`
 const MEMBER2 = `${S}000000000004`
@@ -90,16 +125,29 @@ const MW3 = `${S}000000000012`
 // Showdown and LMS are pool-level modes, so each needs its own pool. Both hang
 // off the SAME scratch season, so teardown is unchanged.
 const POOL_SD = `${S}000000000006`   // showdown
-const SD_MEM_A = `${S}000000000060`
-const SD_MEM_B = `${S}000000000061`
-const SD_ENTRY_A = `${S}000000000062`
-const SD_ENTRY_B = `${S}000000000063`
+// ⚠ ONE MEMBER, TWO ENTRIES. `pool_members` is UNIQUE on (pool_id, user_id) and
+// this script has exactly one real user to work with, so two members in one
+// pool is impossible. It does not matter: both engines pair and enrol ENTRIES,
+// not members, and a member holding several entries is a normal pool anyway.
+const SD_MEM = `${S}000000000060`
+// ⚠ FOUR entries, not two. Retiring from a two-entry pool leaves one, and
+// `league_generate_duel_schedule` then DELETES every unsettled duel outright
+// ("fewer than two entries") — so there is no duel left to settle and the bug
+// is unreachable. With four, the regeneration that `retireEntries` triggers
+// keeps pairing people AND spares the open matchweek's existing duels
+// (migration 118), which is precisely how a duel naming a retired entry
+// survives to be settled.
+const SD_ENTRY = (n: number) => `${S}00000000006${n}`
 
 const POOL_LMS = `${S}000000000007`  // last man standing
-const LMS_MEM = (n: number) => `${S}00000000007${n}`
+const LMS_MEM = `${S}000000000070`
 const LMS_ENTRY = (n: number) => `${S}00000000008${n}`
 const CLUB = (n: number) => `${S}0000000002${n}0`
-const FIX = (n: number) => `${S}0000000003${n}0`
+// ⚠ PADDED, because MW3 uses fixture 10. The last group of a UUID is exactly
+// 12 hex characters and the old `...0003${n}0` produced 13 for any two-digit n,
+// which Postgres rejects outright ("invalid input syntax for type uuid").
+// Offset well clear of MW1-3 (`...000010/11/12`) and CLUB(n) (`...0002n0`).
+const FIX = (n: number) => `${S}0000000${String(n).padStart(2, '0')}000`
 
 const EXACT = 100 // pool_settings absent -> league_score_fixture COALESCE default
 const DUEL_WIN = 500
@@ -234,11 +282,31 @@ async function setup() {
     admin.from('users').select('user_id').eq('username', 'IZZETmagic').limit(1))
   ADMIN_USER = ((users ?? [])[0] as { user_id: string }).user_id
 
-  const tp = await must('league tournament',
-    admin.from('pools').select('tournament_id').not('league_season_id', 'is', null).limit(1))
-  const tournamentId = ((tp ?? [])[0] as { tournament_id: string }).tournament_id
-
+  // ⚠ ITS OWN TOURNAMENT, not a borrowed one. This used to grab an arbitrary
+  // real league pool's tournament_id, and migration 111 (`a pool names one
+  // competition`) has since made that a hard error: the trigger compares
+  // (external_provider, external_league_id, external_season) on the pool's
+  // tournament against its league season and refuses a pool that names two
+  // different competitions. Borrowing Bundesliga's tournament for a season
+  // declared (scratch, -56, -2026) is exactly what it exists to stop.
+  //
+  // The script last passed on 2026-08-24, before 111 — so it has been broken
+  // since, silently, because nothing runs it automatically.
   const future = new Date(Date.now() + 90 * 864e5).toISOString()
+
+  const tournamentId = TOURNAMENT
+  await must('scratch tournament', admin.from('tournaments').insert({
+    tournament_id: TOURNAMENT, name: '__scratch 056 (auto-deleted)',
+    tournament_type: 'league', year: 2026,
+    // ⚠ `format` DEFAULTS TO 'groups_knockout' — a World Cup shape. 111's
+    // trigger checks it as well as the competition triple and refuses a league
+    // season paired with a knockout tournament, because neither side syncs.
+    format: 'league',
+    num_teams: 4, num_groups: 1, teams_per_group: 4,
+    start_date: '2026-08-01', end_date: '2027-05-30', prediction_deadline: future,
+    // Must match the season below, or 111's trigger rejects the pool.
+    external_provider: 'scratch', external_league_id: -56, external_season: -2026,
+  }).select('tournament_id'))
 
   await must('season', admin.from('league_seasons').insert({
     season_id: SEASON, competition_slug: 'scratch-056', competition_name: 'Scratch 056',
@@ -340,14 +408,15 @@ async function setup() {
     status: 'open', prediction_mode: 'league_pickem', league_season_id: SEASON,
     league_mode: 'showdown', league_depth: 'scores',
   }).select('pool_id'))
-  await must('showdown members', admin.from('pool_members').insert([
-    { member_id: SD_MEM_A, pool_id: POOL_SD, user_id: ADMIN_USER, role: 'admin' },
-    { member_id: SD_MEM_B, pool_id: POOL_SD, user_id: ADMIN_USER, role: 'player' },
-  ]).select('member_id'))
-  await must('showdown entries', admin.from('pool_entries').insert([
-    { entry_id: SD_ENTRY_A, member_id: SD_MEM_A, entry_name: 'Duellist A', entry_number: 1 },
-    { entry_id: SD_ENTRY_B, member_id: SD_MEM_B, entry_name: 'Duellist B', entry_number: 1 },
-  ]).select('entry_id'))
+  await must('showdown member', admin.from('pool_members').insert({
+    member_id: SD_MEM, pool_id: POOL_SD, user_id: ADMIN_USER, role: 'admin',
+  }).select('member_id'))
+  await must('showdown entries', admin.from('pool_entries').insert(
+    [1, 2, 3, 4].map((n) => ({
+      entry_id: SD_ENTRY(n), member_id: SD_MEM,
+      entry_name: `Duellist ${n}`, entry_number: n,
+    })),
+  ).select('entry_id'))
 
   // Generated NOW, while every matchweek is still ahead. Regeneration
   // deliberately spares the open matchweek (migration 118), so a schedule built
@@ -360,16 +429,13 @@ async function setup() {
     status: 'open', prediction_mode: 'league_pickem', league_season_id: SEASON,
     league_mode: 'last_man_standing', league_depth: null,
   }).select('pool_id'))
-  await must('lms members', admin.from('pool_members').insert(
-    [1, 2, 3].map((n) => ({
-      member_id: LMS_MEM(n), pool_id: POOL_LMS, user_id: ADMIN_USER,
-      role: n === 1 ? 'admin' : 'player',
-    })),
-  ).select('member_id'))
+  await must('lms member', admin.from('pool_members').insert({
+    member_id: LMS_MEM, pool_id: POOL_LMS, user_id: ADMIN_USER, role: 'admin',
+  }).select('member_id'))
   await must('lms entries', admin.from('pool_entries').insert(
     [1, 2, 3].map((n) => ({
-      entry_id: LMS_ENTRY(n), member_id: LMS_MEM(n),
-      entry_name: `Survivor ${n}`, entry_number: 1,
+      entry_id: LMS_ENTRY(n), member_id: LMS_MEM,
+      entry_name: `Survivor ${n}`, entry_number: n,
     })),
   ).select('entry_id'))
 
@@ -492,13 +558,24 @@ async function run() {
   // ---------------------------------------------------------------- phase 6
   head('6. Showdown — a duel against a member who left is a bye (migration 134)')
 
-  // A picks MW3 exactly; B files NOTHING. That is the discriminator: without
-  // 134, A simply out-scores an absent opponent and takes the win rate. The
-  // asymmetry is deliberate — a retiree who never picked is the shape the bug
-  // actually takes, because they stop picking the moment they stop competing.
-  await must('A picks MW3', admin.from('league_predictions').insert([
-    { entry_id: SD_ENTRY_A, fixture_id: FIX(9), predicted_home_score: 2, predicted_away_score: 0 },
-    { entry_id: SD_ENTRY_A, fixture_id: FIX(10), predicted_home_score: 1, predicted_away_score: 0 },
+  // Which pair the round-robin actually drew for MW3 is the generator's
+  // business, not ours — so read it rather than assume it. One of them will
+  // file picks and stay; the other files nothing and leaves.
+  const drawn = await must('MW3 duels', admin.from('league_duels')
+    .select('duel_id, entry_a, entry_b').eq('pool_id', POOL_SD).eq('matchweek_number', 3))
+  const pair = ((drawn ?? []) as Array<{ duel_id: string; entry_a: string; entry_b: string | null }>)
+    .find((d) => d.entry_b !== null)
+  if (!pair) throw new Error('no two-sided duel was drawn for MW3')
+  const STAYS = pair.entry_a
+  const LEAVES = pair.entry_b as string
+  note(`MW3 drew ${STAYS.slice(-4)} v ${LEAVES.slice(-4)} — the second one leaves`)
+
+  // The one who stays picks both fixtures exactly; the one who leaves files
+  // nothing. That asymmetry is the discriminator: without 134 the stayer simply
+  // out-scores an absent opponent and takes the win rate.
+  await must('picks MW3', admin.from('league_predictions').insert([
+    { entry_id: STAYS, fixture_id: FIX(9), predicted_home_score: 2, predicted_away_score: 0 },
+    { entry_id: STAYS, fixture_id: FIX(10), predicted_home_score: 1, predicted_away_score: 0 },
   ]).select('prediction_id'))
 
   // ⚠ THE LMS ROUND IS OPENED AND PICKED **HERE**, BEFORE THE FOOTBALL — even
@@ -534,15 +611,56 @@ async function run() {
     .select('*', { count: 'exact', head: true }).eq('round_id', roundId)
   eq('all three LMS picks LANDED (silent-skip trigger check)', lmsPickCount ?? 0, 3)
 
+  // ⚠ BOTH RETIREMENTS HAPPEN HERE — AFTER the draw and the picks, BEFORE the
+  // football. Settlement is TRIGGER-DRIVEN, not driven by the RPC calls below:
+  //
+  //   league_lms_on_fixture_complete   on league_fixtures   -> league_lms_settle
+  //   league_settle_duels_on_snapshot  on league_matchweeks -> league_score_duels
+  //
+  // So completing MW3 settles both engines the moment it happens. Retiring
+  // afterwards settles everything while the retirees are still active and the
+  // explicit RPCs below then find `settled_at IS NOT NULL` / a closed round and
+  // do nothing — the phases would reproduce the symptom by accident and STILL
+  // FAIL after 134, for a reason that has nothing to do with the fix.
+  //
+  // This order is the real one anyway: someone leaves during the week, and then
+  // the games are played.
+  const rb = await retireEntries(admin, { entryIds: [LEAVES] }, 'stopped', ADMIN_USER)
+  if (rb.error) bad('retire the duellist', rb.error)
+  else ok('one duellist stopped participating', 'before kickoff — membership kept')
+
+  // ⚠ retireEntries REGENERATES THE DUEL SCHEDULE. With fewer than two entries
+  // left it deletes every unsettled duel; above that it re-pairs, but spares
+  // the open matchweek's existing duels (migration 118). That sparing is what
+  // leaves a drawn duel still naming someone who has gone — the whole reason
+  // this phase can exist. If it ever stops sparing, this check says so rather
+  // than the phase quietly passing on a duel that no longer exists.
+  const stillDrawn = await must('duel survived the regen', admin.from('league_duels')
+    .select('duel_id').eq('pool_id', POOL_SD).eq('duel_id', pair.duel_id))
+  eq('the drawn duel survived retirement', (stillDrawn ?? []).length, 1)
+
+  const retireWinner = await retireEntries(admin, { entryIds: [LMS_ENTRY(1)] }, 'stopped', ADMIN_USER)
+  if (retireWinner.error) bad('retire survivor 1', retireWinner.error)
+  else ok('survivor 1 stopped participating', 'their club is about to win — pre-134 this crowns them')
+
+  // ⚠ MEASURE THE DELTA, AND CAPTURE IT BEFORE THE FOOTBALL.
+  // `league_entry_totals.duel_points` is a SEASON sum recomputed from every
+  // settled duel, so the raw total also carries MW1 and MW2 — which settled as
+  // 0-0 ties back in phases 1-3. And because settlement is trigger-driven,
+  // reading "before" any later than this reads a value MW3 has already changed,
+  // which is how this assertion first came back as a flat 0.
+  const duelPointsFor = async (entry: string) => {
+    const rows = await must('duel points', admin.from('league_entry_totals')
+      .select('duel_points').eq('entry_id', entry))
+    return ((rows ?? []) as Array<{ duel_points: number | null }>)[0]?.duel_points ?? 0
+  }
+  const aBefore = await duelPointsFor(STAYS)
+
+  // Fixtures first (fires the LMS trigger), then accuracy, then the matchweek
+  // rollup (fires the duel trigger) — the production order, so duels settle
+  // against scores that exist rather than against zeroes.
   await playMatchweek3()
   await scoreFixtures([9, 10])
-
-  // Retired AFTER the duel was drawn and AFTER the football was played, which
-  // is the only order that reproduces this. A member who leaves before the draw
-  // is never paired.
-  const rb = await retireEntries(admin, { entryIds: [SD_ENTRY_B] }, 'stopped', ADMIN_USER)
-  if (rb.error) bad('retire duellist B', rb.error)
-  else ok('duellist B stopped participating', 'membership kept — the door 057 exists for')
 
   await must('settle duels', admin.rpc('league_score_duels', {
     p_pool_id: POOL_SD, p_matchweek_number: 3,
@@ -550,7 +668,7 @@ async function run() {
 
   const duels = await must('duel row', admin.from('league_duels')
     .select('entry_a, entry_b, points_a, points_b, accuracy_a, accuracy_b')
-    .eq('pool_id', POOL_SD).eq('matchweek_number', 3))
+    .eq('duel_id', pair.duel_id))
   const duel = ((duels ?? []) as Array<{
     entry_a: string; entry_b: string | null
     points_a: number | null; points_b: number | null
@@ -560,12 +678,12 @@ async function run() {
   if (!duel) {
     bad('a duel was drawn for MW3', 'no row — check league_generate_duel_schedule')
   } else {
-    const aIsA = duel.entry_a === SD_ENTRY_A
+    const aIsA = duel.entry_a === STAYS
     const stayedPts = aIsA ? duel.points_a : duel.points_b
     const leftPts = aIsA ? duel.points_b : duel.points_a
     const stayedAcc = aIsA ? duel.accuracy_a : duel.accuracy_b
 
-    note(`A scored ${stayedAcc ?? 0} on picks; B filed none and left`)
+    note(`the stayer scored ${stayedAcc ?? 0} on picks; the leaver filed none`)
     expectedBy134('the member who stayed gets the BYE rate, not the win rate', stayedPts, DUEL_BYE)
     if (stayedPts === DUEL_WIN) {
       note('beating a ghost paid 500 — an advantage decided by an admin action, not by football')
@@ -573,14 +691,12 @@ async function run() {
     expectedBy134('the member who left scores nothing from the duel', leftPts, 0)
   }
 
-  // The totals INSERT already filtered retired before 134, so this half was
-  // never broken — asserted so a future change cannot quietly break it.
-  const sdTotals = await must('showdown totals', admin.from('league_entry_totals')
-    .select('entry_id, duel_points').in('entry_id', [SD_ENTRY_A, SD_ENTRY_B]))
-  const sdRows = (sdTotals ?? []) as Array<{ entry_id: string; duel_points: number | null }>
-  eq('the retiree has no totals row', sdRows.some((r) => r.entry_id === SD_ENTRY_B), false)
-  expectedBy134('and the leaderboard carries the bye, not a win',
-    sdRows.find((r) => r.entry_id === SD_ENTRY_A)?.duel_points, DUEL_BYE)
+  // What MW3 actually added to the season total. A retiree KEEPS an existing
+  // totals row — the INSERT filters them out of future writes rather than
+  // deleting what is there — so "does B have a row" proves nothing either way.
+  const aAfter = await duelPointsFor(STAYS)
+  expectedBy134('and the matchweek adds a bye to the season total, not a win',
+    aAfter - aBefore, DUEL_BYE)
 
   // ---------------------------------------------------------------- phase 7
   head('7. Last Man Standing — a member who left cannot be crowned (migration 134)')
@@ -591,12 +707,12 @@ async function run() {
   // retired_at when it enrols, so a member who leaves before the round starts
   // is handled correctly today.
   //
-  // The one whose club WON is the one who leaves. Without 134 they are the last
+  // The one whose club WON is the one who left. Without 134 they are the last
   // one standing and the round is theirs.
-  const retireWinner = await retireEntries(admin, { entryIds: [LMS_ENTRY(1)] }, 'stopped', ADMIN_USER)
-  if (retireWinner.error) bad('retire survivor 1', retireWinner.error)
-  else ok('survivor 1 stopped participating', 'their club won — pre-134 this crowned them')
-
+  //
+  // The settle below is belt and braces: the fixture-complete trigger has
+  // almost certainly run it already. Harmless either way — a closed round is
+  // never re-entered (`last_matchweek IS NOT NULL`).
   await must('settle LMS', admin.rpc('league_lms_settle', {
     p_pool_id: POOL_LMS, p_matchweek: 3,
   }) as never)
@@ -618,19 +734,26 @@ async function run() {
   eq('and is NOT marked eliminated — they left, football did not beat them',
     gone?.eliminated_matchweek, null)
 
-  const crowned = [...byEntry.values()].filter((r) => r.is_winner).length
-  if (crowned > 0) ok('the round still resolved', `${crowned} winner(s) among those still competing`)
-  else bad('the round still resolved', 'nobody was crowned — the round has stalled')
+  // ⚠ COUNT ONLY THE ENTRIES STILL COMPETING. A bare `is_winner` count is
+  // satisfied by the retiree themselves, so it passes today for the exact
+  // reason this phase exists to catch. Post-134 the retiree drops out of
+  // `standing`, both remaining entries go out together on the same matchweek,
+  // and the all-out branch gives them the round to share.
+  const crownedStillIn = [LMS_ENTRY(2), LMS_ENTRY(3)]
+    .filter((id) => byEntry.get(id)?.is_winner).length
+  if (crownedStillIn > 0) ok('the round resolved among those still competing', `${crownedStillIn} winner(s)`)
+  else bad('the round resolved among those still competing', `nobody still in the round was crowned — ${BY_134}`)
 
   // The sharpest symptom of the original bug: the rounds_won INSERT ALREADY
   // filtered retired, so crowning a retiree closed the round and credited the
   // win to nobody at all.
   const lmsTotals = await must('lms totals', admin.from('league_entry_totals')
-    .select('entry_id, rounds_won').in('entry_id', [LMS_ENTRY(1), LMS_ENTRY(2), LMS_ENTRY(3)]))
+    .select('entry_id, rounds_won').in('entry_id', [LMS_ENTRY(2), LMS_ENTRY(3)]))
   const wonSum = ((lmsTotals ?? []) as Array<{ rounds_won: number | null }>)
     .reduce((n, r) => n + (r.rounds_won ?? 0), 0)
-  if (wonSum > 0) ok('the win was credited to somebody', `rounds_won total ${wonSum}`)
-  else bad('the win was credited to somebody', `rounds_won total 0 — ${BY_134}`)
+  if (wonSum > 0) ok('and rounds_won reached an entry that can hold it', `total ${wonSum}`)
+  else bad('and rounds_won reached an entry that can hold it',
+           `total 0 — the round closed and the credit went nowhere. ${BY_134}`)
 }
 
 async function teardown() {
@@ -646,6 +769,7 @@ async function teardown() {
     await admin.from('pools').delete().eq('pool_id', pid)
   }
   await admin.from('league_seasons').delete().eq('season_id', SEASON)
+  await admin.from('tournaments').delete().eq('tournament_id', TOURNAMENT)
 
   // ⚠ EVERY new table a phase writes to belongs here. A teardown that deletes
   // the pool but never checks the child table reports success while leaving
@@ -658,12 +782,14 @@ async function teardown() {
     ['league_entry_totals', 'entry_id', ENTRY], ['league_match_scores', 'entry_id', ENTRY],
     ['league_seasons', 'season_id', SEASON], ['league_clubs', 'season_id', SEASON],
     ['league_matchweeks', 'season_id', SEASON], ['league_fixtures', 'season_id', SEASON],
+    ['tournaments', 'tournament_id', TOURNAMENT],
     // phase 6 — showdown
     ['pools', 'pool_id', POOL_SD], ['pool_members', 'pool_id', POOL_SD],
     ['pool_entries', 'pool_id', POOL_SD], ['league_duels', 'pool_id', POOL_SD],
-    ['league_entry_totals', 'entry_id', SD_ENTRY_A],
-    ['league_entry_totals', 'entry_id', SD_ENTRY_B],
-    ['league_predictions', 'entry_id', SD_ENTRY_A],
+    ['league_entry_totals', 'entry_id', SD_ENTRY(1)],
+    ['league_entry_totals', 'entry_id', SD_ENTRY(2)],
+    ['league_entry_totals', 'entry_id', SD_ENTRY(3)],
+    ['league_entry_totals', 'entry_id', SD_ENTRY(4)],
     // phase 7 — last man standing
     ['pools', 'pool_id', POOL_LMS], ['pool_members', 'pool_id', POOL_LMS],
     ['pool_entries', 'pool_id', POOL_LMS], ['league_lms_rounds', 'pool_id', POOL_LMS],
