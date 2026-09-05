@@ -8,7 +8,7 @@ import { fixturesForWeek } from '@/lib/pickemWeek';
 import { toSheetFixtures, useDuel } from '@/lib/useDuel';
 import { useDuelLive, type DuelLive } from '@/lib/useDuelLive';
 import { useLeaguePool } from '@/lib/useLeaguePool';
-import { TeamSheetRows } from './TeamSheet';
+import { Scoreline, TeamSheetRows } from './TeamSheet';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -214,6 +214,20 @@ function DuelRow({
         ? theme.colors.red
         : theme.colors.ink;
 
+  /**
+   * The week's points so far, for a duel that has not settled.
+   *
+   * Both null until at least one side has a scored fixture — see the note by
+   * the scoreline for why that is not the same as nil-nil.
+   */
+  const running = (() => {
+    if (duel.entry_b === null) return { a: null, b: null };
+    const a = live.points.get(duel.entry_a);
+    const b = live.points.get(duel.entry_b);
+    if (a === undefined && b === undefined) return { a: null, b: null };
+    return { a: a ?? 0, b: b ?? 0 };
+  })();
+
   return (
     <Card bordered style={isYours ? { borderColor: withOpacity(theme.colors.primary, 0.5) } : null}>
       <Pressable onPress={onToggle} accessibilityRole="button">
@@ -226,18 +240,36 @@ function DuelRow({
             {name(duel.entry_a)}
           </Text>
 
-          <Text
-            variant="cardTitle"
-            style={{ color: tint, fontFamily: fontFamilies.black, fontVariant: ['tabular-nums'] }}
-          >
-            {/* ⚠ A duel that has not settled has NULL accuracies, not zeroes.
-                Rendering 0–0 on a week nobody has played yet claims a result. */}
-            {settled && duel.entry_b
-              ? `${duel.accuracy_a ?? 0} – ${duel.accuracy_b ?? 0}`
-              : duel.entry_b
-                ? 'v'
-                : 'bye'}
-          </Text>
+          {duel.entry_b === null ? (
+            <Text variant="cardTitle" color="slate" style={{ fontFamily: fontFamilies.black }}>
+              bye
+            </Text>
+          ) : (
+            /*
+              ⚠ THE SCORE THE MOMENT THERE IS ONE — Ryan, 2026-09-05. It used to
+              wait for `settled_at`, so a matchweek being played, and a played
+              one not yet settled, both showed "v" while the Duel tab three taps
+              away had the running scoreline on the header. Same duel, two
+              answers.
+
+              ⚠ A SETTLED DUEL STILL READS ITS STORED ACCURACIES, not the live
+              map. That is the engine's own record of the week and it is what
+              `duelResult` was computed from; preferring a recomputed number
+              would let the card and the result disagree after a rescore.
+
+              ⚠ AND "NO ROWS YET" IS NOT "NIL". `readMatchweekPoints` omits an
+              entry with no score rows, so `undefined` means the fixtures have
+              not been scored — which is a `v`, not a 0-0 claiming a week nobody
+              has played. One side present is enough: the other genuinely has
+              nothing so far, and 0 is the honest number for it.
+            */
+            <Scoreline
+              kind="duel"
+              home={settled ? duel.accuracy_a ?? 0 : running.a}
+              away={settled ? duel.accuracy_b ?? 0 : running.b}
+              tone={settled ? tint : undefined}
+            />
+          )}
 
           <Text
             variant="cardTitle"

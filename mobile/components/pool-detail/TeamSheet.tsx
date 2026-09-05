@@ -385,11 +385,19 @@ export function Scoreline({
   away,
   live = false,
   kind = 'fixture',
+  tone,
 }: {
   home: number | null;
   away: number | null;
   live?: boolean;
   kind?: keyof typeof SCORELINE;
+  /**
+   * Override the digit colour — a settled duel is green or red by its RESULT.
+   *
+   * ⚠ Only ever for a result that has actually landed. Tinting a running score
+   * by who happens to be ahead calls a duel nobody has won yet.
+   */
+  tone?: string;
 }) {
   const theme = useTheme();
   const { width, size } = SCORELINE[kind];
@@ -402,7 +410,7 @@ export function Scoreline({
     );
   }
 
-  const tint = live ? theme.colors.red : theme.colors.ink;
+  const tint = tone ?? (live ? theme.colors.red : theme.colors.ink);
   const digit: TextStyle = {
     fontFamily: fontFamilies.black,
     fontSize: size,
