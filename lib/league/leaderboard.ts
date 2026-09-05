@@ -274,14 +274,34 @@ export async function readLeagueLeaderboard(
 ): Promise<{ leaderboard: LeagueLeaderboard | null; error: string | null }> {
   const isTable = pool.league_mode === 'table'
   const isLms = pool.league_mode === 'last_man_standing'
-  const isPickem = pool.league_mode === 'pickem'
+  /**
+   * Does this mode have a WEEKLY PICKING RECORD to report?
+   *
+   * ⚠ PICK'EM **AND SHOWDOWN**, and that is Decision 9 rather than a
+   * convenience. Showdown is a LAYER over Pick'em, not a peer engine: its
+   * members pick the same fixtures, are scored into the same
+   * `league_match_scores`, and `league_score_duels` reads nothing but the sum of
+   * that column. So a Showdown member has exactly the same weekly form and
+   * correct count a Pick'em member does — there was simply nobody asking for it.
+   *
+   * ⚠ It was `isPickem`, and the omission was invisible because the block it
+   * gates is nullable: a Showdown pool got `pickem: null`, every consumer
+   * defaulted it to `[]` / `0`, and the Tale of the Tape rendered an empty form
+   * row and an opponent with zero correct picks. No error, no empty state —
+   * just two numbers quietly reported as nothing. `depth` below already paired
+   * the two modes for the same reason, which is what makes these omissions
+   * rather than decisions.
+   *
+   * Table and LMS keep null: neither has a per-matchweek picking record.
+   */
+  const hasWeeklyPicks = pool.league_mode === 'pickem' || pool.league_mode === 'showdown'
   // ⚠ ONE POLARITY, EVERYWHERE. NULL depth is Scores — 066 scores it that way
   // byte for byte, and the opposite reading has shipped three times on web and
   // been called a deploy blocker, because it does not fail: members are told
   // they are playing one game and scored at the other. See
   // `leagueDepthPolarity.guard.test.ts`.
   const depth: 'results' | 'scores' | null =
-    isPickem || pool.league_mode === 'showdown'
+    hasWeeklyPicks
       ? pool.league_depth === 'results'
         ? 'results'
         : 'scores'
@@ -350,7 +370,8 @@ export async function readLeagueLeaderboard(
           new Set(entries.filter((e) => e.member_id === viewerMemberId).map((e) => e.entry_id)),
         )
       : Promise.resolve(null),
-    // Pick'em is the one mode with a weekly record to plot.
+    // Pick'em AND Showdown — see `hasWeeklyPicks`. Table and LMS have no
+    // per-matchweek picking record to plot.
     //
     // ⚠ REUSED, NOT REWRITTEN. `readLeagueFormByEntry` already solves the part
     // that is easy to get wrong: `league_match_scores` reaches (entries ×
@@ -359,7 +380,7 @@ export async function readLeagueLeaderboard(
     // how the same query ends up with two answers — and this table has already
     // cost a season of empty form columns once, by being read with the wrong
     // client. It takes admin because it is deny-all (050).
-    isPickem ? readLeagueFormByEntry(admin, poolId) : Promise.resolve(null),
+    hasWeeklyPicks ? readLeagueFormByEntry(admin, poolId) : Promise.resolve(null),
   ])
 
   if (totalsRes.error) return { leaderboard: null, error: `entry totals: ${totalsRes.error.message}` }
@@ -426,7 +447,7 @@ export async function readLeagueLeaderboard(
               entry.member_id !== viewerMemberId,
           }
         : null,
-      pickem: isPickem
+      pickem: hasWeeklyPicks
         ? {
             correct_count: t?.correct_count ?? 0,
             // ⚠ NULL, NOT ZERO, at Results depth — the mode has no scoreline to
