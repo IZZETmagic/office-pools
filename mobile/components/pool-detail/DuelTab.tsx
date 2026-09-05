@@ -823,18 +823,16 @@ function Centre({ row }: { row: SheetRow }) {
   const { day, time } = formatKickoff(row.kickoffAt);
   return (
     <View style={{ width: CENTRE_W, marginHorizontal: CENTRE_AIR, alignItems: 'center' }}>
+      {/*
+        ⚠ THE SAME `SubLine` FOR BOTH — Ryan, 2026-09-04, and the blue is gone
+        on purpose. Primary is the pick language on this card: your chips are
+        blue, your opponent's are red, and a blue kickoff put a third thing in
+        the viewer's colour that had nothing to do with whose pick it was.
+        A kickoff is neutral information about the match, so it reads in the
+        neutral tone the day above it already used.
+      */}
       <SubLine tone={theme.colors.slate}>{day}</SubLine>
-      <Text
-        numberOfLines={1}
-        style={{
-          fontFamily: fontFamilies.bold,
-          fontSize: 11,
-          lineHeight: 15,
-          color: theme.colors.primary,
-        }}
-      >
-        {time}
-      </Text>
+      <SubLine tone={theme.colors.slate}>{time}</SubLine>
     </View>
   );
 }
