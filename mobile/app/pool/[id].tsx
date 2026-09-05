@@ -428,11 +428,25 @@ export default function PoolDetailScreen() {
    */
   const landedRef = useRef(false);
   useEffect(() => {
-    if (landedRef.current || visibleTabs.length === 0) return;
+    // ⚠⚠ THE GATE IS `data`, NOT `visibleTabs.length` — and that was the bug.
+    //
+    // A non-empty tab list is NOT a readiness signal. `visibleTabs` is derived
+    // from `data?.pool`, so before the fetch resolves it is computed from
+    // `isLeague: false, leagueMode: null` — which `getVisiblePoolTabs` answers
+    // with the perfectly valid World Cup set. Non-empty on the very first
+    // render, every time. So this ran immediately, set `leaderboard`, burned
+    // the ref, and by the time the pool arrived saying "showdown" the landing
+    // had already happened and refused to happen again. It read as the fix
+    // never having been applied.
+    //
+    // `data` is the only honest "the pool is known" signal here, and
+    // `visibleTabs` is a `useMemo` over it — so by the time this effect runs on
+    // the render where `data` first lands, the list already reflects the mode.
+    if (landedRef.current || !data) return;
     landedRef.current = true;
     if (tabParam && TAB_PARAM_VALUES.includes(tabParam as PoolTabKey)) return;
-    setTab(visibleTabs[0]);
-  }, [visibleTabs, tabParam]);
+    if (visibleTabs.length > 0) setTab(visibleTabs[0]);
+  }, [data, visibleTabs, tabParam]);
 
   // Stable identity so the memoized Settings panel isn't re-rendered on every
   // tab switch by a fresh inline closure. Reads pool via `data` (optional) so
