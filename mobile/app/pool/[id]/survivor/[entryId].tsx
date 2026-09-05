@@ -276,10 +276,25 @@ function Content({
                   </RNText>
                 ) : null}
               </View>
+              {/*
+                ⚠ NO TICK ON THE SELECTED CLUB — Ryan, 2026-09-05. The tile is
+                already carrying the selection three ways: a 2pt primary border
+                against everyone else's 1pt hairline, a primary wash behind it,
+                and the surrounding tiles left white. A tick on top of that
+                states a fourth time what the tile has already said, and it took
+                22pt off the club name in a tile that is 48.5% of a phone —
+                which is the width "Nott'm Forest" and "Bournemouth" need.
+
+                ⚠ NOTHING IS LOST FOR ASSISTIVE TECH: the selection was never
+                the icon's to carry. `accessibilityState={{ selected }}` on the
+                Pressable above is what a screen reader reads, and it is
+                unchanged.
+
+                The spinner stays — it reports a WRITE in flight, which no
+                amount of border says.
+              */}
               {pending === club.club_id ? (
                 <ActivityIndicator size="small" color={theme.colors.primary} />
-              ) : selected ? (
-                <Icon name="checkmark.circle.fill" color="primary" size={14} />
               ) : null}
             </Pressable>
           );
