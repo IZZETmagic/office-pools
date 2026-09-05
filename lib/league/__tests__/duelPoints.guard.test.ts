@@ -19,8 +19,17 @@ import { resolve } from 'path'
 
 import { DUEL_WIN, DUEL_TIE, DUEL_BYE, DUEL_LOSS, duelResult } from '../duelPoints'
 
+// ⚠ TWO FILES, because the authority MOVED. 121 set the values and the ranker's
+// ORDER BY; 134 last redefined `league_score_duels` to make a duel against a
+// RETIRED opponent a bye. Pointing the whole file at 121 would leave this guard
+// green while pinning a definition production no longer runs — the same stale-
+// invariant trap the soft-delete guard fell into.
 const MIGRATION = '121_a_duel_is_worth_half_a_perfect_week.sql'
 const sql = readFileSync(resolve(process.cwd(), 'lib/migrations', MIGRATION), 'utf8')
+
+/** Wherever `league_score_duels` is defined LAST. Update both if it moves again. */
+const DUEL_ENGINE = '134_a_member_who_left_is_not_an_opponent.sql'
+const duelSql = readFileSync(resolve(process.cwd(), 'lib/migrations', DUEL_ENGINE), 'utf8')
 
 /**
  * The `points_a` CASE from `league_score_duels`, which is the authority.
@@ -31,8 +40,10 @@ const sql = readFileSync(resolve(process.cwd(), 'lib/migrations', MIGRATION), 'u
  *                     ELSE 0 END,
  */
 function pointsACase(): { bye: number; win: number; tie: number; loss: number } | null {
-  const m = sql.match(
-    /points_a = CASE WHEN acc\.b IS NULL THEN (\d+)\s*\n\s*WHEN acc\.a > acc\.b THEN (\d+)\s*\n\s*WHEN acc\.a = acc\.b THEN (\d+)\s*\n\s*ELSE (\d+) END/,
+  // `acc.b IS NULL OR acc.b_gone` — no opponent, or an opponent who left. Both
+  // are a bye, which is the whole point of 134.
+  const m = duelSql.match(
+    /points_a = CASE WHEN acc\.a_gone THEN \d+\s*\n\s*WHEN acc\.b IS NULL OR acc\.b_gone THEN (\d+)\s*\n\s*WHEN acc\.a > acc\.b THEN (\d+)\s*\n\s*WHEN acc\.a = acc\.b THEN (\d+)\s*\n\s*ELSE (\d+) END/,
   )
   return m ? { bye: +m[1], win: +m[2], tie: +m[3], loss: +m[4] } : null
 }
@@ -308,4 +319,52 @@ describe('duel points reach the display layer', () => {
     expect(withoutComments).not.toMatch(/>\s*The season\s*</)
   })
 
+})
+
+describe('a duel against a member who left is a bye, not a win', () => {
+  it('the settle engine knows who has retired', () => {
+    // Before 134 the CTE looked only at accuracy. A retiree filed no picks, so
+    // they scored 0 and whoever was drawn against them collected 500 — an
+    // advantage handed out by an admin action rather than by football.
+    expect(duelSql).toMatch(/a_gone/)
+    expect(duelSql).toMatch(/b_gone/)
+    expect(duelSql).toMatch(/pe\.retired_at IS NOT NULL/)
+  })
+
+  it('pays the bye rate, not the win rate, when the opponent has gone', () => {
+    const c = pointsACase()
+    expect(c, 'the points_a CASE changed shape — re-read it before editing this').not.toBeNull()
+    expect(c!.bye).toBe(DUEL_TIE)
+    expect(c!.bye).not.toBe(DUEL_WIN)
+  })
+
+  it('does not pay a retiree the win rate either', () => {
+    // They are off every leaderboard, so their number is bookkeeping — but a
+    // restore (Decision 15) can bring the row back into view, and 500 sitting
+    // there would be wrong when it did.
+    expect(duelSql).toMatch(/points_a = CASE WHEN acc\.a_gone THEN 0/)
+    expect(duelSql).toMatch(/WHEN acc\.b_gone THEN 0/)
+  })
+})
+
+describe('Last Man Standing cannot crown a member who left', () => {
+  const lms = readFileSync(
+    resolve(process.cwd(), 'lib/migrations', '134_a_member_who_left_is_not_an_opponent.sql'),
+    'utf8',
+  )
+
+  it('filters retired entries out of standing, the count, and both crownings', () => {
+    // Four sites. Miss any one and the round still closes on the wrong field:
+    // the standing CTE, v_left, and the two is_winner branches.
+    const hits = lms.match(/pe\.entry_id = s\.entry_id AND pe\.retired_at IS NULL/g) ?? []
+    expect(hits.length).toBe(4)
+  })
+
+  it('does NOT mark a retired entry eliminated', () => {
+    // Leaving and being knocked out are different facts, and Decision 15
+    // restores a season in full — the survivor row has to keep saying which one
+    // happened, so the filter is at read time.
+    expect(lms).not.toMatch(/SET eliminated_matchweek = p_matchweek\s*\n\s*FROM pool_entries/)
+    expect(lms).toMatch(/is not standing/)
+  })
 })
