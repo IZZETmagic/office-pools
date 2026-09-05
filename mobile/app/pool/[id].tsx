@@ -393,6 +393,51 @@ export default function PoolDetailScreen() {
     () => getVisiblePoolTabs(isAdmin, isProgressive, feesEnabled, isLeague, leagueMode),
     [isAdmin, isProgressive, feesEnabled, isLeague, leagueMode],
   );
+  /**
+   * The tab a pool OPENS on is the first one it offers.
+   *
+   * Ryan: a Showdown pool should land on Duel. It cannot be a different literal
+   * in `useState` — that initialiser runs before `usePoolDetail` resolves, so
+   * the mode is not known yet.
+   *
+   * ⚠⚠ AND IT CANNOT BE AN EFFECT EITHER, which is what the first two attempts
+   * were. An effect runs AFTER the commit, so on the render where the pool
+   * arrives the screen is committed with the OLD tab against the NEW tab list —
+   * and for a Showdown pool that is a real change of position: 'leaderboard'
+   * moves from index 0 to index 1, because Duel has just appeared in front of
+   * it. The pager effect duly animates to page 1, `handleMomentumScrollEnd`
+   * fires when it lands there, reads 'leaderboard' off the settled page and
+   * writes it back to state — setting `skipPagerScrollRef` on the way, which
+   * suppresses the scroll back. The landing was correct and something else
+   * overruled it a frame later: "it opens on Duel then quickly switches".
+   *
+   * ⚠ SO IT IS AN ADJUSTMENT DURING RENDER — React's documented pattern for
+   * deriving state from changed props. React discards this render and re-runs
+   * immediately, so nothing is ever committed holding the wrong pairing:
+   * `tabIndex` below is computed from the landed tab on the very first render
+   * that knows the mode, the pager is never told to go anywhere else, and there
+   * is no scroll for the momentum handler to misread.
+   *
+   * ⚠ GUARDED BY THE POOL ID IN STATE, not a ref. A ref written during render
+   * is the thing React's own guidance warns about — it survives the discarded
+   * render, so under StrictMode's double invoke the guard has already flipped
+   * before the state it guards was ever set. The pool id also re-lands
+   * correctly if this screen is ever reused for a different pool.
+   *
+   * ⚠ AND IT IS `visibleTabs[0]`, NOT `'duel'`. The first tab a mode offers is
+   * already the right landing for every mode — Showdown puts Duel in front,
+   * everything else leads with Leaderboard, exactly where they landed before.
+   * `lib/poolTabs.ts` owns that order and has tests for it.
+   */
+  const [landedFor, setLandedFor] = useState<string | null>(null);
+  if (data && landedFor !== data.pool.poolId) {
+    setLandedFor(data.pool.poolId);
+    // A `?tab=` deep link is a choice; `useState` already honoured it.
+    const deepLinked = tabParam && TAB_PARAM_VALUES.includes(tabParam as PoolTabKey);
+    const landing = visibleTabs[0];
+    if (!deepLinked && landing && landing !== tab) setTab(landing);
+  }
+
   const tabIndex = Math.max(0, visibleTabs.indexOf(tab));
 
   // A tab that is no longer offered leaves the screen in two minds: `tab` still
@@ -406,47 +451,6 @@ export default function PoolDetailScreen() {
     }
   }, [visibleTabs, tab]);
 
-  /**
-   * The tab a pool OPENS on is the first one it offers.
-   *
-   * Ryan: a Showdown pool should land on Duel, not Leaderboard. It could not
-   * simply be a different literal in `useState` — that initialiser runs on the
-   * FIRST render, before `usePoolDetail` has resolved, so the mode is not known
-   * yet. Hence an effect, once the visible set exists.
-   *
-   * ⚠ IT IS `visibleTabs[0]`, NOT `'duel'`. The first tab a mode offers is
-   * already the right landing for every mode — Showdown filters Duel in at the
-   * front, everything else filters it out and leads with Leaderboard, which is
-   * exactly where they landed before. One rule instead of a mode check that
-   * would need editing again for the next mode.
-   *
-   * ⚠ ONCE, AND NEVER OVER A CHOICE. The ref makes this a landing rather than a
-   * correction: without it, any later change to the visible set — an admin
-   * losing rights mid-session — would yank a member back to the first tab from
-   * wherever they were reading. A `?tab=` deep link counts as a choice and is
-   * left alone.
-   */
-  const landedRef = useRef(false);
-  useEffect(() => {
-    // ⚠⚠ THE GATE IS `data`, NOT `visibleTabs.length` — and that was the bug.
-    //
-    // A non-empty tab list is NOT a readiness signal. `visibleTabs` is derived
-    // from `data?.pool`, so before the fetch resolves it is computed from
-    // `isLeague: false, leagueMode: null` — which `getVisiblePoolTabs` answers
-    // with the perfectly valid World Cup set. Non-empty on the very first
-    // render, every time. So this ran immediately, set `leaderboard`, burned
-    // the ref, and by the time the pool arrived saying "showdown" the landing
-    // had already happened and refused to happen again. It read as the fix
-    // never having been applied.
-    //
-    // `data` is the only honest "the pool is known" signal here, and
-    // `visibleTabs` is a `useMemo` over it — so by the time this effect runs on
-    // the render where `data` first lands, the list already reflects the mode.
-    if (landedRef.current || !data) return;
-    landedRef.current = true;
-    if (tabParam && TAB_PARAM_VALUES.includes(tabParam as PoolTabKey)) return;
-    if (visibleTabs.length > 0) setTab(visibleTabs[0]);
-  }, [data, visibleTabs, tabParam]);
 
   // Stable identity so the memoized Settings panel isn't re-rendered on every
   // tab switch by a fresh inline closure. Reads pool via `data` (optional) so
