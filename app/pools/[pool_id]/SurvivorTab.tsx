@@ -52,7 +52,7 @@
 // This renders the record.
 // =============================================================
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useStickyState } from '@/hooks/useStickyState'
 import { Card } from '@/components/ui/Card'
 import { Icon } from '@/components/ui/Icon'
@@ -627,6 +627,29 @@ function PicksWall({
     [roster],
   )
 
+  /**
+   * THE NEWEST MATCHWEEK IS THE ONE YOU CAME TO READ, so the wall opens showing
+   * it.
+   *
+   * Columns run oldest-left, which is the only order a season reads in — but it
+   * means the week that just happened is the one that scrolls off. By December a
+   * member opening this tab would land on August and have to drag fifteen weeks
+   * right to find out whether they survived Saturday.
+   *
+   * ⚠ Set on the ELEMENT, not via `scrollIntoView`. Scrolling a child into view
+   * walks up the ancestor chain and moves the PAGE too, which would jump the
+   * member past the status card and their own picker to get here.
+   *
+   * Re-runs when a matchweek is added — a new column arriving should bring the
+   * view with it — and `behavior: 'auto'` because this is the starting position,
+   * not a movement anybody asked to watch.
+   */
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }, [matchweeks.length])
+
   const cellFor = useCallback(
     (member: LmsRosterEntry, mw: number): CellState => {
       const pick = byCell.get(`${member.entry_id}:${mw}`)
@@ -705,13 +728,19 @@ function PicksWall({
           </div>
 
           {/* ⚠ `flex-1 min-w-0` BOTH. Without flex-1 the region is only as
-              wide as its columns — 168px inside a 734px card — so the
-              current-user row tint stopped a third of the way across and the
-              rest of the card was dead space. Without min-w-0 a flex child
-              refuses to shrink below its content and scrolls the page
-              instead of itself. */}
-          <div className="overflow-x-auto flex-1 min-w-0">
-            <div style={{ minWidth: matchweeks.length * CELL_W }}>
+              wide as its columns, so the current-user row tint stopped a
+              third of the way across the card. Without min-w-0 a flex child
+              refuses to shrink below its content and scrolls the PAGE
+              sideways instead of scrolling itself.
+
+              ⚠ AND THE CELLS DO NOT GROW. They did briefly, to fill that same
+              dead space, and three matchweeks then sat a third of a screen
+              apart — a wall you had to scan rather than read. The fix for the
+              stripe is `min-w-full` HERE, on the thing the rows live in: the
+              columns stay packed at CELL_W and the row's background covers
+              the rest. */}
+          <div ref={scrollRef} className="overflow-x-auto flex-1 min-w-0">
+            <div className="min-w-full w-max">
               <div className="flex" style={{ height: HEAD_H }}>
                 {matchweeks.map((mw) => (
                   <div
@@ -719,9 +748,7 @@ function PicksWall({
                     className={`flex items-center justify-center text-[9px] font-bold tracking-wider ${
                       mw === inPlayMatchweek ? 'text-primary-600' : 'text-neutral-500'
                     }`}
-                    // Grow into spare width, never shrink below CELL_W — three
-                    // columns spread across the card, ten of them scroll.
-                    style={{ flex: `1 0 ${CELL_W}px` }}
+                    style={{ width: CELL_W }}
                   >
                     MW{mw}
                   </div>
@@ -781,7 +808,7 @@ function WallCell({
 
   if (cell.kind === 'sealed') {
     return (
-      <div className={base} style={{ flex: `1 0 ${CELL_W}px`, height: ROW_H }} title="Hidden until this matchweek locks">
+      <div className={base} style={{ width: CELL_W, height: ROW_H }} title="Hidden until this matchweek locks">
         <Icon name="lock.fill" size={11} className="text-neutral-400" />
       </div>
     )
@@ -789,7 +816,7 @@ function WallCell({
 
   if (cell.kind === 'gone') {
     return (
-      <div className={base} style={{ flex: `1 0 ${CELL_W}px`, height: ROW_H }}>
+      <div className={base} style={{ width: CELL_W, height: ROW_H }}>
         <span className="text-neutral-300 text-sm leading-none">·</span>
       </div>
     )
@@ -799,7 +826,7 @@ function WallCell({
   // without ever being beaten — so it is marked rather than left blank.
   if (cell.kind === 'none') {
     return (
-      <div className={base} style={{ flex: `1 0 ${CELL_W}px`, height: ROW_H }} title="No pick that matchweek">
+      <div className={base} style={{ width: CELL_W, height: ROW_H }} title="No pick that matchweek">
         <Icon name="xmark" size={10} className="text-neutral-400" />
       </div>
     )
@@ -816,7 +843,7 @@ function WallCell({
         : ''
 
   return (
-    <div className={base} style={{ flex: `1 0 ${CELL_W}px`, height: ROW_H }}>
+    <div className={base} style={{ width: CELL_W, height: ROW_H }}>
       <span
         className={`w-[34px] h-[34px] rounded-full flex items-center justify-center ${tint}`}
         title={name}

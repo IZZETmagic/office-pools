@@ -22,7 +22,8 @@
 // behind the tester allowlist and would otherwise be public on sportpool.io.
 // =============================================================
 
-import { notFound } from 'next/navigation'
+import { notFound, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 
 import SurvivorTab from '../../pools/[pool_id]/SurvivorTab'
 import type { LmsPick, LmsRosterEntry } from '@/lib/league/lms'
@@ -118,8 +119,19 @@ const PICK_FIXTURES = new Map(
   ] as const).map(([k, v]) => [k, v]),
 ) as unknown as React.ComponentProps<typeof SurvivorTab>['pickFixtures']
 
-export default function SurvivorHarness() {
+/**
+ * ?long=1 stretches the round to twelve matchweeks — enough to overflow the
+ * card, so the scroll and the open-on-newest position can be seen rather than
+ * reasoned about. Three columns never overflow anything.
+ */
+function Harness() {
   if (process.env.NODE_ENV === 'production') notFound()
+  // ⚠ `useSearchParams`, not `window.location` and not state-set-in-an-effect.
+  // Reading `window` during render is a hydration mismatch (the server has no
+  // query string); setting state in an effect to dodge that is what
+  // `react-hooks/set-state-in-effect` exists to reject. This hook is the one
+  // way to read a query string that is correct on both sides.
+  const long = useSearchParams().get('long') !== null
 
   return (
     <div className="min-h-screen bg-neutral-50 py-6">
@@ -143,13 +155,22 @@ export default function SurvivorHarness() {
           entryId="e1"
           currentMatchweek={5}
           inPlayMatchweek={4}
-          matchweeks={[3, 4, 5]}
-          lockedMatchweeks={[3, 4]}
+          matchweeks={long ? Array.from({ length: 12 }, (_, i) => i + 3) : [3, 4, 5]}
+          lockedMatchweeks={long ? Array.from({ length: 11 }, (_, i) => i + 3) : [3, 4]}
           roundsWon={new Map(ROSTER.map((r) => [r.entry_id, r.roundsWon]))}
           fixtures={FIXTURES}
           pickFixtures={PICK_FIXTURES}
         />
       </div>
     </div>
+  )
+}
+
+/** `useSearchParams` suspends, so it needs a boundary above it. */
+export default function SurvivorHarnessPage() {
+  return (
+    <Suspense fallback={null}>
+      <Harness />
+    </Suspense>
   )
 }
