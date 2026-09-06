@@ -40,20 +40,12 @@ export function awayDisplayName(match: ResultsMatch): string {
   return match.awayTeam?.countryName ?? match.awayTeamPlaceholder ?? 'Away';
 }
 
-/**
- * The short form, for the collapsed band and the chrome row's title.
- *
- * ⚠ FALLS BACK, NEVER ASSUMES. `shortName` is null for every World Cup team on
- * purpose — a country has no club-style short form — and only
- * `/api/users/:id/fixtures` sends it at all. See the note on `ResultsTeam`.
- */
-export function homeShortName(match: ResultsMatch): string {
-  return match.homeTeam?.shortName ?? homeDisplayName(match);
-}
-
-export function awayShortName(match: ResultsMatch): string {
-  return match.awayTeam?.shortName ?? awayDisplayName(match);
-}
+// ⚠ `homeShortName` / `awayShortName` used to live here, for the chrome row's
+// "Arsenal v Chelsea" title. That title was removed — it named the match a
+// second time above two crests already doing the job — and these went with it
+// rather than being left as two exported functions nothing calls. If a narrow
+// row ever needs the short form again, note that `shortName` is null for every
+// World Cup team by design and the caller must fall back; see `ResultsTeam`.
 
 export function stageLabel(match: ResultsMatch): string {
   const label = match.groupLetter

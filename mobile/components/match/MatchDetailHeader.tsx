@@ -2,7 +2,14 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text as RNText, useWindowDimensions, View } from 'react-native';
+import {
+  Pressable,
+  type StyleProp,
+  Text as RNText,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -11,22 +18,21 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
+
 import { MatchStatusBadge } from '@/components/MatchStatusBadge';
 import { Icon } from '@/components/ui';
-import { getCompetitionBand } from '@/lib/design/competitionBand';
-import { getCompetitionMarkPng } from '@/lib/design/competition';
+import { getCompetitionBand, getCompetitionGlow, GLOW_HEIGHT } from '@/lib/design/competitionBand';
 import { useMatchClock } from '@/lib/useMatchClock';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme } from '@/theme';
 
 import {
   awayDisplayName,
-  awayShortName,
   competitionLine,
   formattedShortDate,
   formattedTime,
   homeDisplayName,
-  homeShortName,
   MONO_BOLD,
 } from './matchDisplay';
 
@@ -118,7 +124,6 @@ export function MatchDetailHeader({ match, scrollY, onExpandedHeight, children }
   const [crestY, setCrestY] = useState(0);
 
   const [bandLeft, bandRight] = getCompetitionBand(match.competitionId);
-  const mark = getCompetitionMarkPng(match.competitionId);
 
   const chromeH = insets.top + theme.spacing.xs + CHROME_ROW;
 
@@ -215,6 +220,29 @@ export function MatchDetailHeader({ match, scrollY, onExpandedHeight, children }
     return { opacity: interpolate(p, [0, 0.45], [1, 0], Extrapolation.CLAMP) };
   });
 
+  /**
+   * The glow stays put while the band slides out from under it.
+   *
+   * ⚠ WITHOUT THIS THE BLOOMS SEAM THE MOMENT YOU SCROLL. The blobs are
+   * seamless across the two layers only while both canvases sit at the same
+   * screen origin — but the band is inside a view that translates up by
+   * `slideBy`, and it would take its copy of the glow with it. The chrome's
+   * copy does not move, so the light would jump at the boundary between them.
+   *
+   * The glow belongs to the SCREEN, not to the band's content, so the band's
+   * copy travels back DOWN by exactly what the band travelled up. Net movement
+   * zero, and still compositor-only.
+   *
+   * ⚠ The base gradient deliberately does NOT get this. It is purely
+   * horizontal, so translating it vertically changes nothing visible and would
+   * only expose a gap at the bottom of the band as it moved down.
+   */
+  const glowHold = useAnimatedStyle(() => {
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
+    return { transform: [{ translateY: p * slideBy }] };
+  });
+
   return (
     <>
       {/* THE BAND — everything below the chrome, and the part that moves. */}
@@ -226,28 +254,22 @@ export function MatchDetailHeader({ match, scrollY, onExpandedHeight, children }
           }}
           style={{ paddingTop: chromeH, overflow: 'hidden' }}
         >
-          <BandFill left={bandLeft} right={bandRight} />
+          <BandFill
+            left={bandLeft}
+            right={bandRight}
+            competitionId={match.competitionId}
+            idPrefix="band"
+            glowStyle={glowHold}
+          />
 
           {/*
-            The competition's own mark, as a watermark.
-
-            ⚠ The mark PNGs are WHITE ON TRANSPARENT — they were built for the
-            pool card's coloured rail, which is exactly this surface. Drawn on
-            anything light they would be invisible; here they are free identity.
-            Carried on `labelFade` so it leaves with the names rather than
-            colliding with the chrome row it would slide under.
+            ⚠ NO COMPETITION MARK HERE. A white silhouette of the league's crest
+            was drawn as a watermark and it was wrong twice over: at the size
+            that made it read as identity it overlapped the away team's name and
+            clipped it ("Chels…"), and the identity was already being carried
+            better by the band's colour and the competition line. Removed rather
+            than shrunk — Ryan, 2026-09-06.
           */}
-          {mark ? (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                { position: 'absolute', right: -26, top: chromeH - 16, opacity: 0.09 },
-                labelFade,
-              ]}
-            >
-              <Image source={mark} style={{ width: 164, height: 164 }} contentFit="contain" />
-            </Animated.View>
-          ) : null}
 
           <View
             onLayout={(e) => {
@@ -351,7 +373,20 @@ export function MatchDetailHeader({ match, scrollY, onExpandedHeight, children }
           overflow: 'hidden',
         }}
       >
-        <BandFill left={bandLeft} right={bandRight} />
+        <BandFill
+          left={bandLeft}
+          right={bandRight}
+          competitionId={match.competitionId}
+          idPrefix="chrome"
+        />
+        {/*
+          ⚠ THE BACK BUTTON, AND NOTHING ELSE. This row carried "Arsenal v
+          Chelsea" as a title, which named the match a second time directly
+          above two crests and two team names doing the same job — Ryan,
+          2026-09-06. The crests survive the collapse at reduced size, so the
+          matchup is still identified once the band is folded away and the title
+          is not standing in for anything.
+        */}
         <View
           style={{
             height: CHROME_ROW,
@@ -377,21 +412,6 @@ export function MatchDetailHeader({ match, scrollY, onExpandedHeight, children }
           >
             <Icon name="chevron.left" size={15} tint="#FFFFFF" weight="semibold" />
           </Pressable>
-          <View style={{ flex: 1, minWidth: 0, paddingHorizontal: theme.spacing.sm }}>
-            <RNText
-              numberOfLines={1}
-              style={{
-                fontFamily: fontFamilies.semibold,
-                fontSize: 14,
-                color: 'rgba(255,255,255,0.94)',
-                textAlign: 'center',
-              }}
-            >
-              {homeShortName(match)} v {awayShortName(match)}
-            </RNText>
-          </View>
-          {/* Balances the back button so the title stays optically centred. */}
-          <View style={{ width: 32 }} />
         </View>
       </View>
     </>
@@ -399,19 +419,82 @@ export function MatchDetailHeader({ match, scrollY, onExpandedHeight, children }
 }
 
 /**
- * The band's colour, painted left to right.
+ * The band's colour: a flat horizontal base, then four soft blooms of the same
+ * colour at different depths.
  *
- * ⚠ HORIZONTAL ONLY. Drawn in both header layers; see the note at the chrome.
+ * ⚠ BOTH LAYERS DRAW THIS IDENTICALLY, ANCHORED AT top:0, and that is the only
+ * reason there is no seam where the pinned chrome row meets the sliding band.
+ * The base gradient is horizontal, so it is constant down the screen and cannot
+ * show a join. The blooms are NOT constant down the screen — they are seamless
+ * only because both layers paint the same `GLOW_HEIGHT`-tall canvas from the
+ * same origin and each clips its own slice with `overflow: 'hidden'`. Give
+ * either layer its own geometry, or size the canvas off the box drawing it
+ * rather than the screen, and a hard edge appears across the header.
+ *
+ * ⚠ `idPrefix` IS NOT DECORATION. Two `<Svg>` trees are mounted at once and
+ * gradient defs are addressed by id; identical ids across them collide on
+ * Android, where one layer then paints with the other's stops. Each instance
+ * gets its own namespace.
  */
-function BandFill({ left, right }: { left: string; right: string }) {
+function BandFill({
+  left,
+  right,
+  competitionId,
+  idPrefix,
+  glowStyle,
+}: {
+  left: string;
+  right: string;
+  competitionId: number | null;
+  idPrefix: string;
+  /** Counter-translation that keeps the glow screen-fixed on the sliding band. */
+  glowStyle?: StyleProp<ViewStyle>;
+}) {
+  const { width } = useWindowDimensions();
+  const blobs = getCompetitionGlow(competitionId, width);
+
   return (
-    <LinearGradient
-      pointerEvents="none"
-      colors={[left, right]}
-      start={{ x: 0, y: 0.5 }}
-      end={{ x: 1, y: 0.5 }}
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-    />
+    <>
+      <LinearGradient
+        pointerEvents="none"
+        colors={[left, right]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[{ position: 'absolute', top: 0, left: 0 }, glowStyle]}
+      >
+      <Svg
+        pointerEvents="none"
+        width={width}
+        height={GLOW_HEIGHT}
+      >
+        <Defs>
+          {blobs.map((b, i) => (
+            <RadialGradient key={i} id={`${idPrefix}-glow-${i}`} cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor={b.color} stopOpacity={b.opacity} />
+              {/* A mid stop, because a straight 0→1 falloff has a visible ring
+                  where the eye catches the linear ramp. */}
+              <Stop offset="0.55" stopColor={b.color} stopOpacity={b.opacity * 0.42} />
+              <Stop offset="1" stopColor={b.color} stopOpacity={0} />
+            </RadialGradient>
+          ))}
+        </Defs>
+        {blobs.map((b, i) => (
+          <Ellipse
+            key={i}
+            cx={b.cx}
+            cy={b.cy}
+            rx={b.rx}
+            ry={b.ry}
+            fill={`url(#${idPrefix}-glow-${i})`}
+          />
+        ))}
+      </Svg>
+      </Animated.View>
+    </>
   );
 }
 
@@ -425,9 +508,15 @@ function Side({
 }: {
   url: string | null | undefined;
   name: string;
-  move: ReturnType<typeof useAnimatedStyle>;
-  shrink: ReturnType<typeof useAnimatedStyle>;
-  fade: ReturnType<typeof useAnimatedStyle>;
+  // ⚠ `StyleProp<ViewStyle>`, NOT `ReturnType<typeof useAnimatedStyle>`. The
+  // hook returns `DefaultStyle` (ViewStyle & ImageStyle & TextStyle), which
+  // Reanimated 4's own `Animated.View` will not accept as a style prop — that
+  // mismatch is why `ShowdownDuelHeader` carries five type errors it does not
+  // deserve. The intersection IS assignable to ViewStyle, so this satisfies
+  // both the call site and the consumer without a cast.
+  move: StyleProp<ViewStyle>;
+  shrink: StyleProp<ViewStyle>;
+  fade: StyleProp<ViewStyle>;
 }) {
   return (
     <Animated.View style={[{ flex: 1, alignItems: 'center', gap: 8 }, move]}>
