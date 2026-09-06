@@ -13,9 +13,9 @@
 //
 // The same reason the drag-picker verification uses one: the seeded pools are
 // real rows with real RLS and real autosave, and driving them into a state to
-// look at it WRITES. `last_reveal_seen_at` and `last_recap_seen_at` are both
-// one-way — burning them to see a ceremony means the next real reveal is the
-// one you cannot watch.
+// look at it WRITES. `last_reveal_seen_duel` (136) and `last_recap_seen_at`
+// (122) are both one-way — burning them to see a ceremony means the next real
+// reveal is the one you cannot watch.
 //
 // ⚠ NOTHING HERE TOUCHES THE NETWORK OR THE DATABASE. Every value below is a
 // literal. If this file ever grows a `useQuery`, a Supabase client or a real
@@ -44,6 +44,7 @@ import { useSharedValue } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui';
 import { ShowdownDuelHeader, type Standing } from '@/components/pool-detail/ShowdownDuelHeader';
+import { ShowdownRecapSheet } from '@/components/pool-detail/ShowdownRecapSheet';
 import { ShowdownWalkout } from '@/components/pool-detail/ShowdownWalkout';
 import { duelPhase, type DuelPhaseInput } from '@/lib/duelPhase';
 import type { Bout } from '@/lib/useDuel';
@@ -59,16 +60,18 @@ import { useTheme } from '@/theme';
 const YOU_USER = '11111111-1111-4111-8111-111111111111';
 const THEM_USER = '22222222-2222-4222-8222-222222222222';
 const YOU_ENTRY = 'entry-you';
+/** The current duel. Phase 2 is 'the marker does not equal this'. */
+const DUEL_3 = 'duel-mw3';
 const THEM_ENTRY = 'entry-them';
 
 const standings = new Map<string, Standing>([
   [
     YOU_ENTRY,
-    { userId: YOU_USER, rank: 4, points: 3120, correct: 41, lastFive: ['W', 'W', 'L', 'D', 'W'] },
+    { userId: YOU_USER, rank: 4, previousRank: 6, points: 3120, correct: 41, lastFive: ['W', 'W', 'L', 'D', 'W'] },
   ],
   [
     THEM_ENTRY,
-    { userId: THEM_USER, rank: 2, points: 3480, correct: 47, lastFive: ['W', 'D', 'W', 'W', 'L'] },
+    { userId: THEM_USER, rank: 2, previousRank: 2, points: 3480, correct: 47, lastFive: ['W', 'D', 'W', 'W', 'L'] },
   ],
 ]);
 
@@ -87,7 +90,7 @@ function bout(opts: { settled?: boolean; accuracyA?: number; accuracyB?: number 
   const settledAt = settled ? '2026-09-07T20:59:00Z' : null;
   return {
     duel: {
-      duel_id: 'duel-harness',
+      duel_id: DUEL_3,
       matchweek_number: 3,
       entry_a: YOU_ENTRY,
       entry_b: THEM_ENTRY,
@@ -140,7 +143,7 @@ const SITUATIONS: Situation[] = [
       sealedMatchweek: 1,
       isInPlay: false,
       lastSettledAt: null,
-      revealSeenAt: null,
+      revealSeenDuel: null,
       recapSeenAt: null,
     },
     band: { kickoffAt: null, liveScore: null, liveNow: false },
@@ -151,11 +154,11 @@ const SITUATIONS: Situation[] = [
     note: 'The draw is open and the walkout has not been watched. Opponent must be HIDDEN.',
     input: {
       hasDraw: true,
-      current: { matchweek: 3, settledAt: null, revealsAt: '2026-09-02T01:00:00Z' },
+      current: { duelId: DUEL_3, matchweek: 3, settledAt: null },
       sealedMatchweek: 4,
       isInPlay: false,
       lastSettledAt: null,
-      revealSeenAt: null,
+      revealSeenDuel: null,
       recapSeenAt: null,
     },
     band: { kickoffAt: kickoffSoon, liveScore: null, liveNow: false },
@@ -166,11 +169,11 @@ const SITUATIONS: Situation[] = [
     note: 'Met them. Picks still open, clock to the first game.',
     input: {
       hasDraw: true,
-      current: { matchweek: 3, settledAt: null, revealsAt: '2026-09-02T01:00:00Z' },
+      current: { duelId: DUEL_3, matchweek: 3, settledAt: null },
       sealedMatchweek: 4,
       isInPlay: false,
       lastSettledAt: null,
-      revealSeenAt: '2026-09-03T00:00:00Z',
+      revealSeenDuel: DUEL_3,
       recapSeenAt: null,
     },
     band: { kickoffAt: kickoffSoon, liveScore: null, liveNow: false },
@@ -181,11 +184,11 @@ const SITUATIONS: Situation[] = [
     note: 'Locked and being played. Scoreline replaces the clock; LIVE dot only while a ball is in play.',
     input: {
       hasDraw: true,
-      current: { matchweek: 3, settledAt: null, revealsAt: '2026-09-02T01:00:00Z' },
+      current: { duelId: DUEL_3, matchweek: 3, settledAt: null },
       sealedMatchweek: 4,
       isInPlay: true,
       lastSettledAt: null,
-      revealSeenAt: '2026-09-03T00:00:00Z',
+      revealSeenDuel: DUEL_3,
       recapSeenAt: null,
     },
     band: { kickoffAt: null, liveScore: { you: 6, them: 4 }, liveNow: true },
@@ -196,11 +199,11 @@ const SITUATIONS: Situation[] = [
     note: 'Settled, recap unseen. The sheet renders over this.',
     input: {
       hasDraw: true,
-      current: { matchweek: 3, settledAt: '2026-09-07T20:59:00Z', revealsAt: '2026-09-02T01:00:00Z' },
+      current: { duelId: DUEL_3, matchweek: 3, settledAt: '2026-09-07T20:59:00Z' },
       sealedMatchweek: 4,
       isInPlay: false,
       lastSettledAt: '2026-09-07T20:59:00Z',
-      revealSeenAt: '2026-09-03T00:00:00Z',
+      revealSeenDuel: DUEL_3,
       recapSeenAt: null,
     },
     band: { kickoffAt: null, liveScore: null, liveNow: false },
@@ -215,7 +218,7 @@ const SITUATIONS: Situation[] = [
       sealedMatchweek: 4,
       isInPlay: false,
       lastSettledAt: '2026-09-07T20:59:00Z',
-      revealSeenAt: '2026-09-03T00:00:00Z',
+      revealSeenDuel: DUEL_3,
       recapSeenAt: '2026-09-07T21:30:00Z',
     },
     band: { kickoffAt: null, liveScore: null, liveNow: false },
@@ -226,11 +229,11 @@ const SITUATIONS: Situation[] = [
     note: '⚠ NOT a sealed week. Nobody was drawn against you — an odd number of members.',
     input: {
       hasDraw: true,
-      current: { matchweek: 3, settledAt: null, revealsAt: '2026-09-02T01:00:00Z' },
+      current: { duelId: DUEL_3, matchweek: 3, settledAt: null },
       sealedMatchweek: 4,
       isInPlay: false,
       lastSettledAt: null,
-      revealSeenAt: '2026-09-03T00:00:00Z',
+      revealSeenDuel: DUEL_3,
       recapSeenAt: null,
     },
     band: { kickoffAt: kickoffSoon, liveScore: null, liveNow: false },
@@ -255,6 +258,13 @@ export default function ShowdownPhaseHarness() {
    * animation you can only ever see once a week would otherwise be impossible.
    */
   const [watching, setWatching] = useState(false);
+  /**
+   * ⚠ SEPARATE FROM THE PHASE, so the recap can be re-opened after dismissal.
+   * In the product `recapPending` goes false the instant the marker is stamped
+   * and the sheet never returns; here dismissing only closes it, so the
+   * animation can be watched more than once. Writes nothing either way.
+   */
+  const [recapOpen, setRecapOpen] = useState(false);
 
   const s = SITUATIONS[i];
   const isBye = s.label === 'Bye';
@@ -302,6 +312,11 @@ export default function ShowdownPhaseHarness() {
         bout={currentBout}
         sealed={sealed}
         you={you}
+        /* ⚠ DRIVEN OFF THE PHASE, exactly as the real screen does it. Wiring
+           the button to the picker index instead would let the band show a
+           Reveal the machine does not think is owed — which is the one
+           disagreement this harness exists to catch. */
+        onReveal={resolved.phase === 'revealable' ? () => setWatching(true) : null}
         standings={standings}
         kickoffAt={s.band.kickoffAt}
         liveScore={s.band.liveScore}
@@ -352,6 +367,24 @@ export default function ShowdownPhaseHarness() {
             stops returning `revealable` for situation 2 — the exact production
             bug this was all built to prevent — this button disappears, and its
             absence is the alarm. */}
+        {resolved.recapPending ? (
+          <Pressable
+            onPress={() => setRecapOpen(true)}
+            accessibilityRole="button"
+            style={({ pressed }) => ({
+              paddingVertical: theme.spacing.md,
+              borderRadius: theme.radii.md,
+              alignItems: 'center',
+              backgroundColor: theme.colors.primary,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Text variant="cardTitle" style={{ color: '#FFFFFF' }}>
+              Show the recap
+            </Text>
+          </Pressable>
+        ) : null}
+
         {resolved.phase === 'revealable' ? (
           <Pressable
             onPress={() => setWatching(true)}
@@ -397,6 +430,23 @@ export default function ShowdownPhaseHarness() {
         visible over it — a tab bar, a FAB — breaks the takeover and is worth
         catching here rather than on a Saturday.
       */}
+      {/* Phase 5. Review is inert here — the harness has no pool to navigate into. */}
+      <ShowdownRecapSheet
+        recap={
+          recapOpen
+            ? {
+                duelId: DUEL_3,
+                matchweek: 3,
+                you: { name: 'You', userId: YOU_USER, score: 6 },
+                them: { name: 'Priya', userId: THEM_USER, score: 4 },
+                points: 500,
+              }
+            : null
+        }
+        onSkip={() => setRecapOpen(false)}
+        onReview={() => setRecapOpen(false)}
+      />
+
       {watching ? (
         <ShowdownWalkout
           matchweek={3}

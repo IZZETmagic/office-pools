@@ -64,26 +64,11 @@ export type DuelPhase = 'none' | 'sealed' | 'revealable' | 'scouting' | 'live' |
 
 /** The current duel, as much of it as the phase depends on. */
 export type PhaseDuel = {
+  /** `league_duels.duel_id`. The walkout marker is compared against this. */
+  duelId: string;
   matchweek: number;
   /** `null` while it is still being played. */
   settledAt: string | null;
-  /**
-   * When this duel's draw opened — `league_duel_reveals_at`, read from the
-   * contract, never worked out here.
-   *
-   * ⚠ `null` IS TREATED AS ALREADY WATCHED, not as "walk them out". A missing
-   * instant is a contract that has not been deployed yet or a matchweek with no
-   * fixtures, and neither is a reason to replay a ceremony. Failing towards
-   * "seen" means the worst case is a member missing one walkout; failing the
-   * other way means every member gets the same walkout on every app open, which
-   * is the single most irritating way this feature can break.
-   *
-   * `-infinity` arrives as a string from Postgres for the season's first
-   * playable matchweek (129). `Date.parse` gives NaN, which compares false
-   * everywhere — so it reads as "already watched" once a stamp exists, which is
-   * the right answer for a week that was never sealed in the first place.
-   */
-  revealsAt: string | null;
 };
 
 export type DuelPhaseInput = {
@@ -117,8 +102,17 @@ export type DuelPhaseInput = {
    * anyone who does not open the app on a Monday.
    */
   lastSettledAt: string | null;
-  /** `pool_entries.last_reveal_seen_at` (136). */
-  revealSeenAt: string | null;
+  /**
+   * `pool_entries.last_reveal_seen_duel` (136) — the duel whose walkout this
+   * member last watched, or null if they never have.
+   *
+   * ⚠ AN ID, NOT AN INSTANT, AND THE REDRAW IS WHY. A redraw DELETEs and
+   * re-INSERTs (083/095/117), so a changed opponent arrives with a new
+   * `duel_id` but an unchanged reveal instant — a clock comparison would hand
+   * somebody a different opponent with no ceremony at all. 136's header has the
+   * full argument.
+   */
+  revealSeenDuel: string | null;
   /** `pool_entries.last_recap_seen_at` (122). */
   recapSeenAt: string | null;
 };
@@ -216,7 +210,12 @@ export function duelPhase(input: DuelPhaseInput): DuelPhaseResult {
   // 116 withholds a sealed week's duel rows entirely, so `current` is simply
   // null while the week is sealed and this falls through on its own.
   if (current !== null && current.settledAt === null) {
-    const watched = !isUnseen(current.revealsAt, input.revealSeenAt);
+    // ⚠ EQUALITY, and it fails towards "not yet watched" when the marker is
+    // null. That is the safe direction for a FIRST reveal — a member who has
+    // never seen one should get one — and it is the only case where showing
+    // beats withholding. Everywhere else in this file the bias runs the other
+    // way, because a repeated ceremony is worse than a missed one.
+    const watched = input.revealSeenDuel !== null && input.revealSeenDuel === current.duelId;
     return {
       phase: watched ? 'scouting' : 'revealable',
       matchweek: current.matchweek,
@@ -254,27 +253,29 @@ export function duelPhase(input: DuelPhaseInput): DuelPhaseResult {
 /**
  * Has `at` happened since the viewer last acknowledged this kind of thing?
  *
- * ⚠ THE SHAPE MIGRATION 122 CHOSE, AND FOR ITS REASON. Both markers are
- * TIMESTAMPS rather than matchweek numbers: rounds are played out of numerical
+ * ⚠ THE SHAPE MIGRATION 122 CHOSE, AND FOR ITS REASON. The recap marker is a
+ * TIMESTAMP rather than a matchweek number: rounds are played out of numerical
  * order — 101 measured a minimum gap of minus 121 days across three real
  * seasons — so a high-water mark on the number would stop a member ever being
- * shown another recap or another walkout, silently, for the rest of the season.
+ * shown another recap, silently, for the rest of the season.
+ *
+ * ⚠ ONLY THE RECAP USES THIS. The walkout marker is an EQUALITY test on a duel
+ * id (136) because a redraw mints a new one, and no clock can see that.
  *
  * It self-limits, too. Three weeks away means three settled duels behind you
  * and ONE sheet — the latest — because the test is "anything newer than what I
  * last saw", not a queue. That falls out of the comparison rather than needing
  * a rule.
  *
- * ⚠ A MISSING `at` IS "NOTHING TO SEE", NOT "SEE IT". Failing towards seen
- * means a member may miss one ceremony; failing the other way means every
- * member is shown the same one on every app open. See `PhaseDuel.revealsAt`.
+ * ⚠ A MISSING `at` IS "NOTHING TO SEE", NOT "SEE IT". A duel with no
+ * `settled_at` has not been played, so there is no recap owed. Failing towards
+ * seen means a member may miss one sheet; failing the other way means the same
+ * sheet on every app open.
  */
 function isUnseen(at: string | null, seenAt: string | null): boolean {
   if (at === null) return false;
   const t = Date.parse(at);
-  // `-infinity` (129's always-open first matchweek) and any malformed instant
-  // land here. Never unseen — a week that was never sealed has no reveal to
-  // watch, and a value we cannot read is not grounds for replaying a ceremony.
+  // A malformed instant is not grounds for replaying a ceremony.
   if (Number.isNaN(t)) return false;
   if (seenAt === null) return true;
   const s = Date.parse(seenAt);

@@ -53,7 +53,11 @@ import {
 import { Button, Text } from '@/components/ui';
 import { fetchLmsState } from '@/lib/api';
 import type { Standing } from '@/components/pool-detail/ShowdownDuelHeader';
+import { ShowdownRecapSheet } from '@/components/pool-detail/ShowdownRecapSheet';
+import { ShowdownWalkout } from '@/components/pool-detail/ShowdownWalkout';
 import { predictionSurfaceFor } from '@/lib/leagueSurface';
+import { duelPhase } from '@/lib/duelPhase';
+import { useCeremonyMarkers } from '@/lib/useCeremonyMarkers';
 import { useDuel } from '@/lib/useDuel';
 import { useLeaguePool } from '@/lib/useLeaguePool';
 import { useReportActivePool } from '@/lib/PresenceProvider';
@@ -348,6 +352,7 @@ export default function PoolDetailScreen() {
         // makes a member the same colour here as in Banter.
         userId: e.user_id ?? null,
         rank: e.current_rank ?? null,
+        previousRank: e.previous_rank ?? null,
         points: e.total_points ?? 0,
         // For the scouting card's accuracy — same row, no second read.
         correct: e.pickem?.correct_count ?? 0,
@@ -369,6 +374,132 @@ export default function PoolDetailScreen() {
    * built from the two sides of every REVEALED duel and is empty in a pool whose
    * draw has not opened yet. See `useDuel`'s note on the field.
    */
+  /**
+   * The two one-shot markers, and the phase they decide.
+   *
+   * ⚠ THE MARKERS ARE READ SEPARATELY FROM THE LEAGUE CONTRACT, on purpose —
+   * see `useCeremonyMarkers`. They are per-VIEWER, and the season payload they
+   * would otherwise ride on is the one thing the read-path review says to cache.
+   */
+  const ceremony = useCeremonyMarkers(duel.ownEntryId);
+
+  /**
+   * ⚠ ONE DERIVATION FOR ALL SIX PHASES. Nothing on this screen may ask "is it
+   * revealed?" or "is it sealed?" for itself — `duelPhase` is the only answer,
+   * and its header records what a second ad-hoc chain cost in production.
+   *
+   * ⚠ IT WAITS FOR THE MARKERS. Until `ready`, the machine would be told nobody
+   * has watched anything and would throw a walkout over a member who met their
+   * opponent days ago. `failed` is treated the same as "already seen": missing
+   * one ceremony is recoverable, replaying it on every app open is not.
+   */
+  /**
+   * ⚠ PULLED OUT AS LOCALS SO THE DEPENDENCY ARRAYS NAME STABLE REFERENCES.
+   * `useDuel` returns a fresh object literal every render, so depending on
+   * `duel` itself would defeat every memo below it — but each of these fields
+   * is individually `useMemo`d inside the hook, so naming them is both correct
+   * and something the exhaustive-deps rule can actually check.
+   */
+  const { current: duelCurrent, sealed: duelSealed, lastSettled: duelLastSettled } = duel;
+  const duelCount = duel.duels.length;
+  const duelIsInPlay = duel.isInPlay;
+  const duelLastSettledAt = duel.lastSettledAt;
+  const duelOwnName = duel.ownName;
+
+  const duelPhaseState = useMemo(() => {
+    const currentDuelId = duelCurrent?.duel.duel_id ?? null;
+
+    /**
+     * ⚠ WHILE THE MARKERS ARE UNKNOWN, BOTH CEREMONIES ARE SUPPRESSED — and
+     * suppression is expressed as VALUES rather than as an extra branch, so
+     * `duelPhase` keeps exactly one code path.
+     *
+     * Saying "the reveal I last watched is the one on screen" makes the machine
+     * return `scouting`; saying "I last saw the recap at the moment the duel
+     * settled" makes `settled_at > seen` false. Both are the honest reading of
+     * "we do not know yet, so do not throw a full-screen takeover at anybody".
+     */
+    const known = ceremony.ready;
+
+    return duelPhase({
+      hasDraw: duelCount > 0 || duelSealed !== null,
+      current: duelCurrent
+        ? {
+            duelId: duelCurrent.duel.duel_id,
+            matchweek: duelCurrent.matchweek,
+            settledAt: duelCurrent.duel.settled_at,
+          }
+        : null,
+      sealedMatchweek: duelSealed?.matchweek ?? null,
+      isInPlay: duelIsInPlay,
+      lastSettledAt: duelLastSettledAt,
+      revealSeenDuel: known ? ceremony.markers.lastRevealSeenDuel : currentDuelId,
+      recapSeenAt: known ? ceremony.markers.lastRecapSeenAt : duelLastSettledAt,
+    });
+  }, [
+    duelCount,
+    duelSealed,
+    duelCurrent,
+    duelIsInPlay,
+    duelLastSettledAt,
+    ceremony.ready,
+    ceremony.markers,
+  ]);
+
+  const [walkoutOpen, setWalkoutOpen] = useState(false);
+
+  /**
+   * ⚠ CLOSING COUNTS AS WATCHING, HOWEVER IT IS CLOSED — finished, skipped, or
+   * backed out of at two seconds. That is the accessibility floor: if the
+   * ceremony cannot render for somebody, they press Reveal, close it, and the
+   * band names their opponent. Nobody may be trapped behind an animation that
+   * will not play.
+   */
+  const closeWalkout = useCallback(() => {
+    setWalkoutOpen(false);
+    const duelId = duelCurrent?.duel.duel_id;
+    if (duelId) ceremony.markRevealSeen(duelId);
+  }, [duelCurrent, ceremony]);
+
+  /**
+   * The recap, built from the bout that most recently settled.
+   *
+   * ⚠ FROM `lastSettled`, NOT `current`. By the time somebody opens the app on
+   * a Tuesday, `current` is already next week's duel — reading the recap off it
+   * would recap a week nobody has played.
+   */
+  const duelRecap = useMemo(() => {
+    const b = duelLastSettled;
+    if (!b || !duelPhaseState.recapPending) return null;
+    return {
+      duelId: b.duel.duel_id,
+      matchweek: b.matchweek,
+      you: {
+        name: duelOwnName ?? 'You',
+        userId: duelStandings.get(b.you.entryId)?.userId ?? null,
+        score: b.you.accuracy ?? 0,
+      },
+      // ⚠ NULL IS A BYE and must stay structural. A bye pays DUEL_BYE, which
+      // IS DUEL_TIE, so anything reading the points to detect one calls it a
+      // draw against an opponent who never existed.
+      them: b.them
+        ? {
+            name: b.them.name,
+            userId: duelStandings.get(b.them.entryId)?.userId ?? null,
+            score: b.them.accuracy ?? 0,
+          }
+        : null,
+      points: b.you.points,
+    };
+  }, [duelLastSettled, duelOwnName, duelPhaseState.recapPending, duelStandings]);
+
+  /** ⚠ BOTH BUTTONS STAMP. Reading the story is not a reason to be told the news again. */
+  const dismissRecap = useCallback(() => ceremony.markRecapSeen(), [ceremony]);
+  const reviewRecap = useCallback(() => {
+    ceremony.markRecapSeen();
+    if (duelRecap) router.push(`/pool/${id}/duel/${duelRecap.matchweek}`);
+  }, [ceremony, duelRecap, id]);
+
   const duelYou = useMemo(
     () =>
       duel.ownEntryId ? { entryId: duel.ownEntryId, name: duel.ownName ?? 'You' } : null,
@@ -871,6 +1002,7 @@ export default function PoolDetailScreen() {
           bout={duel.current}
           sealed={duel.sealed}
           you={duelYou}
+          onReveal={duelPhaseState.phase === 'revealable' ? () => setWalkoutOpen(true) : null}
           standings={duelStandings}
           kickoffAt={duel.currentKickoff}
           liveScore={duel.liveScore}
@@ -886,6 +1018,54 @@ export default function PoolDetailScreen() {
         unreadCount={banter.unreadCount}
         onPress={() => banterSheetRef.current?.open()}
       />
+
+      {/*
+        ⚠ LAST IN THE TREE, so it covers the band, the pager AND the Banter FAB.
+        A floating action button riding over a full-screen ceremony is the one
+        thing that would break the takeover, and it is easy to miss because the
+        FAB is rendered by a different part of this file.
+
+        ⚠ GUARDED ON THE OPPONENT EXISTING. A bye has no one to walk out, and
+        `duelPhase` has no opinion about that — it answers `revealable` for a bye
+        week too, because the DRAW has opened either way. The ceremony is the
+        wrong shape for "nobody was drawn against you", so the band's own bye
+        copy handles it and the marker is never stamped.
+      */}
+      {/*
+        ⚠ THE RESULT IS ALREADY ON THE SCREEN BEHIND THIS. The band, the Room
+        and the leaderboard are all correct before it opens — see the sheet's
+        own header. This animates news the member could already have read, which
+        is what keeps it a flourish rather than a gate.
+      */}
+      <ShowdownRecapSheet recap={duelRecap} onSkip={dismissRecap} onReview={reviewRecap} />
+
+      {walkoutOpen && duel.current?.them ? (
+        <ShowdownWalkout
+          matchweek={duel.current.matchweek}
+          opponent={{
+            name: duel.current.them.name,
+            userId: duelStandings.get(duel.current.them.entryId)?.userId ?? null,
+            /*
+              ⚠ THE OPPONENT'S RECORD, FROM THE SAME `duelTable` THE DUELS
+              LEADERBOARD RENDERS. Clue 1 has to agree with the board a member
+              can open in two taps — a second derivation here is how the
+              ceremony ends up announcing a record the standings contradict.
+
+              ⚠ AND IT IS BUILT FROM SETTLED DUELS ONLY, so the seal costs it
+              nothing: a week cannot settle without having locked, and a locked
+              week is revealed.
+            */
+            record: {
+              won: duel.duelTable.get(duel.current.them.entryId)?.won ?? 0,
+              tied: duel.duelTable.get(duel.current.them.entryId)?.tied ?? 0,
+              lost: duel.duelTable.get(duel.current.them.entryId)?.lost ?? 0,
+            },
+            duelPoints: duel.duelTable.get(duel.current.them.entryId)?.duelPoints ?? 0,
+            rank: duelStandings.get(duel.current.them.entryId)?.rank ?? null,
+          }}
+          onClose={closeWalkout}
+        />
+      ) : null}
 
       {/* Banter chat — gorhom BottomSheetModal so it only mounts via
           Portal when present()'d. When closed, it's entirely absent

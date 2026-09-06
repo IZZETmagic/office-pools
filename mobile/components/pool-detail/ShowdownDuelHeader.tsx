@@ -183,6 +183,15 @@ const COLLAPSED_ROW = 56;
 export type Standing = {
   userId: string | null;
   rank: number | null;
+  /**
+   * Where they sat before the most recent settlement, for "what it moved".
+   *
+   * ⚠ THE ENGINE'S OWN `previous_rank`, never a remembered value. The
+   * leaderboard already carries it for the weekly arrows, so the duel review
+   * and the arrow beside a member's name cannot disagree about whether they
+   * went up.
+   */
+  previousRank: number | null;
   points: number;
   /**
    * Fixtures called right, from the engine.
@@ -220,6 +229,15 @@ type Props = {
    * part being kept secret.
    */
   you: { entryId: string; name: string } | null;
+  /**
+   * Phase 2. When set, the middle column becomes a Reveal button and the
+   * opponent's corner is withheld.
+   *
+   * ⚠ ITS PRESENCE IS THE PHASE. The screen passes this only when
+   * `duelPhase(...)` returns `revealable`, so the band has no second opinion
+   * about whether the walkout is owed — one derivation, per `duelPhase.ts`.
+   */
+  onReveal?: (() => void) | null;
   /** entry_id → where they sit on the leaderboard. */
   standings: Map<string, Standing>;
   /** First kickoff of the current duel's matchweek — the countdown's target. */
@@ -265,6 +283,7 @@ export function ShowdownDuelHeader({
   bout,
   sealed,
   you,
+  onReveal,
   standings,
   kickoffAt,
   liveScore,
@@ -307,7 +326,15 @@ export function ShowdownDuelHeader({
   const youUserId =
     (bout ? standings.get(bout.you.entryId)?.userId : null) ??
     (you ? standings.get(you.entryId)?.userId ?? null : null);
-  const themUserId = bout?.them ? standings.get(bout.them.entryId)?.userId ?? null : null;
+  /**
+   * ⚠ NULL WHILE THE WALKOUT IS OWED. The right-hand throw is lit with the
+   * opponent's OWN light stop — `gradientForUser(userId)` — which is the exact
+   * colour their avatar is in Banter and on the leaderboard. Leaving it on
+   * during phase 2 would paint the answer across half the band while the middle
+   * of it still says "Reveal".
+   */
+  const themUserId =
+    !onReveal && bout?.them ? standings.get(bout.them.entryId)?.userId ?? null : null;
   const leftGlow = youUserId ? gradientForUser(youUserId)[0] : BAND.primary;
   const rightGlow = themUserId ? gradientForUser(themUserId)[0] : BAND.slate;
   // ⚠ One value, not a light/dark pair: the band is dark in BOTH app themes, so
@@ -506,6 +533,7 @@ export function ShowdownDuelHeader({
                 bout={bout}
                 sealed={sealed}
                 you={you}
+                onReveal={onReveal ?? null}
                 standings={standings}
                 kickoffAt={kickoffAt}
                 liveScore={liveScore}
@@ -637,6 +665,7 @@ function Matchup({
   bout,
   sealed,
   you,
+  onReveal,
   standings,
   kickoffAt,
   liveScore,
@@ -651,6 +680,7 @@ function Matchup({
   bout: Bout | null;
   sealed: Props['sealed'];
   you: Props['you'];
+  onReveal: (() => void) | null;
   standings: Map<string, Standing>;
   kickoffAt: string | null;
   liveScore: Props['liveScore'];
@@ -745,18 +775,43 @@ function Matchup({
             labelFade={labelFade}
           />
           <Animated.View style={[{ minWidth: MIDDLE_COL, alignItems: 'center' }, middleStyle]}>
-            <Middle
-              bout={bout}
-              kickoffAt={kickoffAt}
-              liveScore={liveScore}
-              liveNow={liveNow}
-            />
+            {/*
+              ⚠ PHASE 2 REPLACES THE MIDDLE, IT DOES NOT SIT BESIDE IT — Ryan,
+              2026-09-06: *"there'll be a button there that says Reveal in
+              between the two avatars in the header."*
+
+              A countdown to the first game next to an opponent you have not met
+              is answering a question nobody has asked yet. Until you know WHO,
+              when is not interesting.
+            */}
+            {onReveal ? (
+              <RevealButton onPress={onReveal} />
+            ) : (
+              <Middle
+                bout={bout}
+                kickoffAt={kickoffAt}
+                liveScore={liveScore}
+                liveNow={liveNow}
+              />
+            )}
           </Animated.View>
+          {/*
+            ⚠ WITHHELD WHILE THE WALKOUT IS ON OFFER. Ryan, 2026-09-02, on the
+            web's first build: their face and name in the band NEXT TO a button
+            marked Reveal meant the button revealed nothing — you had already
+            read the answer above it.
+
+            ⚠ AND IT IS THE SEALED SILHOUETTE, NOT THE BYE. A bye says "Nobody"
+            because nobody was drawn; this is a person being held back. A member
+            who cannot tell those apart spends a week thinking they have no
+            opponent.
+          */}
           <Corner
-            name={bout.them ? bout.them.name : 'Nobody'}
-            standing={bout.them ? standings.get(bout.them.entryId) ?? null : null}
-            tone={bout.them ? 'red' : 'muted'}
-            subtitle={bout.them ? undefined : 'Bye week'}
+            name={onReveal ? 'Sealed' : bout.them ? bout.them.name : 'Nobody'}
+            standing={!onReveal && bout.them ? standings.get(bout.them.entryId) ?? null : null}
+            tone={onReveal || !bout.them ? 'muted' : 'red'}
+            sealed={!!onReveal}
+            subtitle={onReveal ? 'Tap Reveal' : bout.them ? undefined : 'Bye week'}
             moveStyle={rightMove}
             avatarShrink={avatarShrink}
             labelFade={labelFade}
@@ -828,6 +883,48 @@ function Matchup({
         </BandText>
       )}
     </View>
+  );
+}
+
+/**
+ * Phase 2's middle column.
+ *
+ * ⚠ IT IS THE ONLY WAY INTO THE WALKOUT, and it is deliberately the only one.
+ * Ryan, 2026-09-02: *"once revealed there should be NO replay button."* So this
+ * appears exactly once per duel, is pressed once, and does not come back — the
+ * marker (136) is stamped on close and `duelPhase` moves to `scouting`.
+ *
+ * ⚠ NO PULSE, NO SHIMMER, NO BADGE. It is already the brightest thing on a dark
+ * band, between two avatars, on the tab the mode lands on. Animating it to be
+ * noticed would be decorating an urgency that is not real — the draw does not
+ * expire, and the walkout is waiting whenever the member arrives.
+ */
+function RevealButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Reveal your opponent"
+      hitSlop={10}
+      style={({ pressed }) => ({
+        paddingHorizontal: 20,
+        paddingVertical: 11,
+        borderRadius: 999,
+        backgroundColor: BAND.primary,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <BandText
+        style={{
+          fontFamily: fontFamilies.black,
+          fontSize: 15,
+          letterSpacing: 0.6,
+          color: '#FFFFFF',
+        }}
+      >
+        Reveal
+      </BandText>
+    </Pressable>
   );
 }
 

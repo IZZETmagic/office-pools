@@ -35,11 +35,12 @@ import {
 //
 // ## ⚠ WHAT COUNTS AS "CURRENT" — and why it is not the in-play matchweek
 //
-// A duel is revealed up to 48 hours before its football starts (migration 123's
-// anticipation window). For that whole stretch there is no in-play matchweek at
-// all, so keying on `inPlayMatchweekNumber` would blank the header during
-// exactly the part of the cycle this mode exists for. The current bout is the
-// first UNSETTLED one, falling back to the last result.
+// A duel is revealed 24 hours after the previous matchweek's last game
+// (migration 129 — it was 48h under 123, and this note said so for four days
+// after the hold changed). Between that instant and the football there is no
+// in-play matchweek at all, so keying on `inPlayMatchweekNumber` would blank the
+// header during exactly the part of the cycle this mode exists for. The current
+// bout is the first UNSETTLED one, falling back to the last result.
 // =============================================================
 
 /** One side of a duel, oriented so the viewer is always `you`. */
@@ -169,6 +170,31 @@ export type DuelState = {
    * screen must read that as "not yet", never as "they did not pick".
    */
   pickDirections: Map<string, Map<string, string>>;
+  /**
+   * When this entry's most recently settled duel settled, or null.
+   *
+   * ⚠ THE RECAP'S TRIGGER, AND IT IS NOT `current`. Once next week's duel
+   * reveals, `current` has already moved on to it while last week's recap may
+   * still be unseen — which is the ordinary case for anybody who does not open
+   * the app on a Monday night. Reading the recap off `current` would silently
+   * skip it for exactly those members.
+   *
+   * ⚠ MAX BY `settled_at`, NEVER BY MATCHWEEK NUMBER. Rounds are played out of
+   * numerical order (101 measured a minus-121-day gap), so the highest-numbered
+   * settled duel is not the most recent one. Settlement time is the only thing
+   * here that moves forward reliably — the same reason 122 chose it.
+   */
+  lastSettledAt: string | null;
+  /**
+   * The bout `lastSettledAt` belongs to — what the recap is ABOUT.
+   *
+   * ⚠ ONE DERIVATION, TWO FIELDS. The instant and the bout are found together
+   * so they cannot disagree: a screen that took the timestamp from here and the
+   * bout from its own scan of `bouts` would eventually recap one duel using
+   * another's settlement time, and the "have I seen this" test would be against
+   * the wrong week.
+   */
+  lastSettled: Bout | null;
   /** The viewer's own entry, for the route into the picker. */
   ownEntryId: string | null;
   /**
@@ -450,6 +476,17 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     () => bouts.find((b) => !b.settled) ?? bouts[bouts.length - 1] ?? null,
     [bouts],
   );
+
+  /** See the field's note: max by `settled_at`, never by matchweek number. */
+  const lastSettled = useMemo<Bout | null>(() => {
+    let best: Bout | null = null;
+    for (const b of bouts) {
+      const at = b.duel.settled_at;
+      if (!at) continue;
+      if (best === null || at > (best.duel.settled_at as string)) best = b;
+    }
+    return best;
+  }, [bouts]);
 
   const record = useMemo<DuelRecord>(() => {
     let won = 0;
@@ -1044,6 +1081,8 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     pickDirections,
     season,
     opponent,
+    lastSettledAt: lastSettled?.duel.settled_at ?? null,
+    lastSettled,
     ownEntryId: data?.you.entries[0]?.entry_id ?? null,
     ownName: data?.you.entries[0]?.entry_name ?? null,
     isInPlay,

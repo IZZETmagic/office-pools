@@ -22,11 +22,11 @@ import { duelPhase, type DuelPhaseInput } from '../duelPhase';
 /** A pool mid-season with nothing unusual about it. */
 const base: DuelPhaseInput = {
   hasDraw: true,
-  current: { matchweek: 3, settledAt: null, revealsAt: '2026-09-02T01:00:00Z' },
+  current: { duelId: 'duel-3', matchweek: 3, settledAt: null },
   sealedMatchweek: 4,
   isInPlay: false,
   lastSettledAt: null,
-  revealSeenAt: null,
+  revealSeenDuel: null,
   recapSeenAt: null,
 };
 
@@ -44,7 +44,7 @@ describe('⚠ the open week is chosen before the sealed one', () => {
   });
 
   it('names the week you can ACT on, never the one you can only wait for', () => {
-    expect(at({ revealSeenAt: '2026-09-03T00:00:00Z' })).toMatchObject({
+    expect(at({ revealSeenDuel: 'duel-3' })).toMatchObject({
       phase: 'scouting',
       matchweek: 3,
     });
@@ -64,7 +64,7 @@ describe('⚠ football outranks both of them', () => {
 
   it('does not offer next week’s walkout mid-match', () => {
     // Unwatched reveal AND a sealed week AND a ball in play.
-    const r = at({ isInPlay: true, revealSeenAt: null, sealedMatchweek: 4 });
+    const r = at({ isInPlay: true, revealSeenDuel: null, sealedMatchweek: 4 });
     expect(r.phase).toBe('live');
     expect(r.opponentVisible).toBe(true);
   });
@@ -84,9 +84,9 @@ describe('⚠ the recap comes before the next walkout', () => {
   // does not open the app on the Monday has both waiting.
   const bothWaiting: Partial<DuelPhaseInput> = {
     lastSettledAt: '2026-09-07T20:59:00Z',
-    current: { matchweek: 4, settledAt: null, revealsAt: '2026-09-08T20:59:00Z' },
+    current: { duelId: 'duel-4', matchweek: 4, settledAt: null },
     sealedMatchweek: 5,
-    revealSeenAt: null,
+    revealSeenDuel: null,
     recapSeenAt: null,
   };
 
@@ -114,48 +114,72 @@ describe('⚠ the opponent is withheld until the walkout has been watched', () =
   it('hides them while the reveal is still on offer', () => {
     // Ryan, 2026-09-02: their face next to a button marked Reveal meant the
     // button revealed nothing.
-    expect(at({ revealSeenAt: null }).opponentVisible).toBe(false);
+    expect(at({ revealSeenDuel: null }).opponentVisible).toBe(false);
   });
 
   it.each([
-    ['scouting', { revealSeenAt: '2026-09-03T00:00:00Z' }],
+    ['scouting', { revealSeenDuel: 'duel-3' }],
     ['live', { isInPlay: true }],
   ] as const)('names them in %s', (_phase, patch) => {
     expect(at(patch).opponentVisible).toBe(true);
   });
 });
 
-describe('the reveal marker', () => {
-  it('walks them out when the draw opened after the last one watched', () => {
-    expect(
-      at({ revealSeenAt: '2026-09-01T00:00:00Z' }).phase, // reveal was 09-02
-    ).toBe('revealable');
-  });
-
-  it('does not replay one already watched', () => {
-    expect(at({ revealSeenAt: '2026-09-03T00:00:00Z' }).phase).toBe('scouting');
-  });
-
-  it('⚠ treats a MISSING reveal instant as already watched, never as replay', () => {
-    // Failing towards "seen" costs a member one walkout. Failing the other way
-    // shows the same walkout on every single app open.
-    expect(at({ current: { matchweek: 3, settledAt: null, revealsAt: null } }).phase).toBe(
-      'scouting',
-    );
-  });
-
-  it('⚠ treats -infinity — the season’s always-open first week — as watched', () => {
-    // 129 returns `-infinity` for the first playable matchweek. There was never
-    // anything sealed about it, so there is nothing to walk out from.
-    const r = at({
-      current: { matchweek: 1, settledAt: null, revealsAt: '-infinity' },
-      revealSeenAt: '2026-08-01T00:00:00Z',
-    });
-    expect(r.phase).toBe('scouting');
-  });
-
+describe('the reveal marker is a DUEL ID, not a clock', () => {
   it('shows a first-ever walkout when the marker is null', () => {
-    expect(at({ revealSeenAt: null }).phase).toBe('revealable');
+    expect(at({ revealSeenDuel: null }).phase).toBe('revealable');
+  });
+
+  it('does not replay the one already watched', () => {
+    expect(at({ revealSeenDuel: 'duel-3' }).phase).toBe('scouting');
+  });
+
+  it('walks them out again for the NEXT duel', () => {
+    const r = at({
+      current: { duelId: 'duel-4', matchweek: 4, settledAt: null },
+      revealSeenDuel: 'duel-3',
+    });
+    expect(r.phase).toBe('revealable');
+    expect(r.opponentVisible).toBe(false);
+  });
+
+  it('⚠⚠ RE-REVEALS AFTER A REDRAW — the whole reason this is not a timestamp', () => {
+    // `league_generate_duel_schedule` redraws with
+    //     DELETE FROM league_duels WHERE ... settled_at IS NULL;  INSERT ...
+    // (083/095/117), so a redrawn week keeps its matchweek NUMBER and its reveal
+    // INSTANT but gets a brand new `duel_id`.
+    //
+    // Under the timestamp design this member would have been handed a different
+    // opponent with no ceremony and no signal whatsoever — the clock says they
+    // already saw this week's reveal, and they did; it just is not true any
+    // more. The id comparison catches it because the thing itself changed.
+    const watchedThenRedrawn = at({
+      current: { duelId: 'duel-3-REDRAWN', matchweek: 3, settledAt: null },
+      revealSeenDuel: 'duel-3',
+    });
+    expect(watchedThenRedrawn.phase).toBe('revealable');
+    expect(watchedThenRedrawn.matchweek).toBe(3);
+    expect(watchedThenRedrawn.opponentVisible).toBe(false);
+  });
+
+  it('⚠ a stale marker pointing at a deleted duel shows the ceremony', () => {
+    // 136 deliberately has no foreign key, so the id can outlive its row. The
+    // only thing a dangling id can do is fail to equal the current duel — which
+    // shows the walkout. That is the safe direction, and it is the same path
+    // the redraw case takes.
+    expect(at({ revealSeenDuel: 'duel-that-no-longer-exists' }).phase).toBe('revealable');
+  });
+
+  it('does not offer a walkout for a duel that has already settled', () => {
+    // A finished duel is not a reveal, whatever the marker says.
+    const r = at({
+      current: { duelId: 'duel-3', matchweek: 3, settledAt: '2026-09-07T20:59:00Z' },
+      lastSettledAt: '2026-09-07T20:59:00Z',
+      recapSeenAt: '2026-09-08T09:00:00Z',
+      revealSeenDuel: null,
+      sealedMatchweek: null,
+    });
+    expect(r.phase).not.toBe('revealable');
   });
 });
 
@@ -172,7 +196,7 @@ describe('a pool with nothing in it', () => {
 
   it('ends the season on the last result rather than a dead clock', () => {
     const r = at({
-      current: { matchweek: 38, settledAt: '2027-05-23T18:00:00Z', revealsAt: null },
+      current: { duelId: 'duel-38', matchweek: 38, settledAt: '2027-05-23T18:00:00Z' },
       sealedMatchweek: null,
       lastSettledAt: '2027-05-23T18:00:00Z',
       recapSeenAt: '2027-05-24T09:00:00Z',

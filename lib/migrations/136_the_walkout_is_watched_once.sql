@@ -20,56 +20,45 @@
 -- calls it "a defensible v1" and names the durable home as "a column beside
 -- `last_recap_seen_at`". This is that column.
 --
--- It was defensible on the web and is not portable to React Native, for two
--- separate reasons:
+-- It was defensible on the web and is not portable to React Native:
 --
 --   · there is no `localStorage` on a phone, and the nearest equivalent
---     (`expo-secure-store`) is still per-INSTALL — reinstall and the walkout
---     replays;
+--     (`expo-secure-store`) is still per-INSTALL — reinstall and it replays;
 --   · phase 6 loops the member straight back round to a new sealed week, so a
---     per-device marker means a member who reads on a phone and a laptop can be
---     walked out against the same opponent twice in one week. The ceremony is
---     worth watching once. Twice is a bug that looks like a feature.
+--     per-device marker means somebody who reads on a phone and a laptop can be
+--     walked out against the same opponent twice in one week.
 --
--- Making it durable also retires the web's compromise: both surfaces can read
--- one answer instead of each keeping their own.
+-- ## ⚠⚠ A DUEL ID, NOT A TIMESTAMP — AND THIS IS WHERE IT PARTS FROM 122
 --
--- ## ⚠ A TIMESTAMP, NEVER A MATCHWEEK NUMBER — 122'S REASONING APPLIES HERE
+-- The first draft of this migration mirrored 122 exactly: a `timestamptz`
+-- compared against `league_duel_reveals_at`. That is wrong here, and the reason
+-- is the REDRAW.
 --
--- The obvious design is `last_reveal_seen_matchweek int` with a `>= n` test,
--- and it is wrong for exactly the reason 122 records: rounds are PLAYED OUT OF
--- NUMERICAL ORDER — 101 measured a minimum gap of minus 121 days across three
--- real seasons — so a member who watched the walkout for a late-numbered round
--- played early would hold a high-water mark no later round could clear, and
--- would never be shown another walkout for the rest of the season. Nothing
--- would error. The flagship moment of the flagship mode would simply stop
--- happening for that member, quietly, for months.
+-- `league_generate_duel_schedule` (083, as amended by 095/117/118) redraws by
 --
--- ## ⚠ THE ANCHOR IS THE REVEAL INSTANT, AND IT IS MONOTONIC
+--     DELETE FROM league_duels WHERE pool_id = ... AND settled_at IS NULL;
+--     INSERT INTO league_duels ...
 --
--- 122 compares against `settled_at`, which is safe because settlement time
--- moves forward whatever order the rounds are numbered in. The equivalent here
--- is `league_duel_reveals_at(pool_id, matchweek_number)` (129), and it carries
--- the same property for the same reason: the hold is measured from the previous
--- matchweek's `ranks_snapshot_at`, and the floor is that matchweek's own
--- `lock_at - 24h`. Both are ordered by LOCK TIME, never by number — 129's
--- `ORDER BY prev.lock_at DESC` is explicit about it. So reveal instants advance
--- in the order the football is actually played.
+-- — so a redraw MINTS A NEW `duel_id` for an already-revealed week. Meanwhile
+-- `league_duel_reveals_at` is derived from the matchweek's own `lock_at` and
+-- the previous week's `ranks_snapshot_at` (129), neither of which a redraw
+-- touches. So under a timestamp marker a member would be handed a DIFFERENT
+-- OPPONENT for the same matchweek with no ceremony and no signal at all — the
+-- clock says they have already seen this week's reveal, and in a sense they
+-- have; it just is not true any more.
 --
--- There is therefore an unseen walkout when
+-- Comparing the duel id cannot have that bug. A new row is a new id is a new
+-- walkout, which is exactly right: the thing being revealed has changed.
 --
---     league_duel_reveals_at(pool_id, matchweek_number) > last_reveal_seen_at
+-- ⚠ 122'S WARNING STILL APPLIES AND IS NOT VIOLATED. What 122 forbids is a
+-- HIGH-WATER MARK over a value that does not advance monotonically — a
+-- `last_recap_seen_matchweek int` tested with `>=`, which breaks because rounds
+-- are played out of numerical order (101 measured a minimum gap of minus 121
+-- days). This is an EQUALITY test against an opaque id, so it has no ordering
+-- to get wrong. There is exactly one current duel at a time (119 opens them one
+-- at a time), so one slot is all it needs.
 --
--- ⚠ AND NOT `created_at`. Every duel of the season is inserted by the draw at
--- once (083), so `created_at` is the same instant for all 38 of them and would
--- say either "all unseen" or "all seen" forever.
---
--- The two degenerate answers both fall out correctly rather than needing a
--- rule. `-infinity` — the season's first playable matchweek, which is always
--- open — is never greater than a real stamp, so it is shown once and then not
--- again. `NULL` — a matchweek with no fixtures, including one the floor-of-5
--- has emptied (106) — makes the comparison NULL, which is not true, so nothing
--- is offered for a duel that can never be played.
+-- ⚠ AND IT IS NOT `matchweek_number` EITHER. That would be 122's bug precisely.
 --
 -- ## Per ENTRY, not per member
 --
@@ -85,25 +74,31 @@
 --     row while the pool is not archived (`member_pool_writable`).
 --
 -- ⚠ THAT GRANT IS WIDER THAN THIS FEATURE NEEDS and a separate audit is open on
--- it. If it is ever narrowed to column-level grants, `last_reveal_seen_at` MUST
--- be on the list alongside `last_recap_seen_at` — otherwise the walkout stops
--- marking itself watched and replays on every single visit, which is the most
--- irritating possible failure of this feature.
+-- it. If it is ever narrowed to column-level grants, `last_reveal_seen_duel`
+-- MUST be on the list alongside `last_recap_seen_at` — otherwise the walkout
+-- stops marking itself watched and replays on every single visit, which is the
+-- most irritating possible failure of this feature.
+--
+-- ⚠ NO FOREIGN KEY TO `league_duels`, DELIBERATELY. The redraw deletes rows,
+-- and `ON DELETE CASCADE` would take the member's entry with it while
+-- `ON DELETE SET NULL` would silently re-arm the walkout for everybody in the
+-- pool every time an admin redraws. A dangling id here is harmless: it can only
+-- ever fail to equal the current duel, which shows the ceremony — the safe
+-- direction.
 
 ALTER TABLE public.pool_entries
-  ADD COLUMN IF NOT EXISTS last_reveal_seen_at timestamptz;
+  ADD COLUMN IF NOT EXISTS last_reveal_seen_duel uuid;
 
-COMMENT ON COLUMN public.pool_entries.last_reveal_seen_at IS
-  'When this entry last watched (or skipped) a duel walkout. There is an '
-  'unseen walkout when league_duel_reveals_at(pool_id, matchweek_number) > '
-  'this, or this is NULL. A TIMESTAMP, never a matchweek number: rounds are '
-  'played out of numerical order (101 measured a minimum gap of minus 121 '
-  'days), so a high-water mark on the number would stop a member ever seeing '
-  'another walkout. NOT created_at either — the draw inserts every duel of the '
-  'season at one instant (083). Written by the client on CLOSE, however it is '
-  'closed, so nobody is trapped behind an animation that will not render. '
-  'The durable replacement for the web''s per-device localStorage marker. '
-  'Twin of last_recap_seen_at (122). Migration 136.';
+COMMENT ON COLUMN public.pool_entries.last_reveal_seen_duel IS
+  'The league_duels.duel_id whose walkout this entry last watched (or skipped). '
+  'There is an unseen walkout when the entry''s current duel_id differs from '
+  'this, or this is NULL. A DUEL ID, not a timestamp and not a matchweek '
+  'number: a redraw DELETEs and re-INSERTs (083/095/117), minting a new id for '
+  'the same matchweek, so an id comparison re-reveals a changed opponent while '
+  'a clock comparison would not. Equality, so 122''s out-of-order-rounds '
+  'warning does not apply. Intentionally NOT a foreign key — see migration 136. '
+  'Written by the client on CLOSE, however it is closed, so nobody is trapped '
+  'behind an animation that will not render. Twin of last_recap_seen_at (122).';
 
 -- -------------------------------------------------------------
 -- The cold start
@@ -112,39 +107,40 @@ COMMENT ON COLUMN public.pool_entries.last_reveal_seen_at IS
 -- HAVE KNOWN ABOUT FOR DAYS. `NULL` means "never seen", which is right for an
 -- entry whose duel has not opened yet and wrong for one whose has.
 --
--- Stamping `now()` says "every walkout already available has been had", which
--- is the intent — for members who watched it on the web it is literally true,
--- and for the rest the ceremony has no anticipation left to build about an
--- opponent already named on the card in front of them. The next matchweek to
--- reveal is later than the stamp, so it walks out normally.
+-- ⚠ THE LATEST REVEALED DUEL IS THE CURRENT ONE, and that is not an
+-- approximation: 119 opens duels ONE AT A TIME, so the most recent matchweek a
+-- member is allowed to see is by construction the one they are playing. Ordered
+-- by `lock_at`, never by `matchweek_number` — 101, the minus-121-day gap.
 --
--- ⚠ ONLY WHERE A DUEL IS ACTUALLY REVEALED, which is what the
--- `league_duel_reveals_at(...) <= now()` test is for. Stamping every showdown
--- entry unconditionally would burn the walkout for a pool whose first duel has
--- not opened yet — the members most entitled to see it.
+-- ⚠ ONLY WHERE A DUEL IS ACTUALLY REVEALED. Stamping every showdown entry
+-- unconditionally would burn the walkout for a pool whose first duel has not
+-- opened yet — the members most entitled to see it. 116's RLS does not filter
+-- this statement (it runs as the migration), so the reveal instant has to be
+-- asked for explicitly rather than inferred from a row being present.
 --
--- ⚠ RUNS AS THE MIGRATION, SO IT SEES EVERY ROW. 116's RLS withholds a sealed
--- duel from a member's own client, but it does not filter this statement, so
--- the reveal instant has to be asked for explicitly rather than inferred from
--- a row being present. That difference is the whole reason this predicate is
--- not just `EXISTS (SELECT 1 FROM league_duels ...)` the way 122's is.
---
--- Scoped to showdown pools: no other mode has duels, and leaving the column
--- NULL elsewhere keeps it honest about never having been used there.
+-- Blast radius at the time of writing: migration 128 verified live that exactly
+-- two pools carry `league_mode = 'showdown'` and both are the seeded UX pools.
+-- No member-facing pool is affected. Re-run that check before assuming it holds.
 
 UPDATE public.pool_entries pe
-   SET last_reveal_seen_at = now()
+   SET last_reveal_seen_duel = (
+     SELECT d.duel_id
+       FROM league_duels d
+       JOIN pools p2 ON p2.pool_id = d.pool_id
+       JOIN league_matchweeks m
+         ON m.season_id = p2.league_season_id
+        AND m.matchweek_number = d.matchweek_number
+      WHERE d.pool_id = p.pool_id
+        AND (d.entry_a = pe.entry_id OR d.entry_b = pe.entry_id)
+        AND league_duel_reveals_at(d.pool_id, d.matchweek_number) <= now()
+      ORDER BY m.lock_at DESC, d.matchweek_number DESC
+      LIMIT 1
+   )
   FROM pool_members pm
   JOIN pools p ON p.pool_id = pm.pool_id
  WHERE pe.member_id = pm.member_id
    AND p.league_mode = 'showdown'
-   AND pe.last_reveal_seen_at IS NULL
-   AND EXISTS (
-     SELECT 1 FROM league_duels d
-      WHERE d.pool_id = p.pool_id
-        AND (d.entry_a = pe.entry_id OR d.entry_b = pe.entry_id)
-        AND league_duel_reveals_at(d.pool_id, d.matchweek_number) <= now()
-   );
+   AND pe.last_reveal_seen_duel IS NULL;
 
 -- =============================================================
 -- VERIFY
@@ -153,28 +149,31 @@ UPDATE public.pool_entries pe
 --   SELECT column_name, data_type, is_nullable
 --     FROM information_schema.columns
 --    WHERE table_name = 'pool_entries'
---      AND column_name = 'last_reveal_seen_at';
---   -- expect: last_reveal_seen_at | timestamp with time zone | YES
+--      AND column_name = 'last_reveal_seen_duel';
+--   -- expect: last_reveal_seen_duel | uuid | YES
 --
---   -- 2. The seeded showdown pools are stamped (mw 3 is revealed), and
---   --    nothing outside showdown was touched.
+--   -- 2. Nothing outside showdown was touched, and every stamped entry points
+--   --    at a duel it is genuinely IN.
 --   SELECT p.league_mode,
---          count(*)                                        AS entries,
---          count(pe.last_reveal_seen_at)                    AS stamped
+--          count(*)                              AS entries,
+--          count(pe.last_reveal_seen_duel)        AS stamped,
+--          count(*) FILTER (
+--            WHERE pe.last_reveal_seen_duel IS NOT NULL
+--              AND NOT EXISTS (
+--                SELECT 1 FROM league_duels d
+--                 WHERE d.duel_id = pe.last_reveal_seen_duel
+--                   AND (d.entry_a = pe.entry_id OR d.entry_b = pe.entry_id)
+--              )
+--          )                                      AS wrong_duel
 --     FROM pool_entries pe
 --     JOIN pool_members pm ON pm.member_id = pe.member_id
 --     JOIN pools p         ON p.pool_id    = pm.pool_id
 --    GROUP BY p.league_mode;
---   -- expect: stamped > 0 ONLY on the 'showdown' row.
+--   -- expect: stamped > 0 ONLY on 'showdown', and wrong_duel = 0 everywhere.
 --
---   -- 3. The next walkout is still ahead of the stamp — i.e. the backfill
---   --    closed the door on what is open, not on what is coming.
---   SELECT d.matchweek_number,
---          league_duel_reveals_at(d.pool_id, d.matchweek_number) AS reveals_at,
---          league_duel_reveals_at(d.pool_id, d.matchweek_number) > now()
---            AS still_to_come
---     FROM league_duels d
---    WHERE d.pool_id = '5eed0003-0000-4000-8000-000000000003'
---    GROUP BY 1, 2
---    ORDER BY 1;
---   -- expect: mw 1-3 false (already revealed), mw 4+ true.
+--   -- 3. Nobody was stamped with a duel that has not revealed yet.
+--   SELECT count(*) AS stamped_but_sealed
+--     FROM pool_entries pe
+--     JOIN league_duels d ON d.duel_id = pe.last_reveal_seen_duel
+--    WHERE league_duel_reveals_at(d.pool_id, d.matchweek_number) > now();
+--   -- expect: 0
