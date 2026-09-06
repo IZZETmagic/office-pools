@@ -51,6 +51,31 @@ export type MatchPredictionInfo = {
   bracketPick: BracketPickInfo | null;
 };
 
+/** One row of the Facts tab's timeline, as `match_events` stores it. */
+export type TimelineEvent = {
+  side: 'home' | 'away';
+  kind:
+    | 'goal'
+    | 'own_goal'
+    | 'penalty'
+    | 'yellow'
+    | 'red'
+    | 'second_yellow'
+    | 'var_goal_cancelled'
+    | 'subst';
+  playerName: string | null;
+  relatedName: string | null;
+  minute: number;
+  extraMinute: number | null;
+};
+
+/** The bits of the record that are not the scoreline. */
+export type MatchFacts = {
+  referee: string | null;
+  halfTimeHome: number | null;
+  halfTimeAway: number | null;
+};
+
 export type GroupStanding = {
   teamId: string;
   teamName: string;
@@ -186,6 +211,8 @@ export function useMatchDetail(matchId: string | undefined) {
   const [matchStats, setMatchStats] = useState<MatchStatsResponse | null>(null);
   const [bracketStats, setBracketStats] = useState<BracketStatsResponse | null>(null);
   const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [facts, setFacts] = useState<MatchFacts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -224,6 +251,7 @@ export function useMatchDetail(matchId: string | undefined) {
       setMatchStats(null);
       setBracketStats(null);
       setGroupStandings([]);
+      await loadLeagueFacts(matchId, setTimeline, setFacts);
       setLoading(false);
       return;
     }
@@ -239,6 +267,11 @@ export function useMatchDetail(matchId: string | undefined) {
       if (!matchRow) throw new Error('Match not found');
       const m = normalizeMatch(matchRow as Record<string, unknown>);
       setMatch(m);
+      // ⚠ The World Cup arm of `match_events` is deliberately empty for now —
+      // migration 136 created the table with both arms but only the league sync
+      // writes it. Cleared rather than left holding the previous match's rows.
+      setTimeline([]);
+      setFacts(null);
 
       // 2. Resolve user's entries across pools, split by prediction mode.
       // Query through pool_members (the source of truth for "this user belongs
@@ -538,10 +571,100 @@ export function useMatchDetail(matchId: string | undefined) {
     matchStats,
     bracketStats,
     groupStandings,
+    timeline,
+    facts,
     loading,
     error,
     refresh: load,
   };
+}
+
+/**
+ * The Facts tab's two reads, in ONE round trip.
+ *
+ * ⚠ READ DIRECTLY RATHER THAN THROUGH `/api/users/:id/fixtures`, and that is a
+ * deliberate departure from the plan. Referee and the half-time pair could ride
+ * the season payload, but that payload is ~197 kB, shared-cached for 30s across
+ * every viewer of a season, and carries all 380 fixtures — adding three columns
+ * to it for something one screen shows on one match is weight on a hot cache to
+ * save a query nobody else makes.
+ *
+ * `league_fixtures` is a calendar table with `SELECT USING (true)` (migration
+ * 050) and `match_events` has its own read policy for authenticated users, so
+ * the phone can ask for both itself. The embed makes it one request.
+ *
+ * A failure here is a blank card, never a thrown screen: the match itself is
+ * already rendered from the list in memory by the time this runs.
+ */
+async function loadLeagueFacts(
+  fixtureId: string,
+  setTimeline: (t: TimelineEvent[]) => void,
+  setFacts: (f: MatchFacts | null) => void,
+) {
+  try {
+    const { data, error: err } = await supabase
+      .from('league_fixtures')
+      .select(
+        'referee, home_goals_ht, away_goals_ht,' +
+          ' match_events(side, kind, player_name, related_name, minute, extra_minute, sort_index)',
+      )
+      .eq('fixture_id', fixtureId)
+      .maybeSingle();
+    if (err) throw err;
+    if (!data) {
+      setTimeline([]);
+      setFacts(null);
+      return;
+    }
+
+    // ⚠ Through `unknown`: the generated client cannot type an embedded select
+    // written as a string, so it widens `data` to GenericStringError and a
+    // direct cast is rejected. Same shape as the joins above.
+    const row = data as unknown as {
+      referee: string | null;
+      home_goals_ht: number | null;
+      away_goals_ht: number | null;
+      match_events: Array<{
+        side: string;
+        kind: string;
+        player_name: string | null;
+        related_name: string | null;
+        minute: number;
+        extra_minute: number | null;
+        sort_index: number;
+      }> | null;
+    };
+
+    setFacts({
+      referee: row.referee,
+      halfTimeHome: row.home_goals_ht,
+      halfTimeAway: row.away_goals_ht,
+    });
+
+    // ⚠ ORDERED HERE, NOT IN THE QUERY. PostgREST cannot order an embedded
+    // resource by two columns through this client, and minute alone does not
+    // order six things that share the 45th — `sort_index` is the feed's own
+    // sequence and is the tiebreak the table stores it for.
+    const events = (row.match_events ?? [])
+      .slice()
+      .sort((a, b) => a.minute - b.minute || a.sort_index - b.sort_index)
+      .map((e) => ({
+        side: e.side as TimelineEvent['side'],
+        kind: e.kind as TimelineEvent['kind'],
+        playerName: e.player_name,
+        relatedName: e.related_name,
+        minute: e.minute,
+        extraMinute: e.extra_minute,
+      }));
+    setTimeline(events);
+  } catch (e) {
+    // ⚠ A MISSING TABLE IS THE EXPECTED CASE UNTIL MIGRATION 136 IS APPLIED.
+    // Warn and render nothing rather than failing the screen — the header,
+    // the scoreline and every other card are unaffected.
+    console.warn('[useMatchDetail] league facts unavailable', e);
+    setTimeline([]);
+    setFacts(null);
+  }
 }
 
 async function loadGroupStandings(

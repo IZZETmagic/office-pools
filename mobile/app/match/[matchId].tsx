@@ -40,7 +40,9 @@ import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
   type BracketPickInfo,
   type GroupStanding,
+  type MatchFacts,
   type MatchPredictionInfo,
+  type TimelineEvent,
   useMatchDetail,
 } from '@/lib/useMatchDetail';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
@@ -77,6 +79,8 @@ export default function MatchDetailScreen() {
     matchStats,
     bracketStats,
     groupStandings,
+    timeline,
+    facts,
     loading,
     error,
     refresh,
@@ -152,7 +156,8 @@ export default function MatchDetailScreen() {
       case 'facts':
         return (
           <View style={{ gap: 16 }}>
-            <MatchInfoCard match={m} />
+            {timeline.length > 0 ? <TimelineCard match={m} events={timeline} facts={facts} /> : null}
+            <MatchInfoCard match={m} facts={facts} />
             {groupStandings.length > 0 ? (
               <GroupStandingsCard groupLetter={m.groupLetter} standings={groupStandings} />
             ) : null}
@@ -384,7 +389,7 @@ function TabPage({
 
 // MARK: - Match Info Card
 
-function MatchInfoCard({ match }: { match: ResultsMatch }) {
+function MatchInfoCard({ match, facts }: { match: ResultsMatch; facts: MatchFacts | null }) {
   const theme = useTheme();
   const rows: Array<{ icon: string; emoji: string; label: string }> = [
     { icon: 'sportscourt', emoji: '🏟', label: stageLabel(match) },
@@ -392,6 +397,20 @@ function MatchInfoCard({ match }: { match: ResultsMatch }) {
   ];
   if (match.venue) {
     rows.push({ icon: 'mappin.and.ellipse', emoji: '📍', label: match.venue });
+  }
+  // ⚠ ONLY WHEN THEY EXIST. Both arrive on the api-football payload and are
+  // written by the league sync from migration 136 onwards, so every fixture
+  // played before that has neither — and a row reading "Referee: —" is worse
+  // than no row. Same for a half-time score on a game that has not reached it.
+  if (facts?.referee) {
+    rows.push({ icon: 'person.2.fill', emoji: '🧑‍⚖️', label: facts.referee });
+  }
+  if (facts?.halfTimeHome != null && facts?.halfTimeAway != null) {
+    rows.push({
+      icon: 'clock',
+      emoji: '⏱',
+      label: `Half time · ${facts.halfTimeHome}–${facts.halfTimeAway}`,
+    });
   }
 
   return (
@@ -441,6 +460,224 @@ function MatchInfoCard({ match }: { match: ResultsMatch }) {
           </View>
         </View>
       ))}
+    </View>
+  );
+}
+
+// MARK: - Timeline
+
+/**
+ * What happened, in two columns.
+ *
+ * ⚠ HOME LEFT, AWAY RIGHT, AND THE SIDE IS READ NOT DERIVED. `match_events.side`
+ * is the side CREDITED — for an own goal that is the opposite of the team the
+ * provider attributed it to, and the mapper has already flipped it. Deriving the
+ * column from anything else here would put own goals in the wrong half and make
+ * the timeline disagree with the scoreline above it.
+ */
+function TimelineCard({
+  match,
+  events,
+  facts,
+}: {
+  match: ResultsMatch;
+  events: TimelineEvent[];
+  facts: MatchFacts | null;
+}) {
+  const theme = useTheme();
+
+  const goals = events.filter(
+    (e) => e.kind === 'goal' || e.kind === 'penalty' || e.kind === 'own_goal',
+  ).length;
+
+  // Half time is drawn where it happened rather than at a fixed index: a first
+  // half can run to 45+7, and the marker belongs after the last of those.
+  const htIndex = events.findIndex((e) => e.minute > 45);
+  const showHt =
+    facts?.halfTimeHome != null && facts?.halfTimeAway != null && htIndex > 0;
+
+  return (
+    <View
+      style={{
+        marginHorizontal: 20,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.radii.lg,
+        ...theme.shadows.card,
+        overflow: 'hidden',
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingTop: 14,
+          paddingBottom: 10,
+        }}
+      >
+        <Text variant="cardTitle">Timeline</Text>
+        <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}>
+          {goals === 1 ? '1 goal' : `${goals} goals`}
+        </RNText>
+      </View>
+      <View
+        style={{ height: 0.5, marginHorizontal: 14, backgroundColor: withOpacity(theme.colors.mist, 0.6) }}
+      />
+      <View style={{ paddingVertical: 8 }}>
+        {events.map((e, i) => (
+          <View key={`${e.minute}-${i}`}>
+            {showHt && i === htIndex ? (
+              <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                <RNText
+                  style={{
+                    fontFamily: fontFamilies.bold,
+                    fontSize: 10,
+                    letterSpacing: 1,
+                    textTransform: 'uppercase',
+                    color: theme.colors.slate,
+                    backgroundColor: theme.colors.snow,
+                    paddingHorizontal: 10,
+                    paddingVertical: 3,
+                    borderRadius: 999,
+                    overflow: 'hidden',
+                  }}
+                >
+                  Half time · {facts!.halfTimeHome}–{facts!.halfTimeAway}
+                </RNText>
+              </View>
+            ) : null}
+            <TimelineRow event={e} match={match} />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** The mark for one kind of event, and whether it reads as struck through. */
+function eventGlyph(kind: TimelineEvent['kind']): { glyph: string; muted: boolean } {
+  switch (kind) {
+    case 'goal':
+      return { glyph: '⚽', muted: false };
+    case 'penalty':
+      return { glyph: '⚽', muted: false };
+    case 'own_goal':
+      return { glyph: '⚽', muted: false };
+    case 'yellow':
+      return { glyph: '🟨', muted: false };
+    case 'red':
+      return { glyph: '🟥', muted: false };
+    case 'second_yellow':
+      return { glyph: '🟥', muted: false };
+    case 'var_goal_cancelled':
+      return { glyph: '📺', muted: true };
+    case 'subst':
+      return { glyph: '🔁', muted: true };
+  }
+}
+
+/** A qualifier the name alone does not carry. Null when there is nothing to add. */
+function eventNote(e: TimelineEvent): string | null {
+  switch (e.kind) {
+    case 'penalty':
+      return 'pen';
+    case 'own_goal':
+      return 'OG';
+    case 'second_yellow':
+      return '2nd yellow';
+    case 'var_goal_cancelled':
+      return 'disallowed';
+    case 'subst':
+      return e.relatedName ? shortName(e.relatedName) : null;
+    case 'goal':
+      return e.relatedName ? shortName(e.relatedName) : null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Surname only.
+ *
+ * ⚠ `/fixtures/events` returns FULL names — "Cesar Palacios Perez" — where
+ * `/fixtures/lineups` returns "C. Palacios". Storing the full one and shortening
+ * at render keeps the source faithful and the row narrow. A single-token name
+ * survives unchanged.
+ */
+function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts.length > 1 ? parts[parts.length - 1] : name;
+}
+
+function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMatch }) {
+  const theme = useTheme();
+  const isHome = event.side === 'home';
+  const { glyph, muted } = eventGlyph(event.kind);
+  const note = eventNote(event);
+  const minute = `${event.minute}${event.extraMinute ? `+${event.extraMinute}` : ''}'`;
+
+  const name = (
+    <View style={{ flex: 1, alignItems: isHome ? 'flex-end' : 'flex-start' }}>
+      <RNText
+        numberOfLines={1}
+        style={{
+          fontFamily: fontFamilies.semibold,
+          fontSize: 13,
+          color: muted ? theme.colors.slate : theme.colors.ink,
+          textDecorationLine: event.kind === 'var_goal_cancelled' ? 'line-through' : 'none',
+          textAlign: isHome ? 'right' : 'left',
+        }}
+      >
+        {event.playerName ? shortName(event.playerName) : '—'}
+      </RNText>
+      {note ? (
+        <RNText
+          numberOfLines={1}
+          style={{
+            fontFamily: fontFamilies.medium,
+            fontSize: 11,
+            color: theme.colors.slate,
+            textAlign: isHome ? 'right' : 'left',
+          }}
+        >
+          {note}
+        </RNText>
+      ) : null}
+    </View>
+  );
+
+  const spacer = <View style={{ flex: 1 }} />;
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 5,
+      }}
+      accessibilityLabel={`${minute} ${event.kind} ${event.playerName ?? ''} ${
+        isHome ? homeDisplayName(match) : awayDisplayName(match)
+      }`}
+    >
+      {isHome ? name : spacer}
+      {isHome ? <RNText style={{ fontSize: 13 }}>{glyph}</RNText> : null}
+      <RNText
+        style={{
+          width: 40,
+          textAlign: 'center',
+          fontFamily: MONO,
+          fontSize: 11,
+          color: theme.colors.slate,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {minute}
+      </RNText>
+      {!isHome ? <RNText style={{ fontSize: 13 }}>{glyph}</RNText> : null}
+      {!isHome ? name : spacer}
     </View>
   );
 }
