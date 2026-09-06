@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { setStatusBarStyle, StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -597,6 +597,33 @@ export default function PoolDetailScreen() {
     const landing = visibleTabs[0];
     if (!deepLinked && landing && landing !== tab) setTab(landing);
   }
+
+  /**
+   * ⚠ RE-ASSERT THE BAR ON THE WAY BACK IN.
+   *
+   * The `<StatusBar style="light">` below applies on mount and on a style
+   * CHANGE — it does not re-apply when this screen is returned to. The duel
+   * decision page pushes on top and sets `dark` (its background is near-white
+   * and white glyphs vanish on it), and without this the clock and battery
+   * stayed black over the dark Showdown band on the way back.
+   *
+   * ⚠ THIS SCREEN OWNS THE ANSWER, so this screen gives it. The decision page
+   * restoring the bar itself would mean knowing which pool it came from and
+   * whether that pool is a Showdown — a fact it has no business holding.
+   *
+   * ⚠ `'auto'` FOR AN ORDINARY POOL, not `'dark'`: those have no band, so the
+   * bar follows the device theme exactly as the root layout sets it.
+   *
+   * ⚠ IT SITS HERE, BELOW `accentColor`, AND NOT WITH THE OTHER FOCUS EFFECTS.
+   * A `useCallback` dependency array is evaluated during RENDER, so reading
+   * either of these from further up the component is a temporal-dead-zone
+   * ReferenceError rather than a stale value.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle(accentColor || isShowdownPool ? 'light' : 'auto', true);
+    }, [accentColor, isShowdownPool]),
+  );
 
   const tabIndex = Math.max(0, visibleTabs.indexOf(tab));
 

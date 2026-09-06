@@ -41,6 +41,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -143,6 +144,14 @@ export function ShowdownRecapSheet({
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onSkip}>
+      {/*
+        ⚠ A NATIVE MODAL RESETS THE BAR ON iOS, so the light glyphs the Showdown
+        band asked for go dark the moment this opens — and land on a scrim that
+        is 72% of near-black. Same failure as the decision page, one layer up.
+        Reasserted here rather than in the pool screen because only this
+        component knows when the modal is up.
+      */}
+      <StatusBar style="light" animated />
       <View
         style={{
           flex: 1,
@@ -178,7 +187,22 @@ export function ShowdownRecapSheet({
             Matchweek {recap.matchweek} · decided
           </Text>
 
-          <Text style={{ fontFamily: fontFamilies.black, fontSize: 26, color: tint }}>
+          {/*
+            ⚠ `lineHeight` WITH THE SIZE, ALWAYS. `Text` defaults to variant
+            'body', whose `lineHeight: 20` shears the tops off anything larger —
+            "Drawn" rendered with its upper half cut away and colliding with the
+            line above it. The band's own header records this trap in three
+            places and I walked into it anyway; every font size over ~18 in this
+            feature now carries its own line height.
+          */}
+          <Text
+            style={{
+              fontFamily: fontFamilies.black,
+              fontSize: 26,
+              lineHeight: 34,
+              color: tint,
+            }}
+          >
             {headline}
           </Text>
 

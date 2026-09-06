@@ -34,12 +34,16 @@
 // that arrow cannot disagree about whether somebody went up.
 // =============================================================
 
+import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
+import { setStatusBarStyle, StatusBar } from 'expo-status-bar';
+import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, Icon, Text } from '@/components/ui';
+import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { Scoreline, TeamSheetRows } from '@/components/pool-detail/TeamSheet';
 import type { Standing } from '@/components/pool-detail/ShowdownDuelHeader';
 import { buildSheet, sheetSummary } from '@/lib/duelSheet';
@@ -169,20 +173,46 @@ export default function DuelDecisionScreen() {
           <Text variant="detail" color="slate" style={{ letterSpacing: 1.4 }}>
             MATCHWEEK {week}
           </Text>
-          <Text style={{ fontFamily: fontFamilies.black, fontSize: 28, color: tint }}>
+          {/*
+            ⚠ `lineHeight` WITH THE SIZE. `Text` defaults to variant 'body',
+            whose `lineHeight: 20` shears the tops off anything larger — at 28pt
+            "Drawn" lost its upper half and ran into the matchweek line above it.
+          */}
+          <Text
+            style={{ fontFamily: fontFamilies.black, fontSize: 28, lineHeight: 36, color: tint }}
+          >
             {verdict}
           </Text>
+
+          {/*
+            ⚠ THE FACES BELONG HERE TOO — Ryan, 2026-09-06: *"can we have the
+            avatar still there in the first card to say this person v this
+            person ... we don't have to have it as intense as the other ones
+            because it's a summary thing, it's like you could take a breath."*
+
+            So they are here and they are QUIETER: 44pt against the ceremony's
+            64 and the band's 80, no ring, no glow, no entrance. The card is
+            where the week stops being an event and becomes a record, and the
+            faces are what stop that record being two names and a number.
+
+            ⚠ SAME `gradientForUser` AS EVERYWHERE ELSE. Keyed on the person's
+            user id, not the entry — that is what makes somebody the same colour
+            here as on the band, in the walkout and in Banter. A second palette
+            on this one card would read as a different person.
+          */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               gap: theme.spacing.sm,
-              marginTop: theme.spacing.sm,
+              marginTop: theme.spacing.md,
             }}
           >
-            <Text variant="cardTitle" numberOfLines={1} style={{ flex: 1 }}>
-              {duel.ownName ?? 'You'}
-            </Text>
+            <Side
+              name={duel.ownName ?? 'You'}
+              userId={you?.userId ?? null}
+              align="left"
+            />
             {bye ? (
               <Text variant="cardTitle" color="slate">
                 bye
@@ -195,9 +225,13 @@ export default function DuelDecisionScreen() {
                 tone={tint}
               />
             )}
-            <Text variant="cardTitle" numberOfLines={1} style={{ flex: 1, textAlign: 'right' }}>
-              {bout.them?.name ?? 'Nobody'}
-            </Text>
+            <Side
+              name={bout.them?.name ?? 'Nobody'}
+              userId={
+                bout.them ? standings.get(bout.them.entryId)?.userId ?? null : null
+              }
+              align="right"
+            />
           </View>
           {/* ⚠ The award is READ from the duel row, never inferred from the
               verdict. 500/250/0 is the engine's number (121). */}
@@ -342,9 +376,38 @@ export default function DuelDecisionScreen() {
 
 function Frame({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
+
+  /**
+   * ⚠⚠ THE CLOCK AND BATTERY GO BLACK HERE, AND BACK TO WHITE ON THE WAY OUT.
+   *
+   * Ryan, 2026-09-06: on this page *"it's all white so ... everything can't be
+   * really seen very well."* The pool screen sets `style="light"` for the
+   * Showdown band, which is dark in both themes — correct there, and it stays
+   * set when this page pushes on top of it, so white glyphs land on a near-white
+   * card.
+   *
+   * ⚠ `useFocusEffect`, NOT THE DECLARATIVE `<StatusBar>` ALONE. That component
+   * applies its style on mount and on a style CHANGE; it does not re-apply when
+   * a screen is returned to. The pool screen sits mounted underneath this one,
+   * so nothing would restore its light bar on the way back — the declarative tag
+   * below covers the first paint, and this covers every return to it.
+   *
+   * ⚠ AND THE POOL SCREEN RE-ASSERTS ITS OWN on focus for the same reason,
+   * rather than this one guessing what to restore. A page that sets somebody
+   * else's status bar on the way out has to know which pool it came from and
+   * whether that pool is a Showdown; the screen that owns the answer should
+   * give it.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle('dark', true);
+    }, []),
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.snow }} edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="dark" animated />
       <View
         style={{
           flexDirection: 'row',
@@ -361,6 +424,78 @@ function Frame({ children }: { children: React.ReactNode }) {
       </View>
       {children}
     </SafeAreaView>
+  );
+}
+
+/**
+ * One member on the decision card: a face and a name, and nothing else.
+ *
+ * ⚠ DELIBERATELY THE QUIETEST OF THE THREE. The band's avatar is 80pt with a
+ * ring and a coloured throw behind it; the walkout's is 86 and arrives out of a
+ * tunnel. This is 44, flat, and already there when the card opens. Ryan asked
+ * for a breath, not a third fanfare.
+ *
+ * ⚠ NO RANK OR POINTS UNDER THE NAME. "What it moved" is its own card directly
+ * below, and saying it twice would make the reader check whether the two agree.
+ */
+function Side({
+  name,
+  userId,
+  align,
+}: {
+  name: string;
+  userId: string | null;
+  align: 'left' | 'right';
+}) {
+  const theme = useTheme();
+  const SIZE = 44;
+  return (
+    <View style={{ flex: 1, alignItems: align === 'left' ? 'flex-start' : 'flex-end', gap: 6 }}>
+      <View
+        style={{
+          width: SIZE,
+          height: SIZE,
+          borderRadius: SIZE / 2,
+          overflow: 'hidden',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.mist,
+        }}
+      >
+        {userId ? (
+          <LinearGradient
+            colors={[...gradientForUser(userId)]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderRadius: SIZE / 2,
+            }}
+          />
+        ) : null}
+        <Text
+          style={{
+            fontFamily: fontFamilies.black,
+            fontSize: 16,
+            lineHeight: 22,
+            color: userId ? '#FFFFFF' : theme.colors.slate,
+          }}
+        >
+          {getInitials(name)}
+        </Text>
+      </View>
+      <Text
+        variant="cardTitle"
+        numberOfLines={1}
+        style={{ width: '100%', textAlign: align === 'left' ? 'left' : 'right' }}
+      >
+        {name}
+      </Text>
+    </View>
   );
 }
 
