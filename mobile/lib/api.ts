@@ -1,3 +1,4 @@
+import type { LeagueDepth, LeagueMode, PredictionMode } from './predictionMode';
 import { supabase } from './supabase';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -54,14 +55,45 @@ export function joinPool(poolCode: string) {
   });
 }
 
+/**
+ * The body of `POST /api/pools/create`.
+ *
+ * ⚠ Built by `buildCreatePayload` in `lib/createPool.ts`, never by hand — the
+ * rules about which of these may be present together are recorded there and in
+ * the route, and a hand-assembled body is how they drift.
+ */
 export type CreatePoolRequest = {
   pool_name: string;
   description: string | null;
   tournament_id: string;
+  /**
+   * Present only for a league pool. The route resolves the placeholder
+   * `tournaments` row from it SERVER-SIDE and forces the mode, so a crafted
+   * request cannot pair a season with the wrong competition.
+   */
+  league_season_id: string | null;
   prediction_deadline: string;
-  prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker';
+  /**
+   * ⚠ EVERY league pool is `league_pickem`, whatever its `league_mode`. That is
+   * the column all the league plumbing keys on; `league_mode` below is the
+   * separate axis deciding how it is played.
+   */
+  prediction_mode: PredictionMode;
+  /** Level 1 (Decision 9). Null for a bracket pool. Immutable once written. */
+  league_mode: LeagueMode | null;
+  /**
+   * Level 2, and only for the two modes with weekly picks — the database CHECK
+   * refuses the pairing for Table and Last Man Standing.
+   */
+  league_depth: LeagueDepth | null;
   is_private: boolean;
-  max_participants: number | null;
+  /**
+   * ⚠ ALWAYS 0, and there is no control behind it. Migration 075 records that
+   * `pools.max_participants` is "stored, displayed and editable but enforced
+   * NOWHERE". The route turns 0 into NULL; the real ceiling is the tier one,
+   * enforced by a BEFORE INSERT trigger so no client can miss it.
+   */
+  max_participants: number;
   max_entries_per_user: number;
 };
 
@@ -1279,6 +1311,49 @@ export type HomePoolFacts = {
   hasSubmitted: boolean | null;
   /** Table and Last Man Standing: one decision, so the ring is a state. */
   isSingleDecision: boolean | null;
+  /**
+   * The mode's own numbers, for the card's stat strip.
+   *
+   * ⚠ NULL ON A WORLD CUP POOL, which is what keeps its five blocks — Rank,
+   * Points, Level, Form, Picks — exactly as they were. A league pool gets the
+   * blocks its engine actually writes instead; see `poolCardBlocks`.
+   *
+   * ⚠ NULL IS ALSO "the API is older than this field". The card falls back to
+   * the World Cup shape rather than blanking, which is the same rule the
+   * pick counts above already follow.
+   */
+  league: HomeLeagueFacts | null;
+};
+
+/** Only what a stat block prints. See the note on `league` in the route. */
+export type HomeLeagueFacts = {
+  leagueMode: string | null;
+  openMatchweek: number | null;
+  matchweekCount: number | null;
+  showdown: {
+    duelPoints: number;
+    won: number;
+    tied: number;
+    lost: number;
+    /** won | tied | lost | bye — NOT the accuracy tiers. Different palette. */
+    recentDuels: string[];
+  } | null;
+  lms: {
+    roundsWon: number;
+    roundNumber: number | null;
+    clubsUsed: number;
+    clubPool: number;
+    survivorsLeft: number;
+    roundEntrants: number;
+    isEliminated: boolean;
+  } | null;
+  table: {
+    spotOn: number;
+    clubCount: number;
+    averageOff: number | null;
+    hasTable: boolean;
+    isFinal: boolean;
+  } | null;
 };
 
 export type HomeScoringPools = Record<string, HomePoolFacts> | null;
@@ -1298,6 +1373,17 @@ export async function fetchHomeScoring(userId: string): Promise<HomeScoring> {
       made_picks: number | null;
       has_submitted: boolean | null;
       is_single_decision: boolean | null;
+      league?: {
+        league_mode: string | null;
+        open_matchweek: number | null;
+        matchweek_count: number | null;
+        showdown: { duel_points: number; won: number; tied: number; lost: number; recent_duels: string[] } | null;
+        lms: {
+          rounds_won: number; round_number: number | null; clubs_used: number; club_pool: number;
+          survivors_left: number; round_entrants: number; is_eliminated: boolean;
+        } | null;
+        table: { spot_on: number; club_count: number; average_off: number | null; has_table: boolean; is_final: boolean } | null;
+      } | null;
     }[];
   }>(`/api/users/${userId}/home-scoring`);
 
@@ -1311,6 +1397,42 @@ export async function fetchHomeScoring(userId: string): Promise<HomeScoring> {
             madePicks: p.made_picks ?? null,
             hasSubmitted: p.has_submitted ?? null,
             isSingleDecision: p.is_single_decision ?? null,
+            league: p.league
+              ? {
+                  leagueMode: p.league.league_mode,
+                  openMatchweek: p.league.open_matchweek,
+                  matchweekCount: p.league.matchweek_count,
+                  showdown: p.league.showdown
+                    ? {
+                        duelPoints: p.league.showdown.duel_points,
+                        won: p.league.showdown.won,
+                        tied: p.league.showdown.tied,
+                        lost: p.league.showdown.lost,
+                        recentDuels: p.league.showdown.recent_duels ?? [],
+                      }
+                    : null,
+                  lms: p.league.lms
+                    ? {
+                        roundsWon: p.league.lms.rounds_won,
+                        roundNumber: p.league.lms.round_number,
+                        clubsUsed: p.league.lms.clubs_used,
+                        clubPool: p.league.lms.club_pool,
+                        survivorsLeft: p.league.lms.survivors_left,
+                        roundEntrants: p.league.lms.round_entrants,
+                        isEliminated: p.league.lms.is_eliminated,
+                      }
+                    : null,
+                  table: p.league.table
+                    ? {
+                        spotOn: p.league.table.spot_on,
+                        clubCount: p.league.table.club_count,
+                        averageOff: p.league.table.average_off,
+                        hasTable: p.league.table.has_table,
+                        isFinal: p.league.table.is_final,
+                      }
+                    : null,
+                }
+              : null,
           },
         ]),
       )

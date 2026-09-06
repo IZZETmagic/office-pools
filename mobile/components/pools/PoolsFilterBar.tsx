@@ -8,7 +8,27 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // the column to ('open','completed'), so there is nothing else to filter on —
 // an 'archived' option used to sit here and could never match a row.
 export type StatusFilter = 'all' | 'open' | 'completed';
-export type TypeFilter = 'all' | 'full_tournament' | 'progressive' | 'bracket_picker';
+/**
+ * ⚠ THE FOUR LEAGUE GAMES ARE NOT OPTIONAL EXTRAS HERE — without them this
+ * filter could not see a league pool at all. It held only the three World Cup
+ * bracket modes, and `applyFilters` matched them against `predictionMode`,
+ * which is `league_pickem` for all four league games. So picking ANY type hid
+ * every league pool (17 in production on 2026-09-05) and no selection could
+ * ever show one.
+ *
+ * The league values are `pools.league_mode`, not `prediction_mode` — see
+ * `applyFilters` in app/(tabs)/pools.tsx, which switches on which kind of
+ * value it is holding.
+ */
+export type TypeFilter =
+  | 'all'
+  | 'full_tournament'
+  | 'progressive'
+  | 'bracket_picker'
+  | 'pickem'
+  | 'showdown'
+  | 'last_man_standing'
+  | 'table';
 export type PredictionFilter = 'all' | 'submitted' | 'pending';
 export type SortMode = 'smart' | 'newest' | 'name' | 'points';
 
@@ -32,11 +52,17 @@ const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'completed', label: 'Completed' },
 ];
 
+// Labels spelled out, unlike the card's pill: a picker row has the width the
+// 10px pill does not, and "Last Man" is a shrug in a list of options.
 const TYPE_OPTIONS: Array<{ value: TypeFilter; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'full_tournament', label: 'Full Tournament' },
   { value: 'progressive', label: 'Progressive' },
   { value: 'bracket_picker', label: 'Bracket' },
+  { value: 'pickem', label: 'Matchweek Pick’em' },
+  { value: 'showdown', label: 'Showdown' },
+  { value: 'last_man_standing', label: 'Last Man Standing' },
+  { value: 'table', label: 'Predict the Table' },
 ];
 
 const PREDICTION_OPTIONS: Array<{ value: PredictionFilter; label: string }> = [

@@ -154,6 +154,7 @@ export async function readEntryScoring(
     // and every leaderboard surface works unchanged.
     type LeagueRow = {
       entry_id: string
+      pool_id: string
       match_points: number | null
       bonus_points: number | null
       point_adjustment: number | null
@@ -164,10 +165,49 @@ export async function readEntryScoring(
     const rows = await paginateByEntry<LeagueRow>(
       admin,
       'league_entry_totals',
-      'entry_id, match_points, bonus_points, point_adjustment, total_points, final_rank, previous_final_rank',
+      'entry_id, pool_id, match_points, bonus_points, point_adjustment, total_points, final_rank, previous_final_rank',
       entryIds,
       ['entry_id'],
     )
+
+    // ⚠⚠ THE STORED RANK IN LAST MAN STANDING IS `entry_id` ORDER, so it is
+    // withheld here rather than handed to a caller that has no way to know.
+    //
+    // `league_finalize_ranks` is the one rank writer for all four modes and
+    // cascades rounds_won → duel_points → total_points → exact_count →
+    // correct_count → bonus_points → first league_prediction → entry_id. In LMS
+    // every rung is ZERO — the mode has no points by design — and the
+    // "picked first" rung is INFINITY, because LMS picks live in
+    // `league_lms_picks` and not `league_predictions`. So `entry_id ASC` decides
+    // the whole thing. Measured on production 5 Sep 2026: all ten stored ranks
+    // in the live pool follow entry_id order exactly, which had three eliminated
+    // members above a survivor.
+    //
+    // ⚠ IT WAS ALREADY DECIDED, TWICE, AND NEITHER PLACE COULD SEE THIS ONE.
+    // `lib/league/leaderboard.ts` nulls it locally (`isLms ? null : …`) and the
+    // LMS leaderboard sorts on survival instead. The pool CARD went the other
+    // way and rendered `rankTile`, which only ever showed "—" because
+    // `hasScoringStarted` gates on `total_points > 0` and LMS never writes any —
+    // one keystroke from publishing a wrong number that looks like a right one.
+    // Doing it here means the next surface inherits the decision instead of
+    // re-learning it.
+    //
+    // ⚠ ONE FLAT QUERY, NOT AN EMBED. `league_entry_totals` carries `pool_id`,
+    // so the mode costs a single `in()` on `pools` — no PostgREST embedding,
+    // which the league read-path review flags at 0.45–0.50 s per call.
+    const lmsPoolIds = new Set<string>()
+    const poolIds = Array.from(new Set(rows.map((r) => r.pool_id).filter(Boolean)))
+    if (poolIds.length > 0) {
+      const { data: modeRows, error: modeErr } = await admin
+        .from('pools')
+        .select('pool_id, league_mode')
+        .in('pool_id', poolIds)
+        .eq('league_mode', 'last_man_standing')
+      // ⚠ NOT `const { data }`. Discarding this would fail OPEN — the set stays
+      // empty, every LMS rank flows through, and nothing says so.
+      if (modeErr) throw new Error(`lms mode lookup: ${modeErr.message}`)
+      for (const r of (modeRows ?? []) as Array<{ pool_id: string }>) lmsPoolIds.add(r.pool_id)
+    }
     for (const r of rows) {
       out.set(r.entry_id, {
         entry_id: r.entry_id,
@@ -177,8 +217,9 @@ export async function readEntryScoring(
         // has to be recovered by subtraction.
         point_adjustment: r.point_adjustment ?? 0,
         scored_total_points: r.total_points ?? 0,
-        current_rank: r.final_rank ?? null,
-        previous_rank: r.previous_final_rank ?? null,
+        // See the LMS note above — null in that mode, in every caller.
+        current_rank: lmsPoolIds.has(r.pool_id) ? null : (r.final_rank ?? null),
+        previous_rank: lmsPoolIds.has(r.pool_id) ? null : (r.previous_final_rank ?? null),
       })
     }
   } else if (source === 'shadow') {

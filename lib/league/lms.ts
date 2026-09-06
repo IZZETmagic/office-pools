@@ -43,6 +43,28 @@ export type LmsPick = {
   fixture_id: string | null
 }
 
+/**
+ * One row of the picks wall's name column — an entry, and everything the wall
+ * says about it before any club is drawn.
+ *
+ * ⚠ `inRound` IS NOT THE OPPOSITE OF ELIMINATED. There are three states here,
+ * not two: standing, out, and never in this round at all. The third is somebody
+ * who joined after it opened — everybody already in it has spent clubs, so a
+ * newcomer with a full twenty would have an advantage nobody else had. Painting
+ * them like the eliminated accuses them of losing a round they were never
+ * allowed to play. Mirrors `LmsMember` on the mobile side, which learned this
+ * first.
+ */
+export type LmsRosterEntry = {
+  entry_id: string
+  name: string
+  /** False for an entry that joined after this round opened. */
+  inRound: boolean
+  eliminatedMatchweek: number | null
+  /** The season score, and the ENTIRE memory of a round once it closes. */
+  roundsWon: number
+}
+
 export type LmsState = {
   /** The round in progress, or null before one has opened. */
   round: LmsRound | null

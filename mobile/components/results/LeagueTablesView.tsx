@@ -66,6 +66,7 @@ export function LeagueTablesView({ tables, initialSeasonId = null }: Props) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{
             paddingHorizontal: theme.spacing.xl,
+            paddingTop: theme.spacing.md,
             paddingBottom: theme.spacing.md,
             gap: theme.spacing.sm,
           }}
@@ -99,7 +100,27 @@ export function LeagueTablesView({ tables, initialSeasonId = null }: Props) {
             );
           })}
         </ScrollView>
-      ) : null}
+      ) : (
+        /*
+          ⚠ NAMED, NOT PICKED. The rule above forbids a dead TAP, not the word.
+          With one league there was neither: the table sat under a header that
+          says "Match Centre" and nothing that says whose table this is. The
+          pills carry the competition's name when there is a choice; this
+          carries it when there is not.
+
+          Padded to the card's own inset rather than the header's, so the
+          title sits flush with the left edge of the table it names.
+        */
+        <View
+          style={{
+            paddingHorizontal: theme.spacing.lg,
+            paddingTop: theme.spacing.md,
+            paddingBottom: theme.spacing.md,
+          }}
+        >
+          <Text variant="sectionHeader">{active.competition ?? 'League'}</Text>
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={{

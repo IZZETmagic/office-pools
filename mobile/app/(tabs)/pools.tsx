@@ -22,8 +22,10 @@ import {
   type DiscoverModeFilter,
   type PoolsFilters,
   type PoolsTab,
+  type TypeFilter,
 } from '@/components/pools';
 import { Button, Icon, Text } from '@/components/ui';
+import { isLeaguePoolMode } from '@/lib/design/poolMode';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import type { PoolSummary } from '@/lib/useHomeData';
@@ -208,10 +210,29 @@ export default function PoolsScreen() {
   );
 }
 
+const LEAGUE_TYPE_VALUES = new Set(['pickem', 'showdown', 'last_man_standing', 'table']);
+
+function matchesType(pool: PoolSummary, type: TypeFilter): boolean {
+  if (LEAGUE_TYPE_VALUES.has(type)) {
+    if (!isLeaguePoolMode(pool.predictionMode)) return false;
+    return (pool.leagueMode ?? 'pickem') === type;
+  }
+  return pool.predictionMode === type;
+}
+
 function applyFilters(pools: PoolSummary[], filters: PoolsFilters): PoolSummary[] {
   const next = pools.filter((p) => {
     if (filters.status !== 'all' && p.status !== filters.status) return false;
-    if (filters.type !== 'all' && p.predictionMode !== filters.type) return false;
+    // ⚠ THE TYPE FILTER SPANS TWO COLUMNS. The three bracket values live in
+    // `predictionMode`; the four league games live in `leagueMode`, because all
+    // four share `predictionMode === 'league_pickem'`. Matching everything
+    // against `predictionMode` — which is what this did — meant no selection
+    // could ever show a league pool, and every selection hid all of them.
+    //
+    // A league pool with a NULL `leagueMode` reads as Pick'em, the same
+    // fallback the card's pill and the web both use (three production pools
+    // carry NULL there and all three are Pick'em).
+    if (filters.type !== 'all' && !matchesType(p, filters.type)) return false;
     // `needsPredictions` is the canonical "does the user still have to predict
     // something?" check — for progressive pools it accounts for new open
     // rounds even when `hasSubmittedPredictions` was flipped true by an

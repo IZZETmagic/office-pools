@@ -367,6 +367,59 @@ async function handleGET(
         // Table and Last Man Standing are one decision, so the ring is a state
         // rather than a count — there is no "1" worth printing inside it.
         is_single_decision: facts ? isSingleDecision({ league_mode: leagueMode }) : null,
+        // ⚠ THE MODE'S OWN NUMBERS, which this route already computed and then
+        // threw away. `readLeagueCardFacts` builds the full per-mode strip — it
+        // is what the web's `kpiTiles` renders — and only four derived fields
+        // were being forwarded, so the phone's card had no choice but to show
+        // the World Cup's five blocks for every league mode. A Showdown pool
+        // led on ACCURACY points while its leaderboard ranks on duel points,
+        // and a Last Man Standing pool showed points in a mode that has none.
+        //
+        // ⚠ FLATTENED AND NARROWED ON PURPOSE. Only what a card block prints
+        // crosses the wire — no opponent user rows, no crest URLs, no pick
+        // history. The phone's card is a strip of numbers; the rich "This week"
+        // tile is the web card's, and sending its parts would be shipping a
+        // payload for a component that does not exist.
+        league: facts
+          ? {
+              league_mode: leagueMode,
+              open_matchweek: facts.openMatchweekNumber,
+              matchweek_count: facts.matchweekCount,
+              showdown: facts.showdown
+                ? {
+                    duel_points: facts.showdown.duelPoints,
+                    won: facts.showdown.won,
+                    tied: facts.showdown.tied,
+                    lost: facts.showdown.lost,
+                    // ⚠ DUEL outcomes, not accuracy tiers. The two strips are
+                    // five dots each and mean different things — won/tied/lost
+                    // against exact/winner_gd/winner/miss — so the card paints
+                    // them from different palettes.
+                    recent_duels: facts.showdown.recentDuels,
+                  }
+                : null,
+              lms: facts.lms
+                ? {
+                    rounds_won: facts.lms.roundsWon,
+                    round_number: facts.lms.roundNumber,
+                    clubs_used: facts.lms.clubsUsed,
+                    club_pool: facts.lms.clubPool,
+                    survivors_left: facts.lms.survivorsLeft,
+                    round_entrants: facts.lms.roundEntrants,
+                    is_eliminated: facts.lms.isEliminated,
+                  }
+                : null,
+              table: facts.table
+                ? {
+                    spot_on: facts.table.spotOn,
+                    club_count: facts.table.clubCount,
+                    average_off: facts.table.averageOff,
+                    has_table: facts.table.hasTable,
+                    is_final: facts.table.isFinal,
+                  }
+                : null,
+            }
+          : null,
       }
     }),
   })
