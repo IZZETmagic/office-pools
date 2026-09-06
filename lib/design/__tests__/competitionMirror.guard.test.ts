@@ -148,3 +148,106 @@ describe('the mobile competition palette mirrors the web', () => {
     expect(failures, `\n  · ${failures.join('\n  · ')}\n`).toEqual([])
   })
 })
+
+/**
+ * The pool card's MODE half, which the competition half above says nothing about.
+ *
+ * `mobile/lib/design/poolMode.ts` is a hand copy of `lib/design/poolMode.ts`
+ * plus `modeIdentityColor` from `lib/design/tokens.ts`, for the same reason
+ * `competition.ts` is: mobile is a separate npm project and cannot import them.
+ *
+ * ⚠ THE PILL IS THE ONLY PLACE THE MODE IS COLOURED on either platform, now
+ * that the rail carries the competition — so a drift here is not a shade being
+ * slightly off, it is Showdown and Last Man Standing becoming indistinguishable
+ * on one platform and not the other. The names matter for the same reason: the
+ * pill is the only place a league pool is told apart from another league pool.
+ */
+describe('the mobile mode-identity palette mirrors the web', () => {
+  it('agrees on every mode colour, name and pill scalar', () => {
+    const root = process.cwd()
+    const read = (p: string) => readFileSync(resolve(root, p), 'utf8')
+
+    const failures: string[] = []
+    const fail = (m: string) => failures.push(m)
+
+    const webTokens = read('lib/design/tokens.ts')
+    const webMode = read('lib/design/poolMode.ts')
+    const webCss = read('app/globals.css')
+    const rn = read('mobile/lib/design/poolMode.ts')
+
+    /** `key: 'value',` pairs out of a named object literal. */
+    function strEntries(src: string, decl: string): Record<string, string> {
+      const start = src.indexOf(decl)
+      if (start === -1) return {}
+      const open = src.indexOf('{', start)
+      let depth = 0
+      let end = open
+      for (let i = open; i < src.length; i++) {
+        if (src[i] === '{') depth++
+        else if (src[i] === '}') { depth--; if (depth === 0) { end = i; break } }
+      }
+      const out: Record<string, string> = {}
+      for (const m of src.slice(open + 1, end).matchAll(/(\w+)\s*:\s*'([^']*)'/g)) out[m[1]] = m[2]
+      return out
+    }
+
+    // ---- modeIdentityColor: all seven, both sides ----
+    const webIdentity = strEntries(webTokens, 'export const modeIdentityColor')
+    const rnIdentity = strEntries(rn, 'export const modeIdentityColor')
+    if (Object.keys(webIdentity).length === 0) fail('could not read modeIdentityColor out of lib/design/tokens.ts')
+    for (const [k, v] of Object.entries(webIdentity)) {
+      if (rnIdentity[k]?.toUpperCase() !== v.toUpperCase()) {
+        fail(`modeIdentityColor.${k}: web ${v}, mobile ${rnIdentity[k] ?? '(missing)'}`)
+      }
+    }
+    for (const k of Object.keys(rnIdentity)) {
+      if (!(k in webIdentity)) fail(`modeIdentityColor.${k} exists on mobile only`)
+    }
+
+    // ---- the four league games, and the short label each wears on the pill ----
+    const leagueList = (src: string) =>
+      src.match(/LEAGUE_MODES\s*=\s*\[([^\]]*)\]/)?.[1]
+        .split(',').map((x) => x.trim().replace(/['"]/g, '')).filter(Boolean) ?? []
+    const webLeague = leagueList(webMode)
+    const rnLeague = leagueList(rn)
+    if (webLeague.length === 0) fail('could not read LEAGUE_MODES out of lib/design/poolMode.ts')
+    if (webLeague.join('|') !== rnLeague.join('|')) {
+      fail(`LEAGUE_MODES: web [${webLeague.join(', ')}], mobile [${rnLeague.join(', ')}]`)
+    }
+
+    const webNames = strEntries(webMode, 'const LEAGUE_NAME')
+    const rnNames = strEntries(rn, 'const LEAGUE_NAME')
+    for (const [k, v] of Object.entries(webNames)) {
+      if (rnNames[k] !== v) fail(`LEAGUE_NAME.${k}: web "${v}", mobile "${rnNames[k] ?? '(missing)'}"`)
+    }
+
+    // ---- the pill's treatment: ink lightness here, tint out of globals.css ----
+    const num = (src: string, name: string) =>
+      src.match(new RegExp(`${name}\\s*=\\s*([\\d.]+)`))?.[1]
+    for (const name of ['INK_L_LIGHT', 'INK_L_DARK']) {
+      const a = num(webMode, name)
+      const b = num(rn, name)
+      if (!a) fail(`${name}: not found on the web side`)
+      else if (a !== b) fail(`${name}: web ${a}, mobile ${b ?? '(missing)'}`)
+    }
+
+    // `.mode-pill` sets the tint as a percentage; mobile passes a 0–1 alpha to
+    // withOpacity, so the comparison is on the same scale rather than the same
+    // literal.
+    const cssTint = (selector: string) =>
+      webCss.match(new RegExp(`${selector}\\s*\\{[^}]*var\\(--mode-base\\)\\s*([\\d.]+)%`))?.[1]
+    const tints: Array<[string, string | undefined, string | undefined]> = [
+      ['TINT_LIGHT', cssTint('\\.mode-pill'), num(rn, 'TINT_LIGHT')],
+      ['TINT_DARK', cssTint('html\\.dark \\.mode-pill'), num(rn, 'TINT_DARK')],
+    ]
+    for (const [name, pct, alpha] of tints) {
+      if (!pct) fail(`${name}: could not read the tint percentage out of app/globals.css`)
+      else if (alpha === undefined) fail(`${name}: missing on mobile`)
+      else if (Math.abs(Number(pct) / 100 - Number(alpha)) > 1e-9) {
+        fail(`${name}: web ${pct}%, mobile ${alpha} (= ${Number(alpha) * 100}%)`)
+      }
+    }
+
+    expect(failures, `\n  · ${failures.join('\n  · ')}\n`).toEqual([])
+  })
+})

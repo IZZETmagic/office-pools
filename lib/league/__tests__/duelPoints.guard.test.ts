@@ -280,14 +280,28 @@ describe('duel points reach the display layer', () => {
   it('the league arm of readEntryScoring SELECTS duel_points', () => {
     // It did not. `total_points` is picks only, so the column simply never left
     // the database and every consumer below was summing an absent number.
+    //
+    // ⚠ ANCHORED ON THE TABLE, NOT ON THE COLUMN ORDER. This used to match the
+    // select by its opening columns — `'entry_id, match_points, …'` — so adding
+    // `pool_id` to the front on 5 Sep failed it with "the select changed shape"
+    // rather than with anything about duel points. A guard that breaks when an
+    // unrelated column is added teaches people to edit the guard.
     const src = read('lib/scoring/readSource.ts')
-    // Located by the columns that identify it rather than by their exact order:
-    // the LMS rank guard later added `pool_id` to this same select, which broke
-    // an order-pinned pattern while the invariant below was never in danger.
-    // Keep this locator loose and the duel_points assertion strict.
-    const select = src.match(/'entry_id,[^']*total_points[^']*final_rank[^']*'/)
-    expect(select, 'the league_entry_totals select changed shape').not.toBeNull()
-    expect(select![0]).toContain('duel_points')
+    const select = src.match(/'league_entry_totals',\s*'([^']*)'/)
+    expect(select, 'the league_entry_totals select could not be found at all').not.toBeNull()
+    expect(select![1]).toContain('duel_points')
+  })
+
+  it('the same select carries pool_id, which is what withholds the LMS rank', () => {
+    // `league_finalize_ranks` leaves Last Man Standing ranked by entry_id — every
+    // rung of its cascade is zero in that mode — so readSource nulls the rank
+    // there. It can only tell which rows are LMS because `pool_id` comes back on
+    // them. Drop the column and the guard above still passes while entry_id
+    // order starts reaching leaderboards again.
+    const src = read('lib/scoring/readSource.ts')
+    const select = src.match(/'league_entry_totals',\s*'([^']*)'/)
+    expect(select![1]).toContain('pool_id')
+    expect(src).toContain("eq('league_mode', 'last_man_standing')")
   })
 
   it('EntryScoring carries duel_points, so a consumer cannot silently omit it', () => {
