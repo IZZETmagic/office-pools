@@ -44,6 +44,7 @@ import { useSharedValue } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui';
 import { ShowdownDuelHeader, type Standing } from '@/components/pool-detail/ShowdownDuelHeader';
+import { ShowdownWalkout } from '@/components/pool-detail/ShowdownWalkout';
 import { duelPhase, type DuelPhaseInput } from '@/lib/duelPhase';
 import type { Bout } from '@/lib/useDuel';
 import { useTheme } from '@/theme';
@@ -242,6 +243,18 @@ export default function ShowdownPhaseHarness() {
   const theme = useTheme();
   const [i, setI] = useState(0);
   const scrollY = useSharedValue(0);
+  /**
+   * ⚠ THE ONE PLACE A WALKOUT MAY BE REPLAYED.
+   *
+   * Ryan, 2026-09-02: *"once revealed there should be NO replay button."* That
+   * is a rule about the PRODUCT — a member who has met their opponent is not
+   * offered the ceremony again, and `last_reveal_seen_at` (136) makes it stick.
+   *
+   * The harness is not the product. It writes nothing, so watching it here
+   * costs a member nothing and burns no marker. Reviewing a six-second
+   * animation you can only ever see once a week would otherwise be impossible.
+   */
+  const [watching, setWatching] = useState(false);
 
   const s = SITUATIONS[i];
   const isBye = s.label === 'Bye';
@@ -335,6 +348,28 @@ export default function ShowdownPhaseHarness() {
           </Text>
         </View>
 
+        {/* ⚠ OFFERED ON THE PHASE, NOT ON THE TAB INDEX. If the machine ever
+            stops returning `revealable` for situation 2 — the exact production
+            bug this was all built to prevent — this button disappears, and its
+            absence is the alarm. */}
+        {resolved.phase === 'revealable' ? (
+          <Pressable
+            onPress={() => setWatching(true)}
+            accessibilityRole="button"
+            style={({ pressed }) => ({
+              paddingVertical: theme.spacing.md,
+              borderRadius: theme.radii.md,
+              alignItems: 'center',
+              backgroundColor: theme.colors.primary,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Text variant="cardTitle" style={{ color: '#FFFFFF' }}>
+              Watch the walkout
+            </Text>
+          </Pressable>
+        ) : null}
+
         {/*
           What the machine actually returned. This is the half of the harness
           that catches an ordering bug: if a situation that should offer the
@@ -355,6 +390,26 @@ export default function ShowdownPhaseHarness() {
           <Row k="recapPending" v={String(resolved.recapPending)} />
         </View>
       </ScrollView>
+
+      {/*
+        ⚠ RENDERED LAST so it covers the band and the picker both. In the real
+        screen it is a full-screen takeover for six seconds; anything that stays
+        visible over it — a tab bar, a FAB — breaks the takeover and is worth
+        catching here rather than on a Saturday.
+      */}
+      {watching ? (
+        <ShowdownWalkout
+          matchweek={3}
+          opponent={{
+            name: 'Priya',
+            userId: THEM_USER,
+            record: { won: 2, tied: 0, lost: 1 },
+            duelPoints: 1250,
+            rank: 2,
+          }}
+          onClose={() => setWatching(false)}
+        />
+      ) : null}
     </View>
   );
 }
