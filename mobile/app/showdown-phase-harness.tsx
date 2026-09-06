@@ -211,10 +211,18 @@ const SITUATIONS: Situation[] = [
   {
     n: '6',
     label: 'Full circle',
-    note: 'Recap dismissed. Same state as 1 — only the clock is shorter.',
+    note: '⚠ Recap dismissed, and `current` is STILL last week\'s settled bout. The band must show the countdown, not the old match.',
     input: {
       hasDraw: true,
-      current: null,
+      /*
+        ⚠ A SETTLED BOUT, NOT NULL — this fixture used to be `current: null`,
+        which is a state production never actually reaches. `useDuel.current`
+        falls back to the last result, so after a week settles there is ALWAYS a
+        bout in hand. The clean fixture rendered a perfect countdown while the
+        real app sat on the finished duel, and the harness said everything was
+        fine. A fixture that cannot reproduce the bug cannot catch it.
+      */
+      current: { duelId: DUEL_3, matchweek: 3, settledAt: '2026-09-07T20:59:00Z' },
       sealedMatchweek: 4,
       isInPlay: false,
       lastSettledAt: '2026-09-07T20:59:00Z',

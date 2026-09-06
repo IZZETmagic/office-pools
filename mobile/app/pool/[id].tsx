@@ -57,7 +57,7 @@ import { ShowdownRecapSheet } from '@/components/pool-detail/ShowdownRecapSheet'
 import { ShowdownWalkout } from '@/components/pool-detail/ShowdownWalkout';
 import { predictionSurfaceFor } from '@/lib/leagueSurface';
 import { duelPhase } from '@/lib/duelPhase';
-import { useCeremonyMarkers } from '@/lib/useCeremonyMarkers';
+import { MISSING, useCeremonyMarkers } from '@/lib/useCeremonyMarkers';
 import { useDuel } from '@/lib/useDuel';
 import { useLeaguePool } from '@/lib/useLeaguePool';
 import { useReportActivePool } from '@/lib/PresenceProvider';
@@ -421,6 +421,17 @@ export default function PoolDetailScreen() {
      */
     const known = ceremony.ready;
 
+    /**
+     * ⚠ THE REVEAL COLUMN MAY BE KNOWN-ABSENT, WHICH IS NOT THE SAME AS NULL.
+     * Migration 136 is applied by hand, so between the code shipping and the
+     * migration running there is a window where the walkout can be OPENED but
+     * its dismissal cannot be STORED — which would replay it on every app open.
+     * Saying "the reveal I last watched is the one on screen" closes it until
+     * the column exists, and it re-arms itself the moment 136 lands.
+     */
+    const seen = ceremony.markers.lastRevealSeenDuel;
+    const revealSeenDuel = !known || seen === MISSING ? currentDuelId : seen;
+
     return duelPhase({
       hasDraw: duelCount > 0 || duelSealed !== null,
       current: duelCurrent
@@ -433,7 +444,7 @@ export default function PoolDetailScreen() {
       sealedMatchweek: duelSealed?.matchweek ?? null,
       isInPlay: duelIsInPlay,
       lastSettledAt: duelLastSettledAt,
-      revealSeenDuel: known ? ceremony.markers.lastRevealSeenDuel : currentDuelId,
+      revealSeenDuel,
       recapSeenAt: known ? ceremony.markers.lastRecapSeenAt : duelLastSettledAt,
     });
   }, [
@@ -1003,6 +1014,7 @@ export default function PoolDetailScreen() {
           sealed={duel.sealed}
           you={duelYou}
           onReveal={duelPhaseState.phase === 'revealable' ? () => setWalkoutOpen(true) : null}
+          phase={duelPhaseState.phase}
           standings={duelStandings}
           kickoffAt={duel.currentKickoff}
           liveScore={duel.liveScore}

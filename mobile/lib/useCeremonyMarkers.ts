@@ -30,12 +30,29 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from './supabase';
 
+/**
+ * The reveal marker cannot be read because migration 136 has not been applied.
+ *
+ * ⚠ A DISTINCT VALUE, NOT `null`. Null is a real answer meaning "this member
+ * has never watched a walkout", and it opens the ceremony. This means "we have
+ * no way to record that they watched it", which must CLOSE it — a ceremony
+ * whose dismissal cannot be stored replays on every single app open.
+ */
+export const MISSING = '__reveal_column_missing__';
+
 export type CeremonyMarkers = {
   lastRevealSeenDuel: string | null;
   lastRecapSeenAt: string | null;
 };
 
 const EMPTY: CeremonyMarkers = { lastRevealSeenDuel: null, lastRecapSeenAt: null };
+
+/** Does this PostgREST error mean the named column is not deployed yet? */
+function isUndefinedColumn(err: { code?: string; message?: string }, column: string): boolean {
+  // 42703 is Postgres `undefined_column`. The message check is the belt to that
+  // braces — PostgREST has changed which of the two it populates before.
+  return err.code === '42703' || (err.message ?? '').includes(column);
+}
 
 function key(entryId: string | null) {
   return ['ceremony-markers', entryId] as const;
@@ -55,11 +72,35 @@ export function useCeremonyMarkers(entryId: string | null) {
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<CeremonyMarkers> => {
-      const { data, error } = await supabase
-        .from('pool_entries')
-        .select('last_reveal_seen_duel, last_recap_seen_at')
-        .eq('entry_id', entryId!)
-        .maybeSingle();
+      const read = async (columns: string) =>
+        supabase.from('pool_entries').select(columns).eq('entry_id', entryId!).maybeSingle();
+
+      let { data, error } = await read('last_reveal_seen_duel, last_recap_seen_at');
+
+      /**
+       * ⚠⚠ THE TWO MARKERS ARE NOT DEPLOYED TOGETHER, AND ASKING FOR BOTH AT
+       * ONCE MADE THE OLDER ONE FAIL.
+       *
+       * `last_recap_seen_at` has been live since migration 122.
+       * `last_reveal_seen_duel` arrives with 136, which has to be applied by
+       * hand. Between those two moments PostgREST rejects the whole SELECT with
+       * `42703` — a select list is all-or-nothing — so the RECAP was suppressed
+       * by a column only the WALKOUT needs.
+       *
+       * Ryan hit exactly this on 2026-09-06: matchweek 3 had settled, he had
+       * not reviewed it, and no recap appeared. Nothing errored on screen,
+       * because the caller treats a failed read as "already seen" — which is
+       * the right bias for a ceremony and the wrong one for a missing column.
+       *
+       * So a missing reveal column degrades to the recap alone rather than
+       * taking both down. It self-heals the moment 136 lands: the first read
+       * succeeds and the fallback stops being reached.
+       */
+      let revealColumnMissing = false;
+      if (error && isUndefinedColumn(error, 'last_reveal_seen_duel')) {
+        revealColumnMissing = true;
+        ({ data, error } = await read('last_recap_seen_at'));
+      }
 
       /**
        * ⚠ THROWN, NOT SWALLOWED INTO A DEFAULT. A discarded PostgREST error is
@@ -71,13 +112,19 @@ export function useCeremonyMarkers(entryId: string | null) {
        */
       if (error) throw new Error(`[ceremony] markers read failed: ${error.message}`);
 
-      const row = data as {
-        last_reveal_seen_duel: string | null;
+      const row = data as unknown as {
+        last_reveal_seen_duel?: string | null;
         last_recap_seen_at: string | null;
       } | null;
 
       return {
-        lastRevealSeenDuel: row?.last_reveal_seen_duel ?? null,
+        /**
+         * ⚠ `MISSING` IS NOT `null` HERE. Null means "never watched one", which
+         * OPENS the walkout; the column being absent means we cannot know, and
+         * offering a ceremony whose dismissal cannot be recorded would replay it
+         * on every app open forever. The caller distinguishes the two.
+         */
+        lastRevealSeenDuel: revealColumnMissing ? MISSING : row?.last_reveal_seen_duel ?? null,
         lastRecapSeenAt: row?.last_recap_seen_at ?? null,
       };
     },
@@ -87,7 +134,11 @@ export function useCeremonyMarkers(entryId: string | null) {
     mutationFn: async (patch: Partial<Record<'duel' | 'recapAt', string>>) => {
       if (!entryId) return;
       const row: Record<string, string> = {};
-      if (patch.duel !== undefined) row.last_reveal_seen_duel = patch.duel;
+      // ⚠ Writing a column that does not exist fails the whole UPDATE, which
+      // would take the recap stamp down with it when both are patched.
+      if (patch.duel !== undefined && patch.duel !== MISSING) {
+        row.last_reveal_seen_duel = patch.duel;
+      }
       if (patch.recapAt !== undefined) row.last_recap_seen_at = patch.recapAt;
       if (Object.keys(row).length === 0) return;
 

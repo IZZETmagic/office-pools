@@ -207,6 +207,66 @@ describe('a pool with nothing in it', () => {
   });
 });
 
+describe('⚠⚠ a SETTLED current bout must not hold the screen on last week', () => {
+  // The production shape Ryan hit on 2026-09-06, and the one the harness's own
+  // fixture was too clean to reproduce.
+  //
+  // `useDuel.current` is "the first UNSETTLED bout, FALLING BACK TO THE LAST
+  // RESULT" — so after matchweek 3 settles, `current` is still matchweek 3.
+  // Everything downstream that asks "is there a bout?" therefore answers yes
+  // forever, and the header sat on a finished duel instead of counting down to
+  // the next one.
+  //
+  // The machine got this right all along; the band was not reading it. These
+  // pin the answer so the next surface to be wired cannot get it wrong either.
+  const settledCurrent = {
+    duelId: 'duel-3',
+    matchweek: 3,
+    settledAt: '2026-09-07T20:59:00Z',
+  };
+
+  it('is SEALED once the recap has been seen, even with a bout in hand', () => {
+    const r = at({
+      current: settledCurrent,
+      sealedMatchweek: 4,
+      lastSettledAt: '2026-09-07T20:59:00Z',
+      recapSeenAt: '2026-09-07T21:30:00Z',
+      revealSeenDuel: 'duel-3',
+    });
+    expect(r.phase).toBe('sealed');
+    // ⚠ AND IT NAMES THE WEEK BEING WAITED FOR, not the one just played.
+    expect(r.matchweek).toBe(4);
+  });
+
+  it('is DECIDED while the recap is still owed — the result stays readable', () => {
+    // The recap renders OVER the band, so the bout must still be on screen
+    // behind it. Flipping to the countdown here would make the popup the only
+    // way to learn the result, which is the disclosure gate's failure case.
+    const r = at({
+      current: settledCurrent,
+      sealedMatchweek: 4,
+      lastSettledAt: '2026-09-07T20:59:00Z',
+      recapSeenAt: null,
+      revealSeenDuel: 'duel-3',
+    });
+    expect(r.phase).toBe('decided');
+    expect(r.matchweek).toBe(3);
+  });
+
+  it('never offers a walkout for the settled week it is falling back to', () => {
+    const r = at({
+      current: settledCurrent,
+      sealedMatchweek: 4,
+      lastSettledAt: '2026-09-07T20:59:00Z',
+      recapSeenAt: '2026-09-07T21:30:00Z',
+      // Never watched anything — and it still must not open one for a duel
+      // that has already been played.
+      revealSeenDuel: null,
+    });
+    expect(r.phase).toBe('sealed');
+  });
+});
+
 describe('⚠ phase 6 is phase 1 — deliberately not its own state', () => {
   it('returns `sealed` whether the pool is new or mid-season', () => {
     const brandNew = at({ current: null, sealedMatchweek: 1, lastSettledAt: null });

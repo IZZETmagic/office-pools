@@ -14,6 +14,7 @@ import { Icon, Text } from '@/components/ui';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { formatDhms, formatHms, useCountdown } from '@/lib/useCountdown';
 import { duelResult } from '@/lib/duelPoints';
+import type { DuelPhase } from '@/lib/duelPhase';
 import type { Bout } from '@/lib/useDuel';
 import { fontFamilies, resolveColors, useTheme, withOpacity } from '@/theme';
 
@@ -238,6 +239,23 @@ type Props = {
    * about whether the walkout is owed — one derivation, per `duelPhase.ts`.
    */
   onReveal?: (() => void) | null;
+  /**
+   * Which of the six phases the pool is in — `duelPhase`'s answer, passed in.
+   *
+   * ⚠⚠ THE BAND USED TO DECIDE THIS FOR ITSELF, AND IT WAS WRONG. It branched
+   * on `bout !== null`, and `useDuel.current` is "the first UNSETTLED bout,
+   * FALLING BACK TO THE LAST RESULT" — so the moment a matchweek settled, the
+   * fallback kept the finished duel on the header and the sealed countdown for
+   * the next week could never be reached. Ryan, 2026-09-06, on a settled
+   * matchweek 3: *"it should be a countdown, not still showing me the old
+   * match, especially in the header."*
+   *
+   * That was a second opinion about the phase living three files away from
+   * `duelPhase`, which is the exact failure mode that module was written to
+   * prevent — and it survived because both branches render a correct-looking
+   * band. The band was not wrong about the duel; it was wrong about the week.
+   */
+  phase?: DuelPhase;
   /** entry_id → where they sit on the leaderboard. */
   standings: Map<string, Standing>;
   /** First kickoff of the current duel's matchweek — the countdown's target. */
@@ -284,6 +302,7 @@ export function ShowdownDuelHeader({
   sealed,
   you,
   onReveal,
+  phase,
   standings,
   kickoffAt,
   liveScore,
@@ -534,6 +553,7 @@ export function ShowdownDuelHeader({
                 sealed={sealed}
                 you={you}
                 onReveal={onReveal ?? null}
+                phase={phase}
                 standings={standings}
                 kickoffAt={kickoffAt}
                 liveScore={liveScore}
@@ -666,6 +686,7 @@ function Matchup({
   sealed,
   you,
   onReveal,
+  phase,
   standings,
   kickoffAt,
   liveScore,
@@ -681,6 +702,7 @@ function Matchup({
   sealed: Props['sealed'];
   you: Props['you'];
   onReveal: (() => void) | null;
+  phase: DuelPhase | undefined;
   standings: Map<string, Standing>;
   kickoffAt: string | null;
   liveScore: Props['liveScore'];
@@ -694,7 +716,19 @@ function Matchup({
 }) {
   const theme = useTheme();
 
-  const matchweek = bout?.matchweek ?? sealed?.matchweek ?? null;
+  /**
+   * ⚠ THE PHASE DECIDES, NOT THE PRESENCE OF A BOUT. See `Props.phase`.
+   *
+   * `sealed` outranks a settled bout: `current` falls back to the last result,
+   * so without this the header shows a finished week forever. `decided` still
+   * shows the bout — the recap sheet renders OVER it, and the result has to be
+   * readable behind it or the recap becomes the only way to learn it.
+   *
+   * ⚠ Undefined `phase` keeps the old behaviour, so a caller that has not been
+   * updated degrades to what it rendered before rather than to nothing.
+   */
+  const showBout = bout !== null && phase !== 'sealed';
+  const matchweek = showBout ? bout.matchweek : sealed?.matchweek ?? bout?.matchweek ?? null;
 
   return (
     // ⚠ Generous on purpose. This is the screen the mode is named after, and
@@ -724,7 +758,7 @@ function Matchup({
             }}
           >
             Matchweek {matchweek}
-            {!bout && sealed ? ' · sealed' : ''}
+            {!showBout && sealed ? ' · sealed' : ''}
           </BandText>
           {/*
             ⚠ THE SAME BADGE AS `LiveMatchCard`, down to the 7pt dot and the
@@ -757,7 +791,7 @@ function Matchup({
       ) : null}
 
       {/* ---------- row 3: the two corners and the v ---------- */}
-      {bout ? (
+      {showBout ? (
         <View
           onLayout={(e) => onCornersY(Math.round(e.nativeEvent.layout.y))}
           style={{
