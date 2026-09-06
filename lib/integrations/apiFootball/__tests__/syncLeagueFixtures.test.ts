@@ -22,6 +22,12 @@ const getFixturesAllPages = vi.fn()
 // completion. Returning [] is the "season has no table yet" path, which the sync
 // treats as a clean no-op.
 const getStandings = vi.fn(async () => [])
+// Same reasoning as `getStandings` directly above: step 7b3 calls
+// /fixtures/events once per CHANGED fixture, and the real function in a unit
+// test has no API key, throws, and would push a `league_timeline` error into
+// every result that contains a completion. [] is the honest quiet path — a
+// fixture whose events the provider has not published yet.
+const getFixtureEvents = vi.fn(async () => [])
 
 vi.mock('@/lib/integrations/apiFootball/client', async (orig) => {
   const actual = await orig<typeof import('@/lib/integrations/apiFootball/client')>()
@@ -29,6 +35,7 @@ vi.mock('@/lib/integrations/apiFootball/client', async (orig) => {
     ...actual,
     getFixturesAllPages: (...a: unknown[]) => getFixturesAllPages(...a),
     getStandings: (...a: unknown[]) => getStandings(...(a as [])),
+    getFixtureEvents: (...a: unknown[]) => getFixtureEvents(...(a as [])),
   }
 })
 
@@ -71,6 +78,9 @@ function fakeDb(opts: {
   const calls: Array<{ table: string; filters: string[] }> = []
   const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = []
   const upserts: Array<{ table: string; row: Record<string, unknown> }> = []
+  const inserts: Array<{ table: string; rows: unknown[] }> = []
+  const deletes: Array<{ table: string; filters: string[] }> = []
+  const updates: Array<{ table: string; row: Record<string, unknown> }> = []
 
   const client = {
     from(table: string) {
@@ -84,8 +94,25 @@ function fakeDb(opts: {
           return api
         }
       }
-      api.insert = () => {
-        throw new Error('the league sync arm must never INSERT a fixture')
+      // ⚠ SCOPED TO `league_fixtures`, WHICH IS WHAT THE MESSAGE ALWAYS MEANT.
+      // The guard is that the sync must never invent a FIXTURE; it was written
+      // when this table was the only one the arm wrote. Step 7b3 legitimately
+      // inserts `match_events`, so a blanket throw here would fail the timeline
+      // rather than the thing being guarded against.
+      api.insert = (rows: unknown) => {
+        if (table === 'league_fixtures') {
+          throw new Error('the league sync arm must never INSERT a fixture')
+        }
+        inserts.push({ table, rows: Array.isArray(rows) ? rows : [rows] })
+        return { then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }) }
+      }
+      api.delete = () => {
+        deletes.push({ table, filters })
+        return api
+      }
+      api.update = (row: Record<string, unknown>) => {
+        updates.push({ table, row })
+        return api
       }
       api.upsert = (row: Record<string, unknown>) => {
         upserts.push({ table, row })
@@ -108,7 +135,7 @@ function fakeDb(opts: {
       return { then: (resolve: (v: unknown) => unknown) => resolve(r) }
     },
   }
-  return { client: client as never, calls, rpcCalls, upserts }
+  return { client: client as never, calls, rpcCalls, upserts, inserts, deletes, updates }
 }
 
 function dbRow(over: Record<string, unknown> = {}) {
@@ -130,11 +157,11 @@ function dbRow(over: Record<string, unknown> = {}) {
   }
 }
 
-function feedFixture(id: number, over: { short?: ApiFootballStatusShort; round?: string; home?: number | null; away?: number | null } = {}): ApiFootballFixture {
+function feedFixture(id: number, over: { short?: ApiFootballStatusShort; round?: string; home?: number | null; away?: number | null; referee?: string | null; ht?: [number | null, number | null] } = {}): ApiFootballFixture {
   return {
     fixture: {
       id,
-      referee: null,
+      referee: over.referee ?? null,
       date: '2026-08-22T12:00:00+00:00',
       venue: { id: null, name: null, city: null },
       status: { long: '', short: over.short ?? 'FT', elapsed: 90, extra: null },
@@ -143,7 +170,7 @@ function feedFixture(id: number, over: { short?: ApiFootballStatusShort; round?:
     teams: { home: { id: 1, name: 'H', winner: null }, away: { id: 2, name: 'A', winner: null } },
     goals: { home: over.home ?? 2, away: over.away ?? 1 },
     score: {
-      halftime: { home: null, away: null },
+      halftime: { home: over.ht?.[0] ?? null, away: over.ht?.[1] ?? null },
       fulltime: { home: null, away: null },
       extratime: { home: null, away: null },
       penalty: { home: null, away: null },
@@ -551,7 +578,7 @@ describe('syncLeagueFixtures — scores a fixture that just completed', () => {
         return { then: (res: (v: unknown) => unknown) => res(rpcImpl(fn, args)) }
       },
     }
-    return { client: client as never, calls }
+    return { client: client as never, calls, inserts: base.inserts, deletes: base.deletes, updates: base.updates }
   }
 
   it('calls league_score_fixture for a completed fixture', async () => {
@@ -624,5 +651,167 @@ describe('syncLeagueFixtures — scores a fixture that just completed', () => {
     // goals are present, and the next tick picks it up.
     expect(r.errors).toHaveLength(0)
     expect(r.scored).toBe(0)
+  })
+})
+
+// =============================================================
+// The timeline hand-off (7b3)
+// =============================================================
+// `/fixtures/events` is a call PER FIXTURE, and this arm made none at all until
+// migration 136. What these pin is the cost shape, not just the behaviour: the
+// fetch is gated on a fixture having CHANGED, which is roughly one call per
+// goal, rather than on the window, which would be one per in-window minute per
+// live fixture — 1,500-2,500 on a full matchday against a 7,500/day plan.
+// =============================================================
+
+describe('syncLeagueFixtures — writes the timeline', () => {
+  const changedRows = (over: Partial<{ is_completed: boolean; status: string }> = {}) => ({
+    seen: 1,
+    changed: [
+      {
+        fixture_id: 'fx-1',
+        external_fixture_id: '1557368',
+        status: over.status ?? 'live',
+        home_goals: 2,
+        away_goals: 1,
+        is_completed: over.is_completed ?? false,
+      },
+    ],
+  })
+
+  function db(
+    rpcImpl: (fn: string) => unknown,
+    fixtures = [feedFixture(1557368)],
+  ) {
+    getFixturesAllPages.mockResolvedValue({ fixtures, calls: 1 })
+    const base = fakeDb({
+      league_fixtures: [
+        { data: [dbRow()], error: null },
+        { data: [], error: null },
+        { data: [{ external_fixture_id: '1557368' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+    })
+    const client = {
+      from: (base.client as unknown as { from: (t: string) => unknown }).from,
+      rpc: (fn: string) => ({ then: (res: (v: unknown) => unknown) => res(rpcImpl(fn)) }),
+    }
+    // ⚠ `client` LAST. Spreading `base` after it puts the unwrapped client
+    // back and the rpc stub is silently ignored — every changed-fixture test
+    // then passes through a tick with nothing changed.
+    return { ...base, client: client as never }
+  }
+
+  it('⚠ makes NO events call when nothing changed — the whole cost argument', async () => {
+    getFixtureEvents.mockClear()
+    const { client } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixtureEvents).not.toHaveBeenCalled()
+    expect(r.timelineCalls).toBe(0)
+    // And a counter nobody needs stays out of the run note entirely.
+    expect(formatLeagueNoteParts(r).join(' ')).not.toContain('timeline=')
+  })
+
+  it('fetches events once per changed fixture and writes the rows', async () => {
+    getFixtureEvents.mockClear()
+    getFixtureEvents.mockResolvedValueOnce([
+      {
+        time: { elapsed: 11, extra: null },
+        team: { id: 1, name: 'H' },
+        player: { id: 9, name: 'Josh King' },
+        assist: { id: null, name: null },
+        type: 'Goal',
+        detail: 'Normal Goal',
+        comments: null,
+      },
+    ] as never)
+    const { client, inserts } = db((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: changedRows(), error: null }
+        : { data: { ok: true, scored: 1, entries: 1 }, error: null },
+    )
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+
+    expect(getFixtureEvents).toHaveBeenCalledTimes(1)
+    expect(r.timelineCalls).toBe(1)
+    expect(r.timelineRows).toBe(1)
+
+    const written = inserts.find((i) => i.table === 'match_events')
+    expect(written).toBeDefined()
+    expect(written!.rows[0]).toMatchObject({
+      fixture_id: 'fx-1',
+      side: 'home',
+      kind: 'goal',
+      player_name: 'Josh King',
+      minute: 11,
+    })
+    expect(formatLeagueNoteParts(r)).toContain('timeline=1/1')
+  })
+
+  it('deletes the fixture’s rows before inserting — replace-all, not upsert', async () => {
+    // ⚠ The reason is a VAR reversal: it REMOVES an event from the payload
+    // rather than marking it, so an upsert would leave a disallowed goal on
+    // the screen for good.
+    getFixtureEvents.mockClear()
+    getFixtureEvents.mockResolvedValueOnce([] as never)
+    const { client, deletes } = db((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: changedRows(), error: null }
+        : { data: { ok: true }, error: null },
+    )
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    const del = deletes.find((d) => d.table === 'match_events')
+    expect(del).toBeDefined()
+    expect(del!.filters.join(' ')).toContain('eq(fixture_id,fx-1)')
+  })
+
+  it('writes referee and the half-time pair together', async () => {
+    getFixtureEvents.mockClear()
+    getFixtureEvents.mockResolvedValueOnce([] as never)
+    const { client, updates } = db(
+      (fn) =>
+        fn === 'league_apply_fixture_sync'
+          ? { data: changedRows({ is_completed: true, status: 'completed' }), error: null }
+          : { data: { ok: true }, error: null },
+      [feedFixture(1557368, { referee: 'S. Barrott', ht: [2, 1] })],
+    )
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    const upd = updates.find((u) => u.table === 'league_fixtures')
+    expect(upd?.row).toEqual({ referee: 'S. Barrott', home_goals_ht: 2, away_goals_ht: 1 })
+  })
+
+  it('never writes half of a half-time pair', async () => {
+    // ⚠ `league_fixtures_ht_pair_ck` refuses {1, null}. mappers.ts records that
+    // diffing each side alone is exactly what raises 23514 in production the
+    // first time the provider reports a half-written score.
+    getFixtureEvents.mockClear()
+    getFixtureEvents.mockResolvedValueOnce([] as never)
+    const { client, updates } = db(
+      (fn) =>
+        fn === 'league_apply_fixture_sync'
+          ? { data: changedRows(), error: null }
+          : { data: { ok: true }, error: null },
+      [feedFixture(1557368, { referee: 'M. Oliver', ht: [1, null] })],
+    )
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    const upd = updates.find((u) => u.table === 'league_fixtures')
+    expect(upd?.row).toEqual({ referee: 'M. Oliver' })
+    expect(upd?.row).not.toHaveProperty('home_goals_ht')
+  })
+
+  it('an events failure is reported but never loses the sync', async () => {
+    getFixtureEvents.mockClear()
+    getFixtureEvents.mockRejectedValueOnce(new Error('api-football 503') as never)
+    const { client } = db((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: changedRows(), error: null }
+        : { data: { ok: true, scored: 1, entries: 1 }, error: null },
+    )
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.errors.map((e) => e.stage)).toContain('league_timeline')
+    // The fixture write and the scoring both still counted — a blank timeline
+    // is a missing card, not a wrong scoreboard.
+    expect(r.written).toBe(1)
+    expect(r.scored).toBe(1)
   })
 })
