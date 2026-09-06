@@ -236,6 +236,17 @@ describe('⚠⚠ a SETTLED current bout must not hold the screen on last week', 
     expect(r.phase).toBe('sealed');
     // ⚠ AND IT NAMES THE WEEK BEING WAITED FOR, not the one just played.
     expect(r.matchweek).toBe(4);
+    /**
+     * ⚠⚠ AND NOBODY MAY BE NAMED. Ryan, 2026-09-06: *"there should be nothing
+     * related to any opponent because we have no opponent right now ... that
+     * was the last active match week and that's over."*
+     *
+     * The Duel tab gates its Tale of the tape and Scouting cards on this, and
+     * both were reading `opponent !== null` instead — which stays true forever,
+     * because `useDuel.current` falls back to the last result. The countdown
+     * header sat above two cards still comparing him to last week's opponent.
+     */
+    expect(r.opponentVisible).toBe(false);
   });
 
   it('is DECIDED while the recap is still owed — the result stays readable', () => {

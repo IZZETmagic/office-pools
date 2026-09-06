@@ -738,7 +738,16 @@ export default function PoolDetailScreen() {
       // Showdown only — `getVisiblePoolTabs` never offers this key elsewhere,
       // so reaching it means the pool has duels.
       case 'duel':
-        return <MemoDuelTab poolId={pool.poolId} standings={duelStandings} />;
+        return (
+          <MemoDuelTab
+            poolId={pool.poolId}
+            standings={duelStandings}
+            /* ⚠ THE SAME ANSWER THE BAND USES. One derivation decides whether
+               the opponent may be named, so the header and the cards under it
+               cannot disagree about whether you currently have one. */
+            opponentVisible={duelPhaseState.opponentVisible}
+          />
+        );
       case 'room':
         return <MemoShowdownRoom poolId={pool.poolId} />;
       case 'leaderboard':

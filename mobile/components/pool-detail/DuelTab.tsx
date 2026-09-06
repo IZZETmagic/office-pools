@@ -55,9 +55,33 @@ type Props = {
    * it about somebody's rank.
    */
   standings: Map<string, Standing>;
+  /**
+   * May the opponent be named on this tab — `duelPhase(...).opponentVisible`.
+   *
+   * ⚠⚠ IT CANNOT BE INFERRED FROM `opponent` BEING NON-NULL, WHICH IS THE BUG
+   * THIS FIXES. `useDuel.opponent` reads `current?.them`, and `current` is "the
+   * first UNSETTLED bout, FALLING BACK TO THE LAST RESULT" — so the moment a
+   * matchweek settles, every card on this tab keeps naming the person you have
+   * just finished playing. Ryan, 2026-09-06, on a sealed matchweek 4: *"there
+   * should be nothing related to any opponent because we have no opponent right
+   * now ... that was the last active match week and that's over."*
+   *
+   * It is the SAME failure the band had an hour earlier, on a second surface —
+   * a component deciding the phase for itself instead of reading the one module
+   * that owns it. The band was wrong about the week; this was wrong about the
+   * person.
+   *
+   * ⚠ IT ALSO COVERS PHASE 2. `opponentVisible` is false while the walkout is
+   * still on offer, so "Scouting Marcus" can no longer sit three cards below a
+   * button promising to reveal who Marcus is.
+   *
+   * ⚠ Defaults to `true` so an un-updated caller degrades to the old behaviour
+   * rather than to a tab with its opponent cards silently missing.
+   */
+  opponentVisible?: boolean;
 };
 
-export function DuelTab({ poolId, standings }: Props) {
+export function DuelTab({ poolId, standings, opponentVisible = true }: Props) {
   const theme = useTheme();
   const {
     loading,
@@ -122,8 +146,13 @@ export function DuelTab({ poolId, standings }: Props) {
         this is the first thing that says anything ABOUT them, so it belongs
         against the header rather than four cards down. Everything below it is
         preparation; this is the reason to prepare.
+
+        ⚠ AND IT LEADS WITH NOTHING WHEN THERE IS NOBODY. Gated on
+        `opponentVisible`, not on `opponent` — see the prop's note. While the
+        draw is sealed this card was still comparing the member against last
+        week's opponent, under a header already counting down to a new one.
       */}
-      {opponent && season && ownEntryId ? (
+      {opponentVisible && opponent && season && ownEntryId ? (
         <TapeCard
           opponent={opponent}
           season={season}
@@ -177,10 +206,12 @@ export function DuelTab({ poolId, standings }: Props) {
           {sheet && ownEntryId ? (
             <SheetCard poolId={poolId} entryId={ownEntryId} sheet={sheet} />
           ) : null}
-          {opponent ? (
+          {opponentVisible && opponent ? (
             <OpponentCard opponent={opponent} standing={standings.get(opponent.entryId) ?? null} />
           ) : null}
-          {fixtures.length > 0 ? <DecidedOnCard fixtures={fixtures} /> : null}
+          {fixtures.length > 0 ? (
+            <DecidedOnCard fixtures={fixtures} hasOpponent={opponentVisible && !!opponent} />
+          ) : null}
         </>
       )}
       {series.length > 0 ? <AgainstTheRoomCard series={series} /> : null}
@@ -307,7 +338,14 @@ function SheetCard({
  * ⚠ No extra read: these are the open matchweek's fixtures, which the league
  * contract already carries for the sheet.
  */
-function DecidedOnCard({ fixtures }: { fixtures: LeagueMatch[] }) {
+function DecidedOnCard({
+  fixtures,
+  hasOpponent,
+}: {
+  fixtures: LeagueMatch[];
+  /** False while the draw is sealed — there is nobody to agree or differ with. */
+  hasOpponent: boolean;
+}) {
   const theme = useTheme();
 
   return (
@@ -315,7 +353,18 @@ function DecidedOnCard({ fixtures }: { fixtures: LeagueMatch[] }) {
       <CardHeader
         title="What it will be decided on"
         meta={`${fixtures.length} fixture${fixtures.length === 1 ? '' : 's'}`}
-        subtitle="Where you agree, nothing can separate you. Where you differ is the duel."
+        /*
+          ⚠ THE SUBTITLE NAMES A SECOND PERSON, so it cannot be said while the
+          draw is sealed. "Where you agree, nothing can separate you" is a
+          sentence about somebody, and during the countdown there is no somebody
+          — the fixtures are still the right thing to show, the reading of them
+          is not.
+        */
+        subtitle={
+          hasOpponent
+            ? 'Where you agree, nothing can separate you. Where you differ is the duel.'
+            : 'These are the games your duel will ride on, whoever you are drawn against.'
+        }
       />
 
       <View style={{ marginTop: theme.spacing.md }}>
