@@ -302,10 +302,25 @@ export default async function PoolPage({
       if (totalsRes.error) console.error('[pool page] lms totals failed:', totalsRes.error)
       if (clubErr) console.error('[pool page] season clubs failed:', clubErr)
 
-      const entryNames = new Map<string, string>()
+      const survivorByEntry = new Map(state.survivors.map((s) => [s.entry_id, s]))
+
+      // The roster the picks wall reads down its left-hand side. Built from the
+      // same `members` the rest of the page uses, so retired entries are already
+      // excluded — `getPoolData` filters `pool_entries.retired_at` and this must
+      // NOT widen that (migration 134: a member who left is not an opponent).
+      const roster: import('@/lib/league/lms').LmsRosterEntry[] = []
       for (const m of members) {
         for (const e of m.entries ?? []) {
-          entryNames.set(e.entry_id, e.entry_name || m.users?.username || 'Entry')
+          const s = survivorByEntry.get(e.entry_id)
+          roster.push({
+            entry_id: e.entry_id,
+            name: e.entry_name || m.users?.username || 'Entry',
+            // ⚠ NO SURVIVOR ROW IS NOT AN ELIMINATION. They joined after the
+            // round opened and enter the next one.
+            inRound: s !== undefined,
+            eliminatedMatchweek: s?.eliminated_matchweek ?? null,
+            roundsWon: totalsRes.totals.get(e.entry_id)?.roundsWon ?? 0,
+          })
         }
       }
 
@@ -313,11 +328,20 @@ export default async function PoolPage({
         round: state.round,
         survivors: state.survivors,
         myPicks: state.myPicks,
+        // ⚠ ALREADY GATED, and no filter goes on top of it. `readLmsState` reads
+        // `league_lms_picks` with the USER's client, so migration 086's two
+        // SELECT policies decided what came back: your own picks always,
+        // everyone else's only once that matchweek locked. What is absent here
+        // is absent because the database refused it — a client-side filter would
+        // be a second, weaker copy of a rule that is already enforced.
+        allPicks: [...state.myPicks, ...state.revealedPicks],
+        roster,
         clubs,
-        entryNames,
         entryId: defaultEntry?.entry_id ?? null,
         currentMatchweek: null,
         inPlayMatchweek: null,
+        matchweeks: [],
+        lockedMatchweeks: [],
         fixtures: new Map(),
         pickFixtures: new Map(),
         roundsWon: new Map(
@@ -607,6 +631,49 @@ export default async function PoolPage({
         if (lmsData) {
           lmsData.currentMatchweek = mw
           lmsData.inPlayMatchweek = view.inPlayMatchweekNumber
+
+          /**
+           * WHICH WEEKS THE PICKS WALL HAS COLUMNS FOR.
+           *
+           * ⚠ ONLY WEEKS THIS ROUND COVERS. A round can open on the matchweek
+           * AFTER the one still being played (106 re-homing), and a column for a
+           * week that predates the round would be empty for every single member
+           * — which reads as a matchweek the whole pool failed to pick in.
+           */
+          const first = lmsData.round?.first_matchweek ?? null
+          const inRound = (n: number | null | undefined): n is number =>
+            n != null && first != null && n >= first
+          const columns = [
+            ...new Set([
+              ...lmsData.allPicks.map((p) => p.matchweek_number),
+              ...(inRound(view.inPlayMatchweekNumber) ? [view.inPlayMatchweekNumber] : []),
+              ...(inRound(mw) ? [mw] : []),
+            ]),
+          ].sort((a, b) => a - b)
+          lmsData.matchweeks = columns
+
+          /**
+           * WHICH OF THEM HAVE LOCKED — the only thing that tells a SEALED cell
+           * from one where somebody genuinely never picked. Rendering both as a
+           * blank would accuse half the pool of not turning up.
+           *
+           * Derived structurally rather than by re-reading `lock_at`, because
+           * every column above is locked by construction except one:
+           *
+           *   a pick's week   picks are only ever WRITTEN against the open week
+           *                   (the DB trigger refuses the rest), so a pick week
+           *                   is either the open one or a week that has since
+           *                   locked
+           *   the in-play week `inPlayMatchweekId` will not return an unlocked
+           *                   matchweek — locked is part of its definition
+           *   the open week   `openMatchweekId` will not return a locked one
+           *
+           * So: everything except the open matchweek. This cannot drift from the
+           * rhythm helpers the way a second `lock_at` read could, and it stays
+           * right when `mw` is null (the season has run out of weeks to open, so
+           * every remaining column really has locked).
+           */
+          lmsData.lockedMatchweeks = columns.filter((n) => n !== mw)
         }
 
         // Who each club plays in the OPEN matchweek, so the picker can show the

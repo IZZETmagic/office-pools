@@ -30,6 +30,22 @@
 // round starts — the grid comes back fully live and nothing carries over but
 // rounds won.
 //
+// ## Everyone's picks are a WALL, not two lists
+//
+// This tab used to end with "Still standing" and "Out" — two lists of names
+// that said each member's survival a second time and never showed what anybody
+// had actually backed. The mobile app answered it as a grid (`LmsEntriesTab`):
+// a member per row, a matchweek per column, a crest per cell. Read DOWN a column
+// for this week, ACROSS a row for how somebody got here. This is that grid, and
+// it is deliberately the same one — the comparator, the four cell states and the
+// three member states are ported rather than reinvented, because two screens
+// disagreeing about who is doing well is worse than either answer alone.
+//
+// ⚠ THE PICKER STAYS INLINE, and that is the one place this diverges from
+// mobile. There the grid lives on its own route because a scrollable child
+// inside the tab pager cannot get a height. That constraint is React Native's;
+// the web has the room, so the mode's main action keeps its one click.
+//
 // ## Nothing here decides anything
 //
 // Survival, elimination and round winners all come from `league_lms_settle`.
@@ -40,7 +56,10 @@ import { useState, useMemo, useCallback } from 'react'
 import { useStickyState } from '@/hooks/useStickyState'
 import { Card } from '@/components/ui/Card'
 import { Icon } from '@/components/ui/Icon'
-import { lmsPickKey, type LmsRound, type LmsSurvivor, type LmsPick, type LmsPickFixture } from '@/lib/league/lms'
+import {
+  lmsPickKey,
+  type LmsRound, type LmsSurvivor, type LmsPick, type LmsPickFixture, type LmsRosterEntry,
+} from '@/lib/league/lms'
 import type { SeasonClub } from '@/lib/league/table'
 import type { NextFixture } from '@/lib/league/read'
 
@@ -49,13 +68,34 @@ type Props = {
   round: LmsRound | null
   survivors: LmsSurvivor[]
   myPicks: LmsPick[]
+  /**
+   * Every pick the viewer may see — the wall's cells.
+   *
+   * ⚠ RLS DECIDED THIS, not us. `readLmsState` reads `league_lms_picks` on the
+   * user's own client, so migration 086's two policies applied: your picks
+   * always, everyone else's only once that matchweek locked. Nothing here
+   * filters it again — a filter is not a gate, and a second copy of a policy is
+   * a liability.
+   */
+  allPicks: LmsPick[]
+  /** Every live entry in the pool. Ordered here, not by the server. */
+  roster: LmsRosterEntry[]
   clubs: SeasonClub[]
-  entryNames: Map<string, string>
   entryId: string | null
   /** The week a pick can still be WRITTEN for. Never the one to narrate with. */
   currentMatchweek: number | null
   /** The week being PLAYED. Null between rounds — that is an answer, not a gap. */
   inPlayMatchweek: number | null
+  /** The wall's columns — this round's matchweeks, ascending. */
+  matchweeks: number[]
+  /**
+   * Which of them have locked.
+   *
+   * ⚠ THE ONLY THING THAT READS AN EMPTY CELL. A missing pick is either sealed
+   * or never made, and those are opposite accusations — one is the rule working,
+   * the other is a member who did not turn up.
+   */
+  lockedMatchweeks: number[]
   /** Rounds won this season, per entry. */
   roundsWon: Map<string, number>
   /**
@@ -73,7 +113,8 @@ type Props = {
 }
 
 export default function SurvivorTab({
-  poolId, round, survivors, myPicks, clubs, entryNames, entryId, currentMatchweek, inPlayMatchweek,
+  poolId, round, survivors, myPicks, allPicks, roster, clubs, entryId,
+  currentMatchweek, inPlayMatchweek, matchweeks, lockedMatchweeks,
   roundsWon, fixtures, pickFixtures,
 }: Props) {
   // Sticky, not plain useState: this tab unmounts when the member switches tabs
@@ -100,9 +141,17 @@ export default function SurvivorTab({
     [picks, currentMatchweek],
   )
 
+  // One lookup for both the crest and the name. The wall draws a badge per
+  // member per matchweek, so a linear `find` per cell is the wrong shape once a
+  // round is six weeks long.
+  const clubById = useMemo(() => new Map(clubs.map((c) => [c.club_id, c])), [clubs])
   const clubName = useCallback(
-    (clubId: string) => clubs.find((c) => c.club_id === clubId)?.club_name ?? 'a club',
-    [clubs],
+    (clubId: string) => clubById.get(clubId)?.club_name ?? 'a club',
+    [clubById],
+  )
+  const clubCrest = useCallback(
+    (clubId: string) => clubById.get(clubId)?.crest_url ?? null,
+    [clubById],
   )
 
   /**
@@ -150,10 +199,10 @@ export default function SurvivorTab({
   const showOpen = currentMatchweek !== null
   const bothWeeks = showInPlay && showOpen
 
+  // Only for the count in the heading. Who is standing is SHOWN by the wall's
+  // name column now — a dot per member — rather than listed a second time
+  // underneath it, which is how the mobile app says it.
   const standing = survivors.filter((s) => s.eliminated_matchweek === null)
-  const out = survivors
-    .filter((s) => s.eliminated_matchweek !== null)
-    .sort((a, b) => (b.eliminated_matchweek ?? 0) - (a.eliminated_matchweek ?? 0))
 
   const choose = useCallback(async (clubId: string) => {
     if (!round || !entryId || currentMatchweek === null) return
@@ -199,8 +248,6 @@ export default function SurvivorTab({
       </Card>
     )
   }
-
-  const name = (e: string) => entryNames.get(e) ?? 'Unknown'
 
   return (
     <div className="space-y-4">
@@ -256,9 +303,16 @@ export default function SurvivorTab({
                 </p>
                 {inPlayPick ? (
                   <>
-                    <p className="text-sm font-semibold text-neutral-900">
-                      You&apos;re backing {clubName(inPlayPick.club_id)}
-                      <Fixture game={gameFor(inPlayPick)} />
+                    {/* THE BADGE, THEN THE NAME — the mobile app's shape. Anyone
+                        who follows football reads a crest faster than a word,
+                        and this line is the one thing on the tab a member checks
+                        on a Saturday. */}
+                    <p className="text-sm font-semibold text-neutral-900 flex items-center gap-1.5 flex-wrap">
+                      <Crest url={clubCrest(inPlayPick.club_id)} name={clubName(inPlayPick.club_id)} />
+                      <span>
+                        {clubName(inPlayPick.club_id)}
+                        <Fixture game={gameFor(inPlayPick)} />
+                      </span>
                     </p>
                     <p className="text-xs text-neutral-500 mt-1">{verdictLine(gameFor(inPlayPick))}</p>
                   </>
@@ -290,9 +344,12 @@ export default function SurvivorTab({
                 </p>
                 {openPick ? (
                   <>
-                    <p className="text-sm font-semibold text-neutral-900">
-                      You&apos;re backing {clubName(openPick.club_id)}
-                      <Fixture game={gameFor(openPick)} />
+                    <p className="text-sm font-semibold text-neutral-900 flex items-center gap-1.5 flex-wrap">
+                      <Crest url={clubCrest(openPick.club_id)} name={clubName(openPick.club_id)} />
+                      <span>
+                        {clubName(openPick.club_id)}
+                        <Fixture game={gameFor(openPick)} />
+                      </span>
                     </p>
                     {/* ⚠ Same resolution as the fixture beside the club name.
                         Asking `fixtures` here and `gameFor` there is two sources
@@ -458,45 +515,27 @@ export default function SurvivorTab({
         </Card>
       )}
 
-      {/* Who's left */}
-      <Card padding="none" className="overflow-hidden">
-        <div className="px-4 py-2.5 bg-neutral-50 text-[10px] uppercase tracking-wider text-neutral-500 font-bold">
-          Still standing
-        </div>
-        <ul>
-          {standing.map((s) => (
-            <li key={s.entry_id} className="px-4 py-2.5 border-t border-border-default flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold text-neutral-900 truncate">{name(s.entry_id)}</span>
-              {(roundsWon.get(s.entry_id) ?? 0) > 0 && (
-                <span className="text-xs text-neutral-500 shrink-0">
-                  {roundsWon.get(s.entry_id)} round{roundsWon.get(s.entry_id) === 1 ? '' : 's'} won
-                </span>
-              )}
-            </li>
-          ))}
-          {standing.length === 0 && (
-            <li className="px-4 py-3 border-t border-border-default text-sm text-neutral-500">
-              Everyone is out — the round is over.
-            </li>
-          )}
-        </ul>
+      {/* EVERYONE'S PICKS — the wall, and what replaced the two name lists that
+          used to sit here. A member per row, a matchweek per column, a crest in
+          each cell. This mode's whole story is who backed what and when it went
+          wrong, and that is a grid, not a list: you read DOWN a column to see
+          the week and ACROSS a row to see how somebody got here.
 
-        {out.length > 0 && (
-          <>
-            <div className="px-4 py-2.5 bg-neutral-50 text-[10px] uppercase tracking-wider text-neutral-500 font-bold border-t border-border-default">
-              Out
-            </div>
-            <ul>
-              {out.map((s) => (
-                <li key={s.entry_id} className="px-4 py-2.5 border-t border-border-default flex items-center justify-between gap-3">
-                  <span className="text-sm text-neutral-500 truncate">{name(s.entry_id)}</span>
-                  <span className="text-xs text-neutral-400 shrink-0">MW {s.eliminated_matchweek}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </Card>
+          The lists it replaced said each member's survival a second time —
+          "Still standing" over a name the wall already marks with a green dot.
+          The ranked view of the same people is the Leaderboard tab's job. */}
+      <PicksWall
+        roster={roster}
+        picks={allPicks}
+        matchweeks={matchweeks}
+        lockedMatchweeks={lockedMatchweeks}
+        roundNumber={round.round_number}
+        inPlayMatchweek={inPlayMatchweek}
+        entryId={entryId}
+        roundsWon={roundsWon}
+        clubName={clubName}
+        clubCrest={clubCrest}
+      />
 
       <p className="text-xs text-neutral-400">
         When one player is left the round ends and a new one opens with everyone back in.
@@ -504,6 +543,308 @@ export default function SurvivorTab({
       </p>
     </div>
   )
+}
+
+// The wall's geometry. A row has to clear a 34px badge with air around it, and
+// the name column has to hold a real display name without truncating every one.
+const ROW_H = 44
+const HEAD_H = 31
+const CELL_W = 56
+/**
+ * The frozen name column.
+ *
+ * Narrower on a phone: at 176px it ate 47% of a 375px viewport and left the
+ * weeks — the thing you came to read — in a third of the screen. The mobile app
+ * runs 112px for the same reason, and gets the room back on a desktop browser
+ * where there is room to give.
+ */
+const NAME_COL = 'w-[124px] sm:w-[176px]'
+
+/** A member's cell in one matchweek, resolved to one of four states. */
+type CellState =
+  | { kind: 'pick'; pick: LmsPick }
+  /** Their club is hidden from you — the week has not locked. */
+  | { kind: 'sealed' }
+  /** They were already out, or never in the round. Nothing was owed. */
+  | { kind: 'gone' }
+  /** Nothing picked, and nothing hiding it. */
+  | { kind: 'none' }
+
+/**
+ * EVERYONE'S PICKS, as a grid.
+ *
+ * ⚠ WHAT IS MISSING FROM `picks` IS NOT NOTHING. The rows arrive already gated
+ * by migration 086's policies — your own always, everyone else's only once that
+ * matchweek has LOCKED — so an absent cell is ambiguous by construction, and
+ * `lockedMatchweeks` is the only thing that resolves it. Rendering sealed and
+ * never-picked the same way would accuse half the pool of not turning up, and
+ * the difference between those two is the difference between the rule working
+ * and a member losing.
+ *
+ * Ported from `LmsEntriesTab` on mobile, down to the four cell states and the
+ * ordering, because two screens disagreeing about who is doing well is worse
+ * than either answer on its own.
+ */
+function PicksWall({
+  roster, picks, matchweeks, lockedMatchweeks, roundNumber, inPlayMatchweek, entryId,
+  roundsWon, clubName, clubCrest,
+}: {
+  roster: LmsRosterEntry[]
+  picks: LmsPick[]
+  matchweeks: number[]
+  lockedMatchweeks: number[]
+  roundNumber: number
+  inPlayMatchweek: number | null
+  entryId: string | null
+  roundsWon: Map<string, number>
+  clubName: (clubId: string) => string
+  clubCrest: (clubId: string) => string | null
+}) {
+  const locked = useMemo(() => new Set(lockedMatchweeks), [lockedMatchweeks])
+  const byCell = useMemo(() => {
+    const m = new Map<string, LmsPick>()
+    for (const p of picks) m.set(`${p.entry_id}:${p.matchweek_number}`, p)
+    return m
+  }, [picks])
+
+  /**
+   * Standing above out, then whoever lasted longer, then by name.
+   *
+   * ⚠ Byte-for-byte the mobile wall's comparator, and it must stay that way.
+   * The same eight people in two different orders on two devices is a bug the
+   * user finds before we do.
+   */
+  const members = useMemo(
+    () =>
+      [...roster].sort((a, b) => {
+        const g = (m: LmsRosterEntry) => (!m.inRound ? 2 : m.eliminatedMatchweek === null ? 0 : 1)
+        if (g(a) !== g(b)) return g(a) - g(b)
+        if ((a.eliminatedMatchweek ?? 0) !== (b.eliminatedMatchweek ?? 0)) {
+          return (b.eliminatedMatchweek ?? 0) - (a.eliminatedMatchweek ?? 0)
+        }
+        return a.name.localeCompare(b.name)
+      }),
+    [roster],
+  )
+
+  const cellFor = useCallback(
+    (member: LmsRosterEntry, mw: number): CellState => {
+      const pick = byCell.get(`${member.entry_id}:${mw}`)
+      if (pick) return { kind: 'pick', pick }
+      if (!member.inRound) return { kind: 'gone' }
+      // Out already: no pick was owed for a week they never played.
+      if (member.eliminatedMatchweek !== null && mw > member.eliminatedMatchweek) {
+        return { kind: 'gone' }
+      }
+      if (!locked.has(mw)) return { kind: 'sealed' }
+      return { kind: 'none' }
+    },
+    [byCell, locked],
+  )
+
+  if (matchweeks.length === 0) {
+    return (
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-2">
+          Everyone&apos;s picks
+        </p>
+        <p className="text-xs text-neutral-500">
+          Nothing to show until the round&apos;s first matchweek opens.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-2">
+        Everyone&apos;s picks — round {roundNumber}
+      </p>
+
+      <Card padding="none" className="overflow-hidden">
+        <div className="flex">
+          {/* Names stay put; only the weeks scroll. A member's row has to stay
+              findable when a round is six weeks long. */}
+          <div className={`shrink-0 border-r border-border-default ${NAME_COL}`}>
+            <div style={{ height: HEAD_H }} />
+            {members.map((m) => (
+              <div
+                key={m.entry_id}
+                className={`flex items-center gap-1.5 pl-3 pr-2 ${
+                  m.entry_id === entryId ? 'bg-primary-600/6' : ''
+                }`}
+                style={{ height: ROW_H }}
+              >
+                <StateDot member={m} />
+                <span
+                  className={`text-xs font-semibold truncate ${
+                    m.eliminatedMatchweek === null ? 'text-neutral-900' : 'text-neutral-500'
+                  }`}
+                >
+                  {m.name}
+                </span>
+                {/* The trophy is the ENTIRE memory of a round. Closing one opens
+                    the next in the same transaction, so survival resets to
+                    "everybody back in" and nothing else here records that the
+                    round ever happened. */}
+                {(roundsWon.get(m.entry_id) ?? m.roundsWon) > 0 && (
+                  <span
+                    className="shrink-0 flex items-center gap-0.5 text-accent-600"
+                    title={`${roundsWon.get(m.entry_id) ?? m.roundsWon} round(s) won`}
+                  >
+                    <Icon name="trophy.fill" size={10} />
+                    {(roundsWon.get(m.entry_id) ?? m.roundsWon) > 1 && (
+                      <span className="text-[9px] font-bold">
+                        ×{roundsWon.get(m.entry_id) ?? m.roundsWon}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* ⚠ `flex-1 min-w-0` BOTH. Without flex-1 the region is only as
+              wide as its columns — 168px inside a 734px card — so the
+              current-user row tint stopped a third of the way across and the
+              rest of the card was dead space. Without min-w-0 a flex child
+              refuses to shrink below its content and scrolls the page
+              instead of itself. */}
+          <div className="overflow-x-auto flex-1 min-w-0">
+            <div style={{ minWidth: matchweeks.length * CELL_W }}>
+              <div className="flex" style={{ height: HEAD_H }}>
+                {matchweeks.map((mw) => (
+                  <div
+                    key={mw}
+                    className={`flex items-center justify-center text-[9px] font-bold tracking-wider ${
+                      mw === inPlayMatchweek ? 'text-primary-600' : 'text-neutral-500'
+                    }`}
+                    // Grow into spare width, never shrink below CELL_W — three
+                    // columns spread across the card, ten of them scroll.
+                    style={{ flex: `1 0 ${CELL_W}px` }}
+                  >
+                    MW{mw}
+                  </div>
+                ))}
+              </div>
+
+              {members.map((m) => (
+                <div
+                  key={m.entry_id}
+                  className={`flex ${m.entry_id === entryId ? 'bg-primary-600/6' : ''}`}
+                  style={{ height: ROW_H }}
+                >
+                  {matchweeks.map((mw) => (
+                    <WallCell
+                      key={mw}
+                      cell={cellFor(m, mw)}
+                      clubName={clubName}
+                      clubCrest={clubCrest}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <p className="text-xs text-neutral-400 mt-2">
+        Clubs stay hidden until their matchweek locks — otherwise the pool could copy the best
+        player.
+      </p>
+    </div>
+  )
+}
+
+/** A colour before any words — the row's state readable at a glance down the list. */
+function StateDot({ member }: { member: LmsRosterEntry }) {
+  // ⚠ THREE STATES, NOT TWO. Grey is somebody who joined after the round opened,
+  // and it must never be the red of an elimination: that would accuse them of
+  // losing a round they were never allowed to play.
+  const tone = !member.inRound
+    ? 'bg-neutral-400'
+    : member.eliminatedMatchweek === null
+      ? 'bg-success-600'
+      : 'bg-danger-600'
+  return <span className={`shrink-0 w-[7px] h-[7px] rounded-full ${tone}`} />
+}
+
+function WallCell({
+  cell, clubName, clubCrest,
+}: {
+  cell: CellState
+  clubName: (clubId: string) => string
+  clubCrest: (clubId: string) => string | null
+}) {
+  const base = 'flex items-center justify-center'
+
+  if (cell.kind === 'sealed') {
+    return (
+      <div className={base} style={{ flex: `1 0 ${CELL_W}px`, height: ROW_H }} title="Hidden until this matchweek locks">
+        <Icon name="lock.fill" size={11} className="text-neutral-400" />
+      </div>
+    )
+  }
+
+  if (cell.kind === 'gone') {
+    return (
+      <div className={base} style={{ flex: `1 0 ${CELL_W}px`, height: ROW_H }}>
+        <span className="text-neutral-300 text-sm leading-none">·</span>
+      </div>
+    )
+  }
+
+  // ⚠ A locked week with no pick is a real, costly fact — it is how you go out
+  // without ever being beaten — so it is marked rather than left blank.
+  if (cell.kind === 'none') {
+    return (
+      <div className={base} style={{ flex: `1 0 ${CELL_W}px`, height: ROW_H }} title="No pick that matchweek">
+        <Icon name="xmark" size={10} className="text-neutral-400" />
+      </div>
+    )
+  }
+
+  const { pick } = cell
+  const name = clubName(pick.club_id)
+  const crest = clubCrest(pick.club_id)
+  const tint =
+    pick.result === 'survived'
+      ? 'bg-success-600/14'
+      : pick.result === 'eliminated'
+        ? 'bg-danger-600/14'
+        : ''
+
+  return (
+    <div className={base} style={{ flex: `1 0 ${CELL_W}px`, height: ROW_H }}>
+      <span
+        className={`w-[34px] h-[34px] rounded-full flex items-center justify-center ${tint}`}
+        title={name}
+      >
+        {crest ? (
+          <img src={crest} alt={name} className="w-6 h-6 object-contain" />
+        ) : (
+          // ⚠ `crest_url` is nullable. An abbreviation beats a blank, which would
+          // read as a cell where nobody picked.
+          <span className="text-[9px] font-bold text-neutral-900">
+            {name.slice(0, 3).toUpperCase()}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * A club's badge, at text size.
+ *
+ * Renders nothing without a URL rather than a placeholder box: the club's name
+ * is always beside it, so a missing crest costs nothing, and `crest_url` is
+ * nullable in this feed.
+ */
+function Crest({ url, name }: { url: string | null; name: string }) {
+  if (!url) return null
+  return <img src={url} alt={name} className="w-5 h-5 object-contain shrink-0" />
 }
 
 /**
