@@ -71,8 +71,15 @@ const MATCH_SELECT = `
   home_score_ft, away_score_ft, home_score_pso, away_score_pso, live_minute, live_period, live_added,
   home_team_placeholder, away_team_placeholder,
   home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url),
-  away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)
+  away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url),
+  tournaments(external_league_id)
 `;
+
+/** PostgREST returns an embedded row as an object or a one-element array. */
+function firstOf<T>(raw: unknown): T | null {
+  if (!raw) return null;
+  return (Array.isArray(raw) ? raw[0] : raw) as T | null;
+}
 
 function normalizeTeam(raw: unknown): ResultsTeam | null {
   if (!raw) return null;
@@ -115,15 +122,31 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
     awayTeamPlaceholder: (row.away_team_placeholder as string | null) ?? null,
     homeTeam: normalizeTeam(row.home_team),
     awayTeam: normalizeTeam(row.away_team),
-    // Both null on this path by definition: it reads the `matches` table, which
-    // holds World Cup rows only. A league fixture never reaches this function —
-    // it is served from the list already in memory. See `leagueMatch` below.
+    // Null on this path by definition: it reads the `matches` table, which
+    // holds bracket-competition rows only. A league fixture never reaches this
+    // function — it is served from the list already in memory. See
+    // `leagueMatch` below.
     roundNumber: null,
+    // ⚠ STILL NULL, AND DELIBERATELY, even though the join below now knows
+    // which competition this is. `competition` is the CAPTION, and the Results
+    // tab renders a section header from it — `CompetitionHeader` returns null
+    // for the World Cup on purpose, because a header reading "Other" over the
+    // 2026 final would be worse than no header. Filling this in would put a
+    // caption on a list that decided not to have one. The detail band falls
+    // back to the stage instead; see `competitionLine`.
     competition: null,
-    // As above: this path is the `matches` table, which is World Cup only and
-    // has no league id. A league fixture arrives already stamped, through
-    // `leagueMatch`.
-    competitionId: null,
+    // ⚠ READ, NOT ASSERTED. The band, the mark and every other brand lookup key
+    // on this — `tournaments.external_league_id`, the api-football league id.
+    //
+    // It used to be hard-coded null, so a World Cup header had nothing to
+    // colour itself with and rendered the same neutral as an unthemed league.
+    // The obvious fix was to stamp `1` here, since `matches` is written only by
+    // the `world_cup` arm of the sync — but "world_cup" is a target KIND, and
+    // `loadSyncTargets` builds one target per `tournaments` row, so there can be
+    // more than one of them. Stamping the literal would have quietly painted a
+    // second bracket competition in the first one's colours.
+    competitionId: firstOf<{ external_league_id: number | null }>(row.tournaments)
+      ?.external_league_id ?? null,
   };
 }
 
@@ -483,13 +506,22 @@ export function useMatchDetail(matchId: string | undefined) {
           const row = payload.new as Record<string, unknown> | null;
           if (!row) return;
           const updated = normalizeMatch(row);
-          // Realtime payload doesn't include joined team data — preserve.
+          // ⚠ A REALTIME PAYLOAD IS THE ROW, NOT THE SELECT. It carries no
+          // embedded resources at all, so everything `MATCH_SELECT` joins comes
+          // back null here and has to be carried over from the previous state.
+          //
+          // The teams were always preserved. `competitionId` joins
+          // `tournaments` and so has exactly the same problem — without it the
+          // band would be correctly coloured until the first goal and neutral
+          // grey from then on, which is both wrong and only reproducible
+          // during a live match.
           setMatch((prev) => {
             if (!prev) return updated;
             return {
               ...updated,
               homeTeam: prev.homeTeam,
               awayTeam: prev.awayTeam,
+              competitionId: prev.competitionId,
             };
           });
         },

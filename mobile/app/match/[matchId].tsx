@@ -2,21 +2,40 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
   RefreshControl,
-  ScrollView,
+  type RefreshControlProps,
   Text as RNText,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import Animated, {
+  type SharedValue,
+  useAnimatedReaction,
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MatchStatusBadge } from '@/components/MatchStatusBadge';
+import { MatchDetailHeader } from '@/components/match/MatchDetailHeader';
+import {
+  awayDisplayName,
+  formattedFullDate,
+  homeDisplayName,
+  isKnockoutTie,
+  MONO,
+  MONO_BOLD,
+  stageLabel,
+} from '@/components/match/matchDisplay';
+import { MATCH_TABS, MatchTabBar, type MatchTabKey } from '@/components/match/MatchTabBar';
 import { Icon, Text } from '@/components/ui';
-import { formatStageLabel } from '@/lib/stage';
-import { useMatchClock } from '@/lib/useMatchClock';
+import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
+import { getCompetitionBand } from '@/lib/design/competitionBand';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
   type BracketPickInfo,
@@ -24,21 +43,34 @@ import {
   type MatchPredictionInfo,
   useMatchDetail,
 } from '@/lib/useMatchDetail';
-import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
-// iOS uses the system-available Menlo / Menlo-Bold. Android falls back to
-// the Google-fonts Roboto Mono faces loaded in `_layout.tsx` — the native
-// `'monospace'` family on Android has no Bold variant, so without this the
-// numbers would render visibly thinner than on iOS.
-const MONO_BOLD = Platform.OS === 'ios' ? 'Menlo-Bold' : 'RobotoMono_700Bold';
-const MONO = Platform.OS === 'ios' ? 'Menlo' : 'RobotoMono_400Regular';
+// =============================================================
+// One match, in four answers
+// =============================================================
+// The screen used to be a single column under a fixed near-black header: every
+// card competed for the same space, the score scrolled away, and a Premier
+// League game looked exactly like a World Cup one.
+//
+// Now it is a competition-coloured band that collapses as you read, over a
+// pager of tabs. The arrangement — band absolutely positioned and rendered
+// AFTER the pager so sliding it up UNCOVERS content already underneath — is
+// `pool/[id].tsx`'s, and the reasons are written out there and in
+// `MatchDetailHeader`. Do not reorder them: rendering the band before the pager
+// puts the scrolling content on top of it.
+//
+// ⚠ WHAT EACH TAB HOLDS DEPENDS ON THE COMPETITION, and one of them is honest
+// about being empty. A World Cup match has picks, crowd stats and a group
+// table; a league fixture today has none of the three, because league picks are
+// pool-scoped and the phone does not read them yet. That is stated on the
+// Predictions tab rather than papered over — see `YourPredictionsSection`.
+// =============================================================
 
 export default function MatchDetailScreen() {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
+  const { width } = useWindowDimensions();
   const {
     match,
     predictionInfos,
@@ -49,404 +81,304 @@ export default function MatchDetailScreen() {
     error,
     refresh,
   } = useMatchDetail(matchId);
-  // Pull-to-refresh: spinner bound to user gesture only. Previously the
-  // RefreshControl was tied to `loading`, which also flips true on the
-  // initial fetch — so opening the screen flashed the iOS pull-down circle
-  // until the request resolved.
+  // Pull-to-refresh: spinner bound to the user gesture only. Tying the
+  // RefreshControl to `loading` also flips it on the initial fetch, which
+  // flashed the iOS pull-down circle every time the screen opened.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
+
+  const [tab, setTab] = useState<MatchTabKey>('facts');
+  const tabIndex = Math.max(0, MATCH_TABS.indexOf(tab));
+
+  /**
+   * Fractional page offset of the pager, on the UI thread.
+   *
+   * Written by `scrollHandler` every scroll frame and read by the tab strip via
+   * `useAnimatedReaction`, so following a swipe costs no React re-render of
+   * this screen or any mounted tab.
+   */
+  const pageOffset = useSharedValue(0);
+  /**
+   * Vertical scroll of whichever tab is on screen, so the band can collapse.
+   *
+   * ⚠ IT LIVES HERE BECAUSE NOTHING ELSE COULD OWN IT. The band sits outside
+   * the pager and every tab is its own ScrollView, so no single scroll position
+   * exists. Each page writes its own offset in and hands it over when it
+   * becomes the active page — see `TabPage`.
+   */
+  const scrollY = useSharedValue(0);
+  /**
+   * The band's expanded height.
+   *
+   * ⚠ The band FLOATS over the pager — that is what lets it slide without a
+   * layout pass — so nothing reserves its space. Every page pads by this, or
+   * its first screenful sits underneath the header.
+   */
+  const [bandHeight, setBandHeight] = useState(0);
+
+  const pagerRef = useRef<Animated.ScrollView | null>(null);
+  // When a tab change comes from a swipe the pager has already settled at the
+  // target page, so the effect below would re-animate to where we already are —
+  // a visible hitch at the end of every swipe. This skips that one scrollTo;
+  // strip taps leave it false and still animate.
+  const skipPagerScrollRef = useRef(false);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      'worklet';
+      if (width > 0) pageOffset.value = e.contentOffset.x / width;
+    },
+  });
+
+  useEffect(() => {
+    if (skipPagerScrollRef.current) {
+      skipPagerScrollRef.current = false;
+      return;
+    }
+    pagerRef.current?.scrollTo({ x: tabIndex * width, animated: true });
+  }, [tabIndex, width]);
+
+  function handleMomentumScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    if (width <= 0) return;
+    const i = Math.round(e.nativeEvent.contentOffset.x / width);
+    const next = MATCH_TABS[i];
+    if (next && next !== tab) {
+      skipPagerScrollRef.current = true;
+      setTab(next);
+    }
+  }
+
+  function renderTab(key: MatchTabKey, m: ResultsMatch) {
+    switch (key) {
+      case 'facts':
+        return (
+          <View style={{ gap: 16 }}>
+            <MatchInfoCard match={m} />
+            {groupStandings.length > 0 ? (
+              <GroupStandingsCard groupLetter={m.groupLetter} standings={groupStandings} />
+            ) : null}
+          </View>
+        );
+      case 'predictions':
+        return (
+          <View style={{ gap: 16 }}>
+            <YourPredictionsSection match={m} predictionInfos={predictionInfos} />
+            {(matchStats && matchStats.total_predictions > 0) ||
+            hasBracketGroupStats(bracketStats) ? (
+              <PredictionStatsSection match={m} stats={matchStats} bracketStats={bracketStats} />
+            ) : null}
+          </View>
+        );
+    }
+  }
+
+  if (loading && !match) {
+    return (
+      <FallbackShell>
+        <ActivityIndicator color={theme.colors.primary} />
+      </FallbackShell>
+    );
+  }
+
+  if (!match) {
+    return (
+      <FallbackShell>
+        <Text variant="cardTitle" align="center">
+          Unable to load match
+        </Text>
+        <Text variant="body" color="slate" align="center">
+          {error ?? 'This match could not be found.'}
+        </Text>
+      </FallbackShell>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
       <StatusBar style="light" animated />
-      {/* Full-bleed dark gradient header band — matches the dashboard's live /
-          upcoming cards. Extends behind the status bar; the safe-area inset is
-          added as paddingTop here so the gradient fills it. Contains the back
-          button row and (once loaded) the teams/score header content. */}
+
+      <Animated.ScrollView
+        ref={pagerRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        style={{ flex: 1 }}
+      >
+        {MATCH_TABS.map((key, i) => (
+          <TabPage
+            key={key}
+            index={i}
+            width={width}
+            pageOffset={pageOffset}
+            scrollY={scrollY}
+            paddingTop={bandHeight + 16}
+            paddingBottom={theme.spacing.xxxl}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={theme.colors.primary}
+                progressViewOffset={bandHeight}
+              />
+            }
+          >
+            {renderTab(key, match)}
+          </TabPage>
+        ))}
+      </Animated.ScrollView>
+
+      {/*
+        ⚠ AFTER THE PAGER, AND THAT IS THE WHOLE TRICK. The band is absolutely
+        positioned and floats over the content, so sliding it up UNCOVERS what
+        was already underneath — no height animates, nothing re-lays out, and it
+        runs on the compositor. Rendering it before the pager would put the
+        scrolling content on top of it.
+      */}
+      <MatchDetailHeader match={match} scrollY={scrollY} onExpandedHeight={setBandHeight}>
+        <MatchTabBar active={tab} onChange={setTab} pageOffset={pageOffset} />
+      </MatchDetailHeader>
+    </View>
+  );
+}
+
+/**
+ * Loading and not-found, with a way back out.
+ *
+ * ⚠ THE BACK BUTTON IS THE POINT. These states used to render inside the old
+ * always-present header; the band needs a match to colour itself, so without
+ * this a failed load would be a dead end with no way off the screen. The band
+ * here is the neutral `UNTHEMED_COMPETITION` one, because at this moment we
+ * genuinely do not know which competition it is.
+ */
+function FallbackShell({ children }: { children: React.ReactNode }) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const [left, right] = getCompetitionBand(null);
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
+      <StatusBar style="light" animated />
       <LinearGradient
-        colors={['#0F0F1A', '#1A1830']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ paddingTop: insets.top, overflow: 'hidden' }}
+        colors={[left, right]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={{ paddingTop: insets.top + theme.spacing.xs }}
       >
         <View
-          pointerEvents="none"
           style={{
-            position: 'absolute',
-            width: 160,
-            height: 160,
-            borderRadius: 80,
-            backgroundColor: withOpacity(theme.colors.primary, 0.06),
-            shadowColor: theme.colors.primary,
-            shadowOpacity: 0.5,
-            shadowRadius: 50,
-            shadowOffset: { width: 0, height: 0 },
-            top: -40,
-            right: -50,
-          }}
-        />
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            width: 120,
-            height: 120,
-            borderRadius: 60,
-            backgroundColor: withOpacity(theme.colors.accent, 0.05),
-            shadowColor: theme.colors.accent,
-            shadowOpacity: 0.4,
-            shadowRadius: 40,
-            shadowOffset: { width: 0, height: 0 },
-            bottom: -30,
-            left: -40,
-          }}
-        />
-        <View
-          style={{
+            height: 34,
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingTop: 8,
-            paddingBottom: 4,
+            paddingHorizontal: theme.spacing.lg,
           }}
         >
           <Pressable
             onPress={() => router.back()}
             hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
             style={({ pressed }) => ({
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: 'rgba(255,255,255,0.12)',
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: 'rgba(255,255,255,0.14)',
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            <Icon name="chevron.left" size={16} tint="#FFFFFF" weight="semibold" />
+            <Icon name="chevron.left" size={15} tint="#FFFFFF" weight="semibold" />
           </Pressable>
         </View>
-        {match ? <MatchHeader match={match} /> : null}
       </LinearGradient>
-
-      {loading && !match ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={theme.colors.primary} />
-        </View>
-      ) : error && !match ? (
-        <View
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 32,
-            gap: 12,
-          }}
-        >
-          <Text variant="cardTitle" align="center">
-            Unable to load match
-          </Text>
-          <Text variant="body" color="slate" align="center">
-            {error}
-          </Text>
-        </View>
-      ) : match ? (
-        <ScrollView
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 32, gap: 16 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={theme.colors.primary}
-            />
-          }
-        >
-          <MatchInfoCard match={match} />
-          {groupStandings.length > 0 ? (
-            <GroupStandingsCard groupLetter={match.groupLetter} standings={groupStandings} />
-          ) : null}
-          {(matchStats && matchStats.total_predictions > 0) ||
-          hasBracketGroupStats(bracketStats) ? (
-            <PredictionStatsSection
-              match={match}
-              stats={matchStats}
-              bracketStats={bracketStats}
-            />
-          ) : null}
-          <YourPredictionsSection match={match} predictionInfos={predictionInfos} />
-        </ScrollView>
-      ) : null}
-    </View>
-  );
-}
-
-// MARK: - Helpers
-
-function parsedDate(iso: string): Date | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function homeDisplayName(match: ResultsMatch): string {
-  return match.homeTeam?.countryName ?? match.homeTeamPlaceholder ?? 'Home';
-}
-
-function awayDisplayName(match: ResultsMatch): string {
-  return match.awayTeam?.countryName ?? match.awayTeamPlaceholder ?? 'Away';
-}
-
-function stageLabel(match: ResultsMatch): string {
-  const label = match.groupLetter
-    ? `Group ${match.groupLetter}`
-    : formatStageLabel(match.stage, match.roundNumber);
-  // ⚠ NO "Match #" FOR A LEAGUE FIXTURE. `match_number` there is the season's
-  // own 1–380 counter, which is a database detail rather than something anybody
-  // says out loud — "Matchweek 12 · Match #118" reads as two competing
-  // numberings. Without the matchweek this line read "Regular Season · Match #1",
-  // which is the same raw-enum bug the web fixed in `MatchCard.tsx`.
-  if (match.roundNumber !== null) return label;
-  return `${label} · Match #${match.matchNumber}`;
-}
-
-/**
- * Is this a two-legged-or-single knockout tie, where the WINNER is what a pick
- * is graded on?
- *
- * ⚠ IT USED TO BE `groupLetter === null`, AND A LEAGUE FIXTURE HAS NO GROUP. So
- * every one of the 380 would have been graded as a knockout — the wrong result
- * badge, and a query against `bracket_picker_knockout_picks` on a fixture id
- * that cannot be in it.
- *
- * Not reachable today: a league fixture arrives with no `predictionInfos`, so
- * neither caller renders. It is corrected anyway, because the thing that makes
- * it reachable is the follow-up this screen already anticipates — showing a
- * member their league pick — and a latent wrong answer waiting on a feature is
- * worse than a wrong answer you can see.
- */
-function isKnockoutTie(match: ResultsMatch): boolean {
-  return match.roundNumber === null && match.groupLetter === null;
-}
-
-function formattedFullDate(iso: string): string {
-  const d = parsedDate(iso);
-  if (!d) return iso;
-  return d.toLocaleString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-function formattedTime(iso: string): string {
-  const d = parsedDate(iso);
-  if (!d) return '--:--';
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-}
-
-function formattedShortDate(iso: string): string {
-  const d = parsedDate(iso);
-  if (!d) return '';
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-/**
- * The header's team mark — a flag or a club crest, both from `flagUrl`.
- *
- * ⚠ Square box + `contain`, for the reason written out in full on
- * `components/results/MatchResultRow.tsx`'s `TeamMark`: a league fixture puts a
- * crest that is not 3:2 through a field named after a flag, and a `cover` fit
- * cropped it. At 64 this is the biggest mark in the app, so it was also the most
- * obviously beheaded one.
- */
-function TeamMark({ url, size = 64 }: { url: string | null | undefined; size?: number }) {
-  const theme = useTheme();
-  if (!url) {
-    return (
       <View
-        style={{ width: size, height: size, borderRadius: 4, backgroundColor: theme.colors.mist }}
-      />
-    );
-  }
-  return (
-    <Image
-      source={{ uri: url }}
-      style={{ width: size, height: size }}
-      contentFit="contain"
-      cachePolicy="memory-disk"
-    />
-  );
-}
-
-// MARK: - Match Header
-
-function MatchHeader({ match }: { match: ResultsMatch }) {
-  const theme = useTheme();
-  const isLive = match.status === 'live';
-  const isFinished = match.status === 'completed';
-
-  return (
-    <View
-      style={{
-        // Outer wrapper (in MatchDetailScreen) owns the blue band + status-bar
-        // extension. This view is just the teams/score content laid out
-        // inside that band.
-        paddingHorizontal: 20,
-        paddingTop: 24,
-        paddingBottom: 24,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {/* Home team */}
-        <View style={{ flex: 1, alignItems: 'center', gap: 8 }}>
-          <TeamMark url={match.homeTeam?.flagUrl} />
-          <RNText
-            numberOfLines={2}
-            style={{
-              fontFamily: fontFamilies.semibold,
-              fontSize: 16,
-              color: '#FFFFFF',
-              textAlign: 'center',
-            }}
-          >
-            {homeDisplayName(match)}
-          </RNText>
-        </View>
-
-        {/* Center: score / time / LIVE / PSO */}
-        <View style={{ width: 124, alignItems: 'center', gap: 4 }}>
-          {isLive ? (
-            <>
-              <ScoreRow home={match.homeScoreFt ?? 0} away={match.awayScoreFt ?? 0} />
-              <MatchClock match={match} />
-            </>
-          ) : isFinished ? (
-            <>
-              <ScoreRow home={match.homeScoreFt ?? 0} away={match.awayScoreFt ?? 0} />
-              {match.homeScorePso !== null && match.awayScorePso !== null ? (
-                <RNText
-                  style={{
-                    fontFamily: fontFamilies.medium,
-                    fontSize: 11,
-                    color: theme.colors.accent,
-                  }}
-                >
-                  ({match.homeScorePso}-{match.awayScorePso} PSO)
-                </RNText>
-              ) : null}
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.medium,
-                  fontSize: 10,
-                  color: 'rgba(255,255,255,0.55)',
-                }}
-              >
-                Full Time
-              </RNText>
-            </>
-          ) : (
-            <>
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 26,
-                  color: '#FFFFFF',
-                }}
-              >
-                {formattedTime(match.matchDate)}
-              </RNText>
-              <RNText
-                style={{
-                  fontFamily: fontFamilies.medium,
-                  fontSize: 11,
-                  color: 'rgba(255,255,255,0.55)',
-                }}
-              >
-                {formattedShortDate(match.matchDate)}
-              </RNText>
-            </>
-          )}
-        </View>
-
-        {/* Away team */}
-        <View style={{ flex: 1, alignItems: 'center', gap: 8 }}>
-          <TeamMark url={match.awayTeam?.flagUrl} />
-          <RNText
-            numberOfLines={2}
-            style={{
-              fontFamily: fontFamilies.semibold,
-              fontSize: 16,
-              color: '#FFFFFF',
-              textAlign: 'center',
-            }}
-          >
-            {awayDisplayName(match)}
-          </RNText>
-        </View>
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 32,
+          gap: 12,
+        }}
+      >
+        {children}
       </View>
-
-      <MatchStatusBadge match={match} style={{ marginTop: 12 }} />
     </View>
   );
 }
 
-// Live clock line for the header — a red dot + a locally-ticking MM:SS estimate
-// (see useMatchClock). Isolated as its own component so the once-a-second tick
-// re-renders only this row, not the whole header (flags, names, score). Falls
-// back to "LIVE" in the brief window before the first minute is known.
-function MatchClock({ match }: { match: ResultsMatch }) {
-  const theme = useTheme();
-  const clock = useMatchClock(match);
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-      <View
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: 3,
-          backgroundColor: theme.colors.red,
-        }}
-      />
-      <RNText
-        style={{
-          fontFamily: MONO_BOLD,
-          fontSize: 13,
-          color: '#FFFFFF',
-          letterSpacing: 0.5,
-        }}
-      >
-        {clock ?? 'LIVE'}
-      </RNText>
-    </View>
-  );
-}
+/**
+ * One page of the horizontal pager: a vertical scroll view that reports its
+ * offset to the screen's shared `scrollY`.
+ *
+ * ⚠ WHY EACH PAGE KEEPS ITS OWN OFFSET TOO.
+ *
+ * The naive version — one handler on every page writing straight to `scrollY` —
+ * looks right until you swipe. Only the visible page emits scroll events, so
+ * `scrollY` keeps whatever the PREVIOUS tab left there: swipe from a tab you
+ * had scrolled 300pt down to one sitting at the top and the band stays
+ * collapsed over a screen that is not scrolled, until you touch it.
+ *
+ * So each page remembers `mine` and pushes it into the shared value at the
+ * moment it BECOMES the active page. `pageOffset` is already a shared value
+ * driven by the pager, so the whole exchange happens on the UI thread with no
+ * re-render — the same reason the strip's pills read it instead of React state.
+ *
+ * ⚠ The guard inside `onScroll` matters as much as the reaction. A page that is
+ * scrolled programmatically while off-screen (a refresh, a keyboard) would
+ * otherwise write over the visible page's offset.
+ *
+ * Lifted from `pool/[id].tsx`, where the same three sentences are written out
+ * at pool scale.
+ */
+function TabPage({
+  index,
+  width,
+  pageOffset,
+  scrollY,
+  paddingTop,
+  paddingBottom,
+  refreshControl,
+  children,
+}: {
+  index: number;
+  width: number;
+  pageOffset: SharedValue<number>;
+  scrollY: SharedValue<number>;
+  paddingTop: number;
+  paddingBottom: number;
+  refreshControl: React.ReactElement<RefreshControlProps>;
+  children: React.ReactNode;
+}) {
+  const mine = useSharedValue(0);
 
-function ScoreRow({ home, away }: { home: number; away: number }) {
+  const handler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      'worklet';
+      mine.value = e.contentOffset.y;
+      if (Math.round(pageOffset.value) === index) scrollY.value = mine.value;
+    },
+  });
+
+  useAnimatedReaction(
+    () => Math.round(pageOffset.value) === index,
+    (isActive, wasActive) => {
+      'worklet';
+      if (isActive && !wasActive) scrollY.value = mine.value;
+    },
+    [index],
+  );
+
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <RNText
-        style={{
-          fontFamily: MONO_BOLD,
-          fontSize: 34,
-          color: '#FFFFFF',
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {home}
-      </RNText>
-      <RNText style={{ fontFamily: MONO_BOLD, fontSize: 34, color: 'rgba(255,255,255,0.4)' }}>-</RNText>
-      <RNText
-        style={{
-          fontFamily: MONO_BOLD,
-          fontSize: 34,
-          color: '#FFFFFF',
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {away}
-      </RNText>
-    </View>
+    <Animated.ScrollView
+      style={{ width }}
+      contentContainerStyle={{ paddingTop, paddingBottom, flexGrow: 1 }}
+      onScroll={handler}
+      scrollEventThrottle={16}
+      refreshControl={refreshControl}
+    >
+      {children}
+    </Animated.ScrollView>
   );
 }
 
