@@ -42,6 +42,7 @@ import {
   type KpiTile,
   type DuelBand,
   poolCardAction,
+  cornerLine,
   deadlineChip,
   kpiTiles,
   cardStrip,
@@ -480,26 +481,50 @@ function DuelBandView({ band, compact }: { band: DuelBand; compact: boolean }) {
       <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         {/* YOU — no avatar, and that is a fact about the card rather than an
             omission. See `DuelBand['you']`. */}
-        <div className="min-w-0">
-          {!compact && <p className="t-caption text-white/45">You</p>}
-          <p className="t-body font-bold text-white truncate">
-            {you.rank != null ? `${ordinal(you.rank)} of ${you.totalEntries}` : 'Unranked'}
-          </p>
-          <p className="text-[11px] font-semibold text-white/45 truncate">
-            {compact ? `${you.duelPoints} pts` : `${you.duelPoints} pts \u00B7 ${you.record}`}
-          </p>
-        </div>
+        {/* ⚠ MIRRORED ABOUT THE CENTRE — face outermost, name inboard, and the
+            opposite on the right. It is what makes the two corners read as two
+            sides of one thing rather than a left-aligned list and a
+            right-aligned one. */}
+        <Corner
+          person={you.person}
+          name="You"
+          line={cornerLine(you.rank, you.duelPoints, compact)}
+          compact={compact}
+        />
 
         {/* The centre. A clock while the draw is sealed, the matchweek once it
             has opened — never a scoreline; see `DuelBand['centre']`. */}
-        <div className="px-2 text-center">
+        {/*
+          ⚠ CAPPED, BECAUSE `auto` MEANS "AS WIDE AS THE CAPTION". Measured in
+          the harness: "UNTIL MW 4 OPENS" grew this column to 111px of a 464px
+          band and clipped BOTH corners' "1st · 500 pts" — the comparison the
+          band exists to make, lost to a caption. The short caption now runs at
+          every size and the column cannot grow past the clock it holds.
+        */}
+        {/*
+          ⚠ THE SEALED GRID CARD GETS A WIDER CENTRE, and it can afford one: its
+          right corner is a 26px circle with no text beside it, where a revealed
+          one carries a name and a rank. At one width for both, "MW 4 OPENS"
+          wrapped to two lines in the 72px column and made the sealed grid card
+          76px against every other state's 61 — the exact thing Ryan cut from
+          the first mockup, reappearing in the variant nobody was looking at.
+
+          `whitespace-nowrap` is the guard rather than the fix: a caption that
+          no longer fits should be shortened in lib/pools/card.ts, not silently
+          grow the band.
+        */}
+        <div
+          className={`shrink-0 px-1 text-center ${
+            compact ? (them ? 'w-[72px]' : 'w-[96px]') : 'w-[92px]'
+          }`}
+        >
           {centre.kind === 'clock' ? (
-            <BandClock to={centre.to} caption={compact ? centre.captionShort : centre.caption} />
+            <BandClock to={centre.to} caption={centre.captionShort} />
           ) : (
             <>
               <p className="t-num text-lg leading-none text-white">{centre.value}</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/45">
-                {compact ? centre.captionShort : centre.caption}
+              <p className="mt-1 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-white/45">
+                {centre.captionShort}
               </p>
             </>
           )}
@@ -510,19 +535,14 @@ function DuelBandView({ band, compact }: { band: DuelBand; compact: boolean }) {
             is being kept from you, which is the whole point of the seal. */}
         <div className="flex min-w-0 items-center justify-end gap-2.5">
           {them ? (
-            <>
-              <div className="min-w-0 text-right">
-                {!compact && <p className="t-caption text-white/45">Opponent</p>}
-                <p className="t-body font-bold text-white truncate" title={them.name}>
-                  {themName}
-                </p>
-              </div>
-              {them.person && (
-                <span className="shrink-0">
-                  <Avatar person={them.person} size={compact ? 28 : 34} />
-                </span>
-              )}
-            </>
+            <Corner
+              person={them.person}
+              name={themName as string}
+              fullName={them.name}
+              line={cornerLine(them.rank, them.duelPoints, compact)}
+              compact={compact}
+              align="right"
+            />
           ) : (
             <>
               {/*
@@ -536,9 +556,11 @@ function DuelBandView({ band, compact }: { band: DuelBand; compact: boolean }) {
               */}
               {!compact && (
                 <div className="min-w-0 text-right">
-                  <p className="t-caption text-white/45">Opponent</p>
                   <p className="t-body font-bold text-white/70 truncate">
                     {state === 'bye' ? 'Nobody' : 'Sealed'}
+                  </p>
+                  <p className="text-[11px] font-semibold text-white/40 truncate">
+                    {state === 'bye' ? 'you sit out' : 'opens soon'}
                   </p>
                 </div>
               )}
@@ -571,6 +593,45 @@ function DuelBandView({ band, compact }: { band: DuelBand; compact: boolean }) {
   )
 }
 
+/**
+ * One side of the band: a face, a name, and where they stand.
+ *
+ * ⚠ ONE COMPONENT FOR BOTH SIDES. The band's whole job is a comparison, and two
+ * corners built separately drift into two different typographic scales — which
+ * is exactly what makes a comparison unreadable. `align` is the only difference
+ * between them, and the children are ordered explicitly rather than with
+ * `flex-row-reverse`, because reverse also inverts what `justify-end` means and
+ * the two then fight.
+ */
+function Corner({
+  person, name, fullName, line, compact, align = 'left',
+}: {
+  person: { user_id: string; full_name: string | null; username: string | null } | null
+  name: string
+  /** The untruncated name, for a title on a shortened one. */
+  fullName?: string
+  line: string
+  compact: boolean
+  align?: 'left' | 'right'
+}) {
+  const face = person && (
+    <span className="shrink-0">
+      <Avatar person={person} size={compact ? 26 : 34} />
+    </span>
+  )
+  const text = (
+    <div className={`min-w-0 ${align === 'right' ? 'text-right' : ''}`}>
+      <p className="t-body font-bold text-white truncate" title={fullName ?? name}>{name}</p>
+      <p className="text-[11px] font-semibold text-white/45 truncate">{line}</p>
+    </div>
+  )
+  return (
+    <div className={`flex min-w-0 items-center gap-2.5 ${align === 'right' ? 'justify-end' : ''}`}>
+      {align === 'right' ? <>{text}{face}</> : <>{face}{text}</>}
+    </div>
+  )
+}
+
 /** The band's clock. Same `useCountdown` the tiles use, in the band's palette. */
 function BandClock({ to, caption }: { to: string; caption: string }) {
   const msLeft = useCountdown(to)
@@ -581,17 +642,12 @@ function BandClock({ to, caption }: { to: string; caption: string }) {
           space holds the row's height so the card does not jump on hydration. */}
       <p className="t-num text-lg leading-none text-accent-400">{text || '\u00A0'}</p>
       {text && (
-        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/45">{caption}</p>
+        <p className="mt-1 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-white/45">
+          {caption}
+        </p>
       )}
     </>
   )
-}
-
-/** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] || s[v] || s[0])
 }
 
 const TONE: Record<'accent' | 'ink' | 'muted', string> = {

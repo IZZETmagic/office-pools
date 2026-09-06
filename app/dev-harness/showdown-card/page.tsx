@@ -28,6 +28,7 @@ const MEMBERS = [
 ]
 
 const MARCUS = { user_id: 'u3', full_name: 'Marcus Bell', username: 'mbell' }
+const ME = { user_id: 'u1', full_name: 'Ryan Sousa', username: 'IZZETmagic' }
 
 /** A Showdown pool, with only the fields the card reads. */
 function pool(over: Partial<PoolCardPool>): PoolCardPool {
@@ -64,6 +65,9 @@ function pool(over: Partial<PoolCardPool>): PoolCardPool {
       byes: 0,
       opponentName: null,
       opponent: null,
+      opponentRank: null,
+      opponentDuelPoints: null,
+      you: ME,
       isBye: false,
       revealsAt: null,
       duelMatchweek: 4,
@@ -88,7 +92,10 @@ const CASES: { name: string; note: string; pool: PoolCardPool }[] = [
     name: 'Revealed',
     note: 'A face, and the matchweek in the centre. Never a scoreline — the card excludes the in-play duel by design.',
     pool: pool({
-      showdown: { ...pool({}).showdown!, opponentName: 'Marcus Bell', opponent: MARCUS },
+      showdown: {
+        ...pool({}).showdown!,
+        opponentName: 'Marcus Bell', opponent: MARCUS, opponentRank: 3, opponentDuelPoints: 250,
+      },
     }),
   },
   {
@@ -100,7 +107,10 @@ const CASES: { name: string; note: string; pool: PoolCardPool }[] = [
     name: 'Revealed, no user row',
     note: 'The name without the person — rare, and the name is still the answer.',
     pool: pool({
-      showdown: { ...pool({}).showdown!, opponentName: 'Marcus Bell', opponent: null },
+      showdown: {
+        ...pool({}).showdown!,
+        opponentName: 'Marcus Bell', opponent: null, opponentRank: 3, opponentDuelPoints: 250,
+      },
     }),
   },
   {
@@ -109,7 +119,10 @@ const CASES: { name: string; note: string; pool: PoolCardPool }[] = [
     pool: pool({
       current_rank: null,
       hasScoringStarted: false,
-      showdown: { ...pool({}).showdown!, opponentName: 'Marcus Bell', opponent: MARCUS },
+      showdown: {
+        ...pool({}).showdown!,
+        opponentName: 'Marcus Bell', opponent: MARCUS, opponentRank: 3, opponentDuelPoints: 250,
+      },
     }),
   },
 ]

@@ -223,6 +223,9 @@ describe('kpiTiles — the mode-dependent slot', () => {
     opponentName: 'Marcus',
     opponent: { user_id: 'u-marcus', full_name: 'Marcus Bell', username: 'marcus' },
     isBye: false, duelMatchweek: 3, revealsAt: null,
+    // The band's two corners: your face, and what the opponent carries in.
+    you: { user_id: 'u-me', full_name: 'Ryan Sousa', username: 'izzet' },
+    opponentRank: 5, opponentDuelPoints: 9,
     recentDuels: ['won', 'tied', 'lost', 'won', 'won'] as DuelOutcome[],
   }
   const sdPool = (over = {}) =>
@@ -496,7 +499,7 @@ describe('kpiTiles — every mode now has a branch', () => {
     // would silently drop one.
     const modes: Array<Partial<PoolCardPool>> = [
       { league_mode: 'pickem' },
-      { league_mode: 'showdown', showdown: { duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, opponentName: null, opponent: null, isBye: false, duelMatchweek: null, revealsAt: null, recentDuels: [] } },
+      { league_mode: 'showdown', showdown: { duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, opponentName: null, opponent: null, opponentRank: null, opponentDuelPoints: null, you: null, isBye: false, duelMatchweek: null, revealsAt: null, recentDuels: [] } },
       { league_mode: 'last_man_standing', lms: { roundsWon: 0, roundNumber: 1, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 5, roundEntrants: 5, clubsUsed: 0, clubPool: 20, inPlayClubName: null, inPlayMatchweek: null, inPlayClubCrest: null, openClubName: null, openMatchweek: 1, openClubCrest: null } },
       { league_mode: 'table', table: { spotOn: 0, clubCount: 20, averageOff: null, hasTable: true, isFinal: false } },
       { prediction_mode: 'full_tournament', league_mode: null },
@@ -521,7 +524,7 @@ describe('kpiTiles — tile order is a contract, because the dashboard drops the
   // tile is load-bearing — without asserting a tile that one mode must not have.
   const cases: Array<[string, Partial<PoolCardPool>, string, string]> = [
     ['pickem', { league_mode: 'pickem', openMatchweekNumber: 3 }, 'Points', 'Rank'],
-    ['showdown', { league_mode: 'showdown', showdown: { duelPoints: 4, won: 1, tied: 1, lost: 0, byes: 0, opponentName: 'Ana', opponent: null, isBye: false, duelMatchweek: 3, revealsAt: null, recentDuels: [] } }, 'Duel pts', 'Rank'],
+    ['showdown', { league_mode: 'showdown', showdown: { duelPoints: 4, won: 1, tied: 1, lost: 0, byes: 0, opponentName: 'Ana', opponent: null, opponentRank: 2, opponentDuelPoints: 6, you: null, isBye: false, duelMatchweek: 3, revealsAt: null, recentDuels: [] } }, 'Duel pts', 'Rank'],
     ['last_man_standing', { league_mode: 'last_man_standing', lms: { roundsWon: 1, roundNumber: 2, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 3, roundEntrants: 8, clubsUsed: 3, clubPool: 20, inPlayClubName: 'Arsenal', inPlayMatchweek: 4, inPlayClubCrest: null, openClubName: null, openMatchweek: 5, openClubCrest: null } }, 'Rounds', 'Clubs'],
     ['table', { league_mode: 'table', table: { spotOn: 4, clubCount: 20, averageOff: 1.2, hasTable: true, isFinal: false } }, 'Table pts', 'Rank'],
     ['full_tournament', { prediction_mode: 'full_tournament', league_mode: null }, 'Points', 'Rank'],

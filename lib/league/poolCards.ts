@@ -244,6 +244,28 @@ export type ShowdownCardFacts = {
    * be reached — all three cases the tile already had to handle.
    */
   opponent: { user_id: string; full_name: string | null; username: string | null } | null
+  /**
+   * The viewer, for their own side of the band.
+   *
+   * ⚠ NULL IS SURVIVABLE AND MUST STAY SO. It falls out of the same walk the
+   * opponent does, so a membership row that cannot be reached loses your face
+   * exactly as it loses theirs — the band then reads as a name without a
+   * circle, which is what it did before there was a face at all.
+   */
+  you: { user_id: string; full_name: string | null; username: string | null } | null
+  /**
+   * What the OPPONENT carries into the week — their standing, not the duel's.
+   *
+   * ⚠ `final_rank` from `league_entry_totals`, the same stored column
+   * `readLeagueLeaderboard` reads, never a rank recomputed from points here. A
+   * derived rank cannot see a deduction, and the card would then disagree with
+   * the leaderboard it sits above.
+   *
+   * NULL on a bye and while the draw is sealed — the two states with nobody to
+   * describe.
+   */
+  opponentRank: number | null
+  opponentDuelPoints: number | null
   /** True when the open matchweek is this member's bye. */
   isBye: boolean
   /**
@@ -652,15 +674,29 @@ export async function readLeagueCardFacts(
         .select('pool_id, matchweek_number, entry_a, entry_b, points_a, points_b, settled_at')
         .in('pool_id', showdownPools.map((p) => p.poolId)),
       // ⚠ The STORED duel points. See the note on ShowdownCardFacts.duelPoints.
+      /**
+       * ⚠ EVERY ENTRY IN THESE POOLS, not just yours — the band names what the
+       * opponent carries into the week beside what you do, and a corner reading
+       * "3rd · 250 pts" on one side and nothing on the other is a half-built
+       * comparison.
+       *
+       * Scoped by POOL rather than by entry id because the opponents are not
+       * known yet: they are derived from the duel rows this query runs
+       * alongside. Sequencing the two to narrow the `.in()` would cost a round
+       * trip to save rows from a table with one per entry per pool.
+       */
       admin
         .from('league_entry_totals')
-        .select('entry_id, duel_points')
-        .in('entry_id', showdownEntryIds),
+        .select('entry_id, duel_points, final_rank, pool_id')
+        .in('pool_id', showdownPools.map((p) => p.poolId)),
     ])
 
+    type TotalRow = { entry_id: string; duel_points: number | null; final_rank: number | null }
     const duelPointsByEntry = new Map(
-      ((totalRows ?? []) as Array<{ entry_id: string; duel_points: number | null }>)
-        .map((r) => [r.entry_id, r.duel_points ?? 0]),
+      ((totalRows ?? []) as TotalRow[]).map((r) => [r.entry_id, r.duel_points ?? 0]),
+    )
+    const rankByEntry = new Map(
+      ((totalRows ?? []) as TotalRow[]).map((r) => [r.entry_id, r.final_rank]),
     )
 
     /**
@@ -771,7 +807,19 @@ export async function readLeagueCardFacts(
     // membership — so the user is two embeds away, the same walk the pool page
     // makes through `members` to build its `entryPeople` map.
     const personByEntry = new Map<string, { user_id: string; full_name: string | null; username: string | null }>()
-    if (opponentIds.size > 0) {
+    /**
+     * ⚠ YOUR OWN ENTRY GOES IN THE SAME LOOKUP — Ryan, 2026-09-06, approving a
+     * band with a face on both sides.
+     *
+     * The card could not draw the viewer before this: `PoolCardPool.members` is
+     * the pool's first few by `joined_at` and never says which one is you, and
+     * the client components have no current-user context. But this walk already
+     * resolves entry -> person, and your entry id is right here — so it is one
+     * more value in an `.in()` that already runs, not a query.
+     */
+    const peopleWanted = new Set(opponentIds)
+    for (const p of showdownPools) if (p.entryId) peopleWanted.add(p.entryId)
+    if (peopleWanted.size > 0) {
       // ⚠ THE ERROR IS READ. A `select` naming a column or an embed that does
       // not exist comes back as a 400 with `data: null`, and destructuring only
       // `data` renders the default — a card with no opponent — for ever. See
@@ -779,7 +827,7 @@ export async function readLeagueCardFacts(
       const { data: nameRows, error: nameErr } = await admin
         .from('pool_entries')
         .select('entry_id, entry_name, pool_members!inner(users!inner(user_id, full_name, username))')
-        .in('entry_id', Array.from(opponentIds))
+        .in('entry_id', Array.from(peopleWanted))
       if (nameErr) console.error('[league] duel opponent read failed:', nameErr.message)
       type OpponentRow = {
         entry_id: string
@@ -856,6 +904,9 @@ export async function readLeagueCardFacts(
           won, tied, lost, byes,
           opponentName: nextThem ? (nameByEntry.get(nextThem) ?? null) : null,
           opponent: nextThem ? (personByEntry.get(nextThem) ?? null) : null,
+          opponentRank: nextThem ? (rankByEntry.get(nextThem) ?? null) : null,
+          opponentDuelPoints: nextThem ? (duelPointsByEntry.get(nextThem) ?? 0) : null,
+          you: personByEntry.get(me) ?? null,
           isBye: !!next && !nextThem,
           // ⚠ Only while the duel is actually sealed. `openRevealsAt` is already
           // scoped to the open matchweek, and `openRevealed` is the gate that

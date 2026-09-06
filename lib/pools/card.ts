@@ -488,7 +488,12 @@ export type DuelBand = {
    * — and the asymmetry is read as intent: your side is the season, their side
    * is this week.
    */
-  you: { rank: number | null; totalEntries: number; duelPoints: number; record: string }
+  you: {
+    person: ShowdownCardFacts['you']
+    rank: number | null
+    totalEntries: number
+    duelPoints: number
+  }
   /**
    * The centre.
    *
@@ -506,7 +511,12 @@ export type DuelBand = {
    * Their corner. NULL while the draw is sealed and on a bye — the two states
    * where there is nobody to name, for two completely different reasons.
    */
-  them: { person: ShowdownCardFacts['opponent']; name: string } | null
+  them: {
+    person: ShowdownCardFacts['opponent']
+    name: string
+    rank: number | null
+    duelPoints: number | null
+  } | null
   state: 'sealed' | 'revealed' | 'bye'
 }
 
@@ -522,6 +532,43 @@ export type CardStrip =
   | { kind: 'tiles'; tiles: KpiTile[] }
   | { kind: 'duel'; band: DuelBand }
 
+/**
+ * A corner's second line: where they sit, and what they have won.
+ *
+ * ⚠ ONE FORMATTER FOR BOTH SIDES. The band exists to compare two people, and it
+ * cannot do that if one corner reads "1st · 500 pts" and the other invents its
+ * own shape. An unranked side says so rather than printing a bare points value
+ * that looks like a rank.
+ */
+export function cornerLine(
+  rank: number | null,
+  duelPoints: number | null,
+  /**
+   * ⚠ THE 357px GRID CARD DROPS THE POINTS. Measured: its corners get 76.5px,
+   * and after a 28px face "1st · 500 pts" wants 63 of the 39 left — so both
+   * corners clipped, on both sides, which is the comparison the band exists to
+   * make. The RANK is the comparison; the points are on the pool page. A rank
+   * alone fits, and an ellipsis does not compare anything.
+   */
+  short = false,
+): string {
+  const pts = duelPoints != null ? `${formatNumber(duelPoints)} pts` : null
+  // ⚠ KEEP THE UNIT WHEN THERE IS NO RANK. Dropping it left a bare "500" in the
+  // slot a rank normally sits in, which reads as a position. "500 pts" is 40pt
+  // against the ~50 a compact corner has spare — it is only "1st · 500 pts"
+  // that did not fit.
+  if (rank == null) return pts ?? '\u2014'
+  if (short) return ordinalRank(rank)
+  return pts ? `${ordinalRank(rank)} \u00B7 ${pts}` : ordinalRank(rank)
+}
+
+/** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
+function ordinalRank(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] || s[v] || s[0])
+}
+
 export function cardStrip(pool: PoolCardPool): CardStrip {
   if (pool.league_mode === 'showdown' && pool.showdown) {
     return { kind: 'duel', band: duelBand(pool.showdown, pool) }
@@ -531,12 +578,10 @@ export function cardStrip(pool: PoolCardPool): CardStrip {
 
 function duelBand(sd: ShowdownCardFacts, pool: PoolCardPool): DuelBand {
   const you = {
+    person: sd.you,
     rank: pool.hasScoringStarted ? pool.current_rank : null,
     totalEntries: pool.totalEntries,
     duelPoints: sd.duelPoints,
-    // Byes are absent on purpose, exactly as the tile had it: a bye is not a
-    // result, and W/T/L is the record a football follower already reads.
-    record: `${sd.won}W ${sd.tied}T ${sd.lost}L`,
   }
   const mw = sd.duelMatchweek
 
@@ -587,7 +632,14 @@ function duelBand(sd: ShowdownCardFacts, pool: PoolCardPool): DuelBand {
     },
     // The name without the person is still the answer — the opponent's user row
     // being unreachable is rare, and a nameless circle would be worse.
-    them: sd.opponentName ? { person: sd.opponent, name: sd.opponentName } : null,
+    them: sd.opponentName
+      ? {
+          person: sd.opponent,
+          name: sd.opponentName,
+          rank: sd.opponentRank,
+          duelPoints: sd.opponentDuelPoints,
+        }
+      : null,
     state: 'revealed',
   }
 }
