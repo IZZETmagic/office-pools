@@ -22,6 +22,16 @@ export type PoolSummary = {
   poolName: string;
   poolCode: string;
   predictionMode: string | null;
+  /**
+   * `pools.league_mode` — which of the four league games this is. NULL for
+   * every World Cup pool, and for three production league pools that predate
+   * the column being filled in.
+   *
+   * ⚠ `predictionMode` ALONE CANNOT NAME A LEAGUE POOL. All four league games
+   * carry `prediction_mode = 'league_pickem'`; the game itself is only in
+   * here. Read the pair through `getModeName` in lib/design/poolMode.
+   */
+  leagueMode: string | null;
   brandName: string | null;
   brandEmoji: string | null;
   brandColor: string | null;
@@ -163,7 +173,7 @@ export function useHomeDataInternal() {
             joined_at,
             pools!inner(
               pool_id, pool_name, pool_code, status, prediction_deadline,
-              prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, tournament_id, is_private
+              prediction_mode, league_mode, brand_name, brand_emoji, brand_color, brand_logo_url, tournament_id, is_private
             ),
             pool_entries(
               entry_id, match_points, bonus_points, current_rank,
@@ -186,6 +196,7 @@ export function useHomeDataInternal() {
             status: string;
             prediction_deadline: string | null;
             prediction_mode: string | null;
+            league_mode: string | null;
             brand_name: string | null;
             brand_emoji: string | null;
             brand_color: string | null;
@@ -519,6 +530,7 @@ export function useHomeDataInternal() {
             poolName: pool.pool_name,
             poolCode: pool.pool_code,
             predictionMode: pool.prediction_mode,
+            leagueMode: pool.league_mode,
             brandName: pool.brand_name,
             brandEmoji: pool.brand_emoji,
             brandColor: pool.brand_color,
