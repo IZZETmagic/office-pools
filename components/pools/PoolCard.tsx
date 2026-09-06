@@ -40,9 +40,11 @@ import { getModeName, getModeChip } from '@/lib/design/poolMode'
 import {
   type PoolCardPool,
   type KpiTile,
+  type DuelBand,
   poolCardAction,
   deadlineChip,
   kpiTiles,
+  cardStrip,
   duelDotClass,
 } from '@/lib/pools/card'
 
@@ -188,7 +190,7 @@ export function PoolCard({
           </div>
 
           {/* ---- 5. the KPI strip — the only mode-dependent slot ---- */}
-          <KpiStrip pool={pool} limit={SHAPE[variant].tiles} />
+          <KpiStrip pool={pool} limit={SHAPE[variant].tiles} compact={variant === 'grid'} />
 
           {/* ---- foot: status + clock ----
               ⚠ mt-auto. The grid stretches a card to match its tallest sibling,
@@ -411,8 +413,14 @@ function BrandBanner({ pool, compact = false }: { pool: PoolCardPool; compact?: 
  * (a stat, a row of dots) and nothing about pool modes. Adding Last Man
  * Standing or Table is a branch in lib/pools/card.ts, not JSX here.
  */
-function KpiStrip({ pool, limit }: { pool: PoolCardPool; limit: number }) {
-  const tiles = kpiTiles(pool).slice(0, limit)
+function KpiStrip({ pool, limit, compact }: { pool: PoolCardPool; limit: number; compact: boolean }) {
+  const strip = cardStrip(pool)
+  // ⚠ A SHAPE, NOT A MODE. This component still knows nothing about Showdown —
+  // `cardStrip` in lib/pools/card.ts decides, exactly as the note above says a
+  // new mode should. `limit` is meaningless to a band, which is one object.
+  if (strip.kind === 'duel') return <DuelBandView band={strip.band} compact={compact} />
+
+  const tiles = strip.tiles.slice(0, limit)
   return (
     <div className="flex items-stretch rounded-control bg-snow/75 mt-3 overflow-hidden">
       {tiles.map((tile, i) => (
@@ -423,6 +431,167 @@ function KpiStrip({ pool, limit }: { pool: PoolCardPool; limit: number }) {
       ))}
     </div>
   )
+}
+
+/**
+ * The duel band — Showdown's KPI strip.
+ *
+ * ⚠ ONE SHAPE, THREE CONTENTS, and the same height in all of them. The first
+ * mockup gave the sealed week its own taller stack — a countdown above a row of
+ * faces — and Ryan cut it: the clock belongs in the slot the matchweek sits in
+ * when the draw has opened, so the card does not grow a week in four. One row,
+ * three columns, whatever the state.
+ *
+ * ⚠ DARK IN BOTH APP THEMES, like the duel band on the phone and the season
+ * table on the web. It is built from two coloured throws and additive light
+ * needs somewhere dark to land — and it is what keeps this card distinct once
+ * the app's own dark theme turns every other card dark too.
+ */
+function DuelBandView({ band, compact }: { band: DuelBand; compact: boolean }) {
+  const { you, centre, them, state } = band
+  /**
+   * ⚠ 357px HAS TO HOLD THIS TOO, and the first build did not. The grid card is
+   * 357px against the list's 544 — after a 30px rail and the padding, each
+   * corner gets about 110px, and at that width "Marcus Bell" clipped to
+   * "Marc…", the eyebrow to "OPPONE" and the word "Sealed" to "S…". Three
+   * truncations in one band is not a tight card, it is an unreadable one.
+   *
+   * So the compact band drops what is repeated or inferable — the eyebrows, and
+   * your own points-and-record line, both of which the list keeps — and shows
+   * the opponent's FIRST NAME. A first name is what a member calls them anyway,
+   * and it beats an ellipsis on a surname nobody reads.
+   */
+  const themName = them && (compact ? them.name.split(' ')[0] : them.name)
+  return (
+    <div className="relative mt-3 overflow-hidden rounded-control bg-midnight px-4 py-3">
+      {/* Your corner's blue from the left, theirs from the right — the same two
+          throws the phone's matchup header uses, so the two surfaces read as one
+          mode. Purely decorative, so they are aria-hidden and pointer-inert. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(90px 70px at 8% 50%, rgba(91,138,255,.34), transparent 70%),'
+            + ' radial-gradient(90px 70px at 92% 50%, rgba(52,217,114,.28), transparent 70%)',
+        }}
+      />
+
+      <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        {/* YOU — no avatar, and that is a fact about the card rather than an
+            omission. See `DuelBand['you']`. */}
+        <div className="min-w-0">
+          {!compact && <p className="t-caption text-white/45">You</p>}
+          <p className="t-body font-bold text-white truncate">
+            {you.rank != null ? `${ordinal(you.rank)} of ${you.totalEntries}` : 'Unranked'}
+          </p>
+          <p className="text-[11px] font-semibold text-white/45 truncate">
+            {compact ? `${you.duelPoints} pts` : `${you.duelPoints} pts \u00B7 ${you.record}`}
+          </p>
+        </div>
+
+        {/* The centre. A clock while the draw is sealed, the matchweek once it
+            has opened — never a scoreline; see `DuelBand['centre']`. */}
+        <div className="px-2 text-center">
+          {centre.kind === 'clock' ? (
+            <BandClock to={centre.to} caption={compact ? centre.captionShort : centre.caption} />
+          ) : (
+            <>
+              <p className="t-num text-lg leading-none text-white">{centre.value}</p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/45">
+                {compact ? centre.captionShort : centre.caption}
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* THEM — a face once the draw opens, a dashed circle while it is
+            sealed. The dashes are the only mark on any card that says something
+            is being kept from you, which is the whole point of the seal. */}
+        <div className="flex min-w-0 items-center justify-end gap-2.5">
+          {them ? (
+            <>
+              <div className="min-w-0 text-right">
+                {!compact && <p className="t-caption text-white/45">Opponent</p>}
+                <p className="t-body font-bold text-white truncate" title={them.name}>
+                  {themName}
+                </p>
+              </div>
+              {them.person && (
+                <span className="shrink-0">
+                  <Avatar person={them.person} size={compact ? 28 : 34} />
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              {/*
+                ⚠ THE WORD GOES IN COMPACT, and not to save space — it is
+                already said. The centre reads "MW 4 OPENS" under a countdown
+                when the draw is sealed, and "Bye" when it is a bye, so this
+                corner was repeating the state at 357px and clipping to "Seal…"
+                doing it. The mark alone is the corner's job there; the list
+                card keeps the word, which is where a member learns what the
+                circle means.
+              */}
+              {!compact && (
+                <div className="min-w-0 text-right">
+                  <p className="t-caption text-white/45">Opponent</p>
+                  <p className="t-body font-bold text-white/70 truncate">
+                    {state === 'bye' ? 'Nobody' : 'Sealed'}
+                  </p>
+                </div>
+              )}
+              {/*
+                ⚠ TWO MARKS, NOT ONE. Sealed and a bye are opposite facts — one
+                is an opponent being withheld, the other is no opponent at all —
+                and with the word dropped in compact the circle is all that
+                separates them. Dashed gold "?" means something is being kept
+                from you; a flat muted dash means there is nobody to keep.
+
+                Labelled rather than `aria-hidden`, because in compact it is now
+                the only thing carrying the state to a screen reader.
+              */}
+              <span
+                role="img"
+                aria-label={state === 'bye' ? 'No opponent this week' : 'Opponent still sealed'}
+                className={`grid shrink-0 place-items-center rounded-full border-2 font-black ${
+                  state === 'bye'
+                    ? 'border-solid border-white/20 text-white/40'
+                    : 'border-dashed border-accent-400/50 text-accent-400'
+                } ${compact ? 'h-7 w-7 text-xs' : 'h-[34px] w-[34px] text-sm'}`}
+              >
+                {state === 'bye' ? '\u2013' : '?'}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The band's clock. Same `useCountdown` the tiles use, in the band's palette. */
+function BandClock({ to, caption }: { to: string; caption: string }) {
+  const msLeft = useCountdown(to)
+  const text = countdownText(msLeft, 'compact')
+  return (
+    <>
+      {/* Empty until mounted — see the note on `useCountdown`. The non-breaking
+          space holds the row's height so the card does not jump on hydration. */}
+      <p className="t-num text-lg leading-none text-accent-400">{text || '\u00A0'}</p>
+      {text && (
+        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/45">{caption}</p>
+      )}
+    </>
+  )
+}
+
+/** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] || s[v] || s[0])
 }
 
 const TONE: Record<'accent' | 'ink' | 'muted', string> = {

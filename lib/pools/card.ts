@@ -462,6 +462,136 @@ export type KpiTile =
       wide?: boolean
     }
 
+/**
+ * The duel band — Showdown's replacement for the KPI strip.
+ *
+ * ⚠ IT IS A STRIP SHAPE, NOT A TILE. `KpiStrip`'s own note says a new mode is a
+ * branch in this file rather than JSX, and that holds: the component still
+ * knows only about shapes, and this is a second shape rather than a mode check
+ * it has to make. `cardStrip` below is the one place that decides.
+ *
+ * ## Why the mode gets its own shape at all
+ *
+ * Every other mode's card answers "how am I doing" — rank, points, form — and
+ * three tiles is the right furniture for that. Showdown's question is "who am I
+ * playing", and the opponent was the third tile of three, in 54px. Ryan,
+ * 2026-09-06: it is the headline mode and it did not look like one.
+ */
+export type DuelBand = {
+  /**
+   * Your corner. Typographic, with no face — deliberately.
+   *
+   * ⚠ THE CARD CANNOT REACH THE VIEWER'S OWN AVATAR. `PoolCardPool.members` is
+   * the pool's first few members by `joined_at` and does not identify which one
+   * is you, and there is no current-user context in these client components. So
+   * your side carries what the card DOES know — your rank and your duel points
+   * — and the asymmetry is read as intent: your side is the season, their side
+   * is this week.
+   */
+  you: { rank: number | null; totalEntries: number; duelPoints: number; record: string }
+  /**
+   * The centre.
+   *
+   * ⚠ THIS SLOT IS A CLOCK OR A LABEL, NEVER A SCORE, and that is a fact about
+   * the card rather than a choice. `readLeagueCardFacts` deliberately EXCLUDES
+   * the in-play week's unsettled duel — see its allow-list — so "this week" on
+   * this card means the week you are PICKING for, which by definition has not
+   * been played. There is no running scoreline to put here, and inventing one
+   * would mean widening a reveal gate (116/119/123) for decoration.
+   */
+  centre:
+    | { kind: 'clock'; to: string; caption: string; captionShort: string }
+    | { kind: 'label'; value: string; caption: string; captionShort: string }
+  /**
+   * Their corner. NULL while the draw is sealed and on a bye — the two states
+   * where there is nobody to name, for two completely different reasons.
+   */
+  them: { person: ShowdownCardFacts['opponent']; name: string } | null
+  state: 'sealed' | 'revealed' | 'bye'
+}
+
+/**
+ * What the card's mode-dependent slot holds.
+ *
+ * ⚠ THE LOCK TIME IS NOT IN HERE. The card's foot already renders
+ * `prediction_deadline`, and a countdown to the same instant inside the band
+ * would say it twice on one card. The band counts to the thing the foot cannot:
+ * when the SEALED draw opens.
+ */
+export type CardStrip =
+  | { kind: 'tiles'; tiles: KpiTile[] }
+  | { kind: 'duel'; band: DuelBand }
+
+export function cardStrip(pool: PoolCardPool): CardStrip {
+  if (pool.league_mode === 'showdown' && pool.showdown) {
+    return { kind: 'duel', band: duelBand(pool.showdown, pool) }
+  }
+  return { kind: 'tiles', tiles: kpiTiles(pool) }
+}
+
+function duelBand(sd: ShowdownCardFacts, pool: PoolCardPool): DuelBand {
+  const you = {
+    rank: pool.hasScoringStarted ? pool.current_rank : null,
+    totalEntries: pool.totalEntries,
+    duelPoints: sd.duelPoints,
+    // Byes are absent on purpose, exactly as the tile had it: a bye is not a
+    // result, and W/T/L is the record a football follower already reads.
+    record: `${sd.won}W ${sd.tied}T ${sd.lost}L`,
+  }
+  const mw = sd.duelMatchweek
+
+  // ⚠ SEALED IS CHECKED FIRST. `revealsAt` is non-null only while the open
+  // week's duel has NOT opened, and in that window there is no opponent to
+  // name — the clock is the whole content, which is what the seal is for.
+  if (sd.revealsAt) {
+    return {
+      you,
+      centre: {
+        kind: 'clock',
+        to: sd.revealsAt,
+        caption: mw != null ? `until MW ${mw} opens` : 'until the draw opens',
+        // ⚠ The 357px grid card. "until MW 4 opens" is ~95px of caption under
+        // the clock, and the width it takes comes out of the two corners either
+        // side — which is what clipped "Sealed" to "S…" there.
+        captionShort: mw != null ? `MW ${mw} opens` : 'draw opens',
+      },
+      them: null,
+      state: 'sealed',
+    }
+  }
+
+  // A bye says so rather than showing a dash — with an odd number of members
+  // somebody sits out every matchweek, and it is not an error.
+  if (sd.isBye) {
+    return {
+      you,
+      centre: {
+        kind: 'label',
+        value: 'Bye',
+        caption: mw != null ? `matchweek ${mw}` : 'this week',
+        captionShort: mw != null ? `MW ${mw}` : 'this week',
+      },
+      them: null,
+      state: 'bye',
+    }
+  }
+
+  return {
+    you,
+    centre: {
+      kind: 'label',
+      value: mw != null ? `MW ${mw}` : 'Next',
+      // Not "locks in …": the foot already counts to that instant.
+      caption: 'you play',
+      captionShort: 'you play',
+    },
+    // The name without the person is still the answer — the opponent's user row
+    // being unreachable is rare, and a nameless circle would be worse.
+    them: sd.opponentName ? { person: sd.opponent, name: sd.opponentName } : null,
+    state: 'revealed',
+  }
+}
+
 export function kpiTiles(pool: PoolCardPool): KpiTile[] {
   if (pool.league_mode === 'showdown' && pool.showdown) return showdownTiles(pool.showdown, pool)
   if (pool.league_mode === 'last_man_standing' && pool.lms) return lmsTiles(pool.lms, pool)
