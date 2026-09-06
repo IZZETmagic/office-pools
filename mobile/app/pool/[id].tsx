@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { setStatusBarStyle, StatusBar } from 'expo-status-bar';
+import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -65,6 +65,7 @@ import { useManualRefresh } from '@/lib/useManualRefresh';
 import { usePendingActions } from '@/lib/usePendingActions';
 import { usePoolBanter } from '@/lib/usePoolBanter';
 import { usePoolDetail } from '@/lib/usePoolDetail';
+import { useScreenStatusBar } from '@/lib/useScreenStatusBar';
 import { useTheme } from '@/theme';
 
 // Tab names accepted via the `?tab=` deep-link param. Anything else
@@ -619,11 +620,7 @@ export default function PoolDetailScreen() {
    * either of these from further up the component is a temporal-dead-zone
    * ReferenceError rather than a stale value.
    */
-  useFocusEffect(
-    useCallback(() => {
-      setStatusBarStyle(accentColor || isShowdownPool ? 'light' : 'auto', true);
-    }, [accentColor, isShowdownPool]),
-  );
+  useScreenStatusBar(accentColor || isShowdownPool ? 'light' : 'auto');
 
   const tabIndex = Math.max(0, visibleTabs.indexOf(tab));
 

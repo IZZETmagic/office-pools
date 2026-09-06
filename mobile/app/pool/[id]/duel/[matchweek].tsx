@@ -34,11 +34,10 @@
 // that arrow cannot disagree about whether somebody went up.
 // =============================================================
 
-import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { setStatusBarStyle, StatusBar } from 'expo-status-bar';
-import { useCallback, useMemo } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -54,6 +53,7 @@ import { useDuelBanter } from '@/lib/useDuelBanter';
 import { useDuelLive } from '@/lib/useDuelLive';
 import { useLeaguePool } from '@/lib/useLeaguePool';
 import { usePoolDetail } from '@/lib/usePoolDetail';
+import { useScreenStatusBar } from '@/lib/useScreenStatusBar';
 import { fontFamilies, useTheme } from '@/theme';
 
 export default function DuelDecisionScreen() {
@@ -386,6 +386,16 @@ function Frame({ children }: { children: React.ReactNode }) {
    * set when this page pushes on top of it, so white glyphs land on a near-white
    * card.
    *
+   * ⚠⚠ `'auto'`, NOT `'dark'`. This background is `theme.colors.snow`, which is
+   * `#F7F8FC` in light mode and `#121520` in DARK — so a hardcoded dark bar puts
+   * black glyphs on near-black for anybody running the app in dark mode. That is
+   * the same bug this fix exists for, inverted, and it would have shipped: the
+   * screenshot that prompted it was taken in light mode.
+   *
+   * `'auto'` follows the device colour scheme, and `useTheme` resolves `snow`
+   * from that same `useColorScheme()` with no independent override — so the two
+   * cannot disagree.
+   *
    * ⚠ `useFocusEffect`, NOT THE DECLARATIVE `<StatusBar>` ALONE. That component
    * applies its style on mount and on a style CHANGE; it does not re-apply when
    * a screen is returned to. The pool screen sits mounted underneath this one,
@@ -398,16 +408,12 @@ function Frame({ children }: { children: React.ReactNode }) {
    * whether that pool is a Showdown; the screen that owns the answer should
    * give it.
    */
-  useFocusEffect(
-    useCallback(() => {
-      setStatusBarStyle('dark', true);
-    }, []),
-  );
+  useScreenStatusBar('auto');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.snow }} edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="dark" animated />
+      <StatusBar style="auto" animated />
       <View
         style={{
           flexDirection: 'row',

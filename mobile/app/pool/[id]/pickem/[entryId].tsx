@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,7 @@ import {
   useLeaguePoolPicks,
   type LeagueMatch,
 } from '@/lib/useLeaguePool';
+import { useScreenStatusBar } from '@/lib/useScreenStatusBar';
 import { useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -54,6 +56,9 @@ import { useTheme, withOpacity } from '@/theme';
 export default function PickemPickScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+
+  // See the note beside <StatusBar> below.
+  useScreenStatusBar('auto');
   const { id: poolId, entryId, mw, name } = useLocalSearchParams<{
     id: string;
     entryId: string;
@@ -248,6 +253,25 @@ export default function PickemPickScreen() {
     // `edges={[]}` plus an explicit paddingTop — the top inset does not apply
     // inside a fullScreenModal and the header drew under the status bar.
     <SafeAreaView edges={[]} style={{ flex: 1, backgroundColor: theme.colors.snow, paddingTop: insets.top }}>
+      {/*
+        ⚠ THE SHOWDOWN BAND LEAKS ITS STATUS BAR IN HERE — Ryan, 2026-09-06.
+        This picker is the ONLY route out of the Duel tab's "Your sheet" card, so
+        every Showdown member arrives from a screen that has set `style="light"`
+        for a band that is dark in both themes. On this `snow` background those
+        white glyphs are invisible. Same leak as the duel decision page, one door
+        along.
+
+        ⚠ `'auto'`, NOT `'dark'`: `snow` is `#F7F8FC` light and `#121520` dark,
+        and `useTheme` resolves it from `useColorScheme()` — the same source
+        `'auto'` reads. Hardcoding dark would break the dark-mode case exactly as
+        badly as doing nothing breaks the light one.
+
+        ⚠ The declarative tag covers the first paint; the focus effect covers
+        every return to it, because expo-status-bar applies on mount and on a
+        style CHANGE and never on refocus. Restoring the band's own bar is the
+        POOL screen's job — it is the one that knows whether it is a Showdown.
+      */}
+      <StatusBar style="auto" animated />
       <View
         style={{
           flexDirection: 'row',

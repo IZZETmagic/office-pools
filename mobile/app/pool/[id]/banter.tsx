@@ -63,6 +63,7 @@ import {
   type BanterMessage,
   type PoolMember,
 } from '@/lib/usePoolBanter';
+import { useScreenStatusBar } from '@/lib/useScreenStatusBar';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Row =
@@ -79,6 +80,12 @@ type Row =
 const GROUP_GAP_MS = 5 * 60 * 1000;
 
 export default function BanterScreen() {
+  // ⚠ This screen is reachable from a Showdown pool, whose band sets the
+  // bar to `light` for a surface that is dark in both themes. On this
+  // screen's `snow` background those glyphs are invisible, so it claims the
+  // bar back on focus. `'auto'`, never `'dark'` — see the hook.
+  useScreenStatusBar('auto');
+
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { id, poolName } = useLocalSearchParams<{ id: string; poolName?: string }>();

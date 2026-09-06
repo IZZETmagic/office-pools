@@ -19,9 +19,16 @@ import { deleteEntry, notifyMemberRemoved } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useMemberDetail, type MemberDetail, type MemberEntry } from '@/lib/useMemberDetail';
 import { usePoolDetail } from '@/lib/usePoolDetail';
+import { useScreenStatusBar } from '@/lib/useScreenStatusBar';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export default function MemberDetailScreen() {
+  // ⚠ This screen is reachable from a Showdown pool, whose band sets the
+  // bar to `light` for a surface that is dark in both themes. On this
+  // screen's `snow` background those glyphs are invisible, so it claims the
+  // bar back on focus. `'auto'`, never `'dark'` — see the hook.
+  useScreenStatusBar('auto');
+
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { id, memberId } = useLocalSearchParams<{ id: string; memberId: string }>();
