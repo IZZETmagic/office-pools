@@ -23,13 +23,20 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // "Make your picks on the web" — untrue since the Duel tab's Your Sheet card
 // started routing into the RN picker.
 //
-// ## ⚠ THE SWITCHER STOPS AT WHAT HAS BEEN REVEALED
+// ## ⚠ THE SWITCHER STOPS AT WHAT HAS BEEN REVEALED — IN BOTH SENSES
 //
 // Migration 116 seals the draw, and the contract reads duels with the VIEWER's
-// client — so a sealed week is not in the payload at all. `revealedWeeks` is
-// therefore the exact set of weeks a member may look at, and the arrows are
-// bounded by it rather than by the season. There is nothing to hide here
-// because there is nothing here to hide.
+// client — so a sealed week is not in the payload at all. That used to be the
+// whole story, and this note used to end here: "there is nothing to hide because
+// there is nothing here to hide."
+//
+// ⚠⚠ THAT STOPPED BEING TRUE WHEN THE WALKOUT SHIPPED (2026-09-06). There are
+// now TWO reveals — 116 reveals a duel to the DATABASE, the ceremony reveals it
+// to the MEMBER — and this screen only ever knew about the first. Between them
+// the Room listed the new opponent's name while the band two tabs away read
+// "Sealed · Opponent hidden".
+//
+// So the bound is `revealedWeeks` MINUS `unwatchedMatchweek`. See that prop.
 //
 // ## ⚠ AN OPEN WEEK HAS NO RIVALS' PICKS, AND THAT IS NOT AN EMPTY WEEK
 //
@@ -41,12 +48,44 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
   poolId: string;
+  /**
+   * A matchweek whose duel has opened in RLS but whose walkout this member has
+   * not watched — withheld from the switcher until they have.
+   *
+   * ⚠⚠ "REVEALED" NOW MEANS TWO THINGS, AND THIS ROOM ONLY KNEW ONE OF THEM.
+   * Migration 116 reveals a duel to the DATABASE; the walkout reveals it to the
+   * MEMBER. Those were the same moment until phase 2 existed, and this file's
+   * own header still says the switcher "stops at what has been revealed" —
+   * true, and about the wrong reveal.
+   *
+   * The gap is not hypothetical. During phase 2 there is no in-play matchweek,
+   * so `shown` falls back to the LATEST revealed week — which is precisely the
+   * one being kept back — and the Room listed both names one tab away from a
+   * header reading "Sealed · Opponent hidden".
+   *
+   * ⚠ IT HIDES A WEEK, NOT A NAME. Blanking the opponent inside the row would
+   * leave a duel that looks like a bye. The week simply is not offered yet, and
+   * arrives whole the moment the walkout is watched.
+   */
+  unwatchedMatchweek?: number | null;
 };
 
-export function ShowdownRoom({ poolId }: Props) {
+export function ShowdownRoom({ poolId, unwatchedMatchweek = null }: Props) {
   const theme = useTheme();
   const league = useLeaguePool(poolId);
-  const { duels, names, revealedWeeks, pickLabels, bouts } = useDuel(poolId);
+  const { duels, names, revealedWeeks: rlsRevealed, pickLabels, bouts } = useDuel(poolId);
+
+  /**
+   * What this member may actually look at — see `unwatchedMatchweek`.
+   *
+   * ⚠ FILTERED HERE RATHER THAN IN `useDuel`, because the hook has no idea
+   * whether a ceremony has been watched and should not learn: the Duel tab and
+   * the band both want the week it withholds.
+   */
+  const revealedWeeks = useMemo(
+    () => (unwatchedMatchweek === null ? rlsRevealed : rlsRevealed.filter((w) => w !== unwatchedMatchweek)),
+    [rlsRevealed, unwatchedMatchweek],
+  );
 
   /**
    * Your own entries, so your duel can be anchored in the week.
@@ -120,12 +159,22 @@ export function ShowdownRoom({ poolId }: Props) {
   }
 
   if (shown === null) {
+    /*
+      ⚠ TWO REASONS FOR AN EMPTY ROOM, AND THEY ARE NOT THE SAME. A pool that has
+      played nothing has nothing to show; a member holding an unwatched walkout
+      has a week waiting behind a door they have not opened. Telling them "your
+      first one appears here once it does" in the second case would be false, and
+      would read as the feature being broken.
+    */
+    const waiting = unwatchedMatchweek !== null;
     return (
       <View style={{ padding: theme.spacing.xxxl, alignItems: 'center', gap: theme.spacing.sm }}>
-        <Icon name="person.2.fill" color="slate" size={34} />
-        <Text variant="cardTitle">Nothing to show yet</Text>
+        <Icon name={waiting ? 'lock.fill' : 'person.2.fill'} color="slate" size={34} />
+        <Text variant="cardTitle">{waiting ? 'Your duel is waiting' : 'Nothing to show yet'}</Text>
         <Text variant="body" color="slate" style={{ textAlign: 'center' }}>
-          The room fills up as duels open. Your first one appears here once it does.
+          {waiting
+            ? `Matchweek ${unwatchedMatchweek} opens here once you have met your opponent on the Duel tab.`
+            : 'The room fills up as duels open. Your first one appears here once it does.'}
         </Text>
       </View>
     );

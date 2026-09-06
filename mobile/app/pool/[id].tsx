@@ -749,7 +749,18 @@ export default function PoolDetailScreen() {
           />
         );
       case 'room':
-        return <MemoShowdownRoom poolId={pool.poolId} />;
+        return (
+          <MemoShowdownRoom
+            poolId={pool.poolId}
+            /* ⚠ ONLY WHILE THE WALKOUT IS STILL OWED. `revealable` is the one
+               phase where a duel is visible to the database and not yet to the
+               member; every other phase either has no current duel or has one
+               they have already met. */
+            unwatchedMatchweek={
+              duelPhaseState.phase === 'revealable' ? duelPhaseState.matchweek : null
+            }
+          />
+        );
       case 'leaderboard':
         // ⚠ Showdown gets its OWN board. The shared one shows a single total,
         // and the whole point here is the split — picks and duels are one
