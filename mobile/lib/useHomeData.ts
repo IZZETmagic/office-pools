@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 import {
   fetchHomeScoring,
   type EntryScoringSummary,
+  type HomeLeagueFacts,
   type HomeScoring,
   type HomeScoringPools,
 } from './api';
@@ -22,6 +23,16 @@ export type PoolSummary = {
   poolName: string;
   poolCode: string;
   predictionMode: string | null;
+  /**
+   * `pools.league_mode` — which of the four league games this is. NULL for
+   * every World Cup pool, and for three production league pools that predate
+   * the column being filled in.
+   *
+   * ⚠ `predictionMode` ALONE CANNOT NAME A LEAGUE POOL. All four league games
+   * carry `prediction_mode = 'league_pickem'`; the game itself is only in
+   * here. Read the pair through `getModeName` in lib/design/poolMode.
+   */
+  leagueMode: string | null;
   brandName: string | null;
   brandEmoji: string | null;
   brandColor: string | null;
@@ -68,6 +79,17 @@ export type PoolSummary = {
    * printing. False for every World Cup pool.
    */
   isSingleDecision: boolean;
+  /**
+   * The mode's own numbers for the card's stat strip — Showdown's duel record,
+   * Last Man Standing's rounds and clubs, Table's accuracy, Pick'em's
+   * matchweek. Read from `/api/users/:id/home-scoring`, which already computed
+   * them and used to throw them away.
+   *
+   * ⚠ NULL ON A WORLD CUP POOL, and null also means "the API predates this
+   * field". Both fall back to the World Cup's five blocks, which is the shape
+   * that has always worked — see `poolCardBlocks`.
+   */
+  league: HomeLeagueFacts | null;
   role: string;
   joinedAt: string;
   /** Mirrors pools.is_private. Drives the "non-admin members of a
@@ -163,7 +185,7 @@ export function useHomeDataInternal() {
             joined_at,
             pools!inner(
               pool_id, pool_name, pool_code, status, prediction_deadline,
-              prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, tournament_id, is_private
+              prediction_mode, league_mode, brand_name, brand_emoji, brand_color, brand_logo_url, tournament_id, is_private
             ),
             pool_entries(
               entry_id, match_points, bonus_points, current_rank,
@@ -186,6 +208,7 @@ export function useHomeDataInternal() {
             status: string;
             prediction_deadline: string | null;
             prediction_mode: string | null;
+            league_mode: string | null;
             brand_name: string | null;
             brand_emoji: string | null;
             brand_color: string | null;
@@ -519,6 +542,7 @@ export function useHomeDataInternal() {
             poolName: pool.pool_name,
             poolCode: pool.pool_code,
             predictionMode: pool.prediction_mode,
+            leagueMode: pool.league_mode,
             brandName: pool.brand_name,
             brandEmoji: pool.brand_emoji,
             brandColor: pool.brand_color,
@@ -603,6 +627,10 @@ export function useHomeDataInternal() {
             // Table and Last Man Standing: one decision, so the ring shows a
             // state rather than a count. False for every World Cup pool.
             isSingleDecision: poolFacts?.[pool.pool_id]?.isSingleDecision ?? false,
+            // ⚠ `?? null`, never `?? {}`. A World Cup pool and an older API both
+            // send nothing here, and both must fall back to the World Cup's five
+            // blocks rather than render a league strip full of zeros.
+            league: poolFacts?.[pool.pool_id]?.league ?? null,
             role: row.role,
             joinedAt: row.joined_at,
             isPrivate: !!pool.is_private,

@@ -462,9 +462,191 @@ export type KpiTile =
       wide?: boolean
     }
 
+/**
+ * The duel band — Showdown's replacement for the KPI strip.
+ *
+ * ⚠ IT IS A STRIP SHAPE, NOT A TILE. `KpiStrip`'s own note says a new mode is a
+ * branch in this file rather than JSX, and that holds: the component still
+ * knows only about shapes, and this is a second shape rather than a mode check
+ * it has to make. `cardStrip` below is the one place that decides.
+ *
+ * ## Why the mode gets its own shape at all
+ *
+ * Every other mode's card answers "how am I doing" — rank, points, form — and
+ * three tiles is the right furniture for that. Showdown's question is "who am I
+ * playing", and the opponent was the third tile of three, in 54px. Ryan,
+ * 2026-09-06: it is the headline mode and it did not look like one.
+ */
+export type DuelBand = {
+  /**
+   * Your corner. Typographic, with no face — deliberately.
+   *
+   * ⚠ THE CARD CANNOT REACH THE VIEWER'S OWN AVATAR. `PoolCardPool.members` is
+   * the pool's first few members by `joined_at` and does not identify which one
+   * is you, and there is no current-user context in these client components. So
+   * your side carries what the card DOES know — your rank and your duel points
+   * — and the asymmetry is read as intent: your side is the season, their side
+   * is this week.
+   */
+  you: {
+    person: ShowdownCardFacts['you']
+    rank: number | null
+    totalEntries: number
+    duelPoints: number
+  }
+  /**
+   * The centre.
+   *
+   * ⚠ THIS SLOT IS A CLOCK OR A LABEL, NEVER A SCORE, and that is a fact about
+   * the card rather than a choice. `readLeagueCardFacts` deliberately EXCLUDES
+   * the in-play week's unsettled duel — see its allow-list — so "this week" on
+   * this card means the week you are PICKING for, which by definition has not
+   * been played. There is no running scoreline to put here, and inventing one
+   * would mean widening a reveal gate (116/119/123) for decoration.
+   */
+  centre:
+    | { kind: 'clock'; to: string; caption: string; captionShort: string }
+    | { kind: 'label'; value: string; caption: string; captionShort: string }
+  /**
+   * Their corner. NULL while the draw is sealed and on a bye — the two states
+   * where there is nobody to name, for two completely different reasons.
+   */
+  them: {
+    person: ShowdownCardFacts['opponent']
+    name: string
+    rank: number | null
+    duelPoints: number | null
+  } | null
+  state: 'sealed' | 'revealed' | 'bye'
+}
+
+/**
+ * What the card's mode-dependent slot holds.
+ *
+ * ⚠ THE LOCK TIME IS NOT IN HERE. The card's foot already renders
+ * `prediction_deadline`, and a countdown to the same instant inside the band
+ * would say it twice on one card. The band counts to the thing the foot cannot:
+ * when the SEALED draw opens.
+ */
+export type CardStrip =
+  | { kind: 'tiles'; tiles: KpiTile[] }
+  | { kind: 'duel'; band: DuelBand }
+
+/**
+ * A corner's second line: where they sit, and what they have won.
+ *
+ * ⚠ ONE FORMATTER FOR BOTH SIDES. The band exists to compare two people, and it
+ * cannot do that if one corner reads "1st · 500 pts" and the other invents its
+ * own shape. An unranked side says so rather than printing a bare points value
+ * that looks like a rank.
+ */
+export function cornerLine(
+  rank: number | null,
+  duelPoints: number | null,
+  /**
+   * ⚠ THE 357px GRID CARD DROPS THE POINTS. Measured: its corners get 76.5px,
+   * and after a 28px face "1st · 500 pts" wants 63 of the 39 left — so both
+   * corners clipped, on both sides, which is the comparison the band exists to
+   * make. The RANK is the comparison; the points are on the pool page. A rank
+   * alone fits, and an ellipsis does not compare anything.
+   */
+  short = false,
+): string {
+  const pts = duelPoints != null ? `${formatNumber(duelPoints)} pts` : null
+  // ⚠ KEEP THE UNIT WHEN THERE IS NO RANK. Dropping it left a bare "500" in the
+  // slot a rank normally sits in, which reads as a position. "500 pts" is 40pt
+  // against the ~50 a compact corner has spare — it is only "1st · 500 pts"
+  // that did not fit.
+  if (rank == null) return pts ?? '\u2014'
+  if (short) return ordinalRank(rank)
+  return pts ? `${ordinalRank(rank)} \u00B7 ${pts}` : ordinalRank(rank)
+}
+
+/** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
+function ordinalRank(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] || s[v] || s[0])
+}
+
+export function cardStrip(pool: PoolCardPool): CardStrip {
+  if (pool.league_mode === 'showdown' && pool.showdown) {
+    return { kind: 'duel', band: duelBand(pool.showdown, pool) }
+  }
+  return { kind: 'tiles', tiles: kpiTiles(pool) }
+}
+
+function duelBand(sd: ShowdownCardFacts, pool: PoolCardPool): DuelBand {
+  const you = {
+    person: sd.you,
+    rank: pool.hasScoringStarted ? pool.current_rank : null,
+    totalEntries: pool.totalEntries,
+    duelPoints: sd.duelPoints,
+  }
+  const mw = sd.duelMatchweek
+
+  // ⚠ SEALED IS CHECKED FIRST. `revealsAt` is non-null only while the open
+  // week's duel has NOT opened, and in that window there is no opponent to
+  // name — the clock is the whole content, which is what the seal is for.
+  if (sd.revealsAt) {
+    return {
+      you,
+      centre: {
+        kind: 'clock',
+        to: sd.revealsAt,
+        caption: mw != null ? `until MW ${mw} opens` : 'until the draw opens',
+        // ⚠ The 357px grid card. "until MW 4 opens" is ~95px of caption under
+        // the clock, and the width it takes comes out of the two corners either
+        // side — which is what clipped "Sealed" to "S…" there.
+        captionShort: mw != null ? `MW ${mw} opens` : 'draw opens',
+      },
+      them: null,
+      state: 'sealed',
+    }
+  }
+
+  // A bye says so rather than showing a dash — with an odd number of members
+  // somebody sits out every matchweek, and it is not an error.
+  if (sd.isBye) {
+    return {
+      you,
+      centre: {
+        kind: 'label',
+        value: 'Bye',
+        caption: mw != null ? `matchweek ${mw}` : 'this week',
+        captionShort: mw != null ? `MW ${mw}` : 'this week',
+      },
+      them: null,
+      state: 'bye',
+    }
+  }
+
+  return {
+    you,
+    centre: {
+      kind: 'label',
+      value: mw != null ? `MW ${mw}` : 'Next',
+      // Not "locks in …": the foot already counts to that instant.
+      caption: 'you play',
+      captionShort: 'you play',
+    },
+    // The name without the person is still the answer — the opponent's user row
+    // being unreachable is rare, and a nameless circle would be worse.
+    them: sd.opponentName
+      ? {
+          person: sd.opponent,
+          name: sd.opponentName,
+          rank: sd.opponentRank,
+          duelPoints: sd.opponentDuelPoints,
+        }
+      : null,
+    state: 'revealed',
+  }
+}
+
 export function kpiTiles(pool: PoolCardPool): KpiTile[] {
   if (pool.league_mode === 'showdown' && pool.showdown) return showdownTiles(pool.showdown, pool)
-  if (pool.league_mode === 'last_man_standing' && pool.lms) return lmsTiles(pool.lms, pool)
+  if (pool.league_mode === 'last_man_standing' && pool.lms) return lmsTiles(pool.lms)
   if (pool.league_mode === 'table' && pool.table) return tableTiles(pool.table, pool)
   return defaultTiles(pool)
 }
@@ -555,7 +737,9 @@ function showdownWeekTile(sd: ShowdownCardFacts): KpiTile {
  * The survivor count is a fact about the POOL, not the viewer, and it is the
  * mode's whole tension — nothing else on the card conveys "four of you left".
  */
-function lmsTiles(lms: LmsCardFacts, pool: PoolCardPool): KpiTile[] {
+// ⚠ TAKES NO `pool`, unlike its three siblings. They need it for `rankTile`;
+// this mode has no rank tile, so there is nothing left to read off the pool.
+function lmsTiles(lms: LmsCardFacts): KpiTile[] {
   return [
     {
       kind: 'stat',
@@ -569,7 +753,30 @@ function lmsTiles(lms: LmsCardFacts, pool: PoolCardPool): KpiTile[] {
       sub: lms.roundNumber != null ? `in round ${lms.roundNumber}` : undefined,
       tone: 'accent',
     },
-    rankTile(pool),
+    // ⚠ NO RANK TILE, and its absence is the decision rather than an omission.
+    // Two independent reasons, either of which is enough:
+    //
+    // 1. THE STORED RANK IN THIS MODE IS `entry_id` ORDER.
+    //    `league_finalize_ranks` is the one rank writer for all four modes and
+    //    cascades rounds_won → duel_points → total_points → exact_count →
+    //    correct_count → bonus_points → first league_prediction → entry_id. In
+    //    LMS every rung is ZERO — there are no points here by design — and the
+    //    "picked first" rung is infinity, because LMS picks live in
+    //    `league_lms_picks` and not `league_predictions`. So `entry_id ASC`
+    //    decides it. Measured on production 5 Sep: all ten stored ranks follow
+    //    entry_id order exactly. `lib/league/leaderboard.ts` already nulls it
+    //    for the leaderboard; `lib/scoring/readSource.ts` now does too, so this
+    //    card cannot be handed one by a future caller either.
+    //
+    // 2. SURVIVAL IS BINARY, so there is no rank to show even if the number
+    //    were right. Numbering three survivors #1/#2/#3 invents a hierarchy the
+    //    football has not produced — the same call made on the leaderboard.
+    //
+    // ⚠ It was not visibly broken, which is why it survived: `hasScoringStarted`
+    // gates league pools on `league_entry_totals.total_points > 0` and LMS never
+    // writes points, so the tile rendered "—" forever. A permanent dash in one
+    // of only four tiles, one keystroke away from becoming a wrong number.
+    lmsClubsTile(lms),
     lmsWeekTile(lms),
     {
       kind: 'stat',
@@ -581,6 +788,46 @@ function lmsTiles(lms: LmsCardFacts, pool: PoolCardPool): KpiTile[] {
       tone: lms.isEliminated ? 'muted' : 'ink',
     },
   ]
+}
+
+/**
+ * How much of the squad is spent.
+ *
+ * The mode's own scarcity, and the number a member actually manages: a club is
+ * used up for the round you spend it in, so the pool of clubs to pick from
+ * tightens every matchweek you survive. It replaced a Rank tile that could
+ * never say anything — see the note in `lmsTiles`.
+ *
+ * ⚠ THE DENOMINATOR IS THE SEASON'S, not twenty. England has 20 clubs, Germany
+ * 18, and this mode is already live in neither only by accident of which pools
+ * exist today.
+ *
+ * ⚠ IT RESETS, and the caption says which round it is counting, because
+ * otherwise a number that falls from 7 to 0 between two visits reads as data
+ * loss rather than as a new round opening with everybody back in.
+ */
+function lmsClubsTile(lms: LmsCardFacts): KpiTile {
+  if (lms.clubPool <= 0) {
+    // The season's club_count could not be read. A denominator of zero would
+    // render "7 of 0", so the tile shows the count alone rather than a fraction
+    // that is arithmetically nonsense.
+    return {
+      kind: 'stat',
+      label: 'Clubs',
+      value: String(lms.clubsUsed),
+      sub: 'used',
+      tone: lms.clubsUsed > 0 ? 'ink' : 'muted',
+    }
+  }
+  return {
+    kind: 'stat',
+    label: 'Clubs',
+    value: String(lms.clubsUsed),
+    sub: `of ${lms.clubPool} used`,
+    // Muted at zero: nothing has been spent yet, which is an absence rather
+    // than a score — the same reading `tableAccuracyTile` gives an empty table.
+    tone: lms.clubsUsed > 0 ? 'ink' : 'muted',
+  }
 }
 
 /**

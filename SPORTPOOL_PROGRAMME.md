@@ -20,8 +20,17 @@ items roll up into.
 changed since the 2026-08-28 audit: what was then a backend with no front end is now a substantially
 finished product — Showdown as a one-page arena with a sealed draw and a walkout reveal, duel points
 feeding the season leaderboard, Last Man Standing, Table mode, avatars, banter as its own surface,
-and a live engine that scores while a game is being played. **1,178 tests pass** across 82 files, up
-from 625 on 2026-08-28.
+and a live engine that scores while a game is being played. **1,244 tests pass** across 92 files, up
+from 625 on 2026-08-28 — and those 92 include `mobile/` **for the first time**.
+
+**The phone can now see the football — 2026-09-02, verified.** All three mobile match surfaces read
+the `matches` table, and a league fixture is not in it and never will be. So Results rendered *"No
+Matches"* while holding a 380-fixture season, Home rendered *"0 matches today"* on a ten-game
+Saturday, and a tap rendered *"Match not found"*. **One cause, three confident blanks, none of which
+raised an error.** A new `GET /api/users/[user_id]/fixtures` closes all three; Ryan confirmed it
+rendering on his device in the Expo dev app. See *📱 The RN league build*. ⚠ **It is a read-only
+surface by decision** — picking on a phone is still not built for any of the four league modes
+(*Decision 14*), and none of it is deployed (**R21**).
 
 **None of it is in production, and that is now the single largest risk in this document.**
 `origin/master` is still **`6dc5710`, 24 August**. `Development` is **225 commits ahead** — the
@@ -59,10 +68,15 @@ needs a different answer from the other three doors, and it is still unanswered.
   verified in production 2026-09-02), and the second scoring engine in the browser.
   ⬜ Items 4–7, all of them cost rather than correctness, are open — and 4–5 are the substance of the
   RN read contract, so they want designing once rather than patching twice.
-- **R24 — the React Native app cannot read league data at all.** Not "has no league screens" — cannot
-  read. Mobile is direct-to-PostgREST for ~110 table reads and consumes only 14 API routes, all of
-  them writes or notifications; four league engine tables are **deny-all**, so a mobile read returns
-  an empty array with `error: null`. See *📱 The RN league build — how far away* below.
+- **R24 — the React Native app could not read league data at all.** 🟡 **HALF CLOSED 2026-09-02.** The
+  premise still holds — mobile is direct-to-PostgREST for ~110 table reads, and migration 050's four
+  engine tables are **deny-all**, so a mobile read of them returns an empty array with `error: null`.
+  What changed is that mobile now goes through server routes for the league: `GET /api/users/:id/
+  fixtures` (the calendar, all three match surfaces) and `/api/users/:id/home-scoring` (the pool
+  card's points, rank and level, `readLeagueCardFacts` server-side). ⬜ **What is still not built:**
+  any league *pool* screen on a phone — and note `mobile/lib/useLeaguePool.ts` was **deleted** in the
+  2026-09-02 revert, so `/api/pools/:id/league` currently has **no second-surface consumer at all**.
+  See *📱 The RN league build — how far away* below.
 
 Behind these sit the 🟠s carried forward, including the one Ryan knowingly accepted (empty-bracket
 bonus inflation, ~243k pts) on condition it be fixed *before the next competition* — **the next
@@ -88,7 +102,7 @@ what has changed is how much is waiting.**
 | `origin/Development` → dev.sportpool.io | — | `c98a037` (2 Sep) |
 | Commits ahead of production | 32 | **225** |
 | Highest migration in the repo | 118 (unapplied) | **129** |
-| Tests | 625 | **1,178 across 82 files, all green** |
+| Tests | 625 | **1,244 across 92 files, all green** (re-run 2026-09-02; 92 includes `mobile/` for the first time) |
 | `readSource` league stubs | 5 `leagueNotImplemented` arms | **3** — two are now real arms |
 
 **Why this is worse than a delayed release.** The database and the code are diverging in the
@@ -142,7 +156,7 @@ path meets a real member's pick.
 | ✅ **FIXED 2026-09-02** (`d9a74bd`) — all three copy sites now derive `depth !== 'results'`, which agrees with the engine (066), and `leagueDepthPolarity.guard.test.ts` fails the build if the losing form returns. It was found by writing that guard, not by looking. `app/api/pools/create/route.ts` is exempt by name: it normalises an incoming *request* with an explicit fallback and never sees a stored NULL. ⛔ **Still needs the deploy to reach anyone.** Was: **NULL `league_depth` is described as Results and scored as Scores.** Both real pools carry NULL mode+depth, because the deployed create route predates migration 077. The engine's fall-through is deliberate (066 — NULL takes the Scores ladder) and the picker and leaderboard agree (`=== 'results'`); three copy sites invert it — `lib/leagueModeInfo.ts:57`, `LeagueHowToPlayTab.tsx:50`, `LeagueScoringRulesTab.tsx:381`. On deploy those members are told *"call each match Home, Draw or Away, every fixture is worth the same"* while entering scorelines paid at 100/75/50. Their Scoring Rules tab also hides the fixture card (`depth !== null`) | 🔴 → ✅ code, ⛔ undeployed |
 | **A Pick'em season has no end.** `openMatchweekId` returns null after matchweek 38 and that is all of it — no completion, no winner, no final standing, no wrap-up; `pools.status` stays `'open'` for ever. The season-end snapshot that exists belongs to Table mode alone | 🔴 open, unplanned |
 | Form tab / XP / badges blocked for league — three stubbed `readSource` arms, which is why the outbox deliberately skips XP | 🟠 known |
-| Mobile has no league code at all | 🟠 known |
+| ~~Mobile has no league code at all~~ → ✅ **the match surface is fixed 2026-09-02** (`8c42d1d`): Results, Home and match detail read `/api/users/:id/fixtures`, confirmed on Ryan's device. ⬜ **Still no league *pool* screen, and picking is deferred by *Decision 14*.** ⛔ Undeployed | 🟠 → 🟡 |
 | No reconciler | 🟠 known |
 
 ⚠ **The copy defect is the same class as `leagueModeCopy.guard.test.ts`, one level down and uncovered.**
@@ -483,7 +497,7 @@ unlanded.**
 | **Ship what is built** | 225 commits and ~30 migrations sit between `Development` and production, and the schema has moved past the deployed code. **The largest single item in the programme, and it is not a build.** | 🔴 **Blocking everything** (**R21**) |
 | **Multi-sport platform** | Generalise the single World Cup product into a reusable multi-competition platform. Product decisions settled 2026-07-25. **Migration 111 (a pool names one competition) is the first foundation applied**; La Liga is planned (`drafts/2026-08-28_la_liga_plan.md`) and unstarted. | 🔵 Designing |
 | **Showdown / EPL launch** | H2H duels, persistent rivalries, and the first league season. ⚠️ **Status corrected 2026-09-02: this is BUILT, not designing** — four modes, sealed draw, walkout reveal, duel points on the season leaderboard, recap. It is undeployed, not unbuilt. | 🟡 **Built, ⛔ undeployed** |
-| **The RN league build** | Bring the Expo app to parity with the league product. ⚠️ **Not started, and gated on a read API rather than on screens** — mobile is direct-to-PostgREST and four league engine tables are deny-all, so it cannot read league data at all (**R24**). | 🔴 Blocked — see *📱 The RN league build* |
+| **The RN league build** | Bring the Expo app to parity with the league product. ⚠️ **Status corrected 2026-09-02: started, and the read half is the part that moved.** The gate was always a read API rather than screens — mobile is direct-to-PostgREST and four league engine tables are deny-all (**R24**). Two server routes now carry the league to the phone: `/api/users/:id/fixtures` (all three match surfaces — Results, Home, match detail) and `/api/users/:id/home-scoring` (the pool card). **Picking is not built for any mode, by decision** (*Decision 14*), and no league *pool* screen exists. | 🟡 **Read half landed, ⛔ undeployed** — see *📱 The RN league build* |
 | **Scale & scoring integrity** | Shadow engine, leaderboard precompute, IO reduction, scoring correctness. | 🟢 In flight |
 | **Performance & caching** | Stop over-fetching, stop recomputing, then cache what's left — web + mobile. Opened 2026-07-26; **steps 2, 3 and most of 7 shipped 2026-07-29** (payload 7,721 kB → 457 kB, `/live` delta, analytics read flip); steps 1, 4, 5, 6, 8–11 open. ⚠️ **A second front opened 2026-08-31**: the league read path has its own review and **none of its seven items are done** (**R23**). | 🟢 In flight |
 | **World Cup wind-down** | Residual bugs, feedback surveys, knockout ops. ⚠️ Still carries the un-sent feedback survey (**R8**), now ~6 weeks past its own time box. | 🟡 Closing out |
@@ -553,7 +567,7 @@ segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 | **R6** | **Empty-bracket bonus inflation.** An unpredicted group falls through to the FIFA-ranking tiebreaker, so seeded order ≈ reality and near-zero predictors collect the bonuses | 🟠 | **~243,000 pts across 155 entries**; a near-zero predictor earns ~77% of a full predictor's bonus with ~2% of their match points. Retro-fixing demotes ~155 real people (~87 pools move) | Any competition with group standings | None — no "did they predict it" gate in `calculateGroupStandingsBonuses` (re-verified 2026-07-26) | **Accepted / deferred 2026-07-21**, on the condition "fix before the next competition" — **that condition is now due** | *Empty-bracket bonus inflation* |
 | **R7** | **Admin churn is unmeasured.** `/api/admin/stats` has counts (pool admins, avg pool size, deleted accounts) but **no cohort or retention series** | 🟠 | The best-identified growth lever: preventing 20% of admin churn ≈ **+722 players** (Decision 7's table). Not silent-wrongness class — ranks below R1–R3 | Dated, not action-driven: the clean baseline is the **WC→EPL transition**, which is happening now and closes at EPL start | None built | Decision 7 says "instrument admin retention"; nothing exists | Decision 7; *Enhanced super-admin stats* |
 | **R8** | **The feedback survey is past its own time box, and was held on a blocker that has cleared.** All four fixes are on `origin/master` as of 2026-07-25 | 🟡 | 477 admins + 3,652 players; response quality decays with distance from the final (16 Jul) | Already triggered — the stated window was "~1 week of the final", i.e. ~23 Jul | Code fixes verified in the repo; **deploy status is prod state, unverified** | Send-or-drop is Ryan's | *Post-tournament feedback surveys — send them* (🔥 Now) |
-| **R9** | **Repo lives in iCloud-synced `~/Documents`.** Now **18** duplicate artifacts on disk, including `.git/index 2` through `.git/index 7` | 🟡 | Local only — **but** it can flip a byte in tracked source, which can then be committed and pushed | Any build or git operation while iCloud syncs | Workaround only (clean `npm ci` in a throwaway worktree; scan `git diff` for null bytes) | Known; ~1 hour to move the repo — not done | *iCloud corrupts the local checkout* (🧹 Housekeeping) |
+| **R9** | **Repo lives in iCloud-synced `~/Documents`.** Now **18** duplicate artifacts on disk, including `.git/index 2` through `.git/index 7` | 🟡 | Local only — **but** it can flip a byte in tracked source, which can then be committed and pushed | Any build or git operation while iCloud syncs | Workaround only (clean `npm ci` in a throwaway worktree; scan `git diff` for null bytes) | Known; ~1 hour to move the repo — not done. ⚠ **Scope corrected 2026-09-02:** the `upload-logo` FormData build failure long attributed to this row is **not** iCloud — it is the root `tsconfig.json` pulling `mobile/**` into the web type program (**R29**). What *is* still this row: `.next/types/routes.d 3.ts` is in the program today and produces five duplicate-identifier errors | *iCloud corrupts the local checkout* (🧹 Housekeeping); **R29** |
 | **R10** | **The archive decision conflicts with the shipped schema.** Migration 025b constrains `pools.status` to `('open','completed')`, so an `archived` state is impossible without another migration; today's "Archive Pool" button just sets `completed` | 🟡 | Blocks "a reversible archive that keeps history" as specified — the replacement R1 depends on | Implementing the archive decision | None — needs either a migration or a ruling that archive *means* `completed` | Unrecognised conflict; needs a ruling before R1's proper fix is built | Decision 7 *"Archive, not delete"*; *"Delete Pool" destroys…* |
 | **R13** | ✅ **CLOSED in prod 2026-07-30 — verified.** Was: `entry_xp_state` had two writers with two different formulas (`lib/push/badges.ts` wrote `Σ match_scores.total_points + badgeXP`; `lib/analytics/entryAnalytics.ts` writes `computeFullXPBreakdown` XP), both measured against the same `LEVELS` thresholds, last-writer-wins. **Migration 026 `entry_xp_highest_level` is applied (20260729010101); 4,980 rows carry the ratchet and 0 violate it** (`highest_level_reached < current_level`), all 623 pools backfilled, parity clean 331/331 | 🟠 → ✅ | Was 187 of 331 sampled entries mismatched, split perfectly by mode; the correction moved **697 entries up and 0 down** on the real run. Now zero | — | Landed: `badges.ts` consumes the shared value, 026 applied, reseed run, parity re-checked | **Decided 2026-07-26 and honoured in code:** levels never demote (ratchet via `everReachedLevel`); `total_xp` stays honest. ⚠️ **The third clause of that decision — *"do not register the analytics-sweep cron"* — is being violated in production right now. See R19.** | *XP has two writers* (🔥 Now) |
 | **R19** | **The analytics sweep is registered and firing every minute, contrary to the decision that it must not be.** ⚠️ **New 2026-07-30.** R13 settled *"do not register the analytics-sweep cron — a second writer is what caused this"*, and this register's basis for believing it wasn't registered was that **`vercel.json` is `{}`**. `vercel.json` **is** `{}` — **registration happened in `pg_cron`, not Vercel**: jobid **15** `analytics-sweep`, schedule `* * * * *`, `active = true`, **2,880 successful runs in 48 h**, POSTing to `sportpool.io/api/cron/analytics-sweep`; `analytics_sweep_enabled = true`; `analytics_last_run_at = 2026-07-30T01:14`. The route calls `writePoolEntryAnalytics`, which writes **`total_xp`, `current_level` and `highest_level_reached`** (`lib/analytics/entryAnalytics.ts:247-249`, upsert `:273`) — the exact columns R13 just closed. **And the route header is stale in the load-bearing way:** `app/api/cron/analytics-sweep/route.ts:1-23` still reads *"DRAFT, NOT YET REGISTERED OR ENABLED"*, *"NOT in vercel.json yet — even deployed, it will not fire until registered"* and *"Writes ONLY entry_xp_state analytics columns"*. **All three are false.** This is precisely the **R15** failure mode: a stale STATUS header is *why* the regression was tolerable to add | 🟠 | **Benign today, and worth saying why:** both writers now share one XP definition, the ratchet holds (0 violations), and the sweep is event-driven off `pool_entries.last_rank_update` — so between competitions it no-ops (**0 `entry_xp_state` rows touched in 24 h**; newest `analytics_updated_at` 2026-07-29 01:06). **It stops being benign at EPL kickoff**, when scoring resumes and it begins writing every minute against a second competition, as a second writer on the columns of a risk this register has just closed | **A dated trigger: EPL kickoff, mid-August** — or any competition that resumes scoring and starts moving `pool_entries.last_rank_update` | **None.** The kill switch exists (`sync_settings.analytics_sweep_enabled`) and is **on**. Note it is also entangled with **Node-retirement gate 4**: the sweep detects work off `pool_entries.last_rank_update`, a column **only the Node engine writes** | ⏳ **NEEDS RYAN — two options, deliberately not chosen here.** **(a) Reverse the decision** and make the sweep the intended owner — then R13's decision text, this route's header and the *Leaderboard precompute* item's writer note all have to be rewritten to match, and gate 4's detector has to move to `shadow_entry_totals.updated_at`. **(b) Deactivate jobid 15 and set `analytics_sweep_enabled = false`** — scoring stays sole owner, as decided. **Either way the stale header is a fix in its own right** and doesn't wait on the ruling | *XP has two writers* (🔥 Now); *Leaderboard precompute*; Node-retirement gate 4 |
@@ -564,12 +578,13 @@ segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 | **R11** | **Dead scoring knobs are editable on mobile.** `bonus_best_player_correct` / `bonus_top_scorer_correct` are read by zero scoring code | 🟢 | A mobile admin can set a value that can never pay out; members see it in the pool's rules | Any admin opening mobile scoring config | Web is honest (greyed *"Coming Soon"*); **mobile is not** (`mobile/app/pool/[id]/scoring-config.tsx:442`) | Covered by the Decision-6 deletion, unimplemented | *Scoring config is internally inconsistent*, defect 4 |
 | **R21** | **Production is 225 commits and ~30 migrations behind the code, and the gap is nine days old.** ⚠️ **New 2026-09-02.** `origin/master` = `6dc5710` (24 Aug), unmoved; `origin/Development` = `c98a037` (2 Sep). Migrations have been applied to the **shared** production database past the deployed code — **121 makes a duel worth 500 while the deployed `DuelsTab` treats anything that is not 3 or 1 as a LOSS**, and **110 DROPPED** `pools.league_table_revealed_at` plus two functions. This is the exact shape of the 2026-08-22 outage recorded under *DROP COLUMN outage + the column guard*: schema and code disagreeing at HTTP 200 | 🔴 | **Everything.** Two real Premier League pools with real members are running the 24 Aug app: Scores depth they did not choose, no wizard, no notifications, no Showdown/LMS/Table, and a duel scoreline that will read as a defeat to whoever won. Every ✅ in this document below the Premier League heading describes code no member can reach | **Already triggered**, and compounding daily. It resolves only by deploying | **None.** No deploy has been attempted. ⚠ The migrations **have** run — the Premier League Build Board probed production 2026-09-02 and confirmed 099, 105, 110, 115 and 127. **But that is five probes spanning 099–127, not eleven verifications**: 119, 120, 123–126, 128 and 129 are individually unattested, and *absence of a record is not evidence of non-application* (that inference is what produced **R19**). Hash `prosrc` before the deploy | ⏳ **NEEDS RYAN — this is a timing call, not an engineering one.** 225 commits over a moved schema is not a routine push; it wants a written order like the R13 release had, and `npx tsx scripts/verify-select-columns.ts` run first | *Premier League 2026/27* → AUDIT 2026-09-02 |
 | **R22** | ✅ **FIXED IN CODE 2026-09-02, ⛔ undeployed.** The ownership guard is now the first thing the route does, before any delete, and its error is captured — an unreadable `pools` table used to look identical to owning no pools. `deleteOrder.guard.test.ts` locks the order and was **negative-tested** (moved the check back, watched it go red). ⚠ Two things it does NOT do: it is not transactional, so a pool handed to the caller mid-flight still races (that failure is an orphaned pool, not data loss — the durable fix is R1's single-Postgres-function shape); and this door still **hard-deletes rather than retiring**, so `retired_at` (056/057) does not defend it — that is **Gate A2**, unanswered. Was: **Account deletion destroys everything before it checks whether it is allowed to.** ⚠️ **New 2026-09-02 — carved out of R1, which is otherwise closed.** `app/api/account/delete/route.ts` deletes `match_scores` (`:36`), `bonus_scores` (`:42`), `predictions` (`:48`), `group_predictions` (`:54`), `special_predictions` (`:60`), `player_scores` (`:66`), `pool_entries` (`:75`) and `pool_members` (`:83`) with the **admin client**, and only at **`:94`** asks *"do you still administer a pool?"* — returning 400 if so. **The 400 comes after the destruction.** A pool admin who tries to delete their account keeps the account and loses every prediction and every score in every pool they were ever in | 🔴 → ✅ (code) | Any user who administers at least one pool and taps Delete Account. Irreversible, silent to everyone else in those pools, and the user is told only that they must transfer admin first — not that their history has just gone. It also **bypasses `retired_at` entirely**, so R12's soft delete does not protect this door | One tap in account settings, by anyone who is a pool admin — **535 accounts** by the R1 count | **Fixed** — commit `6aa2831`, the five-line reordering this row predicted plus the error capture and a guard test. **Closes on deploy (R21), not on the commit** | **New — no call made.** The old R1 item recorded this defect in a sub-bullet and it was never scoped; it is promoted here so it stops riding on a row that is now closed | *"Delete Pool" destroys every member's predictions* (🔥 Now) — this is what remains of that item |
-| **R23** | 🟡 **HALF FIXED 2026-09-02 — the three that silently produce WRONG DATA are done; the four cost items are not.** Was: **The league read path repeats the World Cup's three most expensive habits, and the review that measured it has not been actioned.** ⚠️ **New 2026-09-02.** `drafts/2026-08-31_league_read_path_and_cost_review.md` measured `pg_stat_statements` and found 71.7% of all DB time in three patterns; it then checked the league code and found `SELECT *` **absent** and `postgres_changes` **absent** (both genuinely avoided), but three new instances of the same class: **(1)** `readLeaguePoolView` pages **all 380 fixtures / 175 kB** on every league page load, per viewer, through RLS, outside `getPoolDataCached`, on a `force-dynamic` page, whichever tab is open; **(2)** `lib/league/duels.ts:122` sums `league_match_scores` in a Node `for` loop, which is the rule migration 124 was written to state; **(3)** `DuelsTab.tsx:317` carries `enginePoints?.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE` — **a second scoring engine, in the browser**. Plus two unbounded reads with dated fuses: `readPoolDuels` truncates at **~53 members**, `readMatchweekPoints` at **100** | 🟠 | Cost and silent wrongness together. The truncations return exactly 1,000 rows with `error: null` and render a plausible wrong table — the failure mode in *PostgREST 1,000-row cap*. The browser fallback is one bad `duelPoints` read from two screens disagreeing about the same number, **which already happened** (`readEntryTotals`' own comment records four instances found in one afternoon on 2026-08-30) | A pool over ~53 members, or Premier League carrying real concurrent load. Neither has happened yet — `league_*` is **0.01% of 354 DB-hours** today | ✅ **Items 1–3 DONE 2026-09-02** (commit `6aa2831`): `readPoolDuels` is paged and totally ordered; `readMatchweekPoints` calls **migration 130** `league_matchweek_points`, which aggregates in SQL and returns ONE row whatever the pool size; `buildDuelTable` sums the engine's own stored per-duel points instead of re-deriving them, and the season card's copy of that arithmetic now reads the table. ✅ **130 APPLIED to production 2026-09-02 and verified against real data**: 9 entries / 0 mismatches against a plain aggregate, the empty matchweek returns `{}` not NULL (the COALESCE trap), zeros preserved, `authenticated` and `anon` hold **no** EXECUTE and `service_role` does. The ordering constraint is discharged — the migration is now ahead of the code, which is the safe direction. ✅ **Item 4 DONE 2026-09-02** (`ee240bf`) — the season is cached per SEASON and invalidated off the sync's `changed` array; **165.7 kB shared by 13 pools** on the PL season, verified by `scripts/verify-league-season-cache.ts`. ⬜ **5–7 remain**: scoping the read to the tab (now the smaller half), the three `notify.ts` embeddings, and mobile's four `postgres_changes` consumers | **New — no call made.** The review's own recommendation: items **1–3 are six hours** and should precede Premier League opening | *⚡ The league read path* (new section below) |
-| **R24** | **The React Native app cannot read league data — not "has no screens", cannot read.** ⚠️ **New 2026-09-02.** Mobile's architecture is direct-to-PostgREST: **~110 `.from()` table reads** across `mobile/lib`, `mobile/app` and `mobile/components`, against only **14 API routes**, every one of which is a write or a notification (`create`, `join`, `leave`, `stop-participating`, `account/delete`, the six `notifications/*`). Migration **050** closes four league engine tables to clients — `league_match_scores`, `league_entry_totals`, `league_fixture_state`, `league_score_events` — RLS on, **zero policies**. A user-scoped read of those returns an **empty array with `error: null`**. So the entire mobile data-access pattern returns confident zeroes for every league number that matters: the leaderboard, duel points, rounds won, form | 🟠 | The whole second surface. It also means the RN build is **not** a port of the web screens: the web reads these tables with the **admin client from a server component**, which RN has no equivalent of. And the failure is silent — `denyAllTables.guard.test.ts` records **four** instances of exactly this bug found in one afternoon on the *web*, where the pattern is better understood | Starting the RN league build. Not dated; entirely ours | **None, and the gap is structural rather than missing work.** `/api/pools/[id]/live` and `/leaderboard` have **zero** league references; `/bulk` has 16; `duel-live`, `duel-recap`, `duel-reveal`, `lms-pick`, `table-prediction` exist but are deltas and actions, not a pool read. There is **no read API a second surface can consume** | **New — no call made.** See *📱 The RN league build — how far away* below, which prices the two options | *📱 The RN league build*; **R23** (same section) |
+| **R23** | 🟡 **HALF FIXED 2026-09-02 — the three that silently produce WRONG DATA are done; the four cost items are not.** Was: **The league read path repeats the World Cup's three most expensive habits, and the review that measured it has not been actioned.** ⚠️ **New 2026-09-02.** `drafts/2026-08-31_league_read_path_and_cost_review.md` measured `pg_stat_statements` and found 71.7% of all DB time in three patterns; it then checked the league code and found `SELECT *` **absent** and `postgres_changes` **absent** (both genuinely avoided), but three new instances of the same class: **(1)** `readLeaguePoolView` pages **all 380 fixtures / 175 kB** on every league page load, per viewer, through RLS, outside `getPoolDataCached`, on a `force-dynamic` page, whichever tab is open; **(2)** `lib/league/duels.ts:122` sums `league_match_scores` in a Node `for` loop, which is the rule migration 124 was written to state; **(3)** `DuelsTab.tsx:317` carries `enginePoints?.get(r.entry) ?? r.w * DUEL_WIN + r.d * DUEL_TIE` — **a second scoring engine, in the browser**. Plus two unbounded reads with dated fuses: `readPoolDuels` truncates at **~53 members**, `readMatchweekPoints` at **100** | 🟠 | Cost and silent wrongness together. The truncations return exactly 1,000 rows with `error: null` and render a plausible wrong table — the failure mode in *PostgREST 1,000-row cap*. The browser fallback is one bad `duelPoints` read from two screens disagreeing about the same number, **which already happened** (`readEntryTotals`' own comment records four instances found in one afternoon on 2026-08-30) | A pool over ~53 members, or Premier League carrying real concurrent load. Neither has happened yet — `league_*` is **0.01% of 354 DB-hours** today | ✅ **Items 1–3 DONE 2026-09-02** (commit `6aa2831`): `readPoolDuels` is paged and totally ordered; `readMatchweekPoints` calls **migration 130** `league_matchweek_points`, which aggregates in SQL and returns ONE row whatever the pool size; `buildDuelTable` sums the engine's own stored per-duel points instead of re-deriving them, and the season card's copy of that arithmetic now reads the table. ✅ **130 APPLIED to production 2026-09-02 and verified against real data**: 9 entries / 0 mismatches against a plain aggregate, the empty matchweek returns `{}` not NULL (the COALESCE trap), zeros preserved, `authenticated` and `anon` hold **no** EXECUTE and `service_role` does. The ordering constraint is discharged — the migration is now ahead of the code, which is the safe direction. ✅ **Item 4 DONE 2026-09-02** (`ee240bf`) — the season is cached per SEASON and invalidated off the sync's `changed` array; **165.7 kB shared by 13 pools** on the PL season, verified by `scripts/verify-league-season-cache.ts`. ⬜ **5–7 remain**: scoping the read to the tab (now the smaller half), the three `notify.ts` embeddings (still there — `lib/league/notify.ts` lines 85, 392, 499, each a `users!inner(…), pool_entries(…)` embedding), and mobile's `postgres_changes` consumers. ⚠ **The mobile count in this row was wrong and is corrected 2026-09-02: it is not four consumers, it is nine subscriptions across seven files** — `usePendingActions.tsx` ×3, plus `HomeDataProvider.tsx`, `useMemberRoster.ts`, `usePoolDetail.ts`, `usePoolBanter.ts`, `useTournamentMatches.ts`, `useMatchDetail.ts`, on four distinct tables (`pool_members`, `pool_messages`, `user_pending_actions`, `matches`). One was retired 2026-09-02 (`useHomeData`'s duplicate `matches` channel, whose own comment said it mirrored the Results one), taking `matches` from three subscriptions to two | **New — no call made.** The review's own recommendation: items **1–3 are six hours** and should precede Premier League opening | *⚡ The league read path* (new section below) |
+| **R24** | 🟡 **HALF CLOSED 2026-09-02 — the calendar and the pool card now reach the phone through server routes; no league *pool* screen exists, and picking is not built by decision.** ⚠ **What actually landed, verified in the tree and against production:** `GET /api/users/[user_id]/fixtures` (built on `getLeagueSeasonCached`, shaped by the existing `fixtureToMatch`) feeds all three mobile match surfaces — Results, Home and match detail — which until 2026-09-02 all read the `matches` table, where a league fixture has no row and never will. Each failed *silently*: `roundSections` filtered a hard-coded ladder of seven World Cup stages so `regular_season` fell through all of them (**"No Matches" over a full 380-fixture season**); Home read `matches` unfiltered by tournament (no live card, no next kickoff, **"0 matches today" on a ten-game Saturday** — and a latent cross-tournament leak the other way); a tap ran a well-formed uuid query returning nothing (**"Match not found"**). `scripts/verify-rn-fixtures.ts` re-run against **production 2026-09-02 by this pass**: ✅ all checks pass for **five** leagues — Premier League, La Liga, Serie A (380 fixtures / 20 clubs each), Bundesliga, Ligue 1 (306 / 18 each); every fixture carries a matchweek, every club is named and crested, sections read "Matchweek N", 120–126 of 380 rows mount. ⚠ **Three things this does NOT close.** **(a)** `mobile/lib/useLeaguePool.ts` was **deleted** in the 2026-09-02 revert, so `/api/pools/:id/league` — the Gate M1 contract — has **no second-surface consumer at all** today; the route mobile actually consumes is the fixtures one. **(b)** Picking is not built for any of the four modes, **by decision** (*Decision 14*). **(c)** League pushes still dead-end: `lib/league/notify.ts` sends `data: { poolId, tab }` and `mobile/lib/usePushNotificationHandlers.ts:47` switches on `data.type`, so `routeFor` returns `null` and the tap does nothing — **and even the one branch that exists reads `data.pool_id`, which `notify.ts` never sends.** Untouched by this work. Was: **The React Native app cannot read league data — not "has no screens", cannot read.** Mobile's architecture is direct-to-PostgREST: **~110 `.from()` table reads** across `mobile/lib`, `mobile/app` and `mobile/components`, against only **14 API routes**, every one of which is a write or a notification (`create`, `join`, `leave`, `stop-participating`, `account/delete`, the six `notifications/*`). Migration **050** closes four league engine tables to clients — `league_match_scores`, `league_entry_totals`, `league_fixture_state`, `league_score_events` — RLS on, **zero policies**. A user-scoped read of those returns an **empty array with `error: null`**. So the entire mobile data-access pattern returns confident zeroes for every league number that matters: the leaderboard, duel points, rounds won, form | 🟠 → 🟡 | The whole second surface. It also means the RN build is **not** a port of the web screens: the web reads these tables with the **admin client from a server component**, which RN has no equivalent of. And the failure is silent — `denyAllTables.guard.test.ts` records **four** instances of exactly this bug found in one afternoon on the *web*, where the pattern is better understood. ⚠ **The three blanks above are the same failure class arriving on the second surface, and they were live for testers, not hypothetical** | Starting the RN league build. Not dated; entirely ours | **Partly mitigated 2026-09-02**, and the route is deliberately not an RLS defence: unlike 050's four deny-all engine tables, the four calendar tables are **world-readable** (`lib/migrations/050_l1_league_schema.sql:383-386`, verified). It exists for the **shaping** — club name travels in `country_name`, abbreviation in `country_code`, crest in `flag_url`, all positional, so a mis-mapped key renders a crestless "TBD" rather than throwing. A hand-kept copy of that mapping in `mobile/` is the drift the route avoids, and mobile is a separate npm project that cannot import the first copy. ⬜ Still no read API for a league **pool** with a live consumer | **Read half: no call needed, it was a defect.** Picking on a phone: **called — deferred**, *Decision 14*. See *📱 The RN league build — how far away* below | *📱 The RN league build*; **R23** (same section) |
 | **R27** | **Presence is 63.6% of every replicated write, and it is a heartbeat on a database table.** ⚠️ **New 2026-09-02, measured.** `components/presence/PresenceProvider.tsx` upserts the viewer's `user_presence` row every **25 seconds** (`HEARTBEAT_MS`), and the table is in `supabase_realtime` with an **unfiltered** `postgres_changes` subscription on every row. Writes on replicated tables are what WAL decoding costs, and the split is: `user_presence` **3,641,945 (63.6%)** · `pool_entries` 1,885,651 (32.9%) · everything else **3.5%**. So realtime's ~26.7% of all database time is, to a first approximation, **two tables — and the larger one is presence dots** | 🟠 | The single largest line on the database bill, for a feature that shows who is online. It also scales with *connected users*, not with activity: a quiet Tuesday with fifty people idling costs the same as a matchday | Continuous. Every connected web client, every 25 seconds | **None.** ⚠ The fix is probably not "move it to Broadcast" — Supabase Realtime has **native Presence**, which is ephemeral, never touches Postgres and produces no WAL at all. That is what this feature is, reimplemented on a table. A smaller interim: the subscription is unfiltered, so every client is woken by every other user's heartbeat | **New — no call made.** ⚠ **Outside M3 as scoped** (which was mobile); this is web, and it is bigger than everything M3 covers put together | *⚡ Performance & caching* step 7; **R23** |
 | **R25** | 🟡 **HALF FIXED 2026-09-02 — migration 131 APPLIED to production.** A statement-level trigger pair on `league_standings` now calls `league_after_standings_change` whenever the table actually moves, so the recompute no longer depends on which code path wrote the row (migration 126's reasoning). **Exercised against real rows in rolled-back transactions before applying:** a `fetched_at`-only rewrite changed **0** scores (the diff guard), a real rank move rescored that season and touched **0** non-table pools, the season-end snapshot correctly declined, and ⭐ **both frozen pools unfroze** — *Predict the Table* rescored 5 of 6, *Premier League Test* moved **760 → 940**. ⚠ **Not observable live until 11 Sep** — the trigger fires when standings are written, standings are written when a fixture completes, and nothing is in flight during the international break. ⛔ **The other half is still the deploy**: the standings themselves are stale since 30 Aug because the sync that refreshes them is undeployed and `league-standings` is unscheduled — so the trigger currently has nothing to react to. Was: **Table mode's score never responds to a goal, and after the deadline it stops responding to anything.** ⚠️ **New 2026-09-02, verified against production.** `bonus_points` is Table mode's score and `league_score_table` is its only writer (`league_finalize_ranks` merely *reads* it as rung 4 — confirmed in the live function body). In production exactly one thing calls it: **the member's own save** (`table-prediction/route.ts:150` — three pools show `last_scored` within **200 ms** of `last_member_save`). The correct caller, `league_after_standings_change`, **exists in the database and is wired to nothing**: `league_standings` carries **zero triggers**, and its only caller `syncLeagueFixtures.ts:576` is **not in the deployed 24 Aug code** — the same file on master calls `league_score_fixture` twice, which is why the other three league modes work. No `league-standings` cron is scheduled. ⚠ **The input is stale underneath it too**: `league_standings` last fetched **2026-08-30 18:35** for every season, with completed fixtures since | 🔴 → 🟡 | **Every Table pool.** Its score moves only when somebody edits their table; after the deadline nobody can, so it freezes. **Two pools are already frozen** — *Predict the Table* (locked 28 Aug) and *Premier League Test Table Prediction* (locked 30 Aug). This is the mode Decision 9 aims at people new to football, whose entire return reason is *"shown live against the real table all season"* | **Already triggered.** Every completed fixture since 30 Aug widened it | ⏳ **PLAN WRITTEN 2026-09-02** — `drafts/2026-09-02_table_mode_fix_and_rn_league_plan.md` Part A, awaiting approval. It is **mostly the deploy**: `syncLeagueFixtures` already re-fetches standings when a fixture completes and then calls `league_after_standings_change`, and the leaderboard broadcast is already wired. What is missing is **durability** — A1 is a statement-level, diffed trigger on `league_standings` (migration 131), on migration 126's reasoning that the engine must not wait for a deploy; A2 schedules `league-standings` as a backstop. ✅ **A3 SETTLED — Decision 11:** a league table is a full-time table. `/standings` is full-time, so the table-derived bonus waits for the whistle; the pool's *leaderboard* still moves on the goal. The overlay is deferred, not rejected | **New — no call made.** ⚠ Note it is NOT fixed by the deploy alone: deploying restores the sync-path call, but the standings still need a scheduled refresh to move | *Table mode — one decision, all season*; **R21** |
 | **R26** | ✅ **FIXED 2026-09-02 — migration 133 APPLIED to production.** `refresh_league_matchweek_window` now re-attempts `league_snapshot_matchweek_ranks` for whatever its own UPDATE just changed. ⚠ It loops the UPDATE's `RETURNING` rather than testing state, deliberately: `WHERE completed >= fixture_count AND ranks_snapshot_at IS NULL` would be a **second copy** of *"is this matchweek finished"* — the duplication that has broken this area twice — and it would silently exclude the postponed case 094 exists for, so it would not even be a faithful copy. **Proved in a rolled-back transaction**, ten fixtures completed one at a time: snapshot **YES** on the whistle (was NO), **9** duels settled (was 0), **11** outbox events queued, LMS round closed — and a further touch changed none of the three, because the settle triggers fire only on the NULL→non-NULL transition. Recursion checked against the catalogue, not assumed. Was: **A matchweek does not snapshot on the whistle that completes it.** ⚠️ **New 2026-09-02, measured, and it is bigger than the mode it was found in.** After all 10 fixtures of a matchweek completed **one at a time**, with `completed_fixture_count` at **10/10** and every fixture carrying a scored witness, `ranks_snapshot_at` was **still NULL** — and one further touch to any fixture set it. The cause is trigger name order on `league_fixtures`: `broadcast_league_fixtures_upd → score_league_fixture_upd → settle_league_lms_upd → trg_refresh_league_matchweek_window_upd`. The scorer attempts the snapshot **before** the refresher updates the count, so the count it reads is always one behind, and `refresh_league_matchweek_window` does **not** re-attempt it (verified) | 🟠 → ✅ | **Everything hanging off `ranks_snapshot_at` was late by one write** — Showdown duel settlement, LMS round closure, the `matchweek_completed` outbox event (*"results are in"*), and the movement arrows (`previous_final_rank`). ⚠ It self-heals in production only because the feed keeps touching completed fixtures afterwards, which is luck rather than design: **a matchweek whose last fixture is never written again never snapshots**, and its Showdown duels and LMS round never settle | Every matchweek, silently. MW2 settled because a later write happened to arrive | **Fixed** — the first of the two candidates, migration 133. ⚠ **What it does NOT fix:** a matchweek that goes quiet without completing (a postponed fixture never rescheduled) still waits for something to touch one of its fixtures — nothing here is time-driven, and that is the unscheduled league crons' job (**R21**) | **Taken and shipped same day** on Ryan's instruction. Kept out of 132 deliberately, because a fix here changes when four other things fire | *Update flow, mode by mode*; **132** |
 | **R28** | **A Pick'em member who never picked is missing from the leaderboard, and three of four engines disagree with the fourth.** ⚠️ **New 2026-09-02**, found by `scripts/verify-league-contract.ts` on its first run. Migration **121** states the rule in as many words — *"an entry that has never picked has no totals row yet, and updating nothing would drop them off the leaderboard entirely. They are still in the pool, so they appear on 0 — the same call decision 11 makes for a late joiner in Table mode."* `league_score_duels`, `league_lms_settle` and `league_score_table` all seed `league_entry_totals` **from `pool_entries`** and honour it. **`league_score_fixture` seeds from the score rows**, so an entry with no picks gets no row | 🟡 | **Measured on the two scored Pick'em pools:** *Matchweek Pick'em* has 10 entries and **8** totals rows; *Pick'em: Exact Scores* has 4 and **2**. So four members are absent from a leaderboard they are members of. Not silent-wrongness — no number is wrong — but a member who forgot to pick vanishes rather than sitting on 0, which is the opposite of what Decision 11 chose, and the same person in a Showdown pool would show | Any Pick'em pool where somebody has not picked. It is the normal state of a first matchweek | **None.** The fix is the shape the other three already use: seed from `pool_entries` rather than from `league_match_scores`. ⚠ It changes what a live leaderboard shows, so it wants its own change rather than a rider on something else | **New — no call made.** Worth pairing with *Submitting an entry is a step that shouldn't exist*, whose open question 1 is exactly this: *zero-pick entries — in the leaderboard at 0, or out?* — *"the answer is currently 'out' by accident, not by decision"* | *Submitting an entry is a step that shouldn't exist* (🔥 Now), open call 1 |
+| **R29** | **The web build failure blamed on iCloud for months is actually the root `tsconfig.json` compiling `mobile/**` into the web program.** ⚠️ **New 2026-09-02, verified by isolating it.** `tsconfig.json` has `"include": ["**/*.ts", "**/*.tsx", …]` and `"exclude": ["node_modules"]` — which excludes the *root* `node_modules` only. So the Expo app and its dependency types are in the Next.js type program: **1,433 files from `mobile/node_modules` alone** appear in `tsc --explainFiles`, including a second `@types/node` (**25.9.0**, against the root's 20.19.33) whose global `FormData` is the undici shape. The result is three errors in one web route — `app/api/admin/branded-pools/upload-logo/route.ts(13,25): error TS2339: Property 'get' does not exist on type 'FormData'`, and the same at 14 and 15 | 🟡 | **Build health and, more expensively, diagnosis.** It has been filed as node_modules corruption (**R9**, *iCloud corrupts the local checkout*) — a cause that is real but is **not** this. Every hour spent re-running `npm ci` in a throwaway worktree on this symptom was spent on the wrong thing. It also means a `mobile/` type error can fail a **web** build | Any full `tsc`/`next build`. Continuous, and it does not need iCloud to be syncing | **None. One line in `exclude` fixes it** — proved: the same route compiles clean in a program that omits `mobile/**` (run 2026-09-02 from a scratch tsconfig). ⚠ Doing it also removes ~1,400 files from every type-check, so it is a build-time win as well | **New — no call made.** ⚠ It does **not** retire R9: the iCloud duplicates are separately real (`.next/types/routes.d 3.ts` is in the program right now and produces five more errors). This corrects an attribution, it does not close a risk | **R9**; *iCloud corrupts the local checkout* (🧹 Housekeeping) |
 
 **Why R13 is 🟠 and not 🔴.** It meets the 🔴 wording — it is live and it is misleading users right
 now. It is held at 🟠 because the wrongness is confined to a **displayed gamification level**: no
@@ -731,11 +746,108 @@ ingestion.
 
 **The distance is not screens. It is a read API that does not exist.**
 
-Mobile today has **zero** league code — one comment in `mobile/app/create-pool.tsx:148` explaining
-why league competitions are hidden from the picker, and nothing else. But porting the web screens is
+> ⚠️ **UPDATED 2026-09-02 — the paragraph below is superseded in one respect and still true in the
+> rest.** *"Mobile today has zero league code"* **is no longer true.** Mobile now renders a league
+> season in the Results tab, on the Home cards and on match detail, and Ryan has confirmed it on his
+> device in the Expo dev app. What is still true is the framing: it was fixed by **building the read
+> API**, not by building screens. See *What landed on 2026-09-02* immediately below.
+
+Mobile today has ~~**zero** league code — one comment in `mobile/app/create-pool.tsx:148` explaining
+why league competitions are hidden from the picker, and nothing else.~~ But porting the web screens is
 not the work, because **the way mobile reads data cannot reach league data at all**, and no amount of
 UI closes that. Until that is fixed, "start the RN build" means "start building something that
 renders zeroes."
+
+### ✅ What landed on 2026-09-02 — the phone can read the football
+
+> Verified against the tree, the test suite and production by this pass. Ryan confirmed it rendering
+> on his device in the Expo dev app. **This is a READ surface. Nothing on it is a picking control.**
+
+**One cause, three confident blanks, none of which raised an error.** All three mobile match surfaces
+read the `matches` table, and a league fixture is not in it and never will be:
+
+| Surface | What it did | Why it was silent |
+|---|---|---|
+| **Results** | **"No Matches"** while holding a full 380-fixture season | Read `matches` by `tournament_id`. A league pool *has* one (054b) but nothing league-side ever writes rows there. Separately `roundSections` filtered a hard-coded ladder of **seven World Cup stages**, so `regular_season` fell through all of them. An empty array is a valid answer |
+| **Home** | No live card, no next kickoff, **"0 matches today"** on a ten-game Saturday | Read `matches` for live + scheduled **unfiltered by tournament** — which was also a latent cross-competition leak in the other direction |
+| **A tap** | **"Match not found"** | Read `matches` by id. `fixture_id` and `match_id` are both `uuid`, so it was a clean, well-formed query returning nothing |
+
+**The fix — `GET /api/users/[user_id]/fixtures`.** Built on `getLeagueSeasonCached` (no new cache,
+no new invalidation path) and shaped by the existing `fixtureToMatch`. It returns every fixture of
+every season the member has an **active** pool in; the phone merges that with its existing World Cup
+`matches` read.
+
+⚠ **It exists for the SHAPING, not for RLS — and that distinction matters.** Unlike migration 050's
+four **deny-all** engine tables, the four **calendar** tables are world-readable
+(`lib/migrations/050_l1_league_schema.sql:383-386`, verified), so the phone *could* read them
+directly. But the club fields are **positional** — name → `country_name`, abbreviation →
+`country_code`, crest → `flag_url` — and a mis-mapped key renders **"TBD" with no crest rather than
+throwing**. A hand-kept second copy of that mapping in `mobile/` is the drift the route avoids, and
+`mobile/` is a separate npm project that cannot import the first copy.
+
+**And it fixed the web at the same time.** `status_detail` and `original_kickoff_at` have been on
+`league_fixtures` since migration **050** and were hard-coded `null` in `fixtureToMatch`.
+`lib/matchStatus.ts:47` `getMatchStatusBadge` keys on exactly those two, so **a postponed league
+fixture rendered its kickoff time as though the game were on — on the web as well as the phone.**
+Now read and carried (`lib/league/read.ts:104-105`, `:225-229`).
+
+**Two structural firsts worth recording:**
+
+- **`mobile/` has tests.** The pure list logic moved into `mobile/lib/resultsSections.ts` and
+  `mobile/lib/homeMatches.ts` — **no React Native imports**, so the root vitest can reach them — and
+  `mobile/**/__tests__/**` is now in `vitest.config.ts:37`. **26 tests** (17 + 9), six of them World
+  Cup regression guards. ⚠ **This contradicts any note saying mobile has no test runner.** It also
+  makes the module boundary load-bearing: a `react-native` import in either file breaks the build
+  script that imports them, which is the intended alarm.
+- **The Results screen is a plain `ScrollView` and does not virtualise.** 64 World Cup matches was
+  fine; a season is **380** and two leagues are **760**, all mounted at once. The list is now
+  windowed **in rows** (not sections — date mode makes ~180 tiny sections, matchweek mode 38 large
+  ones, out of the same fixtures) and grown **outward from the live/next section**, because the
+  first 120 rows of a season is August while tonight's game is off the bottom. `ROW_BUDGET = 120`
+  (`mobile/lib/resultsSections.ts:143`), chosen so a World Cup list still renders **whole** — 64 <
+  120, asserted rather than assumed.
+
+⚠ **`loading` in the matches provider must stay the World Cup read only.** The splash gate
+(`mobile/app/_layout.tsx:356`) waits on it, so folding the league fetch in would put a network call
+on cold start. League loading and its error are separate fields
+(`mobile/lib/TournamentMatchesProvider.tsx`), and the Results screen reads both — without that a
+league member sees "No Matches" for the length of the fetch, and a failed fetch is indistinguishable
+from a season with no football in it.
+
+**Verification — what is and is not claimed:**
+
+- ✅ **1,244 tests across 92 files pass** (re-run by this pass, 4.53 s, 6 skipped).
+- ✅ `scripts/verify-rn-fixtures.ts` **re-run against production by this pass**: all checks pass for
+  **five** leagues — Premier League, La Liga, Serie A (380 fixtures / 20 clubs), Bundesliga, Ligue 1
+  (306 / 18). Every fixture carries a matchweek, every club is named and crested, sections read
+  "Matchweek 1" … "Matchweek 38", 120–126 of 380 rows mount. It runs the phone's **own** list logic
+  (`roundSections`, `homeMatchesFrom`, imported straight out of `mobile/`) over the real season.
+- ⚠ **Mobile `tsc` is NOT clean, and the commit messages' account of it is wrong.** Four errors
+  remain — `mobile/app/pool/[id]/banter.tsx:1140` (×2) and
+  `mobile/components/pool-detail/BanterSheet.tsx:933, :1292`, all `react-native-gifted-chat` prop
+  mismatches. Both files were last touched **2026-07-06**, so they are genuinely pre-existing and
+  untouched by this work — but the claimed *"pre-existing `_layout.tsx:158` tuple error"* **does not
+  reproduce**. Nothing turns on it; recorded because the programme's rule is that an unverified
+  claim is not rounded up.
+- ⬜ **No formal device QA.** Ryan saw it render. That is one device, one build, one look.
+- ⛔ **Not deployed, and it is on a third branch.** All of it is local on
+  `tester-gate/allowlist-in-the-app`, **unpushed** — no remote ref contains it. That branch is
+  **259 commits ahead of `origin/master`**, against `Development`'s 225, so it is *further* from
+  production than the gap **R21** describes (**Gate M0**).
+
+**Still open on this surface, stated plainly:**
+
+- **Picking on a phone is not built** for any of the four league modes — *Decision 14*, Ryan's call.
+- **League pushes still dead-end.** `lib/league/notify.ts` sends `data: { poolId, tab }`;
+  `mobile/lib/usePushNotificationHandlers.ts:47` switches on `data.type`, so `routeFor` returns
+  `null` and the tap goes nowhere. ⚠ Its one existing branch reads `data.pool_id` — a second
+  mismatch with what `notify.ts` sends. Untouched by this work.
+- **Match detail shows no predictions for a league fixture** — a stated v1 boundary. League picks are
+  pool-scoped and a match opened from a *global* list has no pool in hand, so the alternative is one
+  contract call per pool per tap, which is the fetch-per-goal pattern the read-path review exists to
+  stop. The empty state uses the pool's own wording rather than *"Join a pool and make your
+  prediction"*, which would tell a member who **is** in a pool and **has** predicted that they have
+  not — the same class of confident wrong statement as the blank Results tab.
 
 ### Why mobile cannot read league data (R24)
 
@@ -787,17 +899,29 @@ Roughly **13,000 lines of league-specific web surface, and 4,930 lines of league
 (**R21**). Building RN against web behaviour that no member has ever seen means verifying against a
 moving target and shipping an OTA into a mismatch. **Nothing else on this list should start first.**
 
-**Gate M1 · One read, two surfaces.** 🟡 **STARTED 2026-09-02** (`ee240bf`): `lib/league/season.ts` +
-`GET /api/pools/:id/league`. A server-owned read API for a league pool, returning what a
-screen renders and nothing else. This is the single largest item and the one that decides whether
-the RN build is a port or a rewrite. It is also the thing that **fixes R23 for the web at the same
-time** — the season read, the SQL aggregate and the removal of the browser-side duel table are the
-same work, done once, behind one contract.
+**Gate M1 · One read, two surfaces.** 🟡 **STARTED 2026-09-02, and further along than the sentence
+below — but NOT done, and the reason is specific.** `lib/league/season.ts` + `GET /api/pools/:id/
+league` (`ee240bf`), plus `GET /api/users/:id/fixtures` and `/api/users/:id/home-scoring`. A
+server-owned read API for a league pool, returning what a screen renders and nothing else. This is
+the single largest item and the one that decides whether the RN build is a port or a rewrite. It is
+also the thing that **fixes R23 for the web at the same time** — the season read, the SQL aggregate
+and the removal of the browser-side duel table are the same work, done once, behind one contract.
+
+> ⚠ **The gate's own wording is "one read, TWO surfaces", and the pool contract currently has one.**
+> `mobile/lib/useLeaguePool.ts` was **deleted** in the 2026-09-02 revert (*Decision 14*), so
+> `/api/pools/:id/league` — the contract this gate is named for — has **no second-surface consumer
+> at all** today. The two routes mobile *does* consume are the calendar (`/fixtures`) and the pool
+> card (`/home-scoring`). That is a real second surface for the football and the card, and **not**
+> for a league pool. Recorded rather than resolved: whether the gate is met by any pair of routes or
+> specifically by the pool contract is Ryan's to say, and it changes what "M1 done" means.
 
 **Gate M2 · Give mobile a cache.** ✅ **DONE 2026-09-02** (`8934907`) — `@tanstack/react-query` 5.102.8,
-a client created once, `AppState` wired to `focusManager` (React Query's focus tracking is written for a
-browser and never fires in RN without it), 30s staleTime matching the server's. First consumer is
-`useLeaguePool`, on the M1 contract. Ships on an **OTA**, not a store build. Was: decided **2026-07-26** (react-query, *Decisions settled
+a client created once (`mobile/lib/queryClient.ts:33`, mounted at `mobile/app/_layout.tsx:225`),
+`AppState` wired to `focusManager` (`queryClient.ts:78` — React Query's focus tracking is written for a
+browser and never fires in RN without it), 30s staleTime matching the server's. ⚠ **Correction
+2026-09-02: the first consumer is no longer `useLeaguePool`** — that hook was deleted in the revert.
+It is now `useTournamentMatches`' `leagueQuery` (`mobile/lib/useTournamentMatches.ts:247`), on the
+`/fixtures` contract. Ships on an **OTA**, not a store build. Was: decided **2026-07-26** (react-query, *Decisions settled
 2026-07-26 (infrastructure)* #2) and **still not started** — verified 2026-09-02: no
 `@tanstack`, `react-query` or `swr` in `mobile/package.json`. Six surfaces refetch on
 `useFocusEffect`, so every tab switch re-runs a full load. Adding league screens on top of that
@@ -807,15 +931,42 @@ multiplies the World Cup's read bill by however many league tabs there are.
 (**32.9%** of replicated writes) is on the `pool:{id}:leaderboard` broadcast; the publication drop that
 banks it is gated on the OTA. ⚠ **And the measurement moved the target**: the largest single item is
 **web presence at 63.6%** (**R27**), which M3 as scoped never covered. Realtime WAL decoding is **25.0% of all database
-time** (`drafts/2026-08-31_league_read_path_and_cost_review.md` §1) and **four of the five remaining
-consumers are mobile**: `usePoolEntries.ts`, `usePoolDetail.ts`, `useMemberRoster.ts`,
-`HomeDataProvider.tsx`. Web is already clean. League itself went Broadcast-from-database from the
+time** (`drafts/2026-08-31_league_read_path_and_cost_review.md` §1). ⚠ **The consumer list this gate
+carried was wrong, and is corrected 2026-09-02 by counting them.** It said *"four of the five
+remaining consumers are mobile: `usePoolEntries.ts`, `usePoolDetail.ts`, `useMemberRoster.ts`,
+`HomeDataProvider.tsx`."* `usePoolEntries.ts` no longer has one — it is on the broadcast. The actual
+count is **nine subscriptions across seven files**:
+
+| File | Subs | Table(s) |
+|---|---:|---|
+| `mobile/lib/usePendingActions.tsx` | 3 | `user_pending_actions`, `pool_messages`, `pool_members` |
+| `mobile/lib/HomeDataProvider.tsx` | 1 | `pool_messages` |
+| `mobile/lib/useMemberRoster.ts` | 1 | `pool_members` |
+| `mobile/lib/usePoolDetail.ts` | 1 | `pool_members` |
+| `mobile/lib/usePoolBanter.ts` | 1 | `pool_members` (the *messages* half already went Broadcast, 022) |
+| `mobile/lib/useTournamentMatches.ts` | 1 | `matches` |
+| `mobile/lib/useMatchDetail.ts` | 1 | `matches` |
+
+🟡 **One retired 2026-09-02:** `useHomeData`'s duplicate `matches` channel, whose own comment said it
+*"mirrors the Results tab"* — it did, exactly: same table, same UPDATE event. Home now reads the
+merged list, so it gets those updates for free. `matches` goes from **three** subscriptions to
+**two**; the publication drop that banks any of this is still gated on the OTA. Web is already clean
+apart from presence (**R27**). League itself went Broadcast-from-database from the
 start (060, 125), so this does not grow with league traffic — **but adding RN league screens on the
 old pattern would put it back.**
 
 Only after those does the screen work — Pick'em first (smallest, and the only mode a member can
 reach today), then Table, then Last Man Standing, then Showdown (largest by an order of magnitude:
 the band, the walkout, the recap).
+
+⚠️ **Amended 2026-09-02 — the ordering above is about *pool* screens, and it is now explicitly
+deferred, not merely unstarted.** *Decision 14*: a league pool on a phone is **read-only**, because
+the RN build has not begun and a picking control deserves its own design pass rather than arriving
+behind a read contract. What shipped on 2026-09-02 is the **match** surface — Results, Home, match
+detail — which is not on this list at all and turned out to be a defect rather than a feature.
+`mobile/lib/leagueSurface.ts` holds the one rule that survived the revert: **a league pool never
+reaches the World Cup wizard**, discriminated on `isLeague` and **not** on `leagueMode`, because two
+production pools carry a season id with a NULL mode and would fall straight through a mode check.
 
 ⚠ **The estimate is deliberately not given as a date.** M1 is the one that decides everything and it
 has not been designed yet. What can be said: **M0 is days, M2 and M3 are each a few days and were
@@ -953,8 +1104,13 @@ re-deriving them. This is the fork in the road: done as a contract it is also st
 patch it has to be done twice.
 
 **E · The RN read API, then RN screens.** `Mobile` — **R24**, gates M1→M3. See *📱 The RN league
-build*. M2 (react-query) and M3 (retire mobile's `postgres_changes`) were both **decided over a month
-ago** and neither has started; M3 is also 25% of the database bill.
+build*. ⚠️ **Updated 2026-09-02.** M2 is **done** (react-query mounted, `AppState` → `focusManager`).
+M3 **moved** — one of nine mobile `postgres_changes` subscriptions retired — and its consumer count in
+this document was wrong; it is corrected in the gate. **The match surface is done and confirmed on
+Ryan's device**: `/api/users/:id/fixtures` closed three silent blanks (Results, Home, a tap). What
+remains under E is a league **pool** screen, and that is deferred by *Decision 14*, not blocked. M3 is
+still ~25% of the database bill and its publication drop is gated on the OTA, so it closes on **A**,
+not here.
 
 **F · Everything the old sequence still holds open** — the feedback survey (**R8**, ~6 weeks past its
 time box), the scoring-defaults collapse (**R3**, carries **R11**), the empty-bracket gate (**R6**),
@@ -1554,6 +1710,30 @@ registers are not decoration.
 > and `origin/master` has not moved since 24 August. Everything in the block immediately below is
 > **built, tested and on `Development`** — it is on this list because it is finished work, not
 > because a member can reach it. **R21** is the gap.
+
+### 🟡 League matches in the RN app — BUILT 2026-09-02, ⛔ NOT DEPLOYED
+
+> Added 2026-09-02. **Ryan confirmed it rendering on his device in the Expo dev app.** Full detail,
+> including what is *not* claimed, in *📱 The RN league build → What landed on 2026-09-02*. Commits
+> `7b2e8a6` · `5cab382` · `e0ddc21` · `b147948` · `05f99de` · `199fa31`, merged at `8c42d1d`.
+
+- **Three silent blanks, one cause.** All three mobile match surfaces read the `matches` table; a
+  league fixture is not in it and never will be. Results said **"No Matches"** over a 380-fixture
+  season, Home said **"0 matches today"** on a ten-game Saturday, a tap said **"Match not found"**.
+  None raised an error.
+- **`GET /api/users/[user_id]/fixtures`** — on `getLeagueSeasonCached`, shaped by `fixtureToMatch`.
+  ⚠ It exists for the **shaping**, not for RLS: the calendar tables are world-readable
+  (050:383-386); the club fields are positional, so a mis-mapped key renders "TBD" with no crest
+  rather than throwing.
+- **It fixed the web too.** `status_detail` + `original_kickoff_at` were hard-coded `null` in
+  `fixtureToMatch` since it was written, and `getMatchStatusBadge` keys on exactly those two — so **a
+  postponed league fixture rendered its kickoff time as though the game were on, on both surfaces.**
+- **`mobile/` has tests for the first time** — 26, six of them World Cup regression guards, reachable
+  because the list logic moved into two files with no React Native imports.
+- **The Results `ScrollView` is now windowed in rows**, grown outward from the live/next section,
+  `ROW_BUDGET = 120` chosen so a 64-match World Cup list still renders whole.
+- ⚠ **Read-only by decision** — the Pick'em screen was reverted (*Decision 14*). League pushes still
+  dead-end. No formal device QA beyond Ryan's look.
 
 ### 🟡 Showdown, end to end — BUILT 2026-08-30 → 2026-09-02, ⛔ NOT DEPLOYED
 

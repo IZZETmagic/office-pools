@@ -104,7 +104,7 @@ export function CompetitionRail({ externalLeagueId, size = 'compact' }: Props) {
         colors={stripe}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
-        style={{ width: 5, height: '100%' }}
+        style={{ width: 5, alignSelf: 'stretch' }}
       />
     );
   }
@@ -118,7 +118,23 @@ export function CompetitionRail({ externalLeagueId, size = 'compact' }: Props) {
       end={{ x: 0, y: 1 }}
       style={{
         width: rail,
-        height: '100%',
+        // ⚠ `alignSelf: 'stretch'`, NEVER `height: '100%'`. A percentage height
+        // resolves against the nearest ancestor with a DEFINITE height, and a
+        // pool card in a list has none — so it reached past the card to the
+        // ScrollView's `flexGrow: 1` content container and the rail became
+        // VIEWPORT-tall, dragging the card to full height with it. The home
+        // card hid this for three days because it hard-codes `height: 180`.
+        // Ryan caught it on his phone, 2026-09-05.
+        //
+        // Stretch is what the 5px bar this replaced did implicitly: it set no
+        // height at all, and a row parent's default `alignItems: 'stretch'`
+        // sized it to the card. This says that explicitly and needs no definite
+        // parent height.
+        alignSelf: 'stretch',
+        // Stretch only fills the CROSS axis, so in a column parent (a harness
+        // cell, a future header) the rail would collapse to nothing. The floor
+        // is the mark plus its padding, so it is legible wherever it is put.
+        minHeight: markH + padV * 2,
         paddingVertical: padV,
         paddingHorizontal: padH,
         alignItems: 'center',

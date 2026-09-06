@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, Share, useWindowDimensions, View } from 'react-native';
+import { Pressable, Share, useWindowDimensions, View, type TextStyle } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -98,11 +98,9 @@ const CHROME_ROW = 34;
  * ⚠ Kept generous on purpose — the members ARE the event, and a duel that
  * collapses into two dots beside a number stops being about two people.
  *
- * ⚠ IT IS NOW UP AGAINST BOTH OF ITS NEIGHBOURS. At 40 in a 44pt row there is
- * 2pt of air top and bottom, and the gap left for the score is
- * `2 × COLLAPSED_SPREAD − COLLAPSED_AVATAR` = 76pt against a line that renders
- * around 60. Going further means moving one of them too: `COLLAPSED_ROW` for
- * the height, `COLLAPSED_SPREAD` for the width.
+ * ⚠ IT IS UP AGAINST BOTH OF ITS NEIGHBOURS. `COLLAPSED_ROW` owns the height
+ * either side of it; `COLLAPSED_SPREAD` owns the width. Growing this without
+ * one of them is how the avatars ended up under the score.
  */
 const COLLAPSED_AVATAR = 40;
 /**
@@ -119,10 +117,46 @@ const COLLAPSED_AVATAR = 40;
  * Ryan asked for: "move the avatars a bit closer to the edges".
  */
 const MIDDLE_COL = 160;
+
+/**
+ * Air either side of the dash in a scoreline.
+ *
+ * ⚠ PADDING ON THE DASH, NOT SPACES IN THE STRING. A space is a glyph and it
+ * belongs to whichever side of the dash it was typed next to, so a centred
+ * string with spaces still moves the dash when the two numbers have different
+ * digit counts. This is the gap as LAYOUT, which is the only version of it the
+ * dash's own position does not depend on.
+ */
+const SCORE_GAP = 8;
 const ROW_PAD = 8;
 
-/** How far from the screen's centre a collapsed avatar settles. */
-const COLLAPSED_SPREAD = 58;
+/**
+ * How far from the screen's centre a collapsed avatar settles.
+ *
+ * ⚠ IT IS SIZED BY THE SCORE, NOT BY TASTE — Ryan, 2026-09-04: at 58 the
+ * scoreline ran underneath the avatars once it went from 22pt to 32.
+ *
+ * ⚠⚠ AND THE BINDING CONSTRAINT IS THE WIDEST HALF, not the whole line. The
+ * dash is pinned to the screen's centre and the digits grow outward from it, so
+ * "100 – 0" is 73pt to the left of centre and 35pt to the right: it collided
+ * with the LEFT avatar and cleared the right one by a comfortable margin.
+ * Budgeting on the total width would have called that line 108pt wide, fitted
+ * it into a 76pt gap on paper, and left the overlap exactly where it was.
+ *
+ * The widest half the type rule permits is four tabular digits at 26pt —
+ * `4 × 15.6` plus `SCORE_GAP` plus half a dash, about 77pt. Add the avatar's
+ * own radius (20) and air that reads as deliberate (≈11), and the avatar's
+ * centre has to sit 108 from the middle. That leaves
+ * `2 × COLLAPSED_SPREAD − COLLAPSED_AVATAR` = 176pt of clear gap for a line
+ * whose widest rendering is about 153.
+ *
+ * ⚠ IT IS A CONSTANT ON PURPOSE, not a measurement of the current score.
+ * Deriving it live would shift both avatars sideways the moment somebody's
+ * score gained a digit — a jump, mid-match, on the two elements the row is
+ * arranged around. A fixed spread that always clears the worst case is worth
+ * more than a snug one that moves.
+ */
+const COLLAPSED_SPREAD = 108;
 /**
  * The strip of band that survives the collapse, holding the shrunken duel.
  *
@@ -180,6 +214,26 @@ type Props = {
   standings: Map<string, Standing>;
   /** First kickoff of the current duel's matchweek — the countdown's target. */
   kickoffAt: string | null;
+  /**
+   * The running duel scoreline while the matchweek is being played.
+   *
+   * ⚠ IT REPLACES THE CLOCK, and only once the clock has run out. Picks close
+   * an hour before the first kickoff (migration 101), so there is a window
+   * where the matchweek is locked — the tab has already swapped to the team
+   * sheet — and no football has started. Showing 0-0 through that hour would
+   * be a scoreline for a game nobody is playing; the countdown is the truer
+   * thing to show, and it hands over by itself the moment it expires.
+   */
+  liveScore: { you: number; them: number } | null;
+  /**
+   * Is a ball in play AT THIS MOMENT — not merely "is the matchweek open".
+   *
+   * ⚠ THE TWO ARE DAYS APART. Matchweek 3 is in progress from Friday night
+   * until Monday, but for most of that window nothing is being played. A LIVE
+   * dot that pulsed the whole time would be claiming something untrue, and by
+   * Saturday at 3pm — when it means the most — it would mean nothing at all.
+   */
+  liveNow: boolean;
   /** Shared vertical scroll offset of whichever tab is on screen. */
   scrollY: SharedValue<number>;
   /** The tab strip. Rendered inside this component — see the header note. */
@@ -202,6 +256,8 @@ export function ShowdownDuelHeader({
   sealed,
   standings,
   kickoffAt,
+  liveScore,
+  liveNow,
   scrollY,
   children,
   onExpandedHeight,
@@ -435,6 +491,8 @@ export function ShowdownDuelHeader({
                 sealed={sealed}
                 standings={standings}
                 kickoffAt={kickoffAt}
+                liveScore={liveScore}
+                liveNow={liveNow}
                 leftMove={leftMove}
                 rightMove={rightMove}
                 avatarShrink={avatarShrink}
@@ -563,6 +621,8 @@ function Matchup({
   sealed,
   standings,
   kickoffAt,
+  liveScore,
+  liveNow,
   leftMove,
   rightMove,
   avatarShrink,
@@ -574,6 +634,8 @@ function Matchup({
   sealed: Props['sealed'];
   standings: Map<string, Standing>;
   kickoffAt: string | null;
+  liveScore: Props['liveScore'];
+  liveNow: boolean;
   leftMove: AnimatedStyle;
   rightMove: AnimatedStyle;
   avatarShrink: AnimatedStyle;
@@ -591,21 +653,57 @@ function Matchup({
     <View style={{ paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.xl }}>
       {/* ---------- row 2: matchweek ---------- */}
       {matchweek !== null ? (
-        <Animated.View style={labelFade}>
-        <BandText
-          align="center"
-          style={{
-            fontFamily: fontFamilies.bold,
-            fontSize: 10,
-            letterSpacing: 1.6,
-            textTransform: 'uppercase',
-            color: BAND.slate,
-            marginBottom: theme.spacing.lg,
-          }}
+        <Animated.View
+          style={[
+            labelFade,
+            {
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: theme.spacing.sm,
+              marginBottom: theme.spacing.lg,
+            },
+          ]}
         >
-          Matchweek {matchweek}
-          {!bout && sealed ? ' · sealed' : ''}
-        </BandText>
+          <BandText
+            style={{
+              fontFamily: fontFamilies.bold,
+              fontSize: 10,
+              letterSpacing: 1.6,
+              textTransform: 'uppercase',
+              color: BAND.slate,
+            }}
+          >
+            Matchweek {matchweek}
+            {!bout && sealed ? ' · sealed' : ''}
+          </BandText>
+          {/*
+            ⚠ THE SAME BADGE AS `LiveMatchCard`, down to the 7pt dot and the
+            letter-spacing — deliberately, and not a new one. "Live" already has
+            a look in this app; a second dialect of it on the one screen a
+            member watches football on would read as two different claims.
+
+            ⚠ AND IT DOES NOT PULSE, for the same reason `liveNow` exists at
+            all: this badge is only on screen while a ball is actually in play,
+            so the honesty is in WHEN it appears, not in it moving.
+          */}
+          {liveNow ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <View
+                style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: BAND.red }}
+              />
+              <BandText
+                style={{
+                  fontFamily: fontFamilies.black,
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  color: BAND.red,
+                }}
+              >
+                LIVE
+              </BandText>
+            </View>
+          ) : null}
         </Animated.View>
       ) : null}
 
@@ -628,7 +726,12 @@ function Matchup({
             labelFade={labelFade}
           />
           <Animated.View style={[{ minWidth: MIDDLE_COL, alignItems: 'center' }, middleStyle]}>
-            <Middle bout={bout} kickoffAt={kickoffAt} />
+            <Middle
+              bout={bout}
+              kickoffAt={kickoffAt}
+              liveScore={liveScore}
+              liveNow={liveNow}
+            />
           </Animated.View>
           <Corner
             name={bout.them ? bout.them.name : 'Nobody'}
@@ -658,18 +761,91 @@ function Matchup({
  * migration 121 left behind on the web for a week — it would tint a win as a
  * defeat while the leaderboard had the member climbing.
  */
-function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
+function Middle({
+  bout,
+  kickoffAt,
+  liveScore,
+  liveNow,
+}: {
+  bout: Bout;
+  kickoffAt: string | null;
+  liveScore: Props['liveScore'];
+  liveNow: boolean;
+}) {
   const { you, them, settled } = bout;
   const result = settled && them ? duelResult(you.points) : null;
-  const tint =
-    result === 'won'
+  // Nothing to count once the duel is decided — the week it belonged to is over.
+  const untilKickoff = useCountdown(settled ? null : kickoffAt);
+  const countdown = them ? untilKickoff : null;
+
+  /**
+   * ⚠ THE CLOCK GETS THE LOCK HOUR, THE SCORE GETS EVERYTHING AFTER IT.
+   *
+   * `liveScore` arrives the moment the matchweek LOCKS, which migration 101
+   * puts an hour before the first kickoff — so for that hour there is a
+   * scoreline available and no football being played, and showing it would put
+   * a 0-0 on the header for a game nobody has started. The countdown is still
+   * counting to a real event, so it keeps the column until it expires and then
+   * hands over on its own. No second condition, and no second clock read.
+   */
+  const showLive = !settled && liveScore !== null && countdown === null;
+
+  const score = settled && them
+    ? { you: you.accuracy ?? 0, them: them.accuracy ?? 0 }
+    : showLive
+      ? liveScore
+      : null;
+
+  /**
+   * ⚠ THE SCORE HAS TO CLEAR TWO THINGS, AND IT CAN BE FOUR DIGITS A SIDE.
+   * A matchweek pays 100 a fixture at Results depth, so a perfect ten is 1000 —
+   * reachable, not hypothetical.
+   *
+   * Expanded, the whole line has to fit `MIDDLE_COL`: 160pt with `flex: 1`
+   * corners either side, so an over-wide score does not clip, it SQUEEZES THE
+   * AVATARS INWARD. Collapsed, each HALF has to clear its own avatar — see
+   * `COLLAPSED_SPREAD`.
+   *
+   * ⚠ SO IT STEPS ON THE WIDEST SIDE, NOT THE TOTAL. Both constraints are about
+   * a half, and the total hides the case that matters: "1000 – 0" is only five
+   * digits, which a total-based rule leaves at full size — and its left half is
+   * the widest thing this component can render.
+   *
+   * Stepped on the digit COUNT rather than measured, because
+   * `adjustsFontSizeToFit` re-measures on every change: a size that shifts
+   * under a number that is already moving.
+   */
+  const liveSize =
+    Math.max(String(score?.you ?? 0).length, String(score?.them ?? 0).length) >= 4 ? 26 : 32;
+
+  const tint = showLive
+    // Red while a ball is in play — the same red the team sheet's clock and the
+    // LIVE badge above use, so one colour means one thing on this screen.
+    ? (liveNow ? BAND.red : BAND.ink)
+    : result === 'won'
       ? BAND.green
       : result === 'lost'
         ? BAND.red
         : BAND.ink;
-  // Nothing to count once the duel is decided — the week it belonged to is over.
-  const remaining = useCountdown(settled ? null : kickoffAt);
-  const countdown = them ? remaining : null;
+
+  /**
+   * ⚠ ONE STYLE FOR ALL THREE PARTS. The dash has to sit on the same baseline
+   * and the same optical weight as the digits either side of it; giving it its
+   * own smaller size is what makes a split scoreline read as three things
+   * rather than one number.
+   */
+  const scoreType: TextStyle = {
+    fontFamily: fontFamilies.black,
+    // ⚠ THE LIVE SCORE IS THE LOUDEST THING HERE, because it is what the
+    // countdown it replaced was: the one number between the corners that
+    // changes while you watch. A settled scoreline is a record and sits back.
+    fontSize: showLive ? liveSize : 22,
+    // ⚠ WITH THE SIZE. Variant 'body' caps `lineHeight` at 20 and shears the
+    // tops off anything larger.
+    lineHeight: showLive ? liveSize + 8 : 28,
+    color: tint,
+    fontVariant: ['tabular-nums'],
+  };
 
   return (
     // ⚠ THE `v` IS GONE — Ryan, and the clock is the middle column now. It was
@@ -698,18 +874,47 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
         gap: 5,
       }}
     >
-      {settled && them ? (
-        <BandText
+      {score ? (
+        /*
+          ⚠ THE DASH IS THE AXIS, NOT THE MIDDLE OF THE STRING — Ryan,
+          2026-09-04.
+
+          A single centred "100 – 0" centres the STRING, so the dash sits
+          wherever the digit counts leave it: right of centre at 100–0, dead
+          centre at 100–100, left of centre at 0–100. It moves every time
+          somebody scores, on the one element the two avatars are arranged
+          around.
+
+          Two `flex: 1` halves with the dash between them fix it by
+          construction: equal halves put the dash's centre at the row's centre
+          whatever the numbers do, and the digits grow OUTWARD from it. The row
+          stretches to the middle column, the column is centred between two
+          `flex: 1` corners inside symmetric padding — so the row's centre is
+          the screen's centre, and it stays there even if a wide score pushes
+          the column wider, because both corners then give up the same width.
+
+          This is the same construction as `DuelTab`'s `Scoreline`, for the same
+          reason. Two surfaces showing the same scoreline should not disagree
+          about where its dash lives.
+        */
+        <View
           style={{
-            fontFamily: fontFamilies.black,
-            fontSize: 22,
-            lineHeight: 28, // see the initials above — 'body' caps it at 20
-            color: tint,
-            fontVariant: ['tabular-nums'],
+            alignSelf: 'stretch',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          {you.accuracy ?? 0}–{them.accuracy ?? 0}
-        </BandText>
+          <BandText numberOfLines={1} style={[scoreType, { flex: 1, textAlign: 'right' }]}>
+            {score.you}
+          </BandText>
+          <BandText numberOfLines={1} style={[scoreType, { paddingHorizontal: SCORE_GAP }]}>
+            –
+          </BandText>
+          <BandText numberOfLines={1} style={[scoreType, { flex: 1, textAlign: 'left' }]}>
+            {score.them}
+          </BandText>
+        </View>
       ) : null}
       {/*
         ⚠ THE COUNTDOWN REPLACES "TO PLAY", it does not sit beside it. Both say
@@ -721,7 +926,16 @@ function Middle({ bout, kickoffAt }: { bout: Bout; kickoffAt: string | null }) {
         hour earlier, so a clock labelled "first game" that used `lock_at` would
         run out while the football had not started.
       */}
-      {countdown ? (
+      {/*
+        ⚠ NOTHING UNDER THE LIVE SCORE — Ryan, 2026-09-04, and it is what puts
+        the score on the avatars' centre line rather than above it. This column
+        is `height: AVATAR` and centred, so a SINGLE child lands exactly on that
+        line by construction; the "9 to play" beneath it made the pair centre
+        instead, which pushed the number that matters upward. The count is not
+        lost — it is the team sheet's own heading, on the card that lists the
+        games it is counting.
+      */}
+      {showLive ? null : countdown ? (
         <BandText
           align="center"
           style={{

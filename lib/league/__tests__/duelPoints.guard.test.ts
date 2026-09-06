@@ -281,7 +281,11 @@ describe('duel points reach the display layer', () => {
     // It did not. `total_points` is picks only, so the column simply never left
     // the database and every consumer below was summing an absent number.
     const src = read('lib/scoring/readSource.ts')
-    const select = src.match(/'entry_id, match_points, bonus_points, point_adjustment, total_points[^']*'/)
+    // Located by the columns that identify it rather than by their exact order:
+    // the LMS rank guard later added `pool_id` to this same select, which broke
+    // an order-pinned pattern while the invariant below was never in danger.
+    // Keep this locator loose and the duel_points assertion strict.
+    const select = src.match(/'entry_id,[^']*total_points[^']*final_rank[^']*'/)
     expect(select, 'the league_entry_totals select changed shape').not.toBeNull()
     expect(select![0]).toContain('duel_points')
   })

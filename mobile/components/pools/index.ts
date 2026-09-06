@@ -8,7 +8,12 @@ export { EmptyPools } from './EmptyPools';
 export { JoinPoolSheet, type JoinPoolSheetHandle } from './JoinPoolSheet';
 export { PoolCreateJoinSheet, type PoolCreateJoinSheetHandle } from './PoolCreateJoinSheet';
 export { PoolListItem } from './PoolListItem';
-export { PoolsFilterBar, DEFAULT_FILTERS, type PoolsFilters } from './PoolsFilterBar';
+export {
+  PoolsFilterBar,
+  DEFAULT_FILTERS,
+  type PoolsFilters,
+  type TypeFilter,
+} from './PoolsFilterBar';
 export {
   PoolsFilterSheet,
   type PoolsFilterSheetHandle,

@@ -84,8 +84,20 @@ export type LmsData = {
   round: LmsRound | null
   survivors: LmsSurvivor[]
   myPicks: LmsPick[]
+  /**
+   * Every pick the VIEWER MAY SEE, theirs included — the picks wall's cells.
+   *
+   * ⚠ ALREADY GATED BY THE DATABASE, and nothing filters it again. Migration
+   * 086 puts two SELECT policies on `league_lms_picks` — your own always,
+   * everyone else's only once that matchweek has LOCKED — and `readLmsState`
+   * runs on the user's client so those policies decide. A pick missing from
+   * here is missing because the seal held; `lockedMatchweeks` is what tells
+   * that apart from a member who never picked.
+   */
+  allPicks: LmsPick[]
+  /** Every live entry in the pool — the wall's name column, in any order. */
+  roster: import('@/lib/league/lms').LmsRosterEntry[]
   clubs: SeasonClub[]
-  entryNames: Map<string, string>
   entryId: string | null
   /**
    * ⚠ The OPEN matchweek, deliberately — an LMS pick is WRITTEN against the week
@@ -103,6 +115,17 @@ export type LmsData = {
    * numbers since it shipped; this mode only got one.
    */
   inPlayMatchweek: number | null
+  /**
+   * The matchweeks the picks wall draws a column for — this round's weeks only,
+   * ascending. A round can open on the week AFTER the one being played (106
+   * re-homing), and a column predating the round would be blank for everybody.
+   */
+  matchweeks: number[]
+  /**
+   * Which of `matchweeks` have locked — the ONLY thing that separates a pick
+   * being sealed from a member who never made one. Both are an absent row.
+   */
+  lockedMatchweeks: number[]
   roundsWon: Map<string, number>
   /** Who each club plays in the open matchweek — the picker's grid. */
   fixtures: Map<string, import('@/lib/league/read').NextFixture>
@@ -398,6 +421,11 @@ type PoolDetailProps = {
   tableModeData?: TableModeData | null
   showdownData?: ShowdownData | null
   lmsData?: LmsData | null
+  /**
+   * Last Man Standing's leaderboard, read server-side with the SAME reader and
+   * ordering the mobile app uses. Null in every other mode.
+   */
+  lmsBoard?: import('@/lib/league/leaderboard').LeagueLeaderboard | null
   roundSubmissions?: EntryRoundSubmission[]
   bpGroupRankings?: BPGroupRanking[]
   bpThirdPlaceRankings?: BPThirdPlaceRanking[]
@@ -450,6 +478,7 @@ export function PoolDetail({
   tableModeData = null,
   showdownData = null,
   lmsData = null,
+  lmsBoard = null,
   roundSubmissions = [],
   bpGroupRankings = [],
   bpThirdPlaceRankings = [],
@@ -635,6 +664,12 @@ export function PoolDetail({
 
   // Entry management
   const [entries, setEntries] = useState<EntryData[]>(userEntries)
+  /**
+   * The viewer's own entries, as a set — the LMS leaderboard's YOU pill and row
+   * tint. Built from `entries` rather than the single `activeEntry` because a
+   * member can hold several, and every one of them is "you".
+   */
+  const myEntryIds = useMemo(() => new Set(entries.map((e) => e.entry_id)), [entries])
   const [activeEntryId, setActiveEntryId] = useState<string>(
     userEntries[0]?.entry_id || ''
   )
@@ -2222,6 +2257,8 @@ export function PoolDetail({
             {(!needsBulk || bulkState === 'ready') && <>
             {activeTab === 'leaderboard' && (
               <LeaderboardTab
+                lmsBoard={lmsBoard}
+                myEntryIds={myEntryIds}
                 poolId={pool.pool_id}
                 members={members}
                 bonusScores={bonusScores}
@@ -2299,11 +2336,14 @@ export function PoolDetail({
                 round={lmsData.round}
                 survivors={lmsData.survivors}
                 myPicks={lmsData.myPicks}
+                allPicks={lmsData.allPicks}
+                roster={lmsData.roster}
                 clubs={lmsData.clubs}
-                entryNames={lmsData.entryNames}
                 entryId={lmsData.entryId}
                 currentMatchweek={lmsData.currentMatchweek}
                 inPlayMatchweek={lmsData.inPlayMatchweek}
+                matchweeks={lmsData.matchweeks}
+                lockedMatchweeks={lmsData.lockedMatchweeks}
                 roundsWon={lmsData.roundsWon}
                 fixtures={lmsData.fixtures}
                 pickFixtures={lmsData.pickFixtures}

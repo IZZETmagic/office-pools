@@ -6,6 +6,7 @@ export { Icon } from './Icon';
 export { Input } from './Input';
 export { NotificationDot } from './NotificationDot';
 export { Placeholder } from './Placeholder';
+export { ProgressRing } from './ProgressRing';
 export { PromptDialog } from './PromptDialog';
 export { Screen } from './Screen';
 export { Text } from './Text';

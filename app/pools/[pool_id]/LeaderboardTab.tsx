@@ -1,6 +1,7 @@
 'use client'
 
 import { Icon } from '@/components/ui/Icon'
+import LmsLeaderboard from './LmsLeaderboard'
 
 import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { PointsBreakdownModal } from './PointsBreakdownModal'
@@ -51,6 +52,14 @@ type LeaderboardTabProps = {
   leagueDepth?: 'results' | 'scores' | null
   /** entry_id -> last five score_types, oldest first, from `league_match_scores`. */
   leagueForm?: Map<string, string[]>
+  /**
+   * Last Man Standing's own board, read server-side by `readLeagueLeaderboard`
+   * — the SAME reader and the same `compareLms` ordering the mobile app uses.
+   * Null for every other mode, which is what routes past the block below.
+   */
+  lmsBoard?: import('@/lib/league/leaderboard').LeagueLeaderboard | null
+  /** The viewer's entries — the YOU pill and the row tint. */
+  myEntryIds?: Set<string>
   /**
    * Table mode only: everything the per-entry breakdown modal needs to colour a
    * band and to decide whether a rival's table may be opened yet.
@@ -119,8 +128,11 @@ export function LeaderboardTab({
   leagueMode = null,
   leagueDepth = null,
   leagueForm,
+  lmsBoard = null,
+  myEntryIds,
   tableView = null,
 }: LeaderboardTabProps) {
+
   // ---- what this pool can actually show -------------------------------
   // Each of these is "can this ever be non-empty", not "do we like it".
   //
@@ -1355,6 +1367,29 @@ export function LeaderboardTab({
   const afterPodium = sorted.slice(podiumCount)
   const visibleEntries = afterPodium.slice(0, visibleCount)
   const hasMore = visibleCount < afterPodium.length
+
+  /**
+   * LAST MAN STANDING GETS ITS OWN LIST.
+   *
+   * ⚠ Not a styling preference — the generic board is WRONG here in a way that
+   * does not look wrong. The mode has no points: `total_points` is 0 for every
+   * entry by design, so the Points column was a column of zeros reading as
+   * "nobody has scored" rather than "this mode does not score". Its stored
+   * `current_rank` is entry_id ORDER, so the numbers beside those zeros were not
+   * a ranking either.
+   *
+   * ⚠ HERE, BELOW EVERY HOOK, and not at the top of the component where it
+   * belongs by reading order. This function calls thirty-odd hooks; returning
+   * above them makes every one conditional, which is `rules-of-hooks` and would
+   * desync React's hook list the first time a pool changed mode under a live
+   * render. The work above is wasted for an LMS pool — the cost of the rule.
+   *
+   * The mobile app made this same early return on 2026-09-03 for the same
+   * reason; the web kept rendering the zeros. See `LmsLeaderboard`.
+   */
+  if (isLeague && leagueMode === 'last_man_standing' && lmsBoard) {
+    return <LmsLeaderboard board={lmsBoard} myEntryIds={myEntryIds ?? new Set()} />
+  }
 
   return (
     <div className="max-w-[480px] sm:max-w-none mx-auto px-1 sm:px-0 space-y-3 sm:space-y-4">

@@ -1,7 +1,18 @@
 import { useMemo } from 'react';
 
 import { duelResult } from './duelPoints';
+import {
+  anyFixtureLive,
+  buildSheet,
+  duelVerdict,
+  remainingFixtures,
+  sheetSummary,
+  type SheetFixture,
+  type SheetRow,
+  type Verdict,
+} from './duelSheet';
 import { fixturesForWeek } from './pickemWeek';
+import { useDuelLive } from './useDuelLive';
 import {
   useLeaguePool,
   useLeaguePoolPicks,
@@ -160,6 +171,66 @@ export type DuelState = {
   pickDirections: Map<string, Map<string, string>>;
   /** The viewer's own entry, for the route into the picker. */
   ownEntryId: string | null;
+
+  // ----------------------------------------------------- the live matchweek
+  /**
+   * ⚠ THE SWITCH THE WHOLE TAB TURNS ON, and it is the server's answer rather
+   * than a clock read here.
+   *
+   * True once the current duel's matchweek has LOCKED — which is an hour before
+   * the first kickoff (migration 101), not at it. That hour is why this is not
+   * "has the football started": the moment picks close, both sheets open, and a
+   * card inviting a member to change picks they can no longer change is worse
+   * than useless. `inPlayMatchweekId` in `lib/league/read.ts` is the derivation;
+   * this reads its answer off the contract.
+   */
+  isInPlay: boolean;
+  /** Both sheets, fixture by fixture. Empty unless `isInPlay`. */
+  sheetRows: SheetRow[];
+  /** The running duel scoreline. Null unless `isInPlay` with an opponent. */
+  liveScore: { you: number; them: number } | null;
+  /** Fixtures the engine has not scored yet. */
+  remaining: number;
+  /**
+   * Is a ball in play AT THIS MOMENT — not merely "is the matchweek open".
+   * See `anyFixtureLive`: the two are days apart and only this one may pulse.
+   */
+  liveNow: boolean;
+  /** What the sheet means, in a sentence. Null before any pick is revealed. */
+  summary: string | null;
+  /** Whether the duel is already mathematically decided. */
+  verdict: Verdict | null;
+  /**
+   * The matchweek currently open for picks — which is NOT the one being played.
+   *
+   * ⚠ THEY OVERLAP, AND THAT IS WHY THIS IS EXPOSED. `openMatchweekId` skips a
+   * locked-but-unfinished matchweek deliberately, so from the moment matchweek
+   * 3 locks on Saturday morning until it finishes on Monday night, matchweek 4
+   * is open for picks the whole time. The tab hides "Your sheet" during that
+   * window; the picking still has to be reachable.
+   */
+  openMatchweek: number | null;
+  /**
+   * Every member's pick as a SHORT LABEL — "HOME" at Results depth, "2-1" at
+   * Scores. Keyed entry → fixture.
+   *
+   * ⚠ Exposed for THE ROOM, which renders the same team sheet for duels that
+   * are not yours. The reveal gate is upstream in `/bulk`, so a week that has
+   * not locked simply has no entries here — this map cannot leak it.
+   */
+  pickLabels: Map<string, Map<string, string>>;
+  /** The matchweek being played, or null between them. */
+  inPlayMatchweek: number | null;
+  /** Every OTHER duel in the live matchweek — the rest of the card. */
+  elsewhere: {
+    id: string;
+    a: string;
+    b: string;
+    aName: string;
+    bName: string;
+    pa: number;
+    pb: number;
+  }[];
 };
 
 export type Season = {
@@ -283,6 +354,45 @@ export type Sheet = {
  *   payload is the whole season (~165 kB) and there is no reason to pull it
  *   for a mode with no duels. `useLeaguePool` is disabled on a null id.
  */
+/**
+ * A matchweek's fixtures in the shape `buildSheet` takes.
+ *
+ * ⚠ EXPORTED because THE ROOM builds sheets too, for any revealed week rather
+ * than only the live one. Two copies of this mapping is two chances to reach
+ * for the wrong field, and there are two fields here that punish exactly that.
+ */
+export function toSheetFixtures(matches: LeagueMatch[]): SheetFixture[] {
+  return matches.map((f) => ({
+    // ⚠ `match_number` IS `league_fixtures.fixture_number` — `read.ts` maps it
+    // across — which is what the live payload keys on. A season-wide index here
+    // would miss every lookup silently.
+    number: f.match_number,
+    id: f.match_id,
+    // ⚠ `country_name` / `flag_url` ARE the club's name and crest. A league
+    // fixture travels through types written for national teams.
+    homeName: f.home_team?.country_name ?? null,
+    awayName: f.away_team?.country_name ?? null,
+    /**
+     * ⚠⚠ `country_code`, NOT `short_name`. Both sound like the answer and only
+     * one is: `short_name` is `shortClubName(name)` — a SHORTENED NAME, which
+     * is why a sheet asking for three-letter codes rendered "Crystal Palace"
+     * and "Nott'm Forest". The code lives in `league_clubs.abbreviation`
+     * (char(3), NOT NULL) and `clubToTeam` carries it as `country_code`;
+     * `MatchweekResultsForm` on the web already reads it that way.
+     *
+     * ⚠ TRIMMED, because `char(3)` is blank-padded by Postgres.
+     */
+    homeAbbr: f.home_team?.country_code?.trim() || null,
+    awayAbbr: f.away_team?.country_code?.trim() || null,
+    homeCrest: f.home_team?.flag_url ?? null,
+    awayCrest: f.away_team?.flag_url ?? null,
+    kickoffAt: f.match_date,
+    homeScoreFt: f.home_score_ft,
+    awayScoreFt: f.away_score_ft,
+    isCompletedFt: f.is_completed,
+  }));
+}
+
 export function useDuel(poolId: string | null | undefined): DuelState {
   const league = useLeaguePool(poolId);
   const data = league.data;
@@ -756,6 +866,152 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     return [...weeks].sort((a, b) => a - b);
   }, [showdown]);
 
+  // =============================================================
+  // THE LIVE MATCHWEEK
+  // =============================================================
+  // Everything below is dark until a matchweek locks, and then it is the tab.
+
+  /**
+   * ⚠ THE SERVER'S ANSWER, NOT A CLOCK READ. `inPlayMatchweekId` walks the
+   * matchweeks by lock time and returns the latest one that has locked and is
+   * not done — against the server's clock, which is the one the engine, the
+   * seal and the deadline all already agree on. Re-deriving it here from
+   * `lock_at` would be a fourth copy of a rule that has drifted before.
+   */
+  const inPlayWeek = data?.season.inPlayMatchweekNumber ?? null;
+  const isInPlay =
+    current !== null && inPlayWeek !== null && current.matchweek === inPlayWeek;
+
+  /**
+   * ⚠ FETCHED ONLY WHILE A WEEK IS BEING PLAYED. A null matchweek disables the
+   * query outright, so a pool between matchweeks — most of the week, most of
+   * the season — polls nothing and holds no subscription.
+   */
+  const live = useDuelLive(poolId, isInPlay ? inPlayWeek : null);
+
+  /**
+   * One member's pick as a SHORT LABEL — "HOME" at Results depth, "2-1" at
+   * Scores depth.
+   *
+   * ⚠ A SECOND PROJECTION OF THE SAME ROWS, not a second source. `pickDirections`
+   * below collapses a scoreline to the direction it backs, which is what The
+   * Room needs; the team sheet needs the scoreline itself, because on a Scores
+   * pool two members who both backed the home side are only separated by the
+   * digits. Same rows, same precedence, different rendering.
+   *
+   * ⚠ YOUR OWN PICKS ARE SEEDED FIRST AND NEVER GATED. The bulk payload
+   * withholds a matchweek still open for picks — correctly — but your own sheet
+   * is yours to see at any time, and it is already in the contract. Without
+   * this seed your own column would be empty for as long as the bulk fetch
+   * takes, on the one card that exists to compare the two.
+   */
+  const pickLabels = useMemo(() => {
+    const out = new Map<string, Map<string, string>>();
+    const forEntry = (id: string) => {
+      let m = out.get(id);
+      if (!m) {
+        m = new Map<string, string>();
+        out.set(id, m);
+      }
+      return m;
+    };
+    const direction = (o: string) => (o === 'home' ? 'HOME' : o === 'away' ? 'AWAY' : 'DRAW');
+
+    for (const e of data?.you.entries ?? []) {
+      const m = forEntry(e.entry_id);
+      for (const [fixtureId, outcome] of Object.entries(e.outcomes)) m.set(fixtureId, direction(outcome));
+      for (const p of e.predictions) {
+        if (!m.has(p.match_id)) m.set(p.match_id, `${p.predicted_home_score}-${p.predicted_away_score}`);
+      }
+    }
+    for (const o of picks.data?.outcomes ?? []) forEntry(o.entry_id).set(o.match_id, direction(o.outcome));
+    for (const p of picks.data?.predictions ?? []) {
+      const m = forEntry(p.entry_id);
+      if (m.has(p.match_id)) continue;
+      m.set(p.match_id, `${p.predicted_home_score}-${p.predicted_away_score}`);
+    }
+    return out;
+  }, [data, picks.data]);
+
+  /** The live matchweek's fixtures, in the shape the sheet builder takes. */
+  const sheetFixtures = useMemo<SheetFixture[]>(
+    () =>
+      !isInPlay || inPlayWeek === null || !data
+        ? []
+        : toSheetFixtures(fixturesForWeek(data.season.matches, inPlayWeek)),
+    [isInPlay, inPlayWeek, data],
+  );
+
+  const sheetRows = useMemo<SheetRow[]>(() => {
+    if (!isInPlay || !current || sheetFixtures.length === 0) return [];
+    return buildSheet({
+      fixtures: sheetFixtures,
+      live: new Map(live.fixtures.map((f) => [f.number, f])),
+      mine: live.perFixture.get(current.you.entryId) ?? new Map(),
+      theirs: current.them ? live.perFixture.get(current.them.entryId) ?? new Map() : new Map(),
+      label: (entryId, fixtureId) => pickLabels.get(entryId)?.get(fixtureId) ?? null,
+      youEntry: current.you.entryId,
+      themEntry: current.them?.entryId ?? null,
+    });
+  }, [isInPlay, current, sheetFixtures, live, pickLabels]);
+
+  /**
+   * The running scoreline.
+   *
+   * ⚠ FALLS BACK TO `accuracy`, WHICH IS THE MATCHWEEK'S POINTS. The duel row
+   * carries two numbers and they are not the same currency: `points_a` is the
+   * DUEL result (500 / 250 / 0, migration 121) and `accuracy_a` is what that
+   * member's picking scored that week — which is what the header already shows
+   * as the final scoreline. Falling back to it keeps the number honest for the
+   * second before the first live fetch lands, instead of flashing 0-0.
+   */
+  const liveScore = useMemo(() => {
+    if (!isInPlay || !current?.them) return null;
+    return {
+      you: live.points.get(current.you.entryId) ?? current.you.accuracy ?? 0,
+      them: live.points.get(current.them.entryId) ?? current.them.accuracy ?? 0,
+    };
+  }, [isInPlay, current, live.points]);
+
+  const remaining = useMemo(() => remainingFixtures(sheetRows), [sheetRows]);
+  const liveNow = useMemo(() => anyFixtureLive(sheetRows), [sheetRows]);
+  const summary = useMemo(() => sheetSummary(sheetRows), [sheetRows]);
+  const verdict = useMemo(
+    () => (liveScore ? duelVerdict(sheetRows, liveScore.you, liveScore.them) : null),
+    [sheetRows, liveScore],
+  );
+
+  /**
+   * Every other duel in the live matchweek — the rest of the card.
+   *
+   * The mode is personal, but the pool is not: five duels resolve on the same
+   * ten fixtures, and knowing two other members are level makes the afternoon
+   * bigger than your own game.
+   *
+   * ⚠ ONLY THE MATCHWEEK BEING PLAYED. Every later one is sealed, and its rows
+   * are not here to filter — RLS withheld them (116), which is also why this
+   * needs no reveal check of its own.
+   */
+  const elsewhere = useMemo(() => {
+    if (!isInPlay || inPlayWeek === null || !showdown) return [];
+    const name = (id: string) => showdown.names[id] ?? 'Unknown';
+    return showdown.duels
+      .filter((d) => d.matchweek_number === inPlayWeek && d.entry_b !== null)
+      .filter((d) => !ownEntryIds.has(d.entry_a) && !ownEntryIds.has(d.entry_b as string))
+      .map((d) => {
+        const b = d.entry_b as string;
+        return {
+          id: d.duel_id,
+          a: d.entry_a,
+          b,
+          aName: name(d.entry_a),
+          bName: name(b),
+          pa: live.points.get(d.entry_a) ?? d.accuracy_a ?? 0,
+          pb: live.points.get(b) ?? d.accuracy_b ?? 0,
+        };
+      });
+  }, [isInPlay, inPlayWeek, showdown, ownEntryIds, live.points]);
+
   return {
     // ⚠ A DISABLED query reports `isPending` forever. React Query has no
     // "idle" status any more, so a null poolId — every non-Showdown pool —
@@ -779,5 +1035,16 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     season,
     opponent,
     ownEntryId: data?.you.entries[0]?.entry_id ?? null,
+    isInPlay,
+    sheetRows,
+    liveScore,
+    remaining,
+    liveNow,
+    summary,
+    verdict,
+    elsewhere,
+    openMatchweek: openWeek,
+    pickLabels,
+    inPlayMatchweek: inPlayWeek,
   };
 }

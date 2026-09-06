@@ -1,7 +1,11 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ActivityIndicator, Image, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, View } from 'react-native';
 
 import { Button, Card, Icon, Text } from '@/components/ui';
+import { getInitials, gradientForUser } from '@/lib/avatarGradient';
+import { Scoreline, TeamSheetRows } from './TeamSheet';
+import type { SheetRow, Verdict } from '@/lib/duelSheet';
 import { useDuel, type DuelState, type Opponent, type Season, type Sheet } from '@/lib/useDuel';
 import type { LeagueMatch } from '@/lib/useLeaguePool';
 import type { Standing } from './ShowdownDuelHeader';
@@ -55,8 +59,25 @@ type Props = {
 
 export function DuelTab({ poolId, standings }: Props) {
   const theme = useTheme();
-  const { loading, error, isShowdown, sheet, fixtures, series, season, opponent, ownEntryId } =
-    useDuel(poolId);
+  const {
+    loading,
+    error,
+    isShowdown,
+    sheet,
+    fixtures,
+    series,
+    season,
+    opponent,
+    ownEntryId,
+    current,
+    isInPlay,
+    sheetRows,
+    remaining,
+    summary,
+    verdict,
+    elsewhere,
+    openMatchweek,
+  } = useDuel(poolId);
 
   if (loading) {
     return (
@@ -110,15 +131,88 @@ export function DuelTab({ poolId, standings }: Props) {
           them={standings.get(opponent.entryId) ?? null}
         />
       ) : null}
-      {sheet && ownEntryId ? (
-        <SheetCard poolId={poolId} entryId={ownEntryId} sheet={sheet} />
-      ) : null}
-      {opponent ? (
-        <OpponentCard opponent={opponent} standing={standings.get(opponent.entryId) ?? null} />
-      ) : null}
-      {fixtures.length > 0 ? <DecidedOnCard fixtures={fixtures} /> : null}
+      {/*
+        ⚠ THE TAB HAS TWO STATES AND THE MATCHWEEK LOCK IS THE DOOR BETWEEN
+        THEM — Ryan, 2026-09-04, the morning matchweek 3 kicked off.
+
+        BEFORE lock the tab is preparation: your sheet (what is still unpicked),
+        the opponent scouted, and the fixtures the duel will be decided on.
+        Every one of those cards exists to inform a pick.
+
+        AFTER lock there are no picks left to inform, and all three become
+        wallpaper — worse than that, "Your sheet" invites a member to open a
+        picker that will refuse them. So they go, and the fixture list is
+        replaced by the same ten games with both columns filled in: the team
+        sheet, which is the duel itself rather than a preview of it.
+
+        ⚠ LOCK, NOT KICKOFF. Migration 101 closes picks an hour before the first
+        game, and the sheets open at the same moment. Waiting for kickoff would
+        leave an hour where the picks are settled, both sheets are readable, and
+        the tab still shows a "finish your picks" button.
+
+        `isInPlay` is the server's own `inPlayMatchweekId` answer, read off the
+        contract — never a `lock_at` comparison made here.
+      */}
+      {isInPlay ? (
+        <>
+          {sheetRows.length > 0 && current ? (
+            <TeamSheetCard
+              rows={sheetRows}
+              themName={current.them?.name ?? null}
+              remaining={remaining}
+              summary={summary}
+              verdict={verdict}
+            />
+          ) : null}
+          {elsewhere.length > 0 ? (
+            <ElsewhereCard
+              duels={elsewhere}
+              matchweek={current?.matchweek ?? null}
+              standings={standings}
+            />
+          ) : null}
+        </>
+      ) : (
+        <>
+          {sheet && ownEntryId ? (
+            <SheetCard poolId={poolId} entryId={ownEntryId} sheet={sheet} />
+          ) : null}
+          {opponent ? (
+            <OpponentCard opponent={opponent} standing={standings.get(opponent.entryId) ?? null} />
+          ) : null}
+          {fixtures.length > 0 ? <DecidedOnCard fixtures={fixtures} /> : null}
+        </>
+      )}
       {series.length > 0 ? <AgainstTheRoomCard series={series} /> : null}
+      {/* ⚠ STAYS IN BOTH STATES. "Your season" is a record, not preparation —
+          it is the one card that is as true on Saturday afternoon as it was on
+          Friday morning. */}
       {season ? <ScoutingCard season={season} /> : null}
+      {/*
+        ⚠⚠ THE ONLY WAY INTO THE PICKER, AND IT IS WHY THIS ROW EXISTS.
+
+        `predictionSurfaceFor` sends a Showdown pool to `league-read-only`, so
+        the Pick'em entries tab is never rendered for one — the button inside
+        "Your sheet" is the single route to `/pool/:id/pickem/:entryId` on the
+        phone. Hiding that card while a matchweek is in play therefore hid the
+        picking as well, and not for a moment: `openMatchweekId` SKIPS a locked
+        matchweek, so matchweek 4 is open from the Saturday matchweek 3 locks
+        until it finishes on Monday night. That is most of the week, and all of
+        the weekend.
+
+        So the card goes and the door does not. It is one line at the bottom
+        rather than a card near the top because that is its real priority while
+        football is being played — the live duel is the tab, and next week's
+        sheet can wait until this one is over.
+      */}
+      {isInPlay && sheet && ownEntryId && openMatchweek !== null ? (
+        <NextWeekRow
+          poolId={poolId}
+          entryId={ownEntryId}
+          matchweek={openMatchweek}
+          sheet={sheet}
+        />
+      ) : null}
     </View>
   );
 }
@@ -306,6 +400,348 @@ function Side({
       ) : (
         <>
           {badge}
+          {label}
+        </>
+      )}
+    </View>
+  );
+}
+
+// ------------------------------------------------------------- the team sheet
+
+/**
+ * The card that replaces the fixture list the moment a matchweek locks.
+ *
+ * Same ten games, both columns filled in. Before lock it says what the duel
+ * WILL be decided on; after lock it is the deciding, in progress — which is why
+ * it is one card in two states rather than two cards.
+ *
+ * ⚠ THE OPPONENT'S COLUMN IS REVEAL-GATED AT THE SOURCE. Their picks arrive
+ * through the bulk route, which withholds a matchweek still open for picks. If
+ * a label is null here it is because nothing was released, and nothing on this
+ * card may reconstruct a pick from anywhere else.
+ */
+function TeamSheetCard({
+  rows,
+  themName,
+  remaining,
+  summary,
+  verdict,
+}: {
+  rows: SheetRow[];
+  themName: string | null;
+  remaining: number;
+  summary: string | null;
+  verdict: Verdict | null;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Card bordered>
+      <CardHeader
+        title="The team sheet"
+        meta={
+          remaining > 0
+            ? `${remaining} to play`
+            : rows.length > 0
+              ? 'All played'
+              : undefined
+        }
+        subtitle="Both sheets are open. Where you agree, nothing can separate you."
+      />
+
+      {/* The two column heads carry the same colours as the chips beneath them,
+          which is what makes the sheet readable without a key — and they are the
+          header's colours, so "you" is the same blue in both places. */}
+      {/*
+        ⚠ NOT `width: CHIP_W`. The heads were pinned to the chip width beneath
+        them, which truncated "Marcus" to "MARC…" for no reason — the row is
+        otherwise empty, so the name had the whole card to sit in and was being
+        clipped against a column it does not belong to. It is a LABEL for the
+        column, not a cell in it: `flex: 1` and right-aligned gives it
+        everything spare while keeping it on one line.
+      */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          gap: theme.spacing.sm,
+          marginTop: theme.spacing.md,
+          marginBottom: theme.spacing.sm,
+        }}
+      >
+        <Text variant="caption" style={{ color: theme.colors.primary }}>
+          You
+        </Text>
+        <Text
+          variant="caption"
+          numberOfLines={1}
+          style={{ flex: 1, textAlign: 'right', color: theme.colors.red }}
+        >
+          {themName ?? '—'}
+        </Text>
+      </View>
+      {/*
+        ⚠ THE CLUB NAMES ARE GONE AND THE ROW IS BIGGER FOR IT — Ryan,
+        2026-09-04. "Nott'm Forest" and "Bournemouth" were spending the width on
+        strings a crest already says, and paying for it with a small crest and a
+        code nobody could read at arm's length. The kickoff moved into the
+        middle, where the `v` was, so an unplayed row is no longer two rows tall.
+
+        ⚠ SHARED WITH THE ROOM. `TeamSheetRows` is one implementation for both
+        tabs — see the note at the top of `TeamSheet.tsx`.
+      */}
+      <TeamSheetRows rows={rows} />
+
+      {/* What the sheet MEANS. Agreements cannot separate two members by
+          definition, so the duel is only ever the divergences. */}
+      {summary || verdict ? (
+        <View
+          style={{
+            marginTop: theme.spacing.sm,
+            paddingTop: theme.spacing.md,
+            borderTopWidth: theme.borders.thin,
+            borderTopColor: theme.colors.silver,
+            gap: theme.spacing.xs,
+          }}
+        >
+          {summary ? (
+            <Text variant="body" color="slate">
+              {summary}
+            </Text>
+          ) : null}
+          {verdict ? (
+            <Text variant="body" color="slate">
+              {verdict.safe
+                ? verdict.leader === 'you'
+                  ? `Mathematically safe — a ${verdict.lead}-point lead with nothing left that can close it.`
+                  : `Out of reach — behind by ${verdict.lead}, with less than that still to play for.`
+                : verdict.deciders === 0
+                  ? verdict.lead === 0
+                    ? 'Level, with everything played.'
+                    : `${verdict.lead} points in it, with everything played.`
+                  : `${verdict.lead === 0 ? 'Level' : `${verdict.lead} points in it`} — ${
+                      verdict.deciders === 1
+                        ? 'one game left, and it decides the duel'
+                        : `${verdict.deciders} games left, and they decide the duel`
+                    }.`}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+    </Card>
+  );
+}
+
+
+// ------------------------------------------------------------ next week's sheet
+
+/**
+ * The way into the picker while a matchweek is being played.
+ *
+ * Deliberately a ROW and not a card: during a live matchweek the tab belongs to
+ * the duel in progress, and next week's sheet is the quietest thing on it. It
+ * still has to be reachable — see the note at the call site for why nothing
+ * else on the phone reaches the picker for a Showdown pool.
+ */
+function NextWeekRow({
+  poolId,
+  entryId,
+  matchweek,
+  sheet,
+}: {
+  poolId: string;
+  entryId: string;
+  matchweek: number;
+  sheet: Sheet;
+}) {
+  const theme = useTheme();
+  const finished = sheet.open.length === 0;
+
+  return (
+    <Pressable
+      onPress={() => router.navigate(`/pool/${poolId}/pickem/${entryId}`)}
+      accessibilityRole="button"
+      accessibilityLabel={
+        finished
+          ? `See your picks for matchweek ${matchweek}`
+          : `Finish your picks for matchweek ${matchweek}`
+      }
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.md,
+        paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
+        borderRadius: theme.radii.lg,
+        borderWidth: theme.borders.thin,
+        borderColor: theme.colors.silver,
+        opacity: pressed ? 0.6 : 1,
+      })}
+    >
+      <Icon name={finished ? 'checkmark.circle.fill' : 'pencil.line'} color="slate" size={18} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="body" numberOfLines={1} style={{ fontFamily: fontFamilies.bold }}>
+          Matchweek {matchweek} is open
+        </Text>
+        <Text variant="detail" color="slate" numberOfLines={1}>
+          {finished
+            ? `All ${sheet.total} picked — you can still change them.`
+            : `${sheet.done} of ${sheet.total} picked.`}
+        </Text>
+      </View>
+      <Icon name="chevron.right" color="slate" size={14} />
+    </Pressable>
+  );
+}
+
+// -------------------------------------------------------- elsewhere on the card
+
+/**
+ * Every other duel in the live matchweek.
+ *
+ * The mode is personal, but the pool is not: five duels resolve on the same ten
+ * fixtures, and knowing two other members are level makes the afternoon bigger
+ * than your own game. It is also the only place the rest of the room is visible
+ * while a matchweek is being played.
+ *
+ * ⚠ ONLY THE WEEK BEING PLAYED, and it needs no reveal check to stay that way:
+ * a later matchweek's duel rows were withheld by RLS (migration 116), so they
+ * are not here to filter out.
+ */
+function ElsewhereCard({
+  duels,
+  matchweek,
+  standings,
+}: {
+  duels: DuelState['elsewhere'];
+  matchweek: number | null;
+  standings: Map<string, Standing>;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Card bordered>
+      <CardHeader
+        title="Elsewhere on the card"
+        meta={matchweek !== null ? `Matchweek ${matchweek}` : undefined}
+        subtitle="The rest of the room, on the same ten games."
+      />
+
+      <View style={{ marginTop: theme.spacing.md }}>
+        {duels.map((d, i) => {
+          const lead = d.pa === d.pb ? null : d.pa > d.pb ? 'a' : 'b';
+          return (
+            <View
+              key={d.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: theme.spacing.sm,
+                borderTopWidth: i === 0 ? 0 : theme.borders.thin,
+                borderTopColor: theme.colors.silver,
+              }}
+            >
+              <Fighter
+                name={d.aName}
+                userId={standings.get(d.a)?.userId ?? null}
+                leading={lead === 'a'}
+                dimmed={lead === 'b'}
+              />
+              <Scoreline home={d.pa} away={d.pb} kind="duel" />
+              <Fighter
+                name={d.bName}
+                userId={standings.get(d.b)?.userId ?? null}
+                leading={lead === 'b'}
+                dimmed={lead === 'a'}
+                align="right"
+              />
+            </View>
+          );
+        })}
+      </View>
+    </Card>
+  );
+}
+
+/**
+ * One member in somebody else's duel.
+ *
+ * ⚠ DIMMED RATHER THAN RE-COLOURED. Blue and red mean "you" and "your opponent"
+ * everywhere else on this tab; painting a third pair of members in them would
+ * make the two cards contradict each other. Their own avatar gradient carries
+ * who they are, and weight carries who is ahead.
+ */
+function Fighter({
+  name,
+  userId,
+  leading,
+  dimmed,
+  align = 'left',
+}: {
+  name: string;
+  userId: string | null;
+  leading: boolean;
+  dimmed: boolean;
+  align?: 'left' | 'right';
+}) {
+  const theme = useTheme();
+  const gradient = userId ? gradientForUser(userId) : null;
+
+  const face = (
+    <View style={{ width: 26, height: 26, borderRadius: theme.radii.pill, overflow: 'hidden' }}>
+      {gradient ? (
+        <LinearGradient
+          colors={[gradient[0], gradient[1]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text variant="detail" style={{ color: '#FFFFFF', fontFamily: fontFamilies.bold }}>
+            {getInitials(name)}
+          </Text>
+        </LinearGradient>
+      ) : (
+        <View style={{ flex: 1, backgroundColor: theme.colors.mist }} />
+      )}
+    </View>
+  );
+
+  const label = (
+    <Text
+      variant="detail"
+      numberOfLines={1}
+      color={leading ? 'ink' : 'slate'}
+      style={{
+        flexShrink: 1,
+        fontFamily: leading ? fontFamilies.bold : undefined,
+        textAlign: align === 'right' ? 'right' : 'left',
+      }}
+    >
+      {name}
+    </Text>
+  );
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+        gap: theme.spacing.sm,
+        opacity: dimmed ? 0.55 : 1,
+      }}
+    >
+      {align === 'right' ? (
+        <>
+          {label}
+          {face}
+        </>
+      ) : (
+        <>
+          {face}
           {label}
         </>
       )}

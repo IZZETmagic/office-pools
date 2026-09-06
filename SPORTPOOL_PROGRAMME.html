@@ -222,20 +222,36 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <strong>decisions already made</strong>, so they don't get re-litigated. A <em>programme</em>, not a roadmap,
       because SportPool is now several distinct projects running under one banner rather than one ordered list.</p>
     <div class="src">
-      A view of <code>SPORTPOOL_PROGRAMME.md</code> — the working copy, which is <code>6f3980d</code> plus the
-      <strong>2026-07-30 audit corrections</strong> (three risks closed, <strong>R19</strong> opened, R2/R18/Gate B rewritten),
-      which are in the working tree and <strong>not yet committed</strong>. The 2026-07-26 performance session <em>is</em> applied
-      and deployed — migrations 026/037/038/039, the analytics backfill and the shadow read widening are live in production.
-      The markdown is the source of truth — <strong>if these two ever disagree, the markdown wins.</strong>
+      A view of <code>SPORTPOOL_PROGRAMME.md</code>. The markdown is the source of truth —
+      <strong>if these two ever disagree, the markdown wins.</strong>
     </div>
   </div>
 </header>
+
+<div class="wrap" style="padding-top:18px">
+  <div class="note danger" style="margin:0">
+    <p style="margin:0 0 8px"><strong>⚠️ THIS VIEW IS PARTIALLY STALE — read this before trusting anything below. Recorded
+      2026-09-02.</strong></p>
+    <p style="margin:0 0 8px">Most of this page was written on <strong>2026-07-30</strong> and the markdown has been rewritten
+      several times since — including two full audits (2026-08-28 and 2026-09-02) and roughly 225 commits of Premier League work.
+      <strong>The view drifted from the source, which is the failure this file is supposed to prevent.</strong> It is being brought
+      back in passes; what has been refreshed as of 2026-09-02 is marked <span class="chip ok">REFRESHED 2026-09-02</span>.</p>
+    <p style="margin:0"><strong>Concretely, what is wrong below if you read it as current:</strong> the risk register table
+      carried <strong>R1–R19</strong> when the markdown has <strong>R1–R29</strong> — the ten missing rows are added at the foot of
+      the table with their current levels, but the <strong>R1–R19 rows themselves still read as of 2026-07-30</strong> and several
+      have since closed or changed level (see the levels list in the status strip note). The <em>Order of deliveries</em>,
+      <em>Scoring engines</em>, <em>Settled decisions</em> (the markdown now has <strong>14</strong>, this page shows
+      <strong>8</strong>) and every backlog section below <em>Projects</em> are <strong>2026-07-30 text</strong>. For anything not
+      marked refreshed, <strong>open the markdown</strong>.</p>
+  </div>
+</div>
 
 <nav class="sticky">
   <div class="wrap">
     <a href="#summary">Where this stands</a>
     <a href="#status">Status</a>
     <a href="#risks">Risk register</a>
+    <a href="#rn-league">📱 RN league build</a>
     <a href="#order">Order of deliveries</a>
     <a href="#design-system">🏗️ System design</a>
     <a href="#engines">🧮 Scoring engines</a>
@@ -263,9 +279,36 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ SUMMARY ============================ -->
 <section id="summary">
-  <h2 class="sec">Where this stands</h2>
+  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span></h2>
+
   <div class="card crit">
-    <p style="margin:0 0 10px">The World Cup shipped, completed, and is nearly wound down — what's left of it is one ops send and a
+    <p style="margin:0 0 10px"><strong>The World Cup is closed. The programme is now a Premier League programme.</strong> What the
+      2026-08-28 audit called a backend with no front end is now a substantially finished product — Showdown as a one-page arena with
+      a sealed draw and a walkout reveal, duel points feeding the season leaderboard, Last Man Standing, Table mode, avatars, banter
+      as its own surface, and a live engine that scores while a game is being played. <strong>1,244 tests pass across 92 files</strong>
+      (re-run 2026-09-02), up from 625 on 2026-08-28 — and those 92 include <code>mobile/</code> <strong>for the first time</strong>.</p>
+    <p style="margin:0 0 10px"><strong>None of it is in production, and that is the single largest risk in this document.</strong>
+      <code>origin/master</code> is still <code>6dc5710</code>, <strong>24 August</strong>. <code>Development</code> is
+      <strong>225 commits ahead</strong>, and roughly <strong>thirty migrations have been applied to the shared production
+      database</strong> past the code that is serving members. Two live Premier League pools are being run by real people against the
+      24 August app. This is not a backlog item; it is a state the product is in every minute it stays there — <strong>R21</strong>.</p>
+  </div>
+
+  <div class="card okc">
+    <p style="margin:0 0 10px"><strong>✅ The phone can now see the football — 2026-09-02, verified.</strong> All three mobile match
+      surfaces read the <code>matches</code> table, and a league fixture is not in it and never will be. So Results rendered
+      <strong>"No Matches"</strong> while holding a 380-fixture season, Home rendered <strong>"0 matches today"</strong> on a ten-game
+      Saturday, and a tap rendered <strong>"Match not found"</strong>. <strong>One cause, three confident blanks, none of which raised
+      an error.</strong> A new <code>GET /api/users/[user_id]/fixtures</code> closes all three; Ryan confirmed it rendering on his
+      device in the Expo dev app.</p>
+    <p style="margin:0"><strong>⚠ It is a read-only surface by decision</strong> — picking on a phone is still not built for any of
+      the four league modes (<em>Decision 14</em>), league pushes still dead-end, there has been no formal device QA beyond Ryan's
+      look, and <strong>none of it is deployed</strong>. Detail: <a href="#rn-league">📱 The RN league build</a>.</p>
+  </div>
+
+  <details class="card neutral">
+    <summary style="cursor:pointer;font-weight:700">⏳ The 2026-07-30 summary this replaces — kept as the dated record</summary>
+    <p style="margin:10px 0 10px">The World Cup shipped, completed, and is nearly wound down — what's left of it is one ops send and a
       handful of residual bugs. The record itself is current again: the two things this document was missing, the shadow read-path
       cutover of 2026-07-19 with its rollback and the ~324k-point podium remediation of 2026-07-21, are now written down, so the
       programme and the code broadly agree for the first time since the final. A second full audit against prod and code on
@@ -309,9 +352,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <p style="margin:0 0 10px">One standing caveat on everything above: <strong>fourteen groups of claims here depend on production
       state and cannot be verified from code</strong> — the 2026-07-30 audit resolved <strong>six of them outright</strong>, the rest are
       still listed in <a href="#unverifiable">the register</a>, and unverified is not done.</p>
-  </div>
-  <div class="card warnc">
-    <p style="margin:0"><strong>Added 2026-07-26 (performance session), updated 2026-07-30.</strong> A site-wide performance pass measured
+  </details>
+  <details class="card warnc">
+    <summary style="cursor:pointer;font-weight:700">⏳ The 2026-07-26 performance note — kept as the dated record</summary>
+    <p style="margin:10px 0 0"><strong>Added 2026-07-26 (performance session), updated 2026-07-30.</strong> A site-wide performance pass measured
       where the database actually spends its time and, in the process, found another instance of the failure mode above:
       <code>entry_xp_state.total_xp</code> / <code>.current_level</code> had <strong>two writers computing different
       quantities</strong>, so the level shown on <code>/pools</code> and <code>/dashboard</code> was whichever path last touched
@@ -324,40 +368,55 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       is new and open:</strong> the analytics-sweep cron that Ryan decided <em>must not be registered</em> <strong>is registered and
       firing every minute</strong> — in <code>pg_cron</code>, not <code>vercel.json</code>, which is why the register believed otherwise —
       writing the very columns R13 just closed (<strong>R19</strong>). It is benign only because no competition is running.</p>
-  </div>
+  </details>
 </section>
 
 <!-- ============================ STATUS ============================ -->
 <section id="status">
-  <h2 class="sec">Status at a glance</h2>
-  <p class="sec-sub">Counts are of what this document records, on <strong>2026-07-30</strong>. Risk levels are defined in the register
-    below. Closed risks stay on the register and are counted separately, not deleted.</p>
+  <h2 class="sec">Status at a glance <span class="chip ok">REFRESHED 2026-09-02</span></h2>
+  <p class="sec-sub">Counts are of what the <strong>markdown</strong> records, on <strong>2026-09-02</strong>, at each risk's
+    <em>current</em> level. Risk levels are defined in the register below. Closed risks stay on the register and are counted
+    separately, not deleted.</p>
   <div class="strip">
-    <div class="stat crit"><div class="n">3</div><div class="l">🔴 Critical risks</div></div>
-    <div class="stat high"><div class="n">8</div><div class="l">🟠 High risks</div></div>
-    <div class="stat med"><div class="n">3</div><div class="l">🟡 Medium risks</div></div>
+    <div class="stat crit"><div class="n">2</div><div class="l">🔴 Critical risks</div></div>
+    <div class="stat high"><div class="n">12</div><div class="l">🟠 High risks</div></div>
+    <div class="stat med"><div class="n">7</div><div class="l">🟡 Medium risks</div></div>
     <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
-    <div class="stat low"><div class="n">3</div><div class="l">✅ Closed, prod-verified</div></div>
-    <div class="stat pri"><div class="n">4</div><div class="l">Items in 🔥 Now</div></div>
-    <div class="stat neu"><div class="n">7</div><div class="l">Projects</div></div>
-    <div class="stat neu"><div class="n">8+5</div><div class="l">Settled decisions · product + infra</div></div>
-    <div class="stat neu"><div class="n">6</div><div class="l">Decisions needing Ryan</div></div>
-    <div class="stat neu"><div class="n">8</div><div class="l">Unverified claim groups (of 14)</div></div>
+    <div class="stat low"><div class="n">6</div><div class="l">✅ Closed (4 prod-verified)</div></div>
+    <div class="stat pri"><div class="n">6</div><div class="l">Items in 🔥 Now</div></div>
+    <div class="stat neu"><div class="n">9</div><div class="l">Projects</div></div>
+    <div class="stat neu"><div class="n">14+5</div><div class="l">Settled decisions · product + infra</div></div>
+    <div class="stat neu"><div class="n">23</div><div class="l">Decisions needing Ryan</div></div>
+    <div class="stat neu"><div class="n">R29</div><div class="l">Highest risk id on the register</div></div>
   </div>
-  <p class="strip-note"><strong>Changed 2026-07-30.</strong> <strong>R17</strong> (ledger), <strong>R4</strong> (shadow podium) and
-    <strong>R13</strong> (XP writers) are <strong>✅ closed and prod-verified</strong> — the bar for that mark is that the fix is in
-    production and the closing evidence is a query against production, not a commit and not a passing test. They stay on the register.
-    <strong>R19 is new</strong> and needs a ruling: the analytics-sweep cron is registered in <code>pg_cron</code> against a decision that
-    says it must not be. Two risks carry an existing decision: <strong>R6</strong> (accepted / deferred 2026-07-21, on a condition that is
-    now due) and <strong>R3</strong> (decided 2026-07-25, unimplemented) — an accepted risk stays on the register, it is not closed.
-    <strong>R12</strong>'s blast radius is still <strong>uncounted</strong>, and the 2026-07-30 queries suggest it may not be countable at
-    all: the cascade leaves no residue. Levels are counted at their <em>current</em> value, so <strong>R15</strong> counts 🟢, having been
-    downgraded from 🟠.</p>
+  <p class="strip-note"><strong>Current levels, R1–R29, as the markdown has them on 2026-09-02.</strong>
+    <strong>🔴</strong> R2 · R21. &nbsp;
+    <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27. &nbsp;
+    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29. &nbsp;
+    <strong>🟢</strong> R11 · R15. &nbsp;
+    <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 — of which <strong>R4, R13, R17 and R26 are prod-verified</strong>;
+    R1 and R22 are closed <em>in code only</em>, and code is not production while <strong>R21</strong> stands.</p>
+  <p class="strip-note"><strong>Moved 2026-09-02.</strong> <strong>R24</strong> 🟠 → 🟡 — the RN app could not read league data at
+    all; the calendar and the pool card now reach the phone through server routes, and the three silent blanks on the match surfaces
+    are fixed. <strong>R29 is new</strong> 🟡 — the root <code>tsconfig.json</code> compiles <code>mobile/**</code> into the web type
+    program, which is the real cause of the <code>upload-logo</code> <code>FormData</code> build failure long attributed to iCloud
+    (<strong>R9</strong>); that attribution is corrected, and R9 is not closed by it. <strong>R23</strong>'s mobile
+    <code>postgres_changes</code> count was wrong in this document — it is <strong>nine subscriptions across seven files</strong>,
+    not four consumers; one was retired on 2026-09-02.</p>
 </section>
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R19 · 3 closed 2026-07-30</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R29 · 6 closed · R20–R29 added to this view 2026-09-02</span></h2>
+  <div class="note warn" style="margin-bottom:14px">
+    <strong>⚠️ Mixed vintage — read the row dates.</strong> <strong>R1–R19</strong> below are <strong>2026-07-30 text</strong> and
+    several have since closed or changed level; <strong>R20–R29</strong> were added on <strong>2026-09-02</strong> and are current.
+    The authoritative current level of every row is listed in the <a href="#status">status strip</a> above, and the full cells are in
+    <code>SPORTPOOL_PROGRAMME.md</code>. Notably: <strong>R1</strong> and <strong>R12</strong> are no longer what they say here — the
+    <em>Delete Pool</em> button is gone from both surfaces (archive, migrations 040/041/044) and soft delete now exists
+    (<code>pool_entries.retired_at</code>, 056/057), so the note below about "no soft-delete anywhere" is <strong>false as of
+    2026-09-02</strong> and is kept only as the record of why the two rows were split.
+  </div>
   <p class="quote">Standing reference, not an appendix. Opened 2026-07-26 from a full audit of this document against the
     code, migrations and git history. Every risk carries: <strong>what · blast radius · trigger · mitigation status ·
     whether Ryan has already called it</strong>, plus the backlog item it maps onto so the register and the backlog
@@ -755,6 +814,192 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td><strong>New — no call made</strong></td>
         <td><a href="#i-shadow">Shadow scoring engine</a>. Violates <a href="#design-system">P3</a></td>
       </tr>
+
+      <tr><td colspan="8" style="background:var(--mist);font-weight:700;padding:10px 12px">
+        ➕ R20–R29 — added to this view 2026-09-02. Condensed from the markdown; open
+        <code>SPORTPOOL_PROGRAMME.md</code> for the full cells. <strong>The R1–R19 rows above still read as of
+        2026-07-30 and several have since moved</strong> — the current levels are listed in the status strip.
+      </td></tr>
+
+      <tr class="risk-crit">
+        <td class="id">R21</td>
+        <td><strong>Production is 225 commits and ~30 migrations behind the code.</strong> <code>origin/master</code> =
+          <code>6dc5710</code> (24 Aug), unmoved; <code>Development</code> = <code>c98a037</code> (2 Sep). Migrations have been
+          applied to the <strong>shared</strong> production database past the deployed code — <strong>121 makes a duel worth 500
+          while the deployed <code>DuelsTab</code> treats anything that is not 3 or 1 as a LOSS</strong>, and <strong>110
+          DROPPED</strong> <code>pools.league_table_revealed_at</code> plus two functions. The exact shape of the 2026-08-22
+          outage: schema and code disagreeing at HTTP 200</td>
+        <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
+        <td class="blast"><strong>Everything.</strong> Two real Premier League pools with real members are running the 24 Aug app.
+          Every ✅ in this document below the Premier League heading describes code no member can reach</td>
+        <td><strong>Already triggered</strong>, and compounding daily. It resolves only by deploying</td>
+        <td><strong>None.</strong> No deploy attempted. The migrations <em>have</em> run — five probes confirmed 099, 105, 110,
+          115, 127; but 119, 120, 123–126, 128 and 129 are individually unattested, and absence of a record is not evidence of
+          non-application</td>
+        <td>⏳ <strong>NEEDS RYAN — a timing call, not an engineering one.</strong> Wants a written order, and
+          <code>scripts/verify-select-columns.ts</code> run first</td>
+        <td>Ship what is built</td>
+      </tr>
+
+      <tr class="risk-crit">
+        <td class="id">R22</td>
+        <td>✅ <strong>FIXED IN CODE 2026-09-02, ⛔ undeployed.</strong> Was: <code>app/api/account/delete/route.ts</code> destroyed
+          scores, predictions, entries and memberships and <em>only then</em> asked "do you still administer a pool?", returning
+          400 — <strong>after</strong> the destruction. The guard is now first and its error is captured;
+          <code>deleteOrder.guard.test.ts</code> was negative-tested. ⚠ Not transactional, and this door still
+          <strong>hard-deletes rather than retiring</strong> (Gate A2, unanswered)</td>
+        <td><span class="chip lvl-crit">🔴 → ✅ code</span></td>
+        <td class="blast">Any user who administers ≥1 pool and taps Delete Account — <strong>535 accounts</strong> by the R1 count.
+          Irreversible, silent to everyone else in those pools, and it bypasses <code>retired_at</code> entirely</td>
+        <td>One tap in account settings</td>
+        <td><strong>Fixed</strong> — <code>6aa2831</code>. <strong>Closes on deploy (R21), not on the commit</strong></td>
+        <td>New — no call made</td>
+        <td>Account deletion destroys everything before it checks (🔥 Now)</td>
+      </tr>
+
+      <tr class="risk-high">
+        <td class="id">R23</td>
+        <td>🟡 <strong>HALF FIXED 2026-09-02 — the three that silently produce WRONG DATA are done; the four cost items are
+          not.</strong> The league read path repeated the World Cup's expensive habits: <code>readLeaguePoolView</code> paged all
+          380 fixtures / 175 kB per viewer outside the cache; <code>duels.ts</code> summed scores in a Node loop;
+          <code>DuelsTab.tsx</code> carried <strong>a second scoring engine in the browser</strong>. Plus two unbounded reads
+          truncating at ~53 members and 100</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">Cost and silent wrongness together. The truncations return exactly 1,000 rows with
+          <code>error: null</code> and render a plausible wrong table</td>
+        <td>A pool over ~53 members, or Premier League carrying real concurrent load. Neither yet</td>
+        <td>✅ <strong>Items 1–4 DONE</strong> (<code>6aa2831</code>, <code>ee240bf</code>, <strong>migration 130 applied and
+          prod-verified</strong>). ⬜ <strong>5–7 remain:</strong> scoping the read to the tab; the three
+          <code>notify.ts</code> embeddings (lines 85, 392, 499); mobile's <code>postgres_changes</code>. ⚠ <strong>Count
+          corrected 2026-09-02: nine subscriptions across seven files, not four consumers</strong> — one retired on 2026-09-02
+          (<code>useHomeData</code>'s duplicate <code>matches</code> channel), taking <code>matches</code> from three to two</td>
+        <td>New — no call made</td>
+        <td>⚡ The league read path</td>
+      </tr>
+
+      <tr class="risk-med">
+        <td class="id">R24</td>
+        <td>🟡 <strong>HALF CLOSED 2026-09-02.</strong> Was: <strong>the RN app could not read league data at all</strong> — not
+          "has no screens", cannot read. Mobile is direct-to-PostgREST (~110 <code>.from()</code> reads) and migration 050's four
+          engine tables are <strong>deny-all</strong>, so a mobile read returns <code>[]</code> with <code>error: null</code>.
+          <strong>What landed:</strong> <code>GET /api/users/:id/fixtures</code> feeds all three match surfaces, and
+          <code>/home-scoring</code> feeds the pool card. Each of the three had failed <em>silently</em>: "No Matches" over a
+          380-fixture season, "0 matches today" on a ten-game Saturday, "Match not found" on a tap</td>
+        <td><span class="chip lvl-med">🟠 → 🟡</span></td>
+        <td class="blast">The whole second surface. ⚠ The three blanks were live for testers, not hypothetical</td>
+        <td>Starting the RN league build. Not dated; entirely ours</td>
+        <td><strong>Partly mitigated 2026-09-02</strong>, verified against production for five leagues. ⚠ The route is
+          <strong>not</strong> an RLS defence — the calendar tables are world-readable (050:383-386); it exists for the
+          <strong>shaping</strong>, where a mis-mapped key renders "TBD" with no crest rather than throwing. ⬜ Still no read API
+          for a league <em>pool</em> with a live consumer: <code>mobile/lib/useLeaguePool.ts</code> was <strong>deleted</strong> in
+          the revert, so <code>/api/pools/:id/league</code> has <strong>no second-surface consumer at all</strong></td>
+        <td>Read half: no call needed, it was a defect. <strong>Picking on a phone: called — deferred</strong> (Decision 14)</td>
+        <td><a href="#rn-league">📱 The RN league build</a></td>
+      </tr>
+
+      <tr class="risk-med">
+        <td class="id">R25</td>
+        <td>🟡 <strong>HALF FIXED 2026-09-02 — migration 131 APPLIED.</strong> Was: <strong>Table mode's score never responded to a
+          goal, and after the deadline it stopped responding to anything.</strong> In production exactly one thing called the
+          scorer: the member's own save. Two pools were already frozen. A diffed statement trigger on
+          <code>league_standings</code> now fires whenever the table actually moves</td>
+        <td><span class="chip lvl-med">🔴 → 🟡</span></td>
+        <td class="blast"><strong>Every Table pool.</strong> Both frozen pools unfroze in the rolled-back test —
+          <em>Premier League Test</em> moved <strong>760 → 940</strong></td>
+        <td>Already triggered. Every completed fixture since 30 Aug widened it</td>
+        <td>⛔ <strong>The other half is still the deploy</strong> — standings are stale since 30 Aug because the sync that
+          refreshes them is undeployed and <code>league-standings</code> is unscheduled, so the trigger has nothing to react to.
+          Not observable live until 11 Sep (international break)</td>
+        <td>New — no call made. ⚠ NOT fixed by the deploy alone</td>
+        <td>Table mode — one decision, all season</td>
+      </tr>
+
+      <tr class="risk-high">
+        <td class="id">R26</td>
+        <td>✅ <strong>FIXED 2026-09-02 — migration 133 APPLIED.</strong> Was: <strong>a matchweek did not snapshot on the whistle
+          that completed it.</strong> Trigger name order on <code>league_fixtures</code> meant the scorer attempted the snapshot
+          <em>before</em> the refresher updated the count, so the count was always one behind</td>
+        <td><span class="chip ok">🟠 → ✅</span></td>
+        <td class="blast"><strong>Everything hanging off <code>ranks_snapshot_at</code> was late by one write</strong> — duel
+          settlement, LMS closure, the "results are in" outbox event, the movement arrows. It self-healed only by luck: a matchweek
+          whose last fixture is never written again never snapshots</td>
+        <td>Every matchweek, silently</td>
+        <td><strong>Fixed.</strong> Proved in a rolled-back transaction: snapshot YES on the whistle (was NO), 9 duels settled (was
+          0), 11 outbox events queued. ⚠ Does not fix a matchweek that goes quiet without completing</td>
+        <td>Taken and shipped same day on Ryan's instruction</td>
+        <td>Update flow, mode by mode</td>
+      </tr>
+
+      <tr class="risk-high">
+        <td class="id">R27</td>
+        <td><strong>Presence is 63.6% of every replicated write, and it is a heartbeat on a database table.</strong>
+          <code>PresenceProvider.tsx</code> upserts <code>user_presence</code> every <strong>25 seconds</strong>, and the table is
+          in <code>supabase_realtime</code> with an <strong>unfiltered</strong> subscription on every row. The split:
+          <code>user_presence</code> <strong>63.6%</strong> · <code>pool_entries</code> 32.9% · everything else 3.5%</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">The single largest line on the database bill, for a feature that shows who is online. It scales with
+          <em>connected users</em>, not activity — a quiet Tuesday with fifty people idling costs the same as a matchday</td>
+        <td>Continuous. Every connected web client, every 25 seconds</td>
+        <td><strong>None.</strong> ⚠ The fix is probably not Broadcast — Supabase Realtime has <strong>native Presence</strong>,
+          which is ephemeral and produces no WAL at all. That is what this feature is, reimplemented on a table</td>
+        <td>New — no call made. ⚠ Outside M3 as scoped (that was mobile); this is web, and bigger than all of M3</td>
+        <td>⚡ Performance &amp; caching step 7</td>
+      </tr>
+
+      <tr class="risk-med">
+        <td class="id">R28</td>
+        <td><strong>A Pick'em member who never picked is missing from the leaderboard, and three of four engines disagree with the
+          fourth.</strong> <code>league_score_duels</code>, <code>league_lms_settle</code> and <code>league_score_table</code> all
+          seed <code>league_entry_totals</code> from <code>pool_entries</code>. <strong><code>league_score_fixture</code> seeds
+          from the score rows</strong>, so an entry with no picks gets no row</td>
+        <td><span class="chip lvl-med">🟡 MEDIUM</span></td>
+        <td class="blast">Measured on the two scored Pick'em pools: 10 entries / <strong>8</strong> rows, and 4 / <strong>2</strong>.
+          Four members absent from a leaderboard they are members of. No number is wrong — but a member who forgot to pick vanishes
+          rather than sitting on 0, the opposite of what Decision 11 chose</td>
+        <td>Any Pick'em pool where somebody has not picked. The normal state of a first matchweek</td>
+        <td><strong>None.</strong> The fix is the shape the other three already use. It changes what a live leaderboard shows, so
+          it wants its own change</td>
+        <td>New — no call made. Pairs with <em>Submitting an entry is a step that shouldn't exist</em>, open call 1</td>
+        <td>Submitting an entry is a step that shouldn't exist (🔥 Now)</td>
+      </tr>
+
+      <tr class="risk-med">
+        <td class="id">R29</td>
+        <td><strong>The web build failure blamed on iCloud for months is actually the root <code>tsconfig.json</code> compiling
+          <code>mobile/**</code> into the web program.</strong> ⚠️ New 2026-09-02, verified by isolating it.
+          <code>"exclude": ["node_modules"]</code> excludes the <em>root</em> one only, so
+          <strong>1,433 files from <code>mobile/node_modules</code></strong> are in the Next.js type program — including a second
+          <code>@types/node</code> (25.9.0 vs the root's 20.19.33) whose global <code>FormData</code> is the undici shape</td>
+        <td><span class="chip lvl-med">🟡 MEDIUM</span></td>
+        <td class="blast">Build health and, more expensively, <em>diagnosis</em>. Three errors in one web route —
+          <code>upload-logo/route.ts(13,25): error TS2339: Property 'get' does not exist on type 'FormData'</code>, and the same at
+          14 and 15. Filed as node_modules corruption (<strong>R9</strong>) — a cause that is real but is not this. It also means a
+          <code>mobile/</code> type error can fail a <strong>web</strong> build</td>
+        <td>Any full <code>tsc</code> / <code>next build</code>. Continuous, and it does not need iCloud to be syncing</td>
+        <td><strong>None. One line in <code>exclude</code> fixes it</strong> — proved: the same route compiles clean in a program
+          that omits <code>mobile/**</code>. It also removes ~1,400 files from every type-check</td>
+        <td>New — no call made. ⚠ It does <strong>not</strong> retire R9: <code>.next/types/routes.d 3.ts</code> is in the program
+          right now and produces five more errors. This corrects an attribution, it does not close a risk</td>
+        <td>R9; iCloud corrupts the local checkout</td>
+      </tr>
+
+      <tr class="risk-high">
+        <td class="id">R20</td>
+        <td>✅ <strong>RESOLVED IN SHADOW 2026-08-15 — full re-score run.</strong> Migration 042 folded the group→knockout ratio
+          into the stage multipliers; the shadow engine was never updated, so it read <code>knockout_*</code> as a base
+          <strong>and</strong> applied the folded multiplier, double-counting. Fixed by <strong>046d</strong>; all 104 World Cup
+          matches re-scored</td>
+        <td><span class="chip lvl-high">🟠 → 🟢 shadow / 🟠 prod</span></td>
+        <td class="blast">286,872 rows: <code>score_type</code> changed on <strong>0</strong> — no member's judgement moved.
+          <code>total_points</code> changed on only <strong>855</strong>. Net +11,453 across 7 pools / 126 entries; 52 entries in 4
+          pools moved rank</td>
+        <td>Discharged. The remaining trigger is a <strong>prod</strong> recalc of the 7 affected pools</td>
+        <td><strong>Reversible:</strong> <code>backup_shadow_match_scores_pre_r20</code> and
+          <code>backup_shadow_entry_totals_pre_r20</code> hold the exact pre-change rows</td>
+        <td>⏳ <strong>One consequence needs a call.</strong> The diff alarm went from <strong>66 to 126</strong> mismatched
+          entries across 6 pools. Members are unaffected — they read shadow</td>
+        <td>Shadow scoring engine</td>
+      </tr>
     </tbody>
   </table>
   </div>
@@ -986,6 +1231,186 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li>⚠️ <span class="f">The analytics-sweep cron was believed unregistered on the strength of one registration mechanism.</span>
         See <strong>R19</strong> and the note under the register.</li>
     </ul>
+  </div>
+</section>
+
+<!-- ============================ RN LEAGUE BUILD ============================ -->
+<section id="rn-league">
+  <h2 class="sec">📱 The RN league build <span class="chip ok">REFRESHED 2026-09-02</span></h2>
+  <p class="sec-sub">How far away, and what must not be repeated. Added 2026-09-02 on Ryan's instruction —
+    <em>how far are we from starting the RN build to match the features we have built on the web, and have we avoided the World
+    Cup's mistakes?</em> Both halves answered from the code, not from the plans. <strong>Nothing here is a decision.</strong></p>
+
+  <div class="card okc">
+    <h3 style="margin:0 0 8px">✅ What landed 2026-09-02 — the phone can read the football</h3>
+    <p style="margin:0 0 10px">Verified against the tree, the test suite and production. Ryan confirmed it rendering on his device
+      in the Expo dev app. <strong>This is a READ surface. Nothing on it is a picking control.</strong> Commits
+      <code>7b2e8a6</code> · <code>5cab382</code> · <code>e0ddc21</code> · <code>b147948</code> · <code>05f99de</code> ·
+      <code>199fa31</code>, merged at <code>8c42d1d</code>.</p>
+    <p style="margin:0 0 10px"><strong>One cause, three confident blanks, none of which raised an error.</strong> All three mobile
+      match surfaces read the <code>matches</code> table, and a league fixture is not in it and never will be.</p>
+    <div class="scroller">
+      <table class="risk">
+        <thead><tr><th>Surface</th><th>What it did</th><th>Why it was silent</th></tr></thead>
+        <tbody>
+          <tr><td class="id">Results</td>
+            <td><strong>"No Matches"</strong> while holding a full 380-fixture season</td>
+            <td>Read <code>matches</code> by <code>tournament_id</code>. A league pool <em>has</em> one (054b) but nothing
+              league-side ever writes rows there. Separately <code>roundSections</code> filtered a hard-coded ladder of
+              <strong>seven World Cup stages</strong>, so <code>regular_season</code> fell through all of them. An empty array is a
+              valid answer</td></tr>
+          <tr><td class="id">Home</td>
+            <td>No live card, no next kickoff, <strong>"0 matches today"</strong> on a ten-game Saturday</td>
+            <td>Read <code>matches</code> for live + scheduled <strong>unfiltered by tournament</strong> — also a latent
+              cross-competition leak in the other direction</td></tr>
+          <tr><td class="id">A tap</td>
+            <td><strong>"Match not found"</strong></td>
+            <td>Read <code>matches</code> by id. <code>fixture_id</code> and <code>match_id</code> are both <code>uuid</code>, so it
+              was a clean, well-formed query returning nothing</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:10px 0 10px"><strong>The fix — <code>GET /api/users/[user_id]/fixtures</code>.</strong> Built on
+      <code>getLeagueSeasonCached</code> (no new cache, no new invalidation path) and shaped by the existing
+      <code>fixtureToMatch</code>. It returns every fixture of every season the member has an <strong>active</strong> pool in; the
+      phone merges that with its existing World Cup <code>matches</code> read.</p>
+    <p style="margin:0 0 10px">⚠ <strong>It exists for the SHAPING, not for RLS.</strong> Unlike migration 050's four
+      <strong>deny-all</strong> engine tables, the four <strong>calendar</strong> tables are world-readable
+      (<code>lib/migrations/050_l1_league_schema.sql:383-386</code>, verified), so the phone <em>could</em> read them directly. But
+      the club fields are <strong>positional</strong> — name → <code>country_name</code>, abbreviation → <code>country_code</code>,
+      crest → <code>flag_url</code> — and a mis-mapped key renders <strong>"TBD" with no crest rather than throwing</strong>. A
+      hand-kept second copy of that mapping in <code>mobile/</code> is the drift the route avoids, and <code>mobile/</code> is a
+      separate npm project that cannot import the first copy.</p>
+    <p style="margin:0"><strong>And it fixed the web at the same time.</strong> <code>status_detail</code> and
+      <code>original_kickoff_at</code> have been on <code>league_fixtures</code> since migration <strong>050</strong> and were
+      hard-coded <code>null</code> in <code>fixtureToMatch</code>. <code>lib/matchStatus.ts:47</code>
+      <code>getMatchStatusBadge</code> keys on exactly those two, so <strong>a postponed league fixture rendered its kickoff time as
+      though the game were on — on the web as well as the phone.</strong> Now read and carried
+      (<code>lib/league/read.ts:104-105</code>, <code>:225-229</code>).</p>
+  </div>
+
+  <div class="card neutral">
+    <h3 style="margin:0 0 8px">Two structural firsts worth recording</h3>
+    <p style="margin:0 0 10px"><strong><code>mobile/</code> has tests.</strong> The pure list logic moved into
+      <code>mobile/lib/resultsSections.ts</code> and <code>mobile/lib/homeMatches.ts</code> — <strong>no React Native
+      imports</strong>, so the root vitest can reach them — and <code>mobile/**/__tests__/**</code> is now in
+      <code>vitest.config.ts:37</code>. <strong>26 tests</strong> (17 + 9), six of them World Cup regression guards.
+      ⚠ <strong>This contradicts any note saying mobile has no test runner.</strong></p>
+    <p style="margin:0 0 10px"><strong>The Results screen is a plain <code>ScrollView</code> and does not virtualise.</strong> 64
+      World Cup matches was fine; a season is <strong>380</strong> and two leagues are <strong>760</strong>, all mounted at once.
+      The list is now windowed <strong>in rows</strong> (not sections — date mode makes ~180 tiny ones, matchweek mode 38 large
+      ones, out of the same fixtures) and grown <strong>outward from the live/next section</strong>, because the first 120 rows of a
+      season is August while tonight's game is off the bottom. <code>ROW_BUDGET = 120</code>
+      (<code>mobile/lib/resultsSections.ts:143</code>), chosen so a World Cup list still renders <strong>whole</strong> — 64 &lt;
+      120, asserted rather than assumed.</p>
+    <p style="margin:0">⚠ <strong><code>loading</code> in the matches provider must stay the World Cup read only.</strong> The
+      splash gate (<code>mobile/app/_layout.tsx:356</code>) waits on it, so folding the league fetch in would put a network call on
+      cold start. League loading and its error are separate fields, and the Results screen reads both — without that a league member
+      sees "No Matches" for the length of the fetch, and a failed fetch is indistinguishable from a season with no football in it.</p>
+  </div>
+
+  <div class="card warnc">
+    <h3 style="margin:0 0 8px">Verification — what is and is not claimed</h3>
+    <ul style="margin:0;padding-left:20px">
+      <li>✅ <strong>1,244 tests across 92 files pass</strong> — re-run by this pass, 4.53 s, 6 skipped.</li>
+      <li>✅ <code>scripts/verify-rn-fixtures.ts</code> <strong>re-run against production by this pass</strong>: all checks pass for
+        <strong>five</strong> leagues — Premier League, La Liga, Serie A (380 fixtures / 20 clubs), Bundesliga, Ligue 1 (306 / 18).
+        Every fixture carries a matchweek, every club is named and crested, sections read "Matchweek 1" … "Matchweek 38", 120–126 of
+        380 rows mount. It runs the phone's <strong>own</strong> list logic (<code>roundSections</code>,
+        <code>homeMatchesFrom</code>, imported straight out of <code>mobile/</code>) over the real season.</li>
+      <li>⚠ <strong>Mobile <code>tsc</code> is NOT clean, and the commit messages' account of it is wrong.</strong> Four errors
+        remain — <code>mobile/app/pool/[id]/banter.tsx:1140</code> (×2) and
+        <code>mobile/components/pool-detail/BanterSheet.tsx:933, :1292</code>, all <code>react-native-gifted-chat</code> prop
+        mismatches. Both files were last touched <strong>2026-07-06</strong>, so they are genuinely pre-existing and untouched by
+        this work — but the claimed "pre-existing <code>_layout.tsx:158</code> tuple error" <strong>does not reproduce</strong>.</li>
+      <li>⬜ <strong>No formal device QA.</strong> Ryan saw it render. That is one device, one build, one look.</li>
+      <li>⛔ <strong>Not deployed, and it is on a third branch.</strong> All of it is local on
+        <code>tester-gate/allowlist-in-the-app</code>, <strong>unpushed</strong> — no remote ref contains it. That branch is
+        <strong>259 commits ahead of <code>origin/master</code></strong>, against <code>Development</code>'s 225, so it is
+        <em>further</em> from production than the gap <strong>R21</strong> describes (<strong>Gate M0</strong>).</li>
+    </ul>
+  </div>
+
+  <div class="card crit">
+    <h3 style="margin:0 0 8px">Still open on this surface, stated plainly</h3>
+    <ul style="margin:0;padding-left:20px">
+      <li><strong>Picking on a phone is not built</strong> for any of the four league modes — <em>Decision 14</em>, Ryan's call
+        2026-09-02: RN development had not begun, and a picking control deserves its own design pass.
+        <code>mobile/lib/leagueSurface.ts</code> keeps the one rule worth keeping — a league pool never reaches the World Cup
+        wizard, discriminated on <code>isLeague</code> and <strong>not</strong> on <code>leagueMode</code>, because two production
+        pools carry a season id with a NULL mode and would fall straight through a mode check.</li>
+      <li><strong>League pushes still dead-end.</strong> <code>lib/league/notify.ts</code> sends
+        <code>data: { poolId, tab }</code>; <code>mobile/lib/usePushNotificationHandlers.ts:47</code> switches on
+        <code>data.type</code>, so <code>routeFor</code> returns <code>null</code> and the tap goes nowhere. ⚠ Its one existing
+        branch reads <code>data.pool_id</code> — a second mismatch with what <code>notify.ts</code> sends. Untouched by this
+        work.</li>
+      <li><strong>Match detail shows no predictions for a league fixture</strong> — a stated v1 boundary. League picks are
+        pool-scoped and a match opened from a <em>global</em> list has no pool in hand, so the alternative is one contract call per
+        pool per tap, which is the fetch-per-goal pattern the read-path review exists to stop.</li>
+      <li>⚠ <strong>Gate M1 is named "one read, two surfaces", and the pool contract currently has one.</strong>
+        <code>mobile/lib/useLeaguePool.ts</code> was <strong>deleted</strong> in the revert, so
+        <code>/api/pools/:id/league</code> has <strong>no second-surface consumer at all</strong> today. The two routes mobile
+        <em>does</em> consume are the calendar and the pool card. Whether the gate is met by any pair of routes or specifically by
+        the pool contract is <strong>Ryan's to say</strong>, and it changes what "M1 done" means.</li>
+    </ul>
+  </div>
+
+  <div class="card neutral">
+    <h3 style="margin:0 0 8px">The four gates, in the order they bind</h3>
+    <div class="scroller">
+      <table class="risk">
+        <thead><tr><th>Gate</th><th>Status</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td class="id">M0</td><td><span class="chip lvl-crit">⛔ BLOCKING</span></td>
+            <td><strong>Deploy what exists.</strong> <code>origin/master</code> is 225 commits and ~30 migrations behind
+              (<strong>R21</strong>). Building RN against web behaviour no member has ever seen means verifying against a moving
+              target and shipping an OTA into a mismatch. <strong>Nothing else on this list should start first.</strong></td></tr>
+          <tr><td class="id">M1</td><td><span class="chip lvl-med">🟡 STARTED</span></td>
+            <td><strong>One read, two surfaces.</strong> <code>lib/league/season.ts</code> +
+              <code>GET /api/pools/:id/league</code> (<code>ee240bf</code>), plus <code>/api/users/:id/fixtures</code> and
+              <code>/api/users/:id/home-scoring</code>. The single largest item, and the one that decides whether the RN build is a
+              port or a rewrite. It also <strong>fixes R23 for the web at the same time</strong>. ⚠ See the caveat above — the pool
+              contract has no second consumer.</td></tr>
+          <tr><td class="id">M2</td><td><span class="chip ok">✅ DONE</span></td>
+            <td><strong>Give mobile a cache.</strong> <code>@tanstack/react-query</code> 5.102.8, a client created once
+              (<code>mobile/lib/queryClient.ts:33</code>, mounted at <code>mobile/app/_layout.tsx:225</code>),
+              <code>AppState</code> wired to <code>focusManager</code> (<code>queryClient.ts:78</code> — React Query's focus
+              tracking is written for a browser and never fires in RN without it), 30s staleTime. ⚠ <strong>The first consumer is
+              no longer <code>useLeaguePool</code></strong> — that hook was deleted in the revert. It is now
+              <code>useTournamentMatches</code>' <code>leagueQuery</code>
+              (<code>mobile/lib/useTournamentMatches.ts:247</code>).</td></tr>
+          <tr><td class="id">M3</td><td><span class="chip lvl-med">🟡 MOVED</span></td>
+            <td><strong>Retire mobile's <code>postgres_changes</code>.</strong> ⚠ <strong>The consumer list this gate carried was
+              wrong and is corrected 2026-09-02 by counting them:</strong> not four, but <strong>nine subscriptions across seven
+              files</strong> — <code>usePendingActions.tsx</code> ×3, plus <code>HomeDataProvider.tsx</code>,
+              <code>useMemberRoster.ts</code>, <code>usePoolDetail.ts</code>, <code>usePoolBanter.ts</code>,
+              <code>useTournamentMatches.ts</code>, <code>useMatchDetail.ts</code>, on four distinct tables.
+              <code>usePoolEntries.ts</code> no longer has one — it is on the broadcast. 🟡 <strong>One retired
+              2026-09-02:</strong> <code>useHomeData</code>'s duplicate <code>matches</code> channel, whose own comment said it
+              "mirrors the Results tab" — it did, exactly. <code>matches</code> goes from <strong>three</strong> subscriptions to
+              <strong>two</strong>; the publication drop that banks any of this is still gated on the OTA. ⚠ The largest single
+              item is <strong>web presence at 63.6%</strong> (<strong>R27</strong>), which M3 as scoped never covered.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:10px 0 0">⚠ <strong>The estimate is deliberately not given as a date.</strong> M1 is the one that decides
+      everything and it has not been designed yet. What can be said: <strong>M0 is days, M2 and M3 are each a few days and were both
+      decided over a month ago, and M1 is the piece that needs a plan before anyone can size it.</strong> Per <em>Plan before
+      executing</em>, M1 wants a written plan Ryan approves before code.</p>
+  </div>
+
+  <div class="note warn">
+    <strong>Why mobile could not read league data (R24), and what is still true of it.</strong> Mobile is
+    <strong>direct-to-PostgREST</strong> — ~110 <code>.from()</code> table reads across <code>mobile/lib</code>,
+    <code>mobile/app</code> and <code>mobile/components</code>. Migration <strong>050</strong> put RLS on
+    <code>league_match_scores</code>, <code>league_entry_totals</code>, <code>league_fixture_state</code> and
+    <code>league_score_events</code> with <strong>zero policies</strong>, on purpose — those hold every number a league screen
+    shows. <strong>RLS with no policy is not a 403:</strong> PostgREST returns <code>[]</code> with <code>error: null</code>, so the
+    read "succeeds", the map is empty and the screen renders a confident zero.
+    <code>lib/league/__tests__/denyAllTables.guard.test.ts</code> exists because this bug was found <strong>four times in one
+    afternoon on 2026-08-30 — on the web</strong>, where the pattern is better understood than it would be in a new RN file. The web
+    reads those tables with the <strong>service-role client from a server component</strong>, which RN has no equivalent of and must
+    never hold. <strong>There is no port of this; there is only a new server surface both can call.</strong>
   </div>
 </section>
 
@@ -1645,11 +2070,33 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ PROJECTS ============================ -->
 <section id="projects">
-  <h2 class="sec">Projects in this programme <span class="count">7</span></h2>
+  <h2 class="sec">Projects in this programme <span class="count">9</span> <span class="chip ok">2 ADDED 2026-09-02</span></h2>
   <p class="sec-sub">SportPool is several distinct projects under one banner. Day-to-day delivery is still ordered by
     priority (Now → Later) below; these are the larger bodies of work those items roll up into.
     <em>Nesting note: the markdown associates work with a project through its section headings and each project's own
-    description — it does not tag every backlog item with a project. Only stated associations are shown here.</em></p>
+    description — it does not tag every backlog item with a project. Only stated associations are shown here.</em>
+    ⚠ <strong>The two cards immediately below were added 2026-09-02; the seven after them are 2026-07-30 text and their
+    statuses have moved</strong> — see the markdown.</p>
+
+  <div class="card crit">
+    <h4>🚢 Ship what is built <span class="chip lvl-crit">🔴 Blocking everything</span></h4>
+    <p style="margin:0 0 8px">225 commits and ~30 migrations sit between <code>Development</code> and production, and the schema
+      has moved past the deployed code. <strong>The largest single item in the programme, and it is not a build.</strong></p>
+    <p style="margin:0">Carries <strong>R21</strong>. Every ✅ below the Premier League heading in the markdown describes code no
+      member can reach.</p>
+  </div>
+
+  <div class="card warnc">
+    <h4>📱 The RN league build <span class="chip lvl-med">🟡 Read half landed, ⛔ undeployed</span></h4>
+    <p style="margin:0 0 8px">Bring the Expo app to parity with the league product. ⚠️ <strong>Status corrected 2026-09-02:
+      started, and the read half is the part that moved.</strong> The gate was always a read API rather than screens — mobile is
+      direct-to-PostgREST and four league engine tables are deny-all (<strong>R24</strong>).</p>
+    <p style="margin:0 0 8px">Two server routes now carry the league to the phone: <code>/api/users/:id/fixtures</code> (all three
+      match surfaces — Results, Home, match detail) and <code>/api/users/:id/home-scoring</code> (the pool card). Ryan confirmed it
+      on his device.</p>
+    <p style="margin:0"><strong>Picking is not built for any mode, by decision</strong> (Decision 14), and no league <em>pool</em>
+      screen exists. Full detail: <a href="#rn-league">📱 The RN league build</a>.</p>
+  </div>
 
   <div class="card pri" style="border-left:4px solid var(--primary)">
     <h4>🌍 Multi-sport platform <span class="chip">🔵 Designing</span></h4>

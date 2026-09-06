@@ -223,6 +223,9 @@ describe('kpiTiles — the mode-dependent slot', () => {
     opponentName: 'Marcus',
     opponent: { user_id: 'u-marcus', full_name: 'Marcus Bell', username: 'marcus' },
     isBye: false, duelMatchweek: 3, revealsAt: null,
+    // The band's two corners: your face, and what the opponent carries in.
+    you: { user_id: 'u-me', full_name: 'Ryan Sousa', username: 'izzet' },
+    opponentRank: 5, opponentDuelPoints: 9,
     recentDuels: ['won', 'tied', 'lost', 'won', 'won'] as DuelOutcome[],
   }
   const sdPool = (over = {}) =>
@@ -314,6 +317,7 @@ describe('kpiTiles — Last Man Standing', () => {
     survivorsLeft: 4, roundEntrants: 10,
     inPlayClubName: 'Arsenal', inPlayMatchweek: 2, inPlayClubCrest: 'https://x/arsenal.png',
     openClubName: 'Hull City', openMatchweek: 3, openClubCrest: 'https://x/hull.png',
+    clubsUsed: 7, clubPool: 20,
   }
   const lmsPool = (over = {}) =>
     pool({ league_mode: 'last_man_standing', totalMatches: 1, hasScoringStarted: true,
@@ -323,11 +327,53 @@ describe('kpiTiles — Last Man Standing', () => {
     // ⚠ 900 accuracy points, 2 rounds won. `league_finalize_ranks` sorts on
     // rounds_won ahead of everything — showing 900 would put a number in tile 1
     // unrelated to the rank in tile 2.
-    expect(kpiTiles(lmsPool()).map((t) => t.label)).toEqual(['Rounds', 'Rank', 'This week', 'Still in'])
+    // ⚠ NO 'Rank'. See `lmsTiles` — the stored rank in this mode is entry_id
+    // order, and survival is binary so there is none to show even if it were
+    // right. `current_rank: 3` is left on the fixture ON PURPOSE: it proves the
+    // tile is gone because the mode says so, not because the data happened to
+    // be absent.
+    expect(kpiTiles(lmsPool()).map((t) => t.label)).toEqual(['Rounds', 'Clubs', 'This week', 'Still in'])
     // ⚠ "Rounds won" measured 56.6px against a 54px column on the dashboard's
     // strip card, so the tile carrying the season score read "Rounds wo…". The
     // verb moved into the caption rather than off the card.
     expect(kpiTiles(lmsPool())[0]).toMatchObject({ value: '2', sub: 'in round 3' })
+  })
+
+  it('never shows a rank, even when one is sitting on the pool', () => {
+    // The regression this exists to stop. `hasScoringStarted` gates league pools
+    // on `total_points > 0` and LMS writes none, so a Rank tile rendered "—"
+    // forever and looked harmless — a mode with points would have published
+    // entry_id order as a leaderboard position. Asserting on the LABELS rather
+    // than on the value is deliberate: a tile reading "—" would pass a value
+    // check while still occupying one of only four slots.
+    const tiles = kpiTiles(lmsPool())
+    expect(tiles.some((t) => t.label === 'Rank')).toBe(false)
+  })
+
+  it('counts the clubs spent in this round, against the season club count', () => {
+    // ⚠ The denominator is the SEASON's, not twenty — Germany has 18.
+    expect(kpiTiles(lmsPool())[1]).toMatchObject({
+      kind: 'stat', label: 'Clubs', value: '7', sub: 'of 20 used', tone: 'ink',
+    })
+    expect(kpiTiles(lmsPool({ clubsUsed: 4, clubPool: 18 }))[1]).toMatchObject({
+      value: '4', sub: 'of 18 used',
+    })
+  })
+
+  it('reads an unspent squad as an absence, not a score', () => {
+    // Round one, nothing picked yet. Muted for the same reason an empty table
+    // mutes "Spot on" — a zero here is not a judgement on anybody.
+    expect(kpiTiles(lmsPool({ clubsUsed: 0 }))[1]).toMatchObject({
+      value: '0', sub: 'of 20 used', tone: 'muted',
+    })
+  })
+
+  it('drops the fraction rather than printing "of 0" when the club count is missing', () => {
+    // `league_seasons.club_count` failed to read. A denominator of zero is
+    // arithmetically nonsense on a tile whose whole point is scarcity.
+    expect(kpiTiles(lmsPool({ clubsUsed: 5, clubPool: 0 }))[1]).toMatchObject({
+      value: '5', sub: 'used',
+    })
   })
 
   it('names the club being PLAYED, not the one lined up for next week', () => {
@@ -453,8 +499,8 @@ describe('kpiTiles — every mode now has a branch', () => {
     // would silently drop one.
     const modes: Array<Partial<PoolCardPool>> = [
       { league_mode: 'pickem' },
-      { league_mode: 'showdown', showdown: { duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, opponentName: null, opponent: null, isBye: false, duelMatchweek: null, revealsAt: null, recentDuels: [] } },
-      { league_mode: 'last_man_standing', lms: { roundsWon: 0, roundNumber: 1, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 5, roundEntrants: 5, inPlayClubName: null, inPlayMatchweek: null, inPlayClubCrest: null, openClubName: null, openMatchweek: 1, openClubCrest: null } },
+      { league_mode: 'showdown', showdown: { duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, opponentName: null, opponent: null, opponentRank: null, opponentDuelPoints: null, you: null, isBye: false, duelMatchweek: null, revealsAt: null, recentDuels: [] } },
+      { league_mode: 'last_man_standing', lms: { roundsWon: 0, roundNumber: 1, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 5, roundEntrants: 5, clubsUsed: 0, clubPool: 20, inPlayClubName: null, inPlayMatchweek: null, inPlayClubCrest: null, openClubName: null, openMatchweek: 1, openClubCrest: null } },
       { league_mode: 'table', table: { spotOn: 0, clubCount: 20, averageOff: null, hasTable: true, isFinal: false } },
       { prediction_mode: 'full_tournament', league_mode: null },
     ]
@@ -466,25 +512,40 @@ describe('kpiTiles — tile order is a contract, because the dashboard drops the
   // ⚠ The dashboard card is 357px and shows only THREE of these (SHAPE in
   // components/pools/PoolCard.tsx). It takes the first three, so the ORDER here
   // is what decides which fact a member loses on that surface. Tile 1 must be
-  // the mode's own score and tile 2 the rank — those are the two that have to
-  // survive on every surface — which makes tile 4 the droppable one by
-  // construction.
-  const cases: Array<[string, Partial<PoolCardPool>, string]> = [
-    ['pickem', { league_mode: 'pickem', openMatchweekNumber: 3 }, 'Points'],
-    ['showdown', { league_mode: 'showdown', showdown: { duelPoints: 4, won: 1, tied: 1, lost: 0, byes: 0, opponentName: 'Ana', opponent: null, isBye: false, duelMatchweek: 3, revealsAt: null, recentDuels: [] } }, 'Duel pts'],
-    ['last_man_standing', { league_mode: 'last_man_standing', lms: { roundsWon: 1, roundNumber: 2, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 3, roundEntrants: 8, inPlayClubName: 'Arsenal', inPlayMatchweek: 4, inPlayClubCrest: null, openClubName: null, openMatchweek: 5, openClubCrest: null } }, 'Rounds'],
-    ['table', { league_mode: 'table', table: { spotOn: 4, clubCount: 20, averageOff: 1.2, hasTable: true, isFinal: false } }, 'Table pts'],
-    ['full_tournament', { prediction_mode: 'full_tournament', league_mode: null }, 'Points'],
+  // the mode's own SCORE and tile 2 its second-most-important FACT — those are
+  // the two that have to survive everywhere — which makes tile 4 the droppable
+  // one by construction.
+  //
+  // ⚠ TILE 2 IS NOT ALWAYS 'Rank', and this test used to say it was. Last Man
+  // Standing has no rank to show: the stored one is entry_id order, and
+  // survival is binary so numbering survivors would invent a hierarchy the
+  // football has not produced. Its second fact is how much of the squad is
+  // spent. Naming the expected label per mode keeps the contract — the second
+  // tile is load-bearing — without asserting a tile that one mode must not have.
+  const cases: Array<[string, Partial<PoolCardPool>, string, string]> = [
+    ['pickem', { league_mode: 'pickem', openMatchweekNumber: 3 }, 'Points', 'Rank'],
+    ['showdown', { league_mode: 'showdown', showdown: { duelPoints: 4, won: 1, tied: 1, lost: 0, byes: 0, opponentName: 'Ana', opponent: null, opponentRank: 2, opponentDuelPoints: 6, you: null, isBye: false, duelMatchweek: 3, revealsAt: null, recentDuels: [] } }, 'Duel pts', 'Rank'],
+    ['last_man_standing', { league_mode: 'last_man_standing', lms: { roundsWon: 1, roundNumber: 2, isEliminated: false, eliminatedMatchweek: null, survivorsLeft: 3, roundEntrants: 8, clubsUsed: 3, clubPool: 20, inPlayClubName: 'Arsenal', inPlayMatchweek: 4, inPlayClubCrest: null, openClubName: null, openMatchweek: 5, openClubCrest: null } }, 'Rounds', 'Clubs'],
+    ['table', { league_mode: 'table', table: { spotOn: 4, clubCount: 20, averageOff: 1.2, hasTable: true, isFinal: false } }, 'Table pts', 'Rank'],
+    ['full_tournament', { prediction_mode: 'full_tournament', league_mode: null }, 'Points', 'Rank'],
   ]
 
-  for (const [name, over, expectedFirst] of cases) {
-    it(`${name}: score first, rank second — so the dropped tile is never either`, () => {
+  for (const [name, over, expectedFirst, expectedSecond] of cases) {
+    it(`${name}: ${expectedFirst} then ${expectedSecond} — so the dropped tile is never either`, () => {
       const tiles = kpiTiles(pool(over))
       expect(tiles[0].label).toBe(expectedFirst)
-      expect(tiles[1].label).toBe('Rank')
+      expect(tiles[1].label).toBe(expectedSecond)
       // What the dashboard actually renders.
       expect(tiles.slice(0, 3).map((t) => t.label)).toHaveLength(3)
-      expect(tiles.slice(0, 3).map((t) => t.label)).toContain('Rank')
+      expect(tiles.slice(0, 3).map((t) => t.label)).toContain(expectedSecond)
     })
   }
+
+  it('last man standing is the ONLY mode without a rank tile', () => {
+    // Stated once, positively, so a future mode cannot quietly join it.
+    const withoutRank = cases
+      .filter(([, over]) => !kpiTiles(pool(over)).some((t) => t.label === 'Rank'))
+      .map(([name]) => name)
+    expect(withoutRank).toEqual(['last_man_standing'])
+  })
 })
