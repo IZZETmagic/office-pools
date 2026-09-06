@@ -68,6 +68,40 @@ export default function SettingsScreen() {
     },
   ];
 
+  /**
+   * Dev-only doors into the two Showdown review surfaces.
+   *
+   * ⚠ THEY EXIST BECAUSE DEEP LINKS DO NOT REACH A PHYSICAL DEVICE. Both the
+   * phase harness and the June reveal playground were written as deep-link-only
+   * routes — `officepools://…` — and `npx uri-scheme open` targets a SIMULATOR.
+   * This machine has no simulator destinations (Xcode has no usable
+   * destinations, Android's Maven is 403), so on real hardware there has never
+   * been a way in. The playground has been unreachable since 2026-06-27 for
+   * exactly this reason, which is why nobody has looked at it.
+   *
+   * ⚠⚠ `__DEV__` IS LOAD-BEARING. These are review surfaces with fixture data
+   * in them; a member finding "Showdown phase harness" in their settings would
+   * see a duel against somebody called Priya who does not exist in their pool.
+   * Metro strips this branch from a production bundle — but only because the
+   * check is a literal `__DEV__`, not a variable holding it.
+   */
+  const devItems: Row[] = [
+    {
+      id: 'dev-phases',
+      icon: 'flame.fill',
+      title: 'Showdown phase harness',
+      subtitle: 'All six phases on demand, from fixtures',
+      onPress: () => router.push('/showdown-phase-harness'),
+    },
+    {
+      id: 'dev-reveal',
+      icon: 'sparkles',
+      title: 'Reveal playground',
+      subtitle: 'The 2026-06-27 motion-spec scrubber',
+      onPress: () => router.push('/showdown-reveal-playground'),
+    },
+  ];
+
   const dangerItems: Row[] = [
     {
       id: 'sign-out',
@@ -102,6 +136,16 @@ export default function SettingsScreen() {
             render={({ id: _id, ...row }) => <SettingsRow {...row} />}
           />
         </SectionWrapper>
+
+        {__DEV__ ? (
+          <SectionWrapper title="Developer">
+            <DividedList
+              items={devItems}
+              keyOf={(i) => i.id}
+              render={({ id: _id, ...row }) => <SettingsRow {...row} />}
+            />
+          </SectionWrapper>
+        ) : null}
 
         <SectionWrapper title="Account Actions">
           <DividedList
