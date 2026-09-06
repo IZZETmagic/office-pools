@@ -421,6 +421,11 @@ type PoolDetailProps = {
   tableModeData?: TableModeData | null
   showdownData?: ShowdownData | null
   lmsData?: LmsData | null
+  /**
+   * Last Man Standing's leaderboard, read server-side with the SAME reader and
+   * ordering the mobile app uses. Null in every other mode.
+   */
+  lmsBoard?: import('@/lib/league/leaderboard').LeagueLeaderboard | null
   roundSubmissions?: EntryRoundSubmission[]
   bpGroupRankings?: BPGroupRanking[]
   bpThirdPlaceRankings?: BPThirdPlaceRanking[]
@@ -473,6 +478,7 @@ export function PoolDetail({
   tableModeData = null,
   showdownData = null,
   lmsData = null,
+  lmsBoard = null,
   roundSubmissions = [],
   bpGroupRankings = [],
   bpThirdPlaceRankings = [],
@@ -658,6 +664,12 @@ export function PoolDetail({
 
   // Entry management
   const [entries, setEntries] = useState<EntryData[]>(userEntries)
+  /**
+   * The viewer's own entries, as a set — the LMS leaderboard's YOU pill and row
+   * tint. Built from `entries` rather than the single `activeEntry` because a
+   * member can hold several, and every one of them is "you".
+   */
+  const myEntryIds = useMemo(() => new Set(entries.map((e) => e.entry_id)), [entries])
   const [activeEntryId, setActiveEntryId] = useState<string>(
     userEntries[0]?.entry_id || ''
   )
@@ -2242,6 +2254,8 @@ export function PoolDetail({
             {(!needsBulk || bulkState === 'ready') && <>
             {activeTab === 'leaderboard' && (
               <LeaderboardTab
+                lmsBoard={lmsBoard}
+                myEntryIds={myEntryIds}
                 poolId={pool.pool_id}
                 members={members}
                 bonusScores={bonusScores}

@@ -106,6 +106,11 @@ export default async function PoolPage({
   let tableModeData: import('./PoolDetail').TableModeData | null = null
   let showdownData: import('./PoolDetail').ShowdownData | null = null
   let lmsData: import('./PoolDetail').LmsData | null = null
+  /**
+   * Last Man Standing's leaderboard rows — the mode has no points, so the
+   * generic board would be a column of zeros. Null for every other mode.
+   */
+  let lmsLeaderboard: import('@/lib/league/leaderboard').LeagueLeaderboard | null = null
   let roundSubmissions: EntryRoundSubmission[] = []
   if (pool.prediction_mode === 'progressive') {
     const [roundStatesRes, roundSubsRes] = await Promise.all([
@@ -348,6 +353,39 @@ export default async function PoolPage({
           [...totalsRes.totals].map(([entryId, t]) => [entryId, t.roundsWon]),
         ),
       }
+
+      /**
+       * THE LEADERBOARD, from the reader the mobile app already uses.
+       *
+       * ⚠ `readLeagueLeaderboard` and NOT a second derivation off `lmsData`,
+       * even though almost every field is already in hand. This is the one
+       * function that decides the mode's ordering (`compareLms` — season score
+       * first, then survival), and two platforms disagreeing about who is
+       * leading is the failure worth spending a query to avoid. It is also
+       * where `retired_at` is filtered, which a hand-rolled version would have
+       * to remember (migration 134).
+       *
+       * ⚠ ADMIN, as the reader requires: `league_entry_totals` is one of
+       * migration 050's deny-all tables, so a user-scoped read returns zero
+       * rows with no error — the confident-zero shape that makes a `rounds_won`
+       * badge impossible to paint.
+       *
+       * ⚠ It re-implements the pick seal in TypeScript BECAUSE it holds the
+       * service key (see its header). That is its bargain, not a bug — and it
+       * is exactly why the picks WALL above reads `readLmsState` on the user's
+       * client instead. Two screens, two clients, one rule enforced twice on
+       * purpose: once by the database, once by the code that had to bypass it.
+       */
+      const { readLeagueLeaderboard } = await import('@/lib/league/leaderboard')
+      const { createAdminClient: adminForLmsBoard } = await import('@/lib/supabase/server')
+      const lmsBoard = await readLeagueLeaderboard(
+        adminForLmsBoard(),
+        pool_id,
+        { league_season_id: pool.league_season_id, league_mode: pool.league_mode },
+        membership?.member_id ?? null,
+      )
+      if (lmsBoard.error) console.error('[pool page] lms leaderboard failed:', lmsBoard.error)
+      lmsLeaderboard = lmsBoard.leaderboard
     }
 
     const standings = await readLeagueStandings(supabase, pool.league_season_id)
@@ -819,6 +857,7 @@ export default async function PoolPage({
       tableModeData={tableModeData}
       showdownData={showdownData}
       lmsData={lmsData}
+      lmsBoard={lmsLeaderboard}
       bpGroupRankings={bpGroupRankings}
       bpThirdPlaceRankings={bpThirdPlaceRankings}
       bpKnockoutPicks={bpKnockoutPicks}

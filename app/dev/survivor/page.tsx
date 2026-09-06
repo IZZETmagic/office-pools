@@ -26,6 +26,8 @@ import { notFound, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
 import SurvivorTab from '../../pools/[pool_id]/SurvivorTab'
+import LmsLeaderboard from '../../pools/[pool_id]/LmsLeaderboard'
+import type { LeagueLeaderboard } from '@/lib/league/leaderboard'
 import type { LmsPick, LmsRosterEntry } from '@/lib/league/lms'
 
 const ROUND = { round_id: 'r1', round_number: 2, first_matchweek: 3, last_matchweek: null }
@@ -140,6 +142,14 @@ function Harness() {
           Dev harness — round 2, MW3 and MW4 settled, MW5 open. Do not click a club: the picker
           posts to a pool that does not exist.
         </p>
+        <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">
+          Leaderboard tab
+        </p>
+        <LmsLeaderboard board={BOARD} myEntryIds={new Set(['e1'])} />
+
+        <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold pt-4">
+          Survival tab
+        </p>
         <SurvivorTab
           poolId="harness"
           round={ROUND}
@@ -167,6 +177,55 @@ function Harness() {
 }
 
 /** `useSearchParams` suspends, so it needs a boundary above it. */
+
+function boardRow(
+  entry_id: string, entry_name: string, username: string,
+  lms: NonNullable<LeagueLeaderboard['rows'][number]['lms']>,
+): LeagueLeaderboard['rows'][number] {
+  return {
+    entry_id, entry_name, entry_number: 1, member_id: entry_id, user_id: entry_id,
+    full_name: entry_name, username,
+    // ⚠ Zero and NULL on purpose. The mode has no points, and its stored rank is
+    // entry_id order — which is exactly why this component ignores both.
+    total_points: 0, current_rank: null, previous_rank: null,
+    has_filed: false, champion: null, pickem: null, lms,
+  }
+}
+
+/**
+ * The leaderboard's own fixture, in `compareLms` order — season score first,
+ * then survival, then who lasted longer.
+ *
+ * ⚠ ORDERED BY HAND HERE, and that is the point of the harness rather than a
+ * shortcut: the real page gets this order from `readLeagueLeaderboard`, so this
+ * list is what the sort is SUPPOSED to produce. Marcus leads on two rounds won
+ * while sitting out of this one — the case the OUT chip exists to keep honest.
+ */
+const BOARD: LeagueLeaderboard = {
+  mode: 'last_man_standing',
+  depth: null,
+  is_final: false,
+  lms: {
+    round_number: 2, first_matchweek: 3, last_matchweek: null,
+    standing: 2, in_round: 5, pick_matchweek: 5, pick_in_play: false, pick_revealed: false,
+  },
+  rows: [
+    // Two rounds won, but OUT of this one — season leads, round rides along.
+    boardRow('e2', 'Marcus Webb', 'marcusw', { is_round_winner: false, in_round: true, eliminated_matchweek: 4, rounds_won: 2, pick: null, pick_sealed: false }),
+    // You, still in, pick sealed because MW5 has not locked.
+    boardRow('e1', 'You', 'izzetmagic', { is_round_winner: false, in_round: true, eliminated_matchweek: null, rounds_won: 1, pick: null, pick_sealed: true }),
+    // Still in, and their club is public — the crest chip.
+    boardRow('e7', 'Ana Lucia', 'analucia', { is_round_winner: false, in_round: true, eliminated_matchweek: null, rounds_won: 0, pick: { club_name: 'Chelsea', crest_url: crest('%23034694', 'C') }, pick_sealed: false }),
+    // Out, later — sorts above the earlier exit.
+    boardRow('e3', 'Priya Raman', 'priyar', { is_round_winner: false, in_round: true, eliminated_matchweek: 4, rounds_won: 0, pick: null, pick_sealed: false }),
+    boardRow('e4', 'Danny O’Shea', 'dannyo', { is_round_winner: false, in_round: true, eliminated_matchweek: 3, rounds_won: 0, pick: null, pick_sealed: false }),
+    // In the round, not out, nothing picked and nothing hiding it.
+    boardRow('e8', 'Tom Ellis', 'tome', { is_round_winner: false, in_round: true, eliminated_matchweek: null, rounds_won: 0, pick: null, pick_sealed: false }),
+    // ⚠ NOT eliminated — joined after the round opened. Grey, never red.
+    boardRow('e5', 'Kwame Boateng', 'kwameb', { is_round_winner: false, in_round: false, eliminated_matchweek: null, rounds_won: 0, pick: null, pick_sealed: false }),
+  ],
+}
+
 export default function SurvivorHarnessPage() {
   return (
     <Suspense fallback={null}>
