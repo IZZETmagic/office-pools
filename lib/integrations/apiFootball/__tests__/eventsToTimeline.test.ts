@@ -111,8 +111,79 @@ describe('eventsToTimeline — Brentford 1–1 Sunderland (1557388)', () => {
   })
 })
 
+
+describe('eventsToTimeline — Crystal Palace 1–4 Manchester City (1557381)', () => {
+  // ⚠ THE OWN-GOAL FIXTURE, AND IT IS IN THE SUITE FOR A REASON. The mapper
+  // used to flip an own goal to the opposite side on the assumption that the
+  // provider attributes it to the scorer's own team. It does not: the 56th
+  // minute Own Goal here is attributed to CRYSTAL PALACE — the side it counted
+  // FOR — with `player` = G. Donnarumma, a Manchester City player.
+  //
+  // That flip cost 14 of 137 backfilled fixtures their scoreline and was
+  // invisible to the synthetic test above, which asserted the same wrong
+  // answer. Palace's ONLY goal in this match is the own goal, so if the flip
+  // ever comes back this reads 0–5 and fails immediately.
+  const rows = eventsToTimeline(load('pl-1557381-events.json'), {
+    fixtureId: 'fx-3',
+    homeExternalTeamId: 52, // Crystal Palace
+  })
+
+  it('reproduces 1–4, where the home goal IS the own goal', () => {
+    expect(scoreFrom(rows)).toEqual({ home: 1, away: 4 })
+  })
+
+  it('credits the own goal to the beneficiary, naming the player who scored it', () => {
+    const og = rows.filter((r) => r.kind === 'own_goal')
+    expect(og).toHaveLength(1)
+    expect(og[0].side).toBe('home')          // Palace benefited
+    expect(og[0].player_name).toBe('G. Donnarumma') // a Manchester City player
+    expect(og[0].minute).toBe(56)
+  })
+})
+
+
+describe('eventsToTimeline — Aston Villa 0–1 Arsenal (1557377)', () => {
+  // ⚠ THE FEED LEFT A CANCELLED GOAL IN THE LIST. At 55' it reports both a
+  // `Var / Penalty cancelled` (player: Bukayo Saka) and a `Goal / Normal Goal`
+  // with NO player — the residue of the same incident. Read literally that is a
+  // 0-2 timeline over a 0-1 scoreline, and it was the last of 137 backfilled
+  // fixtures whose timeline did not add up.
+  //
+  // Note this is the OPPOSITE convention to 1557391, where a disallowed goal is
+  // simply absent from the payload. Both fixtures are pinned here because the
+  // mapper has to survive either.
+  const rows = eventsToTimeline(load('pl-1557377-events.json'), {
+    fixtureId: 'fx-4',
+    homeExternalTeamId: 66, // Aston Villa
+  })
+
+  it('reproduces 0–1, not the 0–2 the payload literally contains', () => {
+    expect(scoreFrom(rows)).toEqual({ home: 0, away: 1 })
+  })
+
+  it('keeps the goal that stood, with its scorer', () => {
+    const goals = rows.filter((r) => r.kind === 'goal')
+    expect(goals).toHaveLength(1)
+    expect(goals[0].player_name).toBe('B. Saka')
+    expect(goals[0].minute).toBe(59)
+  })
+
+  it('still records the cancellation itself', () => {
+    expect(rows.filter((r) => r.kind === 'var_goal_cancelled')).toHaveLength(1)
+  })
+
+  it('does not drop an unattributed goal that has no cancellation beside it', () => {
+    // The narrow half of the rule: a null player alone is not enough.
+    const rows2 = eventsToTimeline(
+      [ev({ type: 'Goal', detail: 'Normal Goal', player: { id: null, name: null } })],
+      { fixtureId: 'fx', homeExternalTeamId: 36 },
+    )
+    expect(rows2).toHaveLength(1)
+  })
+})
+
 // -------------------------------------------------------------
-// The cases the two real fixtures happen not to contain. Hand-built from the
+// The cases the real fixtures happen not to contain. Hand-built from the
 // provider's own vocabulary rather than left untested — an own goal on the
 // wrong side and a counted missed penalty are both silent scoreline bugs.
 // -------------------------------------------------------------
@@ -129,16 +200,18 @@ function ev(partial: Partial<ApiFootballEvent> & { type: ApiFootballEvent['type'
 }
 
 describe('eventsToTimeline — the edges', () => {
-  it('credits an own goal to the OTHER side', () => {
-    // The feed attributes it to the team the scorer plays for. Drawn in that
-    // column it would read as them having scored it.
+  it('leaves an own goal on the side the feed gave it', () => {
+    // ⚠ THIS TEST USED TO ASSERT THE OPPOSITE, and was wrong in the same way
+    // the mapper was — a synthetic case can only ever confirm the author's
+    // assumption. The real fixture below is the actual evidence; this one just
+    // guards the unit behaviour.
     const rows = eventsToTimeline([ev({ type: 'Goal', detail: 'Own Goal' })], {
       fixtureId: 'fx',
       homeExternalTeamId: 36,
     })
     expect(rows).toHaveLength(1)
     expect(rows[0].kind).toBe('own_goal')
-    expect(rows[0].side).toBe('away')
+    expect(rows[0].side).toBe('home')
   })
 
   it('drops a missed penalty, which the feed types as a Goal', () => {
@@ -167,6 +240,19 @@ describe('eventsToTimeline — the edges', () => {
       homeExternalTeamId: 36,
     })
     expect(rows).toHaveLength(0)
+  })
+
+  it('clamps a negative minute to zero rather than losing the event', () => {
+    // ⚠ REAL DATA, NOT HYPOTHETICAL. Fixture 1550091 reports two yellow cards
+    // at `elapsed: -5`, and the 0..130 CHECK refused the whole fixture until
+    // this clamp existed — one of 137 lost to a 23514 during the backfill.
+    const rows = eventsToTimeline(
+      [ev({ type: 'Card', detail: 'Yellow Card', time: { elapsed: -5, extra: null } })],
+      { fixtureId: 'fx', homeExternalTeamId: 36 },
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].kind).toBe('yellow')
+    expect(rows[0].minute).toBe(0)
   })
 
   it('keeps stoppage time rather than flattening it into the minute', () => {

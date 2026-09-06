@@ -17,6 +17,12 @@
 --
 -- Plan: ~/.claude/plans/adaptive-painting-wombat.md → Phase 1
 --
+-- ✅ APPLIED TO PRODUCTION 2026-09-06 (ujthamlehjyubbzxbnes). VERIFY block run
+--    after: 5 indexes, RLS on with one authenticated SELECT policy, 3 columns,
+--    pair constraint present, 1752 league_fixtures / 104 matches unchanged. All
+--    three constraint-bite checks refused with 23514 (XOR both-null, XOR
+--    both-set, half-written HT pair).
+--
 -- ## What this is for
 --
 -- The match detail screen's Facts tab. `/fixtures/events` has been fetched on
@@ -63,10 +69,12 @@ CREATE TABLE IF NOT EXISTS match_events (
   -- only question the screen ever asks is "which column", and the fixture
   -- already knows who home and away are.
   --
-  -- ⚠ FOR AN OWN GOAL THIS IS THE SIDE THAT BENEFITS, which is the opposite of
-  -- the team api-football attributes the event to. `eventsToTimeline` flips it;
-  -- anything else writing here must too, or a timeline stops adding up to its
-  -- own scoreline.
+  -- ⚠ FOR AN OWN GOAL THIS IS THE SIDE THAT BENEFITS — AND SO IS THE FEED'S.
+  -- api-football attributes an own goal to the team it counted FOR, with
+  -- `player` set to the man who put it in his own net, so the two are from
+  -- opposite squads by design. `eventsToTimeline` copies `team` straight
+  -- across. An earlier version "corrected" it by flipping, which cost 14 of 137
+  -- backfilled fixtures their scoreline. Do not reintroduce that.
   side          text    NOT NULL,
   kind          text    NOT NULL,
 

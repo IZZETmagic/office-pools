@@ -500,6 +500,10 @@ export function fixtureToLeagueUpdate(
 //
 // 2. A MISSED PENALTY IS `type: 'Goal'`. Dropping it is the difference between
 //    a timeline and a scoreline that does not add up.
+//
+// 3. AN OWN GOAL IS ALREADY ATTRIBUTED TO THE SIDE IT COUNTED FOR. `team` is
+//    the beneficiary and `player` is the man who put it in his own net — they
+//    are deliberately from opposite squads. Do not "correct" this.
 // =============================================================
 
 export type MatchEventKind =
@@ -581,15 +585,62 @@ export function eventsToTimeline(
 ): MatchEventRow[] {
   const rows: MatchEventRow[] = []
 
+  // ⚠ THE FEED IS NOT CONSISTENT ABOUT REMOVING A CANCELLED GOAL, so the
+  // cancellations have to be known before the goals are read.
+  //
+  // In fixture 1557391 a VAR-disallowed goal is simply ABSENT from the payload:
+  // five Goal events for a 2-3 match. In fixture 1557377 — Aston Villa 0-1
+  // Arsenal — the same situation leaves the goal row in place with its player
+  // stripped, alongside the `Var / Penalty cancelled` that explains it:
+  //
+  //     55'  Var  "Penalty cancelled"  player = Bukayo Saka
+  //     55'  Goal "Normal Goal"        player = null
+  //
+  // Read literally that is a 0-2 timeline over a 0-1 scoreline. So a Goal that
+  // shares a minute and a team with a cancellation AND names nobody is dropped:
+  // the feed has already said it did not stand, and a goal with no scorer is
+  // not renderable in any case.
+  //
+  // ⚠ BOTH CONDITIONS, deliberately. Minute+team alone would discard a real
+  // goal scored in the same minute as a separate cancellation; a null player
+  // alone would discard a legitimately unattributed goal. Requiring the two
+  // together is the narrowest rule that fits what the provider actually sends,
+  // and the scoreline check in the tests is what would catch it if the feed
+  // grows a variant this misses.
+  const cancelledAt = new Set<string>()
+  for (const ev of events) {
+    if (ev.type === 'Var' && (ev.detail ?? '').toLowerCase().includes('cancelled')) {
+      cancelledAt.add(`${ev.team?.id}@${ev.time?.elapsed}`)
+    }
+  }
+
   events.forEach((ev, i) => {
     const kind = classify(ev)
     if (kind === null) return
 
+    const isScoring = kind === 'goal' || kind === 'penalty' || kind === 'own_goal'
+    if (
+      isScoring &&
+      !ev.player?.name &&
+      cancelledAt.has(`${ev.team?.id}@${ev.time?.elapsed}`)
+    ) {
+      return
+    }
+
+    // ⚠ NO FLIP FOR AN OWN GOAL. THE FEED ALREADY CREDITS THE RIGHT SIDE, and
+    // an earlier version of this mapper flipped it on the assumption that the
+    // provider attributes an own goal to the team the scorer plays for. It does
+    // not. Verified on fixture 1557381 — Crystal Palace 1-4 Manchester City —
+    // where the 56th-minute Own Goal is attributed to CRYSTAL PALACE, the side
+    // it counted FOR, with `player` = G. Donnarumma, a Manchester City player.
+    //
+    // The flip cost 14 of 137 backfilled fixtures their scoreline: every game
+    // with an own goal came out with that goal in the wrong column, so the
+    // timeline read one short on one side and one over on the other. It was
+    // invisible in unit tests because the synthetic case asserted the wrong
+    // answer too — which is why the real fixture is pinned in the suite now.
     const isHome = ev.team?.id === opts.homeExternalTeamId
-    // ⚠ AN OWN GOAL IS CREDITED TO THE OTHER SIDE. The provider attributes it
-    // to the team the scorer plays for, which is the one it counted against.
-    // Drawn in that column it would read as them having scored it.
-    const side: 'home' | 'away' = kind === 'own_goal' ? (isHome ? 'away' : 'home') : isHome ? 'home' : 'away'
+    const side: 'home' | 'away' = isHome ? 'home' : 'away'
 
     rows.push({
       fixture_id: opts.fixtureId,
@@ -597,7 +648,18 @@ export function eventsToTimeline(
       kind,
       player_name: ev.player?.name ?? null,
       related_name: ev.assist?.name ?? null,
-      minute: ev.time?.elapsed ?? 0,
+      // ⚠ CLAMPED AT ZERO, BECAUSE THE FEED SENDS NEGATIVE MINUTES. Fixture
+      // 1550091 carries two yellow cards at `elapsed: -5` — a booking before
+      // kick-off, or the provider's stand-in for a minute it does not know.
+      // Either way it is not a match minute, and `match_events_minute_ck`
+      // (0..130) refuses it: the backfill lost that whole fixture to a 23514
+      // until this existed.
+      //
+      // Clamped rather than DROPPED on purpose. The cards were really shown, so
+      // discarding them loses a fact; "at or before kick-off" is true, where
+      // "-5th minute" is not. The constraint stays tight so the next kind of
+      // nonsense still fails loudly rather than rendering.
+      minute: Math.max(0, ev.time?.elapsed ?? 0),
       extra_minute: ev.time?.extra ?? null,
       sort_index: i,
     })
