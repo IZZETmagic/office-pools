@@ -162,6 +162,26 @@ export type LmsCardFacts = {
   survivorsLeft: number
   roundEntrants: number
   /**
+   * Distinct clubs this member has spent in the OPEN ROUND, and how many the
+   * competition has.
+   *
+   * ⚠ PER ROUND, NOT PER SEASON, and that is the whole point. A club is spent
+   * for the round you spend it in; `league_lms_settle` opens the next round in
+   * the same transaction that closes one, and everybody starts it with every
+   * club available again. A season-long count would only ever rise and would
+   * never describe the constraint the member is actually under.
+   *
+   * ⚠ DISTINCT, not a row count. Nothing stops the same club appearing twice in
+   * the pick table across a re-home or a corrected pick, and "8 used of 20"
+   * when only 7 clubs are gone would overstate the squeeze in the one mode
+   * where running out is how you lose.
+   *
+   * `clubPool` is `league_seasons.club_count` — 20 in England, 18 in Germany —
+   * so this reads correctly in every competition rather than assuming twenty.
+   */
+  clubsUsed: number
+  clubPool: number
+  /**
    * The club picked for the matchweek being PLAYED, already shortened. NULL when
    * nothing is in play, or when they did not pick that week.
    *
@@ -485,6 +505,25 @@ export async function readLeagueCardFacts(
           .in('entry_id', lmsEntryIds),
       ])
 
+      // The denominator for the Clubs tile. `club_count` is the season's own —
+      // never a hardcoded 20, which is England's number and not Germany's.
+      const lmsSeasonIds = Array.from(
+        new Set(lmsPools.map((x) => x.seasonId).filter((x): x is string => !!x)),
+      )
+      const clubPoolBySeason = new Map<string, number>()
+      if (lmsSeasonIds.length > 0) {
+        const { data: seasonRows, error: seasonErr } = await admin
+          .from('league_seasons')
+          .select('season_id, club_count')
+          .in('season_id', lmsSeasonIds)
+        // ⚠ NOT `const { data }`. A discarded PostgREST error here would render
+        // "7 used of 0" — the tile's own denominator, silently zero.
+        if (seasonErr) console.error('lms club pool:', seasonErr.message)
+        for (const r of (seasonRows ?? []) as Array<{ season_id: string; club_count: number | null }>) {
+          if (r.club_count != null) clubPoolBySeason.set(r.season_id, r.club_count)
+        }
+      }
+
       const pickRows = (lmsPicks ?? []) as Array<{ round_id: string; entry_id: string; matchweek_number: number; club_id: string }>
       const picked = new Set(pickRows.map((r) => `${r.round_id}:${r.entry_id}:${r.matchweek_number}`))
       const roundsWonByEntry = new Map(
@@ -563,6 +602,15 @@ export async function readLeagueCardFacts(
             eliminatedMatchweek: mine?.eliminated_matchweek ?? null,
             survivorsLeft: standingByRound.get(round.round_id) ?? 0,
             roundEntrants: entrantsByRound.get(round.round_id) ?? 0,
+            // Distinct, and scoped to THIS round and THIS entry — see the note
+            // on `clubsUsed`. `pickRows` is already narrowed to the open rounds
+            // and to this member's entries, so this costs no query.
+            clubsUsed: new Set(
+              pickRows
+                .filter((r) => r.round_id === round.round_id && r.entry_id === me)
+                .map((r) => r.club_id),
+            ).size,
+            clubPool: (p.seasonId ? clubPoolBySeason.get(p.seasonId) : 0) ?? 0,
             inPlayClubName: inPlayPick ? (clubNameById.get(inPlayPick.club_id) ?? null) : null,
             inPlayMatchweek: inPlay?.matchweek_number ?? null,
             inPlayClubCrest: inPlayPick ? (clubCrestById.get(inPlayPick.club_id) ?? null) : null,

@@ -464,7 +464,7 @@ export type KpiTile =
 
 export function kpiTiles(pool: PoolCardPool): KpiTile[] {
   if (pool.league_mode === 'showdown' && pool.showdown) return showdownTiles(pool.showdown, pool)
-  if (pool.league_mode === 'last_man_standing' && pool.lms) return lmsTiles(pool.lms, pool)
+  if (pool.league_mode === 'last_man_standing' && pool.lms) return lmsTiles(pool.lms)
   if (pool.league_mode === 'table' && pool.table) return tableTiles(pool.table, pool)
   return defaultTiles(pool)
 }
@@ -555,7 +555,9 @@ function showdownWeekTile(sd: ShowdownCardFacts): KpiTile {
  * The survivor count is a fact about the POOL, not the viewer, and it is the
  * mode's whole tension — nothing else on the card conveys "four of you left".
  */
-function lmsTiles(lms: LmsCardFacts, pool: PoolCardPool): KpiTile[] {
+// ⚠ TAKES NO `pool`, unlike its three siblings. They need it for `rankTile`;
+// this mode has no rank tile, so there is nothing left to read off the pool.
+function lmsTiles(lms: LmsCardFacts): KpiTile[] {
   return [
     {
       kind: 'stat',
@@ -569,7 +571,30 @@ function lmsTiles(lms: LmsCardFacts, pool: PoolCardPool): KpiTile[] {
       sub: lms.roundNumber != null ? `in round ${lms.roundNumber}` : undefined,
       tone: 'accent',
     },
-    rankTile(pool),
+    // ⚠ NO RANK TILE, and its absence is the decision rather than an omission.
+    // Two independent reasons, either of which is enough:
+    //
+    // 1. THE STORED RANK IN THIS MODE IS `entry_id` ORDER.
+    //    `league_finalize_ranks` is the one rank writer for all four modes and
+    //    cascades rounds_won → duel_points → total_points → exact_count →
+    //    correct_count → bonus_points → first league_prediction → entry_id. In
+    //    LMS every rung is ZERO — there are no points here by design — and the
+    //    "picked first" rung is infinity, because LMS picks live in
+    //    `league_lms_picks` and not `league_predictions`. So `entry_id ASC`
+    //    decides it. Measured on production 5 Sep: all ten stored ranks follow
+    //    entry_id order exactly. `lib/league/leaderboard.ts` already nulls it
+    //    for the leaderboard; `lib/scoring/readSource.ts` now does too, so this
+    //    card cannot be handed one by a future caller either.
+    //
+    // 2. SURVIVAL IS BINARY, so there is no rank to show even if the number
+    //    were right. Numbering three survivors #1/#2/#3 invents a hierarchy the
+    //    football has not produced — the same call made on the leaderboard.
+    //
+    // ⚠ It was not visibly broken, which is why it survived: `hasScoringStarted`
+    // gates league pools on `league_entry_totals.total_points > 0` and LMS never
+    // writes points, so the tile rendered "—" forever. A permanent dash in one
+    // of only four tiles, one keystroke away from becoming a wrong number.
+    lmsClubsTile(lms),
     lmsWeekTile(lms),
     {
       kind: 'stat',
@@ -581,6 +606,46 @@ function lmsTiles(lms: LmsCardFacts, pool: PoolCardPool): KpiTile[] {
       tone: lms.isEliminated ? 'muted' : 'ink',
     },
   ]
+}
+
+/**
+ * How much of the squad is spent.
+ *
+ * The mode's own scarcity, and the number a member actually manages: a club is
+ * used up for the round you spend it in, so the pool of clubs to pick from
+ * tightens every matchweek you survive. It replaced a Rank tile that could
+ * never say anything — see the note in `lmsTiles`.
+ *
+ * ⚠ THE DENOMINATOR IS THE SEASON'S, not twenty. England has 20 clubs, Germany
+ * 18, and this mode is already live in neither only by accident of which pools
+ * exist today.
+ *
+ * ⚠ IT RESETS, and the caption says which round it is counting, because
+ * otherwise a number that falls from 7 to 0 between two visits reads as data
+ * loss rather than as a new round opening with everybody back in.
+ */
+function lmsClubsTile(lms: LmsCardFacts): KpiTile {
+  if (lms.clubPool <= 0) {
+    // The season's club_count could not be read. A denominator of zero would
+    // render "7 of 0", so the tile shows the count alone rather than a fraction
+    // that is arithmetically nonsense.
+    return {
+      kind: 'stat',
+      label: 'Clubs',
+      value: String(lms.clubsUsed),
+      sub: 'used',
+      tone: lms.clubsUsed > 0 ? 'ink' : 'muted',
+    }
+  }
+  return {
+    kind: 'stat',
+    label: 'Clubs',
+    value: String(lms.clubsUsed),
+    sub: `of ${lms.clubPool} used`,
+    // Muted at zero: nothing has been spent yet, which is an absence rather
+    // than a score — the same reading `tableAccuracyTile` gives an empty table.
+    tone: lms.clubsUsed > 0 ? 'ink' : 'muted',
+  }
 }
 
 /**
