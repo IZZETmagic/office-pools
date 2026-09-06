@@ -1289,6 +1289,49 @@ export type HomePoolFacts = {
   hasSubmitted: boolean | null;
   /** Table and Last Man Standing: one decision, so the ring is a state. */
   isSingleDecision: boolean | null;
+  /**
+   * The mode's own numbers, for the card's stat strip.
+   *
+   * ⚠ NULL ON A WORLD CUP POOL, which is what keeps its five blocks — Rank,
+   * Points, Level, Form, Picks — exactly as they were. A league pool gets the
+   * blocks its engine actually writes instead; see `poolCardBlocks`.
+   *
+   * ⚠ NULL IS ALSO "the API is older than this field". The card falls back to
+   * the World Cup shape rather than blanking, which is the same rule the
+   * pick counts above already follow.
+   */
+  league: HomeLeagueFacts | null;
+};
+
+/** Only what a stat block prints. See the note on `league` in the route. */
+export type HomeLeagueFacts = {
+  leagueMode: string | null;
+  openMatchweek: number | null;
+  matchweekCount: number | null;
+  showdown: {
+    duelPoints: number;
+    won: number;
+    tied: number;
+    lost: number;
+    /** won | tied | lost | bye — NOT the accuracy tiers. Different palette. */
+    recentDuels: string[];
+  } | null;
+  lms: {
+    roundsWon: number;
+    roundNumber: number | null;
+    clubsUsed: number;
+    clubPool: number;
+    survivorsLeft: number;
+    roundEntrants: number;
+    isEliminated: boolean;
+  } | null;
+  table: {
+    spotOn: number;
+    clubCount: number;
+    averageOff: number | null;
+    hasTable: boolean;
+    isFinal: boolean;
+  } | null;
 };
 
 export type HomeScoringPools = Record<string, HomePoolFacts> | null;
@@ -1308,6 +1351,17 @@ export async function fetchHomeScoring(userId: string): Promise<HomeScoring> {
       made_picks: number | null;
       has_submitted: boolean | null;
       is_single_decision: boolean | null;
+      league?: {
+        league_mode: string | null;
+        open_matchweek: number | null;
+        matchweek_count: number | null;
+        showdown: { duel_points: number; won: number; tied: number; lost: number; recent_duels: string[] } | null;
+        lms: {
+          rounds_won: number; round_number: number | null; clubs_used: number; club_pool: number;
+          survivors_left: number; round_entrants: number; is_eliminated: boolean;
+        } | null;
+        table: { spot_on: number; club_count: number; average_off: number | null; has_table: boolean; is_final: boolean } | null;
+      } | null;
     }[];
   }>(`/api/users/${userId}/home-scoring`);
 
@@ -1321,6 +1375,42 @@ export async function fetchHomeScoring(userId: string): Promise<HomeScoring> {
             madePicks: p.made_picks ?? null,
             hasSubmitted: p.has_submitted ?? null,
             isSingleDecision: p.is_single_decision ?? null,
+            league: p.league
+              ? {
+                  leagueMode: p.league.league_mode,
+                  openMatchweek: p.league.open_matchweek,
+                  matchweekCount: p.league.matchweek_count,
+                  showdown: p.league.showdown
+                    ? {
+                        duelPoints: p.league.showdown.duel_points,
+                        won: p.league.showdown.won,
+                        tied: p.league.showdown.tied,
+                        lost: p.league.showdown.lost,
+                        recentDuels: p.league.showdown.recent_duels ?? [],
+                      }
+                    : null,
+                  lms: p.league.lms
+                    ? {
+                        roundsWon: p.league.lms.rounds_won,
+                        roundNumber: p.league.lms.round_number,
+                        clubsUsed: p.league.lms.clubs_used,
+                        clubPool: p.league.lms.club_pool,
+                        survivorsLeft: p.league.lms.survivors_left,
+                        roundEntrants: p.league.lms.round_entrants,
+                        isEliminated: p.league.lms.is_eliminated,
+                      }
+                    : null,
+                  table: p.league.table
+                    ? {
+                        spotOn: p.league.table.spot_on,
+                        clubCount: p.league.table.club_count,
+                        averageOff: p.league.table.average_off,
+                        hasTable: p.league.table.has_table,
+                        isFinal: p.league.table.is_final,
+                      }
+                    : null,
+                }
+              : null,
           },
         ]),
       )

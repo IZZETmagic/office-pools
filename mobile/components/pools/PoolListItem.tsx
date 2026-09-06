@@ -1,12 +1,14 @@
+import { Fragment } from 'react';
 import { ActionSheetIOS, Alert, Image, Platform, Pressable, Share, Text as RNText, View } from 'react-native';
 
 import { CompetitionRail } from '@/components/CompetitionRail';
 import { Icon, ProgressRing, Text } from '@/components/ui';
 import { getCompetitionColor } from '@/lib/design/competition';
 import { getModeChip, getModeName } from '@/lib/design/poolMode';
+import { poolCardBlocks, type PoolCardBlock } from '@/lib/poolCardBlocks';
 import { isPoolFinished, poolStatusDisplay } from '@/lib/poolStatus';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
-import type { FormResult, PoolSummary } from '@/lib/useHomeData';
+import type { PoolSummary } from '@/lib/useHomeData';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // ⚠ MODE_LABEL AND MODE_GRADIENT ARE GONE, and neither was merely plainer than
@@ -25,11 +27,24 @@ type PoolListItemProps = {
   onPress?: () => void;
 };
 
-const FORM_COLOR: Record<FormResult, string> = {
+const FORM_COLOR: Record<string, string> = {
   exact: '#E2B830',
   winner_gd: '#52D660',
   winner: '#30B7FF',
   miss: '#EF4444',
+};
+
+/**
+ * A duel outcome's dot — Showdown only.
+ *
+ * ⚠ NOT the accuracy tiers above. A bye is drawn faint because nothing
+ * happened: it is not a result and must not read as one.
+ */
+const DUEL_COLOR: Record<string, string> = {
+  won: '#22C55E',
+  tied: '#F59E0B',
+  lost: '#EF4444',
+  bye: '#D4DAE8',
 };
 
 function brandHex(hex: string | null): string | null {
@@ -83,6 +98,7 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
   // which is why a Premier League ring was World Cup blue.
   const accentColor =
     isBranded && brandColor ? brandColor : getCompetitionColor(pool.externalLeagueId);
+  const blocks = poolCardBlocks(pool);
 
   async function shareInvite() {
     const url = `https://sportpool.io/join/${pool.poolCode}`;
@@ -266,50 +282,20 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
               gap: theme.spacing.xs,
             }}
           >
-            <RankBlock
-              currentRank={pool.currentRank}
-              totalEntries={pool.totalEntries}
-              hasScoringStarted={pool.hasScoringStarted}
-            />
-            <Divider />
-            <StatBlock label="Points" value={pool.totalPoints.toLocaleString()} />
-            {/* No level on a league pool — `pool.level` is NULL there because
-                XP is World Cup machinery and does not apply. Its Divider goes
-                with it so the row does not end up with two rules in a row. */}
-            {pool.level ? (
-              <>
-                <Divider />
-                <LevelBlock levelNumber={pool.level.number} levelName={pool.level.name} />
-              </>
-            ) : null}
-            <Divider />
-            <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
-              <FormSparkline results={pool.formResults} />
-              <Text variant="detail" color="slate">
-                Form
-              </Text>
-            </View>
-            <Divider />
-            <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
-              {/* ⚠ AN ARC, NOT A BORDER. What this replaced drew a full circle
-                  whose BORDER COLOUR changed across three states with the count
-                  inside, so 3 of 10 and 9 of 10 rendered identically. It also
-                  had no idea about `isSingleDecision`, so a Predict-the-Table
-                  or Last Man Standing pool — one decision for the whole season
-                  — showed a bogus fraction. Shared with the home card so the
-                  two cannot say different things about the same number. */}
-              <ProgressRing
-                completed={pool.predictionsCompleted}
-                total={pool.predictionsTotal}
-                singleDecision={pool.isSingleDecision}
-                accent={accentColor}
-                size={22}
-                stroke={2.5}
-              />
-              <Text variant="detail" color="slate">
-                Picks
-              </Text>
-            </View>
+            {/* ⚠ THE BLOCKS ARE THE MODE'S, not a fixed five. This was Rank,
+                Points, Level, Form, Picks for every pool — the World Cup's
+                shape — so a Showdown card led on ACCURACY points while its
+                leaderboard ranks on duel points, a Table card showed five Form
+                dots for a mode with one decision a season, and a Last Man
+                Standing card showed Points in a mode that has none. What each
+                mode shows is decided in lib/poolCardBlocks, which mirrors the
+                web's `kpiTiles` calls without copying its layout. */}
+            {blocks.map((b, i) => (
+              <Fragment key={`${b.kind}-${i}`}>
+                {i > 0 ? <Divider /> : null}
+                <Block block={b} pool={pool} accent={accentColor} />
+              </Fragment>
+            ))}
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
@@ -349,7 +335,89 @@ export function PoolListItem({ pool, onPress }: PoolListItemProps) {
   );
 }
 
-function StatBlock({ label, value }: { label: string; value: string }) {
+/**
+ * One block of the strip, whatever kind it is.
+ *
+ * ⚠ THE MONO FONT IS LOAD-BEARING at this width. Every value is a number or a
+ * short token in a ~45pt column, and proportional digits made a 4-digit total
+ * wider than a 4-digit one beside it, so the row's columns visibly disagreed.
+ */
+function Block({
+  block,
+  pool,
+  accent,
+}: {
+  block: PoolCardBlock;
+  pool: PoolSummary;
+  accent: string;
+}) {
+  const theme = useTheme();
+
+  if (block.kind === 'rank') {
+    return (
+      <BlockShell
+        value={block.show ? `#${block.rank}` : '—'}
+        valueColor={block.show ? theme.colors.ink : theme.colors.slate}
+        label={block.show ? `of ${block.totalEntries.toLocaleString()}` : 'Rank'}
+      />
+    );
+  }
+
+  if (block.kind === 'dots') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
+        <FormSparkline results={block.dots} palette={block.palette} />
+        <Text variant="detail" color="slate" numberOfLines={1}>
+          {block.label}
+        </Text>
+      </View>
+    );
+  }
+
+  if (block.kind === 'ring') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
+        {/* ⚠ AN ARC, NOT A BORDER. What this replaced drew a full circle whose
+            BORDER COLOUR changed across three states with the count inside, so
+            3 of 10 and 9 of 10 rendered identically. It also had no idea about
+            `isSingleDecision`, so a Predict-the-Table or Last Man Standing pool
+            — one decision for the whole season — showed a bogus fraction.
+            Shared with the home card so the two cannot say different things
+            about the same number. */}
+        <ProgressRing
+          completed={pool.predictionsCompleted}
+          total={pool.predictionsTotal}
+          singleDecision={pool.isSingleDecision}
+          accent={accent}
+          size={22}
+          stroke={2.5}
+        />
+        <Text variant="detail" color="slate" numberOfLines={1}>
+          {block.label}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <BlockShell
+      value={block.value}
+      valueColor={block.muted ? theme.colors.slate : theme.colors.ink}
+      label={block.sub ?? block.label}
+    />
+  );
+}
+
+/** The two stacked lines every non-graphical block is. */
+function BlockShell({
+  value,
+  valueColor,
+  label,
+}: {
+  value: string;
+  valueColor: string;
+  label: string;
+}) {
   const theme = useTheme();
   return (
     <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
@@ -359,76 +427,13 @@ function StatBlock({ label, value }: { label: string; value: string }) {
           fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
           fontSize: 13,
           fontWeight: '700',
-          color: theme.colors.ink,
+          color: valueColor,
         }}
       >
         {value}
       </RNText>
-      <Text variant="detail" color="slate">
+      <Text variant="detail" color="slate" numberOfLines={1}>
         {label}
-      </Text>
-    </View>
-  );
-}
-
-/**
- * The member's position, and the size of the field it is a position in.
- *
- * ⚠ "of N" IS THE LABEL, not a second value on the rank's baseline. It used to
- * sit beside `#4` in a `flexDirection: 'row'` — `#12` plus `of 623` plus the
- * gap is ~70pt of text in a block that has never been wider than ~45, and
- * nothing shrank or clipped it, so a big pool's rank ran into Points. Stacking
- * it costs nothing: `#4` over `of 30` still reads as a rank, and the word
- * "Rank" is only needed in the state where there is no number to read.
- */
-function RankBlock({
-  currentRank,
-  totalEntries,
-  hasScoringStarted,
-}: {
-  currentRank: number | null;
-  totalEntries: number;
-  hasScoringStarted: boolean;
-}) {
-  const theme = useTheme();
-  const showRank = hasScoringStarted && currentRank !== null && totalEntries > 0;
-  return (
-    <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
-      <RNText
-        numberOfLines={1}
-        style={{
-          fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 13,
-          fontWeight: '700',
-          color: showRank ? theme.colors.ink : theme.colors.slate,
-        }}
-      >
-        {showRank ? `#${currentRank}` : '—'}
-      </RNText>
-      <Text variant="detail" color="slate" numberOfLines={1}>
-        {showRank ? `of ${totalEntries.toLocaleString()}` : 'Rank'}
-      </Text>
-    </View>
-  );
-}
-
-function LevelBlock({ levelNumber, levelName }: { levelNumber: number; levelName: string }) {
-  const theme = useTheme();
-  return (
-    <View style={{ flex: 1, alignItems: 'center', gap: theme.spacing.xs }}>
-      <RNText
-        numberOfLines={1}
-        style={{
-          fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 13,
-          fontWeight: '700',
-          color: theme.colors.ink,
-        }}
-      >
-        Lv.{levelNumber}
-      </RNText>
-      <Text variant="detail" color="slate" numberOfLines={1}>
-        {levelName}
       </Text>
     </View>
   );
@@ -447,8 +452,17 @@ function Divider() {
   );
 }
 
-function FormSparkline({ results }: { results: FormResult[] }) {
+/**
+ * Five dots — of whichever kind this mode produces.
+ *
+ * ⚠ TWO PALETTES, AND THEY MUST NOT BE ONE. Accuracy grades how close a
+ * scoreline was (exact / winner+GD / winner / miss); a duel is won, tied or
+ * lost. Painting a duel in the accuracy colours would say the two strips mean
+ * the same thing, and gold — the top accuracy tier — would land on a draw.
+ */
+function FormSparkline({ results, palette }: { results: string[]; palette: 'form' | 'duel' }) {
   const theme = useTheme();
+  const paint = palette === 'duel' ? DUEL_COLOR : FORM_COLOR;
   return (
     <View style={{ flexDirection: 'row', gap: 3, alignItems: 'center', height: 18 }}>
       {Array.from({ length: 5 }).map((_, i) => {
@@ -460,7 +474,7 @@ function FormSparkline({ results }: { results: FormResult[] }) {
               width: 7,
               height: 7,
               borderRadius: 3.5,
-              backgroundColor: r ? FORM_COLOR[r] : theme.colors.mist,
+              backgroundColor: (r ? paint[r] : undefined) ?? theme.colors.mist,
             }}
           />
         );
