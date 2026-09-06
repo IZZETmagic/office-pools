@@ -1,7 +1,9 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,97 +13,60 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Icon, Input, Text } from '@/components/ui';
-import { createPool, type CreatePoolRequest } from '@/lib/api';
+import { createPool } from '@/lib/api';
+import {
+  LEAGUE_DEPTHS,
+  LEAGUE_MODES,
+  WC_MODES,
+  buildCreatePayload,
+  deadlineDescription,
+  deadlineTitle,
+  defaultDeadline,
+  effectiveMode,
+  formatDeadline,
+  formatSeasonRange,
+  isLeague as competitionIsLeague,
+  modeHasDepth,
+  pairSeasons,
+  quickPicks as computeQuickPicks,
+  selectableCompetitions,
+  validateDeadline,
+  withoutSeason,
+  type Competition,
+  type LeagueDepth,
+  type LeagueMode,
+  type PoolMode,
+  type QuickPick,
+  type SeasonRow,
+  type TournamentRow,
+  type UpcomingLock,
+} from '@/lib/createPool';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
-type Tournament = {
-  tournament_id: string;
-  name: string;
-  short_name: string | null;
-  host_countries: string | null;
-  start_date: string;
-  end_date: string;
-  description: string | null;
-};
+/**
+ * The native date/time picker, behind the same guarded require as
+ * `components/pool-detail/SettingsTab.tsx` — it is a native module, so a JS-only
+ * OTA into an older binary would otherwise throw at render rather than degrade.
+ */
+let DateTimePicker: ComponentType<{
+  value: Date;
+  mode?: 'date' | 'time' | 'datetime' | 'countdown';
+  display?: 'default' | 'spinner' | 'clock' | 'calendar' | 'compact' | 'inline';
+  minimumDate?: Date;
+  onChange?: (event: unknown, date?: Date) => void;
+}> | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  DateTimePicker = require('@react-native-community/datetimepicker').default;
+} catch {
+  DateTimePicker = null;
+}
 
 type Step = 'tournament' | 'pool_type' | 'details' | 'settings';
 
 const STEP_ORDER: Step[] = ['tournament', 'pool_type', 'details', 'settings'];
-
-const STEP_TITLES: Record<Step, string> = {
-  tournament: 'Tournament',
-  pool_type: 'Pool Type',
-  details: 'Details',
-  settings: 'Settings',
-};
-
-type ModeOption = {
-  value: CreatePoolRequest['prediction_mode'];
-  icon: string;
-  title: string;
-  description: string;
-};
-
-const MODE_OPTIONS: ModeOption[] = [
-  {
-    value: 'full_tournament',
-    icon: 'list.bullet.rectangle',
-    title: 'Full Tournament',
-    description:
-      'Members predict all matches upfront before the tournament starts. They must predict which teams qualify for the knockout rounds based on their group stage predictions.',
-  },
-  {
-    value: 'progressive',
-    icon: 'arrow.forward.circle',
-    title: 'Progressive',
-    description:
-      'Members predict round-by-round as teams advance. After each round completes, the next round opens with actual qualified teams and matchups.',
-  },
-  {
-    value: 'bracket_picker',
-    icon: 'square.grid.2x2',
-    title: 'Bracket Picker',
-    description:
-      'Members rank groups and pick knockout winners only — no score predictions needed. Quick & simple (~10 min).',
-  },
-];
-
-type QuickDeadline = 'tournament_start' | 'one_day_before' | 'one_week_before';
-
-function parseDate(iso: string): Date | null {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function setOnePm(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(13, 0, 0, 0);
-  return out;
-}
-
-function computeQuickDeadline(option: QuickDeadline, start: Date): Date {
-  switch (option) {
-    case 'tournament_start':
-      return setOnePm(start);
-    case 'one_day_before':
-      return setOnePm(new Date(start.getTime() - 24 * 60 * 60 * 1000));
-    case 'one_week_before':
-      return setOnePm(new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000));
-  }
-}
-
-function formatDeadlineDisplay(d: Date): string {
-  return d.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
 
 export default function CreatePoolModal() {
   const theme = useTheme();
@@ -113,12 +78,20 @@ export default function CreatePoolModal() {
   const stepIndex = STEP_ORDER.indexOf(step);
 
   // Step 1
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [tournamentsLoading, setTournamentsLoading] = useState(true);
-  const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
+  const [competitions, setCompetitions] = useState<Competition[]>([]);
+  const [competitionsLoading, setCompetitionsLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Step 2
-  const [mode, setMode] = useState<CreatePoolRequest['prediction_mode']>('full_tournament');
+  // Step 2 — two axes, held separately.
+  //
+  // `predictionMode` is the bracket choice and `leagueMode`/`leagueDepth` are
+  // the league ones. They never merge: EVERY league pool is
+  // `prediction_mode = 'league_pickem'` (the column all the league plumbing
+  // keys on), and `league_mode` is what decides whether it is played by picking
+  // fixtures or by ordering the table.
+  const [predictionMode, setPredictionMode] = useState<PoolMode>('full_tournament');
+  const [leagueMode, setLeagueMode] = useState<LeagueMode>('pickem');
+  const [leagueDepth, setLeagueDepth] = useState<LeagueDepth>('results');
 
   // Step 3
   const [poolName, setPoolName] = useState('');
@@ -126,83 +99,151 @@ export default function CreatePoolModal() {
 
   // Step 4
   const [deadline, setDeadline] = useState<Date | null>(null);
-  // Private by default, matching the web wizard — see the note in
-  // components/pools/CreatePoolModal.tsx. Two create surfaces disagreeing
-  // about a privacy default is the kind of drift nobody reports.
+  const [showPicker, setShowPicker] = useState(false);
+  // ⚠ PRIVATE BY DEFAULT (Ryan, 2026-08-29), matching the web wizard. A pool
+  // code is required either way; the only thing this decides is whether the
+  // pool is also listed in Discover. Two create surfaces disagreeing about a
+  // privacy default is the kind of drift nobody reports.
   const [isPrivate, setIsPrivate] = useState(true);
-  const [maxParticipants, setMaxParticipants] = useState('0');
   const [maxEntriesPerUser, setMaxEntriesPerUser] = useState(1);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedTournament = useMemo(
-    () => tournaments.find((t) => t.tournament_id === selectedTournamentId) ?? null,
-    [tournaments, selectedTournamentId],
+  const selected = useMemo(
+    () => competitions.find((c) => c.tournament_id === selectedId) ?? null,
+    [competitions, selectedId],
   );
+
+  const isLeague = competitionIsLeague(selected);
+
+  // The mode that will actually be submitted, DERIVED from the competition
+  // rather than synced into state by an effect. See `effectiveMode` — a mode
+  // held in state survives a step back and a change of competition, and creates
+  // a league pool that scores zero for every fixture, silently.
+  const mode = effectiveMode(predictionMode, isLeague);
+
+  // ------------------------------------------------------------- data
 
   useEffect(() => {
     (async () => {
-      // Bracket-format competitions only.
+      // Bracket AND league competitions.
       //
-      // A league tournament exists in production (Premier League 2026/27), but
-      // this wizard only offers the three World Cup pool modes. Creating a
-      // league pool as `full_tournament` would score ZERO for every fixture,
-      // silently — the scoring gate compares predicted teams against a bracket
-      // the pool does not have. Until the league mode has a create flow and a
-      // prediction UI (Phase 4), league competitions are not selectable here.
+      // ⚠ Leagues were excluded here until 2026-09-05, on the grounds that a
+      // league pool had no create flow or prediction UI on the phone. That is
+      // no longer true: all four league modes are playable on RN — Pick'em and
+      // Showdown through `pool/[id]/pickem/[entryId]`, Last Man Standing
+      // through `survivor/`, Predict the Table through `table/`. This wizard
+      // was the last thing on the phone that did not know leagues exist.
       //
-      // `format` is null on rows predating migration 024, so null is treated as
-      // bracket rather than filtered out.
-      const { data, error: tErr } = await supabase
+      // `format` is null on rows predating migration 024; those are brackets.
+      const { data: tRows, error: tErr } = await supabase
         .from('tournaments')
-        .select('tournament_id, name, short_name, host_countries, start_date, end_date, description, format')
-        .or('format.is.null,format.eq.groups_knockout')
+        .select(
+          'tournament_id, name, short_name, host_countries, start_date, end_date, format, logo_url, external_provider, external_league_id, external_season',
+        )
+        .or('format.is.null,format.eq.groups_knockout,format.eq.league')
         .order('start_date', { ascending: false });
+
       if (tErr) {
         setError(tErr.message);
-      } else {
-        // Drop competitions that have already finished. Derived from end_date,
-        // not from `tournaments.status` — that column is authored and goes
-        // stale (the World Cup still read 'upcoming' a month after its final).
-        // Inlined rather than imported from the web app's lib/: mobile is a
-        // separate package and does not resolve those paths. Mirrors
-        // hasCompetitionEnded in lib/competitionFormat.ts.
-        const hasEnded = (endDate: string | null | undefined) => {
-          if (!endDate) return false;
-          const endOfFinalDay = new Date(`${endDate}T23:59:59.999Z`).getTime();
-          return !Number.isNaN(endOfFinalDay) && endOfFinalDay < Date.now();
-        };
-        const rows = ((data ?? []) as Tournament[]).filter((t) => !hasEnded(t.end_date));
-        setTournaments(rows);
-        if (rows.length === 1) {
-          setSelectedTournamentId(rows[0].tournament_id);
-        }
+        setCompetitionsLoading(false);
+        return;
       }
-      setTournamentsLoading(false);
+
+      // A league's identity is its `league_seasons` row, not the placeholder
+      // `tournaments` row that carries its dates. Resolved here so the wizard
+      // can DROP a league it cannot create rather than offering one that 409s
+      // at submit.
+      //
+      // ⚠ Errors are read, not discarded. `const { data } = await …` hides a
+      // 400 and renders an empty list for ever — and an empty `seasons` here
+      // would silently remove every league from the wizard rather than failing.
+      const { data: sRows, error: sErr } = await supabase
+        .from('league_seasons')
+        .select('season_id, club_count, external_provider, external_league_id, external_season');
+
+      if (sErr) {
+        setError(sErr.message);
+        setCompetitionsLoading(false);
+        return;
+      }
+
+      const list = selectableCompetitions(
+        pairSeasons((tRows ?? []) as TournamentRow[], (sRows ?? []) as SeasonRow[]),
+      );
+      setCompetitions(list);
+      if (list.length === 1) setSelectedId(list[0].tournament_id);
+      setCompetitionsLoading(false);
     })();
   }, []);
 
-  useEffect(() => {
-    if (selectedTournament && !deadline) {
-      const start = parseDate(selectedTournament.start_date);
-      if (start) setDeadline(setOnePm(start));
-    }
-  }, [selectedTournament, deadline]);
+  /**
+   * The next few matchweek locks, for the shortcut chips.
+   *
+   * ⚠ Only meaningful once a season is UNDER WAY. "Tournament Start (Aug 21)"
+   * is a useful shortcut in July and a dead one in September — the date is
+   * behind us and the button sets something the form then rejects. Mid-season
+   * the shortcut somebody actually wants is the next matchweek's deadline.
+   */
+  const [upcomingLocks, setUpcomingLocks] = useState<UpcomingLock[]>([]);
 
-  function applyQuickDeadline(option: QuickDeadline) {
-    if (!selectedTournament) return;
-    const start = parseDate(selectedTournament.start_date);
-    if (!start) return;
-    setDeadline(computeQuickDeadline(option, start));
-  }
+  useEffect(() => {
+    const seasonId = selected?.league_season_id;
+    if (!seasonId) {
+      setUpcomingLocks([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('league_matchweeks')
+        .select('matchweek_number, label, lock_at')
+        .eq('season_id', seasonId)
+        .not('lock_at', 'is', null)
+        .gt('lock_at', new Date().toISOString())
+        .order('lock_at', { ascending: true })
+        .limit(3);
+      if (cancelled) return;
+      // A failure here costs the CHIPS and nothing else — the admin can still
+      // set any date with the picker — so it does not raise an error banner
+      // over the whole step.
+      setUpcomingLocks(
+        (data ?? []).map((r) => ({
+          number: r.matchweek_number as number,
+          label: r.label as string | null,
+          lockAt: r.lock_at as string,
+        })),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.league_season_id]);
+
+  // Pre-fill the deadline when the competition changes.
+  //
+  // ⚠ Keyed on the competition ID and not guarded by `!deadline`, so switching
+  // competitions re-prefills. The old guard meant a deadline set for the World
+  // Cup rode along onto a Premier League pool.
+  useEffect(() => {
+    if (!selected) return;
+    setDeadline(defaultDeadline(selected));
+  }, [selected?.tournament_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const quickPicks = useMemo(
+    () => computeQuickPicks(selected, upcomingLocks),
+    [selected, upcomingLocks],
+  );
+
+  // ------------------------------------------------------------- navigation
 
   function canProceed(): boolean {
     switch (step) {
       case 'tournament':
-        return !!selectedTournamentId;
+        return !!selectedId;
       case 'pool_type':
-        return true;
+        return true; // always has a default selection
       case 'details':
         return poolName.trim().length > 0;
       case 'settings':
@@ -212,41 +253,48 @@ export default function CreatePoolModal() {
 
   function goNext() {
     setError(null);
-    if (stepIndex < STEP_ORDER.length - 1) {
-      setStep(STEP_ORDER[stepIndex + 1]);
-    }
+    if (stepIndex < STEP_ORDER.length - 1) setStep(STEP_ORDER[stepIndex + 1]);
   }
 
   function goBack() {
     setError(null);
-    if (stepIndex > 0) {
-      setStep(STEP_ORDER[stepIndex - 1]);
-    }
+    if (stepIndex > 0) setStep(STEP_ORDER[stepIndex - 1]);
   }
 
   async function handleSubmit() {
-    if (!selectedTournamentId || !deadline || !poolName.trim()) return;
+    if (!selected || !deadline || !poolName.trim()) return;
+
+    // ⚠ The picker is floored at today, and a DAY-level floor cannot catch
+    // "today at 09:00" chosen at noon. A deadline already gone closes nothing,
+    // and for a table pool it is the real lock — the pool would be created shut.
+    const invalid = validateDeadline(deadline);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+
     setError(null);
     setLoading(true);
     try {
-      const maxP = parseInt(maxParticipants, 10);
-      const created = await createPool({
-        pool_name: poolName.trim(),
-        description: description.trim() || null,
-        tournament_id: selectedTournamentId,
-        prediction_deadline: deadline.toISOString(),
-        prediction_mode: mode,
-        is_private: isPrivate,
-        max_participants: Number.isFinite(maxP) && maxP > 0 ? maxP : null,
-        max_entries_per_user: Math.max(1, Math.min(10, maxEntriesPerUser)),
-      });
+      const created = await createPool(
+        buildCreatePayload({
+          poolName,
+          description,
+          competition: selected,
+          leagueMode,
+          leagueDepth,
+          predictionMode,
+          deadline,
+          isPrivate,
+          maxEntriesPerUser,
+        }),
+      );
       // Refresh the home dashboard / Pools tab list so the new pool card
       // is already there when the user navigates between tabs. Fire-and-
       // forget — the deep-link below doesn't wait for it.
       void refreshHomeData();
       // Land the admin on the new pool's Settings tab so they can tune
       // scoring rules, prizes, branding, etc. before sharing the pool.
-      // Pool detail reads `?tab=` to override its default `leaderboard`.
       router.replace(`/pool/${created.pool_id}?tab=settings`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create pool');
@@ -291,7 +339,10 @@ export default function CreatePoolModal() {
           <View style={{ width: 50 }} />
         </View>
 
-        <StepIndicator currentIndex={stepIndex} onTapStep={(i) => i < stepIndex && setStep(STEP_ORDER[i])} />
+        <StepIndicator
+          currentIndex={stepIndex}
+          onTapStep={(i) => i < stepIndex && setStep(STEP_ORDER[i])}
+        />
 
         <ScrollView
           contentContainerStyle={{
@@ -318,18 +369,29 @@ export default function CreatePoolModal() {
 
           {step === 'tournament' ? (
             <TournamentStep
-              tournaments={tournaments}
-              loading={tournamentsLoading}
-              selectedId={selectedTournamentId}
-              onSelect={setSelectedTournamentId}
+              competitions={competitions}
+              loading={competitionsLoading}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
             />
           ) : null}
 
-          {step === 'pool_type' ? <PoolTypeStep mode={mode} onChange={setMode} /> : null}
+          {step === 'pool_type' ? (
+            <PoolTypeStep
+              isLeague={isLeague}
+              clubCount={selected?.league_club_count ?? null}
+              mode={mode}
+              onModeChange={setPredictionMode}
+              leagueMode={leagueMode}
+              onLeagueModeChange={setLeagueMode}
+              leagueDepth={leagueDepth}
+              onLeagueDepthChange={setLeagueDepth}
+            />
+          ) : null}
 
           {step === 'details' ? (
             <DetailsStep
-              tournament={selectedTournament}
+              competition={selected}
               poolName={poolName}
               description={description}
               onNameChange={setPoolName}
@@ -340,12 +402,25 @@ export default function CreatePoolModal() {
           {step === 'settings' ? (
             <SettingsStep
               mode={mode}
+              isLeague={isLeague}
+              leagueMode={leagueMode}
               deadline={deadline}
-              onApplyQuickDeadline={applyQuickDeadline}
+              quickPicks={quickPicks}
+              onPickDeadline={setDeadline}
+              showPicker={showPicker}
+              onRequestPicker={() => {
+                if (!DateTimePicker) {
+                  Alert.alert(
+                    'Rebuild needed',
+                    'The date picker uses a native module that ships in the next dev build. Use the shortcuts below for now.',
+                  );
+                  return;
+                }
+                setShowPicker(true);
+              }}
+              onDismissPicker={() => setShowPicker(false)}
               isPrivate={isPrivate}
               onPrivacyChange={setIsPrivate}
-              maxParticipants={maxParticipants}
-              onMaxParticipantsChange={setMaxParticipants}
               maxEntriesPerUser={maxEntriesPerUser}
               onMaxEntriesChange={setMaxEntriesPerUser}
             />
@@ -388,18 +463,19 @@ function StepIndicator({
       {STEP_ORDER.map((s, i) => {
         const isComplete = i < currentIndex;
         const isCurrent = i === currentIndex;
-        const dotColor =
-          isComplete || isCurrent ? theme.colors.primary : theme.colors.silver;
+        const dotColor = isComplete || isCurrent ? theme.colors.primary : theme.colors.silver;
         return (
-          <View key={s} style={{ flex: i === STEP_ORDER.length - 1 ? 0 : 1, flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            key={s}
+            style={{
+              flex: i === STEP_ORDER.length - 1 ? 0 : 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
             <Pressable onPress={() => onTapStep(i)} hitSlop={8}>
               <View
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: dotColor,
-                }}
+                style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dotColor }}
               />
             </Pressable>
             {i < STEP_ORDER.length - 1 ? (
@@ -408,7 +484,8 @@ function StepIndicator({
                   flex: 1,
                   height: 2,
                   marginHorizontal: 4,
-                  backgroundColor: i < currentIndex ? theme.colors.primary : theme.colors.silver,
+                  backgroundColor:
+                    i < currentIndex ? theme.colors.primary : theme.colors.silver,
                 }}
               />
             ) : null}
@@ -422,17 +499,18 @@ function StepIndicator({
 // ============ Step 1: Tournament ============
 
 function TournamentStep({
-  tournaments,
+  competitions,
   loading,
   selectedId,
   onSelect,
 }: {
-  tournaments: Tournament[];
+  competitions: Competition[];
   loading: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
   const theme = useTheme();
+  const isDark = theme.mode === 'dark';
 
   if (loading) {
     return (
@@ -442,12 +520,18 @@ function TournamentStep({
     );
   }
 
-  if (tournaments.length === 0) {
+  if (competitions.length === 0) {
     return (
-      <View style={{ alignItems: 'center', paddingVertical: theme.spacing.xxxl, gap: theme.spacing.md }}>
+      <View
+        style={{
+          alignItems: 'center',
+          paddingVertical: theme.spacing.xxxl,
+          gap: theme.spacing.md,
+        }}
+      >
         <Icon name="trophy" color="slate" size={32} />
         <Text variant="body" color="slate">
-          No tournaments available
+          No competitions available
         </Text>
       </View>
     );
@@ -456,79 +540,22 @@ function TournamentStep({
   return (
     <View style={{ gap: theme.spacing.md }}>
       <Text variant="body" color="slate">
-        Choose the tournament for your prediction pool.
+        Choose the competition for your prediction pool.
       </Text>
-      {tournaments.map((t) => {
-        const isSelected = selectedId === t.tournament_id;
+      {competitions.map((c) => {
+        const isSelected = selectedId === c.tournament_id;
         return (
           <Pressable
-            key={t.tournament_id}
-            onPress={() => onSelect(t.tournament_id)}
-            style={({ pressed }) => ({
-              padding: theme.spacing.lg,
-              borderRadius: theme.radii.md,
-              backgroundColor: isSelected
-                ? withOpacity(theme.colors.primary, 0.08)
-                : theme.colors.surface,
-              gap: theme.spacing.xs,
-              opacity: pressed ? 0.85 : 1,
-            })}
-          >
-            <Text variant="cardTitle">{t.name}</Text>
-            {t.host_countries ? (
-              <Text variant="detail" color="slate">
-                {t.host_countries}
-              </Text>
-            ) : null}
-            <Text variant="detail" color="slate">
-              {formatDateRange(t.start_date, t.end_date)}
-            </Text>
-            {t.description ? (
-              <Text variant="detail" color="slate" numberOfLines={2}>
-                {t.description}
-              </Text>
-            ) : null}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-function formatDateRange(startIso: string, endIso: string): string {
-  const start = parseDate(startIso);
-  const end = parseDate(endIso);
-  if (!start || !end) return `${startIso} – ${endIso}`;
-  const startStr = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const endStr = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  return `${startStr} – ${endStr}`;
-}
-
-// ============ Step 2: Pool Type ============
-
-function PoolTypeStep({
-  mode,
-  onChange,
-}: {
-  mode: CreatePoolRequest['prediction_mode'];
-  onChange: (mode: CreatePoolRequest['prediction_mode']) => void;
-}) {
-  const theme = useTheme();
-  return (
-    <View style={{ gap: theme.spacing.md }}>
-      <Text variant="body" color="slate">
-        How will members make their predictions?
-      </Text>
-
-      {MODE_OPTIONS.map((opt) => {
-        const isSelected = mode === opt.value;
-        return (
-          <Pressable
-            key={opt.value}
-            onPress={() => onChange(opt.value)}
+            key={c.tournament_id}
+            onPress={() => onSelect(c.tournament_id)}
+            accessibilityRole="button"
+            // The tint is the only visual signal of which card is chosen, so
+            // `selected` carries it for anyone who cannot see the tint — a
+            // screen reader reads "selected" rather than two identical buttons.
+            accessibilityState={{ selected: isSelected }}
             style={({ pressed }) => ({
               flexDirection: 'row',
-              alignItems: 'flex-start',
+              alignItems: 'center',
               gap: theme.spacing.md,
               padding: theme.spacing.lg,
               borderRadius: theme.radii.md,
@@ -538,22 +565,162 @@ function PoolTypeStep({
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <View style={{ width: 32, alignItems: 'center', paddingTop: 2 }}>
-              <Icon
-                name={opt.icon as never}
-                color={isSelected ? 'primary' : 'slate'}
-                size={22}
-              />
-            </View>
-            <View style={{ flex: 1, gap: theme.spacing.xs }}>
-              <Text variant="cardTitle">{opt.title}</Text>
+            {/* ⚠ Rendered only when there IS one, and NULL is the common case
+                on purpose. The provider serves a real crest for the Premier
+                League and a generic grey shield for the World Cup, so the
+                column is filled only where the image is the competition's own —
+                a card with no logo is a deliberate state, not a loading one,
+                and must not get a placeholder box.
+
+                The white plate is DARK MODE ONLY. Several league marks are dark
+                on transparent — the Premier League lion is near-black purple —
+                and vanish on the dark surface. In light mode the page is already
+                that ground, so a plate would only inset the mark for nothing. */}
+            {c.logo_url ? (
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: theme.radii.sm,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isDark ? '#FFFFFF' : 'transparent',
+                }}
+              >
+                <Image
+                  // Decorative — the competition's name is the label beside it.
+                  alt=""
+                  source={{ uri: c.logo_url }}
+                  style={{ width: isDark ? 32 : 44, height: isDark ? 32 : 44 }}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : null}
+
+            <View style={{ flex: 1, gap: 2 }}>
+              {/* The season is dropped from the NAME because the dates are on
+                  the line below it, which is where somebody actually checks
+                  which season they are joining. Display only — `tournaments.name`
+                  is what every email and export uses. */}
+              <Text variant="cardTitle">{withoutSeason(c.name)}</Text>
+              {c.host_countries ? (
+                <Text variant="detail" color="slate">
+                  {c.host_countries}
+                </Text>
+              ) : null}
               <Text variant="detail" color="slate">
-                {opt.description}
+                {formatSeasonRange(c.start_date, c.end_date)}
               </Text>
+              {/* ⚠ `description` is deliberately NOT rendered. "20 clubs, 38
+                  matchweeks, 380 fixtures. Flat round-robin: no groups, no
+                  knockout." is format detail for a step whose only decision is
+                  WHICH competition — the longest line on the card carrying the
+                  least. */}
             </View>
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+// ============ Step 2: Pool Type ============
+
+function PoolTypeStep({
+  isLeague,
+  clubCount,
+  mode,
+  onModeChange,
+  leagueMode,
+  onLeagueModeChange,
+  leagueDepth,
+  onLeagueDepthChange,
+}: {
+  isLeague: boolean;
+  clubCount: number | null;
+  mode: PoolMode;
+  onModeChange: (m: PoolMode) => void;
+  leagueMode: LeagueMode;
+  onLeagueModeChange: (m: LeagueMode) => void;
+  leagueDepth: LeagueDepth;
+  onLeagueDepthChange: (d: LeagueDepth) => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <View style={{ gap: theme.spacing.md }}>
+      <Text variant="body" color="slate">
+        How will members make their predictions?
+      </Text>
+
+      {isLeague
+        ? LEAGUE_MODES.map((opt) => (
+            <ModeCard
+              key={opt.value}
+              icon={opt.icon}
+              title={opt.label}
+              description={opt.desc(clubCount)}
+              selected={leagueMode === opt.value}
+              onPress={() => onLeagueModeChange(opt.value)}
+            />
+          ))
+        : WC_MODES.map((opt) => (
+            <ModeCard
+              key={opt.value}
+              icon={opt.icon}
+              title={opt.label}
+              description={opt.desc(null)}
+              selected={mode === opt.value}
+              onPress={() => onModeChange(opt.value)}
+            />
+          ))}
+
+      {/* Depth is level 2, and it is asked ONLY of the two modes with weekly
+          picks — there is no "predict the scoreline" version of ordering twenty
+          clubs, and the database CHECK refuses the pairing outright. */}
+      {isLeague && modeHasDepth(leagueMode) ? (
+        <View style={{ gap: theme.spacing.sm }}>
+          <Text variant="caption" color="ink">
+            How much do members predict each match?
+          </Text>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            {LEAGUE_DEPTHS.map((opt) => {
+              const selected = leagueDepth === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => onLeagueDepthChange(opt.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    gap: theme.spacing.xxs,
+                    padding: theme.spacing.md,
+                    borderRadius: theme.radii.sm,
+                    backgroundColor: selected
+                      ? withOpacity(theme.colors.primary, 0.08)
+                      : theme.colors.surface,
+                    opacity: pressed ? 0.85 : 1,
+                  })}
+                >
+                  <Text
+                    style={{
+                      fontFamily: fontFamilies.bold,
+                      fontSize: 14,
+                      color: selected ? theme.colors.primary : theme.colors.ink,
+                    }}
+                  >
+                    {opt.label}
+                  </Text>
+                  <Text variant="detail" color="slate">
+                    {opt.desc}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
 
       <View
         style={{
@@ -567,30 +734,76 @@ function PoolTypeStep({
       >
         <Icon name="exclamationmark.triangle.fill" color="amber" size={14} />
         <Text variant="detail" color="slate" style={{ flex: 1 }}>
-          Pool type cannot be changed after creation.
+          This cannot be changed after your pool is created.
         </Text>
       </View>
     </View>
   );
 }
 
+function ModeCard({
+  icon,
+  title,
+  description,
+  selected,
+  onPress,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: theme.spacing.md,
+        padding: theme.spacing.lg,
+        borderRadius: theme.radii.md,
+        backgroundColor: selected
+          ? withOpacity(theme.colors.primary, 0.08)
+          : theme.colors.surface,
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <View style={{ width: 32, alignItems: 'center', paddingTop: 2 }}>
+        <Icon name={icon} color={selected ? 'primary' : 'slate'} size={22} />
+      </View>
+      <View style={{ flex: 1, gap: theme.spacing.xs }}>
+        <Text variant="cardTitle">{title}</Text>
+        <Text variant="detail" color="slate">
+          {description}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 // ============ Step 3: Details ============
 
 function DetailsStep({
-  tournament,
+  competition,
   poolName,
   description,
   onNameChange,
   onDescriptionChange,
 }: {
-  tournament: Tournament | null;
+  competition: Competition | null;
   poolName: string;
   description: string;
   onNameChange: (s: string) => void;
   onDescriptionChange: (s: string) => void;
 }) {
   const theme = useTheme();
-  const placeholder = tournament ? `e.g. Office ${tournament.short_name ?? tournament.name}` : 'e.g. Office World Cup';
+  const placeholder = competition
+    ? `e.g. Office ${withoutSeason(competition.name)}`
+    : 'e.g. Office World Cup';
 
   return (
     <View style={{ gap: theme.spacing.lg }}>
@@ -622,113 +835,164 @@ function DetailsStep({
 
 function SettingsStep({
   mode,
+  isLeague,
+  leagueMode,
   deadline,
-  onApplyQuickDeadline,
+  quickPicks,
+  onPickDeadline,
+  showPicker,
+  onRequestPicker,
+  onDismissPicker,
   isPrivate,
   onPrivacyChange,
-  maxParticipants,
-  onMaxParticipantsChange,
   maxEntriesPerUser,
   onMaxEntriesChange,
 }: {
-  mode: CreatePoolRequest['prediction_mode'];
+  mode: PoolMode;
+  isLeague: boolean;
+  leagueMode: LeagueMode;
   deadline: Date | null;
-  onApplyQuickDeadline: (option: QuickDeadline) => void;
+  quickPicks: QuickPick[];
+  onPickDeadline: (d: Date) => void;
+  showPicker: boolean;
+  onRequestPicker: () => void;
+  onDismissPicker: () => void;
   isPrivate: boolean;
   onPrivacyChange: (b: boolean) => void;
-  maxParticipants: string;
-  onMaxParticipantsChange: (s: string) => void;
   maxEntriesPerUser: number;
   onMaxEntriesChange: (n: number) => void;
 }) {
   const theme = useTheme();
+  const effectiveLeagueMode = isLeague ? leagueMode : null;
 
   return (
     <View style={{ gap: theme.spacing.lg }}>
-      <Card title={mode === 'progressive' ? 'Group Stage Deadline' : 'Prediction Deadline'}>
-        <Text variant="body">
-          {deadline ? formatDeadlineDisplay(deadline) : '—'}
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-          <Chip label="Tournament Start" onPress={() => onApplyQuickDeadline('tournament_start')} />
-          <Chip label="1 Day Before" onPress={() => onApplyQuickDeadline('one_day_before')} />
-          <Chip label="1 Week Before" onPress={() => onApplyQuickDeadline('one_week_before')} />
-        </View>
+      <Card
+        title={deadlineTitle(mode, effectiveLeagueMode)}
+        description={deadlineDescription(mode, effectiveLeagueMode)}
+      >
+        {/* Tappable, so the admin can set ANY date and time. Before this the
+            three chips were the only way to set a deadline at all — and once a
+            season was under way all three of them were in the past. */}
+        <Pressable
+          onPress={onRequestPicker}
+          accessibilityRole="button"
+          accessibilityLabel="Change deadline"
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingVertical: theme.spacing.sm,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Text variant="body">{deadline ? formatDeadline(deadline) : '—'}</Text>
+          <Icon name="calendar" color="slate" size={18} />
+        </Pressable>
+
+        {showPicker && DateTimePicker ? (
+          <DateTimePicker
+            value={deadline ?? new Date()}
+            mode="datetime"
+            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+            // A day-level floor. It cannot catch "today at 09:00" chosen at
+            // noon — `validateDeadline` does that at submit.
+            minimumDate={new Date()}
+            onChange={(_e: unknown, picked?: Date) => {
+              if (Platform.OS !== 'ios') onDismissPicker();
+              if (picked) onPickDeadline(picked);
+            }}
+          />
+        ) : null}
+
+        {/* ⚠ NO CHIPS AT ALL for a started competition with no matchweeks we
+            can read. An empty row is honest; a row of buttons that set dates
+            the form rejects is not. */}
+        {quickPicks.length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+            {quickPicks.map((q) => (
+              <Chip key={q.key} label={q.label} onPress={() => onPickDeadline(q.at)} />
+            ))}
+          </View>
+        ) : null}
       </Card>
 
-      <Card title="Privacy">
+      <Card
+        title="Who can join"
+        description="Everyone needs the pool code either way. Private also keeps it out of Discover."
+      >
         <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
           <PrivacyOption
             title="Public"
-            subtitle="Anyone with code can join"
+            subtitle="Listed in Discover"
             selected={!isPrivate}
             onPress={() => onPrivacyChange(false)}
           />
           <PrivacyOption
             title="Private"
-            subtitle="Invite only"
+            subtitle="Code only"
             selected={isPrivate}
             onPress={() => onPrivacyChange(true)}
           />
         </View>
       </Card>
 
-      <Card title="Maximum Members">
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-          <View style={{ width: 88 }}>
-            <Input
-              value={maxParticipants}
-              onChangeText={(v) => onMaxParticipantsChange(v.replace(/[^0-9]/g, ''))}
-              keyboardType="number-pad"
-              style={{
-                fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-                fontSize: 16,
-                textAlign: 'center',
-              }}
-            />
-          </View>
-          <Text variant="detail" color="slate" style={{ flex: 1 }}>
-            Set to 0 for unlimited
-          </Text>
-        </View>
-      </Card>
+      {/* ⚠ NO "MAXIMUM MEMBERS" CARD, and its absence is deliberate.
+          Migration 075 records that `pools.max_participants` is "stored,
+          displayed and editable but enforced NOWHERE" — an admin could set 20
+          and 50 people would still join. It was a control that had never done
+          anything, sitting in a step where every question is meant to matter.
+          The limit that IS real is the tier ceiling, enforced by a BEFORE
+          INSERT trigger precisely so no route or client can miss it. */}
 
-      <Card title="Max Entries Per Member">
-        <Text variant="detail" color="slate">
-          Allow members to submit multiple sets of predictions. Each entry is scored independently.
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
-            const isSelected = maxEntriesPerUser === n;
-            return (
-              <Pressable
-                key={n}
-                onPress={() => onMaxEntriesChange(n)}
-                style={({ pressed }) => ({
-                  width: 48,
-                  height: 40,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: theme.radii.sm,
-                  backgroundColor: isSelected ? theme.colors.primary : theme.colors.mist,
-                  opacity: pressed ? 0.85 : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-                    fontSize: 14,
-                    color: isSelected ? '#FFFFFF' : theme.colors.ink,
-                    fontWeight: isSelected ? '700' : '500',
-                  }}
+      {/* ⚠ NOT OFFERED ON A LEAGUE POOL — one entry per member, always. The
+          same rule `components/pool-detail/SettingsTab.tsx` already applies
+          after creation, applied here so the wizard stops asking a question the
+          create route overrides. A second entry is unreachable by construction:
+          the Pick'em and table pickers both resolve to the member's FIRST
+          entry, so entry 2 could never be filled and would score 0 all season.
+          Showdown is worse — the draw is per entry, so a member would be drawn
+          against people twice with one side unplayable. */}
+      {isLeague ? null : (
+        <Card
+          title="Entries per member"
+          description="More than one lets somebody enter several predictions. Each is scored and ranked on the leaderboard by itself."
+        >
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+              const selected = maxEntriesPerUser === n;
+              return (
+                <Pressable
+                  key={n}
+                  onPress={() => onMaxEntriesChange(n)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  style={({ pressed }) => ({
+                    width: 48,
+                    height: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: theme.radii.sm,
+                    backgroundColor: selected ? theme.colors.primary : theme.colors.mist,
+                    opacity: pressed ? 0.85 : 1,
+                  })}
                 >
-                  {n}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Card>
+                  <Text
+                    style={{
+                      fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
+                      fontSize: 14,
+                      color: selected ? '#FFFFFF' : theme.colors.ink,
+                      fontWeight: selected ? '700' : '500',
+                    }}
+                  >
+                    {n}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+      )}
 
       <View
         style={{
@@ -743,10 +1007,10 @@ function SettingsStep({
         <Icon name="info.circle.fill" color="primary" size={16} />
         <View style={{ flex: 1, gap: theme.spacing.xxs }}>
           <Text variant="caption" color="ink">
-            Scoring & Bonus Points
+            Scoring uses the defaults
           </Text>
           <Text variant="detail" color="slate">
-            Your pool will be created with default scoring settings. You can customize all scoring rules, multipliers, and bonus points from the pool admin settings after creation.
+            Every rule, multiplier and bonus can be changed from the pool’s admin settings once it exists.
           </Text>
         </View>
       </View>
@@ -754,7 +1018,15 @@ function SettingsStep({
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
   const theme = useTheme();
   return (
     <View
@@ -765,7 +1037,14 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
         gap: theme.spacing.md,
       }}
     >
-      <Text variant="cardTitle">{title}</Text>
+      <View style={{ gap: theme.spacing.xxs }}>
+        <Text variant="cardTitle">{title}</Text>
+        {description ? (
+          <Text variant="detail" color="slate">
+            {description}
+          </Text>
+        ) : null}
+      </View>
       {children}
     </View>
   );
@@ -776,6 +1055,7 @@ function Chip({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
       style={({ pressed }) => ({
         paddingHorizontal: theme.spacing.md,
         paddingVertical: theme.spacing.xs + 2,
@@ -806,6 +1086,8 @@ function PrivacyOption({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
       style={({ pressed }) => ({
         flex: 1,
         alignItems: 'center',

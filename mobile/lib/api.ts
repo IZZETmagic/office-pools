@@ -1,3 +1,4 @@
+import type { LeagueDepth, LeagueMode, PredictionMode } from './predictionMode';
 import { supabase } from './supabase';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -54,14 +55,45 @@ export function joinPool(poolCode: string) {
   });
 }
 
+/**
+ * The body of `POST /api/pools/create`.
+ *
+ * ⚠ Built by `buildCreatePayload` in `lib/createPool.ts`, never by hand — the
+ * rules about which of these may be present together are recorded there and in
+ * the route, and a hand-assembled body is how they drift.
+ */
 export type CreatePoolRequest = {
   pool_name: string;
   description: string | null;
   tournament_id: string;
+  /**
+   * Present only for a league pool. The route resolves the placeholder
+   * `tournaments` row from it SERVER-SIDE and forces the mode, so a crafted
+   * request cannot pair a season with the wrong competition.
+   */
+  league_season_id: string | null;
   prediction_deadline: string;
-  prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker';
+  /**
+   * ⚠ EVERY league pool is `league_pickem`, whatever its `league_mode`. That is
+   * the column all the league plumbing keys on; `league_mode` below is the
+   * separate axis deciding how it is played.
+   */
+  prediction_mode: PredictionMode;
+  /** Level 1 (Decision 9). Null for a bracket pool. Immutable once written. */
+  league_mode: LeagueMode | null;
+  /**
+   * Level 2, and only for the two modes with weekly picks — the database CHECK
+   * refuses the pairing for Table and Last Man Standing.
+   */
+  league_depth: LeagueDepth | null;
   is_private: boolean;
-  max_participants: number | null;
+  /**
+   * ⚠ ALWAYS 0, and there is no control behind it. Migration 075 records that
+   * `pools.max_participants` is "stored, displayed and editable but enforced
+   * NOWHERE". The route turns 0 into NULL; the real ceiling is the tier one,
+   * enforced by a BEFORE INSERT trigger so no client can miss it.
+   */
+  max_participants: number;
   max_entries_per_user: number;
 };
 

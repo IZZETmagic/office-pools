@@ -575,7 +575,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
           // 0 means "no admin-set limit", which the create route turns into
           // NULL. The real ceiling is the tier one, enforced by a trigger.
           max_participants: 0,
-          max_entries_per_user: maxE,
+          // ⚠ 1 FOR A LEAGUE, whatever the strip above was last left on. The
+          // control is hidden for a league competition, but the state is not
+          // reset by that — pick 5 for the World Cup, step back, switch to the
+          // Premier League, and 5 is still what this line would send. The route
+          // forces 1 regardless, so the pool was always correct; the request
+          // was the thing that disagreed with it.
+          max_entries_per_user: isLeagueTournament ? 1 : maxE,
         }),
       })
 
@@ -1199,7 +1205,25 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
                   {/* The heading names the control, so the FormField label that
                       used to sit above the 1–10 strip has gone — it was the third
-                      time the same words appeared in one block. */}
+                      time the same words appeared in one block.
+
+                      ⚠ NOT ASKED OF A LEAGUE POOL — one entry per member, always,
+                      and this step was asking a question the create route then
+                      overrode. An admin could pick 5 for a Premier League pool and
+                      get 1, with nothing on screen saying so.
+
+                      A second entry is unreachable by construction, which is why
+                      the route forces it: the table picker and `/table-prediction`
+                      both resolve to the member's FIRST entry, so entry 2 could
+                      never be filled and would score 0 all season. Showdown is
+                      worse — its draw is per entry, so a member would be drawn
+                      against people twice with one side unplayable.
+
+                      Both Settings screens already hide it for a league pool
+                      (`app/pools/[pool_id]/admin/SettingsTab.tsx`, and mobile's
+                      `components/pool-detail/SettingsTab.tsx`). This is the create
+                      wizard catching up with them. */}
+                  {!isLeagueTournament && (
                   <Section
                     title="Entries per member"
                     description="More than one lets somebody enter several predictions. Each is scored and ranked on the leaderboard by itself."
@@ -1222,6 +1246,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       ))}
                     </div>
                   </Section>
+                  )}
 
                   {/* Not a Section: it is not a setting, and giving it the same
                       chrome as the three above would imply there is something

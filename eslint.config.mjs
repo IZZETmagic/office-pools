@@ -177,9 +177,17 @@ const eslintConfig = defineConfig([
     rules: { "no-restricted-syntax": ["error", ...CONFINEMENT_RULES] },
   },
 
-  // The owning modules, and the file that declares the mode type, are exempt by design.
+  // The owning modules, and the files that declare the mode type, are exempt by design.
+  //
+  // ⚠ TWO declarations, and the second is forced rather than chosen. `mobile/`
+  // is a separate npm project whose `@/*` resolves to `mobile/*`, so it cannot
+  // import the web app's `lib/`. Without an owner of its own, every mobile file
+  // would have to write the union inline — which is the inventory this rule
+  // exists to end, and why `mobile/lib/api.ts` is on the baseline below.
+  // `mobile/lib/predictionMode.ts` carries a header naming the web file and the
+  // CHECK constraint it must be kept in step with.
   {
-    files: [...TABLE_OWNERS, 'lib/predictionMode.ts'],
+    files: [...TABLE_OWNERS, 'lib/predictionMode.ts', 'mobile/lib/predictionMode.ts'],
     rules: { "no-restricted-syntax": "off" },
   },
 
