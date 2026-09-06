@@ -1,0 +1,354 @@
+[
+  {
+    "time": {
+      "elapsed": 9,
+      "extra": null
+    },
+    "team": {
+      "id": 746,
+      "name": "Sunderland",
+      "logo": "https://media.api-sports.io/football/teams/746.png"
+    },
+    "player": {
+      "id": 55904,
+      "name": "Dan Ballard"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Var",
+    "detail": "Goal cancelled",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 14,
+      "extra": null
+    },
+    "team": {
+      "id": 746,
+      "name": "Sunderland",
+      "logo": "https://media.api-sports.io/football/teams/746.png"
+    },
+    "player": {
+      "id": 365331,
+      "name": "Noah Sadiki"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Card",
+    "detail": "Yellow Card",
+    "comments": "Foul"
+  },
+  {
+    "time": {
+      "elapsed": 17,
+      "extra": null
+    },
+    "team": {
+      "id": 55,
+      "name": "Brentford",
+      "logo": "https://media.api-sports.io/football/teams/55.png"
+    },
+    "player": {
+      "id": 19495,
+      "name": "Nathan Collins"
+    },
+    "assist": {
+      "id": 441271,
+      "name": "Jannik Schuster"
+    },
+    "type": "subst",
+    "detail": "Substitution 1",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 30,
+      "extra": null
+    },
+    "team": {
+      "id": 55,
+      "name": "Brentford",
+      "logo": "https://media.api-sports.io/football/teams/55.png"
+    },
+    "player": {
+      "id": 277306,
+      "name": "Mamadou Sangare"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Card",
+    "detail": "Yellow Card",
+    "comments": "Foul"
+  },
+  {
+    "time": {
+      "elapsed": 45,
+      "extra": null
+    },
+    "team": {
+      "id": 55,
+      "name": "Brentford",
+      "logo": "https://media.api-sports.io/football/teams/55.png"
+    },
+    "player": {
+      "id": 342022,
+      "name": "Michael Kayode"
+    },
+    "assist": {
+      "id": 44871,
+      "name": "Aaron Hickey"
+    },
+    "type": "subst",
+    "detail": "Substitution 2",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 45,
+      "extra": null
+    },
+    "team": {
+      "id": 55,
+      "name": "Brentford",
+      "logo": "https://media.api-sports.io/football/teams/55.png"
+    },
+    "player": {
+      "id": 284797,
+      "name": "Dango Ouattara"
+    },
+    "assist": {
+      "id": 196855,
+      "name": "Jaidon Anthony"
+    },
+    "type": "subst",
+    "detail": "Substitution 3",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 45,
+      "extra": null
+    },
+    "team": {
+      "id": 55,
+      "name": "Brentford",
+      "logo": "https://media.api-sports.io/football/teams/55.png"
+    },
+    "player": {
+      "id": 277306,
+      "name": "Mamadou Sangare"
+    },
+    "assist": {
+      "id": 263538,
+      "name": "Yehor Yarmoliuk"
+    },
+    "type": "subst",
+    "detail": "Substitution 4",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 57,
+      "extra": null
+    },
+    "team": {
+      "id": 55,
+      "name": "Brentford",
+      "logo": "https://media.api-sports.io/football/teams/55.png"
+    },
+    "player": {
+      "id": 25073,
+      "name": "Vitaly Janelt"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Goal",
+    "detail": "Normal Goal",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 62,
+      "extra": null
+    },
+    "team": {
+      "id": 55,
+      "name": "Brentford",
+      "logo": "https://media.api-sports.io/football/teams/55.png"
+    },
+    "player": {
+      "id": 25073,
+      "name": "Vitaly Janelt"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Card",
+    "detail": "Yellow Card",
+    "comments": "Foul"
+  },
+  {
+    "time": {
+      "elapsed": 64,
+      "extra": null
+    },
+    "team": {
+      "id": 746,
+      "name": "Sunderland",
+      "logo": "https://media.api-sports.io/football/teams/746.png"
+    },
+    "player": {
+      "id": 264,
+      "name": "Thomas Meunier"
+    },
+    "assist": {
+      "id": 119121,
+      "name": "Trai Hume"
+    },
+    "type": "subst",
+    "detail": "Substitution 1",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 64,
+      "extra": null
+    },
+    "team": {
+      "id": 746,
+      "name": "Sunderland",
+      "logo": "https://media.api-sports.io/football/teams/746.png"
+    },
+    "player": {
+      "id": 311543,
+      "name": "Nilson Angulo"
+    },
+    "assist": {
+      "id": 84087,
+      "name": "Wilson Isidor"
+    },
+    "type": "subst",
+    "detail": "Substitution 2",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 69,
+      "extra": null
+    },
+    "team": {
+      "id": 55,
+      "name": "Brentford",
+      "logo": "https://media.api-sports.io/football/teams/55.png"
+    },
+    "player": {
+      "id": 263538,
+      "name": "Yehor Yarmoliuk"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Card",
+    "detail": "Yellow Card",
+    "comments": "Foul"
+  },
+  {
+    "time": {
+      "elapsed": 74,
+      "extra": null
+    },
+    "team": {
+      "id": 746,
+      "name": "Sunderland",
+      "logo": "https://media.api-sports.io/football/teams/746.png"
+    },
+    "player": {
+      "id": 365331,
+      "name": "Noah Sadiki"
+    },
+    "assist": {
+      "id": 361348,
+      "name": "Malick Fofana"
+    },
+    "type": "subst",
+    "detail": "Substitution 3",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 82,
+      "extra": null
+    },
+    "team": {
+      "id": 746,
+      "name": "Sunderland",
+      "logo": "https://media.api-sports.io/football/teams/746.png"
+    },
+    "player": {
+      "id": 20638,
+      "name": "Enzo Le Fée"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Goal",
+    "detail": "Penalty",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 86,
+      "extra": null
+    },
+    "team": {
+      "id": 55,
+      "name": "Brentford",
+      "logo": "https://media.api-sports.io/football/teams/55.png"
+    },
+    "player": {
+      "id": 15908,
+      "name": "Mikkel Damsgaard"
+    },
+    "assist": {
+      "id": 2939,
+      "name": "Callum Wilson"
+    },
+    "type": "subst",
+    "detail": "Substitution 5",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 88,
+      "extra": null
+    },
+    "team": {
+      "id": 746,
+      "name": "Sunderland",
+      "logo": "https://media.api-sports.io/football/teams/746.png"
+    },
+    "player": {
+      "id": 1464,
+      "name": "Granit Xhaka"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Card",
+    "detail": "Yellow Card",
+    "comments": "Argument"
+  }
+]

@@ -473,3 +473,135 @@ export function fixtureToLeagueUpdate(
 
   return { payload: moved ? out : null, flags }
 }
+
+// =============================================================
+// The timeline — what happened, for a screen rather than for scoring
+// =============================================================
+// ⚠ THIS IS NOT `eventsToConduct`, AND MUST NOT BECOME IT. That mapper reads
+// the same `/fixtures/events` payload and keeps CARD COUNTS PER TEAM, because
+// its consumer is World Cup fair-play scoring: it discards the minute, the
+// player and every goal, and `summarize()` collapses a player's two yellows
+// into one worst-category row. Correct for a tiebreak, useless for a timeline.
+//
+// This one keeps the opposite half: every goal, card, VAR reversal and
+// substitution, each with its minute and the people involved, and no
+// aggregation at all. Nothing downstream scores off it — `match_events` has no
+// scoring consumer by design — so a wrong row here is a wrong line on a screen,
+// not wrong points.
+//
+// ## Two things about the feed that are not guessable
+//
+// 1. FOR A SUBSTITUTION, `player` IS THE ONE GOING OFF and `assist` is the one
+//    coming on. Verified by PLAYER ID across fixtures 1557391, 1557388 and
+//    1557394 — 26 of 26 substitutions had `player.id` in that team's startXI
+//    and `assist.id` on its bench. Do not re-check this by NAME: `/events`
+//    returns "Eddie Nketiah" where `/lineups` returns "E. Nketiah", so a
+//    name comparison reports 0 matches and looks like proof of the opposite.
+//
+// 2. A MISSED PENALTY IS `type: 'Goal'`. Dropping it is the difference between
+//    a timeline and a scoreline that does not add up.
+// =============================================================
+
+export type MatchEventKind =
+  | 'goal'
+  | 'own_goal'
+  | 'penalty'
+  | 'yellow'
+  | 'red'
+  | 'second_yellow'
+  | 'var_goal_cancelled'
+  | 'subst'
+
+/** One row of `match_events`, as the league arm writes it. */
+export type MatchEventRow = {
+  fixture_id: string
+  /**
+   * Which column the row is drawn in — the side CREDITED, not the side the
+   * provider attributed the event to. They differ for an own goal, which is
+   * the only place this distinction shows up and the only place it matters.
+   */
+  side: 'home' | 'away'
+  kind: MatchEventKind
+  /** Scorer, carded player, or the player LEAVING for a substitution. */
+  player_name: string | null
+  /** Assist, or the player ARRIVING for a substitution. Null when neither. */
+  related_name: string | null
+  minute: number
+  extra_minute: number | null
+  /**
+   * Feed order within a minute.
+   *
+   * ⚠ Six things can share the 45th minute and `minute` alone cannot order
+   * them. This is the index in the provider's array, which is the only ordering
+   * information the payload carries.
+   */
+  sort_index: number
+}
+
+/** Lowercased detail matching, because the feed's capitalisation is not stable. */
+function classify(ev: ApiFootballEvent): MatchEventKind | null {
+  const detail = (ev.detail ?? '').trim().toLowerCase()
+  switch (ev.type) {
+    case 'Goal':
+      // ⚠ A missed penalty arrives as a GOAL. Kept out entirely.
+      if (detail.includes('missed')) return null
+      if (detail.includes('own goal')) return 'own_goal'
+      if (detail.includes('penalty')) return 'penalty'
+      return 'goal'
+    case 'Card':
+      if (detail.includes('second yellow')) return 'second_yellow'
+      if (detail.includes('red')) return 'red'
+      if (detail.includes('yellow')) return 'yellow'
+      // An unrecognised card is dropped rather than guessed at: a wrong card on
+      // a timeline is a claim about a player that the feed did not make.
+      return null
+    case 'subst':
+      return 'subst'
+    case 'Var':
+      // Only the reversal is rendered. "Penalty confirmed" and friends describe
+      // a decision about an event that is already in the list on its own.
+      return detail.includes('cancelled') || detail.includes('disallowed')
+        ? 'var_goal_cancelled'
+        : null
+    default:
+      return null
+  }
+}
+
+/**
+ * `/fixtures/events` → `match_events` rows for one league fixture.
+ *
+ * Returns rows in feed order. The caller writes them replace-all: the provider
+ * gives events no stable id, and a VAR reversal REMOVES an event from the
+ * payload, so an upsert would leave a disallowed goal on the screen forever.
+ */
+export function eventsToTimeline(
+  events: ApiFootballEvent[],
+  opts: { fixtureId: string; homeExternalTeamId: number },
+): MatchEventRow[] {
+  const rows: MatchEventRow[] = []
+
+  events.forEach((ev, i) => {
+    const kind = classify(ev)
+    if (kind === null) return
+
+    const isHome = ev.team?.id === opts.homeExternalTeamId
+    // ⚠ AN OWN GOAL IS CREDITED TO THE OTHER SIDE. The provider attributes it
+    // to the team the scorer plays for, which is the one it counted against.
+    // Drawn in that column it would read as them having scored it.
+    const side: 'home' | 'away' = kind === 'own_goal' ? (isHome ? 'away' : 'home') : isHome ? 'home' : 'away'
+
+    rows.push({
+      fixture_id: opts.fixtureId,
+      side,
+      kind,
+      player_name: ev.player?.name ?? null,
+      related_name: ev.assist?.name ?? null,
+      minute: ev.time?.elapsed ?? 0,
+      extra_minute: ev.time?.extra ?? null,
+      sort_index: i,
+    })
+  })
+
+  return rows
+}

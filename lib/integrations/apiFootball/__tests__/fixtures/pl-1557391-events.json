@@ -1,0 +1,354 @@
+[
+  {
+    "time": {
+      "elapsed": 11,
+      "extra": null
+    },
+    "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+    },
+    "player": {
+      "id": 389315,
+      "name": "Josh King"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Goal",
+    "detail": "Normal Goal",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 14,
+      "extra": null
+    },
+    "team": {
+      "id": 52,
+      "name": "Crystal Palace",
+      "logo": "https://media.api-sports.io/football/teams/52.png"
+    },
+    "player": {
+      "id": 2601,
+      "name": "Daichi Kamada"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Var",
+    "detail": "Goal cancelled",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 35,
+      "extra": null
+    },
+    "team": {
+      "id": 52,
+      "name": "Crystal Palace",
+      "logo": "https://media.api-sports.io/football/teams/52.png"
+    },
+    "player": {
+      "id": 182201,
+      "name": "Tyrick Mitchell"
+    },
+    "assist": {
+      "id": 1468,
+      "name": "Eddie Nketiah"
+    },
+    "type": "Goal",
+    "detail": "Normal Goal",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 42,
+      "extra": null
+    },
+    "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+    },
+    "player": {
+      "id": 386306,
+      "name": "Cesar Palacios Perez"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Goal",
+    "detail": "Normal Goal",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 45,
+      "extra": null
+    },
+    "team": {
+      "id": 52,
+      "name": "Crystal Palace",
+      "logo": "https://media.api-sports.io/football/teams/52.png"
+    },
+    "player": {
+      "id": 1468,
+      "name": "Eddie Nketiah"
+    },
+    "assist": {
+      "id": 2032,
+      "name": "Jörgen Strand Larsen"
+    },
+    "type": "subst",
+    "detail": "Substitution 1",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 54,
+      "extra": null
+    },
+    "team": {
+      "id": 52,
+      "name": "Crystal Palace",
+      "logo": "https://media.api-sports.io/football/teams/52.png"
+    },
+    "player": {
+      "id": 182201,
+      "name": "Tyrick Mitchell"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Goal",
+    "detail": "Normal Goal",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 61,
+      "extra": null
+    },
+    "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+    },
+    "player": {
+      "id": 386306,
+      "name": "Cesar Palacios Perez"
+    },
+    "assist": {
+      "id": 1934,
+      "name": "Sander Berge"
+    },
+    "type": "subst",
+    "detail": "Substitution 1",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 74,
+      "extra": null
+    },
+    "team": {
+      "id": 52,
+      "name": "Crystal Palace",
+      "logo": "https://media.api-sports.io/football/teams/52.png"
+    },
+    "player": {
+      "id": 38747,
+      "name": "Quinten Timber"
+    },
+    "assist": {
+      "id": 18806,
+      "name": "Will Hughes"
+    },
+    "type": "subst",
+    "detail": "Substitution 2",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 74,
+      "extra": null
+    },
+    "team": {
+      "id": 52,
+      "name": "Crystal Palace",
+      "logo": "https://media.api-sports.io/football/teams/52.png"
+    },
+    "player": {
+      "id": 182201,
+      "name": "Tyrick Mitchell"
+    },
+    "assist": {
+      "id": 2933,
+      "name": "Ben Chilwell"
+    },
+    "type": "subst",
+    "detail": "Substitution 3",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 77,
+      "extra": null
+    },
+    "team": {
+      "id": 52,
+      "name": "Crystal Palace",
+      "logo": "https://media.api-sports.io/football/teams/52.png"
+    },
+    "player": {
+      "id": 2933,
+      "name": "Ben Chilwell"
+    },
+    "assist": {
+      "id": 2601,
+      "name": "Daichi Kamada"
+    },
+    "type": "Goal",
+    "detail": "Normal Goal",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 79,
+      "extra": null
+    },
+    "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+    },
+    "player": {
+      "id": 19549,
+      "name": "Antonee Robinson"
+    },
+    "assist": {
+      "id": 19032,
+      "name": "Ryan Sessegnon"
+    },
+    "type": "subst",
+    "detail": "Substitution 2",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 79,
+      "extra": null
+    },
+    "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+    },
+    "player": {
+      "id": 278133,
+      "name": "Oscar Bobb"
+    },
+    "assist": {
+      "id": 335094,
+      "name": "Hugo Larsson"
+    },
+    "type": "subst",
+    "detail": "Substitution 3",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 79,
+      "extra": null
+    },
+    "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+    },
+    "player": {
+      "id": 284356,
+      "name": "Shea Charles"
+    },
+    "assist": {
+      "id": 1161,
+      "name": "Emile Smith Rowe"
+    },
+    "type": "subst",
+    "detail": "Substitution 4",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 83,
+      "extra": null
+    },
+    "team": {
+      "id": 36,
+      "name": "Fulham",
+      "logo": "https://media.api-sports.io/football/teams/36.png"
+    },
+    "player": {
+      "id": 1455,
+      "name": "Alex Iwobi"
+    },
+    "assist": {
+      "id": 195106,
+      "name": "Rodrigo Muniz"
+    },
+    "type": "subst",
+    "detail": "Substitution 5",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 89,
+      "extra": null
+    },
+    "team": {
+      "id": 52,
+      "name": "Crystal Palace",
+      "logo": "https://media.api-sports.io/football/teams/52.png"
+    },
+    "player": {
+      "id": 184226,
+      "name": "Yeremy Pino"
+    },
+    "assist": {
+      "id": 162712,
+      "name": "Oscar Mingueza"
+    },
+    "type": "subst",
+    "detail": "Substitution 4",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 89,
+      "extra": null
+    },
+    "team": {
+      "id": 52,
+      "name": "Crystal Palace",
+      "logo": "https://media.api-sports.io/football/teams/52.png"
+    },
+    "player": {
+      "id": 2601,
+      "name": "Daichi Kamada"
+    },
+    "assist": {
+      "id": 307117,
+      "name": "Dario Osorio"
+    },
+    "type": "subst",
+    "detail": "Substitution 5",
+    "comments": null
+  }
+]
