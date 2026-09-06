@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
-import { formatHms, useCountdown } from '@/lib/useCountdown';
+import { formatDhms, formatHms, useCountdown } from '@/lib/useCountdown';
 import { duelResult } from '@/lib/duelPoints';
 import type { Bout } from '@/lib/useDuel';
 import { fontFamilies, resolveColors, useTheme, withOpacity } from '@/theme';
@@ -210,6 +210,16 @@ type Props = {
   bout: Bout | null;
   /** The next sealed matchweek, when there is one. */
   sealed: { matchweek: number; opensAt: string | null } | null;
+  /**
+   * The viewer, for the corner that is never a secret.
+   *
+   * ⚠ IT CANNOT COME OFF `bout`, WHICH IS THE WHOLE REASON IT IS A PROP. A
+   * sealed week has no duel row at all — 116's RLS withholds it — so `bout` is
+   * null through phases 1 and 6, and reading "you" from it would leave the
+   * sealed band with nobody on either side. The member's own entry is not the
+   * part being kept secret.
+   */
+  you: { entryId: string; name: string } | null;
   /** entry_id → where they sit on the leaderboard. */
   standings: Map<string, Standing>;
   /** First kickoff of the current duel's matchweek — the countdown's target. */
@@ -254,6 +264,7 @@ export function ShowdownDuelHeader({
   poolCode,
   bout,
   sealed,
+  you,
   standings,
   kickoffAt,
   liveScore,
@@ -290,7 +301,12 @@ export function ShowdownDuelHeader({
    * same value their ring and glow already use, so the background agrees with
    * the avatars instead of being a third opinion about who is who.
    */
-  const youUserId = bout ? standings.get(bout.you.entryId)?.userId ?? null : null;
+  // ⚠ FALLS BACK TO `you` SO THE BAND KEEPS YOUR COLOUR WHILE SEALED. Your own
+  // side is not the secret; only the right-hand throw goes neutral, which is
+  // what makes a sealed band read as half-lit rather than switched off.
+  const youUserId =
+    (bout ? standings.get(bout.you.entryId)?.userId : null) ??
+    (you ? standings.get(you.entryId)?.userId ?? null : null);
   const themUserId = bout?.them ? standings.get(bout.them.entryId)?.userId ?? null : null;
   const leftGlow = youUserId ? gradientForUser(youUserId)[0] : BAND.primary;
   const rightGlow = themUserId ? gradientForUser(themUserId)[0] : BAND.slate;
@@ -489,6 +505,7 @@ export function ShowdownDuelHeader({
               <Matchup
                 bout={bout}
                 sealed={sealed}
+                you={you}
                 standings={standings}
                 kickoffAt={kickoffAt}
                 liveScore={liveScore}
@@ -619,6 +636,7 @@ function Glow({
 function Matchup({
   bout,
   sealed,
+  you,
   standings,
   kickoffAt,
   liveScore,
@@ -632,6 +650,7 @@ function Matchup({
 }: {
   bout: Bout | null;
   sealed: Props['sealed'];
+  you: Props['you'];
   standings: Map<string, Standing>;
   kickoffAt: string | null;
   liveScore: Props['liveScore'];
@@ -743,6 +762,64 @@ function Matchup({
             labelFade={labelFade}
           />
         </View>
+      ) : sealed && you ? (
+        /*
+          ⚠ PHASES 1 AND 6 — THE SEALED BAND, WHICH USED TO BE ONE SENTENCE.
+
+          Ryan, 2026-09-06: the sealed state is half the Showdown cycle. It is
+          every hour between one duel settling and the next one opening, and it
+          is where the anticipation the mode is built on is supposed to
+          accumulate. It was rendering a single grey line of text — *"Your
+          opponent opens one week at a time"* — with no clock, no avatars, and
+          nothing that changed between visits.
+
+          ⚠ THE COUNTDOWN TARGET WAS ALREADY HERE AND WAS NEVER READ. `sealed.
+          opensAt` has been on this component's props since the sealed card was
+          stripped out on 2026-09-03, and nothing in the file touched it. The
+          instant comes from `league_duel_reveals_at` via the contract (127/129)
+          — 24 hours after the previous matchweek's last game — so this is a
+          real clock to a real event, not a guess dressed as one.
+
+          ⚠ PHASE 6 IS THIS SAME BRANCH. A brand-new pool and a member coming
+          out of last week's recap land here identically and differ only in what
+          the clock says. Giving the "full circle" case its own component would
+          be two things that must always agree about one countdown.
+
+          ⚠ AND IT IS STILL THE SEALED SHAPE. Your corner is real because your
+          own entry was never the secret; the other corner is a locked
+          silhouette with no name, no rank and no colour of its own. Nothing
+          here narrows who it might be.
+        */
+        <View
+          onLayout={(e) => onCornersY(Math.round(e.nativeEvent.layout.y))}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            paddingHorizontal: ROW_PAD,
+          }}
+        >
+          <Corner
+            name={you.name}
+            standing={standings.get(you.entryId) ?? null}
+            tone="primary"
+            moveStyle={leftMove}
+            avatarShrink={avatarShrink}
+            labelFade={labelFade}
+          />
+          <Animated.View style={[{ minWidth: MIDDLE_COL, alignItems: 'center' }, middleStyle]}>
+            <SealedMiddle opensAt={sealed.opensAt} />
+          </Animated.View>
+          <Corner
+            name="Sealed"
+            standing={null}
+            tone="muted"
+            sealed
+            subtitle="Opponent hidden"
+            moveStyle={rightMove}
+            avatarShrink={avatarShrink}
+            labelFade={labelFade}
+          />
+        </View>
       ) : (
         <BandText align="center" variant="body" style={{ paddingHorizontal: 24, color: BAND.slate }}>
           {sealed
@@ -750,6 +827,69 @@ function Matchup({
             : 'The draw is made once there are two members.'}
         </BandText>
       )}
+    </View>
+  );
+}
+
+/**
+ * The centre column while the draw is sealed: a clock to the walkout.
+ *
+ * ⚠ IT COUNTS DOWN TO A TARGET IT WAS GIVEN. `useCountdown` returns null once
+ * the instant passes — see its own header on why a hook that renders a clock is
+ * allowed and one that decides what the clock is FOR is not.
+ *
+ * ⚠ `formatDhms` RATHER THAN `formatHms`, AND THAT IS NOT COSMETIC. This wait
+ * is a DAY at minimum (129) and can be nineteen: three matchweeks a season sit
+ * behind an international break — mw 6 is 19.7 days, mw 31 is 20.8 — and
+ * `formatHms` accumulates hours without rolling over, so it would print
+ * `499:00:00` and mean nothing to anybody. Days are the unit this wait is
+ * actually measured in.
+ *
+ * ⚠ AND IT SAYS SO WHEN IT CANNOT SAY WHEN. `opensAt` is null while the
+ * previous matchweek is unsettled and the floor has not bitten yet, which is a
+ * real state — the football has not finished, so the 24-hour hold has nothing
+ * to count from. An empty clock would read as broken; naming the condition is
+ * the honest version, and it is the same thing the web's sealed card has said
+ * since 123.
+ */
+function SealedMiddle({ opensAt }: { opensAt: string | null }) {
+  const theme = useTheme();
+  const until = useCountdown(opensAt);
+
+  return (
+    <View style={{ alignItems: 'center', gap: theme.spacing.xs }}>
+      <BandText
+        style={{
+          fontFamily: fontFamilies.bold,
+          fontSize: 9,
+          letterSpacing: 1.4,
+          textTransform: 'uppercase',
+          color: BAND.slate,
+        }}
+      >
+        {until === null ? 'Opens' : 'Opponent in'}
+      </BandText>
+      <BandText
+        style={{
+          fontFamily: fontFamilies.black,
+          // ⚠ Smaller than the live scoreline's 32 on purpose. A clock to an
+          // event is not the event; sizing it like the score would make the
+          // wait shout louder than the football it is waiting for.
+          fontSize: 20,
+          lineHeight: 26,
+          color: BAND.ink,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {/*
+          ⚠ THREE STATES, AND THE THIRD IS NOT AN ERROR. A live clock while the
+          hold is running; "Any moment" once it has expired but the payload has
+          not caught up — the reveal lands on a clock, and this component cannot
+          make rows appear; and "After this week" when there is no instant to
+          count to at all because the previous matchweek is still being played.
+        */}
+        {until !== null ? formatDhms(until) : opensAt !== null ? 'Any moment' : 'After this week'}
+      </BandText>
     </View>
   );
 }
@@ -980,6 +1120,7 @@ function Corner({
   standing,
   tone,
   subtitle,
+  sealed = false,
   moveStyle,
   avatarShrink,
   labelFade,
@@ -988,6 +1129,21 @@ function Corner({
   standing: Standing | null;
   tone: 'primary' | 'red' | 'muted';
   subtitle?: string;
+  /**
+   * Draw this corner as a locked silhouette rather than a person.
+   *
+   * ⚠ IT IS NOT THE SAME AS A BYE, and the two must not converge. A bye is a
+   * fact — nobody was drawn against you — and it names itself. A sealed corner
+   * is a person who EXISTS and is being withheld, which is why it gets the lock
+   * rather than the "Nobody" the bye uses. A member who cannot tell those apart
+   * will spend a week thinking they have no opponent.
+   *
+   * ⚠ AND IT MUST NARROW NOTHING. No initial, no rank, no points, and the ring
+   * takes the muted tone instead of `gradientForUser` — a corner tinted with
+   * the opponent's own colour would identify them to anybody who has seen that
+   * colour in Banter, which is everybody.
+   */
+  sealed?: boolean;
   /** Travels the whole column to this corner's collapsed position. */
   moveStyle: AnimatedStyle;
   /** Shrinks the avatar box alone — see the header for why it is separate. */
@@ -1084,18 +1240,32 @@ function Corner({
               }}
             />
           ) : null}
-          <BandText
-            style={{
-              fontFamily: fontFamilies.black,
-              fontSize: 26,
-              // ⚠ SET WITH THE FONT SIZE. `Text` defaults to variant 'body',
-              // whose `lineHeight: 20` shears the tops off anything larger.
-              lineHeight: 32,
-              color: userId ? '#FFFFFF' : color,
-            }}
-          >
-            {getInitials(name)}
-          </BandText>
+          {sealed ? (
+            // ⚠ A LOCK, NOT AN INITIAL. `getInitials('Sealed')` is "S", which is
+            // a letter somebody in the pool has — and a member staring at a
+            // sealed corner all week WILL read it as a clue. The glyph has to be
+            // something no name can produce.
+            //
+            // ⚠ `tint`, NEVER `color`. The `color` prop resolves through
+            // `useTheme()` and so follows the DEVICE theme, on a band that is
+            // dark in both — the same failure the `BandText` note records, which
+            // silently vanished the pool name and both usernames in light mode.
+            // `RoundButton` below already does it this way.
+            <Icon name="lock.fill" tint={BAND.slate} size={30} weight="semibold" />
+          ) : (
+            <BandText
+              style={{
+                fontFamily: fontFamilies.black,
+                fontSize: 26,
+                // ⚠ SET WITH THE FONT SIZE. `Text` defaults to variant 'body',
+                // whose `lineHeight: 20` shears the tops off anything larger.
+                lineHeight: 32,
+                color: userId ? '#FFFFFF' : color,
+              }}
+            >
+              {getInitials(name)}
+            </BandText>
+          )}
         </View>
 
         {/*

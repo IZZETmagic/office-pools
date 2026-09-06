@@ -171,6 +171,16 @@ export type DuelState = {
   pickDirections: Map<string, Map<string, string>>;
   /** The viewer's own entry, for the route into the picker. */
   ownEntryId: string | null;
+  /**
+   * The viewer's own display name.
+   *
+   * ⚠ FROM THE POOL PAYLOAD, NOT FROM `names`. `names` is built from the two
+   * sides of every REVEALED duel, so it is empty in a pool whose draw is still
+   * sealed — which is exactly when the sealed header needs to letter the
+   * member's own avatar. Reading it from `you.entries` means the one corner
+   * that is never a secret is never blank.
+   */
+  ownName: string | null;
 
   // ----------------------------------------------------- the live matchweek
   /**
@@ -1035,6 +1045,7 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     season,
     opponent,
     ownEntryId: data?.you.entries[0]?.entry_id ?? null,
+    ownName: data?.you.entries[0]?.entry_name ?? null,
     isInPlay,
     sheetRows,
     liveScore,

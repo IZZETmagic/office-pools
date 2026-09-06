@@ -357,6 +357,24 @@ export default function PoolDetailScreen() {
     return m;
   }, [data?.leagueLeaderboard]);
 
+  /**
+   * The viewer's own corner, for the sealed band.
+   *
+   * ⚠ IT EXISTS BECAUSE `duel.current` DOES NOT, THROUGH HALF THE CYCLE. RLS
+   * (116) withholds a sealed week's duel rows, so the header has no bout to
+   * read "you" off during phases 1 and 6 — which is most of any given week. The
+   * member's own entry was never the part being kept secret.
+   *
+   * ⚠ `ownName` COMES FROM THE POOL PAYLOAD, not from `duel.names`: that map is
+   * built from the two sides of every REVEALED duel and is empty in a pool whose
+   * draw has not opened yet. See `useDuel`'s note on the field.
+   */
+  const duelYou = useMemo(
+    () =>
+      duel.ownEntryId ? { entryId: duel.ownEntryId, name: duel.ownName ?? 'You' } : null,
+    [duel.ownEntryId, duel.ownName],
+  );
+
   const pickemDeadline = (() => {
     const season = pickemLeague.data?.season;
     const open = season?.openMatchweekNumber ?? null;
@@ -852,6 +870,7 @@ export default function PoolDetailScreen() {
           poolCode={pool.poolCode ?? null}
           bout={duel.current}
           sealed={duel.sealed}
+          you={duelYou}
           standings={duelStandings}
           kickoffAt={duel.currentKickoff}
           liveScore={duel.liveScore}

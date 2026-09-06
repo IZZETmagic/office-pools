@@ -55,11 +55,16 @@ export function formatHms(ms: number): string {
 /**
  * `2d 04:11:09` — for waits long enough that a raw hour count stops meaning much.
  *
- * ⚠ UNUSED RIGHT NOW, on purpose. Its caller was the Duel tab's sealed card,
- * which came out when the tab was stripped back to Your Sheet (2026-09-03). It
- * is kept rather than deleted because the sealed card is on the list to come
- * back and a reveal can be a week out — but if that stops being true, this
- * should go with it rather than sit here looking sanctioned.
+ * ⚠ IT HAS A CALLER AGAIN — `SealedMiddle` in `ShowdownDuelHeader`, 2026-09-06.
+ * It sat unused from 2026-09-03, when the Duel tab's sealed card came out and
+ * the header replaced it with a single line of text and no clock at all. The
+ * note kept here then said it was retained "because the sealed card is on the
+ * list to come back"; it came back into the band instead.
+ *
+ * ⚠ AND THE SEALED CLOCK MUST USE THIS ONE, NOT `formatHms`. The wait is a day
+ * at minimum (129) and up to twenty across an international break, and
+ * `formatHms` accumulates hours rather than rolling over — so it would render
+ * `499:00:00`, which is technically correct and unreadable.
  */
 export function formatDhms(ms: number): string {
   const s = Math.floor(ms / 1000);
