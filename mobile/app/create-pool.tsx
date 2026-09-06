@@ -562,6 +562,15 @@ function TournamentStep({
               backgroundColor: isSelected
                 ? withOpacity(theme.colors.primary, 0.08)
                 : theme.colors.surface,
+              // The app's selection treatment — see BracketPickerWizard and
+              // OutcomePicker. An 8% tint ALONE was the whole signal here, and
+              // on a white card against the snow page it barely registered.
+              //
+              // Border is always rendered so only its COLOUR changes on select:
+              // a border that appears on selection shifts the card and its
+              // neighbours by its own width.
+              borderWidth: theme.borders.accent,
+              borderColor: isSelected ? theme.colors.primary : 'transparent',
               opacity: pressed ? 0.85 : 1,
             })}
           >
@@ -700,14 +709,23 @@ function PoolTypeStep({
                     backgroundColor: selected
                       ? withOpacity(theme.colors.primary, 0.08)
                       : theme.colors.surface,
+                    borderWidth: theme.borders.accent,
+                    borderColor: selected ? theme.colors.primary : 'transparent',
                     opacity: pressed ? 0.85 : 1,
                   })}
                 >
+                  {/* ⚠ THE LABEL STAYS AT FULL STRENGTH. It used to go
+                      `primary` when selected, which is the mistake
+                      OutcomePicker already records: the tint is bright but
+                      LESS LUMINANT than the ink, so in dark mode the option you
+                      had chosen read SOFTER than the one you had not. Selection
+                      is carried by the fill and the border — which gain
+                      contrast — and by the weight, never by trading it away. */}
                   <Text
                     style={{
-                      fontFamily: fontFamilies.bold,
+                      fontFamily: selected ? fontFamilies.bold : fontFamilies.semibold,
                       fontSize: 14,
-                      color: selected ? theme.colors.primary : theme.colors.ink,
+                      color: theme.colors.ink,
                     }}
                   >
                     {opt.label}
@@ -769,10 +787,17 @@ function ModeCard({
         backgroundColor: selected
           ? withOpacity(theme.colors.primary, 0.08)
           : theme.colors.surface,
+        // Always rendered, colour-only change — see the note on the competition
+        // card above. Four mode cards stacked with nothing but an 8% tint
+        // between them is the case Ryan reported as "not very visible".
+        borderWidth: theme.borders.accent,
+        borderColor: selected ? theme.colors.primary : 'transparent',
         opacity: pressed ? 0.85 : 1,
       })}
     >
       <View style={{ width: 32, alignItems: 'center', paddingTop: 2 }}>
+        {/* The ICON may take the tint — it is a glyph, not text to read, so the
+            luminance trap described on the depth labels below does not apply. */}
         <Icon name={icon} color={selected ? 'primary' : 'slate'} size={22} />
       </View>
       <View style={{ flex: 1, gap: theme.spacing.xs }}>
@@ -1095,14 +1120,17 @@ function PrivacyOption({
         paddingVertical: theme.spacing.md,
         borderRadius: theme.radii.sm,
         backgroundColor: selected ? withOpacity(theme.colors.primary, 0.08) : theme.colors.mist,
+        borderWidth: theme.borders.accent,
+        borderColor: selected ? theme.colors.primary : 'transparent',
         opacity: pressed ? 0.85 : 1,
       })}
     >
+      {/* ⚠ Full strength when selected — same rule as the depth labels above. */}
       <Text
         style={{
           fontFamily: fontFamilies.bold,
           fontSize: 16,
-          color: selected ? theme.colors.primary : theme.colors.ink,
+          color: theme.colors.ink,
         }}
       >
         {title}
