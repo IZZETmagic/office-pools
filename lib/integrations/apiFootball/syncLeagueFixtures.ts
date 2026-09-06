@@ -21,18 +21,23 @@
 //   - no scoring, no recalculation, no pushes, no cache invalidation, no
 //     realtime broadcast. League scoring is L7 and the side-effect orchestrator
 //     is L8. This arm's only job is to make `league_fixtures` true.
-//   - resolves no clubs (the 20 are fixed at import) and fetches no events
-//     (there is no league conduct table; it would be pure quota burn).
+//   - resolved no events until migration 136. It does now, in 7b3 — gated on a
+//     fixture having actually CHANGED rather than on the window, because
+//     /fixtures/events is a call PER FIXTURE and a per-tick fetch is 1,500-2,500
+//     of them on a full matchday, against a 7,500/day plan shared with every
+//     competition this arm is meant to scale to. It still resolves no clubs
+//     (the 20 are fixed at import).
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { invalidateLeagueSeason } from '@/lib/league/season'
 import { syncLeagueStandings } from './syncLeagueStandings'
-import { getFixturesAllPages } from './client'
+import { getFixtureEvents, getFixturesAllPages } from './client'
 import {
   fixtureToLeagueUpdate,
   type LeagueFixtureRow,
   type LeagueFixturePayload,
+  eventsToTimeline,
 } from './mappers'
 import { rehomeSeason } from '@/lib/league/rehomeSeason'
 import type { LeagueSyncTarget } from './syncTargets'
@@ -90,6 +95,10 @@ export type LeagueSyncResult = {
   written: number
   /** Fixtures that completed this tick and were scored. */
   scored: number
+  /** `/fixtures/events` calls made this tick — one per changed fixture. */
+  timelineCalls: number
+  /** Event rows written across all fixtures this tick. */
+  timelineRows: number
   /** Entries whose league totals moved as a result. */
   scoredEntries: number
   /** Standings rows re-ingested this tick, if a fixture finished. */
@@ -155,6 +164,8 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     proposed: 0,
     written: 0,
     scored: 0,
+    timelineCalls: 0,
+    timelineRows: 0,
     scoredEntries: 0,
     standings: 0,
     tablePoolsScored: 0,
@@ -527,6 +538,96 @@ export async function syncLeagueFixtures(
     result.scoredEntries += sr.entries ?? 0
   }
 
+  // ------------------------------------------------------- 7b3. the timeline
+  // Goals, cards, VAR reversals and substitutions, plus the referee and the
+  // half-time score — everything the Facts tab draws that is not the scoreline.
+  //
+  // ⚠ GATED ON `res.changed`, NOT ON THE WINDOW, AND THAT IS THE WHOLE COST
+  // ARGUMENT. `/fixtures/events` is a call PER FIXTURE, and this arm has made
+  // exactly zero of those until now — one bulk call a tick, whatever is
+  // playing. Fetching per fixture on every tick instead would be roughly one
+  // call per in-window minute per live fixture: a Saturday 15:00 slate is six
+  // simultaneous fixtures over a ~3-hour window, ~1,080 calls from that slate
+  // alone, and a full matchday lands 1,500-2,500 against a 7,500/day plan
+  // shared with every other competition this route is meant to scale to.
+  //
+  // Iterating `changed` costs ONE call per goal, card or status change, which
+  // is the same trade 7b already makes for scoring: "a live match costs ONE
+  // re-score per goal, not one per minute".
+  //
+  // ⚠ AND ONE MORE WHEN IT FINISHES, which is not redundant. A VAR-disallowed
+  // goal that restores the previous score changes nothing on `league_fixtures`,
+  // so it produces NO `changed` row and the timeline would keep a goal that
+  // never stood. The completion tick is what reconciles that. `is_completed`
+  // flips exactly once per fixture, so this is one extra call per match.
+  //
+  // A failure is an ERROR but never stops the loop or the sync: the fixture
+  // data is already written and correct, and a missing timeline is a blank card
+  // rather than a wrong one. The next change re-fetches from scratch.
+  for (const c of res.changed ?? []) {
+    const fx = byExt.get(c.external_fixture_id)
+    if (!fx) continue
+
+    try {
+      const evts = await getFixtureEvents(fx.fixture.id)
+      result.timelineCalls++
+
+      const timeline = eventsToTimeline(evts, {
+        fixtureId: c.fixture_id,
+        homeExternalTeamId: fx.teams.home.id,
+      })
+
+      // ⚠ REPLACE-ALL, NEVER UPSERT. api-football gives an event no stable id,
+      // and a VAR reversal REMOVES it from the payload rather than marking it —
+      // so an upsert leaves a disallowed goal on the screen permanently. The
+      // set is a handful of rows; deleting and re-inserting is cheaper than any
+      // scheme for working out what vanished.
+      const { error: delErr } = await admin
+        .from('match_events')
+        .delete()
+        .eq('fixture_id', c.fixture_id)
+      if (delErr) {
+        push('league_timeline', delErr.message, { fixture_id: c.fixture_id })
+        continue
+      }
+      if (timeline.length > 0) {
+        const { error: insErr } = await admin.from('match_events').insert(timeline)
+        if (insErr) {
+          push('league_timeline', insErr.message, { fixture_id: c.fixture_id })
+          continue
+        }
+        result.timelineRows += timeline.length
+      }
+
+      // ⚠ THE HALF-TIME PAIR IS WRITTEN AS A PAIR. `league_fixtures_ht_pair_ck`
+      // refuses `{1, null}`, and mappers.ts records that diffing each side
+      // alone is exactly what raises 23514 in production the first time the
+      // provider reports a half-written score. Both or neither, decided here.
+      //
+      // Written on this step rather than threaded through
+      // `league_apply_fixture_sync` deliberately: that RPC is a live set-based
+      // function, and replacing it would mean the full md5(prosrc) ritual for
+      // three display-only columns.
+      const ht = fx.score?.halftime
+      const htPair =
+        ht && ht.home !== null && ht.away !== null
+          ? { home_goals_ht: ht.home, away_goals_ht: ht.away }
+          : {}
+      const referee = fx.fixture.referee ?? null
+      if (referee !== null || Object.keys(htPair).length > 0) {
+        const { error: metaErr } = await admin
+          .from('league_fixtures')
+          .update({ ...(referee !== null ? { referee } : {}), ...htPair })
+          .eq('fixture_id', c.fixture_id)
+        if (metaErr) push('league_timeline', metaErr.message, { fixture_id: c.fixture_id })
+      }
+    } catch (e) {
+      push('league_timeline', e instanceof Error ? e.message : String(e), {
+        fixture_id: c.fixture_id,
+      })
+    }
+  }
+
   // ------------------------------------------------------------ 7b2. re-home
   // Our matchweeks are PICKING rounds, so a fixture that just moved may now
   // belong to a different one — Decision 10, and the policy lives in
@@ -646,6 +747,8 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     `seen=${r.seen}`,
     `changed=${r.written}`,
     `scored=${r.scored}`,
+    // Only when it did something — a permanently-zero counter is one nobody reads.
+    ...(r.timelineCalls > 0 ? [`timeline=${r.timelineRows}/${r.timelineCalls}`] : []),
     `manual=${r.skippedManual}`,
     `unmatched=${r.unmatched}`,
     `unknown=${r.unknownProvider}`,

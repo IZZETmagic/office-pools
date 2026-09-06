@@ -51,6 +51,31 @@ export type MatchPredictionInfo = {
   bracketPick: BracketPickInfo | null;
 };
 
+/** One row of the Facts tab's timeline, as `match_events` stores it. */
+export type TimelineEvent = {
+  side: 'home' | 'away';
+  kind:
+    | 'goal'
+    | 'own_goal'
+    | 'penalty'
+    | 'yellow'
+    | 'red'
+    | 'second_yellow'
+    | 'var_goal_cancelled'
+    | 'subst';
+  playerName: string | null;
+  relatedName: string | null;
+  minute: number;
+  extraMinute: number | null;
+};
+
+/** The bits of the record that are not the scoreline. */
+export type MatchFacts = {
+  referee: string | null;
+  halfTimeHome: number | null;
+  halfTimeAway: number | null;
+};
+
 export type GroupStanding = {
   teamId: string;
   teamName: string;
@@ -71,8 +96,15 @@ const MATCH_SELECT = `
   home_score_ft, away_score_ft, home_score_pso, away_score_pso, live_minute, live_period, live_added,
   home_team_placeholder, away_team_placeholder,
   home_team:teams!matches_home_team_id_fkey(country_name, country_code, flag_url),
-  away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url)
+  away_team:teams!matches_away_team_id_fkey(country_name, country_code, flag_url),
+  tournaments(external_league_id)
 `;
+
+/** PostgREST returns an embedded row as an object or a one-element array. */
+function firstOf<T>(raw: unknown): T | null {
+  if (!raw) return null;
+  return (Array.isArray(raw) ? raw[0] : raw) as T | null;
+}
 
 function normalizeTeam(raw: unknown): ResultsTeam | null {
   if (!raw) return null;
@@ -115,15 +147,31 @@ function normalizeMatch(row: Record<string, unknown>): ResultsMatch {
     awayTeamPlaceholder: (row.away_team_placeholder as string | null) ?? null,
     homeTeam: normalizeTeam(row.home_team),
     awayTeam: normalizeTeam(row.away_team),
-    // Both null on this path by definition: it reads the `matches` table, which
-    // holds World Cup rows only. A league fixture never reaches this function —
-    // it is served from the list already in memory. See `leagueMatch` below.
+    // Null on this path by definition: it reads the `matches` table, which
+    // holds bracket-competition rows only. A league fixture never reaches this
+    // function — it is served from the list already in memory. See
+    // `leagueMatch` below.
     roundNumber: null,
+    // ⚠ STILL NULL, AND DELIBERATELY, even though the join below now knows
+    // which competition this is. `competition` is the CAPTION, and the Results
+    // tab renders a section header from it — `CompetitionHeader` returns null
+    // for the World Cup on purpose, because a header reading "Other" over the
+    // 2026 final would be worse than no header. Filling this in would put a
+    // caption on a list that decided not to have one. The detail band falls
+    // back to the stage instead; see `competitionLine`.
     competition: null,
-    // As above: this path is the `matches` table, which is World Cup only and
-    // has no league id. A league fixture arrives already stamped, through
-    // `leagueMatch`.
-    competitionId: null,
+    // ⚠ READ, NOT ASSERTED. The band, the mark and every other brand lookup key
+    // on this — `tournaments.external_league_id`, the api-football league id.
+    //
+    // It used to be hard-coded null, so a World Cup header had nothing to
+    // colour itself with and rendered the same neutral as an unthemed league.
+    // The obvious fix was to stamp `1` here, since `matches` is written only by
+    // the `world_cup` arm of the sync — but "world_cup" is a target KIND, and
+    // `loadSyncTargets` builds one target per `tournaments` row, so there can be
+    // more than one of them. Stamping the literal would have quietly painted a
+    // second bracket competition in the first one's colours.
+    competitionId: firstOf<{ external_league_id: number | null }>(row.tournaments)
+      ?.external_league_id ?? null,
   };
 }
 
@@ -163,6 +211,8 @@ export function useMatchDetail(matchId: string | undefined) {
   const [matchStats, setMatchStats] = useState<MatchStatsResponse | null>(null);
   const [bracketStats, setBracketStats] = useState<BracketStatsResponse | null>(null);
   const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [facts, setFacts] = useState<MatchFacts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -201,6 +251,7 @@ export function useMatchDetail(matchId: string | undefined) {
       setMatchStats(null);
       setBracketStats(null);
       setGroupStandings([]);
+      await loadLeagueFacts(matchId, setTimeline, setFacts);
       setLoading(false);
       return;
     }
@@ -216,6 +267,11 @@ export function useMatchDetail(matchId: string | undefined) {
       if (!matchRow) throw new Error('Match not found');
       const m = normalizeMatch(matchRow as Record<string, unknown>);
       setMatch(m);
+      // ⚠ The World Cup arm of `match_events` is deliberately empty for now —
+      // migration 136 created the table with both arms but only the league sync
+      // writes it. Cleared rather than left holding the previous match's rows.
+      setTimeline([]);
+      setFacts(null);
 
       // 2. Resolve user's entries across pools, split by prediction mode.
       // Query through pool_members (the source of truth for "this user belongs
@@ -483,13 +539,22 @@ export function useMatchDetail(matchId: string | undefined) {
           const row = payload.new as Record<string, unknown> | null;
           if (!row) return;
           const updated = normalizeMatch(row);
-          // Realtime payload doesn't include joined team data — preserve.
+          // ⚠ A REALTIME PAYLOAD IS THE ROW, NOT THE SELECT. It carries no
+          // embedded resources at all, so everything `MATCH_SELECT` joins comes
+          // back null here and has to be carried over from the previous state.
+          //
+          // The teams were always preserved. `competitionId` joins
+          // `tournaments` and so has exactly the same problem — without it the
+          // band would be correctly coloured until the first goal and neutral
+          // grey from then on, which is both wrong and only reproducible
+          // during a live match.
           setMatch((prev) => {
             if (!prev) return updated;
             return {
               ...updated,
               homeTeam: prev.homeTeam,
               awayTeam: prev.awayTeam,
+              competitionId: prev.competitionId,
             };
           });
         },
@@ -506,10 +571,100 @@ export function useMatchDetail(matchId: string | undefined) {
     matchStats,
     bracketStats,
     groupStandings,
+    timeline,
+    facts,
     loading,
     error,
     refresh: load,
   };
+}
+
+/**
+ * The Facts tab's two reads, in ONE round trip.
+ *
+ * ⚠ READ DIRECTLY RATHER THAN THROUGH `/api/users/:id/fixtures`, and that is a
+ * deliberate departure from the plan. Referee and the half-time pair could ride
+ * the season payload, but that payload is ~197 kB, shared-cached for 30s across
+ * every viewer of a season, and carries all 380 fixtures — adding three columns
+ * to it for something one screen shows on one match is weight on a hot cache to
+ * save a query nobody else makes.
+ *
+ * `league_fixtures` is a calendar table with `SELECT USING (true)` (migration
+ * 050) and `match_events` has its own read policy for authenticated users, so
+ * the phone can ask for both itself. The embed makes it one request.
+ *
+ * A failure here is a blank card, never a thrown screen: the match itself is
+ * already rendered from the list in memory by the time this runs.
+ */
+async function loadLeagueFacts(
+  fixtureId: string,
+  setTimeline: (t: TimelineEvent[]) => void,
+  setFacts: (f: MatchFacts | null) => void,
+) {
+  try {
+    const { data, error: err } = await supabase
+      .from('league_fixtures')
+      .select(
+        'referee, home_goals_ht, away_goals_ht,' +
+          ' match_events(side, kind, player_name, related_name, minute, extra_minute, sort_index)',
+      )
+      .eq('fixture_id', fixtureId)
+      .maybeSingle();
+    if (err) throw err;
+    if (!data) {
+      setTimeline([]);
+      setFacts(null);
+      return;
+    }
+
+    // ⚠ Through `unknown`: the generated client cannot type an embedded select
+    // written as a string, so it widens `data` to GenericStringError and a
+    // direct cast is rejected. Same shape as the joins above.
+    const row = data as unknown as {
+      referee: string | null;
+      home_goals_ht: number | null;
+      away_goals_ht: number | null;
+      match_events: Array<{
+        side: string;
+        kind: string;
+        player_name: string | null;
+        related_name: string | null;
+        minute: number;
+        extra_minute: number | null;
+        sort_index: number;
+      }> | null;
+    };
+
+    setFacts({
+      referee: row.referee,
+      halfTimeHome: row.home_goals_ht,
+      halfTimeAway: row.away_goals_ht,
+    });
+
+    // ⚠ ORDERED HERE, NOT IN THE QUERY. PostgREST cannot order an embedded
+    // resource by two columns through this client, and minute alone does not
+    // order six things that share the 45th — `sort_index` is the feed's own
+    // sequence and is the tiebreak the table stores it for.
+    const events = (row.match_events ?? [])
+      .slice()
+      .sort((a, b) => a.minute - b.minute || a.sort_index - b.sort_index)
+      .map((e) => ({
+        side: e.side as TimelineEvent['side'],
+        kind: e.kind as TimelineEvent['kind'],
+        playerName: e.player_name,
+        relatedName: e.related_name,
+        minute: e.minute,
+        extraMinute: e.extra_minute,
+      }));
+    setTimeline(events);
+  } catch (e) {
+    // ⚠ A MISSING TABLE IS THE EXPECTED CASE UNTIL MIGRATION 136 IS APPLIED.
+    // Warn and render nothing rather than failing the screen — the header,
+    // the scoreline and every other card are unaffected.
+    console.warn('[useMatchDetail] league facts unavailable', e);
+    setTimeline([]);
+    setFacts(null);
+  }
 }
 
 async function loadGroupStandings(

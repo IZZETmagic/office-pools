@@ -1,0 +1,354 @@
+[
+  {
+    "time": {
+      "elapsed": 29,
+      "extra": null
+    },
+    "team": {
+      "id": 42,
+      "name": "Arsenal",
+      "logo": "https://media.api-sports.io/football/teams/42.png"
+    },
+    "player": {
+      "id": 161800,
+      "name": "Christos Tzolis"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Card",
+    "detail": "Yellow Card",
+    "comments": "Foul"
+  },
+  {
+    "time": {
+      "elapsed": 46,
+      "extra": null
+    },
+    "team": {
+      "id": 42,
+      "name": "Arsenal",
+      "logo": "https://media.api-sports.io/football/teams/42.png"
+    },
+    "player": {
+      "id": 161800,
+      "name": "C. Tzolis"
+    },
+    "assist": {
+      "id": 19586,
+      "name": "E. Eze"
+    },
+    "type": "subst",
+    "detail": "Substitution 1",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 55,
+      "extra": null
+    },
+    "team": {
+      "id": 42,
+      "name": "Arsenal",
+      "logo": "https://media.api-sports.io/football/teams/42.png"
+    },
+    "player": {
+      "id": 1460,
+      "name": "Bukayo Saka"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Var",
+    "detail": "Penalty cancelled",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 55,
+      "extra": null
+    },
+    "team": {
+      "id": 42,
+      "name": "Arsenal",
+      "logo": "https://media.api-sports.io/football/teams/42.png"
+    },
+    "player": {
+      "id": null,
+      "name": null
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Goal",
+    "detail": "Normal Goal",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 59,
+      "extra": null
+    },
+    "team": {
+      "id": 42,
+      "name": "Arsenal",
+      "logo": "https://media.api-sports.io/football/teams/42.png"
+    },
+    "player": {
+      "id": 1460,
+      "name": "B. Saka"
+    },
+    "assist": {
+      "id": 157052,
+      "name": "R. Calafiori"
+    },
+    "type": "Goal",
+    "detail": "Normal Goal",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 71,
+      "extra": null
+    },
+    "team": {
+      "id": 66,
+      "name": "Aston Villa",
+      "logo": "https://media.api-sports.io/football/teams/66.png"
+    },
+    "player": {
+      "id": 364566,
+      "name": "G. Hemmings"
+    },
+    "assist": {
+      "id": 464004,
+      "name": "Alysson"
+    },
+    "type": "subst",
+    "detail": "Substitution 1",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 71,
+      "extra": null
+    },
+    "team": {
+      "id": 66,
+      "name": "Aston Villa",
+      "logo": "https://media.api-sports.io/football/teams/66.png"
+    },
+    "player": {
+      "id": 283058,
+      "name": "N. Jackson"
+    },
+    "assist": {
+      "id": 19194,
+      "name": "T. Abraham"
+    },
+    "type": "subst",
+    "detail": "Substitution 2",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 71,
+      "extra": null
+    },
+    "team": {
+      "id": 42,
+      "name": "Arsenal",
+      "logo": "https://media.api-sports.io/football/teams/42.png"
+    },
+    "player": {
+      "id": 313245,
+      "name": "M. Lewis-Skelly"
+    },
+    "assist": {
+      "id": 10135,
+      "name": "Bruno Guimaraes"
+    },
+    "type": "subst",
+    "detail": "Substitution 2",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 71,
+      "extra": null
+    },
+    "team": {
+      "id": 42,
+      "name": "Arsenal",
+      "logo": "https://media.api-sports.io/football/teams/42.png"
+    },
+    "player": {
+      "id": 37127,
+      "name": "M. Odegaard"
+    },
+    "assist": {
+      "id": 47311,
+      "name": "M. Merino"
+    },
+    "type": "subst",
+    "detail": "Substitution 3",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 78,
+      "extra": null
+    },
+    "team": {
+      "id": 66,
+      "name": "Aston Villa",
+      "logo": "https://media.api-sports.io/football/teams/66.png"
+    },
+    "player": {
+      "id": 19298,
+      "name": "M. Cash"
+    },
+    "assist": {
+      "id": 18846,
+      "name": "A. Wan-Bissaka"
+    },
+    "type": "subst",
+    "detail": "Substitution 3",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 78,
+      "extra": null
+    },
+    "team": {
+      "id": 66,
+      "name": "Aston Villa",
+      "logo": "https://media.api-sports.io/football/teams/66.png"
+    },
+    "player": {
+      "id": 2287,
+      "name": "R. Barkley"
+    },
+    "assist": {
+      "id": 284324,
+      "name": "A. Garnacho"
+    },
+    "type": "subst",
+    "detail": "Substitution 4",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 79,
+      "extra": null
+    },
+    "team": {
+      "id": 42,
+      "name": "Arsenal",
+      "logo": "https://media.api-sports.io/football/teams/42.png"
+    },
+    "player": {
+      "id": 333682,
+      "name": "C. Mosquera"
+    },
+    "assist": {
+      "id": 19354,
+      "name": "E. Konsa"
+    },
+    "type": "subst",
+    "detail": "Substitution 4",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 80,
+      "extra": null
+    },
+    "team": {
+      "id": 66,
+      "name": "Aston Villa",
+      "logo": "https://media.api-sports.io/football/teams/66.png"
+    },
+    "player": {
+      "id": 464004,
+      "name": "Alysson"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Card",
+    "detail": "Yellow Card",
+    "comments": "Foul"
+  },
+  {
+    "time": {
+      "elapsed": 81,
+      "extra": null
+    },
+    "team": {
+      "id": 66,
+      "name": "Aston Villa",
+      "logo": "https://media.api-sports.io/football/teams/66.png"
+    },
+    "player": {
+      "id": 19191,
+      "name": "John McGinn"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Card",
+    "detail": "Yellow Card",
+    "comments": "Foul"
+  },
+  {
+    "time": {
+      "elapsed": 85,
+      "extra": null
+    },
+    "team": {
+      "id": 42,
+      "name": "Arsenal",
+      "logo": "https://media.api-sports.io/football/teams/42.png"
+    },
+    "player": {
+      "id": 2937,
+      "name": "D. Rice"
+    },
+    "assist": {
+      "id": 47315,
+      "name": "M. Zubimendi"
+    },
+    "type": "subst",
+    "detail": "Substitution 5",
+    "comments": null
+  },
+  {
+    "time": {
+      "elapsed": 90,
+      "extra": 6
+    },
+    "team": {
+      "id": 66,
+      "name": "Aston Villa",
+      "logo": "https://media.api-sports.io/football/teams/66.png"
+    },
+    "player": {
+      "id": 138816,
+      "name": "Ian Maatsen"
+    },
+    "assist": {
+      "id": null,
+      "name": null
+    },
+    "type": "Card",
+    "detail": "Yellow Card",
+    "comments": "Foul"
+  }
+]

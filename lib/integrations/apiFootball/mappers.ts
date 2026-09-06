@@ -473,3 +473,197 @@ export function fixtureToLeagueUpdate(
 
   return { payload: moved ? out : null, flags }
 }
+
+// =============================================================
+// The timeline — what happened, for a screen rather than for scoring
+// =============================================================
+// ⚠ THIS IS NOT `eventsToConduct`, AND MUST NOT BECOME IT. That mapper reads
+// the same `/fixtures/events` payload and keeps CARD COUNTS PER TEAM, because
+// its consumer is World Cup fair-play scoring: it discards the minute, the
+// player and every goal, and `summarize()` collapses a player's two yellows
+// into one worst-category row. Correct for a tiebreak, useless for a timeline.
+//
+// This one keeps the opposite half: every goal, card, VAR reversal and
+// substitution, each with its minute and the people involved, and no
+// aggregation at all. Nothing downstream scores off it — `match_events` has no
+// scoring consumer by design — so a wrong row here is a wrong line on a screen,
+// not wrong points.
+//
+// ## Two things about the feed that are not guessable
+//
+// 1. FOR A SUBSTITUTION, `player` IS THE ONE GOING OFF and `assist` is the one
+//    coming on. Verified by PLAYER ID across fixtures 1557391, 1557388 and
+//    1557394 — 26 of 26 substitutions had `player.id` in that team's startXI
+//    and `assist.id` on its bench. Do not re-check this by NAME: `/events`
+//    returns "Eddie Nketiah" where `/lineups` returns "E. Nketiah", so a
+//    name comparison reports 0 matches and looks like proof of the opposite.
+//
+// 2. A MISSED PENALTY IS `type: 'Goal'`. Dropping it is the difference between
+//    a timeline and a scoreline that does not add up.
+//
+// 3. AN OWN GOAL IS ALREADY ATTRIBUTED TO THE SIDE IT COUNTED FOR. `team` is
+//    the beneficiary and `player` is the man who put it in his own net — they
+//    are deliberately from opposite squads. Do not "correct" this.
+// =============================================================
+
+export type MatchEventKind =
+  | 'goal'
+  | 'own_goal'
+  | 'penalty'
+  | 'yellow'
+  | 'red'
+  | 'second_yellow'
+  | 'var_goal_cancelled'
+  | 'subst'
+
+/** One row of `match_events`, as the league arm writes it. */
+export type MatchEventRow = {
+  fixture_id: string
+  /**
+   * Which column the row is drawn in — the side CREDITED, not the side the
+   * provider attributed the event to. They differ for an own goal, which is
+   * the only place this distinction shows up and the only place it matters.
+   */
+  side: 'home' | 'away'
+  kind: MatchEventKind
+  /** Scorer, carded player, or the player LEAVING for a substitution. */
+  player_name: string | null
+  /** Assist, or the player ARRIVING for a substitution. Null when neither. */
+  related_name: string | null
+  minute: number
+  extra_minute: number | null
+  /**
+   * Feed order within a minute.
+   *
+   * ⚠ Six things can share the 45th minute and `minute` alone cannot order
+   * them. This is the index in the provider's array, which is the only ordering
+   * information the payload carries.
+   */
+  sort_index: number
+}
+
+/** Lowercased detail matching, because the feed's capitalisation is not stable. */
+function classify(ev: ApiFootballEvent): MatchEventKind | null {
+  const detail = (ev.detail ?? '').trim().toLowerCase()
+  switch (ev.type) {
+    case 'Goal':
+      // ⚠ A missed penalty arrives as a GOAL. Kept out entirely.
+      if (detail.includes('missed')) return null
+      if (detail.includes('own goal')) return 'own_goal'
+      if (detail.includes('penalty')) return 'penalty'
+      return 'goal'
+    case 'Card':
+      if (detail.includes('second yellow')) return 'second_yellow'
+      if (detail.includes('red')) return 'red'
+      if (detail.includes('yellow')) return 'yellow'
+      // An unrecognised card is dropped rather than guessed at: a wrong card on
+      // a timeline is a claim about a player that the feed did not make.
+      return null
+    case 'subst':
+      return 'subst'
+    case 'Var':
+      // Only the reversal is rendered. "Penalty confirmed" and friends describe
+      // a decision about an event that is already in the list on its own.
+      return detail.includes('cancelled') || detail.includes('disallowed')
+        ? 'var_goal_cancelled'
+        : null
+    default:
+      return null
+  }
+}
+
+/**
+ * `/fixtures/events` → `match_events` rows for one league fixture.
+ *
+ * Returns rows in feed order. The caller writes them replace-all: the provider
+ * gives events no stable id, and a VAR reversal REMOVES an event from the
+ * payload, so an upsert would leave a disallowed goal on the screen forever.
+ */
+export function eventsToTimeline(
+  events: ApiFootballEvent[],
+  opts: { fixtureId: string; homeExternalTeamId: number },
+): MatchEventRow[] {
+  const rows: MatchEventRow[] = []
+
+  // ⚠ THE FEED IS NOT CONSISTENT ABOUT REMOVING A CANCELLED GOAL, so the
+  // cancellations have to be known before the goals are read.
+  //
+  // In fixture 1557391 a VAR-disallowed goal is simply ABSENT from the payload:
+  // five Goal events for a 2-3 match. In fixture 1557377 — Aston Villa 0-1
+  // Arsenal — the same situation leaves the goal row in place with its player
+  // stripped, alongside the `Var / Penalty cancelled` that explains it:
+  //
+  //     55'  Var  "Penalty cancelled"  player = Bukayo Saka
+  //     55'  Goal "Normal Goal"        player = null
+  //
+  // Read literally that is a 0-2 timeline over a 0-1 scoreline. So a Goal that
+  // shares a minute and a team with a cancellation AND names nobody is dropped:
+  // the feed has already said it did not stand, and a goal with no scorer is
+  // not renderable in any case.
+  //
+  // ⚠ BOTH CONDITIONS, deliberately. Minute+team alone would discard a real
+  // goal scored in the same minute as a separate cancellation; a null player
+  // alone would discard a legitimately unattributed goal. Requiring the two
+  // together is the narrowest rule that fits what the provider actually sends,
+  // and the scoreline check in the tests is what would catch it if the feed
+  // grows a variant this misses.
+  const cancelledAt = new Set<string>()
+  for (const ev of events) {
+    if (ev.type === 'Var' && (ev.detail ?? '').toLowerCase().includes('cancelled')) {
+      cancelledAt.add(`${ev.team?.id}@${ev.time?.elapsed}`)
+    }
+  }
+
+  events.forEach((ev, i) => {
+    const kind = classify(ev)
+    if (kind === null) return
+
+    const isScoring = kind === 'goal' || kind === 'penalty' || kind === 'own_goal'
+    if (
+      isScoring &&
+      !ev.player?.name &&
+      cancelledAt.has(`${ev.team?.id}@${ev.time?.elapsed}`)
+    ) {
+      return
+    }
+
+    // ⚠ NO FLIP FOR AN OWN GOAL. THE FEED ALREADY CREDITS THE RIGHT SIDE, and
+    // an earlier version of this mapper flipped it on the assumption that the
+    // provider attributes an own goal to the team the scorer plays for. It does
+    // not. Verified on fixture 1557381 — Crystal Palace 1-4 Manchester City —
+    // where the 56th-minute Own Goal is attributed to CRYSTAL PALACE, the side
+    // it counted FOR, with `player` = G. Donnarumma, a Manchester City player.
+    //
+    // The flip cost 14 of 137 backfilled fixtures their scoreline: every game
+    // with an own goal came out with that goal in the wrong column, so the
+    // timeline read one short on one side and one over on the other. It was
+    // invisible in unit tests because the synthetic case asserted the wrong
+    // answer too — which is why the real fixture is pinned in the suite now.
+    const isHome = ev.team?.id === opts.homeExternalTeamId
+    const side: 'home' | 'away' = isHome ? 'home' : 'away'
+
+    rows.push({
+      fixture_id: opts.fixtureId,
+      side,
+      kind,
+      player_name: ev.player?.name ?? null,
+      related_name: ev.assist?.name ?? null,
+      // ⚠ CLAMPED AT ZERO, BECAUSE THE FEED SENDS NEGATIVE MINUTES. Fixture
+      // 1550091 carries two yellow cards at `elapsed: -5` — a booking before
+      // kick-off, or the provider's stand-in for a minute it does not know.
+      // Either way it is not a match minute, and `match_events_minute_ck`
+      // (0..130) refuses it: the backfill lost that whole fixture to a 23514
+      // until this existed.
+      //
+      // Clamped rather than DROPPED on purpose. The cards were really shown, so
+      // discarding them loses a fact; "at or before kick-off" is true, where
+      // "-5th minute" is not. The constraint stays tight so the next kind of
+      // nonsense still fails loudly rather than rendering.
+      minute: Math.max(0, ev.time?.elapsed ?? 0),
+      extra_minute: ev.time?.extra ?? null,
+      sort_index: i,
+    })
+  })
+
+  return rows
+}
