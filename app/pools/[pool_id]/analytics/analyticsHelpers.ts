@@ -18,9 +18,20 @@ export type PredictionResult = {
 /**
  * Convert stored match_scores to PredictionResult[] (single source of truth).
  * Use this instead of computePredictionResults() for client-side code.
+ *
+ * FORM = POST-MATCH ONLY: match_scores contains LIVE, in-progress matches too
+ * (scoring runs on `is_completed || live` — see lib/scoring/core.ts) because the
+ * leaderboard's points are live. The FORM layer (XP, level, trophies, streaks,
+ * form dots, hit-rate) must NOT reflect a live match — pass `completedMatchIds`
+ * so in-progress matches are excluded and form only moves when a match ends.
+ * Omitting it keeps every match (leaderboard/points-style callers).
  */
-export function matchScoresToPredictionResults(matchScores: MatchScoreNarrow[]): PredictionResult[] {
+export function matchScoresToPredictionResults(
+  matchScores: MatchScoreNarrow[],
+  completedMatchIds?: Set<string>,
+): PredictionResult[] {
   return matchScores
+    .filter(ms => !completedMatchIds || completedMatchIds.has(ms.match_id))
     .map(ms => ({
       matchId: ms.match_id,
       matchNumber: ms.match_number,

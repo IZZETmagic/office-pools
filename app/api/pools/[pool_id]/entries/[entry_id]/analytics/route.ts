@@ -193,7 +193,12 @@ async function handleGET(
       readEntryScoring(adminClient, [entry_id], source),
     ])
 
-    const predictionResults = matchScoresToPredictionResults(entryMatchScores)
+    // FORM = post-match only: exclude live/in-progress matches (leaderboard uses
+    // their provisional rows, the form layer must not).
+    const completedMatchIds = new Set<string>(
+      matchesData.filter(m => m.is_completed).map(m => m.match_id),
+    )
+    const predictionResults = matchScoresToPredictionResults(entryMatchScores, completedMatchIds)
     const stageAccuracy = computeAccuracyByStage(predictionResults)
     const overallAccuracy = computeOverallAccuracy(predictionResults)
     const streaks = computeStreaks(predictionResults)

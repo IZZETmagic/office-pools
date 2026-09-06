@@ -156,8 +156,11 @@ export function AnalyticsTab({
 
   const predictionResults = useMemo(() => {
     if (isBracketPicker || !isEntrySubmitted || entryMatchScores.length === 0) return []
-    return matchScoresToPredictionResults(entryMatchScores)
-  }, [entryMatchScores, isBracketPicker, isEntrySubmitted])
+    // FORM = post-match only: exclude live/in-progress matches so the form tab
+    // freezes during a live game and only moves when a match ends.
+    const completedMatchIds = new Set(matches.filter(m => m.is_completed).map(m => m.match_id))
+    return matchScoresToPredictionResults(entryMatchScores, completedMatchIds)
+  }, [entryMatchScores, matches, isBracketPicker, isEntrySubmitted])
 
   // Streaks
   const streaks = useMemo(

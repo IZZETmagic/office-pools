@@ -145,6 +145,13 @@ export async function computePoolEntryAnalytics(
     away_team: Array.isArray(m.away_team) ? m.away_team[0] ?? null : m.away_team,
   }))
 
+  // FORM = post-match only. match_scores carries LIVE rows (the leaderboard's
+  // points are live), but the form layer (XP/level/trophies/streaks/dots) must
+  // freeze during a live match — exclude in-progress matches from the compute.
+  const completedMatchIds = new Set<string>(
+    normalizedMatches.filter((m: any) => m.is_completed).map((m: any) => m.match_id),
+  )
+
   const predsByEntry = new Map<string, any[]>()
   for (const p of allPredictions) {
     const a = predsByEntry.get(p.entry_id) || []
@@ -217,7 +224,7 @@ export async function computePoolEntryAnalytics(
     }))
     if (entryPreds.length === 0) continue
 
-    const predResults = matchScoresToPredictionResults(matchScoresByEntry.get(entry.entry_id) || [])
+    const predResults = matchScoresToPredictionResults(matchScoresByEntry.get(entry.entry_id) || [], completedMatchIds)
     const streaks = computeStreaks(predResults)
     // Consensus is hoisted above the loop — this is just the per-entry overlay.
     const crowdData = applyCrowdOverlay(crowdConsensus, entryPreds as any)
