@@ -14,7 +14,7 @@ import {
   AdjustPointsSheet,
   type AdjustPointsSheetHandle,
 } from '@/components/pool-detail/AdjustPointsSheet';
-import { Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import { deleteEntry, notifyMemberRemoved } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useMemberDetail, type MemberDetail, type MemberEntry } from '@/lib/useMemberDetail';
@@ -31,49 +31,45 @@ export default function MemberDetailScreen() {
   const [busy, setBusy] = useState(false);
   const [unlockedEntryIds, setUnlockedEntryIds] = useState<Set<string>>(new Set());
   const adjustSheetRef = useRef<AdjustPointsSheetHandle>(null);
+  const [unlockTarget, setUnlockTarget] = useState<MemberEntry | null>(null);
+  const [deleteEntryTarget, setDeleteEntryTarget] = useState<MemberEntry | null>(null);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
 
   function handleUnlockEntry(entry: MemberEntry) {
     if (!member) return;
-    Alert.alert(
-      'Unlock Entry',
-      `Unlock ${entry.entryName} so ${member.fullName} can edit their predictions again?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unlock',
-          style: 'destructive',
-          onPress: async () => {
-            // Optimistic update — hide the Unlock button right away.
-            setUnlockedEntryIds((prev) => {
-              const next = new Set(prev);
-              next.add(entry.entryId);
-              return next;
-            });
-            try {
-              const { error } = await supabase
-                .from('pool_entries')
-                .update({
-                  has_submitted_predictions: false,
-                  predictions_submitted_at: null,
-                })
-                .eq('entry_id', entry.entryId);
-              if (error) throw error;
-              await refresh();
-            } catch (err) {
-              setUnlockedEntryIds((prev) => {
-                const next = new Set(prev);
-                next.delete(entry.entryId);
-                return next;
-              });
-              Alert.alert(
-                "Couldn't unlock entry",
-                err instanceof Error ? err.message : 'Unknown error',
-              );
-            }
-          },
-        },
-      ],
-    );
+    setUnlockTarget(entry);
+  }
+
+  async function performUnlockEntry(entry: MemberEntry) {
+    // Optimistic update — hide the Unlock button right away.
+    setUnlockedEntryIds((prev) => {
+      const next = new Set(prev);
+      next.add(entry.entryId);
+      return next;
+    });
+    setUnlockTarget(null);
+    try {
+      const { error } = await supabase
+        .from('pool_entries')
+        .update({
+          has_submitted_predictions: false,
+          predictions_submitted_at: null,
+        })
+        .eq('entry_id', entry.entryId);
+      if (error) throw error;
+      await refresh();
+    } catch (err) {
+      setUnlockedEntryIds((prev) => {
+        const next = new Set(prev);
+        next.delete(entry.entryId);
+        return next;
+      });
+      Alert.alert(
+        "Couldn't unlock entry",
+        err instanceof Error ? err.message : 'Unknown error',
+      );
+    }
   }
 
   function handleDeleteEntry(entry: MemberEntry) {
@@ -89,37 +85,42 @@ export default function MemberDetailScreen() {
       );
       return;
     }
-    Alert.alert(
-      'Delete entry',
-      `Delete "${entry.entryName}"? This removes the entry, its predictions, and its scores. This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setBusy(true);
-            try {
-              await deleteEntry(id, entry.entryId);
-              await refresh();
-            } catch (err) {
-              Alert.alert(
-                "Couldn't delete entry",
-                err instanceof Error ? err.message : 'Unknown error',
-              );
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ],
-    );
+    setDeleteEntryTarget(entry);
   }
 
-  async function handleToggleRole() {
-    if (!member) return;
-    const nextRole = member.isAdmin ? 'player' : 'admin';
+  async function performDeleteEntry(entry: MemberEntry) {
+    if (!id) return;
     setBusy(true);
+    setDeleteEntryTarget(null);
+    try {
+      await deleteEntry(id, entry.entryId);
+      await refresh();
+    } catch (err) {
+      Alert.alert(
+        "Couldn't delete entry",
+        err instanceof Error ? err.message : 'Unknown error',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleToggleRole() {
+    if (!member) return;
+    // Promotion needs an explicit confirm because the new admin gets
+    // full management power. Demotion is safe — current admin can
+    // re-promote — so it runs directly.
+    if (!member.isAdmin) {
+      setShowPromoteConfirm(true);
+      return;
+    }
+    void performRoleChange('player');
+  }
+
+  async function performRoleChange(nextRole: 'admin' | 'player') {
+    if (!member) return;
+    setBusy(true);
+    setShowPromoteConfirm(false);
     try {
       const { error } = await supabase
         .from('pool_members')
@@ -139,44 +140,37 @@ export default function MemberDetailScreen() {
 
   function handleRemove() {
     if (!member) return;
-    Alert.alert(
-      'Remove Member',
-      `Remove ${member.fullName} from the pool? Their predictions will be deleted.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setBusy(true);
-            try {
-              const { error } = await supabase
-                .from('pool_members')
-                .delete()
-                .eq('member_id', member.memberId);
-              if (error) throw error;
-              // Best-effort: tell the server to email + push the removed
-              // user. Fire-and-forget so a slow / failing notification
-              // doesn't block the admin's UI return — the actual removal
-              // is the source of truth and is already committed.
-              if (id) {
-                void notifyMemberRemoved(id, member.userId).catch((err) => {
-                  console.warn('[notifyMemberRemoved]', err);
-                });
-              }
-              router.back();
-            } catch (err) {
-              Alert.alert(
-                "Couldn't remove member",
-                err instanceof Error ? err.message : 'Unknown error',
-              );
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ],
-    );
+    setShowRemoveConfirm(true);
+  }
+
+  async function performRemove() {
+    if (!member) return;
+    setBusy(true);
+    setShowRemoveConfirm(false);
+    try {
+      const { error } = await supabase
+        .from('pool_members')
+        .delete()
+        .eq('member_id', member.memberId);
+      if (error) throw error;
+      // Best-effort: tell the server to email + push the removed
+      // user. Fire-and-forget so a slow / failing notification
+      // doesn't block the admin's UI return — the actual removal
+      // is the source of truth and is already committed.
+      if (id) {
+        void notifyMemberRemoved(id, member.userId).catch((err) => {
+          console.warn('[notifyMemberRemoved]', err);
+        });
+      }
+      router.back();
+    } catch (err) {
+      Alert.alert(
+        "Couldn't remove member",
+        err instanceof Error ? err.message : 'Unknown error',
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (loading && !member) {
@@ -259,6 +253,68 @@ export default function MemberDetailScreen() {
         onAdjusted={() => {
           void refresh();
         }}
+      />
+
+      <ConfirmDialog
+        visible={unlockTarget !== null}
+        title="Unlock Entry"
+        description={
+          unlockTarget && member
+            ? `Unlock ${unlockTarget.entryName} so ${member.fullName} can edit their predictions again?`
+            : ''
+        }
+        cancelLabel="Cancel"
+        confirmLabel="Unlock"
+        destructive
+        onCancel={() => setUnlockTarget(null)}
+        onConfirm={() => unlockTarget && void performUnlockEntry(unlockTarget)}
+      />
+
+      <ConfirmDialog
+        visible={deleteEntryTarget !== null}
+        title="Delete entry"
+        description={
+          deleteEntryTarget
+            ? `Delete "${deleteEntryTarget.entryName}"? This removes the entry, its predictions, and its scores. This action cannot be undone.`
+            : ''
+        }
+        cancelLabel="Cancel"
+        confirmLabel="Delete"
+        destructive
+        busy={busy}
+        onCancel={() => setDeleteEntryTarget(null)}
+        onConfirm={() => deleteEntryTarget && void performDeleteEntry(deleteEntryTarget)}
+      />
+
+      <ConfirmDialog
+        visible={showPromoteConfirm}
+        title="Make Admin?"
+        description={
+          member
+            ? `${member.fullName} will be able to edit pool settings, change scoring rules, remove or promote other members, adjust points, unlock and delete entries, and archive the pool. You can demote them later.`
+            : ''
+        }
+        cancelLabel="Cancel"
+        confirmLabel="Make Admin"
+        busy={busy}
+        onCancel={() => setShowPromoteConfirm(false)}
+        onConfirm={() => void performRoleChange('admin')}
+      />
+
+      <ConfirmDialog
+        visible={showRemoveConfirm}
+        title="Remove Member"
+        description={
+          member
+            ? `Remove ${member.fullName} from the pool? Their predictions will be deleted.`
+            : ''
+        }
+        cancelLabel="Cancel"
+        confirmLabel="Remove"
+        destructive
+        busy={busy}
+        onCancel={() => setShowRemoveConfirm(false)}
+        onConfirm={() => void performRemove()}
       />
     </View>
   );

@@ -637,6 +637,20 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
     }
   }, [sheetOpen, banter, poolId, clearPoolUnread]);
 
+  // Refetch on every sheet open. The realtime postgres_changes
+  // subscription in usePoolBanter is the live path, but it can drop
+  // events silently — JWT-refresh drift against RLS, a brief
+  // WebSocket reconnect after an iOS network blip, or a backgrounded
+  // app missing INSERTs while suspended. Without this, missed
+  // messages stay invisible until the pool detail screen remounts
+  // (force-close, or nav home + back), which is what users were
+  // working around. One extra SELECT on open is a cheap safety net.
+  const banterRefresh = banter.refresh;
+  useEffect(() => {
+    if (!sheetOpen) return;
+    void banterRefresh();
+  }, [sheetOpen, banterRefresh]);
+
   // Dismiss the keyboard whenever the sheet closes. If the user was
   // mid-composition (keyboard up), pan-down-to-close / backdrop tap /
   // X button would otherwise leave the keyboard floating awkwardly

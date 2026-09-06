@@ -1,0 +1,58 @@
+Starting storyboard generation: 32 frames (4 moods x 8 beats), Flash model, 16:9.
+
+================================================================
+  Generating mood: cinematic
+================================================================
+  ok  cinematic/frame-08.png
+  ok  cinematic/frame-04.png
+  ok  cinematic/frame-06.png
+  ok  cinematic/frame-02.png
+  ok  cinematic/frame-05.png
+  ok  cinematic/frame-07.png
+  ok  cinematic/frame-03.png
+  ok  cinematic/frame-01.png
+Mood 'cinematic' complete.
+
+================================================================
+  Generating mood: hyped
+================================================================
+  ok  hyped/frame-06.png
+  ok  hyped/frame-02.png
+  ok  hyped/frame-01.png
+  ok  hyped/frame-03.png
+  ok  hyped/frame-04.png
+  ok  hyped/frame-08.png
+  ok  hyped/frame-07.png
+  ok  hyped/frame-05.png
+Mood 'hyped' complete.
+
+================================================================
+  Generating mood: irreverent
+================================================================
+  ok  irreverent/frame-02.png
+  ok  irreverent/frame-04.png
+  ok  irreverent/frame-03.png
+  ok  irreverent/frame-01.png
+  ok  irreverent/frame-08.png
+  ok  irreverent/frame-07.png
+  ok  irreverent/frame-05.png
+  ok  irreverent/frame-06.png
+Mood 'irreverent' complete.
+
+================================================================
+  Generating mood: office-pool
+================================================================
+  ok  office-pool/frame-02.png
+  ok  office-pool/frame-01.png
+  ok  office-pool/frame-05.png
+  ok  office-pool/frame-04.png
+  ok  office-pool/frame-07.png
+  ok  office-pool/frame-06.png
+  ok  office-pool/frame-03.png
+  ok  office-pool/frame-08.png
+Mood 'office-pool' complete.
+
+================================================================
+  ALL DONE in 87 seconds
+================================================================
+  Generated 32 PNG files.

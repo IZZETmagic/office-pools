@@ -86,3 +86,10 @@ scripts/*.sent
 # Remotion bundle, produced by scripts/create-snapshot.ts at build time
 .remotion
 .remotion-public
+
+# Never commit a push token
+.github-push-token
+
+# leftover node_modules snapshot + image backups
+mobile/.doomed_node_modules_*/
+*.bak
