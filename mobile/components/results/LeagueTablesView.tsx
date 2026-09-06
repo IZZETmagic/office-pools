@@ -66,6 +66,7 @@ export function LeagueTablesView({ tables, initialSeasonId = null }: Props) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{
             paddingHorizontal: theme.spacing.xl,
+            paddingTop: theme.spacing.md,
             paddingBottom: theme.spacing.md,
             gap: theme.spacing.sm,
           }}
