@@ -124,7 +124,38 @@ const EASE = {
   graphic: Easing.bezier(0.65, 0, 0.35, 1).factory(),
 } as const;
 
-const beat = (n: number) => BEATS.find((b) => b.num === n)!;
+/**
+ * Beat boundaries as PLAIN NUMBERS, keyed by beat number.
+ *
+ * ⚠⚠ THESE EXIST BECAUSE A WORKLET CANNOT CALL `BEATS.find()`. Every animated
+ * style below runs on the UI thread, and the first version of this file reached
+ * for a `beat(n)` helper inside each one — a plain arrow function closing over
+ * an array. Reanimated cannot serialise that, so the ceremony threw the instant
+ * it mounted: the app died on the Reveal press, with the walkout never drawing
+ * a frame.
+ *
+ * ⚠ RESOLVED ONCE, AT MODULE LOAD, ON THE JS THREAD. A worklet may capture
+ * plain objects of numbers, so `START[5]` costs nothing and cannot throw. If
+ * you need another fact about a beat in an animated style, hoist it here rather
+ * than reaching back into `BEATS`.
+ */
+const START: Record<number, number> = {};
+const END: Record<number, number> = {};
+for (const b of BEATS) {
+  START[b.num] = b.startMs;
+  END[b.num] = b.endMs;
+}
+
+/**
+ * The haptic styles, read off the module HERE rather than inside the reaction.
+ *
+ * ⚠ `Haptics.ImpactFeedbackStyle.Light` INSIDE A WORKLET CAPTURES `Haptics`
+ * ITSELF — a native module object, which does not serialise to the UI thread.
+ * Hoisted, the worklet captures three plain enum values and nothing else.
+ */
+const TAP_LIGHT = Haptics.ImpactFeedbackStyle.Light;
+const TAP_MEDIUM = Haptics.ImpactFeedbackStyle.Medium;
+const TAP_HEAVY = Haptics.ImpactFeedbackStyle.Heavy;
 
 export type WalkoutOpponent = {
   name: string;
@@ -187,10 +218,10 @@ export function ShowdownWalkout({ matchweek, opponent, onClose }: Props) {
       if (prev === null) return;
       const crossed = (m: number) => prev < m && now >= m;
       if (crossed(c0) || crossed(c1) || crossed(c2)) {
-        runOnJS(tap)(Haptics.ImpactFeedbackStyle.Light);
+        runOnJS(tap)(TAP_LIGHT);
       }
-      if (crossed(THRESHOLD_AT)) runOnJS(tap)(Haptics.ImpactFeedbackStyle.Heavy);
-      if (crossed(NAME_AT)) runOnJS(tap)(Haptics.ImpactFeedbackStyle.Medium);
+      if (crossed(THRESHOLD_AT)) runOnJS(tap)(TAP_HEAVY);
+      if (crossed(NAME_AT)) runOnJS(tap)(TAP_MEDIUM);
     },
     [c0, c1, c2, tap],
   );
@@ -202,12 +233,12 @@ export function ShowdownWalkout({ matchweek, opponent, onClose }: Props) {
    * tunnel, 1 is the threshold, and past 1 the camera has stopped.
    */
   const dolly: BeatSeg[] = [
-    { start: 0, end: beat(1).endMs, easing: EASE.ambient, from: 0, to: 0.08 },
-    { start: beat(2).startMs, end: beat(2).endMs, easing: EASE.anticipate, from: 0.08, to: 0.3 },
-    { start: beat(3).startMs, end: beat(3).endMs, easing: EASE.ambient, from: 0.3, to: 0.55 },
-    { start: beat(4).startMs, end: beat(4).endMs, easing: EASE.reveal, from: 0.55, to: 0.86 },
-    { start: beat(5).startMs, end: beat(5).endMs, easing: EASE.climax, from: 0.86, to: 1 },
-    { start: beat(6).startMs, end: beat(6).endMs, easing: EASE.settle, from: 1, to: 1.04 },
+    { start: 0, end: END[1], easing: EASE.ambient, from: 0, to: 0.08 },
+    { start: START[2], end: END[2], easing: EASE.anticipate, from: 0.08, to: 0.3 },
+    { start: START[3], end: END[3], easing: EASE.ambient, from: 0.3, to: 0.55 },
+    { start: START[4], end: END[4], easing: EASE.reveal, from: 0.55, to: 0.86 },
+    { start: START[5], end: END[5], easing: EASE.climax, from: 0.86, to: 1 },
+    { start: START[6], end: END[6], easing: EASE.settle, from: 1, to: 1.04 },
   ];
 
   const archStyle = useAnimatedStyle(() => {
@@ -221,11 +252,11 @@ export function ShowdownWalkout({ matchweek, opponent, onClose }: Props) {
 
   const blowoutStyle = useAnimatedStyle(() => {
     const glow = beatValue(t.value, [
-      { start: 0, end: beat(2).endMs, easing: EASE.anticipate, from: 0.18, to: 0.35 },
-      { start: beat(3).startMs, end: beat(4).endMs, easing: EASE.ambient, from: 0.35, to: 0.6 },
+      { start: 0, end: END[2], easing: EASE.anticipate, from: 0.18, to: 0.35 },
+      { start: START[3], end: END[4], easing: EASE.ambient, from: 0.35, to: 0.6 },
       // The flare peaks AT the threshold and decays — the spec's beat 5.
-      { start: beat(5).startMs, end: beat(5).endMs, easing: EASE.climax, from: 0.6, to: 1 },
-      { start: beat(6).startMs, end: beat(7).endMs, easing: EASE.settle, from: 1, to: 0.42 },
+      { start: START[5], end: END[5], easing: EASE.climax, from: 0.6, to: 1 },
+      { start: START[6], end: END[7], easing: EASE.settle, from: 1, to: 0.42 },
     ]);
     return { opacity: glow, transform: [{ scale: 0.6 + glow * 1.5 }] };
   });
@@ -239,8 +270,8 @@ export function ShowdownWalkout({ matchweek, opponent, onClose }: Props) {
    */
   const shakeStyle = useAnimatedStyle(() => {
     const now = t.value;
-    if (now < THRESHOLD_AT || now > beat(5).endMs) return { transform: [{ translateX: 0 }] };
-    const k = (now - THRESHOLD_AT) / (beat(5).endMs - THRESHOLD_AT);
+    if (now < THRESHOLD_AT || now > END[5]) return { transform: [{ translateX: 0 }] };
+    const k = (now - THRESHOLD_AT) / (END[5] - THRESHOLD_AT);
     // Decaying oscillation, so it settles instead of stopping dead.
     const amp = 3 * (1 - k);
     return { transform: [{ translateX: Math.sin(now / 18) * amp }] };
@@ -249,9 +280,9 @@ export function ShowdownWalkout({ matchweek, opponent, onClose }: Props) {
   /** Both figures: they rise out of the dark and gain their colour at the threshold. */
   const figuresStyle = useAnimatedStyle(() => {
     const appear = beatValue(t.value, [
-      { start: beat(3).startMs, end: beat(3).endMs, easing: EASE.ambient, from: 0, to: 0.55 },
-      { start: beat(4).startMs, end: beat(4).endMs, easing: EASE.reveal, from: 0.55, to: 0.9 },
-      { start: beat(5).startMs, end: beat(6).endMs, easing: EASE.settle, from: 0.9, to: 1 },
+      { start: START[3], end: END[3], easing: EASE.ambient, from: 0, to: 0.55 },
+      { start: START[4], end: END[4], easing: EASE.reveal, from: 0.55, to: 0.9 },
+      { start: START[5], end: END[6], easing: EASE.settle, from: 0.9, to: 1 },
     ]);
     return {
       opacity: appear,
@@ -261,14 +292,14 @@ export function ShowdownWalkout({ matchweek, opponent, onClose }: Props) {
 
   const nameStyle = useAnimatedStyle(() => {
     const rise = beatValue(t.value, [
-      { start: NAME_AT, end: beat(7).endMs, easing: EASE.hero, from: 0, to: 1 },
+      { start: NAME_AT, end: END[7], easing: EASE.hero, from: 0, to: 1 },
     ]);
     return { opacity: rise, transform: [{ translateY: (1 - rise) * 28 }] };
   });
 
   const lockStyle = useAnimatedStyle(() => ({
     opacity: beatValue(t.value, [
-      { start: beat(8).startMs, end: beat(8).endMs, easing: EASE.graphic, from: 0, to: 1 },
+      { start: START[8], end: END[8], easing: EASE.graphic, from: 0, to: 1 },
     ]),
   }));
 
@@ -544,7 +575,7 @@ function Figure({
    */
   const colourStyle = useAnimatedStyle(() => ({
     opacity: beatValue(t.value, [
-      { start: beat(5).startMs, end: beat(6).endMs, easing: EASE.settle, from: 0, to: 1 },
+      { start: START[5], end: END[6], easing: EASE.settle, from: 0, to: 1 },
     ]),
   }));
   return (
