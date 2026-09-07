@@ -350,7 +350,12 @@ export default function MatchDetailScreen() {
         runs on the compositor. Rendering it before the pager would put the
         scrolling content on top of it.
       */}
-      <MatchDetailHeader match={match} scrollY={scrollY} onExpandedHeight={setBandHeight}>
+      <MatchDetailHeader
+        match={match}
+        scrollY={scrollY}
+        timeline={timeline}
+        onExpandedHeight={setBandHeight}
+      >
         <MatchTabBar active={tab} tabs={tabs} onChange={setTab} pageOffset={pageOffset} />
       </MatchDetailHeader>
     </View>

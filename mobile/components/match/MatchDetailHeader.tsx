@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Pressable,
   type StyleProp,
@@ -23,7 +23,9 @@ import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { MatchStatusBadge } from '@/components/MatchStatusBadge';
 import { Icon } from '@/components/ui';
 import { getCompetitionBand, getCompetitionGlow, GLOW_HEIGHT } from '@/lib/design/competitionBand';
+import { hasScorers, matchScorers, type ScorerLine } from '@/lib/matchScorers';
 import { useMatchClock } from '@/lib/useMatchClock';
+import type { TimelineEvent } from '@/lib/useMatchDetail';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme } from '@/theme';
 
@@ -104,13 +106,27 @@ type Props = {
   match: ResultsMatch;
   /** The active tab's scroll offset, shared from the screen. */
   scrollY: SharedValue<number>;
+  /**
+   * The match's events, for the scorer lists under the scoreline.
+   *
+   * ⚠ THE SAME ROWS THE TIMELINE DRAWS. Passed in rather than fetched here so
+   * the header and the Facts tab cannot disagree about who scored — which they
+   * would the moment either counted goals for itself.
+   */
+  timeline?: TimelineEvent[];
   /** Reports the band's full expanded height so each page can pad by it. */
   onExpandedHeight?: (h: number) => void;
   /** The tab strip. Rides up with the band and ends level with the chrome. */
   children?: React.ReactNode;
 };
 
-export function MatchDetailHeader({ match, scrollY, onExpandedHeight, children }: Props) {
+export function MatchDetailHeader({
+  match,
+  scrollY,
+  timeline = [],
+  onExpandedHeight,
+  children,
+}: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -124,6 +140,7 @@ export function MatchDetailHeader({ match, scrollY, onExpandedHeight, children }
   const [crestY, setCrestY] = useState(0);
 
   const [bandLeft, bandRight] = getCompetitionBand(match.competitionId);
+  const scorers = useMemo(() => matchScorers(timeline), [timeline]);
 
   const chromeH = insets.top + theme.spacing.xs + CHROME_ROW;
 
@@ -345,6 +362,22 @@ export function MatchDetailHeader({ match, scrollY, onExpandedHeight, children }
             <Animated.View style={labelFade}>
               <MatchStatusBadge match={match} style={{ marginTop: 12 }} />
             </Animated.View>
+
+            {/*
+              ⚠ INSIDE THE MEASURED BLOCK, WHICH IS WHAT MAKES IT COLLAPSE FOR
+              FREE. `matchupH` is this block's own height and is also the slide
+              distance and the scroll range, so adding the scorers lengthens the
+              travel by exactly their height — the band still ends level with
+              the chrome and nothing needed retuning. Wrapped in `labelFade` so
+              they go with the team names rather than shrinking into something
+              unreadable.
+            */}
+            {hasScorers(scorers) ? (
+              <Animated.View style={labelFade}>
+                <Scorers home={scorers.home} away={scorers.away} />
+              </Animated.View>
+            ) : null}
+
             <View style={{ height: 12 }} />
           </View>
 
@@ -666,6 +699,57 @@ function ScoreRow({ home, away }: { home: number; away: number }) {
       >
         {away}
       </RNText>
+    </View>
+  );
+}
+
+/**
+ * The scorers, either side of a ball.
+ *
+ * ⚠ HOME RIGHT-ALIGNED AND AWAY LEFT-ALIGNED, so both lists run away from the
+ * ball in the middle and each sits under the crest it belongs to. Centring them
+ * both would leave the reader working out which column is whose.
+ */
+function Scorers({ home, away }: { home: ScorerLine[]; away: ScorerLine[] }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        gap: 10,
+        paddingHorizontal: ROW_PAD,
+        marginTop: 12,
+      }}
+    >
+      <ScorerColumn lines={home} align="right" />
+      {/* The ball sits on the first line's baseline rather than centred on the
+          block, so it does not drift down as one side's list grows. */}
+      <View style={{ paddingTop: 2 }}>
+        <Icon name="sportscourt.fill" size={12} tint="rgba(255,255,255,0.72)" solid />
+      </View>
+      <ScorerColumn lines={away} align="left" />
+    </View>
+  );
+}
+
+function ScorerColumn({ lines, align }: { lines: ScorerLine[]; align: 'left' | 'right' }) {
+  return (
+    <View style={{ flex: 1, alignItems: align === 'right' ? 'flex-end' : 'flex-start', gap: 1 }}>
+      {lines.map((line) => (
+        <RNText
+          key={line.name}
+          numberOfLines={1}
+          style={{
+            fontFamily: fontFamilies.medium,
+            fontSize: 11.5,
+            color: 'rgba(255,255,255,0.88)',
+            textAlign: align,
+          }}
+        >
+          {line.name} {line.minutes.join(', ')}
+        </RNText>
+      ))}
     </View>
   );
 }
