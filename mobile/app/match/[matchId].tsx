@@ -813,7 +813,23 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
   const note = eventNote(event);
   const minute = `${event.minute}${event.extraMinute ? `+${event.extraMinute}` : ''}'`;
 
-  /** The player, and the qualifier the name alone does not carry. */
+  const isSub = event.kind === 'subst';
+
+  /**
+   * The player, and the qualifier the name alone does not carry.
+   *
+   * ⚠ A SUBSTITUTION IS TWO PLAYERS, NOT A PLAYER AND A FOOTNOTE. Everywhere
+   * else the second line is a qualifier — "disallowed", "pen", an assist — and
+   * is deliberately quieter than the name above it. A substitution is not that
+   * shape: both lines are people, equally involved, so they take the same size
+   * and weight and are told apart by COLOUR instead.
+   *
+   * ⚠ RED IS THE ONE GOING OFF AND GREEN THE ONE COMING ON, matching the two
+   * arrows in the chip beside them. `playerName` is the departing player and
+   * `relatedName` the arriving one — verified by player id across 26
+   * substitutions, and NOT re-checkable by name, because `/events` and
+   * `/lineups` abbreviate differently. See `eventsToTimeline`.
+   */
   const detail = (
     <View style={{ flex: 1, alignItems: isHome ? 'flex-end' : 'flex-start', gap: 1 }}>
       <RNText
@@ -821,7 +837,7 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
         style={{
           fontFamily: fontFamilies.semibold,
           fontSize: 13,
-          color: muted ? theme.colors.slate : theme.colors.ink,
+          color: isSub ? theme.colors.red : muted ? theme.colors.slate : theme.colors.ink,
           textDecorationLine: event.kind === 'var_goal_cancelled' ? 'line-through' : 'none',
           textAlign: isHome ? 'right' : 'left',
         }}
@@ -832,9 +848,9 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
         <RNText
           numberOfLines={1}
           style={{
-            fontFamily: fontFamilies.medium,
-            fontSize: 11,
-            color: theme.colors.slate,
+            fontFamily: isSub ? fontFamilies.semibold : fontFamilies.medium,
+            fontSize: isSub ? 13 : 11,
+            color: isSub ? theme.colors.green : theme.colors.slate,
             textAlign: isHome ? 'right' : 'left',
           }}
         >
@@ -882,9 +898,17 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
         paddingHorizontal: 16,
         paddingVertical: 5,
       }}
-      accessibilityLabel={`${minute} ${event.kind} ${event.playerName ?? ''} ${
-        isHome ? homeDisplayName(match) : awayDisplayName(match)
-      }`}
+      // ⚠ COLOUR CANNOT CARRY THIS TO A SCREEN READER, so the substitution
+      // spells out which player went which way.
+      accessibilityLabel={
+        isSub
+          ? `${minute} substitution, ${event.playerName ?? 'unknown'} off, ${
+              event.relatedName ?? 'unknown'
+            } on, ${isHome ? homeDisplayName(match) : awayDisplayName(match)}`
+          : `${minute} ${event.kind} ${event.playerName ?? ''} ${
+              isHome ? homeDisplayName(match) : awayDisplayName(match)
+            }`
+      }
     >
       {isHome ? detail : <View style={{ flex: 1 }} />}
       {minuteCell('left')}
