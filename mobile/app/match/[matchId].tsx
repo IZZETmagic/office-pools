@@ -225,10 +225,11 @@ export default function MatchDetailScreen() {
                 match={m}
               />
             ) : null}
-            {leagueContext?.slice && leagueContext.table ? (
+            {leagueContext?.rows && leagueContext.table ? (
               <LeagueTableSliceCard
-                entries={leagueContext.slice}
+                rows={leagueContext.rows}
                 competition={leagueContext.table.competition}
+                competitionId={m.competitionId}
                 seasonId={leagueContext.table.season_id}
               />
             ) : null}

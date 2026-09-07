@@ -18,14 +18,14 @@ import {
   feedForm,
   rowFor,
   tableForMatch,
-  tableSlice,
+  twoClubRows,
   type FormResult,
-  type TableSliceEntry,
 } from './matchContext';
 import { supabase } from './supabase';
 import { useTournamentMatches } from './TournamentMatchesProvider';
 import {
   type LeagueSeasonTable,
+  type LeagueStandingRow,
   type ResultsMatch,
   type ResultsTeam,
 } from './useTournamentMatches';
@@ -670,12 +670,12 @@ export function useMatchDetail(matchId: string | undefined) {
     if (!match || match.competitionId === null) return null;
 
     const table = tableForMatch(leagueTables, match);
-    const slice = table ? tableSlice(table.standings, match.homeTeamId, match.awayTeamId) : null;
+    const rows = table ? twoClubRows(table.standings, match.homeTeamId, match.awayTeamId) : null;
 
     const formOpts = { competitionId: match.competitionId, beforeKickoff: match.matchDate };
     return {
       table,
-      slice,
+      rows,
       homeForm: clubForm(allMatches, { ...formOpts, clubId: match.homeTeamId }),
       awayForm: clubForm(allMatches, { ...formOpts, clubId: match.awayTeamId }),
       homeFeedForm: feedForm(rowFor(table, match.homeTeamId)),
@@ -706,8 +706,8 @@ export function useMatchDetail(matchId: string | undefined) {
 /** Everything the Facts tab shows around a league fixture. See `leagueContext`. */
 export type LeagueMatchContext = {
   table: LeagueSeasonTable | null;
-  /** Null when either club has no table row — early season, before a table exists. */
-  slice: TableSliceEntry[] | null;
+  /** The two clubs' table rows, higher placed first. Null before a table exists. */
+  rows: LeagueStandingRow[] | null;
   homeForm: FormResult[];
   awayForm: FormResult[];
   homeFeedForm: ('W' | 'D' | 'L')[];

@@ -3,9 +3,9 @@
 // =============================================================
 // `lib/matchContext.ts` is a set of selections over data the app already holds,
 // and every one of them has a way of being subtly wrong that renders perfectly:
-// a form list that includes the match you are looking at, a table slice that
-// closes a gap it should draw, a feed string read back to front. None of those
-// throw. They just state something false, confidently, which is the failure
+// a form list that includes the match you are looking at, a table ordered by
+// who is at home rather than who is higher, a feed string read back to front.
+// None of those throw. They just state something false, confidently, which is the failure
 // class this whole surface keeps running into.
 //
 // So the assertions below are about MEANING, not shape.
@@ -19,7 +19,7 @@ import {
   feedForm,
   rowFor,
   tableForMatch,
-  tableSlice,
+  twoClubRows,
 } from '../matchContext';
 import type {
   LeagueSeasonTable,
@@ -86,49 +86,42 @@ function match(over: Partial<ResultsMatch> = {}): ResultsMatch {
   };
 }
 
-// ------------------------------------------------------------------ the slice
+// ------------------------------------------------------- the two table rows
 
-describe('tableSlice', () => {
-  it('merges into one contiguous run when the clubs are close', () => {
-    // 4th vs 5th: the two windows (3-5 and 4-6) overlap, so 3,4,5,6 with no gap.
-    const slice = tableSlice(TABLE, 'c4', 'c5');
-    expect(slice?.map((e) => (e.kind === 'gap' ? '…' : e.row.rank))).toEqual([3, 4, 5, 6]);
-    expect(slice?.some((e) => e.kind === 'gap')).toBe(false);
+describe('twoClubRows', () => {
+  it('⚠ returns the HIGHER PLACED club first, not the home one', () => {
+    // A table is ordered by position. Ordering by home/away would silently
+    // reorder the league for half of all fixtures.
+    expect(twoClubRows(TABLE, 'c9', 'c4')!.map((r) => r.rank)).toEqual([4, 9]);
+    expect(twoClubRows(TABLE, 'c4', 'c9')!.map((r) => r.rank)).toEqual([4, 9]);
   });
 
-  it('⚠ draws a gap when the clubs are far apart, rather than closing it', () => {
-    // The whole point: 2nd and 18th rendered adjacent would say they ARE
-    // adjacent. One marker, not two, and not one per skipped place.
-    const slice = tableSlice(TABLE, 'c2', 'c18');
-    expect(slice?.map((e) => (e.kind === 'gap' ? '…' : e.row.rank))).toEqual([
-      1, 2, 3, '…', 17, 18, 19,
-    ]);
-    expect(slice?.filter((e) => e.kind === 'gap')).toHaveLength(1);
+  it('returns exactly the two clubs playing, and nobody else', () => {
+    const rows = twoClubRows(TABLE, 'c4', 'c5')!;
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.club_id)).toEqual(['c4', 'c5']);
   });
 
-  it('highlights exactly the two clubs playing, and nothing else', () => {
-    const slice = tableSlice(TABLE, 'c4', 'c5');
-    const lit = slice
-      ?.filter((e) => e.kind === 'row' && e.highlight)
-      .map((e) => (e.kind === 'row' ? e.row.club_id : null));
-    expect(lit).toEqual(['c4', 'c5']);
-  });
-
-  it('clamps at the top and bottom of the table rather than running off it', () => {
-    expect(tableSlice(TABLE, 'c1', 'c2')?.map((e) => (e.kind === 'row' ? e.row.rank : '…'))).toEqual([
-      1, 2, 3,
-    ]);
-    expect(tableSlice(TABLE, 'c19', 'c20')?.map((e) => (e.kind === 'row' ? e.row.rank : '…'))).toEqual([
-      18, 19, 20,
+  it('⚠ orders on the feed\'s rank, never on points', () => {
+    // A club docked points still holds its published position, and a table
+    // derived from points cannot see the deduction. Rank 3 has fewer points
+    // here and must still come first.
+    const docked = [
+      standing(3, 'docked', { points: 1 }),
+      standing(8, 'clean', { points: 40 }),
+    ];
+    expect(twoClubRows(docked, 'clean', 'docked')!.map((r) => r.club_id)).toEqual([
+      'docked',
+      'clean',
     ]);
   });
 
   it('is null when a club has no row — half a fixture is worse than none', () => {
-    // Early season, before the feed publishes a table, or a promoted club the
-    // standings import has not reached yet.
-    expect(tableSlice(TABLE, 'c4', 'not-in-the-table')).toBeNull();
-    expect(tableSlice(TABLE, null, 'c4')).toBeNull();
-    expect(tableSlice([], 'c4', 'c5')).toBeNull();
+    // Early season, before the feed publishes a table.
+    expect(twoClubRows(TABLE, 'c4', 'not-in-the-table')).toBeNull();
+    expect(twoClubRows(TABLE, null, 'c4')).toBeNull();
+    expect(twoClubRows(TABLE, 'c4', null)).toBeNull();
+    expect(twoClubRows([], 'c4', 'c5')).toBeNull();
   });
 });
 

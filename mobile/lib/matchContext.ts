@@ -20,9 +20,6 @@ import type { LeagueSeasonTable, LeagueStandingRow, ResultsMatch, ResultsTeam } 
 // below can be tested without mounting anything. See `__tests__/matchContext.test.ts`.
 // =============================================================
 
-/** How many places either side of a club to keep for context. */
-const NEIGHBOURS = 1;
-
 /** How many previous results make up "form". */
 export const FORM_LENGTH = 5;
 
@@ -45,55 +42,29 @@ export function tableForMatch(
   return tables.find((t) => t.competition_id === match.competitionId) ?? null;
 }
 
-/** A gap in the slice, where places were skipped. Rendered as an ellipsis row. */
-export type TableSliceEntry =
-  | { kind: 'row'; row: LeagueStandingRow; highlight: boolean }
-  | { kind: 'gap' };
-
 /**
- * The two clubs' rows in the real table, with a place either side for context.
+ * The two clubs playing, as their table rows, HIGHER PLACED FIRST.
  *
- * Not the whole table: twenty rows under a scoreline is the Match Centre
- * screen, which is one tap away and already exists. This answers the narrower
- * question the fixture actually poses — where these two stand, and who is
- * around them.
+ * ⚠ ORDERED BY THE FEED'S `rank`, NEVER RECOMPUTED FROM POINTS. The provider's
+ * position already applies the competition's real tiebreakers — which for the
+ * Premier League ends at head-to-head — and a table derived from points cannot
+ * see a points deduction. `league_standings` stores `rank` for exactly this
+ * reason and the app's rule is to read it.
  *
- * When the clubs are close the two windows merge into one contiguous run; when
- * they are far apart a single `gap` marker sits between them. Returns `null`
- * when either club has no row, which is the honest answer early in a season
- * before the feed publishes a table — a slice missing half the fixture is
- * worse than no slice.
+ * Returns `null` when either club has no row, which is the honest answer early
+ * in a season before the feed publishes a table: half a fixture is worse than
+ * none.
  */
-export function tableSlice(
+export function twoClubRows(
   standings: LeagueStandingRow[],
   homeClubId: string | null,
   awayClubId: string | null,
-): TableSliceEntry[] | null {
+): LeagueStandingRow[] | null {
   if (!homeClubId || !awayClubId) return null;
-
-  const homeIdx = standings.findIndex((r) => r.club_id === homeClubId);
-  const awayIdx = standings.findIndex((r) => r.club_id === awayClubId);
-  if (homeIdx === -1 || awayIdx === -1) return null;
-
-  const keep = new Set<number>();
-  for (const idx of [homeIdx, awayIdx]) {
-    for (let i = idx - NEIGHBOURS; i <= idx + NEIGHBOURS; i++) {
-      if (i >= 0 && i < standings.length) keep.add(i);
-    }
-  }
-
-  const out: TableSliceEntry[] = [];
-  let previous = -1;
-  for (const i of [...keep].sort((a, b) => a - b)) {
-    if (previous !== -1 && i > previous + 1) out.push({ kind: 'gap' });
-    out.push({
-      kind: 'row',
-      row: standings[i],
-      highlight: i === homeIdx || i === awayIdx,
-    });
-    previous = i;
-  }
-  return out;
+  const home = standings.find((r) => r.club_id === homeClubId);
+  const away = standings.find((r) => r.club_id === awayClubId);
+  if (!home || !away) return null;
+  return [home, away].sort((a, b) => a.rank - b.rank);
 }
 
 /** One previous result, from the club's point of view. */
