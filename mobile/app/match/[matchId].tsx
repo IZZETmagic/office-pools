@@ -709,35 +709,37 @@ function TimelineCard({
  * said the same thing as a straight red. These are the app's own icon set, at
  * the app's own colours, identical on both platforms.
  *
- * ⚠ SOLID, NOT OUTLINE. At 15px inside a 26px chip a stroke icon reads as
- * decoration; the filled variants come from the Pro package and are opt-in per
- * call site via `solid`. `Icon` drops `strokeWidth` for those — the wrapper
- * would otherwise layer an outline over the filled body and fatten it.
+ * ⚠ FILLED, NOT OUTLINE — BY TWO DIFFERENT ROUTES, WHICH IS NOT AN
+ * INCONSISTENCY. At 13px inside a 26px chip a stroke glyph reads as
+ * decoration, so every mark here is painted. Most use `solid`, which swaps in
+ * a purpose-drawn Pro glyph. The CARD cannot: `RectangleVerticalIcon` has no
+ * Pro solid variant at all, so it uses `filled`, which paints the free glyph's
+ * closed path. A hollow rectangle is simply the wrong drawing for a booking.
  */
 function eventGlyph(
   kind: TimelineEvent['kind'],
   theme: ReturnType<typeof useTheme>,
-): { icon: string; tint: string; muted: boolean } {
+): { icon: string; tint: string; muted: boolean; fill: 'solid' | 'filled' } {
   switch (kind) {
     case 'goal':
     case 'penalty':
-      return { icon: 'sportscourt.fill', tint: theme.colors.ink, muted: false };
+      return { icon: 'sportscourt.fill', tint: theme.colors.ink, muted: false, fill: 'solid' };
     case 'own_goal':
       // A goal, but for the other side. The column already places it on the
       // side it COUNTED for (the mapper does not flip it), so the colour is
       // what says whose misfortune it was.
-      return { icon: 'sportscourt.fill', tint: theme.colors.red, muted: false };
+      return { icon: 'sportscourt.fill', tint: theme.colors.red, muted: false, fill: 'solid' };
     case 'yellow':
-      return { icon: 'rectangle.fill', tint: theme.colors.amber, muted: false };
+      return { icon: 'rectangle.portrait.fill', tint: theme.colors.amber, muted: false, fill: 'filled' };
     case 'red':
     case 'second_yellow':
-      return { icon: 'rectangle.fill', tint: theme.colors.red, muted: false };
+      return { icon: 'rectangle.portrait.fill', tint: theme.colors.red, muted: false, fill: 'filled' };
     case 'var_goal_cancelled':
       // VAR is literally a video assistant referee, so the video glyph is the
       // exact thing rather than an approximation.
-      return { icon: 'video.fill', tint: theme.colors.slate, muted: true };
+      return { icon: 'video.fill', tint: theme.colors.slate, muted: true, fill: 'solid' };
     case 'subst':
-      return { icon: 'arrow.up.arrow.down', tint: theme.colors.slate, muted: true };
+      return { icon: 'arrow.up.arrow.down', tint: theme.colors.slate, muted: true, fill: 'solid' };
   }
 }
 
@@ -789,7 +791,7 @@ const CHIP = 26;
 function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMatch }) {
   const theme = useTheme();
   const isHome = event.side === 'home';
-  const { icon, tint, muted } = eventGlyph(event.kind, theme);
+  const { icon, tint, muted, fill } = eventGlyph(event.kind, theme);
   const note = eventNote(event);
   const minute = `${event.minute}${event.extraMinute ? `+${event.extraMinute}` : ''}'`;
 
@@ -859,7 +861,15 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
             borderColor: withOpacity(tint, muted ? 0.25 : 0.45),
           }}
         >
-          <Icon name={icon} size={13} tint={tint} solid />
+          {/* A card is drawn a touch smaller: a portrait rectangle at the same
+              nominal size reads bigger than a round glyph beside it. */}
+          <Icon
+            name={icon}
+            size={fill === 'filled' ? 12 : 13}
+            tint={tint}
+            solid={fill === 'solid'}
+            filled={fill === 'filled'}
+          />
         </View>
       </View>
 

@@ -76,7 +76,12 @@ import {
   LayoutGridIcon,
   LeftToRightListBulletIcon,
   LeftToRightListNumberIcon,
-  Square01Icon,
+  // ⚠ ALIASED, because the repo root is on @hugeicons/core-free-icons 4.2.3
+  // while mobile/ is on 4.3.0, which renamed this export from
+  // `RectangleVertical` to `RectangleVerticalIcon`. Aliasing keeps the
+  // ICON_MAP body below identical to the RN one — `iconMap.test.ts` compares
+  // them — and confines the version difference to this one line.
+  RectangleVertical as RectangleVerticalIcon,
   Stairs01Icon,
   Link01Icon,
   ListViewIcon,
@@ -148,7 +153,6 @@ import {
   ArrowUpDownIcon as ArrowUpDownSolidIcon,
   FootballIcon as FootballSolidIcon,
   InformationCircleIcon as InformationCircleSolidIcon,
-  Square01Icon as Square01SolidIcon,
   Video01Icon as Video01SolidIcon,
 } from '@hugeicons-pro/core-solid-rounded'
 
@@ -212,7 +216,6 @@ const SOLID_ICON_MAP: Record<string, IconConstant> = {
   'exclamationmark.triangle.fill': Alert02SolidIcon,
   'flame.fill': Fire03SolidIcon,
   'info.circle.fill': InformationCircleSolidIcon,
-  'rectangle.fill': Square01SolidIcon,
   'sportscourt.fill': FootballSolidIcon,
   'trophy': ChampionSolidIcon,
   'trophy.circle.fill': ChampionSolidIcon,
@@ -354,8 +357,8 @@ const ICON_MAP: Record<string, IconConstant> = {
   'qrcode': QrCodeIcon,
   'qrcode.viewfinder': QrCodeScanIcon,
   'questionmark.circle.fill': HelpCircleIcon,
-  'rectangle.fill': Square01Icon,
   'rectangle.portrait.and.arrow.right': Logout03Icon,
+  'rectangle.portrait.fill': RectangleVerticalIcon,
   'rosette': RibbonIcon,
   'slider.horizontal.3': SlidersHorizontalIcon,
   'snowflake': SnowIcon,

@@ -6,9 +6,9 @@
 // using Hugeicons directly).
 //
 // Hugeicons free tier is stroke-only — there are no `.fill` variants
-// like SF Symbols have. The `filled` prop is preserved for API
-// compatibility but is a no-op visually; emphasis is still expressed
-// via the `weight` prop (which controls stroke width).
+// like SF Symbols have. Emphasis is expressed via the `weight` prop
+// (stroke width), via `solid` (a Pro glyph, where one exists), or via
+// `filled` (paint the free glyph's closed paths — see the prop).
 
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -74,7 +74,7 @@ import {
   LayoutGridIcon,
   LeftToRightListBulletIcon,
   LeftToRightListNumberIcon,
-  Square01Icon,
+  RectangleVerticalIcon,
   Stairs01Icon,
   Link01Icon,
   ListViewIcon,
@@ -147,7 +147,6 @@ import {
   InformationCircleIcon as InformationCircleSolidIcon,
   ArrowUpDownIcon as ArrowUpDownSolidIcon,
   FootballIcon as FootballSolidIcon,
-  Square01Icon as Square01SolidIcon,
   Video01Icon as Video01SolidIcon,
 } from '@hugeicons-pro/core-solid-rounded';
 
@@ -175,6 +174,20 @@ type IconProps = {
    * Preserved for API compatibility with the previous Lucide-based
    * renderer. Hugeicons free tier is stroke-only so this is a visual
    * no-op today; for solid variants use `solid` below.
+   */
+  /**
+   * Paint the glyph's closed paths instead of only stroking them.
+   *
+   * ⚠ THIS IS NOT `solid`, AND THE TWO ARE NOT INTERCHANGEABLE. `solid` swaps
+   * in a different, purpose-drawn glyph from the Pro package; this fills the
+   * FREE outline glyph by letting the SVG root's `fill` inherit down to paths
+   * that declare only a `stroke`. It exists because a few shapes have no Pro
+   * solid variant at all — `RectangleVerticalIcon`, the yellow and red card,
+   * is one — and a hollow outline is simply the wrong drawing for them.
+   *
+   * ⚠ Only meaningful on a CLOSED path. An open glyph (an arrow, a chevron)
+   * fills into a smear, which is why this is opt-in per call site rather than
+   * a global.
    */
   filled?: boolean;
   /**
@@ -205,7 +218,6 @@ const SOLID_ICON_MAP: Record<string, IconConstant> = {
   'exclamationmark.triangle.fill': Alert02SolidIcon,
   'flame.fill': Fire03SolidIcon,
   'info.circle.fill': InformationCircleSolidIcon,
-  'rectangle.fill': Square01SolidIcon,
   'sportscourt.fill': FootballSolidIcon,
   'trophy': ChampionSolidIcon,
   'trophy.circle.fill': ChampionSolidIcon,
@@ -347,8 +359,8 @@ const ICON_MAP: Record<string, IconConstant> = {
   'qrcode': QrCodeIcon,
   'qrcode.viewfinder': QrCodeScanIcon,
   'questionmark.circle.fill': HelpCircleIcon,
-  'rectangle.fill': Square01Icon,
   'rectangle.portrait.and.arrow.right': Logout03Icon,
+  'rectangle.portrait.fill': RectangleVerticalIcon,
   'rosette': RibbonIcon,
   'slider.horizontal.3': SlidersHorizontalIcon,
   'snowflake': SnowIcon,
@@ -403,7 +415,7 @@ export function Icon({
   color = 'ink',
   tint,
   weight = 'regular',
-  filled: _filled = false,
+  filled = false,
   solid = false,
 }: IconProps) {
   const theme = useTheme();
@@ -427,12 +439,18 @@ export function Icon({
   // visually fattening them. Omitting strokeWidth for solid icons keeps
   // the wrapper's stroke-injection branch disabled.
   const isSolid = solid && SOLID_ICON_MAP[name] !== undefined;
+  // ⚠ `fill` GOES ON THE SVG ROOT, not on the paths — the icon data owns
+  // those, and every path here declares `stroke` and no `fill`, so the
+  // root's value inherits down to them. A solid glyph already carries its
+  // own fill and must not be given a second one.
+  const fillColor = filled && !isSolid ? tintColor : undefined;
   return (
     <HugeiconsIcon
       icon={iconConstant}
       size={size}
       color={tintColor}
       strokeWidth={isSolid ? undefined : strokeWidthFor(weight)}
+      fill={fillColor}
     />
   );
 }
