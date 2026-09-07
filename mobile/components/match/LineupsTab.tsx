@@ -25,11 +25,15 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // `grid != null`: the two agree today, and inferring would silently drop a
 // starter the feed forgot to place.
 //
-// ⚠ PLAYERS ARE PLACED ABSOLUTELY NOW, NOT FLEXED INTO ROWS. The pitch is drawn
-// to real proportions and carries real markings, so a shirt has to land in the
-// right PART of it — a flexed row spreads evenly through whatever height it is
-// given, which stood a back four across the penalty spot. Percentages of the
-// pitch box put each row where its grid row says it belongs.
+// ⚠ PLAYERS ARE PLACED ABSOLUTELY NOW, NOT FLEXED INTO ROWS. The pitch carries
+// real markings at real sizes, so a shirt has to land in the right PART of it —
+// a flexed row spreads evenly through whatever height it is given, which stood
+// a back four across the penalty spot. Percentages of the pitch box put each
+// row where its grid row says it belongs.
+//
+// ⚠ HOME IS THE TOP HALF. It is the side the fixture is named for and the side
+// the band above the pitch names first, so the eye does not swap ends between
+// the scoreline and the shirts.
 //
 // ⚠ NO PLAYER IS TAPPABLE. There is no player screen to open — "Player detail
 // page" is an unstarted backlog item — and a press that does nothing is worse
@@ -78,8 +82,13 @@ export function LineupsTab({
 }
 
 /**
- * Both starting elevens on one pitch, away defending the top goal and home the
- * bottom — the arrangement every broadcast uses, so it needs no explaining.
+ * Both starting elevens on one pitch, HOME defending the top goal and away the
+ * bottom.
+ *
+ * ⚠ HOME ON TOP, and it is the home side's own goal at the top — the eleven you
+ * read first is the one the fixture is named for. It also matches the order the
+ * band above the pitch puts them in, so a member's eye does not have to swap
+ * sides between the scoreline and the shirts.
  */
 function Pitch({
   home,
@@ -103,9 +112,10 @@ function Pitch({
         borderRadius: theme.radii.lg,
         overflow: 'hidden',
         ...theme.shadows.card,
-        // ⚠ THE PITCH'S OWN PROPORTIONS, 68 BY 105. Anything else stretches the
-        // centre circle into an ellipse, which is the one marking everybody
-        // knows the shape of — and it is what gives the formation its room.
+        // ⚠ EXACTLY THE VIEWBOX'S RATIO, 68 BY 126. Any other value would
+        // stretch the drawing to fit and turn the centre circle into an
+        // ellipse — see `PitchMarkings` for why the extra length over a real
+        // 105m pitch is drawn as grass rather than taken by scaling.
         aspectRatio: PITCH_W / PITCH_L,
         backgroundColor: theme.mode === 'dark' ? '#123021' : '#1D7A45',
       }}
@@ -114,14 +124,14 @@ function Pitch({
         <PitchMarkings />
       </View>
 
-      {/* Away across the top half, home across the bottom. */}
-      <Half lineup={away} tint={palette.away} half="top" />
-      <Half lineup={home} tint={palette.home} half="bottom" />
+      {/* Home across the top half, away across the bottom. */}
+      <Half lineup={home} tint={palette.home} half="top" />
+      <Half lineup={away} tint={palette.away} half="bottom" />
 
       {/* ⚠ IN THE CORNER EACH SIDE DEFENDS, so the caption sits beside the team
           it names rather than in a legend the eye has to travel to. */}
-      <TeamTag lineup={away} name={awayName} corner="top" />
-      <TeamTag lineup={home} name={homeName} corner="bottom" />
+      <TeamTag lineup={home} name={homeName} corner="top" />
+      <TeamTag lineup={away} name={awayName} corner="bottom" />
     </View>
   );
 }

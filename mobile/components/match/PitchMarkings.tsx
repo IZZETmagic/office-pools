@@ -86,7 +86,7 @@ export function PitchMarkings({ stroke = 'rgba(255,255,255,0.30)' }: { stroke?: 
       <Circle cx={MID_X} cy={PITCH_L / 2} r={ARC_R} {...common} />
       <Circle cx={MID_X} cy={PITCH_L / 2} r={0.5} fill={stroke} stroke="none" />
 
-      {/* ---- Top goal (the away side defends this one) ---- */}
+      {/* ---- Top goal (the HOME side defends this one) ---- */}
       <Rect x={PEN_X} y={0} width={PEN_W} height={PEN_D} {...common} />
       <Rect x={SIX_X} y={0} width={SIX_W} height={SIX_D} {...common} />
       <Circle cx={MID_X} cy={SPOT} r={0.5} fill={stroke} stroke="none" />
@@ -100,7 +100,7 @@ export function PitchMarkings({ stroke = 'rgba(255,255,255,0.30)' }: { stroke?: 
         {...common}
       />
 
-      {/* ---- Bottom goal (the home side defends this one) ---- */}
+      {/* ---- Bottom goal (the away side defends this one) ---- */}
       <Rect x={PEN_X} y={PITCH_L - PEN_D} width={PEN_W} height={PEN_D} {...common} />
       <Rect x={SIX_X} y={PITCH_L - SIX_D} width={SIX_W} height={SIX_D} {...common} />
       <Circle cx={MID_X} cy={PITCH_L - SPOT} r={0.5} fill={stroke} stroke="none" />
