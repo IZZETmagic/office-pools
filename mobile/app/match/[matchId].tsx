@@ -42,6 +42,7 @@ import { SubstitutionIcon } from '@/components/match/SubstitutionIcon';
 import { Icon, Text } from '@/components/ui';
 import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import { getCompetitionBand } from '@/lib/design/competitionBand';
+import { displayPlayerName } from '@/lib/playerName';
 import { matchTabs, type MatchTabKey } from '@/lib/matchTabs';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
@@ -760,36 +761,14 @@ function eventNote(e: TimelineEvent): string | null {
     case 'var_goal_cancelled':
       return 'disallowed';
     case 'subst':
-      return e.relatedName ? shortName(e.relatedName) : null;
+      return e.relatedName ? displayPlayerName(e.relatedName) : null;
     case 'goal':
-      return e.relatedName ? shortName(e.relatedName) : null;
+      return e.relatedName ? displayPlayerName(e.relatedName) : null;
     default:
       return null;
   }
 }
 
-/**
- * Surname only.
- *
- * ⚠ `/fixtures/events` returns FULL names — "Cesar Palacios Perez" — where
- * `/fixtures/lineups` returns "C. Palacios". Storing the full one and shortening
- * at render keeps the source faithful and the row narrow. A single-token name
- * survives unchanged.
- */
-function shortName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts.length > 1 ? parts[parts.length - 1] : name;
-}
-
-/**
- * The width of the centre rail, and therefore where the line runs.
- *
- * ⚠ FIXED, AND THAT IS THE WHOLE POINT OF IT. Before this the mark sat between
- * a flexed name and the minute, so the axis wandered a few points row to row
- * depending on how long a name was — visible as a wobble down a long timeline.
- * Every row now reserves exactly this much in the middle, so the chips stack
- * dead straight and the line can be drawn once behind them.
- */
 const RAIL = 44;
 const CHIP = 26;
 
@@ -842,7 +821,7 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
           textAlign: isHome ? 'right' : 'left',
         }}
       >
-        {event.playerName ? shortName(event.playerName) : '—'}
+        {event.playerName ? displayPlayerName(event.playerName) : '—'}
       </RNText>
       {note ? (
         <RNText
