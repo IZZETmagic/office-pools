@@ -238,6 +238,32 @@ export function MatchDetailHeader({
   });
 
   /**
+   * The scorers go FIRST, and well before anything else.
+   *
+   * ⚠ THE TEAM NAMES TRAVEL DOWN THROUGH THEM. `leftMove` translates each side
+   * column down by `p * (slideBy - wantedY)` to cancel the band's upward slide,
+   * so relative to the band's own content the names move DOWN while the
+   * scorers ride UP with it — the two converge, and mid-collapse "Arsenal"
+   * lands on top of "Havertz 25'". Ryan caught this on a screenshot.
+   *
+   * ⚠ AND ADDING THE SCORERS IS WHAT MADE IT BITE. They lengthened `matchupH`,
+   * which lengthened `slideBy`, which increased exactly that downward travel.
+   *
+   * So they are gone by `p = 0.15`, roughly a fifth of the way into a fade that
+   * `labelFade` only starts to finish at 0.45. The names need something like a
+   * third of the travel to reach them, so this clears out with room to spare —
+   * and it stays clear as the block grows, because a longer list means a taller
+   * band, a longer slide, and a collision that arrives LATER in `p`, not
+   * sooner. Going first is also the right order: of everything in the band, the
+   * scorers are the footnote.
+   */
+  const scorerFade = useAnimatedStyle(() => {
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
+    return { opacity: interpolate(p, [0, 0.15], [1, 0], Extrapolation.CLAMP) };
+  });
+
+  /**
    * The glow stays put while the band slides out from under it.
    *
    * ⚠ WITHOUT THIS THE BLOOMS SEAM THE MOMENT YOU SCROLL. The blobs are
@@ -368,12 +394,15 @@ export function MatchDetailHeader({
               FREE. `matchupH` is this block's own height and is also the slide
               distance and the scroll range, so adding the scorers lengthens the
               travel by exactly their height — the band still ends level with
-              the chrome and nothing needed retuning. Wrapped in `labelFade` so
-              they go with the team names rather than shrinking into something
-              unreadable.
+              the chrome and nothing needed retuning.
+
+              ⚠ ON `scorerFade`, NOT `labelFade`, AND THAT IS NOT A PREFERENCE.
+              The side columns translate DOWN through the band as it slides up,
+              so the team names cross this row on the way — see `scorerFade`.
+              These have to be gone before that happens.
             */}
             {hasScorers(scorers) ? (
-              <Animated.View style={labelFade}>
+              <Animated.View style={scorerFade}>
                 <Scorers home={scorers.home} away={scorers.away} />
               </Animated.View>
             ) : null}
