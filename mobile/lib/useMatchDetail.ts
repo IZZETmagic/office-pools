@@ -7,6 +7,7 @@ import {
   fetchMatchStats,
   type BracketStatsResponse,
   type FixturePick,
+  type TablePick,
   type MatchScoreEntry,
   type MatchStatsResponse,
 } from './api';
@@ -274,6 +275,7 @@ export function useMatchDetail(matchId: string | undefined) {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [facts, setFacts] = useState<MatchFacts | null>(null);
   const [leaguePicks, setLeaguePicks] = useState<FixturePick[]>([]);
+  const [leagueTablePicks, setLeagueTablePicks] = useState<TablePick[]>([]);
   const [lineups, setLineups] = useState<MatchLineup[]>([]);
   const [teamStats, setTeamStats] = useState<MatchTeamStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -328,7 +330,7 @@ export function useMatchDetail(matchId: string | undefined) {
         // policy; `league_match_scores` is deny-all (migration 050), so the
         // points need the server. One call for the whole fixture across every
         // pool — not the per-pool contract fan-out the old boundary feared.
-        loadLeaguePicks(appUserId, matchId, setLeaguePicks),
+        loadLeaguePicks(appUserId, matchId, setLeaguePicks, setLeagueTablePicks),
       ]);
       setLoading(false);
       return;
@@ -356,6 +358,7 @@ export function useMatchDetail(matchId: string | undefined) {
       setTeamStats([]);
       // World Cup picks come from `predictionInfos` below, not this.
       setLeaguePicks([]);
+      setLeagueTablePicks([]);
 
       // 2. Resolve user's entries across pools, split by prediction mode.
       // Query through pool_members (the source of truth for "this user belongs
@@ -690,6 +693,7 @@ export function useMatchDetail(matchId: string | undefined) {
     timeline,
     facts,
     leaguePicks,
+    leagueTablePicks,
     lineups,
     teamStats,
     leagueContext,
@@ -1046,11 +1050,15 @@ async function loadLeaguePicks(
   appUserId: string,
   fixtureId: string,
   setPicks: (p: FixturePick[]) => void,
+  setTablePicks: (t: TablePick[]) => void,
 ) {
   try {
-    setPicks(await fetchFixturePicks(appUserId, fixtureId));
+    const { picks, tablePicks } = await fetchFixturePicks(appUserId, fixtureId);
+    setPicks(picks);
+    setTablePicks(tablePicks);
   } catch (e) {
     console.warn('[useMatchDetail] league picks unavailable', e);
     setPicks([]);
+    setTablePicks([]);
   }
 }

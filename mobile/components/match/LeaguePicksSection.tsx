@@ -1,9 +1,12 @@
+import { Image } from 'expo-image';
 import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
-import type { FixturePick } from '@/lib/api';
+import type { FixturePick, TablePick } from '@/lib/api';
 import { pickLabel, tierLabel } from '@/lib/leaguePickLabel';
+import { ordinal } from '@/lib/ordinal';
+import type { LeagueSeasonTable } from '@/lib/useTournamentMatches';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -37,11 +40,23 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 export function LeaguePicksSection({
   match,
   picks,
+  tablePicks,
+  table,
 }: {
   match: ResultsMatch;
   picks: FixturePick[];
+  tablePicks: TablePick[];
+  /**
+   * The live league table, for the "and they are Nth now" half.
+   *
+   * ⚠ ALREADY IN MEMORY — it rides the same `/api/users/:id/fixtures` payload
+   * the Results tab pays for, so the comparison costs nothing. Null before a
+   * season has a table.
+   */
+  table: LeagueSeasonTable | null;
 }) {
   const theme = useTheme();
+  const nothingAtAll = picks.length === 0 && tablePicks.length === 0;
 
   return (
     <View style={{ gap: 12 }}>
@@ -56,7 +71,7 @@ export function LeaguePicksSection({
         Your Predictions
       </RNText>
 
-      {picks.length === 0 ? (
+      {nothingAtAll ? (
         <View
           style={{
             marginHorizontal: 20,
@@ -80,8 +95,134 @@ export function LeaguePicksSection({
           </Text>
         </View>
       ) : (
-        picks.map((pick) => <PickRow key={pick.entryId} match={match} pick={pick} />)
+        <>
+          {picks.map((pick) => <PickRow key={pick.entryId} match={match} pick={pick} />)}
+          {/* ⚠ AFTER the per-fixture picks, because a table pool's answer is
+              about the season rather than this game — it is context, not a
+              prediction on the match in front of you. */}
+          {tablePicks.map((tp) => (
+            <TablePickCard key={tp.entryId} match={match} pick={tp} table={table} />
+          ))}
+        </>
       )}
+    </View>
+  );
+}
+
+/**
+ * Where a table-mode entry placed these two clubs, against where they stand.
+ *
+ * ⚠ IT STATES NO SCORE, AND THAT IS DECISION 11. A league table is a FULL-TIME
+ * table: a table pool settles once, at the end of the season. Printing "4 off"
+ * beside a game in September would read as a running tally of something that
+ * is not being tallied yet — so the card shows the two numbers and lets the
+ * member draw the comparison.
+ */
+function TablePickCard({
+  match,
+  pick,
+  table,
+}: {
+  match: ResultsMatch;
+  pick: TablePick;
+  table: LeagueSeasonTable | null;
+}) {
+  const theme = useTheme();
+  const rankOf = (clubId: string | null) =>
+    clubId ? table?.standings.find((r) => r.club_id === clubId)?.rank ?? null : null;
+
+  return (
+    <View
+      style={{
+        marginHorizontal: 20,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.radii.lg,
+        ...theme.shadows.card,
+        overflow: 'hidden',
+      }}
+    >
+      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 }}>
+        <RNText
+          numberOfLines={1}
+          style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}
+        >
+          {pick.poolName}
+        </RNText>
+        <Text variant="detail" color="slate" numberOfLines={1}>
+          {pick.entryName} · where you had them finishing
+        </Text>
+      </View>
+
+      <ClubPositionRow
+        team={match.homeTeam}
+        picked={pick.homePosition}
+        now={rankOf(match.homeTeamId)}
+      />
+      <ClubPositionRow
+        team={match.awayTeam}
+        picked={pick.awayPosition}
+        now={rankOf(match.awayTeamId)}
+      />
+      <View style={{ height: 6 }} />
+    </View>
+  );
+}
+
+function ClubPositionRow({
+  team,
+  picked,
+  now,
+}: {
+  team: ResultsMatch['homeTeam'];
+  picked: number | null;
+  now: number | null;
+}) {
+  const theme = useTheme();
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+      }}
+    >
+      {/* ⚠ A crest is not a flag — square box, `contain`. */}
+      {team?.flagUrl ? (
+        <Image
+          source={{ uri: team.flagUrl }}
+          style={{ width: 20, height: 20 }}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+        />
+      ) : (
+        <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.mist }} />
+      )}
+      <RNText
+        numberOfLines={1}
+        style={{ flex: 1, fontFamily: fontFamilies.semibold, fontSize: 13, color: theme.colors.ink }}
+      >
+        {team?.shortName ?? team?.countryName ?? 'TBD'}
+      </RNText>
+
+      <View style={{ alignItems: 'flex-end' }}>
+        <RNText
+          style={{
+            fontFamily: MONO_BOLD,
+            fontSize: 14,
+            color: theme.colors.ink,
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {/* ⚠ A club the filed table omits reads "—", not 0th. */}
+          {picked === null ? '—' : ordinal(picked)}
+        </RNText>
+        {now !== null ? (
+          <Text variant="detail" color="slate">{`now ${ordinal(now)}`}</Text>
+        ) : null}
+      </View>
     </View>
   );
 }

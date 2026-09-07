@@ -1663,10 +1663,34 @@ export type FixturePick = {
   points: number | null;
 };
 
+/**
+ * Where a TABLE-mode entry placed this fixture's two clubs.
+ *
+ * ⚠ A TABLE POOL HAS NO PER-FIXTURE PICK — it is one decision for the whole
+ * season (Decision 11) — so it can never appear in `FixturePick`, and without
+ * this it would be invisible on a match screen. What it does have is where the
+ * member put these two clubs, which is the interesting thing to read beside a
+ * game they are playing.
+ */
+export type TablePick = {
+  entryId: string;
+  entryName: string;
+  poolId: string;
+  poolName: string;
+  /** Null when the filed table omits this club — possible on a partial profile. */
+  homePosition: number | null;
+  awayPosition: number | null;
+};
+
+export type FixturePicksResponse = {
+  picks: FixturePick[];
+  tablePicks: TablePick[];
+};
+
 export async function fetchFixturePicks(
   userId: string,
   fixtureId: string,
-): Promise<FixturePick[]> {
+): Promise<FixturePicksResponse> {
   const res = await apiFetch<{
     picks: {
       entry_id: string;
@@ -1679,9 +1703,18 @@ export async function fetchFixturePicks(
       score_type: string | null;
       points: number | null;
     }[];
+    /** ⚠ Optional: absent from a response cached before this field existed. */
+    table_picks?: {
+      entry_id: string;
+      entry_name: string;
+      pool_id: string;
+      pool_name: string;
+      home_position: number | null;
+      away_position: number | null;
+    }[];
   }>(`/api/users/${userId}/fixture-picks?fixture_id=${encodeURIComponent(fixtureId)}`);
 
-  return (res.picks ?? []).map((p) => ({
+  const picks: FixturePick[] = (res.picks ?? []).map((p) => ({
     entryId: p.entry_id,
     entryName: p.entry_name,
     poolId: p.pool_id,
@@ -1692,4 +1725,15 @@ export async function fetchFixturePicks(
     scoreType: p.score_type,
     points: p.points,
   }));
+
+  const tablePicks: TablePick[] = (res.table_picks ?? []).map((t) => ({
+    entryId: t.entry_id,
+    entryName: t.entry_name,
+    poolId: t.pool_id,
+    poolName: t.pool_name,
+    homePosition: t.home_position,
+    awayPosition: t.away_position,
+  }));
+
+  return { picks, tablePicks };
 }

@@ -95,6 +95,7 @@ export default function MatchDetailScreen() {
     timeline,
     facts,
     leaguePicks,
+    leagueTablePicks,
     lineups,
     teamStats,
     leagueContext,
@@ -249,7 +250,14 @@ export default function MatchDetailScreen() {
         // scores and crowd stats. `roundNumber` is the competition test used
         // everywhere else on this screen.
         return m.roundNumber !== null ? (
-          <LeaguePicksSection match={m} picks={leaguePicks} />
+          <LeaguePicksSection
+            match={m}
+            picks={leaguePicks}
+            tablePicks={leagueTablePicks}
+            // The live table is already derived for the Facts tab's slice; the
+            // table-pick card reuses it rather than fetching a second copy.
+            table={leagueContext?.table ?? null}
+          />
         ) : (
           <View style={{ gap: 16 }}>
             <YourPredictionsSection match={m} predictionInfos={predictionInfos} />
