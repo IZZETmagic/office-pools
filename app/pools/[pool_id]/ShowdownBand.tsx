@@ -616,7 +616,28 @@ export function ShowdownBand({
           ⚠ `z-10` FOR THE SAME REASON THE HEADER HAS IT — the gradient and the
           phone block's absolute children are painted in this stacking context,
           and a strip of buttons that cannot be clicked is the failure mode. */}
-      {tabs && <div className="relative z-10">{tabs}</div>}
+      {/* ⚠ THE SAME MEASURE AND THE SAME GUTTER AS THE PAGE BENEATH, character
+          for character: `max-w-[940px] mx-auto px-4 sm:px-6` is what the duel's
+          own cards and <main> both carry. The strip had neither, so it ran from
+          the viewport's left edge while everything under it started at the
+          measure — the band's gradient is full-bleed on purpose, its CONTENTS
+          are not, and the strip is contents.
+
+          ⚠ IT LINES UP WITH `.sd-d` TOO, which is `max-width: 940px` with 24px
+          of padding from `md` — the same place `sm:px-6` puts this. So the first
+          pill sits under the left avatar's own edge at every width, rather than
+          agreeing at one and drifting at the rest. That is the mistake the names
+          in `M` record; it is the same mistake in a different unit.
+
+          ⚠ AND THE CAP IS WHAT MAKES IT SCROLL. Full-bleed, the strip had the
+          whole viewport and rarely overflowed, so the horizontal scroll it has
+          always carried never engaged and the later tabs simply spread out —
+          which is why it did not behave like every other pool's strip. Capped,
+          it overflows and scrolls, and the centre-the-active-pill effect finally
+          has something to do. */}
+      {tabs && (
+        <div className="relative z-10 max-w-[940px] mx-auto px-4 sm:px-6">{tabs}</div>
+      )}
     </div>
     </>
   )

@@ -172,10 +172,32 @@ export function DuelRecapSheet({
               exit may not be harder than the entrance. Same height, same type,
               same width — the only difference is which one is filled. */}
           <div className="grid grid-cols-2 gap-3 mt-8 pt-6 border-t border-white/10">
+            {/* ⚠⚠ `text-midnight`, NEVER `text-ink`, AND THIS SHEET IS DARK IN
+                BOTH COLOUR MODES.
+
+                It was `text-ink`, which is a SEMANTIC token — near-black in
+                light mode and near-WHITE in dark. The panel is `bg-midnight`,
+                which is not: `--sp-midnight` is #0B0F1A in both blocks. So in
+                dark mode this was white type on a white pill, and the only
+                reason the word was legible at all was the antialiasing.
+
+                ⚠ IT FAILS ONLY IN ONE MODE, WHICH IS WHY IT SHIPPED. Every
+                other colour in this sheet is fixed — `text-white`, `bg-white/10`,
+                `text-success-400` — so this was the single flipping token in a
+                surface that has opted out of flipping. Exactly the failure
+                `duelBandPalette.guard.test.ts` exists for on RN, where a bare
+                `<Text>` resolves `ink` through `useTheme()` and goes invisible
+                in light mode.
+
+                ⚠ AND IT IS THE REVIEW BUTTON SPECIFICALLY, which makes it worse
+                than a cosmetic bug. The header note says Skip may not be easier
+                than Review — if only wins get a good page, half the pool quietly
+                learns Skip is the right button and nobody ever reports it. An
+                unreadable Review is the same outcome by a different route. */}
             <Link
               href={reviewHref}
               onClick={onDismiss}
-              className="rounded-pill bg-white text-ink t-caption text-center py-3.5
+              className="rounded-pill bg-white text-midnight t-caption text-center py-3.5
                          hover:bg-white/90 active:bg-white/80 transition-colors"
             >
               Review
