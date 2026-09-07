@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { groupByRow, parseGrid, surnameOf } from '../lineupLayout';
-import { STAT_ROWS, visibleStatRows } from '../matchStatRows';
+import { STAT_ROWS, STAT_SECTIONS, visibleStatRows, visibleStatSections } from '../matchStatRows';
 import { ALL_MATCH_TAB_KEYS, matchTabs } from '../matchTabs';
 import type { LineupPlayer, MatchTeamStats } from '../useMatchDetail';
 
@@ -194,14 +194,16 @@ describe('visibleStatRows', () => {
     expect(visibleStatRows(null, null)).toEqual([]);
   });
 
-  it('preserves the canonical running order — possession first, xG last', () => {
+  it('preserves the canonical running order, filtered', () => {
+    // ⚠ The order is the DECLARED one with absent rows removed — never a
+    // re-sort. Possession leads because it is the headline; the rest follow
+    // their section. This asserts the relationship rather than a fixed tail,
+    // so adding a section does not falsify it.
     const all = stats({
       possessionPct: 50, shotsTotal: 1, expectedGoals: 1.2, redCards: 1, passesPct: 80,
     });
     const rows = visibleStatRows(all, { ...all, side: 'away' });
     expect(rows[0].key).toBe('possession');
-    expect(rows[rows.length - 1].key).toBe('expected_goals');
-    // And the order matches the declared one, filtered.
     const declared = STAT_ROWS.map((r) => r.key).filter((k) => rows.some((r) => r.key === k));
     expect(rows.map((r) => r.key)).toEqual(declared);
   });
@@ -214,5 +216,49 @@ describe('visibleStatRows', () => {
   it('marks both percentages as percentages', () => {
     const pct = STAT_ROWS.filter((r) => r.percent).map((r) => r.key);
     expect(pct).toEqual(['possession', 'passes_pct']);
+  });
+});
+
+// ------------------------------------------------------------- stat sections
+
+describe('visibleStatSections', () => {
+  it('groups the visible rows into cards, in the declared order', () => {
+    const all = stats({
+      possessionPct: 55, shotsTotal: 16, passesTotal: 400, saves: 4, fouls: 12,
+      expectedGoals: 2.05,
+    });
+    const sections = visibleStatSections(all, { ...all, side: 'away' });
+    expect(sections.map((s) => s.key)).toEqual([
+      'possession', 'shots', 'expected', 'passing', 'goalkeeping', 'discipline',
+    ]);
+  });
+
+  it('⚠ drops a section entirely when none of its rows has a value', () => {
+    // A heading over a blank card reads as a bug. 20 of 60 Premier League stat
+    // rows carry no xG at all, so this is the common case rather than an edge.
+    const noXg = stats({ possessionPct: 55, shotsTotal: 16 });
+    const sections = visibleStatSections(noXg, { ...noXg, side: 'away' });
+    expect(sections.map((s) => s.key)).toEqual(['possession', 'shots']);
+    expect(sections.find((s) => s.key === 'expected')).toBeUndefined();
+  });
+
+  it('keeps a section that has SOME of its rows, with only those rows', () => {
+    // The feed sends `Free Kicks` on some fixtures and not others.
+    const partial = stats({ yellowCards: 2, fouls: 11 });
+    const [discipline] = visibleStatSections(partial, { ...partial, side: 'away' });
+    expect(discipline.key).toBe('discipline');
+    expect(discipline.rows.map((r) => r.key)).toEqual(['fouls', 'yellow_cards']);
+  });
+
+  it('is empty when the fixture has no statistics at all', () => {
+    expect(visibleStatSections(stats(), stats({ side: 'away' }))).toEqual([]);
+    expect(visibleStatSections(null, null)).toEqual([]);
+  });
+
+  it('never emits a section with zero rows', () => {
+    const some = stats({ possessionPct: 50, saves: 3 });
+    for (const section of visibleStatSections(some, { ...some, side: 'away' })) {
+      expect(section.rows.length).toBeGreaterThan(0);
+    }
   });
 });
