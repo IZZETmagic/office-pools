@@ -44,6 +44,7 @@ import { Icon, Text } from '@/components/ui';
 import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import { getCompetitionBand } from '@/lib/design/competitionBand';
 import { displayPlayerName } from '@/lib/playerName';
+import { refereeName } from '@/lib/refereeName';
 import { fixturePalette } from '@/lib/design/clubColors';
 import { matchTabs, type MatchTabKey } from '@/lib/matchTabs';
 import { useManualRefresh } from '@/lib/useManualRefresh';
@@ -564,12 +565,19 @@ function MatchInfoCard({ match, facts }: { match: ResultsMatch; facts: MatchFact
   // other row here is self-describing — a date reads as a date, a ground as a
   // ground — but "C. Kavanagh" beside a two-people glyph could be anybody.
   //
-  // ⚠ THE FEED ABBREVIATES IT AND THERE IS NO FULLER FORM TO SHOW. All 132
-  // referees stored on 2026-09-07 are an initial and a surname, and the live
-  // `/fixtures` payload sends "S. Barrott" at source with no other referee
-  // field on the fixture. So this is the whole name the provider has.
+  // ⚠ THE FULL NAME, AND IT TOOK A CORRECTION TO GET HERE. This card said the
+  // provider only had "C. Kavanagh" — true of what we had STORED, and not of
+  // the feed. api-football enriches the referee AFTER the match: at sync time
+  // it sends an initial and a surname, and by the next day it sends
+  // "Chris Kavanagh, England". The sync writes the column once, on the
+  // completion tick, and never revisits it — so the short form was ours, not
+  // theirs. `scripts/refresh-referees.ts` re-reads it.
+  //
+  // ⚠ The country is trimmed at RENDER, not on the way in — see `refereeName`,
+  // which also explains why it splits on the last comma rather than on the word
+  // "England".
   if (facts?.referee) {
-    rows.push({ icon: 'person.2.fill', label: `Referee · ${facts.referee}` });
+    rows.push({ icon: 'person.2.fill', label: `Referee · ${refereeName(facts.referee)}` });
   }
   // ⚠ HALF TIME IS DELIBERATELY NOT HERE. It is a moment in the match, not a
   // fact about the fixture, and the timeline marks it in place — on the line,
