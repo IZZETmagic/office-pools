@@ -194,14 +194,22 @@ export default function MatchDetailScreen() {
       case 'facts':
         return (
           <View style={{ gap: 16 }}>
-            {timeline.length > 0 ? <TimelineCard match={m} events={timeline} facts={facts} /> : null}
-            <MatchInfoCard match={m} facts={facts} />
             {/*
-              ⚠ FORM SITS ABOVE THE TABLE, AND ONLY ON A LEAGUE FIXTURE. Before
-              kickoff there is no timeline, so form is the first thing on this
-              tab with anything to say — and it is the thing a member opening a
-              fixture is actually asking about. The World Cup keeps its group
-              card below, unchanged.
+              ⚠ MATCH FACTS FIRST, AND IT IS THE ONLY CARD THAT IS ALWAYS HERE.
+              The timeline led this tab until now, which meant a fixture that
+              had not kicked off opened on nothing at all — every other card is
+              conditional, so the first thing on the screen changed depending on
+              whether the game had started. The stage, the date and the ground
+              are known from the moment a fixture exists, so they are the stable
+              top of the tab and everything else stacks under them.
+            */}
+            <MatchInfoCard match={m} facts={facts} />
+            {timeline.length > 0 ? <TimelineCard match={m} events={timeline} facts={facts} /> : null}
+            {/*
+              Form, then the table, and only on a league fixture — build-up
+              before standings, because a member opening a fixture is asking
+              about these two clubs before they are asking about the division.
+              The World Cup keeps its group card below, unchanged.
             */}
             {leagueContext && hasForm(leagueContext) ? (
               <FormCard
