@@ -513,27 +513,38 @@ function hasForm(ctx: NonNullable<ReturnType<typeof useMatchDetail>['leagueConte
 
 function MatchInfoCard({ match, facts }: { match: ResultsMatch; facts: MatchFacts | null }) {
   const theme = useTheme();
-  const rows: Array<{ icon: string; emoji: string; label: string }> = [
-    { icon: 'sportscourt', emoji: '🏟', label: stageLabel(match) },
-    { icon: 'calendar', emoji: '📅', label: formattedFullDate(match.matchDate) },
+  // The `emoji` field these rows used to carry is gone with it — it had not been
+  // rendered since the card moved onto `Icon`, and a dead field on a type is a
+  // thing the next reader has to disprove.
+  const rows: { icon: string; label: string }[] = [
+    { icon: 'sportscourt', label: stageLabel(match) },
+    { icon: 'calendar', label: formattedFullDate(match.matchDate) },
   ];
   if (match.venue) {
-    rows.push({ icon: 'mappin.and.ellipse', emoji: '📍', label: match.venue });
+    rows.push({ icon: 'mappin.and.ellipse', label: match.venue });
   }
-  // ⚠ ONLY WHEN THEY EXIST. Both arrive on the api-football payload and are
-  // written by the league sync from migration 136 onwards, so every fixture
-  // played before that has neither — and a row reading "Referee: —" is worse
-  // than no row. Same for a half-time score on a game that has not reached it.
+  // ⚠ ONLY WHEN IT EXISTS. The referee arrives on the api-football payload and
+  // is written by the league sync from migration 136 onwards, so every fixture
+  // played before that has none — and a row reading "Referee —" is worse than
+  // no row at all.
+  //
+  // ⚠ AND IT IS LABELLED, BECAUSE A NAME ALONE DOES NOT SAY WHAT IT IS. Every
+  // other row here is self-describing — a date reads as a date, a ground as a
+  // ground — but "C. Kavanagh" beside a two-people glyph could be anybody.
+  //
+  // ⚠ THE FEED ABBREVIATES IT AND THERE IS NO FULLER FORM TO SHOW. All 132
+  // referees stored on 2026-09-07 are an initial and a surname, and the live
+  // `/fixtures` payload sends "S. Barrott" at source with no other referee
+  // field on the fixture. So this is the whole name the provider has.
   if (facts?.referee) {
-    rows.push({ icon: 'person.2.fill', emoji: '🧑‍⚖️', label: facts.referee });
+    rows.push({ icon: 'person.2.fill', label: `Referee · ${facts.referee}` });
   }
-  if (facts?.halfTimeHome != null && facts?.halfTimeAway != null) {
-    rows.push({
-      icon: 'clock',
-      emoji: '⏱',
-      label: `Half time · ${facts.halfTimeHome}–${facts.halfTimeAway}`,
-    });
-  }
+  // ⚠ HALF TIME IS DELIBERATELY NOT HERE. It is a moment in the match, not a
+  // fact about the fixture, and the timeline marks it in place — on the line,
+  // between the events either side of it, which is where it means something.
+  // Repeating it in a list of stage/date/ground read as a fifth attribute of
+  // the ground. `facts.halfTimeHome/Away` are still loaded and still used
+  // there; only this row is gone.
 
   return (
     <View
