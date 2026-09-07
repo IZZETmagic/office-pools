@@ -242,8 +242,10 @@ export default function MatchDetailScreen() {
         return (
           <LineupsTab
             lineups={lineups}
-            homeName={homeDisplayName(m)}
-            awayName={awayDisplayName(m)}
+            homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
+            awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
+            homeTeam={m.homeTeam}
+            awayTeam={m.awayTeam}
           />
         );
       case 'stats':
