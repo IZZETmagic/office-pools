@@ -150,7 +150,6 @@ import {
   CheckmarkCircle01Icon as CheckmarkCircle01SolidIcon,
   Fire03Icon as Fire03SolidIcon,
   FlashIcon as FlashSolidIcon,
-  ArrowUpDownIcon as ArrowUpDownSolidIcon,
   FootballIcon as FootballSolidIcon,
   InformationCircleIcon as InformationCircleSolidIcon,
   Video01Icon as Video01SolidIcon,
@@ -205,7 +204,6 @@ type IconProps = {
  * set in the Vercel project or the build cannot install this package.
  */
 const SOLID_ICON_MAP: Record<string, IconConstant> = {
-  'arrow.up.arrow.down': ArrowUpDownSolidIcon,
   'bolt.fill': FlashSolidIcon,
   // The four status glyphs. A toast or an inline banner is where the `.fill` in
   // an SF name has to be literally true: the icon is carrying the variant on its

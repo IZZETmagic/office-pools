@@ -38,6 +38,7 @@ import { LeagueTableSliceCard } from '@/components/match/LeagueTableSliceCard';
 import { LineupsTab } from '@/components/match/LineupsTab';
 import { MatchTabBar } from '@/components/match/MatchTabBar';
 import { StatsTab } from '@/components/match/StatsTab';
+import { SubstitutionIcon } from '@/components/match/SubstitutionIcon';
 import { Icon, Text } from '@/components/ui';
 import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import { getCompetitionBand } from '@/lib/design/competitionBand';
@@ -719,7 +720,7 @@ function TimelineCard({
 function eventGlyph(
   kind: TimelineEvent['kind'],
   theme: ReturnType<typeof useTheme>,
-): { icon: string; tint: string; muted: boolean; fill: 'solid' | 'filled' } {
+): { icon: string | null; tint: string; muted: boolean; fill: 'solid' | 'filled' } {
   switch (kind) {
     case 'goal':
     case 'penalty':
@@ -739,7 +740,11 @@ function eventGlyph(
       // exact thing rather than an approximation.
       return { icon: 'video.fill', tint: theme.colors.slate, muted: true, fill: 'solid' };
     case 'subst':
-      return { icon: 'arrow.up.arrow.down', tint: theme.colors.slate, muted: true, fill: 'solid' };
+      // ⚠ NO ICON NAME. A substitution is drawn by `SubstitutionIcon`, which
+      // paints its two arrows in two colours and mirrors for the away side —
+      // neither of which a single `ICON_MAP` entry can express. `tint` here is
+      // only the chip's ring.
+      return { icon: null, tint: theme.colors.slate, muted: true, fill: 'solid' };
   }
 }
 
@@ -861,15 +866,21 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
             borderColor: withOpacity(tint, muted ? 0.25 : 0.45),
           }}
         >
-          {/* A card is drawn a touch smaller: a portrait rectangle at the same
-              nominal size reads bigger than a round glyph beside it. */}
-          <Icon
-            name={icon}
-            size={fill === 'filled' ? 12 : 13}
-            tint={tint}
-            solid={fill === 'solid'}
-            filled={fill === 'filled'}
-          />
+          {icon === null ? (
+            // ⚠ MIRRORED FOR THE AWAY SIDE so the red "off" arrow points at the
+            // column the departing player's name is in.
+            <SubstitutionIcon size={14} flip={!isHome} />
+          ) : (
+            /* A card is drawn a touch smaller: a portrait rectangle at the same
+               nominal size reads bigger than a round glyph beside it. */
+            <Icon
+              name={icon}
+              size={fill === 'filled' ? 12 : 13}
+              tint={tint}
+              solid={fill === 'solid'}
+              filled={fill === 'filled'}
+            />
+          )}
         </View>
       </View>
 

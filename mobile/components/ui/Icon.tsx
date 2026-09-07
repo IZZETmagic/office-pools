@@ -145,7 +145,6 @@ import {
   Fire03Icon as Fire03SolidIcon,
   FlashIcon as FlashSolidIcon,
   InformationCircleIcon as InformationCircleSolidIcon,
-  ArrowUpDownIcon as ArrowUpDownSolidIcon,
   FootballIcon as FootballSolidIcon,
   Video01Icon as Video01SolidIcon,
 } from '@hugeicons-pro/core-solid-rounded';
@@ -203,7 +202,6 @@ type IconProps = {
 // Sparse SF-name → Pro solid-rounded mapping. Only entries here respect
 // the `solid` prop; other names fall through to ICON_MAP regardless.
 const SOLID_ICON_MAP: Record<string, IconConstant> = {
-  'arrow.up.arrow.down': ArrowUpDownSolidIcon,
   'bolt.fill': FlashSolidIcon,
   // The four status glyphs. A toast or an inline banner is where the
   // `.fill` in an SF name has to be literally true: the icon carries the
