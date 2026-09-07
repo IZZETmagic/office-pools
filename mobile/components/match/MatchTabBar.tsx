@@ -15,13 +15,14 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Icon } from '@/components/ui';
+import { ALL_MATCH_TAB_KEYS, type MatchTabKey } from '@/lib/matchTabs';
 import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
 // The match detail strip
 // =============================================================
-// The same object as `PoolTabBar`, at a smaller scale and with a fixed set:
-// pills, horizontal scroll, and an active highlight driven off the pager's
+// The same object as `PoolTabBar`, at a smaller scale: pills, horizontal
+// scroll, and an active highlight driven off the pager's
 // `pageOffset` ON THE UI THREAD so it lands the moment you swipe rather than
 // after a React commit.
 //
@@ -32,27 +33,25 @@ import { fontFamilies, useTheme } from '@/theme';
 // band's gradient off in a straight line where the tabs start.
 // =============================================================
 
-export type MatchTabKey = 'facts' | 'predictions';
-
 type TabDef = {
   key: MatchTabKey;
   label: string;
   icon: string;
 };
 
-// Order drives both the swipe sequence and the strip layout.
-//
-// ⚠ LINE-UPS AND STATISTICS ARE DELIBERATELY ABSENT, not hidden behind a flag.
-// Neither has a row in the database yet — `/fixtures/lineups` and
-// `/fixtures/statistics` are never called — so a tab for either would be
-// permanently empty, and a tab that is always there and never has anything in
-// it teaches people to stop tapping it. They arrive when their data does.
-const ALL_TABS: TabDef[] = [
-  { key: 'facts', label: 'Facts', icon: 'list.bullet' },
-  { key: 'predictions', label: 'Predictions', icon: 'pencil.line' },
-];
+// ⚠ LABELS AND ICONS ONLY. The ORDER and the SET live in `lib/matchTabs.ts`,
+// where they can be unit tested — they drive every index into the pager, and an
+// off-by-one there shows the wrong page rather than throwing.
+const TAB_DEFS: Record<MatchTabKey, Omit<TabDef, 'key'>> = {
+  facts: { label: 'Facts', icon: 'list.bullet' },
+  lineups: { label: 'Line-ups', icon: 'person.3.fill' },
+  stats: { label: 'Stats', icon: 'chart.bar.xaxis' },
+  predictions: { label: 'Predictions', icon: 'pencil.line' },
+};
 
-export const MATCH_TABS: readonly MatchTabKey[] = ALL_TABS.map((t) => t.key);
+const ALL_TABS: TabDef[] = ALL_MATCH_TAB_KEYS.map((key) => ({ key, ...TAB_DEFS[key] }));
+
+export { type MatchTabKey };
 
 /**
  * One pill. Its active styling reads `pageOffset` and HARD-SNAPS to the nearest
@@ -144,10 +143,18 @@ function TabPill({
 
 export function MatchTabBar({
   active,
+  tabs,
   onChange,
   pageOffset,
 }: {
   active: MatchTabKey;
+  /**
+   * The tabs this match actually has, from `matchTabs()`. The strip renders
+   * these and nothing else, so its indices line up with the pager's pages —
+   * laying out `ALL_TABS` here would centre the highlight on the wrong pill the
+   * moment a match lacks one.
+   */
+  tabs: MatchTabKey[];
   onChange: (tab: MatchTabKey) => void;
   /**
    * Fractional page offset of the swipe pager, as a Reanimated shared value, so
@@ -158,7 +165,11 @@ export function MatchTabBar({
 }) {
   const theme = useTheme();
   const { width: screenWidth } = useWindowDimensions();
-  const activeIndex = ALL_TABS.findIndex((t) => t.key === active);
+  const shown = tabs.map((k) => ALL_TABS.find((t) => t.key === k)!).filter(Boolean);
+  const activeIndex = shown.findIndex((t) => t.key === active);
+  // ⚠ A PLAIN NUMBER, read by the centring worklet below. Capturing `shown`
+  // itself would put a fresh array into a UI-thread closure on every render.
+  const shownCount = shown.length;
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const pillLayoutsRef = useRef<{ x: number; width: number }[]>([]);
@@ -173,15 +184,16 @@ export function MatchTabBar({
 
   // Keep the active pill centred as the pager swipes, entirely on the UI
   // thread. The 0.005 threshold filters sub-pixel noise so `scrollTo` is not
-  // spammed at rest. With two tabs this rarely has anywhere to scroll; it is
-  // here so the strip still behaves when Line-ups and Statistics join it.
+  // spammed at rest. It was written before Line-ups and Statistics existed, for
+  // the day they would — with four pills on a narrow phone the strip now does
+  // genuinely scroll, which is what it was waiting for.
   useAnimatedReaction(
     () => pageOffset?.value ?? 0,
     (current, previous) => {
       'worklet';
       if (previous !== null && Math.abs(current - previous) < 0.005) return;
       const layouts = pillLayouts.value;
-      const n = ALL_TABS.length;
+      const n = shownCount;
       const clamped = Math.max(0, Math.min(current, n - 1));
       const lower = Math.floor(clamped);
       const upper = Math.min(lower + 1, n - 1);
@@ -194,7 +206,7 @@ export function MatchTabBar({
       const targetCenter = centerA * (1 - alpha) + centerB * alpha;
       scrollTo(scrollRef, Math.max(0, targetCenter - screenWidth / 2), 0, false);
     },
-    [screenWidth],
+    [screenWidth, shownCount],
   );
 
   return (
@@ -215,7 +227,7 @@ export function MatchTabBar({
         backgroundColor: 'transparent',
       }}
     >
-      {ALL_TABS.map((tab, i) => (
+      {shown.map((tab, i) => (
         <TabPill
           key={tab.key}
           tab={tab}

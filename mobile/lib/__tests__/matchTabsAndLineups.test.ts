@@ -1,0 +1,218 @@
+// =============================================================
+// The tab set, the pitch layout, and which statistics are drawn
+// =============================================================
+// Three small pure modules behind the two tabs migration 139 unlocked. Each is
+// here because its failure mode is silent:
+//
+//   · `matchTabs` drives every index into the pager, so an off-by-one shows the
+//     WRONG PAGE rather than throwing;
+//   · `groupByRow` decides where eleven players stand, and dropping one renders
+//     a ten-man team that looks plausible;
+//   · `visibleStatRows` decides what a null MEANS, and getting it backwards
+//     prints "xG 0.00" over a game that had 3.4.
+// =============================================================
+
+import { describe, it, expect } from 'vitest';
+
+import { groupByRow, parseGrid, surnameOf } from '../lineupLayout';
+import { STAT_ROWS, visibleStatRows } from '../matchStatRows';
+import { ALL_MATCH_TAB_KEYS, matchTabs } from '../matchTabs';
+import type { LineupPlayer, MatchTeamStats } from '../useMatchDetail';
+
+// ---------------------------------------------------------------- the tab set
+
+describe('matchTabs', () => {
+  it('offers only Facts and Predictions when the match has neither', () => {
+    // A World Cup match, or a league fixture the backfill has not reached.
+    expect(matchTabs({ hasLineups: false, hasStats: false })).toEqual(['facts', 'predictions']);
+  });
+
+  it('inserts each tab in the canonical order, not at the end', () => {
+    // ⚠ Order is the swipe sequence. Appending would put Stats after
+    // Predictions on one match and before it on another.
+    expect(matchTabs({ hasLineups: true, hasStats: false })).toEqual([
+      'facts',
+      'lineups',
+      'predictions',
+    ]);
+    expect(matchTabs({ hasLineups: false, hasStats: true })).toEqual([
+      'facts',
+      'stats',
+      'predictions',
+    ]);
+    expect(matchTabs({ hasLineups: true, hasStats: true })).toEqual([
+      'facts',
+      'lineups',
+      'stats',
+      'predictions',
+    ]);
+  });
+
+  it('always starts with facts, whatever the match has', () => {
+    for (const hasLineups of [true, false]) {
+      for (const hasStats of [true, false]) {
+        expect(matchTabs({ hasLineups, hasStats })[0]).toBe('facts');
+      }
+    }
+  });
+
+  it('never offers a tab outside the canonical set', () => {
+    const tabs = matchTabs({ hasLineups: true, hasStats: true });
+    expect(tabs.every((t) => ALL_MATCH_TAB_KEYS.includes(t))).toBe(true);
+    expect(tabs).toHaveLength(ALL_MATCH_TAB_KEYS.length);
+  });
+});
+
+// ------------------------------------------------------------- the pitch grid
+
+function player(over: Partial<LineupPlayer> = {}): LineupPlayer {
+  return { playerId: 1, name: 'A Player', number: 1, pos: 'M', grid: null, starter: true, ...over };
+}
+
+describe('parseGrid', () => {
+  it('reads "row:col"', () => {
+    expect(parseGrid('1:1')).toEqual({ row: 1, col: 1 });
+    expect(parseGrid('4:3')).toEqual({ row: 4, col: 3 });
+  });
+
+  it('is null for a substitute, who never has one', () => {
+    expect(parseGrid(null)).toBeNull();
+  });
+
+  it('⚠ refuses a half-written grid — Number("") is 0, not NaN', () => {
+    // ':' and '2:' would otherwise parse to a real position and stand a player
+    // in a column nobody picked.
+    expect(parseGrid(':')).toBeNull();
+    expect(parseGrid('2:')).toBeNull();
+    expect(parseGrid(':3')).toBeNull();
+    expect(parseGrid('')).toBeNull();
+  });
+
+  it('refuses nonsense and out-of-range rows', () => {
+    expect(parseGrid('nope')).toBeNull();
+    expect(parseGrid('0:1')).toBeNull();
+    expect(parseGrid('44:1')).toBeNull();
+    expect(parseGrid('2:0')).toBeNull();
+  });
+});
+
+describe('groupByRow', () => {
+  it('orders rows from the keeper out, and columns within a row', () => {
+    // A real 4-2-3-1's grids, deliberately shuffled — the feed does not
+    // guarantee order.
+    const players = [
+      player({ playerId: 6, grid: '3:2' }),
+      player({ playerId: 1, grid: '1:1' }),
+      player({ playerId: 4, grid: '2:2' }),
+      player({ playerId: 2, grid: '2:4' }),
+      player({ playerId: 5, grid: '2:1' }),
+      player({ playerId: 3, grid: '2:3' }),
+      player({ playerId: 7, grid: '3:1' }),
+    ];
+    const rows = groupByRow(players);
+    expect(rows.map((r) => r.map((p) => p.grid))).toEqual([
+      ['1:1'],
+      ['2:1', '2:2', '2:3', '2:4'],
+      ['3:1', '3:2'],
+    ]);
+  });
+
+  it('⚠ keeps a starter with no grid, in a trailing row — never a ten-man team', () => {
+    const rows = groupByRow([
+      player({ playerId: 1, grid: '1:1' }),
+      player({ playerId: 9, grid: null }),
+    ]);
+    expect(rows).toHaveLength(2);
+    expect(rows[1].map((p) => p.playerId)).toEqual([9]);
+    // Every player handed in comes back out.
+    expect(rows.flat()).toHaveLength(2);
+  });
+
+  it('loses nobody from a full eleven', () => {
+    const grids = ['1:1', '2:4', '2:3', '2:2', '2:1', '3:2', '3:1', '4:3', '4:2', '4:1', '5:1'];
+    const rows = groupByRow(grids.map((g, i) => player({ playerId: i, grid: g })));
+    expect(rows.flat()).toHaveLength(11);
+    expect(rows.map((r) => r.length)).toEqual([1, 4, 2, 3, 1]);
+  });
+
+  it('is empty for an empty line-up', () => {
+    expect(groupByRow([])).toEqual([]);
+  });
+});
+
+describe('surnameOf', () => {
+  it('drops the initial the feed already abbreviated', () => {
+    expect(surnameOf('B. Leno')).toBe('Leno');
+    expect(surnameOf('E. Nketiah')).toBe('Nketiah');
+  });
+
+  it('leaves a single name alone', () => {
+    expect(surnameOf('Rodri')).toBe('Rodri');
+  });
+
+  it('handles nothing at all', () => {
+    expect(surnameOf(null)).toBe('');
+    expect(surnameOf('   ')).toBe('');
+  });
+});
+
+// ------------------------------------------------------- which stats are drawn
+
+function stats(over: Partial<MatchTeamStats> = {}): MatchTeamStats {
+  return {
+    side: 'home',
+    possessionPct: null, shotsTotal: null, shotsOn: null, shotsOff: null,
+    shotsBlocked: null, shotsInsideBox: null, shotsOutsideBox: null,
+    fouls: null, freeKicks: null, corners: null, offsides: null,
+    yellowCards: null, redCards: null, saves: null,
+    passesTotal: null, passesAccurate: null, passesPct: null,
+    expectedGoals: null, goalsPrevented: null,
+    ...over,
+  };
+}
+
+describe('visibleStatRows', () => {
+  it('⚠ hides a row neither side has — an absent xG must not print 0.00', () => {
+    const rows = visibleStatRows(stats({ possessionPct: 65 }), stats({ side: 'away', possessionPct: 35 }));
+    expect(rows.map((r) => r.key)).toEqual(['possession']);
+    expect(rows.find((r) => r.key === 'expected_goals')).toBeUndefined();
+  });
+
+  it('⚠ KEEPS a row only one side has — "14 shots to none" is a real answer', () => {
+    // Hiding it would silently flatter the side with none.
+    const rows = visibleStatRows(stats({ shotsTotal: 14 }), stats({ side: 'away' }));
+    expect(rows.map((r) => r.key)).toContain('shots_total');
+  });
+
+  it('keeps a genuine zero — 0 is a value, null is an absence', () => {
+    const rows = visibleStatRows(stats({ redCards: 0 }), stats({ side: 'away', redCards: 0 }));
+    expect(rows.map((r) => r.key)).toEqual(['red_cards']);
+  });
+
+  it('is empty when there are no statistics at all', () => {
+    expect(visibleStatRows(stats(), stats({ side: 'away' }))).toEqual([]);
+    expect(visibleStatRows(null, null)).toEqual([]);
+  });
+
+  it('preserves the canonical running order — possession first, xG last', () => {
+    const all = stats({
+      possessionPct: 50, shotsTotal: 1, expectedGoals: 1.2, redCards: 1, passesPct: 80,
+    });
+    const rows = visibleStatRows(all, { ...all, side: 'away' });
+    expect(rows[0].key).toBe('possession');
+    expect(rows[rows.length - 1].key).toBe('expected_goals');
+    // And the order matches the declared one, filtered.
+    const declared = STAT_ROWS.map((r) => r.key).filter((k) => rows.some((r) => r.key === k));
+    expect(rows.map((r) => r.key)).toEqual(declared);
+  });
+
+  it('marks only the two decimals as decimals — the null policy rides on it', () => {
+    const decimals = STAT_ROWS.filter((r) => r.decimals).map((r) => r.key);
+    expect(decimals).toEqual(['expected_goals', 'goals_prevented']);
+  });
+
+  it('marks both percentages as percentages', () => {
+    const pct = STAT_ROWS.filter((r) => r.percent).map((r) => r.key);
+    expect(pct).toEqual(['possession', 'passes_pct']);
+  });
+});

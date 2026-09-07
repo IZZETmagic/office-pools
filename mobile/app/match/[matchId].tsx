@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   type NativeScrollEvent,
@@ -34,10 +34,13 @@ import {
 } from '@/components/match/matchDisplay';
 import { FormCard } from '@/components/match/FormCard';
 import { LeagueTableSliceCard } from '@/components/match/LeagueTableSliceCard';
-import { MATCH_TABS, MatchTabBar, type MatchTabKey } from '@/components/match/MatchTabBar';
+import { LineupsTab } from '@/components/match/LineupsTab';
+import { MatchTabBar } from '@/components/match/MatchTabBar';
+import { StatsTab } from '@/components/match/StatsTab';
 import { Icon, Text } from '@/components/ui';
 import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import { getCompetitionBand } from '@/lib/design/competitionBand';
+import { matchTabs, type MatchTabKey } from '@/lib/matchTabs';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
   type BracketPickInfo,
@@ -51,7 +54,7 @@ import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
-// One match, in four answers
+// One match, in up to four answers
 // =============================================================
 // The screen used to be a single column under a fixed near-black header: every
 // card competed for the same space, the score scrolled away, and a Premier
@@ -64,9 +67,16 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // `MatchDetailHeader`. Do not reorder them: rendering the band before the pager
 // puts the scrolling content on top of it.
 //
-// ⚠ WHAT EACH TAB HOLDS DEPENDS ON THE COMPETITION, and one of them is honest
-// about being empty. A World Cup match has picks, crowd stats and a group
-// table; a league fixture today has none of the three, because league picks are
+// ⚠ THE TAB SET ITSELF DEPENDS ON THE MATCH. Facts and Predictions are always
+// there; Line-ups and Statistics appear only where migration 139 has rows —
+// never for a World Cup match, and not for a league fixture the backfill has
+// not reached. `matchTabs()` decides, and every index into the pager reads that
+// computed list rather than a module constant.
+//
+// ⚠ AND WHAT EACH TAB HOLDS STILL DEPENDS ON THE COMPETITION, with one of them
+// honest about being empty. A World Cup match has picks, crowd stats and a
+// group table; a league fixture has a table slice, form and — once played — a
+// timeline, line-ups and statistics, but NO picks, because league picks are
 // pool-scoped and the phone does not read them yet. That is stated on the
 // Predictions tab rather than papered over — see `YourPredictionsSection`.
 // =============================================================
@@ -83,6 +93,8 @@ export default function MatchDetailScreen() {
     groupStandings,
     timeline,
     facts,
+    lineups,
+    teamStats,
     leagueContext,
     loading,
     error,
@@ -94,7 +106,27 @@ export default function MatchDetailScreen() {
   const { refreshing, onRefresh } = useManualRefresh(refresh);
 
   const [tab, setTab] = useState<MatchTabKey>('facts');
-  const tabIndex = Math.max(0, MATCH_TABS.indexOf(tab));
+  /**
+   * ⚠ THE TAB SET IS PER MATCH, NOT PER APP. Line-ups and Statistics exist only
+   * where migration 139 has rows — never for a World Cup match, and not for a
+   * league fixture the backfill has not reached. Memoised because it is a
+   * dependency of the effect that drives the pager.
+   */
+  const tabs = useMemo(
+    () => matchTabs({ hasLineups: lineups.length > 0, hasStats: teamStats.length > 0 }),
+    [lineups.length, teamStats.length],
+  );
+  const tabIndex = Math.max(0, tabs.indexOf(tab));
+
+  /**
+   * ⚠ FALL BACK WHEN THE SET SHRINKS UNDER THE ACTIVE TAB. The tabs appear when
+   * the line-up read resolves and can disappear again on a refresh that returns
+   * none — leaving `tab` naming a page the pager no longer has, and
+   * `tabs.indexOf` returning -1. Facts always exists, so it is the floor.
+   */
+  useEffect(() => {
+    if (!tabs.includes(tab)) setTab('facts');
+  }, [tabs, tab]);
 
   /**
    * Fractional page offset of the pager, on the UI thread.
@@ -147,7 +179,7 @@ export default function MatchDetailScreen() {
   function handleMomentumScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
     if (width <= 0) return;
     const i = Math.round(e.nativeEvent.contentOffset.x / width);
-    const next = MATCH_TABS[i];
+    const next = tabs[i];
     if (next && next !== tab) {
       skipPagerScrollRef.current = true;
       setTab(next);
@@ -191,6 +223,22 @@ export default function MatchDetailScreen() {
               <GroupStandingsCard groupLetter={m.groupLetter} standings={groupStandings} />
             ) : null}
           </View>
+        );
+      case 'lineups':
+        return (
+          <LineupsTab
+            lineups={lineups}
+            homeName={homeDisplayName(m)}
+            awayName={awayDisplayName(m)}
+          />
+        );
+      case 'stats':
+        return (
+          <StatsTab
+            stats={teamStats}
+            homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
+            awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
+          />
         );
       case 'predictions':
         return (
@@ -240,7 +288,7 @@ export default function MatchDetailScreen() {
         onMomentumScrollEnd={handleMomentumScrollEnd}
         style={{ flex: 1 }}
       >
-        {MATCH_TABS.map((key, i) => (
+        {tabs.map((key, i) => (
           <TabPage
             key={key}
             index={i}
@@ -271,7 +319,7 @@ export default function MatchDetailScreen() {
         scrolling content on top of it.
       */}
       <MatchDetailHeader match={match} scrollY={scrollY} onExpandedHeight={setBandHeight}>
-        <MatchTabBar active={tab} onChange={setTab} pageOffset={pageOffset} />
+        <MatchTabBar active={tab} tabs={tabs} onChange={setTab} pageOffset={pageOffset} />
       </MatchDetailHeader>
     </View>
   );

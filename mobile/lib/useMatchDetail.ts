@@ -80,6 +80,53 @@ export type TimelineEvent = {
   extraMinute: number | null;
 };
 
+/** One player in a line-up, as `match_lineups.players` stores them. */
+export type LineupPlayer = {
+  playerId: number | null;
+  name: string | null;
+  number: number | null;
+  pos: string | null;
+  /** "row:col", row 1 being the keeper. ⚠ NULL for every substitute. */
+  grid: string | null;
+  starter: boolean;
+};
+
+/** One side's line-up. */
+export type MatchLineup = {
+  side: 'home' | 'away';
+  formation: string | null;
+  coachName: string | null;
+  players: LineupPlayer[];
+};
+
+/**
+ * One side's team statistics. Every figure is nullable and the nulls mean two
+ * different things — see migration 139: a null COUNT is "none", a null
+ * `expectedGoals` is "this competition does not publish it".
+ */
+export type MatchTeamStats = {
+  side: 'home' | 'away';
+  possessionPct: number | null;
+  shotsTotal: number | null;
+  shotsOn: number | null;
+  shotsOff: number | null;
+  shotsBlocked: number | null;
+  shotsInsideBox: number | null;
+  shotsOutsideBox: number | null;
+  fouls: number | null;
+  freeKicks: number | null;
+  corners: number | null;
+  offsides: number | null;
+  yellowCards: number | null;
+  redCards: number | null;
+  saves: number | null;
+  passesTotal: number | null;
+  passesAccurate: number | null;
+  passesPct: number | null;
+  expectedGoals: number | null;
+  goalsPrevented: number | null;
+};
+
 /** The bits of the record that are not the scoreline. */
 export type MatchFacts = {
   referee: string | null;
@@ -224,6 +271,8 @@ export function useMatchDetail(matchId: string | undefined) {
   const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [facts, setFacts] = useState<MatchFacts | null>(null);
+  const [lineups, setLineups] = useState<MatchLineup[]>([]);
+  const [teamStats, setTeamStats] = useState<MatchTeamStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -262,7 +311,16 @@ export function useMatchDetail(matchId: string | undefined) {
       setMatchStats(null);
       setBracketStats(null);
       setGroupStandings([]);
-      await loadLeagueFacts(matchId, setTimeline, setFacts);
+      // ⚠ TWO CALLS, NOT ONE EMBED, AND THE REASON IS THE ORDER OF DEPLOYS.
+      // Folding `match_lineups` and `match_team_stats` into the facts select
+      // would be one round trip — and on any client running before migration
+      // 139 is applied, PostgREST would reject the WHOLE select for naming an
+      // unknown relation, taking the timeline and the referee down with it.
+      // Separate reads mean a missing 139 costs exactly the two tabs it should.
+      await Promise.all([
+        loadLeagueFacts(matchId, setTimeline, setFacts),
+        loadLeagueTabs(matchId, setLineups, setTeamStats),
+      ]);
       setLoading(false);
       return;
     }
@@ -283,6 +341,10 @@ export function useMatchDetail(matchId: string | undefined) {
       // writes it. Cleared rather than left holding the previous match's rows.
       setTimeline([]);
       setFacts(null);
+      // ⚠ The World Cup arm of 139 is empty too — as 136, league first. Cleared
+      // rather than left holding the previously opened match's line-up.
+      setLineups([]);
+      setTeamStats([]);
 
       // 2. Resolve user's entries across pools, split by prediction mode.
       // Query through pool_members (the source of truth for "this user belongs
@@ -616,6 +678,8 @@ export function useMatchDetail(matchId: string | undefined) {
     groupStandings,
     timeline,
     facts,
+    lineups,
+    teamStats,
     leagueContext,
     loading,
     error,
@@ -839,5 +903,114 @@ async function loadGroupStandings(
     set(standings);
   } catch (err) {
     console.warn('[useMatchDetail] group standings failed', err);
+  }
+}
+
+/**
+ * The Line-ups and Statistics tabs' data — migration 139.
+ *
+ * ⚠ A SEPARATE READ FROM `loadLeagueFacts`, ON PURPOSE. Both could ride one
+ * embedded select on `league_fixtures` and save a round trip. They must not:
+ * PostgREST rejects an ENTIRE select that names a relation the database does
+ * not have, so on any build running before 139 is applied a combined query
+ * would blank the timeline and the referee too — the tabs taking the Facts tab
+ * down with them. Isolated, a missing 139 costs exactly the two tabs it should.
+ *
+ * ⚠ A MISSING TABLE IS THE EXPECTED CASE UNTIL MIGRATION 139 IS APPLIED, the
+ * same as `loadLeagueFacts` was for 136. Warn and render nothing; every other
+ * card on the screen is unaffected, and `MatchTabBar` simply does not offer a
+ * tab it has no rows for.
+ */
+async function loadLeagueTabs(
+  fixtureId: string,
+  setLineups: (l: MatchLineup[]) => void,
+  setTeamStats: (s: MatchTeamStats[]) => void,
+) {
+  try {
+    const [lineupRes, statsRes] = await Promise.all([
+      supabase
+        .from('match_lineups')
+        .select('side, formation, coach_name, players')
+        .eq('fixture_id', fixtureId),
+      supabase
+        .from('match_team_stats')
+        .select(
+          'side, possession_pct, shots_total, shots_on, shots_off, shots_blocked,' +
+            ' shots_inside_box, shots_outside_box, fouls, free_kicks, corners, offsides,' +
+            ' yellow_cards, red_cards, saves, passes_total, passes_accurate, passes_pct,' +
+            ' expected_goals, goals_prevented',
+        )
+        .eq('fixture_id', fixtureId),
+    ]);
+    // ⚠ BOTH ERRORS ARE READ. `const { data } = await …` would hide a 400 and
+    // render an empty tab forever — the discarded-PostgREST-error pattern this
+    // codebase has been bitten by more than once.
+    if (lineupRes.error) throw lineupRes.error;
+    if (statsRes.error) throw statsRes.error;
+
+    type LineupRow = {
+      side: string;
+      formation: string | null;
+      coach_name: string | null;
+      players: unknown;
+    };
+    setLineups(
+      ((lineupRes.data ?? []) as unknown as LineupRow[]).map((r) => ({
+        side: r.side as 'home' | 'away',
+        formation: r.formation,
+        coachName: r.coach_name,
+        // `players` is jsonb — an array by CHECK constraint, but the client
+        // types it as unknown and a defensive guard costs one line.
+        players: (Array.isArray(r.players) ? r.players : []).map((p) => {
+          const o = (p ?? {}) as Record<string, unknown>;
+          return {
+            playerId: (o.player_id as number | null) ?? null,
+            name: (o.name as string | null) ?? null,
+            number: (o.number as number | null) ?? null,
+            pos: (o.pos as string | null) ?? null,
+            grid: (o.grid as string | null) ?? null,
+            starter: o.starter === true,
+          };
+        }),
+      })),
+    );
+
+    const num = (v: unknown): number | null => {
+      // ⚠ `numeric` COMES BACK AS A STRING from PostgREST — `expected_goals`
+      // would otherwise render "1.81" where a number is expected and compare
+      // wrongly against the other side. Null stays null; see 139 on why that
+      // is not zero.
+      if (v === null || v === undefined) return null;
+      const n = typeof v === 'number' ? v : Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    setTeamStats(
+      ((statsRes.data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+        side: r.side as 'home' | 'away',
+        possessionPct: num(r.possession_pct),
+        shotsTotal: num(r.shots_total),
+        shotsOn: num(r.shots_on),
+        shotsOff: num(r.shots_off),
+        shotsBlocked: num(r.shots_blocked),
+        shotsInsideBox: num(r.shots_inside_box),
+        shotsOutsideBox: num(r.shots_outside_box),
+        fouls: num(r.fouls),
+        freeKicks: num(r.free_kicks),
+        corners: num(r.corners),
+        offsides: num(r.offsides),
+        yellowCards: num(r.yellow_cards),
+        redCards: num(r.red_cards),
+        saves: num(r.saves),
+        passesTotal: num(r.passes_total),
+        passesAccurate: num(r.passes_accurate),
+        passesPct: num(r.passes_pct),
+        expectedGoals: num(r.expected_goals),
+        goalsPrevented: num(r.goals_prevented),
+      })),
+    );
+  } catch (e) {
+    console.warn('[useMatchDetail] league line-ups/statistics unavailable', e);
+    setLineups([]);
+    setTeamStats([]);
   }
 }
