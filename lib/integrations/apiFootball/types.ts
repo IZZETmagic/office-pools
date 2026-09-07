@@ -119,3 +119,55 @@ export type ApiFootballStandingsResponse = {
     standings: ApiFootballStandingRow[][]
   }
 }
+
+// =============================================================
+// /fixtures/lineups and /fixtures/statistics — migration 139
+// =============================================================
+// Only the fields we consume, as everywhere else in this file. Both payloads
+// return exactly two entries, home first, but nothing here relies on that
+// order: the mappers resolve the side from `team.id` against the fixture's own
+// home club, the same way `eventsToTimeline` does.
+// =============================================================
+
+/** One player in a line-up. `grid` is "row:col", and is NULL for substitutes. */
+export type ApiFootballLineupPlayer = {
+  player: {
+    id: number | null
+    name: string | null
+    number: number | null
+    /** 'G' | 'D' | 'M' | 'F' in practice, but the feed is not typed this tightly. */
+    pos: string | null
+    /**
+     * "row:col" — row 1 is the goalkeeper, counting out from that team's own
+     * goal. Null for every substitute, verified on the live feed.
+     */
+    grid: string | null
+  }
+}
+
+export type ApiFootballLineup = {
+  team: { id: number; name: string }
+  coach: { id: number | null; name: string | null } | null
+  /** '4-2-3-1'. A caption; the pitch is drawn from each player's `grid`. */
+  formation: string | null
+  startXI: ApiFootballLineupPlayer[] | null
+  substitutes: ApiFootballLineupPlayer[] | null
+}
+
+/**
+ * One statistic.
+ *
+ * ⚠ `value` IS THREE DIFFERENT THINGS. A count arrives as a number, a
+ * percentage as '65%', and xG as '1.81' — and any of them can be null. Sampled
+ * live 2026-09-06: `Red Cards` came back null on one fixture and 0 on another
+ * for the same real-world state.
+ */
+export type ApiFootballStatistic = {
+  type: string
+  value: number | string | null
+}
+
+export type ApiFootballTeamStatistics = {
+  team: { id: number; name: string }
+  statistics: ApiFootballStatistic[] | null
+}

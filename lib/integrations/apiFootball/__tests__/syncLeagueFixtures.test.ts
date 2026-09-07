@@ -28,6 +28,11 @@ const getStandings = vi.fn(async () => [])
 // every result that contains a completion. [] is the honest quiet path — a
 // fixture whose events the provider has not published yet.
 const getFixtureEvents = vi.fn(async () => [])
+// And the same again for 7b4/7b5 (migration 139). Both default to the quiet
+// path: no statistics published, no line-up published. An unstubbed one would
+// make a real HTTP call with no API key on every test that completes a fixture.
+const getFixtureStatistics = vi.fn(async () => [])
+const getFixtureLineups = vi.fn(async () => [])
 
 vi.mock('@/lib/integrations/apiFootball/client', async (orig) => {
   const actual = await orig<typeof import('@/lib/integrations/apiFootball/client')>()
@@ -36,6 +41,8 @@ vi.mock('@/lib/integrations/apiFootball/client', async (orig) => {
     getFixturesAllPages: (...a: unknown[]) => getFixturesAllPages(...a),
     getStandings: (...a: unknown[]) => getStandings(...(a as [])),
     getFixtureEvents: (...a: unknown[]) => getFixtureEvents(...(a as [])),
+    getFixtureStatistics: (...a: unknown[]) => getFixtureStatistics(...(a as [])),
+    getFixtureLineups: (...a: unknown[]) => getFixtureLineups(...(a as [])),
   }
 })
 
@@ -67,6 +74,8 @@ type Res = { data: unknown[] | null; error: { message: string } | null }
 function fakeDb(opts: {
   league_fixtures?: Res[]
   league_matchweeks?: Res[]
+  /** What 7b5's "which of these do we already hold a line-up for" read returns. */
+  match_lineups?: Res[]
   rpc?: { data: unknown; error: { message: string } | null }
   /** Value returned for a sync_settings lookup, and whether the read errors. */
   sync_settings?: { value: string | null; error?: { message: string } | null }
@@ -74,6 +83,7 @@ function fakeDb(opts: {
   const queues: Record<string, Res[]> = {
     league_fixtures: [...(opts.league_fixtures ?? [])],
     league_matchweeks: [...(opts.league_matchweeks ?? [])],
+    match_lineups: [...(opts.match_lineups ?? [])],
   }
   const calls: Array<{ table: string; filters: string[] }> = []
   const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = []
@@ -88,7 +98,11 @@ function fakeDb(opts: {
       const filters: string[] = []
       calls.push({ table, filters })
       const api: Record<string, unknown> = {}
-      for (const m of ['select', 'order', 'range', 'not', 'eq', 'gte', 'lte', 'lt', 'gt', 'or', 'limit']) {
+      // ⚠ `in` was added for 7b5, which asks `match_lineups` which of the
+      // window's fixtures it already holds. Without it every test that reaches
+      // the line-up arm dies on `.in is not a function`, which is a harness
+      // gap and not a defect in the arm.
+      for (const m of ['select', 'order', 'range', 'not', 'eq', 'gte', 'lte', 'lt', 'gt', 'or', 'limit', 'in']) {
         api[m] = (...args: unknown[]) => {
           filters.push(`${m}(${args.map((a) => String(a)).join(',')})`)
           return api
@@ -813,5 +827,257 @@ describe('syncLeagueFixtures — writes the timeline', () => {
     // is a missing card, not a wrong scoreboard.
     expect(r.written).toBe(1)
     expect(r.scored).toBe(1)
+  })
+})
+
+// =============================================================
+// 7b4 / 7b5 — statistics and line-ups (migration 139)
+// =============================================================
+// Two arms, two DIFFERENT gates, and the gates are the whole design. Statistics
+// ride 7b3's `changed` gate. Line-ups cannot — a line-up is published before a
+// ball is kicked, when nothing has changed — so they are gated on the window
+// and on not already holding one.
+//
+// The tests below are about the GATE far more than the write. A gate that fires
+// too often is a quota bill nobody notices until the month ends; a gate that
+// never fires is a permanently empty tab.
+// =============================================================
+
+describe('syncLeagueFixtures — statistics and line-ups', () => {
+  const changed = (over: Partial<{ is_completed: boolean }> = {}) => ({
+    seen: 1,
+    changed: [
+      {
+        // ⚠ `f-1`, matching `dbRow()`. 7b4 keys off `changed` and 7b5 off the
+        // window row; in production they are the same fixture, and a harness
+        // that gives them different ids lets a test pass for the wrong reason.
+        fixture_id: 'f-1',
+        external_fixture_id: '1557368',
+        status: 'live',
+        home_goals: 2,
+        away_goals: 1,
+        is_completed: over.is_completed ?? false,
+      },
+    ],
+  })
+
+  /**
+   * As the timeline block's `db`, plus a queue for `match_lineups` — 7b5 reads
+   * it to learn which window fixtures it already holds.
+   */
+  function db(
+    rpcImpl: (fn: string) => unknown,
+    opts: { held?: { fixture_id: string }[] } = {},
+  ) {
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture(1557368)], calls: 1 })
+    const base = fakeDb({
+      league_fixtures: [
+        { data: [dbRow()], error: null },
+        { data: [], error: null },
+        { data: [{ external_fixture_id: '1557368' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+      match_lineups: [{ data: opts.held ?? [], error: null }],
+    })
+    const client = {
+      from: (base.client as unknown as { from: (t: string) => unknown }).from,
+      rpc: (fn: string) => ({ then: (res: (v: unknown) => unknown) => res(rpcImpl(fn)) }),
+    }
+    // ⚠ `client` LAST — see the timeline block for what happens otherwise.
+    return { ...base, client: client as never }
+  }
+
+  const STATS_PAYLOAD = [
+    {
+      team: { id: 1, name: 'Home' },
+      statistics: [
+        { type: 'Ball Possession', value: '65%' },
+        { type: 'Total Shots', value: 12 },
+        { type: 'Red Cards', value: null },
+      ],
+    },
+    {
+      team: { id: 2, name: 'Away' },
+      statistics: [
+        { type: 'Ball Possession', value: '35%' },
+        { type: 'Total Shots', value: 4 },
+      ],
+    },
+  ]
+
+  const LINEUP_PAYLOAD = [
+    {
+      team: { id: 1, name: 'Home' },
+      coach: { id: 1, name: 'A Manager' },
+      formation: '4-3-3',
+      startXI: [{ player: { id: 9, name: 'A Player', number: 9, pos: 'F', grid: '4:1' } }],
+      substitutes: [{ player: { id: 12, name: 'A Sub', number: 12, pos: 'M', grid: null } }],
+    },
+    {
+      team: { id: 2, name: 'Away' },
+      coach: { id: 2, name: 'B Manager' },
+      formation: '4-4-2',
+      startXI: [{ player: { id: 10, name: 'B Player', number: 10, pos: 'M', grid: '3:2' } }],
+      substitutes: [],
+    },
+  ]
+
+  beforeEach(() => {
+    getFixtureStatistics.mockClear()
+    getFixtureLineups.mockClear()
+    getFixtureStatistics.mockResolvedValue([] as never)
+    getFixtureLineups.mockResolvedValue([] as never)
+  })
+
+  // ------------------------------------------------------------- statistics
+
+  it('⚠ makes NO statistics call when nothing changed — the cost gate', async () => {
+    const { client } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixtureStatistics).not.toHaveBeenCalled()
+    expect(r.statsCalls).toBe(0)
+    expect(formatLeagueNoteParts(r).join(' ')).not.toContain('stats=')
+  })
+
+  it('fetches statistics once per changed fixture and writes both sides', async () => {
+    getFixtureStatistics.mockResolvedValueOnce(STATS_PAYLOAD as never)
+    const { client, inserts } = db(() => ({ data: changed(), error: null }))
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+
+    expect(getFixtureStatistics).toHaveBeenCalledTimes(1)
+    const written = inserts.find((i) => i.table === 'match_team_stats')
+    expect(written).toBeTruthy()
+    const rows = written!.rows as Record<string, unknown>[]
+    expect(rows).toHaveLength(2)
+    expect(rows.find((x) => x.side === 'home')).toMatchObject({
+      fixture_id: 'f-1',
+      possession_pct: 65,
+      shots_total: 12,
+      // Null, not zero — the feed sends both for "no red cards".
+      red_cards: null,
+    })
+    expect(rows.find((x) => x.side === 'away')).toMatchObject({ possession_pct: 35 })
+    expect(r.statsRows).toBe(2)
+    expect(formatLeagueNoteParts(r).join(' ')).toContain('stats=2/1')
+  })
+
+  it('deletes the fixture rows before inserting — replace-all, not upsert', async () => {
+    getFixtureStatistics.mockResolvedValueOnce(STATS_PAYLOAD as never)
+    const { client, deletes } = db(() => ({ data: changed(), error: null }))
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    const del = deletes.find((d) => d.table === 'match_team_stats')
+    expect(del).toBeTruthy()
+    expect(del!.filters.join(' ')).toContain('eq(fixture_id,f-1)')
+  })
+
+  it('a statistics failure is reported but never loses the sync or the timeline', async () => {
+    getFixtureStatistics.mockRejectedValueOnce(new Error('api-football 503') as never)
+    const { client } = db((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: changed({ is_completed: true }), error: null }
+        : { data: { ok: true, scored: 1, entries: 1 }, error: null },
+    )
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.errors.map((e) => e.stage)).toContain('league_stats')
+    // The fixture itself still synced and still scored.
+    expect(r.written).toBe(1)
+    expect(r.scored).toBe(1)
+  })
+
+  // ---------------------------------------------------------------- line-ups
+
+  it('⚠ asks for a line-up even though NOTHING changed — the gate that differs', async () => {
+    // The failure this pins: a line-up is published before kickoff, when the
+    // fixture is still `scheduled` with null goals and `changed` is empty. Gate
+    // it on `changed` and the tab is blank for the ninety minutes before a game
+    // — precisely when it is opened.
+    const { client } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixtureLineups).toHaveBeenCalledTimes(1)
+    expect(r.lineupCalls).toBe(1)
+  })
+
+  it('writes both line-ups, starters before the bench, with the sub ungridded', async () => {
+    getFixtureLineups.mockResolvedValueOnce(LINEUP_PAYLOAD as never)
+    const { client, inserts } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+
+    const written = inserts.find((i) => i.table === 'match_lineups')
+    expect(written).toBeTruthy()
+    const rows = written!.rows as Record<string, unknown>[]
+    expect(rows).toHaveLength(2)
+    const home = rows.find((x) => x.side === 'home')!
+    expect(home).toMatchObject({ fixture_id: 'f-1', formation: '4-3-3', coach_name: 'A Manager' })
+    expect(home.players).toEqual([
+      { player_id: 9, name: 'A Player', number: 9, pos: 'F', grid: '4:1', starter: true },
+      { player_id: 12, name: 'A Sub', number: 12, pos: 'M', grid: null, starter: false },
+    ])
+    expect(r.lineupRows).toBe(2)
+    expect(formatLeagueNoteParts(r).join(' ')).toContain('lineups=2/1')
+  })
+
+  it('⚠ an empty payload writes NOTHING, so the next tick asks again', async () => {
+    // Writing an empty line-up would satisfy the "do we hold one" check and end
+    // the retries — leaving the tab permanently blank for that fixture.
+    const { client, inserts, deletes } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixtureLineups).toHaveBeenCalledTimes(1)
+    expect(inserts.find((i) => i.table === 'match_lineups')).toBeUndefined()
+    expect(deletes.find((d) => d.table === 'match_lineups')).toBeUndefined()
+    expect(r.lineupRows).toBe(0)
+    // Visible as a call that wrote nothing, rather than vanishing.
+    expect(formatLeagueNoteParts(r).join(' ')).toContain('lineups=0/1')
+  })
+
+  it('⚠ does NOT re-ask for a line-up it already holds', async () => {
+    // The published XI does not change every minute, and the window is open for
+    // thirty of them.
+    const { client } = db(() => ({ data: { seen: 1, changed: [] }, error: null }), {
+      held: [{ fixture_id: 'f-1' }],
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixtureLineups).not.toHaveBeenCalled()
+    expect(r.lineupCalls).toBe(0)
+  })
+
+  it('⚠ DOES re-ask once when the fixture completes, to catch a revision', async () => {
+    getFixtureLineups.mockResolvedValueOnce(LINEUP_PAYLOAD as never)
+    const { client } = db(() => ({ data: changed({ is_completed: true }), error: null }), {
+      held: [{ fixture_id: 'f-1' }],
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixtureLineups).toHaveBeenCalledTimes(1)
+    expect(r.lineupCalls).toBe(1)
+  })
+
+  it('a line-up failure is reported but never loses the sync', async () => {
+    getFixtureLineups.mockRejectedValueOnce(new Error('api-football 503') as never)
+    const { client } = db(() => ({ data: changed(), error: null }))
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.errors.map((e) => e.stage)).toContain('league_lineups')
+    expect(r.written).toBe(1)
+  })
+
+  it('⚠ a failed "what do we hold" read stops it asking, rather than asking for everything', async () => {
+    // Without the read the arm cannot tell "not published" from "already
+    // stored". Asking for all of them every tick would be the runaway this
+    // whole gate exists to avoid, so the safe direction is to ask for none.
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture(1557368)], calls: 1 })
+    const base = fakeDb({
+      league_fixtures: [
+        { data: [dbRow()], error: null },
+        { data: [], error: null },
+        { data: [{ external_fixture_id: '1557368' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+      match_lineups: [{ data: null, error: { message: 'boom' } }],
+    })
+    const client = {
+      from: (base.client as unknown as { from: (t: string) => unknown }).from,
+      rpc: () => ({ then: (res: (v: unknown) => unknown) => res({ data: { seen: 1, changed: [] }, error: null }) }),
+    }
+    const r = await syncLeagueFixtures({ ...base, client: client as never }.client, TARGET, OPTS)
+    expect(getFixtureLineups).not.toHaveBeenCalled()
+    expect(r.errors.map((e) => e.stage)).toContain('league_lineups')
   })
 })

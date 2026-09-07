@@ -27,17 +27,28 @@
 //     of them on a full matchday, against a 7,500/day plan shared with every
 //     competition this arm is meant to scale to. It still resolves no clubs
 //     (the 20 are fixed at import).
+//   - resolved no team statistics or line-ups until migration 139. It does now,
+//     in 7b4 and 7b5, on TWO DIFFERENT GATES — statistics ride 7b3's `changed`
+//     gate, line-ups cannot, because a line-up is published BEFORE a ball is
+//     kicked and nothing has changed yet. Each section states its own budget.
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { invalidateLeagueSeason } from '@/lib/league/season'
 import { syncLeagueStandings } from './syncLeagueStandings'
-import { getFixtureEvents, getFixturesAllPages } from './client'
+import {
+  getFixtureEvents,
+  getFixtureLineups,
+  getFixtureStatistics,
+  getFixturesAllPages,
+} from './client'
 import {
   fixtureToLeagueUpdate,
   type LeagueFixtureRow,
   type LeagueFixturePayload,
   eventsToTimeline,
+  lineupsToRows,
+  statisticsToRows,
 } from './mappers'
 import { rehomeSeason } from '@/lib/league/rehomeSeason'
 import type { LeagueSyncTarget } from './syncTargets'
@@ -59,6 +70,15 @@ const CATCHUP_LIMIT = 10
 const TERMINAL_STATUSES = ['cancelled', 'postponed']
 
 const FEED_TIMEOUT_MS = 4_000
+
+// ⚠ How many fixtures may be asked for a line-up in ONE tick.
+//
+// Bounded for the same reason `CATCHUP_LIMIT` is: this is the only arm whose
+// gate is the WINDOW rather than a change, so on a Saturday with ten kickoffs
+// inside half an hour it is the one place the sync could fan out. Ten
+// simultaneous fixtures is the realistic worst case for one league; twelve
+// leaves headroom without letting a misconfigured season run away.
+const LINEUP_LIMIT = 12
 
 // How often a feed failure for one season may enter `errors[]`.
 //
@@ -99,6 +119,14 @@ export type LeagueSyncResult = {
   timelineCalls: number
   /** Event rows written across all fixtures this tick. */
   timelineRows: number
+  /** `/fixtures/statistics` calls made this tick — one per changed fixture. */
+  statsCalls: number
+  /** Team-stat rows written across all fixtures this tick (two per fixture). */
+  statsRows: number
+  /** `/fixtures/lineups` calls made this tick. See 7b5 for why this gate differs. */
+  lineupCalls: number
+  /** Line-up rows written across all fixtures this tick (two per fixture). */
+  lineupRows: number
   /** Entries whose league totals moved as a result. */
   scoredEntries: number
   /** Standings rows re-ingested this tick, if a fixture finished. */
@@ -165,6 +193,10 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     written: 0,
     scored: 0,
     timelineCalls: 0,
+    statsCalls: 0,
+    statsRows: 0,
+    lineupCalls: 0,
+    lineupRows: 0,
     timelineRows: 0,
     scoredEntries: 0,
     standings: 0,
@@ -628,6 +660,167 @@ export async function syncLeagueFixtures(
     }
   }
 
+  // ---------------------------------------------------- 7b4. team statistics
+  // Possession, shots, corners, cards — the Statistics tab.
+  //
+  // ⚠ THE SAME GATE AS 7b3, AND THE SAME ARGUMENT. `/fixtures/statistics` is a
+  // call PER FIXTURE, so it rides `res.changed` rather than the window: one
+  // call per goal, card or status change, plus the one when `is_completed`
+  // flips. Fetching per tick instead would roughly double 7b3's rejected
+  // 1,500-2,500 calls on a full matchday.
+  //
+  // ⚠ SO IT IS APPROXIMATE WHILE THE GAME IS ON, AND EXACT WHEN IT ENDS, and
+  // that is a deliberate trade rather than an oversight. Possession drifts
+  // continuously and produces no `changed` row, so a live figure here can be a
+  // few minutes stale. The completion tick reconciles every number to the
+  // provider's final set, which is the one people come back to read.
+  //
+  // A SEPARATE LOOP FROM 7b3, on purpose: a statistics failure must not cost
+  // the fixture its timeline, and the two carry different error stages so the
+  // status panel can tell them apart.
+  for (const c of res.changed ?? []) {
+    const fx = byExt.get(c.external_fixture_id)
+    if (!fx) continue
+
+    try {
+      const stats = await getFixtureStatistics(fx.fixture.id)
+      result.statsCalls++
+
+      const rows = statisticsToRows(stats, {
+        fixtureId: c.fixture_id,
+        homeExternalTeamId: fx.teams.home.id,
+      })
+
+      // ⚠ REPLACE-ALL, AS 7b3. The provider revises these mid-match and an
+      // upsert would need a stable key per (fixture, side) plus a diff of
+      // nineteen nullable columns to work out what it revised. Two rows.
+      const { error: delErr } = await admin
+        .from('match_team_stats')
+        .delete()
+        .eq('fixture_id', c.fixture_id)
+      if (delErr) {
+        push('league_stats', delErr.message, { fixture_id: c.fixture_id })
+        continue
+      }
+      if (rows.length > 0) {
+        const { error: insErr } = await admin.from('match_team_stats').insert(rows)
+        if (insErr) {
+          push('league_stats', insErr.message, { fixture_id: c.fixture_id })
+          continue
+        }
+        result.statsRows += rows.length
+      }
+    } catch (e) {
+      push('league_stats', e instanceof Error ? e.message : String(e), {
+        fixture_id: c.fixture_id,
+      })
+    }
+  }
+
+  // ------------------------------------------------------------- 7b5. line-ups
+  // Both starting elevens, the benches, the formations and the two coaches.
+  //
+  // ⚠⚠ THIS ONE CANNOT RIDE `res.changed`, AND THAT IS THE WHOLE POINT OF ITS
+  // BEING A SEPARATE SECTION. A line-up is published roughly an hour BEFORE
+  // kickoff, when the fixture is still `scheduled` with null goals — so nothing
+  // about it has changed, `changed` is empty, and a `changed`-gated fetch would
+  // never fire until the first goal went in. The Line-ups tab would then be
+  // empty for exactly the ninety minutes before kickoff when people look at it.
+  //
+  // So the gate is: IN THE WINDOW, AND WE DO NOT ALREADY HOLD ONE. Which makes
+  // the cost shape different from 7b3's and worth stating plainly:
+  //
+  //   · the window opens 30 minutes before kickoff (`WINDOW_BEFORE_MS`), by
+  //     which time the feed has usually published — so the ordinary case is ONE
+  //     call per fixture, ever;
+  //   · while the feed has not published, it is one call per fixture per tick,
+  //     which is why `LINEUP_LIMIT` bounds the tick and why an empty response
+  //     writes NOTHING (writing an empty line-up would end the retries and
+  //     leave the tab permanently blank);
+  //   · plus one more when the fixture completes, because a published XI is
+  //     revised often enough to be worth reconciling once, exactly as 7b3 does
+  //     for a VAR reversal.
+  //
+  // ⚠ We do not widen `WINDOW_BEFORE_MS` to catch line-ups earlier. That
+  // constant governs which fixtures the WHOLE arm reads and re-syncs every
+  // minute; moving it for a display-only tab would change the sync's cost
+  // profile for every competition. Thirty minutes of line-up is enough.
+  //
+  // A failure never stops the loop or the sync: the fixture is already correct
+  // and a missing line-up is a tab that says so.
+  {
+    // Which of the window's fixtures we already hold a line-up for. One indexed
+    // read per tick, so the arm can ask only for what is genuinely missing
+    // rather than re-fetching a published XI every minute until kickoff.
+    const completedNow = new Set(
+      (res.changed ?? []).filter((c) => c.is_completed).map((c) => c.fixture_id),
+    )
+    const candidates = (windowRows ?? []) as unknown as LeagueFixtureRow[]
+
+    let held = new Set<string>()
+    if (candidates.length > 0) {
+      const { data: haveRows, error: haveErr } = await admin
+        .from('match_lineups')
+        .select('fixture_id')
+        .in('fixture_id', candidates.map((r) => r.fixture_id))
+      if (haveErr) {
+        // Not fatal, but it must not be silent: without this read the arm
+        // cannot tell "not published yet" from "already stored", and would
+        // re-fetch every window fixture every tick.
+        push('league_lineups', haveErr.message, { season_id: target.seasonId })
+        held = new Set(candidates.map((r) => r.fixture_id))
+      } else {
+        held = new Set(((haveRows ?? []) as { fixture_id: string }[]).map((r) => r.fixture_id))
+      }
+    }
+
+    let attempted = 0
+    for (const row of candidates) {
+      if (attempted >= LINEUP_LIMIT) break
+      // Held already and not just finished — nothing to ask.
+      if (held.has(row.fixture_id) && !completedNow.has(row.fixture_id)) continue
+
+      const fx = byExt.get(row.external_fixture_id)
+      if (!fx) continue
+
+      try {
+        const lineups = await getFixtureLineups(fx.fixture.id)
+        result.lineupCalls++
+        attempted++
+
+        const rows = lineupsToRows(lineups, {
+          fixtureId: row.fixture_id,
+          homeExternalTeamId: fx.teams.home.id,
+        })
+
+        // ⚠ AN EMPTY PAYLOAD WRITES NOTHING AND IS NOT AN ERROR. It is the
+        // ordinary answer before the feed publishes, and the next tick asks
+        // again. Deleting here would also throw away a line-up we already hold
+        // on the completion pass, if the provider happened to answer empty.
+        if (rows.length === 0) continue
+
+        const { error: delErr } = await admin
+          .from('match_lineups')
+          .delete()
+          .eq('fixture_id', row.fixture_id)
+        if (delErr) {
+          push('league_lineups', delErr.message, { fixture_id: row.fixture_id })
+          continue
+        }
+        const { error: insErr } = await admin.from('match_lineups').insert(rows)
+        if (insErr) {
+          push('league_lineups', insErr.message, { fixture_id: row.fixture_id })
+          continue
+        }
+        result.lineupRows += rows.length
+      } catch (e) {
+        push('league_lineups', e instanceof Error ? e.message : String(e), {
+          fixture_id: row.fixture_id,
+        })
+      }
+    }
+  }
+
   // ------------------------------------------------------------ 7b2. re-home
   // Our matchweeks are PICKING rounds, so a fixture that just moved may now
   // belong to a different one — Decision 10, and the policy lives in
@@ -749,6 +942,12 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     `scored=${r.scored}`,
     // Only when it did something — a permanently-zero counter is one nobody reads.
     ...(r.timelineCalls > 0 ? [`timeline=${r.timelineRows}/${r.timelineCalls}`] : []),
+    // Same rule, and both are rows/calls so a call that wrote nothing is
+    // visible as `0/1` rather than vanishing. For line-ups that is the ordinary
+    // pre-publication answer, and being able to see it is how you tell "the
+    // feed has not published yet" from "the arm never looked".
+    ...(r.statsCalls > 0 ? [`stats=${r.statsRows}/${r.statsCalls}`] : []),
+    ...(r.lineupCalls > 0 ? [`lineups=${r.lineupRows}/${r.lineupCalls}`] : []),
     `manual=${r.skippedManual}`,
     `unmatched=${r.unmatched}`,
     `unknown=${r.unknownProvider}`,

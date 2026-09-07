@@ -1,4 +1,11 @@
-import type { ApiFootballEvent, ApiFootballFixture, ApiFootballStatusShort } from './types'
+import type {
+  ApiFootballEvent,
+  ApiFootballFixture,
+  ApiFootballLineup,
+  ApiFootballLineupPlayer,
+  ApiFootballStatusShort,
+  ApiFootballTeamStatistics,
+} from './types'
 
 export type OurMatchRow = {
   match_id: string
@@ -664,6 +671,224 @@ export function eventsToTimeline(
       sort_index: i,
     })
   })
+
+  return rows
+}
+
+// =============================================================
+// The line-up and the statistics — migration 139
+// =============================================================
+// 136's siblings, and they follow `eventsToTimeline` in every respect that
+// matters: pure, synchronous, no DB, no client, optional chaining everywhere
+// because the payload is untrusted, and the SIDE resolved from the provider's
+// team id against the fixture's own home club rather than from array order.
+//
+// ⚠ ORDER IS NOT THE SIDE. Both payloads happen to arrive home-first, and
+// relying on that is a one-character bug that swaps two teams' entire line-ups
+// and passes every test written against a payload that also arrives home-first.
+// `homeExternalTeamId` is the same option `eventsToTimeline` takes, for the
+// same reason.
+// =============================================================
+
+/** One row of `match_lineups`, as the league arm writes it. */
+export type MatchLineupRow = {
+  fixture_id: string
+  side: 'home' | 'away'
+  formation: string | null
+  coach_name: string | null
+  players: LineupPlayer[]
+}
+
+/** One player inside `match_lineups.players`. */
+export type LineupPlayer = {
+  /** The provider's id. Kept because names are abbreviated here and not in `/events`. */
+  player_id: number | null
+  name: string | null
+  number: number | null
+  pos: string | null
+  /** "row:col", row 1 being the keeper. NULL for every substitute. */
+  grid: string | null
+  starter: boolean
+}
+
+/**
+ * Both sides' line-ups, as rows.
+ *
+ * ⚠ A SUBSTITUTE HAS NO `grid`, AND THAT IS THE FEED'S ANSWER, NOT A GAP. All
+ * nine subs in fixture 1379342 came back with `grid: null` while all eleven
+ * starters had one. `starter` is therefore carried explicitly rather than being
+ * inferred from `grid != null` — the two happen to agree today, and a renderer
+ * that infers would silently drop a starter the feed forgot to position.
+ *
+ * Returns `[]` for an empty payload, which is the ordinary pre-match answer.
+ */
+export function lineupsToRows(
+  lineups: ApiFootballLineup[],
+  opts: { fixtureId: string; homeExternalTeamId: number },
+): MatchLineupRow[] {
+  const rows: MatchLineupRow[] = []
+
+  for (const l of lineups ?? []) {
+    const teamId = l?.team?.id
+    if (teamId === undefined || teamId === null) continue
+
+    const take = (entries: ApiFootballLineupPlayer[] | null, starter: boolean): LineupPlayer[] =>
+      (entries ?? []).map((e) => ({
+        player_id: e?.player?.id ?? null,
+        name: e?.player?.name ?? null,
+        number: e?.player?.number ?? null,
+        pos: e?.player?.pos ?? null,
+        grid: e?.player?.grid ?? null,
+        starter,
+      }))
+
+    rows.push({
+      fixture_id: opts.fixtureId,
+      side: teamId === opts.homeExternalTeamId ? 'home' : 'away',
+      formation: l?.formation ?? null,
+      coach_name: l?.coach?.name ?? null,
+      // Starters first, then the bench, so a consumer that renders the array in
+      // order gets the XI without having to sort it.
+      players: [...take(l?.startXI ?? null, true), ...take(l?.substitutes ?? null, false)],
+    })
+  }
+
+  return rows
+}
+
+/** One row of `match_team_stats`. Every stat is nullable; see `statisticsToRows`. */
+export type MatchTeamStatsRow = {
+  fixture_id: string
+  side: 'home' | 'away'
+  possession_pct: number | null
+  shots_total: number | null
+  shots_on: number | null
+  shots_off: number | null
+  shots_blocked: number | null
+  shots_inside_box: number | null
+  shots_outside_box: number | null
+  fouls: number | null
+  free_kicks: number | null
+  corners: number | null
+  offsides: number | null
+  yellow_cards: number | null
+  red_cards: number | null
+  saves: number | null
+  passes_total: number | null
+  passes_accurate: number | null
+  passes_pct: number | null
+  expected_goals: number | null
+  goals_prevented: number | null
+}
+
+/**
+ * The provider's `type` strings, mapped to columns.
+ *
+ * ⚠ THIS IS A CLOSED MAP OVER AN OPEN SET, ON PURPOSE. Sampled live 2026-09-06
+ * across four fixtures in two seasons, the union was these 19 — but no single
+ * fixture sent all of them, and the two sets differed in three types in each
+ * direction. So an unknown key here is IGNORED rather than being an error: a
+ * twentieth type appearing next season must not take the fixture sync down for
+ * every competition. Adding a column for it is a two-line migration.
+ */
+const STAT_COLUMN: Record<string, { column: keyof MatchTeamStatsRow; kind: 'int' | 'pct' | 'decimal' }> = {
+  'Ball Possession':  { column: 'possession_pct',    kind: 'pct' },
+  'Total Shots':      { column: 'shots_total',       kind: 'int' },
+  'Shots on Goal':    { column: 'shots_on',          kind: 'int' },
+  'Shots off Goal':   { column: 'shots_off',         kind: 'int' },
+  'Blocked Shots':    { column: 'shots_blocked',     kind: 'int' },
+  'Shots insidebox':  { column: 'shots_inside_box',  kind: 'int' },
+  'Shots outsidebox': { column: 'shots_outside_box', kind: 'int' },
+  'Fouls':            { column: 'fouls',             kind: 'int' },
+  'Free Kicks':       { column: 'free_kicks',        kind: 'int' },
+  'Corner Kicks':     { column: 'corners',           kind: 'int' },
+  'Offsides':         { column: 'offsides',          kind: 'int' },
+  'Yellow Cards':     { column: 'yellow_cards',      kind: 'int' },
+  'Red Cards':        { column: 'red_cards',         kind: 'int' },
+  'Goalkeeper Saves': { column: 'saves',             kind: 'int' },
+  'Total passes':     { column: 'passes_total',      kind: 'int' },
+  'Passes accurate':  { column: 'passes_accurate',   kind: 'int' },
+  'Passes %':         { column: 'passes_pct',        kind: 'pct' },
+  'expected_goals':   { column: 'expected_goals',    kind: 'decimal' },
+  'goals_prevented':  { column: 'goals_prevented',   kind: 'decimal' },
+}
+
+/**
+ * `'65%'` → 65, `'1.81'` → 1.81, `12` → 12, `null`/junk → null.
+ *
+ * ⚠ NULL IS PRESERVED, NEVER COERCED TO ZERO. The feed sends `Red Cards: null`
+ * and `Red Cards: 0` for the same real-world state, and `expected_goals: null`
+ * for a competition that does not publish xG at all. Those are different facts
+ * and the screen renders them differently — a null count shows 0, a null xG row
+ * is hidden. Deciding that here would throw the distinction away.
+ */
+function statValue(raw: number | string | null, kind: 'int' | 'pct' | 'decimal'): number | null {
+  if (raw === null || raw === undefined) return null
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null
+
+  const trimmed = raw.trim()
+  if (trimmed === '') return null
+  // A percentage is the only place the feed appends a unit. `parseFloat` would
+  // handle it anyway; stripping it explicitly is what makes the intent legible.
+  const cleaned = (kind === 'pct' ? trimmed.replace('%', '') : trimmed).trim()
+  // ⚠ THE EMPTY CHECK IS AFTER THE STRIP, NOT ONLY BEFORE IT. `Number('')` is
+  // 0, not NaN — so a bare '%' with no digits would otherwise be read as 0%
+  // possession, a real number nobody would question on a screen.
+  if (cleaned === '') return null
+  const n = Number(cleaned)
+  if (!Number.isFinite(n)) return null
+  // Counts and percentages are whole; only xG and goals_prevented are not.
+  // Rounding rather than truncating: '66.7%' is 67, not 66.
+  return kind === 'decimal' ? n : Math.round(n)
+}
+
+/** An all-null row, so an absent statistic is null rather than missing. */
+function emptyStatsRow(fixtureId: string, side: 'home' | 'away'): MatchTeamStatsRow {
+  return {
+    fixture_id: fixtureId,
+    side,
+    possession_pct: null, shots_total: null, shots_on: null, shots_off: null,
+    shots_blocked: null, shots_inside_box: null, shots_outside_box: null,
+    fouls: null, free_kicks: null, corners: null, offsides: null,
+    yellow_cards: null, red_cards: null, saves: null,
+    passes_total: null, passes_accurate: null, passes_pct: null,
+    expected_goals: null, goals_prevented: null,
+  }
+}
+
+/**
+ * Both sides' statistics, as rows.
+ *
+ * Unknown `type` strings are skipped; absent ones stay null. A side whose
+ * `statistics` array is empty still produces a row — the fixture was played and
+ * the provider simply has nothing yet, which is different from the fixture not
+ * being in the table at all.
+ */
+export function statisticsToRows(
+  stats: ApiFootballTeamStatistics[],
+  opts: { fixtureId: string; homeExternalTeamId: number },
+): MatchTeamStatsRow[] {
+  const rows: MatchTeamStatsRow[] = []
+
+  for (const s of stats ?? []) {
+    const teamId = s?.team?.id
+    if (teamId === undefined || teamId === null) continue
+
+    const row = emptyStatsRow(
+      opts.fixtureId,
+      teamId === opts.homeExternalTeamId ? 'home' : 'away',
+    )
+
+    for (const stat of s?.statistics ?? []) {
+      const target = STAT_COLUMN[stat?.type]
+      if (!target) continue
+      // `as never` because the map's value type cannot narrow which of the
+      // nullable-number columns this is; every target column is `number | null`.
+      ;(row[target.column] as number | null) = statValue(stat?.value ?? null, target.kind)
+    }
+
+    rows.push(row)
+  }
 
   return rows
 }

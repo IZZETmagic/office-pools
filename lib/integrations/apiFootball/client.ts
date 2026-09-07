@@ -4,9 +4,11 @@ import type {
   ApiFootballEnvelope,
   ApiFootballEvent,
   ApiFootballFixture,
+  ApiFootballLineup,
   ApiFootballQuotaInfo,
   ApiFootballRequestOptions,
   ApiFootballTeam,
+  ApiFootballTeamStatistics,
 } from './types'
 
 const DEFAULT_HOST = 'v3.football.api-sports.io'
@@ -108,6 +110,41 @@ export async function getFixtureById(id: number): Promise<ApiFootballFixture | n
 
 export async function getFixtureEvents(fixtureId: number): Promise<ApiFootballEvent[]> {
   const env = await request<ApiFootballEvent>('/fixtures/events', { fixture: fixtureId })
+  return env.response
+}
+
+/**
+ * One fixture's line-ups — two entries, home and away.
+ *
+ * ⚠ AN EMPTY ARRAY IS THE NORMAL PRE-MATCH ANSWER, not a failure. The feed
+ * publishes a line-up roughly an hour before kickoff and returns `[]` until it
+ * does, which is exactly why the sync's line-up arm retries rather than
+ * recording a fixture as done the first time it asks.
+ *
+ * Non-strict like `getFixtureEvents`: a refused request comes back as an empty
+ * envelope and the caller's try/catch never fires. That is deliberate here —
+ * "no line-up yet" and "the provider is unhappy" are both "nothing to write",
+ * and the arm retries either way.
+ */
+export async function getFixtureLineups(fixtureId: number): Promise<ApiFootballLineup[]> {
+  const env = await request<ApiFootballLineup>('/fixtures/lineups', { fixture: fixtureId })
+  return env.response
+}
+
+/**
+ * One fixture's team statistics — two entries, home and away.
+ *
+ * ⚠ THE TYPE SET VARIES BY FIXTURE AND BY SEASON. Sampled live 2026-09-06:
+ * one fixture sent 18 types, another 16 — missing `expected_goals` entirely and
+ * carrying a `Free Kicks` the first did not have. The mapper ignores unknown
+ * types and leaves absent ones null; nothing here tries to normalise the shape.
+ */
+export async function getFixtureStatistics(
+  fixtureId: number,
+): Promise<ApiFootballTeamStatistics[]> {
+  const env = await request<ApiFootballTeamStatistics>('/fixtures/statistics', {
+    fixture: fixtureId,
+  })
   return env.response
 }
 
@@ -232,6 +269,8 @@ export const ApiFootballClient = {
   getStandings,
   getFixtureById,
   getFixtureEvents,
+  getFixtureLineups,
+  getFixtureStatistics,
   getTeamsForLeague,
   getLastQuota,
   // Present for symmetry only. The league arm imports the NAMED export so that
