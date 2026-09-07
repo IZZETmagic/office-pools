@@ -21,13 +21,25 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // The derivation lives in `lib/matchContext.ts` so it can be tested; this file
 // only draws it.
 //
-// ⚠ RICHER THAN 'WWDLW' ON PURPOSE. `league_standings.form` is one letter per
-// game and we hold it, but the season in memory can say WHO and BY HOW MUCH for
-// the same cost. The feed string is the fallback for the case the season cannot
-// cover — see `feedForm`.
+// ## The shape, and why it is both crests
+//
+// A row is `[crest] [score] [crest]` — the fixture as it was played, left to
+// right, with the club whose form this is on the side it actually played.
+//
+// ⚠ THE SCORE IS IN MATCH ORDER, NOT "OURS FIRST", and that is the whole point
+// of drawing both crests. An earlier version showed the opponent's crest and
+// `2-1` from this club's point of view, which reads as a home win whichever way
+// round it was — so a 1-0 away win and a 1-0 home defeat looked identical apart
+// from a colour. Here the crests say who was at home and the numbers stay in
+// the order the scoreboard had them.
+//
+// ⚠ THE COLOUR IS FROM THIS CLUB'S POINT OF VIEW THOUGH. Green, grey and red
+// are win, draw and loss for the column's own club, which is why the same
+// fixture can be green in one column and red in the other.
 // =============================================================
 
 export function FormCard({
+  match,
   homeName,
   awayName,
   homeForm,
@@ -35,8 +47,8 @@ export function FormCard({
   homeFeedForm,
   awayFeedForm,
   earlier,
-  match,
 }: {
+  match: ResultsMatch;
   homeName: string;
   awayName: string;
   homeForm: FormResult[];
@@ -45,7 +57,6 @@ export function FormCard({
   homeFeedForm: ('W' | 'D' | 'L')[];
   awayFeedForm: ('W' | 'D' | 'L')[];
   earlier: ResultsMatch | null;
-  match: ResultsMatch;
 }) {
   const theme = useTheme();
 
@@ -55,8 +66,6 @@ export function FormCard({
     homeFeedForm.length === 0 &&
     awayFeedForm.length === 0 &&
     !earlier;
-  // Rendered by the caller only when there is something; this is belt and
-  // braces for a season that turns out to hold no played football at all.
   if (nothingToShow) return null;
 
   return (
@@ -69,16 +78,25 @@ export function FormCard({
         overflow: 'hidden',
       }}
     >
-      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 }}>
-        <Text variant="cardTitle">Form</Text>
+      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
+        <Text variant="cardTitle">Team form</Text>
         <Text variant="detail" color="slate">Last five, most recent first</Text>
       </View>
 
-      {/* The earlier-meeting row brings its own padding; without it the last
-          form strip would otherwise sit 4px off the card's bottom edge. */}
-      <View style={{ paddingBottom: earlier ? 8 : 14 }}>
-        <SideForm name={homeName} form={homeForm} feedForm={homeFeedForm} />
-        <SideForm name={awayName} form={awayForm} feedForm={awayFeedForm} />
+      {/* Two columns, one per club, so a row in each is the same age. */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingBottom: earlier ? 10 : 14 }}>
+        <SideForm
+          club={match.homeTeam}
+          name={homeName}
+          form={homeForm}
+          feedForm={homeFeedForm}
+        />
+        <SideForm
+          club={match.awayTeam}
+          name={awayName}
+          form={awayForm}
+          feedForm={awayFeedForm}
+        />
       </View>
 
       {earlier ? <EarlierMeeting match={match} earlier={earlier} /> : null}
@@ -87,10 +105,12 @@ export function FormCard({
 }
 
 function SideForm({
+  club,
   name,
   form,
   feedForm,
 }: {
+  club: ResultsTeam | null;
   name: string;
   form: FormResult[];
   feedForm: ('W' | 'D' | 'L')[];
@@ -98,25 +118,24 @@ function SideForm({
   const theme = useTheme();
 
   return (
-    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
+    <View style={{ flex: 1, paddingHorizontal: 4, gap: 6 }}>
       <RNText
         numberOfLines={1}
         style={{
           fontFamily: fontFamilies.bold,
-          fontSize: 13,
+          fontSize: 12,
           color: theme.colors.ink,
-          marginBottom: 8,
+          textAlign: 'center',
+          marginBottom: 2,
         }}
       >
         {name}
       </RNText>
 
       {form.length > 0 ? (
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          {form.map((r) => (
-            <FormChip key={r.matchId} result={r} />
-          ))}
-        </View>
+        form.map((r, i) => (
+          <FormRow key={r.matchId} club={club} result={r} mostRecent={i === 0} />
+        ))
       ) : feedForm.length > 0 ? (
         /*
           ⚠ THE FALLBACK IS DELIBERATELY PLAINER, not padded out to look like
@@ -124,25 +143,42 @@ function SideForm({
           opponent, no score — and drawing an empty crest box beside it would
           imply we know who they played.
         */
-        <View style={{ flexDirection: 'row', gap: 6 }}>
+        <View style={{ flexDirection: 'row', gap: 5, justifyContent: 'center' }}>
           {feedForm.map((letter, i) => (
             <LetterBox key={i} outcome={letter} />
           ))}
         </View>
       ) : (
-        <Text variant="detail" color="slate">No games played yet</Text>
+        <Text variant="detail" color="slate" align="center">No games played yet</Text>
       )}
     </View>
   );
 }
 
 /**
- * One previous result: the opponent's crest, the score, and the outcome as the
- * chip's own colour. Tapping opens that match.
+ * One result: `[crest] [score] [crest]`, the fixture as it was played.
+ *
+ * ⚠ THE CLUB GOES ON THE SIDE IT PLAYED. `wasHome` decides which crest is which
+ * and which way round the goals read — the derivation in `matchContext` stores
+ * them from the club's point of view (`goalsFor`/`goalsAgainst`), so they are
+ * put back into match order here rather than being stored twice.
  */
-function FormChip({ result }: { result: FormResult }) {
+function FormRow({
+  club,
+  result,
+  mostRecent,
+}: {
+  club: ResultsTeam | null;
+  result: FormResult;
+  mostRecent: boolean;
+}) {
   const theme = useTheme();
-  const tint = outcomeColor(result.outcome, theme);
+  const tint = outcomeColor(result.outcome);
+
+  const left = result.wasHome ? club : result.opponent;
+  const right = result.wasHome ? result.opponent : club;
+  const leftGoals = result.wasHome ? result.goalsFor : result.goalsAgainst;
+  const rightGoals = result.wasHome ? result.goalsAgainst : result.goalsFor;
 
   return (
     <Pressable
@@ -150,38 +186,61 @@ function FormChip({ result }: { result: FormResult }) {
       accessibilityRole="button"
       accessibilityLabel={`${result.outcome === 'W' ? 'Won' : result.outcome === 'L' ? 'Lost' : 'Drew'} ${result.goalsFor}-${result.goalsAgainst} ${result.wasHome ? 'at home to' : 'away to'} ${result.opponent?.shortName ?? result.opponent?.countryName ?? 'unknown'}`}
       style={({ pressed }) => ({
-        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
-        gap: 3,
-        paddingVertical: 7,
-        borderRadius: theme.radii.xs,
-        backgroundColor: withOpacity(tint, 0.1),
+        justifyContent: 'center',
+        gap: 5,
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <Crest team={result.opponent} />
-      <RNText
-        style={{
-          fontFamily: MONO_BOLD,
-          fontSize: 11,
-          color: tint,
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {result.goalsFor}-{result.goalsAgainst}
-      </RNText>
-      {/* Home or away, in one character, because "beat Arsenal" and "beat
-          Arsenal at the Emirates" are different facts about a club's form. */}
-      <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 8, color: theme.colors.slate }}>
-        {result.wasHome ? 'H' : 'A'}
-      </RNText>
+      <Crest team={left} />
+      <View style={{ alignItems: 'center' }}>
+        <View
+          style={{
+            minWidth: 48,
+            paddingHorizontal: 7,
+            paddingVertical: 4,
+            borderRadius: theme.radii.xs,
+            backgroundColor: tint,
+            alignItems: 'center',
+          }}
+        >
+          <RNText
+            style={{
+              fontFamily: MONO_BOLD,
+              fontSize: 12,
+              color: '#FFFFFF',
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {leftGoals}-{rightGoals}
+          </RNText>
+        </View>
+        {/*
+          ⚠ MARKS THE MOST RECENT, and it is the only thing on the row that is
+          not a fact about the match. The card says "most recent first" in
+          words; this is the same claim where the eye lands.
+        */}
+        {mostRecent ? (
+          <View
+            style={{
+              height: 2,
+              width: 22,
+              borderRadius: 1,
+              marginTop: 3,
+              backgroundColor: tint,
+            }}
+          />
+        ) : null}
+      </View>
+      <Crest team={right} />
     </Pressable>
   );
 }
 
 function LetterBox({ outcome }: { outcome: 'W' | 'D' | 'L' }) {
   const theme = useTheme();
-  const tint = outcomeColor(outcome, theme);
+  const tint = outcomeColor(outcome);
   return (
     <View
       style={{
@@ -209,12 +268,12 @@ function LetterBox({ outcome }: { outcome: 'W' | 'D' | 'L' }) {
 function Crest({ team }: { team: ResultsTeam | null }) {
   const theme = useTheme();
   if (!team?.flagUrl) {
-    return <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: theme.colors.mist }} />;
+    return <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.mist }} />;
   }
   return (
     <Image
       source={{ uri: team.flagUrl }}
-      style={{ width: 18, height: 18 }}
+      style={{ width: 20, height: 20 }}
       contentFit="contain"
       cachePolicy="memory-disk"
     />
@@ -285,10 +344,29 @@ function EarlierMeeting({ match, earlier }: { match: ResultsMatch; earlier: Resu
   );
 }
 
-function outcomeColor(outcome: 'W' | 'D' | 'L', theme: ReturnType<typeof useTheme>): string {
-  switch (outcome) {
-    case 'W': return theme.colors.green;
-    case 'L': return theme.colors.red;
-    case 'D': return theme.colors.slate;
-  }
+/**
+ * The chip colours — ⚠ DELIBERATELY NOT `theme.colors.green` / `.red`.
+ *
+ * Those tokens are tuned to be read AS TEXT, or as an accent on a light
+ * surface. Used as a solid chip behind white text they fail badly: measured
+ * against white, `green` #22C55E is 2.28:1 and `red` #EF4444 is 3.76:1, where
+ * 4.5:1 is the floor for text this size. `slate` is 3.58:1 and `silver` 1.40:1.
+ *
+ * These are the same hues a step or two darker, chosen to clear that floor with
+ * white on top — 5.02:1, 4.76:1 and 4.83:1 — and they sit closer to the
+ * reference this card was drawn from than the tokens do.
+ *
+ * ⚠ FIXED IN BOTH THEMES, ON PURPOSE. A chip carries its own background, so it
+ * has no need to react to the surface behind it — and the dark-mode tokens run
+ * LIGHTER (`green` becomes #34D972), which would make white text worse rather
+ * than better.
+ */
+const CHIP_COLOR: Record<'W' | 'D' | 'L', string> = {
+  W: '#15803D',
+  D: '#64748B',
+  L: '#DC2626',
+};
+
+function outcomeColor(outcome: 'W' | 'D' | 'L'): string {
+  return CHIP_COLOR[outcome];
 }
