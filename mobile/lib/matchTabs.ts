@@ -10,7 +10,7 @@
 // `mobile/**`.
 // =============================================================
 
-export type MatchTabKey = 'facts' | 'predictions' | 'lineups' | 'stats';
+export type MatchTabKey = 'facts' | 'predictions' | 'lineups' | 'stats' | 'scouting';
 
 /**
  * Every tab that can ever exist, in the order they are swiped through.
@@ -21,6 +21,7 @@ export const ALL_MATCH_TAB_KEYS: readonly MatchTabKey[] = [
   'facts',
   'lineups',
   'stats',
+  'scouting',
   'predictions',
 ];
 
@@ -41,8 +42,21 @@ export const ALL_MATCH_TAB_KEYS: readonly MatchTabKey[] = [
  * rule. Facts has the fixture itself; Predictions states plainly when a league
  * fixture has no picks to show, which is a stated boundary rather than a blank.
  */
-export function matchTabs(opts: { hasLineups: boolean; hasStats: boolean }): MatchTabKey[] {
+export function matchTabs(opts: {
+  hasLineups: boolean;
+  hasStats: boolean;
+  /**
+   * ⚠ THE SERVER DECIDES THIS ONE. Two clubs need a real history before a
+   * "scout report" is anything but noise — the provider holds three meetings
+   * for some current Premier League pairings — and the threshold lives with the
+   * summariser so the two surfaces cannot disagree about it.
+   */
+  hasScouting: boolean;
+}): MatchTabKey[] {
   return ALL_MATCH_TAB_KEYS.filter(
-    (k) => (k !== 'lineups' || opts.hasLineups) && (k !== 'stats' || opts.hasStats),
+    (k) =>
+      (k !== 'lineups' || opts.hasLineups) &&
+      (k !== 'stats' || opts.hasStats) &&
+      (k !== 'scouting' || opts.hasScouting),
   );
 }

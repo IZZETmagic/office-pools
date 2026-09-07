@@ -3,10 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchBracketStats,
   fetchFixturePicks,
+  fetchHeadToHead,
   fetchMatchScores,
   fetchMatchStats,
   type BracketStatsResponse,
   type FixturePick,
+  type H2HResponse,
   type TablePick,
   type MatchScoreEntry,
   type MatchStatsResponse,
@@ -276,6 +278,7 @@ export function useMatchDetail(matchId: string | undefined) {
   const [facts, setFacts] = useState<MatchFacts | null>(null);
   const [leaguePicks, setLeaguePicks] = useState<FixturePick[]>([]);
   const [leagueTablePicks, setLeagueTablePicks] = useState<TablePick[]>([]);
+  const [h2h, setH2h] = useState<H2HResponse | null>(null);
   const [lineups, setLineups] = useState<MatchLineup[]>([]);
   const [teamStats, setTeamStats] = useState<MatchTeamStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -331,6 +334,10 @@ export function useMatchDetail(matchId: string | undefined) {
         // points need the server. One call for the whole fixture across every
         // pool — not the per-pool contract fan-out the old boundary feared.
         loadLeaguePicks(appUserId, matchId, setLeaguePicks, setLeagueTablePicks),
+        // ⚠ A ROUTE BECAUSE THE API KEY IS SERVER-SIDE. The phone cannot ask
+        // api-football itself, and the route caches per club PAIRING so the
+        // second viewer of a fixture costs nothing.
+        loadHeadToHead(matchId, setH2h),
       ]);
       setLoading(false);
       return;
@@ -359,6 +366,7 @@ export function useMatchDetail(matchId: string | undefined) {
       // World Cup picks come from `predictionInfos` below, not this.
       setLeaguePicks([]);
       setLeagueTablePicks([]);
+      setH2h(null);
 
       // 2. Resolve user's entries across pools, split by prediction mode.
       // Query through pool_members (the source of truth for "this user belongs
@@ -694,6 +702,7 @@ export function useMatchDetail(matchId: string | undefined) {
     facts,
     leaguePicks,
     leagueTablePicks,
+    h2h,
     lineups,
     teamStats,
     leagueContext,
@@ -1060,5 +1069,26 @@ async function loadLeaguePicks(
     console.warn('[useMatchDetail] league picks unavailable', e);
     setPicks([]);
     setTablePicks([]);
+  }
+}
+
+/**
+ * The scout report — every previous competitive meeting between these two.
+ *
+ * ⚠ A FAILURE IS NO TAB, NOT AN EMPTY ONE. `enough` gates whether the tab is
+ * offered at all, and a null here simply means it is not — which is the same
+ * outcome as two clubs who have never met, and the right one either way: a
+ * Scouting tab that opens onto an error is worse than a tab that was never
+ * there.
+ */
+async function loadHeadToHead(
+  fixtureId: string,
+  setH2h: (r: H2HResponse | null) => void,
+) {
+  try {
+    setH2h(await fetchHeadToHead(fixtureId));
+  } catch (e) {
+    console.warn('[useMatchDetail] head-to-head unavailable', e);
+    setH2h(null);
   }
 }

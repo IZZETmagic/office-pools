@@ -46,6 +46,7 @@ const TAB_DEFS: Record<MatchTabKey, Omit<TabDef, 'key'>> = {
   facts: { label: 'Facts', icon: 'list.bullet' },
   lineups: { label: 'Line-ups', icon: 'person.3.fill' },
   stats: { label: 'Stats', icon: 'chart.bar.xaxis' },
+  scouting: { label: 'Scouting', icon: 'binoculars' },
   predictions: { label: 'Predictions', icon: 'pencil.line' },
 };
 

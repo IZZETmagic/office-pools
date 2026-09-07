@@ -37,12 +37,14 @@ import { LeaguePicksSection } from '@/components/match/LeaguePicksSection';
 import { LeagueTableSliceCard } from '@/components/match/LeagueTableSliceCard';
 import { LineupsTab } from '@/components/match/LineupsTab';
 import { MatchTabBar } from '@/components/match/MatchTabBar';
+import { ScoutingTab } from '@/components/match/ScoutingTab';
 import { StatsTab } from '@/components/match/StatsTab';
 import { SubstitutionIcon } from '@/components/match/SubstitutionIcon';
 import { Icon, Text } from '@/components/ui';
 import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import { getCompetitionBand } from '@/lib/design/competitionBand';
 import { displayPlayerName } from '@/lib/playerName';
+import { fixturePalette } from '@/lib/design/clubColors';
 import { matchTabs, type MatchTabKey } from '@/lib/matchTabs';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
@@ -98,6 +100,7 @@ export default function MatchDetailScreen() {
     facts,
     leaguePicks,
     leagueTablePicks,
+    h2h,
     lineups,
     teamStats,
     leagueContext,
@@ -118,8 +121,14 @@ export default function MatchDetailScreen() {
    * dependency of the effect that drives the pager.
    */
   const tabs = useMemo(
-    () => matchTabs({ hasLineups: lineups.length > 0, hasStats: teamStats.length > 0 }),
-    [lineups.length, teamStats.length],
+    () =>
+      matchTabs({
+        hasLineups: lineups.length > 0,
+        hasStats: teamStats.length > 0,
+        // ⚠ The SERVER decides this — see `matchTabs`.
+        hasScouting: h2h?.enough === true,
+      }),
+    [lineups.length, teamStats.length, h2h?.enough],
   );
   const tabIndex = Math.max(0, tabs.indexOf(tab));
 
@@ -258,6 +267,19 @@ export default function MatchDetailScreen() {
             awayTeam={m.awayTeam}
           />
         );
+      case 'scouting':
+        return h2h ? (
+          <ScoutingTab
+            match={m}
+            summary={h2h.summary}
+            homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
+            awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
+            palette={fixturePalette(m.homeTeam?.flagUrl, m.awayTeam?.flagUrl, {
+              home: theme.colors.primary,
+              away: theme.colors.accent,
+            })}
+          />
+        ) : null;
       case 'predictions':
         // ⚠ TWO DIFFERENT SECTIONS, NOT ONE WITH A BRANCH INSIDE. A league pick
         // and a World Cup prediction share no shape: one is a scoreline OR an

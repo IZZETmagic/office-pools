@@ -1737,3 +1737,59 @@ export async function fetchFixturePicks(
 
   return { picks, tablePicks };
 }
+
+// =============================================================
+// /api/fixtures/:id/h2h — the scout report
+// =============================================================
+// Every previous competitive meeting between the two clubs, reduced. One
+// provider call per PAIRING and cached for a day server-side, so the second
+// viewer of a fixture costs nothing.
+//
+// ⚠ THE GATE COMES FROM THE SERVER. `enough` decides whether the tab is offered
+// at all; the phone must not carry its own copy of the threshold, or two clubs
+// with three meetings would get a tab on one surface and not the other the day
+// either number moved.
+// =============================================================
+
+export type H2HMeeting = {
+  fixtureId: number;
+  date: string;
+  competition: string;
+  venueName: string | null;
+  homeExternalId: number;
+  awayExternalId: number;
+  homeGoals: number;
+  awayGoals: number;
+};
+
+export type H2HSummary = {
+  meetings: number;
+  /** ⚠ From THIS fixture's home club's view, wherever each meeting was played. */
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  avgGoals: number;
+  bothScored: number;
+  commonScore: { score: string; count: number } | null;
+  atVenue: { played: number; wins: number; draws: number; losses: number } | null;
+  /** ⚠ Carries its own denominator — not every meeting has a half-time score. */
+  decidedAfterHt: number;
+  decidedAfterHtOf: number;
+  recent: H2HMeeting[];
+  span: { from: string; to: string } | null;
+  competitions: { id: number; name: string; count: number }[];
+  /** Friendlies dropped, reported rather than hidden. */
+  excluded: number;
+};
+
+export type H2HResponse = {
+  summary: H2HSummary;
+  enough: boolean;
+  minMeetings: number;
+};
+
+export async function fetchHeadToHead(fixtureId: string): Promise<H2HResponse> {
+  return apiFetch<H2HResponse>(`/api/fixtures/${encodeURIComponent(fixtureId)}/h2h`);
+}
