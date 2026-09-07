@@ -793,6 +793,19 @@ function shortName(name: string): string {
 const RAIL = 44;
 const CHIP = 26;
 
+/**
+ * The minute's own column, one either side of the rail.
+ *
+ * ⚠ FIXED, AND PRESENT ON BOTH SIDES EVEN WHEN EMPTY. The minute belongs beside
+ * the icon, but it can only sit on the side the event happened on — and a slot
+ * that exists on one side only would push the rail off centre by its width and
+ * bend the line row to row. So both are always reserved and one is always
+ * blank, which is what keeps the spine dead straight.
+ *
+ * Wide enough for the longest value the feed produces: `90+7'` at 10pt mono.
+ */
+const MINUTE_COL = 34;
+
 function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMatch }) {
   const theme = useTheme();
   const isHome = event.side === 'home';
@@ -800,14 +813,7 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
   const note = eventNote(event);
   const minute = `${event.minute}${event.extraMinute ? `+${event.extraMinute}` : ''}'`;
 
-  /**
-   * Name, then minute and qualifier beneath it.
-   *
-   * ⚠ THE MINUTE MOVED OUT OF THE MIDDLE. It used to hold the centre column,
-   * which meant the rail could not — and a timeline reads as a spine with
-   * events hanging off it, not as a column of numbers. It sits with the event
-   * it belongs to now, on that team's side.
-   */
+  /** The player, and the qualifier the name alone does not carry. */
   const detail = (
     <View style={{ flex: 1, alignItems: isHome ? 'flex-end' : 'flex-start', gap: 1 }}>
       <RNText
@@ -822,18 +828,49 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
       >
         {event.playerName ? shortName(event.playerName) : '—'}
       </RNText>
-      <RNText
-        numberOfLines={1}
-        style={{
-          fontFamily: MONO,
-          fontSize: 10,
-          color: theme.colors.slate,
-          textAlign: isHome ? 'right' : 'left',
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {note ? `${minute} · ${note}` : minute}
-      </RNText>
+      {note ? (
+        <RNText
+          numberOfLines={1}
+          style={{
+            fontFamily: fontFamilies.medium,
+            fontSize: 11,
+            color: theme.colors.slate,
+            textAlign: isHome ? 'right' : 'left',
+          }}
+        >
+          {note}
+        </RNText>
+      ) : null}
+    </View>
+  );
+
+  /**
+   * The minute, hard against the rail on the event's own side.
+   *
+   * ⚠ ALIGNED TOWARDS THE CHIP, not centred in its column — `flex-end` on the
+   * left and `flex-start` on the right — so it reads as attached to the icon
+   * rather than floating between the icon and the name.
+   */
+  const minuteCell = (side: 'left' | 'right') => (
+    <View
+      style={{
+        width: MINUTE_COL,
+        alignItems: side === 'left' ? 'flex-end' : 'flex-start',
+        paddingHorizontal: 4,
+      }}
+    >
+      {(side === 'left') === isHome ? (
+        <RNText
+          style={{
+            fontFamily: MONO,
+            fontSize: 10,
+            color: theme.colors.slate,
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {minute}
+        </RNText>
+      ) : null}
     </View>
   );
 
@@ -850,6 +887,7 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
       }`}
     >
       {isHome ? detail : <View style={{ flex: 1 }} />}
+      {minuteCell('left')}
 
       {/* The chip sits ON the line. Its opaque fill is what makes the line look
           like it passes behind it rather than stopping at it. */}
@@ -884,6 +922,7 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
         </View>
       </View>
 
+      {minuteCell('right')}
       {isHome ? <View style={{ flex: 1 }} /> : detail}
     </View>
   );
