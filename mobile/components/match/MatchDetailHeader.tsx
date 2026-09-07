@@ -726,7 +726,7 @@ function Scorers({ home, away }: { home: ScorerLine[]; away: ScorerLine[] }) {
       {/* The ball sits on the first line's baseline rather than centred on the
           block, so it does not drift down as one side's list grows. */}
       <View style={{ paddingTop: 2 }}>
-        <Icon name="sportscourt.fill" size={12} tint="rgba(255,255,255,0.72)" solid />
+        <Icon name="sportscourt.fill" size={11} tint="rgba(255,255,255,0.55)" solid />
       </View>
       <ScorerColumn lines={away} align="left" />
     </View>
@@ -741,9 +741,18 @@ function ScorerColumn({ lines, align }: { lines: ScorerLine[]; align: 'left' | '
           key={line.name}
           numberOfLines={1}
           style={{
-            fontFamily: fontFamilies.medium,
+            // ⚠ DELIBERATELY QUIET. These sit directly under the scoreline, and
+            // at full weight two columns of names out-shout the 2-1 they are
+            // explaining. Light enough to read as a caption, which is what they
+            // are — the score is the headline and this is its footnote.
+            //
+            // ⚠ 0.66 IS THE FLOOR, not a starting point. The band behind is a
+            // competition colour and its lightest end is already well short of
+            // black; going further turns a caption into a smudge on the pale
+            // half of the gradient.
+            fontFamily: fontFamilies.regular,
             fontSize: 11.5,
-            color: 'rgba(255,255,255,0.88)',
+            color: 'rgba(255,255,255,0.66)',
             textAlign: align,
           }}
         >
