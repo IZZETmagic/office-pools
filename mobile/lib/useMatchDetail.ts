@@ -9,9 +9,20 @@ import {
   type MatchStatsResponse,
 } from './api';
 import { useHomeData } from './HomeDataProvider';
+import {
+  clubForm,
+  earlierMeeting,
+  feedForm,
+  rowFor,
+  tableForMatch,
+  tableSlice,
+  type FormResult,
+  type TableSliceEntry,
+} from './matchContext';
 import { supabase } from './supabase';
 import { useTournamentMatches } from './TournamentMatchesProvider';
 import {
+  type LeagueSeasonTable,
   type ResultsMatch,
   type ResultsTeam,
 } from './useTournamentMatches';
@@ -200,7 +211,7 @@ export function useMatchDetail(matchId: string | undefined) {
   // It is taken from the list ALREADY IN MEMORY rather than fetched. The
   // provider holds the whole season; re-requesting one fixture of it on every
   // tap would be a round trip to learn something the app already knows.
-  const { matches: allMatches } = useTournamentMatches();
+  const { matches: allMatches, leagueTables } = useTournamentMatches();
   const leagueMatch = useMemo(
     () => allMatches.find((m) => m.matchId === matchId && m.roundNumber !== null) ?? null,
     [allMatches, matchId],
@@ -565,6 +576,38 @@ export function useMatchDetail(matchId: string | undefined) {
     };
   }, [matchId, leagueMatch]);
 
+  /**
+   * The league context around this fixture — table slice, both clubs' form, and
+   * the reverse fixture.
+   *
+   * ⚠ DERIVED, NOT FETCHED, AND THAT IS THE WHOLE REASON IT IS AFFORDABLE. Every
+   * input is already in memory: `allMatches` is the whole season and
+   * `leagueTables` is the whole ordered table, both from the single
+   * `/api/users/:id/fixtures` payload the Results tab already pays for. Asking
+   * the network for any of it on a tap would be the fetch-per-goal pattern the
+   * league read-path review exists to stop.
+   *
+   * Null for a World Cup match, which has `competitionId === null` and its own
+   * group standings card.
+   */
+  const leagueContext = useMemo<LeagueMatchContext | null>(() => {
+    if (!match || match.competitionId === null) return null;
+
+    const table = tableForMatch(leagueTables, match);
+    const slice = table ? tableSlice(table.standings, match.homeTeamId, match.awayTeamId) : null;
+
+    const formOpts = { competitionId: match.competitionId, beforeKickoff: match.matchDate };
+    return {
+      table,
+      slice,
+      homeForm: clubForm(allMatches, { ...formOpts, clubId: match.homeTeamId }),
+      awayForm: clubForm(allMatches, { ...formOpts, clubId: match.awayTeamId }),
+      homeFeedForm: feedForm(rowFor(table, match.homeTeamId)),
+      awayFeedForm: feedForm(rowFor(table, match.awayTeamId)),
+      earlier: earlierMeeting(allMatches, match),
+    };
+  }, [match, allMatches, leagueTables]);
+
   return {
     match,
     predictionInfos,
@@ -573,11 +616,24 @@ export function useMatchDetail(matchId: string | undefined) {
     groupStandings,
     timeline,
     facts,
+    leagueContext,
     loading,
     error,
     refresh: load,
   };
 }
+
+/** Everything the Facts tab shows around a league fixture. See `leagueContext`. */
+export type LeagueMatchContext = {
+  table: LeagueSeasonTable | null;
+  /** Null when either club has no table row — early season, before a table exists. */
+  slice: TableSliceEntry[] | null;
+  homeForm: FormResult[];
+  awayForm: FormResult[];
+  homeFeedForm: ('W' | 'D' | 'L')[];
+  awayFeedForm: ('W' | 'D' | 'L')[];
+  earlier: ResultsMatch | null;
+};
 
 /**
  * The Facts tab's two reads, in ONE round trip.

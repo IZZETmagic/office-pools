@@ -32,6 +32,8 @@ import {
   MONO_BOLD,
   stageLabel,
 } from '@/components/match/matchDisplay';
+import { FormCard } from '@/components/match/FormCard';
+import { LeagueTableSliceCard } from '@/components/match/LeagueTableSliceCard';
 import { MATCH_TABS, MatchTabBar, type MatchTabKey } from '@/components/match/MatchTabBar';
 import { Icon, Text } from '@/components/ui';
 import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
@@ -81,6 +83,7 @@ export default function MatchDetailScreen() {
     groupStandings,
     timeline,
     facts,
+    leagueContext,
     loading,
     error,
     refresh,
@@ -158,6 +161,32 @@ export default function MatchDetailScreen() {
           <View style={{ gap: 16 }}>
             {timeline.length > 0 ? <TimelineCard match={m} events={timeline} facts={facts} /> : null}
             <MatchInfoCard match={m} facts={facts} />
+            {/*
+              ⚠ FORM SITS ABOVE THE TABLE, AND ONLY ON A LEAGUE FIXTURE. Before
+              kickoff there is no timeline, so form is the first thing on this
+              tab with anything to say — and it is the thing a member opening a
+              fixture is actually asking about. The World Cup keeps its group
+              card below, unchanged.
+            */}
+            {leagueContext && hasForm(leagueContext) ? (
+              <FormCard
+                homeName={homeDisplayName(m)}
+                awayName={awayDisplayName(m)}
+                homeForm={leagueContext.homeForm}
+                awayForm={leagueContext.awayForm}
+                homeFeedForm={leagueContext.homeFeedForm}
+                awayFeedForm={leagueContext.awayFeedForm}
+                earlier={leagueContext.earlier}
+                match={m}
+              />
+            ) : null}
+            {leagueContext?.slice && leagueContext.table ? (
+              <LeagueTableSliceCard
+                entries={leagueContext.slice}
+                competition={leagueContext.table.competition}
+                seasonId={leagueContext.table.season_id}
+              />
+            ) : null}
             {groupStandings.length > 0 ? (
               <GroupStandingsCard groupLetter={m.groupLetter} standings={groupStandings} />
             ) : null}
@@ -384,6 +413,24 @@ function TabPage({
     >
       {children}
     </Animated.ScrollView>
+  );
+}
+
+/**
+ * Has this fixture anything to say about form?
+ *
+ * ⚠ THE FEED STRING COUNTS, NOT JUST THE DERIVED RESULTS. A member opening the
+ * first fixture of a season has no prior games in memory, but the table may
+ * still carry last season's tail in `form` — and the card renders that. Testing
+ * only `homeForm.length` would hide a populated card.
+ */
+function hasForm(ctx: NonNullable<ReturnType<typeof useMatchDetail>['leagueContext']>): boolean {
+  return (
+    ctx.homeForm.length > 0 ||
+    ctx.awayForm.length > 0 ||
+    ctx.homeFeedForm.length > 0 ||
+    ctx.awayFeedForm.length > 0 ||
+    ctx.earlier !== null
   );
 }
 
