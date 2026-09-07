@@ -1059,6 +1059,9 @@ export default function PoolDetailScreen() {
           you={duelYou}
           onReveal={duelPhaseState.phase === 'revealable' ? () => setWalkoutOpen(true) : null}
           phase={duelPhaseState.phase}
+          /* ⚠ THE SAME ANSWER THE DUEL TAB GETS. The band's right-hand glow is
+             the opponent's own colour, so this gates light as well as text. */
+          opponentVisible={duelPhaseState.opponentVisible}
           standings={duelStandings}
           kickoffAt={duel.currentKickoff}
           liveScore={duel.liveScore}

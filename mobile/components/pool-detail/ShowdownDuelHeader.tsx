@@ -256,6 +256,30 @@ type Props = {
    * band. The band was not wrong about the duel; it was wrong about the week.
    */
   phase?: DuelPhase;
+  /**
+   * May the opponent be named OR COLOURED — `duelPhase(...).opponentVisible`.
+   *
+   * ⚠⚠ THE COLOUR IS AS MUCH OF A TELL AS THE NAME. The right-hand throw is lit
+   * with `gradientForUser(userId)`, the opponent's own light stop — the exact
+   * colour their avatar is in Banter, on the leaderboard and on every pool card
+   * they appear on. Anybody who has seen this pool for a week can read the
+   * band's right half and know who is behind the lock.
+   *
+   * Ryan, 2026-09-06, on a sealed matchweek 4: *"there should be no glow colour
+   * on that side of the header because we do not know what colour they will be
+   * yet while it is sealed."* The band was throwing Marcus's green across half
+   * of itself under a padlock.
+   *
+   * ⚠ IT REPLACES `onReveal` AS THE VISIBILITY TEST, which was only ever a
+   * proxy. `onReveal` is present in exactly one phase, so gating on it covered
+   * `revealable` and silently missed `sealed` — where `bout` is still last
+   * week's settled duel and `bout.them` is still last week's opponent. Same
+   * root cause as the tab and the band before it: a component inferring the
+   * phase from something adjacent to it instead of reading the machine.
+   *
+   * `onReveal` now means one thing only: draw the Reveal button.
+   */
+  opponentVisible?: boolean;
   /** entry_id → where they sit on the leaderboard. */
   standings: Map<string, Standing>;
   /** First kickoff of the current duel's matchweek — the countdown's target. */
@@ -303,6 +327,7 @@ export function ShowdownDuelHeader({
   you,
   onReveal,
   phase,
+  opponentVisible = true,
   standings,
   kickoffAt,
   liveScore,
@@ -345,16 +370,18 @@ export function ShowdownDuelHeader({
   const youUserId =
     (bout ? standings.get(bout.you.entryId)?.userId : null) ??
     (you ? standings.get(you.entryId)?.userId ?? null : null);
-  /**
-   * ⚠ NULL WHILE THE WALKOUT IS OWED. The right-hand throw is lit with the
-   * opponent's OWN light stop — `gradientForUser(userId)` — which is the exact
-   * colour their avatar is in Banter and on the leaderboard. Leaving it on
-   * during phase 2 would paint the answer across half the band while the middle
-   * of it still says "Reveal".
-   */
+  // ⚠ See `Props.opponentVisible`: the colour identifies them as surely as the
+  // name does, and `bout.them` outlives the week it belonged to.
   const themUserId =
-    !onReveal && bout?.them ? standings.get(bout.them.entryId)?.userId ?? null : null;
+    opponentVisible && bout?.them ? standings.get(bout.them.entryId)?.userId ?? null : null;
   const leftGlow = youUserId ? gradientForUser(youUserId)[0] : BAND.primary;
+  /**
+   * ⚠ NEUTRAL, NOT ABSENT. With no throw at all the band goes visibly lopsided —
+   * lit from the left, flat on the right — which reads as a rendering fault
+   * rather than as a sealed week. `BAND.slate` keeps the composition and
+   * identifies nobody: it is the same grey the locked silhouette and its ring
+   * take, so the whole right-hand side says one thing.
+   */
   const rightGlow = themUserId ? gradientForUser(themUserId)[0] : BAND.slate;
   // ⚠ One value, not a light/dark pair: the band is dark in BOTH app themes, so
   // there is no pale surface for this to be restrained against any more.
@@ -554,6 +581,7 @@ export function ShowdownDuelHeader({
                 you={you}
                 onReveal={onReveal ?? null}
                 phase={phase}
+                opponentVisible={opponentVisible}
                 standings={standings}
                 kickoffAt={kickoffAt}
                 liveScore={liveScore}
@@ -687,6 +715,7 @@ function Matchup({
   you,
   onReveal,
   phase,
+  opponentVisible,
   standings,
   kickoffAt,
   liveScore,
@@ -703,6 +732,7 @@ function Matchup({
   you: Props['you'];
   onReveal: (() => void) | null;
   phase: DuelPhase | undefined;
+  opponentVisible: boolean;
   standings: Map<string, Standing>;
   kickoffAt: string | null;
   liveScore: Props['liveScore'];
@@ -841,11 +871,15 @@ function Matchup({
             opponent.
           */}
           <Corner
-            name={onReveal ? 'Sealed' : bout.them ? bout.them.name : 'Nobody'}
-            standing={!onReveal && bout.them ? standings.get(bout.them.entryId) ?? null : null}
-            tone={onReveal || !bout.them ? 'muted' : 'red'}
-            sealed={!!onReveal}
-            subtitle={onReveal ? 'Tap Reveal' : bout.them ? undefined : 'Bye week'}
+            name={!opponentVisible ? 'Sealed' : bout.them ? bout.them.name : 'Nobody'}
+            standing={
+              opponentVisible && bout.them ? standings.get(bout.them.entryId) ?? null : null
+            }
+            tone={!opponentVisible || !bout.them ? 'muted' : 'red'}
+            sealed={!opponentVisible}
+            subtitle={
+              !opponentVisible ? 'Tap Reveal' : bout.them ? undefined : 'Bye week'
+            }
             moveStyle={rightMove}
             avatarShrink={avatarShrink}
             labelFade={labelFade}

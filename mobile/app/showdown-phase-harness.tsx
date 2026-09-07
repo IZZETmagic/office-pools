@@ -325,6 +325,12 @@ export default function ShowdownPhaseHarness() {
            Reveal the machine does not think is owed — which is the one
            disagreement this harness exists to catch. */
         onReveal={resolved.phase === 'revealable' ? () => setWatching(true) : null}
+        phase={resolved.phase}
+        /* ⚠ THE HARNESS MUST PASS EVERYTHING THE SCREEN PASSES. Left off, this
+           defaults to `true` and the band would light the opponent's corner in
+           their own colour during phase 2 — the harness showing a leak the real
+           screen does not have is as bad as the reverse. */
+        opponentVisible={resolved.opponentVisible}
         standings={standings}
         kickoffAt={s.band.kickoffAt}
         liveScore={s.band.liveScore}
