@@ -18,6 +18,28 @@
 --
 -- Plan: ~/.claude/plans/concurrent-swimming-quiche.md → Piece 2
 --
+-- ✅ APPLIED TO PRODUCTION 2026-09-07 (ujthamlehjyubbzxbnes). VERIFY block run
+--    after: 6 indexes (3 per table — pkey + two partial uniques), RLS on for
+--    both with exactly one authenticated SELECT policy each, and all SEVEN
+--    constraint-bite checks refused with 23514 (XOR both-null and both-set on
+--    each table, players-not-an-array, a side of 'neither', possession 6500,
+--    passes_pct -1). Nothing existing moved: 1752 league_fixtures and 2274
+--    match_events, unchanged either side.
+--
+-- ✅ BACKFILLED 2026-09-07 by `scripts/backfill-match-lineups-stats.ts`:
+--    142 completed fixtures across five leagues, 284 api calls, 284 line-up
+--    rows and 284 stat rows, ZERO failures and zero fixtures the feed had
+--    nothing for. Possession sums to 100 on every one of the 142.
+--
+--    ⚠ AND THE LIVE DATA VINDICATED THE VARIABLE-TYPE-SET DESIGN. Of 60
+--    Premier League stat rows only 40 carry `expected_goals` and only 20 carry
+--    `Free Kicks`; `red_cards` is NULL on 38 of them. So the "ignore unknown,
+--    leave absent NULL" rule is load-bearing in this season's real data, not a
+--    hypothetical. xG is all-or-nothing PER FIXTURE — 94 fixtures have it on
+--    both sides, 48 on neither, none mixed — so the screen's hide-when-both-
+--    null rule never draws a dangling dash, and those 48 would have printed a
+--    false "xG 0.00" under a coerce-to-zero design.
+--
 -- ## What this is for
 --
 -- The match detail screen's two missing tabs. `MatchTabBar` has carried a note
