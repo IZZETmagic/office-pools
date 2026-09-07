@@ -3,11 +3,19 @@ import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 // =============================================================
 // A football pitch, to scale
 // =============================================================
-// ⚠ THE VIEWBOX IS THE REAL PITCH IN METRES — 68 wide by 105 long — so every
-// marking below is its actual dimension rather than a number that looked right:
-// a penalty area is 40.32 × 16.5, a six-yard box 18.32 × 5.5, the spot 11 out
-// and every arc 9.15. Drawing it any other way means guessing at proportions a
-// viewer has seen ten thousand times and will notice being wrong.
+// ⚠ THE VIEWBOX IS IN METRES, AND EVERY MARKING IS ITS REAL SIZE: a penalty
+// area is 40.32 × 16.5, a six-yard box 18.32 × 5.5, the spot 11 out and every
+// arc 9.15. Drawing them any other way means guessing at proportions a viewer
+// has seen ten thousand times and will notice being wrong.
+//
+// ⚠ THE LENGTH, HOWEVER, IS DELIBERATELY LONGER THAN A REAL PITCH — 126m drawn
+// against 105m real. Ryan asked for more height, and there are two ways to get
+// it. Stretching the whole drawing is the obvious one and is wrong: it turns
+// the centre circle into an ellipse and deepens the penalty areas, so every
+// shape a viewer knows becomes subtly incorrect. Adding GRASS instead leaves
+// each marking exactly right and simply puts more midfield between the boxes,
+// which is also the space the formation needed. `PITCH_L` is the only
+// fictional number in this file; a real pitch is 105.
 //
 // ⚠ SVG RATHER THAN BORDERED VIEWS, AND THE 'D' IS WHY. Four of these shapes
 // are arcs — the centre circle and the three arcs off the penalty spots — and a
@@ -21,9 +29,18 @@ import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 // rather than one being a rotation of the other.
 // =============================================================
 
-/** Pitch length and width in metres — the viewBox, and the aspect ratio to lay out at. */
+/** The pitch's real width in metres. Every marking below is sized in metres too. */
 export const PITCH_W = 68;
-export const PITCH_L = 105;
+
+/**
+ * The length we actually draw.
+ *
+ * ⚠ FICTIONAL, AND THE ONLY FICTIONAL NUMBER IN THIS FILE. It buys vertical
+ * room for the two elevens without distorting a single marking: the extra 21m
+ * all lands in midfield, between two penalty areas that stay 16.5 deep and
+ * either side of a centre circle that stays round.
+ */
+export const PITCH_L = 126;
 
 // Every measurement below is the real one, in metres.
 const PEN_W = 40.32;
@@ -54,9 +71,10 @@ export function PitchMarkings({ stroke = 'rgba(255,255,255,0.30)' }: { stroke?: 
       width="100%"
       height="100%"
       viewBox={`0 0 ${PITCH_W} ${PITCH_L}`}
-      // ⚠ The container is laid out at the pitch's own aspect ratio, so nothing
-      // needs stretching — and stretching would turn the centre circle into an
-      // ellipse, which is the one marking everybody knows the shape of.
+      // ⚠ The container is laid out at exactly this viewBox's ratio, so nothing
+      // is stretched — which is the whole reason the extra length is drawn as
+      // grass rather than taken by scaling. Stretching would turn the centre
+      // circle into an ellipse, the one marking everybody knows the shape of.
       preserveAspectRatio="xMidYMid meet"
       pointerEvents="none"
     >
