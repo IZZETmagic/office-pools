@@ -2,8 +2,10 @@ import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
+import { fixturePalette } from '@/lib/design/clubColors';
 import { leadingSide, visibleStatSections, type StatRow, type StatSection } from '@/lib/matchStatRows';
 import type { MatchTeamStats } from '@/lib/useMatchDetail';
+import type { ResultsTeam } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -45,14 +47,27 @@ export function StatsTab({
   stats,
   homeName,
   awayName,
+  homeTeam,
+  awayTeam,
 }: {
   stats: MatchTeamStats[];
   homeName: string;
   awayName: string;
+  /** For the club colours — the crest URL is where the club's id hides. */
+  homeTeam: ResultsTeam | null;
+  awayTeam: ResultsTeam | null;
 }) {
   const theme = useTheme();
   const home = stats.find((s) => s.side === 'home') ?? null;
   const away = stats.find((s) => s.side === 'away') ?? null;
+
+  // ⚠ THE CLUBS' OWN COLOURS WHERE THEY CAN BE TOLD APART, the app's pair
+  // otherwise. `fixturePalette` decides; see `clubColors` for why a red-v-red
+  // fixture reverts rather than shipping two pills nobody can distinguish.
+  const palette = fixturePalette(homeTeam?.flagUrl, awayTeam?.flagUrl, {
+    home: theme.colors.primary,
+    away: theme.colors.accent,
+  });
 
   const sections = visibleStatSections(home, away);
 
@@ -84,7 +99,7 @@ export function StatsTab({
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-          <Swatch color={theme.colors.primary} />
+          <Swatch color={palette.home} />
           <RNText
             numberOfLines={1}
             style={{ flex: 1, fontFamily: fontFamilies.bold, fontSize: 12, color: theme.colors.ink }}
@@ -104,12 +119,18 @@ export function StatsTab({
           >
             {awayName}
           </RNText>
-          <Swatch color={theme.colors.accent} />
+          <Swatch color={palette.away} />
         </View>
       </View>
 
       {sections.map((section) => (
-        <SectionCard key={section.key} section={section} home={home} away={away} />
+        <SectionCard
+          key={section.key}
+          section={section}
+          home={home}
+          away={away}
+          palette={palette}
+        />
       ))}
     </View>
   );
@@ -119,14 +140,18 @@ function Swatch({ color }: { color: string }) {
   return <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />;
 }
 
+type Palette = { home: string; away: string };
+
 function SectionCard({
   section,
   home,
   away,
+  palette,
 }: {
   section: StatSection;
   home: MatchTeamStats | null;
   away: MatchTeamStats | null;
+  palette: Palette;
 }) {
   const theme = useTheme();
   const isPossession = section.key === 'possession';
@@ -147,10 +172,10 @@ function SectionCard({
 
       {isPossession
         ? section.rows.map((row) => (
-            <PossessionBar key={row.key} row={row} home={home} away={away} />
+            <PossessionBar key={row.key} row={row} home={home} away={away} palette={palette} />
           ))
         : section.rows.map((row, i) => (
-            <StatBar key={row.key} row={row} home={home} away={away} first={i === 0} />
+            <StatBar key={row.key} row={row} home={home} away={away} first={i === 0} palette={palette} />
           ))}
       <View style={{ height: 8 }} />
     </View>
@@ -169,10 +194,12 @@ function PossessionBar({
   row,
   home,
   away,
+  palette,
 }: {
   row: StatRow;
   home: MatchTeamStats | null;
   away: MatchTeamStats | null;
+  palette: Palette;
 }) {
   const theme = useTheme();
   const h = home ? row.read(home) : null;
@@ -188,7 +215,7 @@ function PossessionBar({
             flex: Math.max(hFlex, 0.001),
             minWidth: 34,
             borderRadius: theme.radii.xs,
-            backgroundColor: theme.colors.primary,
+            backgroundColor: palette.home,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -204,7 +231,7 @@ function PossessionBar({
             flex: Math.max(1 - hFlex, 0.001),
             minWidth: 34,
             borderRadius: theme.radii.xs,
-            backgroundColor: theme.colors.accent,
+            backgroundColor: palette.away,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -225,11 +252,13 @@ function StatBar({
   home,
   away,
   first,
+  palette,
 }: {
   row: StatRow;
   home: MatchTeamStats | null;
   away: MatchTeamStats | null;
   first: boolean;
+  palette: Palette;
 }) {
   const theme = useTheme();
   const h = home ? row.read(home) : null;
@@ -254,7 +283,7 @@ function StatBar({
         borderTopColor: withOpacity(theme.colors.mist, 0.5),
       }}
     >
-      <Value value={hShown} row={row} align="left" lit={leads === 'home'} color={theme.colors.primary} />
+      <Value value={hShown} row={row} align="left" lit={leads === 'home'} color={palette.home} />
       <RNText
         numberOfLines={2}
         style={{
@@ -267,7 +296,7 @@ function StatBar({
       >
         {row.label}
       </RNText>
-      <Value value={aShown} row={row} align="right" lit={leads === 'away'} color={theme.colors.accent} />
+      <Value value={aShown} row={row} align="right" lit={leads === 'away'} color={palette.away} />
     </View>
   );
 }

@@ -252,6 +252,8 @@ export default function MatchDetailScreen() {
             stats={teamStats}
             homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
             awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
+            homeTeam={m.homeTeam}
+            awayTeam={m.awayTeam}
           />
         );
       case 'predictions':
