@@ -58,7 +58,7 @@
 // matchweek is both fully played and fully scored.
 // =============================================================
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
@@ -66,6 +66,8 @@ import { Countdown } from '@/components/ui/Countdown'
 import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
 import { DuelRevealCeremony, type RevealOpponent } from './DuelRevealCeremony'
 import { DUEL_WIN, DUEL_TIE, duelResult } from '@/lib/league/duelPoints'
+import { duelPhase } from '@/lib/league/duelPhase'
+import { createClient } from '@/lib/supabase/client'
 import { Icon } from '@/components/ui/Icon'
 import { headToHead, type DuelRow } from '@/lib/league/duels'
 import { ownPickDirections } from '@/lib/league/ownPicks'
@@ -75,45 +77,25 @@ import type { MatchweekFixture } from './PoolDetail'
 import { ShowdownBand } from './ShowdownBand'
 
 // -------------------------------------------------------------
-// HAS THIS BROWSER PLAYED THE WALKOUT FOR THIS DUEL?
+// HAS THIS MEMBER PLAYED THE WALKOUT FOR THIS DUEL?
 // -------------------------------------------------------------
-// ⚠ AN EXTERNAL STORE, READ WITH useSyncExternalStore, and both halves of that
-// are deliberate. Reading `localStorage` during render is not SSR-safe, and
-// reading it in an effect instead means the first paint says "not seen" and the
-// second says "seen" — which on this band is the opponent's face appearing and
-// then the button relabelling, a visible flicker on every load. The hook exists
-// for exactly this: a real snapshot on the client, a fixed one on the server.
+// ⚠ IT IS A COLUMN NOW — `pool_entries.last_reveal_seen_duel`, migration 136.
 //
-// ⚠ THE IN-MEMORY SET IS NOT A CACHE, it is the fallback that keeps the promise.
-// Private browsing throws on `localStorage` access — not just writes — so a
-// member there could press Reveal, close it, and be handed the Reveal button
-// again forever, trapped behind an animation with no way past it. Remembering
-// it in memory costs nothing and means the worst case is losing it on reload.
-const seenReveals = new Set<string>()
-/** Fired on ourselves, because the `storage` event only fires in OTHER tabs. */
-const REVEAL_SEEN_EVENT = 'sp:duel-revealed'
-
-function revealKey(duelId: string) { return `sp:duel-revealed:${duelId}` }
-
-function hasSeenReveal(duelId: string): boolean {
-  if (seenReveals.has(duelId)) return true
-  try { return window.localStorage.getItem(revealKey(duelId)) === '1' } catch { return false }
-}
-
-function markSeenReveal(duelId: string) {
-  seenReveals.add(duelId)
-  try { window.localStorage.setItem(revealKey(duelId), '1') } catch { /* memory only; see above */ }
-  window.dispatchEvent(new Event(REVEAL_SEEN_EVENT))
-}
-
-function subscribeRevealSeen(onChange: () => void) {
-  window.addEventListener(REVEAL_SEEN_EVENT, onChange)
-  window.addEventListener('storage', onChange)
-  return () => {
-    window.removeEventListener(REVEAL_SEEN_EVENT, onChange)
-    window.removeEventListener('storage', onChange)
-  }
-}
+// This was a `localStorage` set read through `useSyncExternalStore`, and the
+// note above it already said what was wrong with that: *"PER DEVICE ... the
+// durable home is a column beside `last_recap_seen_at`"*. That column shipped
+// on 2026-09-06 and the phone moved to it the same day, which turned a
+// defensible v1 into a real disagreement — meet your opponent on a laptop, open
+// the app, and the phone knew while the browser did not.
+//
+// The marker arrives as a prop (resolved server-side in page.tsx from rows the
+// pool already loads) and the write goes straight back to `pool_entries` with
+// the viewer's own client, exactly as the recap's does.
+//
+// ⚠ OPTIMISTIC, AND IT HAS TO BE. The ceremony closes the instant Skip is
+// pressed; waiting on a round trip would hold a full-screen takeover open on a
+// bad connection. A failed write means the walkout reappears next visit —
+// annoying, and far better than the alternative.
 
 
 type Props = {
@@ -226,6 +208,15 @@ type Props = {
   bandHeader?: React.ReactNode
   /** Your points and the pool's median, per matchweek (migration 124). */
   series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
+  /**
+   * entry_id → `pool_entries.last_reveal_seen_duel` (136), the viewer's own
+   * entries only. Resolved on the server; see `ShowdownData`.
+   */
+  revealSeen: Map<string, string | null>
+  /** Migration 136 is not deployed here — the walkout is suppressed entirely. */
+  revealColumnMissing: boolean
+  /** `pool_entries.last_recap_seen_at` (122), as the CLIENT currently believes it. */
+  recapSeenAt: string | null
 }
 
 type Side = { entry: string; points: number | null; accuracy: number | null }
@@ -659,6 +650,9 @@ export default function DuelsTab({
   showContent = true,
   bandHeader = null,
   series,
+  revealSeen,
+  revealColumnMissing,
+  recapSeenAt,
 }: Props) {
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
 
@@ -729,6 +723,41 @@ export default function DuelsTab({
     [mine, openMatchweek, inPlayMatchweek],
   )
 
+  /**
+   * The duel in focus — the first UNSETTLED bout, falling back to the last
+   * result. `useDuel.current` on the phone, computed the same way.
+   *
+   * ⚠ `mine` IS SORTED BY MATCHWEEK NUMBER, which is not the order they are
+   * PLAYED in (101 measured a minimum gap of minus 121 days across three real
+   * seasons). That is right for "the first unsettled bout" — the lowest-numbered
+   * week still to be decided is the one you are in — and wrong for "the last
+   * result", which has to be the latest to have SETTLED. Hence the two
+   * different reductions below.
+   */
+  const current = useMemo(() => {
+    const unsettled = mine.find((m) => !m.duel.settled_at)
+    if (unsettled) return unsettled
+    const settled = mine.filter((m) => m.duel.settled_at)
+    if (settled.length === 0) return null
+    return settled.reduce((a, b) => (a.duel.settled_at! > b.duel.settled_at! ? a : b))
+  }, [mine])
+
+  /**
+   * When this viewer's most recent duel was DECIDED.
+   *
+   * ⚠ NOT `current`'s. Once next week's duel reveals, `current` moves on to it
+   * while last week's recap may still be unseen — which is the ordinary case for
+   * anyone who does not open the app on a Monday.
+   */
+  const lastSettledAt = useMemo(() => {
+    let latest: string | null = null
+    for (const m of mine) {
+      const at = m.duel.settled_at
+      if (at && (latest === null || at > latest)) latest = at
+    }
+    return latest
+  }, [mine])
+
   // The duel table — everyone, by duel points. Built from the duels themselves
   // so it cannot disagree with the fixture list beside it.
   const table = useMemo(() => buildDuelTable(duels, duelPoints), [duels, duelPoints])
@@ -748,7 +777,11 @@ export default function DuelsTab({
    * all (migration 116 withholds them). The button is not rendered otherwise.
    */
   const revealOpponent = useMemo<RevealOpponent | null>(() => {
-    const themEntry = open?.them?.entry
+    // ⚠ `current`, THE SAME ROW THE BAND AND THE PHASE MACHINE READ. It was
+    // `open` — a second answer to "which duel am I in", derived from a
+    // different input — so a week where the two disagreed would have revealed
+    // one opponent and then named another.
+    const themEntry = current?.them?.entry
     if (!themEntry) return null
     const person = entryPeople.get(themEntry)
     if (!person) return null
@@ -761,50 +794,120 @@ export default function DuelsTab({
       duelPoints: t?.duelPoints ?? 0,
       rank: t?.rank ?? null,
     }
-  }, [open, entryPeople, entryNames, table, totals])
+  }, [current, entryPeople, entryNames, table, totals])
 
   const [ceremonyOpen, setCeremonyOpen] = useState(false)
 
   /**
-   * Has this viewer actually played the reveal for the open duel?
+   * The walkout this member has just watched, before the write comes back.
    *
-   * ⚠ THIS NOW HIDES THE OPPONENT, which reverses how the band shipped. It used
-   * to show their face and rank BESIDE the Reveal button, on the reasoning that
-   * the ceremony should never be the only way to learn who you drew. Ryan,
-   * 2026-09-01: *"You can't see your opponent in their spot until after the
-   * reveal has happened."* He is right and the old note was wrong — a reveal
-   * button next to the answer reveals nothing.
-   *
-   * ⚠ WHICH IS WHY IT HAD TO GAIN PERSISTENCE. The previous comment here said
-   * "no persistence, and that is the design", and that held only while the face
-   * was visible anyway. Once pressing the button is the way you find out, a
-   * reload that forgets would re-hide an opponent you have already met.
-   *
-   * ⚠ CLOSING COUNTS AS SEEING, however you close it — finished, escaped, or
-   * bailed at two seconds. That is the accessibility floor the old note was
-   * protecting: if the corridor cannot render (no WebGL, reduced motion, a
-   * thrown error) you press Reveal, close it, and the band tells you. Nobody
-   * can be trapped behind an animation that will not play.
-   *
-   * ⚠ PER DEVICE, because it is `localStorage`. Revealing on a laptop and then
-   * opening a phone replays the walkout, which is a defensible v1 — but the
-   * durable home is a column beside `last_recap_seen_at`, which already tracks
-   * exactly this shape of "has this viewer been shown it" server-side.
+   * ⚠ IT OVERRIDES THE PROP RATHER THAN REPLACING IT. The server marker is the
+   * truth and re-arrives on every navigation; this only has to carry the gap
+   * between pressing Skip and the row being updated. Holding the whole marker
+   * in state instead would go stale against a second tab, and a stale "seen"
+   * is a walkout somebody never gets.
    */
-  const openDuelId = open?.duel.duel_id ?? null
-  const revealSeen = useSyncExternalStore(
-    subscribeRevealSeen,
-    () => (openDuelId ? hasSeenReveal(openDuelId) : false),
-    // ⚠ THE SERVER SNAPSHOT IS ALWAYS `false`, which is the safe direction: the
-    // markup that ships from the server withholds the opponent. If it guessed
-    // "seen" and the browser disagreed, the first paint would leak the face the
-    // whole feature exists to withhold.
-    () => false,
-  )
+  const [seenOverride, setSeenOverride] = useState<string | null>(null)
 
+  /**
+   * ⚠⚠ ONE DERIVATION FOR ALL SIX PHASES, AND NOTHING IN THIS FILE MAY ASK
+   * "is it sealed?" OR "is it revealed?" FOR ITSELF.
+   *
+   * This replaces the if-chain that used to live in `bandNode`, whose order was
+   * held correct only by a test that read this file as TEXT and compared two
+   * `indexOf` positions (`bandStateOrder.guard.test.ts`, now retired). That
+   * guard existed because the order had already failed in front of members on
+   * 2026-09-01, and it could only ever protect the one chain it was pointed at.
+   *
+   * `lib/league/duelPhase.ts` carries the order as logic, is tested on what it
+   * RETURNS, and is the same module the phone reads — so the two apps cannot
+   * put the same member in different halves of the cycle.
+   *
+   * ⚠ IT DERIVES NOTHING, and neither may the inputs. Every instant below comes
+   * from the server: the sealed week and its clock from `league_duel_reveals_at`
+   * (127/129), the in-play week from `inPlayMatchweekId`, settlement from
+   * `league_duels.settled_at`. If you are about to compute one here, ask the
+   * contract for it instead.
+   */
+  const phase = useMemo(() => {
+    const youEntry = current?.you.entry ?? null
+    /**
+     * ⚠ THE COLUMN MAY BE KNOWN-ABSENT, WHICH IS NOT `null`. Null means "never
+     * watched one" and OPENS the walkout; absent means the dismissal cannot be
+     * stored, which must CLOSE it, or the ceremony replays on every page load.
+     * Saying "the reveal I last watched is the one on screen" does that in
+     * VALUES rather than as an extra branch, so `duelPhase` keeps one code
+     * path. It re-arms itself the moment 136 lands.
+     */
+    const seen = revealColumnMissing
+      ? current?.duel.duel_id ?? null
+      : youEntry ? revealSeen.get(youEntry) ?? null : null
+
+    return duelPhase({
+      hasDraw: mine.length > 0 || sealedMatchweek !== null,
+      current: current
+        ? {
+            duelId: current.duel.duel_id,
+            matchweek: current.matchweek,
+            settledAt: current.duel.settled_at,
+          }
+        : null,
+      sealedMatchweek,
+      /**
+       * ⚠ THE SERVER'S OWN ANSWER, and it must be about `current`'s week rather
+       * than merely "some week is in play". A late joiner (migration 100) has no
+       * duel in the week being played, and telling the machine football is
+       * happening would put their finished bout on a live band.
+       */
+      isInPlay: inPlayMatchweek !== null && current?.matchweek === inPlayMatchweek,
+      lastSettledAt,
+      revealSeenDuel: seenOverride ?? seen,
+      recapSeenAt,
+    })
+  }, [
+    mine, current, sealedMatchweek, inPlayMatchweek, lastSettledAt,
+    revealSeen, revealColumnMissing, recapSeenAt, seenOverride,
+  ])
+
+  /**
+   * ⚠ WITHHELD UNTIL THE WALKOUT HAS BEEN WATCHED, and this is the one thing on
+   * the tab it gates. Ryan, 2026-09-01: *"You can't see your opponent in their
+   * spot until after the reveal has happened."* A Reveal button standing next
+   * to the answer reveals nothing.
+   *
+   * ⚠ IT CANNOT BE INFERRED FROM `open?.them` BEING NON-NULL. `current` falls
+   * back to the LAST RESULT once a week settles, so every card keyed on "is
+   * there an opponent" keeps naming the person you have just finished playing —
+   * under a header already counting down to the next draw. Ryan caught exactly
+   * that on the phone on 2026-09-06; the machine answers it once, here.
+   */
+  const opponentVisible = phase.opponentVisible
+
+  /**
+   * ⚠ CLOSING COUNTS AS WATCHING, however it is closed — finished, escaped, or
+   * bailed out of at two seconds. That is the accessibility floor: if the
+   * corridor cannot render (no WebGL, reduced motion, a thrown error) you press
+   * Reveal, close it, and the band names them. Nobody may be trapped behind an
+   * animation that will not play.
+   */
   const markRevealSeen = useCallback(() => {
-    if (openDuelId) markSeenReveal(openDuelId)
-  }, [openDuelId])
+    const duelId = current?.duel.duel_id
+    const entryId = current?.you.entry
+    if (!duelId || !entryId) return
+    // Optimistic — see the note at the top of this file.
+    setSeenOverride(duelId)
+    if (revealColumnMissing) return
+    createClient()
+      .from('pool_entries')
+      .update({ last_reveal_seen_duel: duelId })
+      .eq('entry_id', entryId)
+      .then(({ error }) => {
+        // ⚠ LOGGED, NOT DISCARDED. A swallowed PostgREST error is a documented
+        // way this codebase has lost hours, and if the column ever loses its
+        // UPDATE grant this is the only thing that would say so.
+        if (error) console.error('[reveal] marking seen failed:', error.message)
+      })
+  }, [current, revealColumnMissing])
 
   const router = useRouter()
   /**
@@ -1290,18 +1393,43 @@ export default function DuelsTab({
   }
 
   const bandNode = layout !== 'onepage' ? null : (() => {
-        /* ⚠ THE THREE STATES ARE CHOSEN HERE, not in the band, and each one
-           reaches for the component this tab already has for it. In play: the
-           running score the card shows. Sealed: the same `Countdown` that has
-           been on the sealed card since 123. Between the two: the matchweek's
-           own name and nothing invented. */
+        /* ⚠⚠ THE BAND NO LONGER CHOOSES. `duelPhase` does, and this switch only
+           dresses the answer.
+
+           This was an if-chain, and its ORDER was the whole product: two of its
+           branches described DIFFERENT matchweeks, and mid-season there is
+           always a next sealed week, so a chain that asked "is anything sealed?"
+           first could never reach the walkout at all. That is not hypothetical —
+           on 2026-09-01 matchweek 3's draw opened at 10pm and the band went
+           straight from counting down to 3 to counting down to 4. It survived
+           review because the countdown it switched to was itself correct; it was
+           just counting to the wrong week.
+
+           Nothing type-checked it. Every branch compiled and rendered a valid
+           band. What held it was a test that read this file as TEXT and compared
+           two `indexOf` positions, which could only ever protect the one chain it
+           was pointed at — and by 2026-09-06 there was a second chain, on the
+           phone.
+
+           So the order lives in `lib/league/duelPhase.ts`, as logic, tested on
+           what it returns, and read by BOTH apps. Each case below reaches for the
+           component this tab already has: the running score for a live week, the
+           final score for a decided one, the same `Countdown` the sealed card has
+           used since 123.
+
+           ⚠ ADDING A CASE HERE IS NOT HOW YOU ADD A STATE. Six phases resolve to
+           five, deliberately — phase 6 is phase 1 with a shorter clock. A new
+           state goes in the machine, with a test, or the two apps drift. */
         // The viewer's own entry. `ownEntryIds` is the prop the tab already
         // takes; the sealed band needs it because a sealed week has no duel row
         // to read a side off — that is the whole point of it being sealed.
         const you = ownEntryIds[0] ?? null
         if (!you) return null
 
-        if (inPlay) {
+        /* PHASE 4 — LIVE. Football outranks everything, including an unseen
+           recap from last week: the marker is durable, so the sheet arrives the
+           moment the ball stops. */
+        if (phase.phase === 'live' && inPlay) {
           const y = live(inPlay.you.entry)
           const t = live(inPlay.them?.entry ?? null)
           return (
@@ -1329,41 +1457,75 @@ export default function DuelsTab({
           )
         }
 
-        /* ⚠ THE OPEN WEEK IS CHECKED BEFORE THE SEALED ONE, AND THAT ORDER IS
-           THE WHOLE FIX.
+        /* PHASE 5 — DECIDED. The duel is over and the recap has not been seen.
 
-           These two branches do not describe the same matchweek. `open` is the
-           week you are picking for; `sealedMatchweek` is the NEXT one after it,
-           and mid-season there is always a next one — so a chain that asked
-           "is anything sealed?" first could never reach the Reveal button at
-           all. Observed 2026-09-01: matchweek 3's draw opened at 10pm and the
-           band went straight from counting down to 3 to counting down to 4,
-           skipping the walkout entirely. It looked like a working clock, which
-           is why it survived: the countdown it switched to was correct, it was
-           just counting to the wrong week.
+           ⚠ ABOVE THE WALKOUT, because both are true at once for most members.
+           Matchweek 3 settles on the Monday and matchweek 4's draw opens 24
+           hours later (129), so anybody who does not open the app on the Monday
+           has an unseen recap AND an unwatched walkout waiting. Leading with the
+           walkout would bury the result of a duel they have not been told the
+           end of. Ryan's own sequence is explicit that 5 comes before 6.
 
-           This is the same failure the note above `inPlay` records — "matchweek
-           2 was on screen, matchweek 4 was on screen as sealed, and matchweek 3
-           was nowhere" — which was fixed for the TAB layout by rendering both.
-           The band has one slot and cannot, so it orders them instead: the duel
-           you can act on outranks the one you can only wait for.
-
-           ⚠ NO NEW CONDITION IS NEEDED, because RLS already answers it (116). A
-           sealed week has no duel rows, so `open` is null while matchweek 3 is
-           sealed and this branch falls through to the countdown on its own. The
-           instant the reveal lands the rows arrive and it takes over. Guarding
-           this on a re-derived "is it revealed?" would be a fourth copy of the
-           reveal rule, and three have already drifted (123, 127, poolCards). */
-        if (open) {
+           ⚠ THE BAND IS NOT THE SHEET, AND IT DOES NOT GATE IT. The result is
+           on the band, the leaderboard and the season table before the recap
+           opens — withholding it until the ceremony is watched would be "we hold
+           your score back so you come back", the disclosure gate's own worked
+           example of a failure. */
+        if (phase.phase === 'decided' && current) {
+          const settled = current.duel.settled_at !== null
           return (
             <ShowdownBand
-              matchweek={open.matchweek}
-              youEntry={open.you.entry}
+              matchweek={current.matchweek}
+              youEntry={current.you.entry}
+              themEntry={current.them?.entry ?? null}
+              name={name} person={person}
+              header={bandHeader}
+              /* ⚠ THE ACCURACY, NOT THE DUEL POINTS. `accuracy_a/_b` is what the
+                 two of you scored on the week's football; `points_a/_b` is the
+                 500/250/0 the result pays. A band reading 500 – 0 under two
+                 faces is not a scoreline anybody played. */
+              headline={settled ? (
+                <>
+                  <span>{current.you.accuracy ?? 0}</span>
+                  <span className="text-white/30 mx-2.5">–</span>
+                  <span>{current.them ? current.them.accuracy ?? 0 : 0}</span>
+                </>
+              ) : null}
+              /* ⚠ A BYE IS STRUCTURAL — `them === null` — NEVER READ OFF THE
+                 POINTS. `DUEL_BYE === DUEL_TIE === 250`, so a value test calls
+                 it a draw against an opponent who never existed. */
+              sub={!current.them
+                ? 'You had a bye'
+                : duelResult(current.you.points) === 'won' ? 'You won'
+                : duelResult(current.you.points) === 'tied' ? 'Honours even'
+                : 'You lost'}
+              rank={(e) => (e ? totals.get(e)?.rank ?? null : null)}
+              points={(e) => (e ? totals.get(e)?.totalPoints ?? null : null)}
+            />
+          )
+        }
+
+        /* PHASES 2 AND 3 — REVEALABLE, then SCOUTING. The week you can act on.
+
+           ⚠ BEFORE THE SEALED BRANCH, and `duelPhase` is what guarantees it now
+           rather than the position of these lines. See the note at the top.
+
+           ⚠ IT RENDERS `current`, NOT `open`. They are the same row whenever
+           both exist, but `open` is `mine.find(matchweek === openMatchweek)` —
+           a second answer to "which duel am I in", derived from a different
+           input, in a file whose entire subject is one duel at a time. The
+           machine already picked one; a band that picked its own could name a
+           different opponent from the one the ceremony reveals. */
+        if (phase.phase === 'revealable' || phase.phase === 'scouting') {
+          return (
+            <ShowdownBand
+              matchweek={current!.matchweek}
+              youEntry={current!.you.entry}
               /* ⚠ WITHHELD UNTIL THE WALKOUT HAS BEEN PLAYED. Passing the
                  entry here put their face and name in the band NEXT TO a button
                  marked Reveal, which meant the button revealed nothing — you
                  had already read the answer above it. */
-              themEntry={revealSeen ? open.them?.entry ?? null : null}
+              themEntry={opponentVisible ? current!.them?.entry ?? null : null}
               name={name} person={person}
               header={bandHeader}
               /* ⚠ NOTHING AT THE TOP IN THIS STATE, EITHER SIDE OF THE WALKOUT.
@@ -1404,7 +1566,7 @@ export default function DuelsTab({
                  At zero the week starts being played and this branch stops
                  being the right one, so it asks the server the same way the
                  sealed clock does. */
-              sub={!revealSeen ? null : openFirstKickoff ? (
+              sub={!opponentVisible ? null : openFirstKickoff ? (
                 <>First game in <Countdown to={openFirstKickoff} onExpire={onBandClockExpired} /></>
               ) : 'Picks are open'}
               /* ⚠ THE BUTTON IS GONE ONCE YOU HAVE MET THEM. Ryan, 2026-09-02:
@@ -1431,7 +1593,7 @@ export default function DuelsTab({
                  because they are the same state before and after the walkout.
                  Before: the button that fills the empty circle. After: the
                  score between two known faces. */
-              between={revealSeen ? (
+              between={opponentVisible ? (
                 <span className="t-num t-num-black text-white whitespace-nowrap">
                   <span>0</span>
                   <span className="text-white/30 mx-2.5">–</span>
@@ -1455,10 +1617,13 @@ export default function DuelsTab({
           )
         }
 
-        if (sealedMatchweek !== null) {
+        /* PHASES 1 AND 6 — SEALED. The wait, and the two are one state: a pool
+           mid-season and a pool that has never played land on the same screen
+           and differ only in what the clock says. */
+        if (phase.phase === 'sealed' && phase.matchweek !== null) {
           return (
             <ShowdownBand
-              matchweek={sealedMatchweek}
+              matchweek={phase.matchweek}
               youEntry={you}
               themEntry={null}
               name={name} person={person}
@@ -1493,13 +1658,20 @@ export default function DuelsTab({
    * PAGE rather than this tab — and a ceremony mounted only in the other branch
    * would open on one surface and not the other.
    */
+  /**
+   * ⚠ GUARDED ON THERE BEING SOMEBODY TO WALK OUT. A bye has nobody, and
+   * `duelPhase` has no opinion about that — it answers `revealable` for a bye
+   * week too, because the DRAW has opened either way. The ceremony is the wrong
+   * shape for "nobody was drawn against you", so the band's own copy handles it
+   * and the marker is never stamped. Same guard as the phone's.
+   */
   const ceremony =
-    ceremonyOpen && revealOpponent && open ? (
+    ceremonyOpen && revealOpponent && current?.them ? (
       <DuelRevealCeremony
-        matchweek={open.matchweek}
+        matchweek={current.matchweek}
         opponent={revealOpponent}
         poolId={poolId}
-        duelId={open.duel.duel_id}
+        duelId={current.duel.duel_id}
         onClose={() => { markRevealSeen(); setCeremonyOpen(false) }}
       />
     ) : null

@@ -114,6 +114,22 @@ export type EntryData = {
    * silently stop a member ever seeing another recap.
    */
   last_recap_seen_at: string | null
+  /**
+   * The duel whose WALKOUT this entry last watched (migration 136).
+   *
+   * ⚠ A DUEL ID, NOT A TIMESTAMP, and this is the one marker that must not copy
+   * 122's shape. A redraw is `DELETE ... WHERE settled_at IS NULL` then
+   * `INSERT`, so it mints a NEW duel_id for the same matchweek while
+   * `league_duel_reveals_at` is unchanged — a clock comparison would hand
+   * somebody a different opponent with no ceremony at all.
+   *
+   * ⚠ OPTIONAL BECAUSE THE COLUMN MAY NOT BE DEPLOYED. `pool_entries(*)` means
+   * an absent column arrives as `undefined` rather than failing the select, and
+   * `undefined` is NOT `null`: null means "never watched one" and opens the
+   * walkout, absent means we cannot record that they watched it, which must
+   * close it. See `revealColumnMissing` on `ShowdownData`.
+   */
+  last_reveal_seen_duel?: string | null
   // Stored scoring engine values
   match_points: number | null
   bonus_points: number | null

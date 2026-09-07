@@ -247,6 +247,44 @@ export default async function PoolPage({
         return null
       }
 
+      /**
+       * The two one-shot ceremony markers, for the viewer's OWN entries.
+       *
+       * ⚠ NO EXTRA READ. `getPoolData` selects `pool_entries(*)`, so both
+       * columns are already on the rows loaded above — which is also why a
+       * missing column cannot break this page. A named select list is
+       * all-or-nothing and would 42703 the whole thing; `*` simply omits the
+       * key, and `undefined` is what tells us the migration has not landed.
+       *
+       * ⚠ `undefined` IS NOT `null`, AND THE DIFFERENCE DECIDES A CEREMONY.
+       * Null means "this entry has never watched a walkout", which OPENS it.
+       * Absent means we have nowhere to record that they watched it, which must
+       * CLOSE it — a ceremony whose dismissal cannot be stored replays on every
+       * single page load, forever. Same reasoning as `MISSING` in
+       * `mobile/lib/useCeremonyMarkers.ts`.
+       */
+      const revealColumnMissing = userEntries.length > 0
+        && userEntries.every((e) => e.last_reveal_seen_duel === undefined)
+      const revealSeen = new Map<string, string | null>(
+        userEntries.map((e) => [e.entry_id, e.last_reveal_seen_duel ?? null]),
+      )
+      /**
+       * ⚠ THE VIEWER'S OWN RECAP MARKER, SHIPPED AS WELL AS THE RECAP ITSELF.
+       *
+       * `recap` above is the assembled sheet — who, what score, which week — and
+       * is null once it has been seen. The PHASE machine needs the raw instant
+       * instead, because it also has to answer "is the recap still owed?" for
+       * the band, and deriving that from `recap !== null` would go stale the
+       * moment the sheet is dismissed client-side: the member would close the
+       * recap and the band would stay stuck on a decided week until they
+       * reloaded. Both now read the same two facts.
+       *
+       * ⚠ FIRST ENTRY. Multi-entry Showdown pools are not a shape that exists —
+       * the round-robin draws entries, not members — and the recap above makes
+       * the same assumption by returning ONE sheet.
+       */
+      const recapSeenAt = userEntries[0]?.last_recap_seen_at ?? null
+
       const seriesRes = userEntryIds[0]
         ? await supabase.rpc('league_matchweek_series', {
             p_pool_id: pool_id,
@@ -273,6 +311,9 @@ export default async function PoolPage({
           [...totalsRes.totals].map(([entryId, t]) => [entryId, t.duelPoints]),
         ),
         recap: buildDuelRecap(),
+        revealSeen,
+        revealColumnMissing,
+        recapSeenAt,
         // ⚠ ONE ROW PER MATCHWEEK, AGGREGATED IN SQL (124). The raw table is
         // ~3,800 rows for a 10-member season and is deny-all besides; the
         // function is SECURITY DEFINER and returns only the viewer's points and

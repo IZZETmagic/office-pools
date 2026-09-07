@@ -173,6 +173,38 @@ export type ShowdownData = {
    * client-side would mean shipping every entry's marker to every member.
    */
   recap: DuelRecap | null
+  /**
+   * entry_id → `pool_entries.last_reveal_seen_duel` (136), the viewer's OWN
+   * entries only.
+   *
+   * ⚠ THIS IS WHAT RETIRED THE `localStorage` VERSION. The walkout used to be
+   * remembered per BROWSER, so meeting your opponent on a laptop and then
+   * opening a phone played the ceremony again — and the phone had already moved
+   * to the column, so the two apps disagreed about whether you had been
+   * introduced.
+   *
+   * ⚠ AN ID, NOT AN INSTANT. A redraw mints a new `duel_id` for the same
+   * matchweek at the same reveal instant, so a clock marker would hand somebody
+   * a different opponent with no ceremony at all (136's header has the full
+   * argument).
+   */
+  revealSeen: Map<string, string | null>
+  /**
+   * Migration 136 is not deployed here — the walkout must be suppressed.
+   *
+   * ⚠ NOT THE SAME AS "NOBODY HAS WATCHED ONE". Treating an absent column as
+   * null would open a ceremony whose dismissal cannot be recorded, which
+   * replays it on every page load forever. It self-heals the moment 136 lands.
+   */
+  revealColumnMissing: boolean
+  /**
+   * `pool_entries.last_recap_seen_at` (122) as it stands on the server.
+   *
+   * ⚠ THE RAW INSTANT, BESIDE `recap`. The sheet needs the assembled recap; the
+   * phase machine needs the marker, because dismissing the sheet has to move
+   * the phase on without a reload. One fact, read by both.
+   */
+  recapSeenAt: string | null
   entryNames: Map<string, string>
   ownEntryIds: string[]
   /** Open for picks. ⚠ During a matchweek this is the week AFTER the one being
@@ -536,11 +568,31 @@ export function PoolDetail({
    */
   const [recapDismissed, setRecapDismissed] = useState(false)
   const duelRecap = showdownData?.recap ?? null
+  /**
+   * The recap marker as the CLIENT now believes it to be.
+   *
+   * ⚠ IT IS LIFTED TO HERE BECAUSE TWO THINGS READ IT. The sheet closes on
+   * `recapDismissed`, but the band's PHASE also has to move on — `duelPhase`
+   * returns `decided` for as long as a settled duel is newer than this marker,
+   * and phase 5 sits above the walkout on purpose. Left on the server value,
+   * dismissing the recap would leave the band stuck on a finished week until
+   * the member reloaded, with next week's walkout unreachable behind it. That
+   * is the same shape as the bug the phase module exists to prevent, so it does
+   * not get to come back through the door marked "state".
+   *
+   * ⚠ OPTIMISTIC, MATCHING THE WRITE BELOW. A failed write means the sheet
+   * reappears next visit — mildly annoying, and far better than a full-screen
+   * takeover held open on a bad connection.
+   */
+  const [recapSeenAt, setRecapSeenAt] = useState<string | null>(
+    showdownData?.recapSeenAt ?? null,
+  )
   const dismissRecap = useCallback(() => {
     // Optimistic: the sheet closes even if the write is slow or fails. A failed
     // write means it reappears next visit — mildly annoying, and far better
     // than the alternative.
     setRecapDismissed(true)
+    setRecapSeenAt(new Date().toISOString())
     if (!duelRecap || isDemoPool) return
     const supabase = createClient()
     supabase
@@ -2133,6 +2185,14 @@ export function PoolDetail({
           allPredictions={allPredictions}
           bulkState={bulkState}
           totals={showdownData.totals}
+          /* ⚠ THE PHASE MACHINE'S PER-VIEWER INPUTS. `duelPhase` orders the six
+             phases but derives nothing, so the two one-shot markers have to be
+             handed to it — and `recapSeenAt` is the LIVE one held in state here,
+             rather than the server's, so dismissing the recap moves the band on
+             without a reload. */
+          revealSeen={showdownData.revealSeen}
+          revealColumnMissing={showdownData.revealColumnMissing}
+          recapSeenAt={recapSeenAt}
           form={leagueForm}
           duelPoints={showdownData.duelPoints}
           series={showdownData.series}
@@ -2786,6 +2846,14 @@ export function PoolDetail({
                 allPredictions={allPredictions}
                 bulkState={bulkState}
                 totals={showdownData.totals}
+                /* ⚠ THE PHASE MACHINE'S PER-VIEWER INPUTS. `duelPhase` orders the six
+                   phases but derives nothing, so the two one-shot markers have to be
+                   handed to it — and `recapSeenAt` is the LIVE one held in state here,
+                   rather than the server's, so dismissing the recap moves the band on
+                   without a reload. */
+                revealSeen={showdownData.revealSeen}
+                revealColumnMissing={showdownData.revealColumnMissing}
+                recapSeenAt={recapSeenAt}
                 onGoToPicks={() => handleTabSwitch('predictions')}
                 layout={onePage ? 'onepage' : 'tabs'}
                 bandHeader={onePage ? (

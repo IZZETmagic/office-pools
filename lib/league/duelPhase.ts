@@ -18,12 +18,12 @@
 //
 // ## ⚠ WHAT THIS REPLACES, AND WHY IT IS A MODULE RATHER THAN AN if-CHAIN
 //
-// The web picks its state with an if-chain inside a 2,663-line component, and
-// the only thing holding the ORDER correct is a test that reads that file as
-// text and asserts one `indexOf` is smaller than another
-// (`lib/league/__tests__/bandStateOrder.guard.test.ts`).
+// The web used to pick its state with an if-chain inside a 2,663-line
+// component, and the only thing holding the ORDER correct was a test that read
+// that file as text and asserted one `indexOf` was smaller than another
+// (`lib/league/__tests__/bandStateOrder.guard.test.ts`, retired 2026-09-07).
 //
-// That guard exists because the order had already failed in front of members.
+// That guard existed because the order had already failed in front of members.
 // On 2026-09-01 matchweek 3's draw opened at 10pm and the band went straight
 // from counting down to matchweek 3 to counting down to matchweek 4 — the
 // walkout, the flagship moment of the flagship mode, was unreachable. It
@@ -32,7 +32,9 @@
 //
 // A second hand-rolled chain on React Native would have re-earned that bug on a
 // second surface. So the order is encoded here, as logic, and tested on what it
-// RETURNS rather than on the shape of the source that produces it.
+// RETURNS rather than on the shape of the source that produces it — and since
+// 2026-09-07 BOTH apps read it, so there is no longer a surface with an opinion
+// of its own about which phase anybody is in.
 //
 // ## ⚠ IT DERIVES NOTHING. IT ONLY ORDERS.
 //
@@ -47,22 +49,25 @@
 // If you are about to add a `Date.parse(lock_at) - 3600_000` to this file: no.
 // Ask the contract for the instant instead.
 //
-// ## ⚠ THIS IS THE COPY. `lib/league/duelPhase.ts` IS CANONICAL.
+// ## ⚠ THIS FILE IS THE CANONICAL ONE. `mobile/lib/duelPhase.ts` IS A COPY.
 //
-// Edit that one and re-copy, or the mirror guard fails. `mobile/` is a separate
-// npm project whose `@/*` resolves to `mobile/*` and cannot import the web
-// app's `lib/`, which is the same forced duplication as `duelPoints.ts`,
-// `predictionMode.ts` and `design/oklch.ts`.
+// `mobile/` is a separate npm project whose `@/*` resolves to `mobile/*`, so it
+// cannot import this. Same forced duplication as `duelPoints.ts`,
+// `predictionMode.ts` and `design/oklch.ts`, and handled the same way:
+// `duelPhaseMirror.guard.test.ts` compares the two files below their banners
+// and fails on any drift.
 //
-// ⚠ THE DRIFT THIS PREVENTS IS NOT COSMETIC. Both apps now render the same six
-// phases; two copies that disagree by one branch would put a member's phone and
-// their browser in different halves of the cycle, which is precisely the
-// production failure recorded above, only harder to see because each surface
-// would look correct on its own.
+// ⚠ THE COPY'S STYLE IS THE PHONE'S — semicolons, because the mirror is a
+// BYTE comparison and the two cannot both be idiomatic. Do not "tidy" this
+// file to match the rest of `lib/league/`; you would only move the failure to
+// the guard.
 //
-// ⚠ NOTHING HERE MAY IMPORT REACT NATIVE. That is what keeps it inside the root
-// vitest runner's reach (`mobile/**/__tests__/**/*.test.ts`), and
-// `mobile/lib/__tests__/duelPhase.test.ts` is what that buys.
+// ⚠ NOTHING HERE MAY IMPORT REACT NATIVE — nor anything from `@/`. That is what
+// keeps the copy inside the root vitest runner's reach
+// (`mobile/**/__tests__/**/*.test.ts`), and
+// `mobile/lib/__tests__/duelPhase.test.ts` is what that buys. It is also what
+// lets this file be imported from a server component without dragging a client
+// bundle behind it.
 // =============================================================
 
 /**
