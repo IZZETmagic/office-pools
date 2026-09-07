@@ -849,7 +849,30 @@ function Matchup({
               when is not interesting.
             */}
             {onReveal ? (
-              <RevealButton onPress={onReveal} />
+              /*
+                ⚠ CENTRED ON THE AVATAR, NOT ON THE CORNER — Ryan, 2026-09-06,
+                on the first live reveal: the button sat visibly high between the
+                two circles.
+
+                The row is `alignItems: 'flex-start'`, so a short child's TOP
+                lines up with the avatar's top. Measured off the screenshot: the
+                pill's horizontal centre was already exact (645.0 of 1290) and
+                its vertical centre was 19pt above the avatar's — which is
+                precisely `(AVATAR − pillHeight) / 2`.
+
+                ⚠ `AVATAR`, NOT A MEASURED OR GUESSED NUMBER. The button has to
+                stay on the circles' axis if the avatar is ever resized, and a
+                literal 19 would silently stop being right the moment it is.
+                Centring against the CORNER instead would drop it lower still —
+                a corner is the avatar plus a name plus a standing line.
+
+                ⚠ Safe inside `middleStyle`, which animates only `transform`
+                (translateY + scale). A fixed height here cannot fight the
+                collapse; it scales with it.
+              */
+              <View style={{ height: AVATAR, justifyContent: 'center' }}>
+                <RevealButton onPress={onReveal} />
+              </View>
             ) : (
               <Middle
                 bout={bout}
