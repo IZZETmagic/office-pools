@@ -1624,3 +1624,72 @@ export function saveLeaguePicks(
     { method: 'POST', body },
   );
 }
+
+// =============================================================
+// /api/users/:id/fixture-picks — your pick on one league fixture
+// =============================================================
+// The Predictions tab, for a league fixture. It used to say "Your picks are on
+// the web", which was true of the app and false about the member: a stated v1
+// boundary claimed league picks needed one contract call per pool per tap.
+//
+// ⚠ ONLY HALF OF THAT WAS EVER TRUE. `league_predictions` is readable by the
+// client under its own `auth.uid()` policy — the pick never needed a route. The
+// POINTS did: `league_match_scores` is one of migration 050's deny-all tables,
+// so a user-scoped read returns an empty array with `error: null`. That is what
+// this route is for, and it carries the pick along because it is already
+// holding the rows.
+// =============================================================
+
+/** One entry of yours that predicted this fixture. */
+export type FixturePick = {
+  entryId: string;
+  entryName: string;
+  poolId: string;
+  poolName: string;
+  /**
+   * ⚠ EXACTLY ONE OF THESE TWO IS SET, AND WHICH ONE IS A POOL SETTING, not a
+   * mode. Both shapes report `prediction_mode: 'league_pickem'`; a pool scoring
+   * exact scores stores a scoreline, and a pool scoring outcomes stores
+   * 'home' | 'draw' | 'away' with NO scoreline at all. Measured on production
+   * 2026-09-07: 70 of one member's 90 picks were the outcome shape, so a
+   * renderer that assumes a scoreline prints a dash for the majority of them.
+   */
+  predictedHomeScore: number | null;
+  predictedAwayScore: number | null;
+  predictedOutcome: 'home' | 'draw' | 'away' | null;
+  /** `exact` | `winner_gd` | `winner` | `miss`, or null before it is scored. */
+  scoreType: string | null;
+  /** ⚠ Null means NOT YET SCORED. `miss` is a real zero. */
+  points: number | null;
+};
+
+export async function fetchFixturePicks(
+  userId: string,
+  fixtureId: string,
+): Promise<FixturePick[]> {
+  const res = await apiFetch<{
+    picks: {
+      entry_id: string;
+      entry_name: string;
+      pool_id: string;
+      pool_name: string;
+      predicted_home_score: number | null;
+      predicted_away_score: number | null;
+      predicted_outcome: string | null;
+      score_type: string | null;
+      points: number | null;
+    }[];
+  }>(`/api/users/${userId}/fixture-picks?fixture_id=${encodeURIComponent(fixtureId)}`);
+
+  return (res.picks ?? []).map((p) => ({
+    entryId: p.entry_id,
+    entryName: p.entry_name,
+    poolId: p.pool_id,
+    poolName: p.pool_name,
+    predictedHomeScore: p.predicted_home_score,
+    predictedAwayScore: p.predicted_away_score,
+    predictedOutcome: (p.predicted_outcome as FixturePick['predictedOutcome']) ?? null,
+    scoreType: p.score_type,
+    points: p.points,
+  }));
+}

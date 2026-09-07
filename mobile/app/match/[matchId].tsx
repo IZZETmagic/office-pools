@@ -33,6 +33,7 @@ import {
   stageLabel,
 } from '@/components/match/matchDisplay';
 import { FormCard } from '@/components/match/FormCard';
+import { LeaguePicksSection } from '@/components/match/LeaguePicksSection';
 import { LeagueTableSliceCard } from '@/components/match/LeagueTableSliceCard';
 import { LineupsTab } from '@/components/match/LineupsTab';
 import { MatchTabBar } from '@/components/match/MatchTabBar';
@@ -93,6 +94,7 @@ export default function MatchDetailScreen() {
     groupStandings,
     timeline,
     facts,
+    leaguePicks,
     lineups,
     teamStats,
     leagueContext,
@@ -241,7 +243,14 @@ export default function MatchDetailScreen() {
           />
         );
       case 'predictions':
-        return (
+        // ⚠ TWO DIFFERENT SECTIONS, NOT ONE WITH A BRANCH INSIDE. A league pick
+        // and a World Cup prediction share no shape: one is a scoreline OR an
+        // outcome scored into four tiers, the other carries a bracket pick, PSO
+        // scores and crowd stats. `roundNumber` is the competition test used
+        // everywhere else on this screen.
+        return m.roundNumber !== null ? (
+          <LeaguePicksSection match={m} picks={leaguePicks} />
+        ) : (
           <View style={{ gap: 16 }}>
             <YourPredictionsSection match={m} predictionInfos={predictionInfos} />
             {(matchStats && matchStats.total_predictions > 0) ||
@@ -1517,19 +1526,15 @@ function YourPredictionsSection({
             ...theme.shadows.card,
           }}
         >
-          {/* ⚠ TWO DIFFERENT TRUTHS, AND THE WRONG ONE IS A CONFIDENT LIE. For a
-              league fixture the phone does not read picks at all — they are
-              pool-scoped and live in `league_predictions` — so "No predictions
-              yet · Join a pool" would tell a member who IS in a pool and HAS
-              predicted this game that they have not. Says what is actually so,
-              in the same words the pool's Predictions tab uses. */}
-          <Text variant="cardTitle" align="center">
-            {match.roundNumber !== null ? 'Your picks are on the web' : 'No predictions yet'}
-          </Text>
+          {/* ⚠ WORLD CUP ONLY NOW. This section used to carry a second string
+              for a league fixture — "Your picks are on the web" — because the
+              phone could not read league picks. It can: a league fixture is
+              routed to `LeaguePicksSection` before it ever reaches here, so a
+              branch on `roundNumber` would be dead code pretending to be a
+              safeguard. */}
+          <Text variant="cardTitle" align="center">No predictions yet</Text>
           <Text variant="body" color="slate" align="center">
-            {match.roundNumber !== null
-              ? "This competition's picks aren't on the phone yet. Everything else here is up to date."
-              : 'Join a pool and make your prediction for this match'}
+            Join a pool and make your prediction for this match
           </Text>
         </View>
       ) : (

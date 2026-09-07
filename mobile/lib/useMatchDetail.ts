@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   fetchBracketStats,
+  fetchFixturePicks,
   fetchMatchScores,
   fetchMatchStats,
   type BracketStatsResponse,
+  type FixturePick,
   type MatchScoreEntry,
   type MatchStatsResponse,
 } from './api';
@@ -271,6 +273,7 @@ export function useMatchDetail(matchId: string | undefined) {
   const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [facts, setFacts] = useState<MatchFacts | null>(null);
+  const [leaguePicks, setLeaguePicks] = useState<FixturePick[]>([]);
   const [lineups, setLineups] = useState<MatchLineup[]>([]);
   const [teamStats, setTeamStats] = useState<MatchTeamStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -320,6 +323,12 @@ export function useMatchDetail(matchId: string | undefined) {
       await Promise.all([
         loadLeagueFacts(matchId, setTimeline, setFacts),
         loadLeagueTabs(matchId, setLineups, setTeamStats),
+        // ⚠ A ROUTE, NOT A TABLE READ, AND ONLY FOR THE POINTS. The pick itself
+        // is client-readable under `league_predictions`' own `auth.uid()`
+        // policy; `league_match_scores` is deny-all (migration 050), so the
+        // points need the server. One call for the whole fixture across every
+        // pool — not the per-pool contract fan-out the old boundary feared.
+        loadLeaguePicks(appUserId, matchId, setLeaguePicks),
       ]);
       setLoading(false);
       return;
@@ -345,6 +354,8 @@ export function useMatchDetail(matchId: string | undefined) {
       // rather than left holding the previously opened match's line-up.
       setLineups([]);
       setTeamStats([]);
+      // World Cup picks come from `predictionInfos` below, not this.
+      setLeaguePicks([]);
 
       // 2. Resolve user's entries across pools, split by prediction mode.
       // Query through pool_members (the source of truth for "this user belongs
@@ -678,6 +689,7 @@ export function useMatchDetail(matchId: string | undefined) {
     groupStandings,
     timeline,
     facts,
+    leaguePicks,
     lineups,
     teamStats,
     leagueContext,
@@ -1012,5 +1024,33 @@ async function loadLeagueTabs(
     console.warn('[useMatchDetail] league line-ups/statistics unavailable', e);
     setLineups([]);
     setTeamStats([]);
+  }
+}
+
+/**
+ * The member's own picks on one league fixture, with what they scored.
+ *
+ * ⚠ THE POINTS ARE THE ONLY REASON THIS IS A ROUTE. `league_predictions` has a
+ * `Users can view own league predictions` policy, so the phone could read the
+ * pick itself directly. `league_match_scores` has NO policy at all — it is one
+ * of migration 050's four deny-all tables — and a user-scoped read of it
+ * returns an empty array with `error: null`. That silent zero is the failure the
+ * `denyAllTables` guard test exists to catch, and it is why the server reads it
+ * with the admin client and re-implements the ownership check by hand.
+ *
+ * A failure here is an empty section, never a thrown screen — but it is warned,
+ * because "you have no picks" is a statement about the member and the whole
+ * point of this work was to stop making it falsely.
+ */
+async function loadLeaguePicks(
+  appUserId: string,
+  fixtureId: string,
+  setPicks: (p: FixturePick[]) => void,
+) {
+  try {
+    setPicks(await fetchFixturePicks(appUserId, fixtureId));
+  } catch (e) {
+    console.warn('[useMatchDetail] league picks unavailable', e);
+    setPicks([]);
   }
 }
