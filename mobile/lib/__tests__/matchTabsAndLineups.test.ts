@@ -15,7 +15,13 @@
 import { describe, it, expect } from 'vitest';
 
 import { groupByRow, parseGrid, surnameOf } from '../lineupLayout';
-import { STAT_ROWS, STAT_SECTIONS, visibleStatRows, visibleStatSections } from '../matchStatRows';
+import {
+  leadingSide,
+  STAT_ROWS,
+  STAT_SECTIONS,
+  visibleStatRows,
+  visibleStatSections,
+} from '../matchStatRows';
 import { ALL_MATCH_TAB_KEYS, matchTabs } from '../matchTabs';
 import type { LineupPlayer, MatchTeamStats } from '../useMatchDetail';
 
@@ -260,5 +266,68 @@ describe('visibleStatSections', () => {
     for (const section of visibleStatSections(some, { ...some, side: 'away' })) {
       expect(section.rows.length).toBeGreaterThan(0);
     }
+  });
+});
+
+// --------------------------------------------------- which number is lit up
+
+describe('leadingSide', () => {
+  const row = (key: string) => STAT_ROWS.find((r) => r.key === key)!;
+  const pair = (over: Partial<MatchTeamStats>, awayOver: Partial<MatchTeamStats>) =>
+    [stats(over), stats({ side: 'away', ...awayOver })] as const;
+
+  it('gives it to the higher number on almost everything', () => {
+    const [h, a] = pair({ shotsTotal: 16 }, { shotsTotal: 13 });
+    expect(leadingSide(row('shots_total'), h, a)).toBe('home');
+    expect(leadingSide(row('shots_total'), a, h)).toBe('away');
+  });
+
+  it('⚠ gives it to the LOWER number on fouls and cards', () => {
+    // A team-coloured pill reads as praise. Marking the dirtier side in their
+    // own colour would congratulate them for it.
+    const [h, a] = pair({ yellowCards: 4 }, { yellowCards: 2 });
+    expect(leadingSide(row('yellow_cards'), h, a)).toBe('away');
+
+    const [h2, a2] = pair({ fouls: 13 }, { fouls: 16 });
+    expect(leadingSide(row('fouls'), h2, a2)).toBe('home');
+
+    const [h3, a3] = pair({ offsides: 3 }, { offsides: 0 });
+    expect(leadingSide(row('offsides'), h3, a3)).toBe('away');
+  });
+
+  it('⚠ lights NEITHER side on a tie — 0-0 red cards is the commonest row here', () => {
+    const [h, a] = pair({ redCards: 0 }, { redCards: 0 });
+    expect(leadingSide(row('red_cards'), h, a)).toBeNull();
+
+    const [h2, a2] = pair({ shotsTotal: 11 }, { shotsTotal: 11 });
+    expect(leadingSide(row('shots_total'), h2, a2)).toBeNull();
+  });
+
+  it('treats a missing COUNT as zero, so the side that has one leads', () => {
+    const [h, a] = pair({ corners: 5 }, {});
+    expect(leadingSide(row('corners'), h, a)).toBe('home');
+  });
+
+  it('⚠ lights nobody when only one side has a DECIMAL', () => {
+    // A side with no xG figure did not score zero xG — it was never measured,
+    // so it cannot lose the comparison either.
+    const [h, a] = pair({ expectedGoals: 2.05 }, {});
+    expect(leadingSide(row('expected_goals'), h, a)).toBeNull();
+  });
+
+  it('compares decimals properly when both sides have one', () => {
+    const [h, a] = pair({ expectedGoals: 2.05 }, { expectedGoals: 0.39 });
+    expect(leadingSide(row('expected_goals'), h, a)).toBe('home');
+  });
+
+  it('handles a side with no stats row at all', () => {
+    expect(leadingSide(row('shots_total'), stats({ shotsTotal: 4 }), null)).toBe('home');
+    expect(leadingSide(row('shots_total'), null, null)).toBeNull();
+  });
+
+  it('every lowerIsBetter row is one where more is genuinely worse', () => {
+    // Guards against the flag drifting onto a stat where it inverts the meaning.
+    const flipped = STAT_ROWS.filter((r) => r.lowerIsBetter).map((r) => r.key);
+    expect(flipped.sort()).toEqual(['fouls', 'offsides', 'red_cards', 'yellow_cards']);
   });
 });

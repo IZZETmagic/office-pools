@@ -49,6 +49,20 @@ export type StatRow = {
    * count therefore falls back to 0 and a decimal does not.
    */
   decimals?: boolean;
+  /**
+   * Flip which side gets the highlight.
+   *
+   * ⚠ THE HIGHLIGHT IS A TEAM-COLOURED PILL, WHICH READS AS PRAISE. On almost
+   * everything here more is better, so the higher number takes it. On fouls and
+   * cards it is the opposite, and marking the dirtier side in their own colour
+   * would congratulate them for it — so those four flip.
+   *
+   * Left unset elsewhere on purpose, including the shot breakdowns: "more shots
+   * from outside the box" is not obviously better or worse, but it is what the
+   * member is comparing, and the default reads as "who had more" rather than
+   * "who was better".
+   */
+  lowerIsBetter?: boolean;
 };
 
 /** Section order, top to bottom, and the words above each card. */
@@ -89,11 +103,11 @@ export const STAT_ROWS: StatRow[] = [
   // and it grows if the provider ever widens.
   { key: 'saves', section: 'goalkeeping', label: 'Saves', read: (s) => s.saves },
 
-  { key: 'fouls', section: 'discipline', label: 'Fouls', read: (s) => s.fouls },
+  { key: 'fouls', section: 'discipline', label: 'Fouls', read: (s) => s.fouls, lowerIsBetter: true },
   { key: 'free_kicks', section: 'discipline', label: 'Free kicks', read: (s) => s.freeKicks },
-  { key: 'offsides', section: 'discipline', label: 'Offsides', read: (s) => s.offsides },
-  { key: 'yellow_cards', section: 'discipline', label: 'Yellow cards', read: (s) => s.yellowCards },
-  { key: 'red_cards', section: 'discipline', label: 'Red cards', read: (s) => s.redCards },
+  { key: 'offsides', section: 'discipline', label: 'Offsides', read: (s) => s.offsides, lowerIsBetter: true },
+  { key: 'yellow_cards', section: 'discipline', label: 'Yellow cards', read: (s) => s.yellowCards, lowerIsBetter: true },
+  { key: 'red_cards', section: 'discipline', label: 'Red cards', read: (s) => s.redCards, lowerIsBetter: true },
 ];
 
 /**
@@ -131,4 +145,34 @@ export function visibleStatSections(
     title,
     rows: visible.filter((r) => r.section === key),
   })).filter((s) => s.rows.length > 0);
+}
+
+/**
+ * Which side's number gets the highlight, or null when neither does.
+ *
+ * ⚠ NULL ON A TIE, AND THAT MATTERS MORE THAN IT SOUNDS. `0-0` on red cards is
+ * the single most common row on this tab; colouring one side of it would invent
+ * a winner out of two teams who did the same thing.
+ *
+ * ⚠ A MISSING VALUE COUNTS AS ZERO FOR A COUNT AND AS ABSENT FOR A DECIMAL,
+ * matching what the row renders. A side with no xG figure cannot lead on xG —
+ * it was never measured — so a row where only one side has a decimal
+ * highlights nobody rather than awarding it by default.
+ */
+export function leadingSide(
+  row: StatRow,
+  home: MatchTeamStats | null,
+  away: MatchTeamStats | null,
+): 'home' | 'away' | null {
+  const rawH = home ? row.read(home) : null;
+  const rawA = away ? row.read(away) : null;
+
+  if (row.decimals) {
+    if (rawH === null || rawA === null) return null;
+  }
+  const h = rawH ?? 0;
+  const a = rawA ?? 0;
+  if (h === a) return null;
+  const homeLeads = row.lowerIsBetter ? h < a : h > a;
+  return homeLeads ? 'home' : 'away';
 }

@@ -2,7 +2,7 @@ import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
-import { visibleStatSections, type StatRow, type StatSection } from '@/lib/matchStatRows';
+import { leadingSide, visibleStatSections, type StatRow, type StatSection } from '@/lib/matchStatRows';
 import type { MatchTeamStats } from '@/lib/useMatchDetail';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -14,9 +14,19 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // so nothing can be skimmed. The grouping lives in `lib/matchStatRows.ts` where
 // it can be tested; this file draws it.
 //
-// Inside a card, one paired bar per statistic: home pulling left, away pulling
-// right. The shape is `BattleBar`'s from the pool Form tab, which is the same
-// question at a different scale — two numbers competing for one track.
+// Inside a card, the two numbers with the LEADING ONE IN ITS TEAM'S COLOUR.
+//
+// ⚠ THIS REPLACED A PAIRED BAR PER ROW, AND THE BAR WAS MAKING A CLAIM IT HAD
+// NO RIGHT TO. A split track says the two values are shares of one whole — true
+// of possession, and false of everything else here. Sixteen shots against
+// thirteen are two independent counts, not 55% and 45% of twenty-nine, and a
+// bar drew them as though they were. A coloured number says which side had more
+// without inventing a denominator.
+//
+// ⚠ AND THE COLOURED PILL READS AS PRAISE, which is why `lowerIsBetter` exists.
+// On fouls and cards the lower number takes it; marking the dirtier side in
+// their own colour would congratulate them. The rule lives in
+// `leadingSide` where it is tested.
 //
 // ⚠ POSSESSION IS DRAWN DIFFERENTLY, AND IT EARNS IT. It is the only figure
 // here that is a share of a fixed whole: the two numbers always total 100, so a
@@ -230,91 +240,89 @@ function StatBar({
   // none means zero for a count, and "not published" for xG.
   const hShown = h ?? (row.decimals ? null : 0);
   const aShown = a ?? (row.decimals ? null : 0);
-
-  // The split. Both zero is a dead heat rather than a divide by nought, which
-  // would otherwise render NaN-width bars on a goalless, shotless opening.
-  const total = (hShown ?? 0) + (aShown ?? 0);
-  const hFlex = total > 0 ? (hShown ?? 0) / total : 0.5;
+  const leads = leadingSide(row, home, away);
 
   return (
     <View
       style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 9,
+        paddingVertical: 10,
         borderTopWidth: first ? 0 : 0.5,
         borderTopColor: withOpacity(theme.colors.mist, 0.5),
       }}
     >
-      <View
+      <Value value={hShown} row={row} align="left" lit={leads === 'home'} color={theme.colors.primary} />
+      <RNText
+        numberOfLines={2}
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 5,
+          flex: 1,
+          fontFamily: fontFamilies.medium,
+          fontSize: 12,
+          color: theme.colors.slate,
+          textAlign: 'center',
         }}
       >
-        <Value value={hShown} row={row} align="left" />
-        <RNText
-          style={{
-            fontFamily: fontFamilies.medium,
-            fontSize: 11,
-            color: theme.colors.slate,
-            textAlign: 'center',
-          }}
-        >
-          {row.label}
-        </RNText>
-        <Value value={aShown} row={row} align="right" />
-      </View>
-
-      {/* ⚠ `minWidth` ON EACH SIDE, as `BattleBar` does. Without it a 0-14
-          statistic renders one bar the full width and the other invisible,
-          which reads as a missing row rather than a shut-out. */}
-      <View style={{ flexDirection: 'row', height: 5, gap: 2 }}>
-        <View
-          style={{
-            flex: Math.max(hFlex, 0.001),
-            minWidth: 2,
-            borderRadius: 3,
-            backgroundColor: theme.colors.primary,
-          }}
-        />
-        <View
-          style={{
-            flex: Math.max(1 - hFlex, 0.001),
-            minWidth: 2,
-            borderRadius: 3,
-            backgroundColor: theme.colors.accent,
-          }}
-        />
-      </View>
+        {row.label}
+      </RNText>
+      <Value value={aShown} row={row} align="right" lit={leads === 'away'} color={theme.colors.accent} />
     </View>
   );
 }
 
+/**
+ * One side's figure. Lit, it is a filled pill in that team's colour; unlit it is
+ * plain text at the same size, so a row never changes height when the lead does.
+ */
 function Value({
   value,
   row,
   align,
+  lit,
+  color,
 }: {
   value: number | null;
   row: StatRow;
   align: 'left' | 'right';
+  lit: boolean;
+  color: string;
 }) {
   const theme = useTheme();
-  return (
+  const text = (
     <RNText
       style={{
-        width: 56,
-        textAlign: align,
         fontFamily: MONO_BOLD,
         fontSize: 13,
-        color: theme.colors.ink,
+        color: lit ? '#FFFFFF' : theme.colors.ink,
         fontVariant: ['tabular-nums'],
       }}
     >
       {formatStat(value, row)}
     </RNText>
+  );
+
+  return (
+    <View style={{ width: 62, alignItems: align === 'left' ? 'flex-start' : 'flex-end' }}>
+      {lit ? (
+        <View
+          style={{
+            paddingHorizontal: 9,
+            paddingVertical: 3,
+            borderRadius: theme.radii.pill,
+            backgroundColor: color,
+          }}
+        >
+          {text}
+        </View>
+      ) : (
+        // ⚠ THE SAME PADDING AS THE PILL, so the numbers on the two sides sit on
+        // the same baseline and the column does not shuffle sideways depending
+        // on who is winning the row.
+        <View style={{ paddingHorizontal: 9, paddingVertical: 3 }}>{text}</View>
+      )}
+    </View>
   );
 }
 
