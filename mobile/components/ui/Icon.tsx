@@ -74,6 +74,7 @@ import {
   LayoutGridIcon,
   LeftToRightListBulletIcon,
   LeftToRightListNumberIcon,
+  Square01Icon,
   Stairs01Icon,
   Link01Icon,
   ListViewIcon,
@@ -130,6 +131,7 @@ import {
   ViewIcon,
   ViewOffIcon,
   WaveIcon,
+  Video01Icon,
 } from '@hugeicons/core-free-icons';
 
 // Pro solid-rounded variants — opt-in via the `solid` prop. Each entry
@@ -143,6 +145,10 @@ import {
   Fire03Icon as Fire03SolidIcon,
   FlashIcon as FlashSolidIcon,
   InformationCircleIcon as InformationCircleSolidIcon,
+  ArrowUpDownIcon as ArrowUpDownSolidIcon,
+  FootballIcon as FootballSolidIcon,
+  Square01Icon as Square01SolidIcon,
+  Video01Icon as Video01SolidIcon,
 } from '@hugeicons-pro/core-solid-rounded';
 
 import { type ColorToken, useTheme } from '@/theme';
@@ -184,6 +190,7 @@ type IconProps = {
 // Sparse SF-name → Pro solid-rounded mapping. Only entries here respect
 // the `solid` prop; other names fall through to ICON_MAP regardless.
 const SOLID_ICON_MAP: Record<string, IconConstant> = {
+  'arrow.up.arrow.down': ArrowUpDownSolidIcon,
   'bolt.fill': FlashSolidIcon,
   // The four status glyphs. A toast or an inline banner is where the
   // `.fill` in an SF name has to be literally true: the icon carries the
@@ -198,9 +205,12 @@ const SOLID_ICON_MAP: Record<string, IconConstant> = {
   'exclamationmark.triangle.fill': Alert02SolidIcon,
   'flame.fill': Fire03SolidIcon,
   'info.circle.fill': InformationCircleSolidIcon,
+  'rectangle.fill': Square01SolidIcon,
+  'sportscourt.fill': FootballSolidIcon,
   'trophy': ChampionSolidIcon,
   'trophy.circle.fill': ChampionSolidIcon,
   'trophy.fill': ChampionSolidIcon,
+  'video.fill': Video01SolidIcon,
 };
 
 // Map SF Symbol names to Hugeicons constants. Keep alphabetised for
@@ -337,6 +347,7 @@ const ICON_MAP: Record<string, IconConstant> = {
   'qrcode': QrCodeIcon,
   'qrcode.viewfinder': QrCodeScanIcon,
   'questionmark.circle.fill': HelpCircleIcon,
+  'rectangle.fill': Square01Icon,
   'rectangle.portrait.and.arrow.right': Logout03Icon,
   'rosette': RibbonIcon,
   'slider.horizontal.3': SlidersHorizontalIcon,
@@ -363,6 +374,7 @@ const ICON_MAP: Record<string, IconConstant> = {
   // Symbols like every other key here. Mapped 2026-09-04 for the Showdown Room
   // tab; it was reached for once before that and fell through to the fallback
   'trophy.fill': ChampionIcon,
+  'video.fill': Video01Icon,
   'volleyball': FootballIcon,
   'xmark': Cancel01Icon,
   'xmark.circle.fill': CancelCircleIcon,

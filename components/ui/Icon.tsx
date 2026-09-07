@@ -76,6 +76,7 @@ import {
   LayoutGridIcon,
   LeftToRightListBulletIcon,
   LeftToRightListNumberIcon,
+  Square01Icon,
   Stairs01Icon,
   Link01Icon,
   ListViewIcon,
@@ -129,6 +130,7 @@ import {
   UserIcon,
   UserMinus01Icon,
   UserRemove01Icon,
+  Video01Icon,
   ViewIcon,
   ViewOffIcon,
   WaveIcon,
@@ -143,7 +145,11 @@ import {
   CheckmarkCircle01Icon as CheckmarkCircle01SolidIcon,
   Fire03Icon as Fire03SolidIcon,
   FlashIcon as FlashSolidIcon,
+  ArrowUpDownIcon as ArrowUpDownSolidIcon,
+  FootballIcon as FootballSolidIcon,
   InformationCircleIcon as InformationCircleSolidIcon,
+  Square01Icon as Square01SolidIcon,
+  Video01Icon as Video01SolidIcon,
 } from '@hugeicons-pro/core-solid-rounded'
 
 import type { ColorToken } from '@/lib/design/tokens'
@@ -195,6 +201,7 @@ type IconProps = {
  * set in the Vercel project or the build cannot install this package.
  */
 const SOLID_ICON_MAP: Record<string, IconConstant> = {
+  'arrow.up.arrow.down': ArrowUpDownSolidIcon,
   'bolt.fill': FlashSolidIcon,
   // The four status glyphs. A toast or an inline banner is where the `.fill` in
   // an SF name has to be literally true: the icon is carrying the variant on its
@@ -205,9 +212,12 @@ const SOLID_ICON_MAP: Record<string, IconConstant> = {
   'exclamationmark.triangle.fill': Alert02SolidIcon,
   'flame.fill': Fire03SolidIcon,
   'info.circle.fill': InformationCircleSolidIcon,
+  'rectangle.fill': Square01SolidIcon,
+  'sportscourt.fill': FootballSolidIcon,
   'trophy': ChampionSolidIcon,
   'trophy.circle.fill': ChampionSolidIcon,
   'trophy.fill': ChampionSolidIcon,
+  'video.fill': Video01SolidIcon,
 }
 
 // SF Symbol name → Hugeicons constant, alphabetised. Several SF names collapse onto
@@ -344,6 +354,7 @@ const ICON_MAP: Record<string, IconConstant> = {
   'qrcode': QrCodeIcon,
   'qrcode.viewfinder': QrCodeScanIcon,
   'questionmark.circle.fill': HelpCircleIcon,
+  'rectangle.fill': Square01Icon,
   'rectangle.portrait.and.arrow.right': Logout03Icon,
   'rosette': RibbonIcon,
   'slider.horizontal.3': SlidersHorizontalIcon,
@@ -369,6 +380,7 @@ const ICON_MAP: Record<string, IconConstant> = {
   // ⚠ Paired with `mobile/components/ui/Icon.tsx` — `iconMap.test.ts` fails if
   // one map carries an SF name the other does not. Added for the Showdown Room
   'trophy.fill': ChampionIcon,
+  'video.fill': Video01Icon,
   'volleyball': FootballIcon,
   'xmark': Cancel01Icon,
   'xmark.circle.fill': CancelCircleIcon,

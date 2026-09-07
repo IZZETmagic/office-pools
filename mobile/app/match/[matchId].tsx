@@ -644,7 +644,32 @@ function TimelineCard({
       <View
         style={{ height: 0.5, marginHorizontal: 14, backgroundColor: withOpacity(theme.colors.mist, 0.6) }}
       />
+      {/*
+        ⚠ THE LINE IS DRAWN ONCE, BEHIND EVERYTHING, not per row. A border on
+        each row would break at every gap and every half-time marker, and the
+        seams show. This is one hairline spanning the whole list, with the rows
+        rendered over it — so each chip's opaque fill reads as the line passing
+        behind it.
+
+        ⚠ It is inset top and bottom so the spine does not run out of the card
+        into the header rule; a timeline that touches its own edges looks like a
+        list that was cut off.
+      */}
       <View style={{ paddingVertical: 8 }}>
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 14,
+            bottom: 14,
+            // The rail is centred in the row, and the row is inset 16 either
+            // side — so the line's own centre is that same axis.
+            left: '50%',
+            width: 1,
+            marginLeft: -0.5,
+            backgroundColor: withOpacity(theme.colors.mist, 0.9),
+          }}
+        />
         {events.map((e, i) => (
           <View key={`${e.minute}-${i}`}>
             {showHt && i === htIndex ? (
@@ -675,25 +700,44 @@ function TimelineCard({
   );
 }
 
-/** The mark for one kind of event, and whether it reads as struck through. */
-function eventGlyph(kind: TimelineEvent['kind']): { glyph: string; muted: boolean } {
+/**
+ * The mark for one kind of event.
+ *
+ * ⚠ HUGEICONS, NOT EMOJI, and the difference is not cosmetic. An emoji is
+ * rendered by the PLATFORM: ⚽ and 🟨 are a different size, weight and colour on
+ * iOS and Android, they ignore the theme entirely, and 🟥 for a second yellow
+ * said the same thing as a straight red. These are the app's own icon set, at
+ * the app's own colours, identical on both platforms.
+ *
+ * ⚠ SOLID, NOT OUTLINE. At 15px inside a 26px chip a stroke icon reads as
+ * decoration; the filled variants come from the Pro package and are opt-in per
+ * call site via `solid`. `Icon` drops `strokeWidth` for those — the wrapper
+ * would otherwise layer an outline over the filled body and fatten it.
+ */
+function eventGlyph(
+  kind: TimelineEvent['kind'],
+  theme: ReturnType<typeof useTheme>,
+): { icon: string; tint: string; muted: boolean } {
   switch (kind) {
     case 'goal':
-      return { glyph: '⚽', muted: false };
     case 'penalty':
-      return { glyph: '⚽', muted: false };
+      return { icon: 'sportscourt.fill', tint: theme.colors.ink, muted: false };
     case 'own_goal':
-      return { glyph: '⚽', muted: false };
+      // A goal, but for the other side. The column already places it on the
+      // side it COUNTED for (the mapper does not flip it), so the colour is
+      // what says whose misfortune it was.
+      return { icon: 'sportscourt.fill', tint: theme.colors.red, muted: false };
     case 'yellow':
-      return { glyph: '🟨', muted: false };
+      return { icon: 'rectangle.fill', tint: theme.colors.amber, muted: false };
     case 'red':
-      return { glyph: '🟥', muted: false };
     case 'second_yellow':
-      return { glyph: '🟥', muted: false };
+      return { icon: 'rectangle.fill', tint: theme.colors.red, muted: false };
     case 'var_goal_cancelled':
-      return { glyph: '📺', muted: true };
+      // VAR is literally a video assistant referee, so the video glyph is the
+      // exact thing rather than an approximation.
+      return { icon: 'video.fill', tint: theme.colors.slate, muted: true };
     case 'subst':
-      return { glyph: '🔁', muted: true };
+      return { icon: 'arrow.up.arrow.down', tint: theme.colors.slate, muted: true };
   }
 }
 
@@ -730,15 +774,35 @@ function shortName(name: string): string {
   return parts.length > 1 ? parts[parts.length - 1] : name;
 }
 
+/**
+ * The width of the centre rail, and therefore where the line runs.
+ *
+ * ⚠ FIXED, AND THAT IS THE WHOLE POINT OF IT. Before this the mark sat between
+ * a flexed name and the minute, so the axis wandered a few points row to row
+ * depending on how long a name was — visible as a wobble down a long timeline.
+ * Every row now reserves exactly this much in the middle, so the chips stack
+ * dead straight and the line can be drawn once behind them.
+ */
+const RAIL = 44;
+const CHIP = 26;
+
 function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMatch }) {
   const theme = useTheme();
   const isHome = event.side === 'home';
-  const { glyph, muted } = eventGlyph(event.kind);
+  const { icon, tint, muted } = eventGlyph(event.kind, theme);
   const note = eventNote(event);
   const minute = `${event.minute}${event.extraMinute ? `+${event.extraMinute}` : ''}'`;
 
-  const name = (
-    <View style={{ flex: 1, alignItems: isHome ? 'flex-end' : 'flex-start' }}>
+  /**
+   * Name, then minute and qualifier beneath it.
+   *
+   * ⚠ THE MINUTE MOVED OUT OF THE MIDDLE. It used to hold the centre column,
+   * which meant the rail could not — and a timeline reads as a spine with
+   * events hanging off it, not as a column of numbers. It sits with the event
+   * it belongs to now, on that team's side.
+   */
+  const detail = (
+    <View style={{ flex: 1, alignItems: isHome ? 'flex-end' : 'flex-start', gap: 1 }}>
       <RNText
         numberOfLines={1}
         style={{
@@ -751,30 +815,26 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
       >
         {event.playerName ? shortName(event.playerName) : '—'}
       </RNText>
-      {note ? (
-        <RNText
-          numberOfLines={1}
-          style={{
-            fontFamily: fontFamilies.medium,
-            fontSize: 11,
-            color: theme.colors.slate,
-            textAlign: isHome ? 'right' : 'left',
-          }}
-        >
-          {note}
-        </RNText>
-      ) : null}
+      <RNText
+        numberOfLines={1}
+        style={{
+          fontFamily: MONO,
+          fontSize: 10,
+          color: theme.colors.slate,
+          textAlign: isHome ? 'right' : 'left',
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {note ? `${minute} · ${note}` : minute}
+      </RNText>
     </View>
   );
-
-  const spacer = <View style={{ flex: 1 }} />;
 
   return (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
         paddingHorizontal: 16,
         paddingVertical: 5,
       }}
@@ -782,22 +842,28 @@ function TimelineRow({ event, match }: { event: TimelineEvent; match: ResultsMat
         isHome ? homeDisplayName(match) : awayDisplayName(match)
       }`}
     >
-      {isHome ? name : spacer}
-      {isHome ? <RNText style={{ fontSize: 13 }}>{glyph}</RNText> : null}
-      <RNText
-        style={{
-          width: 40,
-          textAlign: 'center',
-          fontFamily: MONO,
-          fontSize: 11,
-          color: theme.colors.slate,
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {minute}
-      </RNText>
-      {!isHome ? <RNText style={{ fontSize: 13 }}>{glyph}</RNText> : null}
-      {!isHome ? name : spacer}
+      {isHome ? detail : <View style={{ flex: 1 }} />}
+
+      {/* The chip sits ON the line. Its opaque fill is what makes the line look
+          like it passes behind it rather than stopping at it. */}
+      <View style={{ width: RAIL, alignItems: 'center' }}>
+        <View
+          style={{
+            width: CHIP,
+            height: CHIP,
+            borderRadius: CHIP / 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.surface,
+            borderWidth: 1.5,
+            borderColor: withOpacity(tint, muted ? 0.25 : 0.45),
+          }}
+        >
+          <Icon name={icon} size={13} tint={tint} solid />
+        </View>
+      </View>
+
+      {isHome ? <View style={{ flex: 1 }} /> : detail}
     </View>
   );
 }
