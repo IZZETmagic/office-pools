@@ -105,3 +105,39 @@ describe('web Icon renderer', () => {
     }
   })
 })
+
+describe('the RN Icon never hands the wrapper an undefined fill', () => {
+  // ⚠ A SOURCE-TEXT GUARD OVER A ONE-CHARACTER MISTAKE THAT BLACKED IN EVERY
+  // ICON IN THE APP.
+  //
+  // `@hugeicons/react-native` builds its <Svg> props as
+  //     Object.assign({ …, fill: 'none' }, …, rest)
+  // and Object.assign copies a key whose value is undefined exactly like any
+  // other. So passing `fill` as a possibly-undefined prop overwrites the
+  // wrapper's own `fill: 'none'` default, and react-native-svg falls back to
+  // ITS default of black — filling the closed paths of every glyph the app
+  // draws. Shipped 2026-09-07; caught on a screenshot of the home screen.
+  //
+  // The fix is that the prop must be ABSENT rather than undefined, which means
+  // a conditional spread. Asserted on the source text because the behaviour
+  // lives inside a third-party wrapper that a node-environment test cannot
+  // render.
+
+  /** The file with comments removed — the rule is about code, not prose. */
+  const code = mobileSource
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+
+  it('spreads fill conditionally instead of passing it as a prop', () => {
+    expect(code).toContain('{...fillProps}')
+    expect(code, 'a bare fill={…} prop reintroduces the undefined-overwrites-none bug').not.toMatch(
+      /fill=\{/,
+    )
+  })
+
+  it('builds those props as null, not as an object holding undefined', () => {
+    // `{ fill: undefined }` spreads the key straight back in.
+    expect(code).toMatch(/const fillProps = .*: null;/)
+    expect(code).not.toMatch(/fill:\s*undefined/)
+  })
+})

@@ -441,14 +441,24 @@ export function Icon({
   // those, and every path here declares `stroke` and no `fill`, so the
   // root's value inherits down to them. A solid glyph already carries its
   // own fill and must not be given a second one.
-  const fillColor = filled && !isSolid ? tintColor : undefined;
+  //
+  // ⚠⚠ SPREAD CONDITIONALLY, NEVER PASSED AS `fill={undefined}`. The wrapper
+  // builds its props with
+  //     Object.assign({ …, fill: 'none' }, …, rest)
+  // and `Object.assign` copies a key whose value is `undefined` exactly like
+  // any other. So `fill={undefined}` OVERWRITES the wrapper's own
+  // `fill: 'none'` default, and react-native-svg falls back to ITS default of
+  // BLACK — filling every closed path in every icon in the app. That shipped
+  // for about an hour on 2026-09-07 and looked like every glyph had been
+  // deliberately blacked in. The prop must be absent, not undefined.
+  const fillProps = filled && !isSolid ? { fill: tintColor } : null;
   return (
     <HugeiconsIcon
       icon={iconConstant}
       size={size}
       color={tintColor}
       strokeWidth={isSolid ? undefined : strokeWidthFor(weight)}
-      fill={fillColor}
+      {...fillProps}
     />
   );
 }
