@@ -109,6 +109,23 @@ export type ShowdownBandProps = {
   rank?: (e: string | null) => number | null
   /** Season points, same. */
   points?: (e: string | null) => number | null
+  /**
+   * The pool's tab strip, drawn INSIDE the band at its foot.
+   *
+   * ⚠ THE STRIP RIDES IN THE BAND, IT DOES NOT SIT UNDER IT. Ryan's RN design,
+   * 2026-09-03: the tab strip is part of the header component. Left outside, the
+   * band is a hero that a separate bar of controls scrolls past — two objects
+   * where the phone has one, and the collapse then looks like content being
+   * clipped rather than a head of page getting shorter.
+   *
+   * ⚠ IT DOES NOT COLLAPSE AWAY. Both band heights are MEASURED off the element
+   * (see `measure`), so a constant-height strip raises `open` and `shut` by the
+   * same amount and every piece of arithmetic downstream — the spacer, the
+   * scroll divisor, `--sd-band-h` — absorbs it with no number changing here.
+   * Which is the point: the tabs are how you leave the duel, and a control that
+   * disappears when you scroll is a control you cannot reach.
+   */
+  tabs?: React.ReactNode
 }
 
 /**
@@ -304,7 +321,7 @@ function Face({
 
 export function ShowdownBand({
   header, matchweek, youEntry, themEntry, name, person, headline, sub, between,
-  liveNow = false, strip = [], rank, points,
+  liveNow = false, strip = [], rank, points, tabs,
 }: ShowdownBandProps) {
   const bandRef = useRef<HTMLDivElement>(null)
   /**
@@ -589,6 +606,17 @@ export function ShowdownBand({
           </span>
         </div>
       </div>
+
+      {/* ⚠ LAST, AND OUTSIDE BOTH DUEL BLOCKS. `.sd-m` is a fixed-height box of
+          absolutely-placed pieces and `.sd-d` is a three-column row; the strip
+          belongs to neither, and putting it inside either one would give it a
+          different position at each breakpoint for no reason. As a sibling it
+          simply sits under whichever of the two is showing.
+
+          ⚠ `z-10` FOR THE SAME REASON THE HEADER HAS IT — the gradient and the
+          phone block's absolute children are painted in this stacking context,
+          and a strip of buttons that cannot be clicked is the failure mode. */}
+      {tabs && <div className="relative z-10">{tabs}</div>}
     </div>
     </>
   )

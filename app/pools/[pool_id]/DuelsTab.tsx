@@ -206,6 +206,16 @@ type Props = {
   showContent?: boolean
   /** The app header, drawn INSIDE the band in one-page mode. */
   bandHeader?: React.ReactNode
+  /**
+   * The pool's tab strip, drawn INSIDE the band at its foot.
+   *
+   * ⚠ PASSED THROUGH, NOT BUILT HERE. The strip is the POOL's navigation and
+   * `PoolDetail` owns it — which tabs exist, which is active, what the unread
+   * badge says. This component only knows where it goes. Same arrangement as
+   * `bandHeader`, and for the same reason: the band is a shell the duel happens
+   * to be the first thing inside.
+   */
+  bandTabs?: React.ReactNode
   /** Your points and the pool's median, per matchweek (migration 124). */
   series: Array<{ matchweek_number: number; your_points: number; median_points: number }>
   /**
@@ -649,6 +659,7 @@ export default function DuelsTab({
   layout = 'tabs',
   showContent = true,
   bandHeader = null,
+  bandTabs = null,
   series,
   revealSeen,
   revealColumnMissing,
@@ -1439,6 +1450,7 @@ export default function DuelsTab({
               themEntry={inPlay.them?.entry ?? null}
               name={name} person={person}
               header={bandHeader}
+              tabs={bandTabs}
               headline={
                 <>
                   <span>{y}</span>
@@ -1480,6 +1492,7 @@ export default function DuelsTab({
               themEntry={current.them?.entry ?? null}
               name={name} person={person}
               header={bandHeader}
+              tabs={bandTabs}
               /* ⚠ THE ACCURACY, NOT THE DUEL POINTS. `accuracy_a/_b` is what the
                  two of you scored on the week's football; `points_a/_b` is the
                  500/250/0 the result pays. A band reading 500 – 0 under two
@@ -1528,6 +1541,7 @@ export default function DuelsTab({
               themEntry={opponentVisible ? current!.them?.entry ?? null : null}
               name={name} person={person}
               header={bandHeader}
+              tabs={bandTabs}
               /* ⚠ NOTHING AT THE TOP IN THIS STATE, EITHER SIDE OF THE WALKOUT.
                  Before it the band is one question — who — and a scoreline
                  above an empty circle is furniture. After it the scoreline
@@ -1628,6 +1642,7 @@ export default function DuelsTab({
               themEntry={null}
               name={name} person={person}
               header={bandHeader}
+              tabs={bandTabs}
               /* ⚠ YELLOW, and only here. The accent marks the thing you are
                  WAITING on — the same gold the sealed card already uses for its
                  line. A live score is white because it is a fact, not a

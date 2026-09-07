@@ -5,6 +5,7 @@ import { Alert } from '@/components/ui/Alert'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { withShowdownFirst } from '@/lib/league/showdownTabs'
 import type { PoolLiveResponse, LiveEntry } from '@/app/api/pools/[pool_id]/live/route'
 import { needsFullRefresh, mergeMatches, mergeMembers, mergeMatchScores, mergeEntryStats } from './liveMerge'
 import { Button } from '@/components/ui/Button'
@@ -312,6 +313,15 @@ type Tab =
   | 'my_bracket'
   /** Showdown only. Its own key rather than borrowing `my_bracket`, which is a World Cup concept. */
   | 'duels'
+  /**
+   * Showdown only — every duel of a matchweek, and what each was decided on.
+   *
+   * ⚠ NOT A SECOND PREDICTIONS TAB. It is one MATCHWEEK asked three questions
+   * at once: your duel history, everybody else's, and what the whole room
+   * picked. The phone built it first (`ShowdownRoom`); this is the web catching
+   * up, and until it does the panel says so rather than rendering blanks.
+   */
+  | 'room'
   | 'analytics'
   | 'standings'
   | 'pool_info'
@@ -370,14 +380,6 @@ export function defaultTabFor(pool: { league_mode?: string | null }): Tab {
   // thing you came to look at; in this one it is who you are playing, and a
   // pool that opens on a totals table reads as pick'em with a duel attached.
   return pool.league_mode === 'showdown' ? 'duels' : 'leaderboard'
-}
-
-function withShowdownFirst(
-  isShowdown: boolean,
-  tabs: { key: Tab; label: string }[],
-): { key: Tab; label: string }[] {
-  if (!isShowdown) return tabs
-  return [{ key: 'duels' as Tab, label: 'Duel' }, ...tabs]
 }
 
 const USER_TABS_DEFAULT: { key: Tab; label: string }[] = [
@@ -1756,6 +1758,53 @@ export function PoolDetail({
    * ungated, and `!onePage` below stops rendering it.
    */
   const onePage = isShowdown && searchParams.get('layout') !== 'tabs'
+  /**
+   * THE STRIPLESS ROLLBACK — `?layout=onepage`, the shape that shipped 2026-08-31.
+   *
+   * ⚠ THREE LAYOUTS ON ONE MODE, AND EACH IS ONE STRING. Ryan, 2026-09-07:
+   * bring the web into line with the phone, which kept its tabs and rides them
+   * inside the band. So the default is now band + strip; `?layout=onepage` is
+   * the four-sections-and-a-chevron layout it replaces, and `?layout=tabs` is
+   * still the pre-band layout underneath both.
+   *
+   * ⚠ IT IS A ROLLBACK, NOT A VARIANT. Nothing links to either parameter and
+   * nothing should; they exist so a shape that has been live can be looked at
+   * again without a revert. When one of them stops being reached for, delete it
+   * WITH the branches it guards — a rollback that half-rolls-back is worse than
+   * none, which is the note the `?layout=tabs` flag already carries.
+   */
+  const stripless = isShowdown && searchParams.get('layout') === 'onepage'
+  /**
+   * The strip rides INSIDE the band rather than above <main>.
+   *
+   * ⚠ THIS IS THE WHOLE OF THE PHONE'S SHAPE. `ShowdownDuelHeader` on RN holds
+   * `PoolTabBar` as a child, so the matchup and the navigation collapse as one
+   * object and the tabs never leave. Rendering the strip in its usual place
+   * with a band above it would put a second bar on screen and make the collapse
+   * read as clipping.
+   */
+  /**
+   * ⚠⚠ IT IS "IS THE BAND ON SCREEN", NOT "IS THIS THE BAND LAYOUT", AND THE
+   * DIFFERENCE IS WHETHER BANTER IS A DEAD END.
+   *
+   * The band sits out on the Banter tab — `CommunityTab` pins `document.body`
+   * to fill the screen, which freezes `window.scrollY` and leaves the band
+   * stuck mid-collapse, so it is deliberately not rendered there. Ask the
+   * layout instead of the screen and the strip goes with it: a member opens
+   * Banter, the band is gone, the strip was inside it, and the only way out is
+   * the browser's back button. The Banter FAB used to cover that gap and is now
+   * stripless-only, so nothing else would have caught it.
+   *
+   * The same applies to a Showdown pool whose `showdownData` failed to load —
+   * no band, and the pool would have no navigation at all.
+   *
+   * ⚠ AND THE FALLBACK IS THE RIGHT GEOMETRY, not a compromise. One-page
+   * already hands Banter the TABBED layout's container verbatim (see the note
+   * on <main>), and the tabbed layout has a strip above it — so this puts the
+   * chat back in exactly the geometry it is measured for.
+   */
+  const bandOnScreen = onePage && activeTab !== 'community' && isShowdown && !!showdownData
+  const stripInBand = bandOnScreen && !stripless
   /** The pool menu behind the chevron — every surface the duel page does not show. */
   const [moreOpen, setMoreOpen] = useState(false)
 
@@ -1780,7 +1829,14 @@ export function PoolDetail({
   // still switches tabs, and landing on a stripless Predictions pane with no
   // way back would be a trap. Slice 4 puts the picks on the page as a card and
   // this goes away with it.
-  const showTabStrip = !onePage
+  /**
+   * ⚠ IT IS `stripless`, NOT `onePage`, SINCE 2026-09-07. The band no longer
+   * implies the absence of tabs — it holds them. Only the explicit
+   * `?layout=onepage` rollback goes without, and everything that stood in for
+   * the missing strip (the chevron menu, the Banter FAB, the "back to Duel"
+   * row) is gated on the same flag so the two layouts cannot half-merge.
+   */
+  const showTabStrip = !stripless
 
   // Swipe navigation for mobile — only swipe between primary tabs
   const allTabKeys = useMemo(() => tabs.map(t => t.key), [tabs])
@@ -1847,8 +1903,18 @@ export function PoolDetail({
    * tints rather than filling, and a tinted pill also carries onto the branded
    * header, where the solid indicator had to special-case the brand accent.
    */
-  const tabPillClass = (isActive: boolean) => {
-    if (hasBranding) {
+  /**
+   * @param onBand  the strip is riding inside the Showdown band.
+   *
+   * ⚠ THE BAND IS DARK IN BOTH COLOUR MODES, so the strip inside it must be
+   * too. This is the same call `onDarkBand` makes on RN's `PoolTabBar`, and it
+   * is one flag rather than a palette because the branded-header treatment
+   * below is already exactly right for white-on-gradient — a second set of
+   * dark tokens would be a second thing to keep in step with the band's
+   * background.
+   */
+  const tabPillClass = (isActive: boolean, onBand = false) => {
+    if (hasBranding || onBand) {
       return isActive
         ? 'bg-white/20 text-white'
         : 'bg-white/10 text-white/60 hover:text-white/85'
@@ -1860,6 +1926,81 @@ export function PoolDetail({
     }
     return 'bg-mist text-muted hover:text-ink'
   }
+  /**
+   * THE TAB STRIP, BUILT ONCE AND RENDERED IN ONE OF TWO PLACES.
+   *
+   * ⚠ IT WAS INLINE, AND INLINING IT IS WHAT MADE THE BAND LAYOUT DROP IT. The
+   * strip lives above <main>; the Showdown band is `position: fixed` at the top
+   * of the viewport, so a strip left in its usual place would scroll away
+   * underneath the thing that is supposed to hold it. Extracting it is the whole
+   * of the change — same markup, same handlers, same badge, one caller more.
+   *
+   * ⚠ `tabStripRef` FOLLOWS IT. The centre-the-active-pill effect reads that
+   * ref, and only ONE of the two call sites ever renders, so the ref can only
+   * ever point at the strip that exists. If both were ever rendered at once the
+   * second would win the ref and the first would stop scrolling itself into
+   * view — silently, because nothing about it looks broken until you land on a
+   * tab that starts off-screen.
+   */
+  const tabStripNode = (onBand: boolean) => (
+  <div ref={tabStripRef} className="flex relative items-center gap-2 overflow-x-auto scrollbar-hide py-2">
+                {USER_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    data-tab-key={tab.key}
+                    onClick={() => handleTabSwitch(tab.key)}
+                    className={`shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${tabPillClass(activeTab === tab.key, onBand)}`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {tab.label}
+                      {tab.key === 'community' && hasUnreadBanter && (
+                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-danger-500 text-white text-[10px] font-bold flex items-center justify-center">
+                          {banterUnreadCount > 99 ? '99+' : banterUnreadCount}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                ))}
+
+                {/* Bar landing page link tab */}
+                {hasBranding && pool.brand_landing_url && (
+                  <Link
+                    href={pool.brand_landing_url}
+                    className="shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors bg-white/10 text-white/60 hover:text-white/85"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {pool.brand_name}
+                      <Icon name="arrow.up.right" size={12} weight="semibold" />
+                    </span>
+                  </Link>
+                )}
+
+                {/* canAdmin, not isAdmin — this is the strip that actually renders.
+                    The `tabs` array gating admin tabs only ever fed allTabKeys;
+                    the strip maps USER_TABS and adminTabs separately, so an
+                    archived pool still drew Rounds / Members / Scoring Config /
+                    Settings and the divider before them. */}
+                {canAdmin && (
+                  <>
+                    <div className="flex items-center px-2">
+                      <div className={`h-5 w-px ${hasBranding ? 'bg-white/20' : 'bg-neutral-300'}`} />
+                    </div>
+
+                    {adminTabs.map((tab) => (
+                      <button
+                        key={tab.key}
+                        data-tab-key={tab.key}
+                        onClick={() => handleTabSwitch(tab.key)}
+                        className={`shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${tabPillClass(activeTab === tab.key, onBand)}`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </>
+                )}
+  </div>
+  )
+
   /**
    * The branded header used to hard-code Dashboard / Pools / Profile in two
    * places, a copy of AppHeader's list frozen at the time it was written. It
@@ -2062,66 +2203,11 @@ export function PoolDetail({
           <div className="max-w-6xl mx-auto px-2 sm:px-6">
 
 
-            {/* ===== Tab bar — one scrollable strip at every width ===== */}
-            {showTabStrip && (
-            <div ref={tabStripRef} className="flex relative items-center gap-2 overflow-x-auto scrollbar-hide py-2">
-              {USER_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  data-tab-key={tab.key}
-                  onClick={() => handleTabSwitch(tab.key)}
-                  className={`shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${tabPillClass(activeTab === tab.key)}`}
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    {tab.label}
-                    {tab.key === 'community' && hasUnreadBanter && (
-                      <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-danger-500 text-white text-[10px] font-bold flex items-center justify-center">
-                        {banterUnreadCount > 99 ? '99+' : banterUnreadCount}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              ))}
-
-              {/* Bar landing page link tab */}
-              {hasBranding && pool.brand_landing_url && (
-                <Link
-                  href={pool.brand_landing_url}
-                  className="shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors bg-white/10 text-white/60 hover:text-white/85"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    {pool.brand_name}
-                    <Icon name="arrow.up.right" size={12} weight="semibold" />
-                  </span>
-                </Link>
-              )}
-
-              {/* canAdmin, not isAdmin — this is the strip that actually renders.
-                  The `tabs` array gating admin tabs only ever fed allTabKeys;
-                  the strip maps USER_TABS and adminTabs separately, so an
-                  archived pool still drew Rounds / Members / Scoring Config /
-                  Settings and the divider before them. */}
-              {canAdmin && (
-                <>
-                  <div className="flex items-center px-2">
-                    <div className={`h-5 w-px ${hasBranding ? 'bg-white/20' : 'bg-neutral-300'}`} />
-                  </div>
-
-                  {adminTabs.map((tab) => (
-                    <button
-                      key={tab.key}
-                      data-tab-key={tab.key}
-                      onClick={() => handleTabSwitch(tab.key)}
-                      className={`shrink-0 px-4 py-2.5 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${tabPillClass(activeTab === tab.key)}`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </>
-              )}
-
-            </div>
-            )}
+            {/* ===== Tab bar =====
+                ⚠ NOT RENDERED HERE WHEN IT RIDES IN THE BAND. See `stripInBand`
+                — the Showdown band is `position: fixed`, so a strip in its usual
+                place would scroll away underneath the header that holds it. */}
+            {showTabStrip && !stripInBand && tabStripNode(false)}
 
           </div>
         </div>
@@ -2155,7 +2241,7 @@ export function PoolDetail({
           band was behind a full-screen scrim in every one of those attempts,
           which is to say invisible. I was protecting something nobody could
           see. */}
-      {onePage && activeTab !== 'community' && isShowdown && showdownData && (
+      {bandOnScreen && showdownData && (
         <DuelsTab
           poolId={initialPool.pool_id}
           duels={showdownData.duels}
@@ -2199,12 +2285,18 @@ export function PoolDetail({
           onGoToPicks={() => handleTabSwitch('predictions')}
           layout="onepage"
           showContent={activeTab === 'duels'}
+          /* ⚠ THE STRIP GOES IN THE BAND, NOT UNDER IT — the phone's shape.
+             Null in the stripless rollback, which is what that rollback IS. */
+          bandTabs={stripInBand ? tabStripNode(true) : null}
           bandHeader={
             <AppHeader
               overlay
               sticky={false}
               breadcrumbs={[{ label: pool.pool_name }]}
-              badges={
+              /* ⚠ ONLY WITHOUT A STRIP. The chevron is the stripless layout's
+                 ONLY route to the other surfaces; beside a strip that lists
+                 every one of them it is a second door to the same rooms. */
+              badges={!stripInBand ? (
                 <button
                   type="button"
                   onClick={() => setMoreOpen(true)}
@@ -2218,7 +2310,7 @@ export function PoolDetail({
                           strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
-              }
+              ) : null}
               isSuperAdmin={isSuperAdmin}
             />
           }
@@ -2270,7 +2362,10 @@ export function PoolDetail({
                 geometry the tabbed layout never puts there. The way back is
                 CommunityTab's own chrome plus the browser's back button, and
                 a stable composer is worth more than a second exit. */}
-            {onePage && activeTab !== 'duels' && activeTab !== 'community' && (
+            {/* ⚠ STRIPLESS ONLY. This row is the way back when there is no
+                strip; with one, "Duel" is a pill three inches above it and a
+                second back-button reads as a different destination. */}
+            {stripless && activeTab !== 'duels' && activeTab !== 'community' && (
               <div className="flex items-center justify-between gap-3 mb-5">
                 <button
                   type="button"
@@ -2891,6 +2986,37 @@ export function PoolDetail({
               />
             )}
 
+            {/* ── THE ROOM — not built on the web yet ─────────────────────
+                ⚠ IT SAYS WHAT IT IS AND WHERE THE ANSWER LIVES TODAY. The
+                phone's Room replaced a Predictions tab that read "make your
+                picks on the web", which had stopped being true — a placeholder
+                that states something FALSE is worse than one that states a gap,
+                because nobody reports it. So this names the three questions the
+                Room will answer and points at the two tabs that answer them now,
+                and Predictions stays in the strip until it does not have to.
+
+                ⚠ IT IS NOT A COUNTDOWN OR A WAITLIST. No date, no "coming
+                soon" — this is a build gap, and dressing it as an event would
+                make it an announcement. */}
+            {activeTab === 'room' && isShowdown && (
+              <div className="rounded-card bg-surface border border-border-default p-6 sm:p-8 text-center">
+                <Icon name="figure.boxing" size={34} className="mx-auto text-neutral-300 mb-3" />
+                <p className="t-body font-semibold text-ink">The Room is on the phone first</p>
+                <p className="t-detail text-muted mt-2 max-w-md mx-auto">
+                  One matchweek, three questions: your duels, everybody else&rsquo;s, and what the
+                  whole room picked. It is live in the app and being brought over here.
+                </p>
+                <p className="t-detail text-muted mt-4 max-w-md mx-auto">
+                  Until then, <button type="button" onClick={() => handleTabSwitch('results')}
+                    className="text-primary-600 hover:text-primary-700 font-semibold">Results</button>
+                  {' '}has the week&rsquo;s football and{' '}
+                  <button type="button" onClick={() => handleTabSwitch('predictions')}
+                    className="text-primary-600 hover:text-primary-700 font-semibold">Predictions</button>
+                  {' '}has the picks once a matchweek has locked.
+                </p>
+              </div>
+            )}
+
             {activeTab === 'standings' && isLeaguePool && (
               <LeagueTableTab rows={leagueStandings} fetchedAt={leagueStandingsAt} nextByClub={leagueNextFixture} />
             )}
@@ -3106,7 +3232,11 @@ export function PoolDetail({
           find. RN has had `BanterFab` all along and it works.
           ⚠ Hidden while the sheet is open — a button that opens what is
           already open is a button that does nothing. */}
-      {onePage && activeTab !== 'community' && (
+      {/* ⚠ STRIPLESS ONLY, and the note above says why it exists at all: the
+          strip was banter's only door AND the only thing carrying the unread
+          count. With the strip back the pill carries the count again, and a FAB
+          beside it is a second door with a second badge. */}
+      {stripless && activeTab !== 'community' && (
         <button
           type="button"
           onClick={() => handleTabSwitch('community')}
@@ -3135,7 +3265,7 @@ export function PoolDetail({
           those rounded corners, so a menu opening inside it would be clipped
           too. `Modal` is the app's own sheet — bottom-anchored on a phone,
           centred on desktop — and reusing it beats a second, thinner one. */}
-      {onePage && moreOpen && (
+      {stripless && moreOpen && (
         <Modal isOpen onClose={() => setMoreOpen(false)} size="sm"
                titleId="pool-more-title" className="bg-midnight dark:border-white/10">
           <div className="px-5 pt-6 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
