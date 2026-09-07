@@ -342,7 +342,7 @@ export function MatchDetailHeader({
                   fontSize: 10.5,
                   letterSpacing: 1.3,
                   textTransform: 'uppercase',
-                  color: 'rgba(255,255,255,0.62)',
+                  color: 'rgba(255,255,255,0.68)',
                   textAlign: 'center',
                 }}
               >
@@ -631,7 +631,7 @@ function Centre({ match }: { match: ResultsMatch }) {
           style={{
             fontFamily: fontFamilies.medium,
             fontSize: 10,
-            color: 'rgba(255,255,255,0.55)',
+            color: 'rgba(255,255,255,0.68)',
           }}
         >
           Full Time
@@ -645,7 +645,7 @@ function Centre({ match }: { match: ResultsMatch }) {
         {formattedTime(match.matchDate)}
       </RNText>
       <RNText
-        style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: 'rgba(255,255,255,0.55)' }}
+        style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: 'rgba(255,255,255,0.68)' }}
       >
         {formattedShortDate(match.matchDate)}
       </RNText>
@@ -715,7 +715,10 @@ function ScoreRow({ home, away }: { home: number; away: number }) {
       >
         {home}
       </RNText>
-      <RNText style={{ fontFamily: MONO_BOLD, fontSize: 34, color: 'rgba(255,255,255,0.4)' }}>
+      {/* ⚠ 0.55, NOT 0.4. The separator is 34px — large text, so a 3:1 bar — but
+          on the lightened band 0.4 measured 2.36:1 and fell under even that.
+          See `competitionBand`: raising the band raised every floor with it. */}
+      <RNText style={{ fontFamily: MONO_BOLD, fontSize: 34, color: 'rgba(255,255,255,0.55)' }}>
         -
       </RNText>
       <RNText
@@ -755,7 +758,7 @@ function Scorers({ home, away }: { home: ScorerLine[]; away: ScorerLine[] }) {
       {/* The ball sits on the first line's baseline rather than centred on the
           block, so it does not drift down as one side's list grows. */}
       <View style={{ paddingTop: 2 }}>
-        <Icon name="sportscourt.fill" size={11} tint="rgba(255,255,255,0.55)" solid />
+        <Icon name="sportscourt.fill" size={11} tint="rgba(255,255,255,0.68)" solid />
       </View>
       <ScorerColumn lines={away} align="left" />
     </View>
@@ -781,7 +784,7 @@ function ScorerColumn({ lines, align }: { lines: ScorerLine[]; align: 'left' | '
             // half of the gradient.
             fontFamily: fontFamilies.regular,
             fontSize: 11.5,
-            color: 'rgba(255,255,255,0.66)',
+            color: 'rgba(255,255,255,0.68)',
             textAlign: align,
           }}
         >

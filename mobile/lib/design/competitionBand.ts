@@ -40,12 +40,36 @@ import { withLightness } from './oklch';
 /**
  * Where the band sits in OKLab lightness, left stop then right.
  *
- * Tuned against white-at-55% (the kickoff/venue line), which is the lowest
- * contrast the band has to carry. Going lighter than ~0.34 starts to lose it on
- * the yellows — the World Cup gold is the one that fails first.
+ * ⚠ RAISED FROM 0.30/0.19, BECAUSE THE DARK BAND COULD NOT TELL TWO REDS APART.
+ * `withLightness` holds hue and chroma and forces L — so for two competitions
+ * whose brands differ mainly in LIGHTNESS, the band threw away the only thing
+ * separating them. La Liga (#EE2737) and the Bundesliga (#7A1020) are 175 apart
+ * as brands and came out 14 apart as bands: the same colour. Ryan spotted it.
+ *
+ * ⚠ AND THE CEILING IS TEXT, NOT TASTE. Measured across all six competitions,
+ * against white-at-55% — the kickoff/venue line, the faintest thing the band
+ * carries — and the two move against each other:
+ *
+ *     L      closest pair of bands      white@0.55
+ *     0.30            14                  4.90:1     ← was here; reds identical
+ *     0.38            44                  3.92:1
+ *     0.42            76                  4.73:1 at α 0.68
+ *     0.46            92                  3.04:1     ← would need α 0.73
+ *
+ * 0.42 is where it stops: 5.4× the separation of the old band, with the faint
+ * labels only having to move 0.55 → 0.68. Going on to 0.46 separates every
+ * pair and forces every quiet label past 0.73 to stay legible — brighter than
+ * the captions are meant to be. Separation is worth having; it is not worth
+ * making the footnotes shout.
+ *
+ * ⚠ NOTHING ON THIS BAND MAY BE FAINTER THAN WHITE AT 0.68, and the ceiling is
+ * La Liga — the band that fails first, at 4.73:1 with 0.68 and under 4.5 below
+ * it. ⚠ THAT INCLUDES LARGE TEXT: the 34px score separator sat at 0.40 and
+ * measured 2.36:1 on the new band, under even the 3:1 large-text bar, so
+ * raising the band raised its floor too.
  */
-const BAND_L_LEFT = 0.30;
-const BAND_L_RIGHT = 0.19;
+const BAND_L_LEFT = 0.42;
+const BAND_L_RIGHT = 0.31;
 
 /**
  * A competition with no colour of its own still needs a band. This is the same
