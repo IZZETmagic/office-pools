@@ -3,17 +3,35 @@
 import { useState } from 'react'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
+import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import {
+  CONTACT_CATEGORIES,
+  findContactCategory,
+  isValidPoolCode,
+  normalizePoolCode,
+  POOL_CODE_MAX,
+} from '@/lib/contact/categories'
 
 export function ContactForm() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [poolCode, setPoolCode] = useState('')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+
+  const category = findContactCategory(categoryId)
+  const poolCodeRequired = category?.requiresPoolCode ?? false
+  const normalizedPoolCode = normalizePoolCode(poolCode)
+
+  // Only an error once they've typed something wrong — an empty required field is
+  // flagged on submit, not while they are still working down the form.
+  const poolCodeInvalid = normalizedPoolCode.length > 0 && !isValidPoolCode(normalizedPoolCode)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -25,9 +43,24 @@ export function ContactForm() {
       return
     }
 
+    if (!category) {
+      setError('Please choose what your message is about.')
+      return
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       setError('Please enter a valid email address.')
+      return
+    }
+
+    if (poolCodeRequired && !normalizedPoolCode) {
+      setError(`A pool code is required for "${category.label}" so we can find the right pool.`)
+      return
+    }
+
+    if (normalizedPoolCode && !isValidPoolCode(normalizedPoolCode)) {
+      setError("That pool code doesn't look right. It's usually 6 letters and numbers, like BDA26X.")
       return
     }
 
@@ -40,6 +73,10 @@ export function ContactForm() {
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim(),
+          category: category.id,
+          // Always send the normalised code when there is one, even for categories
+          // that don't demand it — a volunteered code is still worth having.
+          poolCode: normalizedPoolCode,
           subject: subject.trim(),
           message: message.trim(),
         }),
@@ -101,6 +138,48 @@ export function ContactForm() {
           />
         </FormField>
       </div>
+
+      <FormField label="What's this about?">
+        <Select
+          fullWidth
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+        >
+          <option value="">Choose a category…</option>
+          {CONTACT_CATEGORIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+
+      {/* Always visible, so the field never appears under the cursor mid-form and
+          so a code can be volunteered on any category. Only its requiredness moves. */}
+      <FormField
+        label={poolCodeRequired ? 'Pool code (required)' : 'Pool code (optional)'}
+        helperText={
+          poolCodeInvalid
+            ? undefined
+            : poolCodeRequired
+              ? "We need this to find the pool you're asking about — it's on the pool's page and in its invite link."
+              : 'Include it if your question is about one specific pool.'
+        }
+        error={poolCodeInvalid ? "That doesn't look like a pool code — check the pool's page or invite link." : undefined}
+      >
+        <Input
+          type="text"
+          placeholder="e.g. BDA26X"
+          value={poolCode}
+          onChange={(e) => setPoolCode(e.target.value.toUpperCase())}
+          error={poolCodeInvalid}
+          maxLength={POOL_CODE_MAX + 4}
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          className="font-mono tracking-wider"
+        />
+      </FormField>
 
       <FormField label="Subject">
         <Input
