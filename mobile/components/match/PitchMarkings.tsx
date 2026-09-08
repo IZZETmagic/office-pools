@@ -1,21 +1,23 @@
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
+import {
+  BLEED,
+  cornerArcPath,
+  FACING,
+  PITCH_L,
+  PITCH_W,
+  VIEW_L,
+  VIEW_W,
+} from '@/lib/pitchGeometry';
+
 // =============================================================
 // A football pitch, to scale
 // =============================================================
 // ⚠ THE VIEWBOX IS IN METRES, AND EVERY MARKING IS ITS REAL SIZE: a penalty
 // area is 40.32 × 16.5, a six-yard box 18.32 × 5.5, the spot 11 out and every
 // arc 9.15. Drawing them any other way means guessing at proportions a viewer
-// has seen ten thousand times and will notice being wrong.
-//
-// ⚠ THE LENGTH, HOWEVER, IS DELIBERATELY LONGER THAN A REAL PITCH — 126m drawn
-// against 105m real. Ryan asked for more height, and there are two ways to get
-// it. Stretching the whole drawing is the obvious one and is wrong: it turns
-// the centre circle into an ellipse and deepens the penalty areas, so every
-// shape a viewer knows becomes subtly incorrect. Adding GRASS instead leaves
-// each marking exactly right and simply puts more midfield between the boxes,
-// which is also the space the formation needed. `PITCH_L` is the only
-// fictional number in this file; a real pitch is 105.
+// has seen ten thousand times and will notice being wrong. `PITCH_L` is the one
+// exception and `lib/pitchGeometry.ts` says why.
 //
 // ⚠ SVG RATHER THAN BORDERED VIEWS, AND THE 'D' IS WHY. Four of these shapes
 // are arcs — the centre circle and the three arcs off the penalty spots — and a
@@ -41,51 +43,20 @@ import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 // than the card's 24pt, so its corners were cut clean off. The caller measures
 // the card and passes its radius in PITCH UNITS; subtracting the bleed makes
 // the two arcs concentric, so the touchline runs parallel to the card's edge
-// the whole way round instead of crossing it.
+// the whole way round instead of crossing it. ⚠ THE CORNER ARCS HAD TO FOLLOW
+// IT: they are circles about a corner point that the rounding removed, so they
+// are computed from the touchline now — see `cornerArcPath`.
 // =============================================================
 
-/** The pitch's real width in metres. Every marking below is sized in metres too. */
-export const PITCH_W = 68;
-
-/**
- * The length we actually draw.
- *
- * ⚠ FICTIONAL, AND THE ONLY FICTIONAL NUMBER IN THIS FILE. It buys vertical
- * room for the two elevens without distorting a single marking: the extra 21m
- * all lands in midfield, between two penalty areas that stay 16.5 deep and
- * either side of a centre circle that stays round.
- */
-export const PITCH_L = 126;
-
-/**
- * Metres of grass drawn OUTSIDE the touchline, so an edge line has room.
- *
- * ⚠ Every line on the perimeter is centred on the boundary, so without this
- * exactly half of each is outside the viewBox and invisible. 1.5m is a little
- * over four stroke widths — enough that the rounded clip never reaches a line.
- */
-export const BLEED = 1.5;
-
-/** The box actually rendered, bleed included. The container must match this. */
-export const VIEW_W = PITCH_W + BLEED * 2;
-export const VIEW_L = PITCH_L + BLEED * 2;
-
-/**
- * A percentage across the PITCH, as a percentage across the rendered box.
- *
- * ⚠ THE TWO ARE NOT THE SAME ONCE THERE IS A BLEED, and players are positioned
- * against the box. Left-hand touchline is 0% of the pitch but 2.1% of the box;
- * a goalkeeper placed at a raw pitch percentage would stand fractionally
- * outside his own goal line. Small, but it is the kind of drift that never gets
- * noticed and never gets fixed.
- */
-export function pitchXToView(pct: number): number {
-  return ((BLEED + (pct / 100) * PITCH_W) / VIEW_W) * 100;
-}
-
-export function pitchYToView(pct: number): number {
-  return ((BLEED + (pct / 100) * PITCH_L) / VIEW_L) * 100;
-}
+export {
+  BLEED,
+  PITCH_L,
+  PITCH_W,
+  pitchXToView,
+  pitchYToView,
+  VIEW_L,
+  VIEW_W,
+} from '@/lib/pitchGeometry';
 
 // Every measurement below is the real one, in metres.
 const PEN_W = 40.32;
@@ -127,7 +98,7 @@ export function PitchMarkings({
 
   // Concentric with the card's rounding: the touchline sits exactly `BLEED`
   // inside it the whole way round. Floored so a small card cannot invert it.
-  const touchlineR = Math.max(0.6, cardRadius - BLEED);
+  const r = Math.max(0.6, cardRadius - BLEED);
 
   return (
     <Svg
@@ -142,9 +113,9 @@ export function PitchMarkings({
       pointerEvents="none"
     >
       {/* The touchline, on the boundary itself — the bleed is what keeps its
-          stroke inside the viewBox, and `touchlineR` what keeps its corners
-          inside the card's. */}
-      <Rect x={0} y={0} width={PITCH_W} height={PITCH_L} rx={touchlineR} {...common} />
+          stroke inside the viewBox, and `r` what keeps its corners inside the
+          card's. */}
+      <Rect x={0} y={0} width={PITCH_W} height={PITCH_L} rx={r} {...common} />
 
       {/* Halfway line, centre circle, centre spot. */}
       <Line x1={0} y1={PITCH_L / 2} x2={PITCH_W} y2={PITCH_L / 2} {...common} />
@@ -175,11 +146,13 @@ export function PitchMarkings({
         {...common}
       />
 
-      {/* Corner arcs — 1m, and the detail that makes it read as a pitch. */}
-      <Path d={`M 0 1 A 1 1 0 0 0 1 0`} {...common} />
-      <Path d={`M ${PITCH_W - 1} 0 A 1 1 0 0 0 ${PITCH_W} 1`} {...common} />
-      <Path d={`M 0 ${PITCH_L - 1} A 1 1 0 0 1 1 ${PITCH_L}`} {...common} />
-      <Path d={`M ${PITCH_W - 1} ${PITCH_L} A 1 1 0 0 1 ${PITCH_W} ${PITCH_L - 1}`} {...common} />
+      {/* Corner arcs — a metre, and the detail that makes it read as a pitch.
+          Each is struck from the touchline's own rounding, so it meets the line
+          at both ends however wide the card turns out to be. */}
+      <Path d={cornerArcPath(r, r, FACING.topLeft, r)} {...common} />
+      <Path d={cornerArcPath(PITCH_W - r, r, FACING.topRight, r)} {...common} />
+      <Path d={cornerArcPath(r, PITCH_L - r, FACING.bottomLeft, r)} {...common} />
+      <Path d={cornerArcPath(PITCH_W - r, PITCH_L - r, FACING.bottomRight, r)} {...common} />
     </Svg>
   );
 }
