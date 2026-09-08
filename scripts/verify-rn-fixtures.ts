@@ -61,7 +61,19 @@ function toResultsMatch(row: Record<string, unknown>, competition: string | null
   const team = (raw: unknown) => {
     if (!raw) return null
     const t = raw as { country_name?: string; country_code?: string | null; flag_url?: string | null }
-    return { countryName: t.country_name ?? '', countryCode: t.country_code ?? null, flagUrl: t.flag_url ?? null }
+    return {
+      countryName: t.country_name ?? '',
+      countryCode: t.country_code ?? null,
+      flagUrl: t.flag_url ?? null,
+      // ⚠ NULL, AND THAT IS THE HONEST VALUE RATHER THAN A STUB. `ResultsTeam`
+      // gained `shortName` after this script was written; only
+      // `/api/users/:id/fixtures` computes one, using the web's `shortClubName`
+      // so the phone and the browser cannot end up calling Forest two different
+      // things. The select above asks for three columns and none of them is it,
+      // so inventing a short name here would be this script disagreeing with
+      // the route it exists to verify.
+      shortName: null,
+    }
   }
   return {
     matchId: row.match_id as string,
@@ -88,6 +100,18 @@ function toResultsMatch(row: Record<string, unknown>, competition: string | null
     awayTeam: team(row.away_team),
     roundNumber: (row.round_number as number | null) ?? null,
     competition,
+    /**
+     * ⚠ NULL BECAUSE THIS SCRIPT NEVER ASKED FOR IT, not because a league has
+     * no id. `competitionId` is `tournaments.external_league_id` and every
+     * colour, mark and crest on both platforms keys off it — but the seasons
+     * query above selects four columns and none of them is the tournament, so
+     * there is nothing here to put in it.
+     *
+     * That is fine for what this verifies (the phone's LIST logic over a real
+     * season) and would not be fine for anything that checks branding. A check
+     * that needs it has to read it, not have this default quietly satisfy it.
+     */
+    competitionId: null,
   }
 }
 

@@ -835,16 +835,34 @@ export async function readLeagueRevealContext(
  * has none. Widening that type would put a nullable hole through four World Cup
  * call sites to describe a league concept — the thing phase 5 already declined
  * to do.
+ *
+ * ⚠ THE PREDICTIONS CARRY `entry_id` AND THE RETURN TYPE NOW SAYS SO. This read
+ * is pool-WIDE — the entry is the whole reason it exists, and every caller has
+ * to know whose pick it is looking at. `ExistingPrediction` is the World Cup's
+ * per-entry select shape and has no such field, so the push below cast the
+ * information away with `as ExistingPrediction` while setting it three lines
+ * above. `outcomes` beside it had the field declared all along, which is what
+ * made the omission look deliberate.
+ *
+ * It cost a broken build: `scripts/verify-pickem-reveal.ts` reads `entry_id`
+ * off both halves the same way, was written after the last green deploy, and
+ * only failed on Vercel — nothing local type-checks `scripts/` unless you ask
+ * it to.
+ *
+ * ⚠ AN INTERSECTION, NOT A WIDENED `ExistingPrediction`. Adding an optional
+ * `entry_id` to that type would let every World Cup call site read a field its
+ * own select never asks for, and get `undefined` at runtime with no complaint.
+ * The extra field belongs to THIS function's result, so it is declared here.
  */
 export async function readAllLeaguePredictions(
   supabase: SupabaseClient,
   entryIds: string[],
 ): Promise<{
-  predictions: ExistingPrediction[]
+  predictions: Array<ExistingPrediction & { entry_id: string }>
   outcomes: Array<{ entry_id: string; match_id: string; outcome: 'home' | 'draw' | 'away' }>
   error: string | null
 }> {
-  const out: ExistingPrediction[] = []
+  const out: Array<ExistingPrediction & { entry_id: string }> = []
   const outcomes: Array<{ entry_id: string; match_id: string; outcome: 'home' | 'draw' | 'away' }> = []
   if (entryIds.length === 0) return { predictions: out, outcomes, error: null }
 
@@ -879,7 +897,10 @@ export async function readAllLeaguePredictions(
         predicted_home_pso: null,
         predicted_away_pso: null,
         predicted_winner_team_id: null,
-      } as ExistingPrediction)
+        // ⚠ The cast stays for the World Cup half of the shape (the nullable
+        // score columns above are asserted non-null), but `entry_id` is now
+        // part of the declared type rather than something a cast hides.
+      } as ExistingPrediction & { entry_id: string })
     }
     if (page.length < 1000) break
   }
