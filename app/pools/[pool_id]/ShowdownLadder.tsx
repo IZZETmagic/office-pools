@@ -43,7 +43,7 @@ import { useMemo, useState } from 'react'
 
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { Icon } from '@/components/ui/Icon'
-import { buildDuelRecords, type DuelFormResult, type DuelRecord } from '@/lib/league/duelRecord'
+import { buildDuelRecords, duelMovement, type DuelFormResult, type DuelRecord } from '@/lib/league/duelRecord'
 import { ladderGap, ladderGapLabel, ladderNumberChars, type LadderGap } from '@/lib/league/ladderGap'
 import type { DuelRow } from '@/lib/league/duels'
 import { seasonTotalPoints } from '@/lib/scoring/readSource'
@@ -155,6 +155,28 @@ export function ShowdownLadder({ entries, duels, duelPoints, myEntryIds }: Props
    */
   const numberWidth = `${ladderNumberChars(values)}ch`
 
+  /**
+   * Which way each member moved — MEASURED ON THE BOARD BEING SHOWN.
+   *
+   * ⚠⚠ THE TWO BOARDS MOVE FOR DIFFERENT REASONS, and this row used to arrow
+   * both from `current_rank` / `previous_rank`. Those are the SEASON table's
+   * order — the engine ranks on `(total_points + duel_points) DESC` — so on the
+   * Duels board the number said "first on duel points" while the arrow beside
+   * it said "up three in the season table". Two stories in one cell, and each
+   * of them true.
+   *
+   * Table keeps the engine's own answer, which is the right one there and is
+   * not ours to recompute. Duels gets `duelMovement`, which rebuilds the board
+   * without the most recently SETTLED matchweek — never the highest-numbered
+   * one, because rounds are played out of order.
+   */
+  const duelMoved = useMemo(
+    () => (board === 'duels'
+      ? duelMovement(duels, rows.map((r) => r.entry.entry_id))
+      : null),
+    [board, duels, rows],
+  )
+
   return (
     <div className="space-y-4">
       {/* ⚠ PILLS, NOT A SEGMENTED CONTROL — Ryan asked for the tab strip's
@@ -178,6 +200,7 @@ export function ShowdownLadder({ entries, duels, duelPoints, myEntryIds }: Props
                being told which order it is looking at. */
             gap={r.isYou ? ladderGap(values, i) : null}
             numberWidth={numberWidth}
+            moved={duelMoved ? duelMoved.get(r.entry.entry_id) ?? 0 : null}
           />
         ))}
       </ul>
@@ -199,7 +222,7 @@ export function ShowdownLadder({ entries, duels, duelPoints, myEntryIds }: Props
 // ------------------------------------------------------------------- a row
 
 function Row({
-  position, row, board, gap, numberWidth,
+  position, row, board, gap, numberWidth, moved,
 }: {
   position: number
   row: {
@@ -214,6 +237,12 @@ function Row({
   gap: LadderGap | null
   /** The points column, sized once for the whole board. */
   numberWidth: string
+  /**
+   * Places climbed on the DUELS board, or null on Table — where the engine's
+   * own `previous_rank` is the answer and re-deriving it would be a second
+   * opinion about a number it stores.
+   */
+  moved: number | null
 }) {
   const { entry, duel, picks, combined, isYou } = row
   // ⚠ Gold for first, because `accent` is already the belt colour in the duel
@@ -242,7 +271,9 @@ function Row({
           {position}
         </span>
         <span className="w-6 flex justify-center">
-          <Movement current={entry.current_rank} previous={entry.previous_rank} />
+          {moved === null
+            ? <Movement current={entry.current_rank} previous={entry.previous_rank} />
+            : <Moved places={moved} />}
         </span>
       </span>
 
@@ -321,6 +352,26 @@ function Movement({ current, previous }: { current: number | null; previous: num
       ${climbed ? 'text-success-600' : 'text-danger-600'}`}>
       <Icon name={climbed ? 'arrow.up' : 'arrow.down'} size={10} weight="semibold" />
       {Math.abs(previous - current)}
+    </span>
+  )
+}
+
+/**
+ * Places climbed on the duels board. Positive is a CLIMB.
+ *
+ * ⚠ SILENT AT ZERO, and that covers two different things on purpose: a member
+ * who did not move, and one with no prior row at all. With nothing played every
+ * position is a tie nobody moved into, and an arrow there would be inventing a
+ * story.
+ */
+function Moved({ places }: { places: number }) {
+  if (places === 0) return null
+  const climbed = places > 0
+  return (
+    <span className={`inline-flex items-center gap-0.5 t-detail
+      ${climbed ? 'text-success-600' : 'text-danger-600'}`}>
+      <Icon name={climbed ? 'arrow.up' : 'arrow.down'} size={10} weight="semibold" />
+      {Math.abs(places)}
     </span>
   )
 }

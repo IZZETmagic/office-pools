@@ -243,78 +243,6 @@ export { Countdown }
 type DuelFormResult = 'won' | 'tied' | 'lost' | 'bye'
 
 /**
- * Five dots of DUEL form, oldest on the left — the football convention.
- *
- * ⚠ Deliberately NOT `lib/design/formDots.ts`, and not the `FormDots` further
- * down this file. Both of those colour PICK ACCURACY, on the tier ramp
- * (exact / winner+GD / winner / miss). These are head-to-head results, and
- * green-grey-red for won-tied-lost is the thing every football table already
- * uses. Sharing a component would mean one strip of dots meaning two different
- * things on the same tab.
- *
- * Tuned for the midnight card: the `-400` steps, since the `-500`s go muddy on
- * near-black. A bye is hollow — nothing happened, and it should not read as a
- * result somebody earned.
- */
-function DuelFormDots({ form, align = 'left' }: {
-  form: DuelFormResult[]
-  align?: 'left' | 'right'
-}) {
-  if (!form.length) {
-    return (
-      <span className={`block t-num text-white/20 ${align === 'right' ? 'text-right sm:text-left' : ''}`}
-            aria-hidden="true">&mdash;</span>
-    )
-  }
-  return (
-    <span className={`flex gap-1 ${align === 'right' ? 'justify-end sm:justify-start' : ''}`} aria-hidden="true">
-      {form.map((r, i) => (
-        <span
-          key={i}
-          className={`w-2 h-2 rounded-full shrink-0 ${
-            r === 'won' ? 'bg-success-400'
-              : r === 'lost' ? 'bg-danger-400'
-                : r === 'tied' ? 'bg-white/35'
-                  : 'border border-white/30'}`}
-        />
-      ))}
-    </span>
-  )
-}
-
-/**
- * The standings, reduced from the duel rows themselves.
- *
- * Module-level rather than inline in a `useMemo` because it is run TWICE — once
- * for now and once for "before the last matchweek settled", which is where the
- * movement arrows come from. Two copies of this loop would be two chances for
- * the arrow to describe a table nobody is looking at.
- *
- * ⚠ NOTHING HERE COMPUTES A SCORE — corrected 2026-09-02, and the distinction
- * is the whole point of the change.
- *
- * It used to finish with `enginePoints?.get(e) ?? r.w * DUEL_WIN + r.d *
- * DUEL_TIE`, and that right-hand side was **a second scoring engine, in the
- * browser**: it re-derived from constants a number migration 121 had already
- * written down, and it was "correct" only for as long as a guard test held two
- * literals equal to a migration. That is the divergence the architecture rule
- * exists to prevent, and this project has already paid for it once — a stale
- * `points === 3` shipped for four days and told every winner they had lost.
- *
- * What it does now is ADD UP what the engine stored. `league_duels.points_a/
- * points_b` are engine output, and migration 121 defines `duel_points` as
- * exactly `SUM(points_a or points_b) over settled duels` — so the sum below is
- * not an agreeing re-derivation, it is the same quantity by construction.
- * `enginePoints` (`league_entry_totals.duel_points`) is still preferred where
- * the caller has it, because that is the number the leaderboard adds to
- * `total_points` and the two must not disagree on screen; the `??` is now a
- * missing-row guard, not a second formula.
- *
- * `enginePoints` is deliberately absent for the "before the last matchweek
- * settled" table — the engine stores today's total and has no historical one —
- * which is exactly why the fallback had to stop being arithmetic.
- */
-/**
  * The season table's rows — the duel record, shaped for this tab's columns.
  *
  * ⚠⚠ THE COUNTING MOVED TO `lib/league/duelRecord.ts` BECAUSE IT WAS WRONG
@@ -635,6 +563,42 @@ export default function DuelsTab({
   const current = phase.current
 
   /**
+   * Every settled meeting with the CURRENT opponent, most recent first.
+   *
+   * ⚠ ORDERED BY `settled_at`, NEVER BY MATCHWEEK NUMBER. Rounds are played out
+   * of numerical order — migration 101 measured a minimum gap of minus 121 days
+   * across three real seasons — so "most recent" has to mean the latest to have
+   * been DECIDED. Sorting by the number would put a meeting from March at the
+   * top of a list headed by one from January.
+   *
+   * ⚠ SETTLED ONLY. The duel being played right now is on screen directly above
+   * this; repeating it here as a history entry with a null score would make the
+   * card say the two of you have met once more than you have.
+   *
+   * ⚠ `mine` IS ALREADY ORIENTED, so `you` is always the viewer whichever side
+   * of the row they were drawn on. That is the whole reason it exists — a
+   * history read off `entry_a` would flip half the results.
+   */
+  const meetings = useMemo(() => {
+    const themEntry = current?.them?.entry
+    if (!themEntry) return []
+    return mine
+      .filter((m) => m.duel.settled_at && m.them?.entry === themEntry)
+      .sort((a, b) => b.duel.settled_at!.localeCompare(a.duel.settled_at!))
+      .map((m) => ({
+        matchweek: m.matchweek,
+        you: m.you.accuracy ?? 0,
+        them: m.them!.accuracy ?? 0,
+        // ⚠ `duelResult` off the POINTS column, never the two accuracies. That
+        // is what the engine paid and what every other surface reads; comparing
+        // the scores again would be a second opinion that parts company with the
+        // record above after a rescore.
+        result: duelResult(m.you.points),
+      }))
+  }, [mine, current])
+
+
+  /**
    * The opponent the walkout reveals, assembled from props this tab already has.
    *
    * ⚠ NO NEW SERVER WORK, DELIBERATELY. Everything the ceremony needs is already
@@ -729,85 +693,6 @@ export default function DuelsTab({
     const jitterMs = 2_000 + Math.round(Math.random() * 18_000)
     setTimeout(() => router.refresh(), jitterMs)
   }, [router])
-
-  /**
-   * Each member's last five DUEL results, oldest first.
-   *
-   * ⚠ NOT the same thing as the Form column on the leaderboard, which is pick
-   * accuracy — `exact / winner_gd / winner / miss`. This is won / tied / lost,
-   * the head-to-head record, and it is the only form that means anything in a
-   * mode whose table is decided by duels. Two different truths about a week
-   * would be worse than one, so they get different colours and different dots.
-   *
-   * ⚠ ORDERED BY `settled_at`, NEVER by matchweek number. Rounds are played out
-   * of numerical order (101: a minimum gap of minus 121 days across three real
-   * seasons), so numbering them would put a form guide in an order the season
-   * was not played in. Settlement time is what "recent" actually means.
-   *
-   * ⚠ A BYE IS CHECKED STRUCTURALLY, before the points. It pays `DUEL_BYE`,
-   * which is exactly `DUEL_TIE`, so reading the number would call it a tie.
-   */
-  const duelForm = useMemo(() => {
-    const byEntry = new Map<string, Array<{ at: string; r: DuelFormResult }>>()
-    const push = (e: string | null, at: string, r: DuelFormResult) => {
-      if (!e) return
-      const list = byEntry.get(e) ?? []
-      list.push({ at, r })
-      byEntry.set(e, list)
-    }
-    for (const d of duels) {
-      if (!d.settled_at) continue
-      if (d.entry_b === null) { push(d.entry_a, d.settled_at, 'bye'); continue }
-      push(d.entry_a, d.settled_at, duelResult(d.points_a) ?? 'lost')
-      push(d.entry_b, d.settled_at, duelResult(d.points_b) ?? 'lost')
-    }
-    const out = new Map<string, DuelFormResult[]>()
-    for (const [e, list] of byEntry) {
-      out.set(e, list.sort((a, b) => a.at.localeCompare(b.at)).slice(-5).map((x) => x.r))
-    }
-    return out
-  }, [duels])
-
-  /**
-   * How far each member moved when the last duel settled.
-   *
-   * ⚠ DERIVED, NOT STORED. `league_entry_totals.previous_final_rank` tracks the
-   * WEEKLY ACCURACY rank, which is a different table — using it here would draw
-   * an arrow describing somebody else's movement. Rebuilding the standings one
-   * settled matchweek short is exact and costs nothing: the rows are already in
-   * memory.
-   *
-   * ⚠ The prior table cannot use `duelPoints`, which is today's total from the
-   * engine — there is no stored historical one. It sums the engine's own
-   * per-duel `points_a`/`points_b` off the rows instead, which is the same
-   * quantity migration 121 defines `duel_points` as. It used to re-derive
-   * `w * DUEL_WIN + d * DUEL_TIE` here, correct only while a guard test held
-   * two literals equal to a migration; that was the browser's second scoring
-   * engine and it is gone (2026-09-02).
-   *
-   * Positive is UP the table.
-   */
-  const movement = useMemo(() => {
-    const out = new Map<string, number>()
-    const settled = duels.filter((d) => d.settled_at)
-    if (!settled.length) return out
-    // ⚠ THE MOST RECENTLY SETTLED MATCHWEEK, NOT THE HIGHEST-NUMBERED ONE.
-    // Rounds are played out of numerical order — migration 101 measured a
-    // minimum gap of MINUS 121 days across three real seasons — so
-    // `max(matchweek_number)` picks a week that may not have happened yet, and
-    // the arrow would describe a movement nobody made.
-    const latest = settled.reduce((a, b) => (a.settled_at! > b.settled_at! ? a : b))
-    const before = buildDuelTable(
-      duels.filter((d) => d.matchweek_number !== latest.matchweek_number),
-    )
-    // A member with no prior row is new to the table, not a riser — no arrow.
-    const was = new Map(before.map((r, i) => [r.entry, i + 1]))
-    table.forEach((r, i) => {
-      const prior = was.get(r.entry)
-      if (prior !== undefined && prior !== i + 1) out.set(r.entry, prior - (i + 1))
-    })
-    return out
-  }, [duels, table])
 
   const name = (e: string | null) => (e ? entryNames.get(e) ?? 'Unknown' : 'Bye')
   const person = (e: string | null): AvatarPerson | null => (e ? entryPeople.get(e) ?? null : null)
@@ -2008,20 +1893,24 @@ export default function DuelsTab({
         </Card>
       )}
 
-      {/* THE SEASON — the duel table, in the arena treatment.
-          ⚠ DARK, LIKE THE DUEL CARD AT THE TOP, and that is the point of the
-          change rather than decoration. This is the standing record of the mode
-          — the thing members argue about in November — and it was the quietest
-          card on the tab: a white table of small grey integers, fifth in the
-          scroll, indistinguishable from the working detail above it. The tab
-          now opens and closes in the same world (this week's duel, then the
-          season) with the light cards carrying the detail in between. It is
-          also RN's own treatment: `LiveMatchCard` is a #0F0F1A → #1A1830
-          diagonal with a coloured glow bleeding in from one corner.
+      {/* YOUR RECORD, AND YOUR HISTORY WITH THE PERSON YOU ARE PLAYING.
 
-          ⚠ THE FACES ARE THE POINT, not the darkness. Every other surface on
-          this tab now carries somebody's colour; this table was the one place
-          still purely textual, so it was the one place you could not find
+          ⚠ IT WAS THE POOL'S DUEL TABLE, and that is now the Leaderboard's
+          Duels board — same order, same W/T/L, same form, plus byes and the gap
+          to the rung above. Ryan, 2026-09-07: *"I really like it but it is no
+          longer needed."* What survived is the half that was never a standing:
+          your own record, which is about YOU, and beneath it the one fact no
+          board carries — whether you have played this person before.
+
+          ⚠ DARK, LIKE THE DUEL CARD AT THE TOP, and that is the point rather
+          than decoration. The tab opens and closes in the same world — this
+          week's duel, then your record in it — with the light cards carrying
+          the working detail in between. It is also RN's own treatment:
+          `LiveMatchCard` is a #0F0F1A → #1A1830 diagonal with a coloured glow
+          bleeding in from one corner.
+
+          ⚠ THE GLOW IS YOUR COLOUR. Every other surface on this tab carries
+          somebody's; a purely textual card is the one place you cannot find
           yourself at a glance. */}
       <div className="rounded-card overflow-hidden bg-midnight relative">
         <div
@@ -2084,104 +1973,125 @@ export default function DuelsTab({
           </div>
         </div>
 
-        {/* ⚠ THE PHONE SHOWS FORM INSTEAD OF W/T/L — Ryan's call, 2026-08-31,
-            once the form column made seven columns at 375px.
+        {/* ⚠⚠ THE TEN-ROW TABLE THAT WAS HERE IS GONE — Ryan, 2026-09-07:
+            *"I really like it but it is no longer needed."*
 
-            This is NOT the "crunch, don't drop" rule from `LeagueTableTab`
-            being abandoned. That rule is about never LOSING information to fit,
-            and it stood while the choice was six columns or five. Seven changed
-            the question from "can it fit" — measured, it could — to "what
-            earns a phone's width", and five dots of form carry more than three
-            integers do: the shape of somebody's season rather than its totals,
-            in less space. Your OWN W/T/L is in the header above regardless, and
-            the desktop keeps all seven.
+            The Leaderboard's Duels board is a superset of it: same order, same
+            W/T/L, same form strip, plus byes, plus the gap to the member above.
+            Two boards showing one standing is two things to keep in step, and
+            this one had already fallen behind — it counted a bye as a tie, and
+            its form strip was a fourth copy of a derivation
+            `lib/league/duelRecord.ts` now owns.
 
-            Gutters stay px-0.5 on a phone and px-2 from `sm`, and the type
-            steps to `text-xs`, so the desktop rhythm is untouched.
+            ⚠ WHAT REPLACED IT IS NOT A SMALLER VERSION OF IT. A standing you
+            can reach in one tap does not need repeating three inches from the
+            duel; what the duel is missing is the thing no board carries —
+            whether you have played this person before, and how it went. The
+            programme lists lifetime head-to-head as owed, and `headToHead()`
+            has existed for display since 2026-08-31 with nothing but a single
+            line on the Tale of the Tape reading it.
 
-            `overflow-x-auto` stays as a floor for an unusually long name. */}
-        <div className="relative overflow-x-auto">
-          <table className="w-full text-xs sm:text-sm tabular-nums">
-            <thead>
-              <tr className="t-caption text-white/40">
-                <th className="pt-5 pb-3.5 pl-2.5 pr-0.5 sm:pl-4 sm:pr-1 text-left w-8 sm:w-11">#</th>
-                <th className="pt-5 pb-3.5 px-1 sm:px-2 text-left">Member</th>
-                {/* Beside the name rather than out past the totals: identity,
-                    then recent shape, then the numbers. Same order as the
-                    leaderboard's own PLAYER / FORM / STATS. */}
-                <th className="pt-5 pb-3.5 px-2 text-right sm:text-left w-[58px] sm:w-16">Form</th>
-                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">W</th>
-                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">T</th>
-                <th className="hidden sm:table-cell pt-5 pb-3.5 px-2 text-right w-9">L</th>
-                <th className="pt-5 pb-3.5 pl-2 pr-3 sm:pr-4 text-right w-12 sm:w-16">Pts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {table.map((r, i) => {
-                const you = own.has(r.entry)
-                const p = person(r.entry)
-                const colour = p ? avatarColor(p.user_id) : 'rgba(255,255,255,0.35)'
-                const moved = movement.get(r.entry) ?? 0
-                return (
-                  <tr
-                    key={r.entry}
-                    className="border-t border-white/10"
-                    /* Your row wears YOUR colour, faintly — the same hue as your
-                       face two rows up in the duel card, so finding yourself is
-                       recognition rather than reading ten names. */
-                    style={you
-                      ? { background: `color-mix(in srgb, ${colour} 14%, transparent)`,
-                          boxShadow: `inset 3px 0 0 0 ${colour}` }
-                      : undefined}
-                  >
-                    <td className="py-2.5 pl-2.5 pr-0.5 sm:pl-4 sm:pr-1">
-                      <span className="flex items-baseline gap-1">
-                        <span className={`t-num t-num-medium ${
-                          i === 0 ? 'text-accent-400' : you ? 'text-white' : 'text-white/45'}`}>
-                          {i + 1}
-                        </span>
-                        {/* ⚠ Silent until a duel settles. With nothing played
-                            every position is a tie nobody moved into, and an
-                            arrow would be inventing a story. */}
-                        {moved !== 0 && (
-                          <span className={`text-[9px] font-bold ${
-                            moved > 0 ? 'text-success-400' : 'text-danger-400'}`}>
-                            {moved > 0 ? '▲' : '▼'}{Math.abs(moved)}
-                          </span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-1 sm:px-2">
-                      <span className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                        {p
-                          ? <Avatar person={p} size={22} />
-                          : <span className="block w-[22px] h-[22px] rounded-full bg-white/10 shrink-0" />}
-                        <span className={`truncate ${you ? 'font-bold text-white' : 'font-semibold text-white/85'}`}>
-                          {name(r.entry)}
-                        </span>
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-2">
-                      {/* Right-aligned on a phone, where it is the last thing
-                          before Pts and reads as part of that block; left on
-                          desktop, where W/T/L follow it. */}
-                      <DuelFormDots form={duelForm.get(r.entry) ?? []} align="right" />
-                    </td>
-                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.w}</td>
-                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.d}</td>
-                    <td className="hidden sm:table-cell py-2.5 px-2 text-right t-num text-white/55">{r.l}</td>
-                    <td className="py-2.5 pl-2 pr-3 sm:pr-4 text-right t-num t-num-black text-white">{r.pts}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+            ⚠ AND IT IS GATED ON `opponentVisible`, NOT ON THERE BEING AN
+            OPPONENT. `current` falls back to the LAST RESULT once a week
+            settles, so a card keyed on "is there a them" would spend the sealed
+            half of every cycle listing your history against somebody you have
+            finished playing — under a header counting down to a new draw. Ryan
+            caught exactly that shape on the phone on 2026-09-06. */}
+        {opponentVisible && current?.them && (
+          <HeadToHead
+            meetings={meetings}
+            themName={name(current.them.entry)}
+          />
+        )}
       </div>
 
       </div>
     </div>
     </>
+  )
+}
+
+/**
+ * Every time the two of you have met, and how it went.
+ *
+ * ⚠⚠ THIS IS THE ONE THING NO BOARD SHOWS. The Leaderboard's Duels board is
+ * the pool's standing; the Tale of the Tape above carries the record as three
+ * integers ("MET 2× · 1–1–0"). Neither can tell you that the last time you
+ * played this person you lost by ten points in matchweek 3, which is the fact
+ * that makes a rivalry a rivalry.
+ *
+ * ⚠ IT IS THE ACCURACIES, NOT THE DUEL POINTS. 500–0 is what the result PAID;
+ * 420–380 is what the two of you actually scored on the week's football, and it
+ * is the only one of the two that says whether it was close. The verdict beside
+ * it still comes off the points column, so the pill and the score can never
+ * disagree about who won.
+ *
+ * ⚠ "FIRST MEETING" IS A REAL STATE AND HAS TO SAY SO. A round-robin draws
+ * every pair once a cycle, so in a ten-member pool most weeks this list is
+ * empty — and an empty card reads as broken where a sentence reads as news.
+ */
+function HeadToHead({
+  meetings, themName,
+}: {
+  meetings: Array<{ matchweek: number; you: number; them: number; result: DuelFormResult | null }>
+  themName: string
+}) {
+  return (
+    <div className="relative">
+      <div className="px-4 sm:px-5 pt-5 pb-3.5 border-t border-white/10">
+        <p className="t-caption text-white/45">
+          Against <span className="text-white/85">{themName}</span>
+        </p>
+      </div>
+
+      {meetings.length === 0 ? (
+        <p className="px-4 sm:px-5 pb-5 t-body text-white/55">
+          First meeting. The draw is a round-robin, so you play everybody once a
+          cycle — this one has not come round before.
+        </p>
+      ) : (
+        <ul className="pb-2">
+          {meetings.map((m) => {
+            const won = m.result === 'won'
+            const lost = m.result === 'lost'
+            return (
+              <li
+                key={m.matchweek}
+                className="flex items-center gap-3 px-4 sm:px-5 py-2.5 border-t border-white/[0.06]"
+              >
+                <span className="t-detail text-white/40 uppercase tracking-widest w-16 shrink-0">
+                  MW {m.matchweek}
+                </span>
+                {/* ⚠ THE DASH IS THE AXIS, as it is everywhere else on this
+                    tab: a fixed middle with the digits growing outwards, so a
+                    column of scores reads down cleanly whether it is 40–0 or
+                    420–380. */}
+                <span className="flex-1 inline-grid grid-cols-[1fr_auto_1fr] items-baseline t-num t-num-extrabold text-sm">
+                  <span className={`text-right ${won ? 'text-white' : 'text-white/55'}`}>{m.you}</span>
+                  <span className="text-white/25 font-normal px-1.5">&ndash;</span>
+                  <span className={`text-left ${lost ? 'text-white' : 'text-white/55'}`}>{m.them}</span>
+                </span>
+                {/* ⚠ NO CONSOLATION AND NO EXCLAMATION. Three words, the same
+                    three whatever happened — the recap sheet's rule, on the
+                    surface a member visits when they are looking for a grudge. */}
+                {/* ⚠ NOT THE OPPONENT'S COLOUR. Every other chip on this tab is
+                    keyed on a PERSON, and this one is keyed on an OUTCOME —
+                    painting it with their hue would say the result belonged to
+                    them. Green for a win, flat for a loss, neutral for a draw. */}
+                <span
+                  className={`t-detail uppercase tracking-wider rounded-full px-2.5 py-1 shrink-0
+                    ${won ? 'bg-success-600/25 text-success-300'
+                      : lost ? 'bg-white/[0.07] text-white/50'
+                        : 'bg-white/10 text-white/70'}`}
+                >
+                  {won ? 'Won' : lost ? 'Lost' : m.result === 'tied' ? 'Drew' : '—'}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
   )
 }
 

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { duelResult } from './duelPoints';
+import { buildDuelRecords, type DuelRecord as EntryDuelRecord } from './duelRecord';
 import {
   anyFixtureLive,
   buildSheet,
@@ -368,15 +369,18 @@ export type Opponent = {
   agreement: number | null;
 };
 
-export type DuelRecordRow = {
-  duelPoints: number;
-  won: number;
-  tied: number;
-  lost: number;
-  byes: number;
-  /** Their last five duels, oldest first. */
-  form: ('won' | 'tied' | 'lost' | 'bye')[];
-};
+/**
+ * ⚠ AN ALIAS NOW, not a second declaration of the same shape.
+ *
+ * It was written out here beside a hand-rolled loop that built it, and the two
+ * could disagree about what `form` was ordered by without anything failing —
+ * which they did. `lib/duelRecord.ts` owns both, mirrored from the web.
+ *
+ * ⚠ `DuelRecord` carries an `entry` field this never had. Harmless to every
+ * consumer (they read the map by key) and load-bearing to `duelMovement`, which
+ * has to sort records without being handed their ids separately.
+ */
+export type DuelRecordRow = EntryDuelRecord;
 
 export type Sheet = {
   done: number;
@@ -820,58 +824,28 @@ export function useDuel(poolId: string | null | undefined): DuelState {
   }, [current, picks.data, bouts, showdown, data, myDirections]);
 
   /**
-   * One pass over every settled duel, producing a record per entry.
+   * One record per entry — W / T / L, byes, form and duel points.
    *
-   * ⚠ BOTH SIDES OF EVERY ROW. A duel stores two entries and two point columns,
-   * so each row contributes to TWO members' records — reading only `entry_a`
-   * would give half the pool an empty season.
+   * ⚠⚠ IT WAS A HAND-ROLLED LOOP HERE AND IT HAD DRIFTED. `lib/duelRecord.ts`
+   * owns it now, mirrored byte for byte from the web's copy, because every way
+   * this can be wrong is a row that still adds up:
    *
-   * ⚠ `duelResult`, never a literal. A win has been 500 since migration 121 and
-   * `=== 3` would score every meeting as a defeat, silently.
+   *   · a bye counted as a tie — `DUEL_BYE === DUEL_TIE`, so the points cannot
+   *     tell them apart
+   *   · the form strip in PAYLOAD order rather than by `settled_at`, which is
+   *     what the loop here did. Rounds are played out of numerical order —
+   *     migration 101 measured a minimum gap of minus 121 days across three
+   *     real seasons — so it showed five real results in an order they never
+   *     happened in, and looked completely normal doing it.
+   *
+   * ⚠ THE FORM IS NO LONGER TRIMMED HERE. Consumers slice their own window
+   * (`ShowdownLeaderboard`'s strip takes the last five), so trimming in the
+   * producer would silently cap anything that later wants more.
    */
-  const duelTable = useMemo(() => {
-    const out = new Map<string, DuelRecordRow>();
-    const row = (id: string) => {
-      let r = out.get(id);
-      if (!r) {
-        r = { duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, form: [] };
-        out.set(id, r);
-      }
-      return r;
-    };
-
-    for (const d of showdown?.duels ?? []) {
-      if (!d.settled_at) continue;
-
-      // A bye: one entry, nobody opposite. It still PAYS — 250, the same as a
-      // tie — but it is not a result they earned, so it is counted apart.
-      if (d.entry_b === null) {
-        const r = row(d.entry_a);
-        r.duelPoints += d.points_a ?? 0;
-        r.byes += 1;
-        r.form.push('bye');
-        continue;
-      }
-
-      for (const [id, pts] of [
-        [d.entry_a, d.points_a],
-        [d.entry_b, d.points_b],
-      ] as const) {
-        const r = row(id);
-        r.duelPoints += pts ?? 0;
-        const res = duelResult(pts);
-        if (res === 'won') r.won += 1;
-        else if (res === 'tied') r.tied += 1;
-        else if (res === 'lost') r.lost += 1;
-        if (res) r.form.push(res);
-      }
-    }
-
-    // Only the last five are ever shown, and trimming here keeps every consumer
-    // from having to remember that.
-    for (const r of out.values()) r.form = r.form.slice(-5);
-    return out;
-  }, [showdown]);
+  const duelTable = useMemo(
+    () => buildDuelRecords(showdown?.duels ?? []),
+    [showdown],
+  );
 
   /**
    * Everyone's revealed picks, folded into one map.

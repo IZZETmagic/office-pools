@@ -1,55 +1,30 @@
 // =============================================================
 // WHAT AN ENTRY'S DUELS ADD UP TO — W / T / L, byes, form, points
 // =============================================================
-// One owner for the duel record, because two surfaces now render it and they
-// were already disagreeing about the same member on the same card.
+// ⚠ THIS IS THE COPY. `lib/league/duelRecord.ts` IS CANONICAL — edit that one
+// and re-copy, or `duelRecordMirror.guard.test.ts` fails. `mobile/` is a
+// separate npm project whose `@/*` resolves to `mobile/*` and cannot import the
+// web app's `lib/`; same forced duplication as `duelPhase.ts`, `duelSheet.ts`,
+// `ladderGap.ts` and `duelPoints.ts`.
 //
-// ## ⚠⚠ A BYE IS `entry_b IS NULL`. IT IS NEVER READ OFF THE POINTS.
+// ⚠ IT REPLACES THE `duelTable` MEMO THAT LIVED IN `useDuel.ts`. That version
+// pushed `form` in PAYLOAD order and sliced the last five, so a phone showed a
+// member's results in an order they were never played in whenever the season
+// ran out of numerical sequence — which migration 101 measured happening by up
+// to 121 days. The reasoning for every rule here is in the canonical file's
+// banner and is not repeated, because two copies of an argument drift the same
+// way two copies of a rule do.
 //
-// `DUEL_BYE === DUEL_TIE === 250` by design (migration 121), so anything that
-// classifies a result by its value calls a bye a draw against an opponent who
-// never existed. `buildDuelTable` in `DuelsTab` did exactly that: it walked
-// `[entry_a, points_a]` and `[entry_b, points_b]`, and for a bye row `entry_b`
-// is null so only side A survived — with 250 points, which `duelResult` reads
-// back as `tied`.
+// ⚠ THE STYLE IS THE WEB'S — no semicolons — because the mirror is a BYTE
+// comparison and the two cannot both be idiomatic. `duelPoints.ts` already sits
+// this way for the same reason.
 //
-// The card above it counted byes correctly, so a member with one bye read
-// "0W 0T 0L, 1 bye" in the header and picked up a T in the table underneath.
-// Nothing errored; the two numbers simply were not the same number.
-//
-// ## ⚠ `duelResult`, NEVER A LITERAL
-//
-// A win has been 500 since migration 121. `headToHead()` survived that sweep
-// still comparing against 3 and would have scored every meeting as a LOSS for
-// everybody, silently. `duelPoints.ts` owns the values and its guard test reads
-// them out of the migration.
-//
-// ## ⚠ THE ENGINE'S POINTS WIN WHERE THEY EXIST
-//
-// `league_entry_totals.duel_points` is what the ranker adds to `total_points`.
-// Summing the per-duel column here is a FALLBACK for a pool whose totals row has
-// not been written yet — an entry that never picked has no row at all (migration
-// 085 exists because 084 used UPDATE where it needed INSERT). Preferring the
-// local sum would let this table and the leaderboard part company after a
-// rescore.
-//
-// ## ⚠ THIS FILE IS CANONICAL. `mobile/lib/duelRecord.ts` IS A COPY.
-//
-// It used to say "not mirrored to the phone — yet", and RN's version lived
-// inside `useDuel.ts`'s `duelTable` memo. That copy pushed `form` in PAYLOAD
-// order and sliced the last five, so a phone showed a member's results in an
-// order they were never played in whenever the season ran out of numerical
-// sequence — which migration 101 measured happening by up to 121 days.
-//
-// `duelRecordMirror.guard.test.ts` compares the two below their banners. The
-// copy's style is the phone's — semicolons — because the mirror is a BYTE
-// comparison and the two cannot both be idiomatic.
-//
-// ⚠ NOTHING HERE MAY IMPORT REACT NATIVE, which is what keeps the copy inside
-// the root vitest runner's reach.
+// ⚠ NOTHING HERE MAY IMPORT REACT NATIVE. `DuelRow` is an `import type`, which
+// is erased at runtime, so the hook it comes from is never loaded.
+// =============================================================
 
 import { duelResult } from './duelPoints'
-import type { DuelRow } from './duels'
+import type { DuelRow } from './useLeaguePool'
 
 /** One duel's outcome for one side. ⚠ `bye` is not a value `duelResult` returns. */
 export type DuelFormResult = 'won' | 'tied' | 'lost' | 'bye'

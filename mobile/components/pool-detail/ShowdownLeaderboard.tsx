@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
+import { duelMovement } from '@/lib/duelRecord';
 import { ladderGap, ladderGapLabel, ladderNumberChars, type LadderGap } from '@/lib/ladderGap';
 import { useDuel, type DuelRecordRow } from '@/lib/useDuel';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -55,7 +56,7 @@ type Board = 'table' | 'duels';
 export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
   const theme = useTheme();
   const [board, setBoard] = useState<Board>('table');
-  const { duelTable } = useDuel(poolId);
+  const { duelTable, duels } = useDuel(poolId);
 
   const rows = useMemo(() => {
     const shaped = entries.map((e) => {
@@ -123,6 +124,29 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
    */
   const numberWidth = Math.max(theme.spacing.hero, ladderNumberChars(values) * DIGIT_PT);
 
+  /**
+   * Which way each member moved — MEASURED ON THE BOARD BEING SHOWN.
+   *
+   * ⚠⚠ THE TWO BOARDS MOVE FOR DIFFERENT REASONS, and this row used to arrow
+   * both from `current_rank` / `previous_rank`. Those are the SEASON table's
+   * order — the engine ranks on `(total_points + duel_points) DESC` — so on the
+   * Duels board the number said "first on duel points" while the arrow beside
+   * it said "up three in the season table". Two stories in one cell, and each
+   * of them true.
+   *
+   * Table keeps the engine's own answer, which is the right one there and is
+   * not ours to recompute. Duels gets `duelMovement`, which rebuilds the board
+   * without the most recently SETTLED matchweek — never the highest-numbered
+   * one, because rounds are played out of order.
+   */
+  const duelMoved = useMemo(
+    () =>
+      board === 'duels'
+        ? duelMovement(duels, rows.map((r) => r.entry.entry_id))
+        : null,
+    [board, duels, rows],
+  );
+
   return (
     <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
       {/*
@@ -150,6 +174,7 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
             */
             gap={r.isYou ? ladderGap(values, i) : null}
             numberWidth={numberWidth}
+            moved={duelMoved ? duelMoved.get(r.entry.entry_id) ?? 0 : null}
           />
         ))}
       </View>
@@ -157,7 +182,7 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
   );
 }
 
-const EMPTY: DuelRecordRow = { duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, form: [] };
+const EMPTY: DuelRecordRow = { entry: '', duelPoints: 0, won: 0, tied: 0, lost: 0, byes: 0, form: [] };
 
 /** The name a member would recognise: their entry name, else their username. */
 function displayName(e: LeagueLeaderboardEntry): string {
@@ -172,6 +197,7 @@ function Row({
   board,
   gap,
   numberWidth,
+  moved,
 }: {
   position: number;
   row: {
@@ -186,6 +212,12 @@ function Row({
   gap: LadderGap | null;
   /** The points column, sized once for the whole board. */
   numberWidth: number;
+  /**
+   * Places climbed on the DUELS board, or null on Table — where the engine's
+   * own `previous_rank` is the answer and re-deriving it would be a second
+   * opinion about a number it stores.
+   */
+  moved: number | null;
 }) {
   const theme = useTheme();
   const { entry, duel, picksPoints, combined, isYou } = row;
@@ -247,7 +279,11 @@ function Row({
             {position}
           </Text>
           <View style={{ width: theme.spacing.lg, alignItems: 'center' }}>
-            <Movement current={entry.current_rank} previous={entry.previous_rank} />
+            {moved === null ? (
+              <Movement current={entry.current_rank} previous={entry.previous_rank} />
+            ) : (
+              <Moved places={moved} />
+            )}
           </View>
         </View>
 
@@ -411,6 +447,33 @@ function Movement({ current, previous }: { current: number | null; previous: num
         style={{ color: climbed ? theme.colors.green : theme.colors.red }}
       >
         {Math.abs(previous - current)}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Places climbed on the duels board. Positive is a CLIMB.
+ *
+ * ⚠ SILENT AT ZERO, and that covers two different things on purpose: a member
+ * who did not move, and one with no prior row at all. With nothing played every
+ * position is a tie nobody moved into, and an arrow there would be inventing a
+ * story.
+ */
+function Moved({ places }: { places: number }) {
+  const theme = useTheme();
+  if (places === 0) return null;
+  const climbed = places > 0;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Icon
+        name={climbed ? 'arrow.up' : 'arrow.down'}
+        tint={climbed ? theme.colors.green : theme.colors.red}
+        size={10}
+        weight="semibold"
+      />
+      <Text variant="detail" style={{ color: climbed ? theme.colors.green : theme.colors.red }}>
+        {Math.abs(places)}
       </Text>
     </View>
   );

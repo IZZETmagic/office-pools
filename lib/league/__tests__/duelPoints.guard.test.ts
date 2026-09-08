@@ -151,7 +151,12 @@ describe('no consumer classifies a duel with a bare literal', () => {
     'lib/league/poolCards.ts',
     'lib/league/duels.ts',
     'lib/league/duelVerdict.ts',
-    'app/pools/[pool_id]/DuelsTab.tsx',
+    // ⚠ `DuelsTab` CAME OFF THIS LIST ON 2026-09-07, and the guard is what said
+    // so. It classified a duel inline — and got a bye wrong doing it, because
+    // `DUEL_BYE === DUEL_TIE`. The record moved to `duelRecord.ts`, which is
+    // where the classification now happens and therefore where the guard now
+    // points. A shrinking inventory is the healthy direction for this list.
+    'lib/league/duelRecord.ts',
   ]
 
   it.each(READERS)('%s classifies through duelPoints, not a literal', (rel) => {
