@@ -44,6 +44,7 @@ import { useMemo, useState } from 'react'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { Icon } from '@/components/ui/Icon'
 import { buildDuelRecords, type DuelFormResult, type DuelRecord } from '@/lib/league/duelRecord'
+import { ladderGap, ladderGapLabel, type LadderGap } from '@/lib/league/ladderGap'
 import type { DuelRow } from '@/lib/league/duels'
 import { seasonTotalPoints } from '@/lib/scoring/readSource'
 
@@ -125,6 +126,22 @@ export function ShowdownLadder({ entries, duels, duelPoints, myEntryIds }: Props
     )
   }, [entries, records, board, myEntryIds])
 
+  /**
+   * The number this board is ORDERED BY, row for row.
+   *
+   * ⚠ THE SAME VALUE THAT IS PRINTED ON THE RIGHT of each row, which is what
+   * keeps the gap line arithmetic a member can check. Measuring the Table gap on
+   * duel points, or the Duels gap on the season total, would produce a sentence
+   * that contradicts the two numbers either side of it.
+   */
+  const values = useMemo(
+    () => rows.map((r) => ({
+      name: r.entry.name,
+      value: board === 'table' ? r.combined : r.duel.duelPoints,
+    })),
+    [rows, board],
+  )
+
   return (
     <div className="space-y-4">
       {/* ⚠ PILLS, NOT A SEGMENTED CONTROL — Ryan asked for the tab strip's
@@ -137,7 +154,17 @@ export function ShowdownLadder({ entries, duels, duelPoints, myEntryIds }: Props
 
       <ul className="space-y-2">
         {rows.map((r, i) => (
-          <Row key={r.entry.entry_id} position={i + 1} row={r} board={board} />
+          <Row
+            key={r.entry.entry_id}
+            position={i + 1}
+            row={r}
+            board={board}
+            /* ⚠ COMPUTED OFF THE RENDERED ORDER, and only for the viewer's own
+               rows. `ladderGap` compares against the NEIGHBOUR rather than
+               re-deriving a position, so it is right on both boards without
+               being told which order it is looking at. */
+            gap={r.isYou ? ladderGap(values, i) : null}
+          />
         ))}
       </ul>
 
@@ -158,7 +185,7 @@ export function ShowdownLadder({ entries, duels, duelPoints, myEntryIds }: Props
 // ------------------------------------------------------------------- a row
 
 function Row({
-  position, row, board,
+  position, row, board, gap,
 }: {
   position: number
   row: {
@@ -169,6 +196,8 @@ function Row({
     isYou: boolean
   }
   board: Board
+  /** Non-null on the viewer's own rows only — see `ladderGap`'s header. */
+  gap: LadderGap | null
 }) {
   const { entry, duel, picks, combined, isYou } = row
   // ⚠ Gold for first, because `accent` is already the belt colour in the duel
@@ -216,6 +245,23 @@ function Row({
           <span className="t-detail text-muted block">
             {duel.won}W {duel.tied}T {duel.lost}L
             {duel.byes > 0 ? ` · ${duel.byes} bye${duel.byes === 1 ? '' : 's'}` : ''}
+          </span>
+        )}
+        {/* ⚠ THE GAP LINE — Ryan's own note on this board: *"a standings table
+            tells you where you sit; a gap tells you what to do about it."*
+
+            ⚠ ON YOUR OWN ROW ONLY, and against the member directly above. The
+            distance to the leader is a number nobody in eighth can act on, and
+            in a pool built on "no bad feelings" it is a line telling half the
+            room the season is over in October.
+
+            ⚠ IT INHERITS YOUR ROW'S TINT rather than taking a colour of its
+            own. Green for a lead and red for a deficit would make the board's
+            only editorial line the loudest thing on it — and this is a
+            statement of distance, not a verdict. */}
+        {gap && (
+          <span className="t-detail text-primary-700 dark:text-primary-300 font-bold block mt-0.5">
+            {ladderGapLabel(gap, board === 'table' ? 'pts' : 'duel pts')}
           </span>
         )}
       </span>

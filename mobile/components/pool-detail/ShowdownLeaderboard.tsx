@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
+import { ladderGap, ladderGapLabel, type LadderGap } from '@/lib/ladderGap';
 import { useDuel, type DuelRecordRow } from '@/lib/useDuel';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -92,6 +93,23 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
     );
   }, [entries, duelTable, board, currentUserId]);
 
+  /**
+   * The number this board is ORDERED BY, row for row.
+   *
+   * ⚠ THE SAME VALUE THAT IS PRINTED ON THE RIGHT of each row, which is what
+   * keeps the gap line arithmetic a member can check. Measuring the Table gap on
+   * duel points, or the Duels gap on the season total, would produce a sentence
+   * that contradicts the two numbers either side of it.
+   */
+  const values = useMemo(
+    () =>
+      rows.map((r) => ({
+        name: displayName(r.entry),
+        value: board === 'table' ? r.combined : r.duel.duelPoints,
+      })),
+    [rows, board],
+  );
+
   return (
     <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
       {/*
@@ -111,6 +129,13 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
             position={i + 1}
             row={r}
             board={board}
+            /*
+              ⚠ COMPUTED OFF THE RENDERED ORDER, and only for the viewer's own
+              rows. `ladderGap` compares against the NEIGHBOUR rather than
+              re-deriving a position, so it is right on both boards without being
+              told which order it is looking at.
+            */
+            gap={r.isYou ? ladderGap(values, i) : null}
           />
         ))}
       </View>
@@ -131,6 +156,7 @@ function Row({
   position,
   row,
   board,
+  gap,
 }: {
   position: number;
   row: {
@@ -141,6 +167,8 @@ function Row({
     isYou: boolean;
   };
   board: Board;
+  /** Non-null on the viewer's own rows only — see `ladderGap`'s header. */
+  gap: LadderGap | null;
 }) {
   const theme = useTheme();
   const { entry, duel, picksPoints, combined, isYou } = row;
@@ -223,6 +251,33 @@ function Row({
               {duel.byes > 0 ? ` · ${duel.byes} bye${duel.byes === 1 ? '' : 's'}` : ''}
             </Text>
           )}
+          {/*
+            ⚠ THE GAP LINE — this component's own header has promised it since
+            2026-09-04 and nothing rendered it until 2026-09-07: *"a standings
+            table tells you where you sit; a gap tells you what to do about it."*
+
+            ⚠ ON YOUR OWN ROW ONLY, and against the member directly above. The
+            distance to the leader is a number nobody in eighth can act on, and
+            in a pool built on "no bad feelings" it is a line telling half the
+            room the season is over in October.
+
+            ⚠ IT INHERITS YOUR ROW'S TINT rather than taking a colour of its
+            own. Green for a lead and red for a deficit would make the board's
+            only editorial line the loudest thing on it — and this is a
+            statement of distance, not a verdict.
+          */}
+          {gap ? (
+            <Text
+              variant="detail"
+              style={{
+                color: theme.colors.primary,
+                fontFamily: fontFamilies.bold,
+                marginTop: theme.spacing.xxs,
+              }}
+            >
+              {ladderGapLabel(gap, board === 'table' ? 'pts' : 'duel pts')}
+            </Text>
+          ) : null}
         </View>
 
         {board === 'duels' ? <Form form={duel.form} /> : null}
