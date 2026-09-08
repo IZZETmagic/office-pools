@@ -22,12 +22,22 @@ function AccordionItem({
         <span className="text-lg font-medium text-neutral-900">{item.question}</span>
         <Icon name="chevron.down" size={20} className={`text-muted shrink-0 ml-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
+      {/* grid-rows 0fr -> 1fr rather than a max-height, matching the landing
+          accordion (app/FAQAccordion.tsx), which moved off `max-h-40` after it
+          clipped a rewritten answer.
+
+          Nothing here clips TODAY — measured 2026-09-07, the tallest of the 55
+          answers is 312px at a 375px viewport against the old `max-h-96` cap of
+          384px. But that is 72px of margin on a phone, and a cap is a bad way to
+          hold a limit nobody can see: it truncates mid-sentence with no
+          scrollbar and no sign anything was cut, so the first symptom is a
+          member reading half an answer. This sizes to the content instead. */}
       <div
-        className={`overflow-hidden transition-all duration-200 ${
-          isOpen ? 'max-h-96 pb-5' : 'max-h-0'
+        className={`grid transition-all duration-200 ease-out motion-reduce:transition-none ${
+          isOpen ? 'grid-rows-[1fr] pb-5' : 'grid-rows-[0fr]'
         }`}
       >
-        <p className="text-neutral-600 leading-relaxed">{item.answer}</p>
+        <p className="overflow-hidden text-neutral-600 leading-relaxed">{item.answer}</p>
       </div>
     </div>
   )

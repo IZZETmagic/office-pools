@@ -8,7 +8,7 @@ import { faqCategories } from './faqData'
 export const metadata: Metadata = {
   title: 'FAQ',
   description:
-    'Frequently asked questions about SportPool — the free FIFA World Cup 2026 prediction pool platform. Learn about pools, predictions, scoring, and more.',
+    'Frequently asked questions about SportPool — prediction pools for friends, family and colleagues. Formats, deadlines, scoring, bonuses and notifications explained.',
 }
 
 export default function FAQPage() {
@@ -64,7 +64,10 @@ export default function FAQPage() {
             Can&apos;t find what you&apos;re looking for? Reach out and we&apos;ll be happy to help.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button href="/signup" size="lg">
+            <Button href="/contact" size="lg">
+              Contact Us
+            </Button>
+            <Button href="/signup" size="lg" variant="secondary">
               Get Started &mdash; Free
             </Button>
           </div>
