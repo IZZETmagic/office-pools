@@ -48,15 +48,14 @@ function AccordionSection({ category }: { category: FAQCategory }) {
 
   return (
     <div>
-      {/* The chip is the one from the landing page's how-it-works cards
-          (app/page.tsx) at roughly half again the size — same token, same tint,
-          so the two marketing surfaces keep agreeing. It is `aria-hidden` via
+      {/* A bare 48px glyph, no chip — deliberately larger than the heading it
+          sits beside, so the icon marks the section rather than decorating the
+          title. `shrink-0` because an <svg> in a flex row is squashable and
+          "Entry Fees & Branded Pools" wraps on a phone. It is `aria-hidden` via
           Icon's default: the <h2> already says which section this is, and a
           screen reader announcing "trophy, Pools" adds nothing. */}
       <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 flex items-center gap-4 mb-2">
-        <span className="inline-flex shrink-0 items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-chip bg-primary-600/10 text-primary-600">
-          <Icon name={category.icon} size={30} weight="semibold" />
-        </span>
+        <Icon name={category.icon} size={48} weight="semibold" className="shrink-0 text-primary-600" />
         {category.title}
       </h2>
       <div className="divide-y divide-neutral-200">
