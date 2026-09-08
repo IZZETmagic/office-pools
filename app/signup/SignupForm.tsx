@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { Button } from '@/components/ui/Button'
+import { TERMS_VERSION } from '@/lib/termsVersion'
 
 export function SignupForm() {
   const [email, setEmail] = useState('')
@@ -107,7 +108,10 @@ export function SignupForm() {
         await fetch('/api/terms-agreement', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ terms_version: '2026-03-01' }),
+          // ⚠ Never a literal. This was hardcoded to '2026-03-01' while the
+          // Terms page said April 18 — so five months of consent records named
+          // a version nobody had agreed to. See lib/termsVersion.ts.
+          body: JSON.stringify({ terms_version: TERMS_VERSION }),
         })
       } catch (err) {
         console.error('Failed to log terms agreement:', err)
