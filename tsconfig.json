@@ -30,5 +30,35 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "//exclude": [
+    "⚠⚠ THIS IS THE TSCONFIG `next build` USES, SO IT MUST DESCRIBE THE APP AND",
+    "NOTHING ELSE. `.vercelignore` strips `mobile/**` — the Expo app ships via",
+    "EAS, not Vercel — so any file here that imports from `mobile/` type-checks",
+    "locally and CANNOT resolve on Vercel. Four did, all written after the last",
+    "green deploy, and each one failed the build in turn:",
+    "",
+    "  lib/__tests__/leagueSurface.test.ts        -> mobile/lib/leagueSurface",
+    "  lib/league/__tests__/showdownTabOrder...   -> mobile/lib/poolTabs",
+    "  scripts/verify-rn-fixtures.ts              -> mobile/lib/resultsSections",
+    "  scripts/verify-rn-pools-tab-cards.ts       -> mobile/lib/design/poolMode",
+    "",
+    "Those imports are correct and deliberate — a guard that reads the phone's",
+    "real module is the whole point of it. What was wrong is that the BUILD was",
+    "type-checking files it does not deploy. Tests are run by vitest, verify",
+    "scripts by `tsx` on demand; neither is part of the bundle.",
+    "",
+    "⚠ `mobile` is excluded for a second, unrelated reason: its `@/` resolves to",
+    "`mobile/*` under its OWN tsconfig, so every mobile import reports TS2307",
+    "against this one. Check the phone with `cd mobile && npx tsc --noEmit`.",
+    "",
+    "⚠ NOTHING HERE IS UNCHECKED. `tsconfig.check.json` puts it all back and is",
+    "what `npm run typecheck` runs — use THAT before a push, never this one."
+  ],
+  "exclude": [
+    "node_modules",
+    "mobile",
+    "ios",
+    "**/__tests__/**",
+    "scripts/**"
+  ]
 }

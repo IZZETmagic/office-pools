@@ -1,0 +1,27 @@
+{
+  "//": [
+    "THE FULL SWEEP — everything the repo can type-check in one pass.",
+    "",
+    "`tsconfig.json` is what `next build` reads, so it describes the DEPLOYED app",
+    "and leaves out tests, verify scripts and `mobile/` (see its own note). That",
+    "is right for the build and useless as a pre-push gate: two scripts and two",
+    "tests reached Vercel on 2026-09-08 having never been type-checked by",
+    "anything, and each failed the build in turn.",
+    "",
+    "This puts them back. `npm run typecheck` runs it, and it is the command to",
+    "trust before pushing — NOT `npx tsc --noEmit`, which now reads the build",
+    "config and will tell you everything is fine.",
+    "",
+    "⚠ `mobile` STAYS OUT, and that is not an oversight. Its `@/` resolves to",
+    "`mobile/*` under `mobile/tsconfig.json`; pulled in here every one of those",
+    "imports reports TS2307. The phone has its own check:",
+    "`cd mobile && npx tsc --noEmit`. Files here may still IMPORT from mobile —",
+    "exclusion governs which files are program roots, not module resolution.",
+    "",
+    "⚠ Expect 3 errors in app/api/admin/branded-pools/upload-logo/route.ts",
+    "(`Property 'get' does not exist on type 'FormData'`). They are local only —",
+    "Vercel compiles that route cleanly. See the dev-deploy memory."
+  ],
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "mobile", "ios"]
+}
