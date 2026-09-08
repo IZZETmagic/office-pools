@@ -5,6 +5,19 @@ export interface FAQItem {
 
 export interface FAQCategory {
   title: string
+  /**
+   * SF-Symbol-style name for `components/ui/Icon`, not an emoji.
+   *
+   * These were emoji until 2026-09-07. An emoji is rendered by the reader's OS,
+   * so the section headers looked like a different product on Windows than on a
+   * Mac and could not take the brand colour at all — and 🏊 was standing in for
+   * "pools" only because the word collides with swimming, which is not what the
+   * section is about. `trophy.fill` is the icon the RN app already uses for its
+   * Pools tab, so the two surfaces now agree.
+   *
+   * ⚠ Must exist in ICON_MAP — an unmapped name renders a fallback circle and
+   * only warns in development.
+   */
   icon: string
   items: FAQItem[]
 }
@@ -40,7 +53,7 @@ export interface FAQCategory {
 export const faqCategories: FAQCategory[] = [
   {
     title: 'General',
-    icon: '📋',
+    icon: 'clipboard',
     items: [
       {
         question: 'What is SportPool?',
@@ -71,7 +84,7 @@ export const faqCategories: FAQCategory[] = [
   },
   {
     title: 'Pools',
-    icon: '🏊',
+    icon: 'trophy.fill',
     items: [
       {
         question: 'How do I create a pool?',
@@ -127,7 +140,7 @@ export const faqCategories: FAQCategory[] = [
   },
   {
     title: 'Predictions',
-    icon: '🎯',
+    icon: 'target',
     items: [
       {
         question: 'How do I make predictions?',
@@ -193,7 +206,7 @@ export const faqCategories: FAQCategory[] = [
   },
   {
     title: 'Scoring',
-    icon: '⭐',
+    icon: 'star.fill',
     items: [
       {
         question: 'How does scoring work?',
@@ -264,7 +277,7 @@ export const faqCategories: FAQCategory[] = [
   },
   {
     title: 'Account & Profile',
-    icon: '👤',
+    icon: 'person.crop.circle.fill',
     items: [
       {
         question: 'How do I create an account?',
@@ -300,7 +313,7 @@ export const faqCategories: FAQCategory[] = [
   },
   {
     title: 'Emails & Notifications',
-    icon: '🔔',
+    icon: 'bell.fill',
     items: [
       {
         question: 'What types of emails does SportPool send?',
@@ -326,7 +339,7 @@ export const faqCategories: FAQCategory[] = [
   },
   {
     title: 'Pool Community',
-    icon: '💬',
+    icon: 'bubble.left.and.bubble.right.fill',
     items: [
       {
         question: 'What is pool chat?',
@@ -347,7 +360,7 @@ export const faqCategories: FAQCategory[] = [
   },
   {
     title: 'Entry Fees & Branded Pools',
-    icon: '💳',
+    icon: 'dollarsign.circle.fill',
     items: [
       {
         question: 'Does SportPool take a cut of entry fees or prizes?',

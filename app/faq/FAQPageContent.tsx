@@ -48,8 +48,15 @@ function AccordionSection({ category }: { category: FAQCategory }) {
 
   return (
     <div>
-      <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 flex items-center gap-3 mb-2">
-        <span className="text-2xl">{category.icon}</span>
+      {/* The chip is the one from the landing page's how-it-works cards
+          (app/page.tsx) at roughly half again the size — same token, same tint,
+          so the two marketing surfaces keep agreeing. It is `aria-hidden` via
+          Icon's default: the <h2> already says which section this is, and a
+          screen reader announcing "trophy, Pools" adds nothing. */}
+      <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 flex items-center gap-4 mb-2">
+        <span className="inline-flex shrink-0 items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-chip bg-primary-600/10 text-primary-600">
+          <Icon name={category.icon} size={30} weight="semibold" />
+        </span>
         {category.title}
       </h2>
       <div className="divide-y divide-neutral-200">
