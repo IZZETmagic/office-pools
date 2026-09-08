@@ -666,40 +666,14 @@ export default async function PoolPage({
             //
             // `match_number` IS `league_fixtures.fixture_number`, which is what
             // the score rows are keyed on, so the two join without a lookup.
-            const { shortClubName } = await import('@/lib/league/clubName')
-            showdownData.fixtures = view.matches
-              .filter((mt) => mt.round_number === liveMw)
-              .map((mt) => ({
-                id: mt.match_id,
-                number: mt.match_number,
-                // ⚠ SHORT names, and the two sides kept APART rather than
-                // pre-joined into "A v B". The sheet renders them symmetrically
-                // around the v with a crest each, so a single string would have
-                // to be split back open at the call site.
-                //
-                // `shortClubName` because at 375px "Crystal Palace v Manchester
-                // City" truncated — eating the half that tells City from United.
-                homeName: shortClubName(mt.home_team?.country_name ?? 'Home'),
-                awayName: shortClubName(mt.away_team?.country_name ?? 'Away'),
-                // `country_code` carries the club's abbreviation on the league
-                // path — see `clubToTeam` in lib/league/read.ts, where the World
-                // Cup field names are reused positionally.
-                homeAbbr: mt.home_team?.country_code ?? '',
-                awayAbbr: mt.away_team?.country_code ?? '',
-                homeCrest: mt.home_team?.flag_url ?? null,
-                awayCrest: mt.away_team?.flag_url ?? null,
-                // The real result. Present while a match is LIVE too, which is
-                // what lets the breakdown carry a moving score.
-                homeScore: mt.home_score_ft,
-                awayScore: mt.away_score_ft,
-                kickoffAt: mt.match_date,
-                isCompleted: mt.is_completed,
-                status: mt.status,
-                liveMinute: mt.live_minute,
-                livePeriod: mt.live_period,
-                liveAdded: mt.live_added,
-              }))
-              .sort((a, b) => a.number - b.number)
+            const { matchweekFixtures } = await import('@/lib/league/matchweekFixtures')
+            /* ⚠ ONE MAPPING, SHARED WITH THE ROOM. `country_code` is the
+               club's abbreviation and `country_name` its name, reused
+               positionally by `clubToTeam` — a second copy of that is a second
+               place to render "Nott'm Forest" where "NFO" was asked for, which
+               has already cost a round trip on the phone. See
+               `lib/league/matchweekFixtures.ts`. */
+            showdownData.fixtures = matchweekFixtures(view.matches, liveMw)
           }
         }
         // LMS needs BOTH, for two different jobs. The pick is WRITTEN against

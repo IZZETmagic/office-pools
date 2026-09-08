@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { withShowdownFirst } from '@/lib/league/showdownTabs'
+import { showdownPhase, unwatchedMatchweek } from '@/lib/league/showdownPhase'
+import { ShowdownRoom } from './ShowdownRoom'
 import type { PoolLiveResponse, LiveEntry } from '@/app/api/pools/[pool_id]/live/route'
 import { needsFullRefresh, mergeMatches, mergeMembers, mergeMatchScores, mergeEntryStats } from './liveMerge'
 import { Button } from '@/components/ui/Button'
@@ -353,7 +355,13 @@ type Tab =
 // route. Reusing it rather than reading `league_predictions` from the duel path
 // is deliberate — a second read would be a second place to get the gate wrong,
 // and getting it wrong means showing picks before lock.
-const TABS_NEEDING_BULK: Tab[] = ['community', 'results', 'members', 'duels']
+// ⚠ `room` IS HERE FOR THE SAME REASON `duels` IS, one step further. The Room
+// shows BOTH sides of every duel in a week, for members the viewer is not
+// playing — and the only reveal-gated source of another member's picks is the
+// bulk route. Reading `league_predictions` from the Room instead would be a
+// second place to get the gate wrong, and getting it wrong means showing picks
+// before lock.
+const TABS_NEEDING_BULK: Tab[] = ['community', 'results', 'members', 'duels', 'room']
 
 /**
  * Showdown leads with the duel.
@@ -1803,6 +1811,39 @@ export function PoolDetail({
    * on <main>), and the tabbed layout has a strip above it — so this puts the
    * chat back in exactly the geometry it is measured for.
    */
+  /**
+   * WHICH PHASE OF THE DUEL THIS VIEWER IS IN.
+   *
+   * ⚠⚠ THE SAME PURE FUNCTION `DuelsTab` CALLS, WITH THE SAME PROPS. The band
+   * exists to OFFER an unwatched walkout; The Room exists to WITHHOLD that week
+   * until it has been watched. Two surfaces reading opposite things off one
+   * answer is fine; two surfaces working out the answer separately is how the
+   * phone spent a day listing an opponent's name one tab away from a header
+   * reading "Sealed · Opponent hidden".
+   *
+   * ⚠ IT IS COMPUTED TWICE AND THAT IS NOT A DERIVATION TWICE. A pure function
+   * of its inputs, called with identical inputs, costs a memo and cannot
+   * disagree with itself. What the codebase forbids — see `duelPhase`'s header —
+   * is two different chains reaching the same conclusion by different routes.
+   *
+   * ⚠ `seenOverride` IS NOT PASSED. That is `DuelsTab`'s optimistic "they just
+   * pressed Skip" and it belongs to the band; here it would un-hide a Room week
+   * a frame before the write lands, which is the wrong direction to fail. The
+   * server marker re-arrives on the next navigation and the week appears then.
+   */
+  const showdownPhaseState = useMemo(
+    () => showdownPhase({
+      duels: showdownData?.duels ?? [],
+      ownEntryIds: showdownData?.ownEntryIds ?? [],
+      sealedMatchweek: showdownData?.sealedMatchweek ?? null,
+      inPlayMatchweek: showdownData?.inPlayMatchweek ?? null,
+      revealSeen: showdownData?.revealSeen ?? new Map(),
+      revealColumnMissing: showdownData?.revealColumnMissing ?? false,
+      recapSeenAt,
+    }),
+    [showdownData, recapSeenAt],
+  )
+
   const bandOnScreen = onePage && activeTab !== 'community' && isShowdown && !!showdownData
   const stripInBand = bandOnScreen && !stripless
   /** The pool menu behind the chevron — every surface the duel page does not show. */
@@ -2986,35 +3027,40 @@ export function PoolDetail({
               />
             )}
 
-            {/* ── THE ROOM — not built on the web yet ─────────────────────
-                ⚠ IT SAYS WHAT IT IS AND WHERE THE ANSWER LIVES TODAY. The
-                phone's Room replaced a Predictions tab that read "make your
-                picks on the web", which had stopped being true — a placeholder
-                that states something FALSE is worse than one that states a gap,
-                because nobody reports it. So this names the three questions the
-                Room will answer and points at the two tabs that answer them now,
-                and Predictions stays in the strip until it does not have to.
-
-                ⚠ IT IS NOT A COUNTDOWN OR A WAITLIST. No date, no "coming
-                soon" — this is a build gap, and dressing it as an event would
-                make it an announcement. */}
-            {activeTab === 'room' && isShowdown && (
-              <div className="rounded-card bg-surface border border-border-default p-6 sm:p-8 text-center">
-                <Icon name="figure.boxing" size={34} className="mx-auto text-neutral-300 mb-3" />
-                <p className="t-body font-semibold text-ink">The Room is on the phone first</p>
-                <p className="t-detail text-muted mt-2 max-w-md mx-auto">
-                  One matchweek, three questions: your duels, everybody else&rsquo;s, and what the
-                  whole room picked. It is live in the app and being brought over here.
-                </p>
-                <p className="t-detail text-muted mt-4 max-w-md mx-auto">
-                  Until then, <button type="button" onClick={() => handleTabSwitch('results')}
-                    className="text-primary-600 hover:text-primary-700 font-semibold">Results</button>
-                  {' '}has the week&rsquo;s football and{' '}
-                  <button type="button" onClick={() => handleTabSwitch('predictions')}
-                    className="text-primary-600 hover:text-primary-700 font-semibold">Predictions</button>
-                  {' '}has the picks once a matchweek has locked.
-                </p>
-              </div>
+            {activeTab === 'room' && isShowdown && showdownData && (
+              <ShowdownRoom
+                poolId={initialPool.pool_id}
+                duels={showdownData.duels}
+                entryNames={showdownData.entryNames}
+                entryPeople={showdownData.entryPeople}
+                ownEntryIds={showdownData.ownEntryIds}
+                /* ⚠ THE WHOLE SEASON, AND IT COSTS NOTHING — `matches` is
+                   already in this payload for the Results tab. The Room's entire
+                   interaction is changing the week, so asking the server for one
+                   week's fixtures at a time would be a round trip per press for
+                   rows the browser is holding. */
+                matches={matches}
+                inPlayMatchweek={showdownData.inPlayMatchweek}
+                /* ⚠⚠ THE PHASE MACHINE'S ANSWER, NOT A SECOND ONE. "Revealed"
+                   means two things — 116 reveals a duel to the DATABASE, the
+                   walkout reveals it to the MEMBER — and the Room only ever knew
+                   the first. In the gap it lists a name the band is still
+                   calling "Sealed". Same function the band reads, same inputs. */
+                unwatchedMatchweek={unwatchedMatchweek(showdownPhaseState)}
+                leagueOutcomes={allLeagueOutcomes}
+                allPredictions={allPredictions}
+                bulkState={bulkState}
+                /* ⚠ THE LIVE WEEK'S POINTS COME FROM HERE, not from a second
+                   poller inside the Room. This page already polls `/duel-live`
+                   and folds 125's broadcast into it; two pollers would visibly
+                   disagree on a Saturday afternoon. Every other week the Room
+                   fetches once and caches — a settled week cannot change. */
+                livePerFixture={duelPoints?.mw === showdownData.inPlayMatchweek
+                  ? new Map(Object.entries(duelPoints.perFixture).map(([e, byFx]) => [
+                      e, new Map(Object.entries(byFx).map(([n, pts]) => [Number(n), pts])),
+                    ]))
+                  : showdownData.perFixture}
+              />
             )}
 
             {activeTab === 'standings' && isLeaguePool && (

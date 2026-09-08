@@ -1,4 +1,4 @@
-import { getLiveClock } from './matchStatus';
+import { getLiveClock } from '@/lib/matchStatus'
 
 // =============================================================
 // THE TEAM SHEET — both sides' picks, fixture by fixture
@@ -9,18 +9,29 @@ import { getLiveClock } from './matchStatus';
 //
 // ⚠ PURE, AND THAT IS THE POINT. This rule shipped three separate bugs while it
 // lived inline in a 2,600-line component, and each of them is a two-line test
-// in `__tests__/duelSheet.test.ts`. `mobile/` has no test runner; the root
-// `vitest.config.ts` picks up `mobile/**/__tests__/**` for any module that
-// imports nothing from React Native, which is why this file imports one pure
-// helper and no more.
+// in `mobile/lib/__tests__/duelSheet.test.ts`.
 //
-// ## ⚠ THIS IS THE COPY. `lib/league/duelSheet.ts` IS CANONICAL.
+// ## ⚠ THIS FILE IS CANONICAL. `mobile/lib/duelSheet.ts` IS A COPY.
 //
-// Edit that one and re-copy, or the mirror guard fails. The import line is the
-// only permitted difference. Since 2026-09-07 the web reads this rule too — the
-// Duel tab's team sheet and The Room's expanded duel — so a drift here is two
-// apps disagreeing about who took a fixture, on a card that looks correct on
-// both.
+// `mobile/` is a separate npm project whose `@/*` resolves to `mobile/*` and
+// cannot import the web app's `lib/`. Same forced duplication as
+// `duelPhase.ts`, `duelPoints.ts` and `design/oklch.ts`, and handled the same
+// way: `duelSheetMirror.guard.test.ts` compares the two below their banners.
+//
+// ⚠ THE IMPORT LINE IS THE ONE PERMITTED DIFFERENCE — `@/lib/matchStatus` here,
+// `./matchStatus` there. `lib/matchStatus.ts` is itself a port of the phone's;
+// the two agree about what a clock reads, which is what makes the rest of this
+// file portable at all.
+//
+// ⚠ THE COPY'S STYLE IS THE PHONE'S — semicolons — because the mirror is a BYTE
+// comparison and the two cannot both be idiomatic. Do not tidy this to match
+// the rest of `lib/league/`; you would only move the failure to the guard.
+//
+// ## ⚠ THREE SURFACES READ IT, WHICH IS WHY IT IS A MODULE
+//
+// The Duel tab's team sheet, The Room's expanded duel, and the phone's. A
+// Room-shaped copy of the outcome rule would have had none of the three bug
+// fixes below, and each of them looks like a working card.
 
 /**
  * Who took a fixture, in the duel.

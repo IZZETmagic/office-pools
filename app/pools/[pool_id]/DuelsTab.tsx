@@ -66,15 +66,17 @@ import { Countdown } from '@/components/ui/Countdown'
 import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
 import { DuelRevealCeremony, type RevealOpponent } from './DuelRevealCeremony'
 import { DUEL_WIN, DUEL_TIE, duelResult } from '@/lib/league/duelPoints'
-import { duelPhase } from '@/lib/league/duelPhase'
 import { createClient } from '@/lib/supabase/client'
 import { Icon } from '@/components/ui/Icon'
 import { headToHead, type DuelRow } from '@/lib/league/duels'
+import { orientDuels, showdownPhase } from '@/lib/league/showdownPhase'
 import { ownPickDirections } from '@/lib/league/ownPicks'
 import { getLiveClock } from '@/lib/matchStatus'
-import { LocalTime } from '@/components/LocalTime'
 import type { MatchweekFixture } from './PoolDetail'
 import { ShowdownBand } from './ShowdownBand'
+import { Crest, DuelSide, Scoreline, TeamSheetRows } from './TeamSheet'
+import { buildSheet, sheetSummary as summariseSheet,
+         type SheetFixture, type SheetLive } from '@/lib/league/duelSheet'
 
 // -------------------------------------------------------------
 // HAS THIS MEMBER PLAYED THE WALKOUT FOR THIS DUEL?
@@ -351,144 +353,6 @@ function buildDuelTable(
  * dash, never as "no pick": this component cannot tell withheld from never-made
  * and must not guess.
  */
-function PickChip({
-  label, side, outcome, colour, align = 'left',
-}: {
-  label: string | null
-  side: 'you' | 'them'
-  /** Who took the fixture. Absolute — no chip flips it. */
-  outcome: 'same' | 'you' | 'them' | 'neither' | 'pending'
-  /** Whose chip this is, in their own colour. */
-  colour: AvatarInk
-  align?: 'left' | 'right'
-}) {
-  if (label === null) {
-    return (
-      <span className={`t-num t-num-medium text-xs text-muted/40 block ${align === 'right' ? 'text-right' : ''}`}>
-        &mdash;
-      </span>
-    )
-  }
-  const won = outcome === side
-  // ⚠ THE CHIP IS THE PERSON'S COLOUR, not primary-or-danger. `side` still
-  // decides WHICH of the two people it belongs to; it no longer decides the
-  // hue, which now comes from whoever that is.
-  //
-  // A won chip is filled with `strong` under white text, and needs no theme
-  // switch — a fill is its own ground. An unwon chip is coloured TEXT, which
-  // does: `strong` on the white card, `soft` on the dark one. The border is
-  // `currentColor` mixed down, so it follows the text rather than needing a
-  // third value.
-  const tone =
-    won ? 'text-white'
-      : outcome === 'same' ? 'bg-mist text-muted'
-        : 'border text-[var(--chip-strong)] dark:text-[var(--chip-soft)]'
-
-  return (
-    <span className={`block ${align === 'right' ? 'text-right' : ''}`}>
-      <span
-        style={{
-          '--chip-strong': colour.strong,
-          '--chip-soft': colour.soft,
-          ...(won ? { background: colour.strong } : {}),
-          ...(won || outcome === 'same' ? {}
-            : { borderColor: 'color-mix(in srgb, currentColor 40%, transparent)' }),
-        } as React.CSSProperties}
-        className={`inline-flex items-center justify-center gap-1 t-detail uppercase tracking-wider rounded-md px-1.5 sm:px-2 py-1 w-full sm:w-auto sm:min-w-[3.25rem] ${tone}`}
-        title={won ? 'Took this one'
-          : outcome === 'same' ? 'Same pick — cannot separate you'
-            : outcome === 'neither' ? 'Different picks, neither scored'
-              : undefined}
-      >
-        {label}
-        {/* The win marker. Colour alone cannot carry it: an outline means both
-            "waiting" and "did not take it", and a solid grey means "you picked
-            the same". The tick is the only unambiguous "this one was mine". */}
-        {won && <span aria-hidden="true" className="text-[0.9em] leading-none">&#10003;</span>}
-      </span>
-    </span>
-  )
-}
-
-/**
- * Two numbers either side of a fixed dash.
- *
- * The dash sits in the same place on every row and the numbers grow outwards
- * from it, so a column of scores reads down cleanly whether it is "1-4" or
- * "300-400". A single centred string cannot do that: it centres the STRING, and
- * a longer one pushes its own digits sideways.
- *
- * `t-num` is tabular, so equal digit counts occupy equal width and the
- * alignment holds without measuring anything.
- */
-function Scoreline({
-  left, right, live = false,
-}: { left: number | null; right: number | null; live?: boolean }) {
-  return (
-    <span className={`inline-grid grid-cols-[1fr_auto_1fr] items-baseline t-num t-num-extrabold text-sm whitespace-nowrap
-      ${live ? 'text-danger-600' : 'text-ink'}`}>
-      <span className="text-right">{left}</span>
-      <span className="text-muted/40 font-normal px-0.5">&ndash;</span>
-      <span className="text-left">{right}</span>
-    </span>
-  )
-}
-
-/**
- * One member in someone else's duel: a face, a name, and whether they are ahead.
- *
- * Mirrored like the fixture row — avatar outermost, name inboard — so the two
- * cards share a reading direction. `dimmed` rather than a second colour: these
- * duels are not the viewer's, and colouring them would compete with the blue
- * and red that mean "you" and "your opponent" everywhere else on the tab.
- */
-function DuelSide({
-  name, person, leading, dimmed, align = 'left',
-}: {
-  name: string
-  person: AvatarPerson | null
-  leading: boolean
-  dimmed: boolean
-  align?: 'left' | 'right'
-}) {
-  const face = person
-    ? <span className="shrink-0"><Avatar person={person} size={28} /></span>
-    : <span className="w-7 h-7 rounded-full bg-mist shrink-0" aria-hidden="true" />
-  const label = (
-    <span className={`t-body truncate ${leading ? 'text-ink font-bold' : 'text-muted'}`}>{name}</span>
-  )
-  // Avatar outermost, name inboard — and the group is pushed to the card's own
-  // edge by `justify`, not centred. Children are ordered explicitly rather than
-  // flipped with `flex-row-reverse`, because reverse also inverts what
-  // `justify-end` means and the two fight each other.
-  return (
-    <span className={`flex items-center gap-2.5 min-w-0 ${align === 'right' ? 'justify-end' : 'justify-start'} ${dimmed ? 'opacity-55' : ''}`}>
-      {align === 'right' ? <>{label}{face}</> : <>{face}{label}</>}
-    </span>
-  )
-}
-
-/**
- * A club crest, or nothing. Never a broken image and never a placeholder box.
- *
- * ⚠ LARGER ON A PHONE THAN ON A DESKTOP, which looks backwards and is not:
- * above `md` the club name sits beside it and the crest is decoration, below
- * `md` the crest IS the club.
- */
-function Crest({ url, name }: { url: string | null; name: string }) {
-  if (!url) return null
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt="" aria-hidden="true" title={name}
-      className="w-8 h-8 md:w-6 md:h-6 object-contain shrink-0" loading="lazy" />
-  )
-}
-
-/** Kickoff, in the VIEWER's timezone — never the server's. See components/LocalTime. */
-function formatKickoff(d: Date): string {
-  return d.toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })
-}
-
 /** 1 -> 1st. Small enough to keep local; the app has no shared formatter. */
 /**
  * Every matchweek as a contest against the room: how far ABOVE or BELOW the
@@ -667,28 +531,14 @@ export default function DuelsTab({
 }: Props) {
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])
 
-  /** Every duel the viewer is in, oriented so "you" is always the first side. */
-  const mine = useMemo(() => {
-    const out: Array<{
-      duel: DuelRow
-      you: Side
-      them: Side | null
-      matchweek: number
-    }> = []
-    for (const d of duels) {
-      const iAmA = own.has(d.entry_a)
-      const iAmB = d.entry_b !== null && own.has(d.entry_b)
-      if (!iAmA && !iAmB) continue
-      const you: Side = iAmA
-        ? { entry: d.entry_a, points: d.points_a, accuracy: d.accuracy_a }
-        : { entry: d.entry_b as string, points: d.points_b, accuracy: d.accuracy_b }
-      const them: Side | null = iAmA
-        ? (d.entry_b ? { entry: d.entry_b, points: d.points_b, accuracy: d.accuracy_b } : null)
-        : { entry: d.entry_a, points: d.points_a, accuracy: d.accuracy_a }
-      out.push({ duel: d, you, them, matchweek: d.matchweek_number })
-    }
-    return out.sort((a, b) => a.matchweek - b.matchweek)
-  }, [duels, own])
+  /**
+   * Every duel the viewer is in, oriented so "you" is always the first side.
+   *
+   * ⚠ THE SHARED ORIENTATION, so this list and the phase machine's cannot
+   * disagree about which side of a duel the viewer is on. `showdownPhase` builds
+   * the same list from the same two props.
+   */
+  const mine = useMemo(() => orientDuels(duels, ownEntryIds), [duels, ownEntryIds])
 
   const record = useMemo(() => {
     let won = 0, drawn = 0, lost = 0, byes = 0
@@ -734,44 +584,57 @@ export default function DuelsTab({
     [mine, openMatchweek, inPlayMatchweek],
   )
 
-  /**
-   * The duel in focus — the first UNSETTLED bout, falling back to the last
-   * result. `useDuel.current` on the phone, computed the same way.
-   *
-   * ⚠ `mine` IS SORTED BY MATCHWEEK NUMBER, which is not the order they are
-   * PLAYED in (101 measured a minimum gap of minus 121 days across three real
-   * seasons). That is right for "the first unsettled bout" — the lowest-numbered
-   * week still to be decided is the one you are in — and wrong for "the last
-   * result", which has to be the latest to have SETTLED. Hence the two
-   * different reductions below.
-   */
-  const current = useMemo(() => {
-    const unsettled = mine.find((m) => !m.duel.settled_at)
-    if (unsettled) return unsettled
-    const settled = mine.filter((m) => m.duel.settled_at)
-    if (settled.length === 0) return null
-    return settled.reduce((a, b) => (a.duel.settled_at! > b.duel.settled_at! ? a : b))
-  }, [mine])
-
-  /**
-   * When this viewer's most recent duel was DECIDED.
-   *
-   * ⚠ NOT `current`'s. Once next week's duel reveals, `current` moves on to it
-   * while last week's recap may still be unseen — which is the ordinary case for
-   * anyone who does not open the app on a Monday.
-   */
-  const lastSettledAt = useMemo(() => {
-    let latest: string | null = null
-    for (const m of mine) {
-      const at = m.duel.settled_at
-      if (at && (latest === null || at > latest)) latest = at
-    }
-    return latest
-  }, [mine])
-
   // The duel table — everyone, by duel points. Built from the duels themselves
   // so it cannot disagree with the fixture list beside it.
   const table = useMemo(() => buildDuelTable(duels, duelPoints), [duels, duelPoints])
+
+  const [ceremonyOpen, setCeremonyOpen] = useState(false)
+
+  /**
+   * The walkout this member has just watched, before the write comes back.
+   *
+   * ⚠ IT OVERRIDES THE PROP RATHER THAN REPLACING IT. The server marker is the
+   * truth and re-arrives on every navigation; this only has to carry the gap
+   * between pressing Skip and the row being updated. Holding the whole marker
+   * in state instead would go stale against a second tab, and a stale "seen"
+   * is a walkout somebody never gets.
+   */
+  const [seenOverride, setSeenOverride] = useState<string | null>(null)
+
+  /**
+   * ⚠⚠ ONE DERIVATION FOR ALL SIX PHASES, AND NOTHING IN THIS FILE MAY ASK
+   * "is it sealed?" OR "is it revealed?" FOR ITSELF.
+   *
+   * This replaces the if-chain that used to live in `bandNode`, whose order was
+   * held correct only by a test that read this file as TEXT and compared two
+   * `indexOf` positions (`bandStateOrder.guard.test.ts`, now retired). That
+   * guard existed because the order had already failed in front of members on
+   * 2026-09-01, and it could only ever protect the one chain it was pointed at.
+   *
+   * `lib/league/duelPhase.ts` carries the order as logic, is tested on what it
+   * RETURNS, and is the same module the phone reads — so the two apps cannot
+   * put the same member in different halves of the cycle.
+   *
+   * ⚠ AND `PoolDetail` CALLS `showdownPhase` TOO, because The Room has to
+   * WITHHOLD the week this band is OFFERING. Same inputs, same pure function,
+   * same answer — which is not the same thing as two derivations.
+   *
+   * ⚠ IT DERIVES NOTHING, and neither may the inputs. Every instant below comes
+   * from the server: the sealed week and its clock from `league_duel_reveals_at`
+   * (127/129), the in-play week from `inPlayMatchweekId`, settlement from
+   * `league_duels.settled_at`. If you are about to compute one here, ask the
+   * contract for it instead.
+   */
+  const phase = useMemo(
+    () => showdownPhase({
+      duels, ownEntryIds, sealedMatchweek, inPlayMatchweek,
+      revealSeen, revealColumnMissing, recapSeenAt, seenOverride,
+    }),
+    [duels, ownEntryIds, sealedMatchweek, inPlayMatchweek,
+     revealSeen, revealColumnMissing, recapSeenAt, seenOverride],
+  )
+  /** The duel in focus — the first UNSETTLED bout, falling back to the last result. */
+  const current = phase.current
 
   /**
    * The opponent the walkout reveals, assembled from props this tab already has.
@@ -807,78 +670,6 @@ export default function DuelsTab({
     }
   }, [current, entryPeople, entryNames, table, totals])
 
-  const [ceremonyOpen, setCeremonyOpen] = useState(false)
-
-  /**
-   * The walkout this member has just watched, before the write comes back.
-   *
-   * ⚠ IT OVERRIDES THE PROP RATHER THAN REPLACING IT. The server marker is the
-   * truth and re-arrives on every navigation; this only has to carry the gap
-   * between pressing Skip and the row being updated. Holding the whole marker
-   * in state instead would go stale against a second tab, and a stale "seen"
-   * is a walkout somebody never gets.
-   */
-  const [seenOverride, setSeenOverride] = useState<string | null>(null)
-
-  /**
-   * ⚠⚠ ONE DERIVATION FOR ALL SIX PHASES, AND NOTHING IN THIS FILE MAY ASK
-   * "is it sealed?" OR "is it revealed?" FOR ITSELF.
-   *
-   * This replaces the if-chain that used to live in `bandNode`, whose order was
-   * held correct only by a test that read this file as TEXT and compared two
-   * `indexOf` positions (`bandStateOrder.guard.test.ts`, now retired). That
-   * guard existed because the order had already failed in front of members on
-   * 2026-09-01, and it could only ever protect the one chain it was pointed at.
-   *
-   * `lib/league/duelPhase.ts` carries the order as logic, is tested on what it
-   * RETURNS, and is the same module the phone reads — so the two apps cannot
-   * put the same member in different halves of the cycle.
-   *
-   * ⚠ IT DERIVES NOTHING, and neither may the inputs. Every instant below comes
-   * from the server: the sealed week and its clock from `league_duel_reveals_at`
-   * (127/129), the in-play week from `inPlayMatchweekId`, settlement from
-   * `league_duels.settled_at`. If you are about to compute one here, ask the
-   * contract for it instead.
-   */
-  const phase = useMemo(() => {
-    const youEntry = current?.you.entry ?? null
-    /**
-     * ⚠ THE COLUMN MAY BE KNOWN-ABSENT, WHICH IS NOT `null`. Null means "never
-     * watched one" and OPENS the walkout; absent means the dismissal cannot be
-     * stored, which must CLOSE it, or the ceremony replays on every page load.
-     * Saying "the reveal I last watched is the one on screen" does that in
-     * VALUES rather than as an extra branch, so `duelPhase` keeps one code
-     * path. It re-arms itself the moment 136 lands.
-     */
-    const seen = revealColumnMissing
-      ? current?.duel.duel_id ?? null
-      : youEntry ? revealSeen.get(youEntry) ?? null : null
-
-    return duelPhase({
-      hasDraw: mine.length > 0 || sealedMatchweek !== null,
-      current: current
-        ? {
-            duelId: current.duel.duel_id,
-            matchweek: current.matchweek,
-            settledAt: current.duel.settled_at,
-          }
-        : null,
-      sealedMatchweek,
-      /**
-       * ⚠ THE SERVER'S OWN ANSWER, and it must be about `current`'s week rather
-       * than merely "some week is in play". A late joiner (migration 100) has no
-       * duel in the week being played, and telling the machine football is
-       * happening would put their finished bout on a live band.
-       */
-      isInPlay: inPlayMatchweek !== null && current?.matchweek === inPlayMatchweek,
-      lastSettledAt,
-      revealSeenDuel: seenOverride ?? seen,
-      recapSeenAt,
-    })
-  }, [
-    mine, current, sealedMatchweek, inPlayMatchweek, lastSettledAt,
-    revealSeen, revealColumnMissing, recapSeenAt, seenOverride,
-  ])
 
   /**
    * ⚠ WITHHELD UNTIL THE WALKOUT HAS BEEN WATCHED, and this is the one thing on
@@ -1236,111 +1027,60 @@ export default function DuelsTab({
     [fixtures],
   )
 
+  /**
+   * ⚠⚠ THE OUTCOME RULE IS NOT WRITTEN HERE ANY MORE — `lib/league/duelSheet.ts`
+   * OWNS IT, AND THE PHONE READS THE SAME MODULE.
+   *
+   * It lived inline in this file and shipped three bugs, each of which rendered
+   * a perfectly plausible card: an opponent's chip flipping `neither` into a
+   * tick, a dashed "not started" beside a running clock, and a live 0-0 fading
+   * both clubs as though it were a settled draw. All three are fixed, and all
+   * three are now two-line tests rather than paragraphs of warning.
+   *
+   * The Room renders this same sheet for duels that are not the viewer's, so a
+   * third copy would have had none of those fixes — which is precisely what
+   * happened on the phone before `buildSheet` existed there.
+   *
+   * ⚠ THE LIVE MAP IS BUILT FROM `fixtures`, NOT LEFT EMPTY. `MatchweekFixture`
+   * arrives already merged — `PoolDetail` folds the broadcast's deltas into it
+   * before this component sees it — so the live half and the season half are the
+   * same object here. Handing `buildSheet` an empty map would make it fall back
+   * to the `*Ft` fields, which carry no status and no minute, and the red
+   * ticking clock would silently never appear again.
+   */
+  const sheetFixtures = useMemo<SheetFixture[]>(
+    () => fixtures.map((f) => ({
+      number: f.number, id: f.id,
+      homeName: f.homeName, awayName: f.awayName,
+      homeAbbr: f.homeAbbr, awayAbbr: f.awayAbbr,
+      homeCrest: f.homeCrest, awayCrest: f.awayCrest,
+      kickoffAt: f.kickoffAt,
+      homeScoreFt: f.homeScore, awayScoreFt: f.awayScore,
+      isCompletedFt: f.isCompleted,
+    })),
+    [fixtures],
+  )
+  const sheetLive = useMemo<Map<number, SheetLive>>(
+    () => new Map(fixtures.map((f) => [f.number, {
+      homeScore: f.homeScore, awayScore: f.awayScore,
+      status: f.status, isCompleted: f.isCompleted,
+      liveMinute: f.liveMinute, livePeriod: f.livePeriod, liveAdded: f.liveAdded,
+    }])),
+    [fixtures],
+  )
+
   const breakdown = useMemo(() => {
     if (!inPlay || !inPlay.them || inPlayMatchweek === null) return []
-    const mine = perFixture.get(inPlay.you.entry) ?? new Map<number, number>()
-    const theirs = perFixture.get(inPlay.them.entry) ?? new Map<number, number>()
-    return fixtures.map((f) => {
-      // A fixture is SCORED when a row exists for it, not when the clock says
-      // it is over: the engine writes the row, and until it does there is
-      // nothing to compare. Absent ≠ nil-nil.
-      const scored = mine.has(f.number) || theirs.has(f.number)
-      // Hoisted above `outcome`, which needs it: a fixture being PLAYED is not
-      // the same thing as one that has not started.
-      const clock = getLiveClock({
-        status: f.status, livePeriod: f.livePeriod,
-        liveMinute: f.liveMinute, liveAdded: f.liveAdded,
-      })
-      const mineP = mine.get(f.number) ?? 0
-      const theirsP = theirs.get(f.number) ?? 0
-      const myPick = pickLabel(inPlay.you.entry, f.id)
-      const theirPick = inPlay.them ? pickLabel(inPlay.them.entry, f.id) : null
-      /**
-       * Who took THIS fixture. Named for the fixture, not for the viewer.
-       *
-       * ⚠ IT WAS 'won' | 'lost' AND THAT WAS WRONG. The opponent's chip flipped
-       * the viewer's value, so `lost` — which also means "two different picks,
-       * NEITHER scored" — inverted into a tick on their side. Liverpool v
-       * Nott'm Forest was 0-0 to both and rendered as Sarah taking it.
-       *
-       * `neither` is therefore a state in its own right, and no chip flips
-       * anything: each one asks whether it is the winner.
-       */
-      const outcome: 'same' | 'you' | 'them' | 'neither' | 'pending' =
-        // ⚠ `pending` MEANS NOT STARTED, and a match being played is not that.
-        // Until the engine writes a score row there is nothing to compare, so
-        // nobody can be shown ahead — but "nobody is ahead" is `neither`, which
-        // is grey, not the dashed outline that says the game has not kicked
-        // off. The dashed chip on a live game was reading as "not started"
-        // while the clock beside it ran.
-        //
-        // This window is short by design and shrinks to nothing once the
-        // engine scores live fixtures in production: `scored` goes true on the
-        // first sync tick after kickoff and the real outcome takes over.
-        !scored ? (clock !== null ? 'neither' : 'pending')
-          : myPick !== null && theirPick !== null && myPick === theirPick ? 'same'
-            : mineP > theirsP ? 'you'
-              : theirsP > mineP ? 'them'
-                : 'neither'
-      return {
-        n: f.number,
-        id: f.id,
-        homeName: f.homeName,
-        awayName: f.awayName,
-        homeAbbr: f.homeAbbr,
-        awayAbbr: f.awayAbbr,
-        homeCrest: f.homeCrest,
-        awayCrest: f.awayCrest,
-        homeScore: f.homeScore,
-        awayScore: f.awayScore,
-        /**
-         * Who won the MATCH — a different question from who took the fixture
-         * in the duel. Both members can lose a game City won; that is the
-         * "different picks, neither scored" row, and seeing 2-2 beside it is
-         * what makes the tick pattern legible instead of arbitrary.
-         */
-        /**
-         * ⚠ AT FULL TIME ONLY. This drives which club is bolded and which is
-         * faded back, and doing that to a match still being played states an
-         * outcome the game has not reached — a live 0-0 read as a settled draw
-         * and greyed BOTH clubs out, at the exact moment they are the most
-         * interesting thing on the card. 1-0 at 12 minutes would have faded the
-         * side that goes on to win 3-1.
-         *
-         * `isCompleted` rather than a status string: it is the column the
-         * engine, the snapshot guard and the matchweek window all settle on,
-         * and it stays false through HT, ET and a suspension.
-         */
-        result:
-          !f.isCompleted || f.homeScore === null || f.awayScore === null ? null
-            : f.homeScore > f.awayScore ? 'home'
-              : f.awayScore > f.homeScore ? 'away' : 'draw',
-        outcome,
-        scored,
-        /**
-         * ⚠ THE PILL BELOW HANGS OFF THIS, NOT OFF `outcome`.
-         *
-         * It used to render on `outcome === 'pending'`, which worked only
-         * while "not scored" and "not started" were the same state. The moment
-         * a live fixture stopped being `pending` — so its chip could go grey
-         * instead of dashed — the red ticking clock vanished from every game
-         * in play, which is the one row that most needs it.
-         *
-         * Whether to show a time is a question about the MATCH, so it is
-         * answered from the match: not finished means there is still a clock
-         * or a kickoff to show. Who is winning the duel has nothing to do
-         * with it, and coupling the two is what broke it.
-         */
-        isCompleted: f.isCompleted,
-        mine: mineP,
-        theirs: theirsP,
-        myPick,
-        theirPick,
-        clock,
-        kickoffAt: f.kickoffAt,
-      }
+    return buildSheet({
+      fixtures: sheetFixtures,
+      live: sheetLive,
+      mine: perFixture.get(inPlay.you.entry) ?? new Map<number, number>(),
+      theirs: perFixture.get(inPlay.them.entry) ?? new Map<number, number>(),
+      label: pickLabel,
+      youEntry: inPlay.you.entry,
+      themEntry: inPlay.them.entry,
     })
-  }, [inPlay, inPlayMatchweek, perFixture, fixtures, pickLabel])
+  }, [inPlay, inPlayMatchweek, perFixture, sheetFixtures, sheetLive, pickLabel])
 
   /**
    * Is the live duel already decided?
@@ -1361,15 +1101,13 @@ export default function DuelsTab({
    * "Six of ten are dead heat — this duel is Brighton, Palace and the Sunday
    * game." Null until the sheet is actually revealed.
    */
-  const sheetSummary = useMemo(() => {
-    if (!anyPicksRevealed) return null
-    const differ = breakdown.filter((b) => b.myPick && b.theirPick && b.myPick !== b.theirPick)
-    const same = breakdown.length - differ.length
-    if (differ.length === 0) return `Identical sheets — all ${breakdown.length} picks the same.`
-    const names = differ.slice(0, 3).map((d) => d.homeName)
-    const tail = differ.length > 3 ? ` and ${differ.length - 3} more` : ''
-    return `${same} of ${breakdown.length} are dead heat. This duel is ${names.join(', ')}${tail}.`
-  }, [breakdown, anyPicksRevealed])
+  const sheetSummary = useMemo(
+    // ⚠ THE MODULE'S, so The Room's sentence and this one cannot differ about
+    // what counts as a dead heat. It returns null until at least one side's
+    // picks have been released — the same gate `anyPicksRevealed` reads.
+    () => summariseSheet(breakdown),
+    [breakdown],
+  )
 
   const verdict = useMemo(() => {
     if (!inPlay || !inPlay.them || breakdown.length === 0 || remainingFixturesRaw === null) return null
@@ -2145,80 +1883,12 @@ export default function DuelsTab({
             </span>
           </div>
 
-          <ul>
-            {breakdown.map((b) => (
-              <li key={b.n}
-                className={`grid grid-cols-[3.25rem_1fr_3.25rem] sm:grid-cols-[4.75rem_1fr_4.75rem] items-center gap-3 sm:gap-5 px-3 sm:px-5 py-3.5 border-t border-border-default
-                  ${b.outcome === 'pending' ? 'bg-primary-50/40 dark:bg-primary-900/10 py-4' : ''}`}>
-                <PickChip label={b.myPick} side="you" outcome={b.outcome} colour={youInk} />
-
-                {/* [name][crest] v [crest][name] — mirrored about the v, so the
-                    two clubs carry the same weight and the eye lands in the
-                    middle rather than reading left to right. */}
-                {/* ⚠ A COLUMN, not an inline span with block children. The
-                    kickoff line sat 2px under the crests on a `mt-0.5`, which
-                    is not technically an overlap and reads as one — the crests
-                    are 24px and the text baseline lands right on them. A real
-                    flex column with a gap is the fix; the spacing is then a
-                    property of the container rather than a margin guess. */}
-                <span className="min-w-0 flex flex-col gap-2">
-                  <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5 sm:gap-4">
-                    {/* ⚠ ABBREVIATION ON A PHONE, NAME ABOVE IT. Adding the
-                        crests cost the width that made the names fit: at 375px
-                        six of ten truncated, including "Crystal Palace" and
-                        "Man United". A crest beside "CRY" is unambiguous where a
-                        clipped "Crystal Pal…" is just worse — and it is what a
-                        broadcast scoreboard does at this size. */}
-                    {/* ⚠ THE WINNING CLUB IS LIT, THE LOSER IS DIMMED — the
-                        score alone makes you read two digits and compare them.
-                        A draw dims neither. This is about the MATCH, and is a
-                        different question from who took the fixture in the
-                        duel: both members can lose a game City won. */}
-                    <span className={`flex items-center justify-end gap-2.5 min-w-0
-                      ${b.result === 'home' ? 'opacity-100' : b.result ? 'opacity-60 md:opacity-45' : ''}`}>
-                      {/* ⚠ THE CREST IS THE ONLY LABEL ON A PHONE, so the name
-                          still has to reach a screen reader — sr-only, not
-                          removed. A crest with no accessible name is an
-                          unlabelled image where the content is. */}
-                      <span className="sr-only">{b.homeName}</span>
-                      <span className={`t-body truncate hidden md:inline ${b.result === 'home' ? 'text-ink font-bold' : 'text-muted'}`}>{b.homeName}</span>
-                      <Crest url={b.homeCrest} name={b.homeName} />
-                    </span>
-
-                    {/* The score lives where the v was, which is what makes it
-                        affordable on a phone: it replaces a separator rather
-                        than adding a column. */}
-                    {b.homeScore !== null && b.awayScore !== null ? (
-                      <Scoreline left={b.homeScore} right={b.awayScore} live={!!b.clock} />
-                    ) : (
-                      <span className="t-detail text-muted/40">v</span>
-                    )}
-
-                    <span className={`flex items-center gap-2.5 min-w-0
-                      ${b.result === 'away' ? 'opacity-100' : b.result ? 'opacity-60 md:opacity-45' : ''}`}>
-                      <Crest url={b.awayCrest} name={b.awayName} />
-                      <span className="sr-only">{b.awayName}</span>
-                      <span className={`t-body truncate hidden md:inline ${b.result === 'away' ? 'text-ink font-bold' : 'text-muted'}`}>{b.awayName}</span>
-                    </span>
-                  </span>
-                  {!b.isCompleted && (
-                    <span className="flex justify-center">
-                      {/* A pill, so it reads as metadata about the fixture
-                          rather than a second line of the fixture itself. A
-                          live clock is red and ticking; a kickoff is blue and
-                          quiet. */}
-                      <span className={`t-detail uppercase tracking-wider rounded-full px-2.5 py-1
-                        ${b.clock ? 'bg-danger-500/15 text-danger-600' : 'bg-primary-500/12 text-primary-600'}`}>
-                        {b.clock ?? <LocalTime iso={b.kickoffAt} format={formatKickoff} />}
-                      </span>
-                    </span>
-                  )}
-                </span>
-
-                <PickChip label={b.theirPick} side="them" outcome={b.outcome} colour={themInk} align="right" />
-              </li>
-            ))}
-          </ul>
+          {/* ⚠ THE SAME COMPONENT THE ROOM RENDERS. It was written out here, and
+              the phone's Room re-earned every one of its details badly before
+              `TeamSheet` existed there — a chip either side of one grey string,
+              no crest, no scoreline, no kickoff. A member switching between the
+              two tabs is comparing them directly. */}
+          <TeamSheetRows rows={breakdown} youInk={youInk} themInk={themInk} />
 
           {/* What the sheet MEANS, in a sentence. Agreements cannot separate two
               members by definition, so the duel is only ever the divergences —
