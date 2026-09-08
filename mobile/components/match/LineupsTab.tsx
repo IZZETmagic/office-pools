@@ -1,7 +1,14 @@
+import { useState } from 'react';
 import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
-import { PitchMarkings, PITCH_L, PITCH_W } from '@/components/match/PitchMarkings';
+import {
+  PitchMarkings,
+  pitchXToView,
+  pitchYToView,
+  VIEW_L,
+  VIEW_W,
+} from '@/components/match/PitchMarkings';
 import { Text } from '@/components/ui';
 import { fixturePalette } from '@/lib/design/clubColors';
 import { groupByRow, surnameOf } from '@/lib/lineupLayout';
@@ -105,23 +112,43 @@ function Pitch({
 }) {
   const theme = useTheme();
 
+  /**
+   * The card's rendered width, so the drawing can be told what the card's
+   * corner radius is IN ITS OWN UNITS.
+   *
+   * ⚠ THE RADIUS IS IN POINTS AND THE PITCH IS IN METRES, and the conversion
+   * depends on how wide the card ended up — which is the phone's business, not
+   * this file's. Measuring is the only honest way to make the touchline follow
+   * the card's corner instead of being clipped by it.
+   */
+  const [cardWidth, setCardWidth] = useState(0);
+  const cardRadiusInPitchUnits =
+    cardWidth > 0 ? (theme.radii.lg * VIEW_W) / cardWidth : undefined;
+
   return (
     <View
+      onLayout={(e) => {
+        const w = Math.round(e.nativeEvent.layout.width);
+        // Guarded: `onLayout` fires on every re-render, and writing the same
+        // number back would loop.
+        if (w > 0 && w !== cardWidth) setCardWidth(w);
+      }}
       style={{
         marginHorizontal: 20,
         borderRadius: theme.radii.lg,
         overflow: 'hidden',
         ...theme.shadows.card,
-        // ⚠ EXACTLY THE VIEWBOX'S RATIO, 68 BY 126. Any other value would
-        // stretch the drawing to fit and turn the centre circle into an
-        // ellipse — see `PitchMarkings` for why the extra length over a real
-        // 105m pitch is drawn as grass rather than taken by scaling.
-        aspectRatio: PITCH_W / PITCH_L,
+        // ⚠ EXACTLY THE VIEWBOX'S RATIO — and that is the BLED box, not the
+        // pitch. Any other value stretches the drawing to fit and turns the
+        // centre circle into an ellipse. See `PitchMarkings` for why the extra
+        // length over a real 105m pitch is drawn as grass rather than scaled,
+        // and why the box carries a bleed at all.
+        aspectRatio: VIEW_W / VIEW_L,
         backgroundColor: theme.mode === 'dark' ? '#123021' : '#1D7A45',
       }}
     >
       <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
-        <PitchMarkings />
+        <PitchMarkings cardRadius={cardRadiusInPitchUnits} />
       </View>
 
       {/* Home across the top half, away across the bottom. */}
@@ -240,10 +267,12 @@ function Half({
     <>
       {rows.map((row, rowIndex) => {
         const depth = LEAD + ((rowIndex + 0.5) / rows.length) * BAND;
-        const top = half === 'top' ? depth : 100 - depth;
+        // ⚠ Mapped through the bleed — a raw pitch percentage is not a box
+        // percentage, and the keeper would stand outside his own goal line.
+        const top = pitchYToView(half === 'top' ? depth : 100 - depth);
 
         return row.map((player, colIndex) => {
-          const left = ((colIndex + 0.5) / row.length) * 100;
+          const left = pitchXToView(((colIndex + 0.5) / row.length) * 100);
           return (
             <View
               key={player.playerId ?? `${rowIndex}-${colIndex}`}
