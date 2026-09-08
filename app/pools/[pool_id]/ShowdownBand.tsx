@@ -139,8 +139,12 @@ export type ShowdownBandProps = {
  * clock — split across two files, that relationship is invisible and the next
  * person tunes one number and breaks two.
  *
- * Each value is `expanded - travel * --p`. Expanded is the layout Ryan approved
- * and is not being changed; only the collapsed end moves.
+ * Each value is `expanded - travel * --p`.
+ *
+ * ⚠ THE COLLAPSED END IS THE FIXED ONE. It used to be the other way round —
+ * "expanded is the layout Ryan approved and is not being changed" — and that
+ * stopped being true on 2026-09-08, when the open band came down 40px. What has
+ * never moved is the 100px shut state, because three things line up in it.
  *
  * Collapsed, the block is 100px and everything is arranged around the faces:
  *   faces  36px at top 32  -> centre 50
@@ -164,12 +168,32 @@ export type ShowdownBandProps = {
  * So this is one number used twice on purpose. Splitting it into a height and a
  * separate scroll distance is what made it wrong in the first place.
  */
-const COLLAPSE_PX = 220
+const COLLAPSE_PX = 180
 /** The duel block open, before any of COLLAPSE_PX has been given up. */
-const HERO = 320
+const HERO = 280
 
+/**
+ * ⚠ 320 → 280 AND 266 → 226 ON 2026-09-08 — Ryan, on a phone: make the expanded
+ * header a bit smaller.
+ *
+ * ⚠⚠ NOTHING MOVED. Every placement below is unchanged; only the BLOCK is
+ * shorter, because all 40px came off the air BELOW the names. Measured before
+ * touching it: in the no-headline variant the names end around 205 inside a
+ * 266px block, so a third of the open band was empty. Shifting the pieces up as
+ * well would have been a second change wearing the first one's clothes — and
+ * this layout was tuned by eye over about twenty rounds.
+ *
+ * ⚠ THE COLLAPSED END IS UNTOUCHED, AND IT IS THE PART THAT IS LOAD-BEARING.
+ * 100px with the faces 36px at top 32 puts their centre on 50, which is where
+ * the clock sits. So the travel absorbs the whole change: 220 → 180 here and
+ * 166 → 126 in `M_BETWEEN`, each still `expanded − 100`.
+ *
+ * ⚠ `COLLAPSE_PX` AND THIS EXPRESSION MUST AGREE. The constant is also the
+ * scroll divisor's fallback for the first frame before the band is measured;
+ * out of step, the collapse outruns the content until the ResizeObserver fires.
+ */
 const M = {
-  block: { height: `calc(320px - ${COLLAPSE_PX}px * var(--p))` },
+  block: { height: `calc(${HERO}px - ${COLLAPSE_PX}px * var(--p))` },
   mw:    { top: 'calc(20px - 6px * var(--p))', fontSize: 'calc(15px - 3px * var(--p))' },
   big:   { top: 'calc(50px - 11px * var(--p))', fontSize: 'calc(40px - 18px * var(--p))' },
   face:  { top: 'calc(146px - 114px * var(--p))',
@@ -252,7 +276,8 @@ const M = {
  * could matter.
  */
 const M_BETWEEN = {
-  block:   { height: 'calc(266px - 166px * var(--p))' },
+  // ⚠ 266 → 226, all of it off the air below the names. See `M.block`.
+  block:   { height: 'calc(226px - 126px * var(--p))' },
   /**
    * ⚠ THE SUB MOVES INTO THE SLOT THE HEADLINE VACATED, or it lands ON the
    * headline. At 104px it sat under a headline that started at 50; with the
@@ -636,7 +661,21 @@ export function ShowdownBand({
           it overflows and scrolls, and the centre-the-active-pill effect finally
           has something to do. */}
       {tabs && (
-        <div className="relative z-10 max-w-[940px] mx-auto px-4 sm:px-6">{tabs}</div>
+        /* ⚠ FULL-BLEED ON A PHONE, MEASURED FROM `sm` UP — Ryan, 2026-09-08:
+           *"only on mobile the tabs should expand the whole screen size but have
+           a slight buffer on either end."*
+
+           ⚠ THE BUFFER MOVED INSIDE THE SCROLLER, it did not go away. Padding
+           on THIS element is outside the scroll box, so the pills stopped 16px
+           short of the screen at both ends and the strip looked cropped rather
+           than scrollable — on the one width where there are more tabs than
+           fit. The gutter is now `pl-4` on the scroll container plus a trailing
+           spacer, so the first and last pill clear the edge and everything
+           between them uses the whole screen. See `tabStripNode`.
+
+           From `sm` the measure comes back and matches `<main>` and `.sd-d`, so
+           the desktop alignment is untouched. */
+        <div className="relative z-10 sm:max-w-[940px] sm:mx-auto sm:px-6">{tabs}</div>
       )}
     </div>
     </>

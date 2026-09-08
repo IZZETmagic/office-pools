@@ -2030,7 +2030,21 @@ export function PoolDetail({
    * tab that starts off-screen.
    */
   const tabStripNode = (onBand: boolean) => (
-  <div ref={tabStripRef} className="flex relative items-center gap-2 overflow-x-auto scrollbar-hide py-2">
+  <div
+    ref={tabStripRef}
+    /* ⚠ THE PHONE GUTTER IS INSIDE THE SCROLLER, and only when the strip is in
+       the band — Ryan, 2026-09-08: *"only on mobile the tabs should expand the
+       whole screen size but have a slight buffer on either end."*
+
+       Padding on the WRAPPER is outside the scroll box, so the pills stopped
+       16px short of the screen at both ends and the strip read as cropped
+       rather than scrollable. `pl-4` here scrolls WITH the content, which is
+       what puts a buffer before the first pill while letting everything after
+       it use the full width. From `sm` the wrapper's measure comes back and
+       this goes to zero. */
+    className={`flex relative items-center gap-2 overflow-x-auto scrollbar-hide py-2${
+      onBand ? ' pl-4 sm:pl-0' : ''}`}
+  >
                 {USER_TABS.map((tab) => (
                   <button
                     key={tab.key}
@@ -2085,6 +2099,14 @@ export function PoolDetail({
                     ))}
                   </>
                 )}
+
+      {/* ⚠ A SPACER, NOT `pr-4`. Trailing padding on a horizontal flex scroll
+          container is dropped by Chromium — the last pill ends flush against the
+          screen edge while the leading `pl-4` is honoured, so the strip looks
+          lopsided at the one end you notice. An element cannot be dropped: it is
+          a flex item with a width, and `shrink-0` keeps it from being squeezed
+          out when the row overflows, which is exactly when it is needed. */}
+      {onBand && <span aria-hidden="true" className="w-4 sm:w-0 shrink-0" />}
   </div>
   )
 
