@@ -25,6 +25,7 @@ import { ShowdownBand } from '../../pools/[pool_id]/ShowdownBand'
 import { Countdown } from '../../pools/[pool_id]/DuelsTab'
 import { DuelRevealCeremony, type RevealOpponent } from '../../pools/[pool_id]/DuelRevealCeremony'
 import type { AvatarPerson } from '@/components/ui/Avatar'
+import { ShowdownLadder, type LadderEntry } from '../../pools/[pool_id]/ShowdownLadder'
 
 /** Two real seeded testers, so the colours and initials are the app's own. */
 const YOU: AvatarPerson = {
@@ -255,9 +256,62 @@ export default function Page() {
           </p>
         </div>
       </div>
+
+      {/* ── THE LADDER ────────────────────────────────────────────────────
+          ⚠ THE REAL COMPONENT, given hand-made rows. The pool page needs auth,
+          so this is the only place the Showdown leaderboard can be looked at
+          without one — and the thing most worth looking at is the pair of
+          orders: TABLE is the engine's `current_rank`, DUELS is ours.
+
+          ⚠ THE FIXTURES ENCODE THE BUG THIS BOARD WAS BUILT AFTER. Sarah's
+          only settled duel is a BYE, which pays 250 — the same as a draw. She
+          must read `0W 0T 0L · 1 bye`, never a T. */}
+      <div className="mt-10">
+        <p className="text-[11px] font-extrabold tracking-[3px] text-muted mb-3">THE LADDER</p>
+        <ShowdownLadder
+          entries={LADDER_ENTRIES}
+          duels={LADDER_DUELS}
+          duelPoints={new Map([[ 'e-you', 500 ], [ 'e-them', 250 ]])}
+          myEntryIds={new Set(['e-you'])}
+        />
+      </div>
     </div>
   )
 }
+
+/** Two members, one of whom had a bye. See the note at the call site. */
+const LADDER_ENTRIES: LadderEntry[] = [
+  {
+    entry_id: 'e-you', entry_name: null,
+    current_rank: 1, previous_rank: 3,
+    scored_total_points: 900, match_points: 900, bonus_points: 0, point_adjustment: 0,
+    duel_points: 500, person: YOU, name: 'Priya',
+  },
+  {
+    entry_id: 'e-them', entry_name: null,
+    current_rank: 2, previous_rank: 1,
+    scored_total_points: 1000, match_points: 1000, bonus_points: 0, point_adjustment: 0,
+    duel_points: 250, person: THEM, name: 'Sarah C',
+  },
+]
+
+const LADDER_DUELS = [
+  {
+    duel_id: 'd1', matchweek_number: 1,
+    entry_a: 'e-you', entry_b: 'e-them',
+    points_a: 500, points_b: 0,
+    accuracy_a: 400, accuracy_b: 300,
+    settled_at: '2026-08-20T00:00:00Z',
+  },
+  // ⚠ A BYE — `entry_b` null. It pays 250, which IS what a draw pays.
+  {
+    duel_id: 'd2', matchweek_number: 2,
+    entry_a: 'e-them', entry_b: null,
+    points_a: 250, points_b: null,
+    accuracy_a: null, accuracy_b: null,
+    settled_at: '2026-08-27T00:00:00Z',
+  },
+] as unknown as Parameters<typeof ShowdownLadder>[0]['duels']
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (

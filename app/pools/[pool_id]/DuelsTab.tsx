@@ -70,6 +70,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Icon } from '@/components/ui/Icon'
 import { headToHead, type DuelRow } from '@/lib/league/duels'
 import { orientDuels, showdownPhase } from '@/lib/league/showdownPhase'
+import { buildDuelRecords } from '@/lib/league/duelRecord'
 import { ownPickDirections } from '@/lib/league/ownPicks'
 import { getLiveClock } from '@/lib/matchStatus'
 import type { MatchweekFixture } from './PoolDetail'
@@ -313,33 +314,30 @@ function DuelFormDots({ form, align = 'left' }: {
  * settled" table — the engine stores today's total and has no historical one —
  * which is exactly why the fallback had to stop being arithmetic.
  */
+/**
+ * The season table's rows — the duel record, shaped for this tab's columns.
+ *
+ * ⚠⚠ THE COUNTING MOVED TO `lib/league/duelRecord.ts` BECAUSE IT WAS WRONG
+ * HERE. This walked `[entry_a, points_a]` and `[entry_b, points_b]`, and a bye
+ * row has `entry_b` null — so only side A survived, holding 250 points, which
+ * `duelResult` reads back as `tied`. `DUEL_BYE === DUEL_TIE` by design, so the
+ * points can never tell the two apart.
+ *
+ * The "Duel record" header three inches above this table counted byes
+ * correctly, so one member read "0W 0T 0L · 1 bye" up there and picked up a T
+ * down here. Nothing errored; the two numbers simply were not the same number.
+ *
+ * ⚠ THE SORT IS OURS, and stays here: duel points then wins. Nothing in the
+ * database ranks by duel points alone — the pool's real order is the engine's
+ * `(total_points + duel_points) DESC`, on the Leaderboard tab.
+ */
 function buildDuelTable(
   duels: DuelRow[],
   enginePoints?: Map<string, number>,
-): Array<{ entry: string; w: number; d: number; l: number; pts: number }> {
-  const rows = new Map<string, { entry: string; w: number; d: number; l: number; pts: number }>()
-  /** Σ of the engine's own per-duel points — kept beside the rows, not on them. */
-  const stored = new Map<string, number>()
-  const ensure = (e: string) => {
-    if (!rows.has(e)) rows.set(e, { entry: e, w: 0, d: 0, l: 0, pts: 0 })
-    return rows.get(e)!
-  }
-  for (const duel of duels) {
-    ensure(duel.entry_a)
-    if (duel.entry_b) ensure(duel.entry_b)
-    if (!duel.settled_at) continue
-    for (const [e, p] of [[duel.entry_a, duel.points_a], [duel.entry_b, duel.points_b]] as const) {
-      if (!e || p === null) continue
-      const r = ensure(e)
-      stored.set(e, (stored.get(e) ?? 0) + p)
-      const o = duelResult(p)
-      if (o === 'won') r.w++
-      else if (o === 'tied') r.d++
-      else r.l++
-    }
-  }
-  for (const r of rows.values()) r.pts = enginePoints?.get(r.entry) ?? stored.get(r.entry) ?? 0
-  return [...rows.values()].sort((a, b) => b.pts - a.pts || b.w - a.w)
+): Array<{ entry: string; w: number; d: number; l: number; byes: number; pts: number }> {
+  return [...buildDuelRecords(duels, enginePoints).values()]
+    .map((r) => ({ entry: r.entry, w: r.won, d: r.tied, l: r.lost, byes: r.byes, pts: r.duelPoints }))
+    .sort((a, b) => b.pts - a.pts || b.w - a.w)
 }
 
 /**

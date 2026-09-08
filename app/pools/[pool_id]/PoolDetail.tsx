@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { withShowdownFirst } from '@/lib/league/showdownTabs'
 import { showdownPhase, unwatchedMatchweek } from '@/lib/league/showdownPhase'
 import { ShowdownRoom } from './ShowdownRoom'
+import { ShowdownLadder, type LadderEntry } from './ShowdownLadder'
 import type { PoolLiveResponse, LiveEntry } from '@/app/api/pools/[pool_id]/live/route'
 import { needsFullRefresh, mergeMatches, mergeMembers, mergeMatchScores, mergeEntryStats } from './liveMerge'
 import { Button } from '@/components/ui/Button'
@@ -1831,6 +1832,51 @@ export function PoolDetail({
    * a frame before the write lands, which is the wrong direction to fail. The
    * server marker re-arrives on the next navigation and the week appears then.
    */
+  /**
+   * The ladder's rows — every entry in the pool, flattened out of `members`.
+   *
+   * ⚠ FROM `members`, WHICH IS REALTIME STATE. That is what keeps the ladder
+   * moving without a count-up: the leaderboard must never lag, and a board built
+   * from a server prop would sit still through a Saturday.
+   *
+   * ⚠ THE NAME A MEMBER WOULD RECOGNISE — their entry name where they set one,
+   * their username otherwise. Multi-entry pools are why the entry name leads;
+   * "Ryan" twice in a list of ten is not a leaderboard.
+   *
+   * ⚠ IT DOES NOT ADD THE TWO CURRENCIES HERE. `scored_total_points` is the
+   * picking half and the ladder calls `seasonTotalPoints()`; summing it in two
+   * places is how `#1 Alice 800` ended up above `#2 Bob 900`.
+   */
+  const ladderEntries = useMemo<LadderEntry[]>(() => {
+    const out: LadderEntry[] = []
+    for (const m of members) {
+      for (const e of m.entries ?? []) {
+        out.push({
+          entry_id: e.entry_id,
+          entry_name: e.entry_name ?? null,
+          current_rank: e.current_rank ?? null,
+          previous_rank: e.previous_rank ?? null,
+          scored_total_points: e.scored_total_points ?? null,
+          match_points: e.match_points ?? null,
+          bonus_points: e.bonus_points ?? null,
+          point_adjustment: e.point_adjustment ?? null,
+          duel_points: e.duel_points ?? null,
+          person: m.users?.user_id
+            ? {
+                user_id: m.users.user_id,
+                full_name: m.users.full_name ?? null,
+                username: m.users.username ?? null,
+              }
+            : null,
+          name: e.entry_name?.trim()
+            ? e.entry_name
+            : m.users?.username || m.users?.full_name || 'Entry',
+        })
+      }
+    }
+    return out
+  }, [members])
+
   const showdownPhaseState = useMemo(
     () => showdownPhase({
       duels: showdownData?.duels ?? [],
@@ -2451,7 +2497,25 @@ export function PoolDetail({
               )
             )}
             {(!needsBulk || bulkState === 'ready') && <>
-            {activeTab === 'leaderboard' && (
+            {/* ⚠ SHOWDOWN GETS THE LADDER, NOT THE TABLE. Ryan, 2026-09-04:
+                it should not look like the other leaderboards — "like you're
+                fighting, like you're trying to climb". And it answers a second
+                question the generic board cannot: who is winning FIGHTS, which
+                has no stored order anywhere in the database.
+
+                ⚠ IT DROPS THE POINTS COUNT-UP and the match/bonus breakdown
+                modal. The phone's board has neither, and the numbers still move
+                — `members` is realtime state on this component, so a goal
+                repaints the ladder the same as everything else. Only the
+                roll-up animation is gone. */}
+            {activeTab === 'leaderboard' && isShowdown && showdownData ? (
+              <ShowdownLadder
+                entries={ladderEntries}
+                duels={showdownData.duels}
+                duelPoints={showdownData.duelPoints}
+                myEntryIds={myEntryIds}
+              />
+            ) : activeTab === 'leaderboard' && (
               <LeaderboardTab
                 lmsBoard={lmsBoard}
                 myEntryIds={myEntryIds}
