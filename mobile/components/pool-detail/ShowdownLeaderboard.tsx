@@ -5,7 +5,7 @@ import { Pressable, View } from 'react-native';
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
-import { ladderGap, ladderGapLabel, type LadderGap } from '@/lib/ladderGap';
+import { ladderGap, ladderGapLabel, ladderNumberChars, type LadderGap } from '@/lib/ladderGap';
 import { useDuel, type DuelRecordRow } from '@/lib/useDuel';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -110,6 +110,19 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
     [rows, board],
   );
 
+  /**
+   * ⚠ ONE WIDTH FOR THE WHOLE BOARD — see `ladderNumberChars`.
+   *
+   * ⚠ `DIGIT_PT` IS AN OVER-ESTIMATE ON PURPOSE, and the alignment does not
+   * depend on it being right. Every row gets the SAME number, so the dots line
+   * up whatever it is; the constant only has to be big enough that the widest
+   * value never wraps. Nunito_900Black at 16pt advances about 10pt a digit, so
+   * 11 leaves a point of air rather than a clipped total. React Native cannot
+   * measure text without laying it out, which is the whole reason this is a
+   * constant and not a measurement.
+   */
+  const numberWidth = Math.max(theme.spacing.hero, ladderNumberChars(values) * DIGIT_PT);
+
   return (
     <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
       {/*
@@ -136,6 +149,7 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
               told which order it is looking at.
             */
             gap={r.isYou ? ladderGap(values, i) : null}
+            numberWidth={numberWidth}
           />
         ))}
       </View>
@@ -157,6 +171,7 @@ function Row({
   row,
   board,
   gap,
+  numberWidth,
 }: {
   position: number;
   row: {
@@ -169,6 +184,8 @@ function Row({
   board: Board;
   /** Non-null on the viewer's own rows only — see `ladderGap`'s header. */
   gap: LadderGap | null;
+  /** The points column, sized once for the whole board. */
+  numberWidth: number;
 }) {
   const theme = useTheme();
   const { entry, duel, picksPoints, combined, isYou } = row;
@@ -283,21 +300,25 @@ function Row({
         {board === 'duels' ? <Form form={duel.form} /> : null}
 
         {/*
-          ⚠ FIXED WIDTH, AND IT IS WHAT ALIGNS THE FORM STRIP. Nothing after the
-          name column had a width of its own, so the row packed to the right and
-          every element's x depended on how many digits the TOTAL happened to
-          have: a member on 250 pushed their dots ~55pt left of a member on 0.
-          The strip was internally aligned the whole time and still could not be
-          read down the list.
+          ⚠⚠ A FIXED WIDTH, NOT A MINIMUM, AND THAT IS THE WHOLE FIX.
 
-          `minWidth`, not `width`, so a five-figure season total grows the column
-          rather than being clipped — every row grows with it, so the alignment
-          holds either way.
+          Nothing after the name column had a width of its own, so the row packs
+          to the right and every element's x depends on how wide this column is.
+          It was `minWidth: hero`, and the note here used to claim that a
+          five-figure total simply "grows the column, and every row grows with
+          it" — which is exactly wrong. Only the rows that OVERFLOW the minimum
+          grow. A board reading 1,000 / 750 / 0 therefore put three different
+          widths here and the dots landed at three different offsets, on the one
+          element whose entire purpose is being read DOWN the list.
+
+          `numberWidth` is the widest value on this board, so the column is
+          constant AND never clips. Ryan, 2026-09-07: "the form dots should all
+          be aligned."
         */}
         <Text
           variant="cardTitle"
           style={{
-            minWidth: theme.spacing.hero,
+            width: numberWidth,
             textAlign: 'right',
             fontFamily: fontFamilies.black,
             fontVariant: ['tabular-nums'],
@@ -394,6 +415,15 @@ function Movement({ current, previous }: { current: number | null; previous: num
     </View>
   );
 }
+
+/**
+ * Points per character in the totals column.
+ *
+ * ⚠ AN OVER-ESTIMATE, DELIBERATELY. See `numberWidth` — alignment comes from
+ * every row sharing one number, not from this being accurate. It only has to be
+ * large enough that the widest total never wraps.
+ */
+const DIGIT_PT = 11;
 
 /** How many duels the strip shows. Fixed, so every row is the same width. */
 const FORM_SLOTS = 5;

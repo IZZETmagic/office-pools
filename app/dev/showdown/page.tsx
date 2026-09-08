@@ -293,6 +293,18 @@ const LADDER_ENTRIES: LadderEntry[] = [
     scored_total_points: 1000, match_points: 1000, bonus_points: 0, point_adjustment: 0,
     duel_points: 250, person: THEM, name: 'Sarah C',
   },
+  /* ⚠ A ONE-CHARACTER TOTAL, AND IT IS THE POINT OF THIS THIRD ROW. The board
+     needs values of DIFFERENT widths or it cannot show the bug it exists to
+     watch: `min-width` on the points column aligned every row whose number
+     fitted and no row that did not, so 1,400 / 1,250 — both five characters —
+     looked perfect while a real board did not. With a 0 in the list, the form
+     dots and the numbers either line up down the page or they do not. */
+  {
+    entry_id: 'e-third', entry_name: null,
+    current_rank: 3, previous_rank: 2,
+    scored_total_points: 0, match_points: 0, bonus_points: 0, point_adjustment: 0,
+    duel_points: 0, person: null, name: 'Dev',
+  },
 ]
 
 const LADDER_DUELS = [

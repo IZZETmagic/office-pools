@@ -44,7 +44,7 @@ import { useMemo, useState } from 'react'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { Icon } from '@/components/ui/Icon'
 import { buildDuelRecords, type DuelFormResult, type DuelRecord } from '@/lib/league/duelRecord'
-import { ladderGap, ladderGapLabel, type LadderGap } from '@/lib/league/ladderGap'
+import { ladderGap, ladderGapLabel, ladderNumberChars, type LadderGap } from '@/lib/league/ladderGap'
 import type { DuelRow } from '@/lib/league/duels'
 import { seasonTotalPoints } from '@/lib/scoring/readSource'
 
@@ -142,6 +142,19 @@ export function ShowdownLadder({ entries, duels, duelPoints, myEntryIds }: Props
     [rows, board],
   )
 
+  /**
+   * ⚠ ONE WIDTH FOR THE WHOLE BOARD — see `ladderNumberChars`. A `min-width`
+   * aligned every row whose number fitted and no row that did not, so the form
+   * dots landed at a different offset on 1,000 than on 750.
+   *
+   * ⚠ `ch` IS EXACT HERE AND ONLY BECAUSE `t-num` IS MONOSPACE (Geist Mono, see
+   * globals.css). `ch` is the advance of "0", which in a monospace face is the
+   * advance of every glyph including the separator — so the column is sized to
+   * the character count with nothing left over. Under a proportional font this
+   * would be an estimate, and a bad one.
+   */
+  const numberWidth = `${ladderNumberChars(values)}ch`
+
   return (
     <div className="space-y-4">
       {/* ⚠ PILLS, NOT A SEGMENTED CONTROL — Ryan asked for the tab strip's
@@ -164,6 +177,7 @@ export function ShowdownLadder({ entries, duels, duelPoints, myEntryIds }: Props
                re-deriving a position, so it is right on both boards without
                being told which order it is looking at. */
             gap={r.isYou ? ladderGap(values, i) : null}
+            numberWidth={numberWidth}
           />
         ))}
       </ul>
@@ -185,7 +199,7 @@ export function ShowdownLadder({ entries, duels, duelPoints, myEntryIds }: Props
 // ------------------------------------------------------------------- a row
 
 function Row({
-  position, row, board, gap,
+  position, row, board, gap, numberWidth,
 }: {
   position: number
   row: {
@@ -198,6 +212,8 @@ function Row({
   board: Board
   /** Non-null on the viewer's own rows only — see `ladderGap`'s header. */
   gap: LadderGap | null
+  /** The points column, sized once for the whole board. */
+  numberWidth: string
 }) {
   const { entry, duel, picks, combined, isYou } = row
   // ⚠ Gold for first, because `accent` is already the belt colour in the duel
@@ -268,14 +284,21 @@ function Row({
 
       {board === 'duels' && <Form form={duel.form} />}
 
-      {/* ⚠ A MINIMUM WIDTH, AND IT IS WHAT ALIGNS THE FORM STRIP. Nothing after
-          the name column had a width of its own on the phone, so the row packed
-          to the right and every element's x depended on how many digits the
-          total happened to have — a member on 250 pushed their dots ~55pt left
-          of a member on 0. `min-w`, not a fixed width, so a five-figure season
-          total grows the column rather than being clipped; every row grows with
-          it, so the alignment holds either way. */}
-      <span className="t-num t-num-black text-base text-right tabular-nums min-w-[4.5rem] shrink-0">
+      {/* ⚠⚠ A FIXED WIDTH, NOT A MINIMUM, AND THAT IS THE WHOLE FIX.
+          The form strip sits immediately left of this, so the strip's x is
+          wherever this column's left edge is. `min-width` aligned every row
+          whose number fitted inside it and no row that did not — a board
+          reading 1,000 / 750 / 0 put three different widths here and the dots
+          landed at three different offsets, on the one element whose entire
+          purpose is being read DOWN the list.
+
+          A minimum cannot fix that, because the failure is the content
+          exceeding it. `numberWidth` is the widest value on this board, so the
+          column is constant AND never clips. */}
+      <span
+        className="t-num t-num-black text-base text-right tabular-nums shrink-0"
+        style={{ width: numberWidth }}
+      >
         {(board === 'table' ? combined : duel.duelPoints).toLocaleString()}
       </span>
     </li>

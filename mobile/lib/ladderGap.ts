@@ -64,6 +64,37 @@ export function ladderGap(rows: LadderGapRow[], index: number): LadderGap | null
 }
 
 /**
+ * How many characters wide the points column has to be for THIS board.
+ *
+ * ⚠⚠ THIS IS WHAT ALIGNS THE FORM STRIP, AND A `minWidth` DOES NOT.
+ *
+ * The strip sits immediately left of the points, and the points column was
+ * sized `min-width: X`. That aligns every row whose number happens to fit in X
+ * and NO row that does not — so a board reading 1,000 / 750 / 0 puts three
+ * different widths in that column, and the dots land at three different
+ * offsets. The strip was internally aligned the whole time and still could not
+ * be read down the list, which is the one thing it exists for.
+ *
+ * A minimum cannot fix that, because the failure IS the content exceeding it.
+ * The column has to be one width for the whole board, and the only width that
+ * is both constant and never clips is the widest value on it.
+ *
+ * ⚠ IT IS PER BOARD, NOT PER POOL. Table shows season totals and Duels shows
+ * duel points — five figures against three — so sizing both from the larger
+ * would leave the Duels board with a column of air.
+ *
+ * ⚠ `toLocaleString()`, THE SAME CALL THE ROW RENDERS WITH. A separator is
+ * locale-dependent and "1,000" is five characters where "1000" is four;
+ * measuring with one and drawing with the other is how a column ends up one
+ * character short on somebody else's phone.
+ */
+export function ladderNumberChars(rows: LadderGapRow[]): number {
+  let max = 1;
+  for (const r of rows) max = Math.max(max, r.value.toLocaleString().length);
+  return max;
+}
+
+/**
  * The sentence, so both platforms say it the same way.
  *
  * ⚠ NO ADVERBS AND NO CONSOLATION. "Only 250 behind" and "just one duel back"

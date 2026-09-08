@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
-import { ladderGap, ladderGapLabel, type LadderGapRow } from '../ladderGap'
+import { ladderGap, ladderGapLabel, ladderNumberChars, type LadderGapRow } from '../ladderGap'
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8')
 
@@ -101,5 +101,32 @@ describe('ladderGapLabel', () => {
       ladderGapLabel({ kind: 'level', name: 'A' }, 'pts'),
     ].join(' ')
     expect(said).not.toMatch(/only|just|barely|unlucky|so close|nearly/i)
+  })
+})
+
+describe('ladderNumberChars', () => {
+  it('sizes the column to the WIDEST value, not to a minimum', () => {
+    // The bug this replaces: `min-width` aligns every row whose number fits
+    // inside it and no row that does not — so a board reading 1,000 / 750 / 0
+    // put three different widths in the points column, and the form dots landed
+    // at three different offsets.
+    expect(ladderNumberChars([
+      { name: 'A', value: 1000 },
+      { name: 'B', value: 750 },
+      { name: 'C', value: 0 },
+    ])).toBe(5) // "1,000"
+  })
+
+  it('measures the separator, because the row renders one', () => {
+    // ⚠ Measured with `toLocaleString()` and drawn with `toLocaleString()`.
+    // "1000" is four characters and "1,000" is five; measuring with one and
+    // drawing with the other leaves the column a character short.
+    expect(ladderNumberChars([{ name: 'A', value: 1000 }]))
+      .toBe((1000).toLocaleString().length)
+  })
+
+  it('never returns zero, so an empty board still reserves a column', () => {
+    expect(ladderNumberChars([])).toBe(1)
+    expect(ladderNumberChars([{ name: 'A', value: 0 }])).toBe(1)
   })
 })
