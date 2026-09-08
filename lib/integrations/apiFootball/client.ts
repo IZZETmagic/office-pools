@@ -148,6 +148,30 @@ export async function getFixtureStatistics(
   return env.response
 }
 
+/**
+ * Every meeting between two clubs the provider holds — back to 2010.
+ *
+ * ⚠ ONE CALL PER PAIRING, AND A PAIRING ONLY CHANGES WHEN THEY PLAY AGAIN.
+ * That is what makes a scouting tab affordable: 190 pairings covers a whole
+ * twenty-club league, against the 7,500/day plan. The caller caches.
+ *
+ * ⚠ IT CANNOT BE FILTERED TO ONE COMPETITION. `?league=` is refused without a
+ * `season`, and a scout report wants every season — so the whole history comes
+ * back with friendlies and pre-season tournaments mixed in, and
+ * `lib/scouting/h2h.ts` filters them out on the way through.
+ */
+export async function getHeadToHead(
+  homeExternalId: number,
+  awayExternalId: number,
+  last = 50,
+): Promise<ApiFootballFixture[]> {
+  const env = await request<ApiFootballFixture>('/fixtures/headtohead', {
+    h2h: `${homeExternalId}-${awayExternalId}`,
+    last,
+  })
+  return env.response
+}
+
 export async function getTeamsForLeague(params: {
   league: number
   season: number
@@ -271,6 +295,7 @@ export const ApiFootballClient = {
   getFixtureEvents,
   getFixtureLineups,
   getFixtureStatistics,
+  getHeadToHead,
   getTeamsForLeague,
   getLastQuota,
   // Present for symmetry only. The league arm imports the NAMED export so that

@@ -171,14 +171,17 @@ function dbRow(over: Record<string, unknown> = {}) {
   }
 }
 
-function feedFixture(id: number, over: { short?: ApiFootballStatusShort; round?: string; home?: number | null; away?: number | null; referee?: string | null; ht?: [number | null, number | null] } = {}): ApiFootballFixture {
+function feedFixture(id: number, over: { short?: ApiFootballStatusShort; round?: string; home?: number | null; away?: number | null; referee?: string | null; ht?: [number | null, number | null]; elapsed?: number | null } = {}): ApiFootballFixture {
   return {
     fixture: {
       id,
       referee: over.referee ?? null,
       date: '2026-08-22T12:00:00+00:00',
       venue: { id: null, name: null, city: null },
-      status: { long: '', short: over.short ?? 'FT', elapsed: 90, extra: null },
+      // ⚠ 90 is divisible by 3 AND by 10, so it is a heartbeat minute for both
+      // 7b3 and 7b4 — which is why the older tests kept passing when the live
+      // gate landed. Override it to sit on a quiet minute.
+      status: { long: '', short: over.short ?? 'FT', elapsed: over.elapsed === undefined ? 90 : over.elapsed, extra: null },
     },
     league: { id: 39, season: 2026, round: over.round ?? 'Regular Season - 1' },
     teams: { home: { id: 1, name: 'H', winner: null }, away: { id: 2, name: 'A', winner: null } },
@@ -1079,5 +1082,111 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
     const r = await syncLeagueFixtures({ ...base, client: client as never }.client, TARGET, OPTS)
     expect(getFixtureLineups).not.toHaveBeenCalled()
     expect(r.errors.map((e) => e.stage)).toContain('league_lineups')
+  })
+})
+
+// =============================================================
+// The live gate — what a quiet minute costs
+// =============================================================
+// `res.changed` fires every minute of a live match, because the RPC compares
+// the live clock. Before `shouldRefetch` that meant ~100 events calls and ~100
+// statistics calls per fixture per match. These prove the gate bites in situ,
+// not just in isolation.
+// =============================================================
+
+describe('syncLeagueFixtures — the live gate', () => {
+  const changedLive = (over: Partial<{ home: number; away: number }> = {}) => ({
+    seen: 1,
+    changed: [
+      {
+        fixture_id: 'f-1',
+        external_fixture_id: '1557368',
+        status: 'live',
+        home_goals: over.home ?? 2,
+        away_goals: over.away ?? 1,
+        is_completed: false,
+      },
+    ],
+  })
+
+  /** The fixture as we already hold it — same score, so only the clock moved. */
+  const heldLive = () => dbRow({ status: 'live', home_goals: 2, away_goals: 1 })
+
+  function db(rpcImpl: (fn: string) => unknown, elapsed: number | null) {
+    getFixturesAllPages.mockResolvedValue({
+      fixtures: [feedFixture(1557368, { short: '2H', elapsed })],
+      calls: 1,
+    })
+    const base = fakeDb({
+      league_fixtures: [
+        { data: [heldLive()], error: null },
+        { data: [], error: null },
+        { data: [{ external_fixture_id: '1557368' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+      match_lineups: [{ data: [{ fixture_id: 'f-1' }], error: null }],
+    })
+    const client = {
+      from: (base.client as unknown as { from: (t: string) => unknown }).from,
+      rpc: (fn: string) => ({ then: (res: (v: unknown) => unknown) => res(rpcImpl(fn)) }),
+    }
+    return { ...base, client: client as never }
+  }
+
+  beforeEach(() => {
+    getFixtureEvents.mockClear()
+    getFixtureStatistics.mockClear()
+    getFixtureEvents.mockResolvedValue([] as never)
+    getFixtureStatistics.mockResolvedValue([] as never)
+  })
+
+  it('⚠ a minute where ONLY THE CLOCK MOVED costs nothing', () => {
+    // The whole point. 37 is a heartbeat for neither arm.
+    return (async () => {
+      const { client } = db(() => ({ data: changedLive(), error: null }), 37)
+      const r = await syncLeagueFixtures(client, TARGET, OPTS)
+      expect(getFixtureEvents).not.toHaveBeenCalled()
+      expect(getFixtureStatistics).not.toHaveBeenCalled()
+      expect(r.timelineCalls).toBe(0)
+      expect(r.statsCalls).toBe(0)
+      // And the fixture itself still synced — the gate skips the EXTRA calls,
+      // never the write.
+      expect(r.written).toBe(1)
+    })()
+  })
+
+  it('fetches events on the 3rd minute but not statistics', async () => {
+    const { client } = db(() => ({ data: changedLive(), error: null }), 36)
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixtureEvents).toHaveBeenCalledTimes(1)
+    expect(getFixtureStatistics).not.toHaveBeenCalled()
+    expect(r.statsCalls).toBe(0)
+  })
+
+  it('fetches both on the 10th minute', async () => {
+    const { client } = db(() => ({ data: changedLive(), error: null }), 30)
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixtureEvents).toHaveBeenCalledTimes(1)
+    expect(getFixtureStatistics).toHaveBeenCalledTimes(1)
+  })
+
+  it('⚠ A GOAL FETCHES BOTH AT ONCE, on a quiet minute', () => {
+    // The held row is 2-1; the RPC wrote 3-1. Delaying this to fit a heartbeat
+    // would make the feature worse to save nothing.
+    return (async () => {
+      const { client } = db(() => ({ data: changedLive({ home: 3 }), error: null }), 37)
+      await syncLeagueFixtures(client, TARGET, OPTS)
+      expect(getFixtureEvents).toHaveBeenCalledTimes(1)
+      expect(getFixtureStatistics).toHaveBeenCalledTimes(1)
+    })()
+  })
+
+  it('⚠ a match with no clock costs nothing at all', async () => {
+    // Before kickoff and after full time the provider sends no elapsed minute.
+    // Treating null as 0 would fetch on every idle tick.
+    const { client } = db(() => ({ data: changedLive(), error: null }), null)
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixtureEvents).not.toHaveBeenCalled()
+    expect(getFixtureStatistics).not.toHaveBeenCalled()
   })
 })

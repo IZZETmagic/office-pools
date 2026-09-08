@@ -21,16 +21,16 @@
 //   - no scoring, no recalculation, no pushes, no cache invalidation, no
 //     realtime broadcast. League scoring is L7 and the side-effect orchestrator
 //     is L8. This arm's only job is to make `league_fixtures` true.
-//   - resolved no events until migration 136. It does now, in 7b3 — gated on a
-//     fixture having actually CHANGED rather than on the window, because
-//     /fixtures/events is a call PER FIXTURE and a per-tick fetch is 1,500-2,500
-//     of them on a full matchday, against a 7,500/day plan shared with every
-//     competition this arm is meant to scale to. It still resolves no clubs
-//     (the 20 are fixed at import).
-//   - resolved no team statistics or line-ups until migration 139. It does now,
-//     in 7b4 and 7b5, on TWO DIFFERENT GATES — statistics ride 7b3's `changed`
-//     gate, line-ups cannot, because a line-up is published BEFORE a ball is
-//     kicked and nothing has changed yet. Each section states its own budget.
+//   - resolved no events until migration 136, and no statistics or line-ups
+//     until 139. It does all three now, in 7b3/7b4/7b5, and they run on THREE
+//     DIFFERENT GATES because they want three different things:
+//       · events    — a goal at once, otherwise every 3rd match minute
+//       · statistics— a goal at once, otherwise every 10th
+//       · line-ups  — the WINDOW, because a line-up is published BEFORE a ball
+//                     is kicked and nothing has "changed" yet
+//     ⚠ `res.changed` alone is NOT a gate: the RPC compares the live clock, so
+//     a fixture in play changes every minute. See `liveGate`. It still resolves
+//     no clubs (the 20 are fixed at import).
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -42,6 +42,11 @@ import {
   getFixtureStatistics,
   getFixturesAllPages,
 } from './client'
+import {
+  EVENTS_EVERY_MINUTES,
+  shouldRefetch,
+  STATS_EVERY_MINUTES,
+} from './liveGate'
 import {
   fixtureToLeagueUpdate,
   type LeagueFixtureRow,
@@ -326,6 +331,14 @@ export async function syncLeagueFixtures(
   }
 
   const rows = [...(windowRows ?? []), ...(strayRows ?? [])] as unknown as LeagueFixtureRow[]
+  // ⚠ CAPTURED BEFORE THE RPC WRITES. `res.changed` is the POST state, so the
+  // only way to tell a goal from the clock ticking is to hold what we had.
+  const priorByFixture = new Map(
+    rows.map((r) => [
+      r.fixture_id,
+      { status: r.status, home_goals: r.home_goals, away_goals: r.away_goals },
+    ]),
+  )
   result.window = windowRows?.length ?? 0
   result.stale = strayRows?.length ?? 0
 
@@ -574,24 +587,26 @@ export async function syncLeagueFixtures(
   // Goals, cards, VAR reversals and substitutions, plus the referee and the
   // half-time score — everything the Facts tab draws that is not the scoreline.
   //
-  // ⚠ GATED ON `res.changed`, NOT ON THE WINDOW, AND THAT IS THE WHOLE COST
-  // ARGUMENT. `/fixtures/events` is a call PER FIXTURE, and this arm has made
-  // exactly zero of those until now — one bulk call a tick, whatever is
-  // playing. Fetching per fixture on every tick instead would be roughly one
-  // call per in-window minute per live fixture: a Saturday 15:00 slate is six
-  // simultaneous fixtures over a ~3-hour window, ~1,080 calls from that slate
-  // alone, and a full matchday lands 1,500-2,500 against a 7,500/day plan
-  // shared with every other competition this route is meant to scale to.
+  // ⚠⚠ GATED TWICE, AND THE SECOND GATE IS THE IMPORTANT ONE. `res.changed`
+  // sounds like "something happened" and is not: the RPC compares eight columns
+  // and three of them are the LIVE CLOCK, so a fixture in play is "changed"
+  // every single minute. This arm's original comment claimed it cost "ONE call
+  // per goal, card or status change" and contrasted that with "one call per
+  // in-window minute per live fixture" — it was describing the behaviour it was
+  // meant to have, not the one it had. Measured out, a five-league Saturday
+  // came to ~9,600 calls against the 7,500/day plan the fixture sync itself
+  // depends on.
   //
-  // Iterating `changed` costs ONE call per goal, card or status change, which
-  // is the same trade 7b already makes for scoring: "a live match costs ONE
-  // re-score per goal, not one per minute".
+  // `shouldRefetch` is the real gate: immediate on a goal, on a status change
+  // and on the completion tick, and otherwise only every third minute of the
+  // match clock. About 100 calls a fixture becomes about 30, and a card
+  // surfaces within three minutes rather than one. See `liveGate` for why it
+  // needs no stored state and no migration.
   //
-  // ⚠ AND ONE MORE WHEN IT FINISHES, which is not redundant. A VAR-disallowed
-  // goal that restores the previous score changes nothing on `league_fixtures`,
-  // so it produces NO `changed` row and the timeline would keep a goal that
-  // never stood. The completion tick is what reconciles that. `is_completed`
-  // flips exactly once per fixture, so this is one extra call per match.
+  // ⚠ THE COMPLETION TICK IS NOT REDUNDANT. A VAR-disallowed goal that restores
+  // the previous score changes nothing on `league_fixtures`, so it produces NO
+  // `changed` row of its own and the timeline would keep a goal that never
+  // stood. `is_completed` flips exactly once per fixture, so it is one call.
   //
   // A failure is an ERROR but never stops the loop or the sync: the fixture
   // data is already written and correct, and a missing timeline is a blank card
@@ -599,6 +614,19 @@ export async function syncLeagueFixtures(
   for (const c of res.changed ?? []) {
     const fx = byExt.get(c.external_fixture_id)
     if (!fx) continue
+
+    const prior = priorByFixture.get(c.fixture_id)
+    const gate = {
+      priorStatus: prior?.status ?? null,
+      priorHomeGoals: prior?.home_goals ?? null,
+      priorAwayGoals: prior?.away_goals ?? null,
+      status: c.status,
+      homeGoals: c.home_goals,
+      awayGoals: c.away_goals,
+      isCompleted: c.is_completed,
+      elapsed: fx.fixture.status.elapsed,
+    }
+    if (!shouldRefetch(gate, EVENTS_EVERY_MINUTES)) continue
 
     try {
       const evts = await getFixtureEvents(fx.fixture.id)
@@ -681,6 +709,19 @@ export async function syncLeagueFixtures(
   for (const c of res.changed ?? []) {
     const fx = byExt.get(c.external_fixture_id)
     if (!fx) continue
+
+    const prior = priorByFixture.get(c.fixture_id)
+    const gate = {
+      priorStatus: prior?.status ?? null,
+      priorHomeGoals: prior?.home_goals ?? null,
+      priorAwayGoals: prior?.away_goals ?? null,
+      status: c.status,
+      homeGoals: c.home_goals,
+      awayGoals: c.away_goals,
+      isCompleted: c.is_completed,
+      elapsed: fx.fixture.status.elapsed,
+    }
+    if (!shouldRefetch(gate, STATS_EVERY_MINUTES)) continue
 
     try {
       const stats = await getFixtureStatistics(fx.fixture.id)
