@@ -1,5 +1,14 @@
 import { Image } from 'expo-image';
-import { Animated, Easing, Modal, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text as RNText,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -41,6 +50,7 @@ export function PlayerStatSheet({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
   // ⚠ `useState`, NOT `useRef`. The sibling sheets here hold their
   // `Animated.Value` in a ref, and for them that is fine — they only ever touch
   // it from an effect. This one INTERPOLATES it during render to build the
@@ -73,14 +83,28 @@ export function PlayerStatSheet({
         onPress={onClose}
         style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}
       >
+        {/* This wrapper exists only to swallow presses so a tap on the card
+            does not close it. It deliberately has no height of its own. */}
         <Pressable onPress={() => {}}>
           <Animated.View
             style={{
+              // ⚠⚠ POINTS, NOT A PERCENTAGE, AND THAT IS THE WHOLE BUG. This
+              // was `maxHeight: '80%'`, and a percentage height resolves only
+              // against a parent with a DEFINITE height. Its parent is the
+              // press-swallowing wrapper above, which has none — so the cap
+              // resolved against nothing, the card grew to its content, and the
+              // ScrollView inside was never given a bound to scroll within. The
+              // sheet ran off the bottom of the screen and stayed there.
+              //
+              // A measured height always resolves, whatever the parent is doing.
+              // `ReactionsSheet` reaches for the same trick (`screenHeight *
+              // 0.55`) rather than trusting percentage resolution through a
+              // stack of wrappers, and it is right to.
+              maxHeight: screenHeight * 0.85,
               backgroundColor: theme.colors.surface,
               borderTopLeftRadius: theme.radii.lg,
               borderTopRightRadius: theme.radii.lg,
               paddingBottom: insets.bottom + 16,
-              maxHeight: '80%',
               transform: [
                 { translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
               ],
@@ -194,8 +218,17 @@ export function PlayerStatSheet({
 
             {/* ---- the numbers ---------------------------------------- */}
             <ScrollView
+              // ⚠ THE ONLY PART THAT SHRINKS, and RN defaults `flexShrink` to
+              // 0 where the web defaults to 1. The handle and the header are
+              // fixed; this is what gives way when the card meets its cap, and
+              // therefore what scrolls. Without the explicit shrink it holds its
+              // full content height and pushes the rest off the screen.
+              style={{ flexShrink: 1 }}
               contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}
-              showsVerticalScrollIndicator={false}
+              // ⚠ SHOWN, NOT HIDDEN. Ryan could not tell the sheet scrolled —
+              // and while the real fault was that it did not, a long list with
+              // no indicator gives a reader nothing to go on either way.
+              showsVerticalScrollIndicator
             >
               {groups.map((g) => (
                 <View key={g.title} style={{ marginBottom: 18 }}>
