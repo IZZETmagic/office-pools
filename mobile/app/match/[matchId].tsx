@@ -104,6 +104,7 @@ export default function MatchDetailScreen() {
     h2h,
     lineups,
     teamStats,
+    playerStats,
     leagueContext,
     loading,
     error,
@@ -252,6 +253,7 @@ export default function MatchDetailScreen() {
         return (
           <LineupsTab
             lineups={lineups}
+            playerStats={playerStats}
             homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
             awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
             homeTeam={m.homeTeam}

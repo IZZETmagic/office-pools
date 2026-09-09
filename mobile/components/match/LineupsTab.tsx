@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Text as RNText, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
+import { PlayerStatSheet } from '@/components/match/PlayerStatSheet';
 import {
   PitchMarkings,
   pitchXToView,
@@ -12,6 +13,12 @@ import {
 import { Text } from '@/components/ui';
 import { fixturePalette } from '@/lib/design/clubColors';
 import { groupByRow, surnameOf } from '@/lib/lineupLayout';
+import {
+  formatRating,
+  indexByPlayerId,
+  ratingColor,
+  type MatchPlayerStat,
+} from '@/lib/playerStats';
 import type { LineupPlayer, MatchLineup } from '@/lib/useMatchDetail';
 import type { ResultsTeam } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -54,12 +61,15 @@ const NAME_W = 62;
 
 export function LineupsTab({
   lineups,
+  playerStats,
   homeName,
   awayName,
   homeTeam,
   awayTeam,
 }: {
   lineups: MatchLineup[];
+  /** Migration 141. Empty before a match, and on any client older than it. */
+  playerStats: MatchPlayerStat[];
   homeName: string;
   awayName: string;
   /** For the shirt colours — the crest URL is where the club's id hides. */
@@ -69,6 +79,17 @@ export function LineupsTab({
   const theme = useTheme();
   const home = lineups.find((l) => l.side === 'home') ?? null;
   const away = lineups.find((l) => l.side === 'away') ?? null;
+
+  // ⚠ KEYED ON THE PROVIDER'S PLAYER ID, WHICH IS THE ONLY THING THE TWO
+  // TABLES SHARE. `match_lineups.players[].player_id` and
+  // `match_player_stats.external_player_id` are both api-football's id; the
+  // NAMES differ between the two endpoints (`/lineups` abbreviates), so
+  // matching on those would silently fail for exactly the players whose names
+  // are long enough to be worth reading.
+  const statsById = useMemo(() => indexByPlayerId(playerStats), [playerStats]);
+  const [open, setOpen] = useState<{ stat: MatchPlayerStat; team: string; tint: string } | null>(
+    null,
+  );
 
   // ⚠ THE SAME PALETTE THE STATS TAB USES, and for the same reason: two clubs
   // who play in the same red would put twenty-two indistinguishable shirts on
@@ -81,9 +102,40 @@ export function LineupsTab({
 
   return (
     <View style={{ gap: 16 }}>
-      <Pitch home={home} away={away} homeName={homeName} awayName={awayName} palette={palette} />
-      {home ? <Bench lineup={home} teamName={homeName} tint={palette.home} /> : null}
-      {away ? <Bench lineup={away} teamName={awayName} tint={palette.away} /> : null}
+      <Pitch
+        home={home}
+        away={away}
+        homeName={homeName}
+        awayName={awayName}
+        palette={palette}
+        statsById={statsById}
+        onPick={setOpen}
+      />
+      {home ? (
+        <Bench
+          lineup={home}
+          teamName={homeName}
+          tint={palette.home}
+          statsById={statsById}
+          onPick={setOpen}
+        />
+      ) : null}
+      {away ? (
+        <Bench
+          lineup={away}
+          teamName={awayName}
+          tint={palette.away}
+          statsById={statsById}
+          onPick={setOpen}
+        />
+      ) : null}
+
+      <PlayerStatSheet
+        stat={open?.stat ?? null}
+        teamName={open?.team ?? ''}
+        tint={open?.tint ?? palette.home}
+        onClose={() => setOpen(null)}
+      />
     </View>
   );
 }
@@ -97,18 +149,25 @@ export function LineupsTab({
  * band above the pitch puts them in, so a member's eye does not have to swap
  * sides between the scoreline and the shirts.
  */
+type Pick = (v: { stat: MatchPlayerStat; team: string; tint: string } | null) => void;
+type StatsById = Map<number, MatchPlayerStat>;
+
 function Pitch({
   home,
   away,
   homeName,
   awayName,
   palette,
+  statsById,
+  onPick,
 }: {
   home: MatchLineup | null;
   away: MatchLineup | null;
   homeName: string;
   awayName: string;
   palette: { home: string; away: string };
+  statsById: StatsById;
+  onPick: Pick;
 }) {
   const theme = useTheme();
 
@@ -152,8 +211,12 @@ function Pitch({
       </View>
 
       {/* Home across the top half, away across the bottom. */}
-      <Half lineup={home} tint={palette.home} half="top" />
-      <Half lineup={away} tint={palette.away} half="bottom" />
+      <Half lineup={home} tint={palette.home} half="top" teamName={homeName} statsById={statsById}
+          onPick={onPick}
+        />
+      <Half lineup={away} tint={palette.away} half="bottom" teamName={awayName} statsById={statsById}
+          onPick={onPick}
+        />
 
       {/* ⚠ IN THE CORNER EACH SIDE DEFENDS, so the caption sits beside the team
           it names rather than in a legend the eye has to travel to. */}
@@ -228,10 +291,16 @@ function Half({
   lineup,
   tint,
   half,
+  teamName,
+  statsById,
+  onPick,
 }: {
   lineup: MatchLineup | null;
   tint: string;
   half: 'top' | 'bottom';
+  teamName: string;
+  statsById: StatsById;
+  onPick: Pick;
 }) {
   if (!lineup) {
     return (
@@ -273,11 +342,21 @@ function Half({
 
         return row.map((player, colIndex) => {
           const left = pitchXToView(((colIndex + 0.5) / row.length) * 100);
+          const stat = player.playerId ? statsById.get(player.playerId) : undefined;
           return (
-            <View
+            <Pressable
               key={player.playerId ?? `${rowIndex}-${colIndex}`}
-              pointerEvents="none"
-              style={{
+              // ⚠⚠ A DEAD PRESS IS WORSE THAN NONE — this file's original rule,
+              // and it still holds. Before kickoff there are no statistics, so
+              // there is nothing to open and the shirt stays inert exactly as it
+              // always was. `pointerEvents` flips only when a tap would show
+              // something, which is also what keeps the pitch swipeable.
+              pointerEvents={stat ? 'auto' : 'none'}
+              disabled={!stat}
+              onPress={stat ? () => onPick({ stat, team: teamName, tint }) : undefined}
+              hitSlop={6}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.7 : 1,
                 position: 'absolute',
                 top: `${top}%`,
                 left: `${left}%`,
@@ -287,10 +366,10 @@ function Half({
                 marginLeft: -NAME_W / 2,
                 marginTop: -CHIP / 2,
                 alignItems: 'center',
-              }}
+              })}
             >
-              <Shirt player={player} tint={tint} />
-            </View>
+              <Shirt player={player} tint={tint} rating={stat?.rating ?? null} />
+            </Pressable>
           );
         });
       })}
@@ -298,7 +377,18 @@ function Half({
   );
 }
 
-function Shirt({ player, tint }: { player: LineupPlayer; tint: string }) {
+function Shirt({
+  player,
+  tint,
+  rating,
+}: {
+  player: LineupPlayer;
+  tint: string;
+  rating: number | null;
+}) {
+  const badge = formatRating(rating);
+  const badgeColor = ratingColor(rating);
+
   return (
     <View style={{ alignItems: 'center', gap: 3 }}>
       <View
@@ -314,6 +404,43 @@ function Shirt({ player, tint }: { player: LineupPlayer; tint: string }) {
           borderColor: 'rgba(255,255,255,0.85)',
         }}
       >
+        {/* ⚠ THE RATING RIDES ON THE SHIRT, and this is the whole feature: the
+            numbers are readable without tapping anything, and the tap is for
+            depth rather than for discovery. It hangs OUTSIDE the circle so it
+            never covers the squad number.
+
+            ⚠ It needs its own white hairline. The three band fills measure
+            1.6–2.6:1 against the pitch green — fine for white text ON them,
+            hopeless as an edge against grass. Same reasoning as the shirt. */}
+        {badge && badgeColor ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: -5,
+              right: -9,
+              minWidth: 21,
+              paddingHorizontal: 3,
+              paddingVertical: 1,
+              borderRadius: 5,
+              backgroundColor: badgeColor,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.9)',
+              alignItems: 'center',
+            }}
+          >
+            <RNText
+              style={{
+                fontFamily: MONO_BOLD,
+                fontSize: 9,
+                lineHeight: 12,
+                color: '#FFFFFF',
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {badge}
+            </RNText>
+          </View>
+        ) : null}
         <RNText
           style={{
             fontFamily: MONO_BOLD,
@@ -349,10 +476,14 @@ function Bench({
   lineup,
   teamName,
   tint,
+  statsById,
+  onPick,
 }: {
   lineup: MatchLineup;
   teamName: string;
   tint: string;
+  statsById: StatsById;
+  onPick: Pick;
 }) {
   const theme = useTheme();
   const subs = lineup.players.filter((p) => !p.starter);
@@ -406,10 +537,23 @@ function Bench({
               paddingVertical: 12,
             }}
           >
-            {subs.map((p, i) => (
-              <View
+            {subs.map((p, i) => {
+              const stat = p.playerId ? statsById.get(p.playerId) : undefined;
+              // ⚠ ONLY THE ONES WHO CAME ON HAVE ANYTHING TO SHOW. An unused
+              // substitute has a row in the table but no rating and no minutes,
+              // so his chip stays a label rather than becoming a dead button.
+              const played = stat ? (stat.minutes ?? 0) > 0 || stat.rating !== null : false;
+              const badge = formatRating(stat?.rating ?? null);
+              const badgeColor = ratingColor(stat?.rating ?? null);
+              return (
+              <Pressable
                 key={p.playerId ?? i}
-                style={{
+                disabled={!played}
+                onPress={
+                  played && stat ? () => onPick({ stat, team: teamName, tint }) : undefined
+                }
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.6 : 1,
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 6,
@@ -417,7 +561,7 @@ function Bench({
                   paddingVertical: 5,
                   borderRadius: theme.radii.xs,
                   backgroundColor: withOpacity(theme.colors.mist, 0.5),
-                }}
+                })}
               >
                 <RNText
                   style={{
@@ -434,8 +578,31 @@ function Bench({
                 >
                   {p.name ?? '—'}
                 </RNText>
-              </View>
-            ))}
+                {badge && badgeColor ? (
+                  <View
+                    style={{
+                      paddingHorizontal: 4,
+                      paddingVertical: 1,
+                      borderRadius: 4,
+                      backgroundColor: badgeColor,
+                    }}
+                  >
+                    <RNText
+                      style={{
+                        fontFamily: MONO_BOLD,
+                        fontSize: 9,
+                        lineHeight: 12,
+                        color: '#FFFFFF',
+                        fontVariant: ['tabular-nums'],
+                      }}
+                    >
+                      {badge}
+                    </RNText>
+                  </View>
+                ) : null}
+              </Pressable>
+              );
+            })}
           </View>
         </>
       ) : null}

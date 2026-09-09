@@ -14,6 +14,7 @@ import {
   type MatchStatsResponse,
 } from './api';
 import { useHomeData } from './HomeDataProvider';
+import type { MatchPlayerStat } from './playerStats';
 import {
   clubForm,
   earlierMeeting,
@@ -281,6 +282,7 @@ export function useMatchDetail(matchId: string | undefined) {
   const [h2h, setH2h] = useState<H2HResponse | null>(null);
   const [lineups, setLineups] = useState<MatchLineup[]>([]);
   const [teamStats, setTeamStats] = useState<MatchTeamStats[]>([]);
+  const [playerStats, setPlayerStats] = useState<MatchPlayerStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -318,6 +320,7 @@ export function useMatchDetail(matchId: string | undefined) {
       setPredictionInfos([]);
       setMatchStats(null);
       setBracketStats(null);
+      setPlayerStats([]);
       setGroupStandings([]);
       // ⚠ TWO CALLS, NOT ONE EMBED, AND THE REASON IS THE ORDER OF DEPLOYS.
       // Folding `match_lineups` and `match_team_stats` into the facts select
@@ -328,6 +331,13 @@ export function useMatchDetail(matchId: string | undefined) {
       await Promise.all([
         loadLeagueFacts(matchId, setTimeline, setFacts),
         loadLeagueTabs(matchId, setLineups, setTeamStats),
+        // ⚠ ITS OWN LOADER, FOR THE REASON DIRECTLY ABOVE. Folding
+        // `match_player_stats` into `loadLeagueTabs` would put it inside that
+        // function's `Promise.all`, where a client running before migration 141
+        // is applied would take the LINE-UPS down with it — PostgREST rejects
+        // the whole select for naming an unknown relation. A third loader means
+        // a missing 141 costs exactly the ratings and nothing else.
+        loadLeaguePlayerStats(matchId, setPlayerStats),
         // ⚠ A ROUTE, NOT A TABLE READ, AND ONLY FOR THE POINTS. The pick itself
         // is client-readable under `league_predictions`' own `auth.uid()`
         // policy; `league_match_scores` is deny-all (migration 050), so the
@@ -705,6 +715,7 @@ export function useMatchDetail(matchId: string | undefined) {
     h2h,
     lineups,
     teamStats,
+    playerStats,
     leagueContext,
     loading,
     error,
@@ -946,6 +957,100 @@ async function loadGroupStandings(
  * card on the screen is unaffected, and `MatchTabBar` simply does not offer a
  * tab it has no rows for.
  */
+/**
+ * Every player's line for this fixture (migration 141).
+ *
+ * ⚠ SEPARATE FROM `loadLeagueTabs` ON PURPOSE — see the call site. A client
+ * older than 141 loses the ratings and keeps its line-ups.
+ *
+ * ⚠ `rating` IS `numeric(3,1)`, AND IT ARRIVES AS A NUMBER. Measured against
+ * production 2026-09-09: PostgREST sent `6.3` and `1.27` as JSON numbers for
+ * `match_player_stats.rating` and `match_team_stats.expected_goals` alike. The
+ * `num()` guard below stays anyway — it costs one line and the colour bands are
+ * numeric comparisons, which a string would pass silently rather than loudly.
+ *
+ * ⚠ `loadLeagueTabs` says the opposite about `expected_goals`, and on the
+ * evidence above that note looks like it conflates two different things: the
+ * PROVIDER does send xG as the string '1.81' (migration 139 records it), but
+ * that is the api-football payload, not the row coming back out of our own
+ * database. Left in place rather than deleted — one measurement on one driver
+ * version is not enough to strip a caution that costs nothing.
+ */
+async function loadLeaguePlayerStats(
+  fixtureId: string,
+  setPlayerStats: (s: MatchPlayerStat[]) => void,
+) {
+  try {
+    const { data, error } = await supabase
+      .from('match_player_stats')
+      .select(
+        'side, external_player_id, player_name, shirt_number, position, is_starter,' +
+          ' is_captain, minutes, rating, goals, assists, shots_total, shots_on, offsides,' +
+          ' dribbles_attempts, dribbles_success, penalty_won, penalty_scored, penalty_missed,' +
+          ' goals_conceded, saves, tackles_total, tackles_blocks, interceptions, duels_total,' +
+          ' duels_won, dribbled_past, penalty_committed, penalty_saved, passes_total,' +
+          ' passes_accurate, key_passes, fouls_drawn, fouls_committed, yellow_cards, red_cards',
+      )
+      .eq('fixture_id', fixtureId);
+    // ⚠ The error is READ. `const { data } = await …` hides a 400 and renders
+    // an empty tab forever.
+    if (error) throw error;
+
+    const num = (v: unknown): number | null => {
+      if (v === null || v === undefined) return null;
+      const n = typeof v === 'number' ? v : Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    type Row = Record<string, unknown>;
+    setPlayerStats(
+      ((data ?? []) as unknown as Row[]).map((r) => ({
+        side: r.side as 'home' | 'away',
+        externalPlayerId: (r.external_player_id as number) ?? 0,
+        playerName: (r.player_name as string) ?? '',
+        shirtNumber: num(r.shirt_number),
+        position: (r.position as string | null) ?? null,
+        isStarter: r.is_starter === true,
+        isCaptain: r.is_captain === true,
+        minutes: num(r.minutes),
+        rating: num(r.rating),
+        goals: num(r.goals),
+        assists: num(r.assists),
+        shotsTotal: num(r.shots_total),
+        shotsOn: num(r.shots_on),
+        offsides: num(r.offsides),
+        dribblesAttempts: num(r.dribbles_attempts),
+        dribblesSuccess: num(r.dribbles_success),
+        penaltyWon: num(r.penalty_won),
+        penaltyScored: num(r.penalty_scored),
+        penaltyMissed: num(r.penalty_missed),
+        goalsConceded: num(r.goals_conceded),
+        saves: num(r.saves),
+        tacklesTotal: num(r.tackles_total),
+        tacklesBlocks: num(r.tackles_blocks),
+        interceptions: num(r.interceptions),
+        duelsTotal: num(r.duels_total),
+        duelsWon: num(r.duels_won),
+        dribbledPast: num(r.dribbled_past),
+        penaltyCommitted: num(r.penalty_committed),
+        penaltySaved: num(r.penalty_saved),
+        passesTotal: num(r.passes_total),
+        passesAccurate: num(r.passes_accurate),
+        keyPasses: num(r.key_passes),
+        foulsDrawn: num(r.fouls_drawn),
+        foulsCommitted: num(r.fouls_committed),
+        yellowCards: num(r.yellow_cards),
+        redCards: num(r.red_cards),
+      })),
+    );
+  } catch (e) {
+    // Warn and render nothing. Every other card on the screen is unaffected,
+    // and the pitch simply draws without badges.
+    console.warn('[useMatchDetail] player stats unavailable', e);
+    setPlayerStats([]);
+  }
+}
+
 async function loadLeagueTabs(
   fixtureId: string,
   setLineups: (l: MatchLineup[]) => void,
