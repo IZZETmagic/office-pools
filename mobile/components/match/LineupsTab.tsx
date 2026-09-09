@@ -355,6 +355,8 @@ function TeamBar({
           style={{ width: 22, height: 22 }}
           contentFit="contain"
           cachePolicy="memory-disk"
+          // Decorative: the club's name is the very next thing read out.
+          alt=""
         />
       ) : (
         <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: tint }} />
@@ -451,6 +453,17 @@ function Half({
               pointerEvents={stat ? 'auto' : 'none'}
               disabled={!stat}
               onPress={stat ? () => onPick({ stat, team: teamName, tint }) : undefined}
+              // ⚠ THE PRESSABLE CARRIES THE LABEL, not the photograph. This is
+              // the node a screen reader lands on, and it is the only place the
+              // rating and the name can be read out together.
+              accessibilityRole={stat ? 'button' : undefined}
+              accessibilityLabel={
+                stat
+                  ? `${stat.playerName}, ${teamName}` +
+                    (formatRating(stat.rating) ? `, rated ${formatRating(stat.rating)}` : '') +
+                    '. Open his match statistics.'
+                  : undefined
+              }
               hitSlop={6}
               style={({ pressed }) => ({
                 opacity: pressed ? 0.7 : 1,
@@ -533,6 +546,8 @@ function Shirt({
               // on the first look at a fixture and never again.
               cachePolicy="memory-disk"
               transition={120}
+              // Decorative: the Pressable around it announces the player.
+              alt=""
             />
           ) : null}
         </View>

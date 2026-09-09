@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Animated, Easing, Modal, Pressable, ScrollView, Text as RNText, View } from 'react-native';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
@@ -41,7 +41,13 @@ export function PlayerStatSheet({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const slide = useRef(new Animated.Value(0)).current;
+  // ⚠ `useState`, NOT `useRef`. The sibling sheets here hold their
+  // `Animated.Value` in a ref, and for them that is fine — they only ever touch
+  // it from an effect. This one INTERPOLATES it during render to build the
+  // transform, which is reading a ref while rendering, and react-hooks/refs is
+  // right to object. A lazy `useState` initialiser gives the same
+  // create-once-per-mount behaviour without the lie about what it is for.
+  const [slide] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(slide, {
@@ -132,6 +138,8 @@ export function PlayerStatSheet({
                     style={{ position: 'absolute', width: 48, height: 48 }}
                     contentFit="cover"
                     cachePolicy="memory-disk"
+                    // Decorative: his name is directly beside it.
+                    alt=""
                   />
                 ) : null}
               </View>
