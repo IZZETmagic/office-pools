@@ -32,6 +32,22 @@ export type ApiFootballFixture = {
     extratime: { home: number | null; away: number | null }
     penalty: { home: number | null; away: number | null }
   }
+  // ⚠⚠ PRESENT ONLY WHEN THE FIXTURE WAS ASKED FOR BY ID. `/fixtures?id=` and
+  // `/fixtures?ids=` bundle these; `/fixtures?league=&season=` does NOT, and
+  // `/fixtures?live=all` carries `events` alone. Verified against the live API
+  // 2026-09-09, and the bundled objects are BYTE-IDENTICAL to what the
+  // dedicated /fixtures/{events,lineups,statistics} endpoints return, so the
+  // existing mappers read them unchanged.
+  //
+  // ⚠ OPTIONAL IS LOAD-BEARING, NOT DEFENSIVE. `undefined` here means "this
+  // call did not carry line-ups", which is emphatically not "this fixture has
+  // no line-ups" — the same distinction the client's refusal guard exists to
+  // keep. Anything that treats an absent field as an empty one puts the
+  // delete-on-nothing bug straight back.
+  events?: ApiFootballEvent[]
+  lineups?: ApiFootballLineup[]
+  statistics?: ApiFootballTeamStatistics[]
+  players?: unknown[]
 }
 
 export type ApiFootballEvent = {

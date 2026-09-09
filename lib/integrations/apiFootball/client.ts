@@ -204,6 +204,76 @@ export async function getFixtureStatistics(
 }
 
 /**
+ * The provider's own ceiling on `?ids=`, in its own words:
+ *   {"ids":"...Maximum of 20 ids allowed."}
+ * Measured 2026-09-09 by sending 21. It is a refusal, not a truncation, so
+ * chunking is mandatory rather than merely tidy.
+ */
+export const IDS_PER_CALL = 20
+
+/**
+ * Fixtures by id, WITH their events, line-ups and statistics attached.
+ *
+ * ⚠⚠ THIS IS ONE CALL WHERE WE USED TO MAKE SIXTY. `/fixtures?ids=` takes up to
+ * twenty ids and bundles each fixture's `events`, `lineups`, `statistics` and
+ * `players` into the same response — so a twenty-fixture matchday costs ONE
+ * request for everything the three live arms used to fetch separately, per
+ * fixture, per tick. Measured against the live API on 2026-09-09: twenty
+ * genuinely in-play fixtures came back in 114KB and 0.31s, with events,
+ * line-ups and statistics for each.
+ *
+ * ⚠ AND THE BUNDLED OBJECTS ARE BYTE-IDENTICAL to the dedicated endpoints'.
+ * Compared field for field on fixture 1379342: events 16/16, lineups 2/2,
+ * statistics 2/2, `json.dumps(sort_keys=True)` equal in all three. That is what
+ * makes this a call-count change and not a mapper change — `eventsToTimeline`,
+ * `lineupsToRows` and `statisticsToRows` read the bundled arrays unaltered.
+ *
+ * ⚠ ONLY `id`/`ids` BUNDLES. The season read (`?league=&season=`) returns the
+ * five core keys and nothing else — which is why the 380-fixture window call
+ * stays cheap — and `?live=all` carries `events` but no line-ups or statistics.
+ * So this cannot replace the window read; it is what the window read feeds.
+ *
+ * ⚠ A CHUNK THAT FAILS TAKES ONLY ITS OWN FIXTURES DOWN. Each chunk is a
+ * separate request and a separate throw; the caller indexes what came back and
+ * treats an absent fixture as "not fetched", never as "has nothing". Returning
+ * a partial map with a recorded failure is the only shape that keeps the
+ * refusal guard intact across twenty fixtures at once.
+ */
+export async function getFixturesByIds(
+  ids: number[],
+  opts: ApiFootballRequestOptions = {},
+): Promise<{ fixtures: ApiFootballFixture[]; calls: number; failures: string[] }> {
+  const unique = [...new Set(ids)].filter((n) => Number.isFinite(n) && n > 0)
+  const out: ApiFootballFixture[] = []
+  const failures: string[] = []
+  let calls = 0
+
+  for (let i = 0; i < unique.length; i += IDS_PER_CALL) {
+    const chunk = unique.slice(i, i + IDS_PER_CALL)
+    // ⚠ COUNTED ONCE PER CHUNK, BEFORE THE ATTEMPT, AND DELIBERATELY NOT IN
+    // BOTH BRANCHES. A refusal is a spent request just as much as a success is,
+    // and a run note that under-reports its own cost is worst at exactly the
+    // moment it matters — the tick where the quota ran out. (`getFixturesAllPages`
+    // counts the same way: one per attempt, retries not broken out.)
+    calls++
+    try {
+      const env = await request<ApiFootballFixture>(
+        '/fixtures',
+        { ids: chunk.join('-') },
+        { strict: true, ...opts },
+      )
+      if (hasEnvelopeErrors(env.errors)) {
+        throw new Error(`api-football /fixtures?ids refused: ${JSON.stringify(env.errors)}`)
+      }
+      out.push(...env.response)
+    } catch (e) {
+      failures.push(e instanceof Error ? e.message : String(e))
+    }
+  }
+  return { fixtures: out, calls, failures }
+}
+
+/**
  * Every meeting between two clubs the provider holds — back to 2010.
  *
  * ⚠ ONE CALL PER PAIRING, AND A PAIRING ONLY CHANGES WHEN THEY PLAY AGAIN.

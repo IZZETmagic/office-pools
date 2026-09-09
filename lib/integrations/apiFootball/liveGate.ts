@@ -23,10 +23,26 @@
 // naturally stagger by their own elapsed minutes rather than stampeding.
 // =============================================================
 
-/** Events: a card or substitution surfaces within this many minutes. */
+/**
+ * How often a live fixture is put into the batch call.
+ *
+ * A card or substitution surfaces within this many minutes. It is named for
+ * events because that is what sets the number, but it now governs statistics
+ * and line-ups too — `/fixtures?ids=` brings all three back together, so there
+ * is one cadence rather than three.
+ */
 export const EVENTS_EVERY_MINUTES = 3
 
-/** Statistics: possession does not need to be fresher than this. */
+/**
+ * @deprecated Statistics have no cadence of their own since batching landed.
+ *
+ * ⚠ KEPT ONLY AS A SIGNPOST, AND NOT READ ANYWHERE. Rationing statistics to
+ * every tenth minute made sense while each one cost a request; they now arrive
+ * in the same response as the timeline, so a separate, slower gate would mean
+ * discarding data already paid for. Statistics refresh every third minute now,
+ * not every tenth — the ration was removed by making it pointless, which is
+ * the only way a ration should ever go.
+ */
 export const STATS_EVERY_MINUTES = 10
 
 export type LiveGateInput = {

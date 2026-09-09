@@ -37,15 +37,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { invalidateLeagueSeason } from '@/lib/league/season'
 import { syncLeagueStandings } from './syncLeagueStandings'
 import {
-  getFixtureEvents,
-  getFixtureLineups,
-  getFixtureStatistics,
+  getFixturesByIds,
   getFixturesAllPages,
 } from './client'
 import {
   EVENTS_EVERY_MINUTES,
   shouldRefetch,
-  STATS_EVERY_MINUTES,
 } from './liveGate'
 import {
   fixtureToLeagueUpdate,
@@ -120,16 +117,21 @@ export type LeagueSyncResult = {
   written: number
   /** Fixtures that completed this tick and were scored. */
   scored: number
-  /** `/fixtures/events` calls made this tick — one per changed fixture. */
-  timelineCalls: number
+  /**
+   * `/fixtures?ids=` calls made this tick — one per twenty fixtures.
+   *
+   * ⚠ THERE IS NO LONGER A PER-ARM CALL COUNT, because there are no per-arm
+   * calls: 7b3, 7b4 and 7b5 all read one batched response. Keeping three
+   * counters that could only ever move together would have made the saving
+   * invisible in the very place it is watched.
+   */
+  bundleCalls: number
+  /** Fixtures those calls carried back. `bundleFixtures/bundleCalls` is the win. */
+  bundleFixtures: number
   /** Event rows written across all fixtures this tick. */
   timelineRows: number
-  /** `/fixtures/statistics` calls made this tick — one per changed fixture. */
-  statsCalls: number
   /** Team-stat rows written across all fixtures this tick (two per fixture). */
   statsRows: number
-  /** `/fixtures/lineups` calls made this tick. See 7b5 for why this gate differs. */
-  lineupCalls: number
   /** Line-up rows written across all fixtures this tick (two per fixture). */
   lineupRows: number
   /** Entries whose league totals moved as a result. */
@@ -197,10 +199,9 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     proposed: 0,
     written: 0,
     scored: 0,
-    timelineCalls: 0,
-    statsCalls: 0,
+    bundleCalls: 0,
+    bundleFixtures: 0,
     statsRows: 0,
-    lineupCalls: 0,
     lineupRows: 0,
     timelineRows: 0,
     scoredEntries: 0,
@@ -583,6 +584,112 @@ export async function syncLeagueFixtures(
     result.scoredEntries += sr.entries ?? 0
   }
 
+  // ------------------------------------------------ 7b2c. one call for the lot
+  // Everything 7b3, 7b4 and 7b5 are about to write, fetched together.
+  //
+  // ⚠⚠ `/fixtures?ids=` BUNDLES `events`, `lineups` AND `statistics`, and takes
+  // twenty ids at a time. So the three arms below stopped being three calls per
+  // fixture per tick and became ONE call per twenty fixtures per tick. Measured
+  // against the live API on 2026-09-09: twenty genuinely in-play fixtures in
+  // 114KB and 0.31s, carrying events, line-ups and statistics for each. A
+  // ten-fixture matchday went from ~420 calls across a match to ~30.
+  //
+  // ⚠ AND THE BUNDLED OBJECTS ARE BYTE-IDENTICAL to what /fixtures/events,
+  // /fixtures/lineups and /fixtures/statistics return — compared field for
+  // field on fixture 1379342 — so every mapper below reads them unchanged.
+  // This is a call-count change and nothing else.
+  //
+  // ⚠⚠ AN ABSENT FIXTURE IS "NOT FETCHED", NEVER "HAS NOTHING". If a chunk is
+  // refused, its twenty fixtures are simply not in the map, and each arm skips
+  // them — because each arm DELETES before it writes, and the whole point of
+  // the refusal guard is that a refusal must never reach a delete. Reading
+  // `bundle.get(ext)?.events ?? []` anywhere below would put that bug back in
+  // one character, which is why the arms test membership explicitly.
+  //
+  // ⚠ THE GATES STILL DECIDE WHO IS IN THE CALL, because the call is only free
+  // once it exists: adding a twenty-first fixture costs a whole extra request.
+  // What HAS gone is the separate statistics cadence — see 7b4.
+  const bundle = new Map<string, ApiFootballFixture>()
+  // Worked out while deciding what to fetch, consumed by 7b5 when it writes.
+  // Deciding twice would risk the two disagreeing — asking for a line-up here
+  // and then declining to store it there is a call spent for nothing.
+  let lineupCandidates: LeagueFixtureRow[] = []
+  let lineupsHeld = new Set<string>()
+  let lineupsCompletedNow = new Set<string>()
+  {
+    const wanted = new Set<number>()
+
+    // Events + statistics: the live gate, on the fixtures the RPC just wrote.
+    for (const c of res.changed ?? []) {
+      const fx = byExt.get(c.external_fixture_id)
+      if (!fx) continue
+      const prior = priorByFixture.get(c.fixture_id)
+      if (
+        shouldRefetch(
+          {
+            priorStatus: prior?.status ?? null,
+            priorHomeGoals: prior?.home_goals ?? null,
+            priorAwayGoals: prior?.away_goals ?? null,
+            status: c.status,
+            homeGoals: c.home_goals,
+            awayGoals: c.away_goals,
+            isCompleted: c.is_completed,
+            elapsed: fx.fixture.status.elapsed,
+          },
+          EVENTS_EVERY_MINUTES,
+        )
+      ) {
+        wanted.add(fx.fixture.id)
+      }
+    }
+
+    // Line-ups: the pre-kickoff window, minus the ones we already hold. This
+    // read used to sit inside 7b5; it has to happen BEFORE the fetch now,
+    // because it is what decides which fixtures go into the call.
+    lineupCandidates = ((windowRows ?? []) as unknown as LeagueFixtureRow[]).filter(
+      (r) => byExt.has(r.external_fixture_id),
+    )
+    if (lineupCandidates.length > 0) {
+      const { data: haveRows, error: haveErr } = await admin
+        .from('match_lineups')
+        .select('fixture_id')
+        .in(
+          'fixture_id',
+          lineupCandidates.map((r) => r.fixture_id),
+        )
+      if (haveErr) {
+        // Not fatal, but it must not be silent: without this read the arm
+        // cannot tell "not published yet" from "already stored", and would
+        // re-fetch every window fixture every tick.
+        push('league_lineups', haveErr.message, { season_id: target.seasonId })
+        lineupsHeld = new Set(lineupCandidates.map((r) => r.fixture_id))
+      } else {
+        lineupsHeld = new Set(((haveRows ?? []) as { fixture_id: string }[]).map((r) => r.fixture_id))
+      }
+    }
+    const completedNow = new Set(
+      (res.changed ?? []).filter((c) => c.is_completed).map((c) => c.fixture_id),
+    )
+    let asked = 0
+    for (const row of lineupCandidates) {
+      if (asked >= LINEUP_LIMIT) break
+      if (lineupsHeld.has(row.fixture_id) && !completedNow.has(row.fixture_id)) continue
+      const fx = byExt.get(row.external_fixture_id)
+      if (!fx) continue
+      wanted.add(fx.fixture.id)
+      asked++
+    }
+    lineupsCompletedNow = completedNow
+
+    if (wanted.size > 0) {
+      const got = await getFixturesByIds([...wanted])
+      result.bundleCalls += got.calls
+      result.bundleFixtures += got.fixtures.length
+      for (const f of got.fixtures) bundle.set(String(f.fixture.id), f)
+      for (const msg of got.failures) push('league_bundle', msg, { season_id: target.seasonId })
+    }
+  }
+
   // ------------------------------------------------------- 7b3. the timeline
   // Goals, cards, VAR reversals and substitutions, plus the referee and the
   // half-time score — everything the Facts tab draws that is not the scoreline.
@@ -628,11 +735,16 @@ export async function syncLeagueFixtures(
     }
     if (!shouldRefetch(gate, EVENTS_EVERY_MINUTES)) continue
 
-    try {
-      const evts = await getFixtureEvents(fx.fixture.id)
-      result.timelineCalls++
+    // ⚠⚠ MEMBERSHIP, NOT `?? []`. Absent means the batch call did not carry
+    // this fixture — refused, chunk-failed, or never asked for — and the delete
+    // below must not run on that. `bundle.get(ext)?.events ?? []` would read
+    // identically to a match with no events and clear the timeline, which is
+    // the exact bug the refusal guard was written to close.
+    const bundled = bundle.get(c.external_fixture_id)
+    if (!bundled?.events) continue
 
-      const timeline = eventsToTimeline(evts, {
+    try {
+      const timeline = eventsToTimeline(bundled.events, {
         fixtureId: c.fixture_id,
         homeExternalTeamId: fx.teams.home.id,
       })
@@ -710,24 +822,16 @@ export async function syncLeagueFixtures(
     const fx = byExt.get(c.external_fixture_id)
     if (!fx) continue
 
-    const prior = priorByFixture.get(c.fixture_id)
-    const gate = {
-      priorStatus: prior?.status ?? null,
-      priorHomeGoals: prior?.home_goals ?? null,
-      priorAwayGoals: prior?.away_goals ?? null,
-      status: c.status,
-      homeGoals: c.home_goals,
-      awayGoals: c.away_goals,
-      isCompleted: c.is_completed,
-      elapsed: fx.fixture.status.elapsed,
-    }
-    if (!shouldRefetch(gate, STATS_EVERY_MINUTES)) continue
+    // ⚠ NO CADENCE OF ITS OWN ANY MORE, AND THAT IS AN IMPROVEMENT. Statistics
+    // used to be rationed to every tenth minute because each one was a call;
+    // they now arrive in the same response as the timeline, so refusing to
+    // write them would be throwing away data already paid for. They refresh on
+    // the events cadence instead — every third minute rather than every tenth.
+    const bundled = bundle.get(c.external_fixture_id)
+    if (!bundled?.statistics) continue
 
     try {
-      const stats = await getFixtureStatistics(fx.fixture.id)
-      result.statsCalls++
-
-      const rows = statisticsToRows(stats, {
+      const rows = statisticsToRows(bundled.statistics, {
         fixtureId: c.fixture_id,
         homeExternalTeamId: fx.teams.home.id,
       })
@@ -802,47 +906,28 @@ export async function syncLeagueFixtures(
   //
   // A failure never stops the loop or the sync: the fixture is already correct
   // and a missing line-up is a tab that says so.
+  //
+  // ⚠ WHICH FIXTURES TO ASK ABOUT IS DECIDED IN 7b2c, NOT HERE. The line-up
+  // gate is what puts a pre-kickoff fixture into the batch call at all, so it
+  // has to run before the fetch; this arm inherits its answer rather than
+  // recomputing it. Two copies of the rule would eventually disagree, and the
+  // way they would show it is a call spent asking for a line-up this arm then
+  // declines to store.
   {
-    // Which of the window's fixtures we already hold a line-up for. One indexed
-    // read per tick, so the arm can ask only for what is genuinely missing
-    // rather than re-fetching a published XI every minute until kickoff.
-    const completedNow = new Set(
-      (res.changed ?? []).filter((c) => c.is_completed).map((c) => c.fixture_id),
-    )
-    const candidates = (windowRows ?? []) as unknown as LeagueFixtureRow[]
-
-    let held = new Set<string>()
-    if (candidates.length > 0) {
-      const { data: haveRows, error: haveErr } = await admin
-        .from('match_lineups')
-        .select('fixture_id')
-        .in('fixture_id', candidates.map((r) => r.fixture_id))
-      if (haveErr) {
-        // Not fatal, but it must not be silent: without this read the arm
-        // cannot tell "not published yet" from "already stored", and would
-        // re-fetch every window fixture every tick.
-        push('league_lineups', haveErr.message, { season_id: target.seasonId })
-        held = new Set(candidates.map((r) => r.fixture_id))
-      } else {
-        held = new Set(((haveRows ?? []) as { fixture_id: string }[]).map((r) => r.fixture_id))
-      }
-    }
-
-    let attempted = 0
-    for (const row of candidates) {
-      if (attempted >= LINEUP_LIMIT) break
+    for (const row of lineupCandidates) {
       // Held already and not just finished — nothing to ask.
-      if (held.has(row.fixture_id) && !completedNow.has(row.fixture_id)) continue
+      if (lineupsHeld.has(row.fixture_id) && !lineupsCompletedNow.has(row.fixture_id)) continue
 
       const fx = byExt.get(row.external_fixture_id)
       if (!fx) continue
 
-      try {
-        const lineups = await getFixtureLineups(fx.fixture.id)
-        result.lineupCalls++
-        attempted++
+      // Membership, not `?? []` — see 7b3. An absent entry is a fixture the
+      // batch did not carry, including every one past LINEUP_LIMIT.
+      const bundled = bundle.get(row.external_fixture_id)
+      if (!bundled?.lineups) continue
 
-        const rows = lineupsToRows(lineups, {
+      try {
+        const rows = lineupsToRows(bundled.lineups, {
           fixtureId: row.fixture_id,
           homeExternalTeamId: fx.teams.home.id,
         })
@@ -994,14 +1079,19 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     `seen=${r.seen}`,
     `changed=${r.written}`,
     `scored=${r.scored}`,
-    // Only when it did something — a permanently-zero counter is one nobody reads.
-    ...(r.timelineCalls > 0 ? [`timeline=${r.timelineRows}/${r.timelineCalls}`] : []),
-    // Same rule, and both are rows/calls so a call that wrote nothing is
-    // visible as `0/1` rather than vanishing. For line-ups that is the ordinary
+    // ⚠ THE COST LINE, AND THE ONE TO WATCH AT LAUNCH. `bundle=fixtures/calls`
+    // — twenty fixtures to one call is the ceiling, so anything approaching
+    // `bundle=20/20` means the batching has stopped working and the sync is
+    // back to a request per fixture. The three row counts hang off it.
+    //
+    // Only when it did something: a permanently-zero counter is one nobody
+    // reads. `lineups=0` while `bundle` is non-zero is the ordinary
     // pre-publication answer, and being able to see it is how you tell "the
     // feed has not published yet" from "the arm never looked".
-    ...(r.statsCalls > 0 ? [`stats=${r.statsRows}/${r.statsCalls}`] : []),
-    ...(r.lineupCalls > 0 ? [`lineups=${r.lineupRows}/${r.lineupCalls}`] : []),
+    ...(r.bundleCalls > 0 ? [`bundle=${r.bundleFixtures}/${r.bundleCalls}`] : []),
+    ...(r.bundleCalls > 0 ? [`timeline=${r.timelineRows}`] : []),
+    ...(r.bundleCalls > 0 ? [`stats=${r.statsRows}`] : []),
+    ...(r.bundleCalls > 0 ? [`lineups=${r.lineupRows}`] : []),
     `manual=${r.skippedManual}`,
     `unmatched=${r.unmatched}`,
     `unknown=${r.unknownProvider}`,

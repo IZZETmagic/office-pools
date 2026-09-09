@@ -87,22 +87,43 @@ describe('shouldRefetch — the ticks it now skips', () => {
     expect(shouldRefetch(live({ elapsed: 0 }), EVENTS_EVERY_MINUTES)).toBe(true)
   })
 
-  it('statistics are asked for far less often than events', () => {
+  it('⚠ ONE cadence now, not one per data type', () => {
+    // STATS_EVERY_MINUTES is retired. `/fixtures?ids=` returns events,
+    // line-ups and statistics in the same response, so rationing statistics
+    // separately would mean discarding data already paid for. This asserts the
+    // gate is asked with one number, and that statistics got FASTER — every
+    // third minute now, against every tenth before.
     const minutes = Array.from({ length: 90 }, (_, i) => i + 1)
-    const events = minutes.filter((m) => shouldRefetch(live({ elapsed: m }), EVENTS_EVERY_MINUTES))
-    const stats = minutes.filter((m) => shouldRefetch(live({ elapsed: m }), STATS_EVERY_MINUTES))
-    expect(events.length).toBe(30)
-    expect(stats.length).toBe(9)
+    const ticks = minutes.filter((m) => shouldRefetch(live({ elapsed: m }), EVENTS_EVERY_MINUTES))
+    expect(ticks.length).toBe(30)
+
+    const oldStatsCadence = minutes.filter((m) =>
+      shouldRefetch(live({ elapsed: m }), STATS_EVERY_MINUTES),
+    )
+    expect(oldStatsCadence.length).toBe(9)
+    expect(ticks.length).toBeGreaterThan(oldStatsCadence.length)
   })
 
-  it('⚠ the whole match costs what it should', () => {
-    // 90 quiet minutes, against ~100 + ~100 calls before. This is the number
-    // the change exists to move.
+  it('⚠ the whole matchday costs what it should', () => {
+    // The number the change exists to move, and it is now a MATCHDAY number
+    // rather than a per-fixture one: a batch call carries twenty fixtures, so
+    // ten simultaneous fixtures cost the same 30 ticks that one does.
+    //
+    //   before the gate:      ~100 events + ~100 stats, PER FIXTURE  = ~200
+    //   after the gate:       30 events + 9 stats,      PER FIXTURE  =   39
+    //   after batching:       30 ticks,        FOR THE WHOLE SLATE   =   30
+    //
+    // Ten fixtures: 2,000 -> 390 -> 30.
     const quiet = Array.from({ length: 90 }, (_, i) => i + 1)
-    const cost =
-      quiet.filter((m) => shouldRefetch(live({ elapsed: m }), EVENTS_EVERY_MINUTES)).length +
-      quiet.filter((m) => shouldRefetch(live({ elapsed: m }), STATS_EVERY_MINUTES)).length
-    expect(cost).toBe(39)
-    expect(cost).toBeLessThan(60)
+    const ticksPerMatch = quiet.filter((m) =>
+      shouldRefetch(live({ elapsed: m }), EVENTS_EVERY_MINUTES),
+    ).length
+    expect(ticksPerMatch).toBe(30)
+
+    const FIXTURES = 10
+    const IDS_PER_CALL = 20
+    const callsPerTick = Math.ceil(FIXTURES / IDS_PER_CALL)
+    expect(ticksPerMatch * callsPerTick).toBe(30)
+    expect(ticksPerMatch * callsPerTick).toBeLessThan(FIXTURES * 39)
   })
 })

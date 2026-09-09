@@ -34,15 +34,44 @@ const getFixtureEvents = vi.fn(async () => [])
 const getFixtureStatistics = vi.fn(async () => [])
 const getFixtureLineups = vi.fn(async () => [])
 
+// ⚠ THE SYNC MAKES ONE BATCHED CALL NOW, NOT THREE PER FIXTURE. Rather than
+// restate every expectation in terms of `/fixtures?ids=`, this mock ASSEMBLES a
+// bundle out of the same three per-fixture stubs the tests already drive — so
+// `getFixtureEvents.mockResolvedValueOnce([...])` still means "this is what the
+// provider holds for that fixture", and `toHaveBeenCalledTimes(1)` still means
+// "one fixture's events were carried". What changes is the COST, and that is
+// asserted separately through `bundleCalls` / `bundleFixtures`.
+//
+// ⚠ A FIXTURE THE BUNDLE DOES NOT CARRY IS OMITTED, NOT EMPTIED. Returning
+// `{events: []}` for an id the real call would have dropped would hide the one
+// bug this whole area exists to prevent — an absent fixture reaching a delete.
+const bundleFailures: string[] = []
+const omitFromBundle = new Set<number>()
+const getFixturesByIds = vi.fn(async (ids: number[]) => {
+  const carried = ids.filter((id) => !omitFromBundle.has(id))
+  const fixtures = []
+  for (const id of carried) {
+    fixtures.push({
+      fixture: { id },
+      events: await getFixtureEvents(),
+      statistics: await getFixtureStatistics(),
+      lineups: await getFixtureLineups(),
+    })
+  }
+  return {
+    fixtures,
+    calls: Math.ceil(ids.length / 20),
+    failures: [...bundleFailures],
+  }
+})
+
 vi.mock('@/lib/integrations/apiFootball/client', async (orig) => {
   const actual = await orig<typeof import('@/lib/integrations/apiFootball/client')>()
   return {
     ...actual,
     getFixturesAllPages: (...a: unknown[]) => getFixturesAllPages(...a),
     getStandings: (...a: unknown[]) => getStandings(...(a as [])),
-    getFixtureEvents: (...a: unknown[]) => getFixtureEvents(...(a as [])),
-    getFixtureStatistics: (...a: unknown[]) => getFixtureStatistics(...(a as [])),
-    getFixtureLineups: (...a: unknown[]) => getFixtureLineups(...(a as [])),
+    getFixturesByIds: (...a: unknown[]) => getFixturesByIds(...(a as [number[]])),
   }
 })
 
@@ -202,7 +231,15 @@ const MW = [{ matchweek_id: 'mw-1', provider_round: 'Regular Season - 1' }]
 // reported by the runner as an unhandled error even when the code under test
 // catches it. Clearing call history is all these tests need; every test that
 // reaches the feed sets its own implementation.
-beforeEach(() => getFixturesAllPages.mockClear())
+beforeEach(() => {
+  getFixturesAllPages.mockClear()
+  // The batch call is the cost measurement now, so it has to start every test
+  // at zero — otherwise "made no call" quietly means "made none SINCE the last
+  // test that happened to clear it".
+  getFixturesByIds.mockClear()
+  omitFromBundle.clear()
+  bundleFailures.length = 0
+})
 
 describe('syncLeagueFixtures — the quiet tick', () => {
   it('V3.1 makes no api call when nothing is in the window or catch-up', async () => {
@@ -699,6 +736,10 @@ describe('syncLeagueFixtures — writes the timeline', () => {
   function db(
     rpcImpl: (fn: string) => unknown,
     fixtures = [feedFixture(1557368)],
+    // ⚠ Needed to prove a ZERO-call tick at all. The batch is shared, so the
+    // line-up arm alone will make the call unless it is already satisfied —
+    // "the events gate declined" is no longer visible as an absent request.
+    held: { fixture_id: string }[] = [],
   ) {
     getFixturesAllPages.mockResolvedValue({ fixtures, calls: 1 })
     const base = fakeDb({
@@ -708,6 +749,7 @@ describe('syncLeagueFixtures — writes the timeline', () => {
         { data: [{ external_fixture_id: '1557368' }], error: null },
       ],
       league_matchweeks: [{ data: MW, error: null }],
+      match_lineups: [{ data: held, error: null }],
     })
     const client = {
       from: (base.client as unknown as { from: (t: string) => unknown }).from,
@@ -719,12 +761,18 @@ describe('syncLeagueFixtures — writes the timeline', () => {
     return { ...base, client: client as never }
   }
 
-  it('⚠ makes NO events call when nothing changed — the whole cost argument', async () => {
+  it('⚠ makes NO call at all when nothing changed — the whole cost argument', async () => {
     getFixtureEvents.mockClear()
-    const { client } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
+    // Line-up already held, so no arm wants anything: the tick must be free.
+    const { client } = db(() => ({ data: { seen: 1, changed: [] }, error: null }), undefined, [
+      { fixture_id: 'f-1' },
+    ])
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
-    expect(getFixtureEvents).not.toHaveBeenCalled()
-    expect(r.timelineCalls).toBe(0)
+    // ⚠ THE COST IS THE BATCH CALL, NOT THE ARM. A fixture can ride into the
+    // bundle because a DIFFERENT arm wanted it, so the per-arm stubs no longer
+    // measure anything; `bundleCalls` is the only honest cost assertion now.
+    expect(getFixturesByIds).not.toHaveBeenCalled()
+    expect(r.bundleCalls).toBe(0)
     // And a counter nobody needs stays out of the run note entirely.
     expect(formatLeagueNoteParts(r).join(' ')).not.toContain('timeline=')
   })
@@ -750,7 +798,7 @@ describe('syncLeagueFixtures — writes the timeline', () => {
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
 
     expect(getFixtureEvents).toHaveBeenCalledTimes(1)
-    expect(r.timelineCalls).toBe(1)
+    expect(r.bundleCalls).toBe(1)
     expect(r.timelineRows).toBe(1)
 
     const written = inserts.find((i) => i.table === 'match_events')
@@ -762,7 +810,7 @@ describe('syncLeagueFixtures — writes the timeline', () => {
       player_name: 'Josh King',
       minute: 11,
     })
-    expect(formatLeagueNoteParts(r)).toContain('timeline=1/1')
+    expect(formatLeagueNoteParts(r)).toContain('timeline=1')
   })
 
   it('deletes the fixture’s rows before inserting — replace-all, not upsert', async () => {
@@ -790,9 +838,11 @@ describe('syncLeagueFixtures — writes the timeline', () => {
     // which fires exactly once: the match would end with a blank timeline and
     // nothing would ever revisit it.
     getFixtureEvents.mockClear()
-    getFixtureEvents.mockRejectedValueOnce(
-      new Error('api-football /fixtures/events refused: {"requests":"limit reached"}'),
-    )
+    // ⚠ A REFUSAL IS AN ABSENT FIXTURE, NOT AN EMPTY ONE. The batch call throws
+    // for its whole chunk, so the fixture never reaches the map — which is
+    // precisely what the arm must not mistake for "this match had no events".
+    omitFromBundle.add(1557368)
+    bundleFailures.push('api-football /fixtures?ids refused: {"requests":"limit reached"}')
     const { client, deletes, inserts } = db((fn) =>
       fn === 'league_apply_fixture_sync'
         ? { data: changedRows(), error: null }
@@ -807,7 +857,8 @@ describe('syncLeagueFixtures — writes the timeline', () => {
 
   it('⚠⚠ a REFUSED statistics call deletes nothing either', async () => {
     getFixtureStatistics.mockClear()
-    getFixtureStatistics.mockRejectedValueOnce(new Error('api-football /fixtures/statistics refused: {}'))
+    omitFromBundle.add(1557368)
+    bundleFailures.push('api-football /fixtures?ids refused: {}')
     const { client, deletes } = db((fn) =>
       fn === 'league_apply_fixture_sync'
         ? { data: changedRows({ is_completed: true, status: 'completed' }), error: null }
@@ -867,16 +918,22 @@ describe('syncLeagueFixtures — writes the timeline', () => {
     expect(upd?.row).not.toHaveProperty('home_goals_ht')
   })
 
-  it('an events failure is reported but never loses the sync', async () => {
+  it('a FETCH failure is reported as one bundle error, and never loses the sync', async () => {
     getFixtureEvents.mockClear()
-    getFixtureEvents.mockRejectedValueOnce(new Error('api-football 503') as never)
+    omitFromBundle.add(1557368)
+    bundleFailures.push('api-football 503')
     const { client } = db((fn) =>
       fn === 'league_apply_fixture_sync'
         ? { data: changedRows(), error: null }
         : { data: { ok: true, scored: 1, entries: 1 }, error: null },
     )
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
-    expect(r.errors.map((e) => e.stage)).toContain('league_timeline')
+    // ⚠ ONE CALL, SO ONE STAGE. A fetch failure is `league_bundle` now rather
+    // than being attributed to whichever arm would have used it — there is no
+    // longer a per-arm request to blame, and splitting one failure three ways
+    // would invent detail the sync does not have. WRITE failures still carry
+    // their own arm's stage, which is the distinction that survived.
+    expect(r.errors.map((e) => e.stage)).toContain('league_bundle')
     // The fixture write and the scoring both still counted — a blank timeline
     // is a missing card, not a wrong scoreboard.
     expect(r.written).toBe(1)
@@ -985,11 +1042,13 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
 
   // ------------------------------------------------------------- statistics
 
-  it('⚠ makes NO statistics call when nothing changed — the cost gate', async () => {
-    const { client } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
+  it('⚠ makes NO call at all when nothing changed — the cost gate', async () => {
+    const { client } = db(() => ({ data: { seen: 1, changed: [] }, error: null }), {
+      held: [{ fixture_id: 'f-1' }],
+    })
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
-    expect(getFixtureStatistics).not.toHaveBeenCalled()
-    expect(r.statsCalls).toBe(0)
+    expect(getFixturesByIds).not.toHaveBeenCalled()
+    expect(r.bundleCalls).toBe(0)
     expect(formatLeagueNoteParts(r).join(' ')).not.toContain('stats=')
   })
 
@@ -1012,7 +1071,7 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
     })
     expect(rows.find((x) => x.side === 'away')).toMatchObject({ possession_pct: 35 })
     expect(r.statsRows).toBe(2)
-    expect(formatLeagueNoteParts(r).join(' ')).toContain('stats=2/1')
+    expect(formatLeagueNoteParts(r).join(' ')).toContain('stats=2')
   })
 
   it('deletes the fixture rows before inserting — replace-all, not upsert', async () => {
@@ -1024,15 +1083,21 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
     expect(del!.filters.join(' ')).toContain('eq(fixture_id,f-1)')
   })
 
-  it('a statistics failure is reported but never loses the sync or the timeline', async () => {
-    getFixtureStatistics.mockRejectedValueOnce(new Error('api-football 503') as never)
+  it('a fetch failure costs the statistics but not the sync or the scoring', async () => {
+    omitFromBundle.add(1557368)
+    bundleFailures.push('api-football 503')
     const { client } = db((fn) =>
       fn === 'league_apply_fixture_sync'
         ? { data: changed({ is_completed: true }), error: null }
         : { data: { ok: true, scored: 1, entries: 1 }, error: null },
     )
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
-    expect(r.errors.map((e) => e.stage)).toContain('league_stats')
+    // ⚠ ONE CALL, SO ONE STAGE. A fetch failure is `league_bundle` now rather
+    // than being attributed to whichever arm would have used it — there is no
+    // longer a per-arm request to blame, and splitting one failure three ways
+    // would invent detail the sync does not have. WRITE failures still carry
+    // their own arm's stage, which is the distinction that survived.
+    expect(r.errors.map((e) => e.stage)).toContain('league_bundle')
     // The fixture itself still synced and still scored.
     expect(r.written).toBe(1)
     expect(r.scored).toBe(1)
@@ -1048,7 +1113,7 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
     const { client } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
     expect(getFixtureLineups).toHaveBeenCalledTimes(1)
-    expect(r.lineupCalls).toBe(1)
+    expect(r.bundleCalls).toBe(1)
   })
 
   it('writes both line-ups, starters before the bench, with the sub ungridded', async () => {
@@ -1067,7 +1132,7 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
       { player_id: 12, name: 'A Sub', number: 12, pos: 'M', grid: null, starter: false },
     ])
     expect(r.lineupRows).toBe(2)
-    expect(formatLeagueNoteParts(r).join(' ')).toContain('lineups=2/1')
+    expect(formatLeagueNoteParts(r).join(' ')).toContain('lineups=2')
   })
 
   it('⚠ an empty payload writes NOTHING, so the next tick asks again', async () => {
@@ -1080,7 +1145,7 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
     expect(deletes.find((d) => d.table === 'match_lineups')).toBeUndefined()
     expect(r.lineupRows).toBe(0)
     // Visible as a call that wrote nothing, rather than vanishing.
-    expect(formatLeagueNoteParts(r).join(' ')).toContain('lineups=0/1')
+    expect(formatLeagueNoteParts(r).join(' ')).toContain('lineups=0')
   })
 
   it('⚠ does NOT re-ask for a line-up it already holds', async () => {
@@ -1090,8 +1155,8 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
       held: [{ fixture_id: 'f-1' }],
     })
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
-    expect(getFixtureLineups).not.toHaveBeenCalled()
-    expect(r.lineupCalls).toBe(0)
+    expect(getFixturesByIds).not.toHaveBeenCalled()
+    expect(r.bundleCalls).toBe(0)
   })
 
   it('⚠ DOES re-ask once when the fixture completes, to catch a revision', async () => {
@@ -1101,14 +1166,20 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
     })
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
     expect(getFixtureLineups).toHaveBeenCalledTimes(1)
-    expect(r.lineupCalls).toBe(1)
+    expect(r.bundleCalls).toBe(1)
   })
 
-  it('a line-up failure is reported but never loses the sync', async () => {
-    getFixtureLineups.mockRejectedValueOnce(new Error('api-football 503') as never)
+  it('a fetch failure costs the line-up but not the sync', async () => {
+    omitFromBundle.add(1557368)
+    bundleFailures.push('api-football 503')
     const { client } = db(() => ({ data: changed(), error: null }))
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
-    expect(r.errors.map((e) => e.stage)).toContain('league_lineups')
+    // ⚠ ONE CALL, SO ONE STAGE. A fetch failure is `league_bundle` now rather
+    // than being attributed to whichever arm would have used it — there is no
+    // longer a per-arm request to blame, and splitting one failure three ways
+    // would invent detail the sync does not have. WRITE failures still carry
+    // their own arm's stage, which is the distinction that survived.
+    expect(r.errors.map((e) => e.stage)).toContain('league_bundle')
     expect(r.written).toBe(1)
   })
 
@@ -1196,27 +1267,31 @@ describe('syncLeagueFixtures — the live gate', () => {
     return (async () => {
       const { client } = db(() => ({ data: changedLive(), error: null }), 37)
       const r = await syncLeagueFixtures(client, TARGET, OPTS)
-      expect(getFixtureEvents).not.toHaveBeenCalled()
-      expect(getFixtureStatistics).not.toHaveBeenCalled()
-      expect(r.timelineCalls).toBe(0)
-      expect(r.statsCalls).toBe(0)
+      expect(getFixturesByIds).not.toHaveBeenCalled()
+      expect(r.bundleCalls).toBe(0)
       // And the fixture itself still synced — the gate skips the EXTRA calls,
       // never the write.
       expect(r.written).toBe(1)
     })()
   })
 
-  it('fetches events on the 3rd minute but not statistics', async () => {
+  it('⚠ the 3rd minute now carries STATISTICS TOO, in the same one call', async () => {
+    // It used to fetch events here and make statistics wait for minute 10,
+    // because each was its own request. They share a response now, so the
+    // slower cadence would only mean discarding what we had already paid for.
+    // Statistics got three times fresher and the tick got cheaper.
     const { client } = db(() => ({ data: changedLive(), error: null }), 36)
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixturesByIds).toHaveBeenCalledTimes(1)
+    expect(r.bundleCalls).toBe(1)
     expect(getFixtureEvents).toHaveBeenCalledTimes(1)
-    expect(getFixtureStatistics).not.toHaveBeenCalled()
-    expect(r.statsCalls).toBe(0)
+    expect(getFixtureStatistics).toHaveBeenCalledTimes(1)
   })
 
-  it('fetches both on the 10th minute', async () => {
+  it('the 10th minute is no longer special — one call, same as any other', async () => {
     const { client } = db(() => ({ data: changedLive(), error: null }), 30)
-    await syncLeagueFixtures(client, TARGET, OPTS)
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.bundleCalls).toBe(1)
     expect(getFixtureEvents).toHaveBeenCalledTimes(1)
     expect(getFixtureStatistics).toHaveBeenCalledTimes(1)
   })
@@ -1237,7 +1312,6 @@ describe('syncLeagueFixtures — the live gate', () => {
     // Treating null as 0 would fetch on every idle tick.
     const { client } = db(() => ({ data: changedLive(), error: null }), null)
     await syncLeagueFixtures(client, TARGET, OPTS)
-    expect(getFixtureEvents).not.toHaveBeenCalled()
-    expect(getFixtureStatistics).not.toHaveBeenCalled()
+    expect(getFixturesByIds).not.toHaveBeenCalled()
   })
 })
