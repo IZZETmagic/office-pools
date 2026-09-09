@@ -35,6 +35,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { invalidateLeagueSeason } from '@/lib/league/season'
+import { createRetryBudget, replaceRows } from './replaceRows'
 import { syncLeagueStandings } from './syncLeagueStandings'
 import {
   getFixturesByIds,
@@ -613,6 +614,13 @@ export async function syncLeagueFixtures(
   // ⚠ THE GATES STILL DECIDE WHO IS IN THE CALL, because the call is only free
   // once it exists: adding a twenty-first fixture costs a whole extra request.
   // What HAS gone is the separate statistics cadence — see 7b4.
+  // ⚠ ONE BUDGET FOR THE WHOLE TICK. Retrying is safe per write (140 made
+  // every replace atomic) but not free in aggregate: forty failing writes at
+  // 750ms of backoff each would add half a minute to a sync that runs every
+  // minute. After a handful of transport faults the run stops retrying and
+  // reports instead — a tick that overruns is worse than one that says so.
+  const writeBudget = createRetryBudget()
+
   const bundle = new Map<string, ApiFootballFixture>()
   // Worked out while deciding what to fetch, consumed by 7b5 when it writes.
   // Deciding twice would risk the two disagreeing — asking for a line-up here
@@ -769,10 +777,13 @@ export async function syncLeagueFixtures(
       // neither. See `140_both_or_neither.sql` for why an upsert could not do
       // this — every unique index here is partial, and PostgREST cannot name an
       // index predicate.
-      const { error: wErr } = await admin.rpc('replace_match_events', {
-        p_fixture_id: c.fixture_id,
-        p_rows: timeline,
-      })
+      const { error: wErr } = await replaceRows(
+        admin,
+        'replace_match_events',
+        c.fixture_id,
+        timeline,
+        writeBudget,
+      )
       if (wErr) {
         push('league_timeline', wErr.message, { fixture_id: c.fixture_id })
         continue
@@ -861,10 +872,13 @@ export async function syncLeagueFixtures(
       // The provider revises these mid-match and an upsert would need a stable
       // key per (fixture, side) plus a diff of nineteen nullable columns to
       // work out what it revised. Two rows.
-      const { error: wErr } = await admin.rpc('replace_match_team_stats', {
-        p_fixture_id: c.fixture_id,
-        p_rows: rows,
-      })
+      const { error: wErr } = await replaceRows(
+        admin,
+        'replace_match_team_stats',
+        c.fixture_id,
+        rows,
+        writeBudget,
+      )
       if (wErr) {
         push('league_stats', wErr.message, { fixture_id: c.fixture_id })
         continue
@@ -907,10 +921,13 @@ export async function syncLeagueFixtures(
       // forty stored rows. The function enforces this too.
       if (rows.length === 0) continue
 
-      const { error: wErr } = await admin.rpc('replace_match_player_stats', {
-        p_fixture_id: c.fixture_id,
-        p_rows: rows,
-      })
+      const { error: wErr } = await replaceRows(
+        admin,
+        'replace_match_player_stats',
+        c.fixture_id,
+        rows,
+        writeBudget,
+      )
       if (wErr) {
         push('league_player_stats', wErr.message, { fixture_id: c.fixture_id })
         continue
@@ -988,10 +1005,13 @@ export async function syncLeagueFixtures(
 
         // Atomic, as 7b3 and 7b4 — and this is the arm the failure actually
         // happened on. See `140_both_or_neither.sql`.
-        const { error: wErr } = await admin.rpc('replace_match_lineups', {
-          p_fixture_id: row.fixture_id,
-          p_rows: rows,
-        })
+        const { error: wErr } = await replaceRows(
+          admin,
+          'replace_match_lineups',
+          row.fixture_id,
+          rows,
+          writeBudget,
+        )
         if (wErr) {
           push('league_lineups', wErr.message, { fixture_id: row.fixture_id })
           continue

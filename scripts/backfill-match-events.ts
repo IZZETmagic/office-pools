@@ -70,6 +70,7 @@ try {
 }
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { createRetryBudget, replaceRows } from '@/lib/integrations/apiFootball/replaceRows'
 import { getFixturesByIds, IDS_PER_CALL } from '@/lib/integrations/apiFootball/client'
 import { eventsToTimeline } from '@/lib/integrations/apiFootball/mappers'
 
@@ -91,6 +92,10 @@ type FixtureRow = {
 
 async function main() {
   const admin = createAdminClient()
+  // ⚠ A run-wide budget, as the sync has. A backfill walks every fixture in the
+  // season, so "Supabase is unreachable" would otherwise mean 750ms of backoff
+  // times several hundred before anyone sees a message.
+  const writeBudget = createRetryBudget()
 
   // ---- 1. Which seasons, and their provider coordinates --------------------
   const { data: seasonRows, error: sErr } = await admin
@@ -213,10 +218,13 @@ async function main() {
         // committed, `TypeError: fetch failed` took the insert, and the fixture
         // was left emptier than it started. Migration 140 put the pair in a
         // transaction. Both or neither.
-        const { error: wErr } = await admin.rpc('replace_match_events', {
-          p_fixture_id: fx.fixture_id,
-          p_rows: rows,
-        })
+        const { error: wErr } = await replaceRows(
+          admin,
+          'replace_match_events',
+          fx.fixture_id,
+          rows,
+          writeBudget,
+        )
         if (wErr) {
           failures.push({ fixture: fx.external_fixture_id, reason: `write: ${wErr.message}` })
           continue

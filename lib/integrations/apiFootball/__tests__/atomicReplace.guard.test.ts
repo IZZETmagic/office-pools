@@ -61,16 +61,33 @@ describe('the replace-all writes are atomic', () => {
     }
   })
 
-  it('every writer goes through the migration-140 functions', () => {
+  it('every writer goes through the migration-140/141 functions', () => {
     // The positive half: absence of a delete would also be satisfied by a file
     // that writes nothing at all.
-    expect(read(WRITERS[0])).toContain("rpc('replace_match_events'")
-    expect(read(WRITERS[0])).toContain("rpc('replace_match_lineups'")
-    expect(read(WRITERS[0])).toContain("rpc('replace_match_team_stats'")
-    expect(read(WRITERS[0])).toContain("rpc('replace_match_player_stats'")
-    expect(read(WRITERS[1])).toContain("rpc('replace_match_events'")
-    expect(read(WRITERS[2])).toContain("rpc('replace_match_lineups'")
-    expect(read(WRITERS[2])).toContain("rpc('replace_match_team_stats'")
+    const sync = read(WRITERS[0])
+    for (const fn of [
+      'replace_match_events',
+      'replace_match_lineups',
+      'replace_match_team_stats',
+      'replace_match_player_stats',
+    ]) {
+      expect(sync).toContain(`'${fn}'`)
+    }
+    expect(read(WRITERS[1])).toContain("'replace_match_events'")
+    expect(read(WRITERS[2])).toContain("'replace_match_lineups'")
+    expect(read(WRITERS[2])).toContain("'replace_match_team_stats'")
+    expect(read(WRITERS[2])).toContain("'replace_match_player_stats'")
+  })
+
+  it.each(WRITERS)('⚠ %s calls the replace through replaceRows, not admin.rpc', (file) => {
+    // ⚠ THE RETRY IS PART OF THE CONTRACT NOW, not a convenience. A bare
+    // `admin.rpc('replace_match_…')` is a write that gives up on the first
+    // dropped socket — which on 2026-09-09 happened on four consecutive runs,
+    // a different fixture each time. `replaceRows` is also the only thing that
+    // knows a 23514 must NOT be retried; open-coding the call loses that too.
+    const src = read(file)
+    expect(src).toContain('replaceRows(')
+    expect(/admin\.rpc\(\s*['"]replace_match_/.test(src)).toBe(false)
   })
 
   it('⚠ reading a replaced table is still allowed — this guards writes only', () => {

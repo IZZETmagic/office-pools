@@ -76,6 +76,7 @@ try {
 }
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { createRetryBudget, replaceRows } from '@/lib/integrations/apiFootball/replaceRows'
 import { getFixturesByIds, IDS_PER_CALL } from '@/lib/integrations/apiFootball/client'
 import { lineupsToRows, playersToRows, statisticsToRows } from '@/lib/integrations/apiFootball/mappers'
 
@@ -95,6 +96,10 @@ type FixtureRow = {
 
 async function main() {
   const admin = createAdminClient()
+  // ⚠ A run-wide budget, as the sync has. A backfill walks every fixture in the
+  // season, so "Supabase is unreachable" would otherwise mean 750ms of backoff
+  // times several hundred before anyone sees a message.
+  const writeBudget = createRetryBudget()
 
   const { data: seasonRows, error: sErr } = await admin
     .from('league_seasons')
@@ -228,10 +233,13 @@ async function main() {
         // leaving a Bundesliga fixture with zero line-up rows. Two PostgREST
         // calls have no transaction between them; a plpgsql function does.
         if (lRows.length > 0) {
-          const { error: wErr } = await admin.rpc('replace_match_lineups', {
-            p_fixture_id: fx.fixture_id,
-            p_rows: lRows,
-          })
+          const { error: wErr } = await replaceRows(
+            admin,
+            'replace_match_lineups',
+            fx.fixture_id,
+            lRows,
+            writeBudget,
+          )
           if (wErr) {
             failures.push({ fixture: fx.external_fixture_id, reason: `lineup write: ${wErr.message}` })
           } else {
@@ -240,10 +248,13 @@ async function main() {
         }
 
         if (sRows.length > 0) {
-          const { error: wErr } = await admin.rpc('replace_match_team_stats', {
-            p_fixture_id: fx.fixture_id,
-            p_rows: sRows,
-          })
+          const { error: wErr } = await replaceRows(
+            admin,
+            'replace_match_team_stats',
+            fx.fixture_id,
+            sRows,
+            writeBudget,
+          )
           if (wErr) {
             failures.push({ fixture: fx.external_fixture_id, reason: `stats write: ${wErr.message}` })
           } else {
@@ -252,10 +263,13 @@ async function main() {
         }
 
         if (pRows.length > 0) {
-          const { error: wErr } = await admin.rpc('replace_match_player_stats', {
-            p_fixture_id: fx.fixture_id,
-            p_rows: pRows,
-          })
+          const { error: wErr } = await replaceRows(
+            admin,
+            'replace_match_player_stats',
+            fx.fixture_id,
+            pRows,
+            writeBudget,
+          )
           if (wErr) {
             failures.push({ fixture: fx.external_fixture_id, reason: `player write: ${wErr.message}` })
           } else {
