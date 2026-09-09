@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Image } from 'expo-image';
 import { Pressable, Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
@@ -16,6 +17,7 @@ import { groupByRow, surnameOf } from '@/lib/lineupLayout';
 import {
   formatRating,
   indexByPlayerId,
+  playerPhotoUrl,
   ratingColor,
   type MatchPlayerStat,
 } from '@/lib/playerStats';
@@ -55,7 +57,7 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // =============================================================
 
 /** The shirt. Big enough to read a number in, small enough for five across. */
-const CHIP = 34;
+const CHIP = 38;
 /** How wide a name may run before it truncates — five of these across 68m. */
 const NAME_W = 62;
 
@@ -388,6 +390,7 @@ function Shirt({
 }) {
   const badge = formatRating(rating);
   const badgeColor = ratingColor(rating);
+  const photo = playerPhotoUrl(player.playerId);
 
   return (
     <View style={{ alignItems: 'center', gap: 3 }}>
@@ -402,8 +405,17 @@ function Shirt({
           // A hairline of white, so a dark shirt still separates from the grass.
           borderWidth: 1.5,
           borderColor: 'rgba(255,255,255,0.85)',
+          // ⚠ The photograph is a square laid over a circle; without this it
+          // renders as a square and the club colour disappears behind it.
+          overflow: 'hidden',
         }}
       >
+        {/* ⚠⚠ THE NUMBER IS THE FALLBACK, AND IT IS DRAWN FIRST ON PURPOSE.
+            `expo-image` renders nothing at all when a source 404s — the
+            provider answers an unknown id with HTML, not a placeholder — so
+            the shirt number sitting UNDERNEATH is what shows through, with no
+            error handling and no flash of an empty circle while it loads.
+            Photo covers number; no photo, number stays. */}
         {/* ⚠ THE RATING RIDES ON THE SHIRT, and this is the whole feature: the
             numbers are readable without tapping anything, and the tap is for
             depth rather than for discovery. It hangs OUTSIDE the circle so it
@@ -451,6 +463,21 @@ function Shirt({
         >
           {player.number ?? '–'}
         </RNText>
+
+        {photo ? (
+          <Image
+            source={{ uri: photo }}
+            style={{ position: 'absolute', width: CHIP, height: CHIP }}
+            // `cover`, not `contain`: these are 150×150 head-and-shoulders
+            // cutouts, and letterboxing one inside a circle wastes the little
+            // room a face has.
+            contentFit="cover"
+            // Twenty-two of these load at once. Disk cache means that cost is
+            // paid on the first look at a fixture and never again.
+            cachePolicy="memory-disk"
+            transition={120}
+          />
+        ) : null}
       </View>
       <RNText
         numberOfLines={1}

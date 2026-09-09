@@ -21,6 +21,7 @@ import {
   RATING_COLOR,
   ratingBand,
   ratingColor,
+  playerPhotoUrl,
   statGroups,
   STRONG_FROM,
   type MatchPlayerStat,
@@ -194,5 +195,27 @@ describe('indexByPlayerId', () => {
     // The mapper already skips them; this is the second line of defence,
     // because two id-0 players would silently overwrite each other here.
     expect(indexByPlayerId([player({ externalPlayerId: 0 })]).size).toBe(0);
+  });
+});
+
+describe('playerPhotoUrl', () => {
+  it('⚠ derives the provider URL from the id', () => {
+    // Measured: 958 of 958 feed photos matched this exactly, so a stored
+    // column would be the same string written 6,312 times.
+    expect(playerPhotoUrl(199578)).toBe('https://media.api-sports.io/football/players/199578.png');
+  });
+
+  it('⚠ has nothing for the id-0 sentinel', () => {
+    // The two feed entries that carried no photo were exactly these, and the
+    // mapper already drops them — but the pitch must not request `/0.png`.
+    expect(playerPhotoUrl(0)).toBeNull();
+    expect(playerPhotoUrl(-1)).toBeNull();
+    expect(playerPhotoUrl(null)).toBeNull();
+    expect(playerPhotoUrl(undefined)).toBeNull();
+  });
+
+  it('refuses anything that is not a whole id', () => {
+    expect(playerPhotoUrl(1.5)).toBeNull();
+    expect(playerPhotoUrl(NaN)).toBeNull();
   });
 });

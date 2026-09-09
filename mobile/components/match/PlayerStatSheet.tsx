@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { Animated, Easing, Modal, Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +7,7 @@ import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 import {
   formatRating,
+  playerPhotoUrl,
   ratingColor,
   statGroups,
   headlineParts,
@@ -56,6 +58,7 @@ export function PlayerStatSheet({
   const colour = ratingColor(stat.rating);
   const groups = statGroups(stat);
   const headline = headlineParts(stat);
+  const photo = playerPhotoUrl(stat.externalPlayerId);
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -102,24 +105,35 @@ export function PlayerStatSheet({
             >
               <View
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: tint,
+                  overflow: 'hidden',
                 }}
               >
+                {/* Number first, photo over it — the same fallback the pitch
+                    uses, and for the same reason: a 404 renders nothing. */}
                 <RNText
                   style={{
                     fontFamily: MONO_BOLD,
-                    fontSize: 15,
+                    fontSize: 17,
                     color: '#FFFFFF',
                     fontVariant: ['tabular-nums'],
                   }}
                 >
                   {stat.shirtNumber ?? '–'}
                 </RNText>
+                {photo ? (
+                  <Image
+                    source={{ uri: photo }}
+                    style={{ position: 'absolute', width: 48, height: 48 }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                ) : null}
               </View>
 
               <View style={{ flex: 1 }}>

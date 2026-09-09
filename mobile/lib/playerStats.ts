@@ -221,3 +221,27 @@ export function headlineParts(s: MatchPlayerStat): string[] {
   if (!s.isStarter) parts.push('substitute');
   return parts;
 }
+
+/**
+ * Where the provider keeps this player's photograph.
+ *
+ * ⚠⚠ DERIVED, NOT STORED, AND THAT IS THE WHOLE DESIGN. Measured across 958
+ * player entries in three competitions on 2026-09-09: every single `photo` in
+ * the feed was exactly
+ *   https://media.api-sports.io/football/players/<player.id>.png
+ * — 958 of 958. Adding a `photo_url` column would store the same derivable
+ * string 6,312 times and give it a second chance to go stale.
+ *
+ * ⚠ THE ONLY ENTRIES WITH NO PHOTO WERE THE id-0 SENTINELS, which the mapper
+ * already refuses. So a stored player always has a photograph.
+ *
+ * ⚠ AND THE IMAGES COST NO QUOTA. `media.api-sports.io` is not the API host:
+ * ten image fetches left the daily counter unmoved at 177, and no key is sent
+ * with them. The app already hotlinks this exact CDN for club crests — a
+ * `flagUrl` is `/football/teams/<id>.png` from the same place.
+ */
+export function playerPhotoUrl(externalPlayerId: number | null | undefined): string | null {
+  if (typeof externalPlayerId !== 'number' || externalPlayerId <= 0) return null;
+  if (!Number.isInteger(externalPlayerId)) return null;
+  return `https://media.api-sports.io/football/players/${externalPlayerId}.png`;
+}
