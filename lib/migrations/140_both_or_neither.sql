@@ -55,6 +55,22 @@
 --   re-stamped with the fixture whose rows were just deleted, so a caller
 --   cannot delete fixture A's timeline and insert fixture B's. The `match_id`
 --   arm is left NULL by omission, which is what the XOR wants.
+--
+-- ✅ APPLIED TO PRODUCTION 2026-09-09 (ujthamlehjyubbzxbnes), in two parts:
+--    `both_or_neither`, then `both_or_neither_revoke_anon_authenticated` when
+--    the VERIFY block found the REVOKE had not reached `anon`/`authenticated`.
+--    The file above now carries the corrected form; a fresh apply is one step.
+--
+--    VERIFY run in full against production. All three functions INVOKER with
+--    search_path pinned; EXECUTE false for public, anon and authenticated, true
+--    for service_role. ⭐ THE ATOMICITY CHECK PASSED ON REAL DATA: a fixture
+--    holding 14 events, handed a row with `side='neither'`, raised 23514 and
+--    still held 14 afterwards — table total 2430 before and after. Empty `[]`
+--    kept both line-up rows and both stat rows. A null fixture_id and a
+--    non-array payload were both refused by name. A payload naming a DIFFERENT
+--    fixture was written to the parameter's fixture and left the other alone.
+--    Nothing moved: 2430 match_events, 292 match_lineups, 292 match_team_stats,
+--    unchanged either side.
 -- =============================================================
 
 BEGIN;
@@ -178,9 +194,17 @@ $$;
 -- allows SELECT and nothing else, so an `authenticated` caller would be
 -- refused by RLS anyway — but relying on that is relying on a second mechanism
 -- to cover the first. Only the service role has any business calling these.
-REVOKE ALL ON FUNCTION replace_match_events(uuid, jsonb) FROM PUBLIC;
-REVOKE ALL ON FUNCTION replace_match_lineups(uuid, jsonb) FROM PUBLIC;
-REVOKE ALL ON FUNCTION replace_match_team_stats(uuid, jsonb) FROM PUBLIC;
+--
+-- ⚠⚠ AND `FROM PUBLIC` IS NOT ENOUGH ON SUPABASE — this was wrong when first
+-- applied, and the VERIFY block below caught it within the minute. `anon` and
+-- `authenticated` hold EXECUTE through ALTER DEFAULT PRIVILEGES on the public
+-- schema, which is a DIRECT grant rather than membership in PUBLIC, so
+-- revoking from PUBLIC left both of them exactly as they were:
+--   public_can_execute false, anon true, authenticated true.
+-- Both roles have to be named.
+REVOKE ALL ON FUNCTION replace_match_events(uuid, jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION replace_match_lineups(uuid, jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION replace_match_team_stats(uuid, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION replace_match_events(uuid, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION replace_match_lineups(uuid, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION replace_match_team_stats(uuid, jsonb) TO service_role;

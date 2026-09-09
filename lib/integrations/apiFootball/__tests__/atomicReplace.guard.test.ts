@@ -102,7 +102,16 @@ describe('migration 140 says what it must', () => {
     // caller is the service role, which bypasses RLS without any help.
     expect(code).not.toMatch(/SECURITY\s+DEFINER/i)
     expect(sql).toContain('GRANT EXECUTE ON FUNCTION replace_match_events(uuid, jsonb) TO service_role')
-    expect(sql).toContain('REVOKE ALL ON FUNCTION replace_match_events(uuid, jsonb) FROM PUBLIC')
+    // ⚠ NAMING anon AND authenticated IS THE POINT. `FROM PUBLIC` alone reads
+    // like it covers them and does not: on Supabase both hold EXECUTE through
+    // ALTER DEFAULT PRIVILEGES, a direct grant. The first apply of 140 got this
+    // wrong and its own VERIFY block caught it.
+    expect(sql).toContain(
+      'REVOKE ALL ON FUNCTION replace_match_events(uuid, jsonb) FROM PUBLIC, anon, authenticated',
+    )
+    for (const fn of ['replace_match_events', 'replace_match_lineups', 'replace_match_team_stats']) {
+      expect(code).toContain(`REVOKE ALL ON FUNCTION ${fn}(uuid, jsonb) FROM PUBLIC, anon, authenticated`)
+    }
   })
 
   it('⚠ pins search_path on every function', () => {
