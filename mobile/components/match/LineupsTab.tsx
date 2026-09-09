@@ -126,17 +126,33 @@ export function LineupsTab({
 
   return (
     <View style={{ gap: 16 }}>
-      <Pitch
-        home={home}
-        away={away}
-        homeName={homeName}
-        awayName={awayName}
-        palette={palette}
-        statsById={statsById}
-        onPick={setOpen}
-        homeRating={teamRating(playerStats, 'home')}
-        awayRating={teamRating(playerStats, 'away')}
-      />
+      {/* ⚠ ONE BLOCK, NO GAPS. The bars and the pitch are a single object; the
+          tab's own `gap` would put air between them and break that. */}
+      <View>
+        <TeamBar
+          lineup={home}
+          name={homeName}
+          crestUrl={homeTeam?.flagUrl ?? null}
+          tint={palette.home}
+          rating={teamRating(playerStats, 'home')}
+        />
+        <Pitch
+          home={home}
+          away={away}
+          homeName={homeName}
+          awayName={awayName}
+          palette={palette}
+          statsById={statsById}
+          onPick={setOpen}
+        />
+        <TeamBar
+          lineup={away}
+          name={awayName}
+          crestUrl={awayTeam?.flagUrl ?? null}
+          tint={palette.away}
+          rating={teamRating(playerStats, 'away')}
+        />
+      </View>
       {home ? (
         <Bench
           lineup={home}
@@ -186,18 +202,15 @@ function Pitch({
   palette,
   statsById,
   onPick,
-  homeRating,
-  awayRating,
 }: {
   home: MatchLineup | null;
   away: MatchLineup | null;
+  /** ⚠ Only to title the stat sheet — the BARS carry the names on screen now. */
   homeName: string;
   awayName: string;
   palette: { home: string; away: string };
   statsById: StatsById;
   onPick: Pick;
-  homeRating: number | null;
-  awayRating: number | null;
 }) {
   const theme = useTheme();
 
@@ -225,7 +238,15 @@ function Pitch({
         // length over a real 105m pitch is drawn as grass rather than scaled,
         // and why the box carries a bleed at all.
         aspectRatio: VIEW_W / VIEW_L,
-        backgroundColor: theme.mode === 'dark' ? '#123021' : '#1D7A45',
+        // ⚠ SOFTENED, AND THE NUMBER THAT MATTERED WAS SATURATION, NOT
+        // LIGHTNESS. #1D7A45 was 76% saturated — a strong, almost synthetic
+        // green. #417A57 is 47%, which reads as grass rather than as a colour
+        // swatch, and it holds white text at 5.06:1 (the old one was 5.35, and
+        // 4.5 is the floor for a 12pt name). Every lighter candidate I measured
+        // fell under that floor: #4A9068 is 3.83:1, #52996F is 3.42:1. The
+        // markings are unaffected — 30% white over the new green composites to
+        // 1.77:1 against it, where the old one gave 1.78:1.
+        backgroundColor: theme.mode === 'dark' ? '#1B3A2C' : '#417A57',
       }}
     >
       <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
@@ -233,67 +254,88 @@ function Pitch({
       </View>
 
       {/* Home across the top half, away across the bottom. */}
-      <Half lineup={home} tint={palette.home} half="top" teamName={homeName} statsById={statsById}
-          onPick={onPick}
-        />
-      <Half lineup={away} tint={palette.away} half="bottom" teamName={awayName} statsById={statsById}
-          onPick={onPick}
-        />
+      <Half
+        lineup={home}
+        tint={palette.home}
+        half="top"
+        teamName={homeName}
+        statsById={statsById}
+        onPick={onPick}
+      />
+      <Half
+        lineup={away}
+        tint={palette.away}
+        half="bottom"
+        teamName={awayName}
+        statsById={statsById}
+        onPick={onPick}
+      />
 
-      {/* ⚠ IN THE CORNER EACH SIDE DEFENDS, so the caption sits beside the team
-          it names rather than in a legend the eye has to travel to. */}
-      <TeamTag lineup={home} name={homeName} corner="top" rating={homeRating} />
-      <TeamTag lineup={away} name={awayName} corner="bottom" rating={awayRating} />
     </View>
   );
 }
 
-function TeamTag({
+/**
+ * The band above or below the pitch: rating, crest, name, formation.
+ *
+ * ⚠ ATTACHED, NOT FLOATING. It used to sit inside the pitch, in the corner each
+ * side defends — which kept the caption beside the eleven it named, but cost
+ * two things the reference app gets right: the words competed with the grass
+ * and the markings behind them, and the corner is exactly where a full-back
+ * stands. A band takes the words off the pitch entirely.
+ *
+ * ⚠ NO GAP ANYWHERE. "Attached" is the whole point: the bars and the pitch have
+ * to read as one object, so they sit in a container of their own rather than in
+ * the tab's `gap: 16` stack. Nothing here is rounded, because the pitch stopped
+ * being a card — see the note on the pitch container.
+ */
+function TeamBar({
   lineup,
   name,
-  corner,
+  crestUrl,
+  tint,
   rating,
 }: {
   lineup: MatchLineup | null;
   name: string;
-  corner: 'top' | 'bottom';
-  /** The side's average, over the players who actually played. */
+  crestUrl: string | null;
+  tint: string;
   rating: number | null;
 }) {
+  const theme = useTheme();
   const badge = formatRating(rating);
   const badgeColor = ratingColor(rating);
+
   return (
     <View
-      pointerEvents="none"
       style={{
-        position: 'absolute',
-        left: 12,
-        ...(corner === 'top' ? { top: 10 } : { bottom: 10 }),
-        maxWidth: '62%',
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        // A shade off the grass, so the band separates from the pitch without
+        // becoming a second colour on the screen.
+        backgroundColor: theme.mode === 'dark' ? '#163024' : '#376A4A',
       }}
     >
-      {/* ⚠ THE SIDE'S AVERAGE, and it sits beside the name rather than in a
-          header band so it stays in the corner that side defends — the same
-          reasoning that put the name here. Absent before kickoff, when nobody
-          has been rated. */}
+      {/* ⚠ THE RATING LEADS, as it does in the reference — it is the one number
+          on the band somebody is actually looking for. Absent before kickoff. */}
       {badge && badgeColor ? (
         <View
           style={{
-            paddingHorizontal: 7,
-            paddingVertical: 3,
+            minWidth: 38,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
             borderRadius: 9,
             backgroundColor: badgeColor,
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.9)',
+            alignItems: 'center',
           }}
         >
           <RNText
             style={{
               fontFamily: MONO_BOLD,
-              fontSize: 12,
+              fontSize: 13,
               color: '#FFFFFF',
               fontVariant: ['tabular-nums'],
             }}
@@ -301,51 +343,46 @@ function TeamTag({
             {badge}
           </RNText>
         </View>
-      ) : null}
-      <View style={{ flexShrink: 1 }}>
+      ) : (
+        // Keeps the name in the same place before and after kickoff, so the
+        // band does not jump sideways when the first rating lands.
+        <View style={{ width: 38 }} />
+      )}
+
+      {crestUrl ? (
+        <Image
+          source={{ uri: crestUrl }}
+          style={{ width: 22, height: 22 }}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+        />
+      ) : (
+        <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: tint }} />
+      )}
+
       <RNText
         numberOfLines={1}
-        style={{
-          fontFamily: fontFamilies.bold,
-          fontSize: 13,
-          color: '#FFFFFF',
-          textShadowColor: 'rgba(0,0,0,0.45)',
-          textShadowRadius: 3,
-        }}
+        style={{ fontFamily: fontFamilies.bold, fontSize: 15, color: '#FFFFFF', flexShrink: 1 }}
       >
         {name}
       </RNText>
+
       {lineup?.formation ? (
         <RNText
           style={{
             fontFamily: MONO_BOLD,
-            fontSize: 11,
-            color: 'rgba(255,255,255,0.82)',
-            textShadowColor: 'rgba(0,0,0,0.45)',
-            textShadowRadius: 3,
+            fontSize: 13,
+            color: 'rgba(255,255,255,0.78)',
+            fontVariant: ['tabular-nums'],
           }}
         >
           {lineup.formation}
         </RNText>
       ) : null}
-      </View>
     </View>
   );
 }
 
-/**
- * One team's eleven, placed by `grid` across its own half.
- *
- * ⚠ ROW 1 IS THE KEEPER AND SITS NEAREST THAT TEAM'S OWN GOAL, so the top half
- * counts outward from the top and the bottom half inward from the bottom.
- * Getting this the wrong way round puts a goalkeeper on the halfway line, which
- * looks like a formation rather than a bug.
- *
- * ⚠ THE ROWS SPREAD ACROSS 46% OF THE PITCH, NOT 50%. A team's shape runs from
- * its own six-yard box to a little short of the halfway line; using the exact
- * half would stand the front row ON the centre line, overlapping the eleven
- * coming the other way.
- */
 function Half({
   lineup,
   tint,
