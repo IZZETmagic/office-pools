@@ -21,8 +21,10 @@ import {
   RATING_COLOR,
   ratingBand,
   ratingColor,
+  playerMarkers,
   playerPhotoUrl,
   statGroups,
+  teamRating,
   STRONG_FROM,
   type MatchPlayerStat,
 } from '../playerStats';
@@ -217,5 +219,65 @@ describe('playerPhotoUrl', () => {
   it('refuses anything that is not a whole id', () => {
     expect(playerPhotoUrl(1.5)).toBeNull();
     expect(playerPhotoUrl(NaN)).toBeNull();
+  });
+});
+
+describe('playerMarkers', () => {
+  it('⚠ a starter who came off gets the arrow', () => {
+    expect(playerMarkers(player({ isStarter: true, minutes: 67 })).cameOff).toBe(true);
+    expect(playerMarkers(player({ isStarter: true, minutes: 90 })).cameOff).toBe(false);
+  });
+
+  it('⚠ a substitute who came on gets the arrow; one who did not, does not', () => {
+    expect(playerMarkers(player({ isStarter: false, minutes: 23 })).cameOn).toBe(true);
+    expect(playerMarkers(player({ isStarter: false, minutes: null })).cameOn).toBe(false);
+    expect(playerMarkers(player({ isStarter: false, minutes: 0 })).cameOn).toBe(false);
+  });
+
+  it('⚠⚠ a SENDING-OFF is not a substitution', () => {
+    // A red card also ends a match early. Drawing him with a substitution
+    // arrow would say something false about why he left the pitch.
+    const sentOff = playerMarkers(player({ isStarter: true, minutes: 34, redCards: 1 }));
+    expect(sentOff.cameOff).toBe(false);
+    expect(sentOff.red).toBe(true);
+  });
+
+  it('carries goals, assists, cards and the armband', () => {
+    const m = playerMarkers(player({ goals: 2, assists: 1, yellowCards: 1, isCaptain: true }));
+    expect(m).toMatchObject({ goals: 2, assists: 1, yellow: true, red: false, captain: true });
+  });
+
+  it('a null count is not a marker', () => {
+    const m = playerMarkers(player());
+    expect(m.goals).toBe(0);
+    expect(m.yellow).toBe(false);
+  });
+});
+
+describe('teamRating', () => {
+  it('⚠ averages the players who PLAYED, not the squad', () => {
+    // Eight unused substitutes have no rating; averaging them in would mean
+    // averaging in absences.
+    const stats = [
+      player({ side: 'home', externalPlayerId: 1, rating: 8 }),
+      player({ side: 'home', externalPlayerId: 2, rating: 7 }),
+      player({ side: 'home', externalPlayerId: 3, rating: null, isStarter: false }),
+      player({ side: 'away', externalPlayerId: 4, rating: 5 }),
+    ];
+    expect(teamRating(stats, 'home')).toBe(7.5);
+    expect(teamRating(stats, 'away')).toBe(5);
+  });
+
+  it('⚠ a rating of 0 does not drag the average down', () => {
+    const stats = [
+      player({ side: 'home', externalPlayerId: 1, rating: 8 }),
+      player({ side: 'home', externalPlayerId: 2, rating: 0 }),
+    ];
+    expect(teamRating(stats, 'home')).toBe(8);
+  });
+
+  it('is null before anyone has been rated', () => {
+    expect(teamRating([], 'home')).toBeNull();
+    expect(teamRating([player({ rating: null })], 'home')).toBeNull();
   });
 });

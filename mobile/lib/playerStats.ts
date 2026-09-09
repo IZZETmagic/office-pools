@@ -245,3 +245,62 @@ export function playerPhotoUrl(externalPlayerId: number | null | undefined): str
   if (!Number.isInteger(externalPlayerId)) return null;
   return `https://media.api-sports.io/football/players/${externalPlayerId}.png`;
 }
+
+/** What to draw around a player's circle. Everything here is on his own row. */
+export type PlayerMarkers = {
+  goals: number;
+  assists: number;
+  yellow: boolean;
+  /** A second yellow is a red; the feed reports both, so either flag suffices. */
+  red: boolean;
+  captain: boolean;
+  cameOn: boolean;
+  cameOff: boolean;
+};
+
+/**
+ * ⚠⚠ THE SUBSTITUTION ARROW IS INFERRED, AND THE MINUTE DELIBERATELY IS NOT.
+ * There is no join between a player and the timeline: `match_events` carries
+ * abbreviated names from `/events` ("S. Ajayi") while these rows carry full
+ * names from `/players`, and an event has no player id at all — measured, the
+ * two match ZERO rows.
+ *
+ * `is_starter` and `minutes` give the ARROW with certainty. They do NOT give
+ * the minute: a starter's `minutes` equals a real substitution minute in only
+ * 1,255 of 1,497 cases — 83.8% — because added time is not counted the same
+ * way on both sides. A minute printed beside a face that is wrong one time in
+ * six is worse than no minute, so the sheet shows "minutes played", which is
+ * what the number actually is.
+ *
+ * ⚠ A SENDING-OFF IS NOT A SUBSTITUTION. A red card also ends a player's match
+ * early, and drawing him with a substitution arrow would say something false
+ * about why he left.
+ */
+export function playerMarkers(s: MatchPlayerStat, fullMatchMinutes = 90): PlayerMarkers {
+  const minutes = s.minutes ?? 0;
+  const red = (s.redCards ?? 0) > 0;
+  return {
+    goals: s.goals ?? 0,
+    assists: s.assists ?? 0,
+    yellow: (s.yellowCards ?? 0) > 0,
+    red,
+    captain: s.isCaptain,
+    cameOn: !s.isStarter && minutes > 0,
+    cameOff: s.isStarter && minutes > 0 && minutes < fullMatchMinutes && !red,
+  };
+}
+
+/**
+ * A side's average rating — the number the reference app puts beside the badge.
+ *
+ * ⚠ OVER THE PLAYERS WHO PLAYED, not over the squad. Including the unused
+ * substitutes would mean averaging in eight absences, and they have no rating
+ * to average anyway. Null when nobody has been rated yet, which is every
+ * minute before kickoff.
+ */
+export function teamRating(stats: MatchPlayerStat[], side: 'home' | 'away'): number | null {
+  const rated = stats.filter((s) => s.side === side && ratingBand(s.rating) !== null);
+  if (rated.length === 0) return null;
+  const mean = rated.reduce((t, s) => t + (s.rating as number), 0) / rated.length;
+  return Math.round(mean * 10) / 10;
+}
