@@ -30,11 +30,18 @@
  *   feed has since published.
  *
  * COST
- *   TWO calls per completed fixture — one /fixtures/lineups, one
- *   /fixtures/statistics. On 2026-09-07 that is roughly 2 × the completed
- *   fixture count across five leagues, against a 7,500/day plan. Sequential
- *   with a small delay; there is nothing to gain by racing the rate limit.
+ *   ONE /fixtures?ids= call per TWENTY fixtures, carrying both the line-ups and
+ *   the statistics. It used to be TWO calls per fixture, so a five-league
+ *   season backfill goes from ~3,800 calls to ~95 — the difference between a
+ *   run that can exhaust a 7,500/day plan in one sitting and one that cannot.
  *   Use --dry-run first, and --limit to take a toe in the water.
+ *
+ * ⚠ THE BLAST RADIUS IS THE REAL REASON, NOT THE ARITHMETIC. This script
+ *   deletes before it writes, once per fixture, right down the list. Before the
+ *   client's refusal guard, running out of quota mid-run meant every REMAINING
+ *   fixture read as "the provider holds nothing" — HTTP 200, empty response —
+ *   and the guard is what makes that a reported skip instead of a deletion.
+ *   Twenty times fewer calls is twenty times fewer chances to reach the wall.
  *
  * Usage:
  *   npx tsx scripts/backfill-match-lineups-stats.ts --dry-run
@@ -69,7 +76,7 @@ try {
 }
 
 import { createAdminClient } from '@/lib/supabase/server'
-import { getFixtureLineups, getFixtureStatistics } from '@/lib/integrations/apiFootball/client'
+import { getFixturesByIds, IDS_PER_CALL } from '@/lib/integrations/apiFootball/client'
 import { lineupsToRows, statisticsToRows } from '@/lib/integrations/apiFootball/mappers'
 
 const args = process.argv.slice(2)
@@ -144,91 +151,106 @@ async function main() {
       `\n${season.competition_name} ${season.season_label} — ${fixtures.length} completed fixture(s)`,
     )
 
-    for (const fx of fixtures) {
-      totalFixtures++
-      const homeExt = extByClub.get(fx.home_club_id)
-      if (homeExt === undefined) {
-        failures.push({ fixture: fx.external_fixture_id, reason: 'home club has no provider id' })
-        continue
+    // Twenty fixtures per call, a chunk at a time so a long run reports
+    // progress and commits as it goes rather than all at the end.
+    for (let i = 0; i < fixtures.length; i += IDS_PER_CALL) {
+      const chunk = fixtures.slice(i, i + IDS_PER_CALL)
+      const got = await getFixturesByIds(chunk.map((f) => Number(f.external_fixture_id)))
+      totalCalls += got.calls
+      const carried = new Map(got.fixtures.map((f) => [String(f.fixture.id), f]))
+      for (const msg of got.failures) {
+        failures.push({ fixture: chunk.map((f) => f.external_fixture_id).join(','), reason: msg })
       }
-      const opts = { fixtureId: fx.fixture_id, homeExternalTeamId: homeExt }
 
-      // ---- line-ups --------------------------------------------------------
-      let lRows: ReturnType<typeof lineupsToRows> = []
-      try {
-        lRows = lineupsToRows(await getFixtureLineups(Number(fx.external_fixture_id)), opts)
-        totalCalls++
-      } catch (e) {
-        failures.push({ fixture: fx.external_fixture_id, reason: `lineups: ${String(e)}` })
-      }
-      if (lRows.length === 0) noLineup++
+      for (const fx of chunk) {
+        totalFixtures++
+        const homeExt = extByClub.get(fx.home_club_id)
+        if (homeExt === undefined) {
+          failures.push({ fixture: fx.external_fixture_id, reason: 'home club has no provider id' })
+          continue
+        }
+        const opts = { fixtureId: fx.fixture_id, homeExternalTeamId: homeExt }
 
-      // ---- statistics ------------------------------------------------------
-      let sRows: ReturnType<typeof statisticsToRows> = []
-      try {
-        sRows = statisticsToRows(await getFixtureStatistics(Number(fx.external_fixture_id)), opts)
-        totalCalls++
-      } catch (e) {
-        failures.push({ fixture: fx.external_fixture_id, reason: `statistics: ${String(e)}` })
-      }
-      if (sRows.length === 0) noStats++
+        // ⚠ ABSENT IS NOT EMPTY, AND HERE THE TWO LOOK IDENTICAL DOWNSTREAM. A
+        // fixture the batch did not carry has no line-ups and no statistics to
+        // write — but so does a 1974 fixture the provider simply has nothing for,
+        // and only one of those should be counted as "the feed holds none". The
+        // membership test keeps a refused chunk out of the `noLineup`/`noStats`
+        // tallies, which are what tell you whether a re-run is worth making.
+        const bundled = carried.get(fx.external_fixture_id)
+        if (!bundled) {
+          failures.push({ fixture: fx.external_fixture_id, reason: 'not carried by the batch' })
+          continue
+        }
 
-      if (dryRun) {
-        const xi = lRows.map((r) => r.players.filter((p) => p.starter).length).join('/')
-        const poss = sRows.map((r) => r.possession_pct ?? '—').join('/')
+        // ---- line-ups --------------------------------------------------------
+        const lRows = bundled.lineups ? lineupsToRows(bundled.lineups, opts) : []
+        if (lRows.length === 0) noLineup++
+
+        // ---- statistics ------------------------------------------------------
+        const sRows = bundled.statistics ? statisticsToRows(bundled.statistics, opts) : []
+        if (sRows.length === 0) noStats++
+
+        if (dryRun) {
+          const xi = lRows.map((r) => r.players.filter((p) => p.starter).length).join('/')
+          const poss = sRows.map((r) => r.possession_pct ?? '—').join('/')
+          console.log(
+            `  ${fx.external_fixture_id}: lineups ${lRows.length} side(s)${xi ? ` (XI ${xi})` : ''}` +
+              `, stats ${sRows.length} side(s)${sRows.length ? ` (poss ${poss})` : ''}`,
+          )
+          lineupRows += lRows.length
+          statRows += sRows.length
+          await sleep(120)
+          continue
+        }
+
+        // ⚠ REPLACE-ALL, the same as the sync, so re-running is a no-op rather
+        // than a doubling — and the unique (fixture_id, side) indexes would fail
+        // loudly if it were not.
+        //
+        // ⚠ AN EMPTY RESULT DELETES NOTHING. The provider not holding a line-up
+        // for an old fixture must not wipe one we already have.
+        if (lRows.length > 0) {
+          const { error: delErr } = await admin
+            .from('match_lineups')
+            .delete()
+            .eq('fixture_id', fx.fixture_id)
+          if (delErr) {
+            failures.push({ fixture: fx.external_fixture_id, reason: `lineup delete: ${delErr.message}` })
+          } else {
+            const { error: insErr } = await admin.from('match_lineups').insert(lRows)
+            if (insErr) {
+              failures.push({ fixture: fx.external_fixture_id, reason: `lineup insert: ${insErr.message}` })
+            } else {
+              lineupRows += lRows.length
+            }
+          }
+        }
+
+        if (sRows.length > 0) {
+          const { error: delErr } = await admin
+            .from('match_team_stats')
+            .delete()
+            .eq('fixture_id', fx.fixture_id)
+          if (delErr) {
+            failures.push({ fixture: fx.external_fixture_id, reason: `stats delete: ${delErr.message}` })
+          } else {
+            const { error: insErr } = await admin.from('match_team_stats').insert(sRows)
+            if (insErr) {
+              failures.push({ fixture: fx.external_fixture_id, reason: `stats insert: ${insErr.message}` })
+            } else {
+              statRows += sRows.length
+            }
+          }
+        }
+
         console.log(
-          `  ${fx.external_fixture_id}: lineups ${lRows.length} side(s)${xi ? ` (XI ${xi})` : ''}` +
-            `, stats ${sRows.length} side(s)${sRows.length ? ` (poss ${poss})` : ''}`,
+          `  ${fx.external_fixture_id}: ${lRows.length} line-up row(s), ${sRows.length} stat row(s)`,
         )
-        lineupRows += lRows.length
-        statRows += sRows.length
-        await sleep(120)
-        continue
       }
 
-      // ⚠ REPLACE-ALL, the same as the sync, so re-running is a no-op rather
-      // than a doubling — and the unique (fixture_id, side) indexes would fail
-      // loudly if it were not.
-      //
-      // ⚠ AN EMPTY RESULT DELETES NOTHING. The provider not holding a line-up
-      // for an old fixture must not wipe one we already have.
-      if (lRows.length > 0) {
-        const { error: delErr } = await admin
-          .from('match_lineups')
-          .delete()
-          .eq('fixture_id', fx.fixture_id)
-        if (delErr) {
-          failures.push({ fixture: fx.external_fixture_id, reason: `lineup delete: ${delErr.message}` })
-        } else {
-          const { error: insErr } = await admin.from('match_lineups').insert(lRows)
-          if (insErr) {
-            failures.push({ fixture: fx.external_fixture_id, reason: `lineup insert: ${insErr.message}` })
-          } else {
-            lineupRows += lRows.length
-          }
-        }
-      }
-
-      if (sRows.length > 0) {
-        const { error: delErr } = await admin
-          .from('match_team_stats')
-          .delete()
-          .eq('fixture_id', fx.fixture_id)
-        if (delErr) {
-          failures.push({ fixture: fx.external_fixture_id, reason: `stats delete: ${delErr.message}` })
-        } else {
-          const { error: insErr } = await admin.from('match_team_stats').insert(sRows)
-          if (insErr) {
-            failures.push({ fixture: fx.external_fixture_id, reason: `stats insert: ${insErr.message}` })
-          } else {
-            statRows += sRows.length
-          }
-        }
-      }
-
-      console.log(
-        `  ${fx.external_fixture_id}: ${lRows.length} line-up row(s), ${sRows.length} stat row(s)`,
-      )
+      // Per chunk, not per fixture — there is one request per twenty now, so
+      // pausing per fixture would only be throttling our own database.
       await sleep(120)
     }
   }

@@ -19,10 +19,22 @@
  *   one-off script that "just does the same thing".
  *
  * COST
- *   One /fixtures/events call per completed fixture, plus one bulk /fixtures
- *   call per league-season for referee and half-time. ~142 calls for the whole
- *   backlog, against a 7,500/day plan. Sequential with a small delay: this is a
- *   one-off, and there is nothing to gain by racing the provider's rate limit.
+ *   ONE /fixtures?ids= call per TWENTY fixtures. The bundled response carries
+ *   each fixture's events, and its referee and half-time score alongside them,
+ *   so a 137-fixture backlog is 7 calls rather than 142.
+ *
+ * ⚠ THE SEPARATE BULK CALL FOR REFEREE AND HALF-TIME IS GONE, and not only to
+ *   save the call. It was a second read of the same facts from a different
+ *   endpoint, which is a licence for the two to disagree; they now arrive in
+ *   the same object as the events they belong to.
+ *
+ * ⚠ AND THE BLAST RADIUS IS WHY BATCHING MATTERED MORE HERE THAN IN THE SYNC.
+ *   This script deletes before it writes, across every fixture in a run. Before
+ *   the client's refusal guard, exhausting the daily quota mid-run would have
+ *   wiped the timeline of every REMAINING fixture — each refusal arriving as
+ *   HTTP 200 with an empty response, reading exactly like a match in which
+ *   nothing happened. A fixture the batch does not carry is now skipped and
+ *   reported, and there are twenty times fewer chances to hit the wall.
  *
  * Usage:
  *   npx tsx scripts/backfill-match-events.ts --dry-run    # report only
@@ -58,7 +70,7 @@ try {
 }
 
 import { createAdminClient } from '@/lib/supabase/server'
-import { getFixtureEvents, getFixtures } from '@/lib/integrations/apiFootball/client'
+import { getFixturesByIds, IDS_PER_CALL } from '@/lib/integrations/apiFootball/client'
 import { eventsToTimeline } from '@/lib/integrations/apiFootball/mappers'
 
 const args = process.argv.slice(2)
@@ -130,102 +142,112 @@ async function main() {
       ]),
     )
 
-    // ---- 3. Referee + half time, in ONE call for the whole season -----------
-    // The bulk /fixtures response carries both for all 380, so asking per
-    // fixture would be 380 calls to learn what one already answered.
-    const meta = new Map<string, { referee: string | null; ht: [number, number] | null }>()
-    try {
-      const env = await getFixtures({ league: season.external_league_id, season: season.external_season })
-      totalCalls++
-      for (const f of env) {
-        const ht = f.score?.halftime
-        meta.set(String(f.fixture.id), {
-          referee: f.fixture.referee ?? null,
-          ht: ht && ht.home !== null && ht.away !== null ? [ht.home, ht.away] : null,
-        })
-      }
-    } catch (e) {
-      console.warn(`  ! ${season.competition_name}: bulk fixtures failed — ${String(e)}`)
-    }
-
     console.log(
       `\n${season.competition_name} ${season.season_label} — ${fixtures.length} completed fixture(s)`,
     )
 
-    for (const fx of fixtures) {
-      totalFixtures++
-      const homeExt = extByClub.get(fx.home_club_id)
-      if (homeExt === undefined) {
-        failures.push({ fixture: fx.external_fixture_id, reason: 'home club has no provider id' })
-        continue
+    // ---- 3. Twenty fixtures per call ----------------------------------------
+    // A chunk at a time rather than all up front, so a long run reports
+    // progress and commits as it goes: a backfill that dies at fixture 300
+    // should have written the first 299.
+    for (let i = 0; i < fixtures.length; i += IDS_PER_CALL) {
+      const chunk = fixtures.slice(i, i + IDS_PER_CALL)
+      const got = await getFixturesByIds(chunk.map((f) => Number(f.external_fixture_id)))
+      totalCalls += got.calls
+      const carried = new Map(got.fixtures.map((f) => [String(f.fixture.id), f]))
+      // Named by the ids it took down, so a rerun knows what to chase.
+      for (const msg of got.failures) {
+        failures.push({ fixture: chunk.map((f) => f.external_fixture_id).join(','), reason: msg })
       }
 
-      let rows: ReturnType<typeof eventsToTimeline> = []
-      try {
-        const evts = await getFixtureEvents(Number(fx.external_fixture_id))
-        totalCalls++
-        rows = eventsToTimeline(evts, { fixtureId: fx.fixture_id, homeExternalTeamId: homeExt })
-      } catch (e) {
-        failures.push({ fixture: fx.external_fixture_id, reason: `events: ${String(e)}` })
-        continue
-      }
-
-      const m = meta.get(fx.external_fixture_id)
-      const goals = rows.filter(
-        (r) => r.kind === 'goal' || r.kind === 'penalty' || r.kind === 'own_goal',
-      ).length
-
-      if (dryRun) {
-        console.log(
-          `  ${fx.external_fixture_id}: ${rows.length} event(s), ${goals} goal(s)` +
-            `${m?.referee ? `, ref ${m.referee}` : ''}${m?.ht ? `, HT ${m.ht[0]}-${m.ht[1]}` : ''}`,
-        )
-        totalRows += rows.length
-        continue
-      }
-
-      // ⚠ REPLACE-ALL, the same as the sync. Re-running this script must be a
-      // no-op rather than a doubling — and the unique (fixture_id, sort_index)
-      // index would fail loudly if it were not.
-      const { error: delErr } = await admin
-        .from('match_events')
-        .delete()
-        .eq('fixture_id', fx.fixture_id)
-      if (delErr) {
-        failures.push({ fixture: fx.external_fixture_id, reason: `delete: ${delErr.message}` })
-        continue
-      }
-      if (rows.length > 0) {
-        const { error: insErr } = await admin.from('match_events').insert(rows)
-        if (insErr) {
-          failures.push({ fixture: fx.external_fixture_id, reason: `insert: ${insErr.message}` })
+      for (const fx of chunk) {
+        totalFixtures++
+        const homeExt = extByClub.get(fx.home_club_id)
+        if (homeExt === undefined) {
+          failures.push({ fixture: fx.external_fixture_id, reason: 'home club has no provider id' })
           continue
         }
-      }
 
-      // ⚠ The half-time pair together or not at all — league_fixtures_ht_pair_ck
-      // refuses {1, null}.
-      const patch: Record<string, unknown> = {}
-      if (m?.referee) patch.referee = m.referee
-      if (m?.ht) {
-        patch.home_goals_ht = m.ht[0]
-        patch.away_goals_ht = m.ht[1]
-      }
-      if (Object.keys(patch).length > 0) {
-        const { error: updErr } = await admin
-          .from('league_fixtures')
-          .update(patch)
-          .eq('fixture_id', fx.fixture_id)
-        if (updErr) {
-          failures.push({ fixture: fx.external_fixture_id, reason: `meta: ${updErr.message}` })
+        // ⚠ MEMBERSHIP, NOT `?? []`. An absent fixture is one the batch did not
+        // carry — a refused chunk, or an id the provider does not know — and the
+        // delete below must never run on it. `bundled?.events ?? []` would read
+        // identically to a goalless, cardless match and clear the timeline.
+        const bundled = carried.get(fx.external_fixture_id)
+        if (!bundled?.events) {
+          failures.push({ fixture: fx.external_fixture_id, reason: 'not carried by the batch' })
+          continue
         }
+        const rows = eventsToTimeline(bundled.events, {
+          fixtureId: fx.fixture_id,
+          homeExternalTeamId: homeExt,
+        })
+
+        // Referee and half time out of the SAME object as the events.
+        const ht = bundled.score?.halftime
+        const m = {
+          referee: bundled.fixture.referee ?? null,
+          ht: (ht && ht.home !== null && ht.away !== null ? [ht.home, ht.away] : null) as
+            | [number, number]
+            | null,
+        }
+        const goals = rows.filter(
+          (r) => r.kind === 'goal' || r.kind === 'penalty' || r.kind === 'own_goal',
+        ).length
+
+        if (dryRun) {
+          console.log(
+            `  ${fx.external_fixture_id}: ${rows.length} event(s), ${goals} goal(s)` +
+              `${m.referee ? `, ref ${m.referee}` : ''}${m.ht ? `, HT ${m.ht[0]}-${m.ht[1]}` : ''}`,
+          )
+          totalRows += rows.length
+          continue
+        }
+
+        // ⚠ REPLACE-ALL, the same as the sync. Re-running this script must be a
+        // no-op rather than a doubling — and the unique (fixture_id, sort_index)
+        // index would fail loudly if it were not.
+        const { error: delErr } = await admin
+          .from('match_events')
+          .delete()
+          .eq('fixture_id', fx.fixture_id)
+        if (delErr) {
+          failures.push({ fixture: fx.external_fixture_id, reason: `delete: ${delErr.message}` })
+          continue
+        }
+        if (rows.length > 0) {
+          const { error: insErr } = await admin.from('match_events').insert(rows)
+          if (insErr) {
+            failures.push({ fixture: fx.external_fixture_id, reason: `insert: ${insErr.message}` })
+            continue
+          }
+        }
+
+        // ⚠ The half-time pair together or not at all — league_fixtures_ht_pair_ck
+        // refuses {1, null}.
+        const patch: Record<string, unknown> = {}
+        if (m.referee) patch.referee = m.referee
+        if (m.ht) {
+          patch.home_goals_ht = m.ht[0]
+          patch.away_goals_ht = m.ht[1]
+        }
+        if (Object.keys(patch).length > 0) {
+          const { error: updErr } = await admin
+            .from('league_fixtures')
+            .update(patch)
+            .eq('fixture_id', fx.fixture_id)
+          if (updErr) {
+            failures.push({ fixture: fx.external_fixture_id, reason: `meta: ${updErr.message}` })
+          }
+        }
+
+        totalRows += rows.length
+        console.log(`  ${fx.external_fixture_id}: ${rows.length} event(s), ${goals} goal(s)`)
       }
 
-      totalRows += rows.length
-      console.log(`  ${fx.external_fixture_id}: ${rows.length} event(s), ${goals} goal(s)`)
-
-      // Polite, and this is a one-off — there is nothing to gain by racing the
-      // provider's rate limit.
+      // ⚠ PER CHUNK, NOT PER FIXTURE. It used to sleep between api calls, and
+      // there were as many of those as there were fixtures; there is now one
+      // per twenty, so pausing per fixture would be throttling the DATABASE in
+      // the name of politeness to a provider we are no longer talking to.
       await sleep(120)
     }
   }
