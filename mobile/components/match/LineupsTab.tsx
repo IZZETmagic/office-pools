@@ -454,43 +454,59 @@ function Shirt({
 
   return (
     <View style={{ alignItems: 'center', gap: 3 }}>
-      <View
-        style={{
-          width: CHIP,
-          height: CHIP,
-          borderRadius: CHIP / 2,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: tint,
-          // A hairline of white, so a dark shirt still separates from the grass.
-          borderWidth: 1.5,
-          borderColor: 'rgba(255,255,255,0.85)',
-          // ⚠ The photograph is a square laid over a circle; without this it
-          // renders as a square and the club colour disappears behind it.
-          overflow: 'hidden',
-        }}
-      >
-        {/* ⚠⚠ THE NUMBER IS THE FALLBACK, AND IT IS DRAWN FIRST ON PURPOSE.
-            `expo-image` renders nothing at all when a source 404s — the
-            provider answers an unknown id with HTML, not a placeholder — so
-            the shirt number sitting UNDERNEATH is what shows through, with no
-            error handling and no flash of an empty circle while it loads.
-            Photo covers number; no photo, number stays. */}
-        {/* ⚠ THE RATING RIDES ON THE SHIRT, and this is the whole feature: the
-            numbers are readable without tapping anything, and the tap is for
-            depth rather than for discovery. It hangs OUTSIDE the circle so it
-            never covers the squad number.
+      {/* ⚠⚠ TWO VIEWS, AND THE SPLIT IS LOAD-BEARING. The circle must CLIP: the
+          photograph is a square and without `overflow: hidden` it renders as
+          one, corners and all. But every marker hangs OUTSIDE the circle on a
+          negative offset, and while they were children of the clipping view
+          they were clipped away — the rating, the card, the armband and the
+          arrow all vanished silently the moment the photograph landed. This
+          anchor does not clip, and the markers are siblings of the circle
+          rather than children of it. */}
+      <View style={{ width: CHIP, height: CHIP, alignItems: 'center', justifyContent: 'center' }}>
+        <View
+          style={{
+            width: CHIP,
+            height: CHIP,
+            borderRadius: CHIP / 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: tint,
+            // A hairline of white, so a dark shirt still separates from the grass.
+            borderWidth: 1.5,
+            borderColor: 'rgba(255,255,255,0.85)',
+            overflow: 'hidden',
+          }}
+        >
+          {/* ⚠ THE FALLBACK IS DRAWN FIRST. `expo-image` renders nothing when a
+              source fails — the provider answers an unknown id with HTML — so
+              whatever sits underneath shows through, with no error handling and
+              no empty circle while it loads. */}
+          <RNText style={{ fontFamily: MONO_BOLD, fontSize: 15, color: 'rgba(255,255,255,0.9)' }}>
+            {player.pos ?? '\u00b7'}
+          </RNText>
+          {photo ? (
+            <Image
+              source={{ uri: photo }}
+              style={{ position: 'absolute', width: CHIP, height: CHIP }}
+              // `cover`, not `contain`: these are 150x150 head-and-shoulders
+              // cutouts, and letterboxing one inside a circle wastes the little
+              // room a face has.
+              contentFit="cover"
+              // Twenty-two load at once; the disk cache means that cost is paid
+              // on the first look at a fixture and never again.
+              cachePolicy="memory-disk"
+              transition={120}
+            />
+          ) : null}
+        </View>
 
-            ⚠ It needs its own white hairline. The three band fills measure
-            1.6–2.6:1 against the pitch green — fine for white text ON them,
-            hopeless as an edge against grass. Same reasoning as the shirt. */}
-        {/* ⚠ EVERY MARKER HANGS OUTSIDE THE CIRCLE, never over the face. The
-            photograph is the thing that identifies the player at a glance, and
-            a badge across it costs more than the badge is worth.
-
-            ⚠ THE ICONS ARE THE FACTS TAB'S OWN. `sportscourt.fill` is a goal
-            and `rectangle.portrait.fill` a card there too — two tabs on one
-            screen must not use two vocabularies for the same event. */}
+        {/* ⚠ FIVE MARKERS, FIVE POSITIONS, NO OVERLAP: arrow top-left, rating
+            top-right, card left-middle, armband bottom-left, goal bottom-right.
+            Two in one corner is how a pitch stops being readable at a glance.
+            Every one hangs OUTSIDE the circle: the photograph is what
+            identifies a player, and a badge across it costs more than it is
+            worth. The icons are the Facts tab's own — two tabs on one screen
+            must not use two vocabularies for the same event. */}
         {marks?.cameOff || marks?.cameOn ? (
           <View
             style={{
@@ -512,7 +528,37 @@ function Shirt({
                 equal the real substitution minute only 83.8% of the time. The
                 arrow is certain; the minute would be wrong one time in six. */}
             <RNText style={{ fontFamily: MONO_BOLD, fontSize: 10, color: '#FFFFFF' }}>
-              {marks.cameOff ? '↓' : '↑'}
+              {marks.cameOff ? '\u2193' : '\u2191'}
+            </RNText>
+          </View>
+        ) : null}
+
+        {badge && badgeColor ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: -5,
+              right: -MARK / 2,
+              minWidth: 21,
+              paddingHorizontal: 3,
+              paddingVertical: 1,
+              borderRadius: 5,
+              backgroundColor: badgeColor,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.9)',
+              alignItems: 'center',
+            }}
+          >
+            <RNText
+              style={{
+                fontFamily: MONO_BOLD,
+                fontSize: 9,
+                lineHeight: 12,
+                color: '#FFFFFF',
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {badge}
             </RNText>
           </View>
         ) : null}
@@ -521,12 +567,10 @@ function Shirt({
           <View
             style={{
               position: 'absolute',
-              // Left-middle: the sub arrow has the top-left and the armband
-              // the bottom-left, so a booking sits between them.
+              // Left-middle: the arrow has the top-left and the armband the
+              // bottom-left, so a booking sits between them.
               top: CHIP / 2 - 7,
               left: -MARK / 2 + 2,
-              alignItems: 'center',
-              justifyContent: 'center',
             }}
           >
             <Icon
@@ -535,6 +579,26 @@ function Shirt({
               color={marks.red ? 'red' : 'amber'}
               filled
             />
+          </View>
+        ) : null}
+
+        {marks?.captain ? (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: -3,
+              left: -MARK / 2 + 1,
+              width: 14,
+              height: 14,
+              borderRadius: 7,
+              backgroundColor: '#F5C518',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.9)',
+            }}
+          >
+            <RNText style={{ fontFamily: MONO_BOLD, fontSize: 8, color: '#111827' }}>C</RNText>
           </View>
         ) : null}
 
@@ -577,91 +641,9 @@ function Shirt({
             ) : null}
           </View>
         ) : null}
-
-        {marks?.captain ? (
-          <View
-            style={{
-              position: 'absolute',
-              bottom: -3,
-              left: -MARK / 2 + 1,
-              width: 14,
-              height: 14,
-              borderRadius: 7,
-              backgroundColor: '#F5C518',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.9)',
-            }}
-          >
-            <RNText style={{ fontFamily: MONO_BOLD, fontSize: 8, color: '#111827' }}>C</RNText>
-          </View>
-        ) : null}
-
-        {badge && badgeColor ? (
-          <View
-            style={{
-              position: 'absolute',
-              // ⚠ FIVE MARKERS, FIVE POSITIONS, NO OVERLAP: arrow top-left,
-              // rating top-right, card left-middle, armband bottom-left,
-              // goal bottom-right. Two badges in one corner is how a pitch
-              // stops being readable at a glance — this collided on the first
-              // pass, with the rating and the goal both bottom-right.
-              top: -5,
-              right: -MARK / 2,
-              minWidth: 21,
-              paddingHorizontal: 3,
-              paddingVertical: 1,
-              borderRadius: 5,
-              backgroundColor: badgeColor,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.9)',
-              alignItems: 'center',
-            }}
-          >
-            <RNText
-              style={{
-                fontFamily: MONO_BOLD,
-                fontSize: 9,
-                lineHeight: 12,
-                color: '#FFFFFF',
-                fontVariant: ['tabular-nums'],
-              }}
-            >
-              {badge}
-            </RNText>
-          </View>
-        ) : null}
-        {/* ⚠ THE FALLBACK IS DRAWN FIRST AND IS NO LONGER THE NUMBER — that
-            moved to the label. `expo-image` renders nothing when a source
-            fails (the provider answers an unknown id with HTML), so whatever
-            sits underneath shows through with no error handling. A position
-            letter is the most useful thing to be left with. */}
-        <RNText
-          style={{
-            fontFamily: MONO_BOLD,
-            fontSize: 15,
-            color: 'rgba(255,255,255,0.9)',
-          }}
-        >
-          {player.pos ?? '·'}
-        </RNText>
-
-        {photo ? (
-          <Image
-            source={{ uri: photo }}
-            style={{ position: 'absolute', width: CHIP, height: CHIP }}
-            // `cover`, not `contain`: these are 150×150 head-and-shoulders
-            // cutouts, and letterboxing one inside a circle wastes the little
-            // room a face has.
-            contentFit="cover"
-            // Twenty-two of these load at once. Disk cache means that cost is
-            // paid on the first look at a fixture and never again.
-            cachePolicy="memory-disk"
-            transition={120}
-          />
-        ) : null}
       </View>
+
+
       {/* ⚠⚠ THE NUMBER LIVES HERE NOW, NOT IN THE CIRCLE. It used to be drawn
           inside the shirt purely as the photograph's fallback — and since every
           player has a photograph, it was covered on every single one. We were
