@@ -16,11 +16,26 @@ export const PITCH_W = 68;
  * The length we actually draw.
  *
  * ⚠ FICTIONAL, AND THE ONLY FICTIONAL NUMBER HERE. It buys vertical room for
- * the two elevens without distorting a single marking: the extra 21m all lands
- * in midfield, between two penalty areas that stay 16.5 deep and either side of
- * a centre circle that stays round. A real pitch is 105.
+ * the two elevens without distorting a single marking: the extra length all
+ * lands in midfield, between two penalty areas that stay 16.5 deep and either
+ * side of a centre circle that stays round. A real pitch is 105.
+ *
+ * ⚠ 145 RATHER THAN 126, TO SPACE THE ROWS OUT. This is the ONLY lever for
+ * that: `BAND` is a percentage of the length, and it cannot grow — at 46% the
+ * front row already reaches 45.4% of the half, and 50% would stand it on the
+ * halfway line among the eleven coming the other way. Lengthening the pitch
+ * moves the rows apart in points while leaving that percentage alone.
+ *
+ * Measured on a 393pt phone: rows go from 65.7pt apart to 75.5pt, +15%. A 48pt
+ * circle plus its label ends 41.5pt below its own centre, so the clearance to
+ * the next row goes from 41.7pt (touching) to 51.5pt (comfortable).
+ *
+ * ⚠ THE COST IS THE SHAPE, AND IT IS THE REASON NOT TO GO FURTHER. A real
+ * pitch is about 1:1.55 long to wide. At 126 the drawing was 1:1.85; at 145 it
+ * is 1:2.08. Past that it stops reading as a football pitch and starts reading
+ * as a corridor.
  */
-export const PITCH_L = 126;
+export const PITCH_L = 145;
 
 /**
  * Metres of grass drawn OUTSIDE the touchline, so an edge line has room.

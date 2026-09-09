@@ -352,7 +352,12 @@ export default function MatchDetailScreen() {
             width={width}
             pageOffset={pageOffset}
             scrollY={scrollY}
-            paddingTop={bandHeight + 16}
+            // ⚠ THE LINE-UPS TAB GETS NO BREATHING ROOM, AND THAT IS THE POINT.
+            // Every other tab is a stack of cards, which need the 16pt to sit
+            // off the header. The pitch is full-bleed: a gap above it leaves a
+            // strip of page background between the header and the grass, and
+            // the two stop reading as one surface.
+            paddingTop={bandHeight + (key === 'lineups' ? 0 : 16)}
             paddingBottom={theme.spacing.xxxl}
             refreshControl={
               <RefreshControl

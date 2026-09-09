@@ -643,11 +643,17 @@ function Shirt({
               width: 14,
               height: 14,
               borderRadius: 7,
-              backgroundColor: '#F5C518',
+              // ⚠ WHITE, NOT YELLOW, AND THE CARD IS WHY. An amber armband sits
+              // directly below an amber booking on the same edge — two yellow
+              // markers a few points apart, which is a colour clash the eye has
+              // to resolve twice. The armband is the one that can afford to be
+              // neutral: a card MUST be its own colour, because the colour IS
+              // the fact.
+              backgroundColor: '#FFFFFF',
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.9)',
+              borderColor: 'rgba(0,0,0,0.15)',
             }}
           >
             <RNText style={{ fontFamily: MONO_BOLD, fontSize: 8, color: '#111827' }}>C</RNText>
@@ -674,8 +680,15 @@ function Shirt({
             {/* ⚠ ONLY A GOAL GETS THE BALL. There is no boot in this icon set,
                 and borrowing another glyph for an assist would invent a symbol
                 nobody has been taught — an assist reads as 'A' instead. */}
+            {/* ⚠⚠ `solid`, NOT `filled`. They are not interchangeable and the
+                difference is visible: `filled` paints the FREE outline glyph's
+                closed paths, and a football's outer ring is closed — so it
+                rendered as a plain dark disc, which is what the pitch showed.
+                `solid` swaps in the purpose-drawn Pro football. The card
+                beside it keeps `filled`, because `RectangleVerticalIcon` has
+                no solid variant at all — the Icon docs name it specifically. */}
             {marks.goals > 0 ? (
-              <Icon name="sportscourt.fill" size={11} color="ink" filled />
+              <Icon name="sportscourt.fill" size={11} color="ink" solid />
             ) : (
               <RNText style={{ fontFamily: MONO_BOLD, fontSize: 9, color: '#111827' }}>A</RNText>
             )}
