@@ -340,3 +340,153 @@ export function subMinute(
   if (minutes === null || minutes <= 0) return null;
   return substitutionMinutes.has(minutes) ? minutes : null;
 }
+
+
+// =============================================================
+// Derived rates, and what counts as good
+// =============================================================
+// ⚠⚠ POSITION IS NOT A DETAIL HERE, IT IS THE WHOLE THING. Measured over 6,312
+// player rows, median pass accuracy by position:
+//
+//   defender 88%   midfielder 86%   forward 80%   goalkeeper 71%
+//
+// A striker passing at 80% had an ordinary afternoon; a defender passing at 80%
+// was in the bottom 15% of every defender in five leagues. One set of
+// thresholds would praise the first and say nothing about the second, which is
+// worse than showing no colour at all.
+//
+// ⚠ THE BANDS ARE THE 15th AND 85th PERCENTILES of players who actually did
+// enough of the thing to be measured — the same shape as the rating bands, and
+// for the same reason: the colour marks the outliers rather than grading
+// everyone against a number somebody made up.
+// =============================================================
+
+/** Below these, a percentage is noise rather than a rate. */
+export const MIN_FOR_RATE = {
+  passes: 10,
+  duels: 5,
+  dribbles: 3,
+  shots: 2,
+  saves: 2,
+} as const;
+
+type Band = { low: number; high: number };
+const BY_POSITION: Record<string, { pass: Band; duel: Band }> = {
+  G: { pass: { low: 54, high: 87 }, duel: { low: 30, high: 70 } },
+  D: { pass: { low: 78, high: 94 }, duel: { low: 38, high: 77 } },
+  M: { pass: { low: 74, high: 93 }, duel: { low: 30, high: 67 } },
+  F: { pass: { low: 64, high: 90 }, duel: { low: 25, high: 63 } },
+};
+/** An unknown position gets the midfielder's, the most central of the four. */
+const FALLBACK = BY_POSITION.M;
+
+/** Dribbling barely moves by position (p15 25-33, p85 75-78), so one band. */
+const DRIBBLE: Band = { low: 30, high: 76 };
+/** A keeper's save rate. p15 50, p50 67, p85 100 over 250 keeper-matches. */
+const SAVE: Band = { low: 50, high: 100 };
+
+/**
+ * Which raw row each rate makes redundant.
+ *
+ * ⚠ A RATE CARRIES ITS OWN COUNTS — "Pass accuracy · 26 of 28 · 93%" — so
+ * leaving "Passes 26 of 28" in the list below prints the same fact twice, a few
+ * hundred points apart, and makes the sheet longer for nothing. The mapping
+ * lives here rather than in the component so the two lists cannot drift.
+ *
+ * ⚠ ONLY WHEN THE RATE ACTUALLY APPEARS. Below the volume threshold there is no
+ * rate, and the raw row is then the only place the fact is recorded.
+ */
+export const RATE_COVERS: Record<string, string> = {
+  'Pass accuracy': 'Passes',
+  'Shot accuracy': 'Shots',
+  'Duels won': 'Duels won',
+  'Dribble success': 'Dribbles',
+};
+
+export type Rate = {
+  label: string;
+  /** 0-100, already rounded. */
+  pct: number;
+  detail: string;
+  band: RatingBand | null;
+};
+
+function bandFor(pct: number, b: Band): RatingBand {
+  if (pct >= b.high) return 'strong';
+  if (pct < b.low) return 'poor';
+  return 'par';
+}
+
+const pct = (a: number, b: number) => Math.round((a / b) * 100);
+
+/**
+ * The rates worth showing for this player, in reading order.
+ *
+ * ⚠ A RATE NEEDS A DENOMINATOR WORTH DIVIDING BY. "1 of 1 = 100%" is not a
+ * shooting accuracy, it is one shot. Below `MIN_FOR_RATE` the row is omitted
+ * entirely and the raw counts in the list below still say what happened.
+ *
+ * ⚠ SHOT ACCURACY IS SHOWN BUT NEVER COLOURED. At two or three shots the
+ * measured 85th percentile is 100% for every position on the pitch — which
+ * means the band would be telling you about the sample size rather than the
+ * player.
+ */
+export function playerRates(s: MatchPlayerStat): Rate[] {
+  const out: Rate[] = [];
+  const pos = BY_POSITION[s.position ?? ''] ?? FALLBACK;
+
+  if ((s.passesTotal ?? 0) >= MIN_FOR_RATE.passes && s.passesAccurate !== null) {
+    const v = pct(s.passesAccurate, s.passesTotal as number);
+    out.push({
+      label: 'Pass accuracy',
+      pct: v,
+      detail: `${s.passesAccurate} of ${s.passesTotal}`,
+      band: bandFor(v, pos.pass),
+    });
+  }
+
+  if (s.position === 'G') {
+    const faced = (s.saves ?? 0) + (s.goalsConceded ?? 0);
+    if (faced >= MIN_FOR_RATE.saves) {
+      const v = pct(s.saves ?? 0, faced);
+      out.push({
+        label: 'Save rate',
+        pct: v,
+        detail: `${s.saves ?? 0} of ${faced} faced`,
+        band: bandFor(v, SAVE),
+      });
+    }
+  }
+
+  if ((s.shotsTotal ?? 0) >= MIN_FOR_RATE.shots && s.shotsOn !== null) {
+    const v = pct(s.shotsOn, s.shotsTotal as number);
+    out.push({
+      label: 'Shot accuracy',
+      pct: v,
+      detail: `${s.shotsOn} on target of ${s.shotsTotal}`,
+      band: null,
+    });
+  }
+
+  if ((s.duelsTotal ?? 0) >= MIN_FOR_RATE.duels && s.duelsWon !== null) {
+    const v = pct(s.duelsWon, s.duelsTotal as number);
+    out.push({
+      label: 'Duels won',
+      pct: v,
+      detail: `${s.duelsWon} of ${s.duelsTotal}`,
+      band: bandFor(v, pos.duel),
+    });
+  }
+
+  if ((s.dribblesAttempts ?? 0) >= MIN_FOR_RATE.dribbles && s.dribblesSuccess !== null) {
+    const v = pct(s.dribblesSuccess, s.dribblesAttempts as number);
+    out.push({
+      label: 'Dribble success',
+      pct: v,
+      detail: `${s.dribblesSuccess} of ${s.dribblesAttempts}`,
+      band: bandFor(v, DRIBBLE),
+    });
+  }
+
+  return out;
+}

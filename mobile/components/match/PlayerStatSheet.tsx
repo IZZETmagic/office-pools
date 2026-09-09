@@ -17,6 +17,9 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 import {
   formatRating,
   playerPhotoUrl,
+  playerRates,
+  RATE_COVERS,
+  RATING_COLOR,
   ratingColor,
   statGroups,
   headlineParts,
@@ -72,7 +75,13 @@ export function PlayerStatSheet({
 
   const rating = formatRating(stat.rating);
   const colour = ratingColor(stat.rating);
-  const groups = statGroups(stat);
+  const rates = playerRates(stat);
+  // ⚠ A rate carries its own counts, so the raw row it came from would print
+  // the same fact twice. See RATE_COVERS.
+  const covered = new Set(rates.map((r) => RATE_COVERS[r.label]).filter(Boolean));
+  const groups = statGroups(stat)
+    .map((g) => ({ ...g, rows: g.rows.filter((r) => !covered.has(r.label)) }))
+    .filter((g) => g.rows.length > 0);
   const headline = headlineParts(stat);
   const photo = playerPhotoUrl(stat.externalPlayerId);
 
@@ -230,8 +239,104 @@ export function PlayerStatSheet({
               // no indicator gives a reader nothing to go on either way.
               showsVerticalScrollIndicator
             >
+              {/* ⚠⚠ THE RATES COME FIRST, AND THEY ARE THE POINT OF THE SHEET.
+                  A column of raw counts tells you what happened; a rate tells
+                  you whether it was any good, which is the question somebody
+                  opened this to answer. They are derived from the counts below
+                  rather than fetched — no extra column, no extra call. */}
+              {rates.length > 0 ? (
+                <View
+                  style={{
+                    backgroundColor: withOpacity(theme.colors.slate, 0.07),
+                    borderRadius: theme.radii.md,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    marginBottom: 18,
+                    gap: 12,
+                  }}
+                >
+                  {rates.map((r) => {
+                    const tone = r.band ? RATING_COLOR[r.band] : theme.colors.slate;
+                    return (
+                      <View key={r.label} style={{ gap: 5 }}>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'baseline',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <RNText
+                            style={{
+                              fontFamily: fontFamilies.medium,
+                              fontSize: 13,
+                              color: theme.colors.ink,
+                            }}
+                          >
+                            {r.label}
+                          </RNText>
+                          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                            <RNText
+                              style={{
+                                fontFamily: fontFamilies.regular,
+                                fontSize: 11,
+                                color: theme.colors.slate,
+                              }}
+                            >
+                              {r.detail}
+                            </RNText>
+                            <RNText
+                              style={{
+                                fontFamily: MONO_BOLD,
+                                fontSize: 15,
+                                color: tone,
+                                fontVariant: ['tabular-nums'],
+                              }}
+                            >
+                              {r.pct}%
+                            </RNText>
+                          </View>
+                        </View>
+                        {/* ⚠ THE BAR IS THE VALUE, NOT A RANKING. It fills to the
+                            percentage itself; the COLOUR is what carries how that
+                            compares to everyone else in his position. Two
+                            encodings of the same thing would be one too many. */}
+                        <View
+                          style={{
+                            height: 4,
+                            borderRadius: 2,
+                            backgroundColor: withOpacity(theme.colors.slate, 0.15),
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: `${Math.max(2, Math.min(100, r.pct))}%`,
+                              height: 4,
+                              borderRadius: 2,
+                              backgroundColor: tone,
+                            }}
+                          />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
+
               {groups.map((g) => (
-                <View key={g.title} style={{ marginBottom: 18 }}>
+                <View
+                  key={g.title}
+                  style={{
+                    marginBottom: 12,
+                    borderRadius: theme.radii.md,
+                    borderWidth: 1,
+                    borderColor: withOpacity(theme.colors.slate, 0.14),
+                    paddingHorizontal: 14,
+                    paddingTop: 10,
+                    paddingBottom: 4,
+                  }}
+                >
                   <RNText
                     style={{
                       fontFamily: fontFamilies.semibold,
@@ -239,7 +344,7 @@ export function PlayerStatSheet({
                       letterSpacing: 0.8,
                       textTransform: 'uppercase',
                       color: theme.colors.slate,
-                      marginBottom: 8,
+                      marginBottom: 6,
                     }}
                   >
                     {g.title}
@@ -253,7 +358,7 @@ export function PlayerStatSheet({
                         alignItems: 'center',
                         paddingVertical: 7,
                         borderTopWidth: i === 0 ? 0 : 1,
-                        borderTopColor: withOpacity(theme.colors.slate, 0.12),
+                        borderTopColor: withOpacity(theme.colors.slate, 0.10),
                       }}
                     >
                       <RNText

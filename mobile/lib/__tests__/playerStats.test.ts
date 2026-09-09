@@ -23,6 +23,8 @@ import {
   ratingColor,
   playerMarkers,
   playerPhotoUrl,
+  playerRates,
+  RATE_COVERS,
   subMinute,
   statGroups,
   teamRating,
@@ -309,5 +311,94 @@ describe('subMinute — `minutes` proposes, the timeline confirms', () => {
 
   it('⚠ a sending-off never gets a substitution minute', () => {
     expect(subMinute(player({ isStarter: true, minutes: 34, redCards: 1 }), new Set([34]))).toBeNull();
+  });
+});
+
+describe('playerRates — derived rates, banded by position', () => {
+  it('⚠⚠ the SAME pass accuracy reads differently by position', () => {
+    // Measured 15th percentiles: D 78%, M 74%, F 64%. So 70% is a perfectly
+    // ordinary afternoon for a striker and the bottom 15% of every defender in
+    // five leagues — one set of thresholds would have to be wrong about one of
+    // them. (My first attempt at this test used 80%, which is above the
+    // defender's p15 of 78 and proves nothing.)
+    const passing = { passesTotal: 100, passesAccurate: 70 };
+    const striker = playerRates(player({ position: 'F', ...passing }))[0];
+    const defender = playerRates(player({ position: 'D', ...passing }))[0];
+    expect(striker.pct).toBe(70);
+    expect(defender.pct).toBe(70);
+    expect(striker.band).toBe('par');
+    expect(defender.band).toBe('poor');
+  });
+
+  it('⚠ a rate needs a denominator worth dividing by', () => {
+    // "1 of 1 = 100%" is not a shooting accuracy, it is one shot.
+    expect(playerRates(player({ passesTotal: 9, passesAccurate: 9 }))).toHaveLength(0);
+    expect(playerRates(player({ passesTotal: 10, passesAccurate: 9 }))).toHaveLength(1);
+    expect(playerRates(player({ shotsTotal: 1, shotsOn: 1 }))).toHaveLength(0);
+  });
+
+  it('⚠⚠ shot accuracy is shown but never coloured', () => {
+    // At two or three shots the measured 85th percentile is 100% for every
+    // position, so a band would describe the sample size, not the player.
+    const r = playerRates(player({ shotsTotal: 3, shotsOn: 3 }))[0];
+    expect(r.label).toBe('Shot accuracy');
+    expect(r.pct).toBe(100);
+    expect(r.band).toBeNull();
+  });
+
+  it('a keeper gets a save rate; an outfielder never does', () => {
+    const gk = playerRates(player({ position: 'G', saves: 4, goalsConceded: 1 }));
+    expect(gk.find((r) => r.label === 'Save rate')?.pct).toBe(80);
+    const out = playerRates(player({ position: 'D', saves: 4, goalsConceded: 1 }));
+    expect(out.find((r) => r.label === 'Save rate')).toBeUndefined();
+  });
+
+  it('an unknown position falls back rather than vanishing', () => {
+    const r = playerRates(player({ position: null, passesTotal: 100, passesAccurate: 86 }));
+    expect(r[0].band).toBe('par');
+  });
+
+  it('every rate carries the raw counts it came from', () => {
+    const r = playerRates(
+      player({ passesTotal: 28, passesAccurate: 26, duelsTotal: 12, duelsWon: 7 }),
+    );
+    expect(r.find((x) => x.label === 'Pass accuracy')!.detail).toBe('26 of 28');
+    expect(r.find((x) => x.label === 'Duels won')!.detail).toBe('7 of 12');
+  });
+
+  it('a player who did nothing measurable gets no rates at all', () => {
+    expect(playerRates(player())).toEqual([]);
+  });
+});
+
+describe('RATE_COVERS — a fact is printed once', () => {
+  it('⚠ every rate that duplicates a raw row names it', () => {
+    // If a rate carries "26 of 28" then "Passes 26 of 28" below is the same
+    // fact twice, a few hundred points apart.
+    const busy = player({
+      passesTotal: 28, passesAccurate: 26,
+      shotsTotal: 3, shotsOn: 2,
+      duelsTotal: 12, duelsWon: 7,
+      dribblesAttempts: 5, dribblesSuccess: 4,
+    });
+    const rates = playerRates(busy);
+    expect(rates.length).toBe(4);
+    for (const r of rates) expect(RATE_COVERS[r.label]).toBeTruthy();
+  });
+
+  it('⚠⚠ every name in the map is a row `statGroups` actually produces', () => {
+    // The two lists are in different functions and would drift silently — a
+    // typo here would leave a duplicate on screen and nothing would fail.
+    const busy = player({
+      position: 'F',
+      passesTotal: 28, passesAccurate: 26,
+      shotsTotal: 3, shotsOn: 2,
+      duelsTotal: 12, duelsWon: 7,
+      dribblesAttempts: 5, dribblesSuccess: 4,
+    });
+    const labels = new Set(statGroups(busy).flatMap((g) => g.rows.map((r) => r.label)));
+    for (const rowLabel of Object.values(RATE_COVERS)) {
+      expect(labels.has(rowLabel), `statGroups has no row called "${rowLabel}"`).toBe(true);
+    }
   });
 });
