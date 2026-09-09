@@ -591,7 +591,24 @@ function Shirt({
           ⚠ AND IT DOES NOT TRUNCATE. `numberOfLines` is gone: a name too long
           for its column wraps to a second line rather than losing its ending,
           because the ending is the part that identifies a player. */}
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+      {/* ⚠ `center`, NOT `baseline`. The armband is a View and a View has no
+          baseline, so it would drop out of alignment with the two texts. At
+          10pt against 11pt the centre and the baseline are a fraction apart. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {stat?.isCaptain ? (
+          <View
+            style={{
+              width: 13,
+              height: 13,
+              borderRadius: 6.5,
+              backgroundColor: '#FFFFFF',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <RNText style={{ fontFamily: MONO_BOLD, fontSize: 8, color: '#111827' }}>C</RNText>
+          </View>
+        ) : null}
         {player.number !== null && player.number !== undefined ? (
           <RNText
             style={{

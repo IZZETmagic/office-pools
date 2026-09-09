@@ -7,9 +7,9 @@ import { formatRating, ratingColor, type PlayerMarkers } from '@/lib/playerStats
 // =============================================================
 // What goes where around a player
 // =============================================================
-// ⚠⚠ SIX SLOTS, ONE FACT EACH, AND THE MAP BELOW IS THE SPEC. Every badge on
-// the pitch is placed from `SLOT` and nowhere else, so the layout can be read
-// in one place instead of inferred from six scattered `position: absolute`
+// ⚠⚠ FIVE SLOTS, ONE FACT EACH, AND THE MAP BELOW IS THE SPEC. Every badge on
+// the pitch is placed from `slots()` and nowhere else, so the layout can be
+// read in one place instead of inferred from scattered `position: absolute`
 // blocks. They collided twice while this was inline — the rating and the goal
 // both claimed bottom-right, and the armband and a booking were both amber
 // sitting one above the other.
@@ -18,13 +18,21 @@ import { formatRating, ratingColor, type PlayerMarkers } from '@/lib/playerStats
 //                     (   )
 //             yellow  (   )  red
 //                     ( _ )
-//           captain    ` '   goals / assists
+//                      ` '   goals / assists
+//
+//                    C  17  Tzolis
 //
 // ⚠ THE PAIRINGS ARE DELIBERATE, NOT ARBITRARY. Yellow and red sit opposite
 // each other because they are the same kind of fact and the eye should not have
 // to hunt for the second one. The two that mean "he left" and "how well he
-// played" take the top, where they are read first. The two that are about
-// contribution — the armband and the goals — take the bottom.
+// played" take the top, where they are read first.
+//
+// ⚠ THE ARMBAND IS NOT HERE — IT IS ON THE NAME ROW, ahead of the number. It is
+// the one marker that is not about this match: a captain is a captain before
+// kickoff and stays one whether or not he touches the ball, so it belongs with
+// the things that identify him rather than with the things that happened to
+// him. That also leaves bottom-left empty, which is worth something on a circle
+// that can already be wearing four.
 //
 // ⚠⚠ MULTIPLES STACK, THEY DO NOT COUNT. Two goals are two footballs fanned
 // behind each other, not a ball with a "2" beside it. A count is a thing you
@@ -36,7 +44,7 @@ import { formatRating, ratingColor, type PlayerMarkers } from '@/lib/playerStats
 export const MARK = 17;
 
 /**
- * The six anchors. `CHIP` is the circle's diameter, passed in because the
+ * The five anchors. `chip` is the circle's diameter, passed in because the
  * pitch owns that number and this file should not have a second opinion on it.
  */
 export function slots(chip: number) {
@@ -46,7 +54,6 @@ export function slots(chip: number) {
     rating: { top: -5, right: -MARK / 2 },
     yellow: { top: mid, left: -MARK / 2 + 2 },
     red: { top: mid, right: -MARK / 2 + 2 },
-    captain: { bottom: -3, left: -MARK / 2 + 1 },
     scoring: { bottom: -3, right: -MARK / 2 },
   } as const;
 }
@@ -205,29 +212,6 @@ export function PlayerBadges({
           <Fan count={marks.red} away={-1}>
             <Card tone="red" />
           </Fan>
-        </View>
-      ) : null}
-
-      {/* ---- bottom left: the armband ------------------------------- */}
-      {marks.captain ? (
-        <View style={{ position: 'absolute', ...S.captain }}>
-          <View
-            style={{
-              width: 14,
-              height: 14,
-              borderRadius: 7,
-              // ⚠ WHITE, NOT YELLOW. An amber armband under an amber booking on
-              // the same edge is a clash the eye resolves twice. A card MUST
-              // keep its colour, because for a card the colour IS the fact.
-              backgroundColor: '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(0,0,0,0.15)',
-            }}
-          >
-            <RNText style={{ ...dark, fontSize: 8 }}>C</RNText>
-          </View>
         </View>
       ) : null}
 
