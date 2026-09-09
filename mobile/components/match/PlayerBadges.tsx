@@ -7,32 +7,40 @@ import { formatRating, ratingColor, type PlayerMarkers } from '@/lib/playerStats
 // =============================================================
 // What goes where around a player
 // =============================================================
-// ⚠⚠ FIVE SLOTS, ONE FACT EACH, AND THE MAP BELOW IS THE SPEC. Every badge on
+// ⚠⚠ SIX SLOTS, ONE FACT EACH, AND THE MAP BELOW IS THE SPEC. Every badge on
 // the pitch is placed from `slots()` and nowhere else, so the layout can be
 // read in one place instead of inferred from scattered `position: absolute`
 // blocks. They collided twice while this was inline — the rating and the goal
 // both claimed bottom-right, and the armband and a booking were both amber
 // sitting one above the other.
 //
+//              66'
 //        substitution  ( )  rating
 //                     (   )
 //             yellow  (   )  red
 //                     ( _ )
-//                      ` '   goals / assists
+//            assists   ` '   goals
 //
 //                    C  17  Tzolis
 //
-// ⚠ THE PAIRINGS ARE DELIBERATE, NOT ARBITRARY. Yellow and red sit opposite
-// each other because they are the same kind of fact and the eye should not have
-// to hunt for the second one. The two that mean "he left" and "how well he
-// played" take the top, where they are read first.
+// ⚠ THE PAIRINGS ARE DELIBERATE, NOT ARBITRARY. Each edge holds two facts of
+// the same kind, so the eye never has to hunt for the other half of a pair:
+// yellow opposite red across the middle, and what he MADE opposite what he
+// SCORED across the bottom. The top pair is "he left" and "how well he played",
+// which are the two read first.
+//
+// ⚠⚠ THE MINUTE FLOATS ABOVE THE ARROW AND DOES NOT MOVE IT. The arrow's slot
+// is the anchor; the minute is positioned off it. Stacking them in one column
+// pushed the arrow DOWN by the height of a line of text whenever a minute was
+// present — far enough to collide with the booking below it, which is exactly
+// what the pitch showed.
 //
 // ⚠ THE ARMBAND IS NOT HERE — IT IS ON THE NAME ROW, ahead of the number. It is
 // the one marker that is not about this match: a captain is a captain before
 // kickoff and stays one whether or not he touches the ball, so it belongs with
 // the things that identify him rather than with the things that happened to
-// him. That also leaves bottom-left empty, which is worth something on a circle
-// that can already be wearing four.
+// him. Vacating bottom-left is what let the assists come out from behind the
+// goals, where a player with both used to show only the goals.
 //
 // ⚠⚠ MULTIPLES STACK, THEY DO NOT COUNT. Two goals are two footballs fanned
 // behind each other, not a ball with a "2" beside it. A count is a thing you
@@ -44,7 +52,7 @@ import { formatRating, ratingColor, type PlayerMarkers } from '@/lib/playerStats
 export const MARK = 17;
 
 /**
- * The five anchors. `chip` is the circle's diameter, passed in because the
+ * The six anchors. `chip` is the circle's diameter, passed in because the
  * pitch owns that number and this file should not have a second opinion on it.
  */
 export function slots(chip: number) {
@@ -54,7 +62,8 @@ export function slots(chip: number) {
     rating: { top: -5, right: -MARK / 2 },
     yellow: { top: mid, left: -MARK / 2 + 2 },
     red: { top: mid, right: -MARK / 2 + 2 },
-    scoring: { bottom: -3, right: -MARK / 2 },
+    assist: { bottom: -3, left: -MARK / 2 },
+    goal: { bottom: -3, right: -MARK / 2 },
   } as const;
 }
 
@@ -152,20 +161,27 @@ export function PlayerBadges({
     <>
       {/* ---- top left: he left, or he arrived ------------------------ */}
       {marks.cameOff || marks.cameOn ? (
-        <View style={{ position: 'absolute', ...S.substitution, alignItems: 'center' }}>
-          {/* ⚠ THE MINUTE SITS ABOVE THE ARROW and appears only when the
-              timeline confirmed it. See `subMinute`: `minutes` alone is out by
-              more than a minute for 5.9% of players, and a made-up minute
-              beside a face is worse than none. */}
+        <View style={{ position: 'absolute', ...S.substitution, width: MARK, height: MARK }}>
+          {/* ⚠⚠ ABSOLUTE, SO THE ARROW DOES NOT MOVE. In a column the minute
+              pushed the arrow down by a whole line of text — into the booking
+              below it. The arrow owns the slot; the minute hangs off it.
+
+              ⚠ It appears only when the timeline confirmed it: `minutes` alone
+              is out by more than a minute for 5.9% of players, and a made-up
+              minute beside a face is worse than no minute at all. */}
           {subMinute !== null ? (
             <RNText
               style={{
+                position: 'absolute',
+                bottom: MARK + 1,
+                left: -8,
+                right: -8,
+                textAlign: 'center',
                 fontFamily: MONO_BOLD,
                 fontSize: 9,
                 color: '#FFFFFF',
                 textShadowColor: 'rgba(0,0,0,0.7)',
                 textShadowRadius: 3,
-                marginBottom: 1,
               }}
             >
               {subMinute}&apos;
@@ -215,23 +231,29 @@ export function PlayerBadges({
         </View>
       ) : null}
 
-      {/* ---- bottom right: what he produced ------------------------- */}
-      {marks.goals > 0 || marks.assists > 0 ? (
-        <View style={{ position: 'absolute', ...S.scoring, width: MARK, height: MARK }}>
-          {/* ⚠ GOALS OUTRANK ASSISTS FOR THE SLOT. A player with both shows his
-              goals; the assist is in the sheet. Fanning six badges off one
-              corner would be a pile, not a stack. */}
-          <Fan count={marks.goals > 0 ? marks.goals : marks.assists} away={-1}>
+      {/* ---- bottom left: what he made ------------------------------ */}
+      {marks.assists > 0 ? (
+        <View style={{ position: 'absolute', ...S.assist, width: MARK, height: MARK }}>
+          {/* ⚠ 'A', NOT A BOOT. There is no boot in this icon set, and
+              borrowing another glyph would invent a symbol nobody was taught. */}
+          <Fan count={marks.assists} away={1}>
             <Pill color="#FFFFFF">
-              {marks.goals > 0 ? (
-                // ⚠ `solid`, NOT `filled` — `filled` paints the free glyph's
-                // closed paths and a football's outer ring is closed, so it
-                // renders as a plain dark disc. The cards above are the reverse:
-                // RectangleVerticalIcon has no solid variant at all.
-                <Icon name="sportscourt.fill" size={11} color="ink" solid />
-              ) : (
-                <RNText style={dark}>A</RNText>
-              )}
+              <RNText style={dark}>A</RNText>
+            </Pill>
+          </Fan>
+        </View>
+      ) : null}
+
+      {/* ---- bottom right: what he scored --------------------------- */}
+      {marks.goals > 0 ? (
+        <View style={{ position: 'absolute', ...S.goal, width: MARK, height: MARK }}>
+          <Fan count={marks.goals} away={-1}>
+            <Pill color="#FFFFFF">
+              {/* ⚠ `solid`, NOT `filled` — `filled` paints the free glyph's
+                  closed paths and a football's outer ring is closed, so it
+                  renders as a plain dark disc. The cards are the reverse:
+                  RectangleVerticalIcon has no solid variant at all. */}
+              <Icon name="sportscourt.fill" size={11} color="ink" solid />
             </Pill>
           </Fan>
         </View>
