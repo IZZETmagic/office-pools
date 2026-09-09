@@ -39,44 +39,67 @@ async function request<T>(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 8000)
 
-  let attempt = 0
-  let lastErr: unknown = null
-  while (attempt < 3) {
-    try {
-      const res = await fetch(url, {
-        headers: { 'x-apisports-key': key, accept: 'application/json' },
-        signal: controller.signal,
-        cache: 'no-store',
-      })
-      lastQuota = {
-        requestsRemaining: numericHeader(res.headers.get('x-ratelimit-requests-remaining')),
-        rateLimitRemaining: numericHeader(res.headers.get('x-ratelimit-remaining')),
-      }
-      if (res.status >= 500) {
-        lastErr = new Error(`api-football ${res.status}`)
+  try {
+    let attempt = 0
+    let lastErr: unknown = null
+    while (attempt < 3) {
+      try {
+        const res = await fetch(url, {
+          headers: { 'x-apisports-key': key, accept: 'application/json' },
+          signal: controller.signal,
+          cache: 'no-store',
+        })
+        lastQuota = {
+          requestsRemaining: numericHeader(res.headers.get('x-ratelimit-requests-remaining')),
+          rateLimitRemaining: numericHeader(res.headers.get('x-ratelimit-remaining')),
+        }
+        if (res.status >= 500) {
+          lastErr = new Error(`api-football ${res.status}`)
+          attempt++
+          await sleep(250 * 2 ** attempt)
+          continue
+        }
+        if (!res.ok) {
+          const body = await res.text().catch(() => '')
+          if (opts.strict) throw new NonRetryableStatus(`api-football ${res.status}: ${body}`)
+          return { get: path, parameters: {}, errors: body, results: 0, paging: { current: 1, total: 1 }, response: [] }
+        }
+        return (await res.json()) as ApiFootballEnvelope<T>
+      } catch (e) {
+        // ⚠⚠ A 4xx MUST NOT BE RETRIED, AND USED TO BE. The strict throw above
+        // is raised INSIDE this try, so its own catch swallowed it and went
+        // round again — three requests, 3.5s of backoff, for an answer that
+        // could not change. On a 429 that is the worst possible response: the
+        // per-minute limit is 300 and we were spending three of them, twice
+        // over, to be told the same thing. Measured by the guard's own tests.
+        if (e instanceof NonRetryableStatus) throw e
+        lastErr = e
+        if (e instanceof Error && e.name === 'AbortError') break
         attempt++
         await sleep(250 * 2 ** attempt)
-        continue
       }
-      if (!res.ok) {
-        const body = await res.text().catch(() => '')
-        if (opts.strict) throw new Error(`api-football ${res.status}: ${body}`)
-        return { get: path, parameters: {}, errors: body, results: 0, paging: { current: 1, total: 1 }, response: [] }
-      }
-      return (await res.json()) as ApiFootballEnvelope<T>
-    } catch (e) {
-      lastErr = e
-      if (e instanceof Error && e.name === 'AbortError') break
-      attempt++
-      await sleep(250 * 2 ** attempt)
-    } finally {
-      if (attempt >= 3 || lastErr === null) clearTimeout(timeout)
     }
+    if (opts.strict) throw lastErr instanceof Error ? lastErr : new Error('api-football request failed')
+    return { get: path, parameters: {}, errors: String(lastErr), results: 0, paging: { current: 1, total: 1 }, response: [] }
+  } finally {
+    // ⚠ ONE PLACE, ALWAYS. The old condition (`attempt >= 3 || lastErr === null`)
+    // left the timer running whenever a retry SUCCEEDED after a 5xx, and an
+    // 8-second timer holding a serverless invocation open is a cost nobody
+    // attributes to the request that caused it.
+    clearTimeout(timeout)
   }
-  clearTimeout(timeout)
-  if (opts.strict) throw lastErr instanceof Error ? lastErr : new Error('api-football request failed')
-  return { get: path, parameters: {}, errors: String(lastErr), results: 0, paging: { current: 1, total: 1 }, response: [] }
 }
+
+/**
+ * A status the provider will keep giving us — 4xx. Retrying it spends calls to
+ * be refused again, so it leaves the retry loop immediately.
+ *
+ * ⚠ The 8-second timeout is a budget for ALL THREE attempts, not one each,
+ * because the controller is created once outside the loop. That is worth
+ * knowing before raising the retry count: the backoff sleeps come out of the
+ * same budget.
+ */
+class NonRetryableStatus extends Error {}
 
 function numericHeader(v: string | null): number | null {
   if (v === null) return null
@@ -108,9 +131,45 @@ export async function getFixtureById(id: number): Promise<ApiFootballFixture | n
   return env.response[0] ?? null
 }
 
-export async function getFixtureEvents(fixtureId: number): Promise<ApiFootballEvent[]> {
-  const env = await request<ApiFootballEvent>('/fixtures/events', { fixture: fixtureId })
+/**
+ * The three per-fixture reads, and the one rule they all have to obey.
+ *
+ * ⚠⚠ AN EMPTY RESPONSE IS NOT EVIDENCE OF AN EMPTY MATCH, AND THE CALLERS
+ * DELETE. Steps 7b3 and 7b4 are replace-all — they clear the fixture's rows and
+ * re-insert what came back — so a refusal that arrives as `[]` does not merely
+ * skip an update, it ERASES the timeline or the stat card and writes nothing
+ * back. `scripts/backfill-match-events.ts` has the same shape across every
+ * fixture in a run.
+ *
+ * ⚠⚠ AND THE PROVIDER REFUSES WITH HTTP 200. A rejected parameter, a plan
+ * restriction and an exhausted daily allowance all come back `200` with
+ * `response: []` and a populated `errors` field — verified against the live API
+ * on 2026-09-09 for all three of these paths:
+ *   /fixtures/events?fixture=abc  ->  200 {"errors":{"fixture":"...integer."}}
+ * So `res.ok` is true, `opts.strict` never fires, and the rate-limit headers
+ * are present and healthy-looking on a refusal. `getFixturesAllPages` has read
+ * `errors` since L3 for exactly this reason; these three did not, which left
+ * the daily quota running out as a data-DELETION event rather than a stale one.
+ *
+ * ⚠ A GENUINELY UNKNOWN FIXTURE ANSWERS `errors: []`, which is what makes the
+ * check a clean discriminator rather than a guess: `/fixtures/events?fixture=
+ * 999999999` returns an empty response with NO errors. Empty-with-errors is a
+ * refusal; empty-without is really nothing, and the callers may act on it.
+ *
+ * ⚠ STRICT, SO A TIMEOUT OR A 5xx THROWS TOO. Those return `[]` from `request`
+ * as well, and an empty array from a dead socket deletes exactly as thoroughly
+ * as one from a refusal.
+ */
+async function fixtureSubresource<T>(path: string, fixtureId: number): Promise<T[]> {
+  const env = await request<T>(path, { fixture: fixtureId }, { strict: true })
+  if (hasEnvelopeErrors(env.errors)) {
+    throw new Error(`api-football ${path} refused: ${JSON.stringify(env.errors)}`)
+  }
   return env.response
+}
+
+export async function getFixtureEvents(fixtureId: number): Promise<ApiFootballEvent[]> {
+  return fixtureSubresource<ApiFootballEvent>('/fixtures/events', fixtureId)
 }
 
 /**
@@ -121,14 +180,13 @@ export async function getFixtureEvents(fixtureId: number): Promise<ApiFootballEv
  * does, which is exactly why the sync's line-up arm retries rather than
  * recording a fixture as done the first time it asks.
  *
- * Non-strict like `getFixtureEvents`: a refused request comes back as an empty
- * envelope and the caller's try/catch never fires. That is deliberate here —
- * "no line-up yet" and "the provider is unhappy" are both "nothing to write",
- * and the arm retries either way.
+ * That empty is now distinguishable from a refusal — see `fixtureSubresource`.
+ * Before, "no line-up yet" and "the provider is unhappy" were the same value,
+ * which was survivable here only because the arm retries; the same swallow in
+ * 7b3 was not survivable at all.
  */
 export async function getFixtureLineups(fixtureId: number): Promise<ApiFootballLineup[]> {
-  const env = await request<ApiFootballLineup>('/fixtures/lineups', { fixture: fixtureId })
-  return env.response
+  return fixtureSubresource<ApiFootballLineup>('/fixtures/lineups', fixtureId)
 }
 
 /**
@@ -142,10 +200,7 @@ export async function getFixtureLineups(fixtureId: number): Promise<ApiFootballL
 export async function getFixtureStatistics(
   fixtureId: number,
 ): Promise<ApiFootballTeamStatistics[]> {
-  const env = await request<ApiFootballTeamStatistics>('/fixtures/statistics', {
-    fixture: fixtureId,
-  })
-  return env.response
+  return fixtureSubresource<ApiFootballTeamStatistics>('/fixtures/statistics', fixtureId)
 }
 
 /**

@@ -732,6 +732,19 @@ export async function syncLeagueFixtures(
         homeExternalTeamId: fx.teams.home.id,
       })
 
+      // ⚠ AN EMPTY SET WRITES NOTHING AND DELETES NOTHING — the rule 7b5 and
+      // `backfill-match-lineups-stats.ts` already follow. A refusal now throws
+      // before it can reach here (see `fixtureSubresource`), so an empty at
+      // this point means the provider genuinely holds no statistics for the
+      // fixture; that is a reason to leave what we have alone, not to clear it.
+      //
+      // ⚠ AND THIS IS WHY 7b3 IS DIFFERENT, not an inconsistency. A stat never
+      // vanishes as a correction — it goes to zero, and zero is sent as a
+      // value. An EVENT does vanish: a VAR-disallowed goal is removed from the
+      // payload rather than marked, so for the timeline an empty set is a
+      // meaningful instruction and must still delete.
+      if (rows.length === 0) continue
+
       // ⚠ REPLACE-ALL, AS 7b3. The provider revises these mid-match and an
       // upsert would need a stable key per (fixture, side) plus a diff of
       // nineteen nullable columns to work out what it revised. Two rows.

@@ -782,6 +782,57 @@ describe('syncLeagueFixtures — writes the timeline', () => {
     expect(del!.filters.join(' ')).toContain('eq(fixture_id,fx-1)')
   })
 
+  it('⚠⚠ a REFUSED events call deletes nothing — the quota must not erase a timeline', async () => {
+    // The whole point of the guard. api-football answers an exhausted daily
+    // allowance with HTTP 200 and `response: []`, so before 2026-09-09 a
+    // refusal reached this arm as "no events", and replace-all then cleared the
+    // fixture's timeline and wrote nothing back. Worst on the completion tick,
+    // which fires exactly once: the match would end with a blank timeline and
+    // nothing would ever revisit it.
+    getFixtureEvents.mockClear()
+    getFixtureEvents.mockRejectedValueOnce(
+      new Error('api-football /fixtures/events refused: {"requests":"limit reached"}'),
+    )
+    const { client, deletes, inserts } = db((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: changedRows(), error: null }
+        : { data: { ok: true }, error: null },
+    )
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(deletes.find((d) => d.table === 'match_events')).toBeUndefined()
+    expect(inserts.find((i) => i.table === 'match_events')).toBeUndefined()
+    // And it is recorded rather than swallowed.
+    expect(JSON.stringify(r.errors ?? [])).toContain('refused')
+  })
+
+  it('⚠⚠ a REFUSED statistics call deletes nothing either', async () => {
+    getFixtureStatistics.mockClear()
+    getFixtureStatistics.mockRejectedValueOnce(new Error('api-football /fixtures/statistics refused: {}'))
+    const { client, deletes } = db((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: changedRows({ is_completed: true, status: 'completed' }), error: null }
+        : { data: { ok: true }, error: null },
+    )
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(deletes.find((d) => d.table === 'match_team_stats')).toBeUndefined()
+  })
+
+  it('⚠ an EMPTY statistics set also deletes nothing', async () => {
+    // Distinct from the timeline on purpose. A stat never vanishes as a
+    // correction — it goes to zero, and zero is sent as a value — so an empty
+    // set means the provider holds nothing, which is a reason to leave what we
+    // have alone. An EVENT does vanish (VAR), so 7b3 must still delete on empty.
+    getFixtureStatistics.mockClear()
+    getFixtureStatistics.mockResolvedValueOnce([] as never)
+    const { client, deletes } = db((fn) =>
+      fn === 'league_apply_fixture_sync'
+        ? { data: changedRows({ is_completed: true, status: 'completed' }), error: null }
+        : { data: { ok: true }, error: null },
+    )
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(deletes.find((d) => d.table === 'match_team_stats')).toBeUndefined()
+  })
+
   it('writes referee and the half-time pair together', async () => {
     getFixtureEvents.mockClear()
     getFixtureEvents.mockResolvedValueOnce([] as never)
