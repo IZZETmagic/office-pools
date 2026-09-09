@@ -754,22 +754,26 @@ export async function syncLeagueFixtures(
       // so an upsert leaves a disallowed goal on the screen permanently. The
       // set is a handful of rows; deleting and re-inserting is cheaper than any
       // scheme for working out what vanished.
-      const { error: delErr } = await admin
-        .from('match_events')
-        .delete()
-        .eq('fixture_id', c.fixture_id)
-      if (delErr) {
-        push('league_timeline', delErr.message, { fixture_id: c.fixture_id })
+      //
+      // ⚠⚠ AND IT IS ONE STATEMENT NOW, NOT TWO. This was a DELETE call followed
+      // by an INSERT call, with nothing holding them together — so a dropped
+      // socket between them left the fixture with NO timeline rather than a
+      // stale one. That is not hypothetical: on 2026-09-09 the line-up backfill
+      // lost fixture 1575143 that exact way, `lineup insert: TypeError: fetch
+      // failed` after its delete had already committed. Migration 140 moved the
+      // pair into a plpgsql function, which runs in a transaction: both or
+      // neither. See `140_both_or_neither.sql` for why an upsert could not do
+      // this — every unique index here is partial, and PostgREST cannot name an
+      // index predicate.
+      const { error: wErr } = await admin.rpc('replace_match_events', {
+        p_fixture_id: c.fixture_id,
+        p_rows: timeline,
+      })
+      if (wErr) {
+        push('league_timeline', wErr.message, { fixture_id: c.fixture_id })
         continue
       }
-      if (timeline.length > 0) {
-        const { error: insErr } = await admin.from('match_events').insert(timeline)
-        if (insErr) {
-          push('league_timeline', insErr.message, { fixture_id: c.fixture_id })
-          continue
-        }
-        result.timelineRows += timeline.length
-      }
+      result.timelineRows += timeline.length
 
       // ⚠ THE HALF-TIME PAIR IS WRITTEN AS A PAIR. `league_fixtures_ht_pair_ck`
       // refuses `{1, null}`, and mappers.ts records that diffing each side
@@ -849,25 +853,19 @@ export async function syncLeagueFixtures(
       // meaningful instruction and must still delete.
       if (rows.length === 0) continue
 
-      // ⚠ REPLACE-ALL, AS 7b3. The provider revises these mid-match and an
-      // upsert would need a stable key per (fixture, side) plus a diff of
-      // nineteen nullable columns to work out what it revised. Two rows.
-      const { error: delErr } = await admin
-        .from('match_team_stats')
-        .delete()
-        .eq('fixture_id', c.fixture_id)
-      if (delErr) {
-        push('league_stats', delErr.message, { fixture_id: c.fixture_id })
+      // ⚠ REPLACE-ALL, AS 7b3, and atomic for the same reason — see 140.
+      // The provider revises these mid-match and an upsert would need a stable
+      // key per (fixture, side) plus a diff of nineteen nullable columns to
+      // work out what it revised. Two rows.
+      const { error: wErr } = await admin.rpc('replace_match_team_stats', {
+        p_fixture_id: c.fixture_id,
+        p_rows: rows,
+      })
+      if (wErr) {
+        push('league_stats', wErr.message, { fixture_id: c.fixture_id })
         continue
       }
-      if (rows.length > 0) {
-        const { error: insErr } = await admin.from('match_team_stats').insert(rows)
-        if (insErr) {
-          push('league_stats', insErr.message, { fixture_id: c.fixture_id })
-          continue
-        }
-        result.statsRows += rows.length
-      }
+      result.statsRows += rows.length
     } catch (e) {
       push('league_stats', e instanceof Error ? e.message : String(e), {
         fixture_id: c.fixture_id,
@@ -938,17 +936,14 @@ export async function syncLeagueFixtures(
         // on the completion pass, if the provider happened to answer empty.
         if (rows.length === 0) continue
 
-        const { error: delErr } = await admin
-          .from('match_lineups')
-          .delete()
-          .eq('fixture_id', row.fixture_id)
-        if (delErr) {
-          push('league_lineups', delErr.message, { fixture_id: row.fixture_id })
-          continue
-        }
-        const { error: insErr } = await admin.from('match_lineups').insert(rows)
-        if (insErr) {
-          push('league_lineups', insErr.message, { fixture_id: row.fixture_id })
+        // Atomic, as 7b3 and 7b4 — and this is the arm the failure actually
+        // happened on. See `140_both_or_neither.sql`.
+        const { error: wErr } = await admin.rpc('replace_match_lineups', {
+          p_fixture_id: row.fixture_id,
+          p_rows: rows,
+        })
+        if (wErr) {
+          push('league_lineups', wErr.message, { fixture_id: row.fixture_id })
           continue
         }
         result.lineupRows += rows.length

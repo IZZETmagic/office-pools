@@ -751,14 +751,22 @@ describe('syncLeagueFixtures — writes the timeline', () => {
       league_matchweeks: [{ data: MW, error: null }],
       match_lineups: [{ data: held, error: null }],
     })
+    // ⚠ The three `replace_match_*` writes are RPCs now (migration 140), so the
+    // args are the only place a test can see what was written. The old
+    // `inserts`/`deletes` recorders cannot: there is no longer a delete or an
+    // insert to record, which is the entire point of the change.
+    const writes: Array<{ fn: string; args: Record<string, unknown> }> = []
     const client = {
       from: (base.client as unknown as { from: (t: string) => unknown }).from,
-      rpc: (fn: string) => ({ then: (res: (v: unknown) => unknown) => res(rpcImpl(fn)) }),
+      rpc: (fn: string, args: Record<string, unknown>) => {
+        writes.push({ fn, args })
+        return { then: (res: (v: unknown) => unknown) => res(rpcImpl(fn)) }
+      },
     }
     // ⚠ `client` LAST. Spreading `base` after it puts the unwrapped client
     // back and the rpc stub is silently ignored — every changed-fixture test
     // then passes through a tick with nothing changed.
-    return { ...base, client: client as never }
+    return { ...base, writes, client: client as never }
   }
 
   it('⚠ makes NO call at all when nothing changed — the whole cost argument', async () => {
@@ -790,7 +798,7 @@ describe('syncLeagueFixtures — writes the timeline', () => {
         comments: null,
       },
     ] as never)
-    const { client, inserts } = db((fn) =>
+    const { client, writes } = db((fn) =>
       fn === 'league_apply_fixture_sync'
         ? { data: changedRows(), error: null }
         : { data: { ok: true, scored: 1, entries: 1 }, error: null },
@@ -801,9 +809,10 @@ describe('syncLeagueFixtures — writes the timeline', () => {
     expect(r.bundleCalls).toBe(1)
     expect(r.timelineRows).toBe(1)
 
-    const written = inserts.find((i) => i.table === 'match_events')
+    const written = writes.find((w) => w.fn === 'replace_match_events')
     expect(written).toBeDefined()
-    expect(written!.rows[0]).toMatchObject({
+    expect(written!.args.p_fixture_id).toBe('fx-1')
+    expect((written!.args.p_rows as Record<string, unknown>[])[0]).toMatchObject({
       fixture_id: 'fx-1',
       side: 'home',
       kind: 'goal',
@@ -813,21 +822,31 @@ describe('syncLeagueFixtures — writes the timeline', () => {
     expect(formatLeagueNoteParts(r)).toContain('timeline=1')
   })
 
-  it('deletes the fixture’s rows before inserting — replace-all, not upsert', async () => {
-    // ⚠ The reason is a VAR reversal: it REMOVES an event from the payload
-    // rather than marking it, so an upsert would leave a disallowed goal on
-    // the screen for good.
+  it('⚠ replaces through ONE atomic call, with no bare delete anywhere', async () => {
+    // ⚠ The replace-all itself is unchanged, and the reason is a VAR reversal:
+    // it REMOVES an event from the payload rather than marking it, so an upsert
+    // would leave a disallowed goal on the screen for good.
+    //
+    // ⚠⚠ WHAT CHANGED IS THAT IT IS NO LONGER TWO CALLS. A DELETE followed by
+    // an INSERT has no transaction around it, and on 2026-09-09 the line-up
+    // backfill lost fixture 1575143 in that gap — the delete committed, the
+    // insert got `TypeError: fetch failed`. Migration 140 moved the pair into a
+    // plpgsql function. This asserts BOTH halves: the write goes through the
+    // function, AND nothing issues a naked delete against the table any more,
+    // because a delete this code can make on its own is a delete that can be
+    // left uncompanioned.
     getFixtureEvents.mockClear()
     getFixtureEvents.mockResolvedValueOnce([] as never)
-    const { client, deletes } = db((fn) =>
+    const { client, deletes, writes } = db((fn) =>
       fn === 'league_apply_fixture_sync'
         ? { data: changedRows(), error: null }
         : { data: { ok: true }, error: null },
     )
     await syncLeagueFixtures(client, TARGET, OPTS)
-    const del = deletes.find((d) => d.table === 'match_events')
-    expect(del).toBeDefined()
-    expect(del!.filters.join(' ')).toContain('eq(fixture_id,fx-1)')
+    const w = writes.find((x) => x.fn === 'replace_match_events')
+    expect(w).toBeDefined()
+    expect(w!.args.p_fixture_id).toBe('fx-1')
+    expect(deletes.find((d) => d.table === 'match_events')).toBeUndefined()
   })
 
   it('⚠⚠ a REFUSED events call deletes nothing — the quota must not erase a timeline', async () => {
@@ -990,12 +1009,20 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
       league_matchweeks: [{ data: MW, error: null }],
       match_lineups: [{ data: opts.held ?? [], error: null }],
     })
+    // ⚠ The three `replace_match_*` writes are RPCs now (migration 140), so the
+    // args are the only place a test can see what was written. The old
+    // `inserts`/`deletes` recorders cannot: there is no longer a delete or an
+    // insert to record, which is the entire point of the change.
+    const writes: Array<{ fn: string; args: Record<string, unknown> }> = []
     const client = {
       from: (base.client as unknown as { from: (t: string) => unknown }).from,
-      rpc: (fn: string) => ({ then: (res: (v: unknown) => unknown) => res(rpcImpl(fn)) }),
+      rpc: (fn: string, args: Record<string, unknown>) => {
+        writes.push({ fn, args })
+        return { then: (res: (v: unknown) => unknown) => res(rpcImpl(fn)) }
+      },
     }
     // ⚠ `client` LAST — see the timeline block for what happens otherwise.
-    return { ...base, client: client as never }
+    return { ...base, writes, client: client as never }
   }
 
   const STATS_PAYLOAD = [
@@ -1054,13 +1081,14 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
 
   it('fetches statistics once per changed fixture and writes both sides', async () => {
     getFixtureStatistics.mockResolvedValueOnce(STATS_PAYLOAD as never)
-    const { client, inserts } = db(() => ({ data: changed(), error: null }))
+    const { client, writes } = db(() => ({ data: changed(), error: null }))
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
 
     expect(getFixtureStatistics).toHaveBeenCalledTimes(1)
-    const written = inserts.find((i) => i.table === 'match_team_stats')
+    const written = writes.find((w) => w.fn === 'replace_match_team_stats')
     expect(written).toBeTruthy()
-    const rows = written!.rows as Record<string, unknown>[]
+    expect(written!.args.p_fixture_id).toBe('f-1')
+    const rows = written!.args.p_rows as Record<string, unknown>[]
     expect(rows).toHaveLength(2)
     expect(rows.find((x) => x.side === 'home')).toMatchObject({
       fixture_id: 'f-1',
@@ -1074,13 +1102,16 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
     expect(formatLeagueNoteParts(r).join(' ')).toContain('stats=2')
   })
 
-  it('deletes the fixture rows before inserting — replace-all, not upsert', async () => {
+  it('⚠ replaces through ONE atomic call, with no bare delete anywhere', async () => {
+    // Same argument as the timeline's: a delete this code can issue on its own
+    // is a delete that can be left uncompanioned when the next call fails.
     getFixtureStatistics.mockResolvedValueOnce(STATS_PAYLOAD as never)
-    const { client, deletes } = db(() => ({ data: changed(), error: null }))
+    const { client, deletes, writes } = db(() => ({ data: changed(), error: null }))
     await syncLeagueFixtures(client, TARGET, OPTS)
-    const del = deletes.find((d) => d.table === 'match_team_stats')
-    expect(del).toBeTruthy()
-    expect(del!.filters.join(' ')).toContain('eq(fixture_id,f-1)')
+    const w = writes.find((x) => x.fn === 'replace_match_team_stats')
+    expect(w).toBeTruthy()
+    expect(w!.args.p_fixture_id).toBe('f-1')
+    expect(deletes.find((d) => d.table === 'match_team_stats')).toBeUndefined()
   })
 
   it('a fetch failure costs the statistics but not the sync or the scoring', async () => {
@@ -1118,12 +1149,13 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
 
   it('writes both line-ups, starters before the bench, with the sub ungridded', async () => {
     getFixtureLineups.mockResolvedValueOnce(LINEUP_PAYLOAD as never)
-    const { client, inserts } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
+    const { client, writes } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
 
-    const written = inserts.find((i) => i.table === 'match_lineups')
+    const written = writes.find((w) => w.fn === 'replace_match_lineups')
     expect(written).toBeTruthy()
-    const rows = written!.rows as Record<string, unknown>[]
+    expect(written!.args.p_fixture_id).toBe('f-1')
+    const rows = written!.args.p_rows as Record<string, unknown>[]
     expect(rows).toHaveLength(2)
     const home = rows.find((x) => x.side === 'home')!
     expect(home).toMatchObject({ fixture_id: 'f-1', formation: '4-3-3', coach_name: 'A Manager' })
@@ -1138,10 +1170,10 @@ describe('syncLeagueFixtures — statistics and line-ups', () => {
   it('⚠ an empty payload writes NOTHING, so the next tick asks again', async () => {
     // Writing an empty line-up would satisfy the "do we hold one" check and end
     // the retries — leaving the tab permanently blank for that fixture.
-    const { client, inserts, deletes } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
+    const { client, deletes, writes } = db(() => ({ data: { seen: 1, changed: [] }, error: null }))
     const r = await syncLeagueFixtures(client, TARGET, OPTS)
     expect(getFixtureLineups).toHaveBeenCalledTimes(1)
-    expect(inserts.find((i) => i.table === 'match_lineups')).toBeUndefined()
+    expect(writes.find((w) => w.fn === 'replace_match_lineups')).toBeUndefined()
     expect(deletes.find((d) => d.table === 'match_lineups')).toBeUndefined()
     expect(r.lineupRows).toBe(0)
     // Visible as a call that wrote nothing, rather than vanishing.
@@ -1248,11 +1280,19 @@ describe('syncLeagueFixtures — the live gate', () => {
       league_matchweeks: [{ data: MW, error: null }],
       match_lineups: [{ data: [{ fixture_id: 'f-1' }], error: null }],
     })
+    // ⚠ The three `replace_match_*` writes are RPCs now (migration 140), so the
+    // args are the only place a test can see what was written. The old
+    // `inserts`/`deletes` recorders cannot: there is no longer a delete or an
+    // insert to record, which is the entire point of the change.
+    const writes: Array<{ fn: string; args: Record<string, unknown> }> = []
     const client = {
       from: (base.client as unknown as { from: (t: string) => unknown }).from,
-      rpc: (fn: string) => ({ then: (res: (v: unknown) => unknown) => res(rpcImpl(fn)) }),
+      rpc: (fn: string, args: Record<string, unknown>) => {
+        writes.push({ fn, args })
+        return { then: (res: (v: unknown) => unknown) => res(rpcImpl(fn)) }
+      },
     }
-    return { ...base, client: client as never }
+    return { ...base, writes, client: client as never }
   }
 
   beforeEach(() => {

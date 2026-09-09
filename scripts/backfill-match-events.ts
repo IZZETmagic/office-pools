@@ -206,20 +206,20 @@ async function main() {
         // ⚠ REPLACE-ALL, the same as the sync. Re-running this script must be a
         // no-op rather than a doubling — and the unique (fixture_id, sort_index)
         // index would fail loudly if it were not.
-        const { error: delErr } = await admin
-          .from('match_events')
-          .delete()
-          .eq('fixture_id', fx.fixture_id)
-        if (delErr) {
-          failures.push({ fixture: fx.external_fixture_id, reason: `delete: ${delErr.message}` })
+        //
+        // ⚠⚠ ONE STATEMENT, NOT TWO — and this script is why. It used to DELETE
+        // then INSERT as separate calls, down the whole list, and on 2026-09-09
+        // the sibling backfill lost fixture 1575143 in the gap: the delete
+        // committed, `TypeError: fetch failed` took the insert, and the fixture
+        // was left emptier than it started. Migration 140 put the pair in a
+        // transaction. Both or neither.
+        const { error: wErr } = await admin.rpc('replace_match_events', {
+          p_fixture_id: fx.fixture_id,
+          p_rows: rows,
+        })
+        if (wErr) {
+          failures.push({ fixture: fx.external_fixture_id, reason: `write: ${wErr.message}` })
           continue
-        }
-        if (rows.length > 0) {
-          const { error: insErr } = await admin.from('match_events').insert(rows)
-          if (insErr) {
-            failures.push({ fixture: fx.external_fixture_id, reason: `insert: ${insErr.message}` })
-            continue
-          }
         }
 
         // ⚠ The half-time pair together or not at all — league_fixtures_ht_pair_ck

@@ -210,37 +210,32 @@ async function main() {
         //
         // ⚠ AN EMPTY RESULT DELETES NOTHING. The provider not holding a line-up
         // for an old fixture must not wipe one we already have.
+        // ⚠⚠ THE FAILURE THAT PROMPTED MIGRATION 140 HAPPENED ON THIS LINE.
+        // 2026-09-09, fixture 1575143: `lineup insert: TypeError: fetch failed`
+        // — a transient blip on the INSERT, after the DELETE had committed,
+        // leaving a Bundesliga fixture with zero line-up rows. Two PostgREST
+        // calls have no transaction between them; a plpgsql function does.
         if (lRows.length > 0) {
-          const { error: delErr } = await admin
-            .from('match_lineups')
-            .delete()
-            .eq('fixture_id', fx.fixture_id)
-          if (delErr) {
-            failures.push({ fixture: fx.external_fixture_id, reason: `lineup delete: ${delErr.message}` })
+          const { error: wErr } = await admin.rpc('replace_match_lineups', {
+            p_fixture_id: fx.fixture_id,
+            p_rows: lRows,
+          })
+          if (wErr) {
+            failures.push({ fixture: fx.external_fixture_id, reason: `lineup write: ${wErr.message}` })
           } else {
-            const { error: insErr } = await admin.from('match_lineups').insert(lRows)
-            if (insErr) {
-              failures.push({ fixture: fx.external_fixture_id, reason: `lineup insert: ${insErr.message}` })
-            } else {
-              lineupRows += lRows.length
-            }
+            lineupRows += lRows.length
           }
         }
 
         if (sRows.length > 0) {
-          const { error: delErr } = await admin
-            .from('match_team_stats')
-            .delete()
-            .eq('fixture_id', fx.fixture_id)
-          if (delErr) {
-            failures.push({ fixture: fx.external_fixture_id, reason: `stats delete: ${delErr.message}` })
+          const { error: wErr } = await admin.rpc('replace_match_team_stats', {
+            p_fixture_id: fx.fixture_id,
+            p_rows: sRows,
+          })
+          if (wErr) {
+            failures.push({ fixture: fx.external_fixture_id, reason: `stats write: ${wErr.message}` })
           } else {
-            const { error: insErr } = await admin.from('match_team_stats').insert(sRows)
-            if (insErr) {
-              failures.push({ fixture: fx.external_fixture_id, reason: `stats insert: ${insErr.message}` })
-            } else {
-              statRows += sRows.length
-            }
+            statRows += sRows.length
           }
         }
 
