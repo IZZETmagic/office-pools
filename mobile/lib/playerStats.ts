@@ -250,9 +250,14 @@ export function playerPhotoUrl(externalPlayerId: number | null | undefined): str
 export type PlayerMarkers = {
   goals: number;
   assists: number;
-  yellow: boolean;
-  /** A second yellow is a red; the feed reports both, so either flag suffices. */
-  red: boolean;
+  /**
+   * ⚠ COUNTS, NOT FLAGS, because the badges stack. A second yellow IS a red in
+   * football, and the feed reports both — so a sent-off player reads
+   * `yellow: 2, red: 1`, and drawing all three is the true account of his
+   * afternoon rather than a summary of it.
+   */
+  yellow: number;
+  red: number;
   captain: boolean;
   cameOn: boolean;
   cameOff: boolean;
@@ -278,15 +283,15 @@ export type PlayerMarkers = {
  */
 export function playerMarkers(s: MatchPlayerStat, fullMatchMinutes = 90): PlayerMarkers {
   const minutes = s.minutes ?? 0;
-  const red = (s.redCards ?? 0) > 0;
+  const red = s.redCards ?? 0;
   return {
     goals: s.goals ?? 0,
     assists: s.assists ?? 0,
-    yellow: (s.yellowCards ?? 0) > 0,
+    yellow: s.yellowCards ?? 0,
     red,
     captain: s.isCaptain,
     cameOn: !s.isStarter && minutes > 0,
-    cameOff: s.isStarter && minutes > 0 && minutes < fullMatchMinutes && !red,
+    cameOff: s.isStarter && minutes > 0 && minutes < fullMatchMinutes && red === 0,
   };
 }
 
@@ -303,4 +308,35 @@ export function teamRating(stats: MatchPlayerStat[], side: 'home' | 'away'): num
   if (rated.length === 0) return null;
   const mean = rated.reduce((t, s) => t + (s.rating as number), 0) / rated.length;
   return Math.round(mean * 10) / 10;
+}
+
+/**
+ * The minute a player came off — but only when the timeline agrees.
+ *
+ * ⚠⚠ TWO SOURCES, AND NEITHER IS ENOUGH ALONE. There is no join between a
+ * player and the timeline: `match_events` carries abbreviated names from
+ * `/events` and no player id, and abbreviating our full names to match hits
+ * only 71% (measured — the provider does not always use first-initial-surname).
+ * Meanwhile a starter's `minutes` is his exit minute by definition, but the
+ * provider counts stoppage time differently on the two feeds:
+ *
+ *   exact                84.5%
+ *   out by one minute     9.6%
+ *   out by 20-35 minutes  5.9%   <- early substitutions, and simply wrong
+ *
+ * So `minutes` PROPOSES and the timeline CONFIRMS: the minute is shown only
+ * when a substitution actually happened at exactly that minute in this fixture.
+ * That is 84.5% of players wearing a verified minute and the rest wearing the
+ * arrow alone — and never, at any point, a minute we made up.
+ */
+export function subMinute(
+  s: MatchPlayerStat,
+  substitutionMinutes: ReadonlySet<number>,
+  fullMatchMinutes = 90,
+): number | null {
+  const m = playerMarkers(s, fullMatchMinutes);
+  if (!m.cameOff) return null;
+  const minutes = s.minutes;
+  if (minutes === null || minutes <= 0) return null;
+  return substitutionMinutes.has(minutes) ? minutes : null;
 }

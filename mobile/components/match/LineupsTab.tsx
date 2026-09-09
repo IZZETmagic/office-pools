@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { Pressable, Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
+import { PlayerBadges } from '@/components/match/PlayerBadges';
 import { PlayerStatSheet } from '@/components/match/PlayerStatSheet';
 import {
   PitchMarkings,
@@ -11,7 +12,7 @@ import {
   VIEW_L,
   VIEW_W,
 } from '@/components/match/PitchMarkings';
-import { Icon, Text } from '@/components/ui';
+import { Text } from '@/components/ui';
 import { fixturePalette } from '@/lib/design/clubColors';
 import { groupByRow, rowDepths, surnameOf } from '@/lib/lineupLayout';
 import {
@@ -20,6 +21,7 @@ import {
   playerMarkers,
   playerPhotoUrl,
   ratingColor,
+  subMinute,
   teamRating,
   type MatchPlayerStat,
 } from '@/lib/playerStats';
@@ -69,8 +71,6 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // gap plus an 11pt label ends 41.5pt below its own centre, and the next row's
 // circle starts at 41.7pt. 52 overlaps by 5pt and puts a name across a face.
 const CHIP = 48;
-/** How far a marker hangs outside the circle. */
-const MARK = 17;
 /** How wide a name may run before it truncates — five of these across 68m. */
 // ⚠⚠ THE LABEL TAKES ITS OWN COLUMN, WHICH IS WHY THERE IS NO `NAME_W` ANY
 // MORE. A fixed 62pt was narrower than every column on the pitch — even the
@@ -86,6 +86,7 @@ const MARK = 17;
 export function LineupsTab({
   lineups,
   playerStats,
+  substitutionMinutes,
   homeName,
   awayName,
   homeTeam,
@@ -94,6 +95,13 @@ export function LineupsTab({
   lineups: MatchLineup[];
   /** Migration 141. Empty before a match, and on any client older than it. */
   playerStats: MatchPlayerStat[];
+  /**
+   * ⚠ ONLY THE MINUTES, AND ONLY TO CORROBORATE. A player cannot be joined to
+   * the timeline — its names are abbreviated and carry no id — so this is used
+   * to CONFIRM the minute his own row already implies, never to look one up.
+   * See `subMinute`.
+   */
+  substitutionMinutes: number[];
   homeName: string;
   awayName: string;
   /** For the shirt colours — the crest URL is where the club's id hides. */
@@ -111,6 +119,7 @@ export function LineupsTab({
   // matching on those would silently fail for exactly the players whose names
   // are long enough to be worth reading.
   const statsById = useMemo(() => indexByPlayerId(playerStats), [playerStats]);
+  const substMinutes = useMemo(() => new Set(substitutionMinutes), [substitutionMinutes]);
   const [open, setOpen] = useState<{ stat: MatchPlayerStat; team: string; tint: string } | null>(
     null,
   );
@@ -144,6 +153,7 @@ export function LineupsTab({
           palette={palette}
           statsById={statsById}
           onPick={setOpen}
+          substMinutes={substMinutes}
         />
         <TeamBar
           lineup={away}
@@ -202,6 +212,7 @@ function Pitch({
   palette,
   statsById,
   onPick,
+  substMinutes,
 }: {
   home: MatchLineup | null;
   away: MatchLineup | null;
@@ -211,6 +222,7 @@ function Pitch({
   palette: { home: string; away: string };
   statsById: StatsById;
   onPick: Pick;
+  substMinutes: ReadonlySet<number>;
 }) {
   const theme = useTheme();
 
@@ -261,6 +273,7 @@ function Pitch({
         teamName={homeName}
         statsById={statsById}
         onPick={onPick}
+        substMinutes={substMinutes}
       />
       <Half
         lineup={away}
@@ -269,6 +282,7 @@ function Pitch({
         teamName={awayName}
         statsById={statsById}
         onPick={onPick}
+        substMinutes={substMinutes}
       />
 
     </View>
@@ -392,6 +406,7 @@ function Half({
   teamName,
   statsById,
   onPick,
+  substMinutes,
 }: {
   lineup: MatchLineup | null;
   tint: string;
@@ -399,6 +414,7 @@ function Half({
   teamName: string;
   statsById: StatsById;
   onPick: Pick;
+  substMinutes: ReadonlySet<number>;
 }) {
   if (!lineup) {
     return (
@@ -483,7 +499,12 @@ function Half({
                 alignItems: 'center',
               })}
             >
-              <Shirt player={player} tint={tint} stat={stat} />
+              <Shirt
+                player={player}
+                tint={tint}
+                stat={stat}
+                subbedAt={stat ? subMinute(stat, substMinutes) : null}
+              />
             </Pressable>
           );
         });
@@ -496,14 +517,14 @@ function Shirt({
   player,
   tint,
   stat,
+  subbedAt,
 }: {
   player: LineupPlayer;
   tint: string;
   stat: MatchPlayerStat | undefined;
+  subbedAt: number | null;
 }) {
   const rating = stat?.rating ?? null;
-  const badge = formatRating(rating);
-  const badgeColor = ratingColor(rating);
   const photo = playerPhotoUrl(player.playerId);
   const marks = stat ? playerMarkers(stat) : null;
 
@@ -557,160 +578,7 @@ function Shirt({
           ) : null}
         </View>
 
-        {/* ⚠ FIVE MARKERS, FIVE POSITIONS, NO OVERLAP: arrow top-left, rating
-            top-right, card left-middle, armband bottom-left, goal bottom-right.
-            Two in one corner is how a pitch stops being readable at a glance.
-            Every one hangs OUTSIDE the circle: the photograph is what
-            identifies a player, and a badge across it costs more than it is
-            worth. The icons are the Facts tab's own — two tabs on one screen
-            must not use two vocabularies for the same event. */}
-        {marks?.cameOff || marks?.cameOn ? (
-          <View
-            style={{
-              position: 'absolute',
-              top: -4,
-              left: -MARK / 2,
-              width: MARK,
-              height: MARK,
-              borderRadius: MARK / 2,
-              backgroundColor: marks.cameOff ? '#B91C1C' : '#15803D',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.9)',
-            }}
-          >
-            {/* ⚠ NO MINUTE. The timeline cannot be joined to a player — its
-                names are abbreviated and carry no id — and a starter's minutes
-                equal the real substitution minute only 83.8% of the time. The
-                arrow is certain; the minute would be wrong one time in six. */}
-            <RNText style={{ fontFamily: MONO_BOLD, fontSize: 10, color: '#FFFFFF' }}>
-              {marks.cameOff ? '\u2193' : '\u2191'}
-            </RNText>
-          </View>
-        ) : null}
-
-        {badge && badgeColor ? (
-          <View
-            style={{
-              position: 'absolute',
-              top: -5,
-              right: -MARK / 2,
-              minWidth: 21,
-              paddingHorizontal: 3,
-              paddingVertical: 1,
-              borderRadius: 5,
-              backgroundColor: badgeColor,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.9)',
-              alignItems: 'center',
-            }}
-          >
-            <RNText
-              style={{
-                fontFamily: MONO_BOLD,
-                fontSize: 9,
-                lineHeight: 12,
-                color: '#FFFFFF',
-                fontVariant: ['tabular-nums'],
-              }}
-            >
-              {badge}
-            </RNText>
-          </View>
-        ) : null}
-
-        {marks?.yellow || marks?.red ? (
-          <View
-            style={{
-              position: 'absolute',
-              // Left-middle: the arrow has the top-left and the armband the
-              // bottom-left, so a booking sits between them.
-              top: CHIP / 2 - 7,
-              left: -MARK / 2 + 2,
-            }}
-          >
-            <Icon
-              name="rectangle.portrait.fill"
-              size={13}
-              color={marks.red ? 'red' : 'amber'}
-              filled
-            />
-          </View>
-        ) : null}
-
-        {marks?.captain ? (
-          <View
-            style={{
-              position: 'absolute',
-              bottom: -3,
-              left: -MARK / 2 + 1,
-              width: 14,
-              height: 14,
-              borderRadius: 7,
-              // ⚠ WHITE, NOT YELLOW, AND THE CARD IS WHY. An amber armband sits
-              // directly below an amber booking on the same edge — two yellow
-              // markers a few points apart, which is a colour clash the eye has
-              // to resolve twice. The armband is the one that can afford to be
-              // neutral: a card MUST be its own colour, because the colour IS
-              // the fact.
-              backgroundColor: '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(0,0,0,0.15)',
-            }}
-          >
-            <RNText style={{ fontFamily: MONO_BOLD, fontSize: 8, color: '#111827' }}>C</RNText>
-          </View>
-        ) : null}
-
-        {marks && (marks.goals > 0 || marks.assists > 0) ? (
-          <View
-            style={{
-              position: 'absolute',
-              bottom: -3,
-              right: -MARK / 2,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 1,
-              paddingHorizontal: 3,
-              paddingVertical: 2,
-              borderRadius: MARK / 2,
-              backgroundColor: '#FFFFFF',
-              borderWidth: 1,
-              borderColor: 'rgba(0,0,0,0.12)',
-            }}
-          >
-            {/* ⚠ ONLY A GOAL GETS THE BALL. There is no boot in this icon set,
-                and borrowing another glyph for an assist would invent a symbol
-                nobody has been taught — an assist reads as 'A' instead. */}
-            {/* ⚠⚠ `solid`, NOT `filled`. They are not interchangeable and the
-                difference is visible: `filled` paints the FREE outline glyph's
-                closed paths, and a football's outer ring is closed — so it
-                rendered as a plain dark disc, which is what the pitch showed.
-                `solid` swaps in the purpose-drawn Pro football. The card
-                beside it keeps `filled`, because `RectangleVerticalIcon` has
-                no solid variant at all — the Icon docs name it specifically. */}
-            {marks.goals > 0 ? (
-              <Icon name="sportscourt.fill" size={11} color="ink" solid />
-            ) : (
-              <RNText style={{ fontFamily: MONO_BOLD, fontSize: 9, color: '#111827' }}>A</RNText>
-            )}
-            {(marks.goals > 0 ? marks.goals : marks.assists) > 1 ? (
-              <RNText
-                style={{
-                  fontFamily: MONO_BOLD,
-                  fontSize: 9,
-                  color: '#111827',
-                  fontVariant: ['tabular-nums'],
-                }}
-              >
-                {marks.goals > 0 ? marks.goals : marks.assists}
-              </RNText>
-            ) : null}
-          </View>
-        ) : null}
+        <PlayerBadges marks={marks} rating={rating} subMinute={subbedAt} chip={CHIP} />
       </View>
 
 

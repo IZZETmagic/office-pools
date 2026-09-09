@@ -23,6 +23,7 @@ import {
   ratingColor,
   playerMarkers,
   playerPhotoUrl,
+  subMinute,
   statGroups,
   teamRating,
   STRONG_FROM,
@@ -239,18 +240,18 @@ describe('playerMarkers', () => {
     // arrow would say something false about why he left the pitch.
     const sentOff = playerMarkers(player({ isStarter: true, minutes: 34, redCards: 1 }));
     expect(sentOff.cameOff).toBe(false);
-    expect(sentOff.red).toBe(true);
+    expect(sentOff.red).toBe(1);
   });
 
   it('carries goals, assists, cards and the armband', () => {
     const m = playerMarkers(player({ goals: 2, assists: 1, yellowCards: 1, isCaptain: true }));
-    expect(m).toMatchObject({ goals: 2, assists: 1, yellow: true, red: false, captain: true });
+    expect(m).toMatchObject({ goals: 2, assists: 1, yellow: 1, red: 0, captain: true });
   });
 
   it('a null count is not a marker', () => {
     const m = playerMarkers(player());
     expect(m.goals).toBe(0);
-    expect(m.yellow).toBe(false);
+    expect(m.yellow).toBe(0);
   });
 });
 
@@ -279,5 +280,34 @@ describe('teamRating', () => {
   it('is null before anyone has been rated', () => {
     expect(teamRating([], 'home')).toBeNull();
     expect(teamRating([player({ rating: null })], 'home')).toBeNull();
+  });
+});
+
+describe('playerMarkers — counts, because the badges stack', () => {
+  it('⚠ two yellows and a red are all three reported', () => {
+    // A second yellow IS a red. The feed reports both, and drawing all three is
+    // the true account of his afternoon rather than a summary of it.
+    const m = playerMarkers(player({ yellowCards: 2, redCards: 1 }));
+    expect(m.yellow).toBe(2);
+    expect(m.red).toBe(1);
+  });
+});
+
+describe('subMinute — `minutes` proposes, the timeline confirms', () => {
+  const off = player({ isStarter: true, minutes: 67 });
+
+  it('⚠⚠ shows the minute only when a substitution really happened then', () => {
+    expect(subMinute(off, new Set([67, 80]))).toBe(67);
+    expect(subMinute(off, new Set([66, 80]))).toBeNull();
+    expect(subMinute(off, new Set())).toBeNull();
+  });
+
+  it('a player who did not come off has no minute', () => {
+    expect(subMinute(player({ isStarter: true, minutes: 90 }), new Set([90]))).toBeNull();
+    expect(subMinute(player({ isStarter: false, minutes: 20 }), new Set([20]))).toBeNull();
+  });
+
+  it('⚠ a sending-off never gets a substitution minute', () => {
+    expect(subMinute(player({ isStarter: true, minutes: 34, redCards: 1 }), new Set([34]))).toBeNull();
   });
 });

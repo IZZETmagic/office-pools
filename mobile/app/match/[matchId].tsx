@@ -254,6 +254,12 @@ export default function MatchDetailScreen() {
           <LineupsTab
             lineups={lineups}
             playerStats={playerStats}
+            // ⚠ The MINUTES only. A player cannot be joined to the timeline —
+            // its names are abbreviated and carry no id — so these confirm the
+            // minute his own row already implies rather than supplying one.
+            substitutionMinutes={timeline
+              .filter((e) => e.kind === 'subst' && e.minute !== null)
+              .map((e) => e.minute as number)}
             homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
             awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
             homeTeam={m.homeTeam}
