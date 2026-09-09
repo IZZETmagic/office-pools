@@ -36,7 +36,7 @@ const WRITERS = [
 ]
 
 /** The three tables whose rows are replaced wholesale. */
-const REPLACED = ['match_events', 'match_lineups', 'match_team_stats']
+const REPLACED = ['match_events', 'match_lineups', 'match_team_stats', 'match_player_stats']
 
 const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
 
@@ -67,6 +67,7 @@ describe('the replace-all writes are atomic', () => {
     expect(read(WRITERS[0])).toContain("rpc('replace_match_events'")
     expect(read(WRITERS[0])).toContain("rpc('replace_match_lineups'")
     expect(read(WRITERS[0])).toContain("rpc('replace_match_team_stats'")
+    expect(read(WRITERS[0])).toContain("rpc('replace_match_player_stats'")
     expect(read(WRITERS[1])).toContain("rpc('replace_match_events'")
     expect(read(WRITERS[2])).toContain("rpc('replace_match_lineups'")
     expect(read(WRITERS[2])).toContain("rpc('replace_match_team_stats'")

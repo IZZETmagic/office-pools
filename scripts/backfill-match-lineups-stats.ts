@@ -77,7 +77,7 @@ try {
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { getFixturesByIds, IDS_PER_CALL } from '@/lib/integrations/apiFootball/client'
-import { lineupsToRows, statisticsToRows } from '@/lib/integrations/apiFootball/mappers'
+import { lineupsToRows, playersToRows, statisticsToRows } from '@/lib/integrations/apiFootball/mappers'
 
 const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')
@@ -114,8 +114,10 @@ async function main() {
   let totalFixtures = 0
   let lineupRows = 0
   let statRows = 0
+  let playerRows = 0
   let noLineup = 0
   let noStats = 0
+  let noPlayers = 0
   const failures: Array<{ fixture: string; reason: string }> = []
 
   for (const season of seasons) {
@@ -191,15 +193,25 @@ async function main() {
         const sRows = bundled.statistics ? statisticsToRows(bundled.statistics, opts) : []
         if (sRows.length === 0) noStats++
 
+        // ---- player statistics (migration 141) -------------------------------
+        // ⭐ FREE. Already in the same bundled response; it was being discarded.
+        const pRows = bundled.players ? playersToRows(bundled.players, opts) : []
+        if (pRows.length === 0) noPlayers++
+
         if (dryRun) {
           const xi = lRows.map((r) => r.players.filter((p) => p.starter).length).join('/')
           const poss = sRows.map((r) => r.possession_pct ?? '—').join('/')
+          // The two numbers worth eyeballing before a real run: a squad size
+          // that is not 40, and a top rating that is not in the 6-9 range.
+          const rated = pRows.map((r) => r.rating).filter((r): r is number => r !== null)
           console.log(
             `  ${fx.external_fixture_id}: lineups ${lRows.length} side(s)${xi ? ` (XI ${xi})` : ''}` +
-              `, stats ${sRows.length} side(s)${sRows.length ? ` (poss ${poss})` : ''}`,
+              `, stats ${sRows.length} side(s)${sRows.length ? ` (poss ${poss})` : ''}` +
+              `, players ${pRows.length}${rated.length ? ` (top rating ${Math.max(...rated)})` : ''}`,
           )
           lineupRows += lRows.length
           statRows += sRows.length
+          playerRows += pRows.length
           await sleep(120)
           continue
         }
@@ -239,8 +251,20 @@ async function main() {
           }
         }
 
+        if (pRows.length > 0) {
+          const { error: wErr } = await admin.rpc('replace_match_player_stats', {
+            p_fixture_id: fx.fixture_id,
+            p_rows: pRows,
+          })
+          if (wErr) {
+            failures.push({ fixture: fx.external_fixture_id, reason: `player write: ${wErr.message}` })
+          } else {
+            playerRows += pRows.length
+          }
+        }
+
         console.log(
-          `  ${fx.external_fixture_id}: ${lRows.length} line-up row(s), ${sRows.length} stat row(s)`,
+          `  ${fx.external_fixture_id}: ${lRows.length} line-up row(s), ${sRows.length} stat row(s), ${pRows.length} player row(s)`,
         )
       }
 
@@ -253,7 +277,8 @@ async function main() {
   console.log(
     `\n${dryRun ? 'DRY RUN — ' : ''}${totalFixtures} fixture(s), ${totalCalls} api call(s)\n` +
       `  match_lineups     ${lineupRows} row(s)   (${noLineup} fixture(s) the feed has no line-up for)\n` +
-      `  match_team_stats  ${statRows} row(s)   (${noStats} fixture(s) the feed has no statistics for)`,
+      `  match_team_stats  ${statRows} row(s)   (${noStats} fixture(s) the feed has no statistics for)\n` +
+      `  match_player_stats ${playerRows} row(s)   (${noPlayers} fixture(s) the feed has no player data for)`,
   )
   if (failures.length > 0) {
     console.log(`\n${failures.length} failure(s):`)

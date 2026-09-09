@@ -47,7 +47,7 @@ export type ApiFootballFixture = {
   events?: ApiFootballEvent[]
   lineups?: ApiFootballLineup[]
   statistics?: ApiFootballTeamStatistics[]
-  players?: unknown[]
+  players?: ApiFootballPlayers[]
 }
 
 export type ApiFootballEvent = {
@@ -186,4 +186,71 @@ export type ApiFootballStatistic = {
 export type ApiFootballTeamStatistics = {
   team: { id: number; name: string }
   statistics: ApiFootballStatistic[] | null
+}
+
+// =============================================================
+// Per-player statistics — the `players` arm of the /fixtures?ids= bundle
+// =============================================================
+// ⚠ THE SHAPE IS FIXED, unlike `match_team_stats`. Sampled across 920
+// player-rows in two competitions on 2026-09-09: every row carried the same
+// eleven groups, twenty players a side, positions only ever G/D/M/F. So these
+// are named fields rather than a type/value list.
+//
+// ⚠ MOST NUMBERS ARE NULL MOST OF THE TIME. The feed sends null, not 0, for a
+// stat a player did not register — `shots.total` was null on 560 of 800 rows.
+// =============================================================
+
+export type ApiFootballPlayerStatLine = {
+  games: {
+    minutes: number | null
+    number: number | null
+    position: string | null
+    /** ⚠ A STRING — '7', '7.5', '10'. Null for an unused substitute. */
+    rating: string | null
+    captain: boolean | null
+    substitute: boolean | null
+  }
+  offsides: number | null
+  shots: { total: number | null; on: number | null }
+  goals: {
+    total: number | null
+    conceded: number | null
+    assists: number | null
+    saves: number | null
+  }
+  passes: {
+    total: number | null
+    key: number | null
+    /**
+     * ⚠⚠ A COUNT OF COMPLETED PASSES, NOT A PERCENTAGE — the opposite of the
+     * TEAM-level `Passes %`, which arrives as '83%'. Measured on 604 rows
+     * carrying both: not one had accuracy greater than total. It is a string
+     * regardless, so it still needs parsing.
+     */
+    accuracy: string | number | null
+  }
+  tackles: { total: number | null; blocks: number | null; interceptions: number | null }
+  duels: { total: number | null; won: number | null }
+  dribbles: { attempts: number | null; success: number | null; past: number | null }
+  fouls: { drawn: number | null; committed: number | null }
+  cards: { yellow: number | null; red: number | null }
+  penalty: {
+    won: number | null
+    /** ⚠ THE PROVIDER SPELLS IT WITH ONE 't'. Correcting it here stores NULL. */
+    commited: number | null
+    scored: number | null
+    missed: number | null
+    saved: number | null
+  }
+}
+
+export type ApiFootballPlayerEntry = {
+  player: { id: number | null; name: string | null; photo?: string | null }
+  statistics: ApiFootballPlayerStatLine[]
+}
+
+/** One side of the bundle's `players` array. */
+export type ApiFootballPlayers = {
+  team: { id: number; name: string; logo?: string | null }
+  players: ApiFootballPlayerEntry[]
 }

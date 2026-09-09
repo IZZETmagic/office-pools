@@ -3,6 +3,8 @@ import type {
   ApiFootballFixture,
   ApiFootballLineup,
   ApiFootballLineupPlayer,
+  ApiFootballPlayerStatLine,
+  ApiFootballPlayers,
   ApiFootballStatusShort,
   ApiFootballTeamStatistics,
 } from './types'
@@ -888,6 +890,195 @@ export function statisticsToRows(
     }
 
     rows.push(row)
+  }
+
+  return rows
+}
+
+// =============================================================
+// Per-player statistics
+// =============================================================
+
+export type MatchPlayerStatsRow = {
+  fixture_id: string
+  side: 'home' | 'away'
+  external_player_id: number
+  player_name: string
+  shirt_number: number | null
+  position: string | null
+  is_starter: boolean
+  is_captain: boolean
+  minutes: number | null
+  rating: number | null
+  goals: number | null
+  assists: number | null
+  shots_total: number | null
+  shots_on: number | null
+  offsides: number | null
+  dribbles_attempts: number | null
+  dribbles_success: number | null
+  penalty_won: number | null
+  penalty_scored: number | null
+  penalty_missed: number | null
+  goals_conceded: number | null
+  saves: number | null
+  tackles_total: number | null
+  tackles_blocks: number | null
+  interceptions: number | null
+  duels_total: number | null
+  duels_won: number | null
+  dribbled_past: number | null
+  penalty_committed: number | null
+  penalty_saved: number | null
+  passes_total: number | null
+  passes_accurate: number | null
+  key_passes: number | null
+  fouls_drawn: number | null
+  fouls_committed: number | null
+  yellow_cards: number | null
+  red_cards: number | null
+}
+
+/** Only these four ever appear; anything else is stored as null rather than guessed. */
+const PLAYER_POSITIONS = new Set(['G', 'D', 'M', 'F'])
+
+/**
+ * A count that may arrive as a string, a number, or null.
+ *
+ * ⚠ `Number('')` IS 0, NOT NaN — the trap `statValue` already carries. An empty
+ * string here would become a real zero and read as "took no shots" rather than
+ * "not recorded", and the two are different facts.
+ */
+function playerInt(v: unknown): number | null {
+  if (v === null || v === undefined) return null
+  if (typeof v === 'number') return Number.isFinite(v) ? Math.trunc(v) : null
+  if (typeof v !== 'string') return null
+  const t = v.trim().replace(/%$/, '')
+  if (t === '') return null
+  const n = Number(t)
+  return Number.isFinite(n) ? Math.trunc(n) : null
+}
+
+/** The rating, which arrives as a string like '7.5' and is null for an unused sub. */
+function playerRating(v: unknown): number | null {
+  if (v === null || v === undefined) return null
+  const n = typeof v === 'number' ? v : Number(String(v).trim())
+  if (!Number.isFinite(n)) return null
+  // ⚠ CLAMPED RATHER THAN TRUSTED. The column is CHECK 0..10; a provider
+  // glitch outside that would fail the whole fixture's write, and losing forty
+  // players' statistics to one bad number is the wrong trade for a display-only
+  // figure. Measured range of real ratings was 4.9 to 10.0.
+  if (n < 0 || n > 10) return null
+  // ⚠⚠ ZERO IS "UNRATED", NOT A RATING OF ZERO, and it has to become NULL or it
+  // poisons every average taken over this column. Measured on the first real
+  // backfill: 50 rows arrived with rating 0, and every single one was a
+  // non-assessment — 44 had no minutes at all, and the other 6 were 1-minute
+  // stoppage-time cameos the provider does not rate (Y. Spalt, I. Rondić,
+  // U. Garcia, F. Moumbagna, M. Mbow, O. Sissoko). No player was ever rated 0
+  // for playing badly; the worst real rating in the whole set is 3.0.
+  //
+  // The column CHECK still permits 0 deliberately — a guard that rejects a
+  // write is the wrong tool for a value we simply do not want to keep.
+  if (n === 0) return null
+  return Math.round(n * 10) / 10
+}
+
+/**
+ * Both sides' player statistics, as rows.
+ *
+ * ⚠ THE SIDE COMES FROM THE TEAM ID, never a name — the same rule as every
+ * other mapper here. `/players` abbreviates club names where `/events` does
+ * not, so a name match silently mis-sides a whole squad.
+ *
+ * ⚠ A PLAYER WITH NO PROVIDER ID IS SKIPPED, not given a synthetic one. The id
+ * is the only identity this table has until a `players` entity exists, and a
+ * row that cannot be joined to anything is a row that can only mislead.
+ */
+export function playersToRows(
+  sides: ApiFootballPlayers[] | undefined,
+  opts: { fixtureId: string; homeExternalTeamId: number },
+): MatchPlayerStatsRow[] {
+  const rows: MatchPlayerStatsRow[] = []
+
+  for (const s of sides ?? []) {
+    const teamId = s?.team?.id
+    if (teamId === undefined || teamId === null) continue
+    const side: 'home' | 'away' = teamId === opts.homeExternalTeamId ? 'home' : 'away'
+
+    for (const entry of s?.players ?? []) {
+      const id = entry?.player?.id
+      const name = entry?.player?.name
+      // ⚠⚠ `player.id === 0` IS A SENTINEL, NOT AN ID, AND IT REPEATS. The
+      // provider uses 0 for a player it does not hold in its own database, so
+      // ONE fixture can carry several — Marseille v Paris FC (1552751) had two,
+      // Bamo Meite and Nouhoum Kamissoko, both id 0. They also arrive with no
+      // position, 0 minutes and a rating of '0', so they are placeholders
+      // rather than thin data: skipping them loses nothing and storing them
+      // would put a fake 0.0 into every rating average.
+      //
+      // Found by the unique index refusing the second one on the first real
+      // backfill, which is exactly what it is for — a sample of 920 rows across
+      // two competitions had none.
+      if (id === null || id === undefined || id === 0 || !name) continue
+
+      // Always length 1 in the sample, but taking [0] rather than assuming
+      // means a future second entry is ignored instead of crashing.
+      const st = entry.statistics?.[0]
+      if (!st) continue
+
+      const g = st.games ?? ({} as ApiFootballPlayerStatLine['games'])
+      const pos = g.position ?? null
+
+      rows.push({
+        fixture_id: opts.fixtureId,
+        side,
+        external_player_id: id,
+        player_name: name,
+        shirt_number: playerInt(g.number),
+        position: pos && PLAYER_POSITIONS.has(pos) ? pos : null,
+        // ⚠ INVERTED, AND THE FEED HAS NO `starter` FIELD. `substitute: true`
+        // means he began on the bench — including the ones who never came on,
+        // who are exactly the rows with a null rating and null minutes.
+        is_starter: g.substitute !== true,
+        is_captain: g.captain === true,
+        minutes: playerInt(g.minutes),
+        rating: playerRating(g.rating),
+
+        goals: playerInt(st.goals?.total),
+        assists: playerInt(st.goals?.assists),
+        shots_total: playerInt(st.shots?.total),
+        shots_on: playerInt(st.shots?.on),
+        offsides: playerInt(st.offsides),
+        dribbles_attempts: playerInt(st.dribbles?.attempts),
+        dribbles_success: playerInt(st.dribbles?.success),
+        penalty_won: playerInt(st.penalty?.won),
+        penalty_scored: playerInt(st.penalty?.scored),
+        penalty_missed: playerInt(st.penalty?.missed),
+
+        goals_conceded: playerInt(st.goals?.conceded),
+        saves: playerInt(st.goals?.saves),
+        tackles_total: playerInt(st.tackles?.total),
+        tackles_blocks: playerInt(st.tackles?.blocks),
+        interceptions: playerInt(st.tackles?.interceptions),
+        duels_total: playerInt(st.duels?.total),
+        duels_won: playerInt(st.duels?.won),
+        dribbled_past: playerInt(st.dribbles?.past),
+        // ⚠ `commited`, one 't' — the provider's spelling. Correcting this key
+        // to match the column name stores NULL for every player, forever.
+        penalty_committed: playerInt(st.penalty?.commited),
+        penalty_saved: playerInt(st.penalty?.saved),
+
+        passes_total: playerInt(st.passes?.total),
+        // ⚠⚠ A COUNT, NOT A PERCENTAGE. See the type and migration 141.
+        passes_accurate: playerInt(st.passes?.accuracy),
+        key_passes: playerInt(st.passes?.key),
+
+        fouls_drawn: playerInt(st.fouls?.drawn),
+        fouls_committed: playerInt(st.fouls?.committed),
+        yellow_cards: playerInt(st.cards?.yellow),
+        red_cards: playerInt(st.cards?.red),
+      })
+    }
   }
 
   return rows

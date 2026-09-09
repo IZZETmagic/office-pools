@@ -50,6 +50,7 @@ import {
   type LeagueFixturePayload,
   eventsToTimeline,
   lineupsToRows,
+  playersToRows,
   statisticsToRows,
 } from './mappers'
 import { rehomeSeason } from '@/lib/league/rehomeSeason'
@@ -134,6 +135,8 @@ export type LeagueSyncResult = {
   statsRows: number
   /** Line-up rows written across all fixtures this tick (two per fixture). */
   lineupRows: number
+  /** Player-stat rows written this tick (about forty per fixture). */
+  playerRows: number
   /** Entries whose league totals moved as a result. */
   scoredEntries: number
   /** Standings rows re-ingested this tick, if a fixture finished. */
@@ -203,6 +206,7 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     bundleFixtures: 0,
     statsRows: 0,
     lineupRows: 0,
+    playerRows: 0,
     timelineRows: 0,
     scoredEntries: 0,
     standings: 0,
@@ -873,6 +877,52 @@ export async function syncLeagueFixtures(
     }
   }
 
+  // ------------------------------------------------------ 7b6. player statistics
+  // Every player's rating, minutes, shots, passes, tackles and cards.
+  //
+  // ⭐ THIS ARM COSTS NOTHING. The `players` array arrives in the SAME bundled
+  // response as the events, the line-ups and the team statistics — forty
+  // players a fixture — and was typed `unknown[]` and read by nothing until
+  // migration 141. There is no extra request here and no extra gate; if the
+  // fixture is in the bundle we already hold its player rows, and declining to
+  // store them would be throwing away data already paid for.
+  //
+  // ⚠ DISPLAY-ONLY, like 7b3 and 7b4. Nothing scores from this, which is why a
+  // failure is an error that never stops the loop.
+  for (const c of res.changed ?? []) {
+    const fx = byExt.get(c.external_fixture_id)
+    if (!fx) continue
+
+    // Membership, not `?? []` — see 7b3.
+    const bundled = bundle.get(c.external_fixture_id)
+    if (!bundled?.players) continue
+
+    try {
+      const rows = playersToRows(bundled.players, {
+        fixtureId: c.fixture_id,
+        homeExternalTeamId: fx.teams.home.id,
+      })
+      // An empty set writes nothing and deletes nothing: some competitions
+      // carry no player statistics at all, and a quiet tick must not clear
+      // forty stored rows. The function enforces this too.
+      if (rows.length === 0) continue
+
+      const { error: wErr } = await admin.rpc('replace_match_player_stats', {
+        p_fixture_id: c.fixture_id,
+        p_rows: rows,
+      })
+      if (wErr) {
+        push('league_player_stats', wErr.message, { fixture_id: c.fixture_id })
+        continue
+      }
+      result.playerRows += rows.length
+    } catch (e) {
+      push('league_player_stats', e instanceof Error ? e.message : String(e), {
+        fixture_id: c.fixture_id,
+      })
+    }
+  }
+
   // ------------------------------------------------------------- 7b5. line-ups
   // Both starting elevens, the benches, the formations and the two coaches.
   //
@@ -1087,6 +1137,7 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     ...(r.bundleCalls > 0 ? [`timeline=${r.timelineRows}`] : []),
     ...(r.bundleCalls > 0 ? [`stats=${r.statsRows}`] : []),
     ...(r.bundleCalls > 0 ? [`lineups=${r.lineupRows}`] : []),
+    ...(r.bundleCalls > 0 ? [`players=${r.playerRows}`] : []),
     `manual=${r.skippedManual}`,
     `unmatched=${r.unmatched}`,
     `unknown=${r.unknownProvider}`,
