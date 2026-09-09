@@ -8,6 +8,8 @@
 // almost never dark enough to carry text on top of it.
 // =============================================================
 
+import { fromOklab, toOklab } from '@/lib/design/oklch';
+
 /** One row of `match_player_stats`, as the app reads it. */
 export type MatchPlayerStat = {
   side: 'home' | 'away';
@@ -74,6 +76,73 @@ export const POOR_BELOW = 6.0;
  * green is 1.6–2.6:1, so on the grass the badge would be a smudge. The white
  * border the shirt chip already carries is what separates it — the fill
  * carries the meaning, the border carries the edge.
+ */
+/**
+ * The rating's own colour ramp: red at 1, deep green at 10.
+ *
+ * ⚠⚠ THE GREENS DARKEN AS THEY GO, AND THAT IS NOT A STYLE CHOICE. The badge
+ * has no outline any more, so it has to separate from the grass by itself. A
+ * mid-scale amber does that on HUE — orange against #417A57 is unmistakable
+ * even though the two measure 1.01:1, because WCAG contrast is about text
+ * legibility and says nothing about telling two shapes apart. The top of the
+ * scale has no such luck: it is green on green, so it has to separate by
+ * DARKNESS instead.
+ *
+ *   8.5  #166534  1.41:1 against the pitch
+ *   10   #123D26  2.41:1
+ *
+ * A brighter green at the top (#15803D, 1.01:1) is the same lightness as the
+ * grass and would dissolve into it.
+ *
+ * ⚠ EVERY STOP CARRIES WHITE TEXT AT 4.99:1 OR BETTER, so the label never has
+ * to change colour partway up the scale.
+ */
+const RATING_STOPS: [number, string][] = [
+  [1, '#A32118'],
+  [3.5, '#C2410C'],
+  [5.5, '#B45309'],
+  [7, '#4D7C0F'],
+  [8.5, '#166534'],
+  [10, '#123D26'],
+];
+
+/**
+ * A rating's colour, interpolated.
+ *
+ * ⚠ IN OKLAB, NOT RGB. A straight RGB blend from red to green passes through a
+ * muddy grey-brown around the midpoint — exactly where most ratings live — and
+ * the ramp would go slack in the one place it needs to discriminate.
+ */
+export function ratingScaleColor(rating: number | null | undefined): string | null {
+  if (ratingBand(rating) === null) return null;
+  const r = Math.max(1, Math.min(10, rating as number));
+
+  let lo = RATING_STOPS[0];
+  let hi = RATING_STOPS[RATING_STOPS.length - 1];
+  for (let i = 0; i < RATING_STOPS.length - 1; i++) {
+    if (r >= RATING_STOPS[i][0] && r <= RATING_STOPS[i + 1][0]) {
+      lo = RATING_STOPS[i];
+      hi = RATING_STOPS[i + 1];
+      break;
+    }
+  }
+  if (lo[0] === hi[0]) return lo[1];
+
+  const t = (r - lo[0]) / (hi[0] - lo[0]);
+  const a = toOklab(lo[1]);
+  const b = toOklab(hi[1]);
+  return fromOklab({
+    L: a.L + (b.L - a.L) * t,
+    a: a.a + (b.a - a.a) * t,
+    b: a.b + (b.b - a.b) * t,
+  });
+}
+
+/**
+ * ⚠ STILL BANDED, AND ONLY FOR THE RATES. Pass accuracy and duels are compared
+ * against everyone else in the player's position, which is a three-way verdict
+ * — good, ordinary, poor — not a point on a continuous scale. The RATING is a
+ * number out of ten and gets the ramp above; a percentile is not.
  */
 export const RATING_COLOR: Record<RatingBand, string> = {
   strong: '#15803D',

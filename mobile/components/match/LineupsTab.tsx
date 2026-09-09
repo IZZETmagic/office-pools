@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Image } from 'expo-image';
 import { Pressable, Text as RNText, View } from 'react-native';
 
-import { MONO_BOLD } from '@/components/match/matchDisplay';
+import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
 import { PlayerBadges } from '@/components/match/PlayerBadges';
 import { PlayerStatSheet } from '@/components/match/PlayerStatSheet';
 import {
@@ -20,7 +20,7 @@ import {
   indexByPlayerId,
   playerMarkers,
   playerPhotoUrl,
-  ratingColor,
+  ratingScaleColor,
   subMinute,
   teamRating,
   type MatchPlayerStat,
@@ -318,7 +318,7 @@ function TeamBar({
 }) {
   const theme = useTheme();
   const badge = formatRating(rating);
-  const badgeColor = ratingColor(rating);
+  const badgeColor = ratingScaleColor(rating);
 
   return (
     <View
@@ -348,8 +348,8 @@ function TeamBar({
         >
           <RNText
             style={{
-              fontFamily: MONO_BOLD,
-              fontSize: 13,
+              fontFamily: MONO,
+              fontSize: 14,
               color: '#FFFFFF',
               fontVariant: ['tabular-nums'],
             }}
@@ -721,7 +721,7 @@ function Bench({
               // so his chip stays a label rather than becoming a dead button.
               const played = stat ? (stat.minutes ?? 0) > 0 || stat.rating !== null : false;
               const badge = formatRating(stat?.rating ?? null);
-              const badgeColor = ratingColor(stat?.rating ?? null);
+              const badgeColor = ratingScaleColor(stat?.rating ?? null);
               return (
               <Pressable
                 key={p.playerId ?? i}
@@ -766,7 +766,7 @@ function Bench({
                   >
                     <RNText
                       style={{
-                        fontFamily: MONO_BOLD,
+                        fontFamily: MONO,
                         fontSize: 9,
                         lineHeight: 12,
                         color: '#FFFFFF',

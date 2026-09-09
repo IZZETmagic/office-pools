@@ -12,7 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MONO_BOLD } from '@/components/match/matchDisplay';
+import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 import {
   formatRating,
@@ -20,7 +20,7 @@ import {
   playerRates,
   RATE_COVERS,
   RATING_COLOR,
-  ratingColor,
+  ratingScaleColor,
   statGroups,
   headlineParts,
   type MatchPlayerStat,
@@ -74,7 +74,7 @@ export function PlayerStatSheet({
   if (!stat) return null;
 
   const rating = formatRating(stat.rating);
-  const colour = ratingColor(stat.rating);
+  const colour = ratingScaleColor(stat.rating);
   const rates = playerRates(stat);
   // ⚠ A rate carries its own counts, so the raw row it came from would print
   // the same fact twice. See RATE_COVERS.
@@ -211,10 +211,11 @@ export function PlayerStatSheet({
                     alignItems: 'center',
                   }}
                 >
+                  {/* ⚠ NOT BOLD — the ramp carries the emphasis. */}
                   <RNText
                     style={{
-                      fontFamily: MONO_BOLD,
-                      fontSize: 16,
+                      fontFamily: MONO,
+                      fontSize: 17,
                       color: '#FFFFFF',
                       fontVariant: ['tabular-nums'],
                     }}

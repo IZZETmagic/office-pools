@@ -1,8 +1,8 @@
 import { Text as RNText, View } from 'react-native';
 
-import { MONO_BOLD } from '@/components/match/matchDisplay';
+import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
 import { Icon } from '@/components/ui';
-import { formatRating, ratingColor, type PlayerMarkers } from '@/lib/playerStats';
+import { formatRating, ratingScaleColor, type PlayerMarkers } from '@/lib/playerStats';
 
 // =============================================================
 // What goes where around a player
@@ -155,7 +155,7 @@ export function PlayerBadges({
   if (!marks) return null;
   const S = slots(chip);
   const badge = formatRating(rating);
-  const badgeColor = ratingColor(rating);
+  const badgeColor = ratingScaleColor(rating);
 
   return (
     <>
@@ -205,11 +205,37 @@ export function PlayerBadges({
       ) : null}
 
       {/* ---- top right: how he played -------------------------------- */}
+      {/* ⚠ NO OUTLINE, UNLIKE EVERY OTHER BADGE HERE. The others are pale and
+          need a white hairline to hold an edge against the grass; the rating
+          carries its own colour from a ramp whose greens darken precisely so
+          they separate from #417A57 without one. See `ratingScaleColor`. */}
       {badge && badgeColor ? (
-        <View style={{ position: 'absolute', ...S.rating }}>
-          <Pill color={badgeColor}>
-            <RNText style={{ ...white, fontVariant: ['tabular-nums'] }}>{badge}</RNText>
-          </Pill>
+        <View
+          style={{
+            position: 'absolute',
+            ...S.rating,
+            minWidth: MARK + 6,
+            paddingHorizontal: 4,
+            paddingVertical: 2,
+            borderRadius: 5,
+            backgroundColor: badgeColor,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* ⚠ NOT BOLD. The ramp already carries the emphasis; bold on top of
+              a saturated fill is two shouts for one fact. */}
+          <RNText
+            style={{
+              fontFamily: MONO,
+              fontSize: 10,
+              lineHeight: 12,
+              color: '#FFFFFF',
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {badge}
+          </RNText>
         </View>
       ) : null}
 

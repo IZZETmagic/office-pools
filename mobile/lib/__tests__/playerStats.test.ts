@@ -21,6 +21,7 @@ import {
   RATING_COLOR,
   ratingBand,
   ratingColor,
+  ratingScaleColor,
   playerMarkers,
   playerPhotoUrl,
   playerRates,
@@ -400,5 +401,67 @@ describe('RATE_COVERS — a fact is printed once', () => {
     for (const rowLabel of Object.values(RATE_COVERS)) {
       expect(labels.has(rowLabel), `statGroups has no row called "${rowLabel}"`).toBe(true);
     }
+  });
+});
+
+describe('ratingScaleColor — red at 1, deep green at 10', () => {
+  const hex = (r: number) => ratingScaleColor(r)!;
+  const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+  it('anchors at both ends', () => {
+    expect(hex(1).toUpperCase()).toBe('#A32118');
+    expect(hex(10).toUpperCase()).toBe('#123D26');
+  });
+
+  it('⚠ climbs continuously — no two ratings a decimal apart share a colour', () => {
+    const seen = new Set<string>();
+    for (let r = 3; r <= 10; r = Math.round((r + 0.1) * 10) / 10) seen.add(hex(r));
+    // 71 samples across the range players actually occupy.
+    expect(seen.size).toBeGreaterThan(60);
+  });
+
+  it('⚠⚠ gets greener and redder in the right directions', () => {
+    // Red channel falls, green channel rises, across the whole ramp.
+    const low = rgb(hex(3));
+    const high = rgb(hex(9));
+    expect(low[0]).toBeGreaterThan(high[0]);
+    expect(low[1]).toBeLessThan(low[0]);
+    expect(high[1]).toBeGreaterThan(high[0]);
+  });
+
+  it('⚠ the top of the scale is DARKER than the grass, because it is green on green', () => {
+    // A brighter green would be the same lightness as #417A57 and dissolve into
+    // it — the badge has no outline to fall back on.
+    const relLum = (h: string) => {
+      const f = (v: number) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+      const [r, g, b] = rgb(h);
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const pitch = relLum('#417A57');
+    expect(relLum(hex(9))).toBeLessThan(pitch);
+    expect(relLum(hex(10))).toBeLessThan(pitch);
+  });
+
+  it('⚠ every colour on the ramp carries white text', () => {
+    const relLum = (h: string) => {
+      const f = (v: number) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+      const [r, g, b] = rgb(h);
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    for (let r = 1; r <= 10; r += 0.25) {
+      const contrast = (1.05) / (relLum(hex(r)) + 0.05);
+      expect(contrast, `rating ${r} is ${hex(r)}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('clamps rather than extrapolating off the ends', () => {
+    expect(hex(0.5)).toBe(hex(1));
+    expect(hex(12)).toBe(hex(10));
+  });
+
+  it('⚠ has no colour for a rating of 0 or none — it is not a rating', () => {
+    expect(ratingScaleColor(0)).toBeNull();
+    expect(ratingScaleColor(null)).toBeNull();
+    expect(ratingScaleColor(undefined)).toBeNull();
   });
 });
