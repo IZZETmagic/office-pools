@@ -13,7 +13,7 @@ import {
 } from '@/components/match/PitchMarkings';
 import { Icon, Text } from '@/components/ui';
 import { fixturePalette } from '@/lib/design/clubColors';
-import { groupByRow, surnameOf } from '@/lib/lineupLayout';
+import { groupByRow, rowDepths, surnameOf } from '@/lib/lineupLayout';
 import {
   formatRating,
   indexByPlayerId,
@@ -427,13 +427,18 @@ function Half({
   }
 
   const rows = groupByRow(lineup.players.filter((p) => p.starter));
-  const BAND = 46;
-  const LEAD = 4; // keeps the keeper off his own goal line
+
+  // ⚠ THE KEEPER IS THE FIRST ROW ONLY IF HE IS ALONE IN IT. `groupByRow` sorts
+  // by the feed's `grid`, and a starter missing one lands in a trailing row of
+  // his own — so a lineup with NO grids puts eleven players in "row one", and
+  // pinning that to the goal line would stack the whole team on the keeper.
+  const firstRowIsKeeper = rows.length > 1 && rows[0].length === 1;
+  const depths = rowDepths(rows.length, firstRowIsKeeper);
 
   return (
     <>
       {rows.map((row, rowIndex) => {
-        const depth = LEAD + ((rowIndex + 0.5) / rows.length) * BAND;
+        const depth = depths[rowIndex];
         // ⚠ Mapped through the bleed — a raw pitch percentage is not a box
         // percentage, and the keeper would stand outside his own goal line.
         const top = pitchYToView(half === 'top' ? depth : 100 - depth);

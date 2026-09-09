@@ -14,7 +14,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { groupByRow, parseGrid, surnameOf } from '../lineupLayout';
+import { GK_DEPTH, OUTFIELD_FROM, OUTFIELD_TO, groupByRow, parseGrid, rowDepths, surnameOf } from '../lineupLayout';
 import {
   leadingSide,
   STAT_ROWS,
@@ -340,5 +340,67 @@ describe('leadingSide', () => {
     // Guards against the flag drifting onto a stat where it inverts the meaning.
     const flipped = STAT_ROWS.filter((r) => r.lowerIsBetter).map((r) => r.key);
     expect(flipped.sort()).toEqual(['fouls', 'offsides', 'red_cards', 'yellow_cards']);
+  });
+});
+
+describe('rowDepths — how deep each row stands', () => {
+  it('⚠ pins the keeper in the goal area rather than a formation slot', () => {
+    // He used to take an equal slice and stand 8.6% out — past the six-yard box
+    // (3.79%) — spending a row's worth of pitch on a player who stays put.
+    const d = rowDepths(5, true);
+    expect(d[0]).toBe(GK_DEPTH);
+    expect(d[0]).toBeLessThan(5.5 / 145 * 100 + 1); // about the goal area
+  });
+
+  it('⚠ spends what the keeper gave back on the outfield', () => {
+    const d = rowDepths(5, true);
+    const gap = d[2] - d[1];
+    // The old even spread over the same pitch gave 9.2% between rows.
+    expect(gap).toBeGreaterThan(9.2);
+    expect(gap).toBeCloseTo(10.67, 1);
+  });
+
+  it('runs the outfield end to end, not slice-by-slice', () => {
+    const d = rowDepths(5, true);
+    expect(d[1]).toBe(OUTFIELD_FROM);
+    expect(d[d.length - 1]).toBe(OUTFIELD_TO);
+  });
+
+  it('⚠ never reaches the halfway line', () => {
+    // At 50% the front row would stand on the centre circle among the eleven
+    // coming the other way.
+    for (const n of [2, 3, 4, 5, 6, 7, 8]) {
+      for (const d of rowDepths(n, true)) expect(d).toBeLessThanOrEqual(48);
+      for (const d of rowDepths(n, false)) expect(d).toBeLessThanOrEqual(48);
+    }
+  });
+
+  it('⚠⚠ falls back to an even spread when the first row is NOT one keeper', () => {
+    // `groupByRow` puts a starter with no `grid` in a trailing row, so a lineup
+    // with no grids at all lands eleven players in "row one". Pinning that to
+    // the goal line would stack the whole team on top of the keeper.
+    const even = rowDepths(5, false);
+    expect(even[0]).toBeGreaterThan(GK_DEPTH);
+    // ⚠ Gaps compared with a tolerance, not by Set-of-floats: 46/5 repeated
+    // does not subtract to the same double every time, and the first version of
+    // this test failed on exactly that.
+    const gaps = even.slice(1).map((d, i) => d - even[i]);
+    for (const g of gaps) expect(g).toBeCloseTo(gaps[0], 9);
+  });
+
+  it('degenerate row counts do not divide by zero', () => {
+    expect(rowDepths(0, true)).toEqual([]);
+    expect(rowDepths(1, true)).toHaveLength(1);
+    expect(rowDepths(2, true)).toEqual([GK_DEPTH, (OUTFIELD_FROM + OUTFIELD_TO) / 2]);
+    for (const n of [1, 2, 3, 8]) {
+      for (const d of rowDepths(n, true)) expect(Number.isFinite(d)).toBe(true);
+    }
+  });
+
+  it('rows always run front to back', () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      const d = rowDepths(n, true);
+      for (let i = 1; i < d.length; i++) expect(d[i]).toBeGreaterThan(d[i - 1]);
+    }
   });
 });

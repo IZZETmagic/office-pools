@@ -81,3 +81,70 @@ export function surnameOf(name: string | null): string {
   const parts = trimmed.split(/\s+/);
   return parts[parts.length - 1];
 }
+
+// =============================================================
+// How deep each row stands
+// =============================================================
+
+/**
+ * The goalkeeper's depth, as a percentage of the pitch's length from his own
+ * goal line.
+ *
+ * ⚠ PINNED, AND NOT PART OF THE FORMATION'S SPACING. He used to take an equal
+ * slice of the band like everyone else, which stood him 8.6% out — past the
+ * six-yard box (3.79%) and a third of the way to the penalty spot — and spent a
+ * whole row's worth of pitch on a player who does not move up it. 4% puts him
+ * just off his line, in the goal area where a keeper actually stands, and hands
+ * the difference to the outfield.
+ *
+ * ⚠ IT CANNOT GO MUCH BELOW THIS. His rating badge hangs about 29pt above the
+ * circle's centre, and at 4% that centre sits 40pt from the top of the drawing.
+ * Under roughly 2.6% the badge would be cut off by the edge of the pitch.
+ */
+export const GK_DEPTH = 4;
+
+/** Where the outfield rows begin and end, as percentages of the length. */
+export const OUTFIELD_FROM = 14;
+/**
+ * ⚠ SHORT OF THE HALFWAY LINE, DELIBERATELY. A team's shape runs from its own
+ * box to a little short of halfway; at 50% the front row would stand ON the
+ * centre line, overlapping the eleven coming the other way.
+ */
+export const OUTFIELD_TO = 46;
+
+/**
+ * The depth of every row, front to back, as percentages of the pitch length.
+ *
+ * ⚠ THE OUTFIELD IS SPACED END TO END, not by slicing a band into equal parts
+ * and taking the middle of each. Slicing wastes half a gap at each end: five
+ * rows over 46% gave 9.2% between them, where pinning the keeper and running
+ * the other four from 14% to 46% gives 10.7% — 86pt instead of 74pt on a 393pt
+ * phone, for the same pitch.
+ *
+ * ⚠ THE KEEPER IS THE FIRST ROW ONLY IF HE IS ALONE IN IT. `groupByRow` sorts
+ * by the feed's `grid`, and a starter whose grid is missing lands in a trailing
+ * row of his own — so a lineup with no grids at all would put eleven players in
+ * "row one". Pinning that row to the goal line would stack the whole team on
+ * top of the keeper, so when the first row holds more than one player this
+ * falls back to spreading everyone evenly, which is what it did before.
+ */
+export function rowDepths(rowCount: number, firstRowIsKeeper: boolean): number[] {
+  if (rowCount <= 0) return [];
+
+  if (!firstRowIsKeeper || rowCount === 1) {
+    // The old even spread: each row takes the middle of its own slice.
+    const BAND = OUTFIELD_TO - GK_DEPTH;
+    return Array.from({ length: rowCount }, (_, i) => GK_DEPTH + ((i + 0.5) / rowCount) * BAND);
+  }
+
+  const outfield = rowCount - 1;
+  if (outfield === 1) return [GK_DEPTH, (OUTFIELD_FROM + OUTFIELD_TO) / 2];
+
+  return [
+    GK_DEPTH,
+    ...Array.from(
+      { length: outfield },
+      (_, i) => OUTFIELD_FROM + (i / (outfield - 1)) * (OUTFIELD_TO - OUTFIELD_FROM),
+    ),
+  ];
+}
