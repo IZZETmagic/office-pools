@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
 import { Icon, Text } from '@/components/ui';
+import { withLightness } from '@/lib/design/oklch';
 import { useTheme, withOpacity } from '@/theme';
 import {
   formatRating,
@@ -46,17 +47,27 @@ import {
 // =============================================================
 
 /**
- * The colour the glow behind the photograph is made of.
+ * ⚠⚠ A GLOW ON LIGHT IS A SHADOW. You cannot make a halo out of near-white on a
+ * near-white header — measured, #F7F8FC against the light header is 1.56-1.78:1
+ * and simply is not there. To be seen on light you have to go DARKER, which is
+ * a shadow; to be seen on dark you go lighter, which is a glow. Same job, and
+ * the two modes need opposite colours to do it.
  *
- * ⚠ THE LIGHT-MODE BACKGROUND, IN BOTH THEMES, AND DELIBERATELY NOT A TOKEN
- * LOOKUP. `theme.colors.snow` flips to #121520 in dark mode, and a near-black
- * glow on a dark header is not a glow — it is a smudge. Light is light in both.
- * This is `snow`'s light value, held still.
+ * ⚠ AND THE DARK SIDE IS THE CLUB'S OWN COLOUR, FLOORED. A raw tint works for
+ * Arsenal red (3.16:1) and fails completely for a pale club — Norwich yellow is
+ * 1.06:1 and Spurs white 1.04:1 against their own headers, which is no shadow
+ * at all. `withLightness(tint, 0.45)` keeps the hue and forces the darkness:
+ * worst case across six very different clubs is 3.94:1.
+ */
+const GLOW_LIGHTNESS = 0.45;
+
+/**
+ * The halo on a DARK header: `snow`'s light value, held still.
  *
- * ⚠ IT IS MUCH LOUDER IN DARK MODE, AND THAT IS THE NATURE OF IT. Measured
- * against the header behind it: 12.8 to 18.3:1 on dark, 1.56 to 1.78:1 on
- * light. On a light header a near-white glow is barely a glow at all — which
- * is the same thing as saying there is no ring there, which was the point.
+ * ⚠ NOT A TOKEN LOOKUP, DELIBERATELY. `theme.colors.snow` flips to #121520 in
+ * dark mode, which is the one place this is used — a near-black glow on a dark
+ * header is a smudge, not light. Light mode does not use this at all; it takes
+ * the darkened club colour above.
  */
 const GLOW = '#F7F8FC';
 
@@ -111,6 +122,8 @@ export function PlayerStatSheet({
     .filter((g) => g.rows.length > 0);
   const headline = headlineParts(stat, subMinute(stat, substMinutes));
   const photo = playerPhotoUrl(stat.externalPlayerId);
+  // Lighter than the header on dark, darker than it on light. See GLOW_LIGHTNESS.
+  const halo = theme.mode === 'dark' ? GLOW : withLightness(tint, GLOW_LIGHTNESS);
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -211,10 +224,14 @@ export function PlayerStatSheet({
                       width: 80,
                       height: 80,
                       borderRadius: theme.radii.pill,
-                      backgroundColor: GLOW,
-                      shadowColor: GLOW,
-                      shadowOpacity: 0.95,
-                      shadowRadius: 26,
+                      backgroundColor: halo,
+                      shadowColor: halo,
+                      // ⚠ A DARK HALO NEEDS LESS OF ITSELF. At the opacity that
+                      // makes a light glow read on a dark header, a dark one on
+                      // a light header stops being a halo and becomes a drop
+                      // shadow with a hard waist.
+                      shadowOpacity: theme.mode === 'dark' ? 0.95 : 0.5,
+                      shadowRadius: theme.mode === 'dark' ? 26 : 18,
                       shadowOffset: { width: 0, height: 0 },
                       elevation: 14,
                     }}
