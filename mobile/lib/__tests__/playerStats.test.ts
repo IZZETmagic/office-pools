@@ -25,6 +25,7 @@ import {
   playerMarkers,
   playerPhotoUrl,
   playerRates,
+  positionName,
   RATE_COVERS,
   subMinute,
   statGroups,
@@ -463,5 +464,23 @@ describe('ratingScaleColor — red at 1, deep green at 10', () => {
     expect(ratingScaleColor(0)).toBeNull();
     expect(ratingScaleColor(null)).toBeNull();
     expect(ratingScaleColor(undefined)).toBeNull();
+  });
+});
+
+describe('positionName', () => {
+  it('names the four the feed sends', () => {
+    expect(positionName('G')).toBe('Goalkeeper');
+    expect(positionName('D')).toBe('Defender');
+    expect(positionName('M')).toBe('Midfielder');
+    expect(positionName('F')).toBe('Forward');
+  });
+
+  it('⚠ an unknown letter is null, not shown raw', () => {
+    // "Player · ST" reads as a bug, and the position is decoration on a card
+    // that already names the man.
+    expect(positionName('ST')).toBeNull();
+    expect(positionName(null)).toBeNull();
+    expect(positionName(undefined)).toBeNull();
+    expect(positionName('')).toBeNull();
   });
 });

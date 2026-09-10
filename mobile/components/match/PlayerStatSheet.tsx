@@ -18,6 +18,7 @@ import {
   formatRating,
   playerPhotoUrl,
   playerRates,
+  positionName,
   RATE_COVERS,
   RATING_COLOR,
   ratingScaleColor,
@@ -131,21 +132,28 @@ export function PlayerStatSheet({
               />
             </View>
 
-            {/* ---- who ------------------------------------------------ */}
+            {/* ---- who: a header SECTION, not a row -------------------- */}
+            {/* ⚠ A WASH OF THE CLUB'S OWN COLOUR, not a slab of it. `tint` is
+                the shirt colour the player wears on the pitch above, so the
+                sheet is visibly his side's without becoming a second surface
+                competing with the numbers underneath. It also does the job a
+                divider would, which is why there is no border here. */}
             <View
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 12,
+                gap: 14,
                 paddingHorizontal: 20,
-                paddingTop: 8,
-                paddingBottom: 14,
+                paddingTop: 10,
+                paddingBottom: 16,
+                marginBottom: 16,
+                backgroundColor: withOpacity(tint, theme.mode === 'dark' ? 0.22 : 0.12),
               }}
             >
               <View
                 style={{
-                  width: 48,
-                  height: 48,
+                  width: 60,
+                  height: 60,
                   borderRadius: theme.radii.pill,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -153,22 +161,20 @@ export function PlayerStatSheet({
                   overflow: 'hidden',
                 }}
               >
-                {/* Number first, photo over it — the same fallback the pitch
-                    uses, and for the same reason: a 404 renders nothing. */}
+                {/* ⚠ THE FALLBACK IS THE POSITION LETTER, NOT THE NUMBER — the
+                    same correction the pitch needed. The number used to sit
+                    here purely as the photograph's fallback, and since every
+                    player has a photograph it was covered on every one of them:
+                    rendered, then hidden. It is beside the name now. */}
                 <RNText
-                  style={{
-                    fontFamily: MONO_BOLD,
-                    fontSize: 17,
-                    color: '#FFFFFF',
-                    fontVariant: ['tabular-nums'],
-                  }}
+                  style={{ fontFamily: MONO, fontSize: 20, color: 'rgba(255,255,255,0.9)' }}
                 >
-                  {stat.shirtNumber ?? '–'}
+                  {stat.position ?? '·'}
                 </RNText>
                 {photo ? (
                   <Image
                     source={{ uri: photo }}
-                    style={{ position: 'absolute', width: 48, height: 48 }}
+                    style={{ position: 'absolute', width: 60, height: 60 }}
                     contentFit="cover"
                     cachePolicy="memory-disk"
                     // Decorative: his name is directly beside it.
@@ -177,35 +183,87 @@ export function PlayerStatSheet({
                 ) : null}
               </View>
 
-              <View style={{ flex: 1 }}>
-                <RNText
-                  numberOfLines={1}
-                  style={{ fontFamily: fontFamilies.bold, fontSize: 17, color: theme.colors.ink }}
-                >
-                  {stat.playerName}
-                  {stat.isCaptain ? '  (C)' : ''}
-                </RNText>
+              <View style={{ flex: 1, gap: 2 }}>
+                {/* ⚠ NUMBER THEN NAME, the same order the pitch label uses.
+                    Two places naming the same player should read the same way
+                    round. */}
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                  {stat.shirtNumber !== null ? (
+                    <RNText
+                      style={{
+                        fontFamily: MONO,
+                        fontSize: 15,
+                        color: theme.colors.slate,
+                        fontVariant: ['tabular-nums'],
+                      }}
+                    >
+                      {stat.shirtNumber}
+                    </RNText>
+                  ) : null}
+                  <RNText
+                    numberOfLines={1}
+                    style={{
+                      fontFamily: fontFamilies.bold,
+                      fontSize: 19,
+                      color: theme.colors.ink,
+                      flexShrink: 1,
+                    }}
+                  >
+                    {stat.playerName}
+                  </RNText>
+                  {stat.isCaptain ? (
+                    <View
+                      style={{
+                        width: 15,
+                        height: 15,
+                        borderRadius: theme.radii.pill,
+                        backgroundColor: theme.colors.ink,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <RNText
+                        style={{ fontFamily: MONO_BOLD, fontSize: 9, color: theme.colors.surface }}
+                      >
+                        C
+                      </RNText>
+                    </View>
+                  ) : null}
+                </View>
+
                 <RNText
                   numberOfLines={1}
                   style={{
-                    fontFamily: fontFamilies.regular,
+                    fontFamily: fontFamilies.semibold,
                     fontSize: 13,
-                    color: theme.colors.slate,
-                    marginTop: 2,
+                    color: theme.colors.ink,
                   }}
                 >
-                  {[teamName, ...headline].join(' · ')}
+                  {[positionName(stat.position), teamName].filter(Boolean).join(' · ')}
                 </RNText>
+
+                {headline.length > 0 ? (
+                  <RNText
+                    numberOfLines={1}
+                    style={{
+                      fontFamily: fontFamilies.regular,
+                      fontSize: 12,
+                      color: theme.colors.slate,
+                    }}
+                  >
+                    {headline.join(' · ')}
+                  </RNText>
+                ) : null}
               </View>
 
-              {/* ⚠ The rating is absent, not zero, when the provider did not
-                  give one — an unused substitute has no afternoon to rate. */}
+              {/* ⚠ The rating is absent, not zero, when the provider gave none —
+                  an unused substitute has no afternoon to rate. */}
               {rating && colour ? (
                 <View
                   style={{
-                    minWidth: 46,
-                    paddingHorizontal: 8,
-                    paddingVertical: 6,
+                    minWidth: 52,
+                    paddingHorizontal: 10,
+                    paddingVertical: 7,
                     borderRadius: theme.radii.pill,
                     backgroundColor: colour,
                     alignItems: 'center',
@@ -215,7 +273,7 @@ export function PlayerStatSheet({
                   <RNText
                     style={{
                       fontFamily: MONO,
-                      fontSize: 17,
+                      fontSize: 19,
                       color: '#FFFFFF',
                       fontVariant: ['tabular-nums'],
                     }}

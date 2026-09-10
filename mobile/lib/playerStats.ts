@@ -559,3 +559,27 @@ export function playerRates(s: MatchPlayerStat): Rate[] {
 
   return out;
 }
+
+/**
+ * `'F'` → `'Forward'`.
+ *
+ * ⚠ THE FEED ONLY EVER SENDS FOUR. Measured across 6,312 rows: G, D, M and F,
+ * with nothing else and no nulls except the id-0 placeholders the mapper drops.
+ * An unknown letter returns null rather than being shown raw — "Player · ST"
+ * reads as a bug, and the position is decoration on a card that already names
+ * the man.
+ */
+export function positionName(pos: string | null | undefined): string | null {
+  switch (pos) {
+    case 'G':
+      return 'Goalkeeper';
+    case 'D':
+      return 'Defender';
+    case 'M':
+      return 'Midfielder';
+    case 'F':
+      return 'Forward';
+    default:
+      return null;
+  }
+}
