@@ -886,39 +886,15 @@ function OpponentCard({
         ) : null}
       </View>
 
-      {/* Who they keep backing. */}
-      {opponent.topClub ? (
-        <View style={{ marginTop: theme.spacing.lg }}>
-          <Text variant="caption" color="slate">
-            Backs most often
-          </Text>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: theme.spacing.sm,
-              marginTop: theme.spacing.sm,
-            }}
-          >
-            {opponent.topClub.crest ? (
-              <Image
-                // Decorative — the club's name sits beside it, so announcing
-                // the crest as well would read the same thing twice.
-                alt=""
-                source={{ uri: opponent.topClub.crest }}
-                style={{ width: theme.spacing.xl, height: theme.spacing.xl }}
-                resizeMode="contain"
-              />
-            ) : null}
-            <Text variant="cardTitle" numberOfLines={1} style={{ flex: 1 }}>
-              {opponent.topClub.name}
-            </Text>
-            <Text variant="body" color="slate" style={{ fontVariant: ['tabular-nums'] }}>
-              {opponent.topClub.times}×
-            </Text>
-          </View>
-        </View>
-      ) : null}
+      {/* ⚠ "BACKS MOST OFTEN" MOVED TO THE SCOUT REPORT, Ryan 2026-09-10.
+          It lived here and there, computed two different ways: this one counted
+          raw backings in the browser off `useLeaguePoolPicks` with a floor of
+          three, the report counts them on the server with denominators and a
+          floor of two. Two answers to one question, and the card had no room
+          for the denominator that makes the answer mean anything — "3×" cannot
+          tell three of three from three of eleven.
+
+          The link at the foot of this card is where it went. */}
 
       {/*
         ⚠ TWO ZEROES UNDER "FIRST MEETING" IS NOISE PRETENDING TO BE DATA. There

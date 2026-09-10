@@ -355,13 +355,13 @@ export type Opponent = {
    */
   picks: number;
   /**
-   * The club they back most often, and how many times.
-   *
-   * ⚠ A DRAW BACKS NOBODY, so draws are excluded from the count rather than
-   * filed against the home side. Null under three backings — one club picked
-   * twice is not a favourite, it is a coincidence with a crest.
+   * ⚠ `topClub` LIVED HERE AND IS GONE, Ryan 2026-09-10. The club somebody
+   * backs most is the scout report's now, computed on the SERVER with its
+   * denominator attached — "2 of 2" rather than "3×", which is the difference
+   * between a finding and a number. Two derivations of one question is the
+   * shape this file already warns about repeatedly; deleting the browser one
+   * was the point of moving it.
    */
-  topClub: { name: string; crest: string | null; times: number } | null;
   /**
    * How often the two of you called the same fixture the same way, as a whole
    * percent of the fixtures you BOTH picked. Null under five in common.
@@ -644,12 +644,14 @@ export function useDuel(poolId: string | null | undefined): DuelState {
    *
    * ⚠ LAZY, AND THAT IS A SIZE DECISION RATHER THAN A TIDINESS ONE. The bulk
    * payload is every revealed pick in the pool — ~200 rows today, ~3,800 for a
-   * ten-person pool by May. It is fetched only when there is a revealed
-   * opponent AND a locked matchweek to read, which is exactly the gate
-   * `useLeaguePoolPicks` documents. Anything looser and the phone pulls a
-   * season of picks to render a card nobody can see yet.
+   * ten-person pool by May. It is fetched only once a matchweek has locked,
+   * which is exactly the gate `useLeaguePoolPicks` documents. Anything looser
+   * and the phone pulls a season of picks to render a card nobody can see yet.
+   *
+   * ⚠ `opponentEntryId` USED TO SIT HERE AND WAS ALREADY DEAD — assigned and
+   * never read, left behind when the gate widened from "there is an opponent
+   * AND something locked" to `somethingLocked` alone. Removed 2026-09-10.
    */
-  const opponentEntryId = current?.them?.entryId ?? null;
   /**
    * Has anything locked — i.e. is there a revealed pick to read at all?
    *
@@ -761,36 +763,6 @@ export function useDuel(poolId: string | null | undefined): DuelState {
     }
 
     /**
-     * The club they back most often.
-     *
-     * ⚠ A DRAW BACKS NOBODY. Filing one against the home side would invent a
-     * loyalty out of a member hedging, and hedging is the opposite of one.
-     */
-    const backed = new Map<string, number>();
-    const byFixture = new Map(data?.season.matches.map((m) => [m.match_id, m]) ?? []);
-    for (const [fixtureId, d] of theirs) {
-      const m = byFixture.get(fixtureId);
-      if (!m || d === 'draw') continue;
-      const teamId = d === 'home' ? m.home_team_id : m.away_team_id;
-      backed.set(teamId, (backed.get(teamId) ?? 0) + 1);
-    }
-    let topId: string | null = null;
-    let topTimes = 0;
-    for (const [id, times] of backed) {
-      if (times > topTimes) {
-        topId = id;
-        topTimes = times;
-      }
-    }
-    const team = data?.season.teams.find((t) => t.team_id === topId) ?? null;
-    // ⚠ Three is the floor. One club picked twice is not a favourite, it is a
-    // coincidence with a crest on it.
-    const topClub =
-      team && topTimes >= 3
-        ? { name: team.country_name, crest: team.flag_url, times: topTimes }
-        : null;
-
-    /**
      * How often the two of you called the same fixture the same way.
      *
      * ⚠ Over the fixtures you BOTH picked, not over the season. A week one of
@@ -816,12 +788,11 @@ export function useDuel(poolId: string | null | undefined): DuelState {
       form: form.slice(-5),
       picks: n,
       duelPoints: theirDuelPoints,
-      topClub,
       // Five in common is the floor — below that a percentage is two picks
       // wearing a statistic.
       agreement: shared >= 5 ? Math.round((same / shared) * 100) : null,
     };
-  }, [current, picks.data, bouts, showdown, data, myDirections]);
+  }, [current, picks.data, bouts, showdown, myDirections]);
 
   /**
    * One record per entry — W / T / L, byes, form and duel points.
