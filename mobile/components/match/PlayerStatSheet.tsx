@@ -218,13 +218,20 @@ export function PlayerStatSheet({
 
                   {/* ⚠ ON THE PHOTOGRAPH'S TOP-RIGHT CORNER, exactly where it
                       sits on the pitch. The same badge in the same place on the
-                      same face is one thing to learn, not two. */}
+                      same face is one thing to learn, not two.
+
+                      ⚠ MOSTLY OUTSIDE IT, THOUGH. At `right: -12` the badge is
+                      44 wide against an 80pt photo and 32pt of it lay across the
+                      face — 40% of the photograph's width, over the head rather
+                      than the corner. At -26 that is 18pt, 22%, which clips hair
+                      and background instead. There is room: the photo's right
+                      edge is ~236pt and the X does not start until ~349pt. */}
                   {rating && colour ? (
                     <View
                       style={{
                         position: 'absolute',
                         top: -4,
-                        right: -12,
+                        right: -26,
                         minWidth: 44,
                         paddingHorizontal: 9,
                         paddingVertical: 5,
