@@ -379,8 +379,12 @@ function FingerprintCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf
         ) : null}
 
         {/* ⚠ A STATED ABSENCE IS A FINDING. Most members have never predicted
-            0–0, and saying so is more interesting than any rate on this card. */}
-        {!f.hasPredictedNil ? (
+            0–0, and saying so is more interesting than any rate on this card.
+
+            ⚠⚠ BUT ONLY WHERE ONE COULD HAVE BEEN ENTERED. A Results pool member
+            taps home/draw/away and never files a scoreline, so "Never" would be
+            reporting them for something the pool never offered. */}
+        {f.hasScorelines && !f.hasPredictedNil ? (
           <Row label="Has ever predicted 0–0" value="Never" muted />
         ) : null}
       </View>

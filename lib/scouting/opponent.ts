@@ -29,6 +29,8 @@
 // counts. Keeps it inside the root vitest runner's reach.
 // =============================================================
 
+import { directionOf, type LeagueDirection } from '@/lib/league/ownPicks'
+
 /** A club, as much of one as a dossier needs. */
 export type ClubRef = {
   clubId: string
@@ -61,8 +63,25 @@ export type PickRow = {
   fixtureId: string
   matchweek: number
   kickoffAt: string
-  predictedHome: number
-  predictedAway: number
+  /**
+   * ⚠⚠ NULL IN A RESULTS POOL, AND THAT IS A SCHEMA GUARANTEE.
+   *
+   * Migration 064 gave `league_predictions` two mutually exclusive shapes:
+   * a Scores pool files a scoreline, a Results pool files
+   * `predicted_outcome`, and `league_predictions_shape_ck` REFUSES a row
+   * carrying both or neither. So these two are null for every pick in a
+   * Results pool.
+   *
+   * ⚠ WHICH MEANS `predictedHome > predictedAway` IS FALSE BOTH WAYS THERE,
+   * and a naive reading reports every member as having predicted a draw.
+   * Measured: on `Showdown Duels` this module read 20 of 20 picks as draws for
+   * all four entries before `predictedOutcome` was added. `ownPicks.ts` exists
+   * because two components had already made this exact mistake.
+   */
+  predictedHome: number | null
+  predictedAway: number | null
+  /** ⚠ NULL IN A SCORES POOL — the other half of the same XOR. */
+  predictedOutcome: LeagueDirection | null
   actualHome: number | null
   actualAway: number | null
   homeClub: ClubRef
@@ -149,6 +168,11 @@ export type Fingerprint = {
   theirHomeWinRate: Rate
   /** ⚠ A stated absence is a finding. Most members have never predicted 0–0. */
   hasPredictedNil: boolean
+  /**
+   * ⚠ FALSE IN A RESULTS POOL. The screen needs to tell "never entered a 0–0"
+   * from "cannot enter one", because only the first is worth a row.
+   */
+  hasScorelines: boolean
 }
 
 export type Reliability = {
@@ -199,11 +223,43 @@ export type OpponentDossier = {
   read: string
 }
 
-/** Who a prediction says will win. Null is a predicted draw. */
+/**
+ * Who a prediction says will win. Null is a predicted draw.
+ *
+ * ## ⚠⚠ BOTH SHAPES, AND THE STORED OUTCOME WINS WHERE IT EXISTS
+ *
+ * A stored scoreline can be READ as a direction — 2–1 means they backed the
+ * home side, and saying so invents nothing. The reverse is forbidden:
+ * `write.ts` and Decision 9 both spell it out, because filing "home" as a
+ * sentinel 1–0 would score as a genuine exact and show somebody a scoreline
+ * they never entered. Nothing here writes, and nothing here manufactures a
+ * scoreline from an outcome.
+ *
+ * ⚠ `directionOf` IS IMPORTED, NOT REIMPLEMENTED. It is the same three-line
+ * comparison, and that is exactly why it has an owner — `ownPicks.ts` was
+ * written after two components independently got this wrong.
+ */
 function predictedWinner(p: PickRow): 'home' | 'away' | null {
-  if (p.predictedHome > p.predictedAway) return 'home'
-  if (p.predictedHome < p.predictedAway) return 'away'
+  const direction =
+    p.predictedOutcome ??
+    (p.predictedHome !== null && p.predictedAway !== null
+      ? directionOf(p.predictedHome, p.predictedAway)
+      : null)
+  if (direction === 'home') return 'home'
+  if (direction === 'away') return 'away'
   return null
+}
+
+/** ⚠ A pick with neither shape is not a draw — it is not a pick. */
+function hasView(p: PickRow): boolean {
+  return (
+    p.predictedOutcome !== null || (p.predictedHome !== null && p.predictedAway !== null)
+  )
+}
+
+/** Only a Scores pool has scorelines to average or to tally. */
+function hasScoreline(p: PickRow): p is PickRow & { predictedHome: number; predictedAway: number } {
+  return p.predictedHome !== null && p.predictedAway !== null
 }
 
 /** Who actually won. Null is a draw; undefined means it has not been played. */
@@ -297,8 +353,17 @@ export function buildOpponentDossier(
   }
 
   // ---- fingerprint ---------------------------------------------------------
+  /**
+   * ⚠⚠ SCORELINE FIGURES ARE COMPUTED OVER THE PICKS THAT HAVE ONE, and are
+   * withheld entirely in a Results pool where none do. A signature scoreline
+   * for a member who never entered a scoreline would be invented — the same
+   * one-way rule `ownPicks.ts` states: a scoreline can be read as a direction,
+   * a direction can never be read back as a scoreline.
+   */
+  const withScores = ordered.filter(hasScoreline)
+
   const scoreTally = new Map<string, number>()
-  for (const p of ordered) {
+  for (const p of withScores) {
     const key = `${p.predictedHome}-${p.predictedAway}`
     scoreTally.set(key, (scoreTally.get(key) ?? 0) + 1)
   }
@@ -309,19 +374,33 @@ export function buildOpponentDossier(
     (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
   )[0]
 
-  const predictedGoals = ordered.reduce((s, p) => s + p.predictedHome + p.predictedAway, 0)
-  const theirDraws = ordered.filter((p) => predictedWinner(p) === null).length
-  const theirHomeWins = ordered.filter((p) => predictedWinner(p) === 'home').length
+  const predictedGoals = withScores.reduce((s, p) => s + p.predictedHome + p.predictedAway, 0)
+
+  // ⚠ DIRECTION FIGURES RUN OVER EVERY PICK THAT CARRIES A VIEW, at either
+  // depth — a Results pool has directions even though it has no scorelines, and
+  // those are exactly the rows this card is about.
+  const viewed = ordered.filter(hasView)
+  const theirDraws = viewed.filter((p) => predictedWinner(p) === null).length
+  const theirHomeWins = viewed.filter((p) => predictedWinner(p) === 'home').length
 
   const fingerprint: Fingerprint = {
     signature: topScore
-      ? { score: topScore[0].replace('-', '–'), share: rate(topScore[1], ordered.length) }
+      ? { score: topScore[0].replace('-', '–'), share: rate(topScore[1], withScores.length) }
       : null,
     goalsPerPrediction:
-      ordered.length === 0 ? null : Math.round((predictedGoals / ordered.length) * 10) / 10,
-    theirDrawRate: rate(theirDraws, ordered.length),
-    theirHomeWinRate: rate(theirHomeWins, ordered.length),
-    hasPredictedNil: ordered.some((p) => p.predictedHome === 0 && p.predictedAway === 0),
+      withScores.length === 0
+        ? null
+        : Math.round((predictedGoals / withScores.length) * 10) / 10,
+    theirDrawRate: rate(theirDraws, viewed.length),
+    theirHomeWinRate: rate(theirHomeWins, viewed.length),
+    /**
+     * ⚠ FALSE IN A RESULTS POOL, WHERE IT IS NOT A FINDING BUT A CATEGORY
+     * ERROR. "Has never predicted 0–0" is interesting about somebody who could
+     * have; a Results pool member has no way to enter one, so the row is
+     * suppressed rather than reported as an absence.
+     */
+    hasPredictedNil: withScores.some((p) => p.predictedHome === 0 && p.predictedAway === 0),
+    hasScorelines: withScores.length > 0,
   }
 
   // ---- contrarian ----------------------------------------------------------
@@ -449,34 +528,77 @@ export function buildClubLeans(picks: PickRow[]): ClubLean[] {
 }
 
 /**
+ * How many times a member must have taken a view on a club before it is named.
+ *
+ * ## ⚠⚠ THIS IS NOT `MIN_RATE_SAMPLE`, AND CONFLATING THEM EMPTIED THE CARD
+ *
+ * These two answer different questions and the eligibility filters here used
+ * the wrong one. `MIN_RATE_SAMPLE` governs whether a number may be written as a
+ * PERCENTAGE — five is the point below which "50%" is a lie with a decimal
+ * point on it. Whether a club is worth NAMING is a question about how often
+ * somebody has had an opinion on it, and the answer is smaller.
+ *
+ * ⚠ MEASURED, NOT PICKED. Against the two real Showdown pools every member had
+ * 20 revealed picks across two locked matchweeks, so no club had been seen more
+ * than TWICE — and `seen >= 5` returned null for `mostBacked`, `mostOpposed`
+ * and `blindSpot` for every entry in both pools. The whole Club bias card
+ * returned null and nobody ever saw it. It would have stayed invisible until
+ * matchweek five or so, which is to say for the entire period anyone was
+ * looking at it.
+ *
+ * ⚠ AND THE DISPLAY IS ALREADY SAFE WITHOUT A HIGH FLOOR HERE. Every figure on
+ * the row is a FRACTION — "2 of 2", never "100%" — because `rate()` still
+ * withholds the percentage under `MIN_RATE_SAMPLE`. The floor below decides
+ * whether a club is interesting; that one decides whether a claim is provable.
+ * One coincidence is not a lean; two is a pattern worth putting a name to, with
+ * the fraction beside it so the reader can weigh it themselves.
+ */
+const MIN_BACKINGS = 2
+
+/**
+ * The blind spot asks for more, because it is a stronger claim.
+ *
+ * ⚠ "THEY KEEP GETTING THIS CLUB WRONG" IS AN ACCUSATION, and two failures is a
+ * coin landing badly twice. Three backings is where a habit starts to be
+ * visible — and it is still the same fraction on screen, so a reader who thinks
+ * three is thin can see that it is three.
+ */
+const MIN_BLIND_SPOT_BACKINGS = 3
+
+/**
  * The club they back most — by SHARE of that club's games, not by raw count.
  *
  * ⚠ A COUNT WOULD JUST NAME WHOEVER PLAYED MOST. Every club plays the same
  * number of league games over a season, but a dossier is read in matchweek six
  * over a partial sample where they do not, and mid-season a member who has seen
  * one club eight times and another four would have the first named however
- * lukewarm they were about it. The floor keeps a 1-of-1 out of the answer.
+ * lukewarm they were about it.
+ *
+ * ⚠ THE TIEBREAK ENDS ON THE NAME, WHICH IS ARBITRARY AND DELIBERATE. Early in
+ * a season a dozen clubs sit at 2 of 2 and share and count cannot separate
+ * them; without a final key the answer falls out of map insertion order, so the
+ * same member could be "backs Bournemouth" on one open and "backs Brentford" on
+ * the next. Stable beats meaningful when nothing is meaningful.
  */
 function pickMostBacked(leans: ClubLean[]): ClubLean | null {
-  const eligible = leans.filter((l) => l.seen >= MIN_RATE_SAMPLE && l.backed > 0)
+  const eligible = leans.filter((l) => l.backed >= MIN_BACKINGS)
   if (eligible.length === 0) return null
-  return eligible.reduce((a, b) =>
-    b.backed / b.seen > a.backed / a.seen ||
-    (b.backed / b.seen === a.backed / a.seen && b.backed > a.backed)
-      ? b
-      : a,
-  )
+  return eligible.reduce((a, b) => (betterLean(b, a, 'backed') ? b : a))
 }
 
 function pickMostOpposed(leans: ClubLean[]): ClubLean | null {
-  const eligible = leans.filter((l) => l.seen >= MIN_RATE_SAMPLE && l.opposed > 0)
+  const eligible = leans.filter((l) => l.opposed >= MIN_BACKINGS)
   if (eligible.length === 0) return null
-  return eligible.reduce((a, b) =>
-    b.opposed / b.seen > a.opposed / a.seen ||
-    (b.opposed / b.seen === a.opposed / a.seen && b.opposed > a.opposed)
-      ? b
-      : a,
-  )
+  return eligible.reduce((a, b) => (betterLean(b, a, 'opposed') ? b : a))
+}
+
+/** Share, then raw count, then name. See the tiebreak note above. */
+function betterLean(b: ClubLean, a: ClubLean, key: 'backed' | 'opposed'): boolean {
+  const sb = b[key] / b.seen
+  const sa = a[key] / a.seen
+  if (sb !== sa) return sb > sa
+  if (b[key] !== a[key]) return b[key] > a[key]
+  return b.club.name.localeCompare(a.club.name) < 0
 }
 
 /**
@@ -494,12 +616,19 @@ function pickMostOpposed(leans: ClubLean[]): ClubLean | null {
  */
 function pickBlindSpot(leans: ClubLean[]): ClubLean | null {
   const eligible = leans.filter(
-    (l) => l.backedPlayed >= MIN_RATE_SAMPLE && l.backedRight / l.backedPlayed < 0.5,
+    (l) =>
+      l.backedPlayed >= MIN_BLIND_SPOT_BACKINGS && l.backedRight / l.backedPlayed < 0.5,
   )
   if (eligible.length === 0) return null
-  return eligible.reduce((a, b) =>
-    b.backedRight / b.backedPlayed < a.backedRight / a.backedPlayed ? b : a,
-  )
+  return eligible.reduce((a, b) => {
+    const rb = b.backedRight / b.backedPlayed
+    const ra = a.backedRight / a.backedPlayed
+    if (rb !== ra) return rb < ra ? b : a
+    // More backings at the same strike rate is the stronger finding; then the
+    // name, for the same stability reason as above.
+    if (b.backedPlayed !== a.backedPlayed) return b.backedPlayed > a.backedPlayed ? b : a
+    return b.club.name.localeCompare(a.club.name) < 0 ? b : a
+  })
 }
 
 /**

@@ -23,6 +23,19 @@
 // about: an admin-client reader re-implements every policy it bypasses or the
 // seal is gone. The matchweek filter IS that re-implementation.
 //
+// ## ⚠⚠ BOTH PICK SHAPES ARE READ, BECAUSE A POOL ONLY EVER HAS ONE
+//
+// Migration 064 made `league_predictions` mutually exclusive per row: a Scores
+// pool files a scoreline and leaves `predicted_outcome` null, a Results pool
+// files an outcome and leaves both scores null, and
+// `league_predictions_shape_ck` refuses a row with both or neither. Selecting
+// only the scores therefore returns a full page of nulls for a Results pool —
+// which reads as "predicted a draw" everywhere, not as "no data".
+//
+// Measured before this was fixed: on `Showdown Duels`, a Results-depth pool,
+// every one of four entries reported 20 of 20 picks as draws, no club leans at
+// all, and a verdict sentence that would have said they see draws everywhere.
+//
 // ## ⚠ THE CROWD IS PLATFORM-WIDE, NEVER POOL-SCOPED
 //
 // `readCrowdMajority` deliberately does not take a pool. A crowd figure computed
@@ -34,6 +47,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/server'
 
+import type { LeagueDirection } from '@/lib/league/ownPicks'
 import type { ClubRef, PickRow, ScoreType } from './opponent'
 
 /** Same alias `entryAnalytics.ts` uses, so the two readers agree about it. */
@@ -52,8 +66,10 @@ const MAX_PICKS = 800
 
 type PredictionRow = {
   fixture_id: string
-  predicted_home_score: number
-  predicted_away_score: number
+  /** ⚠ NULL IN A RESULTS POOL — migration 064's XOR. See `PickRow`. */
+  predicted_home_score: number | null
+  predicted_away_score: number | null
+  predicted_outcome: LeagueDirection | null
   league_fixtures: {
     fixture_id: string
     kickoff_at: string
@@ -97,6 +113,7 @@ export async function readOpponentPicks(
       fixture_id,
       predicted_home_score,
       predicted_away_score,
+      predicted_outcome,
       league_fixtures!inner (
         fixture_id, kickoff_at, home_goals, away_goals, matchweek_id,
         home:league_clubs!league_fixtures_home_club_id_fkey ( club_id, name, abbreviation, crest_url ),
@@ -142,6 +159,7 @@ export async function readOpponentPicks(
       kickoffAt: f.kickoff_at,
       predictedHome: r.predicted_home_score,
       predictedAway: r.predicted_away_score,
+      predictedOutcome: r.predicted_outcome,
       actualHome: f.home_goals,
       actualAway: f.away_goals,
       homeClub: home,

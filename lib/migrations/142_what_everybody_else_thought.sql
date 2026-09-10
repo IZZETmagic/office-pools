@@ -77,7 +77,18 @@ AS $$
   WITH revealed AS (
     SELECT
       lp.fixture_id,
+      -- ⚠⚠ BOTH PICK SHAPES. Migration 064 made these mutually exclusive per
+      -- row: a Scores pool files a scoreline and leaves `predicted_outcome`
+      -- null, a Results pool files an outcome and leaves both scores null, and
+      -- `league_predictions_shape_ck` refuses a row with both or neither.
+      --
+      -- ⚠ SO A BARE `ELSE 'draw'` IS WRONG, NOT MERELY INCOMPLETE. Two nulls
+      -- fail both comparisons and fall into it, so every pick in a Results pool
+      -- would be counted as a crowd vote for the draw — silently, and in the
+      -- direction that makes the whole platform look draw-happy.
       CASE
+        WHEN lp.predicted_outcome IS NOT NULL THEN lp.predicted_outcome
+        WHEN lp.predicted_home_score IS NULL OR lp.predicted_away_score IS NULL THEN NULL
         WHEN lp.predicted_home_score > lp.predicted_away_score THEN 'home'
         WHEN lp.predicted_home_score < lp.predicted_away_score THEN 'away'
         ELSE 'draw'
@@ -86,6 +97,10 @@ AS $$
     JOIN league_fixtures   lf ON lf.fixture_id  = lp.fixture_id
     JOIN league_matchweeks mw ON mw.matchweek_id = lf.matchweek_id
     WHERE lp.fixture_id = ANY(p_fixture_ids)
+      -- ⚠ A ROW WITH NEITHER SHAPE IS NOT A VOTE. The CHECK constraint should
+      -- make this impossible; counting it would be counting a pick nobody made.
+      AND (lp.predicted_outcome IS NOT NULL
+           OR (lp.predicted_home_score IS NOT NULL AND lp.predicted_away_score IS NOT NULL))
       -- ⚠⚠ THE SEAL. See the header.
       AND mw.lock_at IS NOT NULL
       AND mw.lock_at <= now()

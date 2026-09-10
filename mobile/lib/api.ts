@@ -1855,6 +1855,12 @@ export type ScoutFingerprint = {
   theirHomeWinRate: ScoutRate;
   /** ⚠ A stated absence is a finding — most members have never predicted 0–0. */
   hasPredictedNil: boolean;
+  /**
+   * ⚠ FALSE IN A RESULTS POOL, where members tap an outcome and never enter a
+   * scoreline. "Has never predicted 0–0" is a finding about somebody who COULD
+   * have; suppress the row rather than report an absence nobody could fill.
+   */
+  hasScorelines: boolean;
 };
 
 export type OpponentDossier = {

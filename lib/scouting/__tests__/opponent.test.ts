@@ -40,6 +40,7 @@ function pick(over: Partial<PickRow> = {}): PickRow {
     kickoffAt: `2026-09-${String(seq).padStart(2, '0')}T15:00:00+00:00`,
     predictedHome: 2,
     predictedAway: 1,
+    predictedOutcome: null,
     actualHome: 2,
     actualAway: 1,
     homeClub: ARS,
@@ -466,5 +467,127 @@ describe('the club a lean names travels whole', () => {
     ])
     expect(leans.find((l) => l.club.clubId === 'che')?.club.crestUrl).toBe('https://x/che.png')
     expect(leans.find((l) => l.club.clubId === 'ars')?.club.crestUrl).toBeNull()
+  })
+})
+
+describe('naming a club is a different threshold from quoting a percentage', () => {
+  it('names a club backed twice, which the rate floor used to hide', () => {
+    // ⚠⚠ THE REGRESSION THIS LOCKS. Eligibility was `seen >= MIN_RATE_SAMPLE`,
+    // and against the two real Showdown pools every member had 20 revealed
+    // picks over two locked matchweeks — so no club had been seen more than
+    // twice and the entire Club bias card returned null for every entry in both
+    // pools. It would have stayed invisible until roughly matchweek five.
+    const d = buildOpponentDossier([
+      ...many(2, { homeClub: CHE, awayClub: MUN, predictedHome: 2, predictedAway: 0 }),
+    ])
+    expect(d.mostBacked?.club.name).toBe('Chelsea')
+  })
+
+  it('still refuses to name a club backed once', () => {
+    const d = buildOpponentDossier([
+      pick({ homeClub: CHE, awayClub: MUN, predictedHome: 2, predictedAway: 0 }),
+    ])
+    expect(d.mostBacked).toBeNull()
+  })
+
+  it('shows that club as a FRACTION, never a percentage', () => {
+    // The naming floor moved; the honesty rule did not. `rate()` still
+    // withholds a percentage under `MIN_RATE_SAMPLE`, so the row reads "2 of 2".
+    const d = buildOpponentDossier(
+      many(2, { homeClub: CHE, awayClub: MUN, predictedHome: 2, predictedAway: 0 }),
+    )
+    expect(d.mostBacked?.backedHome.pct).toBeNull()
+    expect(d.mostBacked?.backedHome).toMatchObject({ count: 2, of: 2 })
+  })
+
+  it('is stable when a dozen clubs are all tied at two of two', () => {
+    // ⚠ Early in a season share and count cannot separate them, so without a
+    // final key the answer falls out of map insertion order — the same member
+    // reads "backs Arsenal" on one open and "backs Chelsea" on the next.
+    const rows = [
+      ...many(2, { homeClub: MUN, awayClub: ARS, predictedHome: 2, predictedAway: 0 }),
+      ...many(2, { homeClub: CHE, awayClub: ARS, predictedHome: 2, predictedAway: 0 }),
+    ]
+    const first = buildOpponentDossier(rows).mostBacked?.club.name
+    const again = buildOpponentDossier([...rows].reverse()).mostBacked?.club.name
+    expect(first).toBe(again)
+  })
+
+  it('keeps the blind spot on a higher bar than a lean', () => {
+    // Two failures is a coin landing badly twice, not a habit.
+    const twice = buildOpponentDossier(
+      many(2, { homeClub: MUN, awayClub: CHE, predictedHome: 2, predictedAway: 0,
+        actualHome: 0, actualAway: 1 }),
+    )
+    expect(twice.mostBacked?.club.name).toBe('Manchester United')
+    expect(twice.blindSpot).toBeNull()
+
+    const thrice = buildOpponentDossier(
+      many(3, { homeClub: MUN, awayClub: CHE, predictedHome: 2, predictedAway: 0,
+        actualHome: 0, actualAway: 1 }),
+    )
+    expect(thrice.blindSpot?.club.name).toBe('Manchester United')
+  })
+})
+
+describe('a Results pool files an outcome, not a scoreline', () => {
+  /** A Results-depth tap: no scores, an outcome. Migration 064's other shape. */
+  function tap(outcome: 'home' | 'draw' | 'away', over: Partial<PickRow> = {}): PickRow {
+    return pick({
+      predictedHome: null,
+      predictedAway: null,
+      predictedOutcome: outcome,
+      ...over,
+    })
+  }
+
+  it('does NOT read a scoreless pick as a predicted draw', () => {
+    // ⚠⚠ THE BUG THIS LOCKS, measured on the real `Showdown Duels` pool: both
+    // score columns are null there, `null > null` and `null < null` are both
+    // false, and every one of four entries' 20 picks fell through to "draw".
+    const d = buildOpponentDossier([
+      ...many(8, {}).map(() => tap('home')),
+      ...many(2, {}).map(() => tap('draw')),
+    ])
+    expect(d.fingerprint.theirDrawRate).toMatchObject({ count: 2, of: 10 })
+    expect(d.fingerprint.theirHomeWinRate).toMatchObject({ count: 8, of: 10 })
+  })
+
+  it('still builds club leans from the outcome', () => {
+    // The club bias card is the one this most obviously broke: with every pick
+    // read as a draw, nobody backed anybody and the card never rendered.
+    const d = buildOpponentDossier(
+      Array.from({ length: 3 }, () => tap('home', { homeClub: CHE, awayClub: MUN })),
+    )
+    expect(d.mostBacked?.club.name).toBe('Chelsea')
+    expect(d.mostOpposed?.club.name).toBe('Manchester United')
+  })
+
+  it('withholds every scoreline figure rather than inventing one', () => {
+    // ⚠ THE ONE-WAY RULE. A scoreline can be read as a direction; a direction
+    // can never be read back as a scoreline. `write.ts` and Decision 9 both
+    // spell it out — a sentinel 1–0 would score as a genuine exact.
+    const d = buildOpponentDossier(Array.from({ length: 6 }, () => tap('home')))
+    expect(d.fingerprint.signature).toBeNull()
+    expect(d.fingerprint.goalsPerPrediction).toBeNull()
+    expect(d.fingerprint.hasScorelines).toBe(false)
+    expect(d.fingerprint.hasPredictedNil).toBe(false)
+  })
+
+  it('reads a Scores pool exactly as before', () => {
+    const d = buildOpponentDossier(many(6, { predictedHome: 2, predictedAway: 1 }))
+    expect(d.fingerprint.hasScorelines).toBe(true)
+    expect(d.fingerprint.goalsPerPrediction).toBe(3)
+    expect(d.fingerprint.signature?.score).toBe('2–1')
+  })
+
+  it('prefers the stored outcome over a scoreline if a row somehow carried both', () => {
+    // The CHECK makes this impossible, so the tiebreak only matters if it ever
+    // stops being. A tap is what the member actually did; the scoreline would
+    // be a derivation of something else.
+    const d = buildOpponentDossier(
+      many(6, { predictedHome: 3, predictedAway: 0, predictedOutcome: 'away' }),
+    )
+    expect(d.fingerprint.theirHomeWinRate.count).toBe(0)
   })
 })
