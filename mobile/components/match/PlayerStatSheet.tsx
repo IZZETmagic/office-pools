@@ -6,6 +6,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text as RNText,
   useWindowDimensions,
   View,
@@ -120,15 +121,27 @@ export function PlayerStatSheet({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      {/* Tapping away closes. The card swallows its own presses. */}
-      <Pressable
-        onPress={onClose}
-        style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}
-      >
-        {/* This wrapper exists only to swallow presses so a tap on the card
-            does not close it. It deliberately has no height of its own. */}
-        <Pressable onPress={() => {}}>
-          <Animated.View
+      {/* ⚠⚠ THE BACKDROP IS A SIBLING OF THE CARD, NOT ITS PARENT, AND THIS IS
+          WHY THE LIST SCROLLS. It used to be a `Pressable` wrapping everything,
+          with a second `Pressable` inside it to swallow taps on the card — so
+          the ScrollView sat inside TWO of them. A Pressable claims the touch
+          responder on touch-START, which means the scroll gesture never reached
+          the list: it was not a height problem at all, and no amount of
+          `maxHeight`, `flexShrink` or `flex` was ever going to fix it.
+
+          As a sibling the backdrop still catches every tap outside the card,
+          the card intercepts nothing, and the swallowing Pressable is not
+          needed because there is no longer anything to swallow. This is exactly
+          how `ReactionsSheet` is built, which is why that one has always
+          scrolled. */}
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
+        />
+        <Animated.View
             style={{
               // ⚠⚠ A DEFINITE HEIGHT, AND `maxHeight` WAS NOT ENOUGH. This is
               // the second go at this bug, so it is worth writing down what
@@ -483,10 +496,9 @@ export function PlayerStatSheet({
                   </View>
                 );
               })}
-            </ScrollView>
-          </Animated.View>
-        </Pressable>
-      </Pressable>
+          </ScrollView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
