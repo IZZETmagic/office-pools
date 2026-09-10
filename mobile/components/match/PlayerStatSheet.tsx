@@ -63,6 +63,19 @@ import {
  */
 const HEADER_LIGHTNESS = 0.84;
 
+/**
+ * How far the header's colour fades, in points.
+ *
+ * ⚠ A DISTANCE, NOT A PROPORTION, WHICH IS THE WHOLE POINT. The header's height
+ * depends on its content — a headline of "Minutes played 90 · 3 goals · 2
+ * assists" wraps where "Minutes played 90" does not — so a gradient that ends
+ * at its own bottom edge stretches with it and leaves a bigger slab of flat
+ * colour at the top each time. 220 covers the tallest realistic header (~202pt)
+ * and overshoots the shortest (~189pt), so the colour runs on into the list
+ * rather than stopping at a seam.
+ */
+const HEADER_FADE = 220;
+
 export function PlayerStatSheet({
   stat,
   teamName,
@@ -184,19 +197,45 @@ export function PlayerStatSheet({
               ],
             }}
           >
+            {/* ⚠⚠ A FIXED HEIGHT BEHIND THE CONTENT, NOT A BACKGROUND ON IT.
+                The gradient used to BE the header, so `end: y 1` meant "the
+                bottom of whatever this contains" — a proportion. Give a
+                player three goals and an assist, the headline wraps, the
+                header grows, and the same ramp spreads over more pixels: the
+                top stays above 80% alpha for 38pt on a short card and 50pt on
+                a tall one, which is the solid bar. Anchored to a fixed
+                distance the fade is identical however tall the header gets.
+
+                ⚠ AND IT IS ALLOWED TO OVERSHOOT. At 220 it reaches a little
+                past the header on most players, so the colour carries on into
+                the top of the list instead of stopping at a seam — which is
+                the "keeps going down" part.
+
+                ⚠ THREE STOPS, NOT TWO. A straight 1 -> 0 ramp has its flattest
+                stretch at the top, exactly where the eye is. Dropping to 0.5
+                in the first third kills the slab and leaves a long soft tail. */}
+            <LinearGradient
+              // ⚠ Fades to the SAME colour at zero alpha, never 'transparent':
+              // a literal transparent fades through black on iOS.
+              colors={[
+                withOpacity(headerColor, headerAlpha),
+                withOpacity(headerColor, headerAlpha * 0.5),
+                withOpacity(headerColor, 0),
+              ]}
+              locations={[0, 0.34, 1]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              pointerEvents="none"
+              style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HEADER_FADE }}
+            />
+
             {/* ---- who ---------------------------------------------- */}
             {/* ⚠ NO GRAB HANDLE. It suggested a drag this sheet never
                 supported — it opens and closes, it does not snap — and the X
                 below says the same thing without implying a gesture that does
                 nothing. Tapping the backdrop still works. */}
-            <LinearGradient
-              // ⚠ Fades to the SAME colour at zero alpha, never 'transparent':
-              // a literal transparent fades through black on iOS.
-              colors={[withOpacity(headerColor, headerAlpha), withOpacity(headerColor, 0)]}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={{ paddingTop: 22, paddingBottom: 20, paddingHorizontal: 20 }}
-            >
+            <View style={{ paddingTop: 22, paddingBottom: 20, paddingHorizontal: 20 }}>
+
               <Pressable
                 onPress={onClose}
                 hitSlop={10}
@@ -342,7 +381,7 @@ export function PlayerStatSheet({
                   </Text>
                 ) : null}
               </View>
-            </LinearGradient>
+            </View>
 
             {/* ---- the numbers ---------------------------------------- */}
             <ScrollView
