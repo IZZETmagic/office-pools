@@ -32,6 +32,15 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // explicitly not for bettors. Nothing here says what to pick.
 // =============================================================
 
+/**
+ * ⚠ NO VERDICT SENTENCE AT THE TOP. Ryan removed it 2026-09-10 — it sat between
+ * the sheet's header and the first card and read as a caption on the header
+ * rather than as a finding of its own.
+ *
+ * ⚠ `dossier.read` IS STILL COMPOSED AND STILL SENT, and that is deliberate
+ * rather than an oversight: it is the payload of the Banter share card, which
+ * is the surface it was written for. Nothing on this screen renders it.
+ */
 export function Dossier({
   dossier,
   isSelf = false,
@@ -41,40 +50,12 @@ export function Dossier({
 }) {
   return (
     <View style={{ gap: 16 }}>
-      <ReadCard read={dossier.read} />
       <AccuracyCard dossier={dossier} />
       {dossier.form.length > 0 ? <FormCard form={dossier.form} /> : null}
       <ClubBiasCard dossier={dossier} isSelf={isSelf} />
       <FingerprintCard dossier={dossier} isSelf={isSelf} />
       <TendenciesCard dossier={dossier} />
       <Footnote dossier={dossier} />
-    </View>
-  );
-}
-
-/**
- * The one-line verdict. Composed on the server so there is only one of it.
- *
- * ⚠ NO NAME ABOVE IT ANY MORE. The collapsing header carries the member's name,
- * their avatar and the pool; repeating it three inches below was the same word
- * twice on one screen. The header is the only place a name belongs now — if
- * this card is ever used somewhere without one, it needs its own, not a copy.
- */
-function ReadCard({ read }: { read: string }) {
-  const theme = useTheme();
-  return (
-    <View style={{ marginHorizontal: 20 }}>
-      <RNText
-        style={{
-          fontFamily: fontFamilies.black,
-          fontSize: 19,
-          lineHeight: 26,
-          letterSpacing: -0.2,
-          color: theme.colors.ink,
-        }}
-      >
-        {read}
-      </RNText>
     </View>
   );
 }

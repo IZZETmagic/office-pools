@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Dossier } from '@/components/scouting/Dossier';
 import { Icon, Text } from '@/components/ui';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
@@ -53,6 +52,13 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // the equivalent for a person is the avatar gradient, which is keyed on their
 // user id and frozen so they are the same colour here, in Banter and on the
 // duel card. That is what makes this read as *them* rather than as a panel.
+//
+// ⚠ NO RANK BADGE ON THE AVATAR, THOUGH THE PLAYER SHEET PUTS A RATING THERE.
+// Ryan removed it 2026-09-10. A rating is what that sheet is ABOUT; a pool
+// position is not what this one is about — the report is how somebody picks,
+// and their standing is a different fact that the season total already covers
+// in the line below. The server still sends `standing.rank`, correctly withheld
+// in Last Man Standing, so a surface that does want it has it.
 // =============================================================
 
 /** Same value the player sheet lands club colours on. See its note. */
@@ -178,42 +184,12 @@ export function DossierSheet({
             </Pressable>
 
             <View style={{ alignItems: 'center', gap: 3 }}>
+              {/* ⚠ THE WRAPPER IS THE SPACING, not a leftover from the rank
+                  badge it used to position. The column's `gap` is 3, which is
+                  right between the three text lines and far too tight under an
+                  80pt circle. */}
               <View style={{ marginBottom: 10 }}>
                 <Avatar name={displayName} gradient={gradient} tint={tint} size={80} />
-
-                {/* ⚠ WHERE THE PLAYER SHEET PUTS A RATING, THIS PUTS THE RANK —
-                    the one figure that says how they are doing at a glance.
-
-                    ⚠⚠ AND IT IS ABSENT IN LAST MAN STANDING. The server
-                    withholds it there because the stored column is entry-id
-                    order rather than a standing; a badge reading "4th" on a
-                    survival pool would be confident and meaningless. */}
-                {data?.standing?.rank != null ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -4,
-                      right: -26,
-                      minWidth: 44,
-                      paddingHorizontal: 9,
-                      paddingVertical: 5,
-                      borderRadius: theme.radii.pill,
-                      backgroundColor: tint,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <RNText
-                      style={{
-                        fontFamily: MONO_BOLD,
-                        fontSize: 15,
-                        color: '#FFFFFF',
-                        fontVariant: ['tabular-nums'],
-                      }}
-                    >
-                      {ordinalise(data.standing.rank)}
-                    </RNText>
-                  </View>
-                ) : null}
               </View>
 
               {/* ⚠ `sectionHeader`, a real token — their name IS this sheet's
@@ -356,12 +332,4 @@ function Avatar({
       {label}
     </LinearGradient>
   );
-}
-
-/** 1 → 1st. ⚠ 11th/12th/13th are not 11st/12nd/13rd. */
-function ordinalise(n: number): string {
-  const tens = n % 100;
-  if (tens >= 11 && tens <= 13) return `${n}th`;
-  const ones = n % 10;
-  return `${n}${ones === 1 ? 'st' : ones === 2 ? 'nd' : ones === 3 ? 'rd' : 'th'}`;
 }
