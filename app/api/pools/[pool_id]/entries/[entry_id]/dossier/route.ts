@@ -82,7 +82,7 @@ async function handler(
   // ---- guard 2: the subject is in this pool -------------------------------
   const { data: subject, error: subjErr } = await admin
     .from('pool_entries')
-    .select('entry_id, entry_name, retired_at, user_id, users(user_id, full_name, username)')
+    .select('entry_id, entry_name, retired_at, user_id')
     .eq('entry_id', entry_id)
     .eq('pool_id', pool_id)
     .maybeSingle()
@@ -143,9 +143,32 @@ async function handler(
    */
   const context = await readDossierContext(admin, pool_id, entry_id)
 
-  const subjectUser = (subject as unknown as {
-    users: { user_id: string; full_name: string | null; username: string | null } | null
-  }).users
+  /**
+   * The person behind the entry.
+   *
+   * ⚠⚠ A SEPARATE READ, NOT A BARE POSTGREST EMBED. `users(...)` on this table
+   * returns, verbatim against production:
+   *
+   *     Could not embed because more than one relationship was found
+   *     for 'pool_entries' and 'users'
+   *
+   * `pool_entries` reaches `users` by more than one path — `user_id` and
+   * `retired_by` — so PostgREST refuses to guess which one was meant. It is
+   * AMBIGUITY, not absence: an embed naming its key
+   * (`users!pool_entries_user_id_fkey(...)`) would resolve and save a round
+   * trip. A plain read is taken instead because it needs no constraint name to
+   * stay correct, and a renamed constraint would fail the same silent way.
+   *
+   * ⚠ AND IT 400s INSIDE GUARD 2, which is the worst place for it: the guard
+   * reads its own error and returns 500, so the entire dossier died before it
+   * was built and the screen showed nothing but "could not load". Every other
+   * `users(...)` embed in this codebase hangs off `pool_members`, which reaches
+   * `users` exactly once — that is why the pattern looked safe and was not.
+   *
+   * ⚠ A MISSING USER IS NORMAL AND MUST NOT FAIL. An entry can outlive its user
+   * row; the header falls back to initials on a flat circle.
+   */
+  const subjectUser = await readEntryUser(admin, subject.user_id)
 
   return NextResponse.json({
     entry_id,
@@ -170,6 +193,31 @@ async function handler(
 }
 
 /**
+ * The person behind an entry, or null.
+ *
+ * ⚠ NEVER THROWS. The dossier is about picks, not about a profile — a header
+ * without a name is a smaller header, while a 500 is no screen at all.
+ */
+async function readEntryUser(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string | null,
+): Promise<{ user_id: string; full_name: string | null; username: string | null } | null> {
+  if (!userId) return null
+  try {
+    const { data, error } = await admin
+      .from('users')
+      .select('user_id, full_name, username')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    return data ?? null
+  } catch (e) {
+    console.error('[dossier] user unavailable —', (e as Error).message)
+    return null
+  }
+}
+
+/**
  * The pool, the competition, and where this entry stands in it.
  *
  * ## ⚠⚠ THE RANK IS WITHHELD IN LAST MAN STANDING, AND THAT IS NOT COSMETIC
@@ -189,7 +237,7 @@ async function readDossierContext(
   try {
     const { data: pool } = await admin
       .from('pools')
-      .select('pool_id, name, league_mode, league_season_id')
+      .select('pool_id, pool_name, league_mode, league_season_id')
       .eq('pool_id', poolId)
       .maybeSingle()
 
@@ -215,7 +263,12 @@ async function readDossierContext(
     const rankIsMeaningful = pool?.league_mode !== 'last_man_standing'
 
     return {
-      pool: pool ? { pool_id: pool.pool_id, name: pool.name, league_mode: pool.league_mode } : null,
+      // ⚠ `pool_name`, NOT `name`. There is no `pools.name` column and never was;
+      // the read is inside a try/catch, so getting this wrong cost no error and
+      // no log — just a header that silently never showed a pool.
+      pool: pool
+        ? { pool_id: pool.pool_id, name: pool.pool_name, league_mode: pool.league_mode }
+        : null,
       competition,
       standing: totals
         ? {
