@@ -47,29 +47,20 @@ import {
 // =============================================================
 
 /**
- * ⚠⚠ A GLOW ON LIGHT IS A SHADOW. You cannot make a halo out of near-white on a
- * near-white header — measured, #F7F8FC against the light header is 1.56-1.78:1
- * and simply is not there. To be seen on light you have to go DARKER, which is
- * a shadow; to be seen on dark you go lighter, which is a glow. Same job, and
- * the two modes need opposite colours to do it.
+ * How light the header's colour is made, in light mode.
  *
- * ⚠ AND THE DARK SIDE IS THE CLUB'S OWN COLOUR, FLOORED. A raw tint works for
- * Arsenal red (3.16:1) and fails completely for a pale club — Norwich yellow is
- * 1.06:1 and Spurs white 1.04:1 against their own headers, which is no shadow
- * at all. `withLightness(tint, 0.45)` keeps the hue and forces the darkness:
- * worst case across six very different clubs is 3.94:1.
- */
-const GLOW_LIGHTNESS = 0.45;
-
-/**
- * The halo on a DARK header: `snow`'s light value, held still.
+ * ⚠⚠ A LIGHTNESS, NOT AN OPACITY, AND THE DIFFERENCE IS WHICH CLUBS SURVIVE.
+ * The header was `tint` at 24% over snow, which is washed out — but simply
+ * turning the opacity up does not work, because the text on it is DARK: at 45%
+ * a black-shirted club (Fulham) drops the ink to 4.37:1 and at 65% to 2.13:1.
+ * Opacity moves every club's lightness by a different amount, so one number
+ * cannot be right for Arsenal red and Fulham black at once.
  *
- * ⚠ NOT A TOKEN LOOKUP, DELIBERATELY. `theme.colors.snow` flips to #121520 in
- * dark mode, which is the one place this is used — a near-black glow on a dark
- * header is a smudge, not light. Light mode does not use this at all; it takes
- * the darkened club colour above.
+ * Setting the LIGHTNESS lands every club in the same band whatever it started
+ * as. At 0.84 they are properly coloured — Arsenal #FF826E, Everton #8BC8FF —
+ * and the worst ink contrast across six very different clubs is 6.37:1.
  */
-const GLOW = '#F7F8FC';
+const HEADER_LIGHTNESS = 0.84;
 
 export function PlayerStatSheet({
   stat,
@@ -122,8 +113,10 @@ export function PlayerStatSheet({
     .filter((g) => g.rows.length > 0);
   const headline = headlineParts(stat, subMinute(stat, substMinutes));
   const photo = playerPhotoUrl(stat.externalPlayerId);
-  // Lighter than the header on dark, darker than it on light. See GLOW_LIGHTNESS.
-  const halo = theme.mode === 'dark' ? GLOW : withLightness(tint, GLOW_LIGHTNESS);
+  // ⚠ Dark mode keeps the translucent tint, which reads well over a dark
+  // surface. Light mode needs a colour of its own — see HEADER_LIGHTNESS.
+  const headerColor = theme.mode === 'dark' ? tint : withLightness(tint, HEADER_LIGHTNESS);
+  const headerAlpha = theme.mode === 'dark' ? 0.38 : 1;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -175,10 +168,9 @@ export function PlayerStatSheet({
                 below says the same thing without implying a gesture that does
                 nothing. Tapping the backdrop still works. */}
             <LinearGradient
-              colors={[
-                withOpacity(tint, theme.mode === 'dark' ? 0.38 : 0.24),
-                withOpacity(tint, 0),
-              ]}
+              // ⚠ Fades to the SAME colour at zero alpha, never 'transparent':
+              // a literal transparent fades through black on iOS.
+              colors={[withOpacity(headerColor, headerAlpha), withOpacity(headerColor, 0)]}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
               style={{ paddingTop: 22, paddingBottom: 20, paddingHorizontal: 20 }}
@@ -207,35 +199,6 @@ export function PlayerStatSheet({
 
               <View style={{ alignItems: 'center', gap: 3 }}>
                 <View style={{ marginBottom: 10 }}>
-                  {/* ⚠ THE GLOW IS A SHADOW ON A CIRCLE, the same trick
-                      `CountdownHero` uses: a coloured shadow at zero offset with
-                      a wide radius reads as light coming off the thing. There is
-                      no radial gradient in React Native to do it properly. */}
-                  <View
-                    pointerEvents="none"
-                    style={{
-                      position: 'absolute',
-                      // ⚠⚠ EXACTLY THE PHOTOGRAPH'S SIZE, WHICH IS THE FIX. It
-                      // was 100pt against an 80pt photo, so 10pt of solid
-                      // tint-at-35% stuck out all the way round — read as a
-                      // dark coloured RING rather than as light. A glow has no
-                      // edge; the moment it has a diameter of its own it is a
-                      // border. Sized to match, only its shadow escapes.
-                      width: 80,
-                      height: 80,
-                      borderRadius: theme.radii.pill,
-                      backgroundColor: halo,
-                      shadowColor: halo,
-                      // ⚠ A DARK HALO NEEDS LESS OF ITSELF. At the opacity that
-                      // makes a light glow read on a dark header, a dark one on
-                      // a light header stops being a halo and becomes a drop
-                      // shadow with a hard waist.
-                      shadowOpacity: theme.mode === 'dark' ? 0.95 : 0.5,
-                      shadowRadius: theme.mode === 'dark' ? 26 : 18,
-                      shadowOffset: { width: 0, height: 0 },
-                      elevation: 14,
-                    }}
-                  />
                   <View
                     style={{
                       width: 80,
@@ -244,10 +207,11 @@ export function PlayerStatSheet({
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: tint,
-                      // ⚠ NO BORDER. It was `surface` at 90%, which is white in
-                      // light mode and #1C2030 in dark — a dark ring in exactly
-                      // the mode where a dark ring is least wanted. The glow
-                      // separates the photograph from the header now.
+                      // ⚠ NO BORDER AND NO GLOW. Both were tried and both read
+                      // as a ring around the face rather than as light. The
+                      // photograph separates on its own: these are cutouts on a
+                      // pale background, sitting on a header that now carries a
+                      // real colour rather than a wash of one.
                       overflow: 'hidden',
                     }}
                   >
