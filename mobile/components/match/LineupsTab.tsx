@@ -27,7 +27,7 @@ import {
 } from '@/lib/playerStats';
 import type { LineupPlayer, MatchLineup } from '@/lib/useMatchDetail';
 import type { ResultsTeam } from '@/lib/useTournamentMatches';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { fontFamilies, radii, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
 // Who played — a pitch, and two benches
@@ -341,7 +341,7 @@ function TeamBar({
             minWidth: 38,
             paddingHorizontal: 8,
             paddingVertical: 4,
-            borderRadius: 9,
+            borderRadius: theme.radii.pill,
             backgroundColor: badgeColor,
             alignItems: 'center',
           }}
@@ -600,7 +600,9 @@ function Shirt({
             style={{
               width: 13,
               height: 13,
-              borderRadius: 6.5,
+              // `radii`, not `theme.radii` — Shirt has no theme, and the token
+              // is a plain export.
+              borderRadius: radii.pill,
               backgroundColor: '#FFFFFF',
               alignItems: 'center',
               justifyContent: 'center',
@@ -687,6 +689,10 @@ function Bench({
         }}
       >
         {/* The same colour the side wears on the pitch above. */}
+        {/* ⚠ A ROUNDED SQUARE, NOT A PILL, AND LEFT ALONE ON PURPOSE. This is
+            the bench header's own marker and predates the badge work; the
+            TeamBar copies it deliberately so the two headers agree. Rounding it
+            would make it a dot and break that pairing. */}
         <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: tint }} />
         <View style={{ flex: 1 }}>
           <Text variant="cardTitle" numberOfLines={1}>{teamName}</Text>
@@ -760,7 +766,7 @@ function Bench({
                     style={{
                       paddingHorizontal: 4,
                       paddingVertical: 1,
-                      borderRadius: 4,
+                      borderRadius: theme.radii.pill,
                       backgroundColor: badgeColor,
                     }}
                   >

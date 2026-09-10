@@ -2,6 +2,7 @@ import { Text as RNText, View } from 'react-native';
 
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
 import { Icon } from '@/components/ui';
+import { radii } from '@/theme';
 import { formatRating, ratingScaleColor, type PlayerMarkers } from '@/lib/playerStats';
 
 // =============================================================
@@ -124,7 +125,7 @@ function Pill({ color, children }: { color: string; children: React.ReactNode })
         minWidth: MARK,
         paddingHorizontal: 3,
         paddingVertical: 2,
-        borderRadius: MARK / 2,
+        borderRadius: radii.pill,
         backgroundColor: color,
         alignItems: 'center',
         justifyContent: 'center',
@@ -191,7 +192,7 @@ export function PlayerBadges({
             style={{
               width: MARK,
               height: MARK,
-              borderRadius: MARK / 2,
+              borderRadius: radii.pill,
               backgroundColor: marks.cameOff ? '#B91C1C' : '#15803D',
               alignItems: 'center',
               justifyContent: 'center',
@@ -217,7 +218,11 @@ export function PlayerBadges({
             minWidth: MARK + 6,
             paddingHorizontal: 4,
             paddingVertical: 2,
-            borderRadius: 5,
+            // ⚠ `radii.pill`, NOT A NUMBER. Every badge on a player is a
+            // capsule now — the token says so once, and a badge that grows a
+            // digit (10.0) stays the same shape instead of needing its radius
+            // re-guessed.
+            borderRadius: radii.pill,
             backgroundColor: badgeColor,
             alignItems: 'center',
             justifyContent: 'center',

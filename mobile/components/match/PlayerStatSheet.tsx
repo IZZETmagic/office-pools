@@ -125,7 +125,7 @@ export function PlayerStatSheet({
                 style={{
                   width: 36,
                   height: 4,
-                  borderRadius: 2,
+                  borderRadius: theme.radii.pill,
                   backgroundColor: withOpacity(theme.colors.slate, 0.3),
                 }}
               />
@@ -146,7 +146,7 @@ export function PlayerStatSheet({
                 style={{
                   width: 48,
                   height: 48,
-                  borderRadius: 24,
+                  borderRadius: theme.radii.pill,
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: tint,
@@ -206,7 +206,7 @@ export function PlayerStatSheet({
                     minWidth: 46,
                     paddingHorizontal: 8,
                     paddingVertical: 6,
-                    borderRadius: 8,
+                    borderRadius: theme.radii.pill,
                     backgroundColor: colour,
                     alignItems: 'center',
                   }}
@@ -305,7 +305,7 @@ export function PlayerStatSheet({
                         <View
                           style={{
                             height: 4,
-                            borderRadius: 2,
+                            borderRadius: theme.radii.pill,
                             backgroundColor: withOpacity(theme.colors.slate, 0.15),
                             overflow: 'hidden',
                           }}
@@ -314,7 +314,7 @@ export function PlayerStatSheet({
                             style={{
                               width: `${Math.max(2, Math.min(100, r.pct))}%`,
                               height: 4,
-                              borderRadius: 2,
+                              borderRadius: theme.radii.pill,
                               backgroundColor: tone,
                             }}
                           />
