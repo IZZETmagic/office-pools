@@ -1793,3 +1793,102 @@ export type H2HResponse = {
 export async function fetchHeadToHead(fixtureId: string): Promise<H2HResponse> {
   return apiFetch<H2HResponse>(`/api/fixtures/${encodeURIComponent(fixtureId)}/h2h`);
 }
+
+// =============================================================
+// /api/pools/:pool_id/entries/:entry_id/dossier — the opponent scout report
+// =============================================================
+// How one member of a pool picks, from picks that have already been revealed.
+// No provider call sits behind any figure here, so unlike the head-to-head tab
+// there is no quota to protect and no cache to wait on.
+//
+// ⚠ EVERY RATE CARRIES ITS DENOMINATOR AND MAY REFUSE TO BE A PERCENTAGE.
+// `pct` is null below the server's sample floor and the screen must show the
+// fraction instead — "3 of 8", never "38%". A `?? 0` on that field would turn
+// every thin sample into a confident zero, which is the exact shape of the pool
+// card bug where a real-valued default could never fail.
+//
+// ⚠ THE SEAL IS THE SERVER'S. Only revealed picks are ever counted, decided
+// against `league_matchweeks.lock_at`. The phone must not add a filter of its
+// own and must not assume one is missing.
+// =============================================================
+
+export type ScoutRate = {
+  count: number;
+  of: number;
+  /** ⚠ NULL BELOW THE SAMPLE FLOOR. Show `count of of`, never a percentage. */
+  pct: number | null;
+};
+
+export type ScoutClubRef = { clubId: string; name: string; abbreviation: string };
+
+export type ScoutClubLean = {
+  club: ScoutClubRef;
+  seen: number;
+  backed: number;
+  backedRight: number;
+  backedPlayed: number;
+  opposed: number;
+  /** ⚠ Denominator is APPEARANCES at that venue, not backings. */
+  backedHome: ScoutRate;
+  backedAway: ScoutRate;
+};
+
+export type ScoutBaseline = {
+  played: number;
+  /** ⚠ MEASURED over the same fixtures, never a constant. */
+  goalsPerGame: number | null;
+  drawRate: ScoutRate;
+  homeWinRate: ScoutRate;
+};
+
+export type ScoutFingerprint = {
+  signature: { score: string; count: number; of: number } | null;
+  goalsPerPrediction: number | null;
+  theirDrawRate: ScoutRate;
+  theirHomeWinRate: ScoutRate;
+  /** ⚠ A stated absence is a finding — most members have never predicted 0–0. */
+  hasPredictedNil: boolean;
+};
+
+export type OpponentDossier = {
+  entry: string;
+  picks: number;
+  scored: number;
+  hitRate: ScoutRate;
+  exactCount: number;
+  pointsPerFixture: number | null;
+  /** ⚠ OLDEST FIRST, ordered by kickoff rather than by matchweek number. */
+  form: { matchweek: number; points: number }[];
+  mostBacked: ScoutClubLean | null;
+  mostOpposed: ScoutClubLean | null;
+  blindSpot: ScoutClubLean | null;
+  baseline: ScoutBaseline;
+  fingerprint: ScoutFingerprint;
+  reliability: { made: number; available: number; missed: number } | null;
+  /** ⚠ Null when the crowd figure was unavailable — not zero. */
+  contrarian: { against: ScoutRate; andRight: ScoutRate } | null;
+  /**
+   * The one-line verdict, composed SERVER-SIDE.
+   *
+   * ⚠ THE PHONE MUST NOT COMPOSE ITS OWN. One owner is why a member who
+   * screenshots a verdict into Banter and taps again sees the same sentence —
+   * and why web and RN cannot drift into two characterisations of one person.
+   */
+  read: string;
+};
+
+export type DossierResponse = {
+  entry_id: string;
+  entry_name: string;
+  is_self: boolean;
+  dossier: OpponentDossier;
+};
+
+export async function fetchDossier(
+  poolId: string,
+  entryId: string,
+): Promise<DossierResponse> {
+  return apiFetch<DossierResponse>(
+    `/api/pools/${encodeURIComponent(poolId)}/entries/${encodeURIComponent(entryId)}/dossier`,
+  );
+}

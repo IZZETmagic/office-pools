@@ -207,7 +207,11 @@ export function DuelTab({ poolId, standings, opponentVisible = true }: Props) {
             <SheetCard poolId={poolId} entryId={ownEntryId} sheet={sheet} />
           ) : null}
           {opponentVisible && opponent ? (
-            <OpponentCard opponent={opponent} standing={standings.get(opponent.entryId) ?? null} />
+            <OpponentCard
+              opponent={opponent}
+              standing={standings.get(opponent.entryId) ?? null}
+              poolId={poolId}
+            />
           ) : null}
           {fixtures.length > 0 ? (
             <DecidedOnCard fixtures={fixtures} hasOpponent={opponentVisible && !!opponent} />
@@ -815,9 +819,11 @@ function Fighter({
 function OpponentCard({
   opponent,
   standing,
+  poolId,
 }: {
   opponent: Opponent;
   standing: Standing | null;
+  poolId: string;
 }) {
   const theme = useTheme();
   const met = opponent.met.won + opponent.met.drawn + opponent.met.lost;
@@ -929,6 +935,42 @@ function OpponentCard({
           Not enough played weeks to read their habits yet.
         </Text>
       )}
+
+      {/*
+        ⚠⚠ THIS CARD AND THE FULL DOSSIER ARE TWO IMPLEMENTATIONS OF ONE CLAIM,
+        AND THAT IS A KNOWN DEBT RATHER THAN A DESIGN.
+
+        The three figures above — accuracy, agreement, and the home/draw/away
+        tendency — are derived HERE, in the browser, off `useLeaguePoolPicks`.
+        `lib/scouting/opponent.ts` derives the same three on the server, with
+        denominators and a different sample floor (10 here, MIN_RATE_SAMPLE=5
+        there). They will not always agree, and when they disagree nothing will
+        error — the card will simply say 62% and the report 58%, about the same
+        person, on two taps.
+
+        That is the duel-scale failure again: one constant, several readers,
+        nine settled duels displayed wrong for four days with no exception
+        raised. The fix is for this card to READ the dossier rather than
+        recompute it, which deletes the client-side derivation entirely. It is
+        not done here because this card ships today and the dossier does not.
+        Do not add a fourth site in the meantime.
+      */}
+      <Pressable
+        onPress={() => router.push(`/pool/${poolId}/scout/${opponent.entryId}` as never)}
+        accessibilityRole="button"
+        accessibilityLabel={`Full scout report on ${opponent.name}`}
+        style={{
+          marginTop: theme.spacing.lg,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <Text variant="body" style={{ color: theme.colors.primary, fontFamily: fontFamilies.bold }}>
+          Full scout report
+        </Text>
+        <Icon name="chevron.right" size={14} color="primary" />
+      </Pressable>
     </Card>
   );
 }
