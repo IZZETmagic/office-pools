@@ -130,19 +130,28 @@ export function PlayerStatSheet({
         <Pressable onPress={() => {}}>
           <Animated.View
             style={{
-              // ⚠⚠ POINTS, NOT A PERCENTAGE, AND THAT IS THE WHOLE BUG. This
-              // was `maxHeight: '80%'`, and a percentage height resolves only
-              // against a parent with a DEFINITE height. Its parent is the
-              // press-swallowing wrapper above, which has none — so the cap
-              // resolved against nothing, the card grew to its content, and the
-              // ScrollView inside was never given a bound to scroll within. The
-              // sheet ran off the bottom of the screen and stayed there.
+              // ⚠⚠ A DEFINITE HEIGHT, AND `maxHeight` WAS NOT ENOUGH. This is
+              // the second go at this bug, so it is worth writing down what
+              // actually differs.
               //
-              // A measured height always resolves, whatever the parent is doing.
-              // `ReactionsSheet` reaches for the same trick (`screenHeight *
-              // 0.55`) rather than trusting percentage resolution through a
-              // stack of wrappers, and it is right to.
-              maxHeight: screenHeight * 0.85,
+              // The first fix moved the cap from a percentage to points, which
+              // was necessary — a percentage resolves only against a parent
+              // with a definite height, and the press-swallowing wrapper above
+              // has none. But it was not sufficient. `maxHeight` still leaves
+              // this view's height AUTO, so Yoga has no fixed box to hand the
+              // ScrollView, the ScrollView sizes to its own content, and the
+              // content runs off the bottom exactly as before.
+              //
+              // `ReactionsSheet` — the sheet in this app that demonstrably
+              // scrolls — uses a real `height` with `flex: 1` on its list, and
+              // that pairing is the point: `flex: 1` distributes REMAINING
+              // space, and there is no remainder until something is definite.
+              //
+              // The cost is a short player leaving space at the bottom, which
+              // is the trade ReactionsSheet's own comment accepts. This card is
+              // ~690pt at its shortest against a 717pt box on a 844pt phone, so
+              // the gap is small and the scrolling is not optional.
+              height: screenHeight * 0.85,
               // ⚠ SNOW, NOT SURFACE, AND THAT IS THE WHOLE RESTRUCTURE. Cards
               // in this app are `surface` on `snow` — that is the relationship
               // every screen uses and the one `shadows.card` is drawn for. The
@@ -324,12 +333,11 @@ export function PlayerStatSheet({
 
             {/* ---- the numbers ---------------------------------------- */}
             <ScrollView
-              // ⚠ THE ONLY PART THAT SHRINKS, and RN defaults `flexShrink` to
-              // 0 where the web defaults to 1. The handle and the header are
-              // fixed; this is what gives way when the card meets its cap, and
-              // therefore what scrolls. Without the explicit shrink it holds its
-              // full content height and pushes the rest off the screen.
-              style={{ flexShrink: 1 }}
+              // ⚠ `flex: 1`, NOT `flexShrink: 1`. Shrinking only applies once
+              // something is over-full; taking the remainder works whenever the
+              // parent is a known size, which it now is. The header above is
+              // fixed, so the remainder is exactly what this gets.
+              style={{ flex: 1 }}
               contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 8 }}
               // ⚠ SHOWN, NOT HIDDEN. Ryan could not tell the sheet scrolled —
               // and while the real fault was that it did not, a long list with
