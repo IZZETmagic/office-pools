@@ -3,11 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchBracketStats,
   fetchFixturePicks,
+  fetchFixturePlayers,
   fetchHeadToHead,
   fetchMatchScores,
   fetchMatchStats,
   type BracketStatsResponse,
   type FixturePick,
+  type FixturePlayersResponse,
   type H2HResponse,
   type TablePick,
   type MatchScoreEntry,
@@ -280,6 +282,7 @@ export function useMatchDetail(matchId: string | undefined) {
   const [leaguePicks, setLeaguePicks] = useState<FixturePick[]>([]);
   const [leagueTablePicks, setLeagueTablePicks] = useState<TablePick[]>([]);
   const [h2h, setH2h] = useState<H2HResponse | null>(null);
+  const [players, setPlayers] = useState<FixturePlayersResponse | null>(null);
   const [lineups, setLineups] = useState<MatchLineup[]>([]);
   const [teamStats, setTeamStats] = useState<MatchTeamStats[]>([]);
   const [playerStats, setPlayerStats] = useState<MatchPlayerStat[]>([]);
@@ -348,6 +351,12 @@ export function useMatchDetail(matchId: string | undefined) {
         // api-football itself, and the route caches per club PAIRING so the
         // second viewer of a fixture costs nothing.
         loadHeadToHead(matchId, setH2h),
+        // ⚠ A SEPARATE CALL FROM THE ONE ABOVE, AND IT COSTS NO PROVIDER QUOTA.
+        // Head-to-head spends an api-football call per club pairing and is
+        // cached a day; this reads rows the fixture sync already stored, and
+        // form changes every weekend. Different costs, different shelf lives,
+        // so they are not one endpoint.
+        loadFixturePlayers(matchId, setPlayers),
       ]);
       setLoading(false);
       return;
@@ -377,6 +386,7 @@ export function useMatchDetail(matchId: string | undefined) {
       setLeaguePicks([]);
       setLeagueTablePicks([]);
       setH2h(null);
+      setPlayers(null);
 
       // 2. Resolve user's entries across pools, split by prediction mode.
       // Query through pool_members (the source of truth for "this user belongs
@@ -713,6 +723,7 @@ export function useMatchDetail(matchId: string | undefined) {
     leaguePicks,
     leagueTablePicks,
     h2h,
+    players,
     lineups,
     teamStats,
     playerStats,
@@ -1186,6 +1197,26 @@ async function loadLeaguePicks(
  * Scouting tab that opens onto an error is worse than a tab that was never
  * there.
  */
+/**
+ * Who is actually playing well, from migration 141's player rows.
+ *
+ * ⚠ A FAILURE IS AN ABSENT CARD, NOT AN ERROR. Same call as `loadHeadToHead`
+ * directly above: the Scouting tab is built out of independent cards and one of
+ * them being unavailable must cost that card only. Early in a season nobody has
+ * cleared the minutes floor and `enough` is false, which is the same outcome.
+ */
+async function loadFixturePlayers(
+  fixtureId: string,
+  setPlayers: (r: FixturePlayersResponse | null) => void,
+) {
+  try {
+    setPlayers(await fetchFixturePlayers(fixtureId));
+  } catch (e) {
+    console.warn('[useMatchDetail] player form unavailable', e);
+    setPlayers(null);
+  }
+}
+
 async function loadHeadToHead(
   fixtureId: string,
   setH2h: (r: H2HResponse | null) => void,

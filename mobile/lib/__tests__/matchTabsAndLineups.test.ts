@@ -31,23 +31,23 @@ import type { LineupPlayer, MatchTeamStats } from '../useMatchDetail';
 describe('matchTabs', () => {
   it('offers only Facts and Predictions when the match has neither', () => {
     // A World Cup match, or a league fixture the backfill has not reached.
-    expect(matchTabs({ hasLineups: false, hasStats: false, hasScouting: false })).toEqual(['facts', 'predictions']);
+    expect(matchTabs({ hasLineups: false, hasStats: false, hasPlayerForm: false, hasScouting: false })).toEqual(['facts', 'predictions']);
   });
 
   it('inserts each tab in the canonical order, not at the end', () => {
     // ⚠ Order is the swipe sequence. Appending would put Stats after
     // Predictions on one match and before it on another.
-    expect(matchTabs({ hasLineups: true, hasStats: false, hasScouting: false })).toEqual([
+    expect(matchTabs({ hasLineups: true, hasStats: false, hasPlayerForm: false, hasScouting: false })).toEqual([
       'facts',
       'lineups',
       'predictions',
     ]);
-    expect(matchTabs({ hasLineups: false, hasStats: true, hasScouting: false })).toEqual([
+    expect(matchTabs({ hasLineups: false, hasStats: true, hasPlayerForm: false, hasScouting: false })).toEqual([
       'facts',
       'stats',
       'predictions',
     ]);
-    expect(matchTabs({ hasLineups: true, hasStats: true, hasScouting: true })).toEqual([
+    expect(matchTabs({ hasLineups: true, hasStats: true, hasPlayerForm: false, hasScouting: true })).toEqual([
       'facts',
       'lineups',
       'stats',
@@ -59,7 +59,7 @@ describe('matchTabs', () => {
   it('always starts with facts, whatever the match has', () => {
     for (const hasLineups of [true, false]) {
       for (const hasStats of [true, false]) {
-        expect(matchTabs({ hasLineups, hasStats, hasScouting: false })[0]).toBe('facts');
+        expect(matchTabs({ hasLineups, hasStats, hasPlayerForm: false, hasScouting: false })[0]).toBe('facts');
       }
     }
   });
@@ -67,7 +67,7 @@ describe('matchTabs', () => {
   it('⚠ the scouting tab is gated separately from the other two', () => {
     // The server decides it, off a meeting count, so it can be present when
     // line-ups and stats are absent and vice versa.
-    expect(matchTabs({ hasLineups: false, hasStats: false, hasScouting: true })).toEqual([
+    expect(matchTabs({ hasLineups: false, hasStats: false, hasPlayerForm: false, hasScouting: true })).toEqual([
       'facts',
       'scouting',
       'predictions',
@@ -75,7 +75,7 @@ describe('matchTabs', () => {
   });
 
   it('never offers a tab outside the canonical set', () => {
-    const tabs = matchTabs({ hasLineups: true, hasStats: true, hasScouting: true });
+    const tabs = matchTabs({ hasLineups: true, hasStats: true, hasPlayerForm: false, hasScouting: true });
     expect(tabs.every((t) => ALL_MATCH_TAB_KEYS.includes(t))).toBe(true);
     expect(tabs).toHaveLength(ALL_MATCH_TAB_KEYS.length);
   });
@@ -447,5 +447,46 @@ describe('⚠⚠ the two front rows must not collide', () => {
     expect(centreFromTop, `keeper sits ${centreFromTop.toFixed(0)}pt down`).toBeGreaterThan(
       REACH_UP,
     );
+  });
+});
+
+describe('the scouting tab appears on either source', () => {
+  const base = { hasLineups: false, hasStats: false };
+
+  it('appears on head-to-head alone', () => {
+    expect(
+      matchTabs({ ...base, hasScouting: true, hasPlayerForm: false }),
+    ).toContain('scouting');
+  });
+
+  it('appears on player form alone', () => {
+    // ⚠⚠ THE CASE THAT WAS BROKEN. Two newly promoted clubs have no history
+    // however late in the season it is, so gating on head-to-head alone meant
+    // that fixture never offered a scout report — even once both squads had a
+    // full autumn of rated minutes behind them.
+    expect(
+      matchTabs({ ...base, hasScouting: false, hasPlayerForm: true }),
+    ).toContain('scouting');
+  });
+
+  it('still refuses to exist on neither', () => {
+    // ⚠ The rule `MatchTabBar` has carried since it was written: a tab that is
+    // always there and never has anything in it teaches people to stop tapping.
+    expect(
+      matchTabs({ ...base, hasScouting: false, hasPlayerForm: false }),
+    ).not.toContain('scouting');
+  });
+
+  it('appears exactly once when both are present', () => {
+    const tabs = matchTabs({ ...base, hasScouting: true, hasPlayerForm: true });
+    expect(tabs.filter((t) => t === 'scouting')).toHaveLength(1);
+  });
+
+  it('keeps its place in the swipe order whichever source produced it', () => {
+    // The pager indexes into this array, so an off-by-one shows the wrong page
+    // rather than throwing — the kind of bug that ships.
+    const viaHistory = matchTabs({ ...base, hasScouting: true, hasPlayerForm: false });
+    const viaForm = matchTabs({ ...base, hasScouting: false, hasPlayerForm: true });
+    expect(viaHistory.indexOf('scouting')).toBe(viaForm.indexOf('scouting'));
   });
 });

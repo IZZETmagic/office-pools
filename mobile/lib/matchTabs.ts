@@ -52,11 +52,27 @@ export function matchTabs(opts: {
    * summariser so the two surfaces cannot disagree about it.
    */
   hasScouting: boolean;
+  /**
+   * Whether anybody has played enough minutes to be rated.
+   *
+   * ⚠⚠ THE SCOUTING TAB NOW APPEARS ON *EITHER* SOURCE, AND THAT IS THE POINT.
+   * Head-to-head and player form go missing for opposite reasons: a newly
+   * promoted pairing has no history however late in the season it is, and
+   * nobody has 180 minutes in the second week however long the clubs have
+   * played each other. Gating on the history alone meant a fixture between two
+   * promoted clubs never offered a scout report at all — which is exactly the
+   * "sometimes the historic data won't be there" case the design note is built
+   * around. The tab still refuses to exist on neither.
+   *
+   * ⚠ ALSO SERVER-DECIDED, for the same reason as above: `/players` returns its
+   * own `enough`, so the floor is not restated here.
+   */
+  hasPlayerForm: boolean;
 }): MatchTabKey[] {
   return ALL_MATCH_TAB_KEYS.filter(
     (k) =>
       (k !== 'lineups' || opts.hasLineups) &&
       (k !== 'stats' || opts.hasStats) &&
-      (k !== 'scouting' || opts.hasScouting),
+      (k !== 'scouting' || opts.hasScouting || opts.hasPlayerForm),
   );
 }

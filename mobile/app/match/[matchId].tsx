@@ -37,6 +37,7 @@ import { LeaguePicksSection } from '@/components/match/LeaguePicksSection';
 import { LeagueTableSliceCard } from '@/components/match/LeagueTableSliceCard';
 import { LineupsTab } from '@/components/match/LineupsTab';
 import { MatchTabBar } from '@/components/match/MatchTabBar';
+import { PeopleCard } from '@/components/match/PeopleCard';
 import { ScoutingTab } from '@/components/match/ScoutingTab';
 import { StatsTab } from '@/components/match/StatsTab';
 import { SubstitutionIcon } from '@/components/match/SubstitutionIcon';
@@ -102,6 +103,7 @@ export default function MatchDetailScreen() {
     leaguePicks,
     leagueTablePicks,
     h2h,
+    players,
     lineups,
     teamStats,
     playerStats,
@@ -127,10 +129,11 @@ export default function MatchDetailScreen() {
       matchTabs({
         hasLineups: lineups.length > 0,
         hasStats: teamStats.length > 0,
-        // ⚠ The SERVER decides this — see `matchTabs`.
+        // ⚠ The SERVER decides both of these — see `matchTabs`.
         hasScouting: h2h?.enough === true,
+        hasPlayerForm: players?.enough === true,
       }),
-    [lineups.length, teamStats.length, h2h?.enough],
+    [lineups.length, teamStats.length, h2h?.enough, players?.enough],
   );
   const tabIndex = Math.max(0, tabs.indexOf(tab));
 
@@ -277,18 +280,36 @@ export default function MatchDetailScreen() {
           />
         );
       case 'scouting':
-        return h2h ? (
-          <ScoutingTab
-            match={m}
-            summary={h2h.summary}
-            homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
-            awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
-            palette={fixturePalette(m.homeTeam?.flagUrl, m.awayTeam?.flagUrl, {
-              home: theme.colors.primary,
-              away: theme.colors.accent,
-            })}
-          />
-        ) : null;
+        /*
+          ⚠ TWO INDEPENDENT CARDS UNDER ONE TAB, AND EITHER MAY BE ABSENT.
+          Head-to-head needs a history the provider may not hold; player form
+          needs minutes nobody has clocked up in August. They fail separately
+          and are rendered separately, so a fixture with a rich history and no
+          rated players still gets the half that exists.
+
+          ⚠ THE TAB ITSELF IS STILL GATED ON `h2h.enough` — see `matchTabs`. A
+          fixture with player form but no history does not currently reach here
+          at all, which is the degradation the design note asks for and this
+          screen does not yet do. Widening that gate means widening it in
+          `matchTabs`, where the set is owned, and not with a branch here.
+        */
+        return (
+          <View style={{ gap: 16 }}>
+            {h2h ? (
+              <ScoutingTab
+                match={m}
+                summary={h2h.summary}
+                homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
+                awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
+                palette={fixturePalette(m.homeTeam?.flagUrl, m.awayTeam?.flagUrl, {
+                  home: theme.colors.primary,
+                  away: theme.colors.accent,
+                })}
+              />
+            ) : null}
+            {players?.enough ? <PeopleCard players={players} /> : null}
+          </View>
+        );
       case 'predictions':
         // ⚠ TWO DIFFERENT SECTIONS, NOT ONE WITH A BRANCH INSIDE. A league pick
         // and a World Cup prediction share no shape: one is a scoreline OR an

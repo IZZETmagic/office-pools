@@ -1892,3 +1892,55 @@ export async function fetchDossier(
     `/api/pools/${encodeURIComponent(poolId)}/entries/${encodeURIComponent(entryId)}/dossier`,
   );
 }
+
+// =============================================================
+// /api/fixtures/:id/players — who is actually playing well
+// =============================================================
+// The people half of a scout report, from migration 141's player rows. It costs
+// no provider calls: every figure was already paid for by the fixture sync.
+//
+// ⚠ THE GATE COMES FROM THE SERVER, same as the head-to-head tab. `enough`
+// decides whether the card is offered; the phone must not carry its own copy of
+// the threshold or the two surfaces disagree the day it moves.
+//
+// ⚠ GOALS HERE ARE FROM THE TIMELINE, NOT FROM THE PLAYER ROWS — the two
+// disagree at source and only `match_events` is authoritative. Nothing on the
+// phone should ever add a goals column from anywhere else.
+// =============================================================
+
+export type PlayerForm = {
+  externalPlayerId: number;
+  name: string;
+  position: 'G' | 'D' | 'M' | 'F' | null;
+  appearances: number;
+  minutes: number;
+  /** ⚠ Mean of RATED appearances only — an unused substitute has no rating. */
+  rating: number;
+  goals: number;
+  assists: number;
+  keyPasses: number;
+};
+
+export type SideScout = {
+  clubId: string;
+  /** Best average rating, minutes-qualified. Empty early in a season. */
+  inForm: PlayerForm[];
+  /** ⚠ NOT minutes-qualified — a total cannot be inflated by a cameo. */
+  dangerMen: PlayerForm[];
+  qualified: number;
+  consideredPlayers: number;
+};
+
+export type FixturePlayersResponse = {
+  enough: boolean;
+  home: { club: { club_id: string; name: string; abbreviation: string }; scout: SideScout };
+  away: { club: { club_id: string; name: string; abbreviation: string }; scout: SideScout };
+};
+
+export async function fetchFixturePlayers(
+  fixtureId: string,
+): Promise<FixturePlayersResponse> {
+  return apiFetch<FixturePlayersResponse>(
+    `/api/fixtures/${encodeURIComponent(fixtureId)}/players`,
+  );
+}

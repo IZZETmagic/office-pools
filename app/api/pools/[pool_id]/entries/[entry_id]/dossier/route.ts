@@ -82,7 +82,7 @@ async function handler(
   // ---- guard 2: the subject is in this pool -------------------------------
   const { data: subject, error: subjErr } = await admin
     .from('pool_entries')
-    .select('entry_id, entry_name, retired_at')
+    .select('entry_id, entry_name, retired_at, user_id')
     .eq('entry_id', entry_id)
     .eq('pool_id', pool_id)
     .maybeSingle()
@@ -105,6 +105,20 @@ async function handler(
     return NextResponse.json({ error: 'Could not read picks' }, { status: 500 })
   }
 
+  // ⚠ THE DENOMINATOR FOR MISSED PICKS, AND IT MUST COVER THE SAME WINDOW THE
+  // PICKS DO — fixtures in matchweeks that have LOCKED. Counting every fixture
+  // in the season would report a member in matchweek six as having missed three
+  // hundred games, and counting only played ones would miss a postponement.
+  // Without it `reliability` is null, which reads as "we did not look" rather
+  // than as "missed none" — the two must not collapse.
+  let available: number | undefined
+  try {
+    available = await countAvailableFixtures(admin, pool_id)
+  } catch (e) {
+    console.error('[dossier] available count unavailable —', (e as Error).message)
+    available = undefined
+  }
+
   // ⚠ THE CROWD IS BEST-EFFORT AND ITS FAILURE IS NOT THE DOSSIER'S. Migration
   // 142 must be applied before this deploys; if it has not been, the contrarian
   // section is absent and every other section still renders. A dossier that
@@ -118,16 +132,57 @@ async function handler(
     crowdMajority = undefined
   }
 
-  const dossier = buildOpponentDossier(picks, { crowdMajority })
+  const dossier = buildOpponentDossier(picks, { crowdMajority, available })
 
   return NextResponse.json({
     entry_id,
     entry_name: subject.entry_name,
-    /** ⚠ The viewer's own dossier is the same object. The phone reads this to
-     *  decide whether it is drawing a scout report or a mirror. */
-    is_self: false,
+    /**
+     * ⚠ THE SAME OBJECT EITHER WAY — the self-scout is not a second engine, it
+     * is this one pointed inward. Only the copy changes ("You predict" rather
+     * than "They predict"), which is why the mirror costs nothing to ship.
+     *
+     * ⚠ AND THE REVEAL FILTER STILL APPLIES TO YOUR OWN PICKS. A member reading
+     * their own dossier over live picks would see different numbers to the ones
+     * their opponent sees, and the two would never reconcile.
+     */
+    is_self: subject.user_id === userData.user_id,
     dossier,
   })
+}
+
+/**
+ * Fixtures in this pool's season whose matchweek has already locked.
+ *
+ * ⚠ THE POOL'S SEASON, NOT THE ENTRY'S PICKS. Deriving it from the picks would
+ * make the denominator move with the numerator — somebody who picked nothing
+ * would have missed nothing, which is the one member this number exists to
+ * describe.
+ */
+async function countAvailableFixtures(
+  admin: ReturnType<typeof createAdminClient>,
+  poolId: string,
+): Promise<number | undefined> {
+  const { data: pool, error: poolErr } = await admin
+    .from('pools')
+    .select('league_season_id')
+    .eq('pool_id', poolId)
+    .maybeSingle()
+
+  if (poolErr) throw new Error(poolErr.message)
+  // A pool with no season is a World Cup pool; it has no league fixtures and
+  // `reliability` should stay null rather than read zero.
+  if (!pool?.league_season_id) return undefined
+
+  const { count, error } = await admin
+    .from('league_fixtures')
+    .select('fixture_id, league_matchweeks!inner(lock_at)', { count: 'exact', head: true })
+    .eq('season_id', pool.league_season_id)
+    .not('league_matchweeks.lock_at', 'is', null)
+    .lte('league_matchweeks.lock_at', new Date().toISOString())
+
+  if (error) throw new Error(error.message)
+  return count ?? undefined
 }
 
 export const GET = withPerfLogging('/api/pools/[pool_id]/entries/[entry_id]/dossier', handler)
