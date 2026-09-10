@@ -180,6 +180,7 @@ export function LineupsTab({
         stat={open?.stat ?? null}
         teamName={open?.team ?? ''}
         tint={open?.tint ?? palette.home}
+        substMinutes={substMinutes}
         onClose={() => setOpen(null)}
       />
     </View>

@@ -281,7 +281,7 @@ export function statGroups(s: MatchPlayerStat): StatGroup[] {
  * Kept separate from `statGroups` because it is the part a person reads without
  * meaning to, and it must stay short enough to be read at a glance.
  */
-export function headlineParts(s: MatchPlayerStat): string[] {
+export function headlineParts(s: MatchPlayerStat, cameOnAt?: number | null): string[] {
   const parts: string[] = [];
   // ⚠ LABELLED, NOT JUST A PRIME MARK. `90'` beside a scoreline reads as the
   // minute something HAPPENED — it is exactly how the timeline writes a goal —
@@ -293,7 +293,24 @@ export function headlineParts(s: MatchPlayerStat): string[] {
   if (s.goals) parts.push(s.goals === 1 ? '1 goal' : `${s.goals} goals`);
   if (s.assists) parts.push(s.assists === 1 ? '1 assist' : `${s.assists} assists`);
   if (s.position === 'G' && s.saves) parts.push(s.saves === 1 ? '1 save' : `${s.saves} saves`);
-  if (!s.isStarter) parts.push('substitute');
+  // ⚠⚠ ONLY THE COMING-ON MINUTE IS NEW INFORMATION, and this is the whole
+  // reason the sheet shows one and not the other. A starter who came off at 67
+  // played 67 minutes — the substitution minute and the minutes played are the
+  // SAME NUMBER, which is exactly why one corroborates the other, and printing
+  // "Minutes played 67 · Off 67" says it twice. A substitute who came on at 67
+  // played 23: two different numbers, and the entry minute cannot be got from
+  // his row at all without the timeline.
+  if (!s.isStarter) {
+    if (cameOnAt !== null && cameOnAt !== undefined && didPlay(s)) {
+      parts.push(`Came on ${cameOnAt}'`);
+    } else if (didPlay(s)) {
+      parts.push('substitute');
+    } else {
+      // He was named and never used. Worth saying plainly rather than leaving
+      // a card with nothing on it but a name.
+      parts.push('unused substitute');
+    }
+  }
   return parts;
 }
 
@@ -410,10 +427,20 @@ export function subMinute(
   fullMatchMinutes = 90,
 ): number | null {
   const m = playerMarkers(s, fullMatchMinutes);
-  if (!m.cameOff) return null;
   const minutes = s.minutes;
   if (minutes === null || minutes <= 0) return null;
-  return substitutionMinutes.has(minutes) ? minutes : null;
+
+  // He started, so the minute he left IS the time he was on for.
+  if (m.cameOff) return substitutionMinutes.has(minutes) ? minutes : null;
+
+  // ⚠ HE CAME ON, SO IT IS THE OTHER WAY ROUND: the match length less the time
+  // he played. Corroborated exactly the same way and measured just as well —
+  // 1,085 of 1,347 substitutes, 80.5%, against 84.5% for the ones going off.
+  if (m.cameOn) {
+    const implied = fullMatchMinutes - minutes;
+    return implied > 0 && substitutionMinutes.has(implied) ? implied : null;
+  }
+  return null;
 }
 
 

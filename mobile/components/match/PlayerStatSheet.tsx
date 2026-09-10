@@ -21,6 +21,7 @@ import {
   playerPhotoUrl,
   playerRates,
   positionName,
+  subMinute,
   RATE_COVERS,
   RATING_COLOR,
   ratingScaleColor,
@@ -47,11 +48,18 @@ export function PlayerStatSheet({
   stat,
   teamName,
   tint,
+  substMinutes,
   onClose,
 }: {
   stat: MatchPlayerStat | null;
   teamName: string;
   tint: string;
+  /**
+   * ⚠ THE MINUTES ONLY, AND ONLY TO CORROBORATE. A player cannot be joined to
+   * the timeline — its names are abbreviated and carry no id — so this confirms
+   * the minute his own row already implies rather than supplying one.
+   */
+  substMinutes: ReadonlySet<number>;
   onClose: () => void;
 }) {
   const theme = useTheme();
@@ -85,7 +93,7 @@ export function PlayerStatSheet({
   const groups = statGroups(stat)
     .map((g) => ({ ...g, rows: g.rows.filter((r) => !covered.has(r.label)) }))
     .filter((g) => g.rows.length > 0);
-  const headline = headlineParts(stat);
+  const headline = headlineParts(stat, subMinute(stat, substMinutes));
   const photo = playerPhotoUrl(stat.externalPlayerId);
 
   return (

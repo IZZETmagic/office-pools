@@ -494,3 +494,34 @@ describe('positionName', () => {
     expect(positionName('')).toBeNull();
   });
 });
+
+describe('the substitution minute, both directions', () => {
+  it('⚠ a substitute who came on gets his entry minute', () => {
+    // 90 - 23 = 67, and the timeline says a substitution happened at 67.
+    const sub = player({ isStarter: false, minutes: 23 });
+    expect(subMinute(sub, new Set([67]))).toBe(67);
+    expect(subMinute(sub, new Set([66]))).toBeNull();
+  });
+
+  it('⚠⚠ the headline shows the coming-ON minute and never the coming-OFF one', () => {
+    // A starter who came off at 67 played 67 minutes — the same number twice.
+    const off = headlineParts(player({ isStarter: true, minutes: 67 }), 67);
+    expect(off).toEqual(['Minutes played 67']);
+    // A substitute who came on at 67 played 23. Two different facts.
+    const on = headlineParts(player({ isStarter: false, minutes: 23 }), 67);
+    expect(on).toEqual(['Minutes played 23', "Came on 67'"]);
+  });
+
+  it('falls back to the plain word when the timeline could not confirm it', () => {
+    expect(headlineParts(player({ isStarter: false, minutes: 23 }), null)).toEqual([
+      'Minutes played 23',
+      'substitute',
+    ]);
+  });
+
+  it('⚠ a named substitute who never played says so', () => {
+    expect(headlineParts(player({ isStarter: false, minutes: null, rating: null }))).toEqual([
+      'unused substitute',
+    ]);
+  });
+});
