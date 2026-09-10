@@ -158,9 +158,16 @@ describe('statGroups', () => {
 });
 
 describe('headlineParts', () => {
+  it('⚠ labels the minutes rather than leaving a prime mark', () => {
+    // `90'` beside a scoreline reads as the minute something happened — it is
+    // how the timeline writes a goal — where here it is a duration.
+    expect(headlineParts(player({ minutes: 67 }))[0]).toBe('Minutes played 67');
+    expect(headlineParts(player({ minutes: 67 }))[0]).not.toContain("'");
+  });
+
   it('reads as a sentence a person would say', () => {
     expect(headlineParts(player({ minutes: 90, goals: 2, assists: 1 })))
-      .toEqual(["90'", '2 goals', '1 assist']);
+      .toEqual(['Minutes played 90', '2 goals', '1 assist']);
   });
 
   it('singular and plural are both right', () => {
@@ -174,7 +181,10 @@ describe('headlineParts', () => {
   });
 
   it('marks a substitute, and says nothing about minutes he did not play', () => {
-    expect(headlineParts(player({ isStarter: false, minutes: 12 }))).toEqual(["12'", 'substitute']);
+    expect(headlineParts(player({ isStarter: false, minutes: 12 }))).toEqual([
+      'Minutes played 12',
+      'substitute',
+    ]);
     expect(headlineParts(player({ isStarter: false, minutes: null }))).toEqual(['substitute']);
   });
 });

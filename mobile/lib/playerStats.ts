@@ -283,7 +283,13 @@ export function statGroups(s: MatchPlayerStat): StatGroup[] {
  */
 export function headlineParts(s: MatchPlayerStat): string[] {
   const parts: string[] = [];
-  if (s.minutes !== null && s.minutes > 0) parts.push(`${s.minutes}'`);
+  // ⚠ LABELLED, NOT JUST A PRIME MARK. `90'` beside a scoreline reads as the
+  // minute something HAPPENED — it is exactly how the timeline writes a goal —
+  // where here it is a duration. The word removes that, and it is also the one
+  // number on this card the sheet can state honestly: the substitution minute
+  // is only shown when the timeline corroborates it, but minutes PLAYED is
+  // whatever the provider recorded, no inference involved.
+  if (s.minutes !== null && s.minutes > 0) parts.push(`Minutes played ${s.minutes}`);
   if (s.goals) parts.push(s.goals === 1 ? '1 goal' : `${s.goals} goals`);
   if (s.assists) parts.push(s.assists === 1 ? '1 assist' : `${s.assists} assists`);
   if (s.position === 'G' && s.saves) parts.push(s.saves === 1 ? '1 save' : `${s.saves} saves`);
