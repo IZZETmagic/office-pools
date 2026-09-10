@@ -136,6 +136,15 @@ export function MatchDetailHeader({
    * ⚠ It is also the slide distance and the scroll range.
    */
   const [matchupH, setMatchupH] = useState(0);
+  /**
+   * The band's own full height, so the glow canvas can be as tall as the band
+   * actually is rather than a constant guess.
+   *
+   * ⚠ THE BAND IS NOT A FIXED HEIGHT. It carries a scorer line PER GOAL, so a
+   * 4-3 is six lines taller than a 0-0 — and the glow used to stop dead at 360,
+   * leaving the base gradient to carry on alone as a flat bar under the tabs.
+   */
+  const [bandH, setBandH] = useState(0);
   /** Where the crest row starts inside the matchup block — what the morph aims at. */
   const [crestY, setCrestY] = useState(0);
 
@@ -143,6 +152,12 @@ export function MatchDetailHeader({
   const scorers = useMemo(() => matchScorers(timeline), [timeline]);
 
   const chromeH = insets.top + theme.spacing.xs + CHROME_ROW;
+
+  /**
+   * ⚠ NEVER SHORTER THAN THE FLOOR, and never shorter than the band. `bandH` is
+   * 0 until layout has run, so the constant carries the first frame.
+   */
+  const glowCanvas = Math.max(GLOW_HEIGHT, bandH);
 
   /** How far the band travels: everything except the strip that stays. */
   const slideBy = Math.max(0, matchupH - COLLAPSED_ROW);
@@ -293,7 +308,12 @@ export function MatchDetailHeader({
         <View
           onLayout={(e) => {
             const h = Math.round(e.nativeEvent.layout.height);
-            if (h > 0) onExpandedHeight?.(h);
+            if (h > 0) {
+              onExpandedHeight?.(h);
+              // Guarded: onLayout fires on every re-render, and writing the same
+              // number back would loop.
+              if (h !== bandH) setBandH(h);
+            }
           }}
           style={{ paddingTop: chromeH, overflow: 'hidden' }}
         >
@@ -302,6 +322,7 @@ export function MatchDetailHeader({
             right={bandRight}
             competitionId={match.competitionId}
             idPrefix="band"
+            glowHeight={glowCanvas}
             glowStyle={glowHold}
           />
 
@@ -440,6 +461,7 @@ export function MatchDetailHeader({
           right={bandRight}
           competitionId={match.competitionId}
           idPrefix="chrome"
+          glowHeight={glowCanvas}
         />
         {/*
           ⚠ THE BACK BUTTON, AND NOTHING ELSE. This row carried "Arsenal v
@@ -503,17 +525,24 @@ function BandFill({
   right,
   competitionId,
   idPrefix,
+  glowHeight,
   glowStyle,
 }: {
   left: string;
   right: string;
   competitionId: number | null;
   idPrefix: string;
+  /**
+   * ⚠⚠ THE SAME NUMBER IN BOTH INSTANCES, ALWAYS. The two layers are seamless
+   * only because they paint an identical canvas from an identical origin. It
+   * comes from one piece of state for exactly that reason.
+   */
+  glowHeight: number;
   /** Counter-translation that keeps the glow screen-fixed on the sliding band. */
   glowStyle?: StyleProp<ViewStyle>;
 }) {
   const { width } = useWindowDimensions();
-  const blobs = getCompetitionGlow(competitionId, width);
+  const blobs = getCompetitionGlow(competitionId, width, glowHeight);
 
   return (
     <>
@@ -528,11 +557,7 @@ function BandFill({
         pointerEvents="none"
         style={[{ position: 'absolute', top: 0, left: 0 }, glowStyle]}
       >
-      <Svg
-        pointerEvents="none"
-        width={width}
-        height={GLOW_HEIGHT}
-      >
+      <Svg pointerEvents="none" width={width} height={glowHeight}>
         <Defs>
           {blobs.map((b, i) => (
             <RadialGradient key={i} id={`${idPrefix}-glow-${i}`} cx="50%" cy="50%" r="50%">

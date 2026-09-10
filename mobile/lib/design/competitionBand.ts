@@ -109,12 +109,18 @@ export function getCompetitionBand(
 // =============================================================
 
 /**
- * Height of the glow canvas, in points from the top of the screen.
+ * FLOOR for the glow canvas, in points from the top of the screen.
  *
- * ⚠ It must cover the band at its TALLEST — status bar, chrome row, the
- * competition line, the crests, the status badge and the tab strip. Short and
- * the glow stops in a straight horizontal line partway down the band, which is
- * the exact seam this whole arrangement exists to avoid.
+ * ⚠⚠ IT IS A FLOOR NOW, NOT THE HEIGHT, BECAUSE 360 WAS NOT ALWAYS ENOUGH. The
+ * comment here used to say the constant "must cover the band at its TALLEST"
+ * and warn that a short canvas leaves the glow stopping in a straight
+ * horizontal line — which is exactly what happened. The band's height is not
+ * fixed: it carries a scorer line PER GOAL, so a 4-3 grows it by six lines over
+ * a 0-0. Past 360 the blooms simply stopped and the base gradient carried on
+ * alone, which reads as a flat bar under the tab strip.
+ *
+ * The caller measures the band and passes the real height; this is only the
+ * minimum, for the first frame before layout has run.
  */
 export const GLOW_HEIGHT = 360;
 
@@ -139,6 +145,17 @@ export type GlowBlob = {
 export function getCompetitionGlow(
   externalLeagueId: number | null | undefined,
   width: number,
+  /**
+   * ⚠ THE BAND'S MEASURED HEIGHT. The two blooms anchored to the bottom track
+   * it, so the deep pocket and the bright bubble stay with the tab strip
+   * however many goals were scored.
+   *
+   * ⚠⚠ BOTH LAYERS MUST BE GIVEN THE SAME NUMBER. The pinned chrome and the
+   * sliding band paint this identical canvas from the same origin and each
+   * clips its own slice; that is the ONLY reason there is no seam where they
+   * meet. Two different heights here would put a hard edge across the header.
+   */
+  height: number = GLOW_HEIGHT,
 ): GlowBlob[] {
   const brand = getCompetitionColor(externalLeagueId);
   return [
@@ -165,7 +182,7 @@ export function getCompetitionGlow(
     // shadow as well as a highlight — light in one direction only reads flat.
     {
       cx: width * 0.78,
-      cy: GLOW_HEIGHT - 40,
+      cy: height - 40,
       rx: width * 0.7,
       ry: 170,
       color: withLightness(brand, 0.12),
@@ -174,7 +191,7 @@ export function getCompetitionGlow(
     // A small bright bubble low-left, to keep the tab strip off a dead ground.
     {
       cx: width * 0.16,
-      cy: GLOW_HEIGHT - 76,
+      cy: height - 76,
       rx: width * 0.36,
       ry: 120,
       color: withLightness(brand, 0.52),
