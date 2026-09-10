@@ -1,8 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, View } from 'react-native';
 
 import { Button, Card, Icon, Text } from '@/components/ui';
+import { DossierSheet } from '@/components/scouting/DossierSheet';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { Scoreline, TeamSheetRows } from './TeamSheet';
 import type { SheetRow, Verdict } from '@/lib/duelSheet';
@@ -826,6 +828,13 @@ function OpponentCard({
   poolId: string;
 }) {
   const theme = useTheme();
+  /**
+   * ⚠ A SHEET, NOT A ROUTE. This pushed a screen at first, which took you off
+   * the duel to read about the person you are playing — and gave the report the
+   * router's own chrome. A scout report is a glance with the duel still behind
+   * it. Ryan, 2026-09-09.
+   */
+  const [scouting, setScouting] = useState(false);
   const met = opponent.met.won + opponent.met.drawn + opponent.met.lost;
   /**
    * ⚠ Joined HERE, from two sources on purpose: the numerator is the engine's
@@ -956,7 +965,7 @@ function OpponentCard({
         Do not add a fourth site in the meantime.
       */}
       <Pressable
-        onPress={() => router.push(`/pool/${poolId}/scout/${opponent.entryId}` as never)}
+        onPress={() => setScouting(true)}
         accessibilityRole="button"
         accessibilityLabel={`Full scout report on ${opponent.name}`}
         style={{
@@ -971,6 +980,12 @@ function OpponentCard({
         </Text>
         <Icon name="chevron.right" size={14} color="primary" />
       </Pressable>
+
+      <DossierSheet
+        poolId={poolId}
+        entryId={scouting ? opponent.entryId : null}
+        onClose={() => setScouting(false)}
+      />
     </Card>
   );
 }

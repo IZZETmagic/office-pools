@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
+import { DossierSheet } from '@/components/scouting/DossierSheet';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { InitialsAvatar } from './leaderboard-shared';
 import { lastLockedWeek, ownWeekState, type OwnWeekState } from '@/lib/pickemWeek';
@@ -78,6 +79,12 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
     league.data?.season.inPlayMatchweekNumber ?? null,
     now,
   );
+
+  /**
+   * ⚠ A SHEET, NOT A ROUTE — see `DossierSheet`. Your own report is a glance
+   * from the list you are already on, not a screen to come back from.
+   */
+  const [scoutingEntryId, setScoutingEntryId] = useState<string | null>(null);
 
   const ownEntryIds = useMemo(
     () => new Set((league.data?.you.entries ?? []).map((e) => e.entry_id)),
@@ -165,7 +172,7 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
               summariser and no second route; `is_self` only changes the copy.
             */}
             <Pressable
-              onPress={() => router.push(`/pool/${poolId}/scout/${entry.entry_id}` as never)}
+              onPress={() => setScoutingEntryId(entry.entry_id)}
               accessibilityRole="button"
               accessibilityLabel="Scout your own season"
               style={{
@@ -218,6 +225,14 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
           ))}
         </View>
       ) : null}
+
+      {/* ⚠ ONE SHEET FOR THE WHOLE LIST, keyed on which entry is open. One per
+          row would mount a `Modal` per member. */}
+      <DossierSheet
+        poolId={poolId}
+        entryId={scoutingEntryId}
+        onClose={() => setScoutingEntryId(null)}
+      />
     </View>
   );
 }
