@@ -116,8 +116,36 @@ function Fan({
   );
 }
 
+/**
+ * A booking.
+ *
+ * ⚠⚠ DRAWN, NOT AN ICON, AND THE OUTLINE IS WHY. A card is a portrait rectangle
+ * with rounded corners — there is no glyph here that a `View` cannot be, and a
+ * View can carry a border where an SVG glyph cannot. Everything else on a
+ * player wears a white hairline because that is what holds an edge against the
+ * grass; the cards were the one thing that did not, and they are the ones that
+ * needed it most. Measured on the light pitch: yellow 2.36:1 and red 1.35:1
+ * against #417A57 — the red was very nearly the same brightness as the grass.
+ *
+ * ⚠ THIS IS STILL THE FACTS TAB'S VOCABULARY. That tab draws a card with
+ * `rectangle.portrait.fill`, and this is the same portrait rectangle at the
+ * same 2:3 — the shape a reader recognises is unchanged, it has simply gained
+ * the edge every other badge here already had.
+ */
 function Card({ tone }: { tone: 'amber' | 'red' }) {
-  return <Icon name="rectangle.portrait.fill" size={13} tint={CARD_COLOR[tone]} filled />;
+  return (
+    <View
+      style={{
+        // A real card is about 2:3. At 13 tall that is 9 wide.
+        width: 9,
+        height: 13,
+        borderRadius: 2,
+        backgroundColor: CARD_COLOR[tone],
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.9)',
+      }}
+    />
+  );
 }
 
 function Pill({ color, children }: { color: string; children: React.ReactNode }) {
@@ -157,9 +185,9 @@ const ON_WHITE = '#111827';
  * fact about football rather than a decision about a colour scheme, and it
  * should be the same yellow whichever theme somebody is reading in. Measured
  * against both pitches: yellow 2.36:1 on the light grass and 5.79:1 on the
- * dark, red 1.35:1 and 3.31:1 — the light-mode figures are low but these are
- * SHAPES with a white hairline, not text, and the hairline is what holds the
- * edge (see the badge notes above).
+ * dark, red 1.35:1 and 3.31:1. Those light-mode figures are low, and for a
+ * while this comment claimed the cards had a white hairline holding their edge
+ * — they did not, they were bare glyphs. They do now; see `Card`.
  */
 const CARD_COLOR = { amber: '#F59E0B', red: '#EF4444' } as const;
 const white = { fontFamily: MONO_BOLD, fontSize: 9, lineHeight: 12, color: '#FFFFFF' } as const;
@@ -270,7 +298,7 @@ export function PlayerBadges({
 
       {/* ---- left: bookings, fanned --------------------------------- */}
       {marks.yellow > 0 ? (
-        <View style={{ position: 'absolute', ...S.yellow, width: 13, height: 15 }}>
+        <View style={{ position: 'absolute', ...S.yellow, width: 9, height: 13 }}>
           <Fan count={marks.yellow} away={1}>
             <Card tone="amber" />
           </Fan>
@@ -279,7 +307,7 @@ export function PlayerBadges({
 
       {/* ---- right: sendings-off, opposite the yellows --------------- */}
       {marks.red > 0 ? (
-        <View style={{ position: 'absolute', ...S.red, width: 13, height: 15 }}>
+        <View style={{ position: 'absolute', ...S.red, width: 9, height: 13 }}>
           <Fan count={marks.red} away={-1}>
             <Card tone="red" />
           </Fan>
@@ -304,12 +332,13 @@ export function PlayerBadges({
         <View style={{ position: 'absolute', ...S.goal, width: MARK, height: MARK }}>
           <Fan count={marks.goals} away={-1}>
             <Pill color="#FFFFFF">
-              {/* ⚠ `solid`, NOT `filled` — `filled` paints the free glyph's
-                  closed paths and a football's outer ring is closed, so it
-                  renders as a plain dark disc. The cards are the reverse:
-                  RectangleVerticalIcon has no solid variant at all. */}
-              {/* ⚠ `tint`, NOT `color`. `color` takes a THEME token and the
-                  pill it sits on is a hard-coded white — see ON_WHITE. */}
+              {/* ⚠ THE ONLY ICON LEFT ON A PLAYER, now the cards are drawn.
+                  `solid`, NOT `filled`: `filled` paints the free glyph's closed
+                  paths, and a football's outer ring is closed — it rendered as
+                  a plain dark disc until this was corrected.
+
+                  ⚠ And `tint`, NOT `color`: `color` takes a THEME token and the
+                  pill it sits on is a hard-coded white. See ON_WHITE. */}
               <Icon name="sportscourt.fill" size={11} tint={ON_WHITE} solid />
             </Pill>
           </Fan>
