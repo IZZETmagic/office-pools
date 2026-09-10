@@ -115,7 +115,7 @@ function Fan({
 }
 
 function Card({ tone }: { tone: 'amber' | 'red' }) {
-  return <Icon name="rectangle.portrait.fill" size={13} color={tone} filled />;
+  return <Icon name="rectangle.portrait.fill" size={13} tint={CARD_COLOR[tone]} filled />;
 }
 
 function Pill({ color, children }: { color: string; children: React.ReactNode }) {
@@ -138,8 +138,30 @@ function Pill({ color, children }: { color: string; children: React.ReactNode })
   );
 }
 
+/**
+ * ⚠⚠ EVERY COLOUR IN THIS FILE IS A LITERAL, AND THAT IS DELIBERATE. The
+ * surfaces here are literal too — a white pill and a green pitch, neither of
+ * which changes with the theme — so anything drawn on them must not change
+ * either. A THEME TOKEN ON A HARD-CODED SURFACE IS A DARK-MODE BUG WAITING:
+ * the goal was `color="ink"`, and `ink` is #1B2340 in light but #E8EAF0 in
+ * dark, so the football went from 15.43:1 to 1.20:1 against its white pill and
+ * simply disappeared. A guard test now refuses theme tokens in this file.
+ */
+const ON_WHITE = '#111827';
+/**
+ * ⚠ THE CARDS ARE LITERALS TOO, AND FOR A DIFFERENT REASON. `ink` on a white
+ * pill was a bug; the theme's `amber` on grass is not — it shifts from #F59E0B
+ * to #FBBF24 in dark mode and stays perfectly legible. But a yellow card is a
+ * fact about football rather than a decision about a colour scheme, and it
+ * should be the same yellow whichever theme somebody is reading in. Measured
+ * against both pitches: yellow 2.36:1 on the light grass and 5.79:1 on the
+ * dark, red 1.35:1 and 3.31:1 — the light-mode figures are low but these are
+ * SHAPES with a white hairline, not text, and the hairline is what holds the
+ * edge (see the badge notes above).
+ */
+const CARD_COLOR = { amber: '#F59E0B', red: '#EF4444' } as const;
 const white = { fontFamily: MONO_BOLD, fontSize: 9, lineHeight: 12, color: '#FFFFFF' } as const;
-const dark = { fontFamily: MONO_BOLD, fontSize: 9, lineHeight: 12, color: '#111827' } as const;
+const dark = { fontFamily: MONO_BOLD, fontSize: 9, lineHeight: 12, color: ON_WHITE } as const;
 
 export function PlayerBadges({
   marks,
@@ -284,7 +306,9 @@ export function PlayerBadges({
                   closed paths and a football's outer ring is closed, so it
                   renders as a plain dark disc. The cards are the reverse:
                   RectangleVerticalIcon has no solid variant at all. */}
-              <Icon name="sportscourt.fill" size={11} color="ink" solid />
+              {/* ⚠ `tint`, NOT `color`. `color` takes a THEME token and the
+                  pill it sits on is a hard-coded white — see ON_WHITE. */}
+              <Icon name="sportscourt.fill" size={11} tint={ON_WHITE} solid />
             </Pill>
           </Fan>
         </View>
