@@ -1819,7 +1819,13 @@ export type ScoutRate = {
   pct: number | null;
 };
 
-export type ScoutClubRef = { clubId: string; name: string; abbreviation: string };
+export type ScoutClubRef = {
+  clubId: string;
+  name: string;
+  abbreviation: string;
+  /** ⚠ Nullable — draw the row without it rather than reserving a hole. */
+  crestUrl: string | null;
+};
 
 export type ScoutClubLean = {
   club: ScoutClubRef;

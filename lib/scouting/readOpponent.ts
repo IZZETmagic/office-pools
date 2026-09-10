@@ -60,15 +60,22 @@ type PredictionRow = {
     home_goals: number | null
     away_goals: number | null
     matchweek_id: string
-    home: { club_id: string; name: string; abbreviation: string } | null
-    away: { club_id: string; name: string; abbreviation: string } | null
+    home: { club_id: string; name: string; abbreviation: string; crest_url: string | null } | null
+    away: { club_id: string; name: string; abbreviation: string; crest_url: string | null } | null
     league_matchweeks: { matchweek_number: number; lock_at: string | null } | null
   } | null
 }
 
 const toClub = (c: PredictionRow['league_fixtures'] extends null ? never
   : NonNullable<PredictionRow['league_fixtures']>['home']): ClubRef | null =>
-  c ? { clubId: c.club_id, name: c.name, abbreviation: c.abbreviation } : null
+  c
+    ? {
+        clubId: c.club_id,
+        name: c.name,
+        abbreviation: c.abbreviation,
+        crestUrl: c.crest_url,
+      }
+    : null
 
 /**
  * Every revealed pick by one entry, with the fixture and result beside it.
@@ -92,8 +99,8 @@ export async function readOpponentPicks(
       predicted_away_score,
       league_fixtures!inner (
         fixture_id, kickoff_at, home_goals, away_goals, matchweek_id,
-        home:league_clubs!league_fixtures_home_club_id_fkey ( club_id, name, abbreviation ),
-        away:league_clubs!league_fixtures_away_club_id_fkey ( club_id, name, abbreviation ),
+        home:league_clubs!league_fixtures_home_club_id_fkey ( club_id, name, abbreviation, crest_url ),
+        away:league_clubs!league_fixtures_away_club_id_fkey ( club_id, name, abbreviation, crest_url ),
         league_matchweeks!inner ( matchweek_number, lock_at )
       )
     `)

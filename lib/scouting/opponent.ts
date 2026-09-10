@@ -34,6 +34,13 @@ export type ClubRef = {
   clubId: string
   name: string
   abbreviation: string
+  /**
+   * ⚠ NULLABLE, AND EVERY CONSUMER MUST DRAW WITHOUT IT. `league_clubs.crest_url`
+   * is nullable in the schema and the importer fills it from the provider, so a
+   * club can arrive without one — and a row that reserves space for a crest it
+   * never gets is a hole beside a name.
+   */
+  crestUrl: string | null
 }
 
 /** The four buckets `league_match_scores.score_type` is constrained to. */

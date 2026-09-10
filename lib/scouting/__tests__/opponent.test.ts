@@ -25,9 +25,9 @@ import {
   type PickRow,
 } from '../opponent'
 
-const ARS: ClubRef = { clubId: 'ars', name: 'Arsenal', abbreviation: 'ARS' }
-const CHE: ClubRef = { clubId: 'che', name: 'Chelsea', abbreviation: 'CHE' }
-const MUN: ClubRef = { clubId: 'mun', name: 'Manchester United', abbreviation: 'MUN' }
+const ARS: ClubRef = { clubId: 'ars', name: 'Arsenal', abbreviation: 'ARS', crestUrl: null }
+const CHE: ClubRef = { clubId: 'che', name: 'Chelsea', abbreviation: 'CHE', crestUrl: 'https://x/che.png' }
+const MUN: ClubRef = { clubId: 'mun', name: 'Manchester United', abbreviation: 'MUN', crestUrl: null }
 
 let seq = 0
 
@@ -453,5 +453,18 @@ describe('the signature scoreline carries a rate, not a bare pair', () => {
       score: '2–1',
       share: { count: 6, of: 10, pct: 60 },
     })
+  })
+})
+
+describe('the club a lean names travels whole', () => {
+  it('carries the crest through, and tolerates not having one', () => {
+    // ⚠ `crest_url` IS NULLABLE IN THE SCHEMA. A lean that dropped the field
+    // would force the screen to look the club up a second time, and a lean that
+    // required it would exclude every club the importer got no crest for.
+    const leans = buildClubLeans([
+      pick({ homeClub: CHE, awayClub: ARS, predictedHome: 2, predictedAway: 0 }),
+    ])
+    expect(leans.find((l) => l.club.clubId === 'che')?.club.crestUrl).toBe('https://x/che.png')
+    expect(leans.find((l) => l.club.clubId === 'ars')?.club.crestUrl).toBeNull()
   })
 })

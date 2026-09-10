@@ -1,4 +1,4 @@
-import { Text as RNText, View } from 'react-native';
+import { Image, Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
@@ -168,7 +168,8 @@ function ClubBiasCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: b
         {mostBacked ? (
           <Lean
             lean={mostBacked}
-            label={isSelf ? 'You back most' : 'Backs most'}
+            label={isSelf ? 'You back most often' : 'Backs most often'}
+            count={{ value: mostBacked.backed, of: mostBacked.seen }}
             detail={venueSplit(mostBacked)}
           />
         ) : null}
@@ -180,6 +181,9 @@ function ClubBiasCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: b
             lean={blindSpot}
             label="Blind spot"
             tone="warn"
+            // ⚠ RIGHT-OVER-BACKED, NOT BACKED-OVER-SEEN. The finding on this row
+            // is the strike rate, so that is the fraction it shows.
+            count={{ value: blindSpot.backedRight, of: blindSpot.backedPlayed }}
             detail={`Backed ${blindSpot.backedPlayed} times. Right ${blindSpot.backedRight}.`}
           />
         ) : null}
@@ -188,7 +192,8 @@ function ClubBiasCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: b
           <Lean
             lean={mostOpposed}
             label={isSelf ? 'You pick against' : 'Picks against'}
-            detail={`${mostOpposed.opposed} of ${mostOpposed.seen} games`}
+            count={{ value: mostOpposed.opposed, of: mostOpposed.seen }}
+            detail="times they were picked to lose"
           />
         ) : null}
       </View>
@@ -205,15 +210,41 @@ function fraction(r: ScoutRate): string {
   return `${r.count} of ${r.of}`;
 }
 
+/**
+ * One club they lean on.
+ *
+ * ⚠ THE CREST IS DRAWN THE WAY EVERY OTHER LIST IN THE APP DRAWS ONE — plain RN
+ * `Image` with `resizeMode="contain"`, the pattern `leagueTableRow` and the duel
+ * card's "Backs most often" row already use. Crests arrive at wildly different
+ * aspect ratios; `cover` crops the badge and `stretch` distorts it.
+ *
+ * ⚠ AND IT IS DECORATIVE. The club's name sits beside it, so an alt text would
+ * announce the same thing twice — the same call the duel card makes.
+ *
+ * ⚠ NO PLACEHOLDER WHEN THERE IS NO CREST. `league_clubs.crest_url` is
+ * nullable, and a reserved empty square beside a name reads as an image that
+ * failed to load. The name simply moves left.
+ */
 function Lean({
   lean,
   label,
   detail,
+  count,
   tone,
 }: {
   lean: ScoutClubLean;
   label: string;
   detail: string;
+  /**
+   * ⚠⚠ THE COUNT IS PASSED IN, NOT READ OFF `lean.backed`.
+   *
+   * It was `backed of seen` for every row, which is right for "backs most" and
+   * the exact OPPOSITE claim on "picks against" — that row would have reported
+   * how often they BACK a club under a heading saying they oppose it, with a
+   * detail line beneath it giving the real number. One row contradicting
+   * itself, and nothing would have errored.
+   */
+  count: { value: number; of: number };
   tone?: 'warn';
 }) {
   const theme = useTheme();
@@ -226,31 +257,51 @@ function Lean({
           tone === 'warn' ? withOpacity(theme.colors.red, 0.08) : theme.colors.mist,
         borderRadius: theme.radii.sm,
         padding: 12,
-        gap: 6,
+        gap: 8,
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Text variant="detail" color="slate" style={{ letterSpacing: 0.8 }}>
-          {label.toUpperCase()}
-        </Text>
-        <View style={{ flex: 1 }} />
+      <Text variant="detail" color="slate" style={{ letterSpacing: 0.8 }}>
+        {label.toUpperCase()}
+      </Text>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        {lean.club.crestUrl ? (
+          <Image
+            alt=""
+            source={{ uri: lean.club.crestUrl }}
+            style={{ width: 24, height: 24 }}
+            resizeMode="contain"
+          />
+        ) : null}
+
+        <RNText
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            fontFamily: fontFamilies.bold,
+            fontSize: 15,
+            color: theme.colors.ink,
+          }}
+        >
+          {lean.club.name}
+        </RNText>
+
+        {/* ⚠ THE FRACTION, NOT "3×". The duel card's row shows a bare count
+            because it has no room for more; this card's whole argument is that
+            nine of nine is a habit and three of nine is not, and a count with
+            no denominator cannot tell those apart. */}
         <RNText
           style={{
             fontFamily: MONO_BOLD,
-            fontSize: 12,
+            fontSize: 13,
             color: accent,
             fontVariant: ['tabular-nums'],
           }}
         >
-          {lean.backed} of {lean.seen}
+          {count.value} of {count.of}
         </RNText>
       </View>
-      <RNText
-        numberOfLines={1}
-        style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}
-      >
-        {lean.club.name}
-      </RNText>
+
       <Text variant="detail" color="slate">
         {detail}
       </Text>
