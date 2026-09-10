@@ -29,6 +29,25 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // Outside Showdown `standing.duels` is null and the duel half is simply not
 // there — a "0–0–0" in a Pick'em pool would be a claim about matches that were
 // never played.
+//
+// ## ⚠⚠ EVERY ABSENCE TEST IS `== null`, NEVER `=== null`
+//
+// This card shipped with `!== null` throughout and rendered **"of undefined in
+// the pool"** and **"NaN since last week"** the first time it met an API that
+// did not yet carry the fields. `undefined !== null` is TRUE, so a missing key
+// sailed through a check written to stop a missing value.
+//
+// The route always sends these now, so in a matched build the strict form would
+// have been correct — which is exactly why it is the wrong thing to rely on. A
+// phone outlives the deploy it was built against: an OTA bundle can be newer
+// than the API it calls, `EXPO_PUBLIC_API_BASE_URL` can point at a stale
+// server, and a member on an old build calls a new one. `== null` costs nothing
+// and covers all three.
+//
+// ⚠ AND THE ARITHMETIC IS GUARDED SEPARATELY. `Math.abs(undefined - 1)` is NaN,
+// which React renders happily as the string "NaN" — no crash, no warning, just
+// a wrong word on the screen. `Number.isFinite` is what stops that reaching the
+// render, not the null check upstream of it.
 // =============================================================
 
 export function StandingCard({ data }: { data: DossierResponse }) {
@@ -40,7 +59,7 @@ export function StandingCard({ data }: { data: DossierResponse }) {
   // ⚠ A pool with no rank and no duels has nothing to stand on — in practice a
   // World Cup pool or an entry the engine has not reached. Say nothing rather
   // than draw a frame around a dash.
-  if (s.rank === null && !duels) return null;
+  if (s.rank == null && !duels) return null;
 
   return (
     <View
@@ -57,7 +76,7 @@ export function StandingCard({ data }: { data: DossierResponse }) {
       </View>
 
       {/* ---- position -------------------------------------------------- */}
-      {s.rank !== null ? (
+      {s.rank != null ? (
         <View
           style={{
             flexDirection: 'row',
@@ -88,7 +107,7 @@ export function StandingCard({ data }: { data: DossierResponse }) {
 
           <View style={{ flex: 1, paddingBottom: 4, gap: 3 }}>
             <Text variant="detail" color="slate">
-              {s.pool_size !== null ? `of ${s.pool_size} in the pool` : 'in the pool'}
+              {s.pool_size != null ? `of ${s.pool_size} in the pool` : 'in the pool'}
             </Text>
             <Movement from={s.previous_rank} to={s.rank} />
           </View>
@@ -112,7 +131,7 @@ export function StandingCard({ data }: { data: DossierResponse }) {
       ) : null}
 
       {/* ---- duels ----------------------------------------------------- */}
-      {duels ? <DuelBlock duels={duels} hasRank={s.rank !== null} /> : null}
+      {duels ? <DuelBlock duels={duels} hasRank={s.rank != null} /> : null}
     </View>
   );
 }
@@ -129,7 +148,10 @@ export function StandingCard({ data }: { data: DossierResponse }) {
  */
 function Movement({ from, to }: { from: number | null; to: number }) {
   const theme = useTheme();
-  if (from === null || from === to) return null;
+  // ⚠⚠ `== null`, WHICH CATCHES `undefined` TOO — see the file header. This
+  // read `=== null` and rendered "NaN since last week" against an API that had
+  // not yet been redeployed with the field.
+  if (from == null || !Number.isFinite(from) || from === to) return null;
 
   // A LOWER rank number is a better position, so a fall in the number is a climb.
   const climbed = to < from;

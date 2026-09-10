@@ -31,6 +31,17 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 //
 // The same numbers can be laid out as a tip sheet and this product is
 // explicitly not for bettors. Nothing here says what to pick.
+//
+// ## ⚠⚠ EVERY ABSENCE TEST IS `== null`, NEVER `=== null`
+//
+// A field the API has not shipped yet arrives as `undefined`, which passes a
+// strict null check and lands in a template literal as the word "undefined", or
+// in arithmetic as NaN. React renders both without complaint. `StandingCard`
+// shipped with the strict form and drew "of undefined in the pool".
+//
+// A phone outlives the deploy it was built against — an OTA bundle can be newer
+// than the API it calls, and a member on an old build can call a new one — so
+// this is not a hypothetical even when the route and the screen ship together.
 // =============================================================
 
 /**
@@ -74,8 +85,8 @@ function AccuracyCard({ dossier }: { dossier: OpponentDossier }) {
     <Card title="Accuracy">
       <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
         <Tile
-          value={dossier.hitRate.pct === null ? `${dossier.hitRate.count}` : `${dossier.hitRate.pct}%`}
-          sub={dossier.hitRate.pct === null ? `of ${dossier.hitRate.of} scored` : 'hit rate'}
+          value={dossier.hitRate.pct == null ? `${dossier.hitRate.count}` : `${dossier.hitRate.pct}%`}
+          sub={dossier.hitRate.pct == null ? `of ${dossier.hitRate.of} scored` : 'hit rate'}
           color={theme.colors.tierWinner}
         />
         <Tile value={`${dossier.exactCount}`} sub="exact" color={theme.colors.tierExact} />
@@ -83,7 +94,7 @@ function AccuracyCard({ dossier }: { dossier: OpponentDossier }) {
           // ⚠ NULL IS A DASH, NOT A ZERO. "0.0 points a fixture" is a statement
           // about somebody who has been scored and did badly; this is somebody
           // who has not been scored at all.
-          value={dossier.pointsPerFixture === null ? '—' : `${dossier.pointsPerFixture}`}
+          value={dossier.pointsPerFixture == null ? '—' : `${dossier.pointsPerFixture}`}
           sub="pts / fixture"
           color={theme.colors.ink}
         />
@@ -308,7 +319,7 @@ function FingerprintCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf
             label="Signature scoreline"
             value={f.signature.score}
             note={
-              f.signature.share.pct === null
+              f.signature.share.pct == null
                 ? fraction(f.signature.share)
                 : `${f.signature.share.pct}% of picks`
             }
@@ -368,7 +379,13 @@ function Comparison({
 
   // ⚠ BOTH HALVES OR NEITHER. One number alone is not the finding this card
   // exists to make, and half a comparison reads as a claim it is not making.
-  if (theirs === null || reality === null) return null;
+  //
+  // ⚠⚠ `== null`, NOT `=== null`. A missing key is `undefined`, which passes a
+  // strict null check and then draws a bar at `undefined / max` — NaN, which
+  // React renders as a width of nothing and a label reading "NaN". See
+  // `StandingCard`, where exactly that shipped.
+  if (theirs == null || reality == null) return null;
+  if (!Number.isFinite(theirs) || !Number.isFinite(reality)) return null;
 
   const share = (v: number) => Math.max(0, Math.min(1, v / max));
 
@@ -537,12 +554,12 @@ function TendenciesCard({ dossier }: { dossier: OpponentDossier }) {
         {contrarian ? (
           <>
             <Tile
-              value={contrarian.against.pct === null ? fraction(contrarian.against) : `${contrarian.against.pct}%`}
+              value={contrarian.against.pct == null ? fraction(contrarian.against) : `${contrarian.against.pct}%`}
               sub="against crowd"
               color={theme.colors.amber}
             />
             <Tile
-              value={contrarian.andRight.pct === null ? fraction(contrarian.andRight) : `${contrarian.andRight.pct}%`}
+              value={contrarian.andRight.pct == null ? fraction(contrarian.andRight) : `${contrarian.andRight.pct}%`}
               sub="and right"
               color={theme.colors.green}
             />
