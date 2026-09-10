@@ -34,16 +34,14 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export function Dossier({
   dossier,
-  name,
   isSelf = false,
 }: {
   dossier: OpponentDossier;
-  name: string;
   isSelf?: boolean;
 }) {
   return (
     <View style={{ gap: 16 }}>
-      <ReadCard read={dossier.read} name={name} isSelf={isSelf} />
+      <ReadCard read={dossier.read} />
       <AccuracyCard dossier={dossier} />
       {dossier.form.length > 0 ? <FormCard form={dossier.form} /> : null}
       <ClubBiasCard dossier={dossier} isSelf={isSelf} />
@@ -54,14 +52,18 @@ export function Dossier({
   );
 }
 
-/** The one-line verdict. Composed on the server so there is only one of it. */
-function ReadCard({ read, name, isSelf }: { read: string; name: string; isSelf: boolean }) {
+/**
+ * The one-line verdict. Composed on the server so there is only one of it.
+ *
+ * ⚠ NO NAME ABOVE IT ANY MORE. The collapsing header carries the member's name,
+ * their avatar and the pool; repeating it three inches below was the same word
+ * twice on one screen. The header is the only place a name belongs now — if
+ * this card is ever used somewhere without one, it needs its own, not a copy.
+ */
+function ReadCard({ read }: { read: string }) {
   const theme = useTheme();
   return (
     <View style={{ marginHorizontal: 20 }}>
-      <Text variant="caption" color="slate">
-        {isSelf ? 'Your season' : name}
-      </Text>
       <RNText
         style={{
           fontFamily: fontFamilies.black,
@@ -69,7 +71,6 @@ function ReadCard({ read, name, isSelf }: { read: string; name: string; isSelf: 
           lineHeight: 26,
           letterSpacing: -0.2,
           color: theme.colors.ink,
-          marginTop: 8,
         }}
       >
         {read}

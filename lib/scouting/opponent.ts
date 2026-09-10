@@ -529,13 +529,29 @@ export function describeDossier(d: OpponentDossier): string {
   }
 
   // ---- the draw -------------------------------------------------------------
-  // ⚠ THE MOST RELIABLE CLAUSE IN THE SET. Roughly a quarter of league games end
-  // level and almost nobody predicts them at anything near that rate, so this
-  // fires for most members and is true when it does.
+  // ⚠⚠ TWO CLAUSES, BECAUSE THE GAP AND THE ABSOLUTE ARE DIFFERENT CLAIMS.
+  //
+  // This originally fired one sentence — "almost never calls a draw" — off the
+  // GAP alone, and it read as a lie on the first real dossier: a member calling
+  // draws 25% of the time against a league running 45% cleared the threshold and
+  // was told they almost never call one. Twenty-five percent is not "almost
+  // never" whatever reality is doing beside it, and the card two inches below
+  // printed the 25% in full.
+  //
+  // So the strong wording now needs a genuinely low ABSOLUTE, and the gap alone
+  // gets the weaker, accurate sentence.
   const theirDraw = d.fingerprint.theirDrawRate.pct
   const realDraw = d.baseline.drawRate.pct
   if (theirDraw !== null && realDraw !== null && realDraw - theirDraw >= 12) {
-    clauses.push(clauses.length ? 'almost never calls a draw' : 'Almost never calls a draw')
+    const wording =
+      theirDraw <= 10 ? 'almost never calls a draw' : 'under-calls the draw'
+    clauses.push(clauses.length ? wording : capitalise(wording))
+  } else if (theirDraw !== null && realDraw !== null && theirDraw - realDraw >= 12) {
+    // ⚠ THE OTHER DIRECTION EXISTS AND WAS MISSING. Somebody who calls draws far
+    // MORE than the league produces is just as readable a habit, and saying
+    // nothing about them made the sentence quietly one-sided.
+    const wording = 'sees draws everywhere'
+    clauses.push(clauses.length ? wording : capitalise(wording))
   }
 
   // ---- the blind spot, always last ------------------------------------------
@@ -559,6 +575,10 @@ export function describeDossier(d: OpponentDossier): string {
   }
 
   return `${clauses.join(', ').replace(/, (and )/, ' $1')}.`
+}
+
+function capitalise(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 /** "an Arsenal", "a Chelsea". Crude, and right for every club name we carry. */

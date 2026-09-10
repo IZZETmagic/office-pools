@@ -386,3 +386,47 @@ describe('the read', () => {
     expect(read.split('.').filter(Boolean)).toHaveLength(1)
   })
 })
+
+describe('the draw clause says what it means', () => {
+  /** Their draw rate against the league's, over a sample big enough to read. */
+  function drawRead(theirDrawsOf20: number, realDrawsOf20: number) {
+    const rows: PickRow[] = []
+    for (let i = 0; i < 20; i++) {
+      const theyCallDraw = i < theirDrawsOf20
+      const itWasDrawn = i < realDrawsOf20
+      rows.push(
+        pick({
+          predictedHome: theyCallDraw ? 1 : 2,
+          predictedAway: 1,
+          actualHome: itWasDrawn ? 1 : 2,
+          actualAway: 1,
+        }),
+      )
+    }
+    return buildOpponentDossier(rows).read
+  }
+
+  it('does NOT say "almost never" about somebody calling a quarter of them', () => {
+    // ⚠⚠ THE BUG THIS CLOSES, caught on the first real dossier on a device.
+    // 25% against a league running 45% clears the gap threshold — but the card
+    // two inches below prints "25%", and "almost never" beside it is a lie.
+    const read = drawRead(5, 9)
+    expect(read).not.toContain('almost never')
+    expect(read).toContain('under-calls the draw')
+  })
+
+  it('still says "almost never" when they genuinely almost never do', () => {
+    expect(drawRead(1, 9)).toContain('almost never calls a draw')
+  })
+
+  it('reads the other direction too', () => {
+    // Somebody calling draws far MORE than the league produces is just as
+    // readable a habit; saying nothing made the sentence one-sided.
+    expect(drawRead(14, 2)).toContain('sees draws everywhere')
+  })
+
+  it('says nothing about the draw when they track reality', () => {
+    const read = drawRead(5, 5)
+    expect(read).not.toContain('draw')
+  })
+})

@@ -1880,7 +1880,20 @@ export type OpponentDossier = {
 export type DossierResponse = {
   entry_id: string;
   entry_name: string;
+  /** ⚠ The USER id, for the avatar gradient — keyed on the person so a member
+   *  is the same colour here as in Banter. Null if the entry has no user. */
+  user_id: string | null;
+  full_name: string | null;
   is_self: boolean;
+  pool: { pool_id: string; name: string; league_mode: string | null } | null;
+  competition: { name: string; season: string } | null;
+  /**
+   * ⚠⚠ `rank` IS NULL IN LAST MAN STANDING AND MUST STAY THAT WAY. The stored
+   * column is entry-id order there, not a standing — there is no second place
+   * in a survival pool. The server withholds it; the phone must not go looking
+   * for it somewhere else.
+   */
+  standing: { total_points: number; rank: number | null } | null;
   dossier: OpponentDossier;
 };
 

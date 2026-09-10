@@ -82,7 +82,7 @@ async function handler(
   // ---- guard 2: the subject is in this pool -------------------------------
   const { data: subject, error: subjErr } = await admin
     .from('pool_entries')
-    .select('entry_id, entry_name, retired_at, user_id')
+    .select('entry_id, entry_name, retired_at, user_id, users(user_id, full_name, username)')
     .eq('entry_id', entry_id)
     .eq('pool_id', pool_id)
     .maybeSingle()
@@ -134,9 +134,27 @@ async function handler(
 
   const dossier = buildOpponentDossier(picks, { crowdMajority, available })
 
+  /**
+   * The pool and the standing behind the report — enough for a header that says
+   * WHOSE season this is and WHERE it is being played.
+   *
+   * ⚠ BEST-EFFORT, LIKE THE CROWD. A dossier that 500s because its header could
+   * not be built is worse than one that arrives without a crest on it.
+   */
+  const context = await readDossierContext(admin, pool_id, entry_id)
+
+  const subjectUser = (subject as unknown as {
+    users: { user_id: string; full_name: string | null; username: string | null } | null
+  }).users
+
   return NextResponse.json({
     entry_id,
     entry_name: subject.entry_name,
+    /** ⚠ The USER id, not the entry id — the avatar gradient is keyed on the
+     *  person, so that a member is the same colour here as in Banter. */
+    user_id: subjectUser?.user_id ?? null,
+    full_name: subjectUser?.full_name ?? subjectUser?.username ?? null,
+    ...context,
     /**
      * ⚠ THE SAME OBJECT EITHER WAY — the self-scout is not a second engine, it
      * is this one pointed inward. Only the copy changes ("You predict" rather
@@ -149,6 +167,67 @@ async function handler(
     is_self: subject.user_id === userData.user_id,
     dossier,
   })
+}
+
+/**
+ * The pool, the competition, and where this entry stands in it.
+ *
+ * ## ⚠⚠ THE RANK IS WITHHELD IN LAST MAN STANDING, AND THAT IS NOT COSMETIC
+ *
+ * `league_entry_totals.final_rank` is written for every league pool, but in an
+ * LMS pool it is entry-id order rather than a standing — there is no such thing
+ * as second place in a survival pool, only in and out. Rendering it would put a
+ * confident, meaningless "4th" on a member's own header. The mode gate lives
+ * here, at the source, rather than in the component, so no future surface can
+ * read the column and reach a different conclusion about it.
+ */
+async function readDossierContext(
+  admin: ReturnType<typeof createAdminClient>,
+  poolId: string,
+  entryId: string,
+) {
+  try {
+    const { data: pool } = await admin
+      .from('pools')
+      .select('pool_id, name, league_mode, league_season_id')
+      .eq('pool_id', poolId)
+      .maybeSingle()
+
+    let competition: { name: string; season: string } | null = null
+    if (pool?.league_season_id) {
+      const { data: season } = await admin
+        .from('league_seasons')
+        .select('competition_name, season_label')
+        .eq('season_id', pool.league_season_id)
+        .maybeSingle()
+      if (season) {
+        competition = { name: season.competition_name, season: season.season_label }
+      }
+    }
+
+    const { data: totals } = await admin
+      .from('league_entry_totals')
+      .select('total_points, final_rank')
+      .eq('entry_id', entryId)
+      .maybeSingle()
+
+    // ⚠⚠ SEE THE HEADER. Not a display preference.
+    const rankIsMeaningful = pool?.league_mode !== 'last_man_standing'
+
+    return {
+      pool: pool ? { pool_id: pool.pool_id, name: pool.name, league_mode: pool.league_mode } : null,
+      competition,
+      standing: totals
+        ? {
+            total_points: totals.total_points,
+            rank: rankIsMeaningful ? totals.final_rank : null,
+          }
+        : null,
+    }
+  } catch (e) {
+    console.error('[dossier] context unavailable —', (e as Error).message)
+    return { pool: null, competition: null, standing: null }
+  }
 }
 
 /**
