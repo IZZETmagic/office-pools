@@ -506,6 +506,13 @@ export const RATE_COVERS: Record<string, string> = {
 };
 
 export type Rate = {
+  /**
+   * ⚠ WHICH SECTION IT BELONGS IN. The rates used to sit in a block of their
+   * own above everything else, which meant a reader looking for passing found
+   * the accuracy in one place and the key passes in another. A rate is the
+   * headline of its own section, not a separate topic.
+   */
+  section: string;
   label: string;
   /** 0-100, already rounded. */
   pct: number;
@@ -540,6 +547,7 @@ export function playerRates(s: MatchPlayerStat): Rate[] {
   if ((s.passesTotal ?? 0) >= MIN_FOR_RATE.passes && s.passesAccurate !== null) {
     const v = pct(s.passesAccurate, s.passesTotal as number);
     out.push({
+      section: 'Passing',
       label: 'Pass accuracy',
       pct: v,
       detail: `${s.passesAccurate} of ${s.passesTotal}`,
@@ -552,7 +560,8 @@ export function playerRates(s: MatchPlayerStat): Rate[] {
     if (faced >= MIN_FOR_RATE.saves) {
       const v = pct(s.saves ?? 0, faced);
       out.push({
-        label: 'Save rate',
+        section: 'Goalkeeping',
+      label: 'Save rate',
         pct: v,
         detail: `${s.saves ?? 0} of ${faced} faced`,
         band: bandFor(v, SAVE),
@@ -563,6 +572,7 @@ export function playerRates(s: MatchPlayerStat): Rate[] {
   if ((s.shotsTotal ?? 0) >= MIN_FOR_RATE.shots && s.shotsOn !== null) {
     const v = pct(s.shotsOn, s.shotsTotal as number);
     out.push({
+      section: 'Attacking',
       label: 'Shot accuracy',
       pct: v,
       detail: `${s.shotsOn} on target of ${s.shotsTotal}`,
@@ -573,6 +583,7 @@ export function playerRates(s: MatchPlayerStat): Rate[] {
   if ((s.duelsTotal ?? 0) >= MIN_FOR_RATE.duels && s.duelsWon !== null) {
     const v = pct(s.duelsWon, s.duelsTotal as number);
     out.push({
+      section: 'Duels & defending',
       label: 'Duels won',
       pct: v,
       detail: `${s.duelsWon} of ${s.duelsTotal}`,
@@ -583,6 +594,7 @@ export function playerRates(s: MatchPlayerStat): Rate[] {
   if ((s.dribblesAttempts ?? 0) >= MIN_FOR_RATE.dribbles && s.dribblesSuccess !== null) {
     const v = pct(s.dribblesSuccess, s.dribblesAttempts as number);
     out.push({
+      section: 'Duels & defending',
       label: 'Dribble success',
       pct: v,
       detail: `${s.dribblesSuccess} of ${s.dribblesAttempts}`,

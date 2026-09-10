@@ -546,3 +546,28 @@ describe('statIsZero', () => {
     expect(statIsZero('')).toBe(false);
   });
 });
+
+describe('every rate belongs to a real section', () => {
+  it('⚠⚠ each rate names a section `statGroups` actually produces', () => {
+    // The two live in different functions and would drift in silence — a rate
+    // pointing at a section that does not exist would simply never render.
+    const busy = player({
+      position: 'F',
+      passesTotal: 28, passesAccurate: 26,
+      shotsTotal: 3, shotsOn: 2,
+      duelsTotal: 12, duelsWon: 7,
+      dribblesAttempts: 5, dribblesSuccess: 4,
+    });
+    const titles = new Set(statGroups(busy).map((g) => g.title));
+    for (const r of playerRates(busy)) {
+      expect(titles.has(r.section), `no section called "${r.section}"`).toBe(true);
+    }
+  });
+
+  it('⚠ a keeper’s save rate lands in his own section', () => {
+    const gk = player({ position: 'G', saves: 4, goalsConceded: 1, passesTotal: 30, passesAccurate: 20 });
+    const titles = new Set(statGroups(gk).map((g) => g.title));
+    for (const r of playerRates(gk)) expect(titles.has(r.section)).toBe(true);
+    expect(playerRates(gk).find((r) => r.label === 'Save rate')?.section).toBe('Goalkeeping');
+  });
+});

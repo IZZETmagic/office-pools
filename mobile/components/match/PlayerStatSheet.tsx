@@ -14,8 +14,8 @@ import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
-import { Icon } from '@/components/ui';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { Icon, Text } from '@/components/ui';
+import { useTheme, withOpacity } from '@/theme';
 import {
   formatRating,
   playerPhotoUrl,
@@ -122,7 +122,13 @@ export function PlayerStatSheet({
               // 0.55`) rather than trusting percentage resolution through a
               // stack of wrappers, and it is right to.
               maxHeight: screenHeight * 0.85,
-              backgroundColor: theme.colors.surface,
+              // ⚠ SNOW, NOT SURFACE, AND THAT IS THE WHOLE RESTRUCTURE. Cards
+              // in this app are `surface` on `snow` — that is the relationship
+              // every screen uses and the one `shadows.card` is drawn for. The
+              // sheet was `surface`, so its cards could not be surface too and
+              // had to invent borders and tinted fills to separate at all. Make
+              // the body a screen and the cards can just be cards.
+              backgroundColor: theme.colors.snow,
               borderTopLeftRadius: theme.radii.lg,
               borderTopRightRadius: theme.radii.lg,
               // ⚠ SO THE BAND REACHES THE ROUNDED CORNERS. The header runs
@@ -276,12 +282,12 @@ export function PlayerStatSheet({
                       {stat.shirtNumber}
                     </RNText>
                   ) : null}
-                  <RNText
-                    numberOfLines={1}
-                    style={{ fontFamily: fontFamilies.bold, fontSize: 21, color: theme.colors.ink }}
-                  >
+                  {/* ⚠ `sectionHeader`, A REAL TOKEN — Nunito Black at 20/24.
+                      This was hand-set bold at 21, which is a size the app does
+                      not have. His name IS the heading of this sheet. */}
+                  <Text variant="sectionHeader" numberOfLines={1}>
                     {stat.playerName}
-                  </RNText>
+                  </Text>
                   {stat.isCaptain ? (
                     <View
                       style={{
@@ -302,26 +308,14 @@ export function PlayerStatSheet({
                   ) : null}
                 </View>
 
-                <RNText
-                  style={{
-                    fontFamily: fontFamilies.semibold,
-                    fontSize: 13,
-                    color: theme.colors.ink,
-                  }}
-                >
+                <Text variant="body">
                   {[positionName(stat.position), teamName].filter(Boolean).join(' · ')}
-                </RNText>
+                </Text>
 
                 {headline.length > 0 ? (
-                  <RNText
-                    style={{
-                      fontFamily: fontFamilies.regular,
-                      fontSize: 12,
-                      color: theme.colors.slate,
-                    }}
-                  >
+                  <Text variant="detail" color="slate">
                     {headline.join(' · ')}
-                  </RNText>
+                  </Text>
                 ) : null}
               </View>
             </LinearGradient>
@@ -340,145 +334,96 @@ export function PlayerStatSheet({
               // no indicator gives a reader nothing to go on either way.
               showsVerticalScrollIndicator
             >
-              {/* ⚠⚠ THE RATES COME FIRST, AND THEY ARE THE POINT OF THE SHEET.
-                  A column of raw counts tells you what happened; a rate tells
-                  you whether it was any good, which is the question somebody
-                  opened this to answer. They are derived from the counts below
-                  rather than fetched — no extra column, no extra call. */}
-              {rates.length > 0 ? (
-                <View
-                  style={{
-                    backgroundColor: withOpacity(theme.colors.slate, 0.07),
-                    borderRadius: theme.radii.md,
-                    paddingHorizontal: 14,
-                    paddingVertical: 12,
-                    marginBottom: 18,
-                    gap: 12,
-                  }}
-                >
-                  {rates.map((r) => {
-                    const tone = r.band ? RATING_COLOR[r.band] : theme.colors.slate;
-                    return (
-                      <View key={r.label} style={{ gap: 5 }}>
+              {groups.map((g) => {
+                const mine = rates.filter((r) => r.section === g.title);
+                return (
+                  <View
+                    key={g.title}
+                    style={{
+                      marginBottom: theme.spacing.md,
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: theme.radii.lg,
+                      ...theme.shadows.card,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* ⚠ `cardTitle`, THE SAME HEADER THE STATS TAB USES. Mine
+                        was 11pt uppercase on a tinted strip — a vocabulary this
+                        app does not have anywhere else. A section title is
+                        `cardTitle`, and it needs no accent to stand out once it
+                        is 16pt bold on its own card. */}
+                    <View
+                      style={{
+                        paddingHorizontal: theme.spacing.lg,
+                        paddingTop: theme.spacing.lg - 2,
+                        paddingBottom: mine.length > 0 ? theme.spacing.md : theme.spacing.xs,
+                      }}
+                    >
+                      <Text variant="cardTitle">{g.title}</Text>
+                    </View>
+
+                    {/* ⚠⚠ THE RATE LEADS ITS OWN SECTION rather than sitting in
+                        a block of its own above everything. A reader after
+                        passing found the accuracy in one place and the key
+                        passes in another; they are one topic and now one card. */}
+                    {mine.map((r) => {
+                      const tone = r.band ? RATING_COLOR[r.band] : theme.colors.slate;
+                      return (
                         <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'baseline',
-                            justifyContent: 'space-between',
-                          }}
-                        >
-                          <RNText
-                            style={{
-                              fontFamily: fontFamilies.medium,
-                              fontSize: 13,
-                              color: theme.colors.ink,
-                            }}
-                          >
-                            {r.label}
-                          </RNText>
-                          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                            <RNText
-                              style={{
-                                fontFamily: fontFamilies.regular,
-                                fontSize: 11,
-                                color: theme.colors.slate,
-                              }}
-                            >
-                              {r.detail}
-                            </RNText>
-                            <RNText
-                              style={{
-                                fontFamily: MONO_BOLD,
-                                fontSize: 15,
-                                color: tone,
-                                fontVariant: ['tabular-nums'],
-                              }}
-                            >
-                              {r.pct}%
-                            </RNText>
-                          </View>
-                        </View>
-                        {/* ⚠ THE BAR IS THE VALUE, NOT A RANKING. It fills to the
-                            percentage itself; the COLOUR is what carries how that
-                            compares to everyone else in his position. Two
-                            encodings of the same thing would be one too many. */}
-                        <View
-                          style={{
-                            height: 4,
-                            borderRadius: theme.radii.pill,
-                            backgroundColor: withOpacity(theme.colors.slate, 0.15),
-                            overflow: 'hidden',
-                          }}
+                          key={r.label}
+                          style={{ paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.md, gap: 6 }}
                         >
                           <View
                             style={{
-                              width: `${Math.max(2, Math.min(100, r.pct))}%`,
-                              height: 4,
-                              borderRadius: theme.radii.pill,
-                              backgroundColor: tone,
+                              flexDirection: 'row',
+                              alignItems: 'baseline',
+                              justifyContent: 'space-between',
                             }}
-                          />
+                          >
+                            <Text variant="body">{r.label}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                              <Text variant="detail" color="slate">
+                                {r.detail}
+                              </Text>
+                              <RNText
+                                style={{
+                                  fontFamily: MONO_BOLD,
+                                  fontSize: 17,
+                                  color: tone,
+                                  fontVariant: ['tabular-nums'],
+                                }}
+                              >
+                                {r.pct}%
+                              </RNText>
+                            </View>
+                          </View>
+                          {/* ⚠ The bar is the VALUE; the colour is how it
+                              compares to everyone else in his position. */}
+                          <View
+                            style={{
+                              height: 6,
+                              borderRadius: theme.radii.pill,
+                              backgroundColor: withOpacity(theme.colors.mist, 0.9),
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: `${Math.max(2, Math.min(100, r.pct))}%`,
+                                height: 6,
+                                borderRadius: theme.radii.pill,
+                                backgroundColor: tone,
+                              }}
+                            />
+                          </View>
                         </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : null}
+                      );
+                    })}
 
-              {groups.map((g) => (
-                <View
-                  key={g.title}
-                  style={{
-                    marginBottom: 12,
-                    borderRadius: theme.radii.md,
-                    backgroundColor: withOpacity(theme.colors.slate, 0.06),
-                    overflow: 'hidden',
-                  }}
-                >
-                  {/* ⚠ THE HEADER IS A STRIP, NOT A LINE OF SMALL GREY TEXT.
-                      It was the same weight and nearly the same colour as the
-                      labels beneath it, so four sections read as one long list.
-                      A tinted band and a rule in the club's own colour give it
-                      somewhere to sit — and the tint is the shirt the player
-                      wears in the header above, so it is his section rather
-                      than a decoration chosen at random. */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 8,
-                      paddingHorizontal: 14,
-                      paddingVertical: 9,
-                      backgroundColor: withOpacity(tint, theme.mode === 'dark' ? 0.20 : 0.13),
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 3,
-                        height: 13,
-                        borderRadius: theme.radii.pill,
-                        backgroundColor: tint,
-                      }}
-                    />
-                    <RNText
-                      style={{
-                        fontFamily: fontFamilies.bold,
-                        fontSize: 11,
-                        letterSpacing: 0.9,
-                        textTransform: 'uppercase',
-                        color: theme.colors.ink,
-                      }}
-                    >
-                      {g.title}
-                    </RNText>
-                  </View>
-
-                  <View style={{ paddingHorizontal: 14 }}>
                     {g.rows.map((r, i) => {
-                      // ⚠⚠ A ZERO IS NOT THE SAME KIND OF FACT AS A NUMBER.
-                      // Most rows on most players are zero — a defender's
-                      // shots, a striker's tackles — so equal weight buries the
-                      // three that say something under a dozen that do not.
+                      // ⚠ A zero is quieter by WEIGHT, never by being fainter:
+                      // `slate` is only 5.56:1 on this card to begin with, so
+                      // there is no headroom to dim into.
                       const empty = statIsZero(r.value);
                       const [lead, ...rest] = r.value.split(' ');
                       return (
@@ -488,35 +433,16 @@ export function PlayerStatSheet({
                             flexDirection: 'row',
                             justifyContent: 'space-between',
                             alignItems: 'baseline',
-                            paddingVertical: 8,
-                            borderTopWidth: i === 0 ? 0 : 1,
-                            borderTopColor: withOpacity(theme.colors.slate, 0.12),
+                            paddingHorizontal: theme.spacing.lg,
+                            paddingVertical: 9,
+                            borderTopWidth: i === 0 && mine.length === 0 ? 0 : 1,
+                            borderTopColor: withOpacity(theme.colors.silver, 0.45),
                           }}
                         >
-                          <RNText
-                            style={{
-                              fontFamily: fontFamilies.regular,
-                              fontSize: 14,
-                              color: theme.colors.slate,
-                            }}
-                          >
+                          <Text variant="body" color="slate">
                             {r.label}
-                          </RNText>
+                          </Text>
                           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                            {/* The leading number is the fact; anything after
-                                it — "of 28", "on / 3" — is context, and reading
-                                as loudly as the number was half the noise. */}
-                            {/* ⚠⚠ THE ZERO IS QUIETER BY WEIGHT AND SIZE, NOT BY
-                                BEING FAINTER. Fading it was the obvious move and
-                                it does not work: `slate` is only 5.56:1 against
-                                this card to start with, so at 0.5 opacity a zero
-                                measures 2.08:1 and at 0.9 it is still 4.45:1 —
-                                under the floor for small text either way. There
-                                is no headroom to dim into. So a zero takes the
-                                LABEL's colour and weight, which says "no more
-                                important than the word beside it", while a real
-                                number is ink, bold and three points larger. Both
-                                stay legible; only one asks to be read. */}
                             <RNText
                               style={{
                                 fontFamily: empty ? MONO : MONO_BOLD,
@@ -532,7 +458,7 @@ export function PlayerStatSheet({
                                 style={{
                                   fontFamily: MONO,
                                   fontSize: 12,
-                                  color: withOpacity(theme.colors.slate, 0.8),
+                                  color: theme.colors.slate,
                                   fontVariant: ['tabular-nums'],
                                 }}
                               >
@@ -543,9 +469,10 @@ export function PlayerStatSheet({
                         </View>
                       );
                     })}
+                    <View style={{ height: theme.spacing.sm }} />
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </Animated.View>
         </Pressable>
