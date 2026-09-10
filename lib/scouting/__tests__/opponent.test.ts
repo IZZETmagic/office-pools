@@ -430,3 +430,28 @@ describe('the draw clause says what it means', () => {
     expect(read).not.toContain('draw')
   })
 })
+
+describe('the signature scoreline carries a rate, not a bare pair', () => {
+  it('withholds its percentage below the floor, like every other rate', () => {
+    // ⚠ THE PHONE MUST NOT OWN THIS DECISION. It renders a percentage where one
+    // exists and the fraction otherwise; if the share arrived as two loose
+    // counts, the phone would need its own copy of the floor to choose — and a
+    // second copy of a threshold is how two surfaces end up disagreeing.
+    const d = buildOpponentDossier(many(3, { predictedHome: 2, predictedAway: 1 }))
+    expect(d.fingerprint.signature?.share.pct).toBeNull()
+    expect(d.fingerprint.signature?.share).toMatchObject({ count: 3, of: 3 })
+  })
+
+  it('reports the share over every pick, not over the scorelines used', () => {
+    // 6 of 10 picks are 2–1. The denominator is the picks, not the number of
+    // DISTINCT scorelines, which would read 60% as "1 of 2".
+    const d = buildOpponentDossier([
+      ...many(6, { predictedHome: 2, predictedAway: 1 }),
+      ...many(4, { predictedHome: 3, predictedAway: 0 }),
+    ])
+    expect(d.fingerprint.signature).toMatchObject({
+      score: '2–1',
+      share: { count: 6, of: 10, pct: 60 },
+    })
+  })
+})

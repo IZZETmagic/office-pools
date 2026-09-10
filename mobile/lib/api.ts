@@ -1842,7 +1842,8 @@ export type ScoutBaseline = {
 };
 
 export type ScoutFingerprint = {
-  signature: { score: string; count: number; of: number } | null;
+  /** ⚠ `share` is a `ScoutRate` — the server owns the floor, not the phone. */
+  signature: { score: string; share: ScoutRate } | null;
   goalsPerPrediction: number | null;
   theirDrawRate: ScoutRate;
   theirHomeWinRate: ScoutRate;

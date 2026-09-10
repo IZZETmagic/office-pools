@@ -265,37 +265,65 @@ function Lean({
  * about arithmetic; "6%, and 25% of games end level" is a finding. Neither line
  * renders without both halves.
  */
+/**
+ * How full a goals bar is at its right-hand end.
+ *
+ * ⚠ A SCALE HAS TO BE CHOSEN AND STATED, because goals per game are not a
+ * percentage and have no natural 100%. Five is the top of the realistic range —
+ * a Premier League season runs about 2.8 and the highest-scoring member in the
+ * test pools predicts 3.4 — so at 5 the interesting band sits across the middle
+ * of the track rather than squashed into its first fifth.
+ *
+ * ⚠ AND IT IS CLAMPED. `league_predictions` permits 0–20 a side, so somebody
+ * who predicts 6–5 every week would otherwise draw a fill wider than its track.
+ */
+const GOALS_SCALE = 5;
+
 function FingerprintCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: boolean }) {
   const { fingerprint: f, baseline: b } = dossier;
-  const who = isSelf ? 'You predict' : 'They predict';
+  const who = isSelf ? 'you predict' : 'they predict';
 
   return (
     <Card title="Against reality">
       <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
         <Comparison
           label="Goals per prediction"
-          theirs={f.goalsPerPrediction === null ? null : `${f.goalsPerPrediction}`}
-          reality={b.goalsPerGame === null ? null : `${b.goalsPerGame} a game`}
+          theirs={f.goalsPerPrediction}
+          reality={b.goalsPerGame}
+          max={GOALS_SCALE}
+          format={(v) => `${v}`}
           who={who}
+          realityLabel={(v) => `league averages ${v}`}
         />
         <Comparison
           label="Predicts a draw"
-          theirs={pct(f.theirDrawRate)}
-          reality={b.drawRate.pct === null ? null : `${b.drawRate.pct}% end level`}
+          theirs={f.theirDrawRate.pct}
+          reality={b.drawRate.pct}
+          max={100}
+          format={(v) => `${v}%`}
           who={who}
+          realityLabel={(v) => `${v}% of games end level`}
         />
         <Comparison
           label="Predicts a home win"
-          theirs={pct(f.theirHomeWinRate)}
-          reality={b.homeWinRate.pct === null ? null : `${b.homeWinRate.pct}% actually are`}
+          theirs={f.theirHomeWinRate.pct}
+          reality={b.homeWinRate.pct}
+          max={100}
+          format={(v) => `${v}%`}
           who={who}
+          realityLabel={(v) => `${v}% actually are`}
         />
 
         {f.signature ? (
           <Row
             label="Signature scoreline"
             value={f.signature.score}
-            note={`${f.signature.count} of ${f.signature.of}`}
+            note={
+              f.signature.share.pct === null
+                ? fraction(f.signature.share)
+                : `${f.signature.share.pct}% of picks`
+            }
+            accent
           />
         ) : null}
 
@@ -309,53 +337,148 @@ function FingerprintCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf
   );
 }
 
-/** ⚠ NULL BELOW THE FLOOR — the fraction, never a percentage. */
-function pct(r: ScoutRate): string | null {
-  return r.pct === null ? null : `${r.pct}%`;
-}
-
+/**
+ * One tendency against what the league actually did.
+ *
+ * ## ⚠ THE TICK IS THE POINT OF THE ROW, NOT THE FILL
+ *
+ * The bar says how often they do it; the gold mark says how often it happens.
+ * The gap between them is the entire finding — "predicts a draw 6%" is a fact
+ * about arithmetic, and "6%, and the mark is over at 25%" is something you can
+ * act on. Neither half renders without the other.
+ *
+ * ⚠ BOTH VALUES ARE NUMBERS HERE, NOT PRE-FORMATTED STRINGS. They used to
+ * arrive formatted, which is why this card had no bars: a component handed
+ * "2.8 a game" cannot place a mark on a track. The formatting moved to the
+ * caller's `format`, and the caller also owns the SCALE — percentages run to
+ * 100 and goals do not.
+ *
+ * ⚠ EVERY VALUE IS THE SAME COLOUR, DELIBERATELY. Colouring the number by how
+ * far it sits from reality would be the screen telling somebody they are wrong,
+ * and under-calling the draw is a habit rather than a mistake. The bar and the
+ * mark already show the size of the gap; the colour does not need to score it.
+ */
 function Comparison({
   label,
   theirs,
   reality,
+  max,
+  format,
   who,
+  realityLabel,
 }: {
   label: string;
-  theirs: string | null;
-  reality: string | null;
+  theirs: number | null;
+  reality: number | null;
+  max: number;
+  format: (v: number) => string;
   who: string;
+  realityLabel: (v: number) => string;
 }) {
   const theme = useTheme();
+
   // ⚠ BOTH HALVES OR NEITHER. One number alone is not the finding this card
   // exists to make, and half a comparison reads as a claim it is not making.
   if (theirs === null || reality === null) return null;
 
+  const share = (v: number) => Math.max(0, Math.min(1, v / max));
+
   return (
     <View
       style={{
-        paddingVertical: 10,
+        paddingVertical: 12,
         borderTopWidth: 0.5,
         borderTopColor: withOpacity(theme.colors.mist, 0.6),
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
         <Text variant="body" style={{ flex: 1 }}>
           {label}
         </Text>
         <RNText
           style={{
             fontFamily: MONO_BOLD,
-            fontSize: 14,
+            fontSize: 16,
             color: theme.colors.primary,
             fontVariant: ['tabular-nums'],
           }}
         >
-          {theirs}
+          {format(theirs)}
         </RNText>
       </View>
-      <Text variant="detail" color="slate" style={{ marginTop: 3 }}>
-        {who} {theirs} · {reality}
-      </Text>
+
+      {/* ---- the track ------------------------------------------------ */}
+      <View
+        style={{
+          height: 6,
+          borderRadius: theme.radii.pill,
+          backgroundColor: withOpacity(theme.colors.slate, 0.18),
+          // ⚠ NOT `overflow: hidden`. The mark is TALLER than the track on
+          // purpose — it has to read as a line drawn across the bar rather than
+          // as a segment of it — and clipping would cut it back to 6pt.
+        }}
+      >
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            // ⚠ A PERCENTAGE STRING, NOT A MEASURED WIDTH. The row has no
+            // `onLayout` and needs none; Yoga resolves this against the track,
+            // which is already full-width.
+            width: `${share(theirs) * 100}%`,
+            borderRadius: theme.radii.pill,
+            backgroundColor: theme.colors.primary,
+          }}
+        />
+
+        {/* ⚠ THE MARK SITS ON TOP OF THE FILL, so it stays visible when the two
+            values are close — which is exactly when the row matters most. */}
+        <View
+          style={{
+            position: 'absolute',
+            left: `${share(reality) * 100}%`,
+            top: -4,
+            width: 3,
+            height: 14,
+            marginLeft: -1.5,
+            borderRadius: 1.5,
+            backgroundColor: theme.colors.accent,
+          }}
+        />
+      </View>
+
+      {/* ---- what the two ends mean ----------------------------------- */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginTop: 8,
+        }}
+      >
+        <Text variant="detail" color="slate" numberOfLines={1} style={{ flexShrink: 1 }}>
+          {who} {format(theirs)}
+        </Text>
+        {/* ⚠ THE SAME GOLD AS THE MARK, which is what ties the sentence to the
+            line on the track. Without the colour match it reads as a second,
+            unrelated caption. */}
+        <RNText
+          numberOfLines={1}
+          style={{
+            fontFamily: fontFamilies.bold,
+            fontSize: 11,
+            lineHeight: 15,
+            color: theme.colors.accent,
+            textAlign: 'right',
+            flexShrink: 0,
+          }}
+        >
+          {realityLabel(reality)}
+        </RNText>
+      </View>
     </View>
   );
 }
@@ -365,11 +488,14 @@ function Row({
   value,
   note,
   muted,
+  accent,
 }: {
   label: string;
   value: string;
   note?: string;
   muted?: boolean;
+  /** The signature scoreline — gold, because it is a finding rather than a total. */
+  accent?: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -386,21 +512,24 @@ function Row({
       <Text variant="body" style={{ flex: 1 }}>
         {label}
       </Text>
-      {note ? (
-        <Text variant="detail" color="slate">
-          {note}
-        </Text>
-      ) : null}
+      {/* ⚠ VALUE FIRST, THEN THE SHARE. The scoreline is the answer and the
+          share is its footnote; reading "4 of 20 · 1–2" puts the qualifier
+          before the thing it qualifies. */}
       <RNText
         style={{
           fontFamily: MONO_BOLD,
-          fontSize: 14,
-          color: muted ? theme.colors.slate : theme.colors.ink,
+          fontSize: 15,
+          color: accent ? theme.colors.accent : muted ? theme.colors.slate : theme.colors.ink,
           fontVariant: ['tabular-nums'],
         }}
       >
         {value}
       </RNText>
+      {note ? (
+        <Text variant="detail" color="slate">
+          {note}
+        </Text>
+      ) : null}
     </View>
   );
 }

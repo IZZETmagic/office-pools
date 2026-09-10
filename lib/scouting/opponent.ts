@@ -127,8 +127,15 @@ export type LeagueBaseline = {
 }
 
 export type Fingerprint = {
-  /** The scoreline they use most, written home–away. */
-  signature: { score: string; count: number; of: number } | null
+  /**
+   * The scoreline they use most, written home–away.
+   *
+   * ⚠ ITS SHARE IS A `Rate`, NOT A BARE COUNT PAIR. The phone renders a
+   * percentage wherever one exists and the fraction otherwise, and it must not
+   * carry its own copy of the floor to decide which — the gate travels with the
+   * answer, the same call `MIN_MEETINGS` makes on the head-to-head route.
+   */
+  signature: { score: string; share: Rate } | null
   /** Their goals per prediction, against what the league actually produced. */
   goalsPerPrediction: number | null
   theirDrawRate: Rate
@@ -301,7 +308,7 @@ export function buildOpponentDossier(
 
   const fingerprint: Fingerprint = {
     signature: topScore
-      ? { score: topScore[0].replace('-', '–'), count: topScore[1], of: ordered.length }
+      ? { score: topScore[0].replace('-', '–'), share: rate(topScore[1], ordered.length) }
       : null,
     goalsPerPrediction:
       ordered.length === 0 ? null : Math.round((predictedGoals / ordered.length) * 10) / 10,
