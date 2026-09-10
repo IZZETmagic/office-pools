@@ -305,9 +305,24 @@ async function readDossierContext(
 
     const { data: totals } = await admin
       .from('league_entry_totals')
-      .select('total_points, final_rank')
+      .select('total_points, duel_points, final_rank, previous_final_rank')
       .eq('entry_id', entryId)
       .maybeSingle()
+
+    /**
+     * How many people they are ranked AGAINST.
+     *
+     * ⚠ `retired_at` FILTERED, matching the league leaderboard's own count.
+     * "3rd of 12" against a denominator that counts members who left reads as a
+     * different, worse position than the board they just came from shows.
+     */
+    const { count: poolSize } = await admin
+      .from('pool_entries')
+      .select('entry_id', { count: 'exact', head: true })
+      .eq('pool_id', poolId)
+      .is('retired_at', null)
+
+    const duels = await readDuelRecord(admin, poolId, entryId, pool?.league_mode ?? null)
 
     // ⚠⚠ SEE THE HEADER. Not a display preference.
     const rankIsMeaningful = pool?.league_mode !== 'last_man_standing'
@@ -324,6 +339,15 @@ async function readDossierContext(
         ? {
             total_points: totals.total_points,
             rank: rankIsMeaningful ? totals.final_rank : null,
+            /**
+             * ⚠ THE PREVIOUS WEEKLY ACCURACY RANK, which is what `final_rank`
+             * is too — so the two are comparable and an arrow drawn between
+             * them describes a real movement. `duelRecord.ts` warns that the
+             * DUELS board is a third order again; nothing here mixes them.
+             */
+            previous_rank: rankIsMeaningful ? totals.previous_final_rank : null,
+            pool_size: poolSize ?? null,
+            duels,
           }
         : null,
     }
