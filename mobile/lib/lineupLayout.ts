@@ -103,14 +103,49 @@ export function surnameOf(name: string | null): string {
  */
 export const GK_DEPTH = 4;
 
+/**
+ * How big a player is on the pitch, and how far his furniture reaches.
+ *
+ * ⚠⚠ THESE LIVE HERE, NOT IN THE COMPONENT, BECAUSE THE SPACING DEPENDS ON
+ * THEM. Two facing strikers overlap or they do not, and that is decided by the
+ * pitch's length, the row depths AND the size of the things hanging off a
+ * circle. With the sizes in a `.tsx` no test could see them, and on 2026-09-09
+ * the front rows collided: the away striker's substitution minute landed on the
+ * home striker's name, and the name itself crossed the halfway line.
+ */
+export const CHIP = 48;
+/** How far a badge hangs outside the circle. */
+export const MARK = 17;
+
+/**
+ * The highest thing on a player: his substitution minute.
+ *
+ * ⚠ TRACED, NOT GUESSED — I added `MARK` twice on the first attempt and it
+ * cancels. From the player's centre: the circle top is CHIP/2; the arrow's
+ * wrapper sits 4 above that at `top: -4`; the wrapper is MARK tall so its
+ * BOTTOM is MARK lower again; and the minute is `bottom: MARK + 1` inside it,
+ * which puts its bottom edge 1 above the wrapper's top. So the two MARKs
+ * cancel and only the +1 and the line's own 12 survive.
+ */
+export const REACH_UP = CHIP / 2 + 4 + 1 + 12;
+/** The lowest: circle bottom, the gap, and the name label. */
+export const REACH_DOWN = CHIP / 2 + 3 + 11 * 1.32;
+
 /** Where the outfield rows begin and end, as percentages of the length. */
 export const OUTFIELD_FROM = 14;
 /**
- * ⚠ SHORT OF THE HALFWAY LINE, DELIBERATELY. A team's shape runs from its own
- * box to a little short of halfway; at 50% the front row would stand ON the
- * centre line, overlapping the eleven coming the other way.
+ * ⚠⚠ SHORT OF THE HALFWAY LINE, AND 44 RATHER THAN 46 BECAUSE 46 WAS NOT SHORT
+ * ENOUGH. A front row at 46% leaves 8% of the pitch between the two of them —
+ * 64pt — and two facing strikers need 100pt: 58 for the taller one's
+ * substitution minute and 42 for the other's name. They collided, and the name
+ * crossed the centre line as well, which needs 42pt of clear pitch on its own
+ * and had 32.
+ *
+ * At 44% the gap is 12% and the clearance 6%, which on a 170m pitch is 113pt
+ * and 56pt. `pitchGeometry` explains why the pitch got longer at the same time
+ * — pulling the row back alone would have cost the spacing between rows.
  */
-export const OUTFIELD_TO = 46;
+export const OUTFIELD_TO = 44;
 
 /**
  * The depth of every row, front to back, as percentages of the pitch length.

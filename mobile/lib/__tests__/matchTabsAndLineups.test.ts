@@ -14,7 +14,8 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { GK_DEPTH, OUTFIELD_FROM, OUTFIELD_TO, groupByRow, parseGrid, rowDepths, surnameOf } from '../lineupLayout';
+import { CHIP, GK_DEPTH, OUTFIELD_FROM, OUTFIELD_TO, REACH_DOWN, REACH_UP, groupByRow, parseGrid, rowDepths, surnameOf } from '../lineupLayout';
+import { BLEED, PITCH_L } from '../pitchGeometry';
 import {
   leadingSide,
   STAT_ROWS,
@@ -355,9 +356,12 @@ describe('rowDepths — how deep each row stands', () => {
   it('⚠ spends what the keeper gave back on the outfield', () => {
     const d = rowDepths(5, true);
     const gap = d[2] - d[1];
-    // The old even spread over the same pitch gave 9.2% between rows.
+    // The old even spread over the same pitch gave 9.2% between rows. The exact
+    // figure moves whenever OUTFIELD_TO does — it went 10.67 to 10.0 when the
+    // front row was pulled back — so the invariant is "better than the spread
+    // it replaced", not a number. What matters in POINTS is asserted below,
+    // against the pitch's real length.
     expect(gap).toBeGreaterThan(9.2);
-    expect(gap).toBeCloseTo(10.67, 1);
   });
 
   it('runs the outfield end to end, not slice-by-slice', () => {
@@ -402,5 +406,46 @@ describe('rowDepths — how deep each row stands', () => {
       const d = rowDepths(n, true);
       for (let i = 1; i < d.length; i++) expect(d[i]).toBeGreaterThan(d[i - 1]);
     }
+  });
+});
+
+describe('⚠⚠ the two front rows must not collide', () => {
+  // On 2026-09-09 they did: the away striker's substitution minute landed on
+  // the home striker's name, and the name crossed the halfway line as well.
+  // Nothing failed, because the numbers that decide it lived in three files —
+  // the pitch's length, the row depths, and the size of a player's badges.
+  // They are all in reach of this test now.
+  const SCREEN = 393;
+  const pitchPt = (SCREEN * PITCH_L) / 71; // the pitch itself, minus the bleed
+  const pct = (p: number) => (p / 100) * pitchPt;
+
+  it('two facing strikers clear each other', () => {
+    // The gap between them is whatever is left of the pitch once both front
+    // rows have taken their share.
+    const gap = pct(100 - 2 * OUTFIELD_TO);
+    const needed = REACH_UP + REACH_DOWN;
+    expect(gap, `${gap.toFixed(0)}pt between them, ${needed.toFixed(0)}pt needed`).toBeGreaterThan(
+      needed,
+    );
+  });
+
+  it('a striker’s name does not cross the halfway line', () => {
+    const toHalfway = pct(50 - OUTFIELD_TO);
+    expect(toHalfway).toBeGreaterThan(REACH_DOWN);
+  });
+
+  it('consecutive rows clear each other', () => {
+    const depths = rowDepths(5, true);
+    const gap = pct(depths[2] - depths[1]);
+    expect(gap).toBeGreaterThan(CHIP / 2 + REACH_DOWN);
+  });
+
+  it('⚠ the keeper’s badge stays on the pitch', () => {
+    // He is pinned nearest his own goal line, so he is the one the top edge can
+    // clip. Measured from the top of the DRAWING, which includes the bleed.
+    const centreFromTop = ((BLEED + (GK_DEPTH / 100) * PITCH_L) * SCREEN) / 71;
+    expect(centreFromTop, `keeper sits ${centreFromTop.toFixed(0)}pt down`).toBeGreaterThan(
+      REACH_UP,
+    );
   });
 });

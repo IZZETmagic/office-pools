@@ -2,6 +2,7 @@ import { Text as RNText, View } from 'react-native';
 
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
 import { Icon } from '@/components/ui';
+import { MARK } from '@/lib/lineupLayout';
 import { radii } from '@/theme';
 import { formatRating, ratingScaleColor, type PlayerMarkers } from '@/lib/playerStats';
 
@@ -49,8 +50,9 @@ import { formatRating, ratingScaleColor, type PlayerMarkers } from '@/lib/player
 // the information arrives before or after you have decided to look.
 // =============================================================
 
-/** How far a badge hangs outside the circle. */
-export const MARK = 17;
+// ⚠ Re-exported rather than declared: the spacing maths in `lineupLayout`
+// needs this number too, and two copies would drift.
+export { MARK } from '@/lib/lineupLayout';
 
 /**
  * The six anchors. `chip` is the circle's diameter, passed in because the

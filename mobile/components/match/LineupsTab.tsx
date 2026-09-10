@@ -14,7 +14,7 @@ import {
 } from '@/components/match/PitchMarkings';
 import { Text } from '@/components/ui';
 import { fixturePalette } from '@/lib/design/clubColors';
-import { groupByRow, rowDepths, surnameOf } from '@/lib/lineupLayout';
+import { CHIP, groupByRow, rowDepths, surnameOf } from '@/lib/lineupLayout';
 import {
   formatRating,
   indexByPlayerId,
@@ -61,16 +61,10 @@ import { fontFamilies, radii, useTheme, withOpacity } from '@/theme';
 // =============================================================
 
 /** The shirt. Big enough to read a number in, small enough for five across. */
-// ⚠ 52, NOT 38, AND THE MARKERS ARE WHY. A rating badge alone was already
-// tight on a 38pt circle; ringing a player with a goal, a card, an armband and
-// a substitution arrow needs about 52 — which needs ~72pt of column, which is
-// what edge to edge provides in a five-man row (79pt) and the card did not
-// (71pt). The size, the markers and the full-bleed pitch are one decision.
-// ⚠ 48 IS THE GEOMETRY, NOT A PREFERENCE. Rows sit 65.7pt apart on a
-// 714pt edge-to-edge pitch (BAND 46% over five rows). A 48pt circle plus a 3pt
-// gap plus an 11pt label ends 41.5pt below its own centre, and the next row's
-// circle starts at 41.7pt. 52 overlaps by 5pt and puts a name across a face.
-const CHIP = 48;
+// ⚠ CHIP AND THE ROW DEPTHS LIVE TOGETHER IN `lineupLayout`, because whether
+// two facing strikers overlap depends on both and no test could see a size
+// declared in a component. 48 is itself geometry: rows sit 94pt apart, and a
+// 48pt circle plus a 3pt gap plus an 11pt label ends 42pt below its own centre.
 /** How wide a name may run before it truncates — five of these across 68m. */
 // ⚠⚠ THE LABEL TAKES ITS OWN COLUMN, WHICH IS WHY THERE IS NO `NAME_W` ANY
 // MORE. A fixed 62pt was narrower than every column on the pitch — even the
