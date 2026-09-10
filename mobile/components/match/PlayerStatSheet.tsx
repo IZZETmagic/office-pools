@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   Animated,
   Easing,
@@ -13,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
+import { Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 import {
   formatRating,
@@ -114,85 +116,143 @@ export function PlayerStatSheet({
               backgroundColor: theme.colors.surface,
               borderTopLeftRadius: theme.radii.lg,
               borderTopRightRadius: theme.radii.lg,
+              // ⚠ SO THE BAND REACHES THE ROUNDED CORNERS. The header runs
+              // edge to edge and right to the top of the sheet; without this it
+              // would square them off.
+              overflow: 'hidden',
               paddingBottom: insets.bottom + 16,
               transform: [
                 { translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
               ],
             }}
           >
-            {/* Grab handle — decorative here, but its absence reads as a bug. */}
-            <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
-              <View
-                style={{
-                  width: 36,
-                  height: 4,
-                  borderRadius: theme.radii.pill,
-                  backgroundColor: withOpacity(theme.colors.slate, 0.3),
-                }}
-              />
-            </View>
-
-            {/* ---- who: a header SECTION, not a row -------------------- */}
-            {/* ⚠ A WASH OF THE CLUB'S OWN COLOUR, not a slab of it. `tint` is
-                the shirt colour the player wears on the pitch above, so the
-                sheet is visibly his side's without becoming a second surface
-                competing with the numbers underneath. It also does the job a
-                divider would, which is why there is no border here. */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 14,
-                paddingHorizontal: 20,
-                paddingTop: 10,
-                paddingBottom: 16,
-                marginBottom: 16,
-                backgroundColor: withOpacity(tint, theme.mode === 'dark' ? 0.22 : 0.12),
-              }}
+            {/* ---- who ---------------------------------------------- */}
+            {/* ⚠ NO GRAB HANDLE. It suggested a drag this sheet never
+                supported — it opens and closes, it does not snap — and the X
+                below says the same thing without implying a gesture that does
+                nothing. Tapping the backdrop still works. */}
+            <LinearGradient
+              colors={[
+                withOpacity(tint, theme.mode === 'dark' ? 0.38 : 0.24),
+                withOpacity(tint, 0),
+              ]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={{ paddingTop: 22, paddingBottom: 20, paddingHorizontal: 20 }}
             >
-              <View
-                style={{
-                  width: 60,
-                  height: 60,
+              <Pressable
+                onPress={onClose}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                style={({ pressed }) => ({
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  width: 32,
+                  height: 32,
                   borderRadius: theme.radii.pill,
+                  backgroundColor: withOpacity(theme.colors.ink, 0.08),
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: tint,
-                  overflow: 'hidden',
-                }}
+                  opacity: pressed ? 0.6 : 1,
+                  zIndex: 2,
+                })}
               >
-                {/* ⚠ THE FALLBACK IS THE POSITION LETTER, NOT THE NUMBER — the
-                    same correction the pitch needed. The number used to sit
-                    here purely as the photograph's fallback, and since every
-                    player has a photograph it was covered on every one of them:
-                    rendered, then hidden. It is beside the name now. */}
-                <RNText
-                  style={{ fontFamily: MONO, fontSize: 20, color: 'rgba(255,255,255,0.9)' }}
-                >
-                  {stat.position ?? '·'}
-                </RNText>
-                {photo ? (
-                  <Image
-                    source={{ uri: photo }}
-                    style={{ position: 'absolute', width: 60, height: 60 }}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    // Decorative: his name is directly beside it.
-                    alt=""
-                  />
-                ) : null}
-              </View>
+                <Icon name="xmark" size={12} tint={theme.colors.ink} weight="semibold" />
+              </Pressable>
 
-              <View style={{ flex: 1, gap: 2 }}>
-                {/* ⚠ NUMBER THEN NAME, the same order the pitch label uses.
-                    Two places naming the same player should read the same way
-                    round. */}
+              <View style={{ alignItems: 'center', gap: 3 }}>
+                <View style={{ marginBottom: 10 }}>
+                  {/* ⚠ THE GLOW IS A SHADOW ON A CIRCLE, the same trick
+                      `CountdownHero` uses: a coloured shadow at zero offset with
+                      a wide radius reads as light coming off the thing. There is
+                      no radial gradient in React Native to do it properly. */}
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      top: -10,
+                      left: -10,
+                      width: 100,
+                      height: 100,
+                      borderRadius: theme.radii.pill,
+                      backgroundColor: withOpacity(tint, 0.35),
+                      shadowColor: tint,
+                      shadowOpacity: 0.7,
+                      shadowRadius: 22,
+                      shadowOffset: { width: 0, height: 0 },
+                      elevation: 12,
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: theme.radii.pill,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: tint,
+                      borderWidth: 2,
+                      borderColor: withOpacity(theme.colors.surface, 0.9),
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* The position letter is the photograph's fallback — the
+                        number lives under the name, as it does on the pitch. */}
+                    <RNText
+                      style={{ fontFamily: MONO, fontSize: 26, color: 'rgba(255,255,255,0.9)' }}
+                    >
+                      {stat.position ?? '·'}
+                    </RNText>
+                    {photo ? (
+                      <Image
+                        source={{ uri: photo }}
+                        style={{ position: 'absolute', width: 80, height: 80 }}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        alt=""
+                      />
+                    ) : null}
+                  </View>
+
+                  {/* ⚠ ON THE PHOTOGRAPH'S TOP-RIGHT CORNER, exactly where it
+                      sits on the pitch. The same badge in the same place on the
+                      same face is one thing to learn, not two. */}
+                  {rating && colour ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: -4,
+                        right: -12,
+                        minWidth: 44,
+                        paddingHorizontal: 9,
+                        paddingVertical: 5,
+                        borderRadius: theme.radii.pill,
+                        backgroundColor: colour,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <RNText
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: 17,
+                          color: '#FFFFFF',
+                          fontVariant: ['tabular-nums'],
+                        }}
+                      >
+                        {rating}
+                      </RNText>
+                    </View>
+                  ) : null}
+                </View>
+
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
                   {stat.shirtNumber !== null ? (
                     <RNText
                       style={{
                         fontFamily: MONO,
-                        fontSize: 15,
+                        fontSize: 16,
                         color: theme.colors.slate,
                         fontVariant: ['tabular-nums'],
                       }}
@@ -202,20 +262,15 @@ export function PlayerStatSheet({
                   ) : null}
                   <RNText
                     numberOfLines={1}
-                    style={{
-                      fontFamily: fontFamilies.bold,
-                      fontSize: 19,
-                      color: theme.colors.ink,
-                      flexShrink: 1,
-                    }}
+                    style={{ fontFamily: fontFamilies.bold, fontSize: 21, color: theme.colors.ink }}
                   >
                     {stat.playerName}
                   </RNText>
                   {stat.isCaptain ? (
                     <View
                       style={{
-                        width: 15,
-                        height: 15,
+                        width: 16,
+                        height: 16,
                         borderRadius: theme.radii.pill,
                         backgroundColor: theme.colors.ink,
                         alignItems: 'center',
@@ -232,7 +287,6 @@ export function PlayerStatSheet({
                 </View>
 
                 <RNText
-                  numberOfLines={1}
                   style={{
                     fontFamily: fontFamilies.semibold,
                     fontSize: 13,
@@ -244,7 +298,6 @@ export function PlayerStatSheet({
 
                 {headline.length > 0 ? (
                   <RNText
-                    numberOfLines={1}
                     style={{
                       fontFamily: fontFamilies.regular,
                       fontSize: 12,
@@ -255,34 +308,7 @@ export function PlayerStatSheet({
                   </RNText>
                 ) : null}
               </View>
-
-              {/* ⚠ The rating is absent, not zero, when the provider gave none —
-                  an unused substitute has no afternoon to rate. */}
-              {rating && colour ? (
-                <View
-                  style={{
-                    minWidth: 52,
-                    paddingHorizontal: 10,
-                    paddingVertical: 7,
-                    borderRadius: theme.radii.pill,
-                    backgroundColor: colour,
-                    alignItems: 'center',
-                  }}
-                >
-                  {/* ⚠ NOT BOLD — the ramp carries the emphasis. */}
-                  <RNText
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: 19,
-                      color: '#FFFFFF',
-                      fontVariant: ['tabular-nums'],
-                    }}
-                  >
-                    {rating}
-                  </RNText>
-                </View>
-              ) : null}
-            </View>
+            </LinearGradient>
 
             {/* ---- the numbers ---------------------------------------- */}
             <ScrollView
@@ -292,7 +318,7 @@ export function PlayerStatSheet({
               // therefore what scrolls. Without the explicit shrink it holds its
               // full content height and pushes the rest off the screen.
               style={{ flexShrink: 1 }}
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 8 }}
               // ⚠ SHOWN, NOT HIDDEN. Ryan could not tell the sheet scrolled —
               // and while the real fault was that it did not, a long list with
               // no indicator gives a reader nothing to go on either way.
