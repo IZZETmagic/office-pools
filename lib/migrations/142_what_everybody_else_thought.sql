@@ -55,11 +55,20 @@
 
 BEGIN;
 
+-- ⚠ DROP FIRST BECAUSE THE RETURN TYPE CHANGED. `CREATE OR REPLACE` cannot
+-- widen a function's OUT columns — Postgres raises 42P13 "cannot change return
+-- type of existing function". This migration was extended with the three-way
+-- split before it was ever applied, so on a clean database the DROP is a no-op;
+-- it is here so that a database which DID get the earlier shape can still take
+-- this one rather than failing halfway through the transaction.
+DROP FUNCTION IF EXISTS public.league_crowd_majority(uuid[]);
+
 -- Fewest predictions before a fixture has a crowd opinion worth reporting.
 -- ⚠ It is a FLOOR ON THE FIXTURE, not on the winning side: twenty picks split
 -- 8/7/5 is a real, reportable split; three picks split 2/1/0 is not a crowd.
 CREATE OR REPLACE FUNCTION public.league_crowd_majority(p_fixture_ids uuid[])
-RETURNS TABLE (fixture_id uuid, majority text, picks integer)
+RETURNS TABLE (fixture_id uuid, majority text, picks integer,
+               home_picks integer, draw_picks integer, away_picks integer)
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
@@ -113,8 +122,22 @@ AS $$
     r.fixture_id,
     -- 'draw' becomes NULL at the boundary, once, here. See the header.
     nullif(r.call, 'draw') AS majority,
-    r.total::integer       AS picks
+    r.total::integer       AS picks,
+    -- ⚠ THE FULL SPLIT, NOT JUST THE WINNER. The contrarian index needs only
+    -- the majority, but the fixture scout card draws the three-way bar — and
+    -- computing that from a second scan of the same rows is two functions that
+    -- can disagree about which matchweeks had locked when they ran.
+    --
+    -- ⚠ COUNTS, NOT PERCENTAGES. Rounding three shares to whole numbers lets
+    -- them total 99 or 101, which `useDuel` already carries a note about. The
+    -- caller divides by `picks` and owns its own rounding.
+    coalesce(h.n, 0)::integer AS home_picks,
+    coalesce(d.n, 0)::integer AS draw_picks,
+    coalesce(a.n, 0)::integer AS away_picks
     FROM ranked r
+    LEFT JOIN tally h ON h.fixture_id = r.fixture_id AND h.call = 'home'
+    LEFT JOIN tally d ON d.fixture_id = r.fixture_id AND d.call = 'draw'
+    LEFT JOIN tally a ON a.fixture_id = r.fixture_id AND a.call = 'away'
    WHERE r.seat = 1;
 $$;
 
@@ -123,7 +146,9 @@ COMMENT ON FUNCTION public.league_crowd_majority(uuid[]) IS
   'SECURITY DEFINER because league_predictions is deny-all to authenticated. '
   'Takes NO pool: a pool-scoped crowd figure leaks that pool''s picks through an '
   'aggregate. Counts only matchweeks whose lock_at has passed. A NULL majority '
-  'means the crowd picked a DRAW; a fixture with no crowd answer is absent.';
+  'means the crowd picked a DRAW; a fixture with no crowd answer is absent. '
+  'Returns the full three-way split as COUNTS so the caller owns its rounding — '
+  'three percentages rounded independently total 99 or 101.';
 
 -- ⚠ `authenticated` MAY EXECUTE IT, which is safe for the two reasons above and
 -- only those two: the answer names no member, and it covers only picks that are

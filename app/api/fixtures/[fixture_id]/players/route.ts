@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
 import { scoutSide, type SideScout } from '@/lib/scouting/players'
 import { readClubPlayerForm } from '@/lib/scouting/readPlayers'
+import { readCrowdSplit, type CrowdSplit } from '@/lib/scouting/readOpponent'
 
 // =============================================================
 // /api/fixtures/:fixture_id/players — who is actually playing well
@@ -89,16 +90,47 @@ async function handler(
   }
 
   /**
+   * How the whole platform called this fixture.
+   *
+   * ⚠⚠ PLATFORM-WIDE AND ANONYMOUS. NEVER THIS VIEWER'S POOL.
+   * `league_crowd_majority` takes no pool argument precisely so that this cannot
+   * be narrowed by accident: a crowd figure scoped to one pool leaks that pool's
+   * picks through the back door of an aggregate, and in a six-member pool an
+   * aggregate is not an aggregate. Platform-wide is safe on the opposite
+   * ground — n is large and nobody in it is identifiable.
+   *
+   * ⚠ AND IT ONLY COVERS LOCKED MATCHWEEKS, which the function enforces. For a
+   * fixture in the open week this is simply absent, which is correct: those
+   * picks are live and nobody may see them, including in aggregate.
+   *
+   * ⚠ BEST-EFFORT. Migration 142 must be applied before this deploys; without
+   * it the crowd bar is absent and every other card still renders.
+   */
+  let crowd: CrowdSplit | null = null
+  try {
+    crowd = (await readCrowdSplit(admin, [fixture_id])).get(fixture_id) ?? null
+  } catch (e) {
+    console.error('[players] crowd unavailable —', (e as Error).message)
+  }
+
+  /**
    * ⚠ THE GATE TRAVELS WITH THE ANSWER, the same way `MIN_MEETINGS` does on the
    * head-to-head route. The phone must not carry its own copy of "is there
    * enough here to show a card", or the two surfaces disagree the day either
-   * threshold moves. A fixture early in a season has stats for nobody, and an
-   * empty card teaches people to stop tapping.
+   * threshold moves.
+   *
+   * ⚠⚠ IT COVERS THE CROWD TOO, AND THAT ORDERING IS THE POINT. This was
+   * computed above the crowd read at first and meant player form alone, which
+   * hid the crowd bar for exactly the fixtures that have one and no rated
+   * players — every fixture in August, when a season's picks are at their most
+   * interesting and nobody has 180 minutes yet. One flag, computed last, over
+   * everything this route can actually return.
    */
-  const enough = home.inForm.length > 0 || away.inForm.length > 0
+  const enough = home.inForm.length > 0 || away.inForm.length > 0 || crowd !== null
 
   return NextResponse.json({
     enough,
+    crowd,
     home: { club: fixture.home, scout: home },
     away: { club: fixture.away, scout: away },
   })

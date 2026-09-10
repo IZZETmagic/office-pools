@@ -1931,8 +1931,32 @@ export type SideScout = {
   consideredPlayers: number;
 };
 
+/**
+ * How the whole platform called this fixture, as COUNTS.
+ *
+ * ⚠⚠ PLATFORM-WIDE, NEVER YOUR POOL. A pool-scoped crowd figure leaks that
+ * pool's picks through an aggregate; the server function takes no pool argument
+ * so the phone cannot narrow it either.
+ *
+ * ⚠ NULL FOR A FIXTURE IN THE OPEN MATCHWEEK — those picks are live and nobody
+ * may see them, in aggregate or otherwise. Null is also what a missing migration
+ * 142 looks like, and both mean "draw no bar".
+ *
+ * ⚠ COUNTS, NOT PERCENTAGES. Round three shares independently and they total 99
+ * or 101; `useDuel` carries the same note about its own bar.
+ */
+export type CrowdSplit = {
+  fixtureId: string;
+  picks: number;
+  home: number;
+  draw: number;
+  away: number;
+  majority: 'home' | 'away' | null;
+};
+
 export type FixturePlayersResponse = {
   enough: boolean;
+  crowd: CrowdSplit | null;
   home: { club: { club_id: string; name: string; abbreviation: string }; scout: SideScout };
   away: { club: { club_id: string; name: string; abbreviation: string }; scout: SideScout };
 };

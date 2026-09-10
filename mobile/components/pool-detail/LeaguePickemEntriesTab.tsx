@@ -148,13 +148,40 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
            your own face on it, not by a label above it and not by a tint. One
            heading on the screen, and it belongs to the list that needs one. */
         mine.map((entry) => (
-          <EntryCard
-            key={entry.entry_id}
-            entry={entry}
-            openable
-            chip={own}
-            onPress={() => open(entry)}
-          />
+          <View key={entry.entry_id} style={{ gap: theme.spacing.sm }}>
+            <EntryCard entry={entry} openable chip={own} onPress={() => open(entry)} />
+
+            {/*
+              ⚠ YOUR OWN DOSSIER, AND ONLY YOUR OWN FROM HERE.
+
+              Self-scouting is the one layer that is unambiguously free: it is
+              your own data, and putting it behind anything would be charging a
+              member to look at what they already did. Scouting somebody ELSE is
+              reachable from the duel, where both sides can see each other —
+              wiring it to every row on this list would quietly answer the
+              paywall question, which is Ryan's to answer and is still open.
+
+              ⚠ IT READS THE SAME ENGINE POINTED INWARD. There is no second
+              summariser and no second route; `is_self` only changes the copy.
+            */}
+            <Pressable
+              onPress={() => router.push(`/pool/${poolId}/scout/${entry.entry_id}` as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Scout your own season"
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+                paddingVertical: theme.spacing.xs,
+              }}
+            >
+              <Icon name="binoculars" color="primary" size={14} />
+              <Text variant="body" style={{ color: theme.colors.primary, fontFamily: fontFamilies.bold }}>
+                Scout your season
+              </Text>
+              <Icon name="chevron.right" color="primary" size={12} />
+            </Pressable>
+          </View>
         ))
       )}
 

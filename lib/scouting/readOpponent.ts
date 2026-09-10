@@ -220,3 +220,58 @@ export async function readCrowdMajority(
   }
   return out
 }
+
+/** The three-way split behind one fixture, as COUNTS. */
+export type CrowdSplit = {
+  fixtureId: string
+  picks: number
+  home: number
+  draw: number
+  away: number
+  majority: 'home' | 'away' | null
+}
+
+/**
+ * How the platform called one fixture, in full.
+ *
+ * ⚠ THE SAME FUNCTION AS `readCrowdMajority`, ON PURPOSE. Both read
+ * `league_crowd_majority`, which decides in one place which matchweeks have
+ * locked. A second query shaped "just for the bar" could scan a different set —
+ * the two would disagree about a matchweek that locked between them, and the
+ * disagreement would be a leak rather than a rounding error.
+ *
+ * ⚠ COUNTS, NOT PERCENTAGES. Three shares rounded independently total 99 or
+ * 101; the caller divides and owns the rounding.
+ */
+export async function readCrowdSplit(
+  admin: Admin,
+  fixtureIds: string[],
+): Promise<Map<string, CrowdSplit>> {
+  const out = new Map<string, CrowdSplit>()
+  if (fixtureIds.length === 0) return out
+
+  const { data, error } = await admin.rpc('league_crowd_majority', {
+    p_fixture_ids: fixtureIds,
+  })
+
+  if (error) throw new Error(`readCrowdSplit: ${error.message}`)
+
+  for (const r of (data ?? []) as {
+    fixture_id: string
+    majority: string | null
+    picks: number
+    home_picks: number
+    draw_picks: number
+    away_picks: number
+  }[]) {
+    out.set(r.fixture_id, {
+      fixtureId: r.fixture_id,
+      picks: r.picks,
+      home: r.home_picks,
+      draw: r.draw_picks,
+      away: r.away_picks,
+      majority: r.majority === 'home' || r.majority === 'away' ? r.majority : null,
+    })
+  }
+  return out
+}

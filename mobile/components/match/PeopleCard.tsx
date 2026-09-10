@@ -2,7 +2,7 @@ import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
-import type { FixturePlayersResponse, PlayerForm, SideScout } from '@/lib/api';
+import type { CrowdSplit, FixturePlayersResponse, PlayerForm, SideScout } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -30,13 +30,35 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // =============================================================
 
 export function PeopleCard({ players }: { players: FixturePlayersResponse }) {
-  const { home, away } = players;
+  const { home, away, crowd } = players;
+  const anyRated =
+    home.scout.inForm.length > 0 ||
+    away.scout.inForm.length > 0 ||
+    home.scout.dangerMen.length > 0 ||
+    away.scout.dangerMen.length > 0;
 
   return (
     <View style={{ gap: 16 }}>
-      <SideCard title={home.club.name} scout={home.scout} />
-      <SideCard title={away.club.name} scout={away.scout} />
+      {crowd ? (
+        <CrowdCard crowd={crowd} homeName={home.club.name} awayName={away.club.name} />
+      ) : null}
 
+      {/*
+        ⚠ THE SIDE CARDS ARE SKIPPED ENTIRELY WHEN NEITHER CLUB HAS A RATED
+        PLAYER, rather than each printing "nobody rated yet". In August that is
+        both of them, and two identical apologies stacked under a crowd bar read
+        as a broken screen. One club rated and the other not IS worth saying —
+        that is a fact about the two squads — so the empty state lives on the
+        card rather than here.
+      */}
+      {anyRated ? (
+        <>
+          <SideCard title={home.club.name} scout={home.scout} />
+          <SideCard title={away.club.name} scout={away.scout} />
+        </>
+      ) : null}
+
+      {anyRated ? (
       <View style={{ marginHorizontal: 20, gap: 2 }}>
         <Text variant="detail" color="slate">
           Form over each club&apos;s last ten completed fixtures
@@ -47,6 +69,91 @@ export function PeopleCard({ players }: { players: FixturePlayersResponse }) {
           Ratings need 180 minutes played · goals from the match timeline
         </Text>
       </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * How the whole platform called this fixture.
+ *
+ * ⚠⚠ THE SCOPE IS STATED ON THE CARD, NOT JUST IN THE CODE. A member seeing a
+ * split beside a fixture will assume it is their pool unless told otherwise,
+ * and their pool is exactly what it must never be — picks reveal per matchweek
+ * and the Showdown draw is sealed. The line at the foot is load-bearing.
+ */
+function CrowdCard({
+  crowd,
+  homeName,
+  awayName,
+}: {
+  crowd: CrowdSplit;
+  homeName: string;
+  awayName: string;
+}) {
+  const theme = useTheme();
+
+  // ⚠ THE SERVER SENDS COUNTS AND THE DIVISION HAPPENS ONCE, HERE. Rounding
+  // three shares independently lets them total 99 or 101 and leaves a gap in
+  // the bar; the flex values below are the raw counts, so the bar is exact
+  // whatever the labels round to.
+  const total = Math.max(1, crowd.picks);
+  const asPct = (n: number) => Math.round((n / total) * 100);
+
+  return (
+    <View
+      style={{
+        marginHorizontal: 20,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.radii.lg,
+        ...theme.shadows.card,
+        overflow: 'hidden',
+      }}
+    >
+      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
+        <Text variant="cardTitle">How SportPool called it</Text>
+      </View>
+
+      <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
+        <View style={{ flexDirection: 'row', height: 26, borderRadius: theme.radii.xs, overflow: 'hidden' }}>
+          <Bar flex={crowd.home} color={theme.colors.primary} label={`${asPct(crowd.home)}%`} />
+          <Bar flex={crowd.draw} color={theme.colors.silver} label={`${asPct(crowd.draw)}%`} />
+          <Bar flex={crowd.away} color={theme.colors.accent} label={`${asPct(crowd.away)}%`} />
+        </View>
+
+        <View style={{ flexDirection: 'row', marginTop: 10, gap: 16 }}>
+          <Key color={theme.colors.primary} label={homeName} />
+          <Key color={theme.colors.silver} label="Draw" />
+          <Key color={theme.colors.accent} label={awayName} />
+        </View>
+
+        <Text variant="detail" color="slate" style={{ marginTop: 12 }}>
+          {crowd.picks} picks across every pool on SportPool — never your own pool,
+          and only from matchweeks that have already locked.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function Bar({ flex, color, label }: { flex: number; color: string; label: string }) {
+  // ⚠ A ZERO-WIDTH SEGMENT MUST NOT RENDER ITS LABEL. `flex: 0` collapses the
+  // view but the text inside would still try to lay out and can escape it.
+  if (flex <= 0) return null;
+  return (
+    <View style={{ flex, alignItems: 'center', justifyContent: 'center', backgroundColor: color }}>
+      <RNText style={{ fontFamily: MONO_BOLD, fontSize: 11, color: '#0B0F1A' }}>{label}</RNText>
+    </View>
+  );
+}
+
+function Key({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+      <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: color }} />
+      <Text variant="detail" color="slate" numberOfLines={1}>
+        {label}
+      </Text>
     </View>
   );
 }
