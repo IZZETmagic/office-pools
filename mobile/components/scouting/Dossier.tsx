@@ -2,7 +2,8 @@ import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
-import type { OpponentDossier, ScoutClubLean, ScoutRate } from '@/lib/api';
+import type { DossierResponse, OpponentDossier, ScoutClubLean, ScoutRate } from '@/lib/api';
+import { StandingCard } from './StandingCard';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -42,14 +43,21 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
  * is the surface it was written for. Nothing on this screen renders it.
  */
 export function Dossier({
+  data,
   dossier,
   isSelf = false,
 }: {
+  /** The whole response — `StandingCard` needs the pool and the standing. */
+  data: DossierResponse;
   dossier: OpponentDossier;
   isSelf?: boolean;
 }) {
   return (
     <View style={{ gap: 16 }}>
+      {/* ⚠ FIRST, BEFORE ANY TENDENCY. Where somebody sits and how their last
+          few duels went is what you want before how they pick — the rest of
+          this report is detail underneath it. Ryan, 2026-09-10. */}
+      <StandingCard data={data} />
       <AccuracyCard dossier={dossier} />
       {dossier.form.length > 0 ? <FormCard form={dossier.form} /> : null}
       <ClubBiasCard dossier={dossier} isSelf={isSelf} />

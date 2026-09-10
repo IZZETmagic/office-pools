@@ -254,7 +254,7 @@ export function DossierSheet({
                 </RNText>
               </Pressable>
             ) : data ? (
-              <Dossier dossier={data.dossier} isSelf={data.is_self} />
+              <Dossier data={data} dossier={data.dossier} isSelf={data.is_self} />
             ) : null}
           </ScrollView>
         </Animated.View>

@@ -1878,6 +1878,27 @@ export type OpponentDossier = {
   read: string;
 };
 
+/**
+ * A member's duel record.
+ *
+ * ⚠⚠ THE PHONE NEVER RECOMPUTES ANY OF THIS. A duel has been worth 500/250/0
+ * since migration 121 and reading that scale as a literal is this codebase's
+ * most repeated bug — three sites have carried `=== 3` at various points. The
+ * server calls `buildDuelRecords`, which owns the arithmetic; these are its
+ * answers, to be displayed and not checked.
+ */
+export type ScoutDuelRecord = {
+  won: number;
+  tied: number;
+  lost: number;
+  /** ⚠ A bye is `entry_b IS NULL`, never a points value — `DUEL_BYE` and
+   *  `DUEL_TIE` are both 250, so a bye counted by value looks like a draw. */
+  byes: number;
+  duel_points: number;
+  /** ⚠ OLDEST FIRST, ordered by when each settled — never by matchweek number. */
+  form: ('won' | 'tied' | 'lost' | 'bye')[];
+};
+
 export type DossierResponse = {
   entry_id: string;
   entry_name: string;
@@ -1894,7 +1915,17 @@ export type DossierResponse = {
    * in a survival pool. The server withholds it; the phone must not go looking
    * for it somewhere else.
    */
-  standing: { total_points: number; rank: number | null } | null;
+  standing: {
+    total_points: number;
+    rank: number | null;
+    /** The weekly accuracy rank a week ago — comparable to `rank`, so an arrow
+     *  between them describes a real movement. ⚠ NOT the duels board's order. */
+    previous_rank: number | null;
+    /** ⚠ `retired_at` filtered, matching the leaderboard's own count. */
+    pool_size: number | null;
+    /** ⚠ NULL OUTSIDE SHOWDOWN — no duels at all is not a record of zeroes. */
+    duels: ScoutDuelRecord | null;
+  } | null;
   dossier: OpponentDossier;
 };
 

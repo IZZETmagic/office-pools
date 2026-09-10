@@ -5,6 +5,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
 import { buildOpponentDossier } from '@/lib/scouting/opponent'
 import { readCrowdMajority, readOpponentPicks } from '@/lib/scouting/readOpponent'
+import { buildDuelRecords } from '@/lib/league/duelRecord'
+import { readPoolDuels } from '@/lib/league/duels'
 
 // =============================================================
 // /api/pools/:pool_id/entries/:entry_id/dossier — the opponent scout report
@@ -190,6 +192,54 @@ async function handler(
     is_self: subject.user_id === userData.user_id,
     dossier,
   })
+}
+
+/**
+ * This entry's duel record — W/T/L, byes, duel points and the form strip.
+ *
+ * ## ⚠⚠ `buildDuelRecords` DOES THE ARITHMETIC. NOTHING HERE COMPARES POINTS.
+ *
+ * A duel has been worth 500/250/0 since migration 121, and reading that scale
+ * as a literal is this codebase's most repeated bug — `headToHead` scored every
+ * meeting as a loss for four days, `poolCards` showed a winner as a defeat, and
+ * `DuelsTab` still carries a fallback that recomputes it. There are already
+ * three sites for one constant. This is not a fourth: it calls the owner.
+ *
+ * ⚠ AND A BYE IS `entry_b IS NULL`, NEVER A POINTS VALUE. `DUEL_BYE` and
+ * `DUEL_TIE` are both 250 by design, so anything classifying by value calls a
+ * bye a draw against an opponent who never existed. `buildDuelRecords` gets
+ * that right; a hand-rolled reduce here would not.
+ *
+ * ⚠ SHOWDOWN ONLY. Every other mode has no duels, and an empty record is not
+ * the same claim as no record at all — the card must be able to tell them
+ * apart, so this returns null rather than a row of zeroes.
+ *
+ * ⚠ SETTLED DUELS ONLY CONTRIBUTE, which is also what keeps the sealed draw
+ * sealed. The admin client sees future rows; `buildDuelRecords` counts nothing
+ * without `settled_at`, and no opponent identity leaves this function.
+ */
+async function readDuelRecord(
+  admin: ReturnType<typeof createAdminClient>,
+  poolId: string,
+  entryId: string,
+  leagueMode: string | null,
+) {
+  if (leagueMode !== 'showdown') return null
+  const { duels, error } = await readPoolDuels(admin, poolId)
+  if (error) throw new Error(error)
+
+  const record = buildDuelRecords(duels).get(entryId)
+  if (!record) return null
+
+  return {
+    won: record.won,
+    tied: record.tied,
+    lost: record.lost,
+    byes: record.byes,
+    duel_points: record.duelPoints,
+    /** ⚠ OLDEST FIRST, ordered by `settled_at` — never by matchweek number. */
+    form: record.form,
+  }
 }
 
 /**
