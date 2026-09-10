@@ -45,6 +45,21 @@ import {
 // from under your thumb.
 // =============================================================
 
+/**
+ * The colour the glow behind the photograph is made of.
+ *
+ * ⚠ THE LIGHT-MODE BACKGROUND, IN BOTH THEMES, AND DELIBERATELY NOT A TOKEN
+ * LOOKUP. `theme.colors.snow` flips to #121520 in dark mode, and a near-black
+ * glow on a dark header is not a glow — it is a smudge. Light is light in both.
+ * This is `snow`'s light value, held still.
+ *
+ * ⚠ IT IS MUCH LOUDER IN DARK MODE, AND THAT IS THE NATURE OF IT. Measured
+ * against the header behind it: 12.8 to 18.3:1 on dark, 1.56 to 1.78:1 on
+ * light. On a light header a near-white glow is barely a glow at all — which
+ * is the same thing as saying there is no ring there, which was the point.
+ */
+const GLOW = '#F7F8FC';
+
 export function PlayerStatSheet({
   stat,
   teamName,
@@ -187,17 +202,21 @@ export function PlayerStatSheet({
                     pointerEvents="none"
                     style={{
                       position: 'absolute',
-                      top: -10,
-                      left: -10,
-                      width: 100,
-                      height: 100,
+                      // ⚠⚠ EXACTLY THE PHOTOGRAPH'S SIZE, WHICH IS THE FIX. It
+                      // was 100pt against an 80pt photo, so 10pt of solid
+                      // tint-at-35% stuck out all the way round — read as a
+                      // dark coloured RING rather than as light. A glow has no
+                      // edge; the moment it has a diameter of its own it is a
+                      // border. Sized to match, only its shadow escapes.
+                      width: 80,
+                      height: 80,
                       borderRadius: theme.radii.pill,
-                      backgroundColor: withOpacity(tint, 0.35),
-                      shadowColor: tint,
-                      shadowOpacity: 0.7,
-                      shadowRadius: 22,
+                      backgroundColor: GLOW,
+                      shadowColor: GLOW,
+                      shadowOpacity: 0.95,
+                      shadowRadius: 26,
                       shadowOffset: { width: 0, height: 0 },
-                      elevation: 12,
+                      elevation: 14,
                     }}
                   />
                   <View
@@ -208,8 +227,10 @@ export function PlayerStatSheet({
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: tint,
-                      borderWidth: 2,
-                      borderColor: withOpacity(theme.colors.surface, 0.9),
+                      // ⚠ NO BORDER. It was `surface` at 90%, which is white in
+                      // light mode and #1C2030 in dark — a dark ring in exactly
+                      // the mode where a dark ring is least wanted. The glow
+                      // separates the photograph from the header now.
                       overflow: 'hidden',
                     }}
                   >
