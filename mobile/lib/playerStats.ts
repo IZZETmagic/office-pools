@@ -616,3 +616,20 @@ export function positionName(pos: string | null | undefined): string | null {
       return null;
   }
 }
+
+/**
+ * Is this stat value nothing at all?
+ *
+ * ⚠⚠ A ZERO IS NOT THE SAME KIND OF FACT AS A NUMBER, and the sheet was giving
+ * them identical weight. Most rows on most players ARE zero — a defender's
+ * shots, a striker's tackles — so a column of equally-black numerals buries the
+ * three or four that say something under a dozen that do not. Dimming the
+ * zeros is not decoration; it is what makes the rest findable at a glance.
+ *
+ * ⚠ IT READS THE LEADING NUMBER, so "0 of 5" is empty and "4 of 5" is not. The
+ * qualifier after it is context, never the fact.
+ */
+export function statIsZero(value: string): boolean {
+  const lead = /^-?\d+/.exec(value.trim());
+  return lead !== null && Number(lead[0]) === 0;
+}

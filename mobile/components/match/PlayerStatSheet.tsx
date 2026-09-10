@@ -21,6 +21,7 @@ import {
   playerPhotoUrl,
   playerRates,
   positionName,
+  statIsZero,
   subMinute,
   RATE_COVERS,
   RATING_COLOR,
@@ -430,58 +431,119 @@ export function PlayerStatSheet({
                   style={{
                     marginBottom: 12,
                     borderRadius: theme.radii.md,
-                    borderWidth: 1,
-                    borderColor: withOpacity(theme.colors.slate, 0.14),
-                    paddingHorizontal: 14,
-                    paddingTop: 10,
-                    paddingBottom: 4,
+                    backgroundColor: withOpacity(theme.colors.slate, 0.06),
+                    overflow: 'hidden',
                   }}
                 >
-                  <RNText
+                  {/* ⚠ THE HEADER IS A STRIP, NOT A LINE OF SMALL GREY TEXT.
+                      It was the same weight and nearly the same colour as the
+                      labels beneath it, so four sections read as one long list.
+                      A tinted band and a rule in the club's own colour give it
+                      somewhere to sit — and the tint is the shirt the player
+                      wears in the header above, so it is his section rather
+                      than a decoration chosen at random. */}
+                  <View
                     style={{
-                      fontFamily: fontFamilies.semibold,
-                      fontSize: 11,
-                      letterSpacing: 0.8,
-                      textTransform: 'uppercase',
-                      color: theme.colors.slate,
-                      marginBottom: 6,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      paddingHorizontal: 14,
+                      paddingVertical: 9,
+                      backgroundColor: withOpacity(tint, theme.mode === 'dark' ? 0.20 : 0.13),
                     }}
                   >
-                    {g.title}
-                  </RNText>
-                  {g.rows.map((r, i) => (
                     <View
-                      key={r.label}
                       style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        paddingVertical: 7,
-                        borderTopWidth: i === 0 ? 0 : 1,
-                        borderTopColor: withOpacity(theme.colors.slate, 0.10),
+                        width: 3,
+                        height: 13,
+                        borderRadius: theme.radii.pill,
+                        backgroundColor: tint,
+                      }}
+                    />
+                    <RNText
+                      style={{
+                        fontFamily: fontFamilies.bold,
+                        fontSize: 11,
+                        letterSpacing: 0.9,
+                        textTransform: 'uppercase',
+                        color: theme.colors.ink,
                       }}
                     >
-                      <RNText
-                        style={{
-                          fontFamily: fontFamilies.regular,
-                          fontSize: 14,
-                          color: theme.colors.slate,
-                        }}
-                      >
-                        {r.label}
-                      </RNText>
-                      <RNText
-                        style={{
-                          fontFamily: MONO_BOLD,
-                          fontSize: 14,
-                          color: theme.colors.ink,
-                          fontVariant: ['tabular-nums'],
-                        }}
-                      >
-                        {r.value}
-                      </RNText>
-                    </View>
-                  ))}
+                      {g.title}
+                    </RNText>
+                  </View>
+
+                  <View style={{ paddingHorizontal: 14 }}>
+                    {g.rows.map((r, i) => {
+                      // ⚠⚠ A ZERO IS NOT THE SAME KIND OF FACT AS A NUMBER.
+                      // Most rows on most players are zero — a defender's
+                      // shots, a striker's tackles — so equal weight buries the
+                      // three that say something under a dozen that do not.
+                      const empty = statIsZero(r.value);
+                      const [lead, ...rest] = r.value.split(' ');
+                      return (
+                        <View
+                          key={r.label}
+                          style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'baseline',
+                            paddingVertical: 8,
+                            borderTopWidth: i === 0 ? 0 : 1,
+                            borderTopColor: withOpacity(theme.colors.slate, 0.12),
+                          }}
+                        >
+                          <RNText
+                            style={{
+                              fontFamily: fontFamilies.regular,
+                              fontSize: 14,
+                              color: theme.colors.slate,
+                            }}
+                          >
+                            {r.label}
+                          </RNText>
+                          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                            {/* The leading number is the fact; anything after
+                                it — "of 28", "on / 3" — is context, and reading
+                                as loudly as the number was half the noise. */}
+                            {/* ⚠⚠ THE ZERO IS QUIETER BY WEIGHT AND SIZE, NOT BY
+                                BEING FAINTER. Fading it was the obvious move and
+                                it does not work: `slate` is only 5.56:1 against
+                                this card to start with, so at 0.5 opacity a zero
+                                measures 2.08:1 and at 0.9 it is still 4.45:1 —
+                                under the floor for small text either way. There
+                                is no headroom to dim into. So a zero takes the
+                                LABEL's colour and weight, which says "no more
+                                important than the word beside it", while a real
+                                number is ink, bold and three points larger. Both
+                                stay legible; only one asks to be read. */}
+                            <RNText
+                              style={{
+                                fontFamily: empty ? MONO : MONO_BOLD,
+                                fontSize: empty ? 14 : 17,
+                                color: empty ? theme.colors.slate : theme.colors.ink,
+                                fontVariant: ['tabular-nums'],
+                              }}
+                            >
+                              {lead}
+                            </RNText>
+                            {rest.length > 0 ? (
+                              <RNText
+                                style={{
+                                  fontFamily: MONO,
+                                  fontSize: 12,
+                                  color: withOpacity(theme.colors.slate, 0.8),
+                                  fontVariant: ['tabular-nums'],
+                                }}
+                              >
+                                {rest.join(' ')}
+                              </RNText>
+                            ) : null}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
               ))}
             </ScrollView>

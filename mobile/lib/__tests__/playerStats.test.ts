@@ -27,6 +27,7 @@ import {
   playerRates,
   positionName,
   RATE_COVERS,
+  statIsZero,
   subMinute,
   statGroups,
   teamRating,
@@ -523,5 +524,25 @@ describe('the substitution minute, both directions', () => {
     expect(headlineParts(player({ isStarter: false, minutes: null, rating: null }))).toEqual([
       'unused substitute',
     ]);
+  });
+});
+
+describe('statIsZero', () => {
+  it('⚠ reads the LEADING number, not the whole string', () => {
+    expect(statIsZero('0')).toBe(true);
+    expect(statIsZero('0 of 5')).toBe(true);
+    expect(statIsZero('4 of 5')).toBe(false);
+    expect(statIsZero('0 on / 3')).toBe(true);
+    expect(statIsZero('3 on / 3')).toBe(false);
+  });
+
+  it('⚠ a zero denominator does not make a real number look empty', () => {
+    // "5 of 0" cannot happen, but "1 of 0" must not dim on the trailing zero.
+    expect(statIsZero('1 of 0')).toBe(false);
+  });
+
+  it('anything without a leading number is not a zero', () => {
+    expect(statIsZero('—')).toBe(false);
+    expect(statIsZero('')).toBe(false);
   });
 });
