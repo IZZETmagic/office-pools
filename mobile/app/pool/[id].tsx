@@ -1,4 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { DossierSheet } from '@/components/scouting/DossierSheet';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -180,6 +181,16 @@ export default function PoolDetailScreen() {
    * other mode, where the header is an ordinary sibling above the pager.
    */
   const [bandHeight, setBandHeight] = useState(0);
+  /**
+   * Whose scout report is open, if anybody's.
+   *
+   * ⚠⚠ IT LIVES HERE BECAUSE THE SHEET HAS TO. A gorhom `BottomSheet` lays out
+   * where it sits in the tree, and every tab that can open one is inside the
+   * pager's ScrollView — an absolutely positioned sheet there fills the scroll
+   * CONTENT and is clipped by the viewport. The tabs ask; this screen renders.
+   * Same reason `bandHeight` above is owned here rather than by `DuelTab`.
+   */
+  const [scoutingEntryId, setScoutingEntryId] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const pagerRef = useRef<Animated.ScrollView | null>(null);
   // When a tab change originates from a swipe, the pager has already
@@ -746,6 +757,7 @@ export default function PoolDetailScreen() {
                the opponent may be named, so the header and the cards under it
                cannot disagree about whether you currently have one. */
             opponentVisible={duelPhaseState.opponentVisible}
+            onScout={setScoutingEntryId}
           />
         );
       case 'room':
@@ -841,6 +853,7 @@ export default function PoolDetailScreen() {
             <MemoLeaguePickemEntriesTab
               poolId={pool.poolId}
               entries={leagueLeaderboard ?? []}
+              onScout={setScoutingEntryId}
             />
           );
         }
@@ -1050,6 +1063,14 @@ export default function PoolDetailScreen() {
         Rendering it before the pager would put the scrolling content on top of
         it. It reports its expanded height back so every page can pad by it.
       */}
+      {/* ⚠ AFTER THE PAGER, like the band below it — a sheet rendered before
+          would have the scrolling content painted on top of it. */}
+      <DossierSheet
+        poolId={pool.poolId}
+        entryId={scoutingEntryId}
+        onClose={() => setScoutingEntryId(null)}
+      />
+
       {isShowdownPool ? (
         <ShowdownDuelHeader
           poolName={pool.poolName}

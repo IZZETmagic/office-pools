@@ -1,10 +1,10 @@
-import {
+import BottomSheet, {
   BottomSheetBackdrop,
-  BottomSheetModal,
   BottomSheetScrollView,
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/theme';
@@ -32,25 +32,31 @@ import { useTheme } from '@/theme';
 // inside, dynamic sizing would also try to size to a scroll view that has no
 // intrinsic height.
 //
-// ## ⚠⚠ `BottomSheetModal`, NOT A PLAIN `BottomSheet`, AND THAT IS STRUCTURAL
+// ## ⚠⚠ IT MUST BE RENDERED AT A SCREEN ROOT. THIS IS NOT A PREFERENCE.
 //
-// A plain `BottomSheet` renders WHERE IT SITS IN THE TREE. In React Native
-// `position: 'absolute'` fills the nearest ancestor, not the screen — so the
-// house pattern's full-screen wrapper only works because `BanterSheet` is
-// rendered at a screen root. These are not: the dossier opens from a card
-// inside a tab inside a horizontal pager, and inside a scroll view "absolute"
-// is relative to the CONTENT, not the viewport. A plain sheet there would be
-// laid out inside the card that triggered it.
+// A plain `BottomSheet` renders WHERE IT SITS IN THE TREE, and in React Native
+// `position: 'absolute'` fills the nearest ancestor rather than the screen. So
+// the wrapper below only works as a sibling of a screen's content — inside a
+// ScrollView it would position against the scroll CONTENT and be clipped by
+// the viewport; inside a card it would be laid out in the card.
 //
-// `BottomSheetModal` portals to a host at the app root, so it is correct from
-// anywhere — which is the property a component used from three unrelated
-// places needs. It requires `BottomSheetModalProvider` in `app/_layout.tsx`.
+// ⚠ `BottomSheetModal` WAS TRIED FOR EXACTLY THIS AND DID NOT WORK. It portals
+// to a provider at the app root, which is the right shape — but with the
+// provider mounted and `present()` demonstrably called (the API behind the
+// sheet was hit five times, 200 each, while nothing appeared on screen) the
+// sheet never became visible. Rather than keep guessing at a library path
+// nothing else in this app uses, this is the pattern every working sheet here
+// already uses: `BanterSheet`, `FlexBadgesSheet`, `PoolsFilterSheet`. If the
+// modal route is revisited, that measurement is the starting point.
 //
-// ⚠ IT IS IMPERATIVE — `present()` / `dismiss()`, not an `index` prop — so the
-// `open` prop is bridged to those in an effect rather than passed through.
+// ⚠ SO CALLERS THAT ARE NOT AT A SCREEN ROOT MUST HOIST. `DossierSheet` opens
+// from a card inside a tab inside a pager; its state lives on the pool screen
+// and the sheet is rendered beside the pager, not inside it.
 //
-// ⚠ `onDismiss` FIRES WHEN THE ANIMATION FINISHES, not when the gesture crosses
-// the threshold, so telling the caller then cannot cut the sheet off mid-slide.
+// ⚠ IMPERATIVE, DRIVEN BY THE `open` PROP. `expand()` / `close()` on a ref,
+// with `index={-1}` so it starts closed — the house pattern. `onClose` fires
+// when the animation finishes, so telling the caller then cannot cut the sheet
+// off mid-slide.
 // =============================================================
 
 export function ScoutSheet({
@@ -73,15 +79,15 @@ export function ScoutSheet({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const ref = useRef<BottomSheetModal | null>(null);
+  const ref = useRef<BottomSheet | null>(null);
 
   const snapPoints = useMemo(() => [height], [height]);
 
-  // ⚠ THE PROP DRIVES THE IMPERATIVE API, and `present()` is safe to call on a
-  // sheet already presented — gorhom no-ops rather than re-animating.
+  // ⚠ THE PROP DRIVES THE IMPERATIVE API. Both are safe to call repeatedly —
+  // gorhom no-ops on a sheet already at that snap point rather than re-animating.
   useEffect(() => {
-    if (open) ref.current?.present();
-    else ref.current?.dismiss();
+    if (open) ref.current?.expand();
+    else ref.current?.close();
   }, [open]);
 
   const renderBackdrop = useCallback(
@@ -101,23 +107,34 @@ export function ScoutSheet({
   );
 
   return (
-    <BottomSheetModal
-      ref={ref}
-      snapPoints={snapPoints}
-      enableDynamicSizing={false}
-      enablePanDownToClose
-      // ⚠ TELLS THE CALLER AFTER THE ANIMATION, so a drag-away and a backdrop
-      // tap both land in the same place as an explicit close.
-      onDismiss={onClose}
-      backdropComponent={renderBackdrop}
-      topInset={insets.top}
-      handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-      // ⚠ SNOW, NOT SURFACE. Cards in this app are `surface` on `snow`; make the
-      // sheet body a screen and the cards inside can just be cards.
-      backgroundStyle={{ backgroundColor: theme.colors.snow }}
+    // ⚠ `box-none` WHEN CLOSED. gorhom keeps a full-parent container in the tree
+    // at `index={-1}`, and on Android it absorbs taps on the screen behind —
+    // `BanterSheet` carries the same wrapper for the same reason.
+    <View
+      pointerEvents={open ? 'auto' : 'box-none'}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
     >
-      {children}
-    </BottomSheetModal>
+      <BottomSheet
+        ref={ref}
+        // ⚠ STARTS CLOSED; the effect above opens it. Mounting at 0 would flash
+        // the sheet open on every screen that holds one.
+        index={-1}
+        snapPoints={snapPoints}
+        enableDynamicSizing={false}
+        enablePanDownToClose
+        // ⚠ TELLS THE CALLER AFTER THE ANIMATION, so a drag-away and a backdrop
+        // tap both land in the same place as an explicit close.
+        onClose={onClose}
+        backdropComponent={renderBackdrop}
+        topInset={insets.top}
+        handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
+        // ⚠ SNOW, NOT SURFACE. Cards in this app are `surface` on `snow`; make
+        // the sheet body a screen and the cards inside can just be cards.
+        backgroundStyle={{ backgroundColor: theme.colors.snow }}
+      >
+        {children}
+      </BottomSheet>
+    </View>
   );
 }
 

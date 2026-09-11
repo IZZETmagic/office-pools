@@ -1,9 +1,8 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
-import { DossierSheet } from '@/components/scouting/DossierSheet';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
 import { InitialsAvatar } from './leaderboard-shared';
 import { lastLockedWeek, ownWeekState, type OwnWeekState } from '@/lib/pickemWeek';
@@ -46,11 +45,17 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
   poolId: string;
+  /**
+   * ⚠ THE POOL SCREEN OWNS THE SHEET — this tab lives inside the pager's
+   * ScrollView, where an absolutely positioned sheet fills the scroll content
+   * rather than the screen.
+   */
+  onScout: (entryId: string) => void;
   /** Everybody in the pool, from the leaderboard — the same source Table uses. */
   entries: LeagueLeaderboardEntry[];
 };
 
-export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
+export function LeaguePickemEntriesTab({ poolId, entries, onScout }: Props) {
   const theme = useTheme();
   const league = useLeaguePool(poolId);
   const now = Date.now();
@@ -79,12 +84,6 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
     league.data?.season.inPlayMatchweekNumber ?? null,
     now,
   );
-
-  /**
-   * ⚠ A SHEET, NOT A ROUTE — see `DossierSheet`. Your own report is a glance
-   * from the list you are already on, not a screen to come back from.
-   */
-  const [scoutingEntryId, setScoutingEntryId] = useState<string | null>(null);
 
   const ownEntryIds = useMemo(
     () => new Set((league.data?.you.entries ?? []).map((e) => e.entry_id)),
@@ -172,7 +171,7 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
               summariser and no second route; `is_self` only changes the copy.
             */}
             <Pressable
-              onPress={() => setScoutingEntryId(entry.entry_id)}
+              onPress={() => onScout(entry.entry_id)}
               accessibilityRole="button"
               accessibilityLabel="Scout your own season"
               style={{
@@ -225,14 +224,6 @@ export function LeaguePickemEntriesTab({ poolId, entries }: Props) {
           ))}
         </View>
       ) : null}
-
-      {/* ⚠ ONE SHEET FOR THE WHOLE LIST, keyed on which entry is open. One per
-          row would mount a `Modal` per member. */}
-      <DossierSheet
-        poolId={poolId}
-        entryId={scoutingEntryId}
-        onClose={() => setScoutingEntryId(null)}
-      />
     </View>
   );
 }

@@ -1,10 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, View } from 'react-native';
 
 import { Button, Card, Icon, Text } from '@/components/ui';
-import { DossierSheet } from '@/components/scouting/DossierSheet';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { Scoreline, TeamSheetRows } from './TeamSheet';
 import type { SheetRow, Verdict } from '@/lib/duelSheet';
@@ -81,9 +79,17 @@ type Props = {
    * rather than to a tab with its opponent cards silently missing.
    */
   opponentVisible?: boolean;
+  /**
+   * Open the scout report on somebody.
+   *
+   * ⚠ THE POOL SCREEN OWNS THE SHEET. A gorhom sheet rendered inside this tab
+   * would sit in the pager's ScrollView, where `position: absolute` fills the
+   * scroll content rather than the screen.
+   */
+  onScout: (entryId: string) => void;
 };
 
-export function DuelTab({ poolId, standings, opponentVisible = true }: Props) {
+export function DuelTab({ poolId, standings, opponentVisible = true, onScout }: Props) {
   const theme = useTheme();
   const {
     loading,
@@ -212,7 +218,7 @@ export function DuelTab({ poolId, standings, opponentVisible = true }: Props) {
             <OpponentCard
               opponent={opponent}
               standing={standings.get(opponent.entryId) ?? null}
-              poolId={poolId}
+              onScout={onScout}
             />
           ) : null}
           {fixtures.length > 0 ? (
@@ -821,20 +827,19 @@ function Fighter({
 function OpponentCard({
   opponent,
   standing,
-  poolId,
+  onScout,
 }: {
   opponent: Opponent;
   standing: Standing | null;
-  poolId: string;
+  /**
+   * ⚠ THE SHEET IS NOT RENDERED HERE, AND CANNOT BE. A gorhom `BottomSheet`
+   * lays out where it sits in the tree, and this card is inside the pager's
+   * ScrollView — an absolutely positioned sheet there fills the scroll CONTENT
+   * and is clipped by the viewport. The pool screen owns it; this asks.
+   */
+  onScout: (entryId: string) => void;
 }) {
   const theme = useTheme();
-  /**
-   * ⚠ A SHEET, NOT A ROUTE. This pushed a screen at first, which took you off
-   * the duel to read about the person you are playing — and gave the report the
-   * router's own chrome. A scout report is a glance with the duel still behind
-   * it. Ryan, 2026-09-09.
-   */
-  const [scouting, setScouting] = useState(false);
   const met = opponent.met.won + opponent.met.drawn + opponent.met.lost;
   /**
    * ⚠ Joined HERE, from two sources on purpose: the numerator is the engine's
@@ -941,7 +946,7 @@ function OpponentCard({
         Do not add a fourth site in the meantime.
       */}
       <Pressable
-        onPress={() => setScouting(true)}
+        onPress={() => onScout(opponent.entryId)}
         accessibilityRole="button"
         accessibilityLabel={`Full scout report on ${opponent.name}`}
         style={{
@@ -957,11 +962,6 @@ function OpponentCard({
         <Icon name="chevron.right" size={14} color="primary" />
       </Pressable>
 
-      <DossierSheet
-        poolId={poolId}
-        entryId={scouting ? opponent.entryId : null}
-        onClose={() => setScouting(false)}
-      />
     </Card>
   );
 }
