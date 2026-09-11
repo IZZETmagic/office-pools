@@ -75,6 +75,17 @@ const toClubRef = (c: ClubRow): ClubRef => ({
   crestUrl: c.crest_url,
 })
 
+/**
+ * The same club, plus the provider's id.
+ *
+ * ⚠ THE EXTRA FIELD IS SCOUT-ONLY AND DOES NOT GO ON `ClubRef`. That type is
+ * shared with the opponent dossier, which has no use for a provider id and no
+ * business carrying one. It is needed here for one reason: every past meeting
+ * in `h2h.recent` identifies its home side by `homeExternalId`, and the strip
+ * has to know which of these two clubs that was to draw the right crest on top.
+ */
+const toScoutClub = (c: ClubRow) => ({ ...toClubRef(c), externalClubId: c.external_club_id })
+
 async function handler(
   _req: NextRequest,
   { params }: { params: Promise<{ fixture_id: string }> },
@@ -198,8 +209,8 @@ async function handler(
       fixture_id: fixture.fixture_id,
       kickoff_at: fixture.kickoff_at,
       venue: fixture.venue,
-      home: homeClub,
-      away: awayClub,
+      home: toScoutClub(fixture.home),
+      away: toScoutClub(fixture.away),
     },
     form,
     h2h,

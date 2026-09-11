@@ -14,6 +14,7 @@ import type {
   H2HSummary,
   MatchScoutResponse,
   ScoutClubRef,
+  ScoutFixtureClub,
   ScoutFormOutcome,
   ScoutVenueForm,
 } from '@/lib/api';
@@ -97,8 +98,8 @@ export function MatchScoutSheet({
                 is better than one that buries the sentence under a table. */}
             <PairingCard
               h2h={data.h2h}
-              homeName={data.fixture.home.name}
-              awayName={data.fixture.away.name}
+              home={data.fixture.home}
+              away={data.fixture.away}
               venue={data.fixture.venue}
             />
             <FormCard form={data.form} />
@@ -370,15 +371,17 @@ function Strip({ outcomes }: { outcomes: ScoutFormOutcome[] }) {
  */
 function PairingCard({
   h2h,
-  homeName,
-  awayName,
+  home,
+  away,
   venue,
 }: {
   h2h: MatchScoutResponse['h2h'];
-  homeName: string;
-  awayName: string;
+  home: ScoutFixtureClub;
+  away: ScoutFixtureClub;
   venue: string | null;
 }) {
+  const homeName = home.name;
+  const awayName = away.name;
   const theme = useTheme();
 
   if (!h2h) {
@@ -478,18 +481,19 @@ function PairingCard({
             <Text variant="body" color="slate">
               Last {s.recent.length === 1 ? 'meeting' : `${s.recent.length} meetings`}
             </Text>
-            {/* ⚠ SCORES AS PLAYED, HOME SIDE FIRST — not flipped into this
-                fixture's order. A member reading "2–1" against a date is
-                reading the scoreboard from that day; rewriting it to put
-                today's home club first would silently invert half of them. */}
+            {/* ⚠ SCORES AS PLAYED — the crest on top is whoever was at HOME
+                that day, which is not necessarily this fixture's home club.
+                Flipping them into today's order would silently invert half the
+                results; showing the crests is what makes that unnecessary to
+                explain. */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {s.recent.map((m) => (
-                <Meeting key={m.fixtureId} meeting={m} />
+                <Meeting key={m.fixtureId} meeting={m} home={home} away={away} />
               ))}
             </View>
-            <Text variant="detail" color="slate">
-              Scores as played — home side first
-            </Text>
+            {/* ⚠ THE CAPTION IS GONE WITH THE AMBIGUITY IT EXPLAINED. "Home
+                side first" was necessary when a chip was two bare numbers; the
+                crests now say whose goals those are. */}
           </View>
         ) : null}
 
@@ -517,39 +521,117 @@ function PairingCard({
  */
 const THIN_SAMPLE = 5;
 
-/** One past meeting, as it was played. */
-function Meeting({ meeting }: { meeting: H2HSummary['recent'][number] }) {
+/**
+ * One past meeting, as a mini scoreboard.
+ *
+ * ## ⚠⚠ STACKED, BECAUSE SIDE BY SIDE DOES NOT FIT FIVE ACROSS
+ *
+ * Measured rather than guessed. On a 390pt phone the card leaves 318pt for five
+ * chips and four gaps — about 60pt each, ~52pt inside the padding. A crest
+ * either side at 13pt plus gaps leaves roughly 20pt for the scoreline: enough
+ * for "2–1" at 11pt and not enough the moment a score reaches double figures.
+ * It overflowed by 6pt before any of that.
+ *
+ * Stacked, a chip needs a crest (16) plus a gap plus one digit — about 48pt, so
+ * five fit with 54pt to spare, and 39pt on the smallest phone this app
+ * supports. It also scales: a 10–0 adds a character to one row instead of
+ * widening the whole chip.
+ *
+ * ⚠ WHICH CREST GOES ON TOP DEPENDS ON WHO WAS HOME THAT DAY, not on who is
+ * home for the fixture being scouted — the two clubs swap ends between
+ * meetings. `homeExternalId` is the only thing that answers it, which is why
+ * the route carries the provider's id through.
+ *
+ * ⚠ NO RESULT TINT ON THE CHIP ANY MORE. It used to be green or red for "the
+ * printed home side won", which was ambiguous the moment you had to work out
+ * who that was. The crests answer it directly, so the winner is shown by
+ * weighting their goal instead — and a draw weights neither.
+ */
+function Meeting({
+  meeting,
+  home,
+  away,
+}: {
+  meeting: H2HSummary['recent'][number];
+  home: ScoutFixtureClub;
+  away: ScoutFixtureClub;
+}) {
   const theme = useTheme();
-  const won = meeting.homeGoals > meeting.awayGoals;
-  const drew = meeting.homeGoals === meeting.awayGoals;
-  // ⚠ WHOSE WIN IT WAS DEPENDS ON WHO WAS HOME THAT DAY, which is not
-  // necessarily this fixture's home club — they swap ends. The colour follows
-  // the scoreline as printed, so it can never disagree with the numbers beside
-  // it.
-  const tone = drew ? theme.colors.slate : won ? theme.colors.green : theme.colors.red;
+
+  // ⚠ Whoever the FEED called home that day.
+  const homeThatDay = meeting.homeExternalId === home.externalClubId ? home : away;
+  const awayThatDay = homeThatDay === home ? away : home;
+
+  const homeWon = meeting.homeGoals > meeting.awayGoals;
+  const awayWon = meeting.awayGoals > meeting.homeGoals;
 
   return (
     <View
       style={{
-        backgroundColor: withOpacity(tone, 0.1),
+        backgroundColor: theme.colors.mist,
         borderRadius: theme.radii.sm,
-        paddingHorizontal: 11,
+        paddingHorizontal: 8,
         paddingVertical: 8,
         alignItems: 'center',
-        minWidth: 62,
+        gap: 5,
+        minWidth: 48,
       }}
     >
-      <RNText
-        style={{ fontFamily: MONO_BOLD, fontSize: 13, color: tone, fontVariant: ['tabular-nums'] }}
-      >
-        {meeting.homeGoals}–{meeting.awayGoals}
-      </RNText>
+      <Side club={homeThatDay} goals={meeting.homeGoals} won={homeWon} />
+      <Side club={awayThatDay} goals={meeting.awayGoals} won={awayWon} />
       <Text variant="detail" color="slate">
         {new Date(meeting.date).toLocaleDateString(undefined, {
           month: 'short',
           year: '2-digit',
         })}
       </Text>
+    </View>
+  );
+}
+
+/** One row of the mini scoreboard: a crest and its goals. */
+function Side({
+  club,
+  goals,
+  won,
+}: {
+  club: ScoutFixtureClub;
+  goals: number;
+  won: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      {club.crestUrl ? (
+        <Image
+          alt=""
+          source={{ uri: club.crestUrl }}
+          style={{ width: 16, height: 16 }}
+          resizeMode="contain"
+        />
+      ) : (
+        // ⚠ A CLUB WITH NO CREST KEEPS ITS SLOT, unlike everywhere else in this
+        // app. The two rows have to stay aligned or the scoreboard reads as
+        // two unrelated numbers; the abbreviation is the stand-in.
+        <View style={{ width: 16, alignItems: 'center' }}>
+          <RNText style={{ fontFamily: MONO_BOLD, fontSize: 8, color: theme.colors.slate }}>
+            {club.abbreviation}
+          </RNText>
+        </View>
+      )}
+      <RNText
+        style={{
+          fontFamily: MONO_BOLD,
+          fontSize: 14,
+          // ⚠ THE WINNER IS WEIGHTED, NOT COLOURED. Green and red on a chip that
+          // now shows both crests would be saying the same thing twice, and
+          // colour would have to pick a side to be "good".
+          color: won ? theme.colors.ink : theme.colors.slate,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {goals}
+      </RNText>
     </View>
   );
 }
