@@ -80,8 +80,37 @@ export type H2HSummary = {
   bothScored: number
   /** The scoreline that has come up most, written from the home club's view. */
   commonScore: { score: string; count: number } | null
-  /** The record at this fixture's ground. Null when the venue is unknown. */
+  /**
+   * The record in meetings where THIS fixture's home club was at home.
+   *
+   * ⚠ NOT A VENUE-NAME MATCH — that could never match and left this null for
+   * every fixture in production. See the note at the counter.
+   *
+   * ⚠ `venueName` IS FOR THE LABEL ONLY. The screen writes "At Selhurst Park";
+   * nothing is filtered on it.
+   */
   atVenue: { played: number; wins: number; draws: number; losses: number } | null
+  /**
+   * One side's winless run at this ground — the line worth reading aloud.
+   *
+   * ⚠ IT IS ABOUT THE GROUND, NOT THE PAIRING. "Chelsea have not won at the
+   * Emirates since 2011" is a fact about visits to one stadium; the same two
+   * clubs' meetings at Stamford Bridge say nothing about it.
+   *
+   * ⚠ `side` IS WHICH END OF *THIS* FIXTURE, so the screen can name the club
+   * without re-deriving who is who. `lastWinYear` is null when they have never
+   * won there at all, which is a stronger sentence and must read differently.
+   *
+   * ⚠ NULL BELOW `MIN_DROUGHT_VISITS`. Two visits without a win is a fortnight,
+   * not a hoodoo, and stating it as one would be the oversell this module is
+   * built to avoid.
+   */
+  venueDrought: {
+    side: 'home' | 'away'
+    /** Visits to this ground since their last win there, or in total if never. */
+    visits: number
+    lastWinYear: string | null
+  } | null
   /**
    * Meetings level at half time that did not finish level.
    *
@@ -102,6 +131,16 @@ export type H2HSummary = {
 const RECENT = 5
 
 /**
+ * Visits without a win before it is worth saying out loud.
+ *
+ * ⚠ THREE, AND IT IS A FLOOR ON A SENTENCE RATHER THAN ON A RATE. The figures
+ * on this card carry their own denominators and can be read at any sample; a
+ * line like "have not won here since 2011" cannot — it either reads as a hoodoo
+ * or it is noise, and two visits is noise.
+ */
+export const MIN_DROUGHT_VISITS = 3
+
+/**
  * Reduce a pile of meetings to the handful of facts worth showing.
  *
  * ⚠ EVERY FIGURE IS FROM THIS FIXTURE'S HOME CLUB'S POINT OF VIEW, and the two
@@ -114,7 +153,11 @@ const RECENT = 5
  */
 export function summariseH2H(
   fixtures: H2HFixture[],
-  opts: { homeExternalId: number; venueName?: string | null },
+  opts: {
+    homeExternalId: number
+    /** ⚠ LABEL ONLY — nothing is filtered on it. See `atVenue`. */
+    venueName?: string | null
+  },
 ): H2HSummary {
   const played = fixtures.filter(isCompetitive)
   const excluded = fixtures.length - played.length
@@ -167,13 +210,68 @@ export function summariseH2H(
       if (f.htHome === f.htAway && f.homeGoals !== f.awayGoals) decidedAfterHt++
     }
 
-    if (opts.venueName && f.venueName === opts.venueName) {
+    // ⚠⚠ "AT THIS GROUND" IS "THIS CLUB WAS AT HOME", NOT A VENUE-NAME MATCH.
+    //
+    // It used to compare `f.venueName === opts.venueName` and could NEVER
+    // match, so this block never ran and `atVenue` was null for every fixture
+    // in production — including on the shipped head-to-head tab, whose "at this
+    // ground" row has therefore never once rendered. Measured 2026-09-11.
+    //
+    // Two independent reasons it cannot work. `league_fixtures.venue` is built
+    // as "name, city" and falls back to the city alone — "Stadio Pierluigi
+    // Penzo, Venice", or just "Berlin" — while the h2h payload sends the bare
+    // name. And the names themselves disagree: "Stadio Pierluigi Penzo" against
+    // the provider's "Stadio Pier Luigi Penzo".
+    //
+    // Who was at home needs no string comparison and is the same question for
+    // a league fixture: a club plays its home games at its own ground.
+    //
+    // ⚠ A NEUTRAL-GROUND CUP TIE IS COUNTED ON WHOEVER THE FEED NAMED AS HOME,
+    // which is a small imprecision. The old test dropped those fixtures — along
+    // with every other one — so this is strictly better, and a cup final in a
+    // league pairing's history is rare enough not to move a record.
+    if (weWereHome) {
       venue.played++
       if (ours > theirs) venue.wins++
       else if (ours < theirs) venue.losses++
       else venue.draws++
     }
   }
+
+  /**
+   * The longer of the two winless runs at this ground.
+   *
+   * ⚠ BOTH SIDES ARE CONSIDERED AND THE LONGER WINS. The mockup's example is
+   * the away club, but a home side on a bad run at its own ground is the more
+   * surprising fact and there is no reason to look for only one of them.
+   *
+   * ⚠ COMPUTED OVER THE VENUE-FILTERED LIST, NEWEST FIRST — `ordered` already
+   * is — so "visits since" is a simple walk until that side wins.
+   */
+  // ⚠ THE SAME CUT AS `atVenue` ABOVE, and for the same reason — see the note
+  // there. Meetings where THIS fixture's home club was the home side.
+  const atThisGround = ordered.filter((f) => f.homeExternalId === opts.homeExternalId)
+
+  const droughtFor = (side: 'home' | 'away') => {
+    let visits = 0
+    for (const f of atThisGround) {
+      const weWereHome = f.homeExternalId === opts.homeExternalId
+      const ours = weWereHome ? f.homeGoals : f.awayGoals
+      const theirs = weWereHome ? f.awayGoals : f.homeGoals
+      // `ours` is THIS FIXTURE's home club wherever the meeting was played, so
+      // the away side's result is simply the mirror.
+      const won = side === 'home' ? ours > theirs : theirs > ours
+      if (won) return { visits, lastWinYear: f.date.slice(0, 4) }
+      visits++
+    }
+    return { visits, lastWinYear: null }
+  }
+
+  const homeDrought = droughtFor('home')
+  const awayDrought = droughtFor('away')
+  const worse = awayDrought.visits >= homeDrought.visits ? awayDrought : homeDrought
+  const worseSide: 'home' | 'away' =
+    awayDrought.visits >= homeDrought.visits ? 'away' : 'home'
 
   const n = ordered.length
   const topScore = [...scoreTally.entries()].sort(
@@ -192,7 +290,11 @@ export function summariseH2H(
     avgGoals: n === 0 ? 0 : Math.round(((goalsFor + goalsAgainst) / n) * 10) / 10,
     bothScored,
     commonScore: topScore ? { score: topScore[0], count: topScore[1] } : null,
-    atVenue: opts.venueName && venue.played > 0 ? venue : null,
+    atVenue: venue.played > 0 ? venue : null,
+    venueDrought:
+      worse.visits >= MIN_DROUGHT_VISITS
+        ? { side: worseSide, visits: worse.visits, lastWinYear: worse.lastWinYear }
+        : null,
     decidedAfterHt,
     decidedAfterHtOf,
     recent: ordered.slice(0, RECENT),

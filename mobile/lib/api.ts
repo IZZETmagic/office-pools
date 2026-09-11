@@ -1774,6 +1774,22 @@ export type H2HSummary = {
   bothScored: number;
   commonScore: { score: string; count: number } | null;
   atVenue: { played: number; wins: number; draws: number; losses: number } | null;
+  /**
+   * One side's winless run at THIS ground — the line worth reading aloud.
+   *
+   * ⚠ `side` is which end of THIS fixture, so the screen names the club without
+   * re-deriving who is who. `lastWinYear` is NULL when they have never won
+   * there at all, which is a stronger sentence and must read differently — not
+   * the earliest date in the sample.
+   *
+   * ⚠ Null below the server's floor. Two visits without a win is a fortnight,
+   * not a hoodoo.
+   */
+  venueDrought: {
+    side: 'home' | 'away';
+    visits: number;
+    lastWinYear: string | null;
+  } | null;
   /** ⚠ Carries its own denominator — not every meeting has a half-time score. */
   decidedAfterHt: number;
   decidedAfterHtOf: number;

@@ -175,17 +175,125 @@ describe('summariseH2H — the thin cases', () => {
     expect(s.excluded).toBe(1)
   })
 
-  it('has no venue record when the ground never comes up', () => {
-    const s = summariseH2H([meeting({ venueName: 'Stamford Bridge' })], {
+  it('counts the home record by WHO WAS AT HOME, not by venue name', () => {
+    // ⚠⚠ THIS TEST USED TO ASSERT THE BUG. It fed a meeting at "Stamford
+    // Bridge" against a fixture at "Emirates Stadium" and expected null — which
+    // passed, and would also have passed for two meetings at the SAME ground,
+    // because the comparison could never match anything.
+    //
+    // `league_fixtures.venue` is "name, city" and falls back to the city alone;
+    // the h2h payload sends the bare name, and the two spell it differently
+    // anyway. `atVenue` was null for every fixture in production.
+    //
+    // Arsenal at home is Arsenal at home wherever the feed says it was played.
+    const s = summariseH2H([meeting({ homeExternalId: ARSENAL, venueName: 'Stamford Bridge' })], {
       homeExternalId: ARSENAL,
       venueName: 'Emirates Stadium',
     })
-    expect(s.atVenue).toBeNull()
+    expect(s.atVenue).toMatchObject({ played: 1 })
+  })
+
+  it('excludes meetings where the other club was at home', () => {
+    const s = summariseH2H(
+      [
+        meeting({ homeExternalId: ARSENAL, awayExternalId: CHELSEA, homeGoals: 2, awayGoals: 0 }),
+        meeting({ homeExternalId: CHELSEA, awayExternalId: ARSENAL, homeGoals: 3, awayGoals: 1 }),
+      ],
+      { homeExternalId: ARSENAL, venueName: 'Emirates Stadium' },
+    )
+    expect(s.atVenue).toMatchObject({ played: 1, wins: 1, draws: 0, losses: 0 })
+    expect(s.meetings).toBe(2)
   })
 
   it('⚠ the gate is above the thinnest real pairings in the league', () => {
     // The provider holds 3 meetings for Sunderland v Brighton and 3 for
     // Coventry v Arsenal, one of them competitive. Those must not get a tab.
     expect(MIN_MEETINGS).toBeGreaterThan(3)
+  })
+})
+
+describe('the venue drought', () => {
+  const EMIRATES = 'Emirates Stadium'
+  /** A meeting at the Emirates on 1 Jan of `year`, from Arsenal's point of view. */
+  const atEmirates = (year: number, arsenalGoals: number, chelseaGoals: number) =>
+    meeting({
+      date: `${year}-01-01T15:00:00+00:00`,
+      venueName: EMIRATES,
+      homeExternalId: ARSENAL,
+      awayExternalId: CHELSEA,
+      homeGoals: arsenalGoals,
+      awayGoals: chelseaGoals,
+    })
+
+  it('names the away side and the year they last won there', () => {
+    const s = summariseH2H(
+      [
+        atEmirates(2026, 2, 1),
+        atEmirates(2025, 1, 1),
+        atEmirates(2024, 3, 0),
+        atEmirates(2023, 0, 2), // Chelsea's last win at the Emirates
+        atEmirates(2022, 1, 0),
+      ],
+      { homeExternalId: ARSENAL, venueName: EMIRATES },
+    )
+    expect(s.venueDrought).toEqual({ side: 'away', visits: 3, lastWinYear: '2023' })
+  })
+
+  it('reports a side that has NEVER won there with a null year', () => {
+    // ⚠ A DIFFERENT AND STRONGER SENTENCE. "Have not won since 2011" and "have
+    // never won here" are not the same claim, and the screen has to tell them
+    // apart — hence null rather than the earliest date in the sample.
+    const s = summariseH2H(
+      [atEmirates(2026, 2, 1), atEmirates(2025, 1, 0), atEmirates(2024, 3, 0)],
+      { homeExternalId: ARSENAL, venueName: EMIRATES },
+    )
+    expect(s.venueDrought).toEqual({ side: 'away', visits: 3, lastWinYear: null })
+  })
+
+  it('stays silent below the floor — two visits is a fortnight, not a hoodoo', () => {
+    const s = summariseH2H(
+      [atEmirates(2026, 2, 1), atEmirates(2025, 1, 0)],
+      { homeExternalId: ARSENAL, venueName: EMIRATES },
+    )
+    expect(s.venueDrought).toBeNull()
+  })
+
+  it('will name the HOME side when it is the one on the bad run', () => {
+    // ⚠ A home club winless at its own ground is the more surprising fact, and
+    // there is no reason to look for only the away one.
+    const s = summariseH2H(
+      [atEmirates(2026, 0, 2), atEmirates(2025, 1, 1), atEmirates(2024, 0, 3), atEmirates(2023, 2, 0)],
+      { homeExternalId: ARSENAL, venueName: EMIRATES },
+    )
+    expect(s.venueDrought).toMatchObject({ side: 'home', visits: 3, lastWinYear: '2023' })
+  })
+
+  it('counts visits to THIS ground only, not the pairing', () => {
+    // ⚠ Meetings at Stamford Bridge say nothing about a run at the Emirates.
+    const s = summariseH2H(
+      [
+        atEmirates(2026, 2, 1),
+        atEmirates(2025, 1, 0),
+        atEmirates(2024, 3, 0),
+        meeting({ date: '2023-01-01T15:00:00+00:00', venueName: 'Stamford Bridge',
+          homeExternalId: CHELSEA, awayExternalId: ARSENAL, homeGoals: 4, awayGoals: 0 }),
+      ],
+      { homeExternalId: ARSENAL, venueName: EMIRATES },
+    )
+    expect(s.venueDrought?.visits).toBe(3)
+    expect(s.meetings).toBe(4)
+  })
+
+  it('still measures when the fixture carries no venue string', () => {
+    // ⚠ `venueName` IS A LABEL, NOT A FILTER. The cut is who was at home, which
+    // needs no string at all — so a fixture with a null venue still gets a real
+    // record and a real drought. The screen falls back to "this ground" in the
+    // sentence.
+    const s = summariseH2H([atEmirates(2026, 2, 1), atEmirates(2025, 1, 0), atEmirates(2024, 3, 0)], {
+      homeExternalId: ARSENAL,
+      venueName: null,
+    })
+    expect(s.atVenue).toMatchObject({ played: 3 })
+    expect(s.venueDrought).toMatchObject({ side: 'away', visits: 3 })
   })
 })
