@@ -2088,23 +2088,13 @@ export type ScoutMatchForm = {
   seasonPlayed: number;
 };
 
-/**
- * A club on the scout sheet, carrying the provider's id.
- *
- * ⚠ THE ID IS WHAT LETS THE LAST-FIVE STRIP DRAW CRESTS. Each past meeting
- * names its home side by `homeExternalId`, and the two clubs swap ends between
- * fixtures — so without this the strip could not tell which crest belonged on
- * top of which scoreline.
- */
-export type ScoutFixtureClub = ScoutClubRef & { externalClubId: number };
-
 export type MatchScoutResponse = {
   fixture: {
     fixture_id: string;
     kickoff_at: string;
     venue: string | null;
-    home: ScoutFixtureClub;
-    away: ScoutFixtureClub;
+    home: ScoutClubRef;
+    away: ScoutClubRef;
   };
   form: ScoutMatchForm | null;
   h2h: { summary: H2HSummary; enough: boolean; minMeetings: number } | null;
