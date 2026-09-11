@@ -1,10 +1,59 @@
+import Constants from 'expo-constants';
+
 import type { LeagueDepth, LeagueMode, PredictionMode } from './predictionMode';
 import { supabase } from './supabase';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+/** Where the API lives when nothing else says otherwise. */
+const PROD_BASE_URL = 'https://sportpool.io';
 
-if (!BASE_URL) {
-  throw new Error('EXPO_PUBLIC_API_BASE_URL is not set in mobile/.env.local');
+/** The port `npm run dev` serves the Next app on, at the repo root. */
+const DEV_API_PORT = 3000;
+
+/**
+ * Resolve the API origin, in priority order.
+ *
+ * ⚠⚠ DO NOT REINTRODUCE A HARDCODED LAN IP HERE OR IN `.env.local`.
+ *
+ * A LAN address written down anywhere is wrong twice over. It goes stale the
+ * moment the router hands this Mac a new DHCP lease — and because
+ * `EXPO_PUBLIC_*` is INLINED INTO THE BUNDLE at build time and `eas.json`
+ * sets no `env` block for it, whatever sits in `.env.local` is what ships.
+ * A stale LAN IP in that file is a production bundle that calls an address
+ * no one outside the office can reach, and every screen in here fails
+ * silently — `apiFetch` just never resolves.
+ *
+ * So instead:
+ *
+ * 1. An explicit `EXPO_PUBLIC_API_BASE_URL` always wins. This is the escape
+ *    hatch — point it at a preview deploy, or at a tunnel host when running
+ *    `expo start --tunnel` (where the derivation below cannot work, since the
+ *    tunnel forwards Metro's port only).
+ * 2. Otherwise, in dev, derive the host from Metro itself. `hostUri` is the
+ *    address serving this very bundle (e.g. `192.168.68.109:8081`), so the
+ *    Next dev server is by definition on that same machine. This tracks DHCP
+ *    for free: no lease change can desync it.
+ * 3. Otherwise, production.
+ */
+function resolveBaseUrl(): string {
+  const explicit = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, '');
+
+  if (__DEV__) {
+    // Present only under @expo/cli. Strip any path, then the port, to leave
+    // the bare host.
+    const host = Constants.expoConfig?.hostUri?.split('/')[0]?.split(':')[0];
+    if (host) return `http://${host}:${DEV_API_PORT}`;
+  }
+
+  return PROD_BASE_URL;
+}
+
+const BASE_URL = resolveBaseUrl();
+
+if (__DEV__) {
+  // This failure mode is otherwise invisible: a wrong origin looks exactly
+  // like an app with no data in it. Say the origin out loud once at startup.
+  console.log(`[api] base URL: ${BASE_URL}`);
 }
 
 type Options = {
