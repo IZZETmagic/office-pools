@@ -126,7 +126,7 @@ function Header({ data }: { data: MatchScoutResponse | null }) {
       }}
     >
       <Text variant="caption" color="slate">
-        Scout
+        Scout report
       </Text>
 
       {data ? (
