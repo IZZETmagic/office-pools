@@ -1063,14 +1063,6 @@ export default function PoolDetailScreen() {
         Rendering it before the pager would put the scrolling content on top of
         it. It reports its expanded height back so every page can pad by it.
       */}
-      {/* ⚠ AFTER THE PAGER, like the band below it — a sheet rendered before
-          would have the scrolling content painted on top of it. */}
-      <DossierSheet
-        poolId={pool.poolId}
-        entryId={scoutingEntryId}
-        onClose={() => setScoutingEntryId(null)}
-      />
-
       {isShowdownPool ? (
         <ShowdownDuelHeader
           poolName={pool.poolName}
@@ -1097,6 +1089,27 @@ export default function PoolDetailScreen() {
       <BanterFab
         unreadCount={banter.unreadCount}
         onPress={() => banterSheetRef.current?.open()}
+      />
+
+      {/*
+        ⚠⚠ AFTER THE BAND AND THE FAB, BECAUSE PAINT ORDER IS TREE ORDER. It sat
+        directly ABOVE the Showdown band and the band drew straight over it — the
+        sheet slid up underneath the matchup header and its backdrop stopped at
+        the tab bar. The comment on it even said "after the pager, like the band
+        below it", which was true and not the point: being after the PAGER is
+        what stops the scrolling content covering it, and being after the BAND is
+        what stops the band covering it. Two different siblings, two different
+        requirements.
+
+        ⚠ AND STILL BEFORE THE RECAP AND THE WALKOUT, deliberately. Those are
+        full-screen ceremonies and they are supposed to take the screen over —
+        including over this. The rule down this whole block is that the further
+        down you are, the more you cover.
+      */}
+      <DossierSheet
+        poolId={pool.poolId}
+        entryId={scoutingEntryId}
+        onClose={() => setScoutingEntryId(null)}
       />
 
       {/*
