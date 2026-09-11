@@ -235,9 +235,14 @@ COMMENT ON FUNCTION public.league_crowd_majority(uuid[]) IS
   'Returns the full three-way split as COUNTS so the caller owns its rounding — '
   'three percentages rounded independently total 99 or 101.';
 
--- ⚠ `authenticated` MAY EXECUTE IT, which is safe for the two reasons above and
--- only those two: the answer names no member, and it covers only picks that are
--- already revealed. Widening either of those makes this grant wrong.
+-- ⚠ `authenticated` MAY EXECUTE IT, which is safe for two reasons and only
+-- those two: the answer names no member, and no fixture is answered at all
+-- unless at least three DISTINCT POOLS have picked it.
+--
+-- ⚠⚠ THE SECOND REASON USED TO BE "it covers only revealed picks" AND THAT IS
+-- NO LONGER TRUE — the open matchweek is counted now, deliberately, because the
+-- scout sheet is opened from the prediction flow. The pool count is what
+-- replaced it. Weakening the pool floor makes this grant wrong.
 REVOKE ALL ON FUNCTION public.league_crowd_majority(uuid[]) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.league_crowd_majority(uuid[]) TO authenticated, service_role;
 
