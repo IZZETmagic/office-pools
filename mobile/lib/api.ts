@@ -2088,6 +2088,24 @@ export type ScoutMatchForm = {
   seasonPlayed: number;
 };
 
+/** How the platform called one fixture, as COUNTS. */
+export type ScoutCrowd = {
+  fixtureId: string;
+  picks: number;
+  home: number;
+  draw: number;
+  away: number;
+  majority: 'home' | 'away' | null;
+  /**
+   * ⚠ ITS DENOMINATOR IS `scorePicks`, NOT `picks`. A Results pool files an
+   * outcome and no scoreline, so the two differ on a platform carrying both —
+   * and dividing by the wrong one overstates how settled the crowd is.
+   */
+  topScore: string | null;
+  topScorePicks: number;
+  scorePicks: number;
+};
+
 export type MatchScoutResponse = {
   fixture: {
     fixture_id: string;
@@ -2117,6 +2135,18 @@ export type MatchScoutResponse = {
    * normal in August and a different sentence again.
    */
   people?: { home: SideScout; away: SideScout } | null;
+  /**
+   * How the whole platform called this fixture.
+   *
+   * ⚠⚠ PLATFORM-WIDE AND ANONYMOUS, NEVER THIS VIEWER'S POOL. The server
+   * function takes no pool argument, so the phone cannot narrow it either, and
+   * it refuses any fixture picked by fewer than three distinct pools — twelve
+   * picks can be twelve members of one pool.
+   *
+   * ⚠ NULL IS ORDINARY HERE. A fixture below the anonymity gate has no crowd
+   * answer, and so does every fixture until migration 142 is applied.
+   */
+  crowd?: ScoutCrowd | null;
   h2h?: { summary: H2HSummary; enough: boolean; minMeetings: number } | null;
 };
 

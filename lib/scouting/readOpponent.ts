@@ -254,6 +254,20 @@ export type CrowdSplit = {
   draw: number
   away: number
   majority: 'home' | 'away' | null
+  /**
+   * The most-picked scoreline, over the picks that HAVE one.
+   *
+   * ⚠ ITS DENOMINATOR IS `scorePicks`, NOT `picks`. A Results pool files an
+   * outcome and no scoreline, so on a platform carrying both depths the two
+   * differ — and dividing by the wrong one would overstate how settled the
+   * crowd is on a line.
+   *
+   * ⚠ NULL WHEN NOBODY FILED ONE, which is every fixture if the only pools
+   * picking it are Results-depth.
+   */
+  topScore: string | null
+  topScorePicks: number
+  scorePicks: number
 }
 
 /**
@@ -288,6 +302,9 @@ export async function readCrowdSplit(
     home_picks: number
     draw_picks: number
     away_picks: number
+    top_score: string | null
+    top_score_picks: number
+    score_picks: number
   }[]) {
     out.set(r.fixture_id, {
       fixtureId: r.fixture_id,
@@ -296,6 +313,9 @@ export async function readCrowdSplit(
       draw: r.draw_picks,
       away: r.away_picks,
       majority: r.majority === 'home' || r.majority === 'away' ? r.majority : null,
+      topScore: r.top_score,
+      topScorePicks: r.top_score_picks,
+      scorePicks: r.score_picks,
     })
   }
   return out

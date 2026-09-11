@@ -109,6 +109,11 @@ export function MatchScoutSheet({
               homeClub={data.fixture.home}
               awayClub={data.fixture.away}
             />
+            <CrowdCard
+              crowd={data.crowd}
+              homeName={data.fixture.home.name}
+              awayName={data.fixture.away.name}
+            />
           </>
         ) : null}
       </ScoutSheetBody>
@@ -868,6 +873,130 @@ function PersonRow({ row, first }: { row: PersonPick; first: boolean }) {
           {player.rating.toFixed(2)}
         </RNText>
       </View>
+    </View>
+  );
+}
+
+/**
+ * How the whole platform called this fixture.
+ *
+ * ## ⚠⚠ THE SCOPE IS ON THE CARD, NOT JUST IN THE CODE
+ *
+ * A member seeing a split beside a fixture will assume it is their pool unless
+ * told otherwise, and their pool is exactly what it must never be. The line at
+ * the foot is load-bearing: picks reveal per matchweek and the Showdown draw is
+ * sealed, so a pool-scoped version of this card would defeat both.
+ *
+ * ⚠ IT IS SAFE BECAUSE OF THE POOL COUNT, NOT THE PICK COUNT. The server
+ * refuses any fixture picked by fewer than three distinct pools — twelve picks
+ * can be twelve members of one pool, and reporting that back to one of them is
+ * the leak. The card cannot narrow the figure even if it wanted to; the
+ * function takes no pool argument.
+ *
+ * ⚠ NULL IS ORDINARY. Below the gate there is no crowd answer, and there is
+ * none at all until migration 142 is applied — so this draws nothing rather
+ * than claiming a failure.
+ */
+function CrowdCard({
+  crowd,
+  homeName,
+  awayName,
+}: {
+  crowd: MatchScoutResponse['crowd'];
+  homeName: string;
+  awayName: string;
+}) {
+  const theme = useTheme();
+
+  // ⚠ ABSENT AND NULL BOTH DRAW NOTHING HERE, unlike the other cards. A fixture
+  // below the anonymity gate has no crowd — that is the guard working, not a
+  // fault, and "could not be loaded" would misreport it as one.
+  if (!crowd) return null;
+
+  // ⚠ COUNTS IN, PERCENTAGES OUT, AND THE DIVISION HAPPENS ONCE. Rounding three
+  // shares independently lets them total 99 or 101 and leaves a gap in the bar;
+  // the flex values are the raw counts, so the bar is exact whatever the labels
+  // round to.
+  const total = Math.max(1, crowd.picks);
+  const pct = (n: number) => Math.round((n / total) * 100);
+
+  return (
+    <Card title="The crowd">
+      <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 12 }}>
+        <Text variant="detail" color="slate">
+          How SportPool picked this fixture
+        </Text>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            height: 30,
+            borderRadius: theme.radii.xs,
+            overflow: 'hidden',
+          }}
+        >
+          <Bar flex={crowd.home} color={theme.colors.primary} label={`${pct(crowd.home)}%`} dark />
+          <Bar flex={crowd.draw} color={theme.colors.silver} label={`${pct(crowd.draw)}%`} />
+          <Bar flex={crowd.away} color={theme.colors.accent} label={`${pct(crowd.away)}%`} />
+        </View>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+          <Key color={theme.colors.primary} label={homeName} />
+          <Key color={theme.colors.silver} label="Draw" />
+          <Key color={theme.colors.accent} label={awayName} />
+        </View>
+
+        {/* ⚠ ITS OWN DENOMINATOR. A Results pool files no scoreline, so this is
+            a share of the picks that HAVE one — smaller than the bar above it,
+            and saying so is the difference between a fact and a coincidence. */}
+        {crowd.topScore && crowd.scorePicks > 0 ? (
+          <Line
+            label="Most-picked scoreline"
+            value={crowd.topScore.replace('-', '–')}
+            note={`${Math.round((crowd.topScorePicks / crowd.scorePicks) * 100)}% of ${crowd.scorePicks}`}
+            accent
+          />
+        ) : null}
+
+        <View
+          style={{
+            backgroundColor: withOpacity(theme.colors.red, 0.08),
+            borderRadius: theme.radii.sm,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+          }}
+        >
+          <Text variant="detail" style={{ color: theme.colors.red, lineHeight: 16 }}>
+            {crowd.picks} picks from across every pool on SportPool — never your own.
+          </Text>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+/** One segment of the crowd bar. */
+function Bar({
+  flex,
+  color,
+  label,
+  dark,
+}: {
+  flex: number;
+  color: string;
+  label: string;
+  dark?: boolean;
+}) {
+  // ⚠ A ZERO-WIDTH SEGMENT MUST NOT RENDER ITS LABEL. `flex: 0` collapses the
+  // view but the text inside still lays out and can escape it.
+  if (flex <= 0) return null;
+  return (
+    <View style={{ flex, alignItems: 'center', justifyContent: 'center', backgroundColor: color }}>
+      <RNText
+        style={{ fontFamily: MONO_BOLD, fontSize: 11, color: dark ? '#FFFFFF' : '#0B0F1A' }}
+      >
+        {label}
+      </RNText>
     </View>
   );
 }

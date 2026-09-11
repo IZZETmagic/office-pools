@@ -8,6 +8,7 @@ import { fetchCachedH2H } from '@/lib/scouting/h2hFetch'
 import { buildMatchForm, type FormFixture } from '@/lib/scouting/form'
 import { scoutSide, type SideScout } from '@/lib/scouting/players'
 import { readClubPlayerForm } from '@/lib/scouting/readPlayers'
+import { readCrowdSplit } from '@/lib/scouting/readOpponent'
 import type { ClubRef } from '@/lib/scouting/opponent'
 
 // =============================================================
@@ -129,7 +130,7 @@ async function handler(
    * every branch resolves to null instead. Losing one card beats losing the
    * sheet, and each card already says when it is the one that is missing.
    */
-  const [form, people, h2h] = await Promise.all([
+  const [form, people, crowd, h2h] = await Promise.all([
     readForm(admin, fixture, homeClub, awayClub).catch((e) => {
       console.error('[scout] form unavailable for', fixture_id, '—', (e as Error).message)
       return null
@@ -138,6 +139,25 @@ async function handler(
       console.error('[scout] player form unavailable for', fixture_id, '—', (e as Error).message)
       return null
     }),
+    /**
+     * How the whole platform called this fixture.
+     *
+     * ⚠⚠ PLATFORM-WIDE AND ANONYMOUS, NEVER THIS VIEWER'S POOL.
+     * `league_crowd_majority` takes no pool argument precisely so it cannot be
+     * narrowed by accident, and it refuses any fixture picked by fewer than
+     * three distinct pools — twelve picks can be twelve members of one pool,
+     * and reporting that back to one of them is the leak the weekly reveal and
+     * the sealed draw exist to stop.
+     *
+     * ⚠ BEST-EFFORT, AND ITS ABSENCE IS SILENT. Migration 142 must be applied
+     * before this returns anything; without it the card simply does not appear.
+     */
+    readCrowdSplit(admin, [fixture_id])
+      .then((m) => m.get(fixture_id) ?? null)
+      .catch((e) => {
+        console.error('[scout] crowd unavailable for', fixture_id, '—', (e as Error).message)
+        return null
+      }),
     readH2H(fixture).catch((e) => {
       // The provider being unavailable is not the same as two clubs never
       // having played, and the phone must be able to tell them apart — hence
@@ -157,6 +177,7 @@ async function handler(
     },
     form,
     people,
+    crowd,
     h2h,
   })
 }
