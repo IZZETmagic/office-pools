@@ -46,6 +46,7 @@ import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import { getCompetitionBand } from '@/lib/design/competitionBand';
 import { displayPlayerName } from '@/lib/playerName';
 import { refereeName } from '@/lib/refereeName';
+import { FULL_TIME } from '@/lib/playerStats';
 import { fixturePalette } from '@/lib/design/clubColors';
 import { matchTabs, type MatchTabKey } from '@/lib/matchTabs';
 import { useManualRefresh } from '@/lib/useManualRefresh';
@@ -263,6 +264,14 @@ export default function MatchDetailScreen() {
             substitutionMinutes={timeline
               .filter((e) => e.kind === 'subst' && e.minute !== null)
               .map((e) => e.minute as number)}
+            // ⚠⚠ A LIVE MATCH IS NOT A 90-MINUTE ONE. The substitution arrow is
+            // inferred from "played fewer minutes than the match has", so passing
+            // full time while the game is running marks EVERY starter as
+            // substituted — and dates every substitute's entry by the time left.
+            // `liveMinute` is api-football's `elapsed`; it holds at 45 through
+            // half time and counts 91-120 in extra time, which is exactly the
+            // frame this judgement wants.
+            progress={m.status === 'live' ? { minute: m.liveMinute, isLive: true } : FULL_TIME}
             homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
             awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
             homeTeam={m.homeTeam}

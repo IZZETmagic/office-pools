@@ -31,6 +31,7 @@ import {
   statGroups,
   headlineParts,
   type MatchPlayerStat,
+  type MatchProgress,
 } from '@/lib/playerStats';
 
 // =============================================================
@@ -81,6 +82,7 @@ export function PlayerStatSheet({
   teamName,
   tint,
   substMinutes,
+  progress,
   onClose,
 }: {
   stat: MatchPlayerStat | null;
@@ -92,6 +94,8 @@ export function PlayerStatSheet({
    * the minute his own row already implies rather than supplying one.
    */
   substMinutes: ReadonlySet<number>;
+  /** See `progress` on LineupsTab — a live match is not a 90-minute one. */
+  progress: MatchProgress;
   onClose: () => void;
 }) {
   const theme = useTheme();
@@ -125,7 +129,7 @@ export function PlayerStatSheet({
   const groups = statGroups(stat)
     .map((g) => ({ ...g, rows: g.rows.filter((r) => !covered.has(r.label)) }))
     .filter((g) => g.rows.length > 0);
-  const headline = headlineParts(stat, subMinute(stat, substMinutes));
+  const headline = headlineParts(stat, subMinute(stat, substMinutes, progress));
   const photo = playerPhotoUrl(stat.externalPlayerId);
   // ⚠ Dark mode keeps the translucent tint, which reads well over a dark
   // surface. Light mode needs a colour of its own — see HEADER_LIGHTNESS.

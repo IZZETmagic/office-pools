@@ -24,6 +24,7 @@ import {
   subMinute,
   teamRating,
   type MatchPlayerStat,
+  type MatchProgress,
 } from '@/lib/playerStats';
 import type { LineupPlayer, MatchLineup } from '@/lib/useMatchDetail';
 import type { ResultsTeam } from '@/lib/useTournamentMatches';
@@ -81,6 +82,7 @@ export function LineupsTab({
   lineups,
   playerStats,
   substitutionMinutes,
+  progress,
   homeName,
   awayName,
   homeTeam,
@@ -96,6 +98,13 @@ export function LineupsTab({
    * See `subMinute`.
    */
   substitutionMinutes: number[];
+  /**
+   * ⚠⚠ HOW FAR THE MATCH HAS GOT, and it is not decoration. The substitution
+   * arrow is inferred from "played fewer minutes than the match has", so a
+   * frame of 90 on a running match marks every starter as substituted. See
+   * `leftBefore` in playerStats.
+   */
+  progress: MatchProgress;
   homeName: string;
   awayName: string;
   /** For the shirt colours — the crest URL is where the club's id hides. */
@@ -148,6 +157,7 @@ export function LineupsTab({
           statsById={statsById}
           onPick={setOpen}
           substMinutes={substMinutes}
+          progress={progress}
         />
         <TeamBar
           lineup={away}
@@ -181,6 +191,7 @@ export function LineupsTab({
         teamName={open?.team ?? ''}
         tint={open?.tint ?? palette.home}
         substMinutes={substMinutes}
+        progress={progress}
         onClose={() => setOpen(null)}
       />
     </View>
@@ -208,6 +219,7 @@ function Pitch({
   statsById,
   onPick,
   substMinutes,
+  progress,
 }: {
   home: MatchLineup | null;
   away: MatchLineup | null;
@@ -218,6 +230,7 @@ function Pitch({
   statsById: StatsById;
   onPick: Pick;
   substMinutes: ReadonlySet<number>;
+  progress: MatchProgress;
 }) {
   const theme = useTheme();
 
@@ -269,6 +282,7 @@ function Pitch({
         statsById={statsById}
         onPick={onPick}
         substMinutes={substMinutes}
+        progress={progress}
       />
       <Half
         lineup={away}
@@ -278,6 +292,7 @@ function Pitch({
         statsById={statsById}
         onPick={onPick}
         substMinutes={substMinutes}
+        progress={progress}
       />
 
     </View>
@@ -402,6 +417,7 @@ function Half({
   statsById,
   onPick,
   substMinutes,
+  progress,
 }: {
   lineup: MatchLineup | null;
   tint: string;
@@ -410,6 +426,7 @@ function Half({
   statsById: StatsById;
   onPick: Pick;
   substMinutes: ReadonlySet<number>;
+  progress: MatchProgress;
 }) {
   if (!lineup) {
     return (
@@ -498,7 +515,8 @@ function Half({
                 player={player}
                 tint={tint}
                 stat={stat}
-                subbedAt={stat ? subMinute(stat, substMinutes) : null}
+                subbedAt={stat ? subMinute(stat, substMinutes, progress) : null}
+                progress={progress}
               />
             </Pressable>
           );
@@ -513,15 +531,17 @@ function Shirt({
   tint,
   stat,
   subbedAt,
+  progress,
 }: {
   player: LineupPlayer;
   tint: string;
   stat: MatchPlayerStat | undefined;
   subbedAt: number | null;
+  progress: MatchProgress;
 }) {
   const rating = stat?.rating ?? null;
   const photo = playerPhotoUrl(player.playerId);
-  const marks = stat ? playerMarkers(stat) : null;
+  const marks = stat ? playerMarkers(stat, progress) : null;
 
   return (
     <View style={{ alignItems: 'center', gap: 3 }}>

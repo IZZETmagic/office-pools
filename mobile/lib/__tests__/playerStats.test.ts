@@ -250,6 +250,60 @@ describe('playerMarkers', () => {
     expect(playerMarkers(player({ isStarter: false, minutes: 0 })).cameOn).toBe(false);
   });
 
+  // =============================================================
+  // The live pitch
+  // =============================================================
+  // ⚠⚠ THE BUG THESE PIN. `cameOff` was `minutes < 90`, so 69 minutes into a
+  // running match every starter had "played under 90" and ALL ELEVEN wore a
+  // substitution arrow. Reported from a real Serie A fixture at 69:13.
+  it('⚠⚠ LIVE: a starter still on the pitch has NO arrow', () => {
+    const live = { minute: 69, isLive: true };
+    // He has played the whole match so far — 69 of 69.
+    expect(playerMarkers(player({ isStarter: true, minutes: 69 }), live).cameOff).toBe(false);
+    // And the whole eleven, which is what the screenshot showed.
+    for (const m of [67, 68, 69]) {
+      expect(playerMarkers(player({ isStarter: true, minutes: m }), live).cameOff).toBe(false);
+    }
+  });
+
+  it('⚠ LIVE: a starter actually substituted still gets the arrow', () => {
+    const live = { minute: 69, isLive: true };
+    expect(playerMarkers(player({ isStarter: true, minutes: 44 }), live).cameOff).toBe(true);
+    expect(playerMarkers(player({ isStarter: true, minutes: 60 }), live).cameOff).toBe(true);
+  });
+
+  it('⚠⚠ LIVE: the two feeds disagree by a minute, and that must not mark anyone', () => {
+    // `minutes` comes from /players and `live_minute` from /fixtures, refreshed
+    // by different syncs — measured disagreeing by one minute in 9.6% of cases.
+    // Without the lag guard a lagging stats feed invents a substitution.
+    const live = { minute: 69, isLive: true };
+    expect(playerMarkers(player({ isStarter: true, minutes: 68 }), live).cameOff).toBe(false);
+    expect(playerMarkers(player({ isStarter: true, minutes: 67 }), live).cameOff).toBe(false);
+  });
+
+  it('⚠ LIVE: no minute from the feed yet means no claim about anybody', () => {
+    const live = { minute: null, isLive: true };
+    expect(playerMarkers(player({ isStarter: true, minutes: 20 }), live).cameOff).toBe(false);
+  });
+
+  it('⚠ HALF TIME holds at 45, so the half is not a mass substitution', () => {
+    const ht = { minute: 45, isLive: true };
+    expect(playerMarkers(player({ isStarter: true, minutes: 45 }), ht).cameOff).toBe(false);
+    // But a first-half substitution is real.
+    expect(playerMarkers(player({ isStarter: true, minutes: 30 }), ht).cameOff).toBe(true);
+  });
+
+  it('⚠ EXTRA TIME counts past 90 and still reads correctly', () => {
+    const et = { minute: 105, isLive: true };
+    expect(playerMarkers(player({ isStarter: true, minutes: 105 }), et).cameOff).toBe(false);
+    expect(playerMarkers(player({ isStarter: true, minutes: 80 }), et).cameOff).toBe(true);
+  });
+
+  it('⚠ a FINISHED match is unchanged — the old behaviour is the default', () => {
+    expect(playerMarkers(player({ isStarter: true, minutes: 89 })).cameOff).toBe(true);
+    expect(playerMarkers(player({ isStarter: true, minutes: 90 })).cameOff).toBe(false);
+  });
+
   it('⚠⚠ a SENDING-OFF is not a substitution', () => {
     // A red card also ends a match early. Drawing him with a substitution
     // arrow would say something false about why he left the pitch.
@@ -324,6 +378,20 @@ describe('subMinute — `minutes` proposes, the timeline confirms', () => {
 
   it('⚠ a sending-off never gets a substitution minute', () => {
     expect(subMinute(player({ isStarter: true, minutes: 34, redCards: 1 }), new Set([34]))).toBeNull();
+  });
+
+  it("⚠⚠ LIVE: a substitute's entry minute is against the CURRENT minute, not 90", () => {
+    // Reported: Beto came on at 60' in a match at 69' and the sheet said 81'.
+    // 9 minutes played against a hardcoded 90 implies 81; against 69 it is 60.
+    const beto = player({ isStarter: false, minutes: 9 });
+    expect(subMinute(beto, new Set([60]), { minute: 69, isLive: true })).toBe(60);
+    expect(subMinute(beto, new Set([60]))).toBeNull();
+  });
+
+  it('⚠ LIVE: a starter substituted at a corroborated minute keeps his minute', () => {
+    const off = player({ isStarter: true, minutes: 44 });
+    expect(subMinute(off, new Set([44]), { minute: 69, isLive: true })).toBe(44);
+    expect(subMinute(off, new Set([43]), { minute: 69, isLive: true })).toBeNull();
   });
 });
 

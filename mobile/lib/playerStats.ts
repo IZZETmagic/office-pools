@@ -356,6 +356,61 @@ export type PlayerMarkers = {
 };
 
 /**
+ * How far the match has got. Every "he left early" judgement is made against
+ * this, and getting it wrong is not a cosmetic error — see `leftBefore`.
+ */
+export type MatchProgress = {
+  /**
+   * The minute the match has reached — `league_fixtures.live_minute`, which is
+   * api-football's `elapsed`. Null while live before the feed reports one.
+   *
+   * ⚠ It HOLDS at 45 through half time and all of first-half stoppage, and it
+   * counts 91→120 in extra time. It is the minute the match is at, not the
+   * minute a clock would show.
+   */
+  minute: number | null;
+  /** True only while the match is actually running. */
+  isLive: boolean;
+};
+
+/** A finished match — the only frame that existed before lineups went live. */
+export const FULL_TIME: MatchProgress = { minute: 90, isLive: false };
+
+/**
+ * ⚠⚠ THE LAG GUARD. `minutes` (from `/players`) and `live_minute` (from
+ * `/fixtures`) are two different feeds refreshed by two different syncs, and
+ * this file already measures them disagreeing by a minute in 9.6% of cases. So
+ * a player still on the pitch routinely reports 68 while the match says 69.
+ *
+ * Comparing them exactly would therefore put a substitution arrow on whoever
+ * the stats feed happened to lag on — a wrong badge that appears and vanishes
+ * as the syncs leapfrog. Two minutes is wide enough to absorb the observed
+ * disagreement and still catch a real substitution, which is minutes off the
+ * pace within seconds of happening.
+ */
+const LIVE_LAG_MINUTES = 2;
+
+/**
+ * The minute before which leaving means "he was substituted".
+ *
+ * ⚠⚠ THIS IS THE WHOLE FIX FOR THE LIVE PITCH. It used to be the constant 90,
+ * which reads "a starter who played under 90 minutes came off" — true at full
+ * time, and catastrophic at 69 minutes of a running match, where it put a
+ * substitution arrow on ALL ELEVEN starters because none of them had reached 90
+ * yet. The inference was written for a finished match and nothing told it the
+ * match was still going.
+ *
+ * ⚠ NO MINUTE YET MEANS NO CLAIM. Live with a null minute returns 0, so nobody
+ * is marked. An arrow on everyone is far worse than an arrow on nobody: the
+ * first is a confident lie, the second is visibly just "not known yet".
+ */
+function leftBefore(progress: MatchProgress): number {
+  if (!progress.isLive) return progress.minute ?? 90;
+  if (progress.minute == null) return 0;
+  return Math.max(0, progress.minute - LIVE_LAG_MINUTES);
+}
+
+/**
  * ⚠⚠ THE SUBSTITUTION ARROW IS INFERRED, AND THE MINUTE DELIBERATELY IS NOT.
  * There is no join between a player and the timeline: `match_events` carries
  * abbreviated names from `/events` ("S. Ajayi") while these rows carry full
@@ -373,7 +428,10 @@ export type PlayerMarkers = {
  * early, and drawing him with a substitution arrow would say something false
  * about why he left.
  */
-export function playerMarkers(s: MatchPlayerStat, fullMatchMinutes = 90): PlayerMarkers {
+export function playerMarkers(
+  s: MatchPlayerStat,
+  progress: MatchProgress = FULL_TIME,
+): PlayerMarkers {
   const minutes = s.minutes ?? 0;
   const red = s.redCards ?? 0;
   return {
@@ -383,7 +441,7 @@ export function playerMarkers(s: MatchPlayerStat, fullMatchMinutes = 90): Player
     red,
     captain: s.isCaptain,
     cameOn: !s.isStarter && minutes > 0,
-    cameOff: s.isStarter && minutes > 0 && minutes < fullMatchMinutes && red === 0,
+    cameOff: s.isStarter && minutes > 0 && minutes < leftBefore(progress) && red === 0,
   };
 }
 
@@ -424,9 +482,9 @@ export function teamRating(stats: MatchPlayerStat[], side: 'home' | 'away'): num
 export function subMinute(
   s: MatchPlayerStat,
   substitutionMinutes: ReadonlySet<number>,
-  fullMatchMinutes = 90,
+  progress: MatchProgress = FULL_TIME,
 ): number | null {
-  const m = playerMarkers(s, fullMatchMinutes);
+  const m = playerMarkers(s, progress);
   const minutes = s.minutes;
   if (minutes === null || minutes <= 0) return null;
 
@@ -436,8 +494,19 @@ export function subMinute(
   // ⚠ HE CAME ON, SO IT IS THE OTHER WAY ROUND: the match length less the time
   // he played. Corroborated exactly the same way and measured just as well —
   // 1,085 of 1,347 substitutes, 80.5%, against 84.5% for the ones going off.
+  //
+  // ⚠⚠ AND IT IS THE MATCH'S CURRENT MINUTE, NOT 90, OR IT IS WRONG ALL GAME.
+  // A substitute who came on at 60 has played 9 minutes when the match is at
+  // 69; against a hardcoded 90 that implies he entered at 81. Every live
+  // substitute wore a minute that was too late by exactly the time left.
+  //
+  // ⚠ NO LAG GUARD HERE, DELIBERATELY. `leftBefore` needs one because it
+  // decides a boolean from a near-miss comparison; this needs an exact number,
+  // and the timeline corroboration below is already the guard — an implied
+  // minute that is off by the feeds' disagreement simply fails to match a real
+  // substitution and shows nothing, which is the documented fallback.
   if (m.cameOn) {
-    const implied = fullMatchMinutes - minutes;
+    const implied = (progress.minute ?? 90) - minutes;
     return implied > 0 && substitutionMinutes.has(implied) ? implied : null;
   }
   return null;
