@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { LogBox, useColorScheme } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
@@ -224,6 +225,13 @@ function InnerLayout() {
         storm rather than like a bug. */}
     <QueryClientProvider client={queryClient}>
     <GestureHandlerRootView style={{ flex: 1 }}>
+    {/* ⚠ THE PORTAL HOST FOR `BottomSheetModal`. The scout sheets open from a
+        card inside a tab inside a horizontal pager, where a plain `BottomSheet`
+        would be laid out inside the card that triggered it — in React Native
+        `position: absolute` fills the nearest ancestor, not the screen. Modal
+        sheets portal here instead. Plain `BottomSheet` usages elsewhere
+        (Banter, the pool sheets) are unaffected by this provider. */}
+    <BottomSheetModalProvider>
     <KeyboardProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <HomeDataProvider>
@@ -362,6 +370,7 @@ function InnerLayout() {
       <StatusBar style="auto" />
     </ThemeProvider>
     </KeyboardProvider>
+    </BottomSheetModalProvider>
     </GestureHandlerRootView>
     </QueryClientProvider>
     </SafeAreaProvider>

@@ -1,21 +1,15 @@
-import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
   Image,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text as RNText,
-  useWindowDimensions,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
-import { Icon, Text } from '@/components/ui';
+import { ScoutSheet, ScoutSheetBody } from '@/components/scouting/ScoutSheet';
+import { Text } from '@/components/ui';
 import type {
   H2HSummary,
   MatchScoutResponse,
@@ -33,14 +27,12 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // fixture. It is a GLANCE, not a report: two cards, no tabs, no navigation, and
 // the picker is still behind it when it closes.
 //
-// ⚠ THE SHELL IS `PlayerStatSheet`'s, as `DossierSheet`'s is — vanilla RN
-// `Modal` over gorhom, a SIBLING backdrop so the list can scroll, and a
-// DEFINITE height so Yoga has a box to hand the ScrollView. All three were bugs
-// on that sheet first; see `DossierSheet` for the long version.
+// ⚠ THE SHELL IS `ScoutSheet` — gorhom, so it can be thrown back down with a
+// drag, the way the Banter sheet is. Ryan, 2026-09-10.
 //
-// ⚠ SHORTER THAN THE OTHER TWO SHEETS, DELIBERATELY. A dossier is something you
-// read; this is something you check. 72% leaves the picker visible behind it,
-// which is the whole difference between a peek and a page.
+// ⚠ SHORTER THAN THE DOSSIER, DELIBERATELY. A dossier is something you read;
+// this is something you check. 72% leaves the picker visible behind it, which
+// is the whole difference between a peek and a page.
 //
 // ## ⚠⚠ THE TWO HALVES GO MISSING FOR OPPOSITE REASONS
 //
@@ -58,103 +50,69 @@ export function MatchScoutSheet({
   fixtureId,
   onClose,
 }: {
-  /** Null closes the sheet, matching `PlayerStatSheet`'s `stat` prop. */
+  /**
+   * Null closes the sheet.
+   *
+   * ⚠ THE SHEET STAYS MOUNTED AND DISMISSES, rather than unmounting — that is
+   * what lets the close ANIMATE instead of vanishing. `useMatchScout` does not
+   * fetch on a null id, so a closed sheet costs nothing but a render.
+   *
+   * ⚠ ONE SHEET PER SCREEN, NOT PER ROW. The picker draws ten fixtures and a
+   * sheet per card would hold ten of these.
+   */
   fixtureId: string | null;
   onClose: () => void;
 }) {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
   const { data, loading, error, refresh } = useMatchScout(fixtureId);
 
-  // ⚠ `useState`, not `useRef` — interpolated during render to build the
-  // transform, and reading a ref while rendering is what `react-hooks/refs`
-  // objects to.
-  const [slide] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    Animated.timing(slide, {
-      toValue: fixtureId ? 1 : 0,
-      duration: fixtureId ? 220 : 160,
-      easing: fixtureId ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [fixtureId, slide]);
-
-  if (!fixtureId) return null;
-
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        {/* ⚠⚠ A SIBLING, NOT A PARENT. A `Pressable` claims the touch responder
-            on touch-START, so a ScrollView inside one never receives the scroll
-            gesture. This is what lets the cards below scroll at all. */}
-        <Pressable
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
-        />
-
-        <Animated.View
-          style={{
-            // ⚠ DEFINITE, NOT `maxHeight` — `flex: 1` distributes what REMAINS,
-            // and nothing remains until something is definite.
-            height: screenHeight * 0.72,
-            backgroundColor: theme.colors.snow,
-            borderTopLeftRadius: theme.radii.lg,
-            borderTopRightRadius: theme.radii.lg,
-            overflow: 'hidden',
-            transform: [
-              { translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
-            ],
-          }}
-        >
-          <Header data={data} onClose={onClose} />
-
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 24, gap: 16 }}
-            showsVerticalScrollIndicator={false}
+    <ScoutSheet open={!!fixtureId} onClose={onClose} height="72%">
+      <Header data={data} />
+      <ScoutSheetBody>
+        {loading ? (
+          <View style={{ paddingTop: 40, alignItems: 'center' }}>
+            <ActivityIndicator color={theme.colors.primary} />
+          </View>
+        ) : error ? (
+          <Pressable
+            onPress={() => void refresh()}
+            style={{ marginHorizontal: 20, paddingVertical: 28, alignItems: 'center', gap: 8 }}
           >
-            {loading ? (
-              <View style={{ paddingTop: 40, alignItems: 'center' }}>
-                <ActivityIndicator color={theme.colors.primary} />
-              </View>
-            ) : error ? (
-              <Pressable
-                onPress={() => void refresh()}
-                style={{ marginHorizontal: 20, paddingVertical: 28, alignItems: 'center', gap: 8 }}
-              >
-                <RNText
-                  style={{ fontFamily: fontFamilies.bold, fontSize: 15, color: theme.colors.ink }}
-                >
-                  Could not load the scout report
-                </RNText>
-                <Text variant="detail" color="slate">
-                  Tap to try again
-                </Text>
-              </Pressable>
-            ) : data ? (
-              <>
-                <FormCard form={data.form} />
-                <H2HCard
-                  h2h={data.h2h}
-                  homeName={data.fixture.home.name}
-                  awayName={data.fixture.away.name}
-                  venue={data.fixture.venue}
-                />
-              </>
-            ) : null}
-          </ScrollView>
-        </Animated.View>
-      </View>
-    </Modal>
+            <RNText
+              style={{ fontFamily: fontFamilies.bold, fontSize: 15, color: theme.colors.ink }}
+            >
+              Could not load the scout report
+            </RNText>
+            <Text variant="detail" color="slate">
+              Tap to try again
+            </Text>
+          </Pressable>
+        ) : data ? (
+          <>
+            <FormCard form={data.form} />
+            <H2HCard
+              h2h={data.h2h}
+              homeName={data.fixture.home.name}
+              awayName={data.fixture.away.name}
+              venue={data.fixture.venue}
+            />
+          </>
+        ) : null}
+      </ScoutSheetBody>
+    </ScoutSheet>
   );
 }
 
-/** The fixture itself, so the sheet says which match you are peeking at. */
-function Header({ data, onClose }: { data: MatchScoutResponse | null; onClose: () => void }) {
+/**
+ * The fixture itself, so the sheet says which match you are peeking at.
+ *
+ * ⚠ NO CLOSE BUTTON ANY MORE. The Modal shell needed one because it had no
+ * other affordance; gorhom draws a grab handle above this, the backdrop closes
+ * on a tap and a drag throws it down. A fourth way out would be clutter
+ * competing with the gesture the sheet was rebuilt to have.
+ */
+function Header({ data }: { data: MatchScoutResponse | null }) {
   const theme = useTheme();
 
   return (
@@ -167,30 +125,6 @@ function Header({ data, onClose }: { data: MatchScoutResponse | null; onClose: (
         borderBottomColor: withOpacity(theme.colors.mist, 0.8),
       }}
     >
-      {/* ⚠ NO GRAB HANDLE — it implies a drag this sheet does not support. The
-          X says the same thing honestly, and the backdrop still closes it. */}
-      <Pressable
-        onPress={onClose}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel="Close"
-        style={({ pressed }) => ({
-          position: 'absolute',
-          top: 10,
-          right: 12,
-          width: 30,
-          height: 30,
-          borderRadius: theme.radii.pill,
-          backgroundColor: withOpacity(theme.colors.ink, 0.08),
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: pressed ? 0.6 : 1,
-          zIndex: 2,
-        })}
-      >
-        <Icon name="xmark" size={11} tint={theme.colors.ink} weight="semibold" />
-      </Pressable>
-
       <Text variant="caption" color="slate">
         Scout
       </Text>

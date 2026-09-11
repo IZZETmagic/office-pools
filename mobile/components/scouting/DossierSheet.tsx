@@ -1,21 +1,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
-  Modal,
   Pressable,
-  ScrollView,
-  StyleSheet,
   Text as RNText,
-  useWindowDimensions,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Dossier } from '@/components/scouting/Dossier';
-import { Icon, Text } from '@/components/ui';
+import { ScoutSheet, ScoutSheetBody } from '@/components/scouting/ScoutSheet';
+import { Text } from '@/components/ui';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { withLightness } from '@/lib/design/oklch';
 import { useDossier } from '@/lib/useDossier';
@@ -29,24 +22,20 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // away from the thing you opened it to think about. A scout report is something
 // you glance at with the duel still behind it. Ryan, 2026-09-09.
 //
-// ## ⚠ THE SHELL IS `PlayerStatSheet`'s, DELIBERATELY AND ALMOST EXACTLY
+// ## ⚠ THE SHELL IS `ScoutSheet` — gorhom, so it can be dragged away
 //
-// Same vanilla RN `Modal` + `Animated.View` — not gorhom, which buys gesture
-// dismissal and a snap stack this wants neither of. Same three structural
-// decisions, and every one of them was a bug there first:
+// It shipped on `PlayerStatSheet`'s vanilla `Modal`, whose comment argues the
+// library "buys gesture dismissal and a snap-point stack, and this sheet wants
+// neither". True of a player card; not true here. Ryan asked for the Banter
+// sheet's feel on 2026-09-10 and drag-to-dismiss is the whole reason gorhom
+// exists. The three `Modal` subtleties that used to live here — sibling
+// backdrop, definite height, `BottomSheetScrollView` — are the shell's problem
+// now, and are documented there.
 //
-//   1. THE BACKDROP IS A SIBLING OF THE CARD, NOT ITS PARENT. A `Pressable`
-//      claims the touch responder on touch-START, so a ScrollView inside one
-//      never receives the scroll gesture. That sheet spent two attempts on
-//      `maxHeight` before finding it was never a height problem.
-//   2. A DEFINITE `height`, NOT `maxHeight`. `maxHeight` leaves the box auto,
-//      Yoga hands the ScrollView no fixed height, and the content runs off the
-//      bottom. `flex: 1` distributes what REMAINS, and nothing remains until
-//      something is definite.
-//   3. THE HEADER GRADIENT IS A FIXED HEIGHT BEHIND THE CONTENT, not a
-//      background on it. Anchored to a distance the fade looks identical
-//      however tall the header grows; anchored to the content it re-spreads
-//      every time a name wraps.
+// ⚠ THE HEADER GRADIENT IS STILL A FIXED HEIGHT BEHIND THE CONTENT, not a
+// background on it. Anchored to a distance the fade looks identical however
+// tall the header grows; anchored to the content it re-spreads every time a
+// name wraps.
 //
 // ⚠ THE TINT IS THE MEMBER'S OWN COLOUR. The player sheet uses the club's;
 // the equivalent for a person is the avatar gradient, which is keyed on their
@@ -81,25 +70,7 @@ export function DossierSheet({
   onClose: () => void;
 }) {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
   const { data, loading, error, refresh } = useDossier(poolId, entryId ?? undefined);
-
-  // ⚠ `useState`, NOT `useRef` — this value is interpolated during render to
-  // build the transform, and reading a ref while rendering is what
-  // `react-hooks/refs` objects to. Same call `PlayerStatSheet` makes.
-  const [slide] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    Animated.timing(slide, {
-      toValue: entryId ? 1 : 0,
-      duration: entryId ? 220 : 160,
-      easing: entryId ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [entryId, slide]);
-
-  if (!entryId) return null;
 
   const gradient = data?.user_id ? gradientForUser(data.user_id) : null;
   const tint = gradient ? gradient[0] : NEUTRAL_TINT;
@@ -114,33 +85,8 @@ export function DossierSheet({
     : (data?.full_name ?? 'Scout report');
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        {/* ⚠⚠ A SIBLING, NOT A PARENT — see the header. This is what lets the
-            list below scroll at all. */}
-        <Pressable
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
-        />
-
-        <Animated.View
-          style={{
-            // ⚠⚠ DEFINITE, NOT `maxHeight` — see the header.
-            height: screenHeight * 0.85,
-            // ⚠ SNOW, NOT SURFACE. Cards in this app are `surface` on `snow`;
-            // make the sheet body a screen and the cards can just be cards.
-            backgroundColor: theme.colors.snow,
-            borderTopLeftRadius: theme.radii.lg,
-            borderTopRightRadius: theme.radii.lg,
-            // So the header band reaches the rounded corners.
-            overflow: 'hidden',
-            transform: [
-              { translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
-            ],
-          }}
-        >
+    <ScoutSheet open={!!entryId} onClose={onClose} height="88%">
+      <View style={{ flex: 1 }}>
           <LinearGradient
             // ⚠ Fades to the SAME colour at zero alpha, never 'transparent' —
             // a literal transparent fades through black on iOS.
@@ -161,27 +107,11 @@ export function DossierSheet({
               this sheet does not support. The X says the same thing honestly,
               and tapping the backdrop still works. */}
           <View style={{ paddingTop: 22, paddingBottom: 18, paddingHorizontal: 20 }}>
-            <Pressable
-              onPress={onClose}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              style={({ pressed }) => ({
-                position: 'absolute',
-                top: 12,
-                right: 12,
-                width: 32,
-                height: 32,
-                borderRadius: theme.radii.pill,
-                backgroundColor: withOpacity(theme.colors.ink, 0.08),
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.6 : 1,
-                zIndex: 2,
-              })}
-            >
-              <Icon name="xmark" size={12} tint={theme.colors.ink} weight="semibold" />
-            </Pressable>
+            {/* ⚠ NO CLOSE BUTTON. The `Modal` shell needed one because it had
+                no other way out; gorhom draws a grab handle above this, the
+                backdrop closes on a tap, and a drag throws it down. A fourth
+                affordance would compete with the gesture the sheet was rebuilt
+                to have. */}
 
             <View style={{ alignItems: 'center', gap: 3 }}>
               {/* ⚠ THE WRAPPER IS THE SPACING, not a leftover from the rank
@@ -226,13 +156,7 @@ export function DossierSheet({
           </View>
 
           {/* ---- the report ------------------------------------------ */}
-          {/* ⚠ `flex: 1` AGAINST THE DEFINITE HEIGHT ABOVE. That pairing is the
-              whole reason this scrolls; see the header. */}
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 28 }}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScoutSheetBody>
             {loading ? (
               <View style={{ paddingTop: 48, alignItems: 'center' }}>
                 <ActivityIndicator color={theme.colors.primary} />
@@ -256,10 +180,9 @@ export function DossierSheet({
             ) : data ? (
               <Dossier data={data} dossier={data.dossier} isSelf={data.is_self} />
             ) : null}
-          </ScrollView>
-        </Animated.View>
+          </ScoutSheetBody>
       </View>
-    </Modal>
+    </ScoutSheet>
   );
 }
 
