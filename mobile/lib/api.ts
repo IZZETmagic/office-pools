@@ -2097,6 +2097,14 @@ export type MatchScoutResponse = {
     away: ScoutClubRef;
   };
   form: ScoutMatchForm | null;
+  /**
+   * Who is playing well, from migration 141's player rows.
+   *
+   * ⚠ NULL IS "COULD NOT BE READ", NOT "NOBODY". An empty `inForm` on a side
+   * that HAS been read means nobody has cleared the minutes floor yet, which is
+   * normal in August and a different sentence.
+   */
+  people: { home: SideScout; away: SideScout } | null;
   h2h: { summary: H2HSummary; enough: boolean; minMeetings: number } | null;
 };
 

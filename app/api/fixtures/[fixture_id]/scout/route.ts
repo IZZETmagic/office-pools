@@ -6,6 +6,8 @@ import { withPerfLogging } from '@/lib/api-perf'
 import { MIN_MEETINGS, summariseH2H, type H2HFixture } from '@/lib/scouting/h2h'
 import { fetchCachedH2H } from '@/lib/scouting/h2hFetch'
 import { buildMatchForm, type FormFixture } from '@/lib/scouting/form'
+import { scoutSide, type SideScout } from '@/lib/scouting/players'
+import { readClubPlayerForm } from '@/lib/scouting/readPlayers'
 import type { ClubRef } from '@/lib/scouting/opponent'
 
 // =============================================================
@@ -112,86 +114,38 @@ async function handler(
   const homeClub = toClubRef(fixture.home)
   const awayClub = toClubRef(fixture.away)
 
-  // ---- form, from fixtures the sync already stored --------------------------
-  let form = null
-  try {
-    const { data: rows, error: formErr } = await admin
-      .from('league_fixtures')
-      .select('fixture_id, kickoff_at, home_club_id, away_club_id, home_goals, away_goals')
-      .eq('season_id', fixture.season_id)
-      // ⚠ BOTH CLUBS IN ONE READ. Two reads would double the round trips for a
-      // sheet whose whole point is that it opens instantly.
-      .or(
-        `home_club_id.eq.${fixture.home_club_id},away_club_id.eq.${fixture.home_club_id},` +
-          `home_club_id.eq.${fixture.away_club_id},away_club_id.eq.${fixture.away_club_id}`,
-      )
-      .limit(MAX_FORM_FIXTURES)
-
-    if (formErr) throw new Error(formErr.message)
-    const fixtures = (rows ?? []) as unknown as Array<{
-      fixture_id: string
-      kickoff_at: string
-      home_club_id: string
-      away_club_id: string
-      home_goals: number | null
-      away_goals: number | null
-    }>
-
-    if (fixtures.length >= MAX_FORM_FIXTURES) {
-      throw new Error(
-        `hit the ${MAX_FORM_FIXTURES}-row ceiling for fixture ${fixture_id} — ` +
-          'a form table built on a truncated page is missing games silently',
-      )
-    }
-
-    const asForm: FormFixture[] = fixtures.map((f) => ({
-      fixtureId: f.fixture_id,
-      kickoffAt: f.kickoff_at,
-      homeClubId: f.home_club_id,
-      awayClubId: f.away_club_id,
-      homeGoals: f.home_goals,
-      awayGoals: f.away_goals,
-    }))
-
-    form = buildMatchForm(asForm, {
-      homeClub,
-      awayClub,
-      kickoffAt: fixture.kickoff_at,
-    })
-  } catch (e) {
-    // ⚠ BEST-EFFORT, LIKE ITS SIBLING. Losing one half of the sheet is better
-    // than losing the sheet.
-    console.error('[scout] form unavailable for', fixture_id, '—', (e as Error).message)
-  }
-
-  // ---- head to head, shared cache with /h2h --------------------------------
-  let h2h = null
-  try {
-    const meetings: H2HFixture[] = await fetchCachedH2H(
-      fixture.home.external_club_id,
-      fixture.away.external_club_id,
-    )
-    const summary = summariseH2H(meetings, {
-      // ⚠ FROM THIS FIXTURE'S HOME CLUB'S POINT OF VIEW, wherever each meeting
-      // was played. The clubs swap ends between fixtures, so reading the
-      // payload's home/away columns straight through yields a complete,
-      // plausible and entirely different team's record.
-      homeExternalId: fixture.home.external_club_id,
-      venueName: fixture.venue,
-    })
-    h2h = {
-      summary,
-      // ⚠ THE GATE TRAVELS WITH THE ANSWER, so the phone cannot carry its own
-      // copy of the threshold and disagree with the match tab about it.
-      enough: summary.meetings >= MIN_MEETINGS,
-      minMeetings: MIN_MEETINGS,
-    }
-  } catch (e) {
-    // The provider being unavailable is not the same as two clubs never having
-    // played, and the phone must be able to tell them apart — hence null rather
-    // than an empty summary.
-    console.error('[scout] h2h unavailable for', fixture_id, '—', (e as Error).message)
-  }
+  /**
+   * ⚠⚠ THE THREE HALVES RUN CONCURRENTLY, AND THAT IS THE PRODUCT.
+   *
+   * They were sequential and the sheet paid the sum: the form read, then six
+   * bounded reads for the people — measured at 590–750ms across four real
+   * fixtures — then the head-to-head. A sheet whose stated premise is a quick
+   * peek cannot spend a second and a half assembling itself, and nothing here
+   * depends on anything else, so the wait is now the slowest branch rather than
+   * all three added up.
+   *
+   * ⚠ EACH BRANCH OWNS ITS OWN FAILURE. `Promise.all` rejects on the FIRST
+   * rejection, which would take the whole sheet down with one slow table — so
+   * every branch resolves to null instead. Losing one card beats losing the
+   * sheet, and each card already says when it is the one that is missing.
+   */
+  const [form, people, h2h] = await Promise.all([
+    readForm(admin, fixture, homeClub, awayClub).catch((e) => {
+      console.error('[scout] form unavailable for', fixture_id, '—', (e as Error).message)
+      return null
+    }),
+    readPeople(admin, fixture).catch((e) => {
+      console.error('[scout] player form unavailable for', fixture_id, '—', (e as Error).message)
+      return null
+    }),
+    readH2H(fixture).catch((e) => {
+      // The provider being unavailable is not the same as two clubs never
+      // having played, and the phone must be able to tell them apart — hence
+      // null rather than an empty summary.
+      console.error('[scout] h2h unavailable for', fixture_id, '—', (e as Error).message)
+      return null
+    }),
+  ])
 
   return NextResponse.json({
     fixture: {
@@ -202,8 +156,102 @@ async function handler(
       away: awayClub,
     },
     form,
+    people,
     h2h,
   })
+}
+
+
+/** Form for both clubs, from fixtures the sync already stored. No provider calls. */
+async function readForm(
+  admin: ReturnType<typeof createAdminClient>,
+  fixture: FixtureRow,
+  homeClub: ClubRef,
+  awayClub: ClubRef,
+) {
+  const { data: rows, error } = await admin
+    .from('league_fixtures')
+    .select('fixture_id, kickoff_at, home_club_id, away_club_id, home_goals, away_goals')
+    .eq('season_id', fixture.season_id)
+    // ⚠ BOTH CLUBS IN ONE READ. Two reads would double the round trips for a
+    // sheet whose whole point is that it opens instantly.
+    .or(
+      `home_club_id.eq.${fixture.home_club_id},away_club_id.eq.${fixture.home_club_id},` +
+        `home_club_id.eq.${fixture.away_club_id},away_club_id.eq.${fixture.away_club_id}`,
+    )
+    .limit(MAX_FORM_FIXTURES)
+
+  if (error) throw new Error(error.message)
+  const fixtures = (rows ?? []) as unknown as Array<{
+    fixture_id: string
+    kickoff_at: string
+    home_club_id: string
+    away_club_id: string
+    home_goals: number | null
+    away_goals: number | null
+  }>
+
+  // ⚠ POSTGREST TRUNCATES AN UNBOUNDED SELECT SILENTLY. A full page here means
+  // games are missing, with nothing in the numbers to say so.
+  if (fixtures.length >= MAX_FORM_FIXTURES) {
+    throw new Error(`hit the ${MAX_FORM_FIXTURES}-row ceiling — the form table would be short`)
+  }
+
+  const asForm: FormFixture[] = fixtures.map((f) => ({
+    fixtureId: f.fixture_id,
+    kickoffAt: f.kickoff_at,
+    homeClubId: f.home_club_id,
+    awayClubId: f.away_club_id,
+    homeGoals: f.home_goals,
+    awayGoals: f.away_goals,
+  }))
+
+  return buildMatchForm(asForm, { homeClub, awayClub, kickoffAt: fixture.kickoff_at })
+}
+
+/**
+ * Who is playing well, from migration 141's player rows. No provider calls.
+ *
+ * ⚠ THE TWO CLUBS RUN CONCURRENTLY TOO. This is the heaviest branch — three
+ * bounded reads per club — and the two clubs are independent of each other.
+ */
+async function readPeople(
+  admin: ReturnType<typeof createAdminClient>,
+  fixture: FixtureRow,
+): Promise<{ home: SideScout; away: SideScout }> {
+  const [homeRows, awayRows] = await Promise.all([
+    readClubPlayerForm(admin, fixture.season_id, fixture.home_club_id),
+    readClubPlayerForm(admin, fixture.season_id, fixture.away_club_id),
+  ])
+  return {
+    home: scoutSide(homeRows.stats, homeRows.goals, fixture.home_club_id),
+    away: scoutSide(awayRows.stats, awayRows.goals, fixture.away_club_id),
+  }
+}
+
+/** Every previous meeting. One provider call per PAIRING, cached a day. */
+async function readH2H(fixture: FixtureRow) {
+  const home = fixture.home!
+  const away = fixture.away!
+  const meetings: H2HFixture[] = await fetchCachedH2H(
+    home.external_club_id,
+    away.external_club_id,
+  )
+  const summary = summariseH2H(meetings, {
+    // ⚠ FROM THIS FIXTURE'S HOME CLUB'S POINT OF VIEW, wherever each meeting was
+    // played. The clubs swap ends between fixtures, so reading the payload's
+    // home/away columns straight through yields a complete, plausible and
+    // entirely different team's record.
+    homeExternalId: home.external_club_id,
+    venueName: fixture.venue,
+  })
+  return {
+    summary,
+    // ⚠ THE GATE TRAVELS WITH THE ANSWER, so the phone cannot carry its own copy
+    // of the threshold and disagree with the match tab about it.
+    enough: summary.meetings >= MIN_MEETINGS,
+    minMeetings: MIN_MEETINGS,
+  }
 }
 
 export const GET = withPerfLogging('/api/fixtures/[fixture_id]/scout', handler)

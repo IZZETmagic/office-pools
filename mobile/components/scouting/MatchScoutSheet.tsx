@@ -10,10 +10,12 @@ import {
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { ScoutSheet, ScoutSheetBody } from '@/components/scouting/ScoutSheet';
 import { Text } from '@/components/ui';
+import { playerPhotoUrl } from '@/lib/playerStats';
 import type {
   H2HSummary,
   MatchScoutResponse,
   ScoutClubRef,
+  SideScout,
   ScoutFormOutcome,
   ScoutVenueForm,
 } from '@/lib/api';
@@ -102,6 +104,11 @@ export function MatchScoutSheet({
               venue={data.fixture.venue}
             />
             <FormCard form={data.form} />
+            <PeopleCard
+              people={data.people}
+              homeClub={data.fixture.home}
+              awayClub={data.fixture.away}
+            />
           </>
         ) : null}
       </ScoutSheetBody>
@@ -691,6 +698,171 @@ function Crest({ club, size }: { club: ScoutClubRef; size: number }) {
       style={{ width: size, height: size }}
       resizeMode="contain"
     />
+  );
+}
+
+/**
+ * Who is playing well.
+ *
+ * ## ⚠ ONE LIST, NOT TWO COLUMNS — THIS IS THE PEEK, NOT THE TAB
+ *
+ * The match-detail Scouting tab draws a card per club with three in-form names
+ * and three danger men. That is a report. Here the question is narrower — who
+ * should I be thinking about in THIS match — so it is one short list, and it
+ * guarantees a name from each club before it fills the rest by rating. Sorting
+ * purely by rating would hand both slots to whichever squad is having the
+ * better season, which is the one shape this card must not take.
+ *
+ * ⚠ MINUTES-QUALIFIED, AND IT SAYS SO. The floor is the server's — a
+ * substitute's 9.0 over eleven minutes would otherwise top it every week — and
+ * a reader wondering why a name they expected is missing deserves the reason.
+ *
+ * ⚠ NULL IS "COULD NOT BE READ"; AN EMPTY LIST IS "NOBODY QUALIFIES YET". Those
+ * are different sentences and August produces the second one constantly.
+ */
+function PeopleCard({
+  people,
+  homeClub,
+  awayClub,
+}: {
+  people: MatchScoutResponse['people'];
+  homeClub: ScoutClubRef;
+  awayClub: ScoutClubRef;
+}) {
+  if (!people) {
+    return (
+      <Card title="People">
+        <Blurb>Player form could not be loaded just now.</Blurb>
+      </Card>
+    );
+  }
+
+  const rows = pickPeople(people, homeClub, awayClub);
+
+  if (rows.length === 0) {
+    return (
+      <Card title="People">
+        <Blurb>Nobody has played enough minutes to be rated yet.</Blurb>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="People">
+      <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
+        <Text variant="detail" color="slate" style={{ marginBottom: 4 }}>
+          In form now · average rating, minutes-qualified
+        </Text>
+        {rows.map((r, i) => (
+          <PersonRow key={r.player.externalPlayerId} row={r} first={i === 0} />
+        ))}
+      </View>
+    </Card>
+  );
+}
+
+type PersonPick = {
+  player: SideScout['inForm'][number];
+  club: ScoutClubRef;
+};
+
+/**
+ * The best of each side first, then the next best of either.
+ *
+ * ⚠ THE GUARANTEE IS THE POINT. A straight rating sort gives both slots to the
+ * stronger squad and the card stops being about the fixture.
+ */
+function pickPeople(
+  people: NonNullable<MatchScoutResponse['people']>,
+  homeClub: ScoutClubRef,
+  awayClub: ScoutClubRef,
+): PersonPick[] {
+  const home = people.home.inForm.map((player) => ({ player, club: homeClub }));
+  const away = people.away.inForm.map((player) => ({ player, club: awayClub }));
+
+  const picked: PersonPick[] = [];
+  if (home[0]) picked.push(home[0]);
+  if (away[0]) picked.push(away[0]);
+
+  // Fill to four from whatever is left, best rating first.
+  const rest = [...home.slice(1), ...away.slice(1)].sort(
+    (a, b) => b.player.rating - a.player.rating,
+  );
+  return [...picked, ...rest].slice(0, 4);
+}
+
+function PersonRow({ row, first }: { row: PersonPick; first: boolean }) {
+  const theme = useTheme();
+  const { player, club } = row;
+  const photo = playerPhotoUrl(player.externalPlayerId);
+  const involvements = player.goals + player.assists;
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 11,
+        paddingVertical: 10,
+        borderTopWidth: first ? 0 : StyleSheet.hairlineWidth,
+        borderTopColor: withOpacity(theme.colors.mist, 0.8),
+      }}
+    >
+      {/* ⚠ THE FACE, WITH THE CLUB'S CREST AS THE FALLBACK. The provider does
+          not hold a photograph for every player, and an empty circle beside a
+          name reads as a failed image — the crest at least says who he plays
+          for, which is the next most useful thing. */}
+      <View
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: theme.radii.pill,
+          backgroundColor: theme.colors.mist,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}
+      >
+        {photo ? (
+          <Image alt="" source={{ uri: photo }} style={{ width: 34, height: 34 }} resizeMode="cover" />
+        ) : club.crestUrl ? (
+          <Image alt="" source={{ uri: club.crestUrl }} style={{ width: 20, height: 20 }} resizeMode="contain" />
+        ) : null}
+      </View>
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <RNText
+          numberOfLines={1}
+          style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}
+        >
+          {player.name}
+        </RNText>
+        <Text variant="detail" color="slate" numberOfLines={1}>
+          {club.name} · {player.appearances} app{player.appearances === 1 ? '' : 's'}
+          {involvements > 0 ? ` · ${involvements} G+A` : ''}
+        </Text>
+      </View>
+
+      <View
+        style={{
+          paddingHorizontal: 9,
+          paddingVertical: 4,
+          borderRadius: theme.radii.xs,
+          backgroundColor: withOpacity(theme.colors.green, 0.15),
+        }}
+      >
+        <RNText
+          style={{
+            fontFamily: MONO_BOLD,
+            fontSize: 14,
+            color: theme.colors.green,
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {player.rating.toFixed(2)}
+        </RNText>
+      </View>
+    </View>
   );
 }
 
