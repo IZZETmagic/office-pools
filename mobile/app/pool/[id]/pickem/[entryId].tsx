@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MatchScoutSheet } from '@/components/scouting/MatchScoutSheet';
 import { OutcomePicker, type Outcome } from '@/components/pool-detail/OutcomePicker';
 import { TapScoreField } from '@/components/pool-detail/TapScoreField';
 import { Icon, Text } from '@/components/ui';
@@ -75,6 +76,14 @@ export default function PickemPickScreen() {
   }>();
 
   const league = useLeaguePool(poolId);
+  /**
+   * Which fixture's peek is open, if any.
+   *
+   * ⚠ ON THE SCREEN, NOT ON THE ROW. One `Modal` for the list; a sheet per card
+   * would mount ten of them and `useMatchScout` would fetch a scout report for
+   * every fixture on screen.
+   */
+  const [scoutingFixtureId, setScoutingFixtureId] = useState<string | null>(null);
   const qc = useQueryClient();
   const now = Date.now();
 
@@ -336,6 +345,7 @@ export default function PickemPickScreen() {
             <FixtureRow
               key={f.match_id}
               fixture={f}
+              onScout={() => setScoutingFixtureId(f.match_id)}
               isResults={isResults}
               canEdit={canEdit}
               score={
@@ -350,6 +360,14 @@ export default function PickemPickScreen() {
           ))}
         </ScrollView>
       )}
+
+      {/* ⚠ ONE SHEET FOR THE WHOLE LIST, keyed on which fixture is open. One
+          per row would mount a `Modal` per fixture, and the hook inside would
+          fetch a scout report for ten matches nobody asked about. */}
+      <MatchScoutSheet
+        fixtureId={scoutingFixtureId}
+        onClose={() => setScoutingFixtureId(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -506,10 +524,13 @@ function FixtureRow({
   outcome,
   onScore,
   onOutcome,
+  onScout,
 }: {
   fixture: LeagueMatch;
   isResults: boolean;
   canEdit: boolean;
+  /** Opens the peek. ⚠ Never disabled with `canEdit` — see the button. */
+  onScout: () => void;
   score: { home: number | null; away: number | null };
   outcome: Outcome | null;
   onScore: (side: 'home' | 'away', value: number) => void;
@@ -533,8 +554,8 @@ function FixtureRow({
         ...theme.shadows.card,
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text variant="detail" color="slate">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+        <Text variant="detail" color="slate" style={{ flex: 1 }}>
           {kickoff(fixture)}
         </Text>
         {fixture.is_completed ? (
@@ -542,6 +563,35 @@ function FixtureRow({
             FT {fixture.home_score_ft}–{fixture.away_score_ft}
           </Text>
         ) : null}
+
+        {/*
+          ⚠⚠ IT IS NEVER DISABLED, AND NOT BY `canEdit`. The picker locks when
+          the matchweek does, but a scout report is a read — it is worth MORE
+          after the lock, when a member is looking back at what they filed, and
+          a control that vanishes the moment the week closes teaches people it
+          was never really theirs.
+
+          ⚠ AND IT DOES NOT BLOCK THE PICK. It sits on the header row rather
+          than beside the steppers, so the gesture to open it cannot be confused
+          with the gesture to change a score.
+        */}
+        <Pressable
+          onPress={onScout}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={`Scout ${fixture.home_team?.country_name ?? 'home'} against ${fixture.away_team?.country_name ?? 'away'}`}
+          style={({ pressed }) => ({
+            width: 28,
+            height: 28,
+            borderRadius: theme.radii.pill,
+            backgroundColor: withOpacity(theme.colors.primary, 0.12),
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Icon name="binoculars" size={14} color="primary" />
+        </Pressable>
       </View>
 
       {/*

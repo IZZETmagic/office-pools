@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { unstable_cache } from 'next/cache'
 
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
-import { getHeadToHead } from '@/lib/integrations/apiFootball/client'
 import { MIN_MEETINGS, summariseH2H, type H2HFixture } from '@/lib/scouting/h2h'
+import { fetchCachedH2H } from '@/lib/scouting/h2hFetch'
 
 // =============================================================
 // /api/fixtures/:fixture_id/h2h — the scout report
@@ -45,59 +44,18 @@ import { MIN_MEETINGS, summariseH2H, type H2HFixture } from '@/lib/scouting/h2h'
 
 export const dynamic = 'force-dynamic'
 
-/** A day. A pairing's history changes only when they play, which is rarer. */
-const H2H_TTL_SECONDS = 60 * 60 * 24
-
 type FixtureRow = {
   venue: string | null
   home: { external_club_id: number; name: string } | null
   away: { external_club_id: number; name: string } | null
 }
 
-/**
- * ⚠ SHAPED HERE, NOT IN THE SUMMARISER. `summariseH2H` is pure and knows
- * nothing about api-football; this is the one place the provider's field names
- * are read, so a change to their payload lands in a single function.
+/*
+ * ⚠ `normalise` AND `cachedH2H` MOVED TO `lib/scouting/h2hFetch.ts` so the
+ * match scout sheet can ask the same question without a second cache entry or
+ * a second copy of the provider's field names. Two routes each building their
+ * own key would double the provider spend on one answer.
  */
-function normalise(raw: unknown[]): H2HFixture[] {
-  const out: H2HFixture[] = []
-  for (const r of raw as Record<string, never>[]) {
-    const f = r as unknown as {
-      fixture: { id: number; date: string; venue?: { name: string | null } | null }
-      league: { id: number; name: string }
-      teams: { home: { id: number }; away: { id: number } }
-      goals: { home: number | null; away: number | null }
-      score?: { halftime?: { home: number | null; away: number | null } | null } | null
-    }
-    // A meeting with no score never happened as far as a record is concerned —
-    // an abandoned or postponed fixture can still appear here.
-    if (f?.goals?.home === null || f?.goals?.away === null) continue
-    out.push({
-      fixtureId: f.fixture.id,
-      date: f.fixture.date,
-      competitionId: f.league.id,
-      competition: f.league.name,
-      venueName: f.fixture.venue?.name ?? null,
-      homeExternalId: f.teams.home.id,
-      awayExternalId: f.teams.away.id,
-      homeGoals: f.goals.home as number,
-      awayGoals: f.goals.away as number,
-      htHome: f.score?.halftime?.home ?? null,
-      htAway: f.score?.halftime?.away ?? null,
-    })
-  }
-  return out
-}
-
-function cachedH2H(a: number, b: number) {
-  // Ordered, so the pair is one cache entry rather than two.
-  const [lo, hi] = a < b ? [a, b] : [b, a]
-  return unstable_cache(
-    async () => normalise(await getHeadToHead(lo, hi)),
-    ['h2h', String(lo), String(hi)],
-    { tags: [`h2h:${lo}-${hi}`], revalidate: H2H_TTL_SECONDS },
-  )()
-}
 
 async function handleGET(
   _request: NextRequest,
@@ -134,7 +92,7 @@ async function handleGET(
 
   let meetings: H2HFixture[]
   try {
-    meetings = await cachedH2H(homeId, awayId)
+    meetings = await fetchCachedH2H(homeId, awayId)
   } catch (err) {
     // The provider being unavailable is not the same as two clubs never having
     // played, and the phone must be able to tell them apart.

@@ -2025,3 +2025,67 @@ export async function fetchFixturePlayers(
     `/api/fixtures/${encodeURIComponent(fixtureId)}/players`,
   );
 }
+
+// =============================================================
+// /api/fixtures/:id/scout — the peek under the hood
+// =============================================================
+// What the prediction flow shows when somebody taps the binoculars on a
+// fixture. Both halves in one round trip, because the sheet slides up over the
+// picker with the member mid-decision and two fetches means two spinners inside
+// one gesture.
+//
+// ⚠ EITHER HALF MAY BE NULL, AND THEY GO MISSING FOR OPPOSITE REASONS. Head to
+// head is absent for a PAIRING — two promoted clubs have never met however late
+// it is. Form is absent for a DATE — nobody has played anybody in the second
+// week of August. Between them something is nearly always there.
+//
+// ⚠ A NULL IS NOT AN EMPTY RECORD. `h2h: null` means the provider could not be
+// reached; `h2h.enough === false` means they really have barely met. The screen
+// must not collapse the two into one sentence.
+// =============================================================
+
+export type ScoutFormOutcome = 'W' | 'D' | 'L';
+
+export type ScoutVenueForm = {
+  club: ScoutClubRef;
+  /** Which end of THIS fixture they are at. */
+  venue: 'home' | 'away';
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  /** ⚠ Null when nothing has been played at that venue — never 0. */
+  goalsForPerGame: number | null;
+  goalsAgainstPerGame: number | null;
+  /** ⚠ OLDEST FIRST, so it reads left to right in the order it happened. */
+  strip: ScoutFormOutcome[];
+  /** ⚠ Both venues — the fallback when the split is one game deep in August. */
+  overallPlayed: number;
+  overallStrip: ScoutFormOutcome[];
+};
+
+export type ScoutMatchForm = {
+  home: ScoutVenueForm;
+  away: ScoutVenueForm;
+  seasonPlayed: number;
+};
+
+export type MatchScoutResponse = {
+  fixture: {
+    fixture_id: string;
+    kickoff_at: string;
+    venue: string | null;
+    home: ScoutClubRef;
+    away: ScoutClubRef;
+  };
+  form: ScoutMatchForm | null;
+  h2h: { summary: H2HSummary; enough: boolean; minMeetings: number } | null;
+};
+
+export async function fetchMatchScout(fixtureId: string): Promise<MatchScoutResponse> {
+  return apiFetch<MatchScoutResponse>(
+    `/api/fixtures/${encodeURIComponent(fixtureId)}/scout`,
+  );
+}
