@@ -2096,16 +2096,28 @@ export type MatchScoutResponse = {
     home: ScoutClubRef;
     away: ScoutClubRef;
   };
-  form: ScoutMatchForm | null;
+  /**
+   * ⚠⚠ ALL THREE ARE OPTIONAL AS WELL AS NULLABLE, AND THE DIFFERENCE MATTERS.
+   *
+   * `null` means the server tried and failed — say so. `undefined` means the
+   * server never sent the field at all, because the app is talking to an API
+   * older than itself: an OTA bundle can outrun the deploy it calls, and
+   * `EXPO_PUBLIC_API_BASE_URL` can point at a stale server. A card that renders
+   * "could not be loaded" for a field the server has simply never heard of is
+   * reporting a fault that does not exist.
+   *
+   * Absent ⇒ draw no card. Null ⇒ say it failed. They are not the same.
+   */
+  form?: ScoutMatchForm | null;
   /**
    * Who is playing well, from migration 141's player rows.
    *
    * ⚠ NULL IS "COULD NOT BE READ", NOT "NOBODY". An empty `inForm` on a side
    * that HAS been read means nobody has cleared the minutes floor yet, which is
-   * normal in August and a different sentence.
+   * normal in August and a different sentence again.
    */
-  people: { home: SideScout; away: SideScout } | null;
-  h2h: { summary: H2HSummary; enough: boolean; minMeetings: number } | null;
+  people?: { home: SideScout; away: SideScout } | null;
+  h2h?: { summary: H2HSummary; enough: boolean; minMeetings: number } | null;
 };
 
 export async function fetchMatchScout(fixtureId: string): Promise<MatchScoutResponse> {

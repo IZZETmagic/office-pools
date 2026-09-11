@@ -195,12 +195,12 @@ function Header({ data }: { data: MatchScoutResponse | null }) {
  * many it is over. Neither number is hidden and neither is oversold.
  */
 function FormCard({ form }: { form: MatchScoutResponse['form'] }) {
-  if (!form) {
+  // ⚠ See `PeopleCard` — absent is not the same as failed.
+  if (form === undefined) return null;
+  if (form === null) {
     return (
       <Card title="Form">
-        <Text variant="body" color="slate" style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-          Form is unavailable for this fixture.
-        </Text>
+        <Blurb>Form is unavailable for this fixture.</Blurb>
       </Card>
     );
   }
@@ -388,7 +388,9 @@ function PairingCard({
 }) {
   const theme = useTheme();
 
-  if (!h2h) {
+  // ⚠ See `PeopleCard` — absent is not the same as failed.
+  if (h2h === undefined) return null;
+  if (h2h === null) {
     return (
       <Card title="The pairing">
         <Blurb>Their history could not be loaded just now.</Blurb>
@@ -729,7 +731,11 @@ function PeopleCard({
   homeClub: ScoutClubRef;
   awayClub: ScoutClubRef;
 }) {
-  if (!people) {
+  // ⚠⚠ ABSENT AND NULL ARE DIFFERENT. `undefined` means this server has never
+  // heard of the field — an older API behind a newer bundle — and drawing "could
+  // not be loaded" would report a fault that does not exist. Null means it tried.
+  if (people === undefined) return null;
+  if (people === null) {
     return (
       <Card title="People">
         <Blurb>Player form could not be loaded just now.</Blurb>
