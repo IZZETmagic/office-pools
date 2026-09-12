@@ -356,58 +356,75 @@ export type PlayerMarkers = {
 };
 
 /**
- * How far the match has got. Every "he left early" judgement is made against
- * this, and getting it wrong is not a cosmetic error — see `leftBefore`.
+ * ⚠ AT LEAST TEN OF THE TWENTY-TWO PLAY THE WHOLE MATCH, WHICH IS WHAT MAKES
+ * THIS WORK. Each side may make five substitutions, so at most ten men are
+ * replaced — the tenth-highest `minutes` in a fixture therefore belongs to
+ * someone who was never substituted, and his own count IS the match minute.
+ *
+ * Ten rather than twelve (the eleven-a-side arithmetic gives twelve) buys room
+ * for two sendings-off, or a sixth substitute in extra time. Going deeper is
+ * the safe direction anyway: a clock that is too LOW removes arrows, and only a
+ * clock that is too HIGH invents them.
  */
-export type MatchProgress = {
-  /**
-   * The minute the match has reached — `league_fixtures.live_minute`, which is
-   * api-football's `elapsed`. Null while live before the feed reports one.
-   *
-   * ⚠ It HOLDS at 45 through half time and all of first-half stoppage, and it
-   * counts 91→120 in extra time. It is the minute the match is at, not the
-   * minute a clock would show.
-   */
-  minute: number | null;
-  /** True only while the match is actually running. */
-  isLive: boolean;
-};
-
-/** A finished match — the only frame that existed before lineups went live. */
-export const FULL_TIME: MatchProgress = { minute: 90, isLive: false };
+const FULL_MATCH_PLAYERS = 10;
 
 /**
- * ⚠⚠ THE LAG GUARD. `minutes` (from `/players`) and `live_minute` (from
- * `/fixtures`) are two different feeds refreshed by two different syncs, and
- * this file already measures them disagreeing by a minute in 9.6% of cases. So
- * a player still on the pitch routinely reports 68 while the match says 69.
+ * THE MATCH MINUTE AS THE PLAYER-STATS FEED ITSELF SEES IT.
  *
- * Comparing them exactly would therefore put a substitution arrow on whoever
- * the stats feed happened to lag on — a wrong badge that appears and vanishes
- * as the syncs leapfrog. Two minutes is wide enough to absorb the observed
- * disagreement and still catch a real substitution, which is minutes off the
- * pace within seconds of happening.
+ * ⚠⚠ AND IT IS DELIBERATELY NOT `live_minute`. That was the previous frame, and
+ * it is a number from a DIFFERENT FEED MOVING AT A DIFFERENT SPEED:
+ * `live_minute` is rewritten on every cron tick from the fixtures list, while
+ * `minutes` only changes when the bundled `/fixtures?ids=` refetch fires —
+ * which `liveGate` rations to every third elapsed minute, and which the
+ * provider's own clock already trails by about a minute. Sampled against
+ * production during a live first half on 2026-09-12:
+ *
+ *   live_minute 41, players' own clock 36   gap 5   21 of 21 on the pitch marked
+ *   live_minute 42, players' own clock 40   gap 2   16 of 21 marked
+ *
+ * The gap swings between 0 and 5 across the refetch cycle, so no slack against
+ * `live_minute` is ever the right size — and the second row is the proof, since
+ * it is the exact lag the two-minute guard was built for and still marked
+ * sixteen men. Taken from the fixture's own rows, the comparison is against the
+ * SAME PAYLOAD: a snapshot five minutes stale still says only "he was on at
+ * minute 36", which is true, and which was never a claim about a substitution.
+ *
+ * ⚠⚠ AND IT IS THE TENTH-HIGHEST, NOT THE HIGHEST, BECAUSE THE ELEVEN DO NOT
+ * ALL READ THE SAME MINUTE. The provider counts stoppage per player: that live
+ * snapshot read `40':5  39':6` among men who were all still on the pitch, and a
+ * finished match routinely carries one player on 91' while the rest are on 90'.
+ * The leader is one man's rounding; the tenth-highest is the pack. A max-based
+ * clock needs a slack constant to absorb that spread, and a slack is a guess —
+ * this needs none, because the spread sits above the value it reads.
+ *
+ * ⚠ MEASURED AGAINST THE TIMELINE, over the 120 most recent finished fixtures.
+ * Every substitution in a fixture takes one player off and brings one on, so
+ * the rows below the clock should number exactly twice the substitution events
+ * in that fixture's own `match_events`:
+ *
+ *   this clock          102 exact   0 too many   18 too few
+ *   highest minus two    65 exact   1 too many   54 too few
+ *
+ * ⚠⚠ THE ZERO IS THE COLUMN THAT MATTERS. It never marks a man who was not
+ * substituted. The eighteen "too few" are substitutions made in the 89th or
+ * 90th minute, where the player's own count has already reached the clock —
+ * an arrow missing for a minute, against an arrow that is a lie.
+ *
+ * ⚠ 0 BEFORE ANYONE HAS KICKED A BALL, and that marks nobody. An arrow on
+ * everyone is a confident lie; an arrow on no one is visibly "not known yet".
  */
-const LIVE_LAG_MINUTES = 2;
-
-/**
- * The minute before which leaving means "he was substituted".
- *
- * ⚠⚠ THIS IS THE WHOLE FIX FOR THE LIVE PITCH. It used to be the constant 90,
- * which reads "a starter who played under 90 minutes came off" — true at full
- * time, and catastrophic at 69 minutes of a running match, where it put a
- * substitution arrow on ALL ELEVEN starters because none of them had reached 90
- * yet. The inference was written for a finished match and nothing told it the
- * match was still going.
- *
- * ⚠ NO MINUTE YET MEANS NO CLAIM. Live with a null minute returns 0, so nobody
- * is marked. An arrow on everyone is far worse than an arrow on nobody: the
- * first is a confident lie, the second is visibly just "not known yet".
- */
-function leftBefore(progress: MatchProgress): number {
-  if (!progress.isLive) return progress.minute ?? 90;
-  if (progress.minute == null) return 0;
-  return Math.max(0, progress.minute - LIVE_LAG_MINUTES);
+export function statsClock(stats: readonly MatchPlayerStat[]): number {
+  // ⚠ THE UNUSED SUBSTITUTES ARE NOT PART OF THE COUNT. Nine men on 0 would
+  // drag the tenth-highest down to zero and silence the whole pitch.
+  const played = stats
+    .map((s) => s.minutes ?? 0)
+    .filter((m) => m > 0)
+    .sort((a, b) => b - a);
+  if (played.length === 0) return 0;
+  // ⚠ ONE TEAM'S ROWS, OR A HANDFUL, STILL ANSWER SOMETHING. Fewer than ten
+  // played means taking the lowest of what there is — a low clock, which
+  // under-marks rather than over-marks. See `FULL_MATCH_PLAYERS`.
+  return played[Math.min(FULL_MATCH_PLAYERS - 1, played.length - 1)];
 }
 
 /**
@@ -428,10 +445,7 @@ function leftBefore(progress: MatchProgress): number {
  * early, and drawing him with a substitution arrow would say something false
  * about why he left.
  */
-export function playerMarkers(
-  s: MatchPlayerStat,
-  progress: MatchProgress = FULL_TIME,
-): PlayerMarkers {
+export function playerMarkers(s: MatchPlayerStat, clock: number): PlayerMarkers {
   const minutes = s.minutes ?? 0;
   const red = s.redCards ?? 0;
   return {
@@ -441,7 +455,7 @@ export function playerMarkers(
     red,
     captain: s.isCaptain,
     cameOn: !s.isStarter && minutes > 0,
-    cameOff: s.isStarter && minutes > 0 && minutes < leftBefore(progress) && red === 0,
+    cameOff: s.isStarter && minutes > 0 && minutes < clock && red === 0,
   };
 }
 
@@ -482,9 +496,9 @@ export function teamRating(stats: MatchPlayerStat[], side: 'home' | 'away'): num
 export function subMinute(
   s: MatchPlayerStat,
   substitutionMinutes: ReadonlySet<number>,
-  progress: MatchProgress = FULL_TIME,
+  clock: number,
 ): number | null {
-  const m = playerMarkers(s, progress);
+  const m = playerMarkers(s, clock);
   const minutes = s.minutes;
   if (minutes === null || minutes <= 0) return null;
 
@@ -500,13 +514,20 @@ export function subMinute(
   // 69; against a hardcoded 90 that implies he entered at 81. Every live
   // substitute wore a minute that was too late by exactly the time left.
   //
-  // ⚠ NO LAG GUARD HERE, DELIBERATELY. `leftBefore` needs one because it
-  // decides a boolean from a near-miss comparison; this needs an exact number,
-  // and the timeline corroboration below is already the guard — an implied
-  // minute that is off by the feeds' disagreement simply fails to match a real
-  // substitution and shows nothing, which is the documented fallback.
+  // ⚠⚠ WHICH IS WHY IT IS `statsClock` AND NOT `live_minute` — MORE SO HERE
+  // THAN FOR THE ARROW, WHICH ONLY NEEDS A BOOLEAN. Subtracting one feed's
+  // minutes from another feed's clock carries the whole gap between them into
+  // the answer. In the sampled snapshot two substitutes had played 17 and 22
+  // minutes: against the players' own clock of 39 that is 22' and 17', which
+  // the timeline confirms exactly; against `live_minute` 42 it is 25' and 20',
+  // and against the highest single figure on the pitch (40') it is 23' and 18'.
+  // Every one of those wrong answers matches no real substitution and so shows
+  // no minute at all — the failure is silent, which is why it survived.
+  //
+  // ⚠ AND THE TIMELINE IS STILL THE GUARD. An implied minute that is off by one
+  // simply fails to match, and the player wears the arrow alone.
   if (m.cameOn) {
-    const implied = (progress.minute ?? 90) - minutes;
+    const implied = clock - minutes;
     return implied > 0 && substitutionMinutes.has(implied) ? implied : null;
   }
   return null;

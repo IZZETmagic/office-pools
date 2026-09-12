@@ -21,10 +21,10 @@ import {
   playerMarkers,
   playerPhotoUrl,
   ratingScaleColor,
+  statsClock,
   subMinute,
   teamRating,
   type MatchPlayerStat,
-  type MatchProgress,
 } from '@/lib/playerStats';
 import type { LineupPlayer, MatchLineup } from '@/lib/useMatchDetail';
 import type { ResultsTeam } from '@/lib/useTournamentMatches';
@@ -82,7 +82,6 @@ export function LineupsTab({
   lineups,
   playerStats,
   substitutionMinutes,
-  progress,
   homeName,
   awayName,
   homeTeam,
@@ -98,13 +97,6 @@ export function LineupsTab({
    * See `subMinute`.
    */
   substitutionMinutes: number[];
-  /**
-   * ⚠⚠ HOW FAR THE MATCH HAS GOT, and it is not decoration. The substitution
-   * arrow is inferred from "played fewer minutes than the match has", so a
-   * frame of 90 on a running match marks every starter as substituted. See
-   * `leftBefore` in playerStats.
-   */
-  progress: MatchProgress;
   homeName: string;
   awayName: string;
   /** For the shirt colours — the crest URL is where the club's id hides. */
@@ -123,6 +115,14 @@ export function LineupsTab({
   // are long enough to be worth reading.
   const statsById = useMemo(() => indexByPlayerId(playerStats), [playerStats]);
   const substMinutes = useMemo(() => new Set(substitutionMinutes), [substitutionMinutes]);
+
+  // ⚠⚠ HOW FAR THE MATCH HAS GOT, AND IT COMES OUT OF THE ROWS THEMSELVES
+  // rather than in on a prop. The substitution arrow is inferred from "played
+  // fewer minutes than the match has", so the two sides of that comparison have
+  // to come from one feed or the lag between two feeds invents substitutions —
+  // which is exactly what a live pitch showed while this was `live_minute`. See
+  // `statsClock` in playerStats for the measurement.
+  const clock = useMemo(() => statsClock(playerStats), [playerStats]);
   const [open, setOpen] = useState<{ stat: MatchPlayerStat; team: string; tint: string } | null>(
     null,
   );
@@ -157,7 +157,7 @@ export function LineupsTab({
           statsById={statsById}
           onPick={setOpen}
           substMinutes={substMinutes}
-          progress={progress}
+          clock={clock}
         />
         <TeamBar
           lineup={away}
@@ -191,7 +191,7 @@ export function LineupsTab({
         teamName={open?.team ?? ''}
         tint={open?.tint ?? palette.home}
         substMinutes={substMinutes}
-        progress={progress}
+        clock={clock}
         onClose={() => setOpen(null)}
       />
     </View>
@@ -219,7 +219,7 @@ function Pitch({
   statsById,
   onPick,
   substMinutes,
-  progress,
+  clock,
 }: {
   home: MatchLineup | null;
   away: MatchLineup | null;
@@ -230,7 +230,7 @@ function Pitch({
   statsById: StatsById;
   onPick: Pick;
   substMinutes: ReadonlySet<number>;
-  progress: MatchProgress;
+  clock: number;
 }) {
   const theme = useTheme();
 
@@ -282,7 +282,7 @@ function Pitch({
         statsById={statsById}
         onPick={onPick}
         substMinutes={substMinutes}
-        progress={progress}
+        clock={clock}
       />
       <Half
         lineup={away}
@@ -292,7 +292,7 @@ function Pitch({
         statsById={statsById}
         onPick={onPick}
         substMinutes={substMinutes}
-        progress={progress}
+        clock={clock}
       />
 
     </View>
@@ -417,7 +417,7 @@ function Half({
   statsById,
   onPick,
   substMinutes,
-  progress,
+  clock,
 }: {
   lineup: MatchLineup | null;
   tint: string;
@@ -426,7 +426,7 @@ function Half({
   statsById: StatsById;
   onPick: Pick;
   substMinutes: ReadonlySet<number>;
-  progress: MatchProgress;
+  clock: number;
 }) {
   if (!lineup) {
     return (
@@ -515,8 +515,8 @@ function Half({
                 player={player}
                 tint={tint}
                 stat={stat}
-                subbedAt={stat ? subMinute(stat, substMinutes, progress) : null}
-                progress={progress}
+                subbedAt={stat ? subMinute(stat, substMinutes, clock) : null}
+                clock={clock}
               />
             </Pressable>
           );
@@ -531,17 +531,17 @@ function Shirt({
   tint,
   stat,
   subbedAt,
-  progress,
+  clock,
 }: {
   player: LineupPlayer;
   tint: string;
   stat: MatchPlayerStat | undefined;
   subbedAt: number | null;
-  progress: MatchProgress;
+  clock: number;
 }) {
   const rating = stat?.rating ?? null;
   const photo = playerPhotoUrl(player.playerId);
-  const marks = stat ? playerMarkers(stat, progress) : null;
+  const marks = stat ? playerMarkers(stat, clock) : null;
 
   return (
     <View style={{ alignItems: 'center', gap: 3 }}>
