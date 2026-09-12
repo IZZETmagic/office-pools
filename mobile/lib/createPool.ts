@@ -399,13 +399,42 @@ export const WC_MODES: ModeOption<Exclude<PoolMode, 'league_pickem'>>[] = [
  * different thing in each mode.
  */
 export function deadlineTitle(mode: PoolMode, leagueMode: LeagueMode | null): string {
+  // ⬅ 143. The two league titles that used to live here — "First round
+  // deadline" for Last Man Standing and "First matchweek deadline" for the
+  // rest — were BOTH claims this screen could not keep. The date they labelled
+  // was overwritten by the create route with the season's last kickoff and the
+  // round opened in whichever week happened to be unlocked. Those modes no
+  // longer reach this function at all; they ask `startMatchweekTitle` instead.
   if (mode === 'league_pickem') {
     if (leagueMode === 'table') return 'Table deadline'
-    if (leagueMode === 'last_man_standing') return 'First round deadline'
-    return 'First matchweek deadline'
   }
   if (mode === 'progressive') return 'Group stage deadline'
   return 'Prediction deadline'
+}
+
+/**
+ * ⬅ 143. Does this pool choose a START MATCHWEEK rather than a deadline?
+ *
+ * ⚠ Mirrors `asksStartMatchweek` in `components/pools/CreatePoolModal.tsx`.
+ * Mobile is a separate npm project and cannot import the web app's paths — the
+ * same reason `hasCompetitionEnded` is duplicated above. A change to one is a
+ * change to both, and `buildCreatePayload` reads this so the two wizards cannot
+ * send different shapes.
+ */
+export function asksStartMatchweek(
+  competition: Competition | null,
+  leagueMode: LeagueMode | null,
+): boolean {
+  return isLeague(competition) && leagueMode !== 'table'
+}
+
+/** The heading over the start-matchweek chooser. */
+export function startMatchweekTitle(): string {
+  return 'When does the pool start?'
+}
+
+export function startMatchweekDescription(): string {
+  return 'Members pick from this matchweek on. Earlier weeks aren’t scored and nobody is marked as having missed them.'
 }
 
 export function deadlineDescription(mode: PoolMode, leagueMode: LeagueMode | null): string {
@@ -519,6 +548,11 @@ export type WizardState = {
   deadline: Date
   isPrivate: boolean
   maxEntriesPerUser: number
+  /**
+   * ⬅ 143. The matchweek a league pool starts from. NULL for a bracket pool,
+   * for table mode, and until the options have loaded.
+   */
+  startMatchweek: number | null
 }
 
 export type CreatePoolPayload = {
@@ -530,6 +564,8 @@ export type CreatePoolPayload = {
   prediction_mode: PoolMode
   league_mode: LeagueMode | null
   league_depth: LeagueDepth | null
+  /** ⬅ 143. The matchweek a league pool plays from. NULL = no floor. */
+  league_start_matchweek: number | null
   is_private: boolean
   max_participants: number
   max_entries_per_user: number
@@ -573,10 +609,116 @@ export function buildCreatePayload(state: WizardState): CreatePoolPayload {
     prediction_mode: mode,
     league_mode: league ? state.leagueMode : null,
     league_depth: league && modeHasDepth(state.leagueMode) ? state.leagueDepth : null,
+    // ⬅ 143. Only the modes that HAVE a start matchweek send one. Table is
+    // excluded by Decision 11 — a full-time table has no week it begins in, it
+    // has `league_table_lock_at` — and a CHECK constraint refuses the pair.
+    league_start_matchweek: asksStartMatchweek(state.competition, state.leagueMode)
+      ? state.startMatchweek
+      : null,
     is_private: state.isPrivate,
     max_participants: 0,
     max_entries_per_user: league
       ? 1
       : Math.max(1, Math.min(10, state.maxEntriesPerUser || 1)),
   }
+}
+
+// ============================================================= start matchweek
+
+/**
+ * ⚠ MIRROR OF `lib/league/startMatchweek.ts` IN THE WEB APP. Mobile is a
+ * separate npm project that cannot resolve the web app's paths, which is the
+ * same reason `hasCompetitionEnded` above is a copy rather than an import. Both
+ * copies are pinned by tests that assert the same expectations, and a change to
+ * one is a change to both.
+ *
+ * The full reasoning — why a matchweek and not a date, and why the answer is a
+ * floor rather than an equality — lives in migration 143's header.
+ */
+export type StartMatchweekOption = {
+  number: number
+  title: string
+  lockAt: string
+  isOpenNow: boolean
+  closesIn: string
+}
+
+/**
+ * How soon picks close, in words.
+ *
+ * ⚠ Days are FLOORED. "in 1 day" for something 44 hours away overstates the
+ * notice a group has, and understating it is the safe direction on a screen
+ * whose only job is judging whether there is enough time.
+ */
+export function closesInLabel(lockAt: string, now: number): string {
+  const at = new Date(lockAt).getTime()
+  if (Number.isNaN(at)) return ''
+  if (at <= now) return 'closed'
+  const days = Math.floor((at - now) / 86_400_000)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'tomorrow'
+  return `in ${days} days`
+}
+
+/**
+ * The instant picks close, device-local.
+ *
+ * ⚠ `lock_at`, NEVER `first_kickoff_at`. Migration 101 moved picking shut to an
+ * hour BEFORE the first match of the week and backfilled it; printing the
+ * kickoff here would tell an admin their group has an hour more than it does.
+ */
+export function formatLockInstant(lockAt: string): string {
+  const d = new Date(lockAt)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+/**
+ * The matchweeks a pool being created right now may start from.
+ *
+ * ⚠ ROWS MUST ALREADY BE THE UNLOCKED, NON-EMPTY ONES. Eligibility is the
+ * create route's rule and re-deciding it here would be a second copy of
+ * Decision 16. This orders and labels; it does not choose.
+ *
+ * ⚠ A row that locked while the wizard sat open is DROPPED, not disabled. A
+ * greyed row invites "why can't I pick that" for a week whose answer is simply
+ * that it has started.
+ */
+export function startMatchweekOptions(
+  rows: UpcomingLock[],
+  now: number,
+  limit = 4,
+): StartMatchweekOption[] {
+  return rows
+    .filter((r) => {
+      const at = new Date(r.lockAt).getTime()
+      return !Number.isNaN(at) && at > now
+    })
+    .sort((a, b) => new Date(a.lockAt).getTime() - new Date(b.lockAt).getTime())
+    .slice(0, limit)
+    .map((r, i) => ({
+      number: r.number,
+      title: r.label ?? `Matchweek ${r.number}`,
+      lockAt: r.lockAt,
+      isOpenNow: i === 0,
+      closesIn: closesInLabel(r.lockAt, now),
+    }))
+}
+
+/**
+ * The option the wizard lands on.
+ *
+ * ⚠ THE OPEN ONE — today's behaviour, now stated rather than assumed.
+ * Defaulting to the second week would fix the Saturday this was found on and
+ * break every ordinary creation, and it would be us deciding how much notice a
+ * group needs, which is the decision this screen hands back to the admin.
+ */
+export function defaultStartMatchweek(options: StartMatchweekOption[]): number | null {
+  return options[0]?.number ?? null
 }

@@ -181,6 +181,38 @@ describe('openMatchweekId — exactly one matchweek is open', () => {
     expect(openMatchweekId([played(1), played(2)], NOW)).toBeNull()
   })
 
+  // ---- ⬅ 143. the pool's own start matchweek -------------------------------
+
+  it('skips matchweeks before the pool started', () => {
+    // Ryan's pool, exactly: created the night before matchweek 4, meant to
+    // start in 5. Without the floor it is owed a decision in a week its members
+    // were never invited to — and in Last Man Standing that is an elimination.
+    expect(openMatchweekId([mw(4), mw(5), mw(6)], NOW, 5)).toBe('mw5')
+  })
+
+  it('is a FLOOR, not an equality — the start week having passed does not close the pool', () => {
+    // The pool started at 5 and 5 has been played. It is now owed 6, not
+    // nothing. An equality test here would silently end every pool one week in.
+    expect(openMatchweekId([played(4), played(5), mw(6)], NOW, 5)).toBe('mw6')
+  })
+
+  it('floors on the NUMBER while still ordering by lock time', () => {
+    // The two questions this function asks are different. Which weeks the pool
+    // plays is about the number the admin chose; which of those is open is
+    // about the clock. Round 29 locking before round 28 must not let a pool
+    // that starts at 29 be offered 28.
+    const r28 = mw(28, { lock_at: new Date(NOW + 20 * 24 * HOUR).toISOString() })
+    const r29 = mw(29, { lock_at: new Date(NOW + 2 * HOUR).toISOString() })
+    expect(openMatchweekId([r28, r29], NOW, 29)).toBe('mw29')
+  })
+
+  it('is unchanged when the pool has no floor', () => {
+    // NULL and undefined both mean "no floor" — every World Cup pool, every
+    // table pool and every league pool created before 143.
+    expect(openMatchweekId([mw(1), mw(2)], NOW, null)).toBe('mw1')
+    expect(openMatchweekId([mw(1), mw(2)], NOW, undefined)).toBe('mw1')
+  })
+
   it('is ordered by the rule, not by array order', () => {
     // The rule must not depend on the caller having sorted anything.
     expect(openMatchweekId([mw(3), mw(1), mw(2)], NOW)).toBe('mw1')

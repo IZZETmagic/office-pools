@@ -253,10 +253,29 @@ export function PoolInfoTab({
                 No matchweek is open for picks right now.
               </p>
             )}
+            {/* ⚠ "AN HOUR BEFORE", NOT "AT". This line said *at the first
+                kickoff* until 2026-09-12, and it had been an hour wrong since
+                migration 101 moved the deadline forward and backfilled it —
+                measured on production, matchweek 3 onward run a 60-minute gap
+                between `lock_at` and `first_kickoff_at`. The same stale claim
+                still stands in `LeagueScoringRulesTab`'s LockCard. On a card
+                whose entire subject is when picking closes, an hour is the
+                whole answer. */}
             <p className="t-body text-muted mt-3">
-              Picks lock at the first kickoff of each matchweek, and the next matchweek opens on
-              its own the moment the last one locks. There is no season-wide deadline.
+              Picks lock an hour before the first kickoff of each matchweek, and the next matchweek
+              opens on its own the moment the last one locks. There is no season-wide deadline.
             </p>
+            {/* ⬅ 143. Why this pool has fewer weeks on it than the season does.
+                Without it, somebody joining in matchweek 9 a pool that starts in
+                10 reads the empty history as the pool being broken — or as
+                everybody having missed nine weeks. The programme's rule for a
+                late JOINER is the same one a level up: "what is owed is
+                honesty, not a lever." */}
+            {pool.league_start_matchweek != null && (
+              <p className="t-body text-muted mt-3">
+                This pool plays from matchweek {pool.league_start_matchweek}.
+              </p>
+            )}
           </div>
         ) : pool.prediction_deadline ? (
           <div className="flex justify-between items-center gap-3 py-2.5">

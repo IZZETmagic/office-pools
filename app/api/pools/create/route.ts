@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
     league_mode,
     league_depth,
     league_table_profile,
+    league_start_matchweek,
     prediction_deadline,
     prediction_mode,
     is_private,
@@ -82,6 +83,14 @@ export async function POST(request: NextRequest) {
   let resolvedProfile: string | null = null
   let resolvedTableLockAt: string | null = null
   let resolvedDepth: string | null = null
+  // ⬅ 143. The matchweek the admin chose to start from. NULL until a league
+  // branch below sets it, and NULL is a real answer — it means "no floor",
+  // which is what every pool created before 143 has.
+  let resolvedStartMatchweek: number | null = null
+  // The first matchweek still open, resolved once in the league branch and read
+  // again when Last Man Standing opens its first round. Two queries for one fact
+  // is how the two answers start disagreeing.
+  let firstOpenMatchweek: number | null = null
 
   if (league_season_id) {
     const { data: season, error: seasonErr } = await adminClient
@@ -172,6 +181,79 @@ export async function POST(request: NextRequest) {
       resolvedDepth = league_depth === 'scores' ? 'scores' : 'results'
     }
 
+    // ------------------------------------------- level 2: the start matchweek
+    // Migration 143. Which matchweek this pool plays FROM, chosen by the admin.
+    //
+    // ⚠ THIS IS THE FIELD THE WIZARD USED TO COLLECT AND THROW AWAY. The
+    // Settings step was titled "First matchweek deadline", and for every league
+    // mode except table the date it produced was overwritten a few lines above
+    // with the season's LAST kickoff and never looked at again. A pool created
+    // the night before a Saturday with matchweek 5 chosen started in matchweek
+    // 4, and in Last Man Standing that is not cosmetic — see 143's header.
+    //
+    // Table mode has no start matchweek by construction (Decision 11: a league
+    // table is a full-time table) and a CHECK constraint says so. Its date is
+    // `resolvedTableLockAt`, handled below and already correct.
+    if (resolvedLeagueMode !== 'table') {
+      // The first matchweek anybody could still be asked to pick in. Both
+      // conditions matter: `lock_at` in the future is what "open" means, and
+      // `fixture_count > 0` is what stops a pool starting in a matchweek that
+      // re-homing emptied — 106's floor of five empties roughly one a season,
+      // and an empty matchweek never opens (`league_open_matchweek` skips it),
+      // so a pool floored into one would sit waiting for a week that will never
+      // invite a pick.
+      const { data: openMw } = await adminClient
+        .from('league_matchweeks')
+        .select('matchweek_number')
+        .eq('season_id', league_season_id)
+        .gt('lock_at', new Date().toISOString())
+        .gt('fixture_count', 0)
+        .order('matchweek_number', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      firstOpenMatchweek = openMw?.matchweek_number ?? null
+
+      if (firstOpenMatchweek === null) {
+        // Nothing left to pick. Refusing beats creating a pool that can never
+        // open a round — the same call the table branch makes below.
+        return NextResponse.json(
+          { error: 'This season has no matchweeks left to play — a pool needs at least one.' },
+          { status: 409 },
+        )
+      }
+
+      const chosen =
+        typeof league_start_matchweek === 'number' && Number.isInteger(league_start_matchweek)
+          ? league_start_matchweek
+          : null
+
+      if (chosen !== null) {
+        // It has to be a matchweek this season actually has. A number that is
+        // merely in range would pass the CHECK and then floor silently below,
+        // which would look like the bug this whole change is about.
+        const { data: chosenMw } = await adminClient
+          .from('league_matchweeks')
+          .select('matchweek_number')
+          .eq('season_id', league_season_id)
+          .eq('matchweek_number', chosen)
+          .maybeSingle()
+        if (!chosenMw) {
+          return NextResponse.json(
+            { error: `This season has no matchweek ${chosen}.` },
+            { status: 400 },
+          )
+        }
+
+        // ⭐ THE FLOOR, and the reason it is a floor rather than an equality.
+        // Migration 095 already applied it to Showdown; 143 promotes it to the
+        // rule for every mode. It can only ever move the start LATER, which is
+        // the safe direction: a pool can be created seconds before a lock, and
+        // starting in a week whose picker already shut is how somebody gets
+        // eliminated in Last Man Standing without ever seeing one.
+        resolvedStartMatchweek = Math.max(chosen, firstOpenMatchweek)
+      }
+    }
+
     if (resolvedLeagueMode === 'table') {
       resolvedProfile = league_table_profile === 'headline_only' ? 'headline_only' : 'full_table'
 
@@ -251,6 +333,9 @@ export async function POST(request: NextRequest) {
       league_mode: resolvedLeagueMode,
       league_table_profile: resolvedProfile,
       league_table_lock_at: resolvedTableLockAt,
+      // ⬅ 143. Immutable from here (trg_league_mode_immutable), because it is
+      // the matchweek members were told the pool begins.
+      league_start_matchweek: resolvedStartMatchweek,
       admin_user_id: userData.user_id,
       prediction_deadline: resolvedDeadline,
       prediction_mode: resolvedMode,
@@ -361,18 +446,17 @@ export async function POST(request: NextRequest) {
   // advantage nobody else had. Rounds repeat, so the wait is bounded — which is
   // the same reasoning that made them repeat in the first place.
   if (resolvedLeagueMode === 'last_man_standing' && league_season_id) {
-    const { data: openMw } = await adminClient
-      .from('league_matchweeks')
-      .select('matchweek_number')
-      .eq('season_id', league_season_id)
-      .gt('lock_at', new Date().toISOString())
-      .order('matchweek_number', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    if (openMw?.matchweek_number) {
+    // ⬅ 143. The admin's matchweek, already floored to the first open one, or
+    // that open one when no choice was sent (an API caller; both wizards now
+    // always send one). The lookup that used to live here has moved up into the
+    // league branch so the round and the stored column cannot disagree — they
+    // are the same number, and before 143 the stored one did not exist while
+    // this one silently won.
+    const startAt = resolvedStartMatchweek ?? firstOpenMatchweek
+    if (startAt) {
       const { error: roundErr } = await adminClient.rpc('league_lms_open_round', {
         p_pool_id: newPool.pool_id,
-        p_matchweek: openMw.matchweek_number,
+        p_matchweek: startAt,
       })
       if (roundErr) console.error('[create pool] lms round failed:', roundErr.message)
     }

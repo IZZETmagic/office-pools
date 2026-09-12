@@ -18,18 +18,24 @@ import {
   LEAGUE_DEPTHS,
   LEAGUE_MODES,
   WC_MODES,
+  asksStartMatchweek,
   buildCreatePayload,
   deadlineDescription,
   deadlineTitle,
   defaultDeadline,
+  defaultStartMatchweek,
   effectiveMode,
   formatDeadline,
+  formatLockInstant,
   formatSeasonRange,
   isLeague as competitionIsLeague,
   modeHasDepth,
   pairSeasons,
   quickPicks as computeQuickPicks,
   selectableCompetitions,
+  startMatchweekDescription,
+  startMatchweekOptions,
+  startMatchweekTitle,
   validateDeadline,
   withoutSeason,
   type Competition,
@@ -38,6 +44,7 @@ import {
   type PoolMode,
   type QuickPick,
   type SeasonRow,
+  type StartMatchweekOption,
   type TournamentRow,
   type UpcomingLock,
 } from '@/lib/createPool';
@@ -100,6 +107,13 @@ export default function CreatePoolModal() {
   // Step 4
   const [deadline, setDeadline] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  /**
+   * ⬅ 143. The matchweek a league pool starts from.
+   *
+   * NULL for a bracket pool and for table mode, and NULL until the options have
+   * loaded. `asksStartMatchweek` decides whether it is asked for at all.
+   */
+  const [startMatchweek, setStartMatchweek] = useState<number | null>(null);
   // ⚠ PRIVATE BY DEFAULT (Ryan, 2026-08-29), matching the web wizard. A pool
   // code is required either way; the only thing this decides is whether the
   // pool is also listed in Discover. Two create surfaces disagreeing about a
@@ -202,8 +216,15 @@ export default function CreatePoolModal() {
         .eq('season_id', seasonId)
         .not('lock_at', 'is', null)
         .gt('lock_at', new Date().toISOString())
+        // ⬅ 143. Same predicate the create route floors on. 106's re-homing
+        // floor empties roughly one matchweek a season and an empty one never
+        // opens, so offering it would start a pool in a week that will never
+        // ask for a pick.
+        .gt('fixture_count', 0)
         .order('lock_at', { ascending: true })
-        .limit(3);
+        // ⬅ 143. Five, not three: the chooser shows four and wants a spare in
+        // case one locks between this read and the render.
+        .limit(5);
       if (cancelled) return;
       // A failure here costs the CHIPS and nothing else — the admin can still
       // set any date with the picker — so it does not raise an error banner
@@ -236,6 +257,28 @@ export default function CreatePoolModal() {
     [selected, upcomingLocks],
   );
 
+  // ⬅ 143. Does this pool choose a start matchweek instead of a deadline? The
+  // rule itself lives in `mobile/lib/createPool.ts` alongside the payload
+  // builder that reads it, so the screen and the body cannot disagree.
+  const asksStart = asksStartMatchweek(selected, leagueMode);
+  const startOptions = useMemo(
+    () => startMatchweekOptions(upcomingLocks, Date.now()),
+    [upcomingLocks],
+  );
+
+  // Land on the open matchweek — the behaviour before 143, now chosen out loud.
+  useEffect(() => {
+    if (!asksStart) {
+      setStartMatchweek(null);
+      return;
+    }
+    setStartMatchweek((prev) =>
+      prev !== null && startOptions.some((o) => o.number === prev)
+        ? prev
+        : defaultStartMatchweek(startOptions),
+    );
+  }, [asksStart, startOptions]);
+
   // ------------------------------------------------------------- navigation
 
   function canProceed(): boolean {
@@ -247,7 +290,11 @@ export default function CreatePoolModal() {
       case 'details':
         return poolName.trim().length > 0;
       case 'settings':
-        return !!deadline;
+        // ⬅ 143. A league pool that asks for a start matchweek needs THAT
+        // answered, not a date it never shows. `deadline` is still prefilled
+        // and still sent — the route overwrites it with the season's last
+        // kickoff for every league pool — but it is not what the step is about.
+        return asksStart ? startMatchweek !== null : !!deadline;
     }
   }
 
@@ -287,6 +334,7 @@ export default function CreatePoolModal() {
           deadline,
           isPrivate,
           maxEntriesPerUser,
+          startMatchweek,
         }),
       );
       // Refresh the home dashboard / Pools tab list so the new pool card
@@ -406,6 +454,10 @@ export default function CreatePoolModal() {
               leagueMode={leagueMode}
               deadline={deadline}
               quickPicks={quickPicks}
+              asksStart={asksStart}
+              startOptions={startOptions}
+              startMatchweek={startMatchweek}
+              onPickStartMatchweek={setStartMatchweek}
               onPickDeadline={setDeadline}
               showPicker={showPicker}
               onRequestPicker={() => {
@@ -864,6 +916,10 @@ function SettingsStep({
   leagueMode,
   deadline,
   quickPicks,
+  asksStart,
+  startOptions,
+  startMatchweek,
+  onPickStartMatchweek,
   onPickDeadline,
   showPicker,
   onRequestPicker,
@@ -878,6 +934,11 @@ function SettingsStep({
   leagueMode: LeagueMode;
   deadline: Date | null;
   quickPicks: QuickPick[];
+  /** ⬅ 143. Start matchweek instead of a deadline? See `asksStartMatchweek`. */
+  asksStart: boolean;
+  startOptions: StartMatchweekOption[];
+  startMatchweek: number | null;
+  onPickStartMatchweek: (n: number) => void;
   onPickDeadline: (d: Date) => void;
   showPicker: boolean;
   onRequestPicker: () => void;
@@ -892,6 +953,38 @@ function SettingsStep({
 
   return (
     <View style={{ gap: theme.spacing.lg }}>
+      {/* ⬅ 143. THE QUESTION THE ADMIN WAS ACTUALLY ANSWERING.
+
+          This card used to be a date picker headed "First round deadline" for
+          Last Man Standing and "First matchweek deadline" for the rest. The
+          create route discarded that date for every league mode but table and
+          started the pool in whichever matchweek happened to be unlocked. Ryan
+          set a pool to matchweek 5 the night before matchweek 4 and it began in
+          4 — and in Last Man Standing a week you were never shown a picker for
+          is a week you are eliminated in. Migration 143. */}
+      {asksStart ? (
+        <Card title={startMatchweekTitle()} description={startMatchweekDescription()}>
+          {startOptions.length === 0 ? (
+            /* The create route refuses this with a 409, so saying it here is
+               the same answer given earlier rather than an empty card that
+               fails on submit. */
+            <Text variant="body" color="slate">
+              This season has no matchweeks left to play.
+            </Text>
+          ) : (
+            <View style={{ gap: theme.spacing.sm }}>
+              {startOptions.map((o) => (
+                <StartMatchweekRow
+                  key={o.number}
+                  option={o}
+                  selected={startMatchweek === o.number}
+                  onPress={() => onPickStartMatchweek(o.number)}
+                />
+              ))}
+            </View>
+          )}
+        </Card>
+      ) : (
       <Card
         title={deadlineTitle(mode, effectiveLeagueMode)}
         description={deadlineDescription(mode, effectiveLeagueMode)}
@@ -941,6 +1034,7 @@ function SettingsStep({
           </View>
         ) : null}
       </Card>
+      )}
 
       <Card
         title="Who can join"
@@ -1091,6 +1185,68 @@ function Chip({ label, onPress }: { label: string; onPress: () => void }) {
     >
       <Text variant="detail" color="slate">
         {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * ⬅ 143. One matchweek the pool could start from.
+ *
+ * Styled as the privacy options below are — a full-width tappable row rather
+ * than a radio, because the thing being compared is two lines of information
+ * (which week, and how long the group has) and a radio dot next to a label
+ * would hide the second line.
+ */
+function StartMatchweekRow({
+  option,
+  selected,
+  onPress,
+}: {
+  option: StartMatchweekOption;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      // ⚠ The label carries the CLOSING TIME, not just the matchweek. A screen
+      // reader user is making the same judgement as everybody else — is that
+      // enough notice for my group — and the number alone cannot answer it.
+      accessibilityLabel={`${option.title}, picks close ${formatLockInstant(option.lockAt)}, ${option.closesIn}`}
+      style={({ pressed }) => ({
+        gap: 2,
+        padding: theme.spacing.md,
+        borderRadius: theme.radii.sm,
+        backgroundColor: selected ? withOpacity(theme.colors.primary, 0.08) : theme.colors.mist,
+        borderWidth: theme.borders.accent,
+        borderColor: selected ? theme.colors.primary : 'transparent',
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <View
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+      >
+        <Text style={{ fontFamily: fontFamilies.bold, fontSize: 16, color: theme.colors.ink }}>
+          {option.title}
+        </Text>
+        {/* ⚠ A FACT, NOT A RECOMMENDATION. This is the current default and the
+            whole point of the screen is that a later week is an equally correct
+            answer — so it names the state and says nothing about what to do. */}
+        {option.isOpenNow ? (
+          <Text variant="detail" color="slate">
+            Open now
+          </Text>
+        ) : null}
+      </View>
+      {/* ⚠ `lock_at`, never the first kickoff. Migration 101 moved picking shut
+          to an hour BEFORE the first match of the week; printing the kickoff
+          would tell an admin their group has an hour more than it does. */}
+      <Text variant="detail" color="slate">
+        Picks close {formatLockInstant(option.lockAt)} · {option.closesIn}
       </Text>
     </Pressable>
   );

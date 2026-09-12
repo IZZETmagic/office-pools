@@ -302,7 +302,26 @@ const byLockTime = (a: MatchweekRow, b: MatchweekRow) => {
  *
  * Returns null once the season is over.
  */
-export function openMatchweekId(rows: MatchweekRow[], now: number): string | null {
+export function openMatchweekId(
+  rows: MatchweekRow[],
+  now: number,
+  /**
+   * ⬅ 143. The pool's `league_start_matchweek`, when the caller has a pool.
+   *
+   * A FLOOR, not a filter on equality: a pool that starts at matchweek 5 has no
+   * business in 4, but it has every business in 6 once 5 has been played. NULL
+   * or omitted means no floor, which is what a season-level caller wants and
+   * what every pool created before 143 has.
+   *
+   * ⚠ Compared on `matchweek_number`, which is the ONE place in this file that
+   * is legitimately about the number rather than the lock time. The number is
+   * what the admin chose in the wizard and what the pool tells its members; the
+   * ORDER the weeks are considered in is still lock time, below, because a
+   * whole round can be moved and round 29 can lock before round 28. Those are
+   * two different questions and this is the only function that asks both.
+   */
+  startMatchweek?: number | null,
+): string | null {
   const inOrder = [...rows].sort(byLockTime)
   for (const mw of inOrder) {
     if (isMatchweekDone(mw)) continue
@@ -310,6 +329,7 @@ export function openMatchweekId(rows: MatchweekRow[], now: number): string | nul
     // mean a matchweek can sit locked with fixtures still to play for weeks, and
     // that must not hold the whole season shut behind it.
     if (isMatchweekLocked(mw, now)) continue
+    if (startMatchweek != null && mw.matchweek_number < startMatchweek) continue
     return mw.matchweek_id
   }
   return null
@@ -445,6 +465,15 @@ export async function readLeaguePoolView(
      * `getLeagueSeasonCached`. Omitted, the three reads happen inline below.
      */
     season?: LeagueSeasonView
+    /**
+     * ⬅ 143. `pools.league_start_matchweek` — the week this pool plays from.
+     *
+     * ⚠ PASSED IN, NEVER READ HERE, for the same reason `season` is: this
+     * module is imported by client components, and a pool read inside it would
+     * be a second source for a fact the caller already holds on the pool row it
+     * loaded to get here. Omitted means no floor.
+     */
+    startMatchweek?: number | null
   },
 ): Promise<{ view: LeaguePoolView | null; error: string | null }> {
   const now = args.now ?? Date.now()
@@ -507,7 +536,12 @@ export async function readLeaguePoolView(
   // Which matchweek is open — and which is being played — are facts about the
   // whole list, so both are resolved once here rather than re-derived for each
   // of the 38 rows below.
-  const openId = openMatchweekId(matchweekRows, now)
+  // ⬅ 143. The pool's own floor. `inPlayMatchweekId` deliberately gets NO
+  // floor: what is being PLAYED is a fact about the football, not about this
+  // pool, and a pool starting at matchweek 5 still wants matchweek 4's scores
+  // on its screens while they are coming in. Only what it can be asked to
+  // DECIDE is floored.
+  const openId = openMatchweekId(matchweekRows, now, args.startMatchweek)
   const inPlayId = inPlayMatchweekId(matchweekRows, now)
 
   /**

@@ -212,7 +212,7 @@ async function handleGET(
   const poolIds = [...new Set(memberships.map((m) => m.pool_id))]
   const { data: leaguePoolRows, error: leagueErr } = await admin
     .from('pools')
-    .select('pool_id, league_season_id, league_mode, league_table_lock_at')
+    .select('pool_id, league_season_id, league_mode, league_table_lock_at, league_start_matchweek')
     .in('pool_id', poolIds)
     .not('league_season_id', 'is', null)
     .returns<
@@ -220,6 +220,8 @@ async function handleGET(
         pool_id: string
         league_season_id: string | null
         league_mode: string | null
+        /** ⬅ 143. The matchweek this pool plays from; NULL means no floor. */
+        league_start_matchweek: number | null
         league_table_lock_at: string | null
       }>
     >()
@@ -271,6 +273,7 @@ async function handleGET(
       seasonId: row.league_season_id,
       leagueMode: row.league_mode,
       tableLockAt: row.league_table_lock_at,
+      startMatchweek: row.league_start_matchweek ?? null,
       entryId: (m.pool_entries ?? [])[0]?.entry_id ?? null,
     })
   }

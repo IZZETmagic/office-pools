@@ -78,6 +78,7 @@ const pickemPool = {
   seasonId: SEASON,
   leagueMode: 'pickem',
   tableLockAt: null,
+  startMatchweek: null,
   entryId: 'e1',
 }
 

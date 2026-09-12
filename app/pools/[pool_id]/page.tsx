@@ -592,6 +592,9 @@ export default async function PoolPage({
       seasonId: pool.league_season_id,
       tournamentId: pool.tournament_id,
       season,
+      // ⬅ 143. `getPoolData` selects `*`, so this rides along on the pool row
+      // already in hand — no extra read.
+      startMatchweek: pool.league_start_matchweek ?? null,
     })
     if (leagueErr) {
       // Loud. A league pool rendering an empty fixture list is exactly the

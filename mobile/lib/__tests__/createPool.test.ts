@@ -21,9 +21,12 @@ import { describe, it, expect } from 'vitest'
 import {
   LEAGUE_MODES,
   WC_MODES,
+  asksStartMatchweek,
   buildCreatePayload,
+  closesInLabel,
   deadlineTitle,
   defaultDeadline,
+  defaultStartMatchweek,
   effectiveMode,
   hasCompetitionEnded,
   isLeague,
@@ -32,6 +35,7 @@ import {
   parseLocalDate,
   quickPicks,
   selectableCompetitions,
+  startMatchweekOptions,
   validateDeadline,
   withoutSeason,
   type Competition,
@@ -298,10 +302,24 @@ describe('mode catalogues', () => {
 describe('deadlineTitle', () => {
   it('names what the date actually locks in each mode', () => {
     expect(deadlineTitle('league_pickem', 'table')).toBe('Table deadline')
-    expect(deadlineTitle('league_pickem', 'pickem')).toBe('First matchweek deadline')
-    expect(deadlineTitle('league_pickem', 'last_man_standing')).toBe('First round deadline')
     expect(deadlineTitle('progressive', null)).toBe('Group stage deadline')
     expect(deadlineTitle('full_tournament', null)).toBe('Prediction deadline')
+  })
+
+  /**
+   * ⬅ 143. This used to return "First matchweek deadline" for Pick'em and
+   * Showdown and "First round deadline" for Last Man Standing. BOTH WERE
+   * CLAIMS THE SCREEN COULD NOT KEEP: the create route overwrote that date with
+   * the season's last kickoff and started the pool in whichever matchweek
+   * happened to be unlocked. Those modes now ask `startMatchweekTitle` instead,
+   * and this function must not grow a league title back.
+   */
+  it('no longer titles itself a matchweek or a round it does not set', () => {
+    for (const mode of ['pickem', 'showdown', 'last_man_standing'] as const) {
+      const title = deadlineTitle('league_pickem', mode)
+      expect(title).not.toMatch(/matchweek|round/i)
+      expect(asksStartMatchweek(pl(), mode)).toBe(true)
+    }
   })
 })
 
@@ -414,6 +432,7 @@ describe('buildCreatePayload', () => {
     deadline: new Date('2026-10-01T13:00:00Z'),
     isPrivate: true,
     maxEntriesPerUser: 3,
+    startMatchweek: null as number | null,
   }
 
   it('trims the name and nulls an empty description', () => {
@@ -498,5 +517,116 @@ describe('buildCreatePayload', () => {
   it('sends the deadline as an ISO instant', () => {
     const p = buildCreatePayload({ ...base, competition: wc() })
     expect(p.prediction_deadline).toBe('2026-10-01T13:00:00.000Z')
+  })
+})
+
+// ------------------------------------------------------- ⬅ 143 start matchweek
+
+describe('startMatchweekOptions (mirror of lib/league/startMatchweek.ts)', () => {
+  const NOW = new Date('2026-09-12T12:00:00Z').getTime()
+  const HOUR = 3_600_000
+  const DAY = 24 * HOUR
+  const lock = (number: number, atMs: number, label: string | null = null) => ({
+    number,
+    label,
+    lockAt: new Date(atMs).toISOString(),
+  })
+
+  it('offers the open matchweek first and marks it', () => {
+    const opts = startMatchweekOptions([lock(4, NOW + HOUR), lock(5, NOW + 6 * DAY)], NOW)
+    expect(opts.map((o) => o.number)).toEqual([4, 5])
+    expect(opts[0].isOpenNow).toBe(true)
+  })
+
+  it('drops a matchweek that locked while the wizard was open', () => {
+    const opts = startMatchweekOptions([lock(4, NOW - HOUR), lock(5, NOW + 6 * DAY)], NOW)
+    expect(opts.map((o) => o.number)).toEqual([5])
+  })
+
+  it('orders by lock time, not by matchweek number', () => {
+    const opts = startMatchweekOptions([lock(29, NOW + DAY), lock(28, NOW + 20 * DAY)], NOW)
+    expect(opts.map((o) => o.number)).toEqual([29, 28])
+  })
+
+  it('lands on the open matchweek by default', () => {
+    const opts = startMatchweekOptions([lock(4, NOW + HOUR), lock(5, NOW + 6 * DAY)], NOW)
+    expect(defaultStartMatchweek(opts)).toBe(4)
+    expect(defaultStartMatchweek([])).toBeNull()
+  })
+
+  it('floors the day count and speaks 0 and 1', () => {
+    expect(closesInLabel(new Date(NOW + 2 * HOUR).toISOString(), NOW)).toBe('today')
+    expect(closesInLabel(new Date(NOW + 44 * HOUR).toISOString(), NOW)).toBe('tomorrow')
+    expect(closesInLabel(new Date(NOW + 95 * HOUR).toISOString(), NOW)).toBe('in 3 days')
+    expect(closesInLabel(new Date(NOW - HOUR).toISOString(), NOW)).toBe('closed')
+  })
+})
+
+describe('asksStartMatchweek', () => {
+  it('asks every league mode except table', () => {
+    expect(asksStartMatchweek(pl(), 'last_man_standing')).toBe(true)
+    expect(asksStartMatchweek(pl(), 'pickem')).toBe(true)
+    expect(asksStartMatchweek(pl(), 'showdown')).toBe(true)
+  })
+
+  /**
+   * ⚠ Decision 11: a league table is a FULL-TIME table — one prediction about
+   * the final standings, with no matchweek it begins in. Its date IS the
+   * question and reaches the route intact as `league_table_lock_at`. A CHECK
+   * constraint (143) refuses the pair, so sending one would 23514 on create.
+   */
+  it('never asks a table pool', () => {
+    expect(asksStartMatchweek(pl(), 'table')).toBe(false)
+  })
+
+  it('never asks a bracket pool', () => {
+    expect(asksStartMatchweek(wc(), 'pickem')).toBe(false)
+    expect(asksStartMatchweek(null, 'pickem')).toBe(false)
+  })
+})
+
+describe('buildCreatePayload — the start matchweek', () => {
+  const base = {
+    poolName: 'Football Daddies Standing',
+    description: '',
+    leagueDepth: 'results' as const,
+    predictionMode: 'full_tournament' as const,
+    deadline: new Date('2026-10-01T13:00:00Z'),
+    isPrivate: true,
+    maxEntriesPerUser: 1,
+  }
+
+  it('sends the chosen matchweek for a Last Man Standing pool', () => {
+    const p = buildCreatePayload({
+      ...base,
+      competition: pl(),
+      leagueMode: 'last_man_standing',
+      startMatchweek: 5,
+    })
+    expect(p.league_start_matchweek).toBe(5)
+  })
+
+  it('sends null for a table pool even when one is selected', () => {
+    // The state can legitimately hold a stale number: pick Last Man Standing,
+    // choose matchweek 5, step back and switch to Table. The payload is what
+    // the database sees, so the rule has to be applied here and not only in the
+    // screen that hides the control.
+    const p = buildCreatePayload({
+      ...base,
+      competition: pl(),
+      leagueMode: 'table',
+      startMatchweek: 5,
+    })
+    expect(p.league_start_matchweek).toBeNull()
+  })
+
+  it('sends null for a World Cup pool', () => {
+    const p = buildCreatePayload({
+      ...base,
+      competition: wc(),
+      leagueMode: 'pickem',
+      startMatchweek: 5,
+    })
+    expect(p.league_start_matchweek).toBeNull()
   })
 })

@@ -86,7 +86,7 @@ export async function GET(
 
   const { data: pool } = await admin
     .from('pools')
-    .select('pool_id, pool_name, league_season_id, tournament_id, league_mode, league_depth, league_table_lock_at')
+    .select('pool_id, pool_name, league_season_id, tournament_id, league_mode, league_depth, league_table_lock_at, league_start_matchweek')
     .eq('pool_id', pool_id)
     .maybeSingle()
   if (!pool?.league_season_id) {
@@ -110,6 +110,8 @@ export async function GET(
     seasonId: pool.league_season_id,
     tournamentId: pool.tournament_id as string,
     season,
+    // ⬅ 143. The pool does not owe a decision in a week it has not started.
+    startMatchweek: pool.league_start_matchweek as number | null,
   })
   // ⚠ Surfaced, never swallowed. Every number below is derived from this, so a
   // failed read that returned 200 would render an empty season as a real one —

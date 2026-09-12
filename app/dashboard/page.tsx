@@ -28,6 +28,8 @@ type LeagueMembership = {
     league_mode: string | null
     league_season_id: string | null
     league_table_lock_at: string | null
+    /** ⬅ 143. The matchweek this pool plays from; NULL means no floor. */
+    league_start_matchweek: number | null
   }
   // The three columns `pickBestEntry` sorts on, plus the id. Both are NULL for
   // every league entry — which is exactly why the league branches replace what
@@ -77,6 +79,7 @@ export default async function DashboardPage() {
         league_mode,
         league_season_id,
         league_table_lock_at,
+        league_start_matchweek,
         brand_name,
         brand_emoji,
         brand_color,
@@ -375,6 +378,7 @@ export default async function DashboardPage() {
           seasonId: m.pools.league_season_id,
           leagueMode: m.pools.league_mode,
           tableLockAt: m.pools.league_table_lock_at,
+          startMatchweek: m.pools.league_start_matchweek ?? null,
           entryId: pickBestEntry(entries, scoredByEntry)?.entry_id ?? entries[0]?.entry_id ?? null,
         }
       }),

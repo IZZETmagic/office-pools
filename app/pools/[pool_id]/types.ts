@@ -55,6 +55,16 @@ export type PoolData = {
    * writing it down (it lagged the deadline by 15 minutes in production).
    */
   league_table_lock_at: string | null
+  /**
+   * ⬅ 143. `pools.league_start_matchweek` — the matchweek this pool plays from,
+   * chosen by its admin at creation and immutable after it.
+   *
+   * Read as a FLOOR, never an equality: `openMatchweekId` skips anything below
+   * it and takes the earliest week left. NULL means no floor, which is what
+   * every World Cup pool, every table pool and every league pool created before
+   * 143 has.
+   */
+  league_start_matchweek: number | null
   prediction_deadline: string | null
   prediction_mode: 'full_tournament' | 'progressive' | 'bracket_picker'
   created_at: string

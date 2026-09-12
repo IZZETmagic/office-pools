@@ -33,6 +33,8 @@ export type PoolDetailInfo = {
   leagueDepth: 'results' | 'scores' | null;
   /** True when `league_season_id` is set — the gate every web league branch uses. */
   isLeague: boolean;
+  /** ⬅ 143. `pools.league_start_matchweek`; NULL means no floor. */
+  startMatchweek: number | null;
   /**
    * When table-mode picking closes. ⚠ NOT `predictionDeadline`, which on a
    * league pool holds the season end and is months or years later.
@@ -118,7 +120,7 @@ export function usePoolDetail(poolId: string | undefined) {
             supabase
               .from('pools')
               .select(
-                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, accepting_members, max_participants, max_entries_per_user, is_private, admin_user_id, created_at, entry_fee, entry_fee_currency, league_mode, league_depth, league_season_id, league_table_lock_at, league_seasons(competition_name)',
+                'pool_id, pool_name, pool_code, description, prediction_mode, brand_name, brand_emoji, brand_color, brand_logo_url, prediction_deadline, status, accepting_members, max_participants, max_entries_per_user, is_private, admin_user_id, created_at, entry_fee, entry_fee_currency, league_mode, league_depth, league_season_id, league_table_lock_at, league_start_matchweek, league_seasons(competition_name)',
               )
               .eq('pool_id', poolId)
               .maybeSingle(),
@@ -169,6 +171,8 @@ export function usePoolDetail(poolId: string | undefined) {
           // pools — so the Info tab was telling members their deadline was a
           // year away and still open when picking had closed five days ago.
           league_table_lock_at: string | null;
+          /** ⬅ 143. The matchweek this pool plays from; NULL means no floor. */
+          league_start_matchweek: number | null;
           // Embedded through `pools_league_season_id_fkey`. World-readable, so
           // no route needed for one caption.
           //
@@ -212,6 +216,10 @@ export function usePoolDetail(poolId: string | undefined) {
             // `leagueDepthPolarity.guard.test.ts` fails the build otherwise.
             leagueDepth: poolRow.league_depth as 'results' | 'scores' | null,
             isLeague: Boolean(poolRow.league_season_id),
+            // ⬅ 143. The matchweek this pool plays from, so the Info tab can
+            // say so rather than leaving a member to wonder why the season is
+            // three weeks old and their pool has one week on it.
+            startMatchweek: poolRow.league_start_matchweek ?? null,
             leagueTableLockAt: poolRow.league_table_lock_at,
             // PostgREST types a to-one embed either way depending on how it
             // infers the relationship — normalise rather than trust.

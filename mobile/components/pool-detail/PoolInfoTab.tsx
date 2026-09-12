@@ -305,6 +305,15 @@ export function PoolInfoTab({ pool, matchweekDeadline = null }: Props) {
             }}
           >
             Picks lock per matchweek, an hour before its first kickoff.
+            {/* ⬅ 143. Why the pool has fewer weeks on it than the season does.
+                Without this a member joining in matchweek 9 a pool that starts
+                in 10 sees an empty history and reads it as the pool being
+                broken — or, worse, as everybody having missed nine weeks. The
+                programme's own rule for a late JOINER is the same one a level
+                up: "what is owed is honesty, not a lever." */}
+            {pool.startMatchweek != null
+              ? ` This pool plays from matchweek ${pool.startMatchweek}.`
+              : ''}
           </RNText>
         ) : deadlineAt ? (
           <View

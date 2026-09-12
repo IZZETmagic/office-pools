@@ -4,6 +4,11 @@ import React, { useState, useEffect } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { createClient } from '@/lib/supabase/client'
 import { hasCompetitionEnded } from '@/lib/competitionFormat'
+import {
+  startMatchweekOptions,
+  defaultStartMatchweek,
+  formatLockInstant,
+} from '@/lib/league/startMatchweek'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
@@ -348,6 +353,13 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   const [maxEntries, setMaxEntries] = useState('1')
   const [deadlineDate, setDeadlineDate] = useState('2026-06-11')
   const [deadlineTime, setDeadlineTime] = useState('13:00')
+  /**
+   * ⬅ 143. The matchweek a league pool starts from.
+   *
+   * NULL until the options load, and NULL for every non-league pool — the route
+   * ignores it there and the CHECK constraint refuses it.
+   */
+  const [startMatchweek, setStartMatchweek] = useState<number | null>(null)
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -443,8 +455,16 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
         .eq('season_id', seasonId)
         .not('lock_at', 'is', null)
         .gt('lock_at', new Date().toISOString())
+        // ⬅ 143. Same predicate the create route floors on. 106's re-homing
+        // floor empties roughly one matchweek a season, an empty one never
+        // opens, and offering it here would let somebody start a pool in a week
+        // that will never ask for a pick.
+        .gt('fixture_count', 0)
         .order('lock_at', { ascending: true })
-        .limit(3)
+        // ⬅ 143. Five, not three. Three was enough for shortcut chips; the
+        // start-matchweek chooser shows four and needs a spare so that a week
+        // locking between this read and the render does not leave three.
+        .limit(5)
       if (cancelled) return
       setUpcomingLocks(
         (data ?? []).map((r) => ({
@@ -478,6 +498,33 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
     : predictionMode === 'league_pickem'
       ? 'full_tournament'
       : predictionMode
+
+  /**
+   * ⬅ 143. Which matchweek this pool can start from, and whether we ask at all.
+   *
+   * ⚠ TABLE MODE IS EXCLUDED, and not as an oversight. Decision 11: a league
+   * table is a FULL-TIME table — one prediction about the final standings, with
+   * no matchweek it begins in. Its date IS the question, it already reaches the
+   * route intact as `league_table_lock_at`, and a CHECK constraint refuses a
+   * start matchweek on that mode. So table keeps the date picker below and every
+   * other league mode replaces it.
+   */
+  const asksStartMatchweek = isLeagueTournament && leagueMode !== 'table'
+  const startOptions = React.useMemo(
+    () => startMatchweekOptions(upcomingLocks, Date.now()),
+    [upcomingLocks],
+  )
+
+  // Land on the open matchweek — today's behaviour, stated out loud instead of
+  // assumed. Re-runs when the competition changes, because the options did.
+  useEffect(() => {
+    if (!asksStartMatchweek) { setStartMatchweek(null); return }
+    setStartMatchweek((prev) =>
+      prev !== null && startOptions.some((o) => o.number === prev)
+        ? prev
+        : defaultStartMatchweek(startOptions),
+    )
+  }, [asksStartMatchweek, startOptions])
 
   const currentStepIndex = STEPS.findIndex((s) => s.key === currentStep)
 
@@ -537,11 +584,22 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
     const maxE = Math.max(1, Math.min(10, parseInt(maxEntries) || 1))
     const deadline = new Date(`${deadlineDate}T${deadlineTime}:00`)
 
-    // ⚠ There was NO past-date check here at all. The calendar greys out earlier
-    // days, but a day-level floor cannot catch "today at 09:00" chosen at noon —
-    // and the wizard submitted it. A deadline already gone closes nothing, and
-    // for a table pool it is the real lock, so the pool would be created shut.
-    if (Number.isNaN(deadline.getTime()) || deadline <= new Date()) {
+    // ⬅ 143. A league pool that asks for a start matchweek is not setting a
+    // clock, so the date check below does not apply to it — `deadlineDate` is
+    // never shown and the route overwrites `prediction_deadline` with the
+    // season's last kickoff regardless. What it needs instead is an answer.
+    if (asksStartMatchweek) {
+      if (startMatchweek === null) {
+        setError('Choose the matchweek this pool starts from.')
+        setLoading(false)
+        return
+      }
+    } else if (Number.isNaN(deadline.getTime()) || deadline <= new Date()) {
+      // ⚠ There was NO past-date check here at all. The calendar greys out
+      // earlier days, but a day-level floor cannot catch "today at 09:00"
+      // chosen at noon — and the wizard submitted it. A deadline already gone
+      // closes nothing, and for a table pool it is the real lock, so the pool
+      // would be created shut.
       setError('The deadline has to be in the future.')
       setLoading(false)
       return
@@ -571,6 +629,11 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
             isLeagueTournament && (leagueMode === 'pickem' || leagueMode === 'showdown')
               ? leagueDepth
               : null,
+          // ⬅ 143. The matchweek this pool plays from. NULL for a bracket pool
+          // and for table mode, both of which the route and a CHECK refuse it
+          // on anyway — sent from one expression rather than behind a second
+          // branch that could drift out of step with `asksStartMatchweek`.
+          league_start_matchweek: asksStartMatchweek ? startMatchweek : null,
           is_private: isPrivate,
           // 0 means "no admin-set limit", which the create route turns into
           // NULL. The real ceiling is the tier one, enforced by a trigger.
@@ -1119,6 +1182,70 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
               {currentStep === 'settings' && (
                 <div className="space-y-4">
 
+                  {/* ⬅ 143. THE QUESTION THE ADMIN WAS ACTUALLY ANSWERING.
+                      This step used to be a date picker titled "First matchweek
+                      deadline" whose value the create route discarded for every
+                      league mode but table. Ryan set a pool to matchweek 5 the
+                      night before matchweek 4 and it started in 4 — which in Last
+                      Man Standing means eliminated in a week he was never shown a
+                      picker for. See migration 143. */}
+                  {asksStartMatchweek && (
+                    <Section
+                      title="When does the pool start?"
+                      description="Members pick from this matchweek on. Earlier weeks aren't scored and nobody is marked as having missed them."
+                    >
+                      {startOptions.length === 0 ? (
+                        /* No unlocked matchweek left to read. The route refuses
+                           this case with a 409, so saying so here is the honest
+                           version of the same answer rather than an empty box
+                           that fails on submit. */
+                        <p className="text-sm text-neutral-500">
+                          This season has no matchweeks left to play.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {startOptions.map((o) => (
+                            <button
+                              key={o.number}
+                              type="button"
+                              onClick={() => setStartMatchweek(o.number)}
+                              aria-pressed={startMatchweek === o.number}
+                              className={`w-full p-3 rounded-xl border cursor-pointer transition text-left ${
+                                startMatchweek === o.number
+                                  ? 'border-primary-500 bg-primary-50'
+                                  : 'border-neutral-200 hover:border-neutral-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-medium text-neutral-900">
+                                  {o.title}
+                                </p>
+                                {/* ⚠ "Open now" is a fact about the season, not a
+                                    recommendation. It is the current default, and
+                                    the whole point of the screen is that starting
+                                    later is an equally correct answer. */}
+                                {o.isOpenNow && (
+                                  <span className="text-[11px] uppercase tracking-wide px-2 py-0.5 rounded-pill bg-mist text-ink">
+                                    Open now
+                                  </span>
+                                )}
+                              </div>
+                              {/* ⚠ `lock_at`, NOT the first kickoff. Migration 101
+                                  moved picking shut to an hour BEFORE the first
+                                  match; anything printing kickoff here is an hour
+                                  late and this screen's entire job is telling an
+                                  admin how much notice their group gets. */}
+                              <p className="text-xs text-neutral-500">
+                                Picks close {formatLockInstant(o.lockAt)} · {o.closesIn}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </Section>
+                  )}
+
+                  {!asksStartMatchweek && (
                   <Section
                     title={
                       isLeagueTournament && leagueMode === 'table'
@@ -1175,6 +1302,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       </div>
                     )}
                   </Section>
+                  )}
 
                   <Section
                     title="Who can join"

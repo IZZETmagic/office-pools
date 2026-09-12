@@ -46,6 +46,18 @@ export type LeagueCardPool = {
   /** `pools.league_table_lock_at`. Table mode's deadline; NULL for the rest. */
   tableLockAt: string | null
   /**
+   * ⬅ 143. `pools.league_start_matchweek` — the week this pool plays from.
+   * NULL for table mode, for World Cup pools and for every league pool created
+   * before 143, all of which mean "no floor".
+   *
+   * ⚠ REQUIRED, not optional, though NULL is a perfectly good value. Optional
+   * would let a new call site omit it and silently get "no floor" — which is
+   * the right answer for a World Cup pool and the wrong one for a league pool
+   * that has not started, and nothing would say which had happened. Four
+   * instances of exactly that shape are recorded in `denyAllTables.guard.test.ts`.
+   */
+  startMatchweek: number | null
+  /**
    * The entry whose progress the card describes — the same "best" entry whose
    * points, rank and form the card already shows, so all five agree.
    */
@@ -357,7 +369,10 @@ export async function readLeagueCardFacts(
     const inPlayId = inPlayMatchweekId(rows, now)
     const inPlay = rows.find((r) => r.matchweek_id === inPlayId)
     if (inPlay) inPlayByPool.set(p.poolId, inPlay)
-    const openId = openMatchweekId(rows, now)
+    // ⬅ 143. Floored per pool. Two pools on the same season can legitimately
+    // be owed decisions in different matchweeks now, which is why this is
+    // inside the loop and `bySeason` is not.
+    const openId = openMatchweekId(rows, now, p.startMatchweek)
     const open = rows.find((r) => r.matchweek_id === openId)
     if (!open) continue
     openByPool.set(p.poolId, open)

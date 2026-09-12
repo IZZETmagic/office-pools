@@ -42,7 +42,7 @@ const bad = (m: string) => { failures++; console.log(`    ✗ ${m}`) }
 async function main() {
   const { data: pools, error } = await admin
     .from('pools')
-    .select('pool_id, pool_name, prediction_mode, league_mode, league_season_id, league_table_lock_at, prediction_deadline, archived_at, tournament_id')
+    .select('pool_id, pool_name, prediction_mode, league_mode, league_season_id, league_table_lock_at, league_start_matchweek, prediction_deadline, archived_at, tournament_id')
     .eq('prediction_mode', 'league_pickem')
     .is('archived_at', null)
     .order('pool_name')
@@ -97,6 +97,7 @@ async function main() {
       seasonId: p.league_season_id,
       leagueMode: p.league_mode,
       tableLockAt: p.league_table_lock_at,
+      startMatchweek: p.league_start_matchweek ?? null,
       entryId: best?.entry_id ?? null,
     })),
   )
