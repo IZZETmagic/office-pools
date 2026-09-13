@@ -288,3 +288,74 @@ describe('goals reach the right player through the key', () => {
     expect(side.dangerMen).toHaveLength(0)
   })
 })
+
+describe('the card is one list of five', () => {
+  /** n qualified players, each rated a point apart so the order is unambiguous. */
+  function squad(n: number): PlayerStatRow[] {
+    return Array.from({ length: n }, (_, i) =>
+      line({
+        externalPlayerId: i + 1,
+        playerName: `Player ${String(i + 1).padStart(2, '0')}`,
+        minutes: 200,
+        rating: 9 - i * 0.1,
+      }),
+    )
+  }
+
+  it('shows five names when five qualify', () => {
+    expect(scoutSide(squad(11), [], ARS).inForm).toHaveLength(5)
+  })
+
+  it('⚠ five, not three — the two lists folded into one', () => {
+    // Pins the number rather than the constant, so a change has to be deliberate.
+    const names = scoutSide(squad(11), [], ARS).inForm.map((p) => p.name)
+    expect(names).toEqual([
+      'Player 01',
+      'Player 02',
+      'Player 03',
+      'Player 04',
+      'Player 05',
+    ])
+  })
+
+  it('shows fewer than five without complaint', () => {
+    expect(scoutSide(squad(2), [], ARS).inForm).toHaveLength(2)
+  })
+
+  it('⚠ the minutes floor now governs the WHOLE card', () => {
+    // The danger list was deliberately unqualified, so a striker with goals in
+    // few minutes used to reach the card that way. With one ranking he does not
+    // appear at all until he clears the floor — the honest cost of one list, and
+    // the reason the footer states it.
+    const s = scoutSide(
+      [
+        ...squad(5),
+        line({
+          externalPlayerId: 99,
+          playerName: 'Cameo Striker',
+          minutes: MIN_MINUTES - 1,
+          rating: 9.9,
+        }),
+      ],
+      [
+        { clubId: ARS, playerName: 'C. Striker', kind: 'goal' },
+        { clubId: ARS, playerName: 'C. Striker', kind: 'goal' },
+      ],
+      ARS,
+    )
+    expect(s.inForm.map((p) => p.name)).not.toContain('Cameo Striker')
+  })
+
+  it('⚠ dangerMen still ships at three, for phones that have not taken the OTA', () => {
+    // Nothing renders it. The old bundle reads `scout.dangerMen.length` with no
+    // guard, so removing the field is a TypeError on every fixture for anybody
+    // still on it. Widening it would change what those bundles draw for no
+    // reason, which is why the two constants are separate.
+    const s = scoutSide(
+      squad(11).map((r, i) => ({ ...r, assists: 11 - i })),
+      [],
+      ARS,
+    )
+    expect(s.dangerMen).toHaveLength(3)
+  })
+})

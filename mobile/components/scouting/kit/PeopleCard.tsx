@@ -13,21 +13,24 @@ import { useScoutPalette } from './tone';
 // =============================================================
 // Who is actually playing well
 // =============================================================
-// ## ⚠ TWO LISTS, BECAUSE THEY ANSWER DIFFERENT QUESTIONS
+// ## ⚠⚠ ONE LIST PER CLUB — THE TOP FIVE IN FORM. Ryan, 2026-09-12.
 //
-// IN FORM is an AVERAGE and is minutes-qualified — a substitute's 9.0 over
-// eleven minutes would otherwise top it every week. DANGER is a TOTAL and is
-// deliberately not qualified, because four goals in three starts is exactly who
-// a card about danger should name. Showing them under one heading would make one
-// of the two floors look arbitrary.
+// There used to be two sections, IN FORM (average rating, minutes-qualified) and
+// DANGER (goals + assists, deliberately not qualified). Measured across 96 clubs
+// they named mostly different people — about a third of names were shared — so
+// the split was not redundant. It was, however, two rankings asking a reader to
+// hold two ideas at once on a card they glance at mid-pick.
 //
-// ## ⚠⚠ THE SHORT PEEK LIST IS GONE, AND THAT WAS A DELIBERATE REVERSAL
+// The single list is ranked by FORM and carries goals and assists ON EACH ROW,
+// so a scorer is still visible — he is ranked by how he has played rather than
+// by what he has scored, and the reader can see both and decide.
 //
-// `MatchScoutSheet` used to draw a single cross-club top four here, with a note
-// arguing "ONE LIST, NOT TWO COLUMNS — THIS IS THE PEEK, NOT THE TAB". Ryan,
-// 2026-09-12: the binoculars sheet and the match-detail tab must be the same
-// report, and the fuller card is the one that survives. The sheet's 72% height
-// is unchanged; the content simply scrolls further.
+// ⚠ SO THE MINUTES FLOOR NOW GOVERNS THE WHOLE CARD. A striker with four goals
+// in three starts no longer appears at all until he clears 180 minutes. That is
+// the honest cost of one ranking, and the footer states the floor.
+//
+// ⚠ `dangerMen` IS STILL ON THE PAYLOAD and nothing here reads it — an installed
+// bundle that has not taken the OTA still does. See `TOP_DANGER` server-side.
 //
 // ⚠ THE GOALS COLUMN COMES FROM THE TIMELINE, not from the player rows the
 // ratings come from. The two disagree at source — 428 against 430 across 146
@@ -61,11 +64,7 @@ export function PeopleCard({
   // "nobody rated yet" panels read as a broken screen. One club rated and the
   // other not IS worth saying — that is a fact about the two squads — so the
   // empty state lives on the side card rather than here.
-  const anyRated =
-    home.inForm.length > 0 ||
-    away.inForm.length > 0 ||
-    home.dangerMen.length > 0 ||
-    away.dangerMen.length > 0;
+  const anyRated = home.inForm.length > 0 || away.inForm.length > 0;
 
   if (!anyRated) {
     return (
@@ -94,7 +93,7 @@ export function PeopleCard({
 }
 
 function SideCard({ title, scout }: { title: string; scout: SideScout }) {
-  const empty = scout.inForm.length === 0 && scout.dangerMen.length === 0;
+  const empty = scout.inForm.length === 0;
 
   if (empty) {
     return (
@@ -106,21 +105,11 @@ function SideCard({ title, scout }: { title: string; scout: SideScout }) {
 
   return (
     <ScoutCard title={title}>
-      {scout.inForm.length > 0 ? (
-        <Section label="In form">
-          {scout.inForm.map((p, i) => (
-            <PlayerRow key={p.externalPlayerId} player={p} first={i === 0} metric="rating" />
-          ))}
-        </Section>
-      ) : null}
-
-      {scout.dangerMen.length > 0 ? (
-        <Section label="Danger">
-          {scout.dangerMen.map((p, i) => (
-            <PlayerRow key={p.externalPlayerId} player={p} first={i === 0} metric="threat" />
-          ))}
-        </Section>
-      ) : null}
+      <Section label="In form">
+        {scout.inForm.map((p, i) => (
+          <PlayerRow key={p.externalPlayerId} player={p} first={i === 0} />
+        ))}
+      </Section>
     </ScoutCard>
   );
 }
@@ -147,18 +136,9 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function PlayerRow({
-  player,
-  first,
-  metric,
-}: {
-  player: PlayerForm;
-  first: boolean;
-  metric: 'rating' | 'threat';
-}) {
+function PlayerRow({ player, first }: { player: PlayerForm; first: boolean }) {
   const theme = useTheme();
   const palette = useScoutPalette();
-  const involvements = player.goals + player.assists;
 
   return (
     <View
@@ -184,9 +164,7 @@ function PlayerRow({
           {player.name}
         </RNText>
         <Text variant="detail" color="slate">
-          {player.position ? `${positionName(player.position)} · ` : ''}
-          {player.appearances} app{player.appearances === 1 ? '' : 's'}
-          {metric === 'rating' ? ` · ${player.minutes} min` : involvementDetail(player)}
+          {playerLine(player)}
         </Text>
       </View>
 
@@ -209,7 +187,7 @@ function PlayerRow({
             fontVariant: ['tabular-nums'],
           }}
         >
-          {metric === 'rating' ? player.rating.toFixed(2) : `${involvements}`}
+          {player.rating.toFixed(2)}
         </RNText>
       </View>
     </View>
@@ -284,17 +262,29 @@ function PlayerFace({ player }: { player: PlayerForm }) {
 }
 
 /**
- * "3 goals, 1 assist" — spelled out rather than shown as "3+1".
+ * "MID · 6 apps · 2 goals · 1 assist"
  *
- * ⚠ A MEMBER READING "4" NEXT TO A NAME NEEDS TO KNOW WHAT KIND OF FOUR IT IS.
- * Goals and assists are not interchangeable to anybody choosing a scoreline, and
- * the shorthand hides which one this player actually does.
+ * ⚠ GOALS AND ASSISTS ARE NAMED, NEVER SUMMED. A member reading "3" beside a
+ * name needs to know what kind of three it is — the two are not interchangeable
+ * to anybody choosing a scoreline, and "3+1" hides which one this player
+ * actually does.
+ *
+ * ⚠ ZEROS ARE SHOWN. They used to be omitted, which made the line a different
+ * shape on every row and left the reader unsure whether a missing figure meant
+ * none or meant unknown. A defender with no goals has scored none, and saying so
+ * costs four characters.
+ *
+ * ⚠ MINUTES CAME OFF. They were here to justify the ranking, and the card's
+ * footer already states the 180-minute floor — repeating it on five rows a club
+ * crowded out the two figures Ryan asked for.
  */
-function involvementDetail(p: PlayerForm): string {
+function playerLine(p: PlayerForm): string {
   const parts: string[] = [];
-  if (p.goals > 0) parts.push(`${p.goals} goal${p.goals === 1 ? '' : 's'}`);
-  if (p.assists > 0) parts.push(`${p.assists} assist${p.assists === 1 ? '' : 's'}`);
-  return parts.length > 0 ? ` · ${parts.join(', ')}` : '';
+  if (p.position) parts.push(positionName(p.position));
+  parts.push(`${p.appearances} app${p.appearances === 1 ? '' : 's'}`);
+  parts.push(`${p.goals} goal${p.goals === 1 ? '' : 's'}`);
+  parts.push(`${p.assists} assist${p.assists === 1 ? '' : 's'}`);
+  return parts.join(' · ');
 }
 
 function positionName(p: 'G' | 'D' | 'M' | 'F'): string {

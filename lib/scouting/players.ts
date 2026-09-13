@@ -136,8 +136,31 @@ export type GoalEventRow = {
  */
 export const MIN_MINUTES = 180
 
-/** How many names each side's card shows. */
-const TOP_N = 3
+/**
+ * How many names the in-form list shows.
+ *
+ * ⚠ FIVE, NOT THREE. Ryan, 2026-09-12: the card is one list per club now, so it
+ * carries the depth the two lists used to split between them. Three was right
+ * when a second section sat underneath it.
+ */
+const TOP_IN_FORM = 5
+
+/**
+ * How many names the danger list shows.
+ *
+ * ## ⚠⚠ NOTHING RENDERS THIS ANY MORE, AND IT STILL SHIPS
+ *
+ * The scout report folded to a single in-form list on 2026-09-12. `dangerMen` is
+ * kept on the payload because an INSTALLED PHONE still reads it — the old
+ * `match/PeopleCard` did `scout.dangerMen.length` with no guard, so sending
+ * `undefined` would be a TypeError on every fixture for anybody who has not
+ * taken the OTA. A phone outlives the deploy it was built against.
+ *
+ * ⚠ SO IT STAYS AT THREE. Widening it would change what those old bundles draw
+ * for no reason. Remove the field only once the old bundle is gone, and remove
+ * it from `mobile/lib/api.ts` at the same time.
+ */
+const TOP_DANGER = 3
 
 export type PlayerForm = {
   externalPlayerId: number
@@ -154,9 +177,20 @@ export type PlayerForm = {
 
 export type SideScout = {
   clubId: string
-  /** Best average rating, minutes-qualified. Empty when nobody qualifies yet. */
+  /**
+   * Best average rating, minutes-qualified. Empty when nobody qualifies yet.
+   *
+   * ⚠ THE ONLY LIST THE SCOUT REPORT DRAWS as of 2026-09-12. Each row carries
+   * goals and assists of its own, so a scorer is still visible here — he is just
+   * ranked by how he has played rather than by what he has scored.
+   */
   inForm: PlayerForm[]
-  /** Most goals + assists. ⚠ Goals from the timeline, assists from the stats. */
+  /**
+   * Most goals + assists. ⚠ Goals from the timeline, assists from the stats.
+   *
+   * ⚠⚠ LEGACY — nothing renders this. Kept on the payload for installed bundles
+   * that still read it without a guard. See `TOP_DANGER`.
+   */
   dangerMen: PlayerForm[]
   /** ⚠ Stated so the card can say what it looked at. */
   qualified: number
@@ -260,7 +294,7 @@ export function scoutSide(
 
   const inForm = [...qualified]
     .sort((a, b) => b.rating - a.rating || b.minutes - a.minutes)
-    .slice(0, TOP_N)
+    .slice(0, TOP_IN_FORM)
 
   // ⚠ THE DANGER MAN IS NOT MINUTES-QUALIFIED, DELIBERATELY. A striker with four
   // goals in three starts is exactly who a card about danger should name, and
@@ -274,7 +308,7 @@ export function scoutSide(
         b.goals - a.goals ||
         b.minutes - a.minutes,
     )
-    .slice(0, TOP_N)
+    .slice(0, TOP_DANGER)
 
   return {
     clubId,
