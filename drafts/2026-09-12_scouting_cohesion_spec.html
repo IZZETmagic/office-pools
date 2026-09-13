@@ -217,9 +217,11 @@ code{font-family:var(--mono);font-size:12px;background:var(--mist);padding:1px 5
 .pname span{display:block;font-size:10px;color:var(--dimmer);margin-top:1px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prate{font-family:var(--mono);font-weight:800;font-size:14px;padding:3px 8px;
-  border-radius:var(--r-xs);background:var(--mist);color:var(--ink);
+  border-radius:var(--r-xs);background:rgba(232,234,240,.07);color:var(--ink);
   font-variant-numeric:tabular-nums}
-.prate.top{background:rgba(245,197,24,.15);color:var(--accent)}
+/* Weight, not hue — the leader of the list, without spending a colour. */
+.prate.top{background:rgba(232,234,240,.14)}
+.sect{padding:8px 0 4px;border-top:1px solid rgba(255,255,255,.06);margin-top:2px}
 
 /* kit: comparison track */
 .cmp{padding:12px 0;border-top:1px solid rgba(255,255,255,.055)}
@@ -355,10 +357,11 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
     </div>
     <div class="thesis" style="border-left-color:var(--green);background:rgba(52,217,114,.07);margin-top:14px">
       <p style="color:#A8E9C2">
-        ✅ <b>Built and committed 12 Sep 2026</b> — <code>a9d57db</code>, local only.
-        2,145 tests pass; both typechecks match their pre-existing baselines.
-        ⚠ Migration 144 is <b>not applied</b> and nothing is pushed. §08 is what turned up during
-        the build, including two corrections to this document and a latent bug worth reading.
+        ✅ <b>Built and committed 12 Sep 2026</b> — <code>a9d57db</code> … <code>a8792f1</code>,
+        local only. 2,160 tests pass; both typechecks match their pre-existing baselines.
+        ✅ Migration 144 applied to production. 🔴 <b>Nothing is pushed.</b>
+        §08 is what turned up during the build — two corrections to this document, a bug that had
+        been firing in production the whole time, and one that has not fired yet.
       </p>
     </div>
   </div>
@@ -661,7 +664,7 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
     <h2 class="t-sec">The kit</h2>
   </div>
   <p class="sec-sub">
-    Twelve primitives. Every scout card on every surface is composed from these and nothing else —
+    Thirteen primitives. Every scout card on every surface is composed from these and nothing else —
     the presentation equivalent of the design note’s <em>one owner per derivation</em> rule. Today
     <code>Card</code> is defined three times, <code>Segment</code> twice, and the label/value row
     twice with <b>contradictory argument order</b>: <code>Line</code> renders label → note → value,
@@ -685,6 +688,7 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
     <div class="kitem"><b>Finding</b><p>The gold block. One per card, maximum. Carries its own denominator caption.</p><p class="used">Was “Drought”</p></div>
     <div class="kitem"><b>Caveat</b><p>The amber strip. Thin samples only — never a statistic.</p><p class="used">Sheet only today</p></div>
     <div class="kitem"><b>StatTiles</b><p>2–3 big numbers. Ink by default; the headline tile takes gold.</p><p class="used">Drops tier colours</p></div>
+    <div class="kitem"><b>PeopleCard</b><p>One card per club: the top five in form, each row with a face, position, apps, goals and assists.</p><p class="used">Replaces 2 copies</p></div>
     <div class="kitem"><b>Comparison</b><p>Blue fill for them, gold mark for reality. The best component in the feature.</p><p class="used">Dossier only today</p></div>
     <div class="kitem"><b>Footnote</b><p>Sample size and scope, in slate. Never red, never a card.</p><p class="used">Replaces 3 copies</p></div>
   </div>
@@ -787,27 +791,76 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
           </div>
 
           <div class="card">
-            <div class="card-hd"><h3 class="t-card">People</h3></div>
+            <div class="card-hd"><h3 class="t-card">Arsenal</h3></div>
             <div class="card-bd">
-              <p class="t-det dim">In form now · average rating, minutes-qualified</p>
+              <p class="t-cap dim" style="font-size:10px">In form</p>
               <div>
                 <div class="prow">
                   <span class="pface" style="background:#EF4444">BS</span>
-                  <span class="pname"><b>Bukayo Saka</b><span>Arsenal · 6 apps · 5 G+A</span></span>
+                  <span class="pname"><b>Bukayo Saka</b><span>MID · 6 apps · 3 goals · 2 assists</span></span>
                   <span class="prate top">7.84</span>
                 </div>
                 <div class="prow">
-                  <span class="pface" style="background:#4F86F7">CP</span>
-                  <span class="pname"><b>Cole Palmer</b><span>Chelsea · 6 apps · 4 G+A</span></span>
-                  <span class="prate">7.41</span>
+                  <span class="pface" style="background:#EF4444">DR</span>
+                  <span class="pname"><b>Declan Rice</b><span>MID · 6 apps · 1 goal · 1 assist</span></span>
+                  <span class="prate">7.52</span>
+                </div>
+                <div class="prow">
+                  <span class="pface" style="background:#EF4444">WS</span>
+                  <span class="pname"><b>William Saliba</b><span>DEF · 6 apps · 0 goals · 0 assists</span></span>
+                  <span class="prate">7.31</span>
                 </div>
                 <div class="prow">
                   <span class="pface" style="background:#EF4444">DR</span>
-                  <span class="pname"><b>Declan Rice</b><span>Arsenal · 6 apps · 2 G+A</span></span>
-                  <span class="prate">7.30</span>
+                  <span class="pname"><b>David Raya</b><span>GK · 6 apps · 0 goals · 0 assists</span></span>
+                  <span class="prate">7.05</span>
+                </div>
+                <div class="prow">
+                  <span class="pface" style="background:#EF4444">KH</span>
+                  <span class="pname"><b>Kai Havertz</b><span>FWD · 5 apps · 4 goals · 0 assists</span></span>
+                  <span class="prate">6.98</span>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd"><h3 class="t-card">Chelsea</h3></div>
+            <div class="card-bd">
+              <p class="t-cap dim" style="font-size:10px">In form</p>
+              <div>
+                <div class="prow">
+                  <span class="pface" style="background:#4F86F7">CP</span>
+                  <span class="pname"><b>Cole Palmer</b><span>MID · 6 apps · 2 goals · 3 assists</span></span>
+                  <span class="prate top">7.62</span>
+                </div>
+                <div class="prow">
+                  <span class="pface" style="background:#4F86F7">MC</span>
+                  <span class="pname"><b>Moisés Caicedo</b><span>MID · 6 apps · 0 goals · 1 assist</span></span>
+                  <span class="prate">7.28</span>
+                </div>
+                <div class="prow">
+                  <span class="pface" style="background:#4F86F7">NJ</span>
+                  <span class="pname"><b>Nicolas Jackson</b><span>FWD · 5 apps · 3 goals · 1 assist</span></span>
+                  <span class="prate">7.11</span>
+                </div>
+                <div class="prow">
+                  <span class="pface" style="background:#4F86F7">RJ</span>
+                  <span class="pname"><b>Reece James</b><span>DEF · 4 apps · 0 goals · 2 assists</span></span>
+                  <span class="prate">6.94</span>
+                </div>
+                <div class="prow">
+                  <span class="pface" style="background:#4F86F7">RS</span>
+                  <span class="pname"><b>Robert Sánchez</b><span>GK · 6 apps · 0 goals · 0 assists</span></span>
+                  <span class="prate">6.70</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="foot">
+            <p>Form over each club&rsquo;s last ten completed fixtures</p>
+            <p>Ratings need 180 minutes played · goals from the match timeline</p>
           </div>
 
           <div class="card">
@@ -1178,8 +1231,11 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
           headline tile takes gold instead, and the rest are ink.
         </p>
         <p>
-          The player rating pill is ink on mist, with gold only on the top-rated name. Green stops
-          being decorative and goes back to meaning a win.
+          The player rating pill was green for <em>every</em> rating — 6.2 and 8.4 alike — so green
+          carried no information on the one card where it was also load-bearing two cards above.
+          It is neutral now, and the leader of the list takes a <b>heavier wash of the same
+          neutral</b> rather than a colour. Hierarchy without spending gold. Green goes back to
+          meaning a win.
         </p>
       </div>
     </div>
@@ -1439,9 +1495,57 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
     <h2 class="t-sec">What the build turned up</h2>
   </div>
   <p class="sec-sub">
-    Three things this document got wrong, and three findings it did not know about. The first
-    finding is a real bug that has not fired yet.
+    Three things this document got wrong, and four findings it did not know about. The first has
+    been firing in production the whole time; the second has not fired yet.
   </p>
+
+  <div class="bignum">
+    <span class="n">90%</span>
+    <div class="b">
+      <p>of goals were landing on nobody, and the Danger list was ranking on assists.</p>
+      <p>
+        <code>match_events</code> files a scorer as <b>K. Havertz</b>. <code>match_player_stats</code>
+        files the same man as <b>Kai Havertz</b>. One provider, two endpoints, two naming
+        conventions — and <code>scoutSide</code> joined them on exact string equality.
+      </p>
+      <p>
+        Measured against production: <b>417 of 463 goals matched nobody.</b> They did not error and
+        they did not duplicate. They landed on no one, the player rendered with zero goals, and a
+        squad’s actual top scorer routinely did not appear on the card about danger.
+      </p>
+      <p style="color:var(--dimmer)">
+        The file carried a comment asserting the opposite — that a two-way spelling “would show a
+        player twice, which is a visible bug rather than a silent one”. Both halves were wrong.
+        <code>playerNameKey()</code> now folds both to <code>&lt;initial&gt;. &lt;rest&gt;</code>,
+        unaccented; <b>426 of 443 join</b>. ⚠ Known limit, written into the code: two team-mates
+        sharing an initial and a surname pool their goals, and <code>match_events</code> carries no
+        player id to disambiguate with.
+      </p>
+    </div>
+  </div>
+
+  <div class="row" style="margin:30px 0">
+    <div class="note gold" style="max-width:78ch">
+      <h4>Which is why “are the two lists the same?” could not be answered until it was fixed</h4>
+      <p>
+        The overlap between <em>In form</em> and <em>Danger</em>, measured across 96 clubs, moved
+        once goals actually attached: shared names went from <b>0.77 of 3 to 1.11</b>, clubs sharing
+        nobody fell from <b>44% to 23%</b>, and clubs sharing two or more rose from <b>19% to 34%</b>.
+      </p>
+      <p>
+        So the split was never redundant — two thirds of names still appeared in only one list. The
+        decision to fold them into <b>one ranking of five</b> is therefore a choice about how much a
+        reader should hold at once mid-pick, not a removal of duplication. Each row carries goals and
+        assists, so a scorer stays visible; he is ranked by how he has played rather than by what he
+        has scored.
+      </p>
+      <p>
+        ⚠ The cost is stated rather than hidden: the 180-minute floor now governs the whole card, so
+        a striker with four goals in three starts does not appear at all. The danger list was his way
+        on.
+      </p>
+    </div>
+  </div>
 
   <div class="bignum" style="border-color:rgba(245,197,24,.3)">
     <span class="n" style="color:var(--accent)">2027</span>
