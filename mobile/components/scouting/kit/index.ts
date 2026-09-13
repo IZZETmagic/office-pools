@@ -17,7 +17,6 @@
 export { Caveat } from './Caveat';
 export { Comparison } from './Comparison';
 export { Crest } from './Crest';
-export { Finding } from './Finding';
 export { FormStrip } from './FormStrip';
 export { Lean } from './Lean';
 export { PeopleCard } from './PeopleCard';

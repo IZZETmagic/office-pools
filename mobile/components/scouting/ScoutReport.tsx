@@ -6,7 +6,6 @@ import { isThinSample } from '@/lib/scoutTone';
 
 import {
   Caveat,
-  Finding,
   PeopleCard,
   ScoreChip,
   ScoutBlurb,
@@ -28,9 +27,8 @@ import {
 // read `/fixtures/:id/scout`; the tab read `/fixtures/:id/h2h` PLUS
 // `/fixtures/:id/players` and drew a completely separate set of cards, so the
 // same fixture told you different things depending on which door you came
-// through — and the tab had no venue-split form card, no drought line and no
-// thin-sample caveat at all. Ryan, 2026-09-12: those two should be the exact
-// same. They now are, and the tab gained all three.
+// through — the tab had no venue-split form card and no thin-sample caveat at
+// all. Ryan, 2026-09-12: those two should be the exact same. They now are.
 //
 // ⚠ IT IS THE BODY, NOT THE SHEET. `MatchScoutSheet` wraps this in `ScoutSheet`
 // and a `ScoutHeader`; the match screen renders it inside its pager. Anything
@@ -60,7 +58,6 @@ export function ScoutReport({ data }: { data: MatchScoutResponse }) {
           better than one that buries the sentence under a table. */}
       <PairingCard
         h2h={data.h2h}
-        headline={data.headline}
         homeName={data.fixture.home.name}
         awayName={data.fixture.away.name}
         venue={data.fixture.venue}
@@ -91,6 +88,19 @@ export function ScoutReport({ data }: { data: MatchScoutResponse }) {
 /**
  * The pairing — what usually happens when these two meet.
  *
+ * ## ⚠ IT ENDS ON ITS FIGURES, AND THAT IS DELIBERATE
+ *
+ * It used to close with a sentence — "Chelsea have not won at the Emirates since
+ * 2011" — drawn whenever a club had visited three times without winning. At a
+ * measured 33.1% away-win rate that run happens 29.9% of the time BY CHANCE, so
+ * one pairing in three was handed a base rate dressed as a hoodoo, and it was a
+ * fact about 2011 on a card about this weekend.
+ *
+ * A ranked picker that only spoke when a fact beat chance was built and then
+ * removed with it: Ryan, 2026-09-12, wants that slot held for AI-written notes
+ * rather than filled with a derived sentence in the meantime. **Do not put
+ * another generated line here** without that conversation.
+ *
  * ## ⚠⚠ BELOW FIVE MEETINGS IT STILL SHOWS THE NUMBERS
  *
  * It used to withhold everything under the floor and print a sentence instead.
@@ -111,13 +121,11 @@ export function ScoutReport({ data }: { data: MatchScoutResponse }) {
  */
 function PairingCard({
   h2h,
-  headline,
   homeName,
   awayName,
   venue,
 }: {
   h2h: MatchScoutResponse['h2h'];
-  headline: MatchScoutResponse['headline'];
   homeName: string;
   awayName: string;
   venue: string | null;
@@ -180,12 +188,7 @@ function PairingCard({
               label="Most common scoreline"
               value={s.commonScore.score.replace('-', '–')}
               note={`${s.commonScore.count} of ${s.meetings}`}
-              // ⚠⚠ GOLD ONLY WHEN THERE IS NO HEADLINE, because the grammar
-              // allows exactly one finding a card and the headline is now the
-              // slot for it. Without this the card carries two gold elements —
-              // and `common_score` is itself one of the headline candidates, so
-              // the two could state the same fact twice, both in gold.
-              finding={!headline}
+              finding
             />
           ) : null}
           <ScoutRow
@@ -227,22 +230,6 @@ function PairingCard({
             <Label>Scores as played — home side first</Label>
           </View>
         ) : null}
-
-        {/* ## ⚠⚠ THE SERVER CHOOSES THE SENTENCE, AND USUALLY THERE ISN'T ONE
-            
-            This was a hardcoded drought line — "have not won here since 2011" —
-            drawn whenever a club had visited three times without winning. At a
-            measured 33.1% away-win rate that happens 29.9% of the time BY
-            CHANCE, so one pairing in three was being handed a base rate dressed
-            as a hoodoo. It was also a fact about 2011 on a card whose job is a
-            pick this weekend.
-
-            `pickHeadline` now ranks a set of candidates by how unlikely each is,
-            and the strongest TRUE one wins — including one drawn from FORM,
-            which is the only thing here about now. Most fixtures qualify for
-            none, and a card with no gold line is the design working rather than
-            a gap. */}
-        {headline ? <Finding note={headline.note}>{headline.text}</Finding> : null}
       </ScoutCardBody>
     </ScoutCard>
   );

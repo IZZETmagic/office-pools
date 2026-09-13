@@ -73,7 +73,7 @@ describe('the scout kit is found at all', () => {
   // list, so a moved or renamed tree must fail HERE rather than quietly
   // reporting a clean sweep of nothing.
   it('finds both halves of the tree', () => {
-    expect(inKit.length, 'no kit files — has components/scouting/kit moved?').toBeGreaterThan(8)
+    expect(inKit.length, 'no kit files — has components/scouting/kit moved?').toBeGreaterThan(7)
     expect(
       outsideKit.length,
       'no scouting files outside the kit — has the tree moved?',
@@ -112,7 +112,6 @@ describe('no kit component is defined twice', () => {
     'FormStrip',
     'ScoreChip',
     'VenueSplit',
-    'Finding',
     'Caveat',
     'StatTiles',
     'Comparison',

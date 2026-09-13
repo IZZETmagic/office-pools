@@ -131,24 +131,24 @@ export type H2HSummary = {
 const RECENT = 5
 
 /**
- * Visits without a win before the FACT is worth computing.
+ * Visits without a win before the fact is worth computing.
  *
- * ## ⚠⚠ THIS IS NO LONGER THE FLOOR ON THE SENTENCE — see `headline.ts`
+ * ## ⚠⚠ THIS IS A FLOOR ON THE DATA. NOTHING RENDERS IT TODAY.
  *
- * It used to be both, and three was far too low for a sentence. An away win
- * happens 33.1% of the time, so three visits without one occurs **29.9% of the
- * time by chance**: roughly one pairing in three was handed "have not won here
- * since 2011" as though it were a hoodoo rather than a base rate.
+ * `venueDrought` used to drive a sentence at the foot of the pairing card —
+ * "Chelsea have not won at the Emirates since 2011" — and three visits was far
+ * too low for one. An away win happens 33.1% of the time, so three visits
+ * without one occurs **29.9% of the time by chance**: roughly one pairing in
+ * three was handed a base rate dressed as a hoodoo, on a card whose job is a
+ * pick this weekend.
  *
- * The display decision moved to `pickHeadline`, which requires SIX visits for a
- * dated drought (≈9%) and five for a "never won here" (≈13%), and ranks both
- * against other candidates. This constant now only decides when the raw field is
- * worth filling in, and it stays low on purpose — a consumer with a different
- * threshold should be able to apply it without a second read.
+ * The sentence was removed on 2026-09-12 and the card now ends with its figures.
+ * Ryan has AI-written "notes" in mind for that slot, some years out.
  *
- * ⚠ SO DO NOT RAISE THIS TO MATCH THE PICKER. Two floors for one concept is
- * confusing; one floor on the DATA and one on the SENTENCE is the separation
- * that let the sentence be fixed without touching the summariser.
+ * ⚠ THE FIELD STAYS COMPUTED, and low, deliberately. It is a correct summary of
+ * a real thing and it is tested; a future consumer with its own threshold should
+ * be able to apply one without a second read of the provider. What it must NOT
+ * do again is decide on its own that three visits is worth a sentence.
  */
 export const MIN_DROUGHT_VISITS = 3
 
