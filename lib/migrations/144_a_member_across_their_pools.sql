@@ -27,13 +27,26 @@
 -- case — the query is correct without it, merely slower — but the habit is what
 -- matters: 136, 139, 140, 141 and 142 all carry this warning because PostgREST
 -- rejects an entire payload for naming a relation that does not exist yet.
+--
+-- ## ✅ APPLIED TO PRODUCTION 2026-09-12, and CONCURRENTLY had to go
+--
+-- The first attempt used `CREATE INDEX CONCURRENTLY` and was refused:
+--
+--     ERROR: 25001: CREATE INDEX CONCURRENTLY cannot run inside a transaction block
+--
+-- The Supabase MCP's `apply_migration` wraps its statements in BEGIN/COMMIT, and
+-- Postgres will not build an index concurrently in one. That is the fallback this
+-- file already anticipated: at 5,040 rows the build is milliseconds and the brief
+-- ACCESS EXCLUSIVE lock is not worth working around.
+--
+-- ⚠ IT WILL BE WORTH WORKING AROUND EVENTUALLY. On a table an order of magnitude
+-- larger, take the concurrent build through a path that does not wrap in a
+-- transaction (psql, or the SQL editor) rather than accepting the lock by habit.
+--
+-- Verified after: `Index Scan using idx_pool_entries_user`, 5 buffers.
 -- =============================================================
 
--- ⚠ CONCURRENTLY, so the build takes no write lock on a live table. It cannot
--- run inside a transaction block — if this is applied through a tool that wraps
--- statements in BEGIN/COMMIT, drop the keyword and accept the brief lock; at
--- 5,040 rows the build is milliseconds.
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pool_entries_user
+CREATE INDEX IF NOT EXISTS idx_pool_entries_user
   ON public.pool_entries (user_id);
 
 COMMENT ON INDEX public.idx_pool_entries_user IS
