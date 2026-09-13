@@ -15,12 +15,28 @@
 // against anywhere else. So goals are counted from `match_events`, which 141
 // names as authoritative, and everything else from `match_player_stats`.
 //
-// ⚠ THEY ARE JOINED ON `player_name`, WHICH IS ONLY SAFE BECAUSE BOTH SIDES
-// COME FROM ONE FEED. `match_events` carries no player id at all (136 chose the
-// side over a team FK and never added one), so the name is the only key
-// available. Two different providers would make this reckless; one provider
-// spelling a name two ways would show a player twice, which is a visible bug
-// rather than a silent one.
+// ## ⚠⚠ THE NAME JOIN WAS SILENTLY EATING 90% OF GOALS — FIXED 2026-09-12
+//
+// `match_events` carries no player id at all (136 chose the side over a team FK
+// and never added one), so the name is the only key available. This file used to
+// assume that was safe because both sides come from one feed, and said a
+// two-way spelling "would show a player twice, which is a visible bug rather
+// than a silent one".
+//
+// Both halves of that were wrong. The provider uses a DIFFERENT CONVENTION PER
+// ENDPOINT — the timeline files `K. Havertz`, the player payload files
+// `Kai Havertz` — so an exact-string match does not double-count anybody. It
+// finds nothing, the goal quietly lands on no one, and the player renders with
+// zero goals. Measured against production before the fix:
+//
+//     417 of 463 goals could not be joined to a player at all
+//
+// So the danger list — `goals + assists` — was ranking almost purely on ASSISTS,
+// and the most dangerous name in a squad routinely did not appear on it. Nothing
+// errored and nothing looked broken.
+//
+// `playerNameKey` normalises both sides to `<initial>. <rest>`, unaccented and
+// lower-cased. Re-measured after: 426 of 443 join. See the guard test.
 //
 // ## ⚠⚠ `is_starter` IS KNOWN-WRONG AND MUST NOT BE FILTERED ON
 //
@@ -55,6 +71,47 @@ export type PlayerStatRow = {
   saves: number | null
   yellowCards: number | null
   redCards: number | null
+}
+
+/**
+ * The join key for a player name, across two endpoints that disagree about how
+ * to spell one.
+ *
+ * `Kai Havertz` and `K. Havertz` both become `k. havertz`.
+ *
+ * ⚠ EVERYTHING AFTER THE FIRST TOKEN IS THE SURNAME, not the last token.
+ * `Maxim De Cuyper` must key the same as `M. De Cuyper`, and taking only the
+ * final word would key one as `cuyper` and the other as `cuyper` by luck — but
+ * `Jan Vertonghen Jr` and similar would diverge. Keeping the whole tail is both
+ * simpler and more faithful to what the provider abbreviates.
+ *
+ * ⚠ A MONONYM HAS NO FIRST TOKEN TO ABBREVIATE. `Rodri`, `Ederson`, `Raphinha`
+ * arrive identically from both endpoints, so they key as themselves.
+ *
+ * ⚠ ACCENTS ARE STRIPPED because the two endpoints do not agree about those
+ * either — `Gündoğan` against `Gundogan`. NFD splits a letter from its combining
+ * mark and the range below removes the marks.
+ *
+ * ## ⚠ WHAT THIS CANNOT DO
+ *
+ * Two players in ONE squad sharing an initial and a surname key the same, and
+ * their goals would pool. There is no id to disambiguate with — the real fix is
+ * an `external_player_id` on `match_events`, which is a migration and a
+ * re-ingest. This is the cheap correct-in-practice version, and the 17 goals
+ * that still fail to join after it are the honest measure of what it misses.
+ */
+export function playerNameKey(name: string): string {
+  const clean = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+
+  if (clean === '') return ''
+  const gap = clean.indexOf(' ')
+  if (gap === -1) return clean
+  return `${clean[0]}. ${clean.slice(gap + 1)}`
 }
 
 /** One scoring event off `match_events`, which is authoritative for goals. */
@@ -167,6 +224,10 @@ export function scoutSide(
   }
 
   // ---- goals, from the authoritative source --------------------------------
+  //
+  // ⚠⚠ KEYED THROUGH `playerNameKey`, NOT ON THE RAW NAME. The two endpoints
+  // spell one player two ways and an exact match found 10% of goals. See the
+  // file header.
   const goalsByName = new Map<string, number>()
   for (const g of goals) {
     if (g.clubId !== clubId) continue
@@ -176,7 +237,9 @@ export function scoutSide(
     // plays against. `match_events` carries the same warning at the schema.
     if (g.kind === 'own_goal') continue
     if (!g.playerName) continue
-    goalsByName.set(g.playerName, (goalsByName.get(g.playerName) ?? 0) + 1)
+    const key = playerNameKey(g.playerName)
+    if (key === '') continue
+    goalsByName.set(key, (goalsByName.get(key) ?? 0) + 1)
   }
 
   const all: PlayerForm[] = [...byPlayer.values()].map((a) => ({
@@ -188,7 +251,7 @@ export function scoutSide(
     // Rounded to two places the way the provider sends them; a mean of 7.605
     // displayed as 7.6 beside another at 7.604 would look like a tie.
     rating: a.ratedApps === 0 ? 0 : Math.round((a.ratingSum / a.ratedApps) * 100) / 100,
-    goals: goalsByName.get(a.name) ?? 0,
+    goals: goalsByName.get(playerNameKey(a.name)) ?? 0,
     assists: a.assists,
     keyPasses: a.keyPasses,
   }))

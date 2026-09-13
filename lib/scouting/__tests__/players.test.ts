@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   MIN_MINUTES,
+  playerNameKey,
   scoutSide,
   type GoalEventRow,
   type PlayerStatRow,
@@ -196,5 +197,94 @@ describe('sides are kept apart', () => {
     ]
     expect(scoutSide(rows, [], ARS).consideredPlayers).toBe(1)
     expect(scoutSide(rows, [], CHE).inForm[0].name).toBe('Blue')
+  })
+})
+
+describe('⚠⚠ playerNameKey — the join that was eating 90% of goals', () => {
+  // `match_events` files the scorer as `K. Havertz`; `match_player_stats` files
+  // the same man as `Kai Havertz`. An exact-string join found 46 of 463 goals in
+  // production, so the danger list was ranking almost purely on assists and the
+  // most dangerous name in a squad routinely did not appear on it.
+  //
+  // Every pair below is a real one, taken from production.
+
+  it('folds the two conventions onto one key', () => {
+    expect(playerNameKey('Kai Havertz')).toBe(playerNameKey('K. Havertz'))
+    expect(playerNameKey('Bukayo Saka')).toBe(playerNameKey('B. Saka'))
+    expect(playerNameKey('Thierno Barry')).toBe(playerNameKey('T. Barry'))
+  })
+
+  it('⚠ keeps a multi-word surname whole', () => {
+    // Taking only the LAST token would work here by luck and break on a suffix.
+    expect(playerNameKey('Maxim De Cuyper')).toBe(playerNameKey('M. De Cuyper'))
+    expect(playerNameKey('Maxim De Cuyper')).toBe('m. de cuyper')
+  })
+
+  it('⚠ handles a hyphenated surname, which is one token', () => {
+    expect(playerNameKey('Kiernan Dewsbury-Hall')).toBe(playerNameKey('K. Dewsbury-Hall'))
+  })
+
+  it('⚠ strips accents, because the two endpoints disagree about those too', () => {
+    expect(playerNameKey('İlkay Gündoğan')).toBe(playerNameKey('I. Gundogan'))
+    expect(playerNameKey('Sergio Gómez')).toBe(playerNameKey('S. Gomez'))
+  })
+
+  it('⚠ a mononym keys as itself — there is no first token to abbreviate', () => {
+    expect(playerNameKey('Rodri')).toBe('rodri')
+    expect(playerNameKey('Raphinha')).toBe(playerNameKey('Raphinha'))
+  })
+
+  it('tolerates ragged whitespace and an empty name', () => {
+    expect(playerNameKey('  Kai   Havertz  ')).toBe('k. havertz')
+    expect(playerNameKey('')).toBe('')
+    expect(playerNameKey('   ')).toBe('')
+  })
+
+  it('⚠ does NOT collapse two different players', () => {
+    // The failure mode to stay away from is over-matching: a key so loose that
+    // two team-mates pool their goals. Different surnames must stay apart.
+    expect(playerNameKey('K. Havertz')).not.toBe(playerNameKey('K. Hansen'))
+    expect(playerNameKey('Bukayo Saka')).not.toBe(playerNameKey('Bukayo Sako'))
+  })
+
+  it('⚠⚠ but it CAN collapse two team-mates who share an initial and surname', () => {
+    // Stated rather than hidden: there is no id on `match_events` to disambiguate
+    // with, so this is a known and accepted limit. The real fix is an
+    // external_player_id column, which is a migration and a re-ingest.
+    // Two Nevilles key apart (different initials) — but a Gary and a George
+    // would not, and nothing here could tell them apart.
+    expect(playerNameKey('Gary Neville')).not.toBe(playerNameKey('Phil Neville'))
+    expect(playerNameKey('Gary Neville')).toBe(playerNameKey('George Neville'))
+  })
+})
+
+describe('goals reach the right player through the key', () => {
+  it('⚠ a timeline goal filed as "K. Havertz" lands on "Kai Havertz"', () => {
+    const side = scoutSide(
+      [
+        line({ externalPlayerId: 1, playerName: 'Kai Havertz', minutes: 90, rating: 7.2 }),
+        line({ externalPlayerId: 2, playerName: 'Bukayo Saka', minutes: 90, rating: 7.0 }),
+      ],
+      [
+        { clubId: ARS, playerName: 'K. Havertz', kind: 'goal' },
+        { clubId: ARS, playerName: 'K. Havertz', kind: 'goal' },
+      ],
+      ARS,
+    )
+
+    const kai = side.dangerMen.find((p) => p.name === 'Kai Havertz')
+    expect(kai, 'the scorer must reach the danger list at all').toBeDefined()
+    expect(kai?.goals).toBe(2)
+    // And the top of the danger list is the scorer, not the other name.
+    expect(side.dangerMen[0]?.name).toBe('Kai Havertz')
+  })
+
+  it('⚠ an own goal still reaches nobody', () => {
+    const side = scoutSide(
+      [line({ externalPlayerId: 1, playerName: 'Kai Havertz', minutes: 90, rating: 7.2 })],
+      [{ clubId: ARS, playerName: 'K. Havertz', kind: 'own_goal' }],
+      ARS,
+    )
+    expect(side.dangerMen).toHaveLength(0)
   })
 })
