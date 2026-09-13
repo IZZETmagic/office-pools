@@ -158,7 +158,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--mist);padding:1px 5
 .srow .lb{flex:1;font-size:13px;color:var(--dim)}
 .srow .vl{font-family:var(--mono);font-weight:800;font-size:14px;font-variant-numeric:tabular-nums}
 .srow .nt{font-family:var(--mono);font-weight:500;font-size:9.5px;color:var(--dimmer)}
-.srow.find .vl{color:var(--accent)}
+.srow.gold .vl{color:var(--accent)}
 
 /* kit: form strip */
 .strip{display:flex;gap:4px}
@@ -190,13 +190,6 @@ code{font-family:var(--mono);font-size:12px;background:var(--mist);padding:1px 5
 .vcol .gf{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap}
 .vcol .gf b{font-family:var(--mono);font-weight:800;font-size:15px}
 .vcol .gf span{font-size:10px;color:var(--dimmer)}
-
-/* kit: the finding — gold, one per card, never more */
-.find{background:rgba(245,197,24,.10);border:1px solid rgba(245,197,24,.26);
-  border-radius:var(--r-sm);padding:13px 14px;display:flex;flex-direction:column;gap:6px}
-.find p{font-size:13.5px;line-height:20px;font-weight:700;color:#F7E6AE}
-.find span{font-size:9.5px;letter-spacing:.9px;text-transform:uppercase;font-weight:700;
-  color:rgba(245,197,24,.58)}
 
 /* kit: the caveat — amber, and only ever this */
 .caveat{background:rgba(251,191,36,.10);border-radius:var(--r-sm);padding:9px 12px}
@@ -357,7 +350,7 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
     </div>
     <div class="thesis" style="border-left-color:var(--green);background:rgba(52,217,114,.07);margin-top:14px">
       <p style="color:#A8E9C2">
-        ✅ <b>Built and committed 12 Sep 2026</b> — <code>a9d57db</code> … <code>a8792f1</code>,
+        ✅ <b>Built and committed 12 Sep 2026</b> — <code>a9d57db</code> … <code>573e42a</code>,
         local only. 2,160 tests pass; both typechecks match their pre-existing baselines.
         ✅ Migration 144 applied to production. 🔴 <b>Nothing is pushed.</b>
         §08 is what turned up during the build — two corrections to this document, a bug that had
@@ -530,8 +523,8 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
       </div>
       <p>The one line on this card worth reading aloud. Exactly one per card, and a card with no
       finding has no gold on it.</p>
-      <p class="only"><b>Used in:</b> the drought, the signature scoreline, the reality mark, the
-      top-rated player.</p>
+      <p class="only"><b>Used in:</b> the signature scoreline, the most-picked scoreline, the
+      reality mark on a comparison, the headline accuracy tile.</p>
     </div>
     <div class="gram">
       <div class="gram-top">
@@ -540,7 +533,8 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
       </div>
       <p>A caveat about the sample, and nothing else. Amber is the feature admitting its own
       limits, which is why it must never also be a statistic.</p>
-      <p class="only"><b>Moves off amber:</b> the contrarian index, the drought’s visit count.</p>
+      <p class="only"><b>Moves off amber:</b> the contrarian index, which is a statistic and was
+      wearing a warning.</p>
     </div>
     <div class="gram">
       <div class="gram-top">
@@ -645,13 +639,11 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
           <div><i class="sb-away"></i>Chelsea</div>
         </div>
       </div>
-      <div class="find" style="margin-top:2px">
-        <p>History leans Arsenal. The crowd is calling it for Chelsea.</p>
-        <span>The gap between the two bars</span>
-      </div>
       <p class="ba-cap">
-        One key serves both. The misalignment between the two bars is now the most visible thing on
-        the card — and it is a fact about football, not a tip.
+        One key serves both, so the two bars can be read against each other: <b>history leans
+        Arsenal, the crowd is calling it for Chelsea.</b> That misalignment is the most visible
+        thing on the card — and the reader draws it themselves, which is the difference between a
+        fact about football and a tip.
       </p>
     </div>
   </div>
@@ -664,7 +656,7 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
     <h2 class="t-sec">The kit</h2>
   </div>
   <p class="sec-sub">
-    Thirteen primitives. Every scout card on every surface is composed from these and nothing else —
+    Twelve primitives. Every scout card on every surface is composed from these and nothing else —
     the presentation equivalent of the design note’s <em>one owner per derivation</em> rule. Today
     <code>Card</code> is defined three times, <code>Segment</code> twice, and the label/value row
     twice with <b>contradictory argument order</b>: <code>Line</code> renders label → note → value,
@@ -685,7 +677,6 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
     <div class="kitem"><b>FormStrip</b><p>W · D · L squares. The only place green and red mean a result.</p><p class="used">Already shared-ish</p></div>
     <div class="kitem"><b>ScoreChip</b><p>A past scoreline with its date, tinted by how that match went.</p><p class="used">Replaces 2 copies</p></div>
     <div class="kitem"><b>VenueSplit</b><p>Two columns, one per side, at the ends they are playing.</p><p class="used">Sheet only today</p></div>
-    <div class="kitem"><b>Finding</b><p>The gold block. One per card, maximum. Carries its own denominator caption.</p><p class="used">Was “Drought”</p></div>
     <div class="kitem"><b>Caveat</b><p>The amber strip. Thin samples only — never a statistic.</p><p class="used">Sheet only today</p></div>
     <div class="kitem"><b>StatTiles</b><p>2–3 big numbers. Ink by default; the headline tile takes gold.</p><p class="used">Drops tier colours</p></div>
     <div class="kitem"><b>PeopleCard</b><p>One card per club: the top five in form, each row with a face, position, apps, goals and assists.</p><p class="used">Replaces 2 copies</p></div>
@@ -747,7 +738,7 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
                 </div>
               </div>
               <div>
-                <div class="srow find"><span class="lb">Most common scoreline</span><span class="nt">3 of 11</span><span class="vl">2–1</span></div>
+                <div class="srow gold"><span class="lb">Most common scoreline</span><span class="nt">3 of 11</span><span class="vl">2–1</span></div>
                 <div class="srow"><span class="lb">Average goals</span><span class="nt">n=11</span><span class="vl">2.9</span></div>
                 <div class="srow"><span class="lb">Both teams scored</span><span class="nt">7 of 11</span><span class="vl">64%</span></div>
               </div>
@@ -760,10 +751,6 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
                   <div class="chip l"><b>0–2</b><span>Oct 24</span></div>
                 </div>
                 <p class="t-det dim" style="margin-top:7px">Scores as played — home side first</p>
-              </div>
-              <div class="find">
-                <p>Chelsea have not won at the Emirates since 2011.</p>
-                <span>7 visits</span>
               </div>
             </div>
           </div>
@@ -879,7 +866,7 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
                   <div><i class="sb-away"></i>Chelsea 42%</div>
                 </div>
               </div>
-              <div class="srow find" style="border-top:1px solid rgba(255,255,255,.055)">
+              <div class="srow gold" style="border-top:1px solid rgba(255,255,255,.055)">
                 <span class="lb">Most-picked scoreline</span><span class="nt">22% of 288</span><span class="vl">1–2</span>
               </div>
             </div>
@@ -944,13 +931,9 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
                 </div>
               </div>
               <div>
-                <div class="srow find"><span class="lb">Most common scoreline</span><span class="nt">3 of 11</span><span class="vl">2–1</span></div>
+                <div class="srow gold"><span class="lb">Most common scoreline</span><span class="nt">3 of 11</span><span class="vl">2–1</span></div>
                 <div class="srow"><span class="lb">Average goals</span><span class="nt">n=11</span><span class="vl">2.9</span></div>
                 <div class="srow"><span class="lb">Both teams scored</span><span class="nt">7 of 11</span><span class="vl">64%</span></div>
-              </div>
-              <div class="find">
-                <p>Chelsea have not won at the Emirates since 2011.</p>
-                <span>7 visits</span>
               </div>
             </div>
           </div>
@@ -1029,8 +1012,8 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
           <p>
             Hidden inside <code>match/PeopleCard.tsx</code> — a second copy of the same bar, with
             the same blue/silver/gold encoding. So the count of duplicated crowd bars was two, not
-            one. The tab's real gaps were the <b>venue-split form card</b>, the <b>drought</b> and
-            the <b>thin-sample caveat</b>; it gained all three.
+            one. The tab's real gaps were the <b>venue-split form card</b> and the
+            <b>thin-sample caveat</b>; it gained both.
           </p>
         </div>
       </div>
@@ -1149,7 +1132,7 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
                     <span class="real">25% of games end level</span>
                   </div>
                 </div>
-                <div class="srow find"><span class="lb">Signature scoreline</span><span class="vl">2–1</span><span class="nt">31% of picks</span></div>
+                <div class="srow gold"><span class="lb">Signature scoreline</span><span class="vl">2–1</span><span class="nt">31% of picks</span></div>
                 <div class="srow"><span class="lb">Has ever predicted 0–0</span><span class="vl" style="color:var(--slate)">Never</span></div>
               </div>
             </div>
@@ -1614,6 +1597,36 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
           wrong reason.
         </p>
       </div>
+    </div>
+  </div>
+
+  <div class="row" style="margin:30px 0">
+    <div class="note warn" style="max-width:78ch">
+      <h4>⚠ The drought line is gone, and so is what replaced it</h4>
+      <p>
+        The pairing card used to close with <em>“Chelsea have not won at the Emirates since
+        2011”</em>, drawn whenever a club had visited three times without winning. Against a
+        measured <b>33.1%</b> away-win rate, three visits without one happens <b>29.9% of the time
+        by chance</b> — one pairing in three was handed a base rate dressed as a hoodoo, about
+        2011, on a card whose job is a pick this weekend.
+      </p>
+      <p>
+        A ranked picker was built to replace it: nine candidates, each with a threshold set to beat
+        chance, showing the strongest true one or nothing. It worked. It was then <b>removed along
+        with the drought</b> — Ryan, 2026-09-12: hold that slot for AI-written notes, which are a
+        couple of years out.
+      </p>
+      <p>
+        So the card ends on its figures. <b>Do not put another generated line there</b> without
+        that conversation; <code>PairingCard</code> and <code>h2h.ts</code> both carry the note, and
+        the picker is recoverable from <code>f69e98e</code>.
+      </p>
+      <p style="color:var(--dimmer)">
+        What survives is the measurement, which was the expensive part and is reusable for any
+        future “is this worth saying?” threshold — including the notes:
+        <b>home 39.1% · draw 27.8% · away 33.1% · both teams scored 56.2% · 3.00 goals a game</b>,
+        over 169 played fixtures.
+      </p>
     </div>
   </div>
 
