@@ -1,6 +1,6 @@
 # Office Pools — Monetization Plan
 
-**Status:** Design proposed (May 2026); payment provider set to **Paddle** (Aug 2026); customer journey added (Sep 2026). Validated against 2026 World Cup pool data. Pending final survey signal in Phase 2. ⚠️ **The "no payment infrastructure built yet" line this file used to carry is stale.** `lib/paddle/` *(tiers, api, verifySignature, transactionCompleted)*, `app/api/paddle/webhook/route.ts` and `app/pools/[pool_id]/upgrade/` all exist, and **migration 075 enforces the tier caps in the database**. What is *deployed* is narrower: `app/pricing/page.tsx` and `app/refund-policy/page.tsx` are live on sportpool.io; checkout, webhook and upgrade route are not.
+**Status:** Design proposed (May 2026); payment provider set to **Paddle** (Aug 2026); customer journey added (Sep 2026); **generalised off the World Cup and repriced on size (Sep 2026)**. Validated against 2026 World Cup pool data. Pending final survey signal in Phase 2. ⚠️ **The "no payment infrastructure built yet" line this file used to carry is stale.** `lib/paddle/` *(tiers, api, verifySignature, transactionCompleted)*, `app/api/paddle/webhook/route.ts` and `app/pools/[pool_id]/upgrade/` all exist, and **migration 075 enforces the tier caps in the database**. What is *deployed* is narrower: `app/pricing/page.tsx` and `app/refund-policy/page.tsx` are live on sportpool.io; checkout, webhook and upgrade route are not.
 
 > ⚠️ **Open blocker:** Paddle's Acceptable Use Policy explicitly prohibits fantasy sports leagues and sports forecasting with prizes, and prohibits physical goods entirely. Nothing here is buildable until Paddle approves the account in writing. See **RM-08** and **RM-09**.
 
@@ -11,11 +11,12 @@ For ongoing project state, see `memory/project_backlog_monetization.md`. For roa
 ## Principles
 
 1. **No gambling.** The platform never holds prize money, never takes a rake from a prize pool, never settles bets. All revenue is a service charge for organizing tools and venue experience. Pools that involve money continue to settle off-platform if admins choose. **Under Paddle this stops being only an ethical principle and becomes a payment-processing constraint** — Paddle's AUP prohibits "fantasy sports leagues" and "Sports forecasting/odds making where monetary or material prizes are involved". The fact that no prize money ever touches the platform is the argument that keeps SportPool sellable.
-2. **Event-based for admins, continuous for players.** Pool admin revenue is per-tournament one-time. Player revenue is a mix of one-time microtransactions and tournament-agnostic subscriptions, depending on the engagement pattern.
+2. **Per-pool for admins, continuous for players.** Pool admin revenue is a one-time charge on the pool. Player revenue is a mix of one-time microtransactions and competition-agnostic subscriptions, depending on the engagement pattern.
 3. **Two independent ladders.** The admin tier (what features exist in a pool) and the player tier (how the player experiences whatever exists) layer cleanly. Neither replaces the other.
 4. **Honest pricing-page framing.** Subscriptions and bundles are marketed for the engagement segment they actually serve, not as one-size-fits-all.
 5. **The bar tier is the leverage point.** Consumer admin pricing pays for hosting and Paddle overhead (5% + 50¢ per transaction). Pool Ultra is where the business model lives.
 6. **The buyer is buying for other people.** Every admin purchase in this product is made on behalf of a group that will never see a price, and every venue purchase on behalf of a room. The flow rules that follow from that are not polish — they are *Customer journey and experience* immediately below, and where they conflict with anything later in this document, **they win**.
+7. **Size is the price axis. Length is free.** *(Decided Sep 2026 — this replaces per-competition pricing.)* What a pool costs depends on **how many people are in it and how many entries they hold**, and on nothing else. A four-week World Cup and a thirty-eight-matchweek Premier League season cost the same, because the honestly scarce resource is the room, not the calendar. That is a simplification the pricing page should say out loud, not a discount we hope nobody notices.
 
 ---
 
@@ -53,27 +54,72 @@ most likely way to get this wrong.
 
 #### The trial, and the one rule that makes it safe
 
-**A trial unlocks features. It never unlocks capacity.**
+> **A trial may only include what can be withdrawn without changing what the pool is.**
 
-That is the whole design, and it is not a detail. Capacity — how many members, how many entries — is
-the only thing whose removal hurts someone other than the buyer. If the trial raises the member cap
-to 30 and then lapses, fifteen real people are stranded, and the published refund policy
+That is the test, and everything else is a corollary of it. Applied, it excludes exactly two things —
+and it excludes them for different reasons, which is why the earlier one-line version of this rule
+("features, never capacity") was not enough.
+
+**Corollary 1 — capacity is excluded, because withdrawing it removes people.** If the trial raises the
+member cap to 30 and then lapses, fifteen real people are stranded, and the published refund policy
 (`app/refund-policy/page.tsx` §3) already says members over the Free limit lose the ability to submit
-new entries. Keeping capacity out of the trial means nobody ever joins a pool under a promise that
-later breaks, and we never have to write that disclosure onto a join screen.
+new entries. Keeping capacity out means nobody ever joins a pool under a promise that later breaks,
+and we never have to write that disclosure onto a join screen. It also keeps the two levers the 2026
+WC regression proved actually convert — the member cap and the entry cap — intact and unblunted.
 
-It also keeps the two levers the 2026 WC regression proved actually convert — the member cap and the
-entry cap — intact and unblunted. **We trial the experience, and we sell the room.**
+**Corollary 2 — the mode is excluded, because withdrawing it removes the game.** See directly below;
+this is the one that a naive trial gets catastrophically wrong.
+
+**We trial the experience. We sell the room. We demo the game.**
 
 | | On trial | Stays on Free if unpaid |
 |---|---|---|
-| All pool modes, custom scoring | ✅ unlocked | Configuration is **kept, permanently** — locked for further edits |
+| Custom scoring configuration | ✅ unlocked | **Kept, permanently** — locked for further edits |
 | Form tab *(XP, badges, level runway)* | ✅ unlocked | Switches off |
 | Banter | ✅ unlocked | Switches off — history stays readable |
 | How Others Predicted | ✅ unlocked | Switches off |
 | Pool branding | ✅ unlocked | **Kept, permanently** |
 | **Member cap** | ❌ **Free cap applies throughout** | Unchanged — nobody is stranded |
 | **Entries per user** | ❌ **Free cap applies throughout** | Unchanged |
+| **Pool mode** | ❌ **Bought at creation, or the free mode** | Unchanged — a pool never changes mode |
+
+#### Why modes are not in the trial
+
+The question that settles this: *an admin trials a Showdown pool, the trial lapses — do they keep
+Showdown for the season?* **Both answers are bad, and that is the finding.**
+
+- **Keep it** and the trial permanently gives away the most valuable thing in the product. Mode gating
+  goes soft: every admin trials into the mode they wanted and never pays.
+- **Take it** and we would convert a live Showdown pool into a Pick'em pool. **The draw is sealed.**
+  Duels have settled at 500/250/0. In Last Man Standing, eliminations are permanent and irreversible.
+  In Table, the whole prediction *is* the ordering. There is no un-Showdowning a pool, and attempting
+  it breaks binding rule 2 outright — it destroys what the trial produced.
+
+A mode is not a feature bolted onto a pool; it is what the pool **is**. Banter can switch off and the
+pool is still the same pool. A mode cannot.
+
+**So modes are sold, and demonstrated — never trialled.**
+
+#### The demo pool — how you try a mode
+
+Every mode has a **live, read-only demo pool**, running on this week's real fixtures, openable from
+the create-pool wizard with one tap and no account required.
+
+- It is a **real pool**, not a mockup: real clubs, real kickoff times, real scoring, a populated
+  leaderboard that moved this weekend.
+- It is **read-only**. Nobody can join, so nothing structural can be taken from anyone — the lapse
+  problem does not exist here.
+- It is the mode at its most legible: a Showdown demo shows a settled duel, an LMS demo shows people
+  already eliminated, a Table demo shows a prediction diverging from the real standings.
+
+This is paywall pattern 6 — *concrete visual proof of value* — applied to the structural decision
+rather than the purchase. An admin choosing between Showdown and Last Man Standing is making the
+biggest decision in the wizard, and today they make it from a paragraph of text.
+
+**Cheap to build:** `scripts/seed-league-ux-picks.ts` already tops up the UI/UX test pools weekly, and
+those pools already exist per mode. The work is making one of each public and read-only, not creating
+them. ⚠️ An admin-client reader must re-implement every RLS policy or the seal is gone — see
+`memory/project_league_last_man_standing.md`.
 
 > **⚠️ What the database already forces.** Migration 075 enforces both caps as triggers keyed on
 > `pools.tier`, through `pool_tier_member_cap()` and `pool_tier_entry_cap()`. **So the trial cannot be
@@ -276,6 +322,43 @@ illustrative.
 3. **Nothing is announced to the pool.** No "Ryan upgraded this pool!" banner. The admin decides
    whether their spending is other people's business.
 
+### The return — next season
+
+A pool is bound to a fixture list, so next season is structurally a **new pool**. That is the moment
+the whole model depends on, and it is the one place where a retention mechanic is both needed and
+allowed.
+
+**The mechanic is the one `CLAUDE.md` already blesses by name.** Its worked example of a mechanic that
+*passes* the disclosure gate is, verbatim:
+
+> *"We pre-built next season with your 14 members so you only have to confirm"* — passes.
+
+So build exactly that:
+
+| | What happens |
+|---|---|
+| **When the competition ends** | The pool finishes. Final standings, the champion, the season's Banter — all of it stays, permanently, at whatever tier it ran on. |
+| **When the next season's fixtures land** | We build the next pool: same name, same members, same mode, same scoring configuration. It sits there, unstarted, waiting. |
+| **What the admin does** | Opens it, looks at the roster, confirms. One payment, one tap. |
+| **What the admin does not do** | Re-invite fourteen people. Re-configure scoring. Remember to do any of it before the season starts. |
+
+**Why this passes where a subscription would not.** The admin is not being auto-charged — nothing
+happens without their tap. They are being spared the *work*, not deprived of the *decision*. Write it
+in the tooltip and it reads as a favour, which is the test.
+
+**Two rules on it:**
+
+1. **A pre-built pool is never auto-started and never auto-charged.** If the admin ignores it, it
+   quietly expires and nobody is billed. An unconfirmed pool that starts anyway would be a
+   subscription wearing a disguise.
+2. **Members are told it exists, not asked to chase it.** *"Last season's pool is ready for
+   2027/28"* is information. *"Ryan hasn't confirmed yet"* is binding rule 5 being broken.
+
+**This is also where the honest upsell lives.** An admin whose pool grew to 9 members last season is
+looking at a roster that will hit the Free wall in week one. Telling them that, on the confirmation
+screen, before it happens to a real person, is the most useful thing we can say — and it is a wall
+they have genuinely hit, so binding rule 6 is satisfied.
+
 ### Exit — Decision 8's symmetry gate
 
 > **Exit must be as easy, fast and prominent as entry.** If cancelling takes more steps than
@@ -305,7 +388,7 @@ illustrative.
 
 These are the ones to check any future flow against.
 
-1. A trial unlocks **features**, never **capacity**.
+1. A trial may only include **what can be withdrawn without changing what the pool is** — which excludes **capacity** (withdrawing it removes people) and **the mode** (withdrawing it removes the game).
 2. Nothing a trial produced is ever destroyed — settings, branding and history are permanent.
 3. The trial clock is the **sporting calendar**, never a rolling day count.
 4. We warn before every charge and before every switch-off, to the admin **and** to the members.
@@ -315,6 +398,10 @@ These are the ones to check any future flow against.
    copywriter.
 8. Exit is as prominent as entry, and carries no counter-offer.
 9. The safety net is stated **on** the paywall, not linked from beneath it.
+10. **A mode is demonstrated, never trialled.** Every mode has a live read-only demo pool on real fixtures.
+11. **A pre-built next season is never auto-started and never auto-charged.** Ignore it and it expires; nobody is billed.
+12. **Price moves on size, never on length.** A nine-month season and a four-week tournament cost the same.
+13. **Cosmetics are bought directly, in real money, for a thing you can see before you pay.** No premium currency, no randomised packs, no limited-edition countdowns, and nothing a cosmetic touches may affect scoring.
 
 ### Open questions this section raises
 
@@ -385,17 +472,54 @@ Agent tooling for all of the above is wired up in `.mcp.json` (`paddle-sandbox`,
 
 ---
 
-## Pool Tiers (admin-paid, per tournament)
+## What you actually buy
 
-The four tiers an admin chooses when creating a pool. One-time fee per tournament. No subscription.
+> **One pool. One payment. Priced on how big it is.**
+
+A **pool** is the unit of sale. It belongs to one competition instance — the 2026/27 Premier League,
+the 2026 World Cup — because that is structurally what a pool *is*: it is bound to a fixture list.
+A new season is a new pool with new fixtures, so it is a new purchase. Nobody is ever re-charged for
+the same pool.
+
+Three things follow, and they are the whole commercial model:
+
+| | |
+|---|---|
+| **Price depends on** | Members and entries. Nothing else. |
+| **Price does not depend on** | Which competition. How long it runs. Which sport. How many matchweeks. |
+| **What the payment guarantees** | The pool runs to the end of its competition. No renewal, no card on file, **no way for it to lapse mid-season.** |
+
+**The one exception, stated rather than hidden.** **Pool Ultra is not priced on size** — Max already
+carries unlimited members, so Ultra's $500 buys the *venue product* (public TV page, marketing pack,
+multi-staff admin, house champion ledger, sponsor slot), not more room. Principle 7 governs the three
+consumer tiers, where the buyer is choosing between bands. Ultra is a different product sold in a
+different way, to a buyer who is on a call with us.
+
+**The thirty-eight-matchweek point.** A Premier League pool costs the same as a World Cup pool that
+lasts four weeks. That is deliberate, and it is the single most persuasive line on the pricing page:
+*"$19 for all 38 matchweeks. One payment. It cannot expire on you in March."* Every subscription
+product the buyer has ever been burned by is the contrast.
+
+**What this replaces.** Every "per tournament" and "per season" price in earlier drafts. The old
+framing was built when there was one competition and it lasted a month; it does not survive contact
+with a league season, and pricing the same $19 against four weeks and against nine months was never
+coherent.
+
+---
+
+## Pool Tiers (admin-paid, per pool)
+
+The four tiers an admin chooses when creating a pool. One-time charge on the pool. No subscription.
+Tiers are **capacity bands** — the features bundled onto each one ride along with the room size, they
+are not separately priced.
 
 | | **Free** *(Small Pool)* | **Pool Plus** | **Pool Max** | **Pool Ultra** |
 |---|---|---|---|---|
 | **Best for** | Friends & family | Office / friend group | Big organized pool | Sports bars and venues going all-in on a tournament |
-| **Price** | $0 | $19 / season | $49 / season | $500 per tournament |
+| **Price** | $0 | $19 | $49 | $500 |
 | **Members** | Up to 10 | Up to 30 | Unlimited | Unlimited |
 | **Entries per user** | 1 | Up to 3 | Unlimited | Unlimited |
-| **Pool modes available** | 1 default per competition | All modes | All modes | All modes |
+| **Pool modes available** | 1 default per competition shape | All seven | All seven | All seven |
 | **Custom scoring config** | — | ✅ | ✅ | ✅ |
 | **Form tab** *(XP, badges, level runway)* | — | ✅ | ✅ | ✅ |
 | **Banter** *(mentions, reactions, badge flex, share-prediction)* | — | ✅ | ✅ | ✅ |
@@ -419,25 +543,51 @@ The four tiers an admin chooses when creating a pool. One-time fee per tournamen
 | **Patron retention dashboard** | — | — | — | ✅ |
 | **Self-serve sponsor slot** | — | — | — | ✅ |
 | **Weekly winner crown mechanic** | — | — | — | ✅ |
-| **Billing** | — | One-time per season, Paddle Checkout | One-time per season, Paddle Checkout | One-time per tournament, Paddle Checkout |
+| **Billing** | — | One-time, Paddle Checkout | One-time, Paddle Checkout | One-time, Paddle Checkout |
 
-### Default mode per competition (Free tier)
+### The seven modes, and which one is free
 
-The free tier gets the simplest mode for the competition. Paid tiers unlock the full catalog.
+There are **seven** pool modes, not the three this document listed while the World Cup was the only
+competition. They are the canonical set in `lib/design/tokens.ts` → `modeIdentityColor`, and they
+split by competition shape:
 
-| Competition | Default mode (Free) | Modes unlocked on Plus+ |
+| Mode | Shape | What it is | Built? |
+|---|---|---|---|
+| **Pick'em** | League | Per-matchweek predictions. Carries a **depth axis** — Results *(H/D/A)* or Scores *(exact goals)* | ✅ Scores depth **live in production**; Results built |
+| **Table** | League | Predict the final standings, set for the season, scored live against the real table | ✅ Built, deadline rules live |
+| **Showdown** | League | Head-to-head duels on a sealed draw | ✅ Built |
+| **Last Man Standing** | League | Pick one winner a week; only a win keeps you in | ✅ Built |
+| **Full tournament** | Tournament | The whole bracket predicted up front | ✅ Live |
+| **Progressive** | Tournament | Round opens as the previous one completes | ✅ Live |
+| **Bracket picker** | Tournament | Knockout bracket only | ✅ Live |
+
+**The free mode is one per competition shape, and it is the inclusive one:**
+
+| Competition shape | Free tier gets | Paid tiers unlock |
 |---|---|---|
-| World Cup / Euros | Full | Progressive, Bracket |
-| Premier League / La Liga | Weekly pick'em | Season-long predictor, H2H Showdown |
-| FA Cup / Champions League knockout | Bracket | Round-by-round progressive |
-| Super Bowl squares | Single-game squares | Multi-game squares, prop predictions |
-| NFL / NBA regular season | Weekly pick'em | Season-long, survivor |
+| **League** *(Premier League, La Liga, Serie A…)* | **Pick'em at Results depth** — H/D/A, three taps a matchweek | Scores depth, Table, Showdown, Last Man Standing |
+| **Tournament** *(World Cup, Euros, Copa América)* | **Full tournament** | Progressive, Bracket picker |
 
-Mode availability per competition becomes config under TD-05 (pool template system, Phase 3c.3). Until that lands, mode gating is only enforceable for WC.
+Results depth is the free one deliberately. It is the mode that asks least of someone who does not
+follow the football closely, which is exactly who a free family pool is full of — and Decision 9
+exists to include them. We do not make the *hard* mode the free one.
+
+⚠️ **Modes are bought, never trialled.** A mode cannot be withdrawn from a live pool without
+destroying it — see *Customer journey and experience → Why modes are not in the trial*. What an admin
+gets before paying is a **live demo pool** of each mode, not a trial of it.
+
+⚠️ **Nothing here prices by competition.** Mode availability is a tier bundle, not a per-competition
+price list. Per-competition mode *config* still lands under TD-05 (pool template system, Phase 3c.3);
+until then, gating is enforceable per competition shape, not per competition.
+
+**Modes this document used to list that do not exist:** Super Bowl squares, prop predictions, NFL
+survivor, multi-game squares. They were aspiration written in the present tense. NHL and NFL work is
+real but scoped separately — see `memory/project_backlog_nhl.md`, where the launch target is the 2027
+playoffs and `club_count CHECK (4..30)` still rejects a 32-team league.
 
 ### Mix-and-match rule
 
-Each tournament is its own purchase. A bar can buy Pool Ultra for EPL ($500), Pool Max for the FA Cup ($49), and skip the Champions League entirely. Any admin can buy any tier. **Pool Ultra is opt-in, not required for venues.**
+Each pool is its own purchase. A bar can buy Pool Ultra for its EPL pool ($500), Pool Max for an FA Cup pool ($49), and skip the Champions League entirely. Any admin can buy any tier. **Pool Ultra is opt-in, not required for venues.**
 
 ### Upsell logic
 
@@ -516,29 +666,107 @@ Hand-design layouts once in Affinity / Adobe with proper CMYK + bleed. Export as
 
 Players currently generate zero revenue. At 50K users, ~83% of users are non-admin players — that's the biggest untapped revenue source. Three complementary vectors, all consistent with the no-subscription-for-admin / no-gambling principles.
 
-### Vector 1 — Cosmetic Marketplace *(microtransactions)*
+### Vector 1 — Avatars and the cosmetics shop *(microtransactions)*
 
-Small one-time IAPs. Pure cosmetics. Owned forever. Sport-agnostic. Lives across every pool the player participates in.
+**The pitch:** every player builds a character — face, hair, kit, celebration — and that character
+turns up wherever they do: the Showdown matchup card, the leaderboard row, a Banter message, the
+reveal animation. The shop sells parts for it. One-time purchases, owned forever, real money, no
+gameplay effect whatsoever.
 
-| Item type | Price | Examples |
+⚠️ **This is not a new design.** It is scoped in full in
+[`memory/project_backlog_avatar_cosmetics.md`](memory/project_backlog_avatar_cosmetics.md) — Phases
+A–E, the reference products *(Fortnite's cosmetics-only ~$5B/yr, Bitmoji, NBA 2K MyPlayer, Discord
+Nitro)*, the build-vs-buy call on Ready Player Me, and the architectural constraints today's decisions
+must not block. **That document is the design. This section is the commercial half, plus the three
+corrections the gates force.** They had drifted apart: this plan still described Vector 1 as five rows
+of static "avatar packs", which is not what anyone intends to build.
+
+#### The gate, which has not moved
+
+| | |
+|---|---|
+| **Prerequisite** | **Avatars v1 — photo upload + initials fallback.** ~3–5 days, scoped in `memory/project_backlog_avatars.md`. It has **not shipped.** |
+| **Go / no-go signal** | Upload rate **>40% within 3 months**. If people will not upload a photo, they will not buy a hat. |
+| **What Ryan has now decided** | The other half of that gate — *"does the Phase 2 monetization decision land on cosmetics?"* — is **yes** (Sep 2026). The adoption signal still stands. |
+
+Ship Avatars v1, measure, then build the shop. Not before — a cosmetics system built on an unproven
+identity layer is months spent on something nobody equips.
+
+#### The slots
+
+Each slot is independent, so the combinations are the value: your setup is yours.
+
+| Slot | What it is | Indicative |
 |---|---|---|
-| **Avatar packs** | $1.99–4.99 | World Cup country avatars, club crest packs, mascot collection |
-| **Theme packs** | $1.99–4.99 | Dark variants, retro arcade, neon, tournament-edition themes |
-| **Reaction packs** | $2.99 | Animated emoji bundles, sport-specific (yellow card, red card, GOAL!) |
-| **Badge frames** | $2.99–4.99 | Premium frames around earned badges (gold, holo, animated) |
-| **Banter effects** | $1.99 | Confetti on rank-up, custom sounds, message highlight colors |
+| **Kit** | The shirt your character wears — the one people will actually buy | $2.99 |
+| **Headwear & accessories** | Hats, scarves, sunglasses, headphones | $1.99 |
+| **Celebration** | Plays on the duel result card when you win a Showdown — knee-slide, flex, the shrug | $2.99 |
+| **Reveal theme** | The Showdown tunnel walk-out backdrop. `MOTION_SPEC.md`'s Irreverent and Office-pool moods become *unlockable* here rather than being cut | $3.99 |
+| **Effects** | Confetti on rank-up, a trail, a message highlight | $1.99 |
+| **Frames** | A border around your avatar on the leaderboard — gold, holo, animated | $2.99 |
 
-**Properties:**
-- No gameplay impact — pure visual / audio polish
-- Permanent ownership after purchase
-- Works in any pool tier (Free included)
-- Reuses Pool Ultra's branding/stamping infrastructure for asset rendering
-- Mobile-native via RevenueCat IAP
-- **Web sales need a custom Paddle rate.** Every item here is under $10, where Paddle's standard 5% + 50¢ becomes punitive (21.7% on a $2.99 item). Negotiate before shipping Vector 1 on web; mobile IAP is unaffected.
+#### 🔴 The kit problem, and how it is solved
 
-### Vector 2 — Pool Pro *(subscription, tournament-agnostic)*
+**You cannot sell a virtual Arsenal shirt.** Club and national-team kits, crests and names are
+protected marks. We display `crest_url` today from api-football, which is informational use inside a
+fixture list; **charging $2.99 for a garment bearing those marks is trading on someone else's IP**,
+and it is the kind of thing that would also make the Paddle domain review (**RM-08**) considerably
+harder than it already is. The cosmetics backlog doc flagged this twice and never resolved it.
 
-A continuous-engagement subscription for engaged players. Works across every pool the player is in, regardless of which sport or pool tier. Sport-agnostic by construction — no "I don't care about NFL" tension because Pool Pro doesn't sell sports, it sells a better player experience.
+**The resolution is colourways, not badges.**
+
+- A kit is **a colour pattern**: red-and-white stripes, all-white with a gold trim, sky blue, the black
+  and red halves. No crest, no sponsor, no club name anywhere in the product.
+- **People recognise their team by colour** — that is what a kit *is* at a glance, and it is why a
+  crowd shot reads instantly on television.
+- We already own the colour grammar. The scouting build shipped **one colour grammar and a kit
+  component** (2026-09-12), and `lib/design/competitionColor.ts` derives competition colour from the
+  same key the crest URL comes from.
+- Users name their own: the kit is called whatever they call it. We never do.
+
+**What stays off the table until a real licence exists:** club crests on merchandise or cosmetics,
+club names as product names, official kit replicas, league marks. Phase E's "branded collaborations"
+in the backlog doc is a licensing project, not a design one.
+
+#### 🔴 Three mechanics in the existing scoping that fail the gates — cut them now
+
+The cosmetics backlog was written before the five gates were adopted. Three things in it do not
+survive contact with them, and they are much cheaper to remove from a plan than from a shipped shop.
+
+| Mechanic | Gate | Why it fails |
+|---|---|---|
+| **A premium currency** *("PoolPoints")* | **1 — Disclosure** | The tooltip reads *"we use a currency so you lose track of what things cost."* Currencies exist to break the link between a purchase and its price, and they strand balances people paid for. **Price everything in real money.** |
+| **Limited-edition drops, weekly countdowns** | **2 — Affect** | Manufactured FOMO is named in the gate explicitly. A tournament-edition kit can *arrive* with the tournament; it must not *expire* to make you hurry. |
+| **Anything randomised** — packs, mystery boxes, gacha | **5 — Variance provenance** | All uncertainty must be inherited from the sporting event. A pack you open is randomness we added, and that is gambling design whether or not money moves. **You see exactly what you are buying before you pay.** |
+
+Cutting all three still describes Fortnite's actual shop, which is a direct-purchase storefront. It is
+the *other* football game — Ultimate Team, with its packs — that draws the loot-box backlash, and the
+backlog doc already identified being the opposite of that as the positioning.
+
+#### Properties
+
+- **No gameplay impact, ever.** Nothing cosmetic touches pick accuracy, scoring, or any competitive
+  outcome. In a product whose whole value is who you are playing with, pay-to-win does not dent trust,
+  it ends it.
+- **Account-level, not pool-level.** Your character is yours across every pool, every competition,
+  every sport. **A pool downgrading to Free never takes a player's purchases away** — they bought it,
+  the admin's billing is not their problem.
+- **Works in Free pools.** This is the only revenue the ~83% non-paying majority ever generates, and
+  gating it behind a tier the *admin* buys would be incoherent.
+- **Standing check:** assume a fifteen-year-old is in a family pool. Every item is a thing they can see,
+  at a price they can read, bought once.
+
+#### Where the money actually lands
+
+- **Mobile is the real channel.** RevenueCat + App Store / Play Billing, 30% year one. Impulse
+  purchases happen on the phone, and the phone is where the avatar is seen.
+- ⚠️ **Web needs a custom Paddle rate before it ships.** Every item here is under $10, where Paddle's
+  5% + 50¢ becomes punitive — **21.7% on a $2.99 kit**. Paddle's own pricing page says to contact them
+  for custom pricing under $10. Negotiate before Vector 1 ships on web; mobile IAP is unaffected.
+
+### Vector 2 — Pool Pro *(subscription, competition-agnostic)*
+
+A continuous-engagement subscription for engaged players. Works across every pool the player is in, regardless of which sport, competition or pool tier. Competition-agnostic by construction — no "I don't care about NFL" tension because Pool Pro doesn't sell sports, it sells a better player experience.
 
 | Tier | Price | What's included |
 |---|---|---|
@@ -548,7 +776,7 @@ A continuous-engagement subscription for engaged players. Works across every poo
 
 **Why subscription works for players (and didn't for admins):**
 
-- Engaged players are in 2–5 pools simultaneously across multiple sports — engagement is continuous even though each tournament is discrete
+- Engaged players are in 2–5 pools simultaneously across multiple sports — engagement is continuous even though each competition is discrete
 - Tournaments overlap across the calendar (EPL Aug–May, NFL Sep–Feb, NBA Oct–Jun) — no dormant time
 - Players touch the app daily (predictions, banter, leaderboard checks)
 - Value is in ongoing engagement experience, not discrete setup moments
@@ -565,7 +793,7 @@ Physical print-on-demand + digital collectibles. Tournament-end / victory-moment
 | **Pool-branded T-shirt** | $29 | Print-on-demand via Printful. Platform margin ~25% = $7/sale. Admin opts in. |
 | **Pool-branded mug** | $19 | Same fulfilment pipeline. Platform margin ~$5/sale. |
 | **Physical winner's medal** | $35 | Engraved, print-on-demand. Platform margin ~$10. |
-| **Tournament edition badge stickers** | $5 *(pack of 10)* | Pure margin. Limited-edition per tournament. |
+| **Competition edition badge stickers** | $5 *(pack of 10)* | Pure margin. A new design arrives with each competition; per binding rule 13 it **does not expire** to create urgency. |
 
 **Properties:**
 - Print-on-demand → zero inventory risk
@@ -613,7 +841,7 @@ Conservative assumptions, all sourced from the 2026 WC regression where data exi
 |---|---|---|
 | Admin tier *(Free / Plus / Max)* | 1.6% paying-admin rate × 4 tournaments × $28 avg | ~$89,400 |
 | Pool Ultra *(venues)* | 1 bar per 2,500 users × 75% × 4 tournaments × $500 | ~$25,000 |
-| Vector 1 — Cosmetics | 3% of players × $3 avg × 4 tournaments | ~$15,000 |
+| Vector 1 — Avatars & cosmetics | 3% of players × $3 avg × 4 buying occasions | ~$15,000 |
 | Vector 2 — Pool Pro subscription | 5% of players × $39/year avg | ~$82,000 |
 | Vector 3 — Merchandise | 1% of players × $7 platform margin × 4 tournaments | ~$12,000 |
 | **Total revenue** | | **~$223,400 / year** |
@@ -639,6 +867,14 @@ Without player monetization, the admin + venue tiers cap at ~$114K/year at 50K u
 
 ### Caveats
 
+- ⚠️ **The "× 4 tournaments" multiplier is a World Cup–era assumption and it does not survive leagues.**
+  It models an admin buying four short competitions a year. A Premier League admin buys **one pool that
+  runs nine months**. Under size-only pricing that is the same $19 for 38 matchweeks, so an admin who
+  moves from four tournament pools to one league pool is worth **a quarter of what this table assumes**.
+  The offsetting effect is that league pools are the ones that persist and renew, and the *return*
+  journey converts far better than a cold sale. **Neither effect is measured. Re-derive this table once
+  one full league season has completed** — the projection below should be read as World Cup–shaped and
+  provisional until then.
 - 5% paying-player Pool Pro conversion is mature-consumer-app territory; first year likely 2–3%
 - Apple/Google take 30% on first-year mobile IAP subs (15% year 2+). Web Paddle takes 5% + 50¢ — still far better than IAP, but **not** the full margin the Stripe-era version of this plan assumed
 - Subscription churn at month 6–12 typically 30–50% for consumer apps without strong retention features
@@ -654,7 +890,7 @@ Each step gated on data from the previous step. No subscription infrastructure s
 |---|---|---|
 | **3a.0** *(gate)* | **Paddle account approval.** Submit the business for Paddle review with the Principle-1 framing in writing *(we sell pool-organizing software; no prize money touches the platform)*. Get the answer before building anything. | Paddle's AUP names fantasy sports and prize-based sports forecasting as prohibited. A rejection here invalidates every row below it. See **RM-08**. |
 | **3a** *(Jul–Aug 2026)* | **Admin tiers** *(Free / Pool Plus / Pool Max)* via Paddle Checkout, web-only. **The trial and its two-days-out reminder ship in the same phase, not after it** — a paywall without the reminder is the trap the whole journey section exists to avoid, and retrofitting honesty is harder than building it. Platform charges land in their own `pool_purchases` table + `pools.tier`; **`entry_fee` is deliberately NOT reused** — it is the members' off-platform pot, and merging our revenue into it weakens the RM-08 argument. | Lowest cost, fastest validation. Doesn't depend on mobile launch. |
-| **3b.1** *(Aug 2026+)* | **Pool Ultra hand-rolled** for first 1–2 venues. **Cosmetic Marketplace (Vector 1)** via RevenueCat. | Ultra: validates $500 price point with real venues before generalizing. Cosmetics: RevenueCat plumbing arrives with Expo launch anyway. |
+| **3b.1** *(Aug 2026+)* | **Pool Ultra hand-rolled** for first 1–2 venues. **Avatars v1** *(photo upload — the prerequisite)*, then the **cosmetics shop (Vector 1)** via RevenueCat, gated on >40% upload adoption. | Ultra: validates $500 price point with real venues before generalizing. Cosmetics: RevenueCat plumbing arrives with Expo launch anyway. |
 | **3b.2** *(Oct–Dec 2026)* | **Pool Pro subscription (Vector 2)** — Paddle Subscriptions on web *(annual default)*, RevenueCat on mobile. | Only if Vector 1 hits ≥2% paying-player conversion. Validates subscription infra investment. |
 | **3c.x** *(2027+)* | **Pool Ultra self-serve** — venue dashboard, automated marketing pack pipeline, public venue directory. **Merchandise (Vector 3)** via Printful integration — **on a non-Paddle rail** (RM-09). | Self-serve venue depends on multi-sport foundation. Merch is heaviest build — ship after Pool Pro confirms players spend. |
 | **Deferred** | Sponsorship marketplace, corporate / white-label tier, sport pass admin subscription | Don't build until adjacent customers exist. Sport Pass rejected — admin subscription is a poor fit for event-based product. |
@@ -673,7 +909,10 @@ Each step gated on data from the previous step. No subscription infrastructure s
 8. **Dual-rail or Paddle-only?** Vector 3 forces a second processor regardless (RM-09). Question is whether to stand Stripe up early as an approval hedge (RM-08) or stay Paddle-only until merch actually ships. Lean **Paddle-only until 3c.x**, on the condition that 3a.0 approval comes back clean.
 9. **Does Pool Max get the same trial shape as Plus?** Under the features-not-capacity rule a Max trial hands over CSV export, which is take-and-leave. See *Customer journey and experience → Open questions*.
 10. **Broadcast email during a trial** — an unpaid admin mailing their members through our sending reputation. Probably sits outside the trial.
-11. **Can an admin trial every season indefinitely?** Each tournament is a fresh pool and a fresh decision, so today the answer is yes.
+11. **Can an admin trial every season indefinitely?** Each competition is a fresh pool and a fresh decision, so today the answer is yes.
+12. **Do demo pools need one per competition, or one per mode?** One per mode is the cheap version and probably enough — a Showdown demo on the Premier League teaches Showdown. One per competition is a lot of pools to keep seeded.
+13. **Does size-only pricing mean the Plus band should move?** If length no longer justifies the price, members and entries carry all of it. The 21–30 band being empty (Open Question 2) matters more under this model than it did before.
+14. **Which shop surface ships first?** Mobile is where impulse purchases happen and where the avatar is seen, but web is where Paddle lives and where the sub-$10 rate is unresolved.
 
 ---
 
@@ -690,6 +929,8 @@ Each step gated on data from the previous step. No subscription infrastructure s
 | RM-07 | "Default mode per competition" relies on TD-05 (pool template system) | For WC only, mode gating is enforceable today. Multi-sport mode gating waits for Phase 3c.3. |
 | **RM-08** | **Paddle may reject the account outright.** Its AUP prohibits "fantasy sports leagues", "Sports forecasting/odds making where monetary or material prizes are involved", and "lotteries, auctions, contests, sweepstakes, or games of chance". As Merchant of Record Paddle carries the liability, so it screens harder than a plain processor. `app/pools/[pool_id]/admin/FeesTab.tsx` (and its mobile twin `mobile/components/pool-detail/FeesTab.tsx`) — the existing entry-fee tracking UI — could read as prize-pool facilitation during domain review even though settlement is off-platform. | **Highest-priority unknown; resolve before any build.** Approach Paddle pre-emptively with the Principle-1 framing in writing. Be ready to explain FeesTab as an off-platform record-keeping tool — and point at the schema: platform revenue lives in `pool_purchases`, never in `entry_fee`. Keep Stripe viable as a fallback — the tax-compliance work Paddle would absorb is the cost of that fallback, not a blocker. |
 | **RM-09** | **Paddle prohibits physical goods**, removing Vector 3 merchandise (T-shirt, mug, medal) from the Paddle rail. | Vector 3 is the last thing built (Phase 3c.x), so this is not urgent — but it means the payment stack ends up dual-rail. Either add Stripe for physical goods, or push fulfilment to Printful's own storefront so the sale never lands on our books. Digital trophy + stickers stay on Paddle. |
+| **RM-12** | **Selling club or country kits is selling someone else's trademark.** Club crests, names and kit designs are protected marks; api-football's `crest_url` is licensed for display in a fixture list, not for resale as a cosmetic. A $2.99 Arsenal shirt is an infringement claim and an aggravating factor in the Paddle domain review (**RM-08**). | **Resolved by design, not by risk-acceptance:** kits are sold as **colourways** — stripes, halves, a colour and a trim — with no crest, sponsor or club name anywhere in the product, and users name their own. Club-branded anything stays behind a real licence, which is a commercial project and not on any roadmap here. See *Vector 1 → The kit problem*. |
+| **RM-13** | **Size-only pricing means a nine-month league season and a four-week tournament earn the same $19.** Revenue per admin-year falls for any admin who consolidates into one long league pool instead of four short ones. | Accepted deliberately (Principle 7) — the simplicity is worth more than the yield, and *"one payment, all 38 matchweeks, it cannot expire on you in March"* is the strongest line on the pricing page. ⚠️ **But the revenue projection has not been re-derived for it.** Re-run after one complete league season. |
 | **RM-10** | **A trial that lapses takes something away from people who never bought it.** In a solo app a lapsed trial affects one person; here an admin's lapse could strand fifteen members mid-season. | **Structurally mitigated, not merely managed:** the features-not-capacity rule means a trial never raises the member or entry cap, so a lapse cannot strand anyone — there is nobody in the pool who would not have been allowed in on Free. Residual exposure is Banter and the Form tab going quiet at kick-off, handled by warning the admin **and** the members two days out, with us taking the blame in the member-facing copy. See *Customer journey and experience*. |
 | **RM-11** | **The admin trial may not be expressible in Paddle.** It is variable-length and ends on *a pool's first prediction deadline* — a date we compute per pool, not a fixed day count. Paddle Billing's trial periods are day-count-based on a price. | Verify against Paddle's docs **before** schema design. Most likely shape: the trial is our own state machine in `pool_purchases`, and Paddle is only invoked at the moment of conversion — which also keeps an unpaid trial from ever creating a Paddle subscription object. Do not design the tables until this is confirmed. |
 
@@ -725,6 +966,10 @@ Full regression detail in `memory/project_backlog_monetization.md`.
 - `memory/project_backlog_feedback.md` — Phase 2 survey should test "would you pay" + "would you run a pool at a bar"
 - `memory/project_backlog_data_model.md` — multi-sport foundation gating the 4+ tournament columns in revenue projections
 - `memory/project_backlog_pool_templates.md` — TD-05, gates mode-level pricing enforcement
+- `memory/project_backlog_avatar_cosmetics.md` — **the design for Vector 1.** Phases A–E, reference products, architectural constraints. This plan holds the commercial half and the gate corrections; that document holds the product.
+- `memory/project_backlog_avatars.md` — **Avatars v1**, the ~3–5 day photo-upload prerequisite the whole shop is gated on. Not shipped.
+- `lib/design/tokens.ts` — `modeIdentityColor` is the canonical list of the seven modes. `competitionColor.ts` / `competitionMark.ts` are the colour grammar the kit colourways reuse.
+- `scripts/seed-league-ux-picks.ts` — tops up the UI/UX test pools weekly; the demo pools are these, made public and read-only.
 - `app/pricing/page.tsx` — **live**. Four tiers rendered; tiers without checkout deliberately render "Not yet available" as plain text rather than a buy button.
 - `app/refund-policy/page.tsx` — **live, and load-bearing for the journey.** §3 the 14-day window and the first-lock boundary the trial reuses; §5 Ultra's own terms; §6 end-of-period cancellation; §8 entry fees are not ours to refund.
 - `app/pools/[pool_id]/admin/FeesTab.tsx` — existing manual fee tracking UI (admin's off-platform pot). Mobile twin: `mobile/components/pool-detail/FeesTab.tsx`. Entry point for the admin upgrade flow, but its schema is NOT reused for platform charges.
@@ -738,6 +983,23 @@ Full regression detail in `memory/project_backlog_monetization.md`.
 **Last updated:** August 2026. Owner: Ryan Sousa.
 
 **Recent revisions:**
+- v1.3 (Sep 2026) — **Three changes, all of which the World Cup framing was hiding.**
+  **(1) Priced on size, not on competition** (new Principle 7, new *What you actually buy*): members and
+  entries set the price; length is free, so a 38-matchweek season and a four-week tournament both cost
+  $19. ⚠️ The revenue projection's "× 4 tournaments" multiplier does not survive this — **RM-13**.
+  **(2) The seven real modes** replace the three-mode World Cup table, split by competition shape, with
+  Pick'em at Results depth as the free league mode. Four modes this document used to list — Super Bowl
+  squares, prop predictions, NFL survivor, multi-game squares — **do not exist** and were aspiration
+  written in the present tense.
+  **(3) Vector 1 rewritten as the avatar and cosmetics economy**, connected to
+  `memory/project_backlog_avatar_cosmetics.md` where the design has been scoped all along. Kits are sold
+  as **colourways, never club marks** (**RM-12**), and three mechanics in the existing scoping are cut
+  for failing the gates: a premium currency, limited-edition scarcity, and randomised packs.
+  Also: the trial rule is sharpened from *"features not capacity"* to **"only what can be withdrawn
+  without changing what the pool is"** — which excludes modes, because a sealed Showdown draw and a
+  permanent LMS elimination cannot be un-made. Modes get **live demo pools** instead of a trial. A
+  **return journey** is added for next season, built on the one retention mechanic `CLAUDE.md` blesses
+  by name. Binding rules 10–13 added.
 - v1.2 (Sep 2026) — **Added *Customer journey and experience*** as the governing section, with a new Principle 6. Introduces an **admin-tier trial** built on one rule — *a trial unlocks features, never capacity* — which removes the mid-season stranding risk structurally rather than managing it (**RM-10**), and a trial clock bound to the **first prediction deadline** rather than a rolling seven days, reusing the boundary the refund policy already draws. Seven paywall patterns assessed against the disclosure gate and Decision 8; six adopted, first-person "my free trial" microcopy flagged and narrowed to true labels only. Open Question 7 closed — the published refund policy had already answered it. New: **RM-11** (the trial's shape may not be expressible in Paddle).
 - v1.1 (Aug 2026) — **Payment provider switched from Stripe to Paddle.** Rationale: Paddle is a Merchant of Record and absorbs global VAT / sales-tax registration and remittance, which is the dominant consideration for a Bermuda-based operator selling into the UK, EU and US. Cost of that is 5% + 50¢ vs Stripe's ~2.9% + 30¢ — roughly $12.5K/year at the 50K-user projection. Two constraints surfaced during the switch and are **not yet resolved**: Paddle's AUP prohibits fantasy sports and prize-based sports forecasting (RM-08, now gating Phase 3a.0), and prohibits physical goods, which forces Vector 3 merchandise onto a second rail (RM-09). Also corrected the "web = full margin" caveat, which was only ever true under Stripe-with-our-own-tax-handling.
 - v1.0 (May 2026) — Initial monetization plan. Four admin tiers + three player-side vectors. Sport Pass admin subscription explicitly rejected as poor product fit (event-based product, not continuous). Pool Pro player subscription added as tournament-agnostic continuous-engagement layer.
