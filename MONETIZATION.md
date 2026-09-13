@@ -1,6 +1,6 @@
 # Office Pools — Monetization Plan
 
-**Status:** Design proposed (May 2026); payment provider set to **Paddle** (Aug 2026); customer journey added (Sep 2026). Validated against 2026 World Cup pool data. Pending final survey signal in Phase 2. **No payment infrastructure built yet** — the pricing and refund-policy pages are live, checkout is not.
+**Status:** Design proposed (May 2026); payment provider set to **Paddle** (Aug 2026); customer journey added (Sep 2026). Validated against 2026 World Cup pool data. Pending final survey signal in Phase 2. ⚠️ **The "no payment infrastructure built yet" line this file used to carry is stale.** `lib/paddle/` *(tiers, api, verifySignature, transactionCompleted)*, `app/api/paddle/webhook/route.ts` and `app/pools/[pool_id]/upgrade/` all exist, and **migration 075 enforces the tier caps in the database**. What is *deployed* is narrower: `app/pricing/page.tsx` and `app/refund-policy/page.tsx` are live on sportpool.io; checkout, webhook and upgrade route are not.
 
 > ⚠️ **Open blocker:** Paddle's Acceptable Use Policy explicitly prohibits fantasy sports leagues and sports forecasting with prizes, and prohibits physical goods entirely. Nothing here is buildable until Paddle approves the account in writing. See **RM-08** and **RM-09**.
 
@@ -74,6 +74,15 @@ entry cap — intact and unblunted. **We trial the experience, and we sell the r
 | Pool branding | ✅ unlocked | **Kept, permanently** |
 | **Member cap** | ❌ **Free cap applies throughout** | Unchanged — nobody is stranded |
 | **Entries per user** | ❌ **Free cap applies throughout** | Unchanged |
+
+> **⚠️ What the database already forces.** Migration 075 enforces both caps as triggers keyed on
+> `pools.tier`, through `pool_tier_member_cap()` and `pool_tier_entry_cap()`. **So the trial cannot be
+> modelled as a temporary `tier` change** — setting `tier = 'plus'` for a trial would raise the member
+> cap to 30 and the entry cap to 3 as a side effect, which is precisely the rule above being broken by
+> the implementation. The trial has to be its own state *(a `trial_until`-shaped column)* that the
+> feature checks read and the cap functions never see. The happy consequence is that the trial never
+> touches the riskiest, DB-level enforcement path at all. *(The existing `tier_enforced_from IS NULL`
+> grandfather escape hatch is for pools that predate the caps — the trial must not borrow it.)*
 
 **Nothing a trial produced is ever destroyed.** A scoring config set during the trial is the config
 the season is scored on — we do not reset a live pool's rules, ever (see **R3** in
