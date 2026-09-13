@@ -348,9 +348,17 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
     </p>
     <div class="thesis">
       <p>
-        A colour must mean exactly one thing across the whole feature. Right now gold means five
-        things, green means four, and the same home/draw/away split is drawn three different ways
-        inside a single sheet.
+        A colour must mean exactly one thing across the whole feature. Before this, gold meant five
+        things, green four, and the same home/draw/away split was drawn three different ways inside
+        a single sheet.
+      </p>
+    </div>
+    <div class="thesis" style="border-left-color:var(--green);background:rgba(52,217,114,.07);margin-top:14px">
+      <p style="color:#A8E9C2">
+        ✅ <b>Built and committed 12 Sep 2026</b> — <code>a9d57db</code>, local only.
+        2,145 tests pass; both typechecks match their pre-existing baselines.
+        ⚠ Migration 144 is <b>not applied</b> and nothing is pushed. §08 is what turned up during
+        the build, including two corrections to this document and a latent bug worth reading.
       </p>
     </div>
   </div>
@@ -953,13 +961,23 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
             <b>gains</b> the form and crowd cards it does not currently have.
           </p>
         </div>
-        <div class="note warn">
-          <h4>One real blocker</h4>
+        <div class="note ok">
+          <h4>The World Cup blocker turned out not to exist</h4>
           <p>
-            <code>/api/fixtures/[id]/scout</code> reads <code>league_fixtures</code> and 404s on a
-            World Cup match. The match detail screen serves both. Either add a <code>matches</code>
-            arm to the route, or keep the old tab alive behind the
-            <code>roundNumber === null</code> test the screen already uses everywhere else.
+            This section used to warn that <code>/scout</code> 404s on a World Cup match. It does —
+            but so do <code>/h2h</code> and <code>/players</code>, and
+            <code>useMatchDetail</code> only calls them inside <code>if (leagueMatch)</code>. The
+            Scouting tab was <b>already league-only in practice</b>, so the swap needed no fallback
+            at all.
+          </p>
+        </div>
+        <div class="note warn">
+          <h4>And the tab already had a crowd card</h4>
+          <p>
+            Hidden inside <code>match/PeopleCard.tsx</code> — a second copy of the same bar, with
+            the same blue/silver/gold encoding. So the count of duplicated crowd bars was two, not
+            one. The tab's real gaps were the <b>venue-split form card</b>, the <b>drought</b> and
+            the <b>thin-sample caveat</b>; it gained all three.
           </p>
         </div>
       </div>
@@ -1333,11 +1351,12 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
 <section>
   <div class="sec-head">
     <span class="sec-num">07</span>
-    <h2 class="t-sec">Order of work</h2>
+    <h2 class="t-sec">Order of work — all shipped</h2>
   </div>
   <p class="sec-sub">
-    Cheapest and most visible first. Items 1–4 are presentation only — no migration, no provider
-    call, no new endpoint.
+    Built in this order on 12 Sep 2026. Items 1–5 are presentation only — no migration, no provider
+    call, no new endpoint. Items 6–7 are the lifetime work, which Ryan chose to ship in the same
+    batch. <b>Migration 144 must be applied before the code that names it deploys.</b>
   </p>
 
   <div class="work">
@@ -1409,6 +1428,113 @@ footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);fon
         sentence. No empty cards.</p>
       </div>
       <span class="cost">small</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 8 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">08</span>
+    <h2 class="t-sec">What the build turned up</h2>
+  </div>
+  <p class="sec-sub">
+    Three things this document got wrong, and three findings it did not know about. The first
+    finding is a real bug that has not fired yet.
+  </p>
+
+  <div class="bignum" style="border-color:rgba(245,197,24,.3)">
+    <span class="n" style="color:var(--accent)">2027</span>
+    <div class="b">
+      <p>Club bias would have split Arsenal in two the day the next season is imported.</p>
+      <p>
+        <code>buildClubLeans</code> grouped on <code>club.clubId</code>, and
+        <code>league_clubs</code> is <code>UNIQUE (season_id, external_club_id)</code> — Arsenal gets
+        a <b>fresh</b> <code>club_id</code> every season, because <code>importLeagueSeason</code>
+        inserts a new row per season and never reuses one.
+      </p>
+      <p>
+        So a lifetime “backs Arsenal 9 of 9” would silently become “5 of 5” and “4 of 4”, and
+        neither half would win the <code>mostBacked</code> contest against a club the member only
+        played one season of. Not a missing club — a <b>confidently wrong winner</b>.
+      </p>
+      <p style="color:var(--dimmer)">
+        Latent today: production holds five competitions but only <b>one season year</b>, so no two
+        seasons share a club — which also settles Open Question 1 of the 09-09 design note. Live the
+        day 2027/28 lands, which is the next thing on the roadmap. Fixed by carrying
+        <code>externalClubId</code> on <code>ClubRef</code>, with a test that fails against the old
+        grouping.
+      </p>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:30px">
+    <div class="notes" style="max-width:none;flex-direction:row;gap:34px;flex-wrap:wrap">
+      <div class="note warn" style="flex:1;min-width:290px">
+        <h4>A late joiner was being reported for weeks they could not pick</h4>
+        <p>
+          <code>countAvailableFixtures</code> counted <em>every</em> locked fixture in the season, so
+          somebody who joined at matchweek six was told they had missed all of one to five.
+        </p>
+        <p>
+          Missed picks is the one dossier stat justified on the grounds that it is “a competitive
+          fact — a missed pick has already changed results”, and it is the number an opponent is
+          most likely to repeat out loud. The denominator now starts at the entry’s join date.
+        </p>
+      </div>
+      <div class="note warn" style="flex:1;min-width:290px">
+        <h4>⚠ The conflict rule may be too strict — watch this one</h4>
+        <p>
+          Where two pools hold different picks for one fixture, the fixture is dropped. On the
+          seeded test pools <b>180 of the 310 deduped fixtures</b> come back as disagreements — so
+          lifetime would yield <em>fewer</em> usable picks than the pool alone, and the route
+          correctly falls back to pool scope rather than shipping a worse dossier.
+        </p>
+        <p>
+          Those seeded picks are random, so the ratio says nothing about real members. But if real
+          members do diverge across pools, the better rule is to count the fixture in
+          <code>seen</code> and not in <code>backed</code> — preserving the opportunity while
+          refusing to claim a direction. Worth revisiting on real data.
+        </p>
+      </div>
+      <div class="note ok" style="flex:1;min-width:290px">
+        <h4>The guard test earned its place immediately</h4>
+        <p>
+          It caught <code>StandingCard</code> — a scouting file reaching for green, red and gold
+          directly, which the port had missed entirely. That is exactly the failure the guard exists
+          for: no single file was wrong, and it was only visible across files.
+        </p>
+        <p>
+          It also refused its own first draft, because <code>kit/tone.ts</code> did not match the
+          pattern it was banning. The positive half of a guard is what stops the ban passing for the
+          wrong reason.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="t-card" style="margin:34px 0 14px">Two decisions taken during the build</h3>
+  <div class="row">
+    <div class="notes" style="max-width:none;flex-direction:row;gap:34px;flex-wrap:wrap">
+      <div class="note" style="flex:1;min-width:290px">
+        <h4>No rank in the dossier header</h4>
+        <p>
+          The §05 mockup drew “3rd of 12” into the detail line. Ryan had removed the rank from that
+          header on 10 Sep — “a pool position is not what this one is about” — so the earlier
+          decision was kept. It is also the safe call: in Last Man Standing the stored
+          <code>current_rank</code> is entry-id order, so a rank there would be wrong for a whole
+          mode. <code>StandingCard</code> still shows it, behind its own guard.
+        </p>
+      </div>
+      <div class="note" style="flex:1;min-width:290px">
+        <h4>“No book yet” is derived, not a threshold</h4>
+        <p>
+          The obvious version is <code>picks &lt; 10</code>. That would be a fourth sample floor
+          beside the three the server already owns, and the two would drift. Instead the screen asks
+          whether every card came back empty — so it can never disagree with what the server was
+          willing to say.
+        </p>
+      </div>
     </div>
   </div>
 </section>
