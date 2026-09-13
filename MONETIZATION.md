@@ -1,6 +1,6 @@
 # Office Pools — Monetization Plan
 
-**Status:** Design proposed (May 2026); payment provider set to **Paddle** (Aug 2026). Validated against 2026 World Cup pool data. Pending final survey signal in Phase 2. No payment infrastructure built yet.
+**Status:** Design proposed (May 2026); payment provider set to **Paddle** (Aug 2026); customer journey added (Sep 2026). Validated against 2026 World Cup pool data. Pending final survey signal in Phase 2. **No payment infrastructure built yet** — the pricing and refund-policy pages are live, checkout is not.
 
 > ⚠️ **Open blocker:** Paddle's Acceptable Use Policy explicitly prohibits fantasy sports leagues and sports forecasting with prizes, and prohibits physical goods entirely. Nothing here is buildable until Paddle approves the account in writing. See **RM-08** and **RM-09**.
 
@@ -15,6 +15,314 @@ For ongoing project state, see `memory/project_backlog_monetization.md`. For roa
 3. **Two independent ladders.** The admin tier (what features exist in a pool) and the player tier (how the player experiences whatever exists) layer cleanly. Neither replaces the other.
 4. **Honest pricing-page framing.** Subscriptions and bundles are marketed for the engagement segment they actually serve, not as one-size-fits-all.
 5. **The bar tier is the leverage point.** Consumer admin pricing pays for hosting and Paddle overhead (5% + 50¢ per transaction). Pool Ultra is where the business model lives.
+6. **The buyer is buying for other people.** Every admin purchase in this product is made on behalf of a group that will never see a price, and every venue purchase on behalf of a room. The flow rules that follow from that are not polish — they are *Customer journey and experience* immediately below, and where they conflict with anything later in this document, **they win**.
+
+---
+
+## Customer journey and experience
+
+> **This is the section everything else is subordinate to.** The tier tables below describe what we
+> sell. This describes what it is like to be sold to, and where the two disagree, this section wins.
+
+**The fact that makes this product different from every subscription app the playbooks are written
+about: our buyer is buying on behalf of other people.** An admin paying $19 is not buying a better
+personal experience — they are buying a better week for fourteen colleagues who will never see a
+price. That single asymmetry generates every rule below. It means the wall has to be hit by the
+person who can pay, never by the people who can't. It means a lapse must never take something away
+from a bystander. And it means the emotion we are allowed to use is the one the admin already has —
+*responsibility for the group* — not one we manufacture.
+
+Run against `CLAUDE.md`'s disclosure gate and Decision 8's five, the whole flow has to survive being
+narrated out loud to the fifteen-year-old in the family pool.
+
+### The four journeys
+
+These are four different people with four different asks, and collapsing them into one paywall is the
+most likely way to get this wrong.
+
+| | **Admin** | **Member** | **Pool Pro player** | **Venue** |
+|---|---|---|---|---|
+| **Who** | Created the pool, feels responsible for it | Joined someone else's pool | Plays in 2–5 pools across sports | Bar or club running a tournament promotion |
+| **Buys** | Pool Plus / Max, one-time per season | **Nothing, ever** | Pool Pro subscription | Pool Ultra, $500 per tournament |
+| **The wall they hit** | The 11th member; the entry cap | None — by design | None; it is an appetite, not a wall | None — it starts as a conversation |
+| **Where it is decided** | In the pool, at the wall | — | On a paywall screen | On a call, over weeks |
+| **Trial** | ✅ Free until the first deadline locks | — | ✅ 7 days, reminder on day 5 | ❌ Never — hand-sold, pack is made to order |
+| **The honest question we are asking** | *"Is this pool worth $19 to the group?"* | — | *"Can I try this for free?"* | *"Will this fill the room on a Tuesday?"* |
+
+### Journey 1 — The admin
+
+#### The trial, and the one rule that makes it safe
+
+**A trial unlocks features. It never unlocks capacity.**
+
+That is the whole design, and it is not a detail. Capacity — how many members, how many entries — is
+the only thing whose removal hurts someone other than the buyer. If the trial raises the member cap
+to 30 and then lapses, fifteen real people are stranded, and the published refund policy
+(`app/refund-policy/page.tsx` §3) already says members over the Free limit lose the ability to submit
+new entries. Keeping capacity out of the trial means nobody ever joins a pool under a promise that
+later breaks, and we never have to write that disclosure onto a join screen.
+
+It also keeps the two levers the 2026 WC regression proved actually convert — the member cap and the
+entry cap — intact and unblunted. **We trial the experience, and we sell the room.**
+
+| | On trial | Stays on Free if unpaid |
+|---|---|---|
+| All pool modes, custom scoring | ✅ unlocked | Configuration is **kept, permanently** — locked for further edits |
+| Form tab *(XP, badges, level runway)* | ✅ unlocked | Switches off |
+| Banter | ✅ unlocked | Switches off — history stays readable |
+| How Others Predicted | ✅ unlocked | Switches off |
+| Pool branding | ✅ unlocked | **Kept, permanently** |
+| **Member cap** | ❌ **Free cap applies throughout** | Unchanged — nobody is stranded |
+| **Entries per user** | ❌ **Free cap applies throughout** | Unchanged |
+
+**Nothing a trial produced is ever destroyed.** A scoring config set during the trial is the config
+the season is scored on — we do not reset a live pool's rules, ever (see **R3** in
+`SPORTPOOL_PROGRAMME.md`'s risk register for what that costs). Branding is kept. Banter already
+posted stays readable. What stops is the continuing service, never the record of it.
+
+#### The clock is the sporting calendar, not seven days
+
+The playbooks say *Today → Day 5 → Day 7*. A rolling seven-day clock is wrong here, because day seven
+lands in the middle of somebody's season.
+
+**The trial runs until the pool's first prediction deadline locks.** That boundary is not invented for
+the trial — it is the line the refund policy already draws, where *"the pool is live and the service
+you paid for is being delivered."* Using the same line twice means there is one concept to explain,
+not two, and it means the decision is always made **before it can matter to anyone else**.
+
+| | **Today** | **Two days before kick-off** | **First deadline locks** |
+|---|---|---|---|
+| **What happens** | Everything in Plus is on. Set up scoring, brand the pool, invite your group, get them talking. | We email you, and we tell your members. Nothing has been charged. | Pay $19 and the season runs on Plus. Do nothing and the pool starts on Free — everyone stays, nothing is deleted. |
+
+Pools created a day before kick-off get a one-day trial; pools created in June get a three-month one.
+That is fine. The trial is *"free while nothing is at stake"*, and upgrading later is always available
+and always retroactive.
+
+#### Where we ask
+
+We ask at a wall the admin has actually hit, and nowhere else. The regression named them: **the 11th
+member** (the cap the data says is real) and **the entry cap** (which busted in 2 of 15 pools and did
+genuine upsell work). A person standing at a locked door does not need to be persuaded; they need to
+be told the price and let through.
+
+**We do not ask on a timer, on a streak, on a login count, or on the back of somebody else's success.**
+
+#### What the member sees — the hard rule
+
+> **Members are never recruited to pressure the admin.** No "ask your admin to upgrade" banner, no
+> locked-feature teases in the member UI, no count of what the pool is missing.
+
+This is the obvious growth hack and it is barred. It fails Decision 8's second gate outright: the
+emotion doing the work would be the admin's embarrassment in front of their own colleagues, and
+that is the precise thing *"no bad feelings"* exists to prevent.
+
+The one member-facing message we do send is the opposite of pressure — it is **us taking the blame**,
+in advance, so that when Banter goes quiet at kick-off nobody concludes their admin is cheap:
+
+> *Banter is on trial in this pool until Saturday. If it switches off after that, it is our billing,
+> not anything your admin did.*
+
+That is the vision's *"the platform takes the blame"* mechanic doing exactly the job it was written
+for.
+
+### Journey 2 — The member
+
+**There is no journey. That is the journey.** ~83% of users are non-paying members, and the strategic
+temptation is to find something to sell them inside a pool someone else paid for. The answer for the
+pool itself is no. The member's only path to spending is Pool Pro and cosmetics, which they choose
+on their own account, for their own experience, outside any pool's walls.
+
+### Journey 3 — The Pool Pro player
+
+This is the one journey where the subscription playbook applies literally, because this is the one
+product that is actually a subscription. Seven days, reminder on day five, annual pre-selected.
+
+| | **Today** | **Day 5** | **Day 7** |
+|---|---|---|---|
+| **What happens** | Full Pool Pro across every pool you are in. | We send you a reminder that your trial ends in two days. | Your subscription starts — $39 for the year. Cancel any time before then and you are not charged. |
+
+Two constraints worth writing down now:
+
+- **Annual is the default-selected option**, and the reason is on both sides of the table: the player
+  saves 35%, and Paddle takes 15% of a $4.99 monthly charge twelve times a year versus 6.3% once.
+  This is the rare case where the better deal for us is also the better deal for them, and we should
+  say the saving out loud rather than engineer the default quietly.
+- **On mobile, Apple and Google own the trial mechanics and send their own notices.** Our reminder
+  sits alongside theirs, it does not replace them, and our copy must not imply we control a
+  cancellation that happens in their Settings app.
+
+### Journey 4 — The venue
+
+Ultra has no paywall and should not acquire one. It is $500, hand-sold to the first cohort, and the
+marketing pack is made to order — which is why the refund policy treats it on its own terms (full
+refund more than 30 days out, partial inside 30, reduced by anything already produced). The journey
+is a call, a pilot for one tournament, and a renewal conversation afterwards. **Do not build a
+self-serve Ultra checkout before three venues have renewed.**
+
+### The seven paywall patterns, and how each one fares at the gate
+
+| # | Pattern | Verdict | How it lands here |
+|---|---|---|---|
+| 1 | **"How it works" timeline instead of a feature dump** | ✅ **Adopt** | This *is* the disclosure gate rendered as UI — the tooltip, drawn as three columns. The admin version runs on the sporting calendar, not on days. |
+| 2 | **Proactive reminder before the trial ends** | ✅ **Adopt — strongest of the seven** | Decision 8's symmetry gate made concrete. Treat it as a promise we keep, not a conversion tactic: a trial that ends without warning is the trap, and saying *"we will warn you"* is only worth anything because it is true. |
+| 3 | **"Start" rather than "Subscribe"** | ✅ **Adopt, conditionally** | "Start" is accurate when what follows genuinely starts and the charge is disclosed directly above it. **The condition is structural: "Start" is only permitted on a screen that carries the timeline.** Used without it, it hides the recurrence and fails gate 1. |
+| 4 | **"My free trial" first-person microcopy** | ⚠️ **Flagged — see below** | The stated mechanism is *"a feeling of ownership before the user even taps."* |
+| 5 | **"Start in 2 taps"** | ✅ **Adopt as a tested claim** | This is a factual assertion about our own flow. If it is three taps it is a lie printed on the paywall. **The number must be asserted by a test over the real flow, not written by hand** — and the test breaks the build when the flow grows a step. |
+| 6 | **Concrete visual proof of value** | ✅ **Adopt — cheapest and best fit** | We can go further than the playbook: not a screenshot of *a* leaderboard, but **their pool, their members, their standings**, already on screen behind the wall they just hit. It is not a mockup, it is their data, and it is the most honest possible answer to *"what do I get?"* |
+| 7 | **Safety net instead of sales pitch** | ✅ **Adopt, re-pointed** | For Pool Pro the easy question is *"can I try this free?"* For an admin buying a one-time tier the real safety net is not a trial at all — it is **the 14-day refund, stated on the paywall itself** rather than buried in a footer link. We already offer terms more generous than most; not saying so on the screen where it would do the work is leaving honesty unspent. |
+
+#### On pattern 4 — the one to think about
+
+The argument **for**: "my" is mild, near-universal, and arguably just clearer English on a button the
+user is pressing about their own account.
+
+The argument **against**, which is the one that matches our stated gate: the mechanism the playbook
+itself gives is manufactured possession — a feeling of owning something *before the transaction*.
+Write that in the tooltip (*"we say 'my' so you feel it is already yours"*) and it does not survive
+being said. Decision 8's second gate asks which emotion is doing the work; here it is not
+anticipation about the football, it is a small synthetic attachment we installed.
+
+**Recommendation: use first person where it is a true label, never as a button's persuasive load.**
+*"My pools"*, *"My trial ends 12 Oct"* — fine, and genuinely clearer. *"Start my free trial"* as the
+thing that makes the button convert — decline. The button should convert because the timeline above
+it is honest.
+
+*(No conflict with our email voice rule: SportPool always speaks as "we". "My" would be the user's
+own word on their own control, not ours about ourselves.)*
+
+### Draft copy
+
+Plain, calm, no exclamation marks — matching the pricing and refund pages. Prices and dates are
+illustrative.
+
+**Admin paywall — triggered at the 11th member**
+
+> ### Sam is the 11th person to join
+> Free pools hold 10. Upgrade to Plus and Sam is in, along with the next nineteen.
+>
+> **Your pool, on Plus**
+> *[the pool's real leaderboard, real names, rendered live behind the panel]*
+>
+> **How it works**
+> **Today** — Plus switches on. Sam joins, Banter opens, everyone gets their Form tab.
+> **Thursday** — we email you two days before your first deadline. Nothing is charged yet.
+> **Saturday, 3pm** — your first deadline locks. $19 for the season. One payment, no subscription.
+>
+> `[ Start Plus free until Saturday ]`
+> Two taps. No card needed to start.
+>
+> Changed your mind within 14 days and the pool has not started? Full refund, no questions.
+
+**Admin reminder — two days out**
+
+> **Subject:** Your pool goes live on Saturday
+>
+> Hello Ryan,
+>
+> The Monday Club's first deadline locks on Saturday at 3pm, which is when the Plus trial ends. We
+> said we would tell you before that happened, so here we are — nothing has been charged.
+>
+> **If you upgrade:** $19 for the whole season. Banter, the Form tab and all four modes stay on for
+> your fourteen members.
+>
+> **If you do nothing:** the pool runs on Free. Everyone stays, every prediction and message stays,
+> your scoring setup stays exactly as you built it. Banter and the Form tab switch off.
+>
+> You can upgrade later at any point in the season, and everything switches back on for the whole
+> pool, including the weeks it was off.
+>
+> `[ Upgrade The Monday Club ]`
+
+**Member notice — in-pool, two days out**
+
+> Banter is on trial in this pool until Saturday. If it goes quiet after that, it is our billing —
+> nothing your admin did.
+
+**Lapse notice — to the admin, no blame**
+
+> The Monday Club is running on Free. Nothing was lost: every prediction, message and point is where
+> it was, and your scoring setup is untouched. Banter and the Form tab are off. Upgrading any time
+> this season turns them back on, including for the weeks they were off.
+
+**Pool Pro paywall**
+
+> ### Pool Pro, free for seven days
+> Form curves, head-to-head, accuracy trend — across every pool you are in.
+>
+> **Today** — everything switches on.
+> **Day 5** — we remind you that the trial ends in two days.
+> **Day 7** — $39 for the year. Cancel before then and you are not charged.
+>
+> `[ Start the free trial ]`   ○ $39/year — save 35%   ○ $4.99/month
+
+### After the money moves
+
+1. **Unlock is retroactive and immediate.** A mid-season upgrade turns paid features on for the whole
+   pool *including the weeks it was off* — Banter history, Form, XP, badges. This is already
+   guardrail #2; it belongs here because it is the single most reassuring fact in the flow and it
+   should be said **before** purchase, not discovered after.
+2. **The receipt names Paddle.** Paddle is the merchant of record, so Paddle is the name on the
+   statement. Say so on the checkout screen, not only in the refund policy — an unrecognised name on
+   a card statement is a chargeback waiting to happen.
+3. **Nothing is announced to the pool.** No "Ryan upgraded this pool!" banner. The admin decides
+   whether their spending is other people's business.
+
+### Exit — Decision 8's symmetry gate
+
+> **Exit must be as easy, fast and prominent as entry.** If cancelling takes more steps than
+> subscribing did, the flow is broken regardless of what it does to the numbers.
+
+- **Cancellation is end-of-period.** You keep access to what you paid for, and we do not claw back the
+  unused part. This is no longer an open question — it is **published, live terms** in
+  `app/refund-policy/page.tsx` §6, and the doc's Open Question 7 below is answered by it.
+- **Cancelling is reachable from the same screen that sells.** One control, same place, both
+  directions.
+- **We confirm a cancellation in writing and we do not counter-offer in the confirmation.** A "wait,
+  here's 50% off" interstitial at the exit is exactly the pattern gate 3 exists to stop.
+- **Downgrade is never destructive.** The refund rule is the general rule: the tier switches off, the
+  pool's contents do not.
+
+### Failure states — the journeys nobody designs
+
+| State | What must happen |
+|---|---|
+| **Card declined on renewal** | Retry silently, tell the player plainly on the second failure, never degrade the pool mid-matchweek. A billing problem is not a reason to take Banter off fourteen people that evening. |
+| **Trial ends unpaid** | Pool → Free. Capacity untouched *(the trial never raised it)*. Config and history kept. One calm email, no blame, no scarcity. |
+| **Refund issued mid-season** | Already specified in the refund policy: back to Free, contents intact. The trial-lapse path must behave **identically** — two different downgrade behaviours would be a support burden and an inconsistency members would notice. |
+| **Ultra expires at tournament end** | The house champion ledger is persistent by design and must survive the tier lapsing. A venue that does not renew still keeps its history. |
+| **Admin leaves or deletes their account** | The pool is not theirs to take with them. Interacts with **R22** *(account deletion)* — resolve there, but the journey answer is that a paid pool outlives its purchaser's account. |
+
+### Binding rules
+
+These are the ones to check any future flow against.
+
+1. A trial unlocks **features**, never **capacity**.
+2. Nothing a trial produced is ever destroyed — settings, branding and history are permanent.
+3. The trial clock is the **sporting calendar**, never a rolling day count.
+4. We warn before every charge and before every switch-off, to the admin **and** to the members.
+5. **Members are never used to apply pressure to an admin.**
+6. We ask at a wall the user has actually hit — never on a timer, a streak, or a login count.
+7. Any factual claim on a paywall *("two taps", "14-day refund")* is **verified by a test**, not by a
+   copywriter.
+8. Exit is as prominent as entry, and carries no counter-offer.
+9. The safety net is stated **on** the paywall, not linked from beneath it.
+
+### Open questions this section raises
+
+1. **Does an unbounded pre-season trial cannibalise?** A pool created in June gets a three-month
+   trial. Probably healthy — it is what makes a pre-season pool feel alive — but unmeasured.
+2. **Can an admin trial every season, indefinitely?** Each tournament is a fresh pool and a fresh
+   decision, so the answer is currently yes. Acceptable, or does the second trial need a shorter
+   window?
+3. **Does Pool Max get the same trial as Plus?** Under rule 1 a Max trial gives the landing page, TV
+   leaderboard, broadcast email and exports but not unlimited members — which leaves the export as a
+   take-and-leave hole. Small, but real.
+4. **Broadcast email on trial** — an unpaid admin mailing fourteen people through our infrastructure
+   and our sending reputation. Probably needs to sit outside the trial.
+5. **Does Paddle support this trial shape?** Paddle Billing has trial periods on a price, but a trial
+   that ends on *a pool's first deadline* is a variable-length trial ending on a date we compute.
+   **Verify against Paddle's docs before designing the schema** — this may need to be our own state
+   machine with Paddle charging only at conversion. See **RM-11**.
 
 ---
 
@@ -336,7 +644,7 @@ Each step gated on data from the previous step. No subscription infrastructure s
 | Phase | Build | Why this order |
 |---|---|---|
 | **3a.0** *(gate)* | **Paddle account approval.** Submit the business for Paddle review with the Principle-1 framing in writing *(we sell pool-organizing software; no prize money touches the platform)*. Get the answer before building anything. | Paddle's AUP names fantasy sports and prize-based sports forecasting as prohibited. A rejection here invalidates every row below it. See **RM-08**. |
-| **3a** *(Jul–Aug 2026)* | **Admin tiers** *(Free / Pool Plus / Pool Max)* via Paddle Checkout, web-only. Platform charges land in their own `pool_purchases` table + `pools.tier`; **`entry_fee` is deliberately NOT reused** — it is the members' off-platform pot, and merging our revenue into it weakens the RM-08 argument. | Lowest cost, fastest validation. Doesn't depend on mobile launch. |
+| **3a** *(Jul–Aug 2026)* | **Admin tiers** *(Free / Pool Plus / Pool Max)* via Paddle Checkout, web-only. **The trial and its two-days-out reminder ship in the same phase, not after it** — a paywall without the reminder is the trap the whole journey section exists to avoid, and retrofitting honesty is harder than building it. Platform charges land in their own `pool_purchases` table + `pools.tier`; **`entry_fee` is deliberately NOT reused** — it is the members' off-platform pot, and merging our revenue into it weakens the RM-08 argument. | Lowest cost, fastest validation. Doesn't depend on mobile launch. |
 | **3b.1** *(Aug 2026+)* | **Pool Ultra hand-rolled** for first 1–2 venues. **Cosmetic Marketplace (Vector 1)** via RevenueCat. | Ultra: validates $500 price point with real venues before generalizing. Cosmetics: RevenueCat plumbing arrives with Expo launch anyway. |
 | **3b.2** *(Oct–Dec 2026)* | **Pool Pro subscription (Vector 2)** — Paddle Subscriptions on web *(annual default)*, RevenueCat on mobile. | Only if Vector 1 hits ≥2% paying-player conversion. Validates subscription infra investment. |
 | **3c.x** *(2027+)* | **Pool Ultra self-serve** — venue dashboard, automated marketing pack pipeline, public venue directory. **Merchandise (Vector 3)** via Printful integration — **on a non-Paddle rail** (RM-09). | Self-serve venue depends on multi-sport foundation. Merch is heaviest build — ship after Pool Pro confirms players spend. |
@@ -352,8 +660,11 @@ Each step gated on data from the previous step. No subscription infrastructure s
 4. **Free-tier banter — fully off vs read-only?** Currently designed as fully off. Read-only might preserve discovery / engagement. Open.
 5. **Pool Ultra venue sign-up — self-serve from day one vs hand-rolled cohort?** User confirmed self-serve, but dashboard isn't built. Pragmatic: hand-roll first 1–2, build self-serve in parallel.
 6. **Pool Pro visibility** — is the "Pro" mark visible to other pool members or only to the subscriber? Lean to **visible but subtle** — small badge on profile + leaderboard, no banter announcements.
-7. **Subscription cancellation policy** — pro-rated refunds vs end-of-period only? Industry standard is end-of-period; lean that direction.
+7. ~~**Subscription cancellation policy** — pro-rated refunds vs end-of-period only?~~ ✅ **Settled, and already published.** `app/refund-policy/page.tsx` §6 states end-of-period in live public terms: *"Cancelling takes effect at the end of the period you have already paid for."* This question was open in the plan while the answer was already on the website — **when a policy page ships, the plan has to be told.**
 8. **Dual-rail or Paddle-only?** Vector 3 forces a second processor regardless (RM-09). Question is whether to stand Stripe up early as an approval hedge (RM-08) or stay Paddle-only until merch actually ships. Lean **Paddle-only until 3c.x**, on the condition that 3a.0 approval comes back clean.
+9. **Does Pool Max get the same trial shape as Plus?** Under the features-not-capacity rule a Max trial hands over CSV export, which is take-and-leave. See *Customer journey and experience → Open questions*.
+10. **Broadcast email during a trial** — an unpaid admin mailing their members through our sending reputation. Probably sits outside the trial.
+11. **Can an admin trial every season indefinitely?** Each tournament is a fresh pool and a fresh decision, so today the answer is yes.
 
 ---
 
@@ -370,6 +681,8 @@ Each step gated on data from the previous step. No subscription infrastructure s
 | RM-07 | "Default mode per competition" relies on TD-05 (pool template system) | For WC only, mode gating is enforceable today. Multi-sport mode gating waits for Phase 3c.3. |
 | **RM-08** | **Paddle may reject the account outright.** Its AUP prohibits "fantasy sports leagues", "Sports forecasting/odds making where monetary or material prizes are involved", and "lotteries, auctions, contests, sweepstakes, or games of chance". As Merchant of Record Paddle carries the liability, so it screens harder than a plain processor. `app/pools/[pool_id]/admin/FeesTab.tsx` (and its mobile twin `mobile/components/pool-detail/FeesTab.tsx`) — the existing entry-fee tracking UI — could read as prize-pool facilitation during domain review even though settlement is off-platform. | **Highest-priority unknown; resolve before any build.** Approach Paddle pre-emptively with the Principle-1 framing in writing. Be ready to explain FeesTab as an off-platform record-keeping tool — and point at the schema: platform revenue lives in `pool_purchases`, never in `entry_fee`. Keep Stripe viable as a fallback — the tax-compliance work Paddle would absorb is the cost of that fallback, not a blocker. |
 | **RM-09** | **Paddle prohibits physical goods**, removing Vector 3 merchandise (T-shirt, mug, medal) from the Paddle rail. | Vector 3 is the last thing built (Phase 3c.x), so this is not urgent — but it means the payment stack ends up dual-rail. Either add Stripe for physical goods, or push fulfilment to Printful's own storefront so the sale never lands on our books. Digital trophy + stickers stay on Paddle. |
+| **RM-10** | **A trial that lapses takes something away from people who never bought it.** In a solo app a lapsed trial affects one person; here an admin's lapse could strand fifteen members mid-season. | **Structurally mitigated, not merely managed:** the features-not-capacity rule means a trial never raises the member or entry cap, so a lapse cannot strand anyone — there is nobody in the pool who would not have been allowed in on Free. Residual exposure is Banter and the Form tab going quiet at kick-off, handled by warning the admin **and** the members two days out, with us taking the blame in the member-facing copy. See *Customer journey and experience*. |
+| **RM-11** | **The admin trial may not be expressible in Paddle.** It is variable-length and ends on *a pool's first prediction deadline* — a date we compute per pool, not a fixed day count. Paddle Billing's trial periods are day-count-based on a price. | Verify against Paddle's docs **before** schema design. Most likely shape: the trial is our own state machine in `pool_purchases`, and Paddle is only invoked at the moment of conversion — which also keeps an unpaid trial from ever creating a Paddle subscription object. Do not design the tables until this is confirmed. |
 
 ---
 
@@ -403,6 +716,8 @@ Full regression detail in `memory/project_backlog_monetization.md`.
 - `memory/project_backlog_feedback.md` — Phase 2 survey should test "would you pay" + "would you run a pool at a bar"
 - `memory/project_backlog_data_model.md` — multi-sport foundation gating the 4+ tournament columns in revenue projections
 - `memory/project_backlog_pool_templates.md` — TD-05, gates mode-level pricing enforcement
+- `app/pricing/page.tsx` — **live**. Four tiers rendered; tiers without checkout deliberately render "Not yet available" as plain text rather than a buy button.
+- `app/refund-policy/page.tsx` — **live, and load-bearing for the journey.** §3 the 14-day window and the first-lock boundary the trial reuses; §5 Ultra's own terms; §6 end-of-period cancellation; §8 entry fees are not ours to refund.
 - `app/pools/[pool_id]/admin/FeesTab.tsx` — existing manual fee tracking UI (admin's off-platform pot). Mobile twin: `mobile/components/pool-detail/FeesTab.tsx`. Entry point for the admin upgrade flow, but its schema is NOT reused for platform charges.
 - `lib/integrations/apiFootball/` — sports data integration; variable cost per tournament
 - `.mcp.json` — `paddle-sandbox` / `paddle-live` / `paddle-docs` MCP servers *(gitignored, untracked, local only. The sandbox key is a literal `pdl_sdbx_…` bearer token in the file itself — **not** an env var. `paddle-live` and `paddle-docs` are OAuth and need authorizing before use. Sandbox connection verified against the live API 2026-08-24.)*
@@ -414,5 +729,6 @@ Full regression detail in `memory/project_backlog_monetization.md`.
 **Last updated:** August 2026. Owner: Ryan Sousa.
 
 **Recent revisions:**
+- v1.2 (Sep 2026) — **Added *Customer journey and experience*** as the governing section, with a new Principle 6. Introduces an **admin-tier trial** built on one rule — *a trial unlocks features, never capacity* — which removes the mid-season stranding risk structurally rather than managing it (**RM-10**), and a trial clock bound to the **first prediction deadline** rather than a rolling seven days, reusing the boundary the refund policy already draws. Seven paywall patterns assessed against the disclosure gate and Decision 8; six adopted, first-person "my free trial" microcopy flagged and narrowed to true labels only. Open Question 7 closed — the published refund policy had already answered it. New: **RM-11** (the trial's shape may not be expressible in Paddle).
 - v1.1 (Aug 2026) — **Payment provider switched from Stripe to Paddle.** Rationale: Paddle is a Merchant of Record and absorbs global VAT / sales-tax registration and remittance, which is the dominant consideration for a Bermuda-based operator selling into the UK, EU and US. Cost of that is 5% + 50¢ vs Stripe's ~2.9% + 30¢ — roughly $12.5K/year at the 50K-user projection. Two constraints surfaced during the switch and are **not yet resolved**: Paddle's AUP prohibits fantasy sports and prize-based sports forecasting (RM-08, now gating Phase 3a.0), and prohibits physical goods, which forces Vector 3 merchandise onto a second rail (RM-09). Also corrected the "web = full margin" caveat, which was only ever true under Stripe-with-our-own-tax-handling.
 - v1.0 (May 2026) — Initial monetization plan. Four admin tiers + three player-side vectors. Sport Pass admin subscription explicitly rejected as poor product fit (event-based product, not continuous). Pool Pro player subscription added as tournament-agnostic continuous-engagement layer.
