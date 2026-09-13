@@ -23,7 +23,7 @@ import {
   visibleStatRows,
   visibleStatSections,
 } from '../matchStatRows';
-import { ALL_MATCH_TAB_KEYS, matchTabs } from '../matchTabs';
+import { ALL_MATCH_TAB_KEYS, hasScoutContent, matchTabs } from '../matchTabs';
 import type { LineupPlayer, MatchTeamStats } from '../useMatchDetail';
 
 // ---------------------------------------------------------------- the tab set
@@ -31,23 +31,23 @@ import type { LineupPlayer, MatchTeamStats } from '../useMatchDetail';
 describe('matchTabs', () => {
   it('offers only Facts and Predictions when the match has neither', () => {
     // A World Cup match, or a league fixture the backfill has not reached.
-    expect(matchTabs({ hasLineups: false, hasStats: false, hasPlayerForm: false, hasScouting: false })).toEqual(['facts', 'predictions']);
+    expect(matchTabs({ hasLineups: false, hasStats: false, hasScout: false })).toEqual(['facts', 'predictions']);
   });
 
   it('inserts each tab in the canonical order, not at the end', () => {
     // ⚠ Order is the swipe sequence. Appending would put Stats after
     // Predictions on one match and before it on another.
-    expect(matchTabs({ hasLineups: true, hasStats: false, hasPlayerForm: false, hasScouting: false })).toEqual([
+    expect(matchTabs({ hasLineups: true, hasStats: false, hasScout: false })).toEqual([
       'facts',
       'lineups',
       'predictions',
     ]);
-    expect(matchTabs({ hasLineups: false, hasStats: true, hasPlayerForm: false, hasScouting: false })).toEqual([
+    expect(matchTabs({ hasLineups: false, hasStats: true, hasScout: false })).toEqual([
       'facts',
       'stats',
       'predictions',
     ]);
-    expect(matchTabs({ hasLineups: true, hasStats: true, hasPlayerForm: false, hasScouting: true })).toEqual([
+    expect(matchTabs({ hasLineups: true, hasStats: true, hasScout: true })).toEqual([
       'facts',
       'lineups',
       'stats',
@@ -59,7 +59,7 @@ describe('matchTabs', () => {
   it('always starts with facts, whatever the match has', () => {
     for (const hasLineups of [true, false]) {
       for (const hasStats of [true, false]) {
-        expect(matchTabs({ hasLineups, hasStats, hasPlayerForm: false, hasScouting: false })[0]).toBe('facts');
+        expect(matchTabs({ hasLineups, hasStats, hasScout: false })[0]).toBe('facts');
       }
     }
   });
@@ -67,7 +67,7 @@ describe('matchTabs', () => {
   it('⚠ the scouting tab is gated separately from the other two', () => {
     // The server decides it, off a meeting count, so it can be present when
     // line-ups and stats are absent and vice versa.
-    expect(matchTabs({ hasLineups: false, hasStats: false, hasPlayerForm: false, hasScouting: true })).toEqual([
+    expect(matchTabs({ hasLineups: false, hasStats: false, hasScout: true })).toEqual([
       'facts',
       'scouting',
       'predictions',
@@ -75,7 +75,7 @@ describe('matchTabs', () => {
   });
 
   it('never offers a tab outside the canonical set', () => {
-    const tabs = matchTabs({ hasLineups: true, hasStats: true, hasPlayerForm: false, hasScouting: true });
+    const tabs = matchTabs({ hasLineups: true, hasStats: true, hasScout: true });
     expect(tabs.every((t) => ALL_MATCH_TAB_KEYS.includes(t))).toBe(true);
     expect(tabs).toHaveLength(ALL_MATCH_TAB_KEYS.length);
   });
@@ -450,43 +450,70 @@ describe('⚠⚠ the two front rows must not collide', () => {
   });
 });
 
-describe('the scouting tab appears on either source', () => {
+describe('the scouting tab is gated on one read, not two', () => {
   const base = { hasLineups: false, hasStats: false };
 
-  it('appears on head-to-head alone', () => {
-    expect(
-      matchTabs({ ...base, hasScouting: true, hasPlayerForm: false }),
-    ).toContain('scouting');
+  it('appears when the scout payload has anything', () => {
+    expect(matchTabs({ ...base, hasScout: true })).toContain('scouting');
   });
 
-  it('appears on player form alone', () => {
-    // ⚠⚠ THE CASE THAT WAS BROKEN. Two newly promoted clubs have no history
-    // however late in the season it is, so gating on head-to-head alone meant
-    // that fixture never offered a scout report — even once both squads had a
-    // full autumn of rated minutes behind them.
-    expect(
-      matchTabs({ ...base, hasScouting: false, hasPlayerForm: true }),
-    ).toContain('scouting');
-  });
-
-  it('still refuses to exist on neither', () => {
+  it('still refuses to exist on nothing', () => {
     // ⚠ The rule `MatchTabBar` has carried since it was written: a tab that is
     // always there and never has anything in it teaches people to stop tapping.
+    expect(matchTabs({ ...base, hasScout: false })).not.toContain('scouting');
+  });
+
+  it('appears exactly once', () => {
     expect(
-      matchTabs({ ...base, hasScouting: false, hasPlayerForm: false }),
-    ).not.toContain('scouting');
+      matchTabs({ ...base, hasScout: true }).filter((t) => t === 'scouting'),
+    ).toHaveLength(1);
   });
 
-  it('appears exactly once when both are present', () => {
-    const tabs = matchTabs({ ...base, hasScouting: true, hasPlayerForm: true });
-    expect(tabs.filter((t) => t === 'scouting')).toHaveLength(1);
-  });
-
-  it('keeps its place in the swipe order whichever source produced it', () => {
+  it('keeps its place in the swipe order', () => {
     // The pager indexes into this array, so an off-by-one shows the wrong page
     // rather than throwing — the kind of bug that ships.
-    const viaHistory = matchTabs({ ...base, hasScouting: true, hasPlayerForm: false });
-    const viaForm = matchTabs({ ...base, hasScouting: false, hasPlayerForm: true });
-    expect(viaHistory.indexOf('scouting')).toBe(viaForm.indexOf('scouting'));
+    const tabs = matchTabs({ hasLineups: true, hasStats: true, hasScout: true });
+    expect(tabs).toEqual(['facts', 'lineups', 'stats', 'scouting', 'predictions']);
+  });
+});
+
+describe('hasScoutContent — the degradation, moved into the payload', () => {
+  it('⚠⚠ ANY ONE FIELD IS ENOUGH, which is the case that used to be broken', () => {
+    // Two newly promoted clubs have no history however late in the season, and
+    // nobody has 180 minutes in the second week however long the clubs have
+    // played each other. The four cards go missing for different reasons and the
+    // report renders however many it has.
+    expect(hasScoutContent({ h2h: {} })).toBe(true);
+    expect(hasScoutContent({ form: {} })).toBe(true);
+    expect(hasScoutContent({ people: {} })).toBe(true);
+    expect(hasScoutContent({ crowd: {} })).toBe(true);
+  });
+
+  it('refuses on a payload where every card is absent', () => {
+    expect(hasScoutContent({})).toBe(false);
+    expect(hasScoutContent(null)).toBe(false);
+    expect(hasScoutContent(undefined)).toBe(false);
+  });
+
+  it('⚠⚠ treats an EXPLICIT null as absent, not as present', () => {
+    // `null` means the server tried and failed; the report would draw four
+    // "could not be loaded" cards, which is worse than no tab at all.
+    expect(hasScoutContent({ h2h: null, form: null, people: null, crowd: null })).toBe(
+      false,
+    );
+  });
+
+  it('⚠⚠ treats `undefined` as absent — the old-API case', () => {
+    // A field an older server has never heard of arrives undefined. `!== null`
+    // would count that as present and offer a tab onto nothing.
+    expect(
+      hasScoutContent({ h2h: undefined, form: undefined, people: undefined }),
+    ).toBe(false);
+  });
+
+  it('⚠ a falsy-but-real value still counts — 0 picks is an answer', () => {
+    // `!= null` rather than truthiness. A crowd object is never 0, but the test
+    // pins the operator rather than today's payload shape.
+    expect(hasScoutContent({ crowd: 0 })).toBe(true);
   });
 });

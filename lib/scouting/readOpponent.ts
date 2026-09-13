@@ -65,6 +65,8 @@ type Admin = ReturnType<typeof createAdminClient>
 const MAX_PICKS = 800
 
 type PredictionRow = {
+  /** ⚠ Only selected by the LIFETIME read, which spans many entries. */
+  entry_id?: string
   fixture_id: string
   /** ⚠ NULL IN A RESULTS POOL — migration 064's XOR. See `PickRow`. */
   predicted_home_score: number | null
@@ -76,8 +78,8 @@ type PredictionRow = {
     home_goals: number | null
     away_goals: number | null
     matchweek_id: string
-    home: { club_id: string; name: string; abbreviation: string; crest_url: string | null } | null
-    away: { club_id: string; name: string; abbreviation: string; crest_url: string | null } | null
+    home: { club_id: string; external_club_id: number; name: string; abbreviation: string; crest_url: string | null } | null
+    away: { club_id: string; external_club_id: number; name: string; abbreviation: string; crest_url: string | null } | null
     league_matchweeks: { matchweek_number: number; lock_at: string | null } | null
   } | null
 }
@@ -87,6 +89,7 @@ const toClub = (c: PredictionRow['league_fixtures'] extends null ? never
   c
     ? {
         clubId: c.club_id,
+        externalClubId: c.external_club_id,
         name: c.name,
         abbreviation: c.abbreviation,
         crestUrl: c.crest_url,
@@ -116,8 +119,8 @@ export async function readOpponentPicks(
       predicted_outcome,
       league_fixtures!inner (
         fixture_id, kickoff_at, home_goals, away_goals, matchweek_id,
-        home:league_clubs!league_fixtures_home_club_id_fkey ( club_id, name, abbreviation, crest_url ),
-        away:league_clubs!league_fixtures_away_club_id_fkey ( club_id, name, abbreviation, crest_url ),
+        home:league_clubs!league_fixtures_home_club_id_fkey ( club_id, external_club_id, name, abbreviation, crest_url ),
+        away:league_clubs!league_fixtures_away_club_id_fkey ( club_id, external_club_id, name, abbreviation, crest_url ),
         league_matchweeks!inner ( matchweek_number, lock_at )
       )
     `)
@@ -319,4 +322,282 @@ export async function readCrowdSplit(
     })
   }
   return out
+}
+
+// =============================================================
+// The same picks, across every league pool the member is in
+// =============================================================
+// ## ⚠⚠ WHY THIS EXISTS: THE COLD START IS PER-CLUB, NOT PER-PICK
+//
+// A new pool's dossier feels empty for a month, and the obvious reading — "not
+// enough picks yet" — is wrong. By matchweek three an entry already has ~30
+// picks, which is plenty for a hit rate, a goals-per-prediction and a draw rate.
+//
+// What is thin is the PER-CLUB count. Each club plays exactly once a matchweek,
+// so at matchweek three you have seen Arsenal three times, and the design note's
+// own example — "backs Arsenal 9 of 9" — needs matchweek nine. Club bias is the
+// card lifetime exists for; the rest of the dossier never needed it.
+//
+// ## ⚠⚠ A NAIVE UNION DOUBLE-COUNTS, AND BADLY
+//
+// A member in two Premier League pools picks the SAME FIXTURE TWICE. Measured in
+// production: 766 `league_predictions` rows resolve to 310 distinct
+// `(user, fixture)` pairs — 59.5% of rows would be counted a second time,
+// inflating every denominator about 2.5×. "Backs Arsenal 8 of 8" would become
+// "16 of 16": the same judgement, presented as twice the evidence.
+//
+// So this dedupes on the fixture, and where the two pools DISAGREE it drops the
+// fixture entirely and counts the drop. Averaging them, or preferring one pool,
+// would invent a considered ambivalence the member never had.
+// =============================================================
+
+/**
+ * How many rows a single page may hold.
+ *
+ * ⚠⚠ THIS IS POSTGREST'S OWN CEILING, NOT A CHOICE. An unbounded `.select()`
+ * truncates at 1,000 silently and a larger explicit `.limit()` does not lift a
+ * server-side `db-max-rows`. A lifetime span can exceed that legitimately — five
+ * competitions of ~380 fixtures is ~1,900 available picks in ONE season year —
+ * so this pages with `.range()` rather than asking for more in one breath.
+ */
+const PAGE = 1000
+
+/**
+ * The ceiling across all pages.
+ *
+ * ⚠ A TRIPWIRE, NOT A PAGE SIZE — the same call `MAX_PICKS` makes for one entry.
+ * A dossier built on a truncated history is wrong in a way that renders
+ * perfectly, so hitting this throws rather than returning what it has.
+ */
+const MAX_LIFETIME_PICKS = 8000
+
+/** What a lifetime read found, beside the picks themselves. */
+export type LifetimeSpan = {
+  picks: PickRow[]
+  pools: number
+  /**
+   * How many distinct competitions those pools span.
+   *
+   * ## ⚠⚠ IT DECIDES WHETHER "THE LEAGUE" IS A LIE
+   *
+   * A member can be in a Premier League pool and an 18-club league pool at once,
+   * and their lifetime baseline is then measured across both. The arithmetic
+   * stays right — it is computed over exactly the fixtures in their pick set —
+   * but the SENTENCE has to widen with it, or the card claims the Premier League
+   * averages something it does not. The screen reads this to choose between
+   * "the league averages 2.8" and "your leagues average 2.8".
+   *
+   * ⚠ READ, NOT INFERRED. Counting distinct clubs and dividing by a squad size
+   * would be a guess, and a guess in a sentence that makes a factual claim about
+   * a named league is not worth the round trip it saves.
+   */
+  competitions: number
+  /** Fixtures picked two different ways in two pools, counted in neither. */
+  droppedConflicts: number
+}
+
+/**
+ * Every revealed pick this user has made, in every league pool, deduped.
+ *
+ * ## ⚠⚠ THE SEAL IS THE SAME SEAL AND IT MUST NOT BE DROPPED HERE
+ *
+ * `lock_at <= now`, applied to the MATCHWEEK. It generalises correctly across
+ * competitions — different leagues lock at different times and the join carries
+ * each fixture's own matchweek — but it is a SECURITY BOUNDARY re-implementing
+ * RLS the admin client bypasses, not a display choice. Widening the query from
+ * one entry to one user does not weaken the reason it exists.
+ *
+ * ⚠ RETIRED ENTRIES ARE INCLUDED, DELIBERATELY. A retired entry's revealed picks
+ * are still things this member did, and a history that silently omitted a pool
+ * they left would be a lie by omission. Stated because the repo rule is that
+ * `retired_at` filters must not be widened casually — this is the opposite, a
+ * deliberate NON-widening.
+ *
+ * ⚠ LEAGUE POOLS ONLY. World Cup picks live in `predictions`, a different table
+ * with a different shape; a cross-schema union is not worth building for a
+ * competition that closed in July.
+ */
+export async function readLifetimePicks(
+  admin: Admin,
+  userId: string,
+  now: Date = new Date(),
+): Promise<LifetimeSpan> {
+  // ---- every entry this user owns ----------------------------------------
+  const { data: entryRows, error: entryErr } = await admin
+    .from('pool_entries')
+    .select('entry_id, pool_id')
+    .eq('user_id', userId)
+    .limit(PAGE)
+
+  if (entryErr) throw new Error(`readLifetimePicks/entries: ${entryErr.message}`)
+
+  const entries = (entryRows ?? []) as { entry_id: string; pool_id: string }[]
+  if (entries.length === 0) {
+    return { picks: [], pools: 0, competitions: 0, droppedConflicts: 0 }
+  }
+
+  const entryIds = entries.map((e) => e.entry_id)
+  const poolIds = [...new Set(entries.map((e) => e.pool_id))]
+  const pools = poolIds.length
+
+  // ---- which competitions those pools are in ------------------------------
+  //
+  // ⚠ A PLAIN READ, NOT A POSTGREST EMBED. `pool_entries` reaching `users` by
+  // two paths is what killed this route once already — the embed 400s and the
+  // guard above it reads its own error and 500s the whole screen. A separate
+  // read needs no constraint name to stay correct.
+  //
+  // ⚠ A NULL `league_season_id` IS A WORLD CUP POOL and is simply not counted.
+  // Its picks live in `predictions`, a different table, so it contributes no
+  // rows to this read either.
+  const { data: poolRows, error: poolErr } = await admin
+    .from('pools')
+    .select('pool_id, league_season_id')
+    .in('pool_id', poolIds)
+    .limit(PAGE)
+
+  if (poolErr) throw new Error(`readLifetimePicks/pools: ${poolErr.message}`)
+
+  const competitions = new Set(
+    ((poolRows ?? []) as { league_season_id: string | null }[])
+      .map((r) => r.league_season_id)
+      .filter((id): id is string => !!id),
+  ).size
+
+  // ---- their picks, paged -------------------------------------------------
+  const rows: PredictionRow[] = []
+  for (let from = 0; from < MAX_LIFETIME_PICKS; from += PAGE) {
+    const { data, error } = await admin
+      .from('league_predictions')
+      .select(`
+        entry_id,
+        fixture_id,
+        predicted_home_score,
+        predicted_away_score,
+        predicted_outcome,
+        league_fixtures!inner (
+          fixture_id, kickoff_at, home_goals, away_goals, matchweek_id,
+          home:league_clubs!league_fixtures_home_club_id_fkey ( club_id, external_club_id, name, abbreviation, crest_url ),
+          away:league_clubs!league_fixtures_away_club_id_fkey ( club_id, external_club_id, name, abbreviation, crest_url ),
+          league_matchweeks!inner ( matchweek_number, lock_at )
+        )
+      `)
+      .in('entry_id', entryIds)
+      // ⚠ A STABLE ORDER IS WHAT MAKES PAGING CORRECT. Without it PostgREST may
+      // return rows in a different order per page and a fixture can be skipped
+      // and another repeated — which would look like a real pick pattern.
+      .order('fixture_id', { ascending: true })
+      .range(from, from + PAGE - 1)
+
+    // ⚠ THE ERROR IS READ. `const { data } = await …` hides a 400 and yields an
+    // empty history forever — "this person has never picked anything" is a
+    // plausible sentence about a real member, which is what makes it dangerous.
+    if (error) throw new Error(`readLifetimePicks: ${error.message}`)
+
+    const page = (data ?? []) as unknown as PredictionRow[]
+    rows.push(...page)
+    if (page.length < PAGE) break
+  }
+
+  if (rows.length >= MAX_LIFETIME_PICKS) {
+    throw new Error(
+      `readLifetimePicks: hit the ${MAX_LIFETIME_PICKS}-row ceiling for user ${userId}. ` +
+        'A dossier built on a truncated history is wrong in a way that renders perfectly.',
+    )
+  }
+
+  // ---- the seal, then the dedupe -----------------------------------------
+  const cutoff = now.getTime()
+
+  // ⚠ KEYED ON THE FIXTURE, because the user is already fixed. Two entries of
+  // the same user on one fixture are the SAME JUDGEMENT made twice, not two
+  // observations.
+  const byFixture = new Map<string, PickRow>()
+  const conflicted = new Set<string>()
+
+  for (const r of rows) {
+    const f = r.league_fixtures
+    const mw = f?.league_matchweeks
+    const home = toClub(f?.home ?? null)
+    const away = toClub(f?.away ?? null)
+    if (!f || !mw || !home || !away) continue
+
+    // ⚠⚠ THE SEAL — see the function header. An unlocked matchweek has no
+    // readable picks, and a matchweek with no `lock_at` has no fixtures
+    // (migration 050's own CHECK) so it cannot have picks either.
+    if (mw.lock_at === null || Date.parse(mw.lock_at) > cutoff) continue
+
+    const pick: PickRow = {
+      entry: r.entry_id ?? '',
+      fixtureId: f.fixture_id,
+      matchweek: mw.matchweek_number,
+      kickoffAt: f.kickoff_at,
+      predictedHome: r.predicted_home_score,
+      predictedAway: r.predicted_away_score,
+      predictedOutcome: r.predicted_outcome,
+      actualHome: f.home_goals,
+      actualAway: f.away_goals,
+      homeClub: home,
+      awayClub: away,
+      scoreType: null,
+      points: null,
+    }
+
+    const seen = byFixture.get(f.fixture_id)
+    if (!seen) {
+      byFixture.set(f.fixture_id, pick)
+      continue
+    }
+
+    // ⚠⚠ DISAGREEMENT DROPS THE FIXTURE. Backing Liverpool in one pool and
+    // against them in another is two different judgements, and there is no
+    // honest way to collapse them: keeping one silently prefers a pool, and
+    // counting both reports an ambivalence as if it were two convictions.
+    if (!samePick(seen, pick)) conflicted.add(f.fixture_id)
+  }
+
+  for (const id of conflicted) byFixture.delete(id)
+
+  return {
+    picks: [...byFixture.values()],
+    pools,
+    competitions,
+    droppedConflicts: conflicted.size,
+  }
+}
+
+/**
+ * Are two picks on one fixture the same judgement?
+ *
+ * ⚠ BOTH SHAPES, BECAUSE A POOL ONLY EVER HAS ONE. Migration 064 made
+ * `league_predictions` mutually exclusive per row: a Scores pool files a
+ * scoreline with `predicted_outcome` null, a Results pool files the outcome with
+ * both scores null. So the same member in a Scores pool and a Results pool files
+ * two DIFFERENT-SHAPED rows for one fixture, and neither is wrong.
+ *
+ * ⚠ A SHAPE MISMATCH IS NOT A CONFLICT — it is the same opinion recorded at two
+ * depths. 2–1 and "home win" agree; 2–1 and "away win" do not. Treating the
+ * shape difference as a disagreement would drop nearly every fixture for anybody
+ * who plays both depths, which is the common case.
+ */
+export function samePick(a: PickRow, b: PickRow): boolean {
+  const dir = (p: PickRow): 'home' | 'draw' | 'away' | null => {
+    if (p.predictedOutcome) return p.predictedOutcome as 'home' | 'draw' | 'away'
+    if (p.predictedHome == null || p.predictedAway == null) return null
+    if (p.predictedHome > p.predictedAway) return 'home'
+    if (p.predictedHome < p.predictedAway) return 'away'
+    return 'draw'
+  }
+
+  // Where both filed a scoreline, the scoreline is the judgement.
+  const aHasScore = a.predictedHome != null && a.predictedAway != null
+  const bHasScore = b.predictedHome != null && b.predictedAway != null
+  if (aHasScore && bHasScore) {
+    return a.predictedHome === b.predictedHome && a.predictedAway === b.predictedAway
+  }
+
+  // Otherwise compare at the shallower depth they have in common.
+  const da = dir(a)
+  const db = dir(b)
+  return da != null && db != null && da === db
 }

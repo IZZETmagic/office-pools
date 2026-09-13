@@ -3,14 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchBracketStats,
   fetchFixturePicks,
-  fetchFixturePlayers,
-  fetchHeadToHead,
+  fetchMatchScout,
   fetchMatchScores,
   fetchMatchStats,
   type BracketStatsResponse,
   type FixturePick,
-  type FixturePlayersResponse,
-  type H2HResponse,
+  type MatchScoutResponse,
   type TablePick,
   type MatchScoreEntry,
   type MatchStatsResponse,
@@ -281,8 +279,7 @@ export function useMatchDetail(matchId: string | undefined) {
   const [facts, setFacts] = useState<MatchFacts | null>(null);
   const [leaguePicks, setLeaguePicks] = useState<FixturePick[]>([]);
   const [leagueTablePicks, setLeagueTablePicks] = useState<TablePick[]>([]);
-  const [h2h, setH2h] = useState<H2HResponse | null>(null);
-  const [players, setPlayers] = useState<FixturePlayersResponse | null>(null);
+  const [scout, setScout] = useState<MatchScoutResponse | null>(null);
   const [lineups, setLineups] = useState<MatchLineup[]>([]);
   const [teamStats, setTeamStats] = useState<MatchTeamStats[]>([]);
   const [playerStats, setPlayerStats] = useState<MatchPlayerStat[]>([]);
@@ -347,16 +344,15 @@ export function useMatchDetail(matchId: string | undefined) {
         // points need the server. One call for the whole fixture across every
         // pool — not the per-pool contract fan-out the old boundary feared.
         loadLeaguePicks(appUserId, matchId, setLeaguePicks, setLeagueTablePicks),
-        // ⚠ A ROUTE BECAUSE THE API KEY IS SERVER-SIDE. The phone cannot ask
-        // api-football itself, and the route caches per club PAIRING so the
-        // second viewer of a fixture costs nothing.
-        loadHeadToHead(matchId, setH2h),
-        // ⚠ A SEPARATE CALL FROM THE ONE ABOVE, AND IT COSTS NO PROVIDER QUOTA.
-        // Head-to-head spends an api-football call per club pairing and is
-        // cached a day; this reads rows the fixture sync already stored, and
-        // form changes every weekend. Different costs, different shelf lives,
-        // so they are not one endpoint.
-        loadFixturePlayers(matchId, setPlayers),
+        // ⚠⚠ ONE CALL FOR THE WHOLE SCOUT REPORT, AND IT USED TO BE TWO.
+        // `/h2h` and `/players` were fetched separately here and rendered by a
+        // DIFFERENT set of cards from the ones the binoculars sheet drew, so the
+        // same fixture said different things depending on which door you opened.
+        // `/scout` already returns the pairing, the venue-split form, the people
+        // and the crowd in one payload — it is what the sheet has always used —
+        // so this is one fewer round trip AND three cards the tab never had.
+        // Ryan, 2026-09-12.
+        loadScout(matchId, setScout),
       ]);
       setLoading(false);
       return;
@@ -385,8 +381,11 @@ export function useMatchDetail(matchId: string | undefined) {
       // World Cup picks come from `predictionInfos` below, not this.
       setLeaguePicks([]);
       setLeagueTablePicks([]);
-      setH2h(null);
-      setPlayers(null);
+      // ⚠ CLEARED ON THE WORLD CUP ARM TOO. `/scout` reads `league_fixtures` and
+      // 404s on a World Cup match, so nothing ever fills this here — but a stale
+      // value from a previously opened LEAGUE fixture would otherwise keep the
+      // Scouting tab on screen showing the wrong match's report.
+      setScout(null);
 
       // 2. Resolve user's entries across pools, split by prediction mode.
       // Query through pool_members (the source of truth for "this user belongs
@@ -722,8 +721,7 @@ export function useMatchDetail(matchId: string | undefined) {
     facts,
     leaguePicks,
     leagueTablePicks,
-    h2h,
-    players,
+    scout,
     lineups,
     teamStats,
     playerStats,
@@ -1198,33 +1196,27 @@ async function loadLeaguePicks(
  * there.
  */
 /**
- * Who is actually playing well, from migration 141's player rows.
+ * The whole scout report, in one call.
  *
- * ⚠ A FAILURE IS AN ABSENT CARD, NOT AN ERROR. Same call as `loadHeadToHead`
- * directly above: the Scouting tab is built out of independent cards and one of
- * them being unavailable must cost that card only. Early in a season nobody has
- * cleared the minutes floor and `enough` is false, which is the same outcome.
+ * ⚠ A FAILURE IS AN ABSENT TAB, NOT AN ERROR. `hasScout` is false on null, so
+ * `matchTabs` simply does not offer Scouting — a tab that opens onto an error is
+ * worse than a tab that was never there. The report's own cards each handle
+ * their own absence inside the payload; this only catches the request failing
+ * outright.
+ *
+ * ⚠ IT REPLACED `loadHeadToHead` AND `loadFixturePlayers`. Their separate
+ * existence was justified on different provider costs and shelf lives — true of
+ * the ROUTES, which still differ, and irrelevant to the phone, which wants the
+ * report or nothing. `/scout` does that fan-out server-side.
  */
-async function loadFixturePlayers(
+async function loadScout(
   fixtureId: string,
-  setPlayers: (r: FixturePlayersResponse | null) => void,
+  setScout: (r: MatchScoutResponse | null) => void,
 ) {
   try {
-    setPlayers(await fetchFixturePlayers(fixtureId));
+    setScout(await fetchMatchScout(fixtureId));
   } catch (e) {
-    console.warn('[useMatchDetail] player form unavailable', e);
-    setPlayers(null);
-  }
-}
-
-async function loadHeadToHead(
-  fixtureId: string,
-  setH2h: (r: H2HResponse | null) => void,
-) {
-  try {
-    setH2h(await fetchHeadToHead(fixtureId));
-  } catch (e) {
-    console.warn('[useMatchDetail] head-to-head unavailable', e);
-    setH2h(null);
+    console.warn('[useMatchDetail] scout report unavailable', e);
+    setScout(null);
   }
 }

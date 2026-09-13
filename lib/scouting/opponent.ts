@@ -34,6 +34,27 @@ import { directionOf, type LeagueDirection } from '@/lib/league/ownPicks'
 /** A club, as much of one as a dossier needs. */
 export type ClubRef = {
   clubId: string
+  /**
+   * The provider's club id, which is the SAME NUMBER ACROSS SEASONS.
+   *
+   * ## ⚠⚠ `clubId` IS NOT, AND A LIFETIME DOSSIER BREAKS ON THAT
+   *
+   * `league_clubs` is `UNIQUE (season_id, external_club_id)`, so Arsenal gets a
+   * fresh `club_id` every season — `importLeagueSeason` inserts a new row per
+   * season and never reuses one. Grouping club leans on `clubId` therefore
+   * splits one club into one entry per season: "backs Arsenal 9 of 9" becomes
+   * "5 of 5" and "4 of 4", and neither wins the `mostBacked` contest against a
+   * club the member only played one season of.
+   *
+   * Latent right now — production holds five competitions but only ONE season
+   * year, so no two seasons share a club — and live the day 2027/28 is
+   * imported, which is the next thing on the roadmap.
+   *
+   * ⚠ THIS IS THE HAND-ROLLED JOIN the design note warns about (§2.1a). The
+   * season-independent `clubs` entity is still the right long-term answer; this
+   * is what makes lifetime correct without blocking on it.
+   */
+  externalClubId: number
   name: string
   abbreviation: string
   /**
@@ -221,6 +242,26 @@ export type OpponentDossier = {
    * screenshots one verdict into Banter and the next tap shows another.
    */
   read: string
+  /**
+   * Set when the tendency half was computed over the member's whole league
+   * history rather than just this pool. Absent when it was not.
+   *
+   * ⚠ ITS PRESENCE IS WHAT THE SCREEN LABELS CARDS FROM, so it must not be set
+   * speculatively — a tag reading "All time" over pool-scoped figures is worse
+   * than no tag.
+   */
+  lifetime?: LifetimeScope | null
+}
+
+/** What a lifetime read covered, for the footnote and the caveat. */
+export type LifetimeScope = {
+  /** Deduped picks — see `readLifetimePicks`, which explains why that matters. */
+  picks: number
+  pools: number
+  /** Distinct competitions those pools span. Widens the baseline copy at 2+. */
+  competitions: number
+  droppedConflicts: number
+  thin: boolean
 }
 
 /**
@@ -461,7 +502,7 @@ export function buildClubLeans(picks: PickRow[]): ClubLean[] {
   const byClub = new Map<string, ClubLean & { backedHomeOf: number; backedAwayOf: number }>()
 
   const ensure = (club: ClubRef) => {
-    let l = byClub.get(club.clubId)
+    let l = byClub.get(String(club.externalClubId))
     if (!l) {
       l = {
         club,
@@ -475,7 +516,7 @@ export function buildClubLeans(picks: PickRow[]): ClubLean[] {
         backedHomeOf: 0,
         backedAwayOf: 0,
       }
-      byClub.set(club.clubId, l)
+      byClub.set(String(club.externalClubId), l)
     }
     return l
   }
@@ -727,4 +768,116 @@ function capitalise(s: string): string {
 /** "an Arsenal", "a Chelsea". Crude, and right for every club name we carry. */
 function aOrAn(name: string): string {
   return /^[AEIOU]/i.test(name) ? `an ${name}` : `a ${name}`
+}
+
+// =============================================================
+// Two scopes, one dossier
+// =============================================================
+// ## "How someone picks is a lifetime trait. How they are doing is a pool fact."
+//
+// That sentence assigns every field below a scope without asking the member to
+// set one, and it is defensible in a line: a duel is decided inside a pool, so
+// the competitive numbers stay there; character does not reset when you join a
+// new pool, so the tendencies do not either.
+//
+// ## ⚠⚠ THE MAP IS EXHAUSTIVE ON PURPOSE, AND THAT IS THE SAFETY
+//
+// `buildOpponentDossier` is a pure function over ONE pick set, so composing two
+// scopes means calling it twice and merging. The hazard in any merge like that
+// is a field added to the type later landing silently in whichever half the
+// merge happens to default to — and a stat computed over the wrong set renders
+// perfectly and is simply wrong.
+//
+// `Record<keyof OpponentDossier, Scope>` makes that a BUILD FAILURE: add a field
+// to `OpponentDossier` and this object stops compiling until somebody decides
+// which scope it belongs to. No guard test can do that, and none is needed.
+// =============================================================
+
+type Scope = 'pool' | 'lifetime'
+
+const SCOPE: Record<keyof OpponentDossier, Scope> = {
+  // ---- pool: how they are doing -------------------------------------------
+  /** The entry id itself — a pool concept, and the lifetime read has no single one. */
+  entry: 'pool',
+  /** Deliberately this pool's count. The lifetime total is on `lifetime.picks`. */
+  picks: 'pool',
+  scored: 'pool',
+  /** ⚠ Pool depth changes what a point is worth — migration 064's XOR means a
+   *  Results pool and a Scores pool do not share a points scale, so a lifetime
+   *  average would be arithmetic over two different units. */
+  hitRate: 'pool',
+  exactCount: 'pool',
+  pointsPerFixture: 'pool',
+  /** ⚠ A timeline of THIS season in THIS competition. Interleaving two pools'
+   *  matchweeks produces an order that never happened to anybody. */
+  form: 'pool',
+  /** ⚠ A competitive fact about THIS duel — a missed pick has already changed a
+   *  result here. It is also pool-scoped in its denominator. */
+  reliability: 'pool',
+
+  // ---- lifetime: how they pick --------------------------------------------
+  /** ⚠ THE CARD LIFETIME EXISTS FOR. A club plays once a matchweek, so "backs
+   *  them 9 of 9" takes half a season inside one pool. */
+  mostBacked: 'lifetime',
+  mostOpposed: 'lifetime',
+  blindSpot: 'lifetime',
+  /** ⚠ MUST TRAVEL WITH THE FINGERPRINT. The baseline is measured over the same
+   *  fixtures the picks cover, so taking one from each scope would compare a
+   *  member's whole history against one pool's slice of football. */
+  baseline: 'lifetime',
+  fingerprint: 'lifetime',
+  /** ⚠ Already platform-wide on the crowd side — `readCrowdMajority` takes no
+   *  pool argument — so scoping the member half to one pool would compare two
+   *  different populations. */
+  contrarian: 'lifetime',
+  /** Composed from the fields above, so it follows the majority of them. */
+  read: 'lifetime',
+  /** Set by the merge itself, not taken from either half. */
+  lifetime: 'pool',
+}
+
+/**
+ * Below this many deduped lifetime picks the tendency cards say so.
+ *
+ * ⚠ IT IS ABOUT CLUBS, NOT PICKS. Twenty picks is four sightings of five clubs,
+ * which is a lean nobody should read as a habit. The figure is deliberately
+ * higher than `MIN_RATE_SAMPLE`, which governs a single rate.
+ */
+export const THIN_LIFETIME = 40
+
+/**
+ * Take each field from the scope it belongs to.
+ *
+ * ⚠ IF THE LIFETIME READ FOUND NOTHING, THE POOL DOSSIER IS RETURNED WHOLE. A
+ * member in exactly one pool has a lifetime set identical to their pool set, and
+ * labelling those figures "All time" would be true but useless; more importantly
+ * a FAILED lifetime read must degrade to the pool dossier rather than to empty
+ * cards.
+ */
+export function mergeDossierScopes(
+  pool: OpponentDossier,
+  lifetime: OpponentDossier | null,
+  span: { pools: number; competitions: number; droppedConflicts: number } | null,
+): OpponentDossier {
+  if (!lifetime || !span) return pool
+
+  const out = {} as OpponentDossier
+  for (const key of Object.keys(SCOPE) as (keyof OpponentDossier)[]) {
+    // ⚠ THE CAST IS UNAVOIDABLE and it is safe: both sides are the SAME type, so
+    // every key's value type matches by construction. TypeScript cannot prove a
+    // per-key copy preserves that without a mapped-type dance that obscures what
+    // this loop does.
+    ;(out as Record<string, unknown>)[key] =
+      SCOPE[key] === 'lifetime' ? lifetime[key] : pool[key]
+  }
+
+  out.lifetime = {
+    picks: lifetime.picks,
+    pools: span.pools,
+    competitions: span.competitions,
+    droppedConflicts: span.droppedConflicts,
+    thin: lifetime.picks < THIN_LIFETIME,
+  }
+
+  return out
 }

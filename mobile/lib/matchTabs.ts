@@ -46,33 +46,71 @@ export function matchTabs(opts: {
   hasLineups: boolean;
   hasStats: boolean;
   /**
-   * ⚠ THE SERVER DECIDES THIS ONE. Two clubs need a real history before a
-   * "scout report" is anything but noise — the provider holds three meetings
-   * for some current Premier League pairings — and the threshold lives with the
-   * summariser so the two surfaces cannot disagree about it.
-   */
-  hasScouting: boolean;
-  /**
-   * Whether anybody has played enough minutes to be rated.
+   * Whether `/fixtures/:id/scout` came back with anything to show.
    *
-   * ⚠⚠ THE SCOUTING TAB NOW APPEARS ON *EITHER* SOURCE, AND THAT IS THE POINT.
-   * Head-to-head and player form go missing for opposite reasons: a newly
-   * promoted pairing has no history however late in the season it is, and
-   * nobody has 180 minutes in the second week however long the clubs have
-   * played each other. Gating on the history alone meant a fixture between two
-   * promoted clubs never offered a scout report at all — which is exactly the
-   * "sometimes the historic data won't be there" case the design note is built
-   * around. The tab still refuses to exist on neither.
+   * ## ⚠⚠ IT USED TO BE TWO FLAGS AND THEY GATED TWO DIFFERENT ENDPOINTS
    *
-   * ⚠ ALSO SERVER-DECIDED, for the same reason as above: `/players` returns its
-   * own `enough`, so the floor is not restated here.
+   * `hasScouting` (head-to-head history) and `hasPlayerForm` (migration 141's
+   * ratings) were separate because the two go missing for OPPOSITE reasons: a
+   * newly promoted pairing has no history however late in the season, and nobody
+   * has 180 minutes in the second week however long the clubs have played each
+   * other. The tab appeared on either.
+   *
+   * That reasoning still holds — it just moved inside the payload. `/scout`
+   * returns the pairing, the form, the people and the crowd as four
+   * independently nullable fields, and the caller ORs them. One flag here, the
+   * same degradation, and the two surfaces can no longer disagree about the
+   * floor because there is only one read.
+   *
+   * ⚠ DELIBERATE CONSEQUENCE: THE TAB NOW APPEARS FAR MORE OFTEN. Venue-split
+   * form costs no provider call — it is read straight from `league_fixtures` —
+   * so it is present for essentially every league fixture. That does NOT break
+   * `MatchTabBar`'s rule, because the rule is that a tab must never be EMPTY and
+   * form is real content; it is the degradation the design note asks for
+   * ("layer 2 guarantees it never is"). But it is a visible change rather than a
+   * refactor, and it is deliberate.
    */
-  hasPlayerForm: boolean;
+  hasScout: boolean;
 }): MatchTabKey[] {
   return ALL_MATCH_TAB_KEYS.filter(
     (k) =>
       (k !== 'lineups' || opts.hasLineups) &&
       (k !== 'stats' || opts.hasStats) &&
-      (k !== 'scouting' || opts.hasScouting || opts.hasPlayerForm),
+      (k !== 'scouting' || opts.hasScout),
+  );
+}
+
+/**
+ * Does a scout payload have anything to show?
+ *
+ * ⚠ STRUCTURAL, NOT TYPED AGAINST `MatchScoutResponse`. This module's header
+ * promises it imports nothing that reaches `react-native`, and keeping that
+ * promise literal — rather than relying on `import type` being erased — is what
+ * lets the whole file be unit-tested under the `mobile/**` vitest glob.
+ *
+ * ⚠ ANY ONE FIELD IS ENOUGH, WHICH IS THE DEGRADATION THE DESIGN NOTE ASKS FOR.
+ * The four cards go missing for different reasons — a pairing with no history, a
+ * date with no fixtures played, a squad with no minutes, a fixture under the
+ * crowd's anonymity floor — and the report renders however many it has. The tab
+ * refuses to exist only on none of them.
+ *
+ * ⚠⚠ `!= null`, NEVER `!== null`. A field an older API has never heard of
+ * arrives as `undefined`, and a strict check counts that as present — which
+ * would offer a Scouting tab that opens onto nothing at all.
+ */
+export function hasScoutContent(
+  scout:
+    | {
+        h2h?: unknown;
+        form?: unknown;
+        people?: unknown;
+        crowd?: unknown;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!scout) return false;
+  return (
+    scout.h2h != null || scout.form != null || scout.people != null || scout.crowd != null
   );
 }

@@ -25,9 +25,13 @@ import {
   type PickRow,
 } from '../opponent'
 
-const ARS: ClubRef = { clubId: 'ars', name: 'Arsenal', abbreviation: 'ARS', crestUrl: null }
-const CHE: ClubRef = { clubId: 'che', name: 'Chelsea', abbreviation: 'CHE', crestUrl: 'https://x/che.png' }
-const MUN: ClubRef = { clubId: 'mun', name: 'Manchester United', abbreviation: 'MUN', crestUrl: null }
+// ⚠ `externalClubId` IS THE GROUPING KEY, NOT `clubId` — see `ClubRef`. It is
+// the provider's id and it is stable across seasons, where `clubId` is a fresh
+// uuid per season. These fixtures carry both because `buildClubLeans` groups on
+// the external one and every display path still reads the season one.
+const ARS: ClubRef = { clubId: 'ars', externalClubId: 42, name: 'Arsenal', abbreviation: 'ARS', crestUrl: null }
+const CHE: ClubRef = { clubId: 'che', externalClubId: 49, name: 'Chelsea', abbreviation: 'CHE', crestUrl: 'https://x/che.png' }
+const MUN: ClubRef = { clubId: 'mun', externalClubId: 33, name: 'Manchester United', abbreviation: 'MUN', crestUrl: null }
 
 let seq = 0
 
@@ -589,5 +593,49 @@ describe('a Results pool files an outcome, not a scoreline', () => {
       many(6, { predictedHome: 3, predictedAway: 0, predictedOutcome: 'away' }),
     )
     expect(d.fingerprint.theirHomeWinRate.count).toBe(0)
+  })
+})
+
+describe('⚠⚠ a club is one club across seasons', () => {
+  // `league_clubs` is UNIQUE (season_id, external_club_id), so Arsenal gets a
+  // FRESH `club_id` every season — `importLeagueSeason` inserts a new row per
+  // season and never reuses one. A lifetime dossier spans seasons, so grouping
+  // leans on `clubId` splits one club into one entry per season and neither half
+  // wins `mostBacked`.
+  //
+  // Latent today (production holds one season year) and live the day 2027/28 is
+  // imported, which is the next thing on the roadmap.
+
+  /** The same Arsenal, one season later: same provider id, new row id. */
+  const ARS_NEXT: ClubRef = {
+    clubId: 'ars-2027',
+    externalClubId: 42,
+    name: 'Arsenal',
+    abbreviation: 'ARS',
+    crestUrl: null,
+  }
+
+  it('counts two seasons of one club as one lean, not two', () => {
+    const leans = buildClubLeans([
+      ...many(5, { homeClub: ARS, awayClub: CHE, predictedHome: 2, predictedAway: 1 }),
+      ...many(4, { homeClub: ARS_NEXT, awayClub: CHE, predictedHome: 2, predictedAway: 1 }),
+    ])
+
+    const arsenal = leans.filter((l) => l.club.name === 'Arsenal')
+    expect(arsenal, 'Arsenal must not appear twice').toHaveLength(1)
+    expect(arsenal[0].backed, 'backed across both seasons').toBe(9)
+    expect(arsenal[0].seen).toBe(9)
+  })
+
+  it('⚠ and a split would have lost the mostBacked contest', () => {
+    // The failure this guards is not a missing club — it is a WRONG WINNER. Two
+    // halves of nine each lose to a club backed six times in one season, and the
+    // card confidently names the wrong team.
+    const d = buildOpponentDossier([
+      ...many(5, { homeClub: ARS, awayClub: MUN, predictedHome: 2, predictedAway: 1 }),
+      ...many(4, { homeClub: ARS_NEXT, awayClub: MUN, predictedHome: 2, predictedAway: 1 }),
+      ...many(6, { homeClub: CHE, awayClub: MUN, predictedHome: 3, predictedAway: 0 }),
+    ])
+    expect(d.mostBacked?.club.name).toBe('Arsenal')
   })
 })

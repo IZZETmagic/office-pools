@@ -3,8 +3,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
-import { buildOpponentDossier } from '@/lib/scouting/opponent'
-import { readCrowdMajority, readOpponentPicks } from '@/lib/scouting/readOpponent'
+import { buildOpponentDossier, mergeDossierScopes } from '@/lib/scouting/opponent'
+import {
+  readCrowdMajority,
+  readLifetimePicks,
+  readOpponentPicks,
+} from '@/lib/scouting/readOpponent'
 import { buildDuelRecords } from '@/lib/league/duelRecord'
 import { readPoolDuels } from '@/lib/league/duels'
 
@@ -84,7 +88,7 @@ async function handler(
   // ---- guard 2: the subject is in this pool -------------------------------
   const { data: subject, error: subjErr } = await admin
     .from('pool_entries')
-    .select('entry_id, entry_name, retired_at, user_id')
+    .select('entry_id, entry_name, retired_at, user_id, created_at')
     .eq('entry_id', entry_id)
     .eq('pool_id', pool_id)
     .maybeSingle()
@@ -115,7 +119,7 @@ async function handler(
   // than as "missed none" — the two must not collapse.
   let available: number | undefined
   try {
-    available = await countAvailableFixtures(admin, pool_id)
+    available = await countAvailableFixtures(admin, pool_id, subject.created_at)
   } catch (e) {
     console.error('[dossier] available count unavailable —', (e as Error).message)
     available = undefined
@@ -134,7 +138,62 @@ async function handler(
     crowdMajority = undefined
   }
 
-  const dossier = buildOpponentDossier(picks, { crowdMajority, available })
+  const poolDossier = buildOpponentDossier(picks, { crowdMajority, available })
+
+  /**
+   * The same member's picks across every league pool they are in.
+   *
+   * ## ⚠⚠ ONLY THE TENDENCY CARDS USE IT — see `mergeDossierScopes`
+   *
+   * "How someone picks is a lifetime trait. How they are doing is a pool fact."
+   * Club bias, the fingerprint and the contrarian index widen; the standing,
+   * accuracy, the matchweek strip and missed picks stay in this pool.
+   *
+   * ⚠ BEST-EFFORT, LIKE THE CROWD. A failed lifetime read degrades to the
+   * pool-scoped dossier, which is exactly what shipped before it existed — the
+   * cards then correctly label themselves "This pool". A dossier that 500s
+   * because the wider read failed is worse than one scoped a little narrower
+   * than it could have been.
+   *
+   * ⚠ NO USER, NO LIFETIME. An entry can outlive its user row, and there is
+   * nothing to key a history on.
+   */
+  let lifetimeDossier: ReturnType<typeof buildOpponentDossier> | null = null
+  let lifetimeSpan: { pools: number; competitions: number; droppedConflicts: number } | null =
+    null
+
+  if (subject.user_id) {
+    try {
+      const span = await readLifetimePicks(admin, subject.user_id)
+
+      // ⚠ ONE POOL IS NOT A LIFETIME. A member in a single pool has an identical
+      // pick set, and labelling those figures "All time" would be true and
+      // useless — it invites the reader to think a wider net was cast than was.
+      if (span.pools > 1 && span.picks.length > picks.length) {
+        // ⚠ THE CROWD IS RE-READ OVER THE WIDER FIXTURE SET. The contrarian
+        // index is a lifetime field, and computing it against only this pool's
+        // fixtures would measure a whole history against a slice of football.
+        let wideCrowd
+        try {
+          wideCrowd = await readCrowdMajority(admin, span.picks.map((p) => p.fixtureId))
+        } catch (e) {
+          console.error('[dossier] lifetime crowd unavailable —', (e as Error).message)
+          wideCrowd = undefined
+        }
+
+        lifetimeDossier = buildOpponentDossier(span.picks, { crowdMajority: wideCrowd })
+        lifetimeSpan = {
+          pools: span.pools,
+          competitions: span.competitions,
+          droppedConflicts: span.droppedConflicts,
+        }
+      }
+    } catch (e) {
+      console.error('[dossier] lifetime unavailable —', (e as Error).message)
+    }
+  }
+
+  const dossier = mergeDossierScopes(poolDossier, lifetimeDossier, lifetimeSpan)
 
   /**
    * The pool and the standing behind the report — enough for a header that says
@@ -368,6 +427,23 @@ async function readDossierContext(
 async function countAvailableFixtures(
   admin: ReturnType<typeof createAdminClient>,
   poolId: string,
+  /**
+   * When this entry joined the pool.
+   *
+   * ## ⚠⚠ WITHOUT IT A LATE JOINER IS REPORTED FOR WEEKS THEY COULD NOT PICK
+   *
+   * This counted every locked fixture in the season, so somebody who joined in
+   * matchweek six was told they had missed all of one to five. `reliability` is
+   * justified in the design note precisely because it is "a competitive fact — a
+   * missed pick has already changed results", and for a late joiner it was
+   * simply false. It is also the stat an opponent is most likely to repeat out
+   * loud, which is the worst place for a number that is wrong.
+   *
+   * ⚠ THE TEST IS ON `lock_at`, NOT ON KICKOFF. A member who joined while a
+   * matchweek was still open could pick it, and one who joined after it locked
+   * could not — the lock is the moment the opportunity closed.
+   */
+  joinedAt: string,
 ): Promise<number | undefined> {
   const { data: pool, error: poolErr } = await admin
     .from('pools')
@@ -385,10 +461,13 @@ async function countAvailableFixtures(
     .select('fixture_id, league_matchweeks!inner(lock_at)', { count: 'exact', head: true })
     .eq('season_id', pool.league_season_id)
     .not('league_matchweeks.lock_at', 'is', null)
+    .gte('league_matchweeks.lock_at', joinedAt)
     .lte('league_matchweeks.lock_at', new Date().toISOString())
 
   if (error) throw new Error(error.message)
   return count ?? undefined
 }
 
+
 export const GET = withPerfLogging('/api/pools/[pool_id]/entries/[entry_id]/dossier', handler)
+

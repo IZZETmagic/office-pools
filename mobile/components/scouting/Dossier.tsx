@@ -1,10 +1,22 @@
-import { Image, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
 import type { DossierResponse, OpponentDossier, ScoutClubLean, ScoutRate } from '@/lib/api';
+import { useTheme, withOpacity } from '@/theme';
+
 import { StandingCard } from './StandingCard';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import {
+  Caveat,
+  Comparison,
+  Lean,
+  ScoutCard,
+  ScoutCardBody,
+  ScoutFootnote,
+  ScoutRow,
+  ScoutRows,
+  StatTiles,
+} from './kit';
 
 // =============================================================
 // The opponent dossier — how somebody picks
@@ -13,11 +25,29 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // sits behind any figure here, which is why this is the half of scouting that
 // costs nothing and the half nobody else has.
 //
+// ## ⚠⚠ EVERY CARD STATES WHAT IT IS COUNTED OVER
+//
+// "How someone picks is a lifetime trait. How they are doing is a pool fact."
+// That sentence assigns every card a scope without asking the member to set one:
+//
+//   THIS POOL — standing, accuracy, recent matchweeks, missed picks. A rank only
+//   exists inside a pool; pool depth changes what a point is worth; a matchweek
+//   timeline from two pools interleaved is an order that never happened; and a
+//   missed pick is a competitive fact about THIS duel.
+//
+//   ALL TIME — club bias, tendencies against reality, the contrarian index.
+//   Draw-blindness and an Arsenal problem are traits, not form, and they are the
+//   cards that need most history: a club appears once a matchweek, so "backs
+//   them 9 of 9" takes half a season inside one pool.
+//
+// ⚠ THE TAG IS NOT DECORATION. A dossier that does not say its scope invites the
+// narrowest reading, and for half these cards the narrowest reading is wrong.
+//
 // ## ⚠⚠ A RATE MAY REFUSE TO BE A PERCENTAGE, AND THE SCREEN MUST LET IT
 //
-// `ScoutRate.pct` is null below the server's sample floor and `Pct` renders the
-// fraction instead — "3 of 8", never "38%". A `?? 0` anywhere on that field
-// turns every thin sample into a confident zero, which is exactly the pool-card
+// `ScoutRate.pct` is null below the server's sample floor and the fraction is
+// shown instead — "3 of 8", never "38%". A `?? 0` anywhere on that field turns
+// every thin sample into a confident zero, which is exactly the pool-card
 // failure where a default that is itself a real value can never be detected.
 // There is no `?? 0` in this file and there must not be one.
 //
@@ -29,8 +59,8 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 //
 // ## ⚠ IT REPORTS, IT NEVER ADVISES
 //
-// The same numbers can be laid out as a tip sheet and this product is
-// explicitly not for bettors. Nothing here says what to pick.
+// The same numbers can be laid out as a tip sheet and this product is explicitly
+// not for bettors. Nothing here says what to pick.
 //
 // ## ⚠⚠ EVERY ABSENCE TEST IS `== null`, NEVER `=== null`
 //
@@ -44,14 +74,18 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // this is not a hypothetical even when the route and the screen ship together.
 // =============================================================
 
+/** What a card is counted over. Shown on the card, never inferred by the reader. */
+const POOL = 'This pool';
+const LIFETIME = 'All time';
+
 /**
  * ⚠ NO VERDICT SENTENCE AT THE TOP. Ryan removed it 2026-09-10 — it sat between
  * the sheet's header and the first card and read as a caption on the header
  * rather than as a finding of its own.
  *
  * ⚠ `dossier.read` IS STILL COMPOSED AND STILL SENT, and that is deliberate
- * rather than an oversight: it is the payload of the Banter share card, which
- * is the surface it was written for. Nothing on this screen renders it.
+ * rather than an oversight: it is the payload of the Banter share card, which is
+ * the surface it was written for. Nothing on this screen renders it.
  */
 export function Dossier({
   data,
@@ -66,40 +100,124 @@ export function Dossier({
   return (
     <View style={{ gap: 16 }}>
       {/* ⚠ FIRST, BEFORE ANY TENDENCY. Where somebody sits and how their last
-          few duels went is what you want before how they pick — the rest of
-          this report is detail underneath it. Ryan, 2026-09-10. */}
+          few duels went is what you want before how they pick — the rest of this
+          report is detail underneath it. Ryan, 2026-09-10. */}
       <StandingCard data={data} />
-      <AccuracyCard dossier={dossier} />
-      {dossier.form.length > 0 ? <FormCard form={dossier.form} /> : null}
-      <ClubBiasCard dossier={dossier} isSelf={isSelf} />
-      <FingerprintCard dossier={dossier} isSelf={isSelf} />
-      <TendenciesCard dossier={dossier} />
+
+      {noBook(dossier) ? (
+        <NoBookYet dossier={dossier} isSelf={isSelf} />
+      ) : (
+        <>
+          <AccuracyCard dossier={dossier} />
+          {dossier.form.length > 0 ? <FormCard form={dossier.form} /> : null}
+          <ClubBiasCard dossier={dossier} isSelf={isSelf} />
+          <FingerprintCard dossier={dossier} isSelf={isSelf} />
+          <TendenciesCard dossier={dossier} />
+        </>
+      )}
+
       <Footnote dossier={dossier} />
     </View>
   );
 }
 
-function AccuracyCard({ dossier }: { dossier: OpponentDossier }) {
-  const theme = useTheme();
+/**
+ * Is there a book on this member yet?
+ *
+ * ## ⚠⚠ DERIVED FROM WHAT WOULD ACTUALLY RENDER, NOT FROM A PICK COUNT
+ *
+ * The tempting version is `picks < 10`. It would be a second floor beside the
+ * three the server already owns — `MIN_RATE_SAMPLE`, `MIN_BACKINGS`,
+ * `MIN_BLIND_SPOT_BACKINGS` — and the two would drift: a number that clears the
+ * screen's floor but not the server's gives a full set of empty cards, and one
+ * that clears the server's but not the screen's hides figures that exist.
+ *
+ * So this asks the only question that matters: did every card come back with
+ * nothing? If the server withheld all of it, the honest screen is a sentence.
+ *
+ * ⚠ `hitRate.pct == null` RATHER THAN `hitRate.count === 0`. A member with four
+ * scored picks HAS a hit rate; the server just refuses to write it as a
+ * percentage. That is a thin book, not an absent one — and the card renders
+ * "2 of 4", which is worth showing.
+ */
+function noBook(d: OpponentDossier): boolean {
   return (
-    <Card title="Accuracy">
-      <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
-        <Tile
-          value={dossier.hitRate.pct == null ? `${dossier.hitRate.count}` : `${dossier.hitRate.pct}%`}
-          sub={dossier.hitRate.pct == null ? `of ${dossier.hitRate.of} scored` : 'hit rate'}
-          color={theme.colors.tierWinner}
+    d.mostBacked == null &&
+    d.mostOpposed == null &&
+    d.blindSpot == null &&
+    d.fingerprint.signature == null &&
+    d.contrarian == null &&
+    d.hitRate.pct == null &&
+    d.form.length === 0
+  );
+}
+
+/**
+ * What the report says when there is nothing to report.
+ *
+ * ⚠ NOT AN EMPTY STATE, A FINDING. Facing somebody nobody has a read on is
+ * itself worth knowing in a duel, and it is the true state for every member of
+ * every pool in its first fortnight. Six cards of dashes would read as a broken
+ * screen; this reads as news, which is the same call the pairing card makes
+ * about two clubs who have never met.
+ *
+ * ⚠ AND IT SAYS WHAT IT IS WAITING FOR. "4 picks so far" tells a member the
+ * report will fill in, which a bare "no data" does not.
+ */
+function NoBookYet({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: boolean }) {
+  const total = dossier.lifetime?.picks ?? dossier.picks;
+
+  return (
+    <ScoutCard title={isSelf ? 'No book on you yet' : 'No book on them yet'}>
+      <ScoutCardBody>
+        <Text variant="body" color="slate">
+          {total === 0
+            ? isSelf
+              ? 'None of your picks have been revealed yet. This fills in as each matchweek locks.'
+              : 'None of their picks have been revealed yet. This fills in as each matchweek locks.'
+            : `${total} revealed pick${total === 1 ? '' : 's'} so far — not enough to call a habit. ` +
+              'The report fills in as the season goes.'}
+        </Text>
+      </ScoutCardBody>
+    </ScoutCard>
+  );
+}
+
+function AccuracyCard({ dossier }: { dossier: OpponentDossier }) {
+  return (
+    <ScoutCard title="Accuracy" scope={POOL}>
+      <ScoutCardBody>
+        {/* ⚠⚠ THE TIER COLOURS ARE GONE AND NEITHER TILE WAS A TIER. Hit rate
+            wore `tierWinner` (cyan) and the exact count wore `tierExact` (gold)
+            — the colours the league scoring engine uses for its four score
+            buckets. A hit RATE is an aggregate across all four, not the winner
+            bucket, so the colour asserted a relationship that does not exist.
+
+            The hit rate is the point of this card, so it takes gold as the
+            finding; the other two are neutral. A row where every tile is
+            coloured has no hierarchy at all. */}
+        <StatTiles
+          tiles={[
+            {
+              value:
+                dossier.hitRate.pct == null
+                  ? `${dossier.hitRate.count}`
+                  : `${dossier.hitRate.pct}%`,
+              label: dossier.hitRate.pct == null ? `of ${dossier.hitRate.of} scored` : 'hit rate',
+              tone: 'finding',
+            },
+            { value: `${dossier.exactCount}`, label: 'exact' },
+            {
+              // ⚠ NULL IS A DASH, NOT A ZERO. "0.0 points a fixture" is a
+              // statement about somebody who has been scored and did badly; this
+              // is somebody who has not been scored at all.
+              value: dossier.pointsPerFixture == null ? '—' : `${dossier.pointsPerFixture}`,
+              label: 'pts / fixture',
+            },
+          ]}
         />
-        <Tile value={`${dossier.exactCount}`} sub="exact" color={theme.colors.tierExact} />
-        <Tile
-          // ⚠ NULL IS A DASH, NOT A ZERO. "0.0 points a fixture" is a statement
-          // about somebody who has been scored and did badly; this is somebody
-          // who has not been scored at all.
-          value={dossier.pointsPerFixture == null ? '—' : `${dossier.pointsPerFixture}`}
-          sub="pts / fixture"
-          color={theme.colors.ink}
-        />
-      </View>
-    </Card>
+      </ScoutCardBody>
+    </ScoutCard>
   );
 }
 
@@ -110,6 +228,9 @@ function AccuracyCard({ dossier }: { dossier: OpponentDossier }) {
  * Rounds are played out of numerical order — migration 101 measured gaps of
  * minus 121 days across three real seasons — so re-sorting here on the number
  * would show a member's season in an order it never happened in. Do not sort.
+ *
+ * ⚠ POOL-SCOPED, AND IT HAS TO BE. Interleaving two pools' matchweeks produces a
+ * timeline that never happened to anybody.
  */
 function FormCard({ form }: { form: { matchweek: number; points: number }[] }) {
   const theme = useTheme();
@@ -117,58 +238,89 @@ function FormCard({ form }: { form: { matchweek: number; points: number }[] }) {
   const peak = Math.max(1, ...recent.map((f) => f.points));
 
   return (
-    <Card title="Recent matchweeks">
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 56 }}>
-          {recent.map((f) => (
-            <View key={f.matchweek} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-              <RNText
-                style={{
-                  fontFamily: MONO_BOLD,
-                  fontSize: 10,
-                  color: theme.colors.slate,
-                  fontVariant: ['tabular-nums'],
-                }}
+    <ScoutCard title="Recent matchweeks" scope={POOL}>
+      <ScoutCardBody>
+        <View>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 56 }}>
+            {recent.map((f) => (
+              <View key={f.matchweek} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
+                <RNText
+                  style={{
+                    fontFamily: MONO_BOLD,
+                    fontSize: 10,
+                    color: theme.colors.slate,
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {f.points}
+                </RNText>
+                <View
+                  style={{
+                    width: '100%',
+                    // A floor of 3 so a zero week is a visible flat bar rather
+                    // than a gap that reads as missing data.
+                    height: Math.max(3, (f.points / peak) * 34),
+                    borderRadius: 3,
+                    backgroundColor:
+                      f.points === peak
+                        ? theme.colors.primary
+                        : withOpacity(theme.colors.primary, 0.35),
+                  }}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+            {recent.map((f) => (
+              <Text
+                key={f.matchweek}
+                variant="detail"
+                color="slate"
+                style={{ flex: 1, textAlign: 'center' }}
               >
-                {f.points}
-              </RNText>
-              <View
-                style={{
-                  width: '100%',
-                  // A floor of 3 so a zero week is a visible flat bar rather
-                  // than a gap that reads as missing data.
-                  height: Math.max(3, (f.points / peak) * 34),
-                  borderRadius: 3,
-                  backgroundColor:
-                    f.points === peak ? theme.colors.primary : withOpacity(theme.colors.primary, 0.35),
-                }}
-              />
-            </View>
-          ))}
+                {f.matchweek}
+              </Text>
+            ))}
+          </View>
         </View>
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-          {recent.map((f) => (
-            <Text key={f.matchweek} variant="detail" color="slate" style={{ flex: 1, textAlign: 'center' }}>
-              {f.matchweek}
-            </Text>
-          ))}
-        </View>
-      </View>
-    </Card>
+      </ScoutCardBody>
+    </ScoutCard>
   );
 }
 
+/**
+ * Which clubs they lean on.
+ *
+ * ## ⚠⚠ THE CARD LIFETIME EXISTS FOR
+ *
+ * A club appears exactly once a matchweek, so inside one pool "backs Arsenal 9
+ * of 9" takes until matchweek nine to be sayable — which is why a new pool's
+ * dossier feels empty for a month even though the member already has thirty
+ * picks. Widening this one card to their whole history is what fixes the cold
+ * start, and the caveat below says how thin the sample still is.
+ */
 function ClubBiasCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: boolean }) {
   const { mostBacked, blindSpot, mostOpposed } = dossier;
   if (!mostBacked && !blindSpot && !mostOpposed) return null;
 
+  const lifetime = dossier.lifetime;
+
   return (
-    <Card title="Club bias">
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
+    <ScoutCard title="Club bias" scope={lifetime ? LIFETIME : POOL}>
+      <ScoutCardBody gap={10}>
+        {/* ⚠ THE CAVEAT SITS ABOVE THE NUMBERS. A reader who stops after the
+            first figure should already know the sample is thin. */}
+        {lifetime?.thin ? (
+          <Caveat>
+            {lifetime.picks} pick{lifetime.picks === 1 ? '' : 's'} across all their pools — read
+            it lightly.
+          </Caveat>
+        ) : null}
+
         {mostBacked ? (
           <Lean
-            lean={mostBacked}
             label={isSelf ? 'You back most often' : 'Backs most often'}
+            club={mostBacked.club}
             count={{ value: mostBacked.backed, of: mostBacked.seen }}
             detail={venueSplit(mostBacked)}
           />
@@ -178,9 +330,9 @@ function ClubBiasCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: b
             public and this card is the one that gets screenshotted into it. */}
         {blindSpot ? (
           <Lean
-            lean={blindSpot}
             label="Blind spot"
-            tone="warn"
+            club={blindSpot.club}
+            tone="loss"
             // ⚠ RIGHT-OVER-BACKED, NOT BACKED-OVER-SEEN. The finding on this row
             // is the strike rate, so that is the fraction it shows.
             count={{ value: blindSpot.backedRight, of: blindSpot.backedPlayed }}
@@ -190,14 +342,14 @@ function ClubBiasCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: b
 
         {mostOpposed ? (
           <Lean
-            lean={mostOpposed}
             label={isSelf ? 'You pick against' : 'Picks against'}
+            club={mostOpposed.club}
             count={{ value: mostOpposed.opposed, of: mostOpposed.seen }}
             detail="times they were picked to lose"
           />
         ) : null}
-      </View>
-    </Card>
+      </ScoutCardBody>
+    </ScoutCard>
   );
 }
 
@@ -211,112 +363,6 @@ function fraction(r: ScoutRate): string {
 }
 
 /**
- * One club they lean on.
- *
- * ⚠ THE CREST IS DRAWN THE WAY EVERY OTHER LIST IN THE APP DRAWS ONE — plain RN
- * `Image` with `resizeMode="contain"`, the pattern `leagueTableRow` and the duel
- * card's "Backs most often" row already use. Crests arrive at wildly different
- * aspect ratios; `cover` crops the badge and `stretch` distorts it.
- *
- * ⚠ AND IT IS DECORATIVE. The club's name sits beside it, so an alt text would
- * announce the same thing twice — the same call the duel card makes.
- *
- * ⚠ NO PLACEHOLDER WHEN THERE IS NO CREST. `league_clubs.crest_url` is
- * nullable, and a reserved empty square beside a name reads as an image that
- * failed to load. The name simply moves left.
- */
-function Lean({
-  lean,
-  label,
-  detail,
-  count,
-  tone,
-}: {
-  lean: ScoutClubLean;
-  label: string;
-  detail: string;
-  /**
-   * ⚠⚠ THE COUNT IS PASSED IN, NOT READ OFF `lean.backed`.
-   *
-   * It was `backed of seen` for every row, which is right for "backs most" and
-   * the exact OPPOSITE claim on "picks against" — that row would have reported
-   * how often they BACK a club under a heading saying they oppose it, with a
-   * detail line beneath it giving the real number. One row contradicting
-   * itself, and nothing would have errored.
-   */
-  count: { value: number; of: number };
-  tone?: 'warn';
-}) {
-  const theme = useTheme();
-  const accent = tone === 'warn' ? theme.colors.red : theme.colors.slate;
-
-  return (
-    <View
-      style={{
-        backgroundColor:
-          tone === 'warn' ? withOpacity(theme.colors.red, 0.08) : theme.colors.mist,
-        borderRadius: theme.radii.sm,
-        padding: 12,
-        gap: 8,
-      }}
-    >
-      <Text variant="detail" color="slate" style={{ letterSpacing: 0.8 }}>
-        {label.toUpperCase()}
-      </Text>
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        {lean.club.crestUrl ? (
-          <Image
-            alt=""
-            source={{ uri: lean.club.crestUrl }}
-            style={{ width: 24, height: 24 }}
-            resizeMode="contain"
-          />
-        ) : null}
-
-        <RNText
-          numberOfLines={1}
-          style={{
-            flex: 1,
-            fontFamily: fontFamilies.bold,
-            fontSize: 15,
-            color: theme.colors.ink,
-          }}
-        >
-          {lean.club.name}
-        </RNText>
-
-        {/* ⚠ THE FRACTION, NOT "3×". The duel card's row shows a bare count
-            because it has no room for more; this card's whole argument is that
-            nine of nine is a habit and three of nine is not, and a count with
-            no denominator cannot tell those apart. */}
-        <RNText
-          style={{
-            fontFamily: MONO_BOLD,
-            fontSize: 13,
-            color: accent,
-            fontVariant: ['tabular-nums'],
-          }}
-        >
-          {count.value} of {count.of}
-        </RNText>
-      </View>
-
-      <Text variant="detail" color="slate">
-        {detail}
-      </Text>
-    </View>
-  );
-}
-
-/**
- * Their tendencies against what the league actually did.
- *
- * ⚠ THE SECOND NUMBER IS THE POINT. "Predicts a draw 6% of the time" is a fact
- * about arithmetic; "6%, and 25% of games end level" is a finding. Neither line
- * renders without both halves.
- */
-/**
  * How full a goals bar is at its right-hand end.
  *
  * ⚠ A SCALE HAS TO BE CHOSEN AND STATED, because goals per game are not a
@@ -325,381 +371,178 @@ function Lean({
  * test pools predicts 3.4 — so at 5 the interesting band sits across the middle
  * of the track rather than squashed into its first fifth.
  *
- * ⚠ AND IT IS CLAMPED. `league_predictions` permits 0–20 a side, so somebody
- * who predicts 6–5 every week would otherwise draw a fill wider than its track.
+ * ⚠ AND IT IS CLAMPED. `league_predictions` permits 0–20 a side, so somebody who
+ * predicts 6–5 every week would otherwise draw a fill wider than its track.
  */
 const GOALS_SCALE = 5;
 
+/**
+ * Their tendencies against what the league actually did.
+ *
+ * ⚠ THE SECOND NUMBER IS THE POINT. "Predicts a draw 6% of the time" is a fact
+ * about arithmetic; "6%, and 25% of games end level" is a finding. Neither line
+ * renders without both halves.
+ */
 function FingerprintCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: boolean }) {
   const { fingerprint: f, baseline: b } = dossier;
   const who = isSelf ? 'you predict' : 'they predict';
+  const lifetime = dossier.lifetime;
+
+  // ⚠⚠ "THE LEAGUE" IS A LIE ONCE THE SCOPE IS LIFETIME. A member can be in a
+  // Premier League pool and an 18-club league pool at the same time, and the
+  // baseline is then measured across both. The arithmetic is right — it is
+  // computed over exactly the fixtures in their pick set — but the SENTENCE has
+  // to widen with it, or the card claims the Premier League averages something
+  // it does not.
+  const realm =
+    lifetime && lifetime.competitions > 1 ? 'your leagues' : 'the league';
 
   return (
-    <Card title="Against reality">
-      <View style={{ paddingHorizontal: 16, paddingBottom: 14 }}>
-        <Comparison
-          label="Goals per prediction"
-          theirs={f.goalsPerPrediction}
-          reality={b.goalsPerGame}
-          max={GOALS_SCALE}
-          format={(v) => `${v}`}
-          who={who}
-          realityLabel={(v) => `league averages ${v}`}
-        />
-        <Comparison
-          label="Predicts a draw"
-          theirs={f.theirDrawRate.pct}
-          reality={b.drawRate.pct}
-          max={100}
-          format={(v) => `${v}%`}
-          who={who}
-          realityLabel={(v) => `${v}% of games end level`}
-        />
-        <Comparison
-          label="Predicts a home win"
-          theirs={f.theirHomeWinRate.pct}
-          reality={b.homeWinRate.pct}
-          max={100}
-          format={(v) => `${v}%`}
-          who={who}
-          realityLabel={(v) => `${v}% actually are`}
-        />
-
-        {f.signature ? (
-          <Row
-            label="Signature scoreline"
-            value={f.signature.score}
-            note={
-              f.signature.share.pct == null
-                ? fraction(f.signature.share)
-                : `${f.signature.share.pct}% of picks`
-            }
-            accent
+    <ScoutCard title="Against reality" scope={lifetime ? LIFETIME : POOL}>
+      <ScoutCardBody gap={0}>
+        <View>
+          <Comparison
+            first
+            label="Goals per prediction"
+            theirs={f.goalsPerPrediction}
+            reality={b.goalsPerGame}
+            max={GOALS_SCALE}
+            format={(v) => `${v}`}
+            who={who}
+            realityLabel={(v) => `${realm} average${realm === 'the league' ? 's' : ''} ${v}`}
           />
-        ) : null}
+          <Comparison
+            label="Predicts a draw"
+            theirs={f.theirDrawRate.pct}
+            reality={b.drawRate.pct}
+            max={100}
+            format={(v) => `${v}%`}
+            who={who}
+            realityLabel={(v) => `${v}% of games end level`}
+          />
+          <Comparison
+            label="Predicts a home win"
+            theirs={f.theirHomeWinRate.pct}
+            reality={b.homeWinRate.pct}
+            max={100}
+            format={(v) => `${v}%`}
+            who={who}
+            realityLabel={(v) => `${v}% actually are`}
+          />
 
-        {/* ⚠ A STATED ABSENCE IS A FINDING. Most members have never predicted
-            0–0, and saying so is more interesting than any rate on this card.
+          <ScoutRows>
+            {f.signature ? (
+              <ScoutRow
+                label="Signature scoreline"
+                value={f.signature.score}
+                note={
+                  f.signature.share.pct == null
+                    ? fraction(f.signature.share)
+                    : `${f.signature.share.pct}% of picks`
+                }
+                finding
+              />
+            ) : null}
 
-            ⚠⚠ BUT ONLY WHERE ONE COULD HAVE BEEN ENTERED. A Results pool member
-            taps home/draw/away and never files a scoreline, so "Never" would be
-            reporting them for something the pool never offered. */}
-        {f.hasScorelines && !f.hasPredictedNil ? (
-          <Row label="Has ever predicted 0–0" value="Never" muted />
-        ) : null}
-      </View>
-    </Card>
-  );
-}
+            {/* ⚠ A STATED ABSENCE IS A FINDING. Most members have never predicted
+                0–0, and saying so is more interesting than any rate on this card.
 
-/**
- * One tendency against what the league actually did.
- *
- * ## ⚠ THE TICK IS THE POINT OF THE ROW, NOT THE FILL
- *
- * The bar says how often they do it; the gold mark says how often it happens.
- * The gap between them is the entire finding — "predicts a draw 6%" is a fact
- * about arithmetic, and "6%, and the mark is over at 25%" is something you can
- * act on. Neither half renders without the other.
- *
- * ⚠ BOTH VALUES ARE NUMBERS HERE, NOT PRE-FORMATTED STRINGS. They used to
- * arrive formatted, which is why this card had no bars: a component handed
- * "2.8 a game" cannot place a mark on a track. The formatting moved to the
- * caller's `format`, and the caller also owns the SCALE — percentages run to
- * 100 and goals do not.
- *
- * ⚠ EVERY VALUE IS THE SAME COLOUR, DELIBERATELY. Colouring the number by how
- * far it sits from reality would be the screen telling somebody they are wrong,
- * and under-calling the draw is a habit rather than a mistake. The bar and the
- * mark already show the size of the gap; the colour does not need to score it.
- */
-function Comparison({
-  label,
-  theirs,
-  reality,
-  max,
-  format,
-  who,
-  realityLabel,
-}: {
-  label: string;
-  theirs: number | null;
-  reality: number | null;
-  max: number;
-  format: (v: number) => string;
-  who: string;
-  realityLabel: (v: number) => string;
-}) {
-  const theme = useTheme();
-
-  // ⚠ BOTH HALVES OR NEITHER. One number alone is not the finding this card
-  // exists to make, and half a comparison reads as a claim it is not making.
-  //
-  // ⚠⚠ `== null`, NOT `=== null`. A missing key is `undefined`, which passes a
-  // strict null check and then draws a bar at `undefined / max` — NaN, which
-  // React renders as a width of nothing and a label reading "NaN". See
-  // `StandingCard`, where exactly that shipped.
-  if (theirs == null || reality == null) return null;
-  if (!Number.isFinite(theirs) || !Number.isFinite(reality)) return null;
-
-  const share = (v: number) => Math.max(0, Math.min(1, v / max));
-
-  return (
-    <View
-      style={{
-        paddingVertical: 12,
-        borderTopWidth: 0.5,
-        borderTopColor: withOpacity(theme.colors.mist, 0.6),
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-        <Text variant="body" style={{ flex: 1 }}>
-          {label}
-        </Text>
-        <RNText
-          style={{
-            fontFamily: MONO_BOLD,
-            fontSize: 16,
-            color: theme.colors.primary,
-            fontVariant: ['tabular-nums'],
-          }}
-        >
-          {format(theirs)}
-        </RNText>
-      </View>
-
-      {/* ---- the track ------------------------------------------------ */}
-      <View
-        style={{
-          height: 6,
-          borderRadius: theme.radii.pill,
-          backgroundColor: withOpacity(theme.colors.slate, 0.18),
-          // ⚠ NOT `overflow: hidden`. The mark is TALLER than the track on
-          // purpose — it has to read as a line drawn across the bar rather than
-          // as a segment of it — and clipping would cut it back to 6pt.
-        }}
-      >
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            // ⚠ A PERCENTAGE STRING, NOT A MEASURED WIDTH. The row has no
-            // `onLayout` and needs none; Yoga resolves this against the track,
-            // which is already full-width.
-            width: `${share(theirs) * 100}%`,
-            borderRadius: theme.radii.pill,
-            backgroundColor: theme.colors.primary,
-          }}
-        />
-
-        {/* ⚠ THE MARK SITS ON TOP OF THE FILL, so it stays visible when the two
-            values are close — which is exactly when the row matters most. */}
-        <View
-          style={{
-            position: 'absolute',
-            left: `${share(reality) * 100}%`,
-            top: -4,
-            width: 3,
-            height: 14,
-            marginLeft: -1.5,
-            borderRadius: 1.5,
-            backgroundColor: theme.colors.accent,
-          }}
-        />
-      </View>
-
-      {/* ---- what the two ends mean ----------------------------------- */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginTop: 8,
-        }}
-      >
-        <Text variant="detail" color="slate" numberOfLines={1} style={{ flexShrink: 1 }}>
-          {who} {format(theirs)}
-        </Text>
-        {/* ⚠ THE SAME GOLD AS THE MARK, which is what ties the sentence to the
-            line on the track. Without the colour match it reads as a second,
-            unrelated caption. */}
-        <RNText
-          numberOfLines={1}
-          style={{
-            fontFamily: fontFamilies.bold,
-            fontSize: 11,
-            lineHeight: 15,
-            color: theme.colors.accent,
-            textAlign: 'right',
-            flexShrink: 0,
-          }}
-        >
-          {realityLabel(reality)}
-        </RNText>
-      </View>
-    </View>
-  );
-}
-
-function Row({
-  label,
-  value,
-  note,
-  muted,
-  accent,
-}: {
-  label: string;
-  value: string;
-  note?: string;
-  muted?: boolean;
-  /** The signature scoreline — gold, because it is a finding rather than a total. */
-  accent?: boolean;
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        gap: 8,
-        paddingVertical: 10,
-        borderTopWidth: 0.5,
-        borderTopColor: withOpacity(theme.colors.mist, 0.6),
-      }}
-    >
-      <Text variant="body" style={{ flex: 1 }}>
-        {label}
-      </Text>
-      {/* ⚠ VALUE FIRST, THEN THE SHARE. The scoreline is the answer and the
-          share is its footnote; reading "4 of 20 · 1–2" puts the qualifier
-          before the thing it qualifies. */}
-      <RNText
-        style={{
-          fontFamily: MONO_BOLD,
-          fontSize: 15,
-          color: accent ? theme.colors.accent : muted ? theme.colors.slate : theme.colors.ink,
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {value}
-      </RNText>
-      {note ? (
-        <Text variant="detail" color="slate">
-          {note}
-        </Text>
-      ) : null}
-    </View>
+                ⚠⚠ BUT ONLY WHERE ONE COULD HAVE BEEN ENTERED. A Results pool
+                member taps home/draw/away and never files a scoreline, so
+                "Never" would be reporting them for something the pool never
+                offered. */}
+            {f.hasScorelines && !f.hasPredictedNil ? (
+              <ScoutRow label="Has ever predicted 0–0" value="Never" muted />
+            ) : null}
+          </ScoutRows>
+        </View>
+      </ScoutCardBody>
+    </ScoutCard>
   );
 }
 
 /** The contrarian index and the missed picks — both only where they exist. */
 function TendenciesCard({ dossier }: { dossier: OpponentDossier }) {
-  const theme = useTheme();
   const { contrarian, reliability } = dossier;
   if (!contrarian && !reliability) return null;
 
+  const tiles = [];
+
+  // ⚠ `andRight` IS MEASURED OVER THE TIMES THEY BROKE FROM THE CROWD, not over
+  // every pick. Its own denominator travels with it.
+  if (contrarian) {
+    tiles.push({
+      value:
+        contrarian.against.pct == null
+          ? fraction(contrarian.against)
+          : `${contrarian.against.pct}%`,
+      label: 'against crowd',
+    });
+    // ⚠ THE FINDING OF THIS CARD. Going against the crowd is a habit; going
+    // against it AND BEING RIGHT is the stat that earns respect.
+    tiles.push({
+      value:
+        contrarian.andRight.pct == null
+          ? fraction(contrarian.andRight)
+          : `${contrarian.andRight.pct}%`,
+      label: 'and right',
+      tone: 'finding' as const,
+    });
+  }
+
+  if (reliability) {
+    tiles.push({
+      value: `${reliability.missed}`,
+      label: `missed of ${reliability.available}`,
+      // ⚠ RED ONLY WHERE THERE IS SOMETHING TO BE RED ABOUT. A missed pick has
+      // already changed a result, which is the one thing red is allowed to mean
+      // about a member.
+      tone: reliability.missed > 0 ? ('loss' as const) : undefined,
+    });
+  }
+
+  // ⚠ THE CONTRARIAN HALF IS PLATFORM-WIDE ON BOTH SIDES, so it cannot be
+  // pool-scoped even in principle — `readCrowdMajority` takes no pool argument.
+  // Missed picks are this pool's. The card carries the narrower of the two
+  // rather than claiming a scope for the pair.
   return (
-    <Card title="Tendencies">
-      <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
-        {/* ⚠ `andRight` IS MEASURED OVER THE TIMES THEY BROKE FROM THE CROWD,
-            not over every pick. Its own denominator travels with it. */}
-        {contrarian ? (
-          <>
-            <Tile
-              value={contrarian.against.pct == null ? fraction(contrarian.against) : `${contrarian.against.pct}%`}
-              sub="against crowd"
-              color={theme.colors.amber}
-            />
-            <Tile
-              value={contrarian.andRight.pct == null ? fraction(contrarian.andRight) : `${contrarian.andRight.pct}%`}
-              sub="and right"
-              color={theme.colors.green}
-            />
-          </>
-        ) : null}
-        {reliability ? (
-          <Tile
-            value={`${reliability.missed}`}
-            sub={`missed of ${reliability.available}`}
-            color={reliability.missed > 0 ? theme.colors.red : theme.colors.ink}
-          />
-        ) : null}
-      </View>
-    </Card>
+    <ScoutCard title="Tendencies" scope={reliability ? POOL : undefined}>
+      <ScoutCardBody>
+        <StatTiles tiles={tiles} />
+      </ScoutCardBody>
+    </ScoutCard>
   );
 }
 
 /**
  * The sample, stated.
  *
- * ⚠ SAME CALL AS THE HEAD-TO-HEAD TAB. A dossier over sixty picks and one over
- * nine are different kinds of claim and the difference is invisible unless the
- * card says so. The reveal boundary is stated too, because a member wondering
- * why this week is missing deserves the answer rather than a gap.
+ * ⚠ SAME CALL AS THE HEAD-TO-HEAD CARD. A dossier over sixty picks and one over
+ * nine are different kinds of claim and the difference is invisible unless it
+ * says so. The reveal boundary is stated too, because a member wondering why
+ * this week is missing deserves the answer rather than a gap.
  */
 function Footnote({ dossier }: { dossier: OpponentDossier }) {
-  return (
-    <View style={{ marginHorizontal: 20, gap: 2 }}>
-      <Text variant="detail" color="slate">
-        {dossier.picks} revealed pick{dossier.picks === 1 ? '' : 's'}
-        {dossier.scored > 0 ? ` · ${dossier.scored} scored` : ''}
-      </Text>
-      <Text variant="detail" color="slate">
-        Picks appear here once their matchweek locks. The open week is never shown.
-      </Text>
-    </View>
-  );
-}
+  const lifetime = dossier.lifetime;
 
-function Tile({ value, sub, color }: { value: string; sub: string; color: string }) {
-  const theme = useTheme();
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: theme.colors.mist,
-        borderRadius: theme.radii.sm,
-        paddingVertical: 12,
-        paddingHorizontal: 10,
-        gap: 4,
-      }}
-    >
-      <RNText
-        style={{
-          fontFamily: MONO_BOLD,
-          fontSize: 18,
-          color,
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {value}
-      </RNText>
-      <Text variant="detail" color="slate">
-        {sub}
-      </Text>
-    </View>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        marginHorizontal: 20,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radii.lg,
-        ...theme.shadows.card,
-        overflow: 'hidden',
-      }}
-    >
-      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
-        <Text variant="cardTitle">{title}</Text>
-      </View>
-      {children}
-    </View>
+    <ScoutFootnote
+      lines={[
+        `${dossier.picks} revealed pick${dossier.picks === 1 ? '' : 's'} in this pool` +
+          (dossier.scored > 0 ? ` · ${dossier.scored} scored` : ''),
+        lifetime
+          ? `${lifetime.picks} across ${lifetime.pools} pool${lifetime.pools === 1 ? '' : 's'}` +
+            // ⚠ THE DROPPED FIXTURES ARE DISCLOSED, NOT SWALLOWED. Where the same
+            // member picked one fixture two different ways in two pools, neither
+            // pick is counted — averaging them would invent an ambivalence they
+            // never had. Saying how many were dropped is what keeps the
+            // denominator honest.
+            (lifetime.droppedConflicts > 0
+              ? ` · ${lifetime.droppedConflicts} fixture${lifetime.droppedConflicts === 1 ? '' : 's'} picked two ways and not counted`
+              : '')
+          : null,
+        'Picks appear here once their matchweek locks. The open week is never shown.',
+      ]}
+    />
   );
 }

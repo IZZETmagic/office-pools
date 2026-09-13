@@ -37,8 +37,6 @@ import { LeaguePicksSection } from '@/components/match/LeaguePicksSection';
 import { LeagueTableSliceCard } from '@/components/match/LeagueTableSliceCard';
 import { LineupsTab } from '@/components/match/LineupsTab';
 import { MatchTabBar } from '@/components/match/MatchTabBar';
-import { PeopleCard } from '@/components/match/PeopleCard';
-import { ScoutingTab } from '@/components/match/ScoutingTab';
 import { StatsTab } from '@/components/match/StatsTab';
 import { SubstitutionIcon } from '@/components/match/SubstitutionIcon';
 import { Icon, Text } from '@/components/ui';
@@ -46,8 +44,8 @@ import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import { getCompetitionBand } from '@/lib/design/competitionBand';
 import { displayPlayerName } from '@/lib/playerName';
 import { refereeName } from '@/lib/refereeName';
-import { fixturePalette } from '@/lib/design/clubColors';
-import { matchTabs, type MatchTabKey } from '@/lib/matchTabs';
+import { ScoutReport } from '@/components/scouting/ScoutReport';
+import { hasScoutContent, matchTabs, type MatchTabKey } from '@/lib/matchTabs';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import {
   type BracketPickInfo,
@@ -102,8 +100,7 @@ export default function MatchDetailScreen() {
     facts,
     leaguePicks,
     leagueTablePicks,
-    h2h,
-    players,
+    scout,
     lineups,
     teamStats,
     playerStats,
@@ -129,11 +126,12 @@ export default function MatchDetailScreen() {
       matchTabs({
         hasLineups: lineups.length > 0,
         hasStats: teamStats.length > 0,
-        // ⚠ The SERVER decides both of these — see `matchTabs`.
-        hasScouting: h2h?.enough === true,
-        hasPlayerForm: players?.enough === true,
+        // ⚠ ONE READ, ONE FLAG — see `hasScoutContent`. It used to be two
+        // booleans off two endpoints, which is how the tab and the binoculars
+        // sheet came to show different reports for the same fixture.
+        hasScout: hasScoutContent(scout),
       }),
-    [lineups.length, teamStats.length, h2h?.enough, players?.enough],
+    [lineups.length, teamStats.length, scout],
   );
   const tabIndex = Math.max(0, tabs.indexOf(tab));
 
@@ -288,35 +286,20 @@ export default function MatchDetailScreen() {
         );
       case 'scouting':
         /*
-          ⚠ TWO INDEPENDENT CARDS UNDER ONE TAB, AND EITHER MAY BE ABSENT.
-          Head-to-head needs a history the provider may not hold; player form
-          needs minutes nobody has clocked up in August. They fail separately
-          and are rendered separately, so a fixture with a rich history and no
-          rated players still gets the half that exists.
+          ⚠⚠ THE SAME COMPONENT THE BINOCULARS SHEET RENDERS, and that is the
+          entire point of the change. This tab used to be `ScoutingTab` — a
+          separate implementation off `/h2h` plus `/players` that drew three
+          head-to-head cards and a per-club people card, with NO venue-split
+          form, NO drought line and NO thin-sample caveat. The sheet drew four
+          different cards off `/scout`. Same fixture, two reports, depending on
+          which door you came through. Ryan, 2026-09-12: they should be the exact
+          same. `ScoutingTab.tsx` is gone.
 
-          ⚠ THE TAB ITSELF IS STILL GATED ON `h2h.enough` — see `matchTabs`. A
-          fixture with player form but no history does not currently reach here
-          at all, which is the degradation the design note asks for and this
-          screen does not yet do. Widening that gate means widening it in
-          `matchTabs`, where the set is owned, and not with a branch here.
+          ⚠ `hasScoutContent` GATES THE TAB, so reaching here with a null payload
+          is not possible — but the guard is kept because the tab set is memoised
+          on a previous render's data and a refresh can empty it mid-swipe.
         */
-        return (
-          <View style={{ gap: 16 }}>
-            {h2h ? (
-              <ScoutingTab
-                match={m}
-                summary={h2h.summary}
-                homeName={m.homeTeam?.shortName ?? homeDisplayName(m)}
-                awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
-                palette={fixturePalette(m.homeTeam?.flagUrl, m.awayTeam?.flagUrl, {
-                  home: theme.colors.primary,
-                  away: theme.colors.accent,
-                })}
-              />
-            ) : null}
-            {players?.enough ? <PeopleCard players={players} /> : null}
-          </View>
-        );
+        return scout ? <ScoutReport data={scout} /> : null;
       case 'predictions':
         // ⚠ TWO DIFFERENT SECTIONS, NOT ONE WITH A BRANCH INSIDE. A league pick
         // and a World Cup prediction share no shape: one is a scoreline OR an

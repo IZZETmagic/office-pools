@@ -1953,6 +1953,33 @@ export type OpponentDossier = {
    * and why web and RN cannot drift into two characterisations of one person.
    */
   read: string;
+  /**
+   * Present when the tendency cards were computed over the member's WHOLE league
+   * history rather than just this pool.
+   *
+   * ## ⚠⚠ ITS ABSENCE IS ORDINARY AND MUST BE HANDLED
+   *
+   * `undefined` means the API is older than this bundle — an OTA outruns its
+   * deploy routinely — and the cards then correctly label themselves "This
+   * pool". Read it with `== null`; a strict `!== null` would treat `undefined`
+   * as present and label a pool-scoped figure "All time".
+   *
+   * `picks` is the DEDUPED count. A member in two Premier League pools picks the
+   * same fixture twice, and 59.5% of the league picks in production today are a
+   * repeat `(user, fixture)` pair — counting the rows would inflate every
+   * denominator about 2.5×.
+   */
+  lifetime?: {
+    /** Deduped picks across every league pool. */
+    picks: number;
+    pools: number;
+    /** How many distinct competitions those pools span. Widens the copy at 2+. */
+    competitions: number;
+    /** Fixtures picked two different ways in two pools, so counted in neither. */
+    droppedConflicts: number;
+    /** Still too few to read confidently, even widened. */
+    thin: boolean;
+  } | null;
 };
 
 /**

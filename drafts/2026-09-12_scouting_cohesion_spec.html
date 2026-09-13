@@ -1,0 +1,1425 @@
+<title>Scout Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;900&family=Geist+Mono:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Tokens — mirrored from mobile/theme/colors.ts (dark mode) and
+   the type scale in app/globals.css. Same set the 09-09 mockup
+   used, so the two files read as one series.
+   ⚠ MOCKUP. Duplicates tokens on purpose; never ships.
+   ============================================================ */
+:root{
+  --midnight:#0B0F1A; --snow:#121520; --surface:#1C2030; --mist:#232840;
+  --silver:#2E3448; --slate:#8B97B8; --ink:#E8EAF0;
+  --primary:#5B8AFF; --accent:#F5C518; --green:#34D972; --red:#F87171;
+  --amber:#FBBF24; --exact:#E2B830; --winner:#30B7FF;
+  --r-xs:6px; --r-sm:12px; --r-md:18px; --r-lg:24px; --r-xl:32px; --r-pill:999px;
+  --mono:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Nunito',ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --hair:rgba(255,255,255,.07);
+  --dim:rgba(232,234,240,.62);
+  --dimmer:rgba(232,234,240,.40);
+}
+*{box-sizing:border-box}
+body{background:var(--midnight);color:var(--ink);font-family:var(--sans);font-weight:500;
+  -webkit-font-smoothing:antialiased;padding:0 0 110px;margin:0}
+h1,h2,h3,h4,p,ul,ol,figure{margin:0}
+ul{padding-left:0;list-style:none}
+
+/* type scale — the app's own */
+.t-page{font-weight:900;font-size:34px;line-height:39px;letter-spacing:-.02em;text-wrap:balance}
+.t-sec{font-weight:900;font-size:21px;line-height:25px;text-wrap:balance}
+.t-card{font-weight:700;font-size:16px;line-height:20px}
+.t-body{font-weight:500;font-size:14px;line-height:20px}
+.t-cap{font-weight:700;font-size:11px;line-height:14px;letter-spacing:1.5px;text-transform:uppercase}
+.t-det{font-weight:500;font-size:10px;line-height:13px}
+.num{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.dim{color:var(--slate)}
+
+.wrap{max-width:1380px;margin:0 auto;padding:0 32px}
+
+/* ---- header ---- */
+header.hero{padding:64px 0 34px;border-bottom:1px solid var(--hair);margin-bottom:52px;
+  background:linear-gradient(180deg,#141A2E 0%,var(--midnight) 100%)}
+.eyebrow{color:var(--primary);margin-bottom:13px}
+.lede{font-size:17px;line-height:27px;color:var(--dim);max-width:66ch;margin-top:17px}
+.thesis{margin-top:26px;padding:16px 20px;border-left:3px solid var(--accent);
+  background:rgba(245,197,24,.07);border-radius:0 var(--r-sm) var(--r-sm) 0;max-width:66ch}
+.thesis p{font-size:14.5px;line-height:23px;font-weight:700;color:#F7E6AE}
+
+/* ---- sections ---- */
+section{margin-bottom:74px;scroll-margin-top:20px}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:9px}
+.sec-num{font-family:var(--mono);font-weight:900;font-size:13px;color:var(--primary);
+  background:rgba(91,138,255,.12);padding:5px 10px;border-radius:var(--r-xs)}
+.sec-sub{color:var(--slate);font-size:14px;line-height:22px;max-width:78ch;margin-bottom:30px}
+
+.row{display:flex;gap:38px;align-items:flex-start;flex-wrap:wrap}
+.notes{flex:1;min-width:320px;max-width:540px;padding-top:4px;display:flex;
+  flex-direction:column;gap:22px}
+.note h4{font-weight:900;font-size:13px;letter-spacing:.3px;margin-bottom:6px}
+.note p{font-size:13.5px;line-height:21px;color:var(--dim)}
+.note p + p{margin-top:9px}
+code{font-family:var(--mono);font-size:12px;background:var(--mist);padding:1px 5px;
+  border-radius:4px;color:#B9C4E0}
+.note.warn{border-left:2px solid var(--red);padding-left:14px}
+.note.warn h4{color:var(--red)}
+.note.ok{border-left:2px solid var(--green);padding-left:14px}
+.note.ok h4{color:var(--green)}
+.note.gold{border-left:2px solid var(--accent);padding-left:14px}
+.note.gold h4{color:var(--accent)}
+
+/* ---- the colour audit table ---- */
+.audit{width:100%;border-collapse:collapse;margin-top:6px}
+.audit th{text-align:left;font-weight:700;font-size:10px;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--slate);padding:0 14px 11px 0;
+  border-bottom:1px solid var(--hair);vertical-align:bottom}
+.audit td{padding:15px 14px 15px 0;border-bottom:1px solid rgba(255,255,255,.045);
+  vertical-align:top;font-size:13px;line-height:20px;color:var(--dim)}
+.audit tr:last-child td{border-bottom:0}
+.swatch{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.swatch i{width:13px;height:13px;border-radius:4px;flex-shrink:0;display:block}
+.swatch b{font-weight:800;font-size:13px;color:var(--ink)}
+.swatch em{font-family:var(--mono);font-style:normal;font-size:10px;color:var(--dimmer);
+  display:block;margin-top:1px}
+.jobs{display:flex;flex-direction:column;gap:5px}
+.jobs span{display:block}
+.jobs span::before{content:"·";color:var(--slate);margin-right:7px}
+.verdict{font-weight:800;font-size:12px;white-space:nowrap}
+.v-bad{color:var(--red)}.v-ok{color:var(--green)}.v-mid{color:var(--amber)}
+.count{font-family:var(--mono);font-weight:900;font-size:19px;color:var(--ink);
+  display:block;line-height:1}
+.count small{display:block;font-family:var(--sans);font-weight:500;font-size:10px;
+  color:var(--dimmer);margin-top:4px;letter-spacing:.3px}
+.scroller{overflow-x:auto}
+
+/* ---- the grammar legend ---- */
+.grammar{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:4px}
+.gram{background:var(--surface);border-radius:var(--r-md);padding:19px 20px 20px;
+  border:1px solid var(--hair);display:flex;flex-direction:column;gap:12px}
+.gram-top{display:flex;align-items:center;gap:10px}
+.gram-top i{width:26px;height:26px;border-radius:var(--r-xs);flex-shrink:0}
+.gram-top b{font-weight:900;font-size:14px;display:block}
+.gram-top em{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--dimmer);
+  display:block;margin-top:2px;letter-spacing:.4px}
+.gram p{font-size:12.5px;line-height:19px;color:var(--dim)}
+.gram .only{font-size:11px;line-height:17px;color:var(--dimmer);padding-top:11px;
+  border-top:1px solid var(--hair)}
+.gram .only b{color:var(--ink);font-weight:800}
+
+/* ---- phone frames ---- */
+.phone{width:390px;flex-shrink:0;background:var(--snow);border-radius:var(--r-xl);
+  border:1px solid rgba(255,255,255,.09);overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.phone-label{display:flex;align-items:center;gap:9px;margin-bottom:11px;padding-left:4px}
+.frame-stack{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.grab{width:36px;height:4px;background:rgba(255,255,255,.18);border-radius:var(--r-pill);
+  margin:10px auto 0}
+
+/* sheet header */
+.sh-head{padding:17px 20px 15px;border-bottom:1px solid var(--hair)}
+.sh-teams{display:flex;align-items:center;gap:9px;margin-top:9px}
+.sh-teams b{font-weight:900;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crest{width:22px;height:22px;border-radius:var(--r-pill);display:grid;place-items:center;
+  font-family:var(--mono);font-weight:900;font-size:8px;color:#0B0F1A;flex-shrink:0}
+.sh-v{color:var(--dimmer);font-weight:700;font-size:12px}
+
+/* dossier header — the SAME object as .sh-head, only the slots differ */
+.avatar{width:22px;height:22px;border-radius:var(--r-pill);display:grid;place-items:center;
+  font-family:var(--mono);font-weight:900;font-size:9px;color:#0B0F1A;flex-shrink:0}
+
+/* the scout card — ONE definition, which is the point of the file */
+.card{background:var(--surface);border-radius:var(--r-lg);margin:0 20px;overflow:hidden;
+  box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.card-hd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  padding:14px 16px 10px}
+.card-bd{padding:0 16px 15px;display:flex;flex-direction:column;gap:13px}
+.stack{display:flex;flex-direction:column;gap:15px;padding:14px 0 20px}
+.scope-tag{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--dimmer);background:var(--mist);
+  padding:3px 7px;border-radius:4px;white-space:nowrap}
+
+/* kit: split bar — ONE encoding for every home/draw/away split */
+.sb-lab{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}
+.sb-lab span{font-size:12px;color:var(--dim)}
+.sb{display:flex;height:9px;border-radius:var(--r-pill);overflow:hidden;gap:2px}
+.sb i{display:block;height:100%;border-radius:var(--r-pill)}
+.sb-home{background:var(--primary)}
+.sb-draw{background:var(--silver)}
+.sb-away{background:var(--ink)}
+.key{display:flex;gap:15px;flex-wrap:wrap;margin-top:9px}
+.key div{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim)}
+.key i{width:8px;height:8px;border-radius:var(--r-pill);flex-shrink:0}
+
+/* kit: stat row */
+.srow{display:flex;align-items:baseline;gap:8px;padding:10px 0;
+  border-top:1px solid rgba(255,255,255,.055)}
+.srow:first-child{border-top:0}
+.srow .lb{flex:1;font-size:13px;color:var(--dim)}
+.srow .vl{font-family:var(--mono);font-weight:800;font-size:14px;font-variant-numeric:tabular-nums}
+.srow .nt{font-family:var(--mono);font-weight:500;font-size:9.5px;color:var(--dimmer)}
+.srow.find .vl{color:var(--accent)}
+
+/* kit: form strip */
+.strip{display:flex;gap:4px}
+.strip i{width:20px;height:20px;border-radius:var(--r-xs);display:grid;place-items:center;
+  font-family:var(--mono);font-weight:900;font-size:10px;font-style:normal}
+.f-w{background:rgba(52,217,114,.18);color:var(--green)}
+.f-d{background:rgba(139,151,184,.20);color:#B4BDD4}
+.f-l{background:rgba(248,113,113,.18);color:var(--red)}
+
+/* kit: score chips */
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border-radius:var(--r-xs);padding:7px 9px;text-align:center;min-width:56px;
+  background:rgba(139,151,184,.13)}
+.chip b{font-family:var(--mono);font-weight:800;font-size:12.5px;display:block}
+.chip span{font-size:9px;color:var(--dimmer);display:block;margin-top:2px}
+.chip.w{background:rgba(52,217,114,.13)}.chip.w b{color:var(--green)}
+.chip.l{background:rgba(248,113,113,.13)}.chip.l b{color:var(--red)}
+.chip.d b{color:#B4BDD4}
+
+/* kit: venue split columns */
+.vsplit{display:flex;gap:10px}
+.vcol{flex:1;background:var(--mist);border-radius:var(--r-sm);padding:12px;
+  display:flex;flex-direction:column;gap:8px;min-width:0}
+.vcol .who{display:flex;align-items:center;gap:7px}
+.vcol .who b{font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.vcol .end{font-size:9.5px;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--dimmer);font-weight:700}
+.vcol .gf{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap}
+.vcol .gf b{font-family:var(--mono);font-weight:800;font-size:15px}
+.vcol .gf span{font-size:10px;color:var(--dimmer)}
+
+/* kit: the finding — gold, one per card, never more */
+.find{background:rgba(245,197,24,.10);border:1px solid rgba(245,197,24,.26);
+  border-radius:var(--r-sm);padding:13px 14px;display:flex;flex-direction:column;gap:6px}
+.find p{font-size:13.5px;line-height:20px;font-weight:700;color:#F7E6AE}
+.find span{font-size:9.5px;letter-spacing:.9px;text-transform:uppercase;font-weight:700;
+  color:rgba(245,197,24,.58)}
+
+/* kit: the caveat — amber, and only ever this */
+.caveat{background:rgba(251,191,36,.10);border-radius:var(--r-sm);padding:9px 12px}
+.caveat p{font-size:11.5px;line-height:16px;color:var(--amber)}
+
+/* kit: footnote — slate, never red */
+.foot{padding:0 20px;display:flex;flex-direction:column;gap:3px}
+.foot p{font-size:10px;line-height:14px;color:var(--dimmer)}
+
+/* kit: people row */
+.prow{display:flex;align-items:center;gap:11px;padding:9px 0;
+  border-top:1px solid rgba(255,255,255,.055)}
+.prow:first-of-type{border-top:0}
+.pface{width:32px;height:32px;border-radius:var(--r-pill);flex-shrink:0;display:grid;
+  place-items:center;font-family:var(--mono);font-weight:800;font-size:10px;color:#0B0F1A}
+.pname{flex:1;min-width:0}
+.pname b{display:block;font-size:13.5px;font-weight:700}
+.pname span{display:block;font-size:10px;color:var(--dimmer);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prate{font-family:var(--mono);font-weight:800;font-size:14px;padding:3px 8px;
+  border-radius:var(--r-xs);background:var(--mist);color:var(--ink);
+  font-variant-numeric:tabular-nums}
+.prate.top{background:rgba(245,197,24,.15);color:var(--accent)}
+
+/* kit: comparison track */
+.cmp{padding:12px 0;border-top:1px solid rgba(255,255,255,.055)}
+.cmp:first-child{border-top:0}
+.cmp-top{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+.cmp-top .lb{flex:1;font-size:13px;color:var(--dim)}
+.cmp-top .vl{font-family:var(--mono);font-weight:800;font-size:16px;color:var(--primary)}
+.track{height:6px;border-radius:var(--r-pill);background:rgba(139,151,184,.18);position:relative}
+.track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-pill);
+  background:var(--primary)}
+.track .mark{position:absolute;top:-4px;width:3px;height:14px;margin-left:-1.5px;
+  border-radius:1.5px;background:var(--accent)}
+.cmp-foot{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:8px}
+.cmp-foot .them{font-size:10px;color:var(--dimmer)}
+.cmp-foot .real{font-size:10.5px;font-weight:800;color:var(--accent);text-align:right}
+
+/* kit: stat tiles */
+.tiles{display:flex;gap:9px}
+.tile{flex:1;background:var(--mist);border-radius:var(--r-sm);padding:12px 10px;
+  display:flex;flex-direction:column;gap:4px;min-width:0}
+.tile b{font-family:var(--mono);font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
+.tile span{font-size:10px;color:var(--dimmer);line-height:13px}
+.tile.hero b{color:var(--accent)}
+
+/* kit: lean block */
+.lean{background:var(--mist);border-radius:var(--r-sm);padding:12px;
+  display:flex;flex-direction:column;gap:8px}
+.lean .lbl{font-size:9.5px;letter-spacing:1.1px;text-transform:uppercase;font-weight:700;
+  color:var(--dimmer)}
+.lean .mid{display:flex;align-items:center;gap:10px}
+.lean .mid b{flex:1;font-weight:700;font-size:14.5px;min-width:0;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.lean .mid .fr{font-family:var(--mono);font-weight:800;font-size:13px;color:var(--slate);
+  font-variant-numeric:tabular-nums}
+.lean .det{font-size:10.5px;color:var(--dimmer);line-height:15px}
+.lean.spot{background:rgba(248,113,113,.08)}
+.lean.spot .mid .fr{color:var(--red)}
+
+/* bars (matchweek) */
+.mwbars{display:flex;align-items:flex-end;gap:6px;height:56px}
+.mwbars div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+  justify-content:flex-end;height:100%}
+.mwbars em{font-family:var(--mono);font-style:normal;font-weight:700;font-size:10px;
+  color:var(--dimmer)}
+.mwbars i{width:100%;border-radius:3px;background:rgba(91,138,255,.35);display:block}
+.mwbars i.peak{background:var(--primary)}
+.mwnums{display:flex;gap:6px;margin-top:6px}
+.mwnums span{flex:1;text-align:center;font-size:10px;color:var(--dimmer)}
+
+/* before/after strip */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:4px}
+.ba-col{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r-md);
+  padding:18px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.ba-col > h4{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;font-weight:700}
+.ba-col.was > h4{color:var(--red)}
+.ba-col.now > h4{color:var(--green)}
+.ba-demo{display:flex;flex-direction:column;gap:9px}
+.ba-cap{font-size:11.5px;line-height:17px;color:var(--dimmer)}
+
+/* kit inventory */
+.kit{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px}
+.kitem{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r-md);
+  padding:16px 17px;display:flex;flex-direction:column;gap:9px}
+.kitem b{font-family:var(--mono);font-weight:800;font-size:12.5px;color:var(--ink)}
+.kitem p{font-size:11.5px;line-height:17px;color:var(--dim)}
+.kitem .used{font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;font-weight:700;
+  color:var(--dimmer);padding-top:9px;border-top:1px solid var(--hair)}
+
+/* the scope decision table */
+.scope-t{width:100%;border-collapse:collapse}
+.scope-t th{text-align:left;font-weight:700;font-size:10px;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--slate);padding:0 14px 11px 0;
+  border-bottom:1px solid var(--hair)}
+.scope-t td{padding:13px 14px 13px 0;border-bottom:1px solid rgba(255,255,255,.045);
+  font-size:13px;line-height:19px;color:var(--dim);vertical-align:top}
+.scope-t td:first-child{color:var(--ink);font-weight:700;white-space:nowrap}
+.tag{display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:800;
+  letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:4px;
+  white-space:nowrap}
+.tag-pool{background:rgba(91,138,255,.15);color:#9DB8FF}
+.tag-life{background:rgba(245,197,24,.14);color:var(--accent)}
+
+/* the finding callout with a number */
+.bignum{display:flex;gap:22px;align-items:flex-start;background:var(--surface);
+  border:1px solid rgba(248,113,113,.22);border-radius:var(--r-md);padding:22px 24px;
+  margin-top:4px;flex-wrap:wrap}
+.bignum .n{font-family:var(--mono);font-weight:900;font-size:46px;line-height:1;
+  color:var(--red);font-variant-numeric:tabular-nums}
+.bignum .b{flex:1;min-width:280px;display:flex;flex-direction:column;gap:8px}
+.bignum .b p{font-size:13.5px;line-height:21px;color:var(--dim)}
+.bignum .b p:first-child{font-size:15px;line-height:23px;font-weight:700;color:var(--ink)}
+
+/* ordered work list */
+.work{display:flex;flex-direction:column;gap:11px;counter-reset:w}
+.witem{display:flex;gap:15px;align-items:flex-start;background:var(--surface);
+  border:1px solid var(--hair);border-radius:var(--r-sm);padding:15px 18px}
+.witem::before{counter-increment:w;content:counter(w);font-family:var(--mono);font-weight:900;
+  font-size:11px;color:var(--midnight);background:var(--slate);width:20px;height:20px;
+  border-radius:5px;display:grid;place-items:center;flex-shrink:0;margin-top:1px}
+.witem div{flex:1}
+.witem b{display:block;font-weight:800;font-size:13.5px;margin-bottom:4px}
+.witem p{font-size:12.5px;line-height:19px;color:var(--dim)}
+.witem .cost{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--dimmer);
+  white-space:nowrap;padding-top:2px}
+
+footer{border-top:1px solid var(--hair);padding-top:26px;color:var(--dimmer);font-size:12px;
+  line-height:19px}
+
+@media (max-width:900px){
+  .ba{grid-template-columns:1fr}
+  .wrap{padding:0 20px}
+  .t-page{font-size:27px;line-height:32px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="t-cap eyebrow">SportPool · Scouting · Visual spec 02</p>
+    <h1 class="t-page">One feature, three doors</h1>
+    <p class="lede">
+      Scouting is built and it works. What it is missing is a grammar — the three surfaces were
+      written separately, so the same fact wears a different colour depending on which door you
+      came through. This is the shared vocabulary that turns three screens into one feature, and
+      the scope rule that fixes the cold start.
+    </p>
+    <div class="thesis">
+      <p>
+        A colour must mean exactly one thing across the whole feature. Right now gold means five
+        things, green means four, and the same home/draw/away split is drawn three different ways
+        inside a single sheet.
+      </p>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ============================================================ 1 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">01</span>
+    <h2 class="t-sec">What each colour currently means</h2>
+  </div>
+  <p class="sec-sub">
+    Counted across <code>MatchScoutSheet.tsx</code>, <code>ScoutingTab.tsx</code> and
+    <code>Dossier.tsx</code>. Nothing here is a bug — every one of these choices is locally
+    reasonable and several are well argued in the code comments. The problem is only visible when
+    you put them side by side.
+  </p>
+
+  <div class="scroller">
+  <table class="audit">
+    <thead>
+      <tr>
+        <th style="width:150px">Colour</th>
+        <th>Jobs it is doing today</th>
+        <th style="width:74px">Jobs</th>
+        <th style="width:104px">Verdict</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><div class="swatch"><i style="background:var(--accent)"></i><span><b>Gold</b><em>accent · #F5C518</em></span></div></td>
+        <td><div class="jobs">
+          <span>The drought line — “Chelsea have not won here since 2011”</span>
+          <span>Signature figures — most common scoreline, signature scoreline</span>
+          <span>The <b>away club</b> in the crowd bar</span>
+          <span>The reality mark on a comparison track</span>
+          <span>Exact-score count, via <code>tierExact</code></span>
+        </div></td>
+        <td><span class="count">5<small>meanings</small></span></td>
+        <td><span class="verdict v-bad">Overloaded</span></td>
+      </tr>
+      <tr>
+        <td><div class="swatch"><i style="background:var(--green)"></i><span><b>Green</b><em>green · #34D972</em></span></div></td>
+        <td><div class="jobs">
+          <span>A win, in a form strip</span>
+          <span>The <b>home club’s</b> wins in the pairing bar</span>
+          <span>Every player rating pill, regardless of the rating</span>
+          <span>“And right” — the contrarian strike rate</span>
+        </div></td>
+        <td><span class="count">4<small>meanings</small></span></td>
+        <td><span class="verdict v-bad">Overloaded</span></td>
+      </tr>
+      <tr>
+        <td><div class="swatch"><i style="background:var(--red)"></i><span><b>Red</b><em>red · #F87171</em></span></div></td>
+        <td><div class="jobs">
+          <span>A loss, in a form strip</span>
+          <span>The <b>away club’s</b> wins in the pairing bar</span>
+          <span>The blind-spot block</span>
+          <span>Missed picks</span>
+          <span>The crowd card’s <b>privacy note</b> — which is not a warning</span>
+        </div></td>
+        <td><span class="count">5<small>meanings</small></span></td>
+        <td><span class="verdict v-bad">Misleading</span></td>
+      </tr>
+      <tr>
+        <td><div class="swatch"><i style="background:var(--primary)"></i><span><b>Blue</b><em>primary · #5B8AFF</em></span></div></td>
+        <td><div class="jobs">
+          <span>The <b>home club</b> in the crowd bar</span>
+          <span>Matchweek points bars</span>
+          <span>“Theirs” on a comparison track</span>
+        </div></td>
+        <td><span class="count">3<small>meanings</small></span></td>
+        <td><span class="verdict v-mid">Salvageable</span></td>
+      </tr>
+      <tr>
+        <td><div class="swatch"><i style="background:var(--amber)"></i><span><b>Amber</b><em>amber · #FBBF24</em></span></div></td>
+        <td><div class="jobs">
+          <span>The thin-sample caveat</span>
+          <span>The drought’s visit count</span>
+          <span>“Against crowd” — the contrarian index</span>
+        </div></td>
+        <td><span class="count">3<small>meanings</small></span></td>
+        <td><span class="verdict v-mid">Nearly right</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="row" style="margin-top:34px">
+    <div class="notes" style="max-width:none;flex-direction:row;gap:34px;flex-wrap:wrap">
+      <div class="note warn" style="flex:1;min-width:290px">
+        <h4>The same split, three encodings, one sheet</h4>
+        <p>
+          A home / draw / away share appears twice in the binoculars sheet and once on the match
+          detail tab. The pairing bar draws it <b>green · silver · red</b>. Two cards below, the
+          crowd bar draws it <b>blue · silver · gold</b>. The match detail tab draws it in
+          <b>club colours</b>.
+        </p>
+        <p>
+          So in the pairing bar green means Arsenal and red means Chelsea — a value judgement the
+          card is explicitly not making — and one scroll later gold has stopped being “the finding”
+          and become Chelsea.
+        </p>
+      </div>
+      <div class="note warn" style="flex:1;min-width:290px">
+        <h4>Red is carrying a privacy note</h4>
+        <p>
+          The crowd card ends with <em>“{n} picks from across every pool on SportPool — never your
+          own”</em> on a red tint. That line is the feature’s best reassurance, and red is the
+          colour this same sheet uses for <em>a defeat</em> four cards earlier.
+        </p>
+        <p>
+          It reads as an error state on the one card that most needs to feel trustworthy. This is
+          the single cheapest fix in the document.
+        </p>
+      </div>
+      <div class="note" style="flex:1;min-width:290px">
+        <h4>The rating pill is decorative</h4>
+        <p>
+          Every player rating renders green, so green there carries no information at all — a 6.2
+          and an 8.4 get the same treatment. Green is doing work in the form strip one card above,
+          which makes this actively costly rather than merely neutral.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 2 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">02</span>
+    <h2 class="t-sec">The grammar — one job per colour</h2>
+  </div>
+  <p class="sec-sub">
+    Five colours, five jobs, no overlap. The rule that makes it hold: a colour may only be spent on
+    the job named below, and if a card needs a sixth meaning it does not get a colour — it gets a
+    label.
+  </p>
+
+  <div class="grammar">
+    <div class="gram">
+      <div class="gram-top">
+        <i style="background:var(--green)"></i>
+        <span><b>Green</b><em>THE FOOTBALL WENT WELL</em></span>
+      </div>
+      <p>A win. Only ever a result that actually happened, from the point of view of the side being
+      described.</p>
+      <p class="only"><b>Used in:</b> form strips, past-meeting chips. Nowhere else.</p>
+    </div>
+    <div class="gram">
+      <div class="gram-top">
+        <i style="background:var(--red)"></i>
+        <span><b>Red</b><em>THE FOOTBALL WENT BADLY</em></span>
+      </div>
+      <p>A defeat, or a genuinely negative fact about a member — a missed pick, a blind spot.</p>
+      <p class="only"><b>Never:</b> a club, a scope note, a privacy disclaimer, or anything the
+      reader has not lost by.</p>
+    </div>
+    <div class="gram">
+      <div class="gram-top">
+        <i style="background:var(--accent)"></i>
+        <span><b>Gold</b><em>THE FINDING</em></span>
+      </div>
+      <p>The one line on this card worth reading aloud. Exactly one per card, and a card with no
+      finding has no gold on it.</p>
+      <p class="only"><b>Used in:</b> the drought, the signature scoreline, the reality mark, the
+      top-rated player.</p>
+    </div>
+    <div class="gram">
+      <div class="gram-top">
+        <i style="background:var(--amber)"></i>
+        <span><b>Amber</b><em>READ IT LIGHTLY</em></span>
+      </div>
+      <p>A caveat about the sample, and nothing else. Amber is the feature admitting its own
+      limits, which is why it must never also be a statistic.</p>
+      <p class="only"><b>Moves off amber:</b> the contrarian index, the drought’s visit count.</p>
+    </div>
+    <div class="gram">
+      <div class="gram-top">
+        <i style="background:var(--primary)"></i>
+        <span><b>Blue</b><em>THE SUBJECT</em></span>
+      </div>
+      <p>Whoever this report is about — the home club in a fixture split, the member in a dossier
+      comparison. The thing being measured, as opposed to what it is measured against.</p>
+      <p class="only"><b>Its opposite is gold:</b> blue is them, gold is reality.</p>
+    </div>
+    <div class="gram">
+      <div class="gram-top">
+        <i style="background:linear-gradient(90deg,var(--primary) 0 38%,var(--silver) 38% 56%,var(--ink) 56%)"></i>
+        <span><b>Blue / silver / ink</b><em>THE THREE-WAY SPLIT</em></span>
+      </div>
+      <p>Home, draw, away — one encoding, every split, every surface. Position and the key beneath
+      it carry the identity; the colours are only a lookup.</p>
+      <p class="only"><b>Replaces:</b> green/silver/red, blue/silver/gold and club colours, all
+      three.</p>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:34px">
+    <div class="note gold" style="max-width:78ch">
+      <h4>The payoff is a comparison that does not exist today</h4>
+      <p>
+        Once the history bar and the crowd bar share an encoding, they can sit directly on top of
+        one another — and the reader sees, in one glance, that <b>history says home and the crowd
+        says away</b>. That is the most interesting thing the scout report knows, and at the moment
+        it is unreadable purely because the two bars are drawn in different colours four cards
+        apart. Cohesion here is not tidiness; it buys a finding.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 3 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">03</span>
+    <h2 class="t-sec">Before and after, on the two bars</h2>
+  </div>
+  <p class="sec-sub">
+    Same data, same cards, same sheet. Only the encoding changes.
+  </p>
+
+  <div class="ba">
+    <div class="ba-col was">
+      <h4>Today — two cards, two languages</h4>
+      <div class="ba-demo">
+        <div class="sb-lab"><span>At the Emirates</span><span class="dim num" style="font-size:10px">11 meetings</span></div>
+        <div class="sb">
+          <i style="flex:6;background:var(--green)"></i>
+          <i style="flex:2;background:var(--silver)"></i>
+          <i style="flex:3;background:var(--red)"></i>
+        </div>
+        <div class="key">
+          <div><i style="background:var(--green)"></i>6 Arsenal</div>
+          <div><i style="background:var(--silver)"></i>2 draw</div>
+          <div><i style="background:var(--red)"></i>3 Chelsea</div>
+        </div>
+      </div>
+      <div class="ba-demo" style="margin-top:5px">
+        <div class="sb-lab"><span>How SportPool picked it</span><span class="dim num" style="font-size:10px">412 picks</span></div>
+        <div class="sb" style="height:26px;border-radius:var(--r-xs);gap:0">
+          <i style="flex:41;background:var(--primary);border-radius:0;display:grid;place-items:center;color:#fff" class="num">41%</i>
+          <i style="flex:17;background:var(--silver);border-radius:0;display:grid;place-items:center;color:var(--ink)" class="num">17%</i>
+          <i style="flex:42;background:var(--accent);border-radius:0;display:grid;place-items:center;color:#2A2210" class="num">42%</i>
+        </div>
+        <div class="key">
+          <div><i style="background:var(--primary)"></i>Arsenal</div>
+          <div><i style="background:var(--silver)"></i>Draw</div>
+          <div><i style="background:var(--accent)"></i>Chelsea</div>
+        </div>
+      </div>
+      <p class="ba-cap">
+        Arsenal is green in one bar and blue in the other. Chelsea is red, then gold. The two bars
+        cannot be compared because nothing in them lines up.
+      </p>
+    </div>
+
+    <div class="ba-col now">
+      <h4>Proposed — one language, stacked</h4>
+      <div class="ba-demo">
+        <div class="sb-lab"><span>At the Emirates</span><span class="dim num" style="font-size:10px">11 meetings</span></div>
+        <div class="sb">
+          <i class="sb-home" style="flex:6"></i>
+          <i class="sb-draw" style="flex:2"></i>
+          <i class="sb-away" style="flex:3"></i>
+        </div>
+      </div>
+      <div class="ba-demo" style="margin-top:-4px">
+        <div class="sb-lab"><span>How SportPool picked it</span><span class="dim num" style="font-size:10px">412 picks</span></div>
+        <div class="sb">
+          <i class="sb-home" style="flex:41"></i>
+          <i class="sb-draw" style="flex:17"></i>
+          <i class="sb-away" style="flex:42"></i>
+        </div>
+        <div class="key">
+          <div><i class="sb-home"></i>Arsenal</div>
+          <div><i class="sb-draw"></i>Draw</div>
+          <div><i class="sb-away"></i>Chelsea</div>
+        </div>
+      </div>
+      <div class="find" style="margin-top:2px">
+        <p>History leans Arsenal. The crowd is calling it for Chelsea.</p>
+        <span>The gap between the two bars</span>
+      </div>
+      <p class="ba-cap">
+        One key serves both. The misalignment between the two bars is now the most visible thing on
+        the card — and it is a fact about football, not a tip.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 4 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">04</span>
+    <h2 class="t-sec">The kit</h2>
+  </div>
+  <p class="sec-sub">
+    Twelve primitives. Every scout card on every surface is composed from these and nothing else —
+    the presentation equivalent of the design note’s <em>one owner per derivation</em> rule. Today
+    <code>Card</code> is defined three times, <code>Segment</code> twice, and the label/value row
+    twice with <b>contradictory argument order</b>: <code>Line</code> renders label → note → value,
+    <code>Row</code> renders label → value → note, and <code>Row</code>’s own comment argues the
+    second is correct.
+  </p>
+
+  <div class="kit">
+    <div class="kitem" style="border-color:rgba(245,197,24,.30);background:rgba(245,197,24,.04)">
+      <b style="color:var(--accent)">ScoutHeader</b>
+      <p>Eyebrow · subject row · detail line · hairline rule. The fixture header’s shape, with the
+      subject as a slot: two crests and a “v” for a match, one avatar for a member.</p>
+      <p class="used" style="color:var(--accent)">Unifies both sheets</p>
+    </div>
+    <div class="kitem"><b>ScoutCard</b><p>Surface, radius, shadow, title, optional scope tag. The one card in the feature.</p><p class="used">Replaces 3 copies</p></div>
+    <div class="kitem"><b>ScoutRow</b><p>Label · value · note, value before note. Takes a <code>finding</code> flag for the gold value.</p><p class="used">Replaces Line + Row</p></div>
+    <div class="kitem"><b>SplitBar</b><p>Home / draw / away in the one encoding, with its key. Counts in, percentages out.</p><p class="used">Replaces 3 encodings</p></div>
+    <div class="kitem"><b>FormStrip</b><p>W · D · L squares. The only place green and red mean a result.</p><p class="used">Already shared-ish</p></div>
+    <div class="kitem"><b>ScoreChip</b><p>A past scoreline with its date, tinted by how that match went.</p><p class="used">Replaces 2 copies</p></div>
+    <div class="kitem"><b>VenueSplit</b><p>Two columns, one per side, at the ends they are playing.</p><p class="used">Sheet only today</p></div>
+    <div class="kitem"><b>Finding</b><p>The gold block. One per card, maximum. Carries its own denominator caption.</p><p class="used">Was “Drought”</p></div>
+    <div class="kitem"><b>Caveat</b><p>The amber strip. Thin samples only — never a statistic.</p><p class="used">Sheet only today</p></div>
+    <div class="kitem"><b>StatTiles</b><p>2–3 big numbers. Ink by default; the headline tile takes gold.</p><p class="used">Drops tier colours</p></div>
+    <div class="kitem"><b>Comparison</b><p>Blue fill for them, gold mark for reality. The best component in the feature.</p><p class="used">Dossier only today</p></div>
+    <div class="kitem"><b>Footnote</b><p>Sample size and scope, in slate. Never red, never a card.</p><p class="used">Replaces 3 copies</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ 5 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">05</span>
+    <h2 class="t-sec">The three doors, rebuilt on it</h2>
+  </div>
+  <p class="sec-sub">
+    Left and centre are <b>the same component</b> — Ryan’s third point, and it is the right call.
+    Right is the dossier, built from the same kit so it reads as the same feature pointed at a
+    person instead of a fixture. Its header is now the fixture header’s, exactly: same eyebrow,
+    same left-aligned subject row, same detail line, same hairline rule.
+  </p>
+
+  <div class="frame-stack">
+
+    <!-- ---------- 1. the binoculars peek ---------- -->
+    <div>
+      <div class="phone-label">
+        <span class="t-cap" style="color:var(--primary)">Door 1</span>
+        <span class="t-body dim">Binoculars, in the picker · 72%</span>
+      </div>
+      <div class="phone">
+        <div class="grab"></div>
+        <div class="sh-head">
+          <p class="t-cap dim">Scout report</p>
+          <div class="sh-teams">
+            <span class="crest" style="background:#EF4444">ARS</span>
+            <b>Arsenal</b>
+            <span class="sh-v">v</span>
+            <b>Chelsea</b>
+            <span class="crest" style="background:#4F86F7">CHE</span>
+          </div>
+          <p class="t-det dim" style="margin-top:5px">Emirates Stadium</p>
+        </div>
+
+        <div class="stack">
+          <div class="card">
+            <div class="card-hd"><h3 class="t-card">The pairing</h3></div>
+            <div class="card-bd">
+              <div>
+                <div class="sb-lab"><span>At the Emirates</span></div>
+                <div class="sb">
+                  <i class="sb-home" style="flex:6"></i>
+                  <i class="sb-draw" style="flex:2"></i>
+                  <i class="sb-away" style="flex:3"></i>
+                </div>
+                <div class="key">
+                  <div><i class="sb-home"></i>6 Arsenal</div>
+                  <div><i class="sb-draw"></i>2 draw</div>
+                  <div><i class="sb-away"></i>3 Chelsea</div>
+                </div>
+              </div>
+              <div>
+                <div class="srow find"><span class="lb">Most common scoreline</span><span class="nt">3 of 11</span><span class="vl">2–1</span></div>
+                <div class="srow"><span class="lb">Average goals</span><span class="nt">n=11</span><span class="vl">2.9</span></div>
+                <div class="srow"><span class="lb">Both teams scored</span><span class="nt">7 of 11</span><span class="vl">64%</span></div>
+              </div>
+              <div>
+                <div class="sb-lab"><span>Last 4 meetings</span></div>
+                <div class="chips">
+                  <div class="chip w"><b>2–1</b><span>May 26</span></div>
+                  <div class="chip d"><b>1–1</b><span>Nov 25</span></div>
+                  <div class="chip w"><b>3–0</b><span>Apr 25</span></div>
+                  <div class="chip l"><b>0–2</b><span>Oct 24</span></div>
+                </div>
+                <p class="t-det dim" style="margin-top:7px">Scores as played — home side first</p>
+              </div>
+              <div class="find">
+                <p>Chelsea have not won at the Emirates since 2011.</p>
+                <span>7 visits</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd"><h3 class="t-card">Form</h3></div>
+            <div class="card-bd">
+              <div class="vsplit">
+                <div class="vcol">
+                  <div class="who"><span class="crest" style="background:#EF4444;width:18px;height:18px;font-size:7px">ARS</span><b>Arsenal</b></div>
+                  <p class="end">At home</p>
+                  <div class="strip"><i class="f-w">W</i><i class="f-w">W</i><i class="f-d">D</i><i class="f-w">W</i><i class="f-l">L</i></div>
+                  <div class="gf"><b>2.4</b><span>scored</span><b>0.8</b><span>let in</span></div>
+                  <p class="t-det dim">a game, over 5</p>
+                </div>
+                <div class="vcol">
+                  <div class="who"><span class="crest" style="background:#4F86F7;width:18px;height:18px;font-size:7px">CHE</span><b>Chelsea</b></div>
+                  <p class="end">Away</p>
+                  <div class="strip"><i class="f-l">L</i><i class="f-d">D</i><i class="f-l">L</i><i class="f-w">W</i><i class="f-l">L</i></div>
+                  <div class="gf"><b>0.9</b><span>scored</span><b>1.8</b><span>let in</span></div>
+                  <p class="t-det dim">a game, over 5</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd"><h3 class="t-card">People</h3></div>
+            <div class="card-bd">
+              <p class="t-det dim">In form now · average rating, minutes-qualified</p>
+              <div>
+                <div class="prow">
+                  <span class="pface" style="background:#EF4444">BS</span>
+                  <span class="pname"><b>Bukayo Saka</b><span>Arsenal · 6 apps · 5 G+A</span></span>
+                  <span class="prate top">7.84</span>
+                </div>
+                <div class="prow">
+                  <span class="pface" style="background:#4F86F7">CP</span>
+                  <span class="pname"><b>Cole Palmer</b><span>Chelsea · 6 apps · 4 G+A</span></span>
+                  <span class="prate">7.41</span>
+                </div>
+                <div class="prow">
+                  <span class="pface" style="background:#EF4444">DR</span>
+                  <span class="pname"><b>Declan Rice</b><span>Arsenal · 6 apps · 2 G+A</span></span>
+                  <span class="prate">7.30</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd"><h3 class="t-card">The crowd</h3></div>
+            <div class="card-bd">
+              <p class="t-det dim">How SportPool picked this fixture</p>
+              <div>
+                <div class="sb">
+                  <i class="sb-home" style="flex:41"></i>
+                  <i class="sb-draw" style="flex:17"></i>
+                  <i class="sb-away" style="flex:42"></i>
+                </div>
+                <div class="key">
+                  <div><i class="sb-home"></i>Arsenal 41%</div>
+                  <div><i class="sb-draw"></i>Draw 17%</div>
+                  <div><i class="sb-away"></i>Chelsea 42%</div>
+                </div>
+              </div>
+              <div class="srow find" style="border-top:1px solid rgba(255,255,255,.055)">
+                <span class="lb">Most-picked scoreline</span><span class="nt">22% of 288</span><span class="vl">1–2</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="foot">
+            <p>11 competitive meetings · 2019–2026 · 2 friendlies not counted</p>
+            <p>412 picks from across every pool on SportPool — never your own.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 2. the match detail tab ---------- -->
+    <div>
+      <div class="phone-label">
+        <span class="t-cap" style="color:var(--green)">Door 2</span>
+        <span class="t-body dim">Match detail · Scout tab</span>
+      </div>
+      <div class="phone">
+        <div style="padding:16px 20px 0">
+          <p class="t-cap dim">Premier League · MW 7</p>
+          <div class="sh-teams" style="margin-top:8px">
+            <span class="crest" style="background:#EF4444">ARS</span>
+            <b>Arsenal</b>
+            <span class="sh-v">v</span>
+            <b>Chelsea</b>
+            <span class="crest" style="background:#4F86F7">CHE</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;padding:15px 20px 0;border-bottom:1px solid var(--hair)">
+          <span class="t-det dim" style="padding:7px 10px">Facts</span>
+          <span class="t-det dim" style="padding:7px 10px">Line-ups</span>
+          <span class="t-det dim" style="padding:7px 10px">Stats</span>
+          <span class="t-det" style="padding:7px 10px;color:var(--primary);font-weight:700;
+            border-bottom:2px solid var(--primary)">Scout</span>
+          <span class="t-det dim" style="padding:7px 10px">Picks</span>
+        </div>
+
+        <div class="stack">
+          <div style="margin:0 20px;padding:11px 14px;background:rgba(91,138,255,.09);
+            border-radius:var(--r-sm);border:1px solid rgba(91,138,255,.18)">
+            <p class="t-body" style="color:#9DB8FF;font-size:12.5px;line-height:18px">
+              Identical to the sheet. Same component, same endpoint, one call instead of two.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-hd"><h3 class="t-card">The pairing</h3></div>
+            <div class="card-bd">
+              <div>
+                <div class="sb-lab"><span>At the Emirates</span></div>
+                <div class="sb">
+                  <i class="sb-home" style="flex:6"></i>
+                  <i class="sb-draw" style="flex:2"></i>
+                  <i class="sb-away" style="flex:3"></i>
+                </div>
+                <div class="key">
+                  <div><i class="sb-home"></i>6 Arsenal</div>
+                  <div><i class="sb-draw"></i>2 draw</div>
+                  <div><i class="sb-away"></i>3 Chelsea</div>
+                </div>
+              </div>
+              <div>
+                <div class="srow find"><span class="lb">Most common scoreline</span><span class="nt">3 of 11</span><span class="vl">2–1</span></div>
+                <div class="srow"><span class="lb">Average goals</span><span class="nt">n=11</span><span class="vl">2.9</span></div>
+                <div class="srow"><span class="lb">Both teams scored</span><span class="nt">7 of 11</span><span class="vl">64%</span></div>
+              </div>
+              <div class="find">
+                <p>Chelsea have not won at the Emirates since 2011.</p>
+                <span>7 visits</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd"><h3 class="t-card">Form</h3></div>
+            <div class="card-bd">
+              <div class="vsplit">
+                <div class="vcol">
+                  <div class="who"><span class="crest" style="background:#EF4444;width:18px;height:18px;font-size:7px">ARS</span><b>Arsenal</b></div>
+                  <p class="end">At home</p>
+                  <div class="strip"><i class="f-w">W</i><i class="f-w">W</i><i class="f-d">D</i><i class="f-w">W</i><i class="f-l">L</i></div>
+                  <div class="gf"><b>2.4</b><span>scored</span><b>0.8</b><span>let in</span></div>
+                  <p class="t-det dim">a game, over 5</p>
+                </div>
+                <div class="vcol">
+                  <div class="who"><span class="crest" style="background:#4F86F7;width:18px;height:18px;font-size:7px">CHE</span><b>Chelsea</b></div>
+                  <p class="end">Away</p>
+                  <div class="strip"><i class="f-l">L</i><i class="f-d">D</i><i class="f-l">L</i><i class="f-w">W</i><i class="f-l">L</i></div>
+                  <div class="gf"><b>0.9</b><span>scored</span><b>1.8</b><span>let in</span></div>
+                  <p class="t-det dim">a game, over 5</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <h3 class="t-card">The crowd</h3>
+              <span class="scope-tag">Platform-wide</span>
+            </div>
+            <div class="card-bd">
+              <div>
+                <div class="sb">
+                  <i class="sb-home" style="flex:41"></i>
+                  <i class="sb-draw" style="flex:17"></i>
+                  <i class="sb-away" style="flex:42"></i>
+                </div>
+                <div class="key">
+                  <div><i class="sb-home"></i>Arsenal 41%</div>
+                  <div><i class="sb-draw"></i>Draw 17%</div>
+                  <div><i class="sb-away"></i>Chelsea 42%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="foot">
+            <p>11 competitive meetings · 2019–2026</p>
+            <p>412 picks from across every pool on SportPool — never your own.</p>
+          </div>
+        </div>
+      </div>
+      <div class="notes" style="max-width:390px;margin-top:20px">
+        <div class="note ok">
+          <h4>This is a deletion, not a build</h4>
+          <p>
+            <code>ScoutingTab.tsx</code> goes. Extract the sheet’s body as
+            <code>&lt;ScoutReport/&gt;</code> and both doors render it. The match screen drops from
+            two calls (<code>/h2h</code> + <code>/players</code>) to one (<code>/scout</code>) and
+            <b>gains</b> the form and crowd cards it does not currently have.
+          </p>
+        </div>
+        <div class="note warn">
+          <h4>One real blocker</h4>
+          <p>
+            <code>/api/fixtures/[id]/scout</code> reads <code>league_fixtures</code> and 404s on a
+            World Cup match. The match detail screen serves both. Either add a <code>matches</code>
+            arm to the route, or keep the old tab alive behind the
+            <code>roundNumber === null</code> test the screen already uses everywhere else.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 3. the dossier ---------- -->
+    <div>
+      <div class="phone-label">
+        <span class="t-cap" style="color:var(--accent)">Door 3</span>
+        <span class="t-body dim">Showdown · opponent dossier · 88%</span>
+      </div>
+      <div class="phone">
+        <div class="grab"></div>
+        <div class="sh-head">
+          <p class="t-cap dim">Scout report</p>
+          <div class="sh-teams">
+            <span class="avatar" style="background:linear-gradient(140deg,#B79BFF,#7C5CC4)">DM</span>
+            <b>Dave M.</b>
+          </div>
+          <p class="t-det dim" style="margin-top:5px">3rd of 12 · 214 pts</p>
+        </div>
+
+        <div class="stack">
+          <div class="card">
+            <div class="card-hd">
+              <h3 class="t-card">Accuracy</h3>
+              <span class="scope-tag">This pool</span>
+            </div>
+            <div class="card-bd">
+              <div class="tiles">
+                <div class="tile hero"><b>48%</b><span>hit rate</span></div>
+                <div class="tile"><b>7</b><span>exact</span></div>
+                <div class="tile"><b>3.4</b><span>pts / fixture</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <h3 class="t-card">Recent matchweeks</h3>
+              <span class="scope-tag">This pool</span>
+            </div>
+            <div class="card-bd">
+              <div>
+                <div class="mwbars">
+                  <div><em>18</em><i style="height:22px"></i></div>
+                  <div><em>26</em><i style="height:32px"></i></div>
+                  <div><em>11</em><i style="height:14px"></i></div>
+                  <div><em>34</em><i class="peak" style="height:42px"></i></div>
+                  <div><em>9</em><i style="height:11px"></i></div>
+                  <div><em>29</em><i style="height:36px"></i></div>
+                </div>
+                <div class="mwnums">
+                  <span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <h3 class="t-card">Club bias</h3>
+              <span class="scope-tag" style="background:rgba(245,197,24,.14);color:var(--accent)">All time</span>
+            </div>
+            <div class="card-bd">
+              <div class="caveat">
+                <p>7 matchweeks in this pool, 31 across all their pools. Read it lightly.</p>
+              </div>
+              <div class="lean">
+                <p class="lbl">Backs most often</p>
+                <div class="mid">
+                  <span class="crest" style="background:#EF4444;width:22px;height:22px;font-size:7px">LIV</span>
+                  <b>Liverpool</b>
+                  <span class="fr">14 of 15</span>
+                </div>
+                <p class="det">At home 8 of 8 · away 6 of 7</p>
+              </div>
+              <div class="lean spot">
+                <p class="lbl">Blind spot</p>
+                <div class="mid">
+                  <span class="crest" style="background:#C9302C;width:22px;height:22px;font-size:7px">MUN</span>
+                  <b>Man Utd</b>
+                  <span class="fr">2 of 9</span>
+                </div>
+                <p class="det">Backed 9 times. Right twice.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <h3 class="t-card">Against reality</h3>
+              <span class="scope-tag" style="background:rgba(245,197,24,.14);color:var(--accent)">All time</span>
+            </div>
+            <div class="card-bd">
+              <div>
+                <div class="cmp">
+                  <div class="cmp-top"><span class="lb">Goals per prediction</span><span class="vl">3.1</span></div>
+                  <div class="track">
+                    <div class="fill" style="width:62%"></div>
+                    <div class="mark" style="left:56%"></div>
+                  </div>
+                  <div class="cmp-foot">
+                    <span class="them">they predict 3.1</span>
+                    <span class="real">league averages 2.8</span>
+                  </div>
+                </div>
+                <div class="cmp">
+                  <div class="cmp-top"><span class="lb">Predicts a draw</span><span class="vl">6%</span></div>
+                  <div class="track">
+                    <div class="fill" style="width:6%"></div>
+                    <div class="mark" style="left:25%"></div>
+                  </div>
+                  <div class="cmp-foot">
+                    <span class="them">they predict 6%</span>
+                    <span class="real">25% of games end level</span>
+                  </div>
+                </div>
+                <div class="srow find"><span class="lb">Signature scoreline</span><span class="vl">2–1</span><span class="nt">31% of picks</span></div>
+                <div class="srow"><span class="lb">Has ever predicted 0–0</span><span class="vl" style="color:var(--slate)">Never</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <h3 class="t-card">Tendencies</h3>
+              <span class="scope-tag">This pool</span>
+            </div>
+            <div class="card-bd">
+              <div class="tiles">
+                <div class="tile"><b>34%</b><span>against crowd</span></div>
+                <div class="tile hero"><b>52%</b><span>and right</span></div>
+                <div class="tile"><b style="color:var(--red)">2</b><span>missed of 70</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="foot">
+            <p>68 revealed picks in this pool · 291 all time · 66 scored</p>
+            <p>Picks appear here once their matchweek locks. The open week is never shown.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="row" style="margin-top:36px">
+    <div class="notes" style="max-width:none;flex-direction:row;gap:34px;flex-wrap:wrap">
+      <div class="note ok" style="flex:1;min-width:290px">
+        <h4>One header, two subjects</h4>
+        <p>
+          The dossier header now takes the fixture header’s shape exactly: <b>eyebrow, subject row,
+          detail line, hairline rule</b>, left-aligned. Only the subject slot differs — two crests
+          and a “v” for a match, one avatar for a member.
+        </p>
+        <p>
+          Which means the member’s colour survives the change. The fixture header carries identity
+          through its crests; the person equivalent is the avatar inline beside the name, keyed on
+          their user id and frozen, so they are still the same colour here, in Banter and on the
+          duel card. It is the same mechanism, not a lost one.
+        </p>
+        <p>
+          The rest follows for free: card edges, title rows, row rhythm, the gold finding, the amber
+          caveat and the slate footnote are all <em>the same objects</em>. Somebody who has learned
+          that gold means “this is the line” on a fixture already knows it on a person.
+        </p>
+      </div>
+      <div class="note gold" style="flex:1;min-width:290px">
+        <h4>The scope tag is new, and it is the fix for the cold start</h4>
+        <p>
+          Every card now states what it is counted over. Three cards say <b>This pool</b> and two
+          say <b>All time</b>, and that is not a toggle the member sets — it is the correct scope
+          for that particular statistic. Section 06 is the argument.
+        </p>
+      </div>
+      <div class="note warn" style="flex:1;min-width:290px">
+        <h4>What the header change costs, and one trap in its detail line</h4>
+        <p>
+          <b>The purple wash goes.</b> <code>DossierSheet</code>’s 220pt gradient was the single
+          biggest visual difference between the two sheets, and it is what “identical” costs. If it
+          is missed, the cheapest way back is a hairline rule in the member’s colour under the
+          header — but the fixture header has two clubs and no single colour, so it could not follow.
+        </p>
+        <p>
+          <b>The detail line now has a standing slot, and Last Man Standing must not fill it.</b>
+          The stored <code>current_rank</code> in LMS is entry-id order, not a position — the venue
+          line is safe to be a rank on a fixture and is not safe to be one on a member. It needs a
+          mode guard before it ships, the same one the pool card KPIs already carry.
+        </p>
+      </div>
+      <div class="note" style="flex:1;min-width:290px">
+        <h4>Two smaller calls baked into the mockup</h4>
+        <p>
+          The accuracy tiles drop <code>tierWinner</code> cyan and <code>tierExact</code> gold —
+          those are the <em>scoring tier</em> colours and neither tile is showing a tier. The
+          headline tile takes gold instead, and the rest are ink.
+        </p>
+        <p>
+          The player rating pill is ink on mist, with gold only on the top-rated name. Green stops
+          being decorative and goes back to meaning a win.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 6 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">06</span>
+    <h2 class="t-sec">The lifetime question</h2>
+  </div>
+  <p class="sec-sub">
+    The instinct is right — the dossier is thin in a new pool. But “make it lifetime” has a trap in
+    it, and the fix is better than a toggle.
+  </p>
+
+  <div class="row" style="margin-bottom:30px">
+    <div class="notes" style="max-width:none;flex-direction:row;gap:34px;flex-wrap:wrap">
+      <div class="note" style="flex:1;min-width:300px">
+        <h4>First — it is not the pick count that is thin</h4>
+        <p>
+          By matchweek 3 an entry already has ~30 picks. That is plenty for a hit rate, a
+          goals-per-prediction, a draw rate — every card in <em>Against reality</em> works from
+          week 3.
+        </p>
+        <p>
+          What is thin is the <b>per-club</b> count. Each club appears once a matchweek, so at MW3
+          you have seen Liverpool exactly three times. <code>MIN_BACKINGS</code> is 2 and
+          <code>MIN_BLIND_SPOT_BACKINGS</code> is 3, so <em>Club bias</em> technically renders — but
+          “backs Liverpool 3 of 3” is noise. The design note’s own example, <em>9 of 9</em>, needs
+          matchweek nine.
+        </p>
+        <p>
+          So the dossier does not go from empty to full. It fills in <b>layers</b>, and only one
+          card is actually waiting on time.
+        </p>
+      </div>
+      <div class="note" style="flex:1;min-width:300px">
+        <h4>Second — a naive union double-counts, badly</h4>
+        <p>
+          A member in two Premier League pools picks the <em>same fixture twice</em>. Union their
+          rows and Liverpool-at-home goes from 8 of 8 to 16 of 16 — the same judgement counted
+          twice, presented as twice the evidence.
+        </p>
+        <p>
+          Worse when the two picks disagree: back Liverpool in one pool and against them in the
+          other, and the lifetime figure reports a considered ambivalence that never existed.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bignum">
+    <span class="n">59.5%</span>
+    <div class="b">
+      <p>of the league picks in production today are a repeat of a <code>(user, fixture)</code> pair already counted.</p>
+      <p>
+        766 prediction rows resolve to 310 independent judgements across 11 users. A lifetime
+        dossier built by unioning rows would inflate every denominator by roughly 2.5×.
+      </p>
+      <p style="color:var(--dimmer)">
+        ⚠ These are the seeded UX-test pools, so the figure is not a forecast of real behaviour —
+        those users sit in more pools than a member will. The <em>mechanism</em> is real for anyone
+        in two pools in one competition, which is exactly the member lifetime is meant to serve.
+        <b>Dedupe on <code>(user_id, fixture_id)</code></b>, and decide explicitly what happens when
+        two picks disagree — dropping the fixture is the honest answer.
+      </p>
+    </div>
+  </div>
+
+  <h3 class="t-card" style="margin:38px 0 14px">The rule: how someone picks is a lifetime trait. How they are doing is a pool fact.</h3>
+  <p class="sec-sub" style="margin-bottom:22px">
+    That single sentence assigns every statistic a scope without a setting, and it is defensible to
+    a member in one line. A duel is decided inside a pool, so the competitive numbers stay there;
+    character does not reset when you join a new pool, so the tendencies do not either.
+  </p>
+
+  <div class="scroller">
+  <table class="scope-t">
+    <thead>
+      <tr>
+        <th style="width:210px">Card</th>
+        <th style="width:110px">Scope</th>
+        <th>Why</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Standing &amp; duel record</td>
+        <td><span class="tag tag-pool">This pool</span></td>
+        <td>A rank only exists inside a pool. A lifetime rank is meaningless and, in Last Man Standing, the stored one is entry-id order anyway.</td>
+      </tr>
+      <tr>
+        <td>Accuracy</td>
+        <td><span class="tag tag-pool">This pool</span></td>
+        <td>Pool depth changes what a point is worth. A Results pool and a Scores pool do not share a points scale, so a lifetime average is arithmetic over two different units.</td>
+      </tr>
+      <tr>
+        <td>Recent matchweeks</td>
+        <td><span class="tag tag-pool">This pool</span></td>
+        <td>It is a timeline of this season in this competition. Interleaving two pools’ matchweeks produces an order that never happened.</td>
+      </tr>
+      <tr>
+        <td>Club bias</td>
+        <td><span class="tag tag-life">All time</span></td>
+        <td><b>The card lifetime exists for.</b> Needs ~9 sightings of one club; one pool takes half a season to get there, three seasons of history gets there on day one.</td>
+      </tr>
+      <tr>
+        <td>Against reality</td>
+        <td><span class="tag tag-life">All time</span></td>
+        <td>Draw-blindness and goal optimism are traits, not form. They are also the most stable numbers in the dossier, so a wider sample makes them better rather than staler.</td>
+      </tr>
+      <tr>
+        <td>Contrarian index</td>
+        <td><span class="tag tag-life">All time</span></td>
+        <td>Measured against the platform crowd, which is already platform-wide — scoping the member half to one pool compares two different populations.</td>
+      </tr>
+      <tr>
+        <td>Missed picks</td>
+        <td><span class="tag tag-pool">This pool</span></td>
+        <td>A competitive fact about <em>this</em> duel. Also the denominator must start at their join date per pool, or a member who joined in MW6 is reported as having missed five weeks.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="row" style="margin-top:34px">
+    <div class="notes" style="max-width:none;flex-direction:row;gap:34px;flex-wrap:wrap">
+      <div class="note warn" style="flex:1;min-width:290px">
+        <h4>The seal still has to be re-implemented</h4>
+        <p>
+          <code>readOpponentPicks</code> filters on <code>league_matchweeks.lock_at</code>, which
+          generalises correctly across competitions — different leagues lock at different times and
+          the join handles it. <b>Do not drop that filter when widening the query from an entry to a
+          user.</b> It is the whole seal, and this route runs on the admin client.
+        </p>
+        <p>
+          One genuinely new exposure: a bigger denominator implicitly reveals that the subject plays
+          in other pools. That is mild, but it means the card may never <em>name</em> another pool
+          or break a figure down by one.
+        </p>
+      </div>
+      <div class="note" style="flex:1;min-width:290px">
+        <h4>“All time” means all league pools, at first</h4>
+        <p>
+          World Cup picks live in <code>predictions</code>, not <code>league_predictions</code> —
+          a different table with a different shape. A lifetime dossier that spans both is a union
+          across two schemas, and it is not worth doing for a competition that closed in July.
+          Say <em>all leagues</em> on the card and mean it.
+        </p>
+      </div>
+      <div class="note ok" style="flex:1;min-width:290px">
+        <h4>And for a genuinely new member, scope does not help at all</h4>
+        <p>
+          Somebody in their first week has no picks anywhere, and no amount of widening invents
+          any. That state needs to be a real screen, not an empty one: the standing and the duel
+          record still exist, and the honest line is <b>“No book on them yet — 4 picks so far.”</b>
+        </p>
+        <p>
+          Which is itself interesting in a duel. Facing an unknown is a fact worth stating plainly.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 7 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">07</span>
+    <h2 class="t-sec">Order of work</h2>
+  </div>
+  <p class="sec-sub">
+    Cheapest and most visible first. Items 1–4 are presentation only — no migration, no provider
+    call, no new endpoint.
+  </p>
+
+  <div class="work">
+    <div class="witem">
+      <div>
+        <b>Move the crowd scope note off red</b>
+        <p>Slate, in the footnote, beside the sample size. One line changed, and it stops the most
+        trustworthy card in the feature reading as an error.</p>
+      </div>
+      <span class="cost">minutes</span>
+    </div>
+    <div class="witem">
+      <div>
+        <b>Pull <code>ScoutHeader</code> out of <code>MatchScoutSheet</code></b>
+        <p>Take the fixture header as written, give it a subject slot, and point
+        <code>DossierSheet</code> at it. Deletes the gradient, the 62pt avatar and the centred
+        column. Guard the standing line against Last Man Standing.</p>
+      </div>
+      <span class="cost">small</span>
+    </div>
+    <div class="witem">
+      <div>
+        <b>Build <code>components/scouting/kit/</code></b>
+        <p>The eleven primitives in §04. Port <code>MatchScoutSheet</code> onto it first — it is the
+        surface Ryan is happiest with, so it is the one that defines the kit rather than bending
+        to it.</p>
+      </div>
+      <span class="cost">the bulk</span>
+    </div>
+    <div class="witem">
+      <div>
+        <b>Apply the one split encoding</b>
+        <p>Pairing bar and crowd bar both to blue / silver / ink, then stack them so the
+        disagreement between history and the crowd is visible.</p>
+      </div>
+      <span class="cost">small</span>
+    </div>
+    <div class="witem">
+      <div>
+        <b>Delete <code>ScoutingTab.tsx</code>; render <code>&lt;ScoutReport/&gt;</code> in the tab</b>
+        <p>Decide the World Cup fallback first — either a <code>matches</code> arm on
+        <code>/scout</code>, or keep the old tab behind <code>roundNumber === null</code>.</p>
+      </div>
+      <span class="cost">small + a call</span>
+    </div>
+    <div class="witem">
+      <div>
+        <b>Port the dossier onto the kit, add scope tags</b>
+        <p>Tags can ship before the lifetime query does — they are true today, they just all say
+        <em>This pool</em>. That is worth shipping on its own: the dossier currently never states
+        its own scope.</p>
+      </div>
+      <span class="cost">small</span>
+    </div>
+    <div class="witem">
+      <div>
+        <b>Widen club bias and Against reality to lifetime</b>
+        <p>Read by <code>user_id</code> across their entries, dedupe on
+        <code>(user_id, fixture_id)</code>, drop disagreements, keep the <code>lock_at</code>
+        filter. Bound the read — a lifetime span will pass <code>MAX_PICKS = 800</code> eventually,
+        and PostgREST truncates at 1,000 silently.</p>
+      </div>
+      <span class="cost">the real work</span>
+    </div>
+    <div class="witem">
+      <div>
+        <b>The “no book yet” state</b>
+        <p>Under a pick floor, the dossier renders the standing, the duel record and one honest
+        sentence. No empty cards.</p>
+      </div>
+      <span class="cost">small</span>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap" style="padding-top:26px">
+  <p>
+    SportPool · scouting cohesion spec · 12 Sep 2026 · follows
+    <code>drafts/2026-09-09_scouting_system_design.md</code> and its mockups.
+    Colour audit counted by hand across the three built components; the 59.5% figure is from
+    production, on the seeded UX-test pools.
+  </p>
+</footer>
+
+</div>

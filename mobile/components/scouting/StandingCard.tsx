@@ -3,7 +3,10 @@ import { Text as RNText, View } from 'react-native';
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Icon, Text } from '@/components/ui';
 import type { DossierResponse, ScoutDuelRecord } from '@/lib/api';
+import type { ScoutTone } from '@/lib/scoutTone';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
+
+import { ScoutCard, useScoutPalette } from './kit';
 
 // =============================================================
 // Where they stand — the report's first card
@@ -62,18 +65,10 @@ export function StandingCard({ data }: { data: DossierResponse }) {
   if (s.rank == null && !duels) return null;
 
   return (
-    <View
-      style={{
-        marginHorizontal: 20,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radii.lg,
-        ...theme.shadows.card,
-        overflow: 'hidden',
-      }}
+    <ScoutCard
+      title={data.is_self ? 'Where you stand' : 'Where they stand'}
+      scope="This pool"
     >
-      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 }}>
-        <Text variant="cardTitle">{data.is_self ? 'Where you stand' : 'Where they stand'}</Text>
-      </View>
 
       {/* ---- position -------------------------------------------------- */}
       {s.rank != null ? (
@@ -132,7 +127,7 @@ export function StandingCard({ data }: { data: DossierResponse }) {
 
       {/* ---- duels ----------------------------------------------------- */}
       {duels ? <DuelBlock duels={duels} hasRank={s.rank != null} /> : null}
-    </View>
+    </ScoutCard>
   );
 }
 
@@ -147,7 +142,7 @@ export function StandingCard({ data }: { data: DossierResponse }) {
  * noise on the majority of rows in a settled pool.
  */
 function Movement({ from, to }: { from: number | null; to: number }) {
-  const theme = useTheme();
+  const palette = useScoutPalette();
   // ⚠⚠ `== null`, WHICH CATCHES `undefined` TOO — see the file header. This
   // read `=== null` and rendered "NaN since last week" against an API that had
   // not yet been redeployed with the field.
@@ -156,19 +151,19 @@ function Movement({ from, to }: { from: number | null; to: number }) {
   // A LOWER rank number is a better position, so a fall in the number is a climb.
   const climbed = to < from;
   const places = Math.abs(from - to);
+  // ⚠ A CLIMB IS A `win` AND A FALL IS A `loss` — the grammar's outcome tones.
+  // They are the right ones: this is a result that happened to them, not a
+  // judgement the screen is making.
+  const tone = palette[climbed ? 'win' : 'loss'];
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-      <Icon
-        name={climbed ? 'arrow.up' : 'arrow.down'}
-        size={11}
-        tint={climbed ? theme.colors.green : theme.colors.red}
-      />
+      <Icon name={climbed ? 'arrow.up' : 'arrow.down'} size={11} tint={tone.fg} />
       <RNText
         style={{
           fontFamily: MONO_BOLD,
           fontSize: 11,
-          color: climbed ? theme.colors.green : theme.colors.red,
+          color: tone.fg,
           fontVariant: ['tabular-nums'],
         }}
       >
@@ -183,6 +178,7 @@ function Movement({ from, to }: { from: number | null; to: number }) {
 
 function DuelBlock({ duels, hasRank }: { duels: ScoutDuelRecord; hasRank: boolean }) {
   const theme = useTheme();
+  const palette = useScoutPalette();
   const played = duels.won + duels.tied + duels.lost;
 
   return (
@@ -208,14 +204,14 @@ function DuelBlock({ duels, hasRank }: { duels: ScoutDuelRecord; hasRank: boolea
       ) : (
         <>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 18, marginTop: 10 }}>
-            <Tally value={duels.won} label="won" color={theme.colors.green} />
-            <Tally value={duels.tied} label="tied" color={theme.colors.slate} />
-            <Tally value={duels.lost} label="lost" color={theme.colors.red} />
+            <DuelTally value={duels.won} label="won" tone="win" />
+            <DuelTally value={duels.tied} label="tied" tone="draw" />
+            <DuelTally value={duels.lost} label="lost" tone="loss" />
             {/* ⚠ ONLY WHEN THERE ARE ANY. An odd-sized pool gives everybody a
                 bye eventually; an even one never does, and a permanent "0 byes"
                 column would be dead space in half of all pools. */}
             {duels.byes > 0 ? (
-              <Tally value={duels.byes} label={duels.byes === 1 ? 'bye' : 'byes'} color={theme.colors.slate} />
+              <DuelTally value={duels.byes} label={duels.byes === 1 ? 'bye' : 'byes'} tone="draw" />
             ) : null}
 
             <View style={{ flex: 1 }} />
@@ -225,7 +221,10 @@ function DuelBlock({ duels, hasRank }: { duels: ScoutDuelRecord; hasRank: boolea
                 style={{
                   fontFamily: MONO_BOLD,
                   fontSize: 16,
-                  color: theme.colors.accent,
+                  // ⚠ THE FINDING OF THIS BLOCK. Duel points are what the
+                  // Showdown ladder is decided on; the W/T/L tallies beside them
+                  // are how they were earned.
+                  color: palette.finding.fg,
                   fontVariant: ['tabular-nums'],
                 }}
               >
@@ -237,7 +236,7 @@ function DuelBlock({ duels, hasRank }: { duels: ScoutDuelRecord; hasRank: boolea
             </View>
           </View>
 
-          <FormStrip form={duels.form} />
+          <DuelForm form={duels.form} />
         </>
       )}
     </View>
@@ -252,18 +251,21 @@ function DuelBlock({ duels, hasRank }: { duels: ScoutDuelRecord; hasRank: boolea
  * days on real seasons. `slice(-5)` therefore takes the five most RECENT, and
  * they still read left to right in the order they happened. Do not re-sort.
  */
-function FormStrip({ form }: { form: ScoutDuelRecord['form'] }) {
+function DuelForm({ form }: { form: ScoutDuelRecord['form'] }) {
   const theme = useTheme();
+  const palette = useScoutPalette();
   if (form.length === 0) return null;
 
   const last = form.slice(-5);
+  // ⚠ A DUEL'S VOCABULARY IS NOT A FIXTURE'S. won/tied/lost map onto the outcome
+  // tones cleanly, but a BYE has its own letter: drawn as a tie it would claim a
+  // contest that never happened, and the two are worth the same points (250
+  // each, which is exactly why a bye counted by value looks like a draw).
   const tone = {
-    won: { bg: withOpacity(theme.colors.green, 0.18), fg: theme.colors.green, letter: 'W' },
-    tied: { bg: withOpacity(theme.colors.slate, 0.18), fg: theme.colors.slate, letter: 'T' },
-    lost: { bg: withOpacity(theme.colors.red, 0.18), fg: theme.colors.red, letter: 'L' },
-    // ⚠ A BYE IS ITS OWN LETTER. Drawn as a tie it would claim a contest that
-    // never happened, and the two are the same number of points.
-    bye: { bg: withOpacity(theme.colors.slate, 0.1), fg: theme.colors.slate, letter: '–' },
+    won: { ...palette.win, letter: 'W' },
+    tied: { ...palette.draw, letter: 'T' },
+    lost: { ...palette.loss, letter: 'L' },
+    bye: { fg: palette.draw.fg, tint: withOpacity(palette.draw.fg, 0.08), letter: '–' },
   } as const;
 
   return (
@@ -276,7 +278,7 @@ function FormStrip({ form }: { form: ScoutDuelRecord['form'] }) {
               width: 24,
               height: 24,
               borderRadius: theme.radii.xs,
-              backgroundColor: tone[r].bg,
+              backgroundColor: tone[r].tint,
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -296,15 +298,25 @@ function FormStrip({ form }: { form: ScoutDuelRecord['form'] }) {
   );
 }
 
-function Tally({ value, label, color }: { value: number; label: string; color: string }) {
+function DuelTally({
+  value,
+  label,
+  tone,
+}: {
+  value: number;
+  label: string;
+  tone: ScoutTone;
+}) {
   const theme = useTheme();
+  const palette = useScoutPalette();
   return (
     <View style={{ alignItems: 'flex-start' }}>
       <RNText
         style={{
           fontFamily: MONO_BOLD,
           fontSize: 18,
-          color: value > 0 ? color : theme.colors.slate,
+          // ⚠ A ZERO EARNS NO COLOUR. "0 won" in green reads as a result.
+          color: value > 0 ? palette[tone].fg : theme.colors.slate,
           fontVariant: ['tabular-nums'],
         }}
       >

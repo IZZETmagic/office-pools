@@ -73,6 +73,10 @@ type FixtureRow = {
 
 const toClubRef = (c: ClubRow): ClubRef => ({
   clubId: c.club_id,
+  // ⚠ THE CROSS-SEASON IDENTITY — see `ClubRef`. It was already selected here
+  // for the head-to-head lookup; carrying it on the ref is what lets club leans
+  // survive a season boundary.
+  externalClubId: c.external_club_id,
   name: c.name,
   abbreviation: c.abbreviation,
   crestUrl: c.crest_url,
