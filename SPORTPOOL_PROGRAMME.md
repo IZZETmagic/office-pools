@@ -2287,7 +2287,7 @@ registers are not decoration.
 
 ## ⚽ Live match & rich football data
 
-> A cluster from the board's "Others" column — richer team/player/match data plus live-match state. Mostly new api-football pulls + new detail screens; grouped so they can be built as one content system. **Audit theme (2026-07-12):** the api-football client only fetches fixtures/events/teams; the five "rich data" items below are all TODO and DB-gated. The live-state items are further along on **mobile** than web.
+> A cluster from the board's "Others" column — richer team/player/match data plus live-match state. Mostly new api-football pulls + new detail screens; grouped so they can be built as one content system. **Audit theme (2026-07-12):** the api-football client only fetches fixtures/events/teams; the five "rich data" items below are all TODO and DB-gated. The live-state items are further along on **mobile** than web. ⚠️ **Half-superseded 2026-09-12:** the client now also speaks **line-ups, team statistics, standings, head-to-head and teams**, and `/fixtures?ids=` bundles per-player stats into a call the sync already pays for — so "rich data is DB-gated" is no longer the blocker on this cluster. What is still true is the **surface** gap: the data mostly exists and mostly renders on **mobile only**. Read each item's own dated note, not this line.
 
 ### Detailed team page `Feature`
 - **Is:** Tap a team anywhere (fixtures, standings, predictions) to open a team detail page with its own tabs — squad list, honours/trophy history, etc. Parent for several items below.
@@ -2313,9 +2313,55 @@ registers are not decoration.
 ### Match line-ups `Feature`
 - **Is:** A tab showing each team's line-up on a pitch appropriate to the sport (football pitch; formations like 4-4-2 / 4-2-3-1).
 - **Touches:** match detail page + lineup endpoint from api-football + a pitch/formation renderer.
-- **Audit 2026-07-12:** TODO — no lineup/formation code or endpoint.
-- **Effort:** ~2–4 days.
-- **Done when:** the match-detail page shows both line-ups on a pitch with formations, when the API provides them.
+- ~~**Audit 2026-07-12:** TODO — no lineup/formation code or endpoint.~~
+- ⚠️ **Audit superseded 2026-09-12 — the 2026-07-12 note is stale and was wrong to keep reading as TODO.** `getFixtureLineups` and `lineupsToRows` both exist, `match_lineups` is populated for **100% of completed fixtures across five leagues**, and [`mobile/components/match/LineupsTab.tsx`](mobile/components/match/LineupsTab.tsx) renders both sides on a real pitch from each player's `grid` — wired into [`mobile/app/match/[matchId].tsx:257`](mobile/app/match/[matchId].tsx). **Mobile is DONE. Web has nothing** — `grep` for `match_lineups`/`startXI`/`lineup` across `app/` and `components/` returns **zero** hits. The remaining work is the web surface only, not the data.
+- **Effort:** ~1 day for the web surface (mobile's renderer is the reference; the rows are already there).
+- **Done when:** ~~the match-detail page shows both line-ups on a pitch with formations~~ — met on mobile; **web match detail** shows the same.
+
+### Probable XI — the line-up before the team sheet `Feature`
+
+- **Is:** On a fixture whose team sheet has not been published, both sides shown on the pitch as a **Probable XI** — the XI each club last started, with anyone reported injured removed and a replacement promoted into the vacated shirt. Visually distinct from a confirmed line-up, labelled with its own accuracy, and replaced by the real team sheet automatically the moment the feed publishes one.
+- **Why it is ours to build:** api-football has **no predicted-line-up endpoint on any plan** — probed live 2026-09-12 on our Pro key. `/predictions` is a match-*outcome* model (winner %, over/under, `advice`) and carries no player data whatsoever. `/fixtures/lineups` answers `results: 0` at 24h out; the real XI lands ~1h before kickoff, which is what `getFixtureLineups`' own comment already says. The gap between *"members are picking"* and *"a team sheet exists"* is therefore **the entire week**, and no plan upgrade closes it.
+
+**⭐ It costs almost nothing, because we already own the raw material.** `match_lineups` holds **every completed fixture in all five leagues** — Premier League, La Liga, Serie A, Ligue 1, Bundesliga — each player carrying the provider's own `grid` "row:col". And the pitch is already drawn: `LineupsTab.tsx` + `PitchMarkings` + `lib/lineupLayout.ts` render from exactly that shape. This is **a new derivation over existing rows, on an existing renderer** — not a new data pull and not a new screen.
+
+**⭐⭐ THE MODEL IS THE BORING ONE, AND THAT IS A MEASURED RESULT, NOT A PREFERENCE.** Backtested 2026-09-12 over **242 consecutive-fixture pairs** across the five leagues:
+
+| model | correct starters |
+|---|---|
+| **repeat the XI the club last started** | **8.76 / 11 — 79.6%** |
+| recency-weighted top-11 over the last 5 matches | 8.68 / 11 |
+| recency-weighted, slotted by position | 8.62 / 11 |
+
+Both cleverer models are **worse than doing nothing clever**. At three or four matches of history the frequency signal is noise and the weighted models spend it. ⚠ **Do not "improve" this into the sophisticated version without re-running the backtest on a deeper season** — the ordering may well flip once clubs have twenty starts on record, but today it does not, and the naive model is also the only one explainable in a single sentence.
+
+Formation repeats **68.2%** of the time — and `formation` is a caption anyway. ⚠ **Position comes from `grid`, never from the formation string**, which is the rule `LineupsTab` already documents and enforces.
+
+**⭐ The one genuinely forward-looking input is `/injuries`, and it is a hard exclusion.** Measured across 12 Premier League fixtures: **88 unique flagged players, and every single one was absent from the matchday squad** — not starting, not benched. Zero false positives. Recall is **47%** (of 15 previous starters who vanished, 7 were flagged; the other 8 were rotation, rest or tactics, which no feed predicts and this feature must not pretend to). On 24 club-sides the filter made **7 correct removals and 0 wrong ones**.
+
+That asymmetry *is* the design: a removal is **never** a loss, because the removed player genuinely was not starting. Every vacancy the filter opens is free upside — filling it well gains, filling it badly gains nothing and costs nothing.
+
+**⚠ `/injuries?fixture=` RETURNS EVERY PLAYER TWICE** — 14 rows for 7 players, verified live. Dedupe by `player.id`.
+
+**⭐ One call covers a whole league.** `/injuries?league=39&season=2026` returned **451 rows spanning 40 fixtures and 122 players, unpaginated**. The feature's entire provider cost is ~1 call per league per refresh, against 7,500/day. The line-up history costs nothing — it is already in the DB.
+
+- **Touches:** a new **pure** derivation module (last XI → injury exclusion → replacement pick) reading `match_lineups`; an `/injuries` pull added to the sync that already runs; the mobile pitch renderer, reused and given a "probable" state; web match detail (which per the item above has no line-up surface at all yet); and the scout sheet as the natural entry point.
+
+**The disclosure gate — passes.** The one-sentence tooltip is *"This is the XI Arsenal last started, minus anyone reported injured. It's right about 8 times out of 11."* Saying the accuracy out loud does not kill the feature — it is the reason to trust it. And all the uncertainty is inherited from the sporting event, so **Decision 8's fifth gate is clear**: we add no randomness of our own.
+
+**⚠ Traps, all already known and all already written down somewhere:**
+- **Do not read `match_player_stats.is_starter`** — known-wrong; the provider sends `substitute: false` for whole squads. `match_lineups.players[].starter` is the honest source.
+- **A substitute has `grid: null`** by design, so a promoted replacement must be given a slot explicitly — it inherits the vacated player's `grid`.
+- **August is the weak point.** Three or four matches of history is the thinnest this model is ever asked to work from, and it strengthens every week. Launching in the opening fortnight of a season shows it at its worst.
+
+- **Effort:** ~2–3 days on top of the existing renderer — the derivation is pure and testable, and the pull is one line on a cron that already runs.
+- **Done when:** a fixture with no published team sheet shows both Probable XIs on the pitch, marked as probable, with reported-injured players excluded — and the real line-up replaces it automatically with no deploy.
+
+**Open calls — none of these are settled:**
+1. **Where it surfaces** — behind the scout sheet as a fifth card, on match detail, or both.
+2. **Whether the accuracy is stated numerically** (*"8 of 11 typically right"*) or qualitatively (*"usually close"*). The gate is satisfied either way; the number is stronger and harder to walk back later.
+3. **How a vacancy is filled.** Recency-weighted starts at that position is the proposal — but *"leave the shirt empty and mark it doubtful"* is a legitimate and more honest alternative that never invents a name. Given the backtest result, the humbler option deserves a real hearing.
+4. **Whether it ships for all five leagues at once.** The data supports it; appetite is a separate question.
 
 ### Match events `Feature`
 - **Is:** A tab (or section on the match-detail page) for in-match events — goals, red/yellow cards, subs — whatever the API exposes.
