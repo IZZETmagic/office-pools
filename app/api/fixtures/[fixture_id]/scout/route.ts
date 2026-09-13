@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
 import { MIN_MEETINGS, summariseH2H, type H2HFixture } from '@/lib/scouting/h2h'
 import { fetchCachedH2H } from '@/lib/scouting/h2hFetch'
+import { pickHeadline } from '@/lib/scouting/headline'
 import { buildMatchForm, type FormFixture } from '@/lib/scouting/form'
 import { scoutSide, type SideScout } from '@/lib/scouting/players'
 import { readClubPlayerForm } from '@/lib/scouting/readPlayers'
@@ -171,6 +172,35 @@ async function handler(
     }),
   ])
 
+  /**
+   * The one line on the pairing card worth reading aloud, or nothing.
+   *
+   * ## ⚠ COMPOSED HERE, NOT ON THE PHONE
+   *
+   * Same call `describeDossier` makes. One owner is why web and RN cannot drift
+   * into two characterisations of one fixture, and why a member who screenshots
+   * the line sees what everybody else sees.
+   *
+   * ⚠ IT NEEDS BOTH HALVES, WHICH IS WHY IT RUNS AFTER THE FAN-OUT. The most
+   * useful candidate — "won four straight at home, lost four straight away" —
+   * reads the FORM, and the rest read the history. Either may be null and the
+   * picker copes; it simply has fewer candidates to choose from.
+   *
+   * ⚠ NULL IS THE COMMON CASE. Most fixtures have no fact that beats chance, and
+   * the card is designed to carry no gold line at all.
+   */
+  const headline =
+    h2h && homeClub.externalClubId
+      ? pickHeadline({
+          summary: h2h.summary,
+          form,
+          homeName: homeClub.name,
+          awayName: awayClub.name,
+          homeExternalId: homeClub.externalClubId,
+          venue: fixture.venue,
+        })
+      : null
+
   return NextResponse.json({
     fixture: {
       fixture_id: fixture.fixture_id,
@@ -183,6 +213,7 @@ async function handler(
     people,
     crowd,
     h2h,
+    headline,
   })
 }
 

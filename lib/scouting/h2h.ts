@@ -131,12 +131,24 @@ export type H2HSummary = {
 const RECENT = 5
 
 /**
- * Visits without a win before it is worth saying out loud.
+ * Visits without a win before the FACT is worth computing.
  *
- * ⚠ THREE, AND IT IS A FLOOR ON A SENTENCE RATHER THAN ON A RATE. The figures
- * on this card carry their own denominators and can be read at any sample; a
- * line like "have not won here since 2011" cannot — it either reads as a hoodoo
- * or it is noise, and two visits is noise.
+ * ## ⚠⚠ THIS IS NO LONGER THE FLOOR ON THE SENTENCE — see `headline.ts`
+ *
+ * It used to be both, and three was far too low for a sentence. An away win
+ * happens 33.1% of the time, so three visits without one occurs **29.9% of the
+ * time by chance**: roughly one pairing in three was handed "have not won here
+ * since 2011" as though it were a hoodoo rather than a base rate.
+ *
+ * The display decision moved to `pickHeadline`, which requires SIX visits for a
+ * dated drought (≈9%) and five for a "never won here" (≈13%), and ranks both
+ * against other candidates. This constant now only decides when the raw field is
+ * worth filling in, and it stays low on purpose — a consumer with a different
+ * threshold should be able to apply it without a second read.
+ *
+ * ⚠ SO DO NOT RAISE THIS TO MATCH THE PICKER. Two floors for one concept is
+ * confusing; one floor on the DATA and one on the SENTENCE is the separation
+ * that let the sentence be fixed without touching the summariser.
  */
 export const MIN_DROUGHT_VISITS = 3
 

@@ -60,6 +60,7 @@ export function ScoutReport({ data }: { data: MatchScoutResponse }) {
           better than one that buries the sentence under a table. */}
       <PairingCard
         h2h={data.h2h}
+        headline={data.headline}
         homeName={data.fixture.home.name}
         awayName={data.fixture.away.name}
         venue={data.fixture.venue}
@@ -110,11 +111,13 @@ export function ScoutReport({ data }: { data: MatchScoutResponse }) {
  */
 function PairingCard({
   h2h,
+  headline,
   homeName,
   awayName,
   venue,
 }: {
   h2h: MatchScoutResponse['h2h'];
+  headline: MatchScoutResponse['headline'];
   homeName: string;
   awayName: string;
   venue: string | null;
@@ -177,7 +180,12 @@ function PairingCard({
               label="Most common scoreline"
               value={s.commonScore.score.replace('-', '–')}
               note={`${s.commonScore.count} of ${s.meetings}`}
-              finding
+              // ⚠⚠ GOLD ONLY WHEN THERE IS NO HEADLINE, because the grammar
+              // allows exactly one finding a card and the headline is now the
+              // slot for it. Without this the card carries two gold elements —
+              // and `common_score` is itself one of the headline candidates, so
+              // the two could state the same fact twice, both in gold.
+              finding={!headline}
             />
           ) : null}
           <ScoutRow
@@ -220,17 +228,21 @@ function PairingCard({
           </View>
         ) : null}
 
-        {/* ⚠ "NOT WON SINCE 2011" AND "NEVER WON HERE" ARE DIFFERENT SENTENCES,
-            and the second is stronger. The server sends a null year for it
-            rather than the earliest date in the sample, so this can say which is
-            true. */}
-        {s.venueDrought ? (
-          <Finding note={`${s.venueDrought.visits} visit${s.venueDrought.visits === 1 ? '' : 's'}`}>
-            {s.venueDrought.lastWinYear
-              ? `${s.venueDrought.side === 'home' ? homeName : awayName} have not won at ${venue ?? 'this ground'} since ${s.venueDrought.lastWinYear}.`
-              : `${s.venueDrought.side === 'home' ? homeName : awayName} have never won at ${venue ?? 'this ground'}.`}
-          </Finding>
-        ) : null}
+        {/* ## ⚠⚠ THE SERVER CHOOSES THE SENTENCE, AND USUALLY THERE ISN'T ONE
+            
+            This was a hardcoded drought line — "have not won here since 2011" —
+            drawn whenever a club had visited three times without winning. At a
+            measured 33.1% away-win rate that happens 29.9% of the time BY
+            CHANCE, so one pairing in three was being handed a base rate dressed
+            as a hoodoo. It was also a fact about 2011 on a card whose job is a
+            pick this weekend.
+
+            `pickHeadline` now ranks a set of candidates by how unlikely each is,
+            and the strongest TRUE one wins — including one drawn from FORM,
+            which is the only thing here about now. Most fixtures qualify for
+            none, and a card with no gold line is the design working rather than
+            a gap. */}
+        {headline ? <Finding note={headline.note}>{headline.text}</Finding> : null}
       </ScoutCardBody>
     </ScoutCard>
   );

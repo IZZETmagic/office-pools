@@ -2224,6 +2224,30 @@ export type MatchScoutResponse = {
    */
   crowd?: ScoutCrowd | null;
   h2h?: { summary: H2HSummary; enough: boolean; minMeetings: number } | null;
+  /**
+   * The one line on the pairing card worth reading aloud.
+   *
+   * ## ⚠⚠ NULL IS THE COMMON CASE AND IT IS NOT A FAILURE
+   *
+   * It replaced a hardcoded drought sentence that fired whenever a club had
+   * visited three times without winning — which, at a measured 33.1% away-win
+   * rate, happens **29.9% of the time by chance**. One pairing in three was
+   * being told a base rate as though it were a hoodoo.
+   *
+   * Now a ranked set of candidates each carries a threshold that beats chance,
+   * and most fixtures qualify for none. A card with no gold line on it is the
+   * design working — `Finding` allows at most one and expects to be absent.
+   *
+   * ⚠ COMPOSED SERVER-SIDE. The phone renders the string and must not build its
+   * own; see `lib/scouting/headline.ts`.
+   */
+  headline?: {
+    text: string;
+    /** Its denominator — "7 visits", "of 11". Never omitted. */
+    note: string;
+    /** Which candidate fired. Not rendered; useful in a bug report. */
+    kind: string;
+  } | null;
 };
 
 export async function fetchMatchScout(fixtureId: string): Promise<MatchScoutResponse> {
