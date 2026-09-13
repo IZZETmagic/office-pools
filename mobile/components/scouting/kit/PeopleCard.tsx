@@ -1,8 +1,10 @@
+import { Image } from 'expo-image';
 import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
 import type { PlayerForm, SideScout } from '@/lib/api';
+import { playerPhotoUrl } from '@/lib/playerStats';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 import { ScoutCard, ScoutBlurb } from './ScoutCard';
@@ -168,6 +170,8 @@ function PlayerRow({
         paddingVertical: 9,
       }}
     >
+      <PlayerFace player={player} />
+
       <View style={{ flex: 1, minWidth: 0 }}>
         <RNText
           numberOfLines={1}
@@ -208,6 +212,73 @@ function PlayerRow({
           {metric === 'rating' ? player.rating.toFixed(2) : `${involvements}`}
         </RNText>
       </View>
+    </View>
+  );
+}
+
+/** How big a face is on a scout row. */
+const FACE = 32;
+
+/**
+ * The player's photograph.
+ *
+ * ## ⚠⚠ THE FALLBACK IS DRAWN FIRST, UNDERNEATH — NOT AS AN ELSE BRANCH
+ *
+ * `expo-image` renders NOTHING when a source fails, and the provider answers an
+ * unknown id with HTML rather than a 404. So there is no error event to hang an
+ * `onError` on: whatever sits beneath the image simply shows through. A
+ * conditional fallback — the shape the old peek list used — leaves an empty
+ * circle instead, because the ternary has already chosen the image branch by the
+ * time the load fails. Same call `LineupsTab` makes, and it carries the note.
+ *
+ * ⚠ THE POSITION IS THE FALLBACK, NOT THE CLUB CREST. The peek list used a crest
+ * because its one list mixed both sides; here the card title already names the
+ * club, so a crest would repeat it. The position is the next most useful thing
+ * about a face you cannot see.
+ *
+ * ⚠ `cover`, NOT `contain`. These are 150×150 head-and-shoulders cutouts and
+ * letterboxing one inside a circle wastes the little room a face has.
+ *
+ * ⚠ AND THE IMAGES COST NO PROVIDER QUOTA. `media.api-sports.io` is not the API
+ * host — no key is sent and the daily counter does not move. The app already
+ * hotlinks this exact CDN for club crests.
+ */
+function PlayerFace({ player }: { player: PlayerForm }) {
+  const theme = useTheme();
+  const photo = playerPhotoUrl(player.externalPlayerId);
+
+  return (
+    <View
+      style={{
+        width: FACE,
+        height: FACE,
+        borderRadius: theme.radii.pill,
+        backgroundColor: theme.colors.mist,
+        alignItems: 'center',
+        justifyContent: 'center',
+        // ⚠ THE CIRCLE MUST CLIP. The photograph is a square and without this it
+        // renders as one, corners and all.
+        overflow: 'hidden',
+      }}
+    >
+      <RNText
+        style={{ fontFamily: MONO_BOLD, fontSize: 10, color: theme.colors.slate }}
+      >
+        {player.position ?? '\u00b7'}
+      </RNText>
+      {photo ? (
+        <Image
+          source={{ uri: photo }}
+          style={{ position: 'absolute', width: FACE, height: FACE }}
+          contentFit="cover"
+          // Twelve can load at once on a two-club card; the disk cache means that
+          // cost is paid on the first look at a fixture and never again.
+          cachePolicy="memory-disk"
+          transition={120}
+          // Decorative — the name sits beside it.
+          alt=""
+        />
+      ) : null}
     </View>
   );
 }
