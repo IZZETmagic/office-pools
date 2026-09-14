@@ -33,6 +33,19 @@ const card = (dir, f) => {
   </figure>`
 }
 
+
+// §4.4 — the character is in a list, not on a half-screen. Below ~36px the
+// mouth is two pixels, so this row is the real acceptance test for a base.
+const sizes = (dir) => {
+  const files = readdirSync(dir).filter((f) => f.endsWith('.svg')).sort()
+  const row = (bg, label) => `<div class="sizes" style="background:${bg}">
+    <span class="sz">${label}</span>
+    ${files.map((f) => [24, 32, 36, 64].map((px) =>
+      `<img src="../${dir}/${f}" width="${px}" height="${px}" style="border-radius:50%">`).join('')).join('<i></i>')}
+  </div>`
+  return row('#F7F8FC', 'snow') + row('#0B0F1A', 'midnight')
+}
+
 const grid = (dir, cols) =>
   `<div class="grid" style="--cols:${cols}">${readdirSync(dir).filter((f) => f.endsWith('.svg')).sort().map((f) => card(dir, f)).join('')}</div>`
 
@@ -50,10 +63,34 @@ const html = `<!doctype html><meta charset="utf-8"><title>SportPool base avatars
   figcaption { font-size:12px; color:#C7CCD1; padding-top:8px; display:flex; flex-direction:column; gap:2px }
   .m { color:#6E757C; font-size:11px }
   .w { color:#F5C518; font-size:11px }
+  .sizes { display:flex; align-items:center; gap:6px; padding:14px; border-radius:12px; margin-bottom:10px; flex-wrap:wrap }
+  .sizes i { width:14px; display:inline-block }
+  .sz { font-size:11px; color:#8B97B8; width:64px }
   .note { border-left:3px solid #3B6EFF; padding:2px 0 2px 14px; margin:20px 0; color:#C7CCD1; max-width:70ch }
 </style>
 <h1>Base avatar exploration — Recraft</h1>
 <p>14 Sep 2026. Newest round first. Rounds 1 and 2 are kept because what they ruled out is the reason round 3 is shaped the way it is.</p>
+
+<h2>Round 4 — the SportPool palette</h2>
+<p>The three you circled, recoloured rather than regenerated (§7c.4: generate for form, recolour for
+palette). No API calls, nothing lost from the art you picked. The ground is the user's identity colour —
+<code>avatarGradient</code>'s first stop, the same colour their initials already carry — and the kit is a
+colourway off <code>lib/design/tokens.ts</code>. Skin and hair are untouched, per §5.3.</p>
+<div class="note">The two things this had to get past, both measured: the background disc is <b>two</b>
+half-elements, and in two of the three the hair and the jersey are the <b>same fill</b>. Recolouring by
+colour value dyed the hair to match the shirt; roles are resolved from rendered geometry instead.</div>
+${grid('assets/avatar-sportpool', 4)}
+
+<h2>Round 4 at real size</h2>
+<p>§4.4: a pool card renders a person at 24px, a banter row at 32px, a member list at 36px. Shown on both
+grounds, because the app has a light and a dark theme.</p>
+<div class="note"><b>These are cropped, and the crop is the reason they work at 24px.</b> Measured under a
+circular crop of the raw canvas: <b>45–48%</b> of every avatar was white margin and only <b>5.5–11.4%</b>
+was the identity colour — on <code>midnight</code> that margin renders as a white ring. Re-cropped to the
+figure via <code>viewBox</code> (which react-native-svg honours, unlike a transform string — C1), the
+margin drops to <b>3–5%</b> and the identity colour rises to <b>7.8–17.6%</b>.<br>
+⚠ B-S1 is the weak one at 7.8%: its head is large against its disc, so the identity colour barely reads.</div>
+${sizes('assets/avatar-sportpool')}
 
 <h2>Round 3B — reference-led, five shapes</h2>
 <p>The five reference tiles built into one vector style, which then carries the look so the prompt only

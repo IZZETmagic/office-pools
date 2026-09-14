@@ -12,10 +12,112 @@
   figcaption { font-size:12px; color:#C7CCD1; padding-top:8px; display:flex; flex-direction:column; gap:2px }
   .m { color:#6E757C; font-size:11px }
   .w { color:#F5C518; font-size:11px }
+  .sizes { display:flex; align-items:center; gap:6px; padding:14px; border-radius:12px; margin-bottom:10px; flex-wrap:wrap }
+  .sizes i { width:14px; display:inline-block }
+  .sz { font-size:11px; color:#8B97B8; width:64px }
   .note { border-left:3px solid #3B6EFF; padding:2px 0 2px 14px; margin:20px 0; color:#C7CCD1; max-width:70ch }
 </style>
 <h1>Base avatar exploration — Recraft</h1>
 <p>14 Sep 2026. Newest round first. Rounds 1 and 2 are kept because what they ruled out is the reason round 3 is shaped the way it is.</p>
+
+<h2>Round 4 — the SportPool palette</h2>
+<p>The three you circled, recoloured rather than regenerated (§7c.4: generate for form, recolour for
+palette). No API calls, nothing lost from the art you picked. The ground is the user's identity colour —
+<code>avatarGradient</code>'s first stop, the same colour their initials already carry — and the kit is a
+colourway off <code>lib/design/tokens.ts</code>. Skin and hair are untouched, per §5.3.</p>
+<div class="note">The two things this had to get past, both measured: the background disc is <b>two</b>
+half-elements, and in two of the three the hair and the jersey are the <b>same fill</b>. Recolouring by
+colour value dyed the hair to match the shirt; roles are resolved from rendered geometry instead.</div>
+<div class="grid" style="--cols:4"><figure>
+    <img src="../assets/avatar-sportpool/B-S1-roundsquare-accent.svg" loading="lazy">
+    <figcaption>B-S1-roundsquare-accent
+      <span class="m">14 paths · 6 fills</span>
+      <span class="w">⚠ 6 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S1-roundsquare-emerald.svg" loading="lazy">
+    <figcaption>B-S1-roundsquare-emerald
+      <span class="m">14 paths · 6 fills</span>
+      <span class="w">⚠ 6 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S1-roundsquare-primary.svg" loading="lazy">
+    <figcaption>B-S1-roundsquare-primary
+      <span class="m">14 paths · 6 fills</span>
+      <span class="w">⚠ 6 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S1-roundsquare-rose.svg" loading="lazy">
+    <figcaption>B-S1-roundsquare-rose
+      <span class="m">14 paths · 6 fills</span>
+      <span class="w">⚠ 6 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S2-oval-accent.svg" loading="lazy">
+    <figcaption>B-S2-oval-accent
+      <span class="m">14 paths · 7 fills</span>
+      <span class="w">⚠ 7 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S2-oval-emerald.svg" loading="lazy">
+    <figcaption>B-S2-oval-emerald
+      <span class="m">14 paths · 7 fills</span>
+      <span class="w">⚠ 7 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S2-oval-primary.svg" loading="lazy">
+    <figcaption>B-S2-oval-primary
+      <span class="m">14 paths · 7 fills</span>
+      <span class="w">⚠ 7 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S2-oval-rose.svg" loading="lazy">
+    <figcaption>B-S2-oval-rose
+      <span class="m">14 paths · 7 fills</span>
+      <span class="w">⚠ 7 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S4-squarejaw-accent.svg" loading="lazy">
+    <figcaption>B-S4-squarejaw-accent
+      <span class="m">14 paths · 6 fills</span>
+      <span class="w">⚠ 6 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S4-squarejaw-emerald.svg" loading="lazy">
+    <figcaption>B-S4-squarejaw-emerald
+      <span class="m">14 paths · 6 fills</span>
+      <span class="w">⚠ 6 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S4-squarejaw-primary.svg" loading="lazy">
+    <figcaption>B-S4-squarejaw-primary
+      <span class="m">14 paths · 6 fills</span>
+      <span class="w">⚠ 6 fills</span>
+    </figcaption>
+  </figure><figure>
+    <img src="../assets/avatar-sportpool/B-S4-squarejaw-rose.svg" loading="lazy">
+    <figcaption>B-S4-squarejaw-rose
+      <span class="m">14 paths · 6 fills</span>
+      <span class="w">⚠ 6 fills</span>
+    </figcaption>
+  </figure></div>
+
+<h2>Round 4 at real size</h2>
+<p>§4.4: a pool card renders a person at 24px, a banter row at 32px, a member list at 36px. Shown on both
+grounds, because the app has a light and a dark theme.</p>
+<div class="note"><b>These are cropped, and the crop is the reason they work at 24px.</b> Measured under a
+circular crop of the raw canvas: <b>45–48%</b> of every avatar was white margin and only <b>5.5–11.4%</b>
+was the identity colour — on <code>midnight</code> that margin renders as a white ring. Re-cropped to the
+figure via <code>viewBox</code> (which react-native-svg honours, unlike a transform string — C1), the
+margin drops to <b>3–5%</b> and the identity colour rises to <b>7.8–17.6%</b>.<br>
+⚠ B-S1 is the weak one at 7.8%: its head is large against its disc, so the identity colour barely reads.</div>
+<div class="sizes" style="background:#F7F8FC">
+    <span class="sz">snow</span>
+    <img src="../assets/avatar-sportpool/B-S1-roundsquare-accent.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-accent.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-accent.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-accent.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S1-roundsquare-emerald.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-emerald.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-emerald.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-emerald.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S1-roundsquare-primary.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-primary.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-primary.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-primary.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S1-roundsquare-rose.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-rose.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-rose.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-rose.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S2-oval-accent.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-accent.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-accent.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-accent.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S2-oval-emerald.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-emerald.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-emerald.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-emerald.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S2-oval-primary.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-primary.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-primary.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-primary.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S2-oval-rose.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-rose.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-rose.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-rose.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S4-squarejaw-accent.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-accent.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-accent.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-accent.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S4-squarejaw-emerald.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-emerald.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-emerald.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-emerald.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S4-squarejaw-primary.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-primary.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-primary.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-primary.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S4-squarejaw-rose.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-rose.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-rose.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-rose.svg" width="64" height="64" style="border-radius:50%">
+  </div><div class="sizes" style="background:#0B0F1A">
+    <span class="sz">midnight</span>
+    <img src="../assets/avatar-sportpool/B-S1-roundsquare-accent.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-accent.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-accent.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-accent.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S1-roundsquare-emerald.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-emerald.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-emerald.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-emerald.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S1-roundsquare-primary.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-primary.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-primary.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-primary.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S1-roundsquare-rose.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-rose.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-rose.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S1-roundsquare-rose.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S2-oval-accent.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-accent.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-accent.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-accent.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S2-oval-emerald.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-emerald.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-emerald.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-emerald.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S2-oval-primary.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-primary.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-primary.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-primary.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S2-oval-rose.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-rose.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-rose.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S2-oval-rose.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S4-squarejaw-accent.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-accent.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-accent.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-accent.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S4-squarejaw-emerald.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-emerald.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-emerald.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-emerald.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S4-squarejaw-primary.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-primary.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-primary.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-primary.svg" width="64" height="64" style="border-radius:50%"><i></i><img src="../assets/avatar-sportpool/B-S4-squarejaw-rose.svg" width="24" height="24" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-rose.svg" width="32" height="32" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-rose.svg" width="36" height="36" style="border-radius:50%"><img src="../assets/avatar-sportpool/B-S4-squarejaw-rose.svg" width="64" height="64" style="border-radius:50%">
+  </div>
 
 <h2>Round 3B — reference-led, five shapes</h2>
 <p>The five reference tiles built into one vector style, which then carries the look so the prompt only

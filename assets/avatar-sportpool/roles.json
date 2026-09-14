@@ -1,0 +1,77 @@
+[
+  {
+    "base": "B-S1-roundsquare",
+    "skin": {
+      "el": 1,
+      "fill": "rgb(249,193,154)"
+    },
+    "hair": {
+      "el": 2,
+      "cy": 200,
+      "fill": "rgb(111,63,42)"
+    },
+    "kit": {
+      "el": 3,
+      "cy": 778,
+      "fill": "rgb(249,92,80)"
+    },
+    "ground": {
+      "els": [
+        4,
+        5
+      ],
+      "fill": "rgb(27,100,187)"
+    },
+    "sharedKitHairFill": false
+  },
+  {
+    "base": "B-S2-oval",
+    "skin": {
+      "el": 1,
+      "fill": "rgb(253,209,172)"
+    },
+    "hair": {
+      "el": 2,
+      "cy": 200,
+      "fill": "rgb(253,176,83)"
+    },
+    "kit": {
+      "el": 3,
+      "cy": 774,
+      "fill": "rgb(253,176,83)"
+    },
+    "ground": {
+      "els": [
+        12,
+        13
+      ],
+      "fill": "rgb(144,99,224)"
+    },
+    "sharedKitHairFill": true
+  },
+  {
+    "base": "B-S4-squarejaw",
+    "skin": {
+      "el": 1,
+      "fill": "rgb(234,201,179)"
+    },
+    "hair": {
+      "el": 2,
+      "cy": 172,
+      "fill": "rgb(84,65,57)"
+    },
+    "kit": {
+      "el": 3,
+      "cy": 766,
+      "fill": "rgb(84,65,57)"
+    },
+    "ground": {
+      "els": [
+        4,
+        5
+      ],
+      "fill": "rgb(230,225,220)"
+    },
+    "sharedKitHairFill": true
+  }
+]
