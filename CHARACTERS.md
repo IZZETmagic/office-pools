@@ -1189,11 +1189,14 @@ reproducing the design. **That is what a designer buys, and it is why one is nee
 
 ---
 
-# Part 7d — 🔴 Generation cannot produce a parts library
+# Part 7d — ⛔ SUPERSEDED: "Generation cannot produce a parts library"
 
-> **The conclusion of a full day's building, reached from three independent
-> directions. It is not about art quality — the art was fine. Read this before
-> proposing any generative asset pipeline.**
+> **The conclusion below is WRONG and Part 7e replaces it.** It is kept because
+> everything except the conclusion still holds: the five fitting algorithms all
+> really do fail, the structural traps are all real, and §7d.5's process lesson is
+> the most important paragraph in this document. The error was inferring from
+> "no route holds a head fixed" — which was only true because I kept asking the
+> generator for a *part* instead of a whole avatar to take apart.
 
 ## 7d.1 The finding
 
@@ -1282,6 +1285,215 @@ All of it is the machinery a designer's parts drop straight into:
 
 ---
 
+# Part 7e — ✅ Generation DOES produce a parts library — decompose, don't inpaint
+
+> **Supersedes Part 7d's conclusion.** 7d is kept below because its five failed
+> fitting algorithms and its traps are all still true and still worth not
+> repeating. What was wrong was the inference: "no generative route holds a head
+> fixed" was false, and it was false because I only ever asked the generator for
+> a *part*. Established 2026-09-14 across 22 generations and two independent runs.
+
+## 7e.1 The inversion
+
+**Do not generate a hairstyle. Generate a whole avatar and take it apart.**
+
+Recraft draws the **complete skull** and layers hair on top of it. So deleting the
+hair paths from a finished avatar leaves a clean bald head — not a head with a
+hair-shaped bite out of it. Every whole-avatar generation is therefore already a
+matched head-and-part pair, authored together, which is precisely the thing 7d
+declared impossible.
+
+The approved reference (`X3-ponytail.svg`) split into a 22-path base and a 3-path
+ponytail by **deleting three paths**. No mask, no fitting, no inpainting. That pair
+had existed since the moment it was generated; a full day was spent building
+machinery to manufacture something already sitting in the file.
+
+⚠ **Inpainting is the wrong tool and was tried properly before this was found.**
+A hair-only mask does hold the head still — silhouette IoU 0.992–0.998, and the
+residual pixel delta is a slight global recolour, not displacement. But the
+generator paints skin into the mask (7–15% of it), and the results were rejected
+on sight, repeatedly. The mask constrains *where* it paints, never *what*.
+
+## 7e.2 The pipeline
+
+Five steps, all automatic, `align.py`:
+
+| # | Step | Anchor | Why |
+|---|---|---|---|
+| 1 | **Split** | — | background, head, neck/shirt, features removed; what remains is the part |
+| 2 | **Z-flag** | path order in the source | which side of the head the part belongs on |
+| 3 | **Scale** | head's **widest row** | size |
+| 4 | **Position** | **eye line + eye mid-x** | where the part sits on the face |
+| 5 | **Seat** | scalp contact | the one scalar the face cannot supply |
+
+Then `verify.py` passes or fails it.
+
+## 7e.3 Registration: eyes for position, head width for scale
+
+This is **not** the fitting that failed five times. Fitting hair to a head is
+ill-posed — a wig and a skull share no landmark, which is why every attempt in
+§7d.2 failed differently. Eyes to eyes is the *same feature on both sides*, and
+two points give a similarity transform with nothing left to guess.
+
+⚠⚠ **Scale must come from head width, NOT eye separation.** Measured across one
+batch:
+
+| | spread | as a scale factor |
+|---|---|---|
+| eye separation | 369.9 – 439.8 (**19%**) | 0.848 – 1.008 |
+| head widest row | 964 – 1008 (**under 5%**) | 0.956 – 1.000 |
+
+The generator moves the eyes around *inside* a head whose size barely varies.
+Scaling by eye separation shrinks a part by up to 15%, its lower edge stops short
+of the temples, and the result is a symmetric pair of gaps at u ≈ ±0.5 to ±0.9.
+Ryan caught these twice; both times the cause was this.
+
+⚠ **Not "width at the eye line" either** — that conflates head size with where the
+eyes sit. The afro and curly heads measured 840 and 820 against a 964 base purely
+because their eyes are higher, where any skull is narrower. The **widest row** is a
+property of the head alone.
+
+⚠ **And not the head path's bbox**, which is contaminated wherever the head path
+has merged with hair or the neck (one read 1009 against a true 972).
+
+## 7e.4 Seating — and why the aggregation IS the algorithm
+
+Eye registration cannot fix **skull height above the eyes**, which varies 0.39–2.16
+normalised and is *unobservable* once hair covers it. The head path's top edge is
+not the crown: where hair merges into it, it is the hair's top (ratio 2.16); where
+a fringe cuts it, it is the forehead (0.39). That information is not in the file.
+
+So the last scalar is solved geometrically: **slide the part down until it touches
+the scalp, only ever downward.** A gap column is one where the part's lowest pixel
+sits above the head's topmost pixel — background showing through.
+
+⚠⚠ **A bounding box cannot do this.** Every part's bbox already overlapped the
+crown, braids included, because the skull curves away from its own bbox top — at
+the braids' columns the scalp is ~90px lower than `y0`. **Contact is per-column or
+it is nothing.** This is the same error as the five attempts in §7d.2: comparing
+quantities measured at different places on the head.
+
+The aggregation took three tries, and each failure is instructive:
+
+| Rule | Result |
+|---|---|
+| `min` of the gap | "if any column touches, do nothing" — returned 0.0 for all seven parts |
+| `max` over all columns | driven by the extreme sides, where hair is *meant* to hang free — sinks everything |
+| median > 0 as a gate | hid real gaps: topknot's median was −32 while 83 columns still showed background |
+| **any positive gap, close the worst, capped** | ✅ |
+
+⚠ **A narrow band hides gaps.** The first working version measured the central 70%
+— which excluded exactly the columns where topknot's gaps were. It is 0.96 now.
+
+⚠ **The cap is tuned to seven samples.** 20% of head width, chosen so buzzcut's
+required 149.6 units fits while braids' 244 gets clipped. More parts may move it.
+It exists because a part that is too *narrow* for the skull reports a huge temple
+gap that sliding cannot honestly fix — sinking it into the forehead trades one
+visible fault for a worse one.
+
+## 7e.5 Head placement is consistent across runs — measured, not assumed
+
+Two independent runs a day apart, same base prompt, same `style_id`, only the
+hairstyle suffix changed:
+
+| | n | centre max \|Δ\| | centre sd | width max \|Δ\| |
+|---|---|---|---|---|
+| first run | 5 | 1.1 px | 0.49 px | 1.88% |
+| fresh run | 8 | 0.5 px | 0.36 px | 4.71% |
+| **combined** | **13** | **1.1 px** | **0.44 px** | 12 of 13 under 1.9% |
+
+**1.1 pixels of horizontal drift on a 2048 canvas.** The style pins the composition;
+it was not one lucky run.
+
+⚠ **This was also the measurement that misled.** Horizontal was never the problem.
+Eye lines run 743.7–839.3 — a **95px vertical spread** — and I reported the
+horizontal agreement as proof of consistency. *Measure the axis the failure is on.*
+
+## 7e.6 Yield — budget for degenerate generations
+
+**2 of 15 whole-avatar generations were structurally broken (~13%).** Not
+low-quality — structurally absent:
+
+- `X7-moustache` — **no head path at all.** Skin is two half-canvas rectangles with
+  facial features floating on top.
+- `Z2-longstraight` — **no hair path at all.** A dark full-canvas rectangle with a
+  pale shape painted over it; the "hair" is negative space.
+
+Both are now detected and rejected rather than silently producing a face-covering
+slab. ⚠ **There can be more than one full-canvas path** — taking only the largest as
+background leaves the second to be classified as hair.
+
+## 7e.7 The detectors, and the traps in each
+
+Everything is found by **geometry and nesting, never by colour** (§7c.3 holds).
+
+**Head** (`findhead.py`) — width 42–54% of canvas, centre within 120px of the axis,
+top edge in the upper half, *and* its fill reappears on a narrow path low in the
+canvas (the neck) **or** the path itself reaches past 75% (head and neck drawn as
+one). ⚠ Area rank alone picks half-canvas background rectangles. ⚠ Width and centre
+alone pick a black hair mass 1094 wide and dead-centred.
+
+**Eyes** (`eyeline.py`) — a mirrored pair of nested shapes, separation 30–55% of head
+width, tie-broken on **closeness to the axis**. ⚠ Nesting direction is not fixed:
+`X3` is dark-almond → white → highlight; `X1` is *skin*-almond → dark pupil. ⚠ Two
+cornrow braids passed every test at 645px apart. ⚠ Tie-breaking on *width* picks the
+eye whites — crescents offset to one side, reading 37px off-centre.
+
+**Eyebrows** — a mirrored pair, wide and flat, small, high on the face. ⚠ They carry
+the hair's **exact** fill, so colour cannot separate them from hair.
+
+**Vertical bands are unreliable** — the head's bottom edge is the chin when the head
+is its own path (1415) and the *neck's* bottom when they are merged (1620), a 200px
+swing that rejected real eyes in two files.
+
+## 7e.8 The result
+
+Seven styles from one fresh batch, on one base:
+
+| part | scale | dx | dy | seat | gap columns |
+|---|---|---|---|---|---|
+| afro | 0.9918 | +2.5 | +95.7 | 0 | **0** |
+| buzzcut | 0.9959 | +0.1 | +27.2 | 149.6 | **0** |
+| curly | 0.9959 | −4.0 | +91.3 | 0 | **0** |
+| bob | 1.0000 | −6.0 | −6.1 | 0 | **0** |
+| topknot | 0.9563 | +38.8 | +57.7 | 65.6 | **0** |
+| braids | 0.9979 | −3.0 | +33.9 | 192.6 | 16 (max 62px) |
+| pixie | 0.9979 | −4.3 | +54.8 | 75.6 | 6 (max 29px) |
+
+**5 of 7 sit flush. Two residuals, both real and both recorded:**
+
+- **braids** — the band is genuinely too **narrow** for this skull at that height.
+  Seating fixes floating, not proportion. Nothing corrects it but redrawing.
+- **pixie** — 6 columns at u ±1.0, the outermost silhouette edge. A sliver where the
+  hair meets the head's widest point.
+
+⚠ **The numbers are baked into the path data, never written as a `<g transform>`.**
+`react-native-svg` ignores transform strings: that asset renders perfect in a
+browser and misplaced on the phone.
+
+**Cost: ~$0.08 per part.** No designer. The whole investigation — 22 generations
+including every failed inpainting route — came to about $1.80.
+
+## 7e.9 ⭐ The process change that matters
+
+§7d.5 recorded the failure: *verifying that code ran and reporting it as evidence
+the output was right.* The fix is not "look harder", because looking is what kept
+failing. **The fix is that the acceptance criterion is now code.**
+
+`verify.py` counts columns where a part's lowest pixel sits above the head's
+topmost pixel. Zero is the pass condition. Ryan had to be the gap detector three
+times; he should not be the fourth.
+
+⚠ Twice during this work a **number disagreed with what I saw, and the number was
+measuring the wrong thing** — "267k pixels changed" was the background being
+repainted, and "silhouette IoU 0.99" was computed on the region that by
+construction cannot change. **A metric that cannot see the failure is worse than no
+metric**, because it reads as confirmation. Check what a green number is actually
+ranging over before believing it.
+
+
+---
+
 # Part 8 — The gates
 
 ## 8.1 The disclosure gate
@@ -1364,8 +1576,8 @@ Deliberately not dated. Each phase is gated on the previous one's signal, not on
 |---|---|---|
 | **0 — Now → Q1 2027** | **This document.** Grammar, catalogue, states, and *paper* design. Adopt the Avataaars rig (Part 7b), extend the skin/hair ramps, derive the hair volume variants, and scope the football commission. Run the distinguishability test (§5.3). | — |
 | **1** | **Avatars v1** — photo upload + initials. Unchanged from its existing scoping. | — |
-| **1.5** | ✅ **The asset harness — BUILT 2026-09-14.** Four bases, six generated parts, live colour, 32px. It proved the machinery and **disproved generated parts** (Part 7d). The harness stands; the parts do not. | — |
-| **1.6** | 🔴 **Parts authored against one fixed head** — the blocker. A designer, or Avataaars' own 27 styles. Everything downstream is built and waiting. | Part 7d |
+| **1.5** | ✅ **The asset harness — BUILT 2026-09-14.** Live colour, 32px, every part on every base. It proved the recolour and role-tagging machinery, which all still stands. | — |
+| **1.6** | ✅ **The decomposition pipeline — BUILT 2026-09-14, no longer a blocker.** Generate whole avatars, discard the head, keep the part: split → z-flag → eye-register → head-width scale → seat, with `verify.py` as the acceptance test. 5 of 7 parts flush, ~$0.08 each, no designer. **Part 7e.** | — |
 | **2** | **The parts model** — config → scene graph → three renderers. Bust rig only. Static, no motion. Ships to the existing `<Avatar>` call sites. | Phase 1 live |
 | **3** | **The editor** — the customisation UI, mobile-first. Free catalogue only, no purchases. **Needs its own design pass — see below.** | Phase 2 rendering correctly on all six surfaces |
 | **4** | **Figure rig** — full body (Part 7b §7b.5), launching on the **banter auto-share-card**, then the pool card, then the profile. States per §6.2, capped by Q5. | §8.4's edit signal |
@@ -1461,6 +1673,14 @@ Numbered so they can be answered individually. Answered ones are struck through 
    the *"users name their own"* clause in `MONETIZATION.md`.
 8. ~~**Scope check — the figure rig's launch surface.**~~ ✅ **2026-09-14 — the banter auto-share-card
    goes first.** Then pool card → profile → Showdown walkout. See Part 9.
+9. 🔴 **ONE base, or four?** *(opened 2026-09-14 by Ryan — Duolingo ships a single base.)*
+   **Recommendation: drop to one for v1.** It quarters the library, quarters the alignment residuals,
+   and is what Part 7e's pipeline already does — every part today is registered onto a single head.
+   ⚠ **This overturns decision 7c.1**, where four bases were chosen deliberately so *"the character can
+   look like the user"* (Q3). What is lost is one identity axis; what is kept is skin, hair, eyes,
+   brows, nose, ears and kit. ⭐ **It is reversible**: adding base #2 later is a script run plus a
+   `verify.py` review, not a re-authoring — which is exactly what was *not* true this morning.
+   **Not actioned. Ryan's call.**
 
 ---
 
