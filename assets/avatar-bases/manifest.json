@@ -1,0 +1,80 @@
+[
+  {
+    "name": "D1-v41-plain-broad",
+    "model": "recraftv4_1_vector",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Broad rounded-square head, wide flat jaw as wide as the brow.",
+    "paths": 32
+  },
+  {
+    "name": "D1-v41-plain-taper",
+    "model": "recraftv4_1_vector",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Strongly tapered head, wide cheekbones narrowing to a small rounded chin.",
+    "paths": 28
+  },
+  {
+    "name": "D2-v41-chunky-broad",
+    "model": "recraftv4_1_vector",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Broad rounded-square head, wide flat jaw as wide as the brow. Bold chunky geometric shapes, very few colours, confident simple silhouette.",
+    "paths": 21
+  },
+  {
+    "name": "D2-v41-chunky-taper",
+    "model": "recraftv4_1_vector",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Strongly tapered head, wide cheekbones narrowing to a small rounded chin. Bold chunky geometric shapes, very few colours, confident simple silhouette.",
+    "paths": 16
+  },
+  {
+    "name": "D3-v3-roundish-broad",
+    "model": "recraftv3_vector",
+    "style": "Roundish flat",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Broad rounded-square head, wide flat jaw as wide as the brow.",
+    "paths": 34
+  },
+  {
+    "name": "D3-v3-roundish-taper",
+    "model": "recraftv3_vector",
+    "style": "Roundish flat",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Strongly tapered head, wide cheekbones narrowing to a small rounded chin.",
+    "paths": 48
+  },
+  {
+    "name": "D4-v3-vivid-broad",
+    "model": "recraftv3_vector",
+    "style": "Vivid shapes",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Broad rounded-square head, wide flat jaw as wide as the brow.",
+    "paths": 153
+  },
+  {
+    "name": "D4-v3-vivid-taper",
+    "model": "recraftv3_vector",
+    "style": "Vivid shapes",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Strongly tapered head, wide cheekbones narrowing to a small rounded chin.",
+    "paths": 26
+  },
+  {
+    "name": "D5-v3-cutout-broad",
+    "model": "recraftv3_vector",
+    "style": "Cutout",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Broad rounded-square head, wide flat jaw as wide as the brow.",
+    "paths": 154
+  },
+  {
+    "name": "D5-v3-cutout-taper",
+    "model": "recraftv3_vector",
+    "style": "Cutout",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Strongly tapered head, wide cheekbones narrowing to a small rounded chin.",
+    "paths": 322
+  },
+  {
+    "name": "D6-v41-wobble-broad",
+    "model": "recraftv4_1_vector",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Broad rounded-square head, wide flat jaw as wide as the brow. Soft hand-drawn wobble on every edge, slightly imperfect, storybook warmth.",
+    "paths": 27
+  },
+  {
+    "name": "D6-v41-wobble-taper",
+    "model": "recraftv4_1_vector",
+    "prompt": "Flat vector avatar portrait, head and shoulders, centred, facing forward. Oversized rounded head filling most of the frame, small shoulders cropped at the bottom edge. Solid flat fills only: no outlines, no strokes, no gradients, no shadows, no texture. Large almond eyes, white with big dark round pupils, thin flat eyebrows, small simple nose, small calm mouth. Hair is one solid mass with a few carved notches, never individual strands. Wearing a plain sports jersey with a contrast crew collar and shoulder yoke, one solid colour, absolutely no logo, no crest, no badge, no text, no numbers, no sponsor. Friendly caricature, warm and approachable, playful proportions. Flat single-colour circular background. Few colours. Reads clearly at 24 pixels. Strongly tapered head, wide cheekbones narrowing to a small rounded chin. Soft hand-drawn wobble on every edge, slightly imperfect, storybook warmth.",
+    "paths": 28
+  }
+]
