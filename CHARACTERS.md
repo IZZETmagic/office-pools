@@ -446,6 +446,15 @@ head shapes, facial hair, eyewear, boots and accessories. Almost all of "can I l
 front-loaded into hair and skin, and the user base is Bermudian and North American office pools —
 coily, locs, braids and wraps are load-bearing, not a box-tick.
 
+⚠ **30 hair and 12 skin are the floor, not the target** *(Ryan, 2026-09-13: "I definitely do not want
+leaner. I want enough that the character can look like the user.")*. Cutting either is where "basic"
+stops meaning *a smaller product* and starts meaning *a product that quietly excludes people* — which
+is A2's real failure mode.
+
+⭐ **Hair volume being continuous (§4.3) buys more than it looks.** One "short curly" asset covers a
+range of volumes instead of needing three baked variants, so 30 styles is closer to *30 styles × a
+volume range* than to 30 fixed looks. The re-weighting is cheaper than the raw count suggests.
+
 ### Later — the paid layer
 
 Tattoos · jewellery · jerseys and premium colourways · headwear drops · custom Showdown celebrations ·
@@ -811,7 +820,7 @@ Deliberately not dated. Each phase is gated on the previous one's signal, not on
 | **0 — Now → Q1 2027** | **This document.** Grammar, catalogue, states, and *paper* design. No code. Commission or produce the v1 parts catalogue as art. Run the distinguishability test (§5.3). | — |
 | **1** | **Avatars v1** — photo upload + initials. Unchanged from its existing scoping. | — |
 | **2** | **The parts model** — config → scene graph → three renderers. Bust rig only. Static, no motion. Ships to the existing `<Avatar>` call sites. | Phase 1 live |
-| **3** | **The editor** — the customisation UI, mobile-first. Free catalogue only, no purchases. | Phase 2 rendering correctly on all six surfaces |
+| **3** | **The editor** — the customisation UI, mobile-first. Free catalogue only, no purchases. **Needs its own design pass — see below.** | Phase 2 rendering correctly on all six surfaces |
 | **4** | **Figure rig + states** — full body, the eight states, idle, share cards, the banter auto-card. | §8.4's edit signal |
 | **5** | **The Showdown walkout** — the figure replaces the silhouette layer in `MOTION_SPEC.md`. | Phase 4 + whatever the corridor decision lands on |
 | **6** | **The shop** — colourways and accessories, real money, no currency, no packs, no countdowns. | The commercial gate in `MONETIZATION.md` |
@@ -819,6 +828,29 @@ Deliberately not dated. Each phase is gated on the previous one's signal, not on
 ⚠ **Phases 2 and 3 are the ones that decide whether this works.** Everything after is amplification.
 If the editor ships and nobody edits, stop — that is the honest outcome, and it costs weeks instead
 of months.
+
+## 🔴 The editor is a real product and it is not designed yet
+
+Flagged by Ryan 2026-09-13. Phase 3 is one row in a table and it is carrying more than one row's
+worth of work.
+
+**The catalogue decision in §5.3 makes the editor harder, not easier** — and that coupling is the
+point. ~120 assets across 13 slots on a phone cannot be a row of swatches; it needs real navigation,
+a live preview that does not stutter while a slider moves, and an ordering that puts hair and skin
+first because that is where recognition happens. Depth only pays off if the editor makes it
+reachable; otherwise 30 hair styles is a scrolling chore and the user takes the third one.
+
+Things the editor has to settle that nothing above answers:
+
+- **Order of slots.** Skin and hair first, or body first? Recognition says face-first.
+- **Randomise / surprise me.** The cheapest path to a non-default character, and the thing that
+  makes A3's "dignified default" much easier to hit.
+- **Undo, and leaving without saving.** A character is fiddly; losing twenty taps is the classic rage-quit.
+- **The preview's rig.** Bust, figure, or both at once — the user is choosing a thing that renders two ways.
+- **Where it lives.** Profile, onboarding, or both — and whether it is ever forced (it must not be: A1).
+- **Live preview cost on a mid-range Android**, given the parts model re-renders on every change.
+
+Not scoped here. Worth its own pass before Phase 3 starts, and probably its own set of questions.
 
 ---
 
@@ -832,8 +864,9 @@ Numbered so they can be answered individually. Answered ones are struck through 
 2. ~~**§4.3 — proportion.**~~ ✅ **2026-09-13 — 3.35 skull-heights, hair volume 1.00 (range 0.4–1.5),
    55% to the torso, chest bust crop.** Settled against a reference image using the interactive model
    sheet. The measurement trap is recorded in §4.3.
-3. **§5.3 — catalogue size.** Is ~120 v1 assets the right order of magnitude, given A2 says shallow
-   is worse than nothing? This is the main cost driver.
+3. ~~**§5.3 — catalogue size.**~~ ✅ **2026-09-13 — ~120 at the re-weighted split, and explicitly not
+   leaner.** Ryan: *"I definitely do not want leaner. I want enough that the character can look like
+   the user."* 30 hair / 12 skin are the floor, not the target.
 4. **Art production.** In-house, commissioned, or generated-then-hand-corrected? A2 and A4 both push
    toward a real illustrator for the base set. Duolingo's own answer was a character library that
    contractors reference — the library is the deliverable, not the drawings.
