@@ -717,9 +717,27 @@ Why this and not Rive, given Rive is plainly the better animation tool:
 ~0% CPU. Mitigation is §6.2's rule — lists render static poses, and only single-character surfaces
 animate. If that rule is ever broken, this decision becomes wrong.
 
+> ✅ **SETTLED 2026-09-14 (Ryan): Rive is deferred, scoped to the Showdown walkout only.**
+
 ⚠ **Revisit Rive for the walkout specifically, and only after the parts-model walkout exists and is
 judged insufficient.** Never before. The walkout already needs an EAS build for the Skia corridor, so
 it is the one surface where C2's cost is already sunk.
+
+**Two things since strengthened the deferral:**
+
+1. **Part 7b makes the parts model the thing we HAVE, not the thing we'd build.** Avataaars *is* a
+   parts model — SVG, flat fills, modular slots, a config object. Moving to Rive would mean
+   re-authoring the whole catalogue in a second tool.
+2. ⭐ **Q5 removed Rive's one real advantage.** Its killer property is a state machine idling at ~0%
+   CPU where a parts model runs a ticker. **Shared boards are now fully still, so there is no ticker**
+   — the cost Rive was solving no longer exists at the scale that mattered.
+
+**The concrete revisit test**, since "judged insufficient" is mush: prototype the walk, show it to
+three people who do not know it is a prototype, and if it reads robotic, **first** spend two more
+animated values on hair and sleeve lag. Only if that fails does a second toolchain come back on the
+table. And the walkout is easier than it looks — beats 3–5 of 8 in `MOTION_SPEC.md` are *"backlit
+figures"* and *"silhouettes emerge"*; a silhouette needs no walk-cycle fidelity, and full detail only
+has to land from beat 6.
 
 ### C1 is a real trap here
 
@@ -1073,8 +1091,8 @@ Numbered so they can be answered individually. Answered ones are struck through 
    `memory/project_backlog_avatar_cosmetics.md` needs striking.
 5. ~~**§6.3 — celebration on shared boards.**~~ ✅ **2026-09-14 — FULLY STILL.** `idle` on every
    shared surface; expression only on your own surfaces and in duels.
-6. **§7.2 — Rive.** Agreed as deferred, revisited only for the walkout after a parts-model version
-   exists and is judged insufficient?
+6. ~~**§7.2 — Rive.**~~ ✅ **2026-09-14 — deferred, walkout-only.** Q5's still boards removed its one
+   advantage (no ticker to idle against), and Part 7b means the parts model is what we already have.
 7. **§5.4 — kit naming.** Colour-only preset names accepted as a hard rule with a lint check?
 8. **Scope check.** Is Showdown the launch surface for the figure rig, or should it be the profile
    (lower risk, lower reward)?
