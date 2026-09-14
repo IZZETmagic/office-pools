@@ -162,6 +162,47 @@ const SHAPES = [
   { key: '6-long', note: 'jaw 18% taller, same width — the neck moves with it', fx: () => 1, fy: 1.18 },
 ]
 
+// ── Long hair, as a shell with the face cut out of it ────────
+// §7c.7: "what reads as gendered is jaw width, and that reading flips entirely
+// once hair is on." So this is the SAME six skulls with a different hair mass —
+// not six more shapes.
+//
+// ⚠ The mass cannot simply be drawn behind the head: the blue mask is painted
+// AFTER the skin, so anything behind the skin is painted over by it. Instead the
+// hair goes on LAST as a shell — an outer capsule with the warped face outline
+// as a second subpath and `fill-rule="evenodd"`, so the face punches a hole
+// through it. That also means the shell fits each warped skull for free, because
+// the hole IS that skull's outline.
+const hairFill = els.find((e) => e.i === 2) ? els.find((e) => e.i === 2).fill : 'rgb(78,62,61)'
+
+// ⚠ First attempt cut the face out of the capsule with `fill-rule="evenodd"`
+// and the skin path as the hole. It produced a halo: the skin path is
+// CANVAS-WIDE (x 109-1938) and only the mask cuts it down to a face, so the
+// hole was far larger than the visible head and the hair floated off it.
+//
+// The visible head outline is the mask's INNER edge, which means the mask is
+// already exactly the right clip. Intersecting a capsule with it — capsule ∩
+// outside-the-head — gives a band that hugs whatever face shape the warp
+// produced, for free, because the mask was warped with the skull.
+const hairShell = (skinD, gd, id, shape) => {
+  const pts = flatten(skinD)
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1])
+  const hx = (Math.min(...xs) + Math.max(...xs)) / 2
+  const headW = Math.max(...xs) - Math.min(...xs)
+  const w = headW * 1.10
+  const top = Math.min(...ys) - headW * 0.03
+  // ⚠ Keyed to the WARPED chin, not the original one: on the 'long' skull the
+  // jaw moves down, and a fixed bottom left the hair hanging above it.
+  const effChin = shape.fy ? browY + (chinY - browY) * shape.fy : chinY
+  const bottom = effChin + headW * 0.34    // past the jaw, so it reads as length
+  const rad = w / 2                         // a capsule — §4.2's vocabulary
+  const x0 = hx - w / 2, x1 = hx + w / 2
+  const capsule = `M ${x0} ${top + rad} A ${rad} ${rad} 0 0 1 ${x1} ${top + rad} ` +
+    `L ${x1} ${bottom - rad} A ${rad} ${rad} 0 0 1 ${x0} ${bottom - rad} Z`
+  return `<defs><clipPath id="${id}">${gd.map((d) => `<path d="${d}"/>`).join('')}</clipPath></defs>` +
+    `<path clip-path="url(#${id})" fill="${hairFill}" d="${capsule}"/>`
+}
+
 mkdirSync(OUT_DIR, { recursive: true })
 
 // The warp is applied to EVERY path, not just the skin. The hair's sideburns,
@@ -241,5 +282,12 @@ for (const shape of SHAPES) {
   out = out.replace(/viewBox="[^"]*"/, `viewBox="${(cx - pad).toFixed(1)} ${(cy - pad).toFixed(1)} ${(pad * 2).toFixed(1)} ${(pad * 2).toFixed(1)}"`)
 
   writeFileSync(join(OUT_DIR, `${shape.key}.svg`), out)
+
+  // The long-hair variant is the same file with the shell appended, so the two
+  // are guaranteed to differ by the hair and nothing else.
+  const warpedSkin = shape.key === '1-base' ? skin.d : warpPath(skin.d, shape)
+  const warpedGround = ground.map((g) => (shape.key === '1-base' ? g.d : warpPath(g.d, shape)))
+  writeFileSync(join(OUT_DIR, `${shape.key}-long-hair.svg`),
+    out.replace('</svg>', `${hairShell(warpedSkin, warpedGround, `hairclip-${shape.key}`, shape)}</svg>`))
   console.log(`✓ ${shape.key.padEnd(13)} ${shape.note}`)
 }

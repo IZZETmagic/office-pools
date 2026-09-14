@@ -78,7 +78,7 @@ join. The six heads are warps of one approved outline, which is what §7c.1
 concluded a new shape actually is: <i>"a designer's five minutes, or a warp of an approved outline — not
 a prompt."</i> A warp also holds "everything else the same" exactly — a generation rerolls the hair, the
 colour and the features every time.</p>
-${grid('assets/avatar-shapes-6', 3)}
+${grid('assets/avatar-shapes-6', 4)}
 <div class="note">⚠⚠ <b>The two blue shapes are a MASK, not a background.</b> They are painted
 <i>after</i> the skin, not behind it — the skin path spans the full canvas (x 109–1938) and they cover its
 outer arcs, which is what cuts the head down to a face. Deleting them to "enlarge the background" enlarged
@@ -86,6 +86,14 @@ nothing; it unmasked the skin and the face ballooned to the width of the canvas.
 along with everything else so the mask keeps following the jaw.<br>
 ⚠ A 1px sliver of skin bleeds along the mask's outer edge in the source art — measured at rgb(72,113,248)
 against the ground's rgb(59,107,254). A ring drawn last covers it: now rgb(58,106,254), one unit off.</div>
+<div class="note"><b>The long-hair set is the same six skulls, not six more shapes.</b> §7c.7:
+"what reads as gendered is jaw width, and that reading flips entirely once hair is on." The hair is one
+capsule intersected with the existing mask — and because the mask was warped with each skull, the hair
+hugs whatever face shape the warp produced, for free.<br>
+Measured: visible skin area is <b>identical to within 4 pixels</b> with and without it, and the spread
+across the six is <b>22.1% either way</b> — the hair takes away none of the shape signal. What does become
+uniform is the OUTER silhouette, which is one capsule in all six.<br>
+⚠ One hairstyle applied six times, not six designed hairstyles. It also covers the ears.</div>
 <div class="note">Measured on the flattened outline — widest row, and where it sits:
 <b>base 1830</b> @ y1120 · <b>widejaw 2052</b> @ y992 · <b>tapered 1726</b> @ y1312 ·
 <b>squarejaw 1911</b> @ y1088 · <b>narrow 1742</b> @ y1312 · <b>long 1830</b>, 1862 tall.
