@@ -1,0 +1,1901 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>SportPool — crest-free identity review</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--snow:#F7F8FC;--surface:#FFF;--mist:#EEF1F8;--silver:#D4DAE8;--slate:#7B87A8;--ink:#1B2340;--primary:#3B6EFF;--accent:#F5C518;--green:#22C55E;--midnight:#0B0F1A}
+body.dark{--snow:#121520;--surface:#1C2030;--mist:#232840;--silver:#2E3448;--slate:#8B97B8;--ink:#E8EAF0;--primary:#5B8AFF}
+*{box-sizing:border-box}
+body{margin:0;background:var(--snow);color:var(--ink);font-family:Nunito,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-weight:500}
+.wrap{max-width:1860px;margin:0 auto;padding:36px 40px 120px}
+h1{font-weight:900;font-size:34px;letter-spacing:-.02em;margin:0 0 8px}
+h2{font-weight:900;font-size:23px;letter-spacing:-.01em;margin:0 0 6px}
+h3{font-weight:900}
+.note{color:var(--slate);max-width:1000px;margin:0 0 6px}
+.verdict{background:var(--mist);border-left:3px solid var(--primary);padding:9px 14px;border-radius:0 12px 12px 0;max-width:1000px;font-size:14px;margin:10px 0 4px}
+section{margin:44px 0;scroll-margin-top:70px}
+.row{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px}
+.phone{width:390px}
+.plabel{font-weight:900;font-size:11px;letter-spacing:1.4px;color:var(--slate);margin:0 0 8px}
+.pframe{border-radius:24px;overflow:hidden;border:1px solid var(--silver)}
+.screen{background:var(--snow);padding:12px}
+.card{background:var(--surface);border-radius:18px;overflow:hidden}
+.card.pad{padding:16px 18px}
+.mb{margin-bottom:12px}.mt{margin-top:10px}.mt6{margin-top:6px}
+.ta-r{text-align:right}.ta-c{text-align:center}.ta-r-in{display:flex;justify-content:flex-end}
+.grow{flex:1;min-width:0}
+.sub{font-size:12px;color:var(--slate);font-weight:500}
+.h1{font-weight:900;font-size:17px}
+.kicker{font-weight:900;font-size:10px;letter-spacing:1.8px;color:var(--slate)}
+.kicker.c{text-align:center;display:block;color:rgba(255,255,255,.62)}
+.cardhead{padding:16px 18px 12px}
+.rule{display:block;border-radius:2px;margin-top:5px}
+/* results */
+.r{display:flex;align-items:center;gap:12px;padding:14px 18px;border-top:1px solid var(--silver);position:relative}
+.side{flex:1;min-width:0}
+.name{font-weight:900;font-size:16px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.name.dim{font-weight:700;color:var(--slate)}
+.ta-r .rule{margin-left:auto}
+.score{min-width:58px;text-align:center;flex-shrink:0}
+.sc{font-weight:900;font-size:19px;font-variant-numeric:tabular-nums}
+.sc i{color:var(--silver);margin:0 5px;font-style:normal}
+.tm{font-weight:900;font-size:15px;color:var(--primary);font-variant-numeric:tabular-nums}
+.crestrow img{width:24px;height:24px;object-fit:contain}
+.crestrow .nm{flex:1;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crestrow .mid{font-weight:900;font-size:15px}
+.fieldrow{padding:0}
+.fh,.fa{position:absolute;top:0;bottom:0;width:50%}.fh{left:0}.fa{right:0}
+.fc{position:relative;display:flex;align-items:center;gap:12px;padding:14px 18px;width:100%}
+.daylabel{padding:14px 18px 8px;font-weight:900;font-size:10px;letter-spacing:1.8px;color:var(--slate)}
+/* header */
+.hdr{position:relative;padding:44px 22px 16px;background:var(--midnight)}
+.hdr.purple{background:linear-gradient(160deg,#5B2C82,#3D195B)}
+.hdr.ink{background:linear-gradient(180deg,#151C30,#0B0F1A)}
+.fieldbg{position:absolute;inset:0;display:flex}.fieldbg span{flex:1}
+.scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,15,26,.28),rgba(11,15,26,.9))}
+.hdrc{position:relative}
+.mirror{display:flex;align-items:center;justify-content:space-between;margin-top:20px;text-align:center;color:#fff}
+.mirror>div{flex:1}
+.big{width:72px;height:72px;object-fit:contain}
+.hn{font-size:14px;font-weight:700;margin-top:8px}
+.bigscore{font-weight:900;font-size:44px}.bigscore i{opacity:.5;margin:0 8px;font-style:normal}
+.stack{margin-top:24px;display:grid;gap:14px}
+.srow{display:flex;align-items:center;gap:14px;color:#fff}
+.bigname{font-weight:900;font-size:26px;letter-spacing:-.02em;line-height:1.05}
+.bigname.dim,.bignum.dim{color:rgba(255,255,255,.6)}
+.bignum{font-weight:900;font-size:38px;font-variant-numeric:tabular-nums;margin-left:auto}
+.ft{text-align:center;font-weight:900;font-size:10px;letter-spacing:1.8px;color:rgba(255,255,255,.55);margin:20px 0 0}
+.scorer{text-align:center;font-size:13px;color:rgba(255,255,255,.82);margin:8px 0 0}
+.tabs{display:flex;gap:8px;margin-top:18px}
+.tabs span{border-radius:999px;padding:9px 14px;font-size:13px;font-weight:700;background:rgba(255,255,255,.14);color:rgba(255,255,255,.92)}
+.tabs span.on{background:#fff;color:#1B2340}
+/* table */
+.thead{display:flex;gap:10px;padding:14px 18px 10px}
+.trow{display:flex;align-items:center;gap:10px;padding:10px 18px;border-top:1px solid var(--silver);position:relative}
+.tfield{position:absolute;inset:0}
+.rk{width:20px;font-weight:900;font-size:13px;color:var(--slate);font-variant-numeric:tabular-nums;position:relative}
+.col{width:26px;text-align:center;font-size:12px;color:var(--slate);font-variant-numeric:tabular-nums;position:relative}
+.col.pts{width:32px;font-weight:900;font-size:15px;color:var(--ink)}
+.thead .col{font-weight:900;font-size:10px;letter-spacing:1px}
+.tn{font-weight:900;font-size:15px;letter-spacing:-.01em;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc{width:24px;height:24px;object-fit:contain;position:relative}
+.tr{width:3px;height:20px;border-radius:2px;flex-shrink:0;position:relative}
+/* pool card */
+.pool{display:flex;margin-bottom:12px;border:1px solid var(--silver)}
+.rail{width:30px;background:linear-gradient(to bottom,#5B2C82,#3D195B);display:grid;place-items:center;flex-shrink:0}
+.railtext{writing-mode:vertical-rl;transform:rotate(180deg);color:#fff;font-weight:900;font-size:10px;letter-spacing:.16em}
+.poolbody{flex:1;padding:12px;display:grid;gap:8px}
+.poolhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.rank b{font-weight:900;font-size:22px}.rank .sub{margin-left:4px}
+.kpis{display:flex;gap:6px}
+.kpi{flex:1;background:var(--mist);border-radius:12px;padding:6px 8px}
+.kpi i{display:block;font-style:normal;font-size:9px;font-weight:900;letter-spacing:1px;color:var(--slate)}
+.kpi b{font-weight:900;font-size:14px}
+/* pickem */
+.pkrow{display:flex;align-items:center;gap:10px}
+.btns{display:flex;gap:8px;margin-top:12px}
+.btns span{flex:1;text-align:center;padding:10px 0;border-radius:12px;background:var(--mist);font-weight:900;font-size:14px}
+.btns span.on{background:var(--primary);color:#fff}
+.drag{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:var(--mist);margin-bottom:6px}
+.handle{color:var(--slate);letter-spacing:2px}
+/* lineups */
+.lhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.pitch{background:#1B5E33;border-radius:14px;padding:16px 8px;display:grid;gap:16px}
+.prow{display:flex;justify-content:space-around}
+.pl{display:grid;justify-items:center;gap:4px;width:68px}
+.num{width:40px;height:40px;border-radius:12px;background:#fff;display:grid;place-items:center;font-weight:900;font-size:16px}
+.pn{font-size:10px;color:#fff;font-weight:700}
+/* scout */
+.scouthead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.srow2{padding:12px 0;border-top:1px solid var(--silver)}
+.sline{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.sline b{font-weight:900;font-size:14px;font-variant-numeric:tabular-nums}
+.sline i{font-style:normal;font-size:10px;font-weight:900;letter-spacing:1.4px;color:var(--slate)}
+.bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--mist)}
+.bar .gap{width:2px}
+.cols{display:flex}
+.colh{flex:1;padding:16px 14px}
+.colh b{display:block;font-weight:900;font-size:17px}
+.colh i{font-style:normal;font-size:11px;color:var(--slate)}
+.colrow{display:flex;align-items:center;border-top:1px solid var(--silver)}
+.cl,.cr{flex:1;padding:11px 14px;font-weight:900;font-size:14px;font-variant-numeric:tabular-nums}
+.cr{text-align:right}
+.cm{width:108px;text-align:center;font-size:10px;font-weight:900;letter-spacing:1.2px;color:var(--slate)}
+.prow2{display:flex;align-items:center;gap:14px;padding:11px 0;border-top:1px solid var(--silver)}
+.pnum{width:30px;text-align:right;font-weight:900;font-size:21px;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.prow2 b{display:block;font-weight:900;font-size:14px}
+.prow2 i{font-style:normal;font-size:11px;color:var(--slate)}
+.pcode{font-size:10px;font-weight:900;letter-spacing:1px;color:var(--slate)}
+/* lms */
+.lms{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--silver)}
+.lms.used{opacity:.38}.lms.used .tn{text-decoration:line-through}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{border-radius:12px;padding:10px 12px;background:var(--mist)}
+.tile.used{opacity:.35}
+.tile b{display:block;font-weight:900;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile i{font-style:normal;font-size:10px;color:var(--slate)}
+.sides{display:flex;gap:8px;margin-bottom:8px}
+.sidebox{flex:1;border-radius:12px;padding:10px 12px;background:var(--mist);border-left:3px solid transparent}
+.sidebox.used{opacity:.34}
+.sidebox b{display:block;font-weight:900;font-size:13px}
+.sidebox i{font-style:normal;font-size:10px;color:var(--slate)}
+/* duel */
+.duelhead{background:linear-gradient(150deg,#3B6EFF,#1E3A8A);border-radius:18px;padding:18px}
+.duelrow{display:flex;justify-content:space-between;align-items:center;margin-top:14px;color:#fff}
+.duelrow b{font-weight:900;font-size:20px}
+.duelrow i{font-style:normal;font-weight:900;font-size:15px;color:rgba(255,255,255,.6)}
+.duelpick{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--silver)}
+.duelpick:first-child{border-top:none}
+.pk{width:26px;text-align:center;font-weight:900;font-size:13px}
+.pk.win{color:var(--green)}
+.duelpick b{font-weight:900;font-size:14px}
+.duelpick em{font-style:normal;color:var(--slate);font-weight:700}
+.rules{display:flex;gap:4px;justify-content:center;margin-top:5px}
+.rules .rule{margin-top:0}
+/* kickoff + upcoming: always dark, that is where they live */
+.kocard,.upc,.upedge{background:#1C2030;color:#E8EAF0}
+.kocard{border-radius:24px;padding:18px 20px 20px;position:relative;overflow:hidden}
+.kohead{display:flex;justify-content:space-between;font-weight:900;font-size:11px;letter-spacing:2.2px;color:#8B97B8}
+.komirror{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px}
+.komirror>div{text-align:center}
+.komark{width:52px;height:52px;object-fit:contain;display:block;margin:0 auto 8px}
+.komirror b{font-weight:900;font-size:15px;letter-spacing:2px;color:#fff}
+.koflank{width:96px;text-align:left}
+.koflank b{display:block;font-size:17px;line-height:1.1;letter-spacing:0}
+.kogrow{flex:1}
+.clock{display:flex;align-items:baseline;justify-content:center;gap:2px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.clock i{font-style:normal;font-size:.34em;color:#8B97B8;margin:0 6px 0 2px}
+.clock em{font-style:normal;color:#8B97B8;margin-right:6px}
+.kofix{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:16px}
+.kofix b{font-weight:900;font-size:18px;color:#fff}
+.kofix em,.kosplit em{font-style:normal;color:#8B97B8;font-weight:700}
+.kofix .rule{margin-top:0}
+.kosplit{display:flex;justify-content:space-between;align-items:flex-end;margin-top:20px}
+.kosplit b{font-weight:900;font-size:16px;color:#fff}
+.more{text-align:center;font-size:13px;color:#F5C518;font-weight:700;margin:14px 0 0}
+.kocard .sub{color:#8B97B8}
+.sub.c{text-align:center;margin-top:8px}
+.blob{position:absolute;border-radius:50%}
+.b1{bottom:-60px;left:-40px;width:170px;height:170px}
+.b2{top:-40px;right:-30px;width:190px;height:190px}
+.korel{position:relative}
+.uph{font-weight:900;font-size:24px;color:#E8EAF0;margin:6px 4px 14px}
+.screen:has(.uph){background:#121520}
+.upc{border-radius:18px;padding:14px 16px;margin-bottom:10px}
+.upcrest{display:flex;align-items:center;gap:12px}
+.upcrest>div{text-align:center}
+.upcrest img{width:38px;height:38px;object-fit:contain;display:block;margin:0 auto 6px}
+.upcrest b{font-weight:900;font-size:13px;letter-spacing:2px;color:#fff}
+.upcrest .grow b{letter-spacing:0;font-size:14px;display:block}
+.upcrest .grow i{font-style:normal;font-size:12px;color:#8B97B8;display:block;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs{font-size:11px;color:#8B97B8;font-weight:800;letter-spacing:1px}
+.upnames{display:flex;align-items:center;gap:10px}
+.upnames .name{color:#fff}
+.upmeta{display:flex;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #2E3448}
+.upmeta b{font-size:12.5px;color:#fff;font-weight:700}
+.upmeta i{font-style:normal;font-size:12.5px;color:#8B97B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
+.upstack{display:flex;gap:12px}
+.stackrules{display:grid;gap:4px;padding-top:2px}
+.stackrules .rule{margin-top:0}
+.upstack .grow b{display:block;font-weight:900;font-size:16px;color:#fff;line-height:1.35}
+.upstack .ta-r b{font-weight:900;font-size:13px}
+.upstack .pri{color:#5B8AFF}
+.upstack .ta-r i{font-style:normal;font-size:11px;color:#8B97B8;display:block;margin-top:2px}
+.upc .sub{color:#8B97B8}
+.upedge{border-radius:18px;display:flex;overflow:hidden;margin-bottom:10px}
+.edge{width:5px;display:grid}.edge span{display:block}
+.edgebody{flex:1;padding:14px 16px;min-width:0}
+.edgebody>b{font-weight:900;font-size:16px;color:#fff;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edgebody em{font-style:normal;color:#8B97B8;font-weight:700}
+.upmeta2{display:flex;justify-content:space-between;gap:10px;margin-top:8px}
+.upmeta2 b{font-size:12.5px;color:#fff;font-weight:700}
+.upmeta2 i{font-style:normal;font-size:12.5px;color:#8B97B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+/* chrome */
+.bar-top{position:sticky;top:0;z-index:10;background:var(--snow);border-bottom:1px solid var(--silver);padding:10px 40px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.bar-top a{color:var(--slate);text-decoration:none;font-size:12px;font-weight:800;letter-spacing:.4px}
+.bar-top a:hover{color:var(--primary)}
+button{border-radius:999px;border:1px solid var(--silver);background:transparent;color:var(--ink);font-weight:800;padding:7px 14px;cursor:pointer;font-family:inherit}
+table.dec{border-collapse:collapse;width:100%;max-width:1000px;margin-top:12px;font-size:14px}
+table.dec th,table.dec td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--silver);vertical-align:top}
+table.dec th{font-weight:900;font-size:11px;letter-spacing:1.2px;color:var(--slate)}
+
+.sidep{flex:1;min-width:0;display:flex;align-items:center;gap:10px}
+.sidep.rev{flex-direction:row-reverse}
+.sidep .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:block;width:4px;border-radius:999px;flex-shrink:0}
+.tabrow{position:relative;padding-left:24px;padding-right:24px}
+.tabl,.tabr{position:absolute;top:10px;bottom:10px;width:5px}
+.tabl{left:0;border-radius:0 5px 5px 0}.tabr{right:0;border-radius:5px 0 0 5px}
+/* header v2 */
+.hdr.v2{background:linear-gradient(180deg,#161D33,#0B0F1A);overflow:hidden}
+.glow{position:absolute;width:300px;height:300px;border-radius:50%;filter:blur(6px)}
+.gl{left:-110px;top:-60px}.gr{right:-110px;top:-60px}
+.sweep,.sweep2{position:absolute;width:150%;height:320px;border-radius:50%;filter:blur(2px)}
+.sweep{left:-58%;top:-130px}.sweep2{right:-58%;top:-130px}
+.hmirror{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:22px}
+.hteam{flex:1;display:grid;justify-items:center;gap:10px}
+.hname{font-weight:900;font-size:19px;line-height:1.12;color:#fff;text-align:center;letter-spacing:-.01em}
+.hrule{display:block;width:34px;height:4px;border-radius:2px}
+.hpill{display:block;width:34px;height:4px;border-radius:2px}
+.hscore{flex-shrink:0;text-align:center;padding-top:2px}
+.hscore b{display:block;font-weight:900;font-size:44px;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.hscore i{font-style:normal;color:rgba(255,255,255,.45);margin:0 7px}
+.hscore span{display:block;font-size:10px;font-weight:900;letter-spacing:1.6px;color:rgba(255,255,255,.55);margin-top:8px}
+/* pickem v2 */
+.trio{display:flex;gap:8px;align-items:stretch}
+.tbtn{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:12px 12px;border-radius:14px;background:var(--mist);border:2px solid transparent}
+.tbtn b{font-weight:900;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dbtn{display:grid;place-items:center;padding:0 16px;border-radius:14px;background:var(--mist);font-weight:900;font-size:13px;color:var(--slate);border:2px solid transparent}
+.dbtn.on{background:var(--primary);color:#fff}
+.dbtn.wide{margin-top:8px;padding:12px 0}
+.stackbtn{display:grid;gap:8px}
+/* jerseys */
+.jgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:18px;max-width:1000px;margin-top:16px}
+.jcell{background:var(--surface);border:1px solid var(--silver);border-radius:18px;padding:14px;display:grid;justify-items:center;gap:8px}
+.jcell span{font-size:11px;color:var(--slate);font-weight:700;text-align:center}
+.jart{display:grid;place-items:center}
+/* lms picks */
+.pickgrid{display:grid;grid-template-columns:64px repeat(4,1fr);gap:6px;align-items:center}
+.pgh{font-size:10px;font-weight:900;letter-spacing:1px;color:var(--slate);text-align:center}
+.pgn{font-weight:900;font-size:13px}
+.pgc{border-radius:10px;padding:9px 0;text-align:center;font-weight:900;font-size:11px;letter-spacing:.5px}
+.byclub{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--silver)}
+.byclub b{display:block;font-weight:900;font-size:15px}
+.byclub i{font-style:normal;font-size:12px;color:var(--slate)}
+.cnt{font-weight:900;font-size:15px;color:var(--slate)}
+.komirror2{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px}
+.koside{width:100px;display:grid;gap:8px}
+.koside.ta-r{justify-items:end}
+.koside b{font-weight:900;font-size:16px;color:#fff;line-height:1.15}
+</style></head><body>
+<div class="bar-top">
+  <strong style="font-weight:900">Crest-free review</strong>
+  <a href="#directions">Directions</a><a href="#everywhere">Applied everywhere</a><a href="#scout">Scout report</a><a href="#lms">Last Man Standing</a><a href="#kickoff">Next Kickoff</a><a href="#upcoming">Upcoming</a><a href="#decide">Decisions</a>
+  <button onclick="document.body.classList.toggle('dark')" style="margin-left:auto">Light / dark</button>
+</div>
+<div class="wrap">
+<h1>SportPool — crest-free identity</h1>
+<p class="note" style="margin-bottom:18px">13 September 2026. Every mockup from the review, in one file. Column one of each row is <strong>what ships today</strong>; everything after it uses only club <strong>names</strong>, <strong>colours</strong>, three-letter codes from <code>league_clubs.abbreviation</code> and shirt numbers — all facts. No crest, league mark, sponsor, manufacturer mark, kit reproduction or player photograph anywhere.</p>
+
+
+<section id="directions">
+  <h2>1 · The three directions</h2>
+  <p class="note">Applied to the three highest-traffic surfaces. A uses no club colour at all and so works for every competition on day one; B attaches the colour to the name; C makes the colour the space.</p>
+  <p class="verdict"><strong>Recommendation:</strong> B · Underline. A is calm but every club is the same grey. C is rich on the header and muddy in a table of eight rows. B keeps the page quiet and still gives each club a colour, and it degrades to A for any club with no colour on file.</p>
+  <div class="row"><div class="phone"><p class="plabel">TODAY</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="cardhead"><div class="h1">Today</div><div class="kicker">PREMIER LEAGUE · MATCHWEEK 4</div></div>
+  <div class="r crestrow">
+      <img src="https://media.api-sports.io/football/teams/33.png" alt=""><span class="nm">Man United</span>
+      <span class="mid">0 – 1</span>
+      <span class="nm ta-r">Man City</span><img src="https://media.api-sports.io/football/teams/50.png" alt="">
+    </div><div class="r crestrow">
+      <img src="https://media.api-sports.io/football/teams/42.png" alt=""><span class="nm">Arsenal</span>
+      <span class="mid">2 – 1</span>
+      <span class="nm ta-r">Chelsea</span><img src="https://media.api-sports.io/football/teams/49.png" alt="">
+    </div><div class="r crestrow">
+      <img src="https://media.api-sports.io/football/teams/40.png" alt=""><span class="nm">Liverpool</span>
+      <span class="mid">1 – 1</span>
+      <span class="nm ta-r">Nott'm Forest</span><img src="https://media.api-sports.io/football/teams/65.png" alt="">
+    </div><div class="r crestrow">
+      <img src="https://media.api-sports.io/football/teams/47.png" alt=""><span class="nm">Spurs</span>
+      <span class="mid">17:30</span>
+      <span class="nm ta-r">Newcastle</span><img src="https://media.api-sports.io/football/teams/34.png" alt="">
+    </div><div class="r crestrow">
+      <img src="https://media.api-sports.io/football/teams/51.png" alt=""><span class="nm">Brighton</span>
+      <span class="mid">20:00</span>
+      <span class="nm ta-r">Everton</span><img src="https://media.api-sports.io/football/teams/45.png" alt="">
+    </div>
+</div></div></div></div><div class="phone"><p class="plabel">BROADSHEET</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="cardhead"><div class="h1">Today</div><div class="kicker">PREMIER LEAGUE · MATCHWEEK 4</div></div>
+  <div class="r">
+    <div class="side">
+      <div class="name dim">Man United</div>
+      
+    </div>
+    <div class="score"><span class="sc">0<i>–</i>1</span></div>
+    <div class="side ta-r">
+      <div class="name">Man City</div>
+      
+    </div></div><div class="r">
+    <div class="side">
+      <div class="name">Arsenal</div>
+      
+    </div>
+    <div class="score"><span class="sc">2<i>–</i>1</span></div>
+    <div class="side ta-r">
+      <div class="name dim">Chelsea</div>
+      
+    </div></div><div class="r">
+    <div class="side">
+      <div class="name">Liverpool</div>
+      
+    </div>
+    <div class="score"><span class="sc">1<i>–</i>1</span></div>
+    <div class="side ta-r">
+      <div class="name">Nott'm Forest</div>
+      
+    </div></div><div class="r">
+    <div class="side">
+      <div class="name">Spurs</div>
+      
+    </div>
+    <div class="score"><span class="tm">17:30</span></div>
+    <div class="side ta-r">
+      <div class="name">Newcastle</div>
+      
+    </div></div><div class="r">
+    <div class="side">
+      <div class="name">Brighton</div>
+      
+    </div>
+    <div class="score"><span class="tm">20:00</span></div>
+    <div class="side ta-r">
+      <div class="name">Everton</div>
+      
+    </div></div>
+</div></div></div></div><div class="phone"><p class="plabel">UNDERLINE</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="cardhead"><div class="h1">Today</div><div class="kicker">PREMIER LEAGUE · MATCHWEEK 4</div></div>
+  <div class="r">
+    <div class="side">
+      <div class="name dim">Man United</div>
+      <span class="rule" style="width:26px;height:3px;background:#DA291C"></span>
+    </div>
+    <div class="score"><span class="sc">0<i>–</i>1</span></div>
+    <div class="side ta-r">
+      <div class="name">Man City</div>
+      <span class="rule" style="width:26px;height:3px;background:#1C6FB5"></span>
+    </div></div><div class="r">
+    <div class="side">
+      <div class="name">Arsenal</div>
+      <span class="rule" style="width:26px;height:3px;background:#DB0007"></span>
+    </div>
+    <div class="score"><span class="sc">2<i>–</i>1</span></div>
+    <div class="side ta-r">
+      <div class="name dim">Chelsea</div>
+      <span class="rule" style="width:26px;height:3px;background:#034694"></span>
+    </div></div><div class="r">
+    <div class="side">
+      <div class="name">Liverpool</div>
+      <span class="rule" style="width:26px;height:3px;background:#C8102E"></span>
+    </div>
+    <div class="score"><span class="sc">1<i>–</i>1</span></div>
+    <div class="side ta-r">
+      <div class="name">Nott'm Forest</div>
+      <span class="rule" style="width:26px;height:3px;background:#C40000"></span>
+    </div></div><div class="r">
+    <div class="side">
+      <div class="name">Spurs</div>
+      <span class="rule" style="width:26px;height:3px;background:#132257"></span>
+    </div>
+    <div class="score"><span class="tm">17:30</span></div>
+    <div class="side ta-r">
+      <div class="name">Newcastle</div>
+      <span class="rule" style="width:26px;height:3px;background:#241F20"></span>
+    </div></div><div class="r">
+    <div class="side">
+      <div class="name">Brighton</div>
+      <span class="rule" style="width:26px;height:3px;background:#0057B8"></span>
+    </div>
+    <div class="score"><span class="tm">20:00</span></div>
+    <div class="side ta-r">
+      <div class="name">Everton</div>
+      <span class="rule" style="width:26px;height:3px;background:#003399"></span>
+    </div></div>
+</div></div></div></div><div class="phone"><p class="plabel">FIELD</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="cardhead"><div class="h1">Today</div><div class="kicker">PREMIER LEAGUE · MATCHWEEK 4</div></div>
+  <div class="r fieldrow">
+    <span class="fh" style="background:linear-gradient(90deg, rgba(218,41,28,0.14), transparent 78%);border-left:2px solid #DA291C"></span>
+    <span class="fa" style="background:linear-gradient(270deg, rgba(28,111,181,0.14), transparent 78%);border-right:2px solid #1C6FB5"></span>
+    <div class="fc">
+    <div class="side">
+      <div class="name dim">Man United</div>
+      
+    </div>
+    <div class="score"><span class="sc">0<i>–</i>1</span></div>
+    <div class="side ta-r">
+      <div class="name">Man City</div>
+      
+    </div></div>
+  </div><div class="r fieldrow">
+    <span class="fh" style="background:linear-gradient(90deg, rgba(219,0,7,0.14), transparent 78%);border-left:2px solid #DB0007"></span>
+    <span class="fa" style="background:linear-gradient(270deg, rgba(3,70,148,0.14), transparent 78%);border-right:2px solid #034694"></span>
+    <div class="fc">
+    <div class="side">
+      <div class="name">Arsenal</div>
+      
+    </div>
+    <div class="score"><span class="sc">2<i>–</i>1</span></div>
+    <div class="side ta-r">
+      <div class="name dim">Chelsea</div>
+      
+    </div></div>
+  </div><div class="r fieldrow">
+    <span class="fh" style="background:linear-gradient(90deg, rgba(200,16,46,0.14), transparent 78%);border-left:2px solid #C8102E"></span>
+    <span class="fa" style="background:linear-gradient(270deg, rgba(196,0,0,0.14), transparent 78%);border-right:2px solid #C40000"></span>
+    <div class="fc">
+    <div class="side">
+      <div class="name">Liverpool</div>
+      
+    </div>
+    <div class="score"><span class="sc">1<i>–</i>1</span></div>
+    <div class="side ta-r">
+      <div class="name">Nott'm Forest</div>
+      
+    </div></div>
+  </div><div class="r fieldrow">
+    <span class="fh" style="background:linear-gradient(90deg, rgba(19,34,87,0.14), transparent 78%);border-left:2px solid #132257"></span>
+    <span class="fa" style="background:linear-gradient(270deg, rgba(36,31,32,0.14), transparent 78%);border-right:2px solid #241F20"></span>
+    <div class="fc">
+    <div class="side">
+      <div class="name">Spurs</div>
+      
+    </div>
+    <div class="score"><span class="tm">17:30</span></div>
+    <div class="side ta-r">
+      <div class="name">Newcastle</div>
+      
+    </div></div>
+  </div><div class="r fieldrow">
+    <span class="fh" style="background:linear-gradient(90deg, rgba(0,87,184,0.14), transparent 78%);border-left:2px solid #0057B8"></span>
+    <span class="fa" style="background:linear-gradient(270deg, rgba(0,51,153,0.14), transparent 78%);border-right:2px solid #003399"></span>
+    <div class="fc">
+    <div class="side">
+      <div class="name">Brighton</div>
+      
+    </div>
+    <div class="score"><span class="tm">20:00</span></div>
+    <div class="side ta-r">
+      <div class="name">Everton</div>
+      
+    </div></div>
+  </div>
+</div></div></div></div><div class="phone"><p class="plabel">TODAY</p><div class="pframe"><div class="hdr purple">
+      <p class="kicker c">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="mirror">
+        <div><img class="big" src="https://media.api-sports.io/football/teams/33.png" alt=""><div class="hn">Man United</div></div>
+        <div class="bigscore">0<i>–</i>1</div>
+        <div><img class="big" src="https://media.api-sports.io/football/teams/50.png" alt=""><div class="hn">Man City</div></div>
+      </div>
+      <p class="ft">FULL TIME</p><p class="scorer">Haaland 60'</p><div class="tabs"><span class="on">Facts</span><span class="">Line-ups</span><span class="">Stats</span><span class="">Scouting</span></div>
+    </div><div class="screen"><div class="card pad"><div class="h1">Match Facts</div><div class="sub">Old Trafford, Manchester</div></div></div></div></div><div class="phone"><p class="plabel">BROADSHEET</p><div class="pframe"><div class="hdr ink">
+    <div class="hdrc">
+      <p class="kicker c">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="stack">
+        <div class="srow"><div><div class="bigname dim">Manchester United</div></div><div class="bignum dim">0</div></div>
+        <div class="srow"><div><div class="bigname">Manchester City</div></div><div class="bignum">1</div></div>
+      </div>
+      <p class="ft">FULL TIME</p><p class="scorer">Haaland 60'</p><div class="tabs"><span class="on">Facts</span><span class="">Line-ups</span><span class="">Stats</span><span class="">Scouting</span></div>
+    </div></div>
+    <div class="screen"><div class="card pad"><div class="h1">Match Facts</div><div class="sub">Old Trafford, Manchester</div></div></div></div></div><div class="phone"><p class="plabel">UNDERLINE</p><div class="pframe"><div class="hdr ink">
+    <div class="hdrc">
+      <p class="kicker c">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="stack">
+        <div class="srow"><div><div class="bigname dim">Manchester United</div><span class="rule" style="width:52px;height:4px;background:#DA291C"></span></div><div class="bignum dim">0</div></div>
+        <div class="srow"><div><div class="bigname">Manchester City</div><span class="rule" style="width:52px;height:4px;background:#1C6FB5"></span></div><div class="bignum">1</div></div>
+      </div>
+      <p class="ft">FULL TIME</p><p class="scorer">Haaland 60'</p><div class="tabs"><span class="on">Facts</span><span class="">Line-ups</span><span class="">Stats</span><span class="">Scouting</span></div>
+    </div></div>
+    <div class="screen"><div class="card pad"><div class="h1">Match Facts</div><div class="sub">Old Trafford, Manchester</div></div></div></div></div><div class="phone"><p class="plabel">FIELD</p><div class="pframe"><div class="hdr ink"><span class="fieldbg"><span style="background:linear-gradient(180deg,rgba(218,41,28,0.9),rgba(218,41,28,0.25))"></span><span style="background:linear-gradient(180deg,rgba(28,111,181,0.9),rgba(28,111,181,0.25))"></span></span><span class="scrim"></span>
+    <div class="hdrc">
+      <p class="kicker c">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="stack">
+        <div class="srow"><div><div class="bigname dim">Manchester United</div></div><div class="bignum dim">0</div></div>
+        <div class="srow"><div><div class="bigname">Manchester City</div></div><div class="bignum">1</div></div>
+      </div>
+      <p class="ft">FULL TIME</p><p class="scorer">Haaland 60'</p><div class="tabs"><span class="on">Facts</span><span class="">Line-ups</span><span class="">Stats</span><span class="">Scouting</span></div>
+    </div></div>
+    <div class="screen"><div class="card pad"><div class="h1">Match Facts</div><div class="sub">Old Trafford, Manchester</div></div></div></div></div><div class="phone"><p class="plabel">TODAY</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="thead"><span class="rk"></span><span class="grow"></span><span class="col">PL</span><span class="col">GD</span><span class="col pts">PTS</span></div>
+  <div class="trow">
+    
+    <span class="rk">1</span>
+    <img class="tc" src="https://media.api-sports.io/football/teams/40.png" alt="">
+    
+    <span class="grow tn">Liverpool</span>
+    <span class="col">4</span><span class="col">+8</span><span class="col pts">12</span>
+  </div><div class="trow">
+    
+    <span class="rk">2</span>
+    <img class="tc" src="https://media.api-sports.io/football/teams/42.png" alt="">
+    
+    <span class="grow tn">Arsenal</span>
+    <span class="col">4</span><span class="col">+6</span><span class="col pts">10</span>
+  </div><div class="trow">
+    
+    <span class="rk">3</span>
+    <img class="tc" src="https://media.api-sports.io/football/teams/50.png" alt="">
+    
+    <span class="grow tn">Man City</span>
+    <span class="col">4</span><span class="col">+5</span><span class="col pts">9</span>
+  </div><div class="trow">
+    
+    <span class="rk">4</span>
+    <img class="tc" src="https://media.api-sports.io/football/teams/49.png" alt="">
+    
+    <span class="grow tn">Chelsea</span>
+    <span class="col">4</span><span class="col">+2</span><span class="col pts">8</span>
+  </div><div class="trow">
+    
+    <span class="rk">5</span>
+    <img class="tc" src="https://media.api-sports.io/football/teams/47.png" alt="">
+    
+    <span class="grow tn">Spurs</span>
+    <span class="col">4</span><span class="col">+1</span><span class="col pts">7</span>
+  </div><div class="trow">
+    
+    <span class="rk">6</span>
+    <img class="tc" src="https://media.api-sports.io/football/teams/34.png" alt="">
+    
+    <span class="grow tn">Newcastle</span>
+    <span class="col">4</span><span class="col">0</span><span class="col pts">5</span>
+  </div><div class="trow">
+    
+    <span class="rk">7</span>
+    <img class="tc" src="https://media.api-sports.io/football/teams/51.png" alt="">
+    
+    <span class="grow tn">Brighton</span>
+    <span class="col">4</span><span class="col">-1</span><span class="col pts">5</span>
+  </div><div class="trow">
+    
+    <span class="rk">8</span>
+    <img class="tc" src="https://media.api-sports.io/football/teams/33.png" alt="">
+    
+    <span class="grow tn">Man United</span>
+    <span class="col">4</span><span class="col">-3</span><span class="col pts">4</span>
+  </div>
+</div></div></div></div><div class="phone"><p class="plabel">BROADSHEET</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="thead"><span class="rk"></span><span class="grow"></span><span class="col">PL</span><span class="col">GD</span><span class="col pts">PTS</span></div>
+  <div class="trow">
+    
+    <span class="rk">1</span>
+    
+    
+    <span class="grow tn">Liverpool</span>
+    <span class="col">4</span><span class="col">+8</span><span class="col pts">12</span>
+  </div><div class="trow">
+    
+    <span class="rk">2</span>
+    
+    
+    <span class="grow tn">Arsenal</span>
+    <span class="col">4</span><span class="col">+6</span><span class="col pts">10</span>
+  </div><div class="trow">
+    
+    <span class="rk">3</span>
+    
+    
+    <span class="grow tn">Man City</span>
+    <span class="col">4</span><span class="col">+5</span><span class="col pts">9</span>
+  </div><div class="trow">
+    
+    <span class="rk">4</span>
+    
+    
+    <span class="grow tn">Chelsea</span>
+    <span class="col">4</span><span class="col">+2</span><span class="col pts">8</span>
+  </div><div class="trow">
+    
+    <span class="rk">5</span>
+    
+    
+    <span class="grow tn">Spurs</span>
+    <span class="col">4</span><span class="col">+1</span><span class="col pts">7</span>
+  </div><div class="trow">
+    
+    <span class="rk">6</span>
+    
+    
+    <span class="grow tn">Newcastle</span>
+    <span class="col">4</span><span class="col">0</span><span class="col pts">5</span>
+  </div><div class="trow">
+    
+    <span class="rk">7</span>
+    
+    
+    <span class="grow tn">Brighton</span>
+    <span class="col">4</span><span class="col">-1</span><span class="col pts">5</span>
+  </div><div class="trow">
+    
+    <span class="rk">8</span>
+    
+    
+    <span class="grow tn">Man United</span>
+    <span class="col">4</span><span class="col">-3</span><span class="col pts">4</span>
+  </div>
+</div></div></div></div><div class="phone"><p class="plabel">UNDERLINE</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="thead"><span class="rk"></span><span class="grow"></span><span class="col">PL</span><span class="col">GD</span><span class="col pts">PTS</span></div>
+  <div class="trow">
+    
+    <span class="rk">1</span>
+    
+    <span class="tr" style="background:#C8102E"></span>
+    <span class="grow tn">Liverpool</span>
+    <span class="col">4</span><span class="col">+8</span><span class="col pts">12</span>
+  </div><div class="trow">
+    
+    <span class="rk">2</span>
+    
+    <span class="tr" style="background:#DB0007"></span>
+    <span class="grow tn">Arsenal</span>
+    <span class="col">4</span><span class="col">+6</span><span class="col pts">10</span>
+  </div><div class="trow">
+    
+    <span class="rk">3</span>
+    
+    <span class="tr" style="background:#1C6FB5"></span>
+    <span class="grow tn">Man City</span>
+    <span class="col">4</span><span class="col">+5</span><span class="col pts">9</span>
+  </div><div class="trow">
+    
+    <span class="rk">4</span>
+    
+    <span class="tr" style="background:#034694"></span>
+    <span class="grow tn">Chelsea</span>
+    <span class="col">4</span><span class="col">+2</span><span class="col pts">8</span>
+  </div><div class="trow">
+    
+    <span class="rk">5</span>
+    
+    <span class="tr" style="background:#132257"></span>
+    <span class="grow tn">Spurs</span>
+    <span class="col">4</span><span class="col">+1</span><span class="col pts">7</span>
+  </div><div class="trow">
+    
+    <span class="rk">6</span>
+    
+    <span class="tr" style="background:#241F20"></span>
+    <span class="grow tn">Newcastle</span>
+    <span class="col">4</span><span class="col">0</span><span class="col pts">5</span>
+  </div><div class="trow">
+    
+    <span class="rk">7</span>
+    
+    <span class="tr" style="background:#0057B8"></span>
+    <span class="grow tn">Brighton</span>
+    <span class="col">4</span><span class="col">-1</span><span class="col pts">5</span>
+  </div><div class="trow">
+    
+    <span class="rk">8</span>
+    
+    <span class="tr" style="background:#DA291C"></span>
+    <span class="grow tn">Man United</span>
+    <span class="col">4</span><span class="col">-3</span><span class="col pts">4</span>
+  </div>
+</div></div></div></div><div class="phone"><p class="plabel">FIELD</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="thead"><span class="rk"></span><span class="grow"></span><span class="col">PL</span><span class="col">GD</span><span class="col pts">PTS</span></div>
+  <div class="trow">
+    <span class="tfield" style="background:linear-gradient(90deg,rgba(200,16,46,0.11),transparent 42%)"></span>
+    <span class="rk">1</span>
+    
+    
+    <span class="grow tn">Liverpool</span>
+    <span class="col">4</span><span class="col">+8</span><span class="col pts">12</span>
+  </div><div class="trow">
+    <span class="tfield" style="background:linear-gradient(90deg,rgba(219,0,7,0.11),transparent 42%)"></span>
+    <span class="rk">2</span>
+    
+    
+    <span class="grow tn">Arsenal</span>
+    <span class="col">4</span><span class="col">+6</span><span class="col pts">10</span>
+  </div><div class="trow">
+    <span class="tfield" style="background:linear-gradient(90deg,rgba(28,111,181,0.11),transparent 42%)"></span>
+    <span class="rk">3</span>
+    
+    
+    <span class="grow tn">Man City</span>
+    <span class="col">4</span><span class="col">+5</span><span class="col pts">9</span>
+  </div><div class="trow">
+    <span class="tfield" style="background:linear-gradient(90deg,rgba(3,70,148,0.11),transparent 42%)"></span>
+    <span class="rk">4</span>
+    
+    
+    <span class="grow tn">Chelsea</span>
+    <span class="col">4</span><span class="col">+2</span><span class="col pts">8</span>
+  </div><div class="trow">
+    <span class="tfield" style="background:linear-gradient(90deg,rgba(19,34,87,0.11),transparent 42%)"></span>
+    <span class="rk">5</span>
+    
+    
+    <span class="grow tn">Spurs</span>
+    <span class="col">4</span><span class="col">+1</span><span class="col pts">7</span>
+  </div><div class="trow">
+    <span class="tfield" style="background:linear-gradient(90deg,rgba(36,31,32,0.11),transparent 42%)"></span>
+    <span class="rk">6</span>
+    
+    
+    <span class="grow tn">Newcastle</span>
+    <span class="col">4</span><span class="col">0</span><span class="col pts">5</span>
+  </div><div class="trow">
+    <span class="tfield" style="background:linear-gradient(90deg,rgba(0,87,184,0.11),transparent 42%)"></span>
+    <span class="rk">7</span>
+    
+    
+    <span class="grow tn">Brighton</span>
+    <span class="col">4</span><span class="col">-1</span><span class="col pts">5</span>
+  </div><div class="trow">
+    <span class="tfield" style="background:linear-gradient(90deg,rgba(218,41,28,0.11),transparent 42%)"></span>
+    <span class="rk">8</span>
+    
+    
+    <span class="grow tn">Man United</span>
+    <span class="col">4</span><span class="col">-3</span><span class="col pts">4</span>
+  </div>
+</div></div></div></div></div>
+</section>
+
+
+<section id="everywhere">
+  <h2>2 · Direction B applied everywhere</h2>
+  <p class="note">The rest of the app in the recommended direction, so the whole thing can be judged in one voice.</p>
+  
+  <div class="row"><div class="phone"><p class="plabel">FIXTURE LIST</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="daylabel">SATURDAY 14 SEPTEMBER</div><div class="r">
+        <div class="side"><div class="name">Liverpool</div><span class="rule" style="width:22px;height:3px;background:#C8102E"></span></div>
+        <div class="score"><span class="tm">12:30</span></div>
+        <div class="side ta-r"><div class="name">Nott'm Forest</div><span class="rule" style="width:22px;height:3px;background:#C40000"></span></div>
+      </div><div class="r">
+        <div class="side"><div class="name">Arsenal</div><span class="rule" style="width:22px;height:3px;background:#DB0007"></span></div>
+        <div class="score"><span class="tm">15:00</span></div>
+        <div class="side ta-r"><div class="name">Chelsea</div><span class="rule" style="width:22px;height:3px;background:#034694"></span></div>
+      </div><div class="r">
+        <div class="side"><div class="name">Brighton</div><span class="rule" style="width:22px;height:3px;background:#0057B8"></span></div>
+        <div class="score"><span class="tm">15:00</span></div>
+        <div class="side ta-r"><div class="name">Everton</div><span class="rule" style="width:22px;height:3px;background:#003399"></span></div>
+      </div><div class="daylabel">SUNDAY 15 SEPTEMBER</div><div class="r">
+        <div class="side"><div class="name">Man United</div><span class="rule" style="width:22px;height:3px;background:#DA291C"></span></div>
+        <div class="score"><span class="tm">14:00</span></div>
+        <div class="side ta-r"><div class="name">Man City</div><span class="rule" style="width:22px;height:3px;background:#1C6FB5"></span></div>
+      </div><div class="r">
+        <div class="side"><div class="name">Spurs</div><span class="rule" style="width:22px;height:3px;background:#132257"></span></div>
+        <div class="score"><span class="tm">16:30</span></div>
+        <div class="side ta-r"><div class="name">Newcastle</div><span class="rule" style="width:22px;height:3px;background:#241F20"></span></div>
+      </div>
+</div></div></div></div><div class="phone"><p class="plabel">POOL CARD (HOME + POOLS)</p><div class="pframe"><div class="screen">
+  <div class="card pool">
+      <span class="rail"><span class="railtext">PREMIER LEAGUE</span></span>
+      <div class="poolbody">
+        <div class="poolhead"><span class="h1">The Sargasso Sea</span><span class="sub">Pick'em</span></div>
+        <div class="rank"><b>2nd</b><span class="sub">of 14</span></div>
+        <div class="kpis"><div class="kpi"><i>PTS</i><b>348</b></div><div class="kpi"><i>EXACT</i><b>14</b></div><div class="kpi"><i>MW</i><b>4</b></div></div>
+      </div></div><div class="card pool">
+      <span class="rail"><span class="railtext">PREMIER LEAGUE</span></span>
+      <div class="poolbody">
+        <div class="poolhead"><span class="h1">Office Legends</span><span class="sub">Predict the Table</span></div>
+        <div class="rank"><b>5th</b><span class="sub">of 31</span></div>
+        <div class="kpis"><div class="kpi"><i>PTS</i><b>348</b></div><div class="kpi"><i>EXACT</i><b>14</b></div><div class="kpi"><i>MW</i><b>4</b></div></div>
+      </div></div>
+</div></div></div><div class="phone"><p class="plabel">PICK'EM</p><div class="pframe"><div class="screen">
+  <div class="card pad mb">
+    <div class="pkrow">
+      <div class="side"><div class="name">Man United</div><span class="rule" style="width:22px;height:3px;background:#DA291C"></span></div>
+      <span class="sub">Sat 15:00</span>
+      <div class="side ta-r"><div class="name">Man City</div><span class="rule" style="width:22px;height:3px;background:#1C6FB5"></span></div>
+    </div>
+    <div class="btns"><span class="">1</span><span class="">X</span><span class="on">2</span></div>
+  </div>
+  <div class="card pad mb">
+    <div class="pkrow">
+      <div class="side"><div class="name">Arsenal</div><span class="rule" style="width:22px;height:3px;background:#DB0007"></span></div>
+      <span class="sub">Sat 15:00</span>
+      <div class="side ta-r"><div class="name">Chelsea</div><span class="rule" style="width:22px;height:3px;background:#034694"></span></div>
+    </div>
+    <div class="btns"><span class="on">1</span><span class="">X</span><span class="">2</span></div>
+  </div>
+  <div class="card pad mb">
+    <div class="pkrow">
+      <div class="side"><div class="name">Liverpool</div><span class="rule" style="width:22px;height:3px;background:#C8102E"></span></div>
+      <span class="sub">Sat 15:00</span>
+      <div class="side ta-r"><div class="name">Nott'm Forest</div><span class="rule" style="width:22px;height:3px;background:#C40000"></span></div>
+    </div>
+    <div class="btns"><span class="">1</span><span class="">X</span><span class="">2</span></div>
+  </div></div></div></div><div class="phone"><p class="plabel">PREDICT THE TABLE</p><div class="pframe"><div class="screen"><div class="card pad">
+  <div class="h1">Predict the table</div><div class="sub mb">Drag to reorder · locks Fri 19:00</div>
+  <div class="drag">
+    <span class="rk">1</span><span class="tr" style="background:#1C6FB5"></span>
+    <span class="grow tn">Man City</span><span class="handle">≡</span></div><div class="drag">
+    <span class="rk">2</span><span class="tr" style="background:#DB0007"></span>
+    <span class="grow tn">Arsenal</span><span class="handle">≡</span></div><div class="drag">
+    <span class="rk">3</span><span class="tr" style="background:#C8102E"></span>
+    <span class="grow tn">Liverpool</span><span class="handle">≡</span></div><div class="drag">
+    <span class="rk">4</span><span class="tr" style="background:#034694"></span>
+    <span class="grow tn">Chelsea</span><span class="handle">≡</span></div><div class="drag">
+    <span class="rk">5</span><span class="tr" style="background:#132257"></span>
+    <span class="grow tn">Spurs</span><span class="handle">≡</span></div><div class="drag">
+    <span class="rk">6</span><span class="tr" style="background:#DA291C"></span>
+    <span class="grow tn">Man United</span><span class="handle">≡</span></div><div class="drag">
+    <span class="rk">7</span><span class="tr" style="background:#241F20"></span>
+    <span class="grow tn">Newcastle</span><span class="handle">≡</span></div><div class="drag">
+    <span class="rk">8</span><span class="tr" style="background:#0057B8"></span>
+    <span class="grow tn">Brighton</span><span class="handle">≡</span></div>
+</div></div></div></div><div class="phone"><p class="plabel">LINE-UPS</p><div class="pframe"><div class="screen"><div class="card pad">
+    <div class="lhead"><span class="tr" style="background:#DA291C;height:18px"></span><span class="h1">Manchester United</span><span class="sub">4–3–3</span></div>
+    <div class="pitch"><div class="prow">
+      <div class="pl"><span class="num" style="color:#DA291C">1</span><span class="pn">Onana</span></div></div><div class="prow">
+      <div class="pl"><span class="num" style="color:#DA291C">2</span><span class="pn">Dalot</span></div>
+      <div class="pl"><span class="num" style="color:#DA291C">19</span><span class="pn">Varane</span></div>
+      <div class="pl"><span class="num" style="color:#DA291C">6</span><span class="pn">Martínez</span></div>
+      <div class="pl"><span class="num" style="color:#DA291C">23</span><span class="pn">Shaw</span></div></div><div class="prow">
+      <div class="pl"><span class="num" style="color:#DA291C">18</span><span class="pn">Casemiro</span></div>
+      <div class="pl"><span class="num" style="color:#DA291C">37</span><span class="pn">Mainoo</span></div>
+      <div class="pl"><span class="num" style="color:#DA291C">8</span><span class="pn">Bruno</span></div></div><div class="prow">
+      <div class="pl"><span class="num" style="color:#DA291C">10</span><span class="pn">Rashford</span></div>
+      <div class="pl"><span class="num" style="color:#DA291C">11</span><span class="pn">Højlund</span></div>
+      <div class="pl"><span class="num" style="color:#DA291C">17</span><span class="pn">Garnacho</span></div></div></div>
+    <p class="sub mt">Shirt number in the club’s colour. Numbers, names and positions are facts.</p>
+  </div></div></div></div><div class="phone"><p class="plabel">SHOWDOWN DUEL</p><div class="pframe"><div class="screen">
+  <div class="duelhead"><p class="kicker c">SHOWDOWN · MATCHWEEK 4</p>
+    <div class="duelrow"><b>Ryan</b><i>3 – 2</i><b>Carson</b></div></div>
+  <div class="card pad mt">
+    
+      <div class="duelpick"><span class="pk ">1</span>
+        <span class="grow ta-c"><b>Man United <em>v</em> Man City</b><span class="rules"><span class="rule" style="width:22px;height:3px;background:#DA291C"></span><span class="rule" style="width:22px;height:3px;background:#1C6FB5"></span></span></span>
+        <span class="pk win">2</span></div>
+      <div class="duelpick"><span class="pk ">1</span>
+        <span class="grow ta-c"><b>Arsenal <em>v</em> Chelsea</b><span class="rules"><span class="rule" style="width:22px;height:3px;background:#DB0007"></span><span class="rule" style="width:22px;height:3px;background:#034694"></span></span></span>
+        <span class="pk ">1</span></div>
+      <div class="duelpick"><span class="pk ">X</span>
+        <span class="grow ta-c"><b>Liverpool <em>v</em> Nott'm Forest</b><span class="rules"><span class="rule" style="width:22px;height:3px;background:#C8102E"></span><span class="rule" style="width:22px;height:3px;background:#C40000"></span></span></span>
+        <span class="pk ">1</span></div>
+      <div class="duelpick"><span class="pk win">2</span>
+        <span class="grow ta-c"><b>Spurs <em>v</em> Newcastle</b><span class="rules"><span class="rule" style="width:22px;height:3px;background:#132257"></span><span class="rule" style="width:22px;height:3px;background:#241F20"></span></span></span>
+        <span class="pk win">2</span></div>
+  </div></div></div></div></div>
+</section>
+
+
+<section id="scout">
+  <h2>3 · Scout report — three options</h2>
+  <p class="note">The crest was anchoring each side of a comparison. Replacing it with the comparison itself is the upgrade.</p>
+  <p class="verdict"><strong>Recommendation:</strong> Divergent bars. Two badges never told you City have conceded three and United six; the bar does, and it uses the club colours rather than decorating with them. The people card is not an alternative — it is the other half of the same screen.</p>
+  <div class="row"><div class="phone"><p class="plabel">1 · DIVERGENT BARS</p><div class="pframe"><div class="screen"><div class="card pad">
+  <div class="scouthead">
+    <div><div class="h1">Man United</div><span class="rule" style="width:34px;height:3px;background:#DA291C"></span></div>
+    <span class="kicker">SCOUT</span>
+    <div class="ta-r"><div class="h1">Man City</div><div class="ta-r-in"><span class="rule" style="width:34px;height:3px;background:#1C6FB5"></span></div></div>
+  </div>
+  <div class="srow2">
+    <div class="sline"><b>W W L D W</b><i>FORM</i><b>W W W D W</b></div>
+    <div class="bar"><span style="flex:0.42;background:#DA291C"></span><span class="gap"></span><span style="flex:0.5800000000000001;background:#1C6FB5"></span></div>
+  </div><div class="srow2">
+    <div class="sline"><b>7</b><i>GOALS FOR</i><b>11</b></div>
+    <div class="bar"><span style="flex:0.39;background:#DA291C"></span><span class="gap"></span><span style="flex:0.61;background:#1C6FB5"></span></div>
+  </div><div class="srow2">
+    <div class="sline"><b>6</b><i>GOALS AGAINST</i><b>3</b></div>
+    <div class="bar"><span style="flex:0.67;background:#DA291C"></span><span class="gap"></span><span style="flex:0.32999999999999996;background:#1C6FB5"></span></div>
+  </div><div class="srow2">
+    <div class="sline"><b>1</b><i>CLEAN SHEETS</i><b>3</b></div>
+    <div class="bar"><span style="flex:0.25;background:#DA291C"></span><span class="gap"></span><span style="flex:0.75;background:#1C6FB5"></span></div>
+  </div><div class="srow2">
+    <div class="sline"><b>24</b><i>CORNERS</i><b>31</b></div>
+    <div class="bar"><span style="flex:0.44;background:#DA291C"></span><span class="gap"></span><span style="flex:0.56;background:#1C6FB5"></span></div>
+  </div>
+</div></div></div></div><div class="phone"><p class="plabel">2 · TINTED COLUMNS</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="cols">
+    <div class="colh" style="background:rgba(218,41,28,0.13);border-top:3px solid #DA291C"><b>Man United</b><i>Home · 6th</i></div>
+    <div class="colh ta-r" style="background:rgba(28,111,181,0.13);border-top:3px solid #1C6FB5"><b>Man City</b><i>Away · 2nd</i></div>
+  </div>
+  <div class="colrow">
+    <span class="cl" style="background:rgba(218,41,28,0.06)">W W L D W</span>
+    <span class="cm">FORM</span>
+    <span class="cr" style="background:rgba(28,111,181,0.06)">W W W D W</span></div><div class="colrow">
+    <span class="cl" style="background:rgba(218,41,28,0.06)">7</span>
+    <span class="cm">GOALS FOR</span>
+    <span class="cr" style="background:rgba(28,111,181,0.06)">11</span></div><div class="colrow">
+    <span class="cl" style="background:rgba(218,41,28,0.06)">6</span>
+    <span class="cm">GOALS AGAINST</span>
+    <span class="cr" style="background:rgba(28,111,181,0.06)">3</span></div><div class="colrow">
+    <span class="cl" style="background:rgba(218,41,28,0.06)">1</span>
+    <span class="cm">CLEAN SHEETS</span>
+    <span class="cr" style="background:rgba(28,111,181,0.06)">3</span></div><div class="colrow">
+    <span class="cl" style="background:rgba(218,41,28,0.06)">24</span>
+    <span class="cm">CORNERS</span>
+    <span class="cr" style="background:rgba(28,111,181,0.06)">31</span></div>
+</div></div></div></div><div class="phone"><p class="plabel">3 · PEOPLE CARD</p><div class="pframe"><div class="screen"><div class="card pad">
+  <div class="kicker">THE PEOPLE</div><div class="h1 mb">Five to watch</div>
+  <div class="prow2">
+      <span class="pnum" style="color:#1C6FB5">9</span>
+      <span class="tr" style="background:#1C6FB5;opacity:.35;height:26px"></span>
+      <span class="grow"><b>Erling Haaland</b><i>4 goals</i></span><span class="pcode">MCI</span></div><div class="prow2">
+      <span class="pnum" style="color:#1C6FB5">17</span>
+      <span class="tr" style="background:#1C6FB5;opacity:.35;height:26px"></span>
+      <span class="grow"><b>Kevin De Bruyne</b><i>3 assists</i></span><span class="pcode">MCI</span></div><div class="prow2">
+      <span class="pnum" style="color:#DA291C">8</span>
+      <span class="tr" style="background:#DA291C;opacity:.35;height:26px"></span>
+      <span class="grow"><b>Bruno Fernandes</b><i>2 goals · 2 assists</i></span><span class="pcode">MUN</span></div><div class="prow2">
+      <span class="pnum" style="color:#DA291C">10</span>
+      <span class="tr" style="background:#DA291C;opacity:.35;height:26px"></span>
+      <span class="grow"><b>Marcus Rashford</b><i>2 goals</i></span><span class="pcode">MUN</span></div><div class="prow2">
+      <span class="pnum" style="color:#1C6FB5">47</span>
+      <span class="tr" style="background:#1C6FB5;opacity:.35;height:26px"></span>
+      <span class="grow"><b>Phil Foden</b><i>1 goal · 3 key passes</i></span><span class="pcode">MCI</span></div>
+</div></div></div></div></div>
+</section>
+
+
+<section id="lms">
+  <h2>4 · Last Man Standing — three options</h2>
+  <p class="note">The hardest surface in the app, and the one that genuinely loses something: twenty crests in a grid are fast to scan.</p>
+  <p class="verdict"><strong>Recommendation:</strong> Pick a side. It changes the question rather than degrading the answer — you needed the fixture to make the pick anyway, and used clubs grey out in place. Tiles are the safe choice if the pick flow must not change.</p>
+  <div class="row"><div class="phone"><p class="plabel">1 · FULL-NAME LIST</p><div class="pframe"><div class="screen"><div class="card pad">
+  <div class="h1">Pick your club</div><div class="sub mb">Matchweek 5 · three already used</div>
+  <div class="lms ">
+    <span class="tr" style="background:#C8102E"></span><span class="grow tn">Liverpool</span>
+    <span class="sub">v Brighton (H)</span></div><div class="lms ">
+    <span class="tr" style="background:#DB0007"></span><span class="grow tn">Arsenal</span>
+    <span class="sub">v Brighton (H)</span></div><div class="lms ">
+    <span class="tr" style="background:#1C6FB5"></span><span class="grow tn">Manchester City</span>
+    <span class="sub">v Brighton (H)</span></div><div class="lms ">
+    <span class="tr" style="background:#034694"></span><span class="grow tn">Chelsea</span>
+    <span class="sub">v Brighton (H)</span></div><div class="lms used">
+    <span class="tr" style="background:#132257"></span><span class="grow tn">Tottenham</span>
+    <span class="sub">used MW2</span></div><div class="lms ">
+    <span class="tr" style="background:#DA291C"></span><span class="grow tn">Manchester United</span>
+    <span class="sub">v Brighton (H)</span></div><div class="lms used">
+    <span class="tr" style="background:#241F20"></span><span class="grow tn">Newcastle</span>
+    <span class="sub">used MW2</span></div><div class="lms ">
+    <span class="tr" style="background:#0057B8"></span><span class="grow tn">Brighton</span>
+    <span class="sub">v Brighton (H)</span></div><div class="lms ">
+    <span class="tr" style="background:#670E36"></span><span class="grow tn">Aston Villa</span>
+    <span class="sub">v Brighton (H)</span></div><div class="lms used">
+    <span class="tr" style="background:#1B1B1B"></span><span class="grow tn">Fulham</span>
+    <span class="sub">used MW2</span></div>
+</div></div></div></div><div class="phone"><p class="plabel">2 · TILES, COLOUR EDGE</p><div class="pframe"><div class="screen"><div class="card pad">
+  <div class="h1 mb">Pick your club</div>
+  <div class="tiles">
+    <div class="tile " style="border-top:3px solid #C8102E"><b>Liverpool</b><i>v BHA (H)</i></div>
+    <div class="tile " style="border-top:3px solid #DB0007"><b>Arsenal</b><i>v BHA (H)</i></div>
+    <div class="tile " style="border-top:3px solid #1C6FB5"><b>Man City</b><i>v BHA (H)</i></div>
+    <div class="tile " style="border-top:3px solid #034694"><b>Chelsea</b><i>v BHA (H)</i></div>
+    <div class="tile used" style="border-top:3px solid #132257"><b>Spurs</b><i>used</i></div>
+    <div class="tile " style="border-top:3px solid #DA291C"><b>Man United</b><i>v BHA (H)</i></div>
+    <div class="tile used" style="border-top:3px solid #241F20"><b>Newcastle</b><i>used</i></div>
+    <div class="tile " style="border-top:3px solid #0057B8"><b>Brighton</b><i>v BHA (H)</i></div>
+    <div class="tile " style="border-top:3px solid #670E36"><b>Villa</b><i>v BHA (H)</i></div>
+    <div class="tile used" style="border-top:3px solid #1B1B1B"><b>Fulham</b><i>used</i></div>
+    <div class="tile " style="border-top:3px solid #C40000"><b>Nott'm Forest</b><i>v BHA (H)</i></div>
+    <div class="tile " style="border-top:3px solid #B50E12"><b>Bournemouth</b><i>v BHA (H)</i></div></div>
+</div></div></div></div><div class="phone"><p class="plabel">3 · PICK A SIDE</p><div class="pframe"><div class="screen"><div class="card pad">
+  <div class="h1">Back a winner</div><div class="sub mb">Tap the side you think wins · no repeats</div>
+  <div class="sides">
+    <div class="sidebox  " style="">
+      <b>Liverpool</b><i>Home</i></div><div class="sidebox  " style="">
+      <b>Nott'm Forest</b><i>Away</i></div>
+  </div><div class="sides">
+    <div class="sidebox on " style="background:rgba(219,0,7,0.16);border-left:3px solid #DB0007">
+      <b>Arsenal</b><i>Home</i></div><div class="sidebox  " style="">
+      <b>Chelsea</b><i>Away</i></div>
+  </div><div class="sides">
+    <div class="sidebox  " style="">
+      <b>Man City</b><i>Home</i></div><div class="sidebox  " style="">
+      <b>Brighton</b><i>Away</i></div>
+  </div><div class="sides">
+    <div class="sidebox  " style="">
+      <b>Man United</b><i>Home</i></div><div class="sidebox  " style="">
+      <b>Everton</b><i>Away</i></div>
+  </div><div class="sides">
+    <div class="sidebox  " style="">
+      <b>Villa</b><i>Home</i></div><div class="sidebox  " style="">
+      <b>Palace</b><i>Away</i></div>
+  </div>
+</div></div></div></div></div>
+</section>
+
+
+<section id="kickoff">
+  <h2>5 · Next Kickoff — three options</h2>
+  <p class="note">This card never shows a club name: it says INT and UDI and lets the crest do the naming. The move is to promote the name into the space the crest was using.</p>
+  <p class="verdict"><strong>Recommendation:</strong> Clock hero. The countdown gets bigger, the fixture becomes a readable sentence, and date and venue merge into one line. The blob variant is the most “SportPool” of the three if you want colour on it.</p>
+  <div class="row"><div class="phone"><p class="plabel">TODAY</p><div class="pframe"><div class="screen"><div class="kocard"><div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 4</span></div>
+    <div class="komirror"><div><img class="komark" src="https://media.api-sports.io/football/teams/505.png" alt=""><b>INT</b></div>
+      <div class="kogrow"><div class="clock" style="font-size:34px"><span>19<i>H</i></span><em>:</em><span>23<i>M</i></span><em>:</em><span>17<i>S</i></span></div><p class="sub c">Monday, Sep 14</p></div>
+      <div><img class="komark" src="https://media.api-sports.io/football/teams/494.png" alt=""><b>UDI</b></div></div>
+    <p class="more">1 more match today</p><p class="sub c">Milan</p></div></div></div></div><div class="phone"><p class="plabel">1 · NAMES ON THE FLANKS</p><div class="pframe"><div class="screen"><div class="kocard"><div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 4</span></div>
+    <div class="komirror"><div class="koflank"><b>Inter Milan</b><span class="rule" style="width:30px;height:3px;background:#0B5FA5"></span></div>
+      <div class="kogrow"><div class="clock" style="font-size:31px"><span>19<i>H</i></span><em>:</em><span>23<i>M</i></span><em>:</em><span>17<i>S</i></span></div><p class="sub c">Monday, Sep 14</p></div>
+      <div class="koflank ta-r"><b>Udinese</b><span class="ta-r-in"><span class="rule" style="width:30px;height:3px;background:#2B2B2B"></span></span></div></div>
+    <p class="more">1 more match today</p><p class="sub c">Milan</p></div></div></div></div><div class="phone"><p class="plabel">2 · CLOCK HERO, FIXTURE LINE</p><div class="pframe"><div class="screen"><div class="kocard"><div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 4</span></div>
+    <div class="clock" style="font-size:42px"><span>19<i>H</i></span><em>:</em><span>23<i>M</i></span><em>:</em><span>17<i>S</i></span></div><div class="kofix"><span class="rule" style="width:22px;height:3px;background:#0B5FA5"></span><b>Inter Milan <em>v</em> Udinese</b><span class="rule" style="width:22px;height:3px;background:#2B2B2B"></span></div>
+    <p class="sub c">Monday, Sep 14 · Milan</p><p class="more">1 more match today</p></div></div></div></div><div class="phone"><p class="plabel">3 · THE CARD’S BLOBS</p><div class="pframe"><div class="screen"><div class="kocard blobs">
+    <span class="blob b1" style="background:rgba(11,95,165,0.22)"></span><span class="blob b2" style="background:rgba(43,43,43,0.3)"></span>
+    <div class="korel"><div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 4</span></div><div class="clock" style="font-size:40px"><span>19<i>H</i></span><em>:</em><span>23<i>M</i></span><em>:</em><span>17<i>S</i></span></div><p class="sub c">Monday, Sep 14</p>
+      <div class="kosplit"><b>Inter Milan</b><em>v</em><b>Udinese</b></div>
+      <p class="more">1 more match today</p><p class="sub c">Milan</p></div></div></div></div></div></div>
+</section>
+
+
+<section id="upcoming">
+  <h2>6 · Upcoming Matches — three options</h2>
+  <p class="note">Five rows across three competitions. Today the venue truncates because two crests and two codes eat the row.</p>
+  <p class="verdict"><strong>Recommendation:</strong> Split edge. One line per fixture, the venue stops truncating, and the two-colour edge reads as one match rather than two things.</p>
+  <div class="row"><div class="phone"><p class="plabel">TODAY</p><div class="pframe"><div class="screen"><h3 class="uph">Upcoming Matches</h3>
+  <div class="card upc"><div class="upcrest">
+      <div><img src="https://media.api-sports.io/football/teams/505.png" alt=""><b>INT</b></div><span class="vs">VS</span>
+      <div><img src="https://media.api-sports.io/football/teams/494.png" alt=""><b>UDI</b></div>
+      <div class="grow ta-r"><b>Mon, Sep 14 · 3:45 PM</b><i>Milan</i></div></div></div><div class="card upc"><div class="upcrest">
+      <div><img src="https://media.api-sports.io/football/teams/63.png" alt=""><b>LEE</b></div><span class="vs">VS</span>
+      <div><img src="https://media.api-sports.io/football/teams/34.png" alt=""><b>NEW</b></div>
+      <div class="grow ta-r"><b>Mon, Sep 14 · 4:00 PM</b><i>Elland Road, Leeds</i></div></div></div><div class="card upc"><div class="upcrest">
+      <div><img src="https://media.api-sports.io/football/teams/542.png" alt=""><b>ALA</b></div><span class="vs">VS</span>
+      <div><img src="https://media.api-sports.io/football/teams/532.png" alt=""><b>VAL</b></div>
+      <div class="grow ta-r"><b>Wed, Sep 16 · 12:00 PM</b><i>Estadio Mendizorrotza, Vitoria</i></div></div></div><div class="card upc"><div class="upcrest">
+      <div><img src="https://media.api-sports.io/football/teams/530.png" alt=""><b>ATM</b></div><span class="vs">VS</span>
+      <div><img src="https://media.api-sports.io/football/teams/727.png" alt=""><b>OSA</b></div>
+      <div class="grow ta-r"><b>Wed, Sep 16 · 12:00 PM</b><i>Metropolitano Stadium, Madrid</i></div></div></div><div class="card upc"><div class="upcrest">
+      <div><img src="https://media.api-sports.io/football/teams/529.png" alt=""><b>BAR</b></div><span class="vs">VS</span>
+      <div><img src="https://media.api-sports.io/football/teams/541.png" alt=""><b>SAN</b></div>
+      <div class="grow ta-r"><b>Wed, Sep 16 · 12:00 PM</b><i>Camp Nou, Barcelona</i></div></div></div></div></div></div><div class="phone"><p class="plabel">1 · NAMES, META BELOW</p><div class="pframe"><div class="screen"><h3 class="uph">Upcoming Matches</h3>
+  <div class="card upc"><div class="upnames">
+      <div class="side"><div class="name">Inter Milan</div><span class="rule" style="width:24px;height:3px;background:#0B5FA5"></span></div><span class="vs">V</span>
+      <div class="side ta-r"><div class="name">Udinese</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#2B2B2B"></span></span></div></div>
+      <div class="upmeta"><b>Mon, Sep 14 · 3:45 PM</b><i>Milan</i></div></div><div class="card upc"><div class="upnames">
+      <div class="side"><div class="name">Leeds United</div><span class="rule" style="width:24px;height:3px;background:#1D428A"></span></div><span class="vs">V</span>
+      <div class="side ta-r"><div class="name">Newcastle</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#241F20"></span></span></div></div>
+      <div class="upmeta"><b>Mon, Sep 14 · 4:00 PM</b><i>Elland Road, Leeds</i></div></div><div class="card upc"><div class="upnames">
+      <div class="side"><div class="name">Deportivo Alavés</div><span class="rule" style="width:24px;height:3px;background:#0761AF"></span></div><span class="vs">V</span>
+      <div class="side ta-r"><div class="name">Valencia</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#C4701A"></span></span></div></div>
+      <div class="upmeta"><b>Wed, Sep 16 · 12:00 PM</b><i>Estadio Mendizorrotza, Vitoria</i></div></div><div class="card upc"><div class="upnames">
+      <div class="side"><div class="name">Atlético Madrid</div><span class="rule" style="width:24px;height:3px;background:#C8102E"></span></div><span class="vs">V</span>
+      <div class="side ta-r"><div class="name">Osasuna</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#A21C28"></span></span></div></div>
+      <div class="upmeta"><b>Wed, Sep 16 · 12:00 PM</b><i>Metropolitano Stadium, Madrid</i></div></div><div class="card upc"><div class="upnames">
+      <div class="side"><div class="name">Barcelona</div><span class="rule" style="width:24px;height:3px;background:#A50044"></span></div><span class="vs">V</span>
+      <div class="side ta-r"><div class="name">Racing Santander</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#00A94F"></span></span></div></div>
+      <div class="upmeta"><b>Wed, Sep 16 · 12:00 PM</b><i>Camp Nou, Barcelona</i></div></div></div></div></div><div class="phone"><p class="plabel">2 · STACKED</p><div class="pframe"><div class="screen"><h3 class="uph">Upcoming Matches</h3>
+  <div class="card upc"><div class="upstack">
+      <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#0B5FA5"></span><span class="rule" style="width:3px;height:16px;background:#2B2B2B"></span></span>
+      <span class="grow"><b>Inter Milan</b><b>Udinese</b></span>
+      <span class="ta-r"><b class="pri">3:45 PM</b><i>Mon, Sep 14</i></span></div>
+      <div class="sub mt6">Milan</div></div><div class="card upc"><div class="upstack">
+      <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#1D428A"></span><span class="rule" style="width:3px;height:16px;background:#241F20"></span></span>
+      <span class="grow"><b>Leeds United</b><b>Newcastle</b></span>
+      <span class="ta-r"><b class="pri">4:00 PM</b><i>Mon, Sep 14</i></span></div>
+      <div class="sub mt6">Elland Road, Leeds</div></div><div class="card upc"><div class="upstack">
+      <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#0761AF"></span><span class="rule" style="width:3px;height:16px;background:#C4701A"></span></span>
+      <span class="grow"><b>Deportivo Alavés</b><b>Valencia</b></span>
+      <span class="ta-r"><b class="pri">12:00 PM</b><i>Wed, Sep 16</i></span></div>
+      <div class="sub mt6">Estadio Mendizorrotza, Vitoria</div></div><div class="card upc"><div class="upstack">
+      <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#C8102E"></span><span class="rule" style="width:3px;height:16px;background:#A21C28"></span></span>
+      <span class="grow"><b>Atlético Madrid</b><b>Osasuna</b></span>
+      <span class="ta-r"><b class="pri">12:00 PM</b><i>Wed, Sep 16</i></span></div>
+      <div class="sub mt6">Metropolitano Stadium, Madrid</div></div><div class="card upc"><div class="upstack">
+      <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#A50044"></span><span class="rule" style="width:3px;height:16px;background:#00A94F"></span></span>
+      <span class="grow"><b>Barcelona</b><b>Racing Santander</b></span>
+      <span class="ta-r"><b class="pri">12:00 PM</b><i>Wed, Sep 16</i></span></div>
+      <div class="sub mt6">Camp Nou, Barcelona</div></div></div></div></div><div class="phone"><p class="plabel">3 · SPLIT EDGE</p><div class="pframe"><div class="screen"><h3 class="uph">Upcoming Matches</h3>
+  <div class="card upedge"><span class="edge"><span style="background:#0B5FA5"></span><span style="background:#2B2B2B"></span></span>
+      <div class="edgebody"><b>Inter Milan <em>v</em> Udinese</b><div class="upmeta2"><b>Mon, Sep 14 · 3:45 PM</b><i>Milan</i></div></div></div><div class="card upedge"><span class="edge"><span style="background:#1D428A"></span><span style="background:#241F20"></span></span>
+      <div class="edgebody"><b>Leeds United <em>v</em> Newcastle</b><div class="upmeta2"><b>Mon, Sep 14 · 4:00 PM</b><i>Elland Road, Leeds</i></div></div></div><div class="card upedge"><span class="edge"><span style="background:#0761AF"></span><span style="background:#C4701A"></span></span>
+      <div class="edgebody"><b>Deportivo Alavés <em>v</em> Valencia</b><div class="upmeta2"><b>Wed, Sep 16 · 12:00 PM</b><i>Estadio Mendizorrotza, Vitoria</i></div></div></div><div class="card upedge"><span class="edge"><span style="background:#C8102E"></span><span style="background:#A21C28"></span></span>
+      <div class="edgebody"><b>Atlético Madrid <em>v</em> Osasuna</b><div class="upmeta2"><b>Wed, Sep 16 · 12:00 PM</b><i>Metropolitano Stadium, Madrid</i></div></div></div><div class="card upedge"><span class="edge"><span style="background:#A50044"></span><span style="background:#00A94F"></span></span>
+      <div class="edgebody"><b>Barcelona <em>v</em> Racing Santander</b><div class="upmeta2"><b>Wed, Sep 16 · 12:00 PM</b><i>Camp Nou, Barcelona</i></div></div></div></div></div></div></div>
+</section>
+
+
+
+<section id="rows">
+  <h2>8 · Round two — the vertical line, three ways</h2>
+  <p class="note">Your lean, built three ways. Underline sits beneath the name; the pill sits before it; the edge tab bleeds off the card’s rounded edge so the colour is part of the silhouette rather than an applied mark.</p>
+  <p class="verdict"><strong>Recommendation:</strong> The edge tab is the new idea and the most “premium” of the three: nothing floats, the colour belongs to the card. The left pill is the safest and reads fastest at small sizes.</p>
+  <div class="row"><div class="phone"><p class="plabel">UNDERLINE</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="cardhead"><div class="h1">Today</div><div class="kicker">PREMIER LEAGUE · MATCHWEEK 4</div></div>
+  <div class="r"><div class="side"><div class="name dim">Man United</div><span class="rule" style="width:26px;height:3px;background:#DA291C"></span></div>
+    <div class="score"><span class="sc">0<i>–</i>1</span></div><div class="side ta-r"><div class="name">Man City</div><span class="rule" style="width:26px;height:3px;background:#1C6FB5"></span></div></div><div class="r"><div class="side"><div class="name">Arsenal</div><span class="rule" style="width:26px;height:3px;background:#DB0007"></span></div>
+    <div class="score"><span class="sc">2<i>–</i>1</span></div><div class="side ta-r"><div class="name dim">Chelsea</div><span class="rule" style="width:26px;height:3px;background:#034694"></span></div></div><div class="r"><div class="side"><div class="name">Liverpool</div><span class="rule" style="width:26px;height:3px;background:#C8102E"></span></div>
+    <div class="score"><span class="sc">1<i>–</i>1</span></div><div class="side ta-r"><div class="name">Nott'm Forest</div><span class="rule" style="width:26px;height:3px;background:#C40000"></span></div></div><div class="r"><div class="side"><div class="name">Spurs</div><span class="rule" style="width:26px;height:3px;background:#132257"></span></div>
+    <div class="score"><span class="tm">17:30</span></div><div class="side ta-r"><div class="name">Newcastle</div><span class="rule" style="width:26px;height:3px;background:#241F20"></span></div></div><div class="r"><div class="side"><div class="name">Brighton</div><span class="rule" style="width:26px;height:3px;background:#0057B8"></span></div>
+    <div class="score"><span class="tm">20:00</span></div><div class="side ta-r"><div class="name">Everton</div><span class="rule" style="width:26px;height:3px;background:#003399"></span></div></div></div></div></div></div><div class="phone"><p class="plabel">LEFT PILL</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="cardhead"><div class="h1">Today</div><div class="kicker">PREMIER LEAGUE · MATCHWEEK 4</div></div>
+  <div class="r"><div class="sidep"><span class="pill" style="height:20px;background:#DA291C"></span><div class="name dim">Man United</div></div>
+    <div class="score"><span class="sc">0<i>–</i>1</span></div><div class="sidep rev"><span class="pill" style="height:20px;background:#1C6FB5"></span><div class="name">Man City</div></div></div><div class="r"><div class="sidep"><span class="pill" style="height:20px;background:#DB0007"></span><div class="name">Arsenal</div></div>
+    <div class="score"><span class="sc">2<i>–</i>1</span></div><div class="sidep rev"><span class="pill" style="height:20px;background:#034694"></span><div class="name dim">Chelsea</div></div></div><div class="r"><div class="sidep"><span class="pill" style="height:20px;background:#C8102E"></span><div class="name">Liverpool</div></div>
+    <div class="score"><span class="sc">1<i>–</i>1</span></div><div class="sidep rev"><span class="pill" style="height:20px;background:#C40000"></span><div class="name">Nott'm Forest</div></div></div><div class="r"><div class="sidep"><span class="pill" style="height:20px;background:#132257"></span><div class="name">Spurs</div></div>
+    <div class="score"><span class="tm">17:30</span></div><div class="sidep rev"><span class="pill" style="height:20px;background:#241F20"></span><div class="name">Newcastle</div></div></div><div class="r"><div class="sidep"><span class="pill" style="height:20px;background:#0057B8"></span><div class="name">Brighton</div></div>
+    <div class="score"><span class="tm">20:00</span></div><div class="sidep rev"><span class="pill" style="height:20px;background:#003399"></span><div class="name">Everton</div></div></div></div></div></div></div><div class="phone"><p class="plabel">EDGE TAB (NEW)</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="cardhead"><div class="h1">Today</div><div class="kicker">PREMIER LEAGUE · MATCHWEEK 4</div></div>
+  <div class="r tabrow"><span class="tabl" style="background:#DA291C"></span><span class="tabr" style="background:#1C6FB5"></span>
+    <div class="side"><div class="name dim">Man United</div></div><div class="score"><span class="sc">0<i>–</i>1</span></div>
+    <div class="side ta-r"><div class="name">Man City</div></div></div><div class="r tabrow"><span class="tabl" style="background:#DB0007"></span><span class="tabr" style="background:#034694"></span>
+    <div class="side"><div class="name">Arsenal</div></div><div class="score"><span class="sc">2<i>–</i>1</span></div>
+    <div class="side ta-r"><div class="name dim">Chelsea</div></div></div><div class="r tabrow"><span class="tabl" style="background:#C8102E"></span><span class="tabr" style="background:#C40000"></span>
+    <div class="side"><div class="name">Liverpool</div></div><div class="score"><span class="sc">1<i>–</i>1</span></div>
+    <div class="side ta-r"><div class="name">Nott'm Forest</div></div></div><div class="r tabrow"><span class="tabl" style="background:#132257"></span><span class="tabr" style="background:#241F20"></span>
+    <div class="side"><div class="name">Spurs</div></div><div class="score"><span class="tm">17:30</span></div>
+    <div class="side ta-r"><div class="name">Newcastle</div></div></div><div class="r tabrow"><span class="tabl" style="background:#0057B8"></span><span class="tabr" style="background:#003399"></span>
+    <div class="side"><div class="name">Brighton</div></div><div class="score"><span class="tm">20:00</span></div>
+    <div class="side ta-r"><div class="name">Everton</div></div></div></div></div></div></div></div>
+</section>
+
+
+<section id="header2">
+  <h2>9 · Match header — home left, away right, no hard seam</h2>
+  <p class="note">Long names wrap to two lines at 19px, which fits “Manchester United” without truncation. The straight split is gone: colour arrives as light rather than as an edge.</p>
+  <p class="verdict"><strong>Recommendation:</strong> Two glows. The colour reads as stadium light behind each side, there is no seam to feel sharp, and the ink base keeps it in the SportPool palette rather than the league’s purple.</p>
+  <div class="row"><div class="phone"><p class="plabel">TWO GLOWS</p><div class="pframe"><div class="hdr v2"><span class="glow gl" style="background:radial-gradient(closest-side, rgba(218,41,28,0.55), transparent)"></span>
+       <span class="glow gr" style="background:radial-gradient(closest-side, rgba(28,111,181,0.5), transparent)"></span>
+    <div class="hdrc">
+      <p class="kicker c">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="hmirror"><div class="hteam l">
+    
+    <div class="hname">Manchester<br>United</div>
+    <span class="hrule" style="background:#DA291C"></span>
+  </div>
+        <div class="hscore"><b>0<i>–</i>1</b><span>FULL TIME</span></div>
+        <div class="hteam r">
+    
+    <div class="hname">Manchester<br>City</div>
+    <span class="hrule" style="background:#1C6FB5"></span>
+  </div></div>
+      <p class="scorer">⚽ Haaland 60'</p><div class="tabs"><span class="on">Facts</span><span class="">Line-ups</span><span class="">Stats</span><span class="">Scouting</span></div>
+    </div></div>
+    <div class="screen"><div class="card pad"><div class="h1">Match Facts</div><div class="sub">Old Trafford, Manchester</div></div></div></div></div><div class="phone"><p class="plabel">CURVED SWEEP</p><div class="pframe"><div class="hdr v2"><span class="sweep" style="background:rgba(218,41,28,0.42)"></span>
+       <span class="sweep2" style="background:rgba(28,111,181,0.42)"></span>
+    <div class="hdrc">
+      <p class="kicker c">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="hmirror"><div class="hteam l">
+    
+    <div class="hname">Manchester<br>United</div>
+    <span class="hrule" style="background:#DA291C"></span>
+  </div>
+        <div class="hscore"><b>0<i>–</i>1</b><span>FULL TIME</span></div>
+        <div class="hteam r">
+    
+    <div class="hname">Manchester<br>City</div>
+    <span class="hrule" style="background:#1C6FB5"></span>
+  </div></div>
+      <p class="scorer">⚽ Haaland 60'</p><div class="tabs"><span class="on">Facts</span><span class="">Line-ups</span><span class="">Stats</span><span class="">Scouting</span></div>
+    </div></div>
+    <div class="screen"><div class="card pad"><div class="h1">Match Facts</div><div class="sub">Old Trafford, Manchester</div></div></div></div></div><div class="phone"><p class="plabel">PILL + GLOW</p><div class="pframe"><div class="hdr v2"><span class="glow gl" style="background:radial-gradient(closest-side, rgba(218,41,28,0.55), transparent)"></span>
+       <span class="glow gr" style="background:radial-gradient(closest-side, rgba(28,111,181,0.5), transparent)"></span>
+    <div class="hdrc">
+      <p class="kicker c">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="hmirror"><div class="hteam l">
+    <span class="hpill" style="background:#DA291C"></span>
+    <div class="hname">Manchester<br>United</div>
+    
+  </div>
+        <div class="hscore"><b>0<i>–</i>1</b><span>FULL TIME</span></div>
+        <div class="hteam r">
+    <span class="hpill" style="background:#1C6FB5"></span>
+    <div class="hname">Manchester<br>City</div>
+    
+  </div></div>
+      <p class="scorer">⚽ Haaland 60'</p><div class="tabs"><span class="on">Facts</span><span class="">Line-ups</span><span class="">Stats</span><span class="">Scouting</span></div>
+    </div></div>
+    <div class="screen"><div class="card pad"><div class="h1">Match Facts</div><div class="sub">Old Trafford, Manchester</div></div></div></div></div></div>
+</section>
+
+
+<section id="table2">
+  <h2>10 · League table — one more idea</h2>
+  <p class="note">The left pill, and the clever alternative: the club’s colour in the rank number itself, so colour costs no extra element at all.</p>
+  
+  <div class="row"><div class="phone"><p class="plabel">LEFT PILL</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="thead"><span class="rk"></span><span class="grow"></span><span class="col">PL</span><span class="col">GD</span><span class="col pts">PTS</span></div>
+  <div class="trow">
+    <span class="rk" >1</span>
+    <span class="pill" style="height:18px;background:#C8102E"></span>
+    <span class="grow tn">Liverpool</span>
+    <span class="col">4</span><span class="col">+8</span><span class="col pts">12</span></div><div class="trow">
+    <span class="rk" >2</span>
+    <span class="pill" style="height:18px;background:#DB0007"></span>
+    <span class="grow tn">Arsenal</span>
+    <span class="col">4</span><span class="col">+6</span><span class="col pts">10</span></div><div class="trow">
+    <span class="rk" >3</span>
+    <span class="pill" style="height:18px;background:#1C6FB5"></span>
+    <span class="grow tn">Man City</span>
+    <span class="col">4</span><span class="col">+5</span><span class="col pts">9</span></div><div class="trow">
+    <span class="rk" >4</span>
+    <span class="pill" style="height:18px;background:#034694"></span>
+    <span class="grow tn">Chelsea</span>
+    <span class="col">4</span><span class="col">+2</span><span class="col pts">8</span></div><div class="trow">
+    <span class="rk" >5</span>
+    <span class="pill" style="height:18px;background:#132257"></span>
+    <span class="grow tn">Spurs</span>
+    <span class="col">4</span><span class="col">+1</span><span class="col pts">7</span></div><div class="trow">
+    <span class="rk" >6</span>
+    <span class="pill" style="height:18px;background:#241F20"></span>
+    <span class="grow tn">Newcastle</span>
+    <span class="col">4</span><span class="col">0</span><span class="col pts">5</span></div><div class="trow">
+    <span class="rk" >7</span>
+    <span class="pill" style="height:18px;background:#0057B8"></span>
+    <span class="grow tn">Brighton</span>
+    <span class="col">4</span><span class="col">-1</span><span class="col pts">5</span></div><div class="trow">
+    <span class="rk" >8</span>
+    <span class="pill" style="height:18px;background:#DA291C"></span>
+    <span class="grow tn">Man United</span>
+    <span class="col">4</span><span class="col">-3</span><span class="col pts">4</span></div>
+</div></div></div></div><div class="phone"><p class="plabel">RANK IN CLUB COLOUR</p><div class="pframe"><div class="screen"><div class="card">
+  <div class="thead"><span class="rk"></span><span class="grow"></span><span class="col">PL</span><span class="col">GD</span><span class="col pts">PTS</span></div>
+  <div class="trow">
+    <span class="rk" style="color:#C8102E">1</span>
+    
+    <span class="grow tn">Liverpool</span>
+    <span class="col">4</span><span class="col">+8</span><span class="col pts">12</span></div><div class="trow">
+    <span class="rk" style="color:#DB0007">2</span>
+    
+    <span class="grow tn">Arsenal</span>
+    <span class="col">4</span><span class="col">+6</span><span class="col pts">10</span></div><div class="trow">
+    <span class="rk" style="color:#1C6FB5">3</span>
+    
+    <span class="grow tn">Man City</span>
+    <span class="col">4</span><span class="col">+5</span><span class="col pts">9</span></div><div class="trow">
+    <span class="rk" style="color:#034694">4</span>
+    
+    <span class="grow tn">Chelsea</span>
+    <span class="col">4</span><span class="col">+2</span><span class="col pts">8</span></div><div class="trow">
+    <span class="rk" style="color:#132257">5</span>
+    
+    <span class="grow tn">Spurs</span>
+    <span class="col">4</span><span class="col">+1</span><span class="col pts">7</span></div><div class="trow">
+    <span class="rk" style="color:#241F20">6</span>
+    
+    <span class="grow tn">Newcastle</span>
+    <span class="col">4</span><span class="col">0</span><span class="col pts">5</span></div><div class="trow">
+    <span class="rk" style="color:#0057B8">7</span>
+    
+    <span class="grow tn">Brighton</span>
+    <span class="col">4</span><span class="col">-1</span><span class="col pts">5</span></div><div class="trow">
+    <span class="rk" style="color:#DA291C">8</span>
+    
+    <span class="grow tn">Man United</span>
+    <span class="col">4</span><span class="col">-3</span><span class="col pts">4</span></div>
+</div></div></div></div></div>
+</section>
+
+
+<section id="pickem2">
+  <h2>11 · Pick’em — the team is the button</h2>
+  <p class="note">No 1/X/2. Each side is a full button carrying the club’s name and colour, with Draw between them. Selecting tints the button in the club’s own colour rather than the app’s blue.</p>
+  
+  <div class="row"><div class="phone"><p class="plabel">THREE BUTTONS</p><div class="pframe"><div class="screen"><div class="card pad mb">
+    <div class="sub mb">Sat 15:00 · Old Trafford</div>
+    <div class="trio"><div class="tbtn " >
+      <span class="pill" style="height:22px;background:#DA291C"></span><b>Man United</b></div><div class="dbtn ">Draw</div><div class="tbtn on" style="border-color:#1C6FB5;background:rgba(28,111,181,0.1)">
+      <span class="pill" style="height:22px;background:#1C6FB5"></span><b>Man City</b></div></div></div><div class="card pad mb">
+    <div class="sub mb">Sat 15:00 · Old Trafford</div>
+    <div class="trio"><div class="tbtn on" style="border-color:#DB0007;background:rgba(219,0,7,0.1)">
+      <span class="pill" style="height:22px;background:#DB0007"></span><b>Arsenal</b></div><div class="dbtn ">Draw</div><div class="tbtn " >
+      <span class="pill" style="height:22px;background:#034694"></span><b>Chelsea</b></div></div></div><div class="card pad mb">
+    <div class="sub mb">Sat 15:00 · Old Trafford</div>
+    <div class="trio"><div class="tbtn " >
+      <span class="pill" style="height:22px;background:#C8102E"></span><b>Liverpool</b></div><div class="dbtn ">Draw</div><div class="tbtn " >
+      <span class="pill" style="height:22px;background:#C40000"></span><b>Nott'm Forest</b></div></div></div></div></div></div><div class="phone"><p class="plabel">STACKED + DRAW</p><div class="pframe"><div class="screen"><div class="card pad mb"><div class="sub mb">Sat 15:00 · Old Trafford</div>
+    <div class="stackbtn"><div class="tbtn " >
+      <span class="pill" style="height:22px;background:#DA291C"></span><b>Man United</b></div><div class="tbtn on" style="border-color:#1C6FB5;background:rgba(28,111,181,0.1)">
+      <span class="pill" style="height:22px;background:#1C6FB5"></span><b>Man City</b></div></div>
+    <div class="dbtn wide ">Draw</div></div><div class="card pad mb"><div class="sub mb">Sat 15:00 · Old Trafford</div>
+    <div class="stackbtn"><div class="tbtn on" style="border-color:#DB0007;background:rgba(219,0,7,0.1)">
+      <span class="pill" style="height:22px;background:#DB0007"></span><b>Arsenal</b></div><div class="tbtn " >
+      <span class="pill" style="height:22px;background:#034694"></span><b>Chelsea</b></div></div>
+    <div class="dbtn wide ">Draw</div></div><div class="card pad mb"><div class="sub mb">Sat 15:00 · Old Trafford</div>
+    <div class="stackbtn"><div class="tbtn " >
+      <span class="pill" style="height:22px;background:#C8102E"></span><b>Liverpool</b></div><div class="tbtn " >
+      <span class="pill" style="height:22px;background:#C40000"></span><b>Nott'm Forest</b></div></div>
+    <div class="dbtn wide ">Draw</div></div></div></div></div></div>
+</section>
+
+<section id="jerseys"><h2>12 · The jersey</h2>
+<p class="note">Built from rounded rects under a mask — body, two sleeve stubs, neck bitten out — so the silhouette carries the app’s radii instead of a sharp football-shirt outline. Colour and number are data; the shape is ours. Patterns are optional and cost a second colour per club.</p>
+<div class="jgrid">
+  <div class="jcell"><div class="jart"><svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="shirt">
+    <defs><mask id="m0">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m0)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">1</text>
+  </svg></div><span>Soft tee · solid</span></div>
+  <div class="jcell"><div class="jart"><svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="shirt">
+    <defs><mask id="m1">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m1)"><rect x="0" y="0" width="120" height="120" fill="#1C6FB5"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">9</text>
+  </svg></div><span>Bubble · solid</span></div>
+  <div class="jcell"><div class="jart"><svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="shirt">
+    <defs><mask id="m2">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m2)"><rect x="0" y="0" width="120" height="120" fill="#C8102E"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">10</text>
+  </svg></div><span>Squircle · no sleeves</span></div>
+  <div class="jcell"><div class="jart"><svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="shirt">
+    <defs><mask id="m3">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="32" y="30" width="56" height="74" rx="15"/>
+    <ellipse cx="33" cy="50" rx="15" ry="11"/>
+    <ellipse cx="87" cy="50" rx="15" ry="11"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m3)"><rect x="0" y="0" width="120" height="120" fill="#034694"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">8</text>
+  </svg></div><span>Tall · slimmer</span></div>
+  <div class="jcell"><div class="jart"><svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="shirt">
+    <defs><mask id="m4">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m4)"><rect width="120" height="120" fill="#E30613"/><rect x="35" y="0" width="9" height="120" fill="#FFFFFF" opacity=".92"/><rect x="69" y="0" width="9" height="120" fill="#FFFFFF" opacity=".92"/><rect x="103" y="0" width="9" height="120" fill="#FFFFFF" opacity=".92"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">17</text>
+  </svg></div><span>Soft tee · stripes</span></div>
+  <div class="jcell"><div class="jart"><svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="shirt">
+    <defs><mask id="m5">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m5)"><rect width="120" height="120" fill="#1B458F"/><rect x="0" y="48" width="120" height="9" fill="#C4122E" opacity=".92"/><rect x="0" y="66" width="120" height="9" fill="#C4122E" opacity=".92"/><rect x="0" y="84" width="120" height="9" fill="#C4122E" opacity=".92"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">23</text>
+  </svg></div><span>Soft tee · hoops</span></div>
+  <div class="jcell"><div class="jart"><svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="shirt">
+    <defs><mask id="m6">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m6)"><rect width="120" height="120" fill="#C8102E"/><rect x="-20" y="52" width="170" height="17" fill="#FFFFFF" opacity=".92" transform="rotate(32 60 60)"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">6</text>
+  </svg></div><span>Bubble · sash</span></div>
+  <div class="jcell"><div class="jart"><svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="shirt">
+    <defs><mask id="m7">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m7)"><rect width="120" height="120" fill="#670E36"/><rect x="0" y="0" width="120" height="46" fill="#95BFE5" opacity=".9"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">11</text>
+  </svg></div><span>Soft tee · shoulder yoke</span></div>
+  <div class="jcell"><div class="jart"><svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="shirt">
+    <defs><mask id="m8">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m8)"><rect width="60" height="120" fill="#1B458F"/><rect x="60" width="60" height="120" fill="#C4122E" opacity=".92"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">4</text>
+  </svg></div><span>Bubble · halves</span></div></div>
+<div class="row" style="margin-top:22px">
+  <div class="phone"><p class="plabel">SOFT TEE ON THE PITCH</p><div class="pframe"><div class="screen"><div class="card pad">
+    <div class="lhead"><span class="pill" style="height:18px;background:#DA291C"></span><span class="h1">Manchester United</span><span class="sub">4–3–3</span></div>
+    <div class="pitch"><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m100">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m100)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">1</text>
+  </svg><span class="pn">Onana</span></div></div><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m101">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m101)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">2</text>
+  </svg><span class="pn">Dalot</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m102">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m102)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">19</text>
+  </svg><span class="pn">Varane</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m103">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m103)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">6</text>
+  </svg><span class="pn">Martínez</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m104">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m104)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">23</text>
+  </svg><span class="pn">Shaw</span></div></div><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m105">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m105)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">18</text>
+  </svg><span class="pn">Casemiro</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m106">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m106)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">37</text>
+  </svg><span class="pn">Mainoo</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m107">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m107)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">8</text>
+  </svg><span class="pn">Bruno</span></div></div><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m108">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m108)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">10</text>
+  </svg><span class="pn">Rashford</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m109">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m109)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">11</text>
+  </svg><span class="pn">Højlund</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m110">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="29" y="30" width="62" height="74" rx="20"/>
+    <ellipse cx="30" cy="50" rx="17" ry="12"/>
+    <ellipse cx="90" cy="50" rx="17" ry="12"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m110)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">17</text>
+  </svg><span class="pn">Garnacho</span></div></div></div>
+  </div></div></div></div><div class="phone"><p class="plabel">BUBBLE ON THE PITCH</p><div class="pframe"><div class="screen"><div class="card pad">
+    <div class="lhead"><span class="pill" style="height:18px;background:#DA291C"></span><span class="h1">Manchester United</span><span class="sub">4–3–3</span></div>
+    <div class="pitch"><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m100">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m100)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">1</text>
+  </svg><span class="pn">Onana</span></div></div><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m101">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m101)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">2</text>
+  </svg><span class="pn">Dalot</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m102">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m102)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">19</text>
+  </svg><span class="pn">Varane</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m103">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m103)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">6</text>
+  </svg><span class="pn">Martínez</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m104">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m104)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">23</text>
+  </svg><span class="pn">Shaw</span></div></div><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m105">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m105)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">18</text>
+  </svg><span class="pn">Casemiro</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m106">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m106)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">37</text>
+  </svg><span class="pn">Mainoo</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m107">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m107)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">8</text>
+  </svg><span class="pn">Bruno</span></div></div><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m108">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m108)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">10</text>
+  </svg><span class="pn">Rashford</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m109">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m109)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">11</text>
+  </svg><span class="pn">Højlund</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m110">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="27" y="30" width="66" height="74" rx="28"/>
+    <ellipse cx="28" cy="52" rx="19" ry="14"/>
+    <ellipse cx="92" cy="52" rx="19" ry="14"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m110)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">17</text>
+  </svg><span class="pn">Garnacho</span></div></div></div>
+  </div></div></div></div><div class="phone"><p class="plabel">SQUIRCLE ON THE PITCH</p><div class="pframe"><div class="screen"><div class="card pad">
+    <div class="lhead"><span class="pill" style="height:18px;background:#DA291C"></span><span class="h1">Manchester United</span><span class="sub">4–3–3</span></div>
+    <div class="pitch"><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m100">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m100)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">1</text>
+  </svg><span class="pn">Onana</span></div></div><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m101">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m101)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">2</text>
+  </svg><span class="pn">Dalot</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m102">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m102)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">19</text>
+  </svg><span class="pn">Varane</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m103">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m103)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">6</text>
+  </svg><span class="pn">Martínez</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m104">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m104)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">23</text>
+  </svg><span class="pn">Shaw</span></div></div><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m105">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m105)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">18</text>
+  </svg><span class="pn">Casemiro</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m106">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m106)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">37</text>
+  </svg><span class="pn">Mainoo</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m107">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m107)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">8</text>
+  </svg><span class="pn">Bruno</span></div></div><div class="prow">
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m108">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m108)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">10</text>
+  </svg><span class="pn">Rashford</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m109">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m109)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">11</text>
+  </svg><span class="pn">Højlund</span></div>
+      <div class="pl"><svg viewBox="0 0 120 120" width="44" height="44" role="img" aria-label="shirt">
+    <defs><mask id="m110">
+      <rect width="120" height="120" fill="black"/>
+      <g fill="white"><rect x="20" y="30" width="80" height="74" rx="28"/></g>
+      <circle cx="60" cy="29" r="12" fill="black"/>
+    </mask></defs>
+    <g mask="url(#m110)"><rect x="0" y="0" width="120" height="120" fill="#DA291C"/></g>
+    <text x="60" y="82" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="34"
+      fill="#FFFFFF">17</text>
+  </svg><span class="pn">Garnacho</span></div></div></div>
+  </div></div></div></div>
+</div></section>
+
+
+<section id="lmspicks">
+  <h2>13 · Last Man Standing — everyone’s picks</h2>
+  <p class="note">The grid of crests, replaced. Codes in a tinted cell keep the shape of the current table; grouping by club answers “who is on Chelsea this week” in one read.</p>
+  <p class="verdict"><strong>Recommendation:</strong> Grid by matchweek — it is a one-for-one replacement for what is there now.</p>
+  <div class="row"><div class="phone"><p class="plabel">GRID BY MATCHWEEK</p><div class="pframe"><div class="screen"><div class="card pad">
+  <div class="h1">Everyone’s picks</div><div class="sub mb">Matchweeks 1–4</div>
+  <div class="pickgrid"><div class="pgh"></div><div class="pgh">MW1</div><div class="pgh">MW2</div><div class="pgh">MW3</div><div class="pgh">MW4</div>
+  <div class="pgn">Ryan</div>
+    <div class="pgc" style="background:rgba(200,16,46,0.16);border-left:3px solid #C8102E">LIV</div>
+    <div class="pgc" style="background:rgba(219,0,7,0.16);border-left:3px solid #DB0007">ARS</div>
+    <div class="pgc" style="background:rgba(28,111,181,0.16);border-left:3px solid #1C6FB5">MCI</div>
+    <div class="pgc" style="background:rgba(3,70,148,0.16);border-left:3px solid #034694">CHE</div><div class="pgn">Carson</div>
+    <div class="pgc" style="background:rgba(219,0,7,0.16);border-left:3px solid #DB0007">ARS</div>
+    <div class="pgc" style="background:rgba(28,111,181,0.16);border-left:3px solid #1C6FB5">MCI</div>
+    <div class="pgc" style="background:rgba(200,16,46,0.16);border-left:3px solid #C8102E">LIV</div>
+    <div class="pgc" style="background:rgba(19,34,87,0.16);border-left:3px solid #132257">TOT</div><div class="pgn">Nadia</div>
+    <div class="pgc" style="background:rgba(28,111,181,0.16);border-left:3px solid #1C6FB5">MCI</div>
+    <div class="pgc" style="background:rgba(200,16,46,0.16);border-left:3px solid #C8102E">LIV</div>
+    <div class="pgc" style="background:rgba(19,34,87,0.16);border-left:3px solid #132257">TOT</div>
+    <div class="pgc" style="background:rgba(219,0,7,0.16);border-left:3px solid #DB0007">ARS</div><div class="pgn">Jules</div>
+    <div class="pgc" style="background:rgba(3,70,148,0.16);border-left:3px solid #034694">CHE</div>
+    <div class="pgc" style="background:rgba(19,34,87,0.16);border-left:3px solid #132257">TOT</div>
+    <div class="pgc" style="background:rgba(219,0,7,0.16);border-left:3px solid #DB0007">ARS</div>
+    <div class="pgc" style="background:rgba(200,16,46,0.16);border-left:3px solid #C8102E">LIV</div><div class="pgn">Dev</div>
+    <div class="pgc" style="background:rgba(19,34,87,0.16);border-left:3px solid #132257">TOT</div>
+    <div class="pgc" style="background:rgba(3,70,148,0.16);border-left:3px solid #034694">CHE</div>
+    <div class="pgc" style="background:rgba(0,87,184,0.16);border-left:3px solid #0057B8">BHA</div>
+    <div class="pgc" style="background:rgba(28,111,181,0.16);border-left:3px solid #1C6FB5">MCI</div></div>
+</div></div></div></div><div class="phone"><p class="plabel">GROUPED BY CLUB</p><div class="pframe"><div class="screen"><div class="card pad">
+  <div class="h1">Matchweek 4 picks</div><div class="sub mb">Grouped by club · 5 still standing</div>
+  
+    <div class="byclub"><span class="pill" style="height:34px;background:#034694"></span>
+      <span class="grow"><b>Chelsea</b><i>Ryan</i></span><span class="cnt">1</span></div>
+    <div class="byclub"><span class="pill" style="height:34px;background:#132257"></span>
+      <span class="grow"><b>Tottenham</b><i>Carson, Nadia</i></span><span class="cnt">2</span></div>
+    <div class="byclub"><span class="pill" style="height:34px;background:#C8102E"></span>
+      <span class="grow"><b>Liverpool</b><i>Jules</i></span><span class="cnt">1</span></div>
+    <div class="byclub"><span class="pill" style="height:34px;background:#1C6FB5"></span>
+      <span class="grow"><b>Manchester City</b><i>Dev</i></span><span class="cnt">1</span></div>
+</div></div></div></div></div>
+</section>
+
+
+<section id="kickoff2">
+  <h2>14 · Next Kickoff + Upcoming, fixed</h2>
+  <p class="note">Udinese vanished because its colour is near-black on a near-black card. The rule now: on a dark surface a club uses its first colour only if that colour is light enough, otherwise its second — which for Udinese, Newcastle, Fulham and Spurs is white, and is honest to the kit.</p>
+  
+  <div class="row"><div class="phone"><p class="plabel">CLOCK HERO</p><div class="pframe"><div class="screen"><div class="kocard"><div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 4</span></div><div class="clock" style="font-size:42px"><span>19<i>H</i></span><em>:</em><span>23<i>M</i></span><em>:</em><span>17<i>S</i></span></div>
+    <div class="kofix"><span class="rule" style="width:22px;height:3px;background:#0B5FA5;margin-top:0"></span><b>Inter Milan <em>v</em> Udinese</b><span class="rule" style="width:22px;height:3px;background:#FFFFFF;margin-top:0"></span></div>
+    <p class="sub c">Monday, Sep 14 · Milan</p><p class="more">1 more match today</p></div></div></div></div><div class="phone"><p class="plabel">SOFT BLOBS</p><div class="pframe"><div class="screen"><div class="kocard blobs">
+    <span class="blob b1" style="background:rgba(11,95,165,0.2)"></span><span class="blob b2" style="background:rgba(255,255,255,0.16)"></span>
+    <div class="korel"><div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 4</span></div><div class="komirror2">
+      <div class="koside"><span class="rule" style="width:26px;height:3px;background:#0B5FA5;margin-top:0"></span><b>Inter Milan</b></div>
+      <div class="kogrow"><div class="clock" style="font-size:31px"><span>19<i>H</i></span><em>:</em><span>23<i>M</i></span><em>:</em><span>17<i>S</i></span></div><p class="sub c">Monday, Sep 14</p></div>
+      <div class="koside ta-r"><span class="rule" style="width:26px;height:3px;background:#FFFFFF;margin-top:0"></span><b>Udinese</b></div></div>
+      <p class="more">1 more match today</p><p class="sub c">Milan</p></div></div></div></div></div><div class="phone"><p class="plabel">UPCOMING · NAMES</p><div class="pframe"><div class="screen"><h3 class="uph">Upcoming Matches</h3>
+  <div class="card upc"><div class="upnames">
+        <div class="side"><div class="name">Inter Milan</div><span class="rule" style="width:24px;height:3px;background:#0B5FA5"></span></div><span class="vs">V</span>
+        <div class="side ta-r"><div class="name">Udinese</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#FFFFFF"></span></span></div></div>
+        <div class="upmeta"><b>Mon, Sep 14 · 3:45 PM</b><i>Milan</i></div></div><div class="card upc"><div class="upnames">
+        <div class="side"><div class="name">Leeds United</div><span class="rule" style="width:24px;height:3px;background:#FFE100"></span></div><span class="vs">V</span>
+        <div class="side ta-r"><div class="name">Newcastle</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#FFFFFF"></span></span></div></div>
+        <div class="upmeta"><b>Mon, Sep 14 · 4:00 PM</b><i>Elland Road, Leeds</i></div></div><div class="card upc"><div class="upnames">
+        <div class="side"><div class="name">Deportivo Alavés</div><span class="rule" style="width:24px;height:3px;background:#0761AF"></span></div><span class="vs">V</span>
+        <div class="side ta-r"><div class="name">Valencia</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#C4701A"></span></span></div></div>
+        <div class="upmeta"><b>Wed, Sep 16 · 12:00 PM</b><i>Estadio Mendizorrotza, Vitoria</i></div></div><div class="card upc"><div class="upnames">
+        <div class="side"><div class="name">Atlético Madrid</div><span class="rule" style="width:24px;height:3px;background:#C8102E"></span></div><span class="vs">V</span>
+        <div class="side ta-r"><div class="name">Osasuna</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#0A2B5E"></span></span></div></div>
+        <div class="upmeta"><b>Wed, Sep 16 · 12:00 PM</b><i>Metropolitano Stadium, Madrid</i></div></div><div class="card upc"><div class="upnames">
+        <div class="side"><div class="name">Barcelona</div><span class="rule" style="width:24px;height:3px;background:#EDBB00"></span></div><span class="vs">V</span>
+        <div class="side ta-r"><div class="name">Racing Santander</div><span class="ta-r-in"><span class="rule" style="width:24px;height:3px;background:#00A94F"></span></span></div></div>
+        <div class="upmeta"><b>Wed, Sep 16 · 12:00 PM</b><i>Camp Nou, Barcelona</i></div></div></div></div></div><div class="phone"><p class="plabel">UPCOMING · STACKED</p><div class="pframe"><div class="screen"><h3 class="uph">Upcoming Matches</h3>
+  <div class="card upc"><div class="upstack">
+        <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#0B5FA5;margin-top:0"></span><span class="rule" style="width:3px;height:16px;background:#FFFFFF;margin-top:0"></span></span>
+        <span class="grow"><b>Inter Milan</b><b>Udinese</b></span>
+        <span class="ta-r"><b class="pri">3:45 PM</b><i>Mon, Sep 14</i></span></div>
+        <div class="sub mt6">Milan</div></div><div class="card upc"><div class="upstack">
+        <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#FFE100;margin-top:0"></span><span class="rule" style="width:3px;height:16px;background:#FFFFFF;margin-top:0"></span></span>
+        <span class="grow"><b>Leeds United</b><b>Newcastle</b></span>
+        <span class="ta-r"><b class="pri">4:00 PM</b><i>Mon, Sep 14</i></span></div>
+        <div class="sub mt6">Elland Road, Leeds</div></div><div class="card upc"><div class="upstack">
+        <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#0761AF;margin-top:0"></span><span class="rule" style="width:3px;height:16px;background:#C4701A;margin-top:0"></span></span>
+        <span class="grow"><b>Deportivo Alavés</b><b>Valencia</b></span>
+        <span class="ta-r"><b class="pri">12:00 PM</b><i>Wed, Sep 16</i></span></div>
+        <div class="sub mt6">Estadio Mendizorrotza, Vitoria</div></div><div class="card upc"><div class="upstack">
+        <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#C8102E;margin-top:0"></span><span class="rule" style="width:3px;height:16px;background:#0A2B5E;margin-top:0"></span></span>
+        <span class="grow"><b>Atlético Madrid</b><b>Osasuna</b></span>
+        <span class="ta-r"><b class="pri">12:00 PM</b><i>Wed, Sep 16</i></span></div>
+        <div class="sub mt6">Metropolitano Stadium, Madrid</div></div><div class="card upc"><div class="upstack">
+        <span class="stackrules"><span class="rule" style="width:3px;height:16px;background:#EDBB00;margin-top:0"></span><span class="rule" style="width:3px;height:16px;background:#00A94F;margin-top:0"></span></span>
+        <span class="grow"><b>Barcelona</b><b>Racing Santander</b></span>
+        <span class="ta-r"><b class="pri">12:00 PM</b><i>Wed, Sep 16</i></span></div>
+        <div class="sub mt6">Camp Nou, Barcelona</div></div></div></div></div></div>
+</section>
+<section id="decide"><h2>9 · What has to be decided</h2>
+<table class="dec">
+<tr><th>Decision</th><th>Options</th><th>Where it stands</th></tr>
+<tr><td><strong>Row treatment</strong></td><td>Underline · left pill · edge tab</td><td>Your lean: a vertical line. Left pill and edge tab are both that idea; pick one in §8</td></tr>
+<tr><td><strong>Match header</strong></td><td>Two glows · curved sweep · pill + glow</td><td>All three keep home left / away right and none has a hard seam</td></tr>
+<tr><td><strong>League table</strong></td><td>Left pill · rank in club colour</td><td>Rank-in-colour is the clever one: colour with no extra element</td></tr>
+<tr><td><strong>Pick’em</strong></td><td>Three buttons · stacked + Draw</td><td>1/X/2 is gone; the team name is the button</td></tr>
+<tr><td><strong>Jersey</strong></td><td>Nine shapes and patterns</td><td>Pick a silhouette first, then whether patterns are worth the data</td></tr>
+<tr><td><strong>LMS picks table</strong></td><td>Grid by matchweek · grouped by club</td><td>Grid replaces the crest grid one-for-one</td></tr>
+<tr><td><strong>Next Kickoff</strong></td><td>Clock hero · soft blobs</td><td>Dark-club fix applied — Udinese now uses its white</td></tr>
+<tr><td><strong>Upcoming</strong></td><td>Names + meta · stacked</td><td>Both work; stacked is denser</td></tr>
+</table>
+<p class="note" style="margin-top:14px">Generated by <code>scripts/build-identity-review.mjs</code>. Mockups also live at <code>app/dev-harness/*</code>. Nothing here is production code.</p>
+</section></div></body></html>

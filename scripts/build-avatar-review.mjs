@@ -53,7 +53,20 @@ const html = `<!doctype html><meta charset="utf-8"><title>SportPool base avatars
   .note { border-left:3px solid #3B6EFF; padding:2px 0 2px 14px; margin:20px 0; color:#C7CCD1; max-width:70ch }
 </style>
 <h1>Base avatar exploration — Recraft</h1>
-<p>14 Sep 2026. Nothing here is a candidate yet; both sheets are for picking a direction.</p>
+<p>14 Sep 2026. Newest round first. Rounds 1 and 2 are kept because what they ruled out is the reason round 3 is shaped the way it is.</p>
+
+<h2>Round 3B — reference-led, five shapes</h2>
+<p>The five reference tiles built into one vector style, which then carries the look so the prompt only
+has to say who. Same five shapes as round 2.</p>
+<div class="note">⚠ <b>This style is built from third-party character art.</b> Fine for deciding a direction.
+The licence question bites when art generated from it ships — and §7c.8 already notes a Recraft asset may
+not be copyrightable at all, which matters because the plan is to sell cosmetics on top of this.</div>
+${grid('assets/avatar-simple-b', 5)}
+
+<h2>Round 3A — the same simplification, prompt only</h2>
+<p>Identical prompt and shapes, no style reference. This is what the words alone buy: the count comes down
+(10–17 paths, 3–7 fills) but the colour and the composition do not land.</p>
+${grid('assets/avatar-simple-a', 5)}
 
 <h2>Round 2 — the look pinned, the skull varied</h2>
 <p>Three surviving directions from round 1, each turned into a Recraft style and re-run across five head
