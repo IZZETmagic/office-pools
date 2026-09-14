@@ -442,7 +442,7 @@ reaches for when the shop needs filling.
 
 | Slot | v1 options | Notes |
 |---|---|---|
-| Head shape | 4 | round, oval, wide, long |
+| Head shape | **4** | ✅ settled 2026-09-14 — rounded square, oval, tapered, squarer jaw. Measurements and the reason a 5th is not generatable: **§7c.1** |
 | Skin tone | 12 | curated ramp, §4.5. **Never paid.** |
 | Hair style | 30 | must include coily, locs, braids, wraps, bald, buzz, long-under-headwear. **Never paid.** |
 | Hair colour | 14 | includes 4 unnatural. **Never paid.** |
@@ -1006,6 +1006,187 @@ code: pin exact versions and trust the lockfile hash.
 
 ---
 
+---
+
+# Part 7c — The base, the anchors, and the editor
+
+> ✅ **SETTLED 2026-09-14.** Everything here came out of generating against the real
+> rig and measuring the results, not from reasoning about it.
+
+## 7c.1 Four base faces
+
+The **base** is what never swaps: head silhouette · skin · eyes (white + separate pupil) ·
+nose · ears · neck, shoulders and shirt body. **Parts** swap on top: hair · facial hair ·
+eyewear · headwear · mouth · collar trim.
+
+The base is built first because **it defines every anchor**. Where hair sits, where glasses
+rest, where an earring hangs — all measured off it. Get it wrong and everything downstream
+is wrong, which is exactly what happened when the hair warp was pinned to a guessed ellipse
+instead of the head's real outline.
+
+**Four shapes, chosen by Ryan** — `B1 rounded square`, `B2 oval`, `B3 tapered`,
+`B5 squarer jaw`. Measured:
+
+| Base | w/h | brow | cheek | jaw | **jaw ÷ brow** |
+|---|---|---|---|---|---|
+| Rounded square | 0.94 | 985 | 1151 | 935 | **0.95** — broad throughout |
+| Oval | 0.72 | 855 | 833 | 672 | **0.79** — gentle taper |
+| Tapered | 0.68 | 828 | 960 | 351 | **0.42** — strong taper |
+| Squarer jaw | 0.67 | 826 | 966 | 389 | **0.47** — strong taper |
+
+⚠ **Tapered and squarer-jaw are near-twins** (0.42 / 0.47, brow and cheek within 2%).
+Kept deliberately; two of the four will read as similar.
+
+🔴 **A fifth shape is not generatable.** Six attempts across both extremes — "square and
+blocky with a very wide flat jaw", "heavy broad jaw flaring outward", "pear shaped",
+"sharp heart shape with a tiny pointed chin", "narrow and delicate", "diamond" — produced
+0.97, 0.44, 0.47, 0.42, 0.71, 0.45. **Not one escaped the shapes already in hand.** The
+cheek width came back as 964, 964, 959, 966, 966 across five completely different prompts.
+**Recraft varies surface detail but not underlying structure.** A fifth shape is a
+designer's five minutes, or a warp of an approved outline — not a prompt.
+
+## 7c.2 The anchor set
+
+`anchorset.json`, built by `anchorset.py`. Per base: head bbox and w/h · crown y · chin y ·
+a 7-point width profile · **a 360-bin polar outline `R(θ)`** · the outline path itself ·
+eye anchors (centres, size, separation) · ear anchors where they exist.
+
+`R(θ)` is the thing that matters: it is what `warp2.py` fits parts against, and it is why a
+hairstyle authored once can be placed on all four faces.
+
+## 7c.3 ⚠⚠ A generated asset is a picture, not a component
+
+**The most important rule to come out of the build.** Three separate detectors broke in one
+sitting, each silently, each caught only by verifying:
+
+| Trap | What happened |
+|---|---|
+| **Shared fills** | Pupils, hair bun and mouth all `#5F3A28`. A naive "recolour the dark colour" turns someone's hair blue along with their eyes. |
+| **Inconsistent colours** | Eye whites were `#FEFEFE` on three bases and `#EADED7` on the fourth. A colour-keyed detector reported that base as having **no eyes at all**. |
+| **Welded features** | Ears are separate paths on **one** base and part of the skull outline on the other **three**. Same picture, different structure. |
+
+And two ranking traps inside the geometric detector itself:
+
+- ranking symmetric pairs by area found the **ears** and called them eyes (tall and narrow
+  beats wide and short on area)
+- adding an aspect-ratio filter then found the **eyebrows** (239×79, ratio 3.0, still more
+  area than the eye whites)
+
+**What actually works: nesting.** An eye white is the only feature on the face with another
+shape inside it. Nothing else contains a pupil.
+
+> **Every asset needs a STRUCTURE PASS before it enters the catalogue** — split shared
+> fills, promote welded features to their own paths, verify every anchor by *geometry and
+> nesting, never by colour*, and **report what it could not find** rather than guess.
+
+🔴 **This blocks a slot Ryan has asked for.** Earrings need an ear to hang off. On three of
+four bases there is no ear path — it is the skull outline. Path-splitting moved from
+nice-to-have to prerequisite.
+
+## 7c.4 Assets versus parameters
+
+Several requested slots are **not drawings**:
+
+| Needs drawing | Free — a parameter |
+|---|---|
+| eye shapes · brow shapes · mouth shapes · hair · facial hair · accessories · skin marks | **ear size** · **nose size** · **all colours** · **pupil position** · eye spacing |
+
+Ears and nose vary by *scale on one asset*, not separate art. Freckles, scars, blotchy skin
+and rosy cheeks are **overlays inside the face**, so they touch no anchor and cost almost
+nothing.
+
+⭐ **Colour is free, and proven.** One generated character recoloured to four different
+people by find-and-replace on `fill` attributes — 7 distinct fills in the whole SVG, no API
+call. So: **generate for FORM, recolour for PALETTE.** Never use Recraft's `colors`
+parameter — it constrains the *entire* palette including skin, which is how we got blue
+faces.
+
+## 7c.5 ⚠ Identity versus state — the collision, and the split
+
+Ryan asked for emotions the **user picks** in the eyes, brows and mouth. §6.2 has the **app**
+driving emotion (`duel_won`, `miss`, `out`, `crowned`). Both cannot own the same slot: either
+a chosen angry brow is overwritten the moment a duel settles, or every identity × state
+combination needs its own art.
+
+> ✅ **The split: identity owns the EYE SHAPE and the BROWS. The app owns the PUPIL POSITION
+> and the MOUTH.**
+
+The chosen face persists, and the app animates with the two cheapest things available —
+**pupil position is a transform** (free, and it is exactly what makes a face read as alive
+rather than dead-eyed), and **one mouth set** covers every state. No combinatorial art.
+
+## 7c.6 One asset, four transforms — never four copies
+
+Four face shapes multiply every part. The wrong way is 30 hair × 4 = **120 files**: fix a
+style and you fix it four times, or three drift.
+
+> **Store one authored asset plus four fit records** — `{scale, offset, warp}` against each
+> base's `R(θ)`. Render time applies the fit. Fix once, all four faces get it.
+
+⚠ **With an override slot.** From the warp work, roughly **one fit in five** needs a hand
+nudge. So: transform by default, override by exception — budget ~24 overrides across 120
+fits, not 90 redraws. Each override is a stored offset, not new art.
+
+## 7c.7 The editor — three stages
+
+> ✅ Stages 2 and 3 as Ryan proposed. Stage 1 replaced.
+
+1. **Start from one of six example avatars.** *(Replaces "choose male / female / other".)*
+   It seeds more than gender would — face shape, hair, features and colours together — it is
+   visual rather than verbal, nobody has to categorise themselves, and "Other" stops being a
+   third option that reads as an afterthought. One tap and the user is already close.
+   ⭐ It also delivers **A3's dignified default** for free: whoever abandons the editor still
+   ends up with something they would put beside their name.
+2. **Face shape** — one of the four. Early, because everything anchors to it and changing it
+   late re-fits every part. The preview must update live.
+3. **Features, with colour chosen per slot as you go** — ⚠ **hair and skin first**, because
+   Q3 established that is where recognition happens. Eyes, brows, mouth, accessories after.
+
+⚠ **Do not label the bases by gender in the UI.** These heads are bald and featureless; what
+reads as gendered is jaw width, and that reading **flips entirely once hair is on**. Show
+four silhouettes and let hair do the work.
+
+## 7c.8 What Recraft can and cannot do
+
+| ✅ | ❌ |
+|---|---|
+| Native SVG — real `d` attributes, **zero `<image>` tags** | Ignores everything without a `style_id` — returned black outlines, running poses and an American football helmet |
+| `style_id` from 1–5 references is the whole ballgame: **462 coordinates and correct structure with it, 4,344 and an editorial portrait without** | Cannot vary **skull structure** (§7c.1) |
+| Isolated parts, if the hole is framed as a **positive object** ("filled with the same magenta as the background") | Cannot hold all variables at once — every generation fixes one thing and regresses another |
+| Output is freely recolourable | No coordinate system; anchors must be measured afterwards |
+| ~$0.08 per vector generation | Prompt limit **1,000 characters** |
+
+⚠ **Because it cannot hold all variables at once, do not generate whole characters.**
+Generate parts, composite them. Which is the parts-model architecture this document already
+specifies — the generator slots in as an *asset source*, not as a character generator.
+
+⚠ **Licence:** paid tier — *"You own all Assets… Recraft hereby assigns to you all copyright
+rights"* (§7.2). But **§7.7 applies to both tiers**: a perpetual, sublicensable, irrevocable
+licence back to Recraft, surviving termination. Training is opt-out, the rest is not. And
+**AI output may not be copyrightable at all** (*Thaler v. Perlmutter*) — a contract cannot
+assign copyright that does not exist. A commissioned illustrator produces work that is
+copyrightable and assignable with no licence-back. That difference matters specifically
+because the plan is to **sell** cosmetics.
+
+## 7c.9 🔴 Five rejected attempts, and what they establish
+
+My capsule characters · the shoulders · the geometric full body · nano-banana hair on the
+real rig · the Recraft characters. **All five rejected on the art. None on the structure.**
+Every time the architecture held and the surface did not; every time I judged it close and
+was wrong; every time Ryan caught it and I had not.
+
+> **Conclusion of record: I am not a reliable judge of whether this art is good.** Structure,
+> anchors, transforms, pipelines and measurement are reliable. Assessment of visual quality
+> is not, and should not be solicited.
+
+⭐ **And the reason the generated work keeps landing in the same uncanny place:** the
+reference was *designed*. The swoop at the crown, the exact width of the face window, the
+tint of the lens, the joint lines on the arms — those are not descriptions, they are
+drawing. Every generated attempt approximates *a description of* a design instead of
+reproducing the design. **That is what a designer buys, and it is why one is needed.**
+
+---
+
 # Part 8 — The gates
 
 ## 8.1 The disclosure gate
@@ -1088,6 +1269,7 @@ Deliberately not dated. Each phase is gated on the previous one's signal, not on
 |---|---|---|
 | **0 — Now → Q1 2027** | **This document.** Grammar, catalogue, states, and *paper* design. Adopt the Avataaars rig (Part 7b), extend the skin/hair ramps, derive the hair volume variants, and scope the football commission. Run the distinguishability test (§5.3). | — |
 | **1** | **Avatars v1** — photo upload + initials. Unchanged from its existing scoping. | — |
+| **1.5** | ⭐ **The asset harness** *(next, agreed 2026-09-14)* — a small sample of each asset class with colour selectors, in a **standalone HTML file** Ryan can open and drive. See below. | — |
 | **2** | **The parts model** — config → scene graph → three renderers. Bust rig only. Static, no motion. Ships to the existing `<Avatar>` call sites. | Phase 1 live |
 | **3** | **The editor** — the customisation UI, mobile-first. Free catalogue only, no purchases. **Needs its own design pass — see below.** | Phase 2 rendering correctly on all six surfaces |
 | **4** | **Figure rig** — full body (Part 7b §7b.5), launching on the **banter auto-share-card**, then the pool card, then the profile. States per §6.2, capped by Q5. | §8.4's edit signal |
@@ -1111,6 +1293,25 @@ showcase — it just must not be the thing that has to prove the system works.
 ⚠ **Phases 2 and 3 are the ones that decide whether this works.** Everything after is amplification.
 If the editor ships and nobody edits, stop — that is the honest outcome, and it costs weeks instead
 of months.
+
+## ⭐ Phase 1.5 — the asset harness (the immediate next step)
+
+Agreed 2026-09-14. **Animation is explicitly not in scope yet**; this is about proving the
+static system holds together.
+
+1. **A small sample of each asset class** — a few eye shapes, brows, mouths, hair, facial
+   hair, accessories — plus colour selectors for skin, hair, eyes and kit.
+2. **A standalone HTML file** Ryan can open and drive directly, to check shapes and hair
+   match the bases and look right.
+
+⚠ **It must test the FIT, not just the look.** The thing that silently breaks is a part
+sitting wrong on one of the four bases, so every asset has to be shown **on all four faces
+at once** (§7c.6), with the 32px rendering beside it (§5.2 — the surface that actually
+decides legibility). A harness that only shows one face at one size would pass everything
+that matters.
+
+⭐ Precedent: `memory/project_verify_drag_pickers.md` — *never verify in a real pool, use a
+throwaway harness route*. Same pattern, same reason.
 
 ## 🔴 The editor is a real product and it is not designed yet
 
