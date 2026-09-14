@@ -1090,9 +1090,23 @@ Deliberately not dated. Each phase is gated on the previous one's signal, not on
 | **1** | **Avatars v1** — photo upload + initials. Unchanged from its existing scoping. | — |
 | **2** | **The parts model** — config → scene graph → three renderers. Bust rig only. Static, no motion. Ships to the existing `<Avatar>` call sites. | Phase 1 live |
 | **3** | **The editor** — the customisation UI, mobile-first. Free catalogue only, no purchases. **Needs its own design pass — see below.** | Phase 2 rendering correctly on all six surfaces |
-| **4** | **Figure rig + states** — full body, the eight states, idle, share cards, the banter auto-card. | §8.4's edit signal |
+| **4** | **Figure rig** — full body (Part 7b §7b.5), launching on the **banter auto-share-card**, then the pool card, then the profile. States per §6.2, capped by Q5. | §8.4's edit signal |
 | **5** | **The Showdown walkout** — the figure replaces the silhouette layer in `MOTION_SPEC.md`. | Phase 4 + whatever the corridor decision lands on |
 | **6** | **The shop** — colourways and accessories, real money, no currency, no packs, no countdowns. | The commercial gate in `MONETIZATION.md` |
+
+## ⭐ The figure rig launches on the banter share-card *(settled 2026-09-14)*
+
+**Order: banter auto-share-card → pool card → profile → Showdown walkout.**
+
+| Candidate | Why not first |
+|---|---|
+| **Showdown walkout** | 🔴 The most fragile dependency chain in the codebase: the walkout needs the corridor, the corridor needs Skia, **Skia is declared in `mobile/package.json` and not installed**, that needs an EAS build, and EAS builds cannot be verified on this machine. Not the chain to hang the first proof on. |
+| **Profile** | Safe, and nobody looks at it. |
+| ⭐ **Banter auto-share-card** | **~67% of all banter traffic** (`memory/project_backlog_banter_engagement.md`). **Server-rendered**, so it is a pure Satori target — no native code, no OTA problem, no animation at all. And it is **social**, which is the only place a character earns anything. |
+
+⭐ **Q5 strengthens this.** With shared boards fully still, the surfaces that *do* express carry the
+whole feature. The share card is the largest of those and the cheapest to build. Showdown stays the
+showcase — it just must not be the thing that has to prove the system works.
 
 ⚠ **Phases 2 and 3 are the ones that decide whether this works.** Everything after is amplification.
 If the editor ships and nobody edits, stop — that is the honest outcome, and it costs weeks instead
@@ -1148,8 +1162,8 @@ Numbered so they can be answered individually. Answered ones are struck through 
 7. ~~**§5.4 — kit naming.**~~ ✅ **2026-09-14 — kits have NO names.** A swatch you pick, like a skin
    tone. Dissolves the association risk, the UGC surface, the lint check and the ToS line. ⚠ Changes
    the *"users name their own"* clause in `MONETIZATION.md`.
-8. **Scope check.** Is Showdown the launch surface for the figure rig, or should it be the profile
-   (lower risk, lower reward)?
+8. ~~**Scope check — the figure rig's launch surface.**~~ ✅ **2026-09-14 — the banter auto-share-card
+   goes first.** Then pool card → profile → Showdown walkout. See Part 9.
 
 ---
 
