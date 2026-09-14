@@ -601,8 +601,24 @@ Duolingo's celebrations are private — you against the app, nobody watching. Sp
 is a room full of people you know. `SPORTPOOL_VISION.md`'s "no bad feelings" is not compatible with a
 character dancing on a board where eleven other people just lost.
 
-> **Rule: your character expresses a result on *your* surfaces and on *rivalry* surfaces. The shared
-> leaderboard shows every character in `idle`.**
+> ✅ **SETTLED 2026-09-14 (Ryan): FULLY STILL on every shared surface.** The leaderboard, the pool
+> card and every member list show each character in `idle` — one neutral pose, no result states, no
+> motion. A character expresses a result only on **your own** surfaces (your card, your profile, your
+> share card) and on **rivalry** surfaces (duels).
+
+The alternatives were weighed and rejected: letting everyone express their own week puts a
+disappointed face beside someone's name in front of their colleagues every week; and a capped
+"positive-only" version still asks the board to carry mood. Still is the version that cannot go
+wrong, and the rank and points beside it already tell the truth without help.
+
+**Three things follow, and two of them are savings:**
+
+1. **The art budget drops.** `miss`, `out` and `duel_lost` only ever need to exist at duel and profile
+   size — never across the catalogue, never at 24px. Every state is something a designer draws.
+2. **§6.2's "idle must not animate in a list" rule stops being a caveat and becomes the default.**
+   Lists render one seeded static pose. No ticker, no battery cost, nothing to tune.
+3. ⚠ **It puts more weight on the surfaces that *do* express.** If the leaderboard is still, the duel
+   card and the banter share-card are where the character earns its keep — which sharpens Q8.
 
 Rivalry surfaces are the exception because gate 2 explicitly permits rivalry as an affect — and
 Showdown is a consented, symmetrical, one-to-one duel. A `duel_won` strut in front of the one person
@@ -1055,8 +1071,8 @@ Numbered so they can be answered individually. Answered ones are struck through 
    the working full-body extension, the hair-warp technique, and the four routes tested with the reason
    each did or did not work. Ready Player Me is dead (shut down 31 Jan 2026) and that line in
    `memory/project_backlog_avatar_cosmetics.md` needs striking.
-5. **§6.3 — celebration on shared boards.** Is "idle on the leaderboard, expressive on your own
-   surfaces and in duels" the right line, or too conservative?
+5. ~~**§6.3 — celebration on shared boards.**~~ ✅ **2026-09-14 — FULLY STILL.** `idle` on every
+   shared surface; expression only on your own surfaces and in duels.
 6. **§7.2 — Rive.** Agreed as deferred, revisited only for the walkout after a parts-model version
    exists and is judged insufficient?
 7. **§5.4 — kit naming.** Colour-only preset names accepted as a hard rule with a lint check?
