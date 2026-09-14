@@ -71,6 +71,28 @@ const html = `<!doctype html><meta charset="utf-8"><title>SportPool base avatars
 <h1>Base avatar exploration — Recraft</h1>
 <p>14 Sep 2026. Newest round first. Rounds 1 and 2 are kept because what they ruled out is the reason round 3 is shaped the way it is.</p>
 
+<h2>Round 5 — six SportPool directions</h2>
+<p>The brief: keep the playfulness, add what SportPool actually is — large radii, the primary blue, a
+degree of restraint. Six directions, from our own construction grammar rather than from the reference.
+It was run twice, and neither run is the answer.</p>
+
+<div class="note"><b>5a — anchored on the approved bases.</b> The art holds and the six directions
+<i>collapse into one</i>. <code>4-outline</code> came back with no outline anywhere; capsule, outline and
+glyph are indistinguishable. <code>style_match: 'flexible'</code> is the loosest V4 offers and the anchor
+still won. This is §7e.5's "the style pins the composition" working against us.</div>
+${grid('assets/avatar-styles-anchored', 4)}
+
+<div class="note"><b>5b — the same six, prompt only, no anchor.</b> Now they are six genuinely different
+directions, and the drawing falls apart: masks on sticks, a ghost, a black silhouette, and the blue
+leaking onto skin. §7c.8, exactly: it cannot hold all the variables at once.</div>
+${grid('assets/avatar-styles', 3)}
+
+<div class="note">🔴 <b>Round 6 is designed and blocked on credits.</b> Neither side of that fork is the
+answer, so the next run gives each direction <i>its own</i> style built from two weighted images — the
+approved base at 0.4 for warmth, proportion and framing, and that direction's own 5b sketch at 0.6 for
+the thing that makes it itself. <code>scripts/gen-avatar-blend.mjs</code> is written and ready;
+<code>/users/me</code> reports <b>3 credits</b> left.</div>
+
 <h2>Round 4 — the SportPool palette</h2>
 <p>The three you circled, recoloured rather than regenerated (§7c.4: generate for form, recolour for
 palette). No API calls, nothing lost from the art you picked. The ground is the user's identity colour —
