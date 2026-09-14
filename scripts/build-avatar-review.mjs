@@ -71,6 +71,14 @@ const html = `<!doctype html><meta charset="utf-8"><title>SportPool base avatars
 <h1>Base avatar exploration — Recraft</h1>
 <p>14 Sep 2026. Newest round first. Rounds 1 and 2 are kept because what they ruled out is the reason round 3 is shaped the way it is.</p>
 
+<div class="note" style="border-color:#EF4444">🔴 <b>Similarity assessment:
+<a href="2026-09-14_avatar_duolingo_similarity.md" style="color:#5B8AFF">2026-09-14_avatar_duolingo_similarity.md</a>.</b>
+On appearance the case is reasonable — every element you would <i>name</i> as Duolingo's (glasses, blush,
+freckles, beards, split backgrounds, hand-drawn wobble) is absent, and SportPool blue is 11.6–27.4% of
+every 5a tile against zero in theirs. On <b>provenance</b> it is not: 5a descends in two documented
+generations from a style trained directly on their artwork. Treat 5a as the brief and apply it to the
+Avataaars rig we already chose on licence grounds (§7b.1).</div>
+
 <h2>Round 5 — six SportPool directions</h2>
 <p>The brief: keep the playfulness, add what SportPool actually is — large radii, the primary blue, a
 degree of restraint. Six directions, from our own construction grammar rather than from the reference.
