@@ -1187,6 +1187,101 @@ reproducing the design. **That is what a designer buys, and it is why one is nee
 
 ---
 
+---
+
+# Part 7d — 🔴 Generation cannot produce a parts library
+
+> **The conclusion of a full day's building, reached from three independent
+> directions. It is not about art quality — the art was fine. Read this before
+> proposing any generative asset pipeline.**
+
+## 7d.1 The finding
+
+**A parts library requires every part authored against ONE FIXED HEAD.** That single
+relationship — this hair, on this skull, at this size — is what makes parts stack without
+a fitting step. Avataaars' 27 hairstyles need no fitting at all because they were drawn
+onto one 264×280 canvas with one head in it. The relationship is *baked in*, never inferred.
+
+**A generative model has no mechanism to hold a head fixed.** Every route was tested
+against the real rig:
+
+| Route | Result |
+|---|---|
+| **Generate parts in isolation** | Each wig has its own arbitrary ratio between face opening and mass. The afro has a small opening in a big mass, the side part a large opening in a small one. Constrain "opening matches the head" and the afro explodes; constrain "outer size looks right" and the opening stops framing the face. **No algorithm satisfies both, because the assets were never drawn to the same head.** |
+| **Generate parts ON the head** (`imageToImage`) | Redraws the face at every strength tried — 0.08, 0.14, 0.22. Asymmetric eyes, warped features, barely any hair. It is a diffusion pass over the whole image, not an edit. |
+| **Inpaint hair onto the head** | Preserves everything *outside* the mask byte-identically, and **regenerates everything inside it** — including the face, which must be inside the mask because hair comes down past the ears. Returns a new head in three-quarter view. |
+| **Generate whole characters** | Every character has a different head, so there are no shared bases to customise. |
+
+⚠ **This is the thing a designer provides by construction**, not by skill: they draw on one
+canvas with one head, so the relationship is exact and needs no recovery.
+
+## 7d.2 Five fitting algorithms, and why each failed
+
+Recorded so nobody rewrites them. Every one was an attempt to *recover by measurement*
+information the assets never contained.
+
+1. **Widest horizontal gap** → found the gap between hair and ponytail tail, and between a
+   mohawk's side arcs. Not the face.
+2. **Opening → brow width** → a wig's opening is *narrower* than the skull because hair
+   overlaps the temples. Forcing them equal scaled the afro to **1.92×** and it filled the
+   frame. ⚠ A scale near 2 on a part that already fills its canvas is nonsense on its face,
+   and I read that number for hours without questioning it.
+3. **Temple width** → plausible scales (0.69–1.06) and much better results, but the round
+   base and the tapered base need different answers from the same asset.
+4. **Iterate opening against head width at eye level** → **diverges.** A larger scale moves
+   the probe toward the narrow top of the opening, demanding a larger scale again. Positive
+   feedback; the afro ran away to 9.7×.
+5. **Root-scan the same constraint** → stable and lands exactly at the target height, but
+   still right on one base and wrong on another, because the asset's proportions are the
+   problem rather than the solver's.
+
+## 7d.3 Three structural traps in generated assets
+
+Each broke a detector silently; each was caught only by verifying rather than trusting.
+
+| Trap | Detail |
+|---|---|
+| **Shared fills** | Pupils, hair bun and mouth all `#5F3A28`. Recolour "the dark colour" and hair turns blue with the eyes. |
+| **Inconsistent colours** | Eye whites were `#FEFEFE` on three bases and `#EADED7` on a fourth. A colour-keyed detector reported that base as having **no eyes**. |
+| **Welded features** | Ears are separate paths on one base, part of the skull outline on three. 🔴 Blocks earrings. |
+| **Painted holes** | Some parts are a solid silhouette with a **white patch drawn on top** — visually a hole, structurally a blob. Strip the patch and hair covers the face; keep it and a white blank composites over it. **Fix:** merge the white subpath into the dark one with `fill-rule="evenodd"`, which converts a painted patch into a real hole. |
+
+Plus two ranking traps inside the geometric detector itself: ranking symmetric pairs by area
+found the **ears** and called them eyes; adding an aspect-ratio filter then found the
+**eyebrows**. What works is **nesting** — an eye white is the only feature with another
+shape inside it.
+
+## 7d.4 What survives, and is worth keeping
+
+All of it is the machinery a designer's parts drop straight into:
+
+- **Four base faces** with measured silhouettes (§7c.1)
+- **`anchorset.json`** — per base: bbox, crown, chin, 7-point width profile, 360-bin polar
+  outline `R(θ)`, the outline path, eye anchors
+- **Role tagging by geometry and nesting**, never by colour
+- **The recolour architecture** — one asset, every palette, by `fill` swap
+- ⭐ **Three part classes**, which changes what metadata every asset carries:
+
+  | Class | Anchored by | Examples |
+  |---|---|---|
+  | **framing** | its face opening | most hair |
+  | **topper** | width + scalp contact, no opening | mohawk, hats, headbands |
+  | **jaw** | chin position | beard, moustache |
+
+- ⚠ **A fourth is implied and not built: back/front layers.** A ponytail renders *behind*
+  the head. Parts need a z-order split.
+- **The harness itself** — every part on every base, live colour, 32px beside each cell
+
+## 7d.5 ⚠ The recurring process failure
+
+> **I repeatedly verified that code ran, and reported it as evidence that the output was
+> right.** "All six fitted to all four bases" meant the fitter returned a transform, not
+> that the transform was correct. The circular round-trip test (§7b.8) is the same error.
+> **Rendering and looking is the only honest check**, and every time Ryan looked he was
+> right and I was wrong.
+
+---
+
 # Part 8 — The gates
 
 ## 8.1 The disclosure gate
@@ -1269,7 +1364,8 @@ Deliberately not dated. Each phase is gated on the previous one's signal, not on
 |---|---|---|
 | **0 — Now → Q1 2027** | **This document.** Grammar, catalogue, states, and *paper* design. Adopt the Avataaars rig (Part 7b), extend the skin/hair ramps, derive the hair volume variants, and scope the football commission. Run the distinguishability test (§5.3). | — |
 | **1** | **Avatars v1** — photo upload + initials. Unchanged from its existing scoping. | — |
-| **1.5** | ⭐ **The asset harness** *(next, agreed 2026-09-14)* — a small sample of each asset class with colour selectors, in a **standalone HTML file** Ryan can open and drive. See below. | — |
+| **1.5** | ✅ **The asset harness — BUILT 2026-09-14.** Four bases, six generated parts, live colour, 32px. It proved the machinery and **disproved generated parts** (Part 7d). The harness stands; the parts do not. | — |
+| **1.6** | 🔴 **Parts authored against one fixed head** — the blocker. A designer, or Avataaars' own 27 styles. Everything downstream is built and waiting. | Part 7d |
 | **2** | **The parts model** — config → scene graph → three renderers. Bust rig only. Static, no motion. Ships to the existing `<Avatar>` call sites. | Phase 1 live |
 | **3** | **The editor** — the customisation UI, mobile-first. Free catalogue only, no purchases. **Needs its own design pass — see below.** | Phase 2 rendering correctly on all six surfaces |
 | **4** | **Figure rig** — full body (Part 7b §7b.5), launching on the **banter auto-share-card**, then the pool card, then the profile. States per §6.2, capped by Q5. | §8.4's edit signal |
