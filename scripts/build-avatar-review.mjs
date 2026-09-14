@@ -73,12 +73,19 @@ const html = `<!doctype html><meta charset="utf-8"><title>SportPool base avatars
 
 <h2>Round 7 — a full disc, and six head shapes</h2>
 <p>Both by geometry, no generation — which is just as well, since the Recraft balance is empty. The
-background is now a single circle sized to contain every point of the figure, drawn behind everything,
-replacing the two crescents. The six heads are warps of one approved outline, which is what §7c.1
+background is now a larger circle drawn <i>behind</i> the existing art, with a ring on top to cover the
+join. The six heads are warps of one approved outline, which is what §7c.1
 concluded a new shape actually is: <i>"a designer's five minutes, or a warp of an approved outline — not
 a prompt."</i> A warp also holds "everything else the same" exactly — a generation rerolls the hair, the
 colour and the features every time.</p>
 ${grid('assets/avatar-shapes-6', 3)}
+<div class="note">⚠⚠ <b>The two blue shapes are a MASK, not a background.</b> They are painted
+<i>after</i> the skin, not behind it — the skin path spans the full canvas (x 109–1938) and they cover its
+outer arcs, which is what cuts the head down to a face. Deleting them to "enlarge the background" enlarged
+nothing; it unmasked the skin and the face ballooned to the width of the canvas. They are kept, and warped
+along with everything else so the mask keeps following the jaw.<br>
+⚠ A 1px sliver of skin bleeds along the mask's outer edge in the source art — measured at rgb(72,113,248)
+against the ground's rgb(59,107,254). A ring drawn last covers it: now rgb(58,106,254), one unit off.</div>
 <div class="note">Measured on the flattened outline — widest row, and where it sits:
 <b>base 1830</b> @ y1120 · <b>widejaw 2052</b> @ y992 · <b>tapered 1726</b> @ y1312 ·
 <b>squarejaw 1911</b> @ y1088 · <b>narrow 1742</b> @ y1312 · <b>long 1830</b>, 1862 tall.

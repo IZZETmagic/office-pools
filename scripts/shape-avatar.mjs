@@ -87,20 +87,35 @@ for (const e of body) (byFill.get(e.fill) || byFill.set(e.fill, []).get(e.fill))
 const ground = [...byFill.values()].find((g) => g.length === 2 && g.some((e) => (e.bbox[0] + e.bbox[2]) / 2 < VB / 2) && g.some((e) => (e.bbox[0] + e.bbox[2]) / 2 > VB / 2) && g.every((e) => e.area > skin.area * 0.1))
 if (!ground) throw new Error('could not identify the two ground crescents')
 
+// ⚠⚠ THE CRESCENTS ARE A MASK, NOT A BACKGROUND. They are painted AFTER the
+// skin, not behind it: the skin path spans the full canvas (x 109-1938) and the
+// two blue shapes cover its outer arcs, which is what cuts the head down to a
+// face. Deleting them to "enlarge the background" did not enlarge anything — it
+// unmasked the skin, and the face ballooned to the width of the canvas.
+// So they stay, and they are warped with everything else so the mask keeps
+// following the jaw. The bigger disc goes BEHIND them instead.
 const figure = body.filter((e) => !ground.includes(e))
-const fbox = figure.reduce((a, e) => [Math.min(a[0], e.bbox[0]), Math.min(a[1], e.bbox[1]), Math.max(a[2], e.bbox[2]), Math.max(a[3], e.bbox[3])], [1e9, 1e9, -1e9, -1e9])
-console.log(`canvas #${canvas.i} · skin #${skin.i} · ground #${ground.map((e) => e.i).join(',')} · figure bbox ${fbox.map(Math.round).join(' ')}`)
+const gbox = ground.reduce((a, e) => [Math.min(a[0], e.bbox[0]), Math.min(a[1], e.bbox[1]), Math.max(a[2], e.bbox[2]), Math.max(a[3], e.bbox[3])], [1e9, 1e9, -1e9, -1e9])
+console.log(`canvas #${canvas.i} · skin #${skin.i} · ground #${ground.map((e) => e.i).join(',')} (mask, kept) · disc bbox ${gbox.map(Math.round).join(' ')}`)
 
 // ── A. One disc that encapsulates the whole avatar ───────────
 // The two crescents are replaced by a single circle drawn FIRST, so everything
 // else paints over it. Radius is the furthest figure point from the centre —
 // Bézier control points are included, which overshoots the true outline
 // slightly and therefore only ever errs toward more margin.
-const cx = (fbox[0] + fbox[2]) / 2
-const cy = (fbox[1] + fbox[3]) / 2
-let r = 0
-for (const e of figure) for (const [x, y] of flatten(e.d)) r = Math.max(r, Math.hypot(x - cx, y - cy))
-r *= 1.12   // the disc should read AS a disc, not as a rim
+// Both crescents together span the disc's full width, so half that width is the
+// original disc radius. The new circle must clear that AND every part of the
+// figure the mask does not cover — the hair above it and the shoulders below.
+// The skin is excluded on purpose: its outer arcs are masked, so its true width
+// is not what anyone sees.
+const cx = (gbox[0] + gbox[2]) / 2
+const cy = (gbox[1] + gbox[3]) / 2
+let r = (gbox[2] - gbox[0]) / 2
+for (const e of figure) {
+  if (e === skin) continue
+  for (const [x, y] of flatten(e.d)) r = Math.max(r, Math.hypot(x - cx, y - cy))
+}
+r *= 1.10   // the disc should read AS a disc, not as a rim
 const groundFill = ground[0].fill
 console.log(`disc: centre ${Math.round(cx)},${Math.round(cy)} radius ${Math.round(r)}`)
 
@@ -194,7 +209,6 @@ for (const shape of SHAPES) {
   let out = svg.replace(ELEMENT, (tag) => {
     i++
     if (i === canvas.i) return tag.replace(/fill="[^"]*"/, 'fill="none"')
-    if (ground.some((g) => g.i === i)) return tag.replace(/fill="[^"]*"/, 'fill="none"')
     const d = dOf(tag)
     if (!d) return tag
     const el = els.find((e) => e.i === i)
@@ -210,6 +224,19 @@ for (const shape of SHAPES) {
   const circle = `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${groundFill}"/>`
   const first = out.search(/<(path|rect|circle|ellipse|polygon)\b/)
   out = out.slice(0, first) + circle + out.slice(first)
+
+  // ⚠ A 1px sliver of skin shows along the mask's outer edge — measured at
+  // rgb(72,113,248) against the ground's rgb(59,107,254), which is ~5% skin
+  // bleeding through. It is inherited from the source art, where the mask edge
+  // sits exactly on the skin edge, and the bigger flat disc only made it easier
+  // to see. A ring drawn LAST, from just inside that edge out to the new
+  // radius, covers both the sliver and any distortion the warp put into the
+  // mask's outer edge.
+  const ri = (gbox[2] - gbox[0]) / 2 - 6
+  const ring = `<path fill-rule="evenodd" fill="${groundFill}" d="` +
+    `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 ${-r * 2} 0 Z ` +
+    `M ${cx - ri} ${cy} a ${ri} ${ri} 0 1 0 ${ri * 2} 0 a ${ri} ${ri} 0 1 0 ${-ri * 2} 0 Z"/>`
+  out = out.replace('</svg>', `${ring}</svg>`)
   const pad = r * 1.06
   out = out.replace(/viewBox="[^"]*"/, `viewBox="${(cx - pad).toFixed(1)} ${(cy - pad).toFixed(1)} ${(pad * 2).toFixed(1)} ${(pad * 2).toFixed(1)}"`)
 
