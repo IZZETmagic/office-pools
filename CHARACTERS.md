@@ -282,18 +282,53 @@ imposed.
 **Forbidden:** any corner with a radius under `radii.xs` (6 at 1× scale). No strokes. No gradients
 *inside* a character — gradients belong to the ground behind it (§5.5). No drop shadows on parts.
 
-## 4.3 Proportion
+## 4.3 Proportion — two numbers, not one
 
-**The full figure is 3 heads tall.** One head, one torso-and-arms, one legs-and-boots.
+> ✅ **SETTLED 2026-09-13** (Ryan, against a reference image, using the interactive model sheet).
 
-- 3.0 is the classic mascot proportion and the one Duolingo's humans sit near. Below 2.5 reads as a
-  toy; above 4 the head stops dominating and the bust crop (§5.2) stops working.
-- The head is the tallest single element in every rendering, at every size. At 24px in a leaderboard
-  the head is ~16px and everything else is inference.
+**The figure is 3.35 skull-heights tall at a default hair volume of 1.00, with 55% of the non-head
+height given to the torso.** All three numbers are required. Any one of them alone is not a
+specification.
 
-Pin it with a test the way `modeIdentity.test.ts` pins hue separation: a `characterProportion.test.ts`
-asserting head height ÷ figure height stays in `[0.31, 0.36]` for every combination of parts. A parts
-catalogue that grows over two years *will* drift otherwise.
+| Number | Value | Range across the catalogue |
+|---|---|---|
+| **Skeleton** | 3.35 skull-heights, crown of skull to sole | fixed |
+| **Hair volume** | 1.00 | 0.4 (buzz) → 1.5 (afro, long hair, full beard) |
+| **Balance** | 55% of the non-head height to the torso | fixed |
+
+⚠⚠ **The measurement trap, and the reason this needed settling before any art was commissioned.**
+A reference character that reads as *"about two heads tall, big chunky head"* is typically **~3.3–3.4
+skull-heights** with a hair-and-beard mass half again the size of the skull under it. Give an
+illustrator "3.35 heads" without the second number and you get a lanky figure that looks nothing like
+the reference. **The mass, not the skeleton, is what makes a character read as a mascot.** Verified by
+drawing it: two figures at an identical 3.35 skeleton read as 3.1 and 2.1 apparent heights when hair
+volume alone is moved from 0.35 to 1.45.
+
+- Below ~2.75 reads as a toy, which collides with **A4**. Above ~3.6 the head stops dominating, and
+  every list renders a person at 24–36px where the head *is* the character.
+- **The height over 3.0 goes to the torso, not the legs.** The torso is the surface every kit,
+  jersey, tattoo and badge is sold on — a short torso caps what the shop can sell. A long torso over
+  short legs also reads as charming rather than childish.
+
+Pin both with a test the way `modeIdentity.test.ts` pins hue separation: a
+`characterProportion.test.ts` asserting skull height ÷ figure height stays in `[0.28, 0.32]` and hair
+volume stays inside `[0.4, 1.5]`, for every combination of parts. A catalogue that grows over two
+years *will* drift otherwise.
+
+### The mass is one shape, and the face is a window in it
+
+Taken from the reference and confirmed by drawing it: hair and beard are **one capsule behind the
+skull**, not two parts stuck on. The face is a smaller skin capsule drawn *over* it, and the beard
+setting **shrinks that window** rather than adding a beard asset.
+
+| Beard | Visible skin | Mechanism |
+|---|---|---|
+| None | full skull — 0.86 × 1.00 | mass clipped at ear level (`y ≤ 0.60`) |
+| Short | 0.86 × 0.95 of skull | mass clipped at the jaw (`y ≤ 1.02`) |
+| Full | 0.72 × 0.86 of skull | mass uncut |
+
+One shape, three states, one clip rectangle. Cheaper than three beard assets, and it is the reason a
+single hair-volume number can change the whole silhouette.
 
 ## 4.4 The eyes carry everything
 
@@ -342,10 +377,24 @@ consequence of that sentence.
 
 ## 5.2 Two rigs, one parts library
 
+> ✅ **The crop was SETTLED 2026-09-13 as a chest crop, not a head crop.**
+
 | Rig | Where it renders | Composition |
 |---|---|---|
-| **Bust** | Leaderboards, pool cards, banter rows, member lists, emails, OG cards | Ground disc + head + a sliver of shoulder, cropped to a circle |
-| **Figure** | Profile, Showdown walkout, duel card, share card, level-up, trophy case | Full 3-head figure on a ground |
+| **Bust** | Leaderboards, pool cards, banter rows, member lists, emails, OG cards | Ground disc + head + shoulders + **upper chest**, cropped to a circle |
+| **Figure** | **Pool card**, profile, Showdown walkout, duel card, share card, level-up, trophy case | Full 3.35-skull figure on a ground |
+
+**The bust is a passport crop**, cutting at roughly **1.72 skull-heights** from the crown of the hair
+mass — far enough down that the collar, the neckline trim, the top of the kit pattern and the chest
+badge slot all read at 32px.
+
+⚠ **This costs head legibility and was chosen anyway.** A head crop puts ~21px of head inside a 24px
+circle; a chest crop puts ~13px. The trade is deliberate: **everything the shop sells lives below the
+jaw**, and a jersey nobody sees is a jersey nobody buys. A large hair mass costs again here — the
+mass eats circle before the face does.
+
+**The figure rig also goes on the pool card**, not only the profile and the duel. The pool card is the
+most-looked-at surface in the app and it has the room.
 
 **The head is byte-identical between them.** Same parts, same coordinates, different viewBox and
 crop. This is Duolingo's nested-artboard idea expressed as geometry instead of as tooling: head and
@@ -358,29 +407,64 @@ surface.
 
 ## 5.3 The parts catalogue — v1 target
 
-A1 and A2 say the first version must let someone build something recognisably them. That sets a
-floor, and the floor is higher than Duolingo's eight categories.
+> ✅ **SETTLED 2026-09-13.** Ryan: *"basic and free to start with various coloured clothes and hair
+> and a few accessories… then maybe we add tattoos or jewellery or eventually jersey… custom
+> celebrations or fight stances for Showdown, sticker packs for the in-app chat."*
 
-| Slot | v1 options | Free | Notes |
-|---|---|---|---|
-| Head shape | 6 | all | round, oval, square-capsule, wide, narrow, long |
-| Skin tone | 12 | all | curated ramp, §4.5 |
-| Hair style | 24 | all | must include coily, locs, braids, wraps, bald, buzz, and long-under-headwear |
-| Hair colour | 14 | all | includes 4 unnatural |
-| Eyes | 4 shapes × 5 colours | all | shape is expression-driven at runtime (§4.4) |
-| Brows | 4 | all | |
-| Facial hair | 10 | all | incl. none |
-| Eyewear | 8 | all | incl. none |
-| Headwear | 12 | 6 free | caps, beanies, wraps, headband, none |
-| Build | 4 | all | |
-| **Kit colourway** | 20 | 8 free | §5.4 — the cosmetics surface |
-| Boots | 6 | 3 free | |
-| Accessory | 8 | 2 free | scarf, gloves, captain's armband, headphones |
+### The rule: free gets you a person, paid gets you flair
 
-Combinations at v1: on the order of 10⁹ before colourways. The number is not the point — **coverage
-is**. The test for v1 is not "how many combinations" but: *can each of ten real people from the
-existing user base make something they'd put next to their name?* Run it as an actual exercise with
-actual people before any art is commissioned.
+**Everything that constitutes looking like yourself is free. Everything that constitutes showing off
+is paid.** The whole v1 catalogue is free — there is no partial free tier, because a part-free
+character editor reads as a demo, which is A2's failure mode with a price tag on it.
+
+⚠⚠ **Skin tone and hair are free forever, with no paid variants, ever.** Not "free at launch" —
+permanently out of scope for the shop, and it belongs in §8.3's cut list. A cosmetics store that
+charges for hair textures is a story you do not want, and it is exactly the SKU a future someone
+reaches for when the shop needs filling.
+
+### v1 — all free
+
+| Slot | v1 options | Notes |
+|---|---|---|
+| Head shape | 4 | round, oval, wide, long |
+| Skin tone | 12 | curated ramp, §4.5. **Never paid.** |
+| Hair style | 30 | must include coily, locs, braids, wraps, bald, buzz, long-under-headwear. **Never paid.** |
+| Hair colour | 14 | includes 4 unnatural. **Never paid.** |
+| Hair volume | continuous 0.4–1.5 | §4.3 — carried by the style, not chosen separately |
+| Eyes | 4 shapes × 5 colours | shape is expression-driven at runtime (§4.4) |
+| Brows | 4 | |
+| Facial hair | 7 | incl. none; drives the face-window size (§4.3) |
+| Eyewear | 6 | incl. none; must be able to fully occlude the eyes |
+| Headwear | 12 | caps, beanies, wraps, headband, none |
+| Build | 4 | |
+| Kit colourway | 8 patterns × colour | §5.4 |
+| Boots | 4 | |
+| Accessory | 5 | scarf, gloves, armband, headphones, none |
+
+~120 assets, re-weighted from the first draft: **hair and skin got the money**, paid for by cutting
+head shapes, facial hair, eyewear, boots and accessories. Almost all of "can I look like me" is
+front-loaded into hair and skin, and the user base is Bermudian and North American office pools —
+coily, locs, braids and wraps are load-bearing, not a box-tick.
+
+### Later — the paid layer
+
+Tattoos · jewellery · jerseys and premium colourways · headwear drops · custom Showdown celebrations ·
+Showdown fight stances · chest-badge designs.
+
+⚠ **Sticker packs are not an avatar slot.** They share the art pipeline and the shop, but they are a
+**chat** product with their own moderation surface. Tracked as a sibling, not a character part.
+
+### The coverage test is Ryan's, not mine
+
+The first draft tested *"can ten real people make something recognisably them"* — unbounded, because
+self-recognition always wants one more option. The bar is Ryan's instead:
+
+> *"There's enough variety that people can see that there are clearly two different avatars or
+> characters for these people."*
+
+Finite, and measurable. It is comfortably met: pools cluster at **10–18 members**, and there are ten
+hashed ground colours before a single character part is chosen. **Variety is not the risk. Depth in
+hair and skin is.**
 
 ## 5.4 🔴 The kit problem — colourways, never crests
 
@@ -682,22 +766,39 @@ Two more to add, specific to characters:
    beside a number.** Non-negotiable in a friend pool.
 5. **No character state may be driven by another user's behaviour.** "Your rival's character is
    taunting you" is social pressure with a costume on.
+6. **Skin tone and hair are never sold.** §5.3. Permanently out of scope, not deferred.
+7. **A chest badge slot never carries a real crest.** The slot is fine; its content is abstract or
+   user-made. §5.4, RM-12.
 
-## 8.4 🔴 The recorded adoption gate has lost its instrument
+## 8.4 The adoption gate — split in two
+
+> ✅ **SETTLED 2026-09-13.** One gate was guarding two different doors.
 
 `MONETIZATION.md` gates the shop on **>40% photo-upload adoption within 3 months of Avatars v1**.
-Avatars v1 has not shipped. If characters ship *instead of* photo upload, the gate cannot be
-measured — and §1.6/A1 says characters must not replace photos anyway.
+Avatars v1 has not shipped, so it has never been measured — and it is a poor instrument in both
+directions. For *"should we build characters?"* it is actively misleading: plenty of people will not
+put their face beside their name in a work pool but would happily build a cartoon, so **low photo
+adoption is an argument for characters, not against them**. For *"should we build a shop?"* it is too
+weak: uploading a photo is ten seconds of effort, and a purchase needs three minutes of investment.
 
-**Proposed resolution, needs Ryan's call (§10 Q1):**
+**The resolution:**
 
-- Ship **Avatars v1 (photo + initials, ~3–5 days) unchanged**. It is the cheapest possible read on
-  "do people care what they look like here", and A1 requires it to exist permanently regardless.
-- Read the 40% gate against **"set a non-default identity"** — photo *or* character — rather than
-  photo specifically.
-- Add a second, better signal before any money is involved: **% of character users who changed ≥1
-  part from the default within 30 days.** Adoption says they tried it; editing says it matters to
-  them. Only the second predicts a purchase.
+| Door | Gate |
+|---|---|
+| **Characters** (Phases 2–4) | **Ungated.** This is the product experience, and it stands on its own. |
+| **The shop** (Phase 6) | **Edit depth** — % of character users who changed ≥1 part from the default within 30 days. |
+
+Adoption says they tried it; **editing says it matters to them**, and only the second predicts someone
+reaching for a card. Ship Avatars v1 regardless — it is 3–5 days and **A1** makes photos permanent
+anyway — but do not let its number decide whether characters get built.
+
+⚠ **The numeric threshold is deliberately left open.** 40% was invented for a different feature and
+re-using the digits would launder a guess into the record. Record the *shape* of the gate now; set the
+number when there is data.
+
+⭐ **There is a free signal available today that beats both.** `memory/project_backlog_banter_engagement.md`
+records that **~67% of banter messages are already auto share-cards** — people are pushing images
+carrying their identity into pools right now, unprompted. Query that before picking any threshold.
 
 ---
 
@@ -707,7 +808,7 @@ Deliberately not dated. Each phase is gated on the previous one's signal, not on
 
 | Phase | What | Gate to start |
 |---|---|---|
-| **0 — Now → Q1 2027** | **This document.** Grammar, catalogue, states, and *paper* design. No code. Commission or produce the v1 parts catalogue as art. Run the ten-real-people coverage test (§5.3). | — |
+| **0 — Now → Q1 2027** | **This document.** Grammar, catalogue, states, and *paper* design. No code. Commission or produce the v1 parts catalogue as art. Run the distinguishability test (§5.3). | — |
 | **1** | **Avatars v1** — photo upload + initials. Unchanged from its existing scoping. | — |
 | **2** | **The parts model** — config → scene graph → three renderers. Bust rig only. Static, no motion. Ships to the existing `<Avatar>` call sites. | Phase 1 live |
 | **3** | **The editor** — the customisation UI, mobile-first. Free catalogue only, no purchases. | Phase 2 rendering correctly on all six surfaces |
@@ -723,12 +824,14 @@ of months.
 
 # Part 10 — Open questions for Ryan
 
-Numbered so they can be answered individually.
+Numbered so they can be answered individually. Answered ones are struck through with their decision.
 
-1. **§8.4 — the adoption gate.** Does the 40% gate move to "set a non-default identity", and is the
-   30-day edit rate accepted as the real pre-purchase signal?
-2. **§4.3 — 3 heads tall.** Confirm the proportion before any art is commissioned; it is expensive to
-   change afterwards.
+1. ~~**§8.4 — the adoption gate.**~~ ✅ **2026-09-13 — split in two.** Characters ungated; the shop
+   gated on 30-day edit depth. Threshold deliberately unset. Free/paid line: *free gets you a person,
+   paid gets you flair* (§5.3).
+2. ~~**§4.3 — proportion.**~~ ✅ **2026-09-13 — 3.35 skull-heights, hair volume 1.00 (range 0.4–1.5),
+   55% to the torso, chest bust crop.** Settled against a reference image using the interactive model
+   sheet. The measurement trap is recorded in §4.3.
 3. **§5.3 — catalogue size.** Is ~120 v1 assets the right order of magnitude, given A2 says shallow
    is worse than nothing? This is the main cost driver.
 4. **Art production.** In-house, commissioned, or generated-then-hand-corrected? A2 and A4 both push
