@@ -476,6 +476,56 @@ volume range* than to 30 fixed looks. The re-weighting is cheaper than the raw c
 Tattoos · jewellery · jerseys and premium colourways · headwear drops · custom Showdown celebrations ·
 Showdown fight stances · chest-badge designs.
 
+### ⭐ The third tier — EARNED (Ryan, 2026-09-14)
+
+> **Free gets you a person. Paid gets you flair. Earned gets you proof.**
+
+Cosmetics unlocked by doing something in the football — win a pool, unlock the champion's sunglasses.
+
+⭐⭐ **This is a renderer for a system that is already live.** `badge_unlocks` is a shipped,
+append-only table holding **18,580 rows** in production, RLS'd so pool members can read their pools'
+unlocks, with idempotent upserts on every recalc. `SPORTPOOL_PROGRAMME.md` already lists the remaining
+work as *"the profile **trophy-case** UI"*. An earned cosmetic hangs off an unlock ledger that has been
+quietly recording achievements for three years.
+
+**Passes all five gates (Decision 8), with three rules that the gates themselves generate:**
+
+| # | Rule | From |
+|---|---|---|
+| **E1** | **Unlocks are earned by sporting and pool outcomes, never by app behaviour.** Not logins, not session counts, not streaks, not posting in banter. | Gate 4 — Substitution |
+| **E2** | **Unlock conditions are deterministic and stated in advance.** "Win a pool → the sunglasses." A *random* item from a champion set is a loot box, and randomised packs are already cut. | Gate 5 — Variance provenance |
+| **E3** | **An earned item is NEVER purchasable. Ever.** *(Ryan, 2026-09-14.)* That is the entire source of its value, and it discloses beautifully: *"you can't buy this one."* | — |
+
+⭐ **E1 is the same principle as §6.1's motion rule** — *caused by the sport or by the user's own
+choice, never by how long since they opened the app*. One rule now governs both what a character
+**does** and what a character **owns**.
+
+⚠ **Watch item, gate 2.** In a friend pool where the same person wins every year, an earned item
+becomes a permanent visible marker of everyone else's not-winning. It is an *honest* record of a real
+thing, so it does not fail — but check it against "no bad feelings" once real ones exist, and prefer
+**subtle** earned items (sunglasses, an armband, a trim) over loud ones.
+
+### ⭐ Kits have no names at all *(Ryan, 2026-09-14)*
+
+A kit is a **swatch you pick and put on your avatar** — the same interaction as choosing a skin tone or
+a hair colour. No preset names. No user-supplied names.
+
+This dissolves the naming problem rather than managing it. It removes, in one move: the association
+risk in our own copy, the UGC moderation surface for user-named kits, the denylist lint check, and the
+acceptable-use line the ToS would otherwise need.
+
+⚠ **This changes a clause in `MONETIZATION.md`**, which currently reads *"…and users name their own"* —
+written as the mitigation for not being able to use club names. Removing naming entirely moves in the
+same direction (strictly less risk) but the clause needs updating rather than quietly diverging.
+
+⚠ **The one place a label still leaks is the shop.** A purchase needs an identifier on the receipt and
+the entitlement row. Keep those as **colour-descriptive slugs** (`red-white-sleeves`,
+`black-amber-hoops`) that never surface as a *name* in the UI — which keeps the association rule
+intact by construction, because there is no surface for a name to appear on.
+
+⭐ **v1's kit is generic and plain** *(Ryan)*. Patterns and colourways arrive later, paid or earned.
+That is also the cheapest possible first commission.
+
 ⚠ **Sticker packs are not an avatar slot.** They share the art pipeline and the shop, but they are a
 **chat** product with their own moderation surface. Tracked as a sibling, not a character part.
 
@@ -995,6 +1045,8 @@ Two more to add, specific to characters:
 6. **Skin tone and hair are never sold.** §5.3. Permanently out of scope, not deferred.
 7. **A chest badge slot never carries a real crest.** The slot is fine; its content is abstract or
    user-made. §5.4, RM-12.
+8. **Earned items are never purchasable** (E3), **never randomised** (E2), and **never unlocked by app
+   behaviour** (E1). §5.3.
 
 ## 8.4 The adoption gate — split in two
 
@@ -1093,7 +1145,9 @@ Numbered so they can be answered individually. Answered ones are struck through 
    shared surface; expression only on your own surfaces and in duels.
 6. ~~**§7.2 — Rive.**~~ ✅ **2026-09-14 — deferred, walkout-only.** Q5's still boards removed its one
    advantage (no ticker to idle against), and Part 7b means the parts model is what we already have.
-7. **§5.4 — kit naming.** Colour-only preset names accepted as a hard rule with a lint check?
+7. ~~**§5.4 — kit naming.**~~ ✅ **2026-09-14 — kits have NO names.** A swatch you pick, like a skin
+   tone. Dissolves the association risk, the UGC surface, the lint check and the ToS line. ⚠ Changes
+   the *"users name their own"* clause in `MONETIZATION.md`.
 8. **Scope check.** Is Showdown the launch surface for the figure rig, or should it be the profile
    (lower risk, lower reward)?
 
