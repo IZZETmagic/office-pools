@@ -274,13 +274,29 @@ imposed.
 | Primitive | Definition | Used for |
 |---|---|---|
 | **Disc** | Circle. | Head, eyes, ball, buttons |
-| **Capsule** | Rect where `r = min(w,h) / 2`. | Torso, arms, legs, hair mass, boots |
+| **Soft rect** | Rect with **four independent corner radii**. A capsule is the case where all four are maxed. | Torso, arms, legs, boots, garments |
 | **Half-capsule** | A capsule cut on its long axis. | Hair fringe, collar, sock top, shorts hem |
 | **Quarter-capsule** | A capsule cut on both axes. | Ear, cuff, eyebrow, shoe toe |
 | **Lens** | Intersection of two discs. | Smile, closed eye, badge |
 
-**Forbidden:** any corner with a radius under `radii.xs` (6 at 1× scale). No strokes. No gradients
-*inside* a character — gradients belong to the ground behind it (§5.5). No drop shadows on parts.
+**Forbidden:** No strokes. No gradients *inside* a character — gradients belong to the ground behind
+it (§5.5). No drop shadows on parts.
+
+⚠⚠ **The original rule said every part is a capsule with `r = min(w,h)/2`. That rule produced
+snowmen** (Ryan, 2026-09-13) — it forces *every corner of every part to full round*, so a torso is a
+pill and an arm is a pill, and pills can only sit *beside* each other. **A joint needs a flat edge,
+and the rule outlawed flat edges.** Roundness is a choice per corner, not a law: a shirt has round
+shoulders and a **flat hem**; shorts have a flat waist and a notch; a neck ends flat and disappears
+into the collar.
+
+⚠ **Second correction, same class** (Ryan, 2026-09-13): a short-sleeve shirt is **one T-shaped
+garment**, not a body plus two sleeves. Drawn as separate objects in a different colour they read as
+shoulder pads floating above the person. The sleeve is the shirt's own yoke, in the shirt's own
+colour, with the trim reduced to a thin cuff — and the kit pattern runs across it, because it is the
+same garment.
+
+⚠ **Third, and the general form of all three:** every seam must **overlap deeply** rather than kiss.
+The arm tucks under the sleeve, the legs run up inside the shorts, the head sits over the collar.
 
 ## 4.3 Proportion — two numbers, not one
 
@@ -739,6 +755,173 @@ once at config-save time, not rendered per request.
 
 ---
 
+---
+
+# Part 7b — The rig: where the art actually comes from
+
+> ✅ **SETTLED 2026-09-14.** Four routes were tested against real artwork, not argued about.
+> This section records what each one proved, so nobody re-runs them.
+
+## 7b.1 The answer
+
+**Adopt the Avataaars rig. Restyle it with the SportPool palette. Commission only the football half.**
+
+Avataaars (Pablo Stanley, free for commercial use, no attribution) is the only free-tier modular
+rig that is flat vector, carries a full skin range, and already ships a **clothing slot with its own
+colour** — the hook the kit colourway system needs. **Open Peeps** (same author, **CC0**) has the best
+hair and cultural range of anything available and is public domain, so its shapes can be redrawn into
+the Avataaars rig without asking anyone.
+
+Both licences permit modification. **We are adopting a rig, not a look** — anchors, slot structure and
+a working parts model, which is the expensive part of this problem.
+
+⚠ **The real cost of Avataaars is that it is everywhere.** Used as-is, SportPool looks like every side
+project on the internet. Restyling is not optional polish, it is the point.
+
+## 7b.2 Every shipping avatar product does it this way
+
+Snap's Bitmoji pipeline is *"flat shape layers, custom color lookup tables, and distinct canvas
+coordinate grids"*, with each user's avatar stored as a **serialized JSON state object**. Mii, Memoji,
+Zepeto and Duolingo are the same shape of thing. **Nobody generates parts.** §7.3's `avatar_config
+jsonb` is, almost exactly, Snap's state object — the architecture in this document was right; only the
+question of where the art comes from was open.
+
+🔴 **Correction to the record:** `memory/project_backlog_avatar_cosmetics.md` recommends **Ready Player
+Me** as the Phase B build option. It **shut down on 31 January 2026** after the Netflix acquisition —
+creator, developer APIs, all of it. That line is dead.
+
+## 7b.3 Licence filter — it removes half the field
+
+| Licence | Commercial | Modify | Attribution | Rigs |
+|---|---|---|---|---|
+| Free commercial | ✅ | ✅ | none | **Avataaars** |
+| CC0 1.0 | ✅ | ✅ | none — public domain | **Open Peeps**, Notionists, Lorelei |
+| CC BY 4.0 | ✅ | ✅ | **visible credit** | Personas, Micah, Big Smile, Miniavs |
+
+Licences read from each asset's own embedded RDF metadata, not from a summary page. A credit line
+beside a paywall is a decision, not a blocker — **Personas** is arguably the best-looking of the lot and
+a licence email to Draftbit is cheap. Two rule themselves out immediately: **Lorelei renders every face
+uncoloured** (no skin tones at all, fails Q3 before anything else) and **Notionists is monochrome** (no
+kit colour possible).
+
+## 7b.4 Catalogue reality, measured from source
+
+| Slot | Sketch file (2018) | npm package | Q3 target | |
+|---|---|---|---|---|
+| Hair | ~10 | **27** | 30 | 3 short |
+| Headwear | in Top | **7** | 12 | 5 short |
+| Skin tone | 7 | 7 defaults, **any hex** | 12 | ✅ config |
+| Hair colour | 10 | 10 defaults, **any hex** | 14 | ✅ config |
+| Eyes / brows / mouth | 12/13/12 | **12/13/12** | — | ✅ exceeds |
+| Facial hair | — | **5** | 7 | 2 short |
+| Eyewear | in Top | **7** | 6 | ✅ |
+| Clothing | 21 | **9** + any hex | 8 colourways | 🔴 none is a kit |
+| Nose | 1 | **1** | — | ⚠ |
+| Body below chest | none | **none** | full figure | see §7b.5 |
+
+⭐ **The skin gap costs nothing.** Skin and hair are each a flat `<rect fill="#hex">` masked to the
+shape. Going from 7 tones to Q3's 12 is **adding five hex values** — no drawing.
+
+⚠ **Strip the graphic tees** before anything ships: `bat, bear, cumbia, deer, diamond, hola, pizza,
+resist, skull`. Off-brand for football, and some carry references we have no reason to inherit.
+
+## 7b.5 Full body: solved, and cleanly
+
+The bust is not missing a body — it is **cropped**, and it terminates in a clean flat edge.
+
+| Measured fact | Value |
+|---|---|
+| Canvas | 280 × 280, content wrapped in `<g transform="translate(8)">` |
+| Head | y 33..182 → **H = 149** |
+| Shirt | x 40..240, path ends `L232,110 L32,110` — flat, **exactly on the canvas floor** |
+| 3.35 heads (§4.3) | 33 + 3.35 × 149 = **532** → extend the canvas by 252 |
+
+Everything below the chest — torso continuation, arms, hands, shorts with the leg-hole notch, hooped
+socks, boots — is ~90 lines of soft-rects and one garment path, fully config-driven. **The torso
+continuation uses the same hex as the shirt, so the seam is invisible.**
+
+⚠⚠ **THE GOTCHA: `viewboxMask`.** DiceBear wraps all content in `<g mask="url(#viewboxMask)">`, and
+that mask is a 280×280 rect. Leave it alone and **everything below y=280 is silently clipped** — the
+figure renders as a bust no matter what you draw. Grow the mask before the canvas. Cost one blank
+render and a wasted debugging pass.
+
+⚠ Quality: the body reads as amateur beside professionally-drawn Avataaars heads (stubby arms, no
+wrist, rectangular legs, no matching shadow). **It is a working skeleton for a refinement brief, not
+shippable art** — which is a far cheaper commission than a blank page.
+
+## 7b.6 ⭐ Growing a hairstyle without growing the face opening
+
+Ryan's idea, and the most reusable technique to come out of this.
+
+**Uniform scaling fails** because the hair silhouette carries the face opening inside its own geometry
+— scale the mass and the hole scales with it, exposing a rim of scalp. Scaling *down* works (a smaller
+hole hides behind the head); scaling *up* never can.
+
+**The warp that works:**
+
+1. Extract the **head's own path** from the same SVG (`fill="#CE8E62"`), sample it, and build a polar
+   radius lookup `R(θ)` around the head's centre — in canvas coords, cropping below the chin (y > 205)
+   so the neck and shoulders don't pollute it.
+2. For every hair point: `r ≤ R(θ)` → **untouched**. `r > R(θ)` → `r' = R + (r − R) × k`.
+
+The interface stays exactly steady; only the mass beyond the real head outline grows. Curves are
+sampled to a dense polyline first — the warp is non-affine and cannot be expressed on control points.
+
+⚠⚠ **Anchor to the head's REAL OUTLINE, never a fitted ellipse.** The first attempt pinned an ellipse
+whose centre came from measuring *rendered pixels* (`cx = 120.5`). The head **path** is symmetric about
+`x = 132` local — `x = 133` in the hair's frame. **12.5 units off, entirely to one side**, which
+produced a clean result on the left and a visible gap on the right. Ryan spotted it; I hadn't.
+
+**Yield across the catalogue:**
+
+| Style type | Shrink | Grow |
+|---|---|---|
+| Voluminous — fro, curly, dreads, bigHair, frizzle, shaggy | ✅ | ✅ warp |
+| Close-cropped — shortFlat, theCaesar, shortRound | ✅ | ❌ spikes — almost all of the shape is *inside* the skull, so only tips get pushed |
+
+2–3 genuine variants per voluminous style, from professionally-placed curves that are only moved. This
+also **partially resurrects Q2's hair-volume parameter** — as discrete steps, not a continuous slider.
+
+⚠ Costs: a warped path is ~2,300 points against ~250 (≈9× bytes); silhouettes go faceted above about
+k=1.7 at 26 samples/segment; and **`bigHair` contains a degenerate arc** (start == end) that crashes
+`svgpathtools` — one style in 27, needs a guard.
+
+## 7b.7 The four routes, and why three of them stop
+
+| Route | Verdict |
+|---|---|
+| **I author the art** | ❌ Structure right, surface wrong. Avataaars' hair is **13,953 hand-placed coordinates** across 36 components; one afro path alone has 266. My whole character used ~40. The gap is not capability, it is the **look-and-nudge loop** — an illustrator makes hundreds of micro-corrections per shape on continuous visual judgement; I write blind, render, and reason in words. Evidence: Ryan caught the snowman bodies, the floating shoulders and the right-side gap. I fixed all three within minutes of each being *named*, and spotted none of them. |
+| **nano-banana generates parts** | ⚠ It **can** isolate a part — but only if the hole is described as a **positive thing** (*"the face opening is filled with the same magenta as the background"*), never as a negation. Against a real rig: ~50% failure per generation, unreliable anchors, and the output is a **different art style** sitting on Avataaars faces. Worse than the 27 styles already in the package. **Root cause is unfixable by prompting: the model emits pixels, has no coordinate system, and each generation is an independent sample.** |
+| **Extend the body geometrically** | ✅ Works — §7b.5. |
+| **Derive variants by transform** | ✅ Works — §7b.6, once anchored to the real outline. |
+
+## 7b.8 Three verification lessons
+
+1. **A round-trip test using the same flawed parser on both sides is circular.** My hand-rolled path
+   transformer reported 256 numbers in, 256 out, zero mismatches — while producing a broken path. Only
+   the **render** caught it. Cause: SVG arc commands pack their flags without separators (`a5 5 0
+   0110 10`), which greedy number-matching misreads.
+2. **Never hand-roll SVG path parsing.** `svgpathtools` round-tripped pixel-identically first try, and
+   correctly *refuses* `sx ≠ sy` on arcs — a non-uniformly scaled circular arc is a rotated ellipse arc.
+3. **Prefer path data to rendered pixels for any measurement.** My naive bbox said `x -41..249, y
+   -46..246`; the real one is `x 17..249, y 0..193` — wrong on every bound, because I assumed
+   alternating x,y pairs on paths that are relative with arcs.
+
+## 7b.9 Security audit — the Sketch library
+
+`Avatar_Library.sketch`, SHA-256 `04002e1f2b1220f64f3cab061254df96867a4f675a3b4eeb280a618170391f15`.
+**Clean.** Real ZIP (9 entries), no path traversal, no symlinks, no exec bits, 4.5× compression ratio,
+**zero URLs** in 3.5M chars of JSON, no scripts/eval/shell/binaries, and every entry verified as JSON
+or PNG **by magic bytes, not extension**. The one flagged token, `.sketchplugin`, is inert layout
+settings left by *Symbol Organizer*. Authentic: Sketch 48.1, five pages including `@pablostanley`.
+
+⚠ `avataaars`, `@dicebear/core`, `@dicebear/collection` and `react-nice-avatar` all have **no npm
+install hooks** (`preinstall`/`install`/`postinstall`/`prepare`) — the real attack surface, and it is
+clean. All are **single-maintainer**, so account takeover is the realistic risk rather than today's
+code: pin exact versions and trust the lockfile hash.
+
+---
+
 # Part 8 — The gates
 
 ## 8.1 The disclosure gate
@@ -817,7 +1000,7 @@ Deliberately not dated. Each phase is gated on the previous one's signal, not on
 
 | Phase | What | Gate to start |
 |---|---|---|
-| **0 — Now → Q1 2027** | **This document.** Grammar, catalogue, states, and *paper* design. No code. Commission or produce the v1 parts catalogue as art. Run the distinguishability test (§5.3). | — |
+| **0 — Now → Q1 2027** | **This document.** Grammar, catalogue, states, and *paper* design. Adopt the Avataaars rig (Part 7b), extend the skin/hair ramps, derive the hair volume variants, and scope the football commission. Run the distinguishability test (§5.3). | — |
 | **1** | **Avatars v1** — photo upload + initials. Unchanged from its existing scoping. | — |
 | **2** | **The parts model** — config → scene graph → three renderers. Bust rig only. Static, no motion. Ships to the existing `<Avatar>` call sites. | Phase 1 live |
 | **3** | **The editor** — the customisation UI, mobile-first. Free catalogue only, no purchases. **Needs its own design pass — see below.** | Phase 2 rendering correctly on all six surfaces |
@@ -867,9 +1050,11 @@ Numbered so they can be answered individually. Answered ones are struck through 
 3. ~~**§5.3 — catalogue size.**~~ ✅ **2026-09-13 — ~120 at the re-weighted split, and explicitly not
    leaner.** Ryan: *"I definitely do not want leaner. I want enough that the character can look like
    the user."* 30 hair / 12 skin are the floor, not the target.
-4. **Art production.** In-house, commissioned, or generated-then-hand-corrected? A2 and A4 both push
-   toward a real illustrator for the base set. Duolingo's own answer was a character library that
-   contractors reference — the library is the deliverable, not the drawings.
+4. ~~**Art production.**~~ ✅ **2026-09-14 — adopt the Avataaars rig, restyle it, commission only the
+   football half.** Full findings in **Part 7b**, including the licence filter, the measured catalogue,
+   the working full-body extension, the hair-warp technique, and the four routes tested with the reason
+   each did or did not work. Ready Player Me is dead (shut down 31 Jan 2026) and that line in
+   `memory/project_backlog_avatar_cosmetics.md` needs striking.
 5. **§6.3 — celebration on shared boards.** Is "idle on the leaderboard, expressive on your own
    surfaces and in duels" the right line, or too conservative?
 6. **§7.2 — Rive.** Agreed as deferred, revisited only for the walkout after a parts-model version
