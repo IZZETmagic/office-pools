@@ -55,9 +55,12 @@ BROW_BAND_MIN = 20       # px between the hairline and the eyes for a slim brow
 BASE_COLOURS = [(254, 205, 180), (245, 178, 150), (255, 255, 255),
                 (30, 118, 214), (50, 118, 183)]
 
-# canonical hair tones — every asset uses these two, so one recolour rule fits all
+# Canonical hair tones. Three, not two: the base mass plus texture that may be DARKER or
+# LIGHTER than it. short-sides traced as a dark base with lighter swooshes, and collapsing
+# that to one "texture" token painted its texture darker than its base, erasing the detail.
 HAIR_BASE = "rgb(140,122,110)"
-HAIR_TEXTURE = "rgb(114,97,86)"
+HAIR_SHADE = "rgb(114,97,86)"     # texture darker than the base
+HAIR_LIGHT = "rgb(168,150,138)"   # texture lighter than the base
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
@@ -143,7 +146,7 @@ def head_jaw_width(traced_path: str) -> int:
     return int((np.abs(im - np.array(BASE_COLOURS[0])).sum(axis=2) < 40).sum(axis=1)[JAW_ROW])
 
 
-def check_landmarks(hair: list[str], mask: str) -> None:
+def check_landmarks(hair: list[str], mask: str) -> dict:
     """Render the hair alone and measure how much of each landmark zone it covers.
 
     Rasterising is the only honest way to do this — a path's bounding box says nothing about
@@ -163,6 +166,8 @@ def check_landmarks(hair: list[str], mask: str) -> None:
         import numpy as np
         im = np.asarray(Image.open(f"{tmp}/h.png").convert("RGB")).astype(int)
         covered = im.sum(axis=2) < 740          # anything drawn; the rest is white canvas
+        areas = {c: int((np.abs(im - np.array(c)).sum(axis=2) < 30).sum())
+                 for c in {fill_of(p) for p in hair} if c}
     eye = LANDMARKS["eye"]["placement"]
     brow = LANDMARKS["brow"]["placement"]
 
@@ -181,13 +186,29 @@ def check_landmarks(hair: list[str], mask: str) -> None:
     flag = "⚠ " if band < BROW_BAND_MIN else ""
     print(f"  eye zone {clear*100:.0f}% clear | {flag}brow band {band}px "
           f"(hair reaches y{low}, eyes start y{eye['y0']})")
+    return areas
 
 
-def normalise(hair: list[str]) -> str:
-    base_tone = fill_of(hair[0])
+def lum(c) -> float:
+    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+
+def normalise(hair: list[str], areas: dict) -> str:
+    """Map each traced tone to a canonical token.
+
+    The base mass is identified by AREA, not by path order and not by luminance. Path order
+    is arbitrary — Recraft sorts by size and stacking, so the first hair path is often a
+    texture swoosh. Luminance fails too: short-sides traced as a DARK base with LIGHTER
+    texture, so "lightest is the base" inverts it. Only area is reliable.
+    """
+    base_tone = max(areas, key=lambda c: areas[c])
     out = []
     for p in hair:
-        token = HAIR_BASE if close(fill_of(p), base_tone, tol=8) else HAIR_TEXTURE
+        c = fill_of(p)
+        if close(c, base_tone, tol=8):
+            token = HAIR_BASE
+        else:
+            token = HAIR_SHADE if lum(c) < lum(base_tone) else HAIR_LIGHT
         out.append(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{token}"', p))
     return "".join(out)
 
@@ -218,8 +239,8 @@ def main() -> None:
                  f"{abs(jaw-want)/want*100:.0f}% — regenerate holding the head size")
 
     mask = face_mask(traced, base_paths)
-    check_landmarks(hair, mask)
-    body = normalise(hair)
+    areas = check_landmarks(hair, mask)
+    body = normalise(hair, areas)
     payload = mask + (f'<g mask="url(#facehole)">{body}</g>' if mask else body)
 
     if dst.endswith(".asset.svg"):
@@ -227,8 +248,8 @@ def main() -> None:
     else:
         open(dst, "w").write(base_svg.replace("</svg>", payload + "</svg>"))
 
-    n_tex = body.count(HAIR_TEXTURE)
-    print(f"{dst}: {len(hair)} paths ({len(hair)-n_tex} base + {n_tex} texture)"
+    n_sh, n_li = body.count(HAIR_SHADE), body.count(HAIR_LIGHT)
+    print(f"{dst}: {len(hair)} paths ({len(hair)-n_sh-n_li} base + {n_sh} shade + {n_li} light)"
           f"{' | face mask' if mask else ''}")
 
 

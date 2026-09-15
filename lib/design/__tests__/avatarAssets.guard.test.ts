@@ -47,9 +47,11 @@ const HAIR = 'assets/character-base/nano/hair/assets'
 /** Recraft emits this on every path; it is a no-op and the locked assets carry it. */
 const GRANDFATHERED = 'translate(0,0)'
 
-/** Canonical hair tones — every hair asset uses these two so one recolour rule fits all. */
+/** Canonical hair tones. Three, not two: some styles trace as a DARK base with LIGHTER
+ *  texture (short-sides), so collapsing texture to a single darker token erases the detail. */
 const HAIR_BASE = 'rgb(140,122,110)'
-const HAIR_TEXTURE = 'rgb(114,97,86)'
+const HAIR_SHADE = 'rgb(114,97,86)'
+const HAIR_LIGHT = 'rgb(168,150,138)'
 
 /** The shared coordinate space. Assets register by living in the base's viewBox. */
 const VIEWBOX = 'viewBox="0 0 2048 2048"'
@@ -76,10 +78,11 @@ describe('avatar assets stay cross-platform', () => {
     }
   })
 
-  it('paints hair only in the two canonical tones', () => {
+  it('paints hair only in the canonical tones', () => {
     for (const f of svgsIn(HAIR)) {
       const fills = [...f.body.matchAll(/fill="(rgb\([^)]*\))"/g)].map((m) => m[1])
-      const unexpected = [...new Set(fills)].filter((c) => c !== HAIR_BASE && c !== HAIR_TEXTURE)
+      const allowed = new Set([HAIR_BASE, HAIR_SHADE, HAIR_LIGHT])
+      const unexpected = [...new Set(fills)].filter((c) => !allowed.has(c))
       expect(unexpected, `${f.name} has off-palette fills`).toEqual([])
     }
   })

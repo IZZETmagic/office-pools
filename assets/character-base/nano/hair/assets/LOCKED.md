@@ -26,9 +26,16 @@ An SVG fragment containing only its own paths, in the locked base's coordinate s
 (`viewBox 0 0 2048 2048`). It registers by construction — see `../../extract-hair.py`.
 Compose with `../../compose.py`, which layers it onto any base and applies colour.
 
-Colour is never baked in. Every asset uses two canonical tones:
-`rgb(140,122,110)` base and `rgb(114,97,86)` texture. `compose.py --hair-colour` swaps
-both from one input, deriving the texture tone by darkening.
+Colour is never baked in. Every asset uses three canonical tones: `rgb(140,122,110)` base,
+`rgb(114,97,86)` shade (texture darker than the base) and `rgb(168,150,138)` light (texture
+lighter than the base). `compose.py --hair-colour` derives all three from one input.
+
+Three tones, not two, because some styles trace as a DARK base with LIGHTER texture —
+short-sides does — and collapsing that to one darker "texture" token paints the texture
+darker than the base and erases the detail entirely.
+
+The base mass is identified by AREA, never by path order (Recraft sorts arbitrarily; the
+first hair path is often a swoosh) and never by luminance (short-sides again).
 
 ## The face mask
 

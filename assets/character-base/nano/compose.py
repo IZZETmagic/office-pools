@@ -19,7 +19,8 @@ import sys
 
 # tokens as they appear in the asset and base files
 HAIR_BASE = "rgb(140,122,110)"
-HAIR_TEXTURE = "rgb(114,97,86)"
+HAIR_SHADE = "rgb(114,97,86)"
+HAIR_LIGHT = "rgb(168,150,138)"
 BASE_SKIN = "rgb(254,205,180)"
 BASE_SHADE = "rgb(245,178,150)"
 BASE_SHIRT = "rgb(30,118,214)"
@@ -34,6 +35,10 @@ def hex_to_rgb(h: str) -> tuple[int, int, int]:
 
 def darken(rgb, f: float = 0.78) -> str:
     return "rgb({},{},{})".format(*(max(0, int(c * f)) for c in rgb))
+
+
+def lighten(rgb, f: float = 1.22) -> str:
+    return "rgb({},{},{})".format(*(min(255, int(c * f)) for c in rgb))
 
 
 def rgb_str(rgb) -> str:
@@ -63,7 +68,8 @@ def main() -> None:
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)
         svg = svg.replace(f'fill="{HAIR_BASE}"', f'fill="{rgb_str(rgb)}"')
-        svg = svg.replace(f'fill="{HAIR_TEXTURE}"', f'fill="{darken(rgb)}"')
+        svg = svg.replace(f'fill="{HAIR_SHADE}"', f'fill="{darken(rgb)}"')
+        svg = svg.replace(f'fill="{HAIR_LIGHT}"', f'fill="{lighten(rgb)}"')
     if c := arg("--skin"):
         rgb = hex_to_rgb(c)
         svg = svg.replace(f'fill="{BASE_SKIN}"', f'fill="{rgb_str(rgb)}"')
