@@ -41,6 +41,7 @@ import tempfile
 
 BASE_HEAD_IDX = 5          # in a base written by neck-width.py
 BASE_NOSE_IDX = 6
+BASE_EAR_IDX = (7, 8)      # ear paths in a base written by neck-width.py
 NOSE_POINT = (1024, 1043)  # the nose centre on the locked base, in viewBox units
 
 # Face landmark zones, 1024-space. A hair asset must leave the eyes clear; the brow zone is
@@ -169,10 +170,27 @@ def face_mask(traced: list[str], base_paths: list[str]) -> str:
     # evenodd) leaves black only where face AND head overlap.
     head_d = d_of(base_paths[BASE_HEAD_IDX])
     outside = f'<path d="M0 0 H2048 V2048 H0 Z {head_d}" fill="white" fill-rule="evenodd"/>'
+
+    # The ears stick out PAST the head outline, so the white-outside-the-head pass above
+    # re-permits hair over them — five assets lost their ears that way while their source
+    # PNGs plainly drew them. Re-protect the ears last, but only if the generation actually
+    # drew them: the afro and locs legitimately cover the ears, and their traces have no ear
+    # shapes at all.
+    ears = ""
+    for idx in BASE_EAR_IDX:
+        ex0, ex1 = min(xs_of(base_paths[idx])), max(xs_of(base_paths[idx]))
+        ey0, ey1 = min(ys_of(base_paths[idx])), max(ys_of(base_paths[idx]))
+        drawn = any(min(xs_of(p)) < ex1 and max(xs_of(p)) > ex0
+                    and min(ys_of(p)) < ey1 and max(ys_of(p)) > ey0
+                    and (max(xs_of(p)) - min(xs_of(p))) < 400
+                    for p in face)
+        if drawn:
+            ears += f'<path d="{d_of(base_paths[idx])}" fill="black"/>'
+
     return ('<defs><mask id="facehole" maskUnits="userSpaceOnUse" x="0" y="0" '
             'width="2048" height="2048">'
             '<rect x="0" y="0" width="2048" height="2048" fill="white"/>'
-            f'{shapes}{outside}</mask></defs>')
+            f'{shapes}{outside}{ears}</mask></defs>')
 
 
 def head_jaw_width(traced_path: str) -> int:

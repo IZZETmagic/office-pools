@@ -74,3 +74,13 @@ the holes.
 
 `extract-hair.py` detects it by shape, not colour: path 0 and path 1 both spanning the
 canvas, the first non-white and the second white.
+
+## Ears
+
+The ears stick out PAST the head outline, so the white-outside-the-head pass in the face mask
+re-permits hair over them. Five assets lost their ears that way while their source PNGs plainly
+drew them. The mask now re-protects the ears last — but only when the generation actually drew
+them, tested by looking for an ear-sized shape at the ear position in the trace.
+
+The afro and the locs legitimately cover the ears; their traces contain no ear shapes, so they
+are left covered. Everything else shows ears.
