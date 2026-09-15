@@ -1654,6 +1654,48 @@ has and this does not.
 keying would leave on that seam.
 
 
+## 7f.4 ⭐⭐ You cannot ask for a shorter skull. You can sample for one.
+
+"I need the head a bit shorter to fit hair asset there." Measured before changing
+anything, and **the premise inverted**: skull height ÷ skull width, across all ten
+generations and the source, with skull width taken as the **modal** row width so
+the ears cannot inflate it the way the widest row does.
+
+| | H/W |
+|---|---|
+| `v2-01` — shortest, but it drew a mouth | 1.134 |
+| **`05` — the pick** | **1.147** |
+| the source skull Ryan approved | 1.192 |
+| `02` — tallest | 1.465 |
+
+**05 is already the second-shortest of the ten, and already shorter than the head
+he liked.** Shortening it further would take it past the approved proportion.
+
+⭐⭐ **But the spread is the finding: 1.134 → 1.465, a 29% range, on a prompt that
+never changed.** §7c.1 says the generator will not vary skull structure *on
+request* — measured three times. It does not say the distribution is narrow. So
+the lever for structure is **selection, not instruction**: generate more and keep
+the tail you want. This is the first route to a structural target that has not
+dead-ended.
+
+⚠ **What actually read as "too tall" was the fit, not the skull.** The hair cap was
+scaled 1.064 by head width (§7e.3) and under-covered — skin peeked either side of
+the crown, and a bald crown reads taller than the same skull with hair on it. At
+**scale ≈1.18 the cap covers and the head reads correctly**, with no change to the
+base.
+
+⭐ §7b.6's ban on scaling hair UP does not apply to this art. That ban exists
+because a hairstyle carries the face opening inside its own geometry, so the hole
+grows with the mass. **This hair is a slab with no opening** (6cc49e4) — it is
+drawn over the skull and cropped by the mask — so scaling the cap simply lowers
+the hairline and widens coverage.
+
+**Which is §7c.6 working as designed**: the head is the anchor, and the part
+carries a fit record. Fitting the head to the part is backwards, and it is
+backwards *now* for free and expensively later — nothing is fitted to this base
+yet, so today is the cheapest moment it will ever be to change it.
+
+
 ---
 
 # Part 8 — The gates
