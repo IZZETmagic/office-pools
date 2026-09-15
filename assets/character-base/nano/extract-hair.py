@@ -128,10 +128,21 @@ def face_mask(traced: list[str], base_paths: list[str]) -> str:
     if not (min(xs_of(big)) < nx < max(xs_of(big)) and min(ys_of(big)) < ny < max(ys_of(big))):
         return ""                                  # hair does not cover the face
     shapes = "".join(f'<path d="{d_of(p)}" fill="black"/>' for p in face)
+    # Intersect the hole with the head's actual SHAPE. The traced "face" is not reliably
+    # just the face: on the long-hair trace it came back FUSED with the shoulder region,
+    # spanning the full canvas below y423. Unbounded, it masked 26,856px of legitimate hair
+    # — the gaps either side of the neck. Bounding it to the head's bounding BOX still lost
+    # 5,733px, because the head narrows toward the chin and hair fills the space beside the
+    # jaw. Only the head's outline is precise enough.
+    #
+    # Painting white over everything OUTSIDE the head path (full-canvas rect + head path,
+    # evenodd) leaves black only where face AND head overlap.
+    head_d = d_of(base_paths[BASE_HEAD_IDX])
+    outside = f'<path d="M0 0 H2048 V2048 H0 Z {head_d}" fill="white" fill-rule="evenodd"/>'
     return ('<defs><mask id="facehole" maskUnits="userSpaceOnUse" x="0" y="0" '
             'width="2048" height="2048">'
             '<rect x="0" y="0" width="2048" height="2048" fill="white"/>'
-            f'{shapes}</mask></defs>')
+            f'{shapes}{outside}</mask></defs>')
 
 
 def head_jaw_width(traced_path: str) -> int:
