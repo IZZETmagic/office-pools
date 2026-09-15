@@ -1,0 +1,59 @@
+{
+  "_comment": "Face landmark zones on the locked base, 1024-space (halve for viewBox units). `placement` is the MEDIAN across the generated avatar set \u2014 where a feature is drawn. `observed` is the envelope, i.e. the full range seen; it is informational. Checks use `placement`: the envelope's corners fall on the temples, where hair legitimately sits, so checking against it fails styles that are perfectly fine.",
+  "space": "1024x1024",
+  "measured_from": "assets/character-base/nano/set/*.png",
+  "eye": {
+    "placement": {
+      "x0": 349,
+      "x1": 673,
+      "y0": 363,
+      "y1": 540
+    },
+    "observed": {
+      "x0": 324,
+      "x1": 699,
+      "y0": 331,
+      "y1": 564
+    },
+    "samples": 10
+  },
+  "brow": {
+    "placement": {
+      "x0": 336,
+      "x1": 686,
+      "y0": 258,
+      "y1": 350
+    },
+    "observed": {
+      "x0": 309,
+      "x1": 713,
+      "y0": 230,
+      "y1": 373
+    },
+    "samples": 7
+  },
+  "mouth": {
+    "placement": {
+      "x0": 421,
+      "x1": 602,
+      "y0": 623,
+      "y1": 651
+    },
+    "observed": {
+      "x0": 362,
+      "x1": 661,
+      "y0": 586,
+      "y1": 754
+    },
+    "samples": 9
+  },
+  "nose": {
+    "placement": {
+      "x0": 482,
+      "x1": 542,
+      "y0": 477,
+      "y1": 565
+    },
+    "samples": "locked base"
+  }
+}

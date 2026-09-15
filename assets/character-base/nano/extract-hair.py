@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pillow", "numpy"]
+# ///
 """Extract a reusable hair asset from a traced avatar.
 
     uv run extract-hair.py traced.svg bases/base-neck-100.svg out.asset.svg   # asset
@@ -29,12 +33,21 @@ then hides anything sitting inside the head outline — which silently ate the u
 sideburns (6,786px). The test is whether the largest hair path actually covers the nose.
 Only a solid-blob trace does. Measured across six styles, the afro was the only one.
 """
+import json
 import re
+import subprocess
 import sys
+import tempfile
 
 BASE_HEAD_IDX = 5          # in a base written by neck-width.py
 BASE_NOSE_IDX = 6
 NOSE_POINT = (1024, 1043)  # the nose centre on the locked base, in viewBox units
+
+# Face landmark zones, 1024-space. A hair asset must leave the eyes clear; the brow zone is
+# advisory, because a low fringe legitimately encroaches and that is a design call, not a bug.
+LANDMARKS = json.load(open(__file__.rsplit("/", 1)[0] + "/landmarks.json"))
+EYE_CLEAR_MIN = 0.97     # fraction of the eye zone that must not be hair
+BROW_BAND_MIN = 20       # px between the hairline and the eyes for a slim brow
 
 # every colour the locked base uses; anything else in a trace is hair
 BASE_COLOURS = [(254, 205, 180), (245, 178, 150), (255, 255, 255),
@@ -43,6 +56,8 @@ BASE_COLOURS = [(254, 205, 180), (245, 178, 150), (255, 255, 255),
 # canonical hair tones — every asset uses these two, so one recolour rule fits all
 HAIR_BASE = "rgb(140,122,110)"
 HAIR_TEXTURE = "rgb(114,97,86)"
+
+CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 SVG_OPEN = ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '
             'viewBox="0 0 2048 2048" width="1024" height="1024">')
@@ -114,6 +129,46 @@ def face_mask(traced: list[str], base_paths: list[str]) -> str:
             f'{shapes}</mask></defs>')
 
 
+def check_landmarks(hair: list[str], mask: str) -> None:
+    """Render the hair alone and measure how much of each landmark zone it covers.
+
+    Rasterising is the only honest way to do this — a path's bounding box says nothing about
+    whether its actual outline crosses a zone. A fringe's box may span the whole forehead
+    while the hair itself clears the brows entirely.
+    """
+    # Measure what the asset ACTUALLY paints, mask included — the afro's raw blob covers
+    # the whole face and is only made correct by its mask.
+    body = "".join(hair)
+    svg = SVG_OPEN + mask + (f'<g mask="url(#facehole)">{body}</g>' if mask else body) + "</svg>"
+    with tempfile.TemporaryDirectory() as tmp:
+        open(f"{tmp}/h.svg", "w").write(svg)
+        subprocess.run([CHROME, "--headless", "--disable-gpu", "--hide-scrollbars",
+                        f"--screenshot={tmp}/h.png", "--window-size=1024,1024",
+                        f"file://{tmp}/h.svg"], capture_output=True)
+        from PIL import Image
+        import numpy as np
+        im = np.asarray(Image.open(f"{tmp}/h.png").convert("RGB")).astype(int)
+        covered = im.sum(axis=2) < 740          # anything drawn; the rest is white canvas
+    eye = LANDMARKS["eye"]["placement"]
+    brow = LANDMARKS["brow"]["placement"]
+
+    clear = 1 - covered[eye["y0"]:eye["y1"], eye["x0"]:eye["x1"]].mean()
+    if clear < EYE_CLEAR_MIN:
+        sys.exit(f"hair covers {(1-clear)*100:.0f}% of the eye zone — only {clear*100:.0f}% "
+                 f"clear, needs {EYE_CLEAR_MIN*100:.0f}%")
+
+    # How far down does hair reach across the brow span? The gap between that and the top of
+    # the eyes is the band a brow has to live in. A percentage here is useless — what a
+    # designer needs is "you have N pixels".
+    strip = covered[:, brow["x0"]:brow["x1"]]
+    dense = [y for y in range(strip.shape[0]) if strip[y].mean() > 0.35]
+    low = max(dense) if dense else 0
+    band = eye["y0"] - low
+    flag = "⚠ " if band < BROW_BAND_MIN else ""
+    print(f"  eye zone {clear*100:.0f}% clear | {flag}brow band {band}px "
+          f"(hair reaches y{low}, eyes start y{eye['y0']})")
+
+
 def normalise(hair: list[str]) -> str:
     base_tone = fill_of(hair[0])
     out = []
@@ -150,6 +205,7 @@ def main() -> None:
                      f"{abs(got-want)/want*100:.0f}% — regenerate holding the head size")
 
     mask = face_mask(traced, base_paths)
+    check_landmarks(hair, mask)
     body = normalise(hair)
     payload = mask + (f'<g mask="url(#facehole)">{body}</g>' if mask else body)
 
