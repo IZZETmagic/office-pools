@@ -26,7 +26,7 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f04-longcurly.asset.svg` | 7 | INVERTED trace; 119px brow band |
 | `hair-f05-pixie.asset.svg` | 6 | unmasked; 60px brow band |
 | `hair-f06-spacebuns.asset.svg` | 12 | ⚠ 13px brow band |
-| `hair-f07-braids.asset.svg` | 13 | ⚠ 1px brow band; eye check OVERRIDDEN at 96% |
+| `hair-f07-braids.asset.svg` | 24 | 23px brow band; passes all checks |
 
 ## What an asset is
 
@@ -89,13 +89,11 @@ them, tested by looking for an ear-sized shape at the ear position in the trace.
 The afro and the locs legitimately cover the ears; their traces contain no ear shapes, so they
 are left covered. Everything else shows ears.
 
-## Deliberate overrides
+## Styles that cannot carry eyebrows as drawn
 
-`hair-f07-braids` was extracted with `--allow-tight`. It measures 96% eye-zone clearance
-against a 97% threshold: its hair edge just touches the top of the eye box, which is the same
-fact as its 1px brow band. Ryan chose it over a compliant retry whose shorter braids lost the
-silhouette that makes the style distinct. The check still runs and still reports; the override
-is explicit and recorded here.
+`f01-bob` (10px), `f06-spacebuns` (13px), `m02-sidepart` (9px), `m07-curls` (13px),
+`m09-afro` (17px). Five of twenty-two. This constrains what the brow slot can assume.
 
-Styles that cannot carry eyebrows as drawn: `f01-bob` (10px), `f07-braids` (1px),
-`f06-spacebuns` (13px), `m02-sidepart` (9px), `m07-curls` (13px), `m09-afro` (17px).
+`--allow-tight` exists in `extract-hair.py` for a deliberate override of the eye-zone check.
+Nothing currently uses it: `f07-braids` needed it until the style was regenerated as two
+separate ropes, which fixed the clearance as a side effect.
