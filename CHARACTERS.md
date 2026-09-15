@@ -1554,6 +1554,73 @@ ranging over before believing it.
 
 ---
 
+# Part 7f — The base of an existing style, two ways
+
+Asked of `avatar-styles-anchored/1-capsule-square.svg`: keep every other shape,
+remove hair, eyes, brows and mouth, keep nose and ears.
+
+## 7f.1 The decomposition — free, exact, and already in the file
+
+⭐ **§7e held on this art too.** 13 paths in, 5 out: canvas, skin mass, the two
+blue paths, nose. `base ∪ parts` reassembles the source **byte-for-byte**, so the
+cut is provably lossless. `scripts/split-avatar-base.mjs`, guarded on fill and
+bounding box so a regenerated source fails loudly instead of cutting the wrong
+shape. Output in `assets/avatar-base-capsule/`.
+
+⚠⚠ **Recraft was NOT used, and could not have been.** The brief's own words —
+"keep all the other shapes the same" — are the one thing `imageToImage` cannot do
+(99d3d08: at strength 0.15 nothing changes, by 0.30 the face disintegrates;
+preservation and edit are the same dial). Deletion preserves exactly. **When the
+ask is removal, the tool is a text editor, not a generator.**
+
+🔴 **There were no ears to keep.** The style never drew them — the hair covered
+the temples, so the skull under it has dead-straight sides. Not a defect in the
+cut; a fact about the source. Nose kept: it is a real path.
+
+⭐ **The head silhouette is the negative space of the two blue paths** (3dc92ff).
+They are background and mask at once. Good: the identity recolour is a two-fill
+swap and the mask can never mismatch the backdrop — the disc problem solved
+differently to 2cf6ff2's chroma key. Bad: the figure has no independent
+silhouette and cannot be lifted off its disc.
+
+⚠ 21KB per file, of which **3.7KB is drawing** — the rest is the C2PA provenance
+block. Keep it in the working assets, strip it at ship time.
+
+## 7f.2 The generation — Ryan's call, and what ten of them measured
+
+Ryan chose a fresh generation with ears over the earless cut, told that §7c.1
+means a new skull rather than this one with ears added.
+`scripts/gen-avatar-base-eared.mjs`, 10 generations + 1 style, **505 API units
+($0.51)**, balance 1,408 → 903.
+
+⚠ **The source's `style_id` was lost.** `gen-avatar-styles.mjs` mints a fresh
+style on every `--anchored` run and only ever printed the id. Rebuilt from the
+same three approved bases → `452cd2a5-212d-4703-a912-abf2104c8790`, and **written
+to `manifest.json` this time**. A style costs 5 units; losing the id costs the
+whole look.
+
+⭐ **The construction came back identical to the source** — 5 paths, canvas +
+skin mass + two blue mask halves + nose, on all three clean results. So these
+recolour and decompose exactly as §7f.1's base does.
+
+🔴 **Negation does not bind. 2 of 10 drew a mouth** — and the second one did it
+*after* "Absolutely no mouth line and no mouth mark of any kind" was added. The
+reinforcement did not help. Budget for negated features failing at roughly the
+§7e.6 degenerate rate and filter on output; do not expect a stronger prompt to fix
+it.
+
+🔴 **The square jaw never arrived, in any of the ten.** "Heavy wide square jaw,
+straight jawline, broad flat chin" produced capsules and eggs every time. §7c.1 on
+a third axis, now measured rather than inferred.
+
+⚠ **The shirt-colour omission from 2cf6ff2 was repeated, by me.** With no colour
+named the top came back orange, yellow, and once in the disc's own blue. Naming it
+white fixed those and produced a new failure — one top came back as bare skin.
+**Every unnamed attribute is a free variable, and the fix for one is not free.**
+
+
+---
+
 # Part 8 — The gates
 
 ## 8.1 The disclosure gate

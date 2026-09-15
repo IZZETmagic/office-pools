@@ -1,0 +1,64 @@
+{
+  "style_id": "452cd2a5-212d-4703-a912-abf2104c8790",
+  "style_refs": [
+    "B-S1-roundsquare-primary",
+    "B-S2-oval-primary",
+    "B-S4-squarejaw-primary"
+  ],
+  "prompt": "Avatar portrait: head, neck and shoulders only, facing forward, centred. Cut off flat at the bottom of the shoulders. No arms, no hands, no torso below the shoulders. Oversized head, narrow neck, shoulders about one and a half head-widths wide. Plain sports top: no logo, no crest, no badge, no text, no numbers. Round flat background in SportPool blue #3B6EFF. Flat colour, no gradient, no scene. Reads clearly at 24 pixels. Completely bald with no hair at all. Completely blank face with NO eyes, NO eyebrows, NO mouth. Simple nose and ears must be present, both ears clearly visible, one on each side of the head. Heavy wide square jaw, straight jawline, broad flat chin. Built only from capsules, circles and rounded bars — every shape is a pill or a disc, nothing has a sharp corner anywhere. Flat solid fills, no outlines. Precise and geometric but warm.",
+  "generated": [
+    {
+      "name": "base-square-01",
+      "paths": 5,
+      "fills": 4
+    },
+    {
+      "name": "base-square-01",
+      "paths": 6,
+      "fills": 4
+    },
+    {
+      "name": "base-square-02",
+      "paths": 6,
+      "fills": 5
+    },
+    {
+      "name": "base-square-03",
+      "paths": 6,
+      "fills": 5
+    },
+    {
+      "name": "base-square-04",
+      "paths": 6,
+      "fills": 5
+    },
+    {
+      "name": "base-square-05",
+      "paths": 5,
+      "fills": 4
+    },
+    {
+      "name": "base-square-06",
+      "paths": 8,
+      "fills": 5
+    },
+    {
+      "name": "base-square-v2-01",
+      "paths": 6,
+      "fills": 5,
+      "prompt": "Avatar portrait: head, neck and shoulders only, facing forward, centred. Cut off flat at the bottom of the shoulders. No arms, no hands, no torso below the shoulders. Oversized head, narrow neck, shoulders about one and a half head-widths wide. Plain sports top: no logo, no crest, no badge, no text, no numbers. Round flat background in SportPool blue #3B6EFF. Flat colour, no gradient, no scene. Reads clearly at 24 pixels. Completely bald with no hair at all. Completely blank face with NO eyes, NO eyebrows, NO mouth. Simple nose and ears must be present, both ears clearly visible, one on each side of the head. Heavy wide square jaw, straight jawline, broad flat chin. Built only from capsules, circles and rounded bars — every shape is a pill or a disc, nothing has a sharp corner anywhere. Flat solid fills, no outlines. Precise and geometric but warm. The sports top is plain solid white with a simple crew collar — never orange, never yellow, and never the same blue as the background. Absolutely no mouth line and no mouth mark of any kind."
+    },
+    {
+      "name": "base-square-v2-02",
+      "paths": 5,
+      "fills": 4,
+      "prompt": "Avatar portrait: head, neck and shoulders only, facing forward, centred. Cut off flat at the bottom of the shoulders. No arms, no hands, no torso below the shoulders. Oversized head, narrow neck, shoulders about one and a half head-widths wide. Plain sports top: no logo, no crest, no badge, no text, no numbers. Round flat background in SportPool blue #3B6EFF. Flat colour, no gradient, no scene. Reads clearly at 24 pixels. Completely bald with no hair at all. Completely blank face with NO eyes, NO eyebrows, NO mouth. Simple nose and ears must be present, both ears clearly visible, one on each side of the head. Heavy wide square jaw, straight jawline, broad flat chin. Built only from capsules, circles and rounded bars — every shape is a pill or a disc, nothing has a sharp corner anywhere. Flat solid fills, no outlines. Precise and geometric but warm. The sports top is plain solid white with a simple crew collar — never orange, never yellow, and never the same blue as the background. Absolutely no mouth line and no mouth mark of any kind."
+    },
+    {
+      "name": "base-square-v2-03",
+      "paths": 6,
+      "fills": 4,
+      "prompt": "Avatar portrait: head, neck and shoulders only, facing forward, centred. Cut off flat at the bottom of the shoulders. No arms, no hands, no torso below the shoulders. Oversized head, narrow neck, shoulders about one and a half head-widths wide. Plain sports top: no logo, no crest, no badge, no text, no numbers. Round flat background in SportPool blue #3B6EFF. Flat colour, no gradient, no scene. Reads clearly at 24 pixels. Completely bald with no hair at all. Completely blank face with NO eyes, NO eyebrows, NO mouth. Simple nose and ears must be present, both ears clearly visible, one on each side of the head. Heavy wide square jaw, straight jawline, broad flat chin. Built only from capsules, circles and rounded bars — every shape is a pill or a disc, nothing has a sharp corner anywhere. Flat solid fills, no outlines. Precise and geometric but warm. The sports top is plain solid white with a simple crew collar — never orange, never yellow, and never the same blue as the background. Absolutely no mouth line and no mouth mark of any kind."
+    }
+  ]
+}
