@@ -52,6 +52,11 @@ def d_of(path: str) -> str:
     return re.search(r'd="([^"]*)"', path).group(1)
 
 
+def xs_of(path: str) -> list[float]:
+    n = [float(x) for x in re.findall(r"-?\d+\.?\d*", d_of(path))]
+    return n[0::2]
+
+
 def ys_of(path: str) -> list[float]:
     n = [float(x) for x in re.findall(r"-?\d+\.?\d*", d_of(path))]
     return n[1::2]
@@ -122,6 +127,20 @@ def main() -> None:
     hair = find_hair(traced)
     if not hair:
         sys.exit("no hair paths found — has the trace layout changed?")
+
+    # Conformance: the generation must have kept the base's head size. Nano Banana
+    # shrinks the skull to make room for big hair — the afro came back 31% narrower
+    # (712 vs 1032) and the mask faithfully carried that smaller face across, producing
+    # a visibly shrunken head. Catch it here instead of by eye three steps later.
+    skin = fill_of(base_paths[BASE_HEAD_IDX])
+    faces = [p for p in traced if close(fill_of(p), skin, 24)]
+    if faces:
+        widest = max(faces, key=lambda p: max(xs_of(p)) - min(xs_of(p)))
+        got = max(xs_of(widest)) - min(xs_of(widest))
+        want = max(xs_of(base_paths[BASE_HEAD_IDX])) - min(xs_of(base_paths[BASE_HEAD_IDX]))
+        if abs(got - want) / want > 0.05:
+            sys.exit(f"head width {got:.0f} differs from the base's {want:.0f} by "
+                     f"{abs(got-want)/want*100:.0f}% — regenerate holding the head size")
 
     mask = face_mask(traced, base_paths)
     body = normalise(hair)
