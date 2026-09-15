@@ -20,6 +20,9 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-m13-manbun.asset.svg` | 10 | bun sits above the crown |
 | `hair-m14-longhair.asset.svg` | 10 | masked; first style with length past the jaw |
 | `hair-m15-locs.asset.svg` | 12 | INVERTED trace — see below |
+| `hair-f01-bob.asset.svg` | 10 | masked; ⚠ 10px brow band — cannot carry brows |
+| `hair-f02-ponytail.asset.svg` | 7 | masked; 124px brow band |
+| `hair-f03-bobswept.asset.svg` | 9 | masked; 129px brow band |
 
 ## What an asset is
 
