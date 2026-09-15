@@ -41,6 +41,7 @@ yarn-error.log*
 # directory, so a negation inside it would never match.
 .claude/*
 !.claude/agents/
+!.claude/skills/
 
 # operational send ledgers — contain real recipient email addresses, never commit
 scripts/.followup_send_ledger.jsonl
