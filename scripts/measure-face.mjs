@@ -80,7 +80,10 @@ export function measureFace(file) {
   return { w: face.w, h: face.h, ratio: face.w / face.h, eyeScore: best }
 }
 
-if (process.argv[2]) {
+// ⚠ Guarded: this module is imported by measure-base.mjs, and an unguarded CLI
+// block ran on import and tried to read that script's directory argument.
+const runDirectly = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop())
+if (runDirectly && process.argv[2]) {
   for (const f of process.argv.slice(2)) {
     const r = measureFace(f)
     console.log(r.error ? `${f.split('/').pop().padEnd(26)} ✗ ${r.error}`
