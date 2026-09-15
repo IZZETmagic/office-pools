@@ -1619,6 +1619,41 @@ white fixed those and produced a new failure — one top came back as bare skin.
 **Every unnamed attribute is a free variable, and the fix for one is not free.**
 
 
+## 7f.3 ⭐ The pick, and what the chroma key cost
+
+Ryan picked **`base-square-05`**, then: drop the blue circle, flood the frame
+green. Pure fill swap — `scripts/chroma-base.mjs`, canvas + both ground halves →
+`rgb(0,170,102)`, the green base3's own generation returned, reused so the key is
+one value across every base we hold.
+
+⚠⚠ **The shoulders were the background, not a shirt.** Proved by repainting the
+canvas magenta — the white "top" went magenta with it. This style draws **no shirt
+path at all**; the top is canvas showing through a gap in the mask, in the
+1-capsule-square source too. So flooding the frame green floods the shirt, and the
+delivered base ends at the neck. 2cf6ff2 said a chroma key only works if it is the
+one colour nothing else shares; here the background and the shirt *are the same
+shape*, so no naming discipline could have saved it.
+
+⭐ **Arguably the right shape anyway.** §5.4 makes the kit a cosmetic layer, and a
+base ending at the neck lets the kit be a part instead of being baked into the
+head. The alternative — a base with shoulders on green — needs the shirt named as
+its own colour at generation time, which is exactly what base3's prompt did and
+ours did not.
+
+⚠ **A 1px skin-coloured ghost traces the old disc edge.** The canvas and the two
+ground halves now share a fill but are still separate shapes, and the skin disc
+sits under the seam between them: **0.51% of a 1024px render**, one pixel wide.
+Invisible at 24–64px, faintly visible on a share card. It cannot be fixed by
+paint — stroking the ground paths to close it would eat 1px off the head
+silhouette, because that silhouette IS their inner edge. The clean fix is a
+generation with the green baked in as one background shape, which is what base3
+has and this does not.
+
+⭐ **Key by swapping the fill, not by raster keying.** These are vectors: replacing
+`rgb(0,170,102)` is exact and free, and sidesteps the halo that exact-colour raster
+keying would leave on that seam.
+
+
 ---
 
 # Part 8 — The gates
