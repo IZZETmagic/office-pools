@@ -9,6 +9,8 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-m01-buzz.asset.svg` | 4 | face mask |
 | `hair-m02-sidepart.asset.svg` | 4 | two base shapes — the parting splits the mass |
 | `hair-m03-quiff.asset.svg` | 5 | face mask |
+| `hair-m05-undercut.asset.svg` | 9 | 3 base shapes — top mass plus both shaved sides |
+| `hair-m07-curls.asset.svg` | 6 | scalloped silhouette |
 | `hair-m09-afro.asset.svg` | 7 | face mask; covers the ears |
 
 ## What an asset is
