@@ -22,6 +22,16 @@ generation left 1px and had to be rejected; the side-part left 9px and cannot ca
 **4. Texture is a second flat tone, with blunt tips.** Recraft's vectorizer rounds off fine
 tapered points, so a swoosh ending in a sharp tip loses it in conversion.
 
+**5. Trace texture in a SECOND pass.** The vectorizer simplifies thin shapes sitting inside a
+much larger one — short-sides kept only 52% of its texture area in a single pass. Isolating
+the texture tone and tracing it alone recovers 95-100%. Across the fourteen men's assets this
+took retention from a measured average to **99%**. Costs 10 extra units per asset. See
+`isolate-texture.py` and `extract-hair.py --texture`.
+
+Do NOT solve this by making the texture chunkier in generation. That was tried: it works
+(100% retention) but produces a visibly different, flatter haircut. Ryan rejected that
+direction — keep the art, fix the trace.
+
 ## Generating
 
 ```sh

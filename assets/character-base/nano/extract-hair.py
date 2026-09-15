@@ -224,8 +224,42 @@ def normalise(hair: list[str], areas: dict) -> str:
     return "".join(out)
 
 
+def merge_texture(hair: list[str], areas: dict, texture_trace: str) -> str:
+    """Replace the traced texture with a second, dedicated trace of the same tone.
+
+    Recraft simplifies thin shapes sitting inside a much larger one: short-sides kept only
+    52% of its texture area, and the buzz lost the tips of its swooshes the same way.
+    Tracing the texture ALONE recovers 95%.
+
+    Both passes come from the same PNG at the same canvas size, so the paths register with no
+    transform. Nothing is drawn by hand — it is the same source art traced twice, once per
+    tone.
+    """
+    base_tone = max(areas, key=lambda c: areas[c])
+    kept = [p for p in hair if close(fill_of(p), base_tone, tol=8)]
+
+    others = [c for c in areas if not close(c, base_tone, tol=8)]
+    token = HAIR_SHADE if (others and lum(others[0]) < lum(base_tone)) else HAIR_LIGHT
+
+    tex = [p for p in paths_of(open(texture_trace).read())
+           if close(fill_of(p), (61, 51, 48), tol=25)]
+    if not tex:
+        print("  ⚠ texture trace had no usable shapes — keeping the single-pass texture")
+        return normalise(hair, areas)
+
+    out = "".join(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{HAIR_BASE}"', p) for p in kept)
+    out += "".join(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{token}"', p) for p in tex)
+    print(f"  two-pass: {len(kept)} base + {len(tex)} texture (was {len(hair)-len(kept)})")
+    return out
+
+
 def main() -> None:
+    flags = {a for a in sys.argv[1:] if a.startswith("--")}
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    texture_trace = None
+    if "--texture" in sys.argv:
+        texture_trace = sys.argv[sys.argv.index("--texture") + 1]
+        args = [a for a in args if a != texture_trace]
     traced_path, base_path, dst = args
 
     base_svg = open(base_path).read()
@@ -252,6 +286,8 @@ def main() -> None:
     mask = face_mask(traced, base_paths)
     areas = check_landmarks(hair, mask)
     body = normalise(hair, areas)
+    if texture_trace:
+        body = merge_texture(hair, areas, texture_trace)
     payload = mask + (f'<g mask="url(#facehole)">{body}</g>' if mask else body)
 
     if dst.endswith(".asset.svg"):
@@ -259,8 +295,8 @@ def main() -> None:
     else:
         open(dst, "w").write(base_svg.replace("</svg>", payload + "</svg>"))
 
-    n_sh, n_li = body.count(HAIR_SHADE), body.count(HAIR_LIGHT)
-    print(f"{dst}: {len(hair)} paths ({len(hair)-n_sh-n_li} base + {n_sh} shade + {n_li} light)"
+    n_sh, n_li, n_ba = body.count(HAIR_SHADE), body.count(HAIR_LIGHT), body.count(HAIR_BASE)
+    print(f"{dst}: {n_ba+n_sh+n_li} paths ({n_ba} base + {n_sh} shade + {n_li} light)"
           f"{' | face mask' if mask else ''}")
 
 
