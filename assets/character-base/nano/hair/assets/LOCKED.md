@@ -18,7 +18,8 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-m11-receding.asset.svg` | 4 | 104px brow band — the roomiest |
 | `hair-m12-shortsides.asset.svg` | 6 | 59px brow band |
 | `hair-m13-manbun.asset.svg` | 10 | bun sits above the crown |
-| `hair-m14-longhair.asset.svg` | 9 | masked; first style with length past the jaw |
+| `hair-m14-longhair.asset.svg` | 10 | masked; first style with length past the jaw |
+| `hair-m15-locs.asset.svg` | 12 | INVERTED trace — see below |
 
 ## What an asset is
 
@@ -55,3 +56,18 @@ drops the mask and paints its black silhouette onto the face.
 ```sh
 shasum -a 256 -c LOCKED.sha256
 ```
+
+## The inverted trace (locs)
+
+On a very hair-dominant image Recraft can invert the layering: it floods the canvas with the
+hair colour, then paints a canvas-sized WHITE path over it with the hair silhouette cut out as
+holes. The hair is NEGATIVE SPACE, not a shape.
+
+Colour-based selection cannot see this — the "hair" is a full-canvas rectangle, and the
+silhouette lives in a path that looks like background. Extracting it means using the white
+path AS the mask, then punching out everything the base draws (face, nose, neck, shadow and
+the shirt), because all of that is painted after the white path and therefore falls inside
+the holes.
+
+`extract-hair.py` detects it by shape, not colour: path 0 and path 1 both spanning the
+canvas, the first non-white and the second white.

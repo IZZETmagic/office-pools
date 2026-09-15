@@ -109,8 +109,38 @@ def find_hair(traced: list[str]) -> list[str]:
         r, _g, bl = c
         if bl > r + 20:          # blue-ish => shirt fold shading, not hair
             continue
+        # A path covering the whole canvas is the background, never hair. The locs image is
+        # so hair-dominated that Recraft laid down a BROWN canvas first — rgb(126,108,95),
+        # not white — and painted everything on top. Colour alone cannot tell that apart
+        # from a big hair mass.
+        xs, ys = xs_of(p), ys_of(p)
+        span = (max(xs) - min(xs)) * (max(ys) - min(ys)) / (2048 * 2048)
+        if span > 0.80:
+            continue
         out.append(p)
     return out
+
+
+def inverted_trace(traced: list[str]):
+    """Detect a trace where the hair is NEGATIVE SPACE, and return (hair_path, white_path).
+
+    On a very hair-dominant image Recraft can invert the layering: it floods the canvas with
+    the hair colour, then paints a canvas-sized WHITE path over it with the hair silhouette
+    cut out as holes. The locs traced this way. Colour-based selection cannot see it — the
+    "hair" is a full-canvas rectangle and the shape lives in a path being discarded as
+    background.
+    """
+    if len(traced) < 2:
+        return None
+    first, second = traced[0], traced[1]
+    def full(p):
+        xs, ys = xs_of(p), ys_of(p)
+        return (max(xs) - min(xs)) > 2000 and (max(ys) - min(ys)) > 2000
+    c0, c1 = fill_of(first), fill_of(second)
+    if full(first) and full(second) and c0 and c1 and not close(c0, (255, 255, 255), 24) \
+            and close(c1, (255, 255, 255), 24):
+        return first, second
+    return None
 
 
 def face_mask(traced: list[str], base_paths: list[str]) -> str:
@@ -265,6 +295,33 @@ def main() -> None:
     base_svg = open(base_path).read()
     base_paths = paths_of(base_svg)
     traced = paths_of(open(traced_path).read())
+
+    inv = inverted_trace(traced)
+    if inv:
+        base_shape, white = inv
+        texture = [p for p in find_hair(traced) if p is not base_shape]
+        # Two things must be punched out of the flood-filled hair: the background (the white
+        # path, whose holes ARE the hair silhouette) and the face — the white path's holes
+        # include the face region, because the face is painted after it in the trace.
+        # Everything the base itself draws — face, nose, neck, shadow AND the shirt — is
+        # painted after the white path, so all of it falls inside the silhouette holes and
+        # must be punched out too. Anything base-coloured except white.
+        wanted = [c for c in BASE_COLOURS if not close(c, (255, 255, 255), 24)]
+        faces = [p for p in traced if any(close(fill_of(p), c, 24) for c in wanted)]
+        holes = f'<path d="{d_of(white)}" fill="black"/>'
+        holes += "".join(f'<path d="{d_of(p)}" fill="black"/>' for p in faces)
+        mask = ('<defs><mask id="facehole" maskUnits="userSpaceOnUse" x="0" y="0" '
+                'width="2048" height="2048">'
+                '<rect x="0" y="0" width="2048" height="2048" fill="white"/>'
+                f'{holes}</mask></defs>')
+        body = re.sub(r'fill="rgb\([^)]*\)"', f'fill="{HAIR_BASE}"', base_shape)
+        body += "".join(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{HAIR_SHADE}"', p) for p in texture)
+        payload = mask + f'<g mask="url(#facehole)">{body}</g>'
+        out = SVG_OPEN + payload + "</svg>" if dst.endswith(".asset.svg") \
+            else base_svg.replace("</svg>", payload + "</svg>")
+        open(dst, "w").write(out)
+        print(f"{dst}: inverted trace — 1 base + {len(texture)} texture, silhouette from the white path")
+        return
 
     hair = find_hair(traced)
     if not hair:
