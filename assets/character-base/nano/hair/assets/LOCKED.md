@@ -23,6 +23,8 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f01-bob.asset.svg` | 10 | masked; ⚠ 10px brow band — cannot carry brows |
 | `hair-f02-ponytail.asset.svg` | 7 | masked; 124px brow band |
 | `hair-f03-bobswept.asset.svg` | 9 | masked; 129px brow band |
+| `hair-f04-longcurly.asset.svg` | 7 | INVERTED trace; 119px brow band |
+| `hair-f05-pixie.asset.svg` | 6 | unmasked; 60px brow band |
 
 ## What an asset is
 
