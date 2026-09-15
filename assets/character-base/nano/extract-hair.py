@@ -46,6 +46,8 @@ NOSE_POINT = (1024, 1043)  # the nose centre on the locked base, in viewBox unit
 # Face landmark zones, 1024-space. A hair asset must leave the eyes clear; the brow zone is
 # advisory, because a low fringe legitimately encroaches and that is a design call, not a bug.
 LANDMARKS = json.load(open(__file__.rsplit("/", 1)[0] + "/landmarks.json"))
+JAW_ROW = 620            # 1024-space row that crosses the jaw, clear of hair on every style
+JAW_WIDTH_BASE = 500     # the locked base measured at that row
 EYE_CLEAR_MIN = 0.97     # fraction of the eye zone that must not be hair
 BROW_BAND_MIN = 20       # px between the hairline and the eyes for a slim brow
 
@@ -129,6 +131,18 @@ def face_mask(traced: list[str], base_paths: list[str]) -> str:
             f'{shapes}</mask></defs>')
 
 
+def head_jaw_width(traced_path: str) -> int:
+    """Rasterise a traced avatar and measure the skin run across the jaw row."""
+    from PIL import Image
+    import numpy as np
+    with tempfile.TemporaryDirectory() as t:
+        subprocess.run([CHROME, "--headless", "--disable-gpu", "--hide-scrollbars",
+                        f"--screenshot={t}/t.png", "--window-size=1024,1024",
+                        f"file://{traced_path}"], capture_output=True)
+        im = np.asarray(Image.open(f"{t}/t.png").convert("RGB")).astype(int)
+    return int((np.abs(im - np.array(BASE_COLOURS[0])).sum(axis=2) < 40).sum(axis=1)[JAW_ROW])
+
+
 def check_landmarks(hair: list[str], mask: str) -> None:
     """Render the hair alone and measure how much of each landmark zone it covers.
 
@@ -190,19 +204,18 @@ def main() -> None:
     if not hair:
         sys.exit("no hair paths found — has the trace layout changed?")
 
-    # Conformance: the generation must have kept the base's head size. Nano Banana
-    # shrinks the skull to make room for big hair — the afro came back 31% narrower
-    # (712 vs 1032) and the mask faithfully carried that smaller face across, producing
-    # a visibly shrunken head. Catch it here instead of by eye three steps later.
-    skin = fill_of(base_paths[BASE_HEAD_IDX])
-    faces = [p for p in traced if close(fill_of(p), skin, 24)]
-    if faces:
-        widest = max(faces, key=lambda p: max(xs_of(p)) - min(xs_of(p)))
-        got = max(xs_of(widest)) - min(xs_of(widest))
-        want = max(xs_of(base_paths[BASE_HEAD_IDX])) - min(xs_of(base_paths[BASE_HEAD_IDX]))
-        if abs(got - want) / want > 0.05:
-            sys.exit(f"head width {got:.0f} differs from the base's {want:.0f} by "
-                     f"{abs(got-want)/want*100:.0f}% — regenerate holding the head size")
+    # Conformance: the generation must have kept the base's head size. Nano Banana shrinks
+    # the skull to make room for big hair — the first afro came back 31% narrower, and both
+    # face-framing styles (long hair, locs) came back 26-32% narrower.
+    #
+    # Measured by rasterising and taking the skin run across the JAW ROW, not by picking the
+    # widest skin path: on the long-hair trace the widest skin path was the face merged with
+    # the shoulder region, 1363px, and the check rejected a perfectly conforming generation.
+    jaw = head_jaw_width(traced_path)
+    want = JAW_WIDTH_BASE
+    if abs(jaw - want) / want > 0.05:
+        sys.exit(f"jaw width {jaw} differs from the base's {want} by "
+                 f"{abs(jaw-want)/want*100:.0f}% — regenerate holding the head size")
 
     mask = face_mask(traced, base_paths)
     check_landmarks(hair, mask)

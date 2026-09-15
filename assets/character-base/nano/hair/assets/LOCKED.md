@@ -13,7 +13,12 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-m06-slickback.asset.svg` | 5 | 70px brow band — the roomiest |
 | `hair-m07-curls.asset.svg` | 6 | scalloped silhouette |
 | `hair-m08-bowl.asset.svg` | 6 | masked; covers the ears |
-| `hair-m09-afro.asset.svg` | 7 | the ONLY masked asset; covers the ears |
+| `hair-m09-afro.asset.svg` | 7 | masked; covers the ears |
+| `hair-m10-mohawk.asset.svg` | 11 | 90px brow band |
+| `hair-m11-receding.asset.svg` | 4 | 104px brow band — the roomiest |
+| `hair-m12-shortsides.asset.svg` | 6 | 59px brow band |
+| `hair-m13-manbun.asset.svg` | 10 | bun sits above the crown |
+| `hair-m14-longhair.asset.svg` | 9 | masked; first style with length past the jaw |
 
 ## What an asset is
 
@@ -29,7 +34,7 @@ both from one input, deriving the texture tone by darkening.
 
 SOME styles trace as one solid mass with the face painted on top — the hair has no hole of
 its own. Those assets carry a `<defs><mask id="facehole">` and wrap their paths in
-`<g mask="url(#facehole)">`. **Only the afro does, of the six.**
+`<g mask="url(#facehole)">`. **Of fourteen: the afro, the bowl and the long hair.**
 
 Most styles need no mask: the tracer gives their hair as exactly the visible hair, and a
 mask then hides anything inside the head outline — which silently ate the undercut's
