@@ -71,7 +71,26 @@ const html = `<!doctype html><meta charset="utf-8"><title>SportPool base avatars
 <h1>Base avatar exploration — Recraft</h1>
 <p>14 Sep 2026. Newest round first. Rounds 1 and 2 are kept because what they ruled out is the reason round 3 is shaped the way it is.</p>
 
-<h2>Round 7 — a full disc, and six head shapes</h2>
+<h2>Round 8 — generated, six shapes × two hair lengths</h2>
+<p>All twelve straight from Recraft, written exactly as returned. No geometry post-processing of any
+kind. Hair colour and kit colour are pinned in the prompt so the six differ by skull, not by reroll.</p>
+<div class="note"><b>The disc is not in the art, and that is the fix rather than a compromise.</b> Four
+phrasings of "a bigger circle that contains the figure" were tested against both <code>style_match</code>
+modes — all four came back with the head bursting out of the disc, because the style pins the composition
+and every reference it was built from has that overflow (§7e.5). The way out is not a better sentence: the
+app already owns that ground. <code>avatarGradient</code> supplies the identity colour and the avatar
+component draws the circle, so a disc-free figure sits on a ground of any size.</div>
+<div class="note">⚠ <b>My error, corrected:</b> the first pass pinned a <i>white</i> top against a white
+background. Every short-hair figure came back as a head on a bare neck stub because the shoulders were
+invisible. The kit has to carry a colour to exist at all.</div>
+<div class="note">🔴 <b>Open:</b> every file still opens with a full-canvas white background path. To sit on
+an identity-coloured ground that needs to be transparent — a one-attribute change, but it is a change to
+the art, so it is yours to call.</div>
+${grid('assets/avatar-set', 6)}
+
+<h2>Round 7 — ⛔ superseded: a full disc, and six head shapes</h2>
+<p>⚠ Kept only as a record. These were produced by editing the generated SVGs geometrically, and the
+edits degraded the art three times running. Round 8 replaces them.</p>
 <p>Both by geometry, no generation — which is just as well, since the Recraft balance is empty. The
 background is now a larger circle drawn <i>behind</i> the existing art, with a ring on top to cover the
 join. The six heads are warps of one approved outline, which is what §7c.1

@@ -44,9 +44,21 @@ const FRAME = [
   'Warm friendly face, natural skin tone, two large eyes with clear round pupils,',
   'simple flat brows, one small nose mark, one small mouth mark.',
   'Plain sports top: no logo, no crest, no badge, no text, no numbers.',
-  // The disc ask, as a prompt instruction rather than a geometric edit.
-  'A large round flat SportPool blue background that fully contains the whole figure,',
-  'with a clear even margin of blue all around the head and shoulders.',
+  // ⚠⚠ NO DISC IN THE ART. Four phrasings of "a bigger circle that contains the
+  // figure" were tested against both style_match modes and all four came back
+  // with the head bursting out of the disc: the style pins the composition and
+  // every reference it was built from has that overflow (§7e.5, and round 5a).
+  // The way out is not a better sentence — it is to stop baking a disc into the
+  // art at all. The app already owns that ground: avatarGradient supplies the
+  // user's identity colour and the avatar component draws the circle. A
+  // disc-free figure can then sit on a ground of ANY size, which is what
+  // "encapsulates the whole avatar" actually needs.
+  'Plain flat white background. No circle, no disc, no coloured shape behind the figure, no scene.',
+  // Pinned so the six differ by SKULL, not by hair and shirt colour rerolling.
+  // ⚠ NOT a white top: on a white background the shoulders disappear and every
+  // short-hair figure came back as a head on a bare neck stub. The kit has to
+  // carry a colour to exist at all.
+  'Dark brown hair. Plain solid blue top with a clearly visible pair of shoulders.',
   'Reads clearly at 24 pixels.',
 ].join(' ')
 
@@ -78,6 +90,8 @@ for (const shape of SHAPES) {
           prompt,
           model: 'recraftv4_styles_vector',
           style_id: STYLE_ID,
+          style_match: 'precise',   // 'flexible' kept the disc; 'precise' dropped it
+
           size: '1024x1024',
           response_format: 'url',
         })
