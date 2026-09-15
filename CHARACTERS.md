@@ -1154,11 +1154,71 @@ four silhouettes and let hair do the work.
 | `style_id` from 1–5 references is the whole ballgame: **462 coordinates and correct structure with it, 4,344 and an editorial portrait without** | Cannot vary **skull structure** (§7c.1) |
 | Isolated parts, if the hole is framed as a **positive object** ("filled with the same magenta as the background") | Cannot hold all variables at once — every generation fixes one thing and regresses another |
 | Output is freely recolourable | No coordinate system; anchors must be measured afterwards |
-| ~$0.08 per vector generation | Prompt limit **1,000 characters** |
+| **$0.05** per vector generation on our model | Prompt ceiling **10,000 characters** (1,000 on V2/V3) |
 
 ⚠ **Because it cannot hold all variables at once, do not generate whole characters.**
 Generate parts, composite them. Which is the parts-model architecture this document already
 specifies — the generator slots in as an *asset source*, not as a character generator.
+
+### ⭐ Costs and operating limits — verified against the live API, 2026-09-14
+
+⚠ **"units" means two different things in this document.** Everywhere else it is SVG
+coordinates (§7e.3, "149.6 units"). Here it is Recraft's billing unit: **1,000 API units =
+$1.00**. Always say *API units* when it is money.
+
+⚠⚠ **Two figures in the table above were wrong and are now corrected.** The prompt limit was
+recorded as 1,000 characters; the API's own error says `prompt length should be in [1, 10000]`
+for `recraftv4_styles_vector`. **Prompts have ten times the room previously assumed** — the
+1,000 ceiling is V2/V3 only. And a vector generation was recorded at ~$0.08, which is the *V4 /
+V4.1* vector price, not ours.
+
+**What our calls actually cost.** We pass three models across `scripts/`; only the first is
+current:
+
+| Model | Raster | Vector | Used |
+|---|---|---|---|
+| `recraftv4_styles` — the approved look | 35 | **50 · $0.05** | 13 calls |
+| `recraftv4_1` | 35 | 80 · $0.08 | 4 calls |
+| `recraftv3` | not published | not published | 3 calls |
+
+**The utilities are almost free**, and this changes what is worth trying:
+
+| Operation | API units | USD |
+|---|---|---|
+| `POST /styles` — create a custom style from 1–5 references | **5** | $0.005 |
+| `/images/eraseRegion` | **2** | $0.002 |
+| `/images/crispUpscale` | 4 | $0.004 |
+| `/images/vectorize`, `/images/removeBackground`, `/prompts/enhance` | 10 | $0.01 |
+| `/images/imageToImage`, `/inpaint`, `/outpaint`, `/variateImage` | 40 | $0.04 |
+| `/images/creativeUpscale` | 250 | $0.25 |
+
+⭐ **Creating a style costs 5 API units** — the third-party spec's 40 is wrong by 8×. A new `style_id` is a rounding error; it is
+the generations against it that cost. Never treat "make another style to test it" as expensive.
+
+**Operating limits:**
+
+- **5 requests/second** and **100 images/minute**, per user.
+- **Failed calls are free** — API units are deducted only on a 2xx. This is why every figure
+  here could be verified for nothing: an empty body or an over-long prompt returns 400 and
+  bills zero. **Probe before assuming; it costs nothing.**
+- ⚠ **Result URLs are signed and expire in ~24 hours.** Every script must download on receipt.
+  There is no "fetch it later".
+- ⚠⚠ **Two wallets that do not exchange.** Our `RECRAFT_API_KEY` spends *API units* (pay as you
+  go). Recraft Studio and the remote MCP server at `mcp.recraft.ai` spend *subscription
+  credits*. A tool that authenticates by OAuth is not spending our balance and cannot.
+- Check the balance with `GET /v1/users/me` — free, and it returns `credits` as API units.
+  **1,408 units on 2026-09-14** (≈ $1.41, ≈ 28 more V4 Styles vector generations).
+
+**The API exposes 19 operations; we call two** — `/images/generations` and `/users/me`. Full
+inventory with per-operation costs: <https://claude.ai/artifact/92Y1ftv5iF9zdhAkA3NaF1>.
+Recraft's own getting-started page lists only 15; the four extra (`/images/generations/raster`,
+`/generations/vector`, `/images/explore`, `/explore/similar`) are real but undocumented —
+probed 2026-09-14, all returned 400 to an empty body where a fabricated path returned 404.
+
+⚠ **The third-party OpenAPI at `api-evangelist/recraft-ai` is not safe to generate a client
+from.** Its `model` enum omits every Styles and Vector variant — including all three we use —
+so a validator built from it would reject the calls that work today. It is a usable map of
+*paths*, and wrong about *parameters*.
 
 ⚠ **Licence:** paid tier — *"You own all Assets… Recraft hereby assigns to you all copyright
 rights"* (§7.2). But **§7.7 applies to both tiers**: a perpetual, sublicensable, irrevocable
