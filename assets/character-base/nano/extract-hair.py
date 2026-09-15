@@ -232,8 +232,15 @@ def check_landmarks(hair: list[str], mask: str) -> dict:
 
     clear = 1 - covered[eye["y0"]:eye["y1"], eye["x0"]:eye["x1"]].mean()
     if clear < EYE_CLEAR_MIN:
-        sys.exit(f"hair covers {(1-clear)*100:.0f}% of the eye zone — only {clear*100:.0f}% "
-                 f"clear, needs {EYE_CLEAR_MIN*100:.0f}%")
+        msg = (f"hair covers {(1-clear)*100:.0f}% of the eye zone — only {clear*100:.0f}% "
+               f"clear, needs {EYE_CLEAR_MIN*100:.0f}%")
+        # --allow-tight is a DELIBERATE override, not a way round the check. f07-braids
+        # measures 96%: its hair edge just touches the top of the eye box, the same fact as
+        # its 1px brow band. Ryan chose that version over a compliant one that lost the
+        # silhouette. The check still reports; the decision is recorded in LOCKED.md.
+        if "--allow-tight" not in sys.argv:
+            sys.exit(msg)
+        print(f"  ⚠ OVERRIDDEN: {msg}")
 
     # How far down does hair reach across the brow span? The gap between that and the top of
     # the eyes is the band a brow has to live in. A percentage here is useless — what a
