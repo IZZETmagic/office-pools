@@ -9,9 +9,9 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-m01-buzz.asset.svg` | 4 | face mask |
 | `hair-m02-sidepart.asset.svg` | 4 | two base shapes — the parting splits the mass |
 | `hair-m03-quiff.asset.svg` | 5 | face mask |
-| `hair-m05-undercut.asset.svg` | 9 | 3 base shapes — top mass plus both shaved sides |
+| `hair-m05-undercut.asset.svg` | 9 | 3 base shapes — top mass plus both shaved sides; no mask |
 | `hair-m07-curls.asset.svg` | 6 | scalloped silhouette |
-| `hair-m09-afro.asset.svg` | 7 | face mask; covers the ears |
+| `hair-m09-afro.asset.svg` | 7 | the ONLY masked asset; covers the ears |
 
 ## What an asset is
 
@@ -25,9 +25,14 @@ both from one input, deriving the texture tone by darkening.
 
 ## The face mask
 
-Styles that overlap the face trace as one solid mass with the face painted on top — the
-hair has no hole of its own. Those assets carry a `<defs><mask id="facehole">` and wrap
-their paths in `<g mask="url(#facehole)">`. Anything consuming an asset must take its
+SOME styles trace as one solid mass with the face painted on top — the hair has no hole of
+its own. Those assets carry a `<defs><mask id="facehole">` and wrap their paths in
+`<g mask="url(#facehole)">`. **Only the afro does, of the six.**
+
+Most styles need no mask: the tracer gives their hair as exactly the visible hair, and a
+mask then hides anything inside the head outline — which silently ate the undercut's
+sideburns (6,786px). The test is whether the largest hair path covers the nose; only a
+solid-blob trace does. Anything consuming an asset must take its
 **full inner markup**, not just its `<path>` elements; pulling paths out with a regex
 drops the mask and paints its black silhouette onto the face.
 

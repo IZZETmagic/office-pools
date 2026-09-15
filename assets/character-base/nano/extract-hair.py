@@ -20,17 +20,21 @@ next style. Hair is whatever is neither a base colour nor blue.
 
 The face hole
 -------------
-A style that overlaps the face (afro, and every long style) traces as ONE solid mass with
-the face painted on top — the hair carries no hole of its own. Painted in front it
-swallows the face; painted behind, the forehead goes bare. Neither is the target. So when
-the traced face is materially shorter than the base head, the face-and-ears silhouette is
-carried along with the asset as an SVG mask, and the hair is emitted inside a masked group.
+SOME styles trace as one solid hair mass with the face painted on top — the hair carries
+no hole of its own. Painted in front it swallows the face; painted behind, the forehead
+goes bare. Those need the face silhouette carried along as an SVG mask.
+
+But MOST styles don't: the tracer gives their hair as exactly the visible hair, and a mask
+then hides anything sitting inside the head outline — which silently ate the undercut's
+sideburns (6,786px). The test is whether the largest hair path actually covers the nose.
+Only a solid-blob trace does. Measured across six styles, the afro was the only one.
 """
 import re
 import sys
 
 BASE_HEAD_IDX = 5          # in a base written by neck-width.py
 BASE_NOSE_IDX = 6
+NOSE_POINT = (1024, 1043)  # the nose centre on the locked base, in viewBox units
 
 # every colour the locked base uses; anything else in a trace is hair
 BASE_COLOURS = [(254, 205, 180), (245, 178, 150), (255, 255, 255),
@@ -96,10 +100,13 @@ def face_mask(traced: list[str], base_paths: list[str]) -> str:
     face = [p for p in traced if close(fill_of(p), skin, 24) or close(fill_of(p), shade, 24)]
     if not face:
         return ""
-    biggest = max(face, key=len)
-    head_top = min(ys_of(base_paths[BASE_HEAD_IDX]))
-    if min(ys_of(biggest)) <= head_top + 120:
-        return ""                                  # hair sits clear of the face
+    # Only a solid-blob trace needs the mask. If the hair is already the VISIBLE hair,
+    # masking it hides legitimate hair inside the head outline — sideburns especially.
+    hair = find_hair(traced)
+    big = max(hair, key=lambda p: (max(xs_of(p)) - min(xs_of(p))) * (max(ys_of(p)) - min(ys_of(p))))
+    nx, ny = NOSE_POINT
+    if not (min(xs_of(big)) < nx < max(xs_of(big)) and min(ys_of(big)) < ny < max(ys_of(big))):
+        return ""                                  # hair does not cover the face
     shapes = "".join(f'<path d="{d_of(p)}" fill="black"/>' for p in face)
     return ('<defs><mask id="facehole" maskUnits="userSpaceOnUse" x="0" y="0" '
             'width="2048" height="2048">'
