@@ -11,6 +11,8 @@ without an explicit request naming the asset. Same rule as `../../bases/LOCKED.m
 | `eye-04-wide.asset.svg` | 6 | surprised — h/w 1.76, small iris with white all round |
 | `eye-05-narrowed.asset.svg` | 8 | sceptical — h/w 0.41 letterbox, iris cropped by the lid |
 | `eye-06-sleepy.asset.svg` | 8 | drowsy — h/w 0.64, a peach lid covers the top half |
+| `eye-07-wink.asset.svg` | 4 | ASYMMETRIC: open eye left, closed lid right |
+| `eye-08-worried.asset.svg` | 9 | concerned — lids slope up toward the nose |
 
 ## What an eye asset is
 
@@ -32,10 +34,15 @@ Collapsing them to a single ink flattens the artwork.
   `rgb(255,255,255)` eye white
   `rgb(90,60,45)`    LID line — closed eyes, never touched by `--eye-colour`
 
-An eye asset with NO white has no eyeball showing: its marks are closed LIDS, not irises, and
-they must stay a lid colour. Recolouring to blue eyes turned the closed eyelids bright blue,
-which reads as paint rather than a shut eye. `extract-feature.py` decides this by the presence
-of white in the zone.
+An eye with NO white has no eyeball showing: its marks are closed LIDS, not irises, and must
+stay a lid colour. Recolouring to blue turned closed eyelids bright blue, which reads as paint
+rather than a shut eye.
+
+⚠ That test is PER SIDE of the face, not per asset. `eye-07-wink` has an open eye on one side
+and a closed lid on the other, so an asset-wide test would recolour the winking lid.
+
+⚠ `eye-07-wink` is the ONLY asset that is deliberately not mirror-symmetric. Its prompt has to
+override the "both eyes are exact mirror images" rule the other assets rely on.
 
 `compose.py --eye-colour` takes ONE colour: the core gets it, the rim is derived by lightening
 28%. Same shape as hair's base/shade/light.

@@ -113,16 +113,26 @@ def main() -> None:
     inks = [fill_of(p) for p in picked if not close(fill_of(p), (255, 255, 255), 30)]
     darkest = min((lum(c) for c in inks), default=0)
 
-    # No white in the zone means there is no eyeball showing — the marks are closed LIDS, not
-    # irises. Closed lids must not take the iris colour: recolouring blue eyes turned the
-    # closed eyelids bright blue, which reads as paint rather than a shut eye.
-    has_white = any(close(fill_of(p), (255, 255, 255), 30) for p in picked)
+    # Lid-vs-iris is decided PER SIDE of the face, not per asset. No white on a side means no
+    # eyeball showing there — the marks are closed LIDS and must not take the iris colour
+    # (recolouring to blue turned closed eyelids bright blue, which reads as paint).
+    #
+    # Per side rather than per asset because of the wink: it has an open eye on one side and a
+    # closed lid on the other, so an asset-wide test would recolour the winking lid.
+    mid = 2048 / 2
+    white_side = {"L": False, "R": False}
+    for p in picked:
+        if close(fill_of(p), (255, 255, 255), 30):
+            bx0, bx1, _, _ = box(p)
+            white_side["L" if (bx0 + bx1) / 2 < mid else "R"] = True
     out = []
     for p in picked:
         c = fill_of(p)
+        bx0, bx1, _, _ = box(p)
+        side = "L" if (bx0 + bx1) / 2 < mid else "R"
         if close(c, (255, 255, 255), 30):
             token = FEATURE_WHITE
-        elif not has_white:
+        elif not white_side[side]:
             token = FEATURE_LINE
         elif lum(c) - darkest > 12:
             token = FEATURE_INK_RIM
@@ -134,7 +144,9 @@ def main() -> None:
     n_w = sum(1 for p in out if FEATURE_WHITE in p)
     n_r = sum(1 for p in out if FEATURE_INK_RIM in p)
     n_l = sum(1 for p in out if FEATURE_LINE in p)
-    kind = "lids" if n_l else f"{n_w} white + {len(out)-n_w-n_r-n_l} core + {n_r} rim"
+    n_c = len(out) - n_w - n_r - n_l
+    parts = [f"{n} {k}" for n, k in ((n_w, "white"), (n_c, "core"), (n_r, "rim"), (n_l, "lid")) if n]
+    kind = " + ".join(parts)
     print(f"{dst}: {len(out)} paths in the {zone_name} zone ({kind})")
 
 
