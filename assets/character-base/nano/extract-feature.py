@@ -110,8 +110,41 @@ def main() -> None:
     # a genuine second tone. This eye is drawn with a lighter rim around a darker core, and
     # collapsing both to one ink flattened a real design feature. Tones are told apart by
     # luminance: the darker is the core, the lighter is the rim.
-    inks = [fill_of(p) for p in picked if not close(fill_of(p), (255, 255, 255), 30)]
-    darkest = min((lum(c) for c in inks), default=0)
+    inks = [p for p in picked if not close(fill_of(p), (255, 255, 255), 30)]
+    darkest = min((lum(fill_of(p)) for p in inks), default=0)
+
+    # An iris RIM sits INSIDE the eyeball; the eye white is always at least as big as it.
+    # A lighter shape that CONTAINS the whites is not a rim — it is the eye socket or a lower
+    # lid, and giving it the iris colour turns the whole socket blue on recolour (which is
+    # exactly what the worried eyes did).
+    #
+    # This is a containment test and not a size ratio because a ratio cannot separate them:
+    # the worried socket is 2.2x its core and the wide rim is 1.7x its, with no safe gap in
+    # between. A first attempt at "much taller than the core" split the wide eyes down the
+    # middle — one side rim, the other lid — on a symmetric asset.
+    # An iris RIM hugs its core; a lighter shape MUCH bigger than the core on its own side is
+    # the eye socket / lower lid, and giving it the iris colour turns the whole socket blue on
+    # recolour — which is what the worried eyes did.
+    #
+    # Measured over the eight assets, the ratio of a lighter shape's area to its own core's:
+    # every genuine rim lands at 0.19-2.75, the worried socket at 4.16 and 4.66. Nothing sits
+    # in between, so 3.5 is the cut.
+    #
+    # Two other tests were tried and both failed. Containment ("does it wrap the eyeball
+    # white?") marks narrowed and sleepy as lids, because their rims are drawn full-width with
+    # the sclera slivers painted back over the ends — in the source art that band is the same
+    # rgb(155,92,40) as every other rim. And a GLOBAL height ratio split the wide eyes down the
+    # middle, one side rim and the other lid, on a symmetric asset: the core it compared
+    # against came from the opposite eye. The comparison has to be per side.
+    RIM_MAX_AREA = 3.5
+
+    def core_area(k: str) -> float:
+        areas = [(b[1] - b[0]) * (b[3] - b[2])
+                 for p in inks
+                 for b in [box(p)]
+                 if abs(lum(fill_of(p)) - darkest) <= 12
+                 and (("L" if (b[0] + b[1]) / 2 < 1024 else "R") == k)]
+        return max(areas) if areas else 0.0
 
     # Lid-vs-iris is decided PER SIDE of the face, not per asset. No white on a side means no
     # eyeball showing there — the marks are closed LIDS and must not take the iris colour
@@ -135,7 +168,10 @@ def main() -> None:
         elif not white_side[side]:
             token = FEATURE_LINE
         elif lum(c) - darkest > 12:
-            token = FEATURE_INK_RIM
+            b = box(p)
+            ca = core_area(side)
+            ratio = ((b[1] - b[0]) * (b[3] - b[2]) / ca) if ca else 0.0
+            token = FEATURE_LINE if ratio > RIM_MAX_AREA else FEATURE_INK_RIM
         else:
             token = FEATURE_INK
         out.append(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{token}"', p))
