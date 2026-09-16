@@ -26,7 +26,7 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f04-longcurly.asset.svg` | 7 | INVERTED trace; 119px brow band |
 | `hair-f05-pixie.asset.svg` | 6 | unmasked; 60px brow band |
 | `hair-f06-spacebuns.asset.svg` | 12 | ⚠ 13px brow band |
-| `hair-f07-braids.asset.svg` | 24 | 23px brow band; passes all checks |
+| `hair-f07-braids.asset.svg` | 43 | braids hang clear of the face; ⚠ 13px brow band |
 
 ## What an asset is
 
@@ -91,8 +91,8 @@ are left covered. Everything else shows ears.
 
 ## Styles that cannot carry eyebrows as drawn
 
-`f01-bob` (10px), `f06-spacebuns` (13px), `m02-sidepart` (9px), `m07-curls` (13px),
-`m09-afro` (17px). Five of twenty-two. This constrains what the brow slot can assume.
+`f01-bob` (10px), `f06-spacebuns` (13px), `f07-braids` (13px), `m02-sidepart` (9px),
+`m07-curls` (13px), `m09-afro` (17px). Six of twenty-two. This constrains what the brow slot can assume.
 
 `--allow-tight` exists in `extract-hair.py` for a deliberate override of the eye-zone check.
 Nothing currently uses it: `f07-braids` needed it until the style was regenerated as two
