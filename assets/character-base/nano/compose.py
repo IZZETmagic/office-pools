@@ -65,6 +65,19 @@ def main() -> None:
         inner = asset[asset.index(">", asset.index("<svg")) + 1: asset.rindex("</svg>")]
         svg = svg.replace("</svg>", inner + "</svg>")   # hair paints last, over the ears
 
+    # Eyes paint AFTER hair. Every hair asset is verified to leave the eye zone clear, so
+    # this cannot hide them, and it guarantees the eyes are never buried by a fringe.
+    if eyes_path := arg("--eyes"):
+        a = open(eyes_path).read()
+        svg = svg.replace("</svg>", a[a.index(">", a.index("<svg")) + 1: a.rindex("</svg>")] + "</svg>")
+
+    if c := arg("--eye-colour"):
+        # The iris has TWO tones — a darker core and a lighter rim — and both come from one
+        # input. Flattening them to a single colour loses a real feature of the artwork.
+        rgb = hex_to_rgb(c)
+        svg = svg.replace('fill="rgb(117,62,21)"', f'fill="{rgb_str(rgb)}"')
+        svg = svg.replace('fill="rgb(150,84,34)"', f'fill="{lighten(rgb, 1.28)}"')
+
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)
         svg = svg.replace(f'fill="{HAIR_BASE}"', f'fill="{rgb_str(rgb)}"')

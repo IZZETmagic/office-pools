@@ -43,6 +43,7 @@ import { resolve, join, basename } from 'path'
 const ROOT = process.cwd()
 const BASES = 'assets/character-base/nano/bases'
 const HAIR = 'assets/character-base/nano/hair/assets'
+const EYES = 'assets/character-base/nano/eyes/assets'
 
 /** Recraft emits this on every path; it is a no-op and the locked assets carry it. */
 const GRANDFATHERED = 'translate(0,0)'
@@ -64,7 +65,7 @@ const svgsIn = (dir: string) =>
 describe('avatar assets stay cross-platform', () => {
   it('uses no transform that react-native-svg would silently drop', () => {
     const offenders: string[] = []
-    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR)]) {
+    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES)]) {
       for (const m of f.body.matchAll(/transform="([^"]*)"/g)) {
         if (m[1].replace(/\s/g, '') !== GRANDFATHERED) offenders.push(`${f.name}: ${m[1]}`)
       }
@@ -73,7 +74,7 @@ describe('avatar assets stay cross-platform', () => {
   })
 
   it('keeps every asset in the base coordinate space', () => {
-    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR)]) {
+    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES)]) {
       expect(f.body, `${f.name} must declare ${VIEWBOX}`).toContain(VIEWBOX)
     }
   })
@@ -98,7 +99,7 @@ describe('avatar assets stay cross-platform', () => {
   })
 
   it('has not altered a locked file', () => {
-    for (const dir of [BASES, HAIR]) {
+    for (const dir of [BASES, HAIR, EYES]) {
       const manifest = resolve(ROOT, dir, 'LOCKED.sha256')
       if (!existsSync(manifest)) continue
       for (const line of readFileSync(manifest, 'utf8').trim().split('\n')) {
