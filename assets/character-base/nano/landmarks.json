@@ -30,7 +30,14 @@
       "y0": 230,
       "y1": 373
     },
-    "samples": 7
+    "samples": 7,
+    "extract": {
+      "x0": 300,
+      "x1": 720,
+      "y0": 285,
+      "y1": 390
+    },
+    "_extract_note": "Extraction band in 1024-space. Deliberately narrow in y: brow path centres measured at 328 (raised/happy) and 365 (angry, which sits lower), while the nearest EYE path centre is 420. With extract-feature.py's 40-unit margin this accepts 265-410 and the eyes miss by 21 units. Widening it eats the eyes."
   },
   "mouth": {
     "placement": {
@@ -62,5 +69,20 @@
       "y1": 565
     },
     "samples": "locked base"
+  },
+  "expression": {
+    "_note": "A whole FACE \u2014 brows + eyes + mouth extracted together from one generated image, rather than assembled from parts. The band runs from above the brows to below the mouth. The nose sits inside it and is excluded by colour, being a base tone.",
+    "placement": {
+      "x0": 280,
+      "x1": 745,
+      "y0": 240,
+      "y1": 720
+    },
+    "extract": {
+      "x0": 280,
+      "x1": 745,
+      "y0": 240,
+      "y1": 720
+    }
   }
 }

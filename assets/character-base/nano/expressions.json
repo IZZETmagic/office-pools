@@ -1,0 +1,38 @@
+{
+  "_comment": "An EXPRESSION is a named pair: one eye asset + one mouth asset, optionally a brow asset. It is a PRESET, not a new asset type — nothing is drawn or generated for the ones below. 8 eyes x 10 mouths is 80 combinations; these are the readable ones. `brows` is null for every expression that reads without them, which is most: brows are a targeted device, not a universal slot, because our hairlines sit low enough to bury them on 10 of 12 hair styles.",
+  "_families": ["positive", "playful", "low", "negative", "surprise"],
+
+  "happy":        { "family": "positive", "eyes": "eye-02-happy",    "mouth": "mouth-02-smile",   "brows": null },
+  "joyful":       { "family": "positive", "eyes": "eye-02-happy",    "mouth": "mouth-03-grin",    "brows": null },
+  "laughing":     { "family": "positive", "eyes": "eye-03-closed",   "mouth": "mouth-09-laugh",   "brows": null },
+  "content":      { "family": "positive", "eyes": "eye-03-closed",   "mouth": "mouth-02-smile",   "brows": null },
+  "delighted":    { "family": "positive", "eyes": "eye-04-wide",     "mouth": "mouth-03-grin",    "brows": null },
+  "smug":         { "family": "positive", "eyes": "eye-03-closed",   "mouth": "mouth-06-smirk",   "brows": null },
+
+  "playful":      { "family": "playful",  "eyes": "eye-07-wink",     "mouth": "mouth-10-tongue",  "brows": null },
+  "cheeky":       { "family": "playful",  "eyes": "eye-07-wink",     "mouth": "mouth-06-smirk",   "brows": null },
+  "silly":        { "family": "playful",  "eyes": "eye-04-wide",     "mouth": "mouth-10-tongue",  "brows": null },
+  "mischievous":  { "family": "playful",  "eyes": "eye-05-narrowed", "mouth": "mouth-06-smirk",   "brows": null },
+  "teasing":      { "family": "playful",  "eyes": "eye-07-wink",     "mouth": "mouth-02-smile",   "brows": null },
+
+  "neutral":      { "family": "low",      "eyes": "eye-01-base",     "mouth": "mouth-01-neutral", "brows": null },
+  "focused":      { "family": "low",      "eyes": "eye-05-narrowed", "mouth": "mouth-01-neutral", "brows": null },
+  "thoughtful":   { "family": "low",      "eyes": "eye-01-base",     "mouth": "mouth-07-pressed", "brows": null },
+  "sleepy":       { "family": "low",      "eyes": "eye-06-sleepy",   "mouth": "mouth-01-neutral", "brows": null },
+  "bored":        { "family": "low",      "eyes": "eye-06-sleepy",   "mouth": "mouth-07-pressed", "brows": null },
+  "dreamy":       { "family": "low",      "eyes": "eye-06-sleepy",   "mouth": "mouth-02-smile",   "brows": null },
+
+  "sad":          { "family": "negative", "eyes": "eye-08-worried",  "mouth": "mouth-04-frown",   "brows": null },
+  "worried":      { "family": "negative", "eyes": "eye-08-worried",  "mouth": "mouth-08-wavy",    "brows": null },
+  "upset":        { "family": "negative", "eyes": "eye-08-worried",  "mouth": "mouth-05-open-o",  "brows": null },
+  "disappointed": { "family": "negative", "eyes": "eye-06-sleepy",   "mouth": "mouth-04-frown",   "brows": null },
+  "unimpressed":  { "family": "negative", "eyes": "eye-05-narrowed", "mouth": "mouth-07-pressed", "brows": null },
+  "sceptical":    { "family": "negative", "eyes": "eye-05-narrowed", "mouth": "mouth-04-frown",   "brows": null },
+  "awkward":      { "family": "negative", "eyes": "eye-01-base",     "mouth": "mouth-08-wavy",    "brows": null },
+  "nervous":      { "family": "negative", "eyes": "eye-04-wide",     "mouth": "mouth-08-wavy",    "brows": null },
+
+  "surprised":    { "family": "surprise", "eyes": "eye-04-wide",     "mouth": "mouth-05-open-o",  "brows": null },
+  "speechless":   { "family": "surprise", "eyes": "eye-01-base",     "mouth": "mouth-05-open-o",  "brows": null },
+  "amazed":       { "family": "surprise", "eyes": "eye-04-wide",     "mouth": "mouth-02-smile",   "brows": null },
+  "gasp":         { "family": "surprise", "eyes": "eye-02-happy",    "mouth": "mouth-05-open-o",  "brows": null }
+}

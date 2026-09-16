@@ -51,6 +51,11 @@ MOUTH_DARK = "rgb(118,72,68)"
 MOUTH_TEETH = "rgb(255,255,255)"
 MOUTH_TONGUE = "rgb(206,116,112)"
 
+# Brows get their own token so they can follow the HAIR colour without being hair.
+BROW_INK = "rgb(101,70,52)"
+FACE_SHADE = "rgb(245,178,150)"   # skin modelling — follows --skin, same token as the base
+BLUSH = "rgb(240,158,138)"        # warmer than shade; follows --skin but keeps a rosy cast
+
 
 def paths_of(svg: str) -> list[str]:
     return [m.group(0) for m in re.finditer(r"<path[^>]*/?>", svg)]
@@ -92,6 +97,13 @@ def main() -> None:
     # mouth — the laugh's tooth band centred 7 units above the `observed` ceiling and was
     # dropped without a word. Same failure that lost both eye whites on the first eye run.
     zone = lm.get("extract") or lm["placement"]
+    # --band overrides the zone for one run, in 1024-space. The special eyes need it: a
+    # teardrop hangs on the CHEEK, well below any band measured from ordinary eyes, and it
+    # would be dropped in silence. Overriding per-run beats widening the shared zone, which
+    # would start swallowing brows and mouths on every other extraction.
+    if "--band" in sys.argv:
+        i = sys.argv.index("--band")
+        zone = dict(zip(("x0", "x1", "y0", "y1"), (float(v) for v in sys.argv[i + 1:i + 5])))
 
     # landmarks.json is in 1024-space; traces are in viewBox units (2x)
     x0, x1 = zone["x0"] * 2 - MARGIN, zone["x1"] * 2 + MARGIN
@@ -115,6 +127,142 @@ def main() -> None:
 
     if not picked:
         sys.exit(f"no {zone_name} paths found inside x {x0:.0f}-{x1:.0f} y {y0:.0f}-{y1:.0f}")
+
+    if zone_name == "expression" and "--verbatim" not in sys.argv:
+        # A whole face, classified by POSITION RELATIVE TO THE EYE WHITES rather than by a
+        # fixed y band. A fixed band cannot work: `g03-pleading` has eyes so large that its
+        # irises sit at y357, which is inside any band tight enough to call `f04-disgusted`'s
+        # brows at y325 a brow. The eye white is the only landmark that moves with the art.
+        whites = [box(p) for p in picked
+                  if close(fill_of(p), (255, 255, 255), 24)
+                  and (box(p)[1] - box(p)[0]) > 120]
+        eye_top = min((b[2] for b in whites), default=0)
+        eye_bot = max((b[3] for b in whites), default=2048)
+
+        def in_an_eye(b):
+            return any(wx0 - 8 <= b[0] and b[1] <= wx1 + 8 and wy0 - 8 <= b[2] and b[3] <= wy1 + 8
+                       for wx0, wx1, wy0, wy1 in whites)
+
+        inks = [p for p in picked
+                if not close(fill_of(p), (255, 255, 255), 40) and fill_of(p)
+                and not (fill_of(p)[0] > 190 and lum(fill_of(p)) > 150)]
+        darkest = min((lum(fill_of(p)) for p in inks), default=0)
+
+        # Is there anything INSIDE the mouth? Teeth read as near-white below the eyes; a
+        # tongue reads as a second, lighter tone down there. Either means the dark shape
+        # around them is an opening rather than a lip.
+        below = [p for p in picked if (box(p)[2] + box(p)[3]) / 2 > eye_bot and fill_of(p)]
+        mouth_has_contents = (
+            any(close(fill_of(p), (255, 255, 255), 24) for p in below)
+            or len({round(lum(fill_of(p)) / 25) for p in below}) > 1)
+
+        out = []
+        for p in picked:
+            c = fill_of(p)
+            if c is None:
+                continue
+            b = box(p)
+            cy = (b[2] + b[3]) / 2
+            sat = max(c) - min(c)
+            if close(c, (255, 255, 255), 24):
+                token = FEATURE_WHITE if cy < eye_bot else MOUTH_TEETH
+            elif c[0] > 190 and lum(c) > 150 and c[0] > c[1] > c[2]:
+                # Skin modelling. Saturation separates a blush from a shadow: the base's own
+                # shade tone is 95, the generated cheek blushes measure 107-132. A tight cut,
+                # and the consequence of getting it wrong is a cheek that reads slightly warm
+                # or slightly grey — not a broken face.
+                token = BLUSH if sat >= 105 else FACE_SHADE
+            elif cy < eye_top:
+                # Above the eye, but a drooping upper LID overlaps the eye white while a BROW
+                # sits clear of it. Measured on f05-exhausted: lids at -52/-57, brows at
+                # +88/+95. A lid is face and follows skin; a brow follows hair.
+                over = [w for w in whites if not (b[1] < w[0] or b[0] > w[1])]
+                sep = min((w[2] - b[3] for w in over), default=999)
+                token = BROW_INK if sep >= 40 else (
+                    BLUSH if (c[0] > 190 and sat >= 105) else FACE_SHADE)
+            elif in_an_eye(b):
+                token = FEATURE_INK if lum(c) - darkest <= 14 else FEATURE_INK_RIM
+            elif cy > eye_bot:
+                # Darkness alone does not make a mouth an INTERIOR. A closed-lip smile is a
+                # single dark stroke and must stay a LIP, or --mouth-colour darkens it to 0.65
+                # and the smile turns near-black. An interior is only an interior when there
+                # is something inside the mouth to be behind — teeth or a tongue.
+                token = MOUTH_DARK if (lum(c) < 100 and mouth_has_contents) else MOUTH_INK
+            else:
+                token = FEATURE_INK
+            out.append(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{token}"', p))
+
+        open(dst, "w").write(SVG_OPEN + "".join(out) + "</svg>")
+        from collections import Counter
+        names = {FEATURE_WHITE: "white", MOUTH_TEETH: "teeth", BROW_INK: "brow",
+                 FEATURE_INK: "iris", FEATURE_INK_RIM: "iris-rim", MOUTH_DARK: "mouth-in",
+                 MOUTH_INK: "lip", BLUSH: "blush", FACE_SHADE: "shade"}
+        tally = Counter(next(n for t, n in names.items() if t in p) for p in out)
+        print(f"{dst}: {len(out)} paths ({', '.join(f'{v} {k}' for k, v in tally.most_common())})")
+        return
+
+    if "--verbatim" in sys.argv:
+        # Keep the traced fills exactly as generated. The canonical tokens exist so one colour
+        # input can drive a part, but a rainbow starstruck iris or a blue teardrop is NOT a
+        # recolourable part — it is the whole point of the asset. Forcing it through the
+        # iris core/rim classifier would flatten 28 paths into two browns.
+        open(dst, "w").write(SVG_OPEN + "".join(picked) + "</svg>")
+        fills = {re.search(r'fill="(rgb\([^)]*\))"', p).group(1) for p in picked
+                 if re.search(r'fill="rgb\([^)]*\)"', p)}
+        print(f"{dst}: {len(picked)} paths kept verbatim, {len(fills)} distinct fills")
+        return
+
+    if zone_name == "brow":
+        # A brow is one flat shape per side and carries no internal structure, so there is
+        # nothing to classify — every path in the band is brow. The work is all in the band
+        # itself: see landmarks.json, the eyes are only 21 units clear of it.
+        out = [re.sub(r'fill="rgb\([^)]*\)"', f'fill="{BROW_INK}"', p) for p in picked]
+
+        # PLACEMENT IS A PARAMETER, exactly as gaze is. The generator draws brows relative to
+        # the eyes IT drew and likes them close: measured across four generations the brow
+        # bottom landed at y408-439 (1024-space) against an eye top of y337 — overlapping by
+        # up to 20px. Prompting did not move it, the same resistance the eye-height round hit
+        # (asking for 1.3/1.45/1.6 returned 1.66/1.57/1.60).
+        #
+        # So the SHAPE is generated and the PLACEMENT is arithmetic: translate the pair as a
+        # unit so its lowest point lands on the target. The drawn form is untouched — this is
+        # the gaze.py operation, not an edit to the art.
+        #
+        # The default of y395 is MEASURED, not chosen. Sweeping the brow bottom from y308 to
+        # y418 against 12 hair assets and the eye asset, there is no clean band: raise the brow
+        # and the hairline buries it, lower it and it lands on the eye. y395 is the only place
+        # where nothing is buried (worst case 23% of one brow under a fringe, which is what a
+        # fringe does) and eye overlap is 1.3%.
+        #
+        # ⚠ That corridor exists because OUR HAIR SITS LOW. Ten of twelve styles bury a brow
+        # placed at y318. If the hair set is ever regenerated with higher hairlines, re-run the
+        # sweep — brows could then sit where they anatomically belong.
+        #
+        # Pass --brow-bottom to raise a surprised brow or drop a heavy one.
+        target = float(sys.argv[sys.argv.index("--brow-bottom") + 1]) * 2 \
+            if "--brow-bottom" in sys.argv else 395.0 * 2
+        low = max(box(p)[3] for p in out)
+        dy = target - low
+        if abs(dy) > 0.5:
+            def shift(path: str) -> str:
+                d = d_of(path)
+                toks, buf, acc = re.findall(r"[A-Za-z]|-?\d+\.?\d*", d), [], []
+                for t in toks:
+                    if re.match(r"[A-Za-z]", t):
+                        acc.append(t)
+                        continue
+                    buf.append(float(t))
+                    if len(buf) == 2:
+                        acc += [f"{buf[0]:.3f}", f"{buf[1] + dy:.3f}"]
+                        buf = []
+                return path.replace(d, " ".join(acc))
+            out = [shift(p) for p in out]
+        open(dst, "w").write(SVG_OPEN + "".join(out) + "</svg>")
+        sides = {"L" if (box(p)[0] + box(p)[1]) / 2 < 1024 else "R" for p in picked}
+        warn = "" if sides == {"L", "R"} else f"  ⚠ only {sorted(sides)} — a brow is missing"
+        print(f"{dst}: {len(out)} brow paths{warn}  "
+              f"| moved {dy:+.0f} so the brow bottom sits at y{target/2:.0f}")
+        return
 
     if zone_name == "mouth":
         # A mouth has no iris, so none of the core/rim/lid reasoning below applies. Tones are

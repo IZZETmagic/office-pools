@@ -29,6 +29,8 @@ BASE_BG = "rgb(255,255,255)"
 MOUTH_INK = "rgb(182,122,112)"
 MOUTH_DARK = "rgb(118,72,68)"   # the inside of an open mouth
 MOUTH_TONGUE = "rgb(206,116,112)"
+BROW_INK = "rgb(101,70,52)"
+BLUSH = "rgb(240,158,138)"
 
 
 def hex_to_rgb(h: str) -> tuple[int, int, int]:
@@ -58,21 +60,36 @@ def main() -> None:
     base_path, dst = positional[0], positional[1]
     svg = open(base_path).read()
 
-    hair_path = arg("--hair")
-    if hair_path:
-        # Take the asset's FULL inner markup, not just its <path> elements. Assets for
-        # styles that overlap the face carry a <defs><mask> and a masked <g>; pulling
-        # paths out with a regex drops the mask wrapper and paints its black silhouette
-        # straight onto the face.
-        asset = open(hair_path).read()
-        inner = asset[asset.index(">", asset.index("<svg")) + 1: asset.rindex("</svg>")]
-        svg = svg.replace("</svg>", inner + "</svg>")   # hair paints last, over the ears
+    # ---------------------------------------------------------------------------------
+    # PHASE 1 — stack every layer. PHASE 2 — recolour once, over the finished document.
+    #
+    # ⚠ These two phases must not interleave. They used to: --eye-colour was applied right
+    # after the --eyes layer, and --expression appended its paths further down. So an
+    # expression's irises were added AFTER the swap that was meant to colour them, and
+    # --eye-colour silently did nothing to a whole-face asset. A recolour can only be
+    # trusted if it runs when the document is complete.
+    # ---------------------------------------------------------------------------------
+    def inner(path: str) -> str:
+        # The asset's FULL inner markup, not just its <path> elements. Hair styles that
+        # overlap the face carry a <defs><mask> and a masked <g>; pulling paths out with a
+        # regex drops the mask wrapper and paints its black silhouette onto the face.
+        a = open(path).read()
+        return a[a.index(">", a.index("<svg")) + 1: a.rindex("</svg>")]
 
-    # Eyes paint AFTER hair. Every hair asset is verified to leave the eye zone clear, so
-    # this cannot hide them, and it guarantees the eyes are never buried by a fringe.
-    if eyes_path := arg("--eyes"):
-        a = open(eyes_path).read()
-        svg = svg.replace("</svg>", a[a.index(">", a.index("<svg")) + 1: a.rindex("</svg>")] + "</svg>")
+    # Paint order, first to last. HAIR GOES LAST, over the face — that is the physical
+    # truth: a lock falling past the eye should pass in front of it, not behind.
+    #
+    # The face used to go last, to guarantee a fringe could never bury the eyes. Measured
+    # against all 28 hair assets that guarantee was protecting against nothing: not one
+    # overlaps the eye whites by a single pixel, and the closest — the bob — clears them by
+    # 6px. So the safeguard cost correctness and bought nothing.
+    #
+    # ⚠ If a future hair style DOES reach the eyes, this order will occlude them. That is the
+    # intended behaviour, but it makes eye clearance a property of the HAIR asset now, which
+    # is where it belongs. Re-run the overlap check when adding hair.
+    for flag in ("--eyes", "--mouth", "--expression", "--brows", "--hair"):
+        if p := arg(flag):
+            svg = svg.replace("</svg>", inner(p) + "</svg>")
 
     if c := arg("--eye-colour"):
         # The iris has TWO tones — a darker core and a lighter rim — and both come from one
@@ -81,21 +98,20 @@ def main() -> None:
         svg = svg.replace('fill="rgb(117,62,21)"', f'fill="{rgb_str(rgb)}"')
         svg = svg.replace('fill="rgb(150,84,34)"', f'fill="{lighten(rgb, 1.28)}"')
 
-    # The mouth has its own token, deliberately NOT the iris tokens. extract-feature.py
-    # assigns iris core/rim to any non-white path in a zone, so a mouth sharing them would
-    # be repainted by --eye-colour and the mouth would turn blue with the eyes.
-    if mouth_path := arg("--mouth"):
-        a = open(mouth_path).read()
-        svg = svg.replace("</svg>", a[a.index(">", a.index("<svg")) + 1: a.rindex("</svg>")] + "</svg>")
-
     if c := arg("--mouth-colour"):
-        # One input drives both, same shape as the iris and the hair: the open mouth's
-        # interior is the lip colour darkened, so a recoloured lip never leaves a mismatched
-        # dark gap behind it.
+        # One input drives all three, same shape as the iris and the hair: the open mouth's
+        # interior is the lip colour darkened and the tongue lightened, so a recoloured lip
+        # never leaves a mismatched gap behind it.
         rgb = hex_to_rgb(c)
         svg = svg.replace(f'fill="{MOUTH_INK}"', f'fill="{rgb_str(rgb)}"')
         svg = svg.replace(f'fill="{MOUTH_DARK}"', f'fill="{darken(rgb, 0.65)}"')
         svg = svg.replace(f'fill="{MOUTH_TONGUE}"', f'fill="{lighten(rgb, 1.13)}"')
+
+    # Brows default to the HAIR colour, darkened. Real brows track hair, and a bald avatar
+    # still needs them coloured — so the token is the brow's own, not hair's, and the default
+    # is derived rather than shared. --brow-colour overrides for dyed hair or grey.
+    if c := (arg("--brow-colour") or arg("--hair-colour")):
+        svg = svg.replace(f'fill="{BROW_INK}"', f'fill="{darken(hex_to_rgb(c), 0.82)}"')
 
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)
@@ -106,6 +122,11 @@ def main() -> None:
         rgb = hex_to_rgb(c)
         svg = svg.replace(f'fill="{BASE_SKIN}"', f'fill="{rgb_str(rgb)}"')
         svg = svg.replace(f'fill="{BASE_SHADE}"', f'fill="{darken(rgb, 0.88)}"')
+        # A blush is the skin pulled a little toward rose, never a fixed pink. Generated
+        # verbatim it read as clown makeup on light skin and would be plain wrong on dark.
+        # 22% is deliberately subtle — a blush should be noticed, not seen.
+        blush = tuple(int(v + (t - v) * 0.22) for v, t in zip(rgb, (232, 112, 104)))
+        svg = svg.replace(f'fill="{BLUSH}"', f'fill="{rgb_str(blush)}"')
     if c := arg("--shirt"):
         rgb = hex_to_rgb(c)
         svg = svg.replace(f'fill="{BASE_SHIRT}"', f'fill="{rgb_str(rgb)}"')

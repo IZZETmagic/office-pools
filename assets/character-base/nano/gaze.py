@@ -70,7 +70,18 @@ def shift(p: str, dx: float, dy: float) -> str:
 
 
 def main() -> None:
-    src, dx_f, dy_f, dst = sys.argv[1], float(sys.argv[2]), float(sys.argv[3]), sys.argv[4]
+    # Two forms. Both eyes together:      gaze.py src dx dy out
+    # Or each eye separately:             gaze.py src dxL dyL dxR dyR out
+    # Per-eye is what makes cross-eyed, wall-eyed and one-eye-drifting possible — the
+    # playful looks that read as character rather than as a direction of attention.
+    args = sys.argv[1:]
+    if len(args) == 6:
+        src, dst = args[0], args[5]
+        per = {"L": (float(args[1]), float(args[2])), "R": (float(args[3]), float(args[4]))}
+    else:
+        src, dst = args[0], args[3]
+        v = (float(args[1]), float(args[2]))
+        per = {"L": v, "R": v}
     svg = open(src).read()
     ps = paths_of(svg)
 
@@ -82,6 +93,7 @@ def main() -> None:
     out = svg
     moved = 0
     for side, pick in (("L", lambda c: c < mid), ("R", lambda c: c >= mid)):
+        dx_f, dy_f = per[side]
         w = [p for p in whites if pick(sum(bbox(p)[:2]) / 2)]
         irises = [p for p in ps if not is_white(p) and pick(sum(bbox(p)[:2]) / 2)]
         if not w or not irises:
@@ -104,7 +116,7 @@ def main() -> None:
             moved += 1
 
     open(dst, "w").write(out)
-    print(f"{dst}: pointed {moved} iris paths  dx={dx_f:+.2f} dy={dy_f:+.2f}")
+    print(f"{dst}: pointed {moved} iris paths  L={per['L'][0]:+.1f},{per['L'][1]:+.1f}  R={per['R'][0]:+.1f},{per['R'][1]:+.1f}")
 
 
 if __name__ == "__main__":
