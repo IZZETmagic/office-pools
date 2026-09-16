@@ -81,3 +81,26 @@ specific height is needed, scale the paths at extraction rather than re-promptin
 ```sh
 shasum -a 256 -c LOCKED.sha256
 ```
+
+## Gaze is a parameter, not a set of assets
+
+`../../gaze.py` points the irises anywhere inside the eye whites:
+
+```sh
+uv run gaze.py eyes/assets/eye-01-base.asset.svg  0.8 -0.4  out.asset.svg
+```
+
+`dx` and `dy` are -1..1 of the available travel, computed per eye from the room the iris has
+inside its white — so the iris can never leave the eyeball. The values are continuous, so this
+is not nine presets but any direction.
+
+⭐ This is the axis Nano Banana will NOT do. Three separate attempts asking for irises "looking
+up", "slid to one side" or "toward the outer edge" all returned centred irises. In the vector it
+is arithmetic. Do not spend generations on gaze.
+
+Only non-white paths move: the white is the eyeball, not the iris. The highlight travels with
+the iris because the tracer draws it as a notch in the iris path. Run it on `eye-07-wink` and
+only the open eye moves — the closed lid has no iris to point.
+
+⚠ The offset is baked into path COORDINATES, never a transform. `react-native-svg` silently
+drops transforms; see `lib/design/__tests__/avatarAssets.guard.test.ts`.
