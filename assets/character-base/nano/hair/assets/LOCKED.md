@@ -27,7 +27,7 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f05-pixie.asset.svg` | 6 | unmasked; 60px brow band |
 | `hair-f06-spacebuns.asset.svg` | 12 | ⚠ 13px brow band |
 | `hair-f07-braids.asset.svg` | 43 | braids hang clear of the face; ⚠ 13px brow band |
-| `hair-f08-topknot.asset.svg` | 10 | single high bun; 55px brow band |
+| `hair-f08-topknot.asset.svg` | 9 | single high bun fused to the crown; 77px brow band |
 | `hair-f09-midwavy.asset.svg` | 9 | INVERTED trace; mid-length; covers the ears |
 | `hair-f11-lowbun.asset.svg` | 6 | masked; sleek, bun at the nape; 99px brow band |
 | `hair-f12-halfup.asset.svg` | 13 | masked; small bun with loose length; ⚠ 27px brow band |
@@ -129,3 +129,13 @@ It did expose a real extractor bug, now fixed: its trace flooded the canvas with
 white, which satisfied the inverted-trace test ("non-white then white") and made the extractor
 treat the skin flood as the hair mass — composing to a bald head. The flood layer must now be a
 hair colour, not any base colour.
+
+## Gaps in the source become scalp in the composite
+
+The first topknot had the bun sitting slightly detached from the crown hair, with a notch of
+BACKGROUND between them. Composited, that notch showed the locked base's SKULL instead — the
+generated head is slightly smaller than the base, so empty space in the source becomes skin
+once the base is behind it.
+
+Any style with a deliberate gap inside the hair silhouette has this problem. The fix is in the
+generation: the shapes must be fused into one continuous silhouette, not merely adjacent.
