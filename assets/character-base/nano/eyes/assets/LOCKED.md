@@ -10,6 +10,7 @@ without an explicit request naming the asset. Same rule as `../../bases/LOCKED.m
 | `eye-03-closed.asset.svg` | 2 | closed lids; LID tone, not iris |
 | `eye-04-wide.asset.svg` | 6 | surprised — h/w 1.76, small iris with white all round |
 | `eye-05-narrowed.asset.svg` | 8 | sceptical — h/w 0.41 letterbox, iris cropped by the lid |
+| `eye-06-sleepy.asset.svg` | 8 | drowsy — h/w 0.64, a peach lid covers the top half |
 
 ## What an eye asset is
 
@@ -54,7 +55,11 @@ Expression is carried by the SHAPE OF THE OPENING, at a constant eye width of 13
 |---|---|
 | `eye-04-wide` | 1.76 |
 | `eye-01-base` | 1.30 |
+| `eye-06-sleepy` | 0.64 |
 | `eye-05-narrowed` | 0.41 |
+
+`eye-02-happy` and `eye-03-closed` are not on this scale — they change the SHAPE of the opening
+rather than its height: a crescent and a pair of lids.
 
 ⚠ The eyes are CLOSE-SET. An earlier prompt said "a generous gap of bare peach between them",
 which produced a gap/eye of 1.09–1.21 — three to four times too wide — through several rounds
