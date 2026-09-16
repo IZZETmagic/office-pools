@@ -5,7 +5,9 @@ without an explicit request naming the asset. Same rule as `../../bases/LOCKED.m
 
 | asset | paths | notes |
 |---|---|---|
-| `eye-01-base.asset.svg` | 6 | the neutral base pair: 2 white + 2 iris core + 2 iris rim |
+| `eye-01-base.asset.svg` | 6 | neutral: 2 white + 2 iris core + 2 iris rim |
+| `eye-02-happy.asset.svg` | 8 | smiling crescents — lower lid arcs up into the eye |
+| `eye-03-closed.asset.svg` | 2 | closed lids; LID tone, not iris |
 
 ## What an eye asset is
 
@@ -22,9 +24,15 @@ The iris is drawn with a DARKER CORE and a LIGHTER RIM, and that is real in the 
 two clusters at luminance 74 and 98 holding ~916px and ~574px. It is not a tracing artifact.
 Collapsing them to a single ink flattens the artwork.
 
-  `rgb(117,62,21)`  iris core
-  `rgb(150,84,34)`  iris rim
+  `rgb(117,62,21)`   iris core
+  `rgb(150,84,34)`   iris rim
   `rgb(255,255,255)` eye white
+  `rgb(90,60,45)`    LID line — closed eyes, never touched by `--eye-colour`
+
+An eye asset with NO white has no eyeball showing: its marks are closed LIDS, not irises, and
+they must stay a lid colour. Recolouring to blue eyes turned the closed eyelids bright blue,
+which reads as paint rather than a shut eye. `extract-feature.py` decides this by the presence
+of white in the zone.
 
 `compose.py --eye-colour` takes ONE colour: the core gets it, the rim is derived by lightening
 28%. Same shape as hair's base/shade/light.

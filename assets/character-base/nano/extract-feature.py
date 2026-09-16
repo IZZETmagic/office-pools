@@ -40,6 +40,8 @@ BASE_COLOURS = [(254, 205, 180), (245, 178, 150), (30, 118, 214), (50, 118, 183)
 FEATURE_WHITE = "rgb(255,255,255)"
 FEATURE_INK = "rgb(117,62,21)"        # the darker core of an iris / the body of a brow or mouth
 FEATURE_INK_RIM = "rgb(150,84,34)"    # the lighter rim around an iris
+FEATURE_LINE = "rgb(90,60,45)"        # a LID line, brow or mouth — not an iris, never recoloured
+                                      # by --eye-colour
 
 
 def paths_of(svg: str) -> list[str]:
@@ -110,11 +112,18 @@ def main() -> None:
     # luminance: the darker is the core, the lighter is the rim.
     inks = [fill_of(p) for p in picked if not close(fill_of(p), (255, 255, 255), 30)]
     darkest = min((lum(c) for c in inks), default=0)
+
+    # No white in the zone means there is no eyeball showing — the marks are closed LIDS, not
+    # irises. Closed lids must not take the iris colour: recolouring blue eyes turned the
+    # closed eyelids bright blue, which reads as paint rather than a shut eye.
+    has_white = any(close(fill_of(p), (255, 255, 255), 30) for p in picked)
     out = []
     for p in picked:
         c = fill_of(p)
         if close(c, (255, 255, 255), 30):
             token = FEATURE_WHITE
+        elif not has_white:
+            token = FEATURE_LINE
         elif lum(c) - darkest > 12:
             token = FEATURE_INK_RIM
         else:
@@ -124,8 +133,9 @@ def main() -> None:
     open(dst, "w").write(SVG_OPEN + "".join(out) + "</svg>")
     n_w = sum(1 for p in out if FEATURE_WHITE in p)
     n_r = sum(1 for p in out if FEATURE_INK_RIM in p)
-    print(f"{dst}: {len(out)} paths in the {zone_name} zone "
-          f"({n_w} white + {len(out)-n_w-n_r} core + {n_r} rim)")
+    n_l = sum(1 for p in out if FEATURE_LINE in p)
+    kind = "lids" if n_l else f"{n_w} white + {len(out)-n_w-n_r-n_l} core + {n_r} rim"
+    print(f"{dst}: {len(out)} paths in the {zone_name} zone ({kind})")
 
 
 if __name__ == "__main__":
