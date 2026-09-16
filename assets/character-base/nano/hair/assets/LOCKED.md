@@ -29,6 +29,7 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f07-braids.asset.svg` | 43 | braids hang clear of the face; ⚠ 13px brow band |
 | `hair-f08-topknot.asset.svg` | 10 | single high bun; 55px brow band |
 | `hair-f09-midwavy.asset.svg` | 9 | INVERTED trace; mid-length; covers the ears |
+| `hair-f11-lowbun.asset.svg` | 6 | masked; sleek, bun at the nape; 99px brow band |
 
 ## What an asset is
 
@@ -105,3 +106,17 @@ trace and are left covered. Ryan confirmed this is fine for longer styles.
 `--allow-tight` exists in `extract-hair.py` for a deliberate override of the eye-zone check.
 Nothing currently uses it: `f07-braids` needed it until the style was regenerated as two
 separate ropes, which fixed the clearance as a side effect.
+
+## Box braids: attempted and dropped
+
+Five generations, none usable. Every version that read as box braids narrowed the jaw 20-44%,
+because the style is defined by braids falling across and around the head — exactly what makes
+the model shrink the skull. The one generation that held the face at 500 did so by splaying the
+braids outward, and traced to a patchy result with white holes at the crown.
+
+The locs and the two pigtails already cover braided styles. Dropped rather than forced.
+
+It did expose a real extractor bug, now fixed: its trace flooded the canvas with SKIN and then
+white, which satisfied the inverted-trace test ("non-white then white") and made the extractor
+treat the skin flood as the hair mass — composing to a bald head. The flood layer must now be a
+hair colour, not any base colour.

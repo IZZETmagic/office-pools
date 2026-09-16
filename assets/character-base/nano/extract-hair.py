@@ -138,10 +138,19 @@ def inverted_trace(traced: list[str]):
         xs, ys = xs_of(p), ys_of(p)
         return (max(xs) - min(xs)) > 2000 and (max(ys) - min(ys)) > 2000
     c0, c1 = fill_of(first), fill_of(second)
-    if full(first) and full(second) and c0 and c1 and not close(c0, (255, 255, 255), 24) \
-            and close(c1, (255, 255, 255), 24):
-        return first, second
-    return None
+    # The flood layer must be a HAIR colour. The box-braids trace flooded with SKIN
+    # (254,204,180) and then white, which satisfied "non-white then white" and made the
+    # extractor treat the skin flood as the hair mass — composing to a bald head.
+    if not (full(first) and full(second) and c0 and c1):
+        return None
+    if not close(c1, (255, 255, 255), 24):
+        return None
+    if any(close(c0, b, tol=24) for b in BASE_COLOURS):
+        return None
+    r, _g, bl = c0
+    if bl > r + 20:                      # blue-ish flood is the shirt, not hair
+        return None
+    return first, second
 
 
 def ear_is_drawn(traced_path: str, ex0, ex1, ey0, ey1, floor: int = 400) -> bool:
