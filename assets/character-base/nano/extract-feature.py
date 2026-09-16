@@ -43,6 +43,14 @@ FEATURE_INK_RIM = "rgb(150,84,34)"    # the lighter rim around an iris
 FEATURE_LINE = "rgb(90,60,45)"        # a LID line, brow or mouth — not an iris, never recoloured
                                       # by --eye-colour
 
+# Mouth tokens, deliberately sharing NOTHING with the iris. compose.py --eye-colour swaps the
+# iris tokens across the whole composed document, so a mouth painted in one would turn blue
+# every time the eyes did.
+MOUTH_INK = "rgb(182,122,112)"
+MOUTH_DARK = "rgb(118,72,68)"
+MOUTH_TEETH = "rgb(255,255,255)"
+MOUTH_TONGUE = "rgb(206,116,112)"
+
 
 def paths_of(svg: str) -> list[str]:
     return [m.group(0) for m in re.finditer(r"<path[^>]*/?>", svg)]
@@ -78,7 +86,12 @@ def close(a, b, tol: int = 24) -> bool:
 def main() -> None:
     traced_path, base_path, zone_name, dst = sys.argv[1:5]
     here = __file__.rsplit("/", 1)[0]
-    zone = json.load(open(f"{here}/landmarks.json"))[zone_name]["placement"]
+    lm = json.load(open(f"{here}/landmarks.json"))[zone_name]
+    # A zone may declare an explicit `extract` band. The mouth needs one: `placement` is the
+    # median of the closed LINE mouths and only 28px tall, and `observed` predates any open
+    # mouth — the laugh's tooth band centred 7 units above the `observed` ceiling and was
+    # dropped without a word. Same failure that lost both eye whites on the first eye run.
+    zone = lm.get("extract") or lm["placement"]
 
     # landmarks.json is in 1024-space; traces are in viewBox units (2x)
     x0, x1 = zone["x0"] * 2 - MARGIN, zone["x1"] * 2 + MARGIN
@@ -102,6 +115,66 @@ def main() -> None:
 
     if not picked:
         sys.exit(f"no {zone_name} paths found inside x {x0:.0f}-{x1:.0f} y {y0:.0f}-{y1:.0f}")
+
+    if zone_name == "mouth":
+        # A mouth has no iris, so none of the core/rim/lid reasoning below applies. Tones are
+        # read straight off: white is teeth, the darkest is the inside of an open mouth, and
+        # anything else is the lip. A closed line mouth traces as a single tone and must come
+        # out as the LIP — not the interior — which is why "darkest = interior" only applies
+        # when there is more than one non-white tone to choose between.
+        inks = [p for p in picked if not close(fill_of(p), (255, 255, 255), 30)]
+        # The INTERIOR of an open mouth is the deep maroon, and it is the one tone that can be
+        # named absolutely: measured across the set it lands at 62-69 while every lip and
+        # tongue sits at 131-148. Ordering alone could not do this — "darkest = interior"
+        # called the open-O a lip (it has only one tone) and called the tongue-out mouth's LINE
+        # an interior (there its darker tone is the lip and the lighter one is the tongue).
+        INTERIOR_MAX_LUM = 100
+        # The interior is the darkest shape; a TONGUE sits inside it, whereas a LIP would
+        # enclose it. Both are lighter than the interior, so luminance alone cannot tell them
+        # apart and the tongue came out tagged as a lip — which would have handed it the lip
+        # colour on recolour.
+        interiors = [box(p) for p in inks if lum(fill_of(p)) < INTERIOR_MAX_LUM]
+        mids = [p for p in inks if lum(fill_of(p)) >= INTERIOR_MAX_LUM]
+        mid_tones = sorted({round(lum(fill_of(p))) for p in mids})
+
+        def inside_interior(b, tol: int = 6) -> bool:
+            return any(ix0 - tol <= b[0] and b[1] <= ix1 + tol
+                       and iy0 - tol <= b[2] and b[3] <= iy1 + tol
+                       for ix0, ix1, iy0, iy1 in interiors)
+
+        # A tongue that is NOT inside an interior — the tongue-out mouth, where it hangs below
+        # a closed line — is the lighter of two mid tones AND reaches further down than the
+        # darker one. Lightness alone is not enough: lip and tongue tones overlap (131-135 vs
+        # 139-148), so the bottom edge is what actually separates them.
+        lowest_bottom = {}
+        for p in mids:
+            k = round(lum(fill_of(p)))
+            lowest_bottom[k] = max(lowest_bottom.get(k, 0), box(p)[3])
+        tongue_tone = None
+        if len(mid_tones) > 1:
+            dark_t, light_t = mid_tones[0], mid_tones[-1]
+            if lowest_bottom[light_t] > lowest_bottom[dark_t] + 20:
+                tongue_tone = light_t
+
+        out = []
+        for p in picked:
+            c = fill_of(p)
+            if close(c, (255, 255, 255), 30):
+                token = MOUTH_TEETH
+            elif lum(c) < INTERIOR_MAX_LUM:
+                token = MOUTH_DARK
+            elif inside_interior(box(p)) or round(lum(c)) == tongue_tone:
+                token = MOUTH_TONGUE
+            else:
+                token = MOUTH_INK
+            out.append(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{token}"', p))
+        open(dst, "w").write(SVG_OPEN + "".join(out) + "</svg>")
+        kinds = {MOUTH_TEETH: "teeth", MOUTH_DARK: "interior", MOUTH_TONGUE: "tongue", MOUTH_INK: "lip"}
+        tally = {k: sum(1 for p in out if t in p) for t, k in kinds.items()}
+        print(f"{dst}: {len(out)} paths in the mouth zone "
+              f"({', '.join(f'{n} {k}' for k, n in tally.items() if n)}) "
+              f"| source tones {sorted({round(lum(fill_of(p))) for p in inks})}")
+        return
 
     # Normalise to canonical tokens so recolouring is one swap per part. The tracer invents
     # extra tones from antialiasing — this eye traced with TWO browns, a lighter rim around a

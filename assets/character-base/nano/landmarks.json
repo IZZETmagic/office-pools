@@ -45,7 +45,14 @@
       "y0": 586,
       "y1": 754
     },
-    "samples": 9
+    "samples": 9,
+    "extract": {
+      "x0": 330,
+      "x1": 695,
+      "y0": 550,
+      "y1": 780
+    },
+    "_extract_note": "The band used for EXTRACTION, in 1024-space \u2014 not a measurement. `placement` is only 28px tall (the median of the closed LINE mouths) and `observed` was measured before any open mouth existed; the laugh's tooth band centred 7 units above the `observed` ceiling and was silently dropped. This band runs from just below the nose (bottom y565) to the chin (y759) with slack, which is where a mouth can anatomically be."
   },
   "nose": {
     "placement": {

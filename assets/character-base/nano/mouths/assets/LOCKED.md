@@ -1,84 +1,109 @@
 # Locked mouth assets
 
-**These files are frozen.** They do not get regenerated or "improved" without an explicit
-request naming the asset. Same rule as `../../bases/LOCKED.md`.
+**These files are frozen.** They do not get regenerated, re-traced, re-extracted or "improved"
+without an explicit request naming the asset. Same rule as `../../bases/LOCKED.md`.
 
-| asset | built by | notes |
+| asset | paths | notes |
 |---|---|---|
-| `mouth-01-neutral.asset.svg` | `--curve 0` | the default; a level line |
-| `mouth-02-smile.asset.svg` | `--curve 26` | closed-lip smile |
-| `mouth-04-frown.asset.svg` | `--curve -22` | |
-| `mouth-06-smirk.asset.svg` | `--lift 38 --bend 0.70 --shift 14` | ASYMMETRIC — see below |
-| `mouth-07-pressed.asset.svg` | `--curve -4 --width 150 --thickness 20` | unimpressed; shorter and heavier |
-| `mouth-08-wavy.asset.svg` | `--wave 7 --waves 2` | nervous squiggle |
+| `mouth-01-neutral.asset.svg` | 1 | the default; a level line |
+| `mouth-02-smile.asset.svg` | 1 | closed-lip smile |
+| `mouth-03-grin.asset.svg` | 3 | open: teeth + interior + tongue |
+| `mouth-04-frown.asset.svg` | 1 | |
+| `mouth-05-open-o.asset.svg` | 1 | surprise; an upright oval opening, INTERIOR tone not lip |
+| `mouth-06-smirk.asset.svg` | 1 | ASYMMETRIC — see below |
+| `mouth-07-pressed.asset.svg` | 1 | unimpressed; shorter and heavier |
+| `mouth-08-wavy.asset.svg` | 1 | nervous squiggle |
+| `mouth-09-laugh.asset.svg` | 3 | open: teeth + interior + tongue |
+| `mouth-10-tongue.asset.svg` | 2 | playful; tongue hangs BELOW a closed line |
 
-Every one is a **single path, no mask, no transform** — the lowest-risk asset type in the
-system, and the only face layer that is not exposed to the unproven `<mask>` device question.
+Generated with Nano Banana Pro against `../../bases/base-neck-100.png`, traced with Recraft
+`vectorize`, extracted by `../../extract-feature.py mouth`. Sources in `../nano/`.
 
-## These are drawn, not generated
+## They were drawn first, and then regenerated
 
-`../../mouth.py` emits them directly. No Nano Banana call, no Recraft trace, no extraction.
-A closed-lip mouth is one stroke: there is nothing for a generator to invent, and the eye
-round proved the model will not take direction on a dimension anyway — asking for eye height
-ratios of 1.3 / 1.45 / 1.6 returned 1.66 / 1.57 / 1.60.
+An earlier set was drawn directly as geometry by a `mouth.py` script (see commit `5b23101` if
+it is ever wanted). Six closed-lip mouths, free and mathematically exact. Ryan asked to try the
+Nano Banana route anyway, and the comparison settled it:
 
-⚠ This is NOT the "regenerate art, never hand-edit it" rule being broken. That rule exists
-because traced art has opaque structure — a shape that looks like a background can be a mask
-painted over the skin, so deleting it unmasks the face. A primitive authored from scratch has
-no hidden structure to break.
+- **Closed lines: no real difference.** Nano came out 7% wider and measurably *less*
+  symmetric (mirror disagreement 6.1% vs 3.4% on the smile). The generated colour does not
+  even survive — extraction normalises both to the same token.
+- **Open mouths: nano wins outright.** The tooth band tapers into the corners, the opening's
+  lower edge curves independently of the upper, and the tongue sits as a dome with a dark rim.
+  The drawn grin collapsed into a pale sliver at 56px.
 
-Only mouths that **open** need generating, because those have interior structure that has to
-be drawn rather than derived: teeth, a dark gap, a tongue. That is `03-grin`, `05-open-o`,
-`09-laugh` and `10-tongue`, still to come.
-
-## Curvature is a parameter
-
-Neutral, smile and frown are the same stroke at `--curve` 0, +26 and −22. Three assets
-collapsed into one number, the same lesson as gaze in `../../gaze.py`. Before adding a mouth,
-ask whether it is a parameter.
-
-`--side -1` mirrors the smirk's curl to the left, so the other-handed smirk is a flag, not a
-second asset.
+⭐ The lesson is not "generate everything". It is that **generation earns its cost where there
+is interior structure to invent**, and earns nothing on a shape that is one stroke. The whole
+set is generated here for one provenance and one character, which is a consistency decision,
+not a quality one.
 
 ## What a smirk is
 
-⭐ A smirk is **not** a tilted straight line. That was the first attempt and it is wrong — a
-uniform tilt only pivots the whole mouth, and it reads as a lopsided face rather than a wry
-expression. A smirk is ASYMMETRIC CURVATURE: flat along one side, rounding up into a half
-smile at the other, with the whole mouth **shifted toward the side that curls**.
+⭐ A smirk is **not** a tilted straight line. That was the first attempt and it reads as a
+lopsided face, because a uniform tilt only pivots the mouth. It is ASYMMETRIC CURVATURE: flat
+along one side, rounding up into a half smile at the other, with the whole mouth **shifted
+toward the side that curls**. The prompt has to say all three parts or the model returns a
+tilt.
 
-That is why the centreline is a cubic. Symmetric curvature cannot express it and neither can
-a tilt; the bend has to be concentrated at one end, which needs two independent control
-points. With `--lift 0` the cubic reduces to the old quadratic exactly (a quadratic Q is the
-cubic with C1 = P0 + ⅔(Q−P0), C2 = P3 + ⅔(Q−P3)) — verified: neutral and smile regenerate to
-identical bounding boxes.
+## Tokens
 
-## The tone is deliberately not an iris tone
+    rgb(182,122,112)   MOUTH_INK    the lip / the line
+    rgb(118,72,68)     MOUTH_DARK   the inside of an open mouth
+    rgb(206,116,112)   MOUTH_TONGUE
+    rgb(255,255,255)   MOUTH_TEETH  never recoloured
 
-    rgb(182,122,112)   MOUTH_INK — sampled from the approved line weight, C-lightest.png
+⚠ None of these may collide with the iris tokens `rgb(117,62,21)` / `rgb(150,84,34)`.
+`compose.py --eye-colour` swaps those across the whole composed document, so a mouth sharing
+one would turn blue every time the eyes did. The guard test enforces it, stated as "no iris
+token" rather than a closed palette so the rule survives new open mouths.
 
-`compose.py --eye-colour` recolours the iris tokens with a plain string swap across the whole
-composed document. A mouth sharing `rgb(117,62,21)` or `rgb(150,84,34)` would turn blue every
-time the eyes did. The guard test enforces the separation.
+`--mouth-colour` takes ONE colour: the lip gets it, the interior is derived 0.65 darker, the
+tongue 1.13 lighter. ⚠ On `10-tongue` that flattens the design slightly — its line and tongue
+are further apart in the generated art than a 1.13 ratio reproduces.
 
-## Proportions
+## Classifying the parts, and why it is not by luminance order
 
-Width 186 and thickness 17 are C-lightest's own line, measured. The centreline sits at y634
-in 1024-space — where `landmarks.json` puts the mouth (centre 637), and the same fraction
-between nose-bottom and chin that the reference used (0.34 of a 194px band).
+The extractor has to decide which traced path is lip, interior, tongue or teeth. Ordering
+alone fails in two directions and both were seen:
 
-⚠ Curve values are tuned for **legibility at 56px**, not for the close-up. A sagitta of 18
-matches the reference smile exactly but flattens back toward neutral at leaderboard size; 26
-survives the downscale. Judge a mouth at the size it will actually be seen.
+- "darkest = interior" called **05-open-o** a *lip* — it has only one tone.
+- it called **10-tongue**'s *line* an interior — there the darker tone is the lip and the
+  lighter one is the tongue, the opposite of the grin.
 
-## Path data is M/L only
+What works:
 
-Deliberately. Every number is then one half of an x,y pair, which is how `gaze.py`,
-`extract-feature.py` and the guard test all parse path data. An `A` arc command takes 7
-parameters, not 2, and would silently corrupt every bounding box they compute.
+1. white → teeth.
+2. **luminance < 100 → interior.** This one tone can be named absolutely: measured across the
+   set the interiors land at 62–69 while every lip and tongue sits at 131–148.
+3. a mid tone **contained inside an interior** → tongue.
+4. otherwise, with two mid tones, the lighter one → tongue **only if it reaches lower** than
+   the darker. Lightness alone cannot do it: lip and tongue tones overlap (131–135 vs
+   139–148), so the bottom edge is what separates them.
+5. anything left → lip.
+
+## Two silent failures this set produced
+
+⚠ **The extraction band was too small and ate the laugh's teeth.** `landmarks.json` mouth
+`placement` is 28px tall — the median of the closed LINE mouths — and `observed` predates any
+open mouth. The laugh's tooth band centred 7 units above the `observed` ceiling and vanished
+with no error. The zone now carries an explicit `extract` band running from below the nose to
+the chin. Same failure that lost both eye whites on the first eye run.
+
+⚠ **A mouth that is too big makes the model move the NOSE.** The first laugh came back with
+the nose 110px higher, because the mouth would not otherwise fit — the same reflex that made
+the first afro shrink the skull by 31%. Registration is by construction and that breaks it.
+The prompt now says explicitly: if the mouth will not fit, make the MOUTH smaller, never
+rearrange the face. **Check nose drift on every new open mouth** — nine of ten registered to
+within 1px, so an outlier is obvious.
 
 ## Verifying
 
 ```sh
 shasum -a 256 -c LOCKED.sha256
+```
+
+Nose registration, which the checksums cannot see:
+
+```sh
+# every trace should put the nose at y954-1132, the locked base's own position
 ```

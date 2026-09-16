@@ -15,7 +15,8 @@ What gets stored per member. **A config, never an image.**
   "gaze":       [0.0, 0.0],        // dx, dy in -1..1 — see gaze.py
 
   "brows":      null,              // slot not built yet
-  "mouth":      "mouth-02-smile", // 6 closed-lip assets; open mouths still to come
+  "mouth":      "mouth-02-smile", // 10 assets
+  "mouthColour": "#B67A70",       // optional; drives lip, interior and tongue
 
   "shirt":      "#3B6EFF",
   "background": "#FFFFFF"
@@ -38,8 +39,7 @@ This distinction is the whole architecture, and getting it wrong is expensive.
 
 | Parameter (a value) | Asset (a file) |
 |---|---|
-| skin, hair, eye, shirt, background colour | hair style, eye expression |
-| **mouth curvature** (`mouth.py`) | open-mouth shapes (teeth, tongue) |
+| skin, hair, eye, shirt, background colour | hair style, eye expression, mouth |
 | neck width (`neck-width.py`) | |
 | **gaze** (`gaze.py`) | |
 
@@ -48,9 +48,12 @@ dropped because "the generator can't do gaze" — which was true and beside the 
 vector, pointing an iris is arithmetic. **Before generating a variant, ask whether it is a
 parameter.** 28 hair styles x 8 colours is 28 assets and 8 values, never 224.
 
-⭐ The mouths went the same way. Neutral, smile and frown are one stroke at `--curve` 0,
-+26 and −22, drawn by `mouth.py` — no generation, no trace, no extraction, no cost. Only
-mouths that OPEN need generating, because those have interior structure.
+⭐ The mouths tested that rule and came out the other way. Six were drawn as pure geometry
+first — free, exact, and for the closed-lip lines indistinguishable from the generated ones
+(7% narrower, and the generated colour does not survive extraction anyway). But the OPEN
+mouths were decisively better generated, so the whole set is generated for one provenance.
+**Generation earns its cost where there is interior structure to invent, and earns nothing on
+a shape that is one stroke.** See `mouths/assets/LOCKED.md`.
 
 ## Rendering
 

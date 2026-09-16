@@ -27,6 +27,8 @@ BASE_SHIRT = "rgb(30,118,214)"
 BASE_SHIRT2 = "rgb(50,118,183)"
 BASE_BG = "rgb(255,255,255)"
 MOUTH_INK = "rgb(182,122,112)"
+MOUTH_DARK = "rgb(118,72,68)"   # the inside of an open mouth
+MOUTH_TONGUE = "rgb(206,116,112)"
 
 
 def hex_to_rgb(h: str) -> tuple[int, int, int]:
@@ -87,7 +89,13 @@ def main() -> None:
         svg = svg.replace("</svg>", a[a.index(">", a.index("<svg")) + 1: a.rindex("</svg>")] + "</svg>")
 
     if c := arg("--mouth-colour"):
-        svg = svg.replace(f'fill="{MOUTH_INK}"', f'fill="{rgb_str(hex_to_rgb(c))}"')
+        # One input drives both, same shape as the iris and the hair: the open mouth's
+        # interior is the lip colour darkened, so a recoloured lip never leaves a mismatched
+        # dark gap behind it.
+        rgb = hex_to_rgb(c)
+        svg = svg.replace(f'fill="{MOUTH_INK}"', f'fill="{rgb_str(rgb)}"')
+        svg = svg.replace(f'fill="{MOUTH_DARK}"', f'fill="{darken(rgb, 0.65)}"')
+        svg = svg.replace(f'fill="{MOUTH_TONGUE}"', f'fill="{lighten(rgb, 1.13)}"')
 
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)
