@@ -44,6 +44,7 @@ const ROOT = process.cwd()
 const BASES = 'assets/character-base/nano/bases'
 const HAIR = 'assets/character-base/nano/hair/assets'
 const EYES = 'assets/character-base/nano/eyes/assets'
+const MOUTHS = 'assets/character-base/nano/mouths/assets'
 
 /** Recraft emits this on every path; it is a no-op and the locked assets carry it. */
 const GRANDFATHERED = 'translate(0,0)'
@@ -57,6 +58,12 @@ const HAIR_LIGHT = 'rgb(168,150,138)'
 /** The shared coordinate space. Assets register by living in the base's viewBox. */
 const VIEWBOX = 'viewBox="0 0 2048 2048"'
 
+/** The iris tokens. compose.py recolours these from --eye-colour with a plain string swap
+ *  across the whole composed document, so ANY other feature painted in them gets dragged
+ *  along. A mouth drawn in iris brown would turn blue whenever the eyes did. */
+const IRIS_CORE = 'rgb(117,62,21)'
+const IRIS_RIM = 'rgb(150,84,34)'
+
 const svgsIn = (dir: string) =>
   readdirSync(resolve(ROOT, dir))
     .filter((f) => f.endsWith('.svg'))
@@ -65,7 +72,7 @@ const svgsIn = (dir: string) =>
 describe('avatar assets stay cross-platform', () => {
   it('uses no transform that react-native-svg would silently drop', () => {
     const offenders: string[] = []
-    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES)]) {
+    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES), ...svgsIn(MOUTHS)]) {
       for (const m of f.body.matchAll(/transform="([^"]*)"/g)) {
         if (m[1].replace(/\s/g, '') !== GRANDFATHERED) offenders.push(`${f.name}: ${m[1]}`)
       }
@@ -74,7 +81,7 @@ describe('avatar assets stay cross-platform', () => {
   })
 
   it('keeps every asset in the base coordinate space', () => {
-    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES)]) {
+    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES), ...svgsIn(MOUTHS)]) {
       expect(f.body, `${f.name} must declare ${VIEWBOX}`).toContain(VIEWBOX)
     }
   })
@@ -98,8 +105,19 @@ describe('avatar assets stay cross-platform', () => {
     }
   })
 
+  it('keeps mouths off the iris palette', () => {
+    // Not "mouths use only the mouth ink" — the open-mouth assets still to come carry white
+    // teeth and a dark interior, so a closed palette would have to be reopened. The durable
+    // invariant is the collision: a mouth must never share a token with the iris.
+    for (const f of svgsIn(MOUTHS)) {
+      const fills = [...f.body.matchAll(/fill="(rgb\([^)]*\))"/g)].map((m) => m[1])
+      const clash = [...new Set(fills)].filter((c) => c === IRIS_CORE || c === IRIS_RIM)
+      expect(clash, `${f.name} paints in an iris token — --eye-colour would repaint it`).toEqual([])
+    }
+  })
+
   it('has not altered a locked file', () => {
-    for (const dir of [BASES, HAIR, EYES]) {
+    for (const dir of [BASES, HAIR, EYES, MOUTHS]) {
       const manifest = resolve(ROOT, dir, 'LOCKED.sha256')
       if (!existsSync(manifest)) continue
       for (const line of readFileSync(manifest, 'utf8').trim().split('\n')) {

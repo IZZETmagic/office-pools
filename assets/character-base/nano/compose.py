@@ -26,6 +26,7 @@ BASE_SHADE = "rgb(245,178,150)"
 BASE_SHIRT = "rgb(30,118,214)"
 BASE_SHIRT2 = "rgb(50,118,183)"
 BASE_BG = "rgb(255,255,255)"
+MOUTH_INK = "rgb(182,122,112)"
 
 
 def hex_to_rgb(h: str) -> tuple[int, int, int]:
@@ -77,6 +78,16 @@ def main() -> None:
         rgb = hex_to_rgb(c)
         svg = svg.replace('fill="rgb(117,62,21)"', f'fill="{rgb_str(rgb)}"')
         svg = svg.replace('fill="rgb(150,84,34)"', f'fill="{lighten(rgb, 1.28)}"')
+
+    # The mouth has its own token, deliberately NOT the iris tokens. extract-feature.py
+    # assigns iris core/rim to any non-white path in a zone, so a mouth sharing them would
+    # be repainted by --eye-colour and the mouth would turn blue with the eyes.
+    if mouth_path := arg("--mouth"):
+        a = open(mouth_path).read()
+        svg = svg.replace("</svg>", a[a.index(">", a.index("<svg")) + 1: a.rindex("</svg>")] + "</svg>")
+
+    if c := arg("--mouth-colour"):
+        svg = svg.replace(f'fill="{MOUTH_INK}"', f'fill="{rgb_str(hex_to_rgb(c))}"')
 
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)

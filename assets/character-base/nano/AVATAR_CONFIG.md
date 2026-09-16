@@ -15,7 +15,7 @@ What gets stored per member. **A config, never an image.**
   "gaze":       [0.0, 0.0],        // dx, dy in -1..1 — see gaze.py
 
   "brows":      null,              // slot not built yet
-  "mouth":      null,              // slot not built yet
+  "mouth":      "mouth-02-smile", // 6 closed-lip assets; open mouths still to come
 
   "shirt":      "#3B6EFF",
   "background": "#FFFFFF"
@@ -39,6 +39,7 @@ This distinction is the whole architecture, and getting it wrong is expensive.
 | Parameter (a value) | Asset (a file) |
 |---|---|
 | skin, hair, eye, shirt, background colour | hair style, eye expression |
+| **mouth curvature** (`mouth.py`) | open-mouth shapes (teeth, tongue) |
 | neck width (`neck-width.py`) | |
 | **gaze** (`gaze.py`) | |
 
@@ -46,6 +47,10 @@ This distinction is the whole architecture, and getting it wrong is expensive.
 dropped because "the generator can't do gaze" — which was true and beside the point. In the
 vector, pointing an iris is arithmetic. **Before generating a variant, ask whether it is a
 parameter.** 28 hair styles x 8 colours is 28 assets and 8 values, never 224.
+
+⭐ The mouths went the same way. Neutral, smile and frown are one stroke at `--curve` 0,
++26 and −22, drawn by `mouth.py` — no generation, no trace, no extraction, no cost. Only
+mouths that OPEN need generating, because those have interior structure.
 
 ## Rendering
 
