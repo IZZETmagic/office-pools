@@ -27,6 +27,8 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f05-pixie.asset.svg` | 6 | unmasked; 60px brow band |
 | `hair-f06-spacebuns.asset.svg` | 12 | ⚠ 13px brow band |
 | `hair-f07-braids.asset.svg` | 43 | braids hang clear of the face; ⚠ 13px brow band |
+| `hair-f08-topknot.asset.svg` | 10 | single high bun; 55px brow band |
+| `hair-f09-midwavy.asset.svg` | 9 | INVERTED trace; mid-length; covers the ears |
 
 ## What an asset is
 
@@ -86,8 +88,14 @@ re-permits hair over them. Five assets lost their ears that way while their sour
 drew them. The mask now re-protects the ears last — but only when the generation actually drew
 them, tested by looking for an ear-sized shape at the ear position in the trace.
 
-The afro and the locs legitimately cover the ears; their traces contain no ear shapes, so they
-are left covered. Everything else shows ears.
+Ear protection applies to EVERY asset, masked or not: an unmasked style paints hair over the
+whole base, so a pulled-back style like the topknot buried ears its PNG plainly drew. Whether
+an ear is protected is decided by rasterising the trace and looking for ear-coloured pixels at
+the ear position — not by path bounding boxes, which miss a half-covered ear because it merges
+into the face path and is far wider than an ear.
+
+Styles that legitimately cover the ears — afro, locs, midwavy — have no ear pixels in their
+trace and are left covered. Ryan confirmed this is fine for longer styles.
 
 ## Styles that cannot carry eyebrows as drawn
 

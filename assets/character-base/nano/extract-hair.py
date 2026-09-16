@@ -144,7 +144,31 @@ def inverted_trace(traced: list[str]):
     return None
 
 
-def face_mask(traced: list[str], base_paths: list[str]) -> str:
+def ear_is_drawn(traced_path: str, ex0, ex1, ey0, ey1, floor: int = 400) -> bool:
+    """Did the generation actually draw an ear here? Measured off the rendered trace."""
+    from PIL import Image
+    import numpy as np
+    with tempfile.TemporaryDirectory() as t:
+        subprocess.run([CHROME, "--headless", "--disable-gpu", "--hide-scrollbars",
+                        f"--screenshot={t}/t.png", "--window-size=1024,1024",
+                        f"file://{traced_path}"], capture_output=True)
+        im = np.asarray(Image.open(f"{t}/t.png").convert("RGB")).astype(int)
+    box = im[int(ey0 // 2):int(ey1 // 2), int(ex0 // 2):int(ex1 // 2)]
+    return int((np.abs(box - np.array(BASE_COLOURS[1])).sum(axis=2) < 60).sum()) > floor
+
+
+def ear_holes(base_paths: list[str], traced_path: str) -> str:
+    """Black shapes for any ear the generation actually drew."""
+    out = ""
+    for idx in BASE_EAR_IDX:
+        ex0, ex1 = min(xs_of(base_paths[idx])), max(xs_of(base_paths[idx]))
+        ey0, ey1 = min(ys_of(base_paths[idx])), max(ys_of(base_paths[idx]))
+        if traced_path and ear_is_drawn(traced_path, ex0, ex1, ey0, ey1):
+            out += f'<path d="{d_of(base_paths[idx])}" fill="black"/>'
+    return out
+
+
+def face_mask(traced: list[str], base_paths: list[str], traced_path: str = "") -> str:
     """Return an SVG mask hiding the hair over the face, or '' if the hair doesn't overlap."""
     skin = fill_of(base_paths[BASE_HEAD_IDX])
     shade = fill_of(base_paths[BASE_NOSE_IDX])
@@ -180,10 +204,14 @@ def face_mask(traced: list[str], base_paths: list[str]) -> str:
     for idx in BASE_EAR_IDX:
         ex0, ex1 = min(xs_of(base_paths[idx])), max(xs_of(base_paths[idx]))
         ey0, ey1 = min(ys_of(base_paths[idx])), max(ys_of(base_paths[idx]))
-        drawn = any(min(xs_of(p)) < ex1 and max(xs_of(p)) > ex0
-                    and min(ys_of(p)) < ey1 and max(ys_of(p)) > ey0
-                    and (max(xs_of(p)) - min(xs_of(p))) < 400
-                    for p in face)
+        # Test the RENDERED trace, not path bounding boxes. A half-covered ear traces as a
+        # crescent that merges into the face path and is far wider than an ear, so the
+        # shape-size test missed it — the topknot lost ears its PNG plainly drew.
+        drawn = ear_is_drawn(traced_path, ex0, ex1, ey0, ey1) if traced_path else any(
+            min(xs_of(p)) < ex1 and max(xs_of(p)) > ex0
+            and min(ys_of(p)) < ey1 and max(ys_of(p)) > ey0
+            and (max(xs_of(p)) - min(xs_of(p))) < 400
+            for p in face)
         if drawn:
             ears += f'<path d="{d_of(base_paths[idx])}" fill="black"/>'
 
@@ -365,7 +393,17 @@ def main() -> None:
         sys.exit(f"jaw width {jaw} differs from the base's {want} by "
                  f"{abs(jaw-want)/want*100:.0f}% — regenerate holding the head size")
 
-    mask = face_mask(traced, base_paths)
+    mask = face_mask(traced, base_paths, traced_path)
+    if not mask:
+        # An UNMASKED asset paints hair over everything, ears included. Most styles never
+        # reach them; a pulled-back one like the topknot sweeps across and buries ears its
+        # PNG plainly drew. Give those an ear-only mask.
+        ears = ear_holes(base_paths, traced_path)
+        if ears:
+            mask = ('<defs><mask id="facehole" maskUnits="userSpaceOnUse" x="0" y="0" '
+                    'width="2048" height="2048">'
+                    '<rect x="0" y="0" width="2048" height="2048" fill="white"/>'
+                    f'{ears}</mask></defs>')
     areas = check_landmarks(hair, mask)
     body = normalise(hair, areas)
     if texture_trace:
