@@ -123,38 +123,63 @@ def find_hair(traced: list[str]) -> list[str]:
 
 
 def inverted_trace(traced: list[str]):
-    """Detect a trace where the hair is NEGATIVE SPACE, and return (hair_path, white_path).
+    """Detect a trace where the hair is NEGATIVE SPACE, and return (flood, cover_paths).
 
-    On a very hair-dominant image Recraft can invert the layering: it floods the canvas with
-    the hair colour, then paints a canvas-sized WHITE path over it with the hair silhouette
-    cut out as holes. The locs traced this way. Colour-based selection cannot see it — the
-    "hair" is a full-canvas rectangle and the shape lives in a path being discarded as
-    background.
+    On a hair-dominant image Recraft can invert the layering: it floods the whole canvas with
+    the HAIR colour, then paints the background and the figure on top. The hair is whatever
+    shows through — negative space, not a shape.
+
+    Colour-based selection cannot see this: the "hair" is a full-canvas rectangle. Nor can a
+    single-white-path test — the locs covered the flood with ONE white path, but long straight
+    hair covered it with TWO (left and right of the hair), so requiring one missed it and the
+    crown vanished (194,650px).
+
+    The reliable signal is the flood itself: path 0 spanning the canvas in a hair colour.
+    Everything painted over it — white background, face, neck, shirt — becomes the mask.
     """
-    if len(traced) < 2:
+    if not traced:
         return None
-    first, second = traced[0], traced[1]
-    def full(p):
-        xs, ys = xs_of(p), ys_of(p)
-        return (max(xs) - min(xs)) > 2000 and (max(ys) - min(ys)) > 2000
-    c0, c1 = fill_of(first), fill_of(second)
-    # The flood layer must be a HAIR colour. The box-braids trace flooded with SKIN
-    # (254,204,180) and then white, which satisfied "non-white then white" and made the
-    # extractor treat the skin flood as the hair mass — composing to a bald head.
-    if not (full(first) and full(second) and c0 and c1):
+    first = traced[0]
+    xs, ys = xs_of(first), ys_of(first)
+    if not ((max(xs) - min(xs)) > 2000 and (max(ys) - min(ys)) > 2000):
         return None
-    if not close(c1, (255, 255, 255), 24):
+    c = fill_of(first)
+    if c is None or any(close(c, b, tol=24) for b in BASE_COLOURS):
         return None
-    if any(close(c0, b, tol=24) for b in BASE_COLOURS):
+    r, _g, bl = c
+    if bl > r + 20:                       # a blue flood is the shirt, not hair
         return None
-    r, _g, bl = c0
-    if bl > r + 20:                      # blue-ish flood is the shirt, not hair
-        return None
-    return first, second
+    # everything base-coloured or white painted after the flood covers it
+    cover = [p for p in traced[1:]
+             if any(close(fill_of(p), b, tol=24) for b in BASE_COLOURS)]
+    return (first, cover) if cover else None
+
+
+def hair_covers_nose(hair: list[str]) -> bool:
+    """True only if the rendered hair actually paints over the nose point.
+
+    Measured by rasterising, not by bounding box: a long side panel's box spans the centre
+    while the panel itself is nowhere near the nose, and that false positive masked
+    f13-longstraight's crown away entirely.
+    """
+    from PIL import Image
+    import numpy as np
+    with tempfile.TemporaryDirectory() as t:
+        open(f"{t}/h.svg", "w").write(SVG_OPEN + "".join(hair) + "</svg>")
+        subprocess.run([CHROME, "--headless", "--disable-gpu", "--hide-scrollbars",
+                        f"--screenshot={t}/h.png", "--window-size=1024,1024",
+                        f"file://{t}/h.svg"], capture_output=True)
+        im = np.asarray(Image.open(f"{t}/h.png").convert("RGB")).astype(int)
+    nx, ny = NOSE_POINT[0] // 2, NOSE_POINT[1] // 2
+    return bool(im[ny, nx].sum() < 740)
 
 
 def ear_is_drawn(traced_path: str, ex0, ex1, ey0, ey1, floor: int = 400) -> bool:
-    """Did the generation actually draw an ear here? Measured off the rendered trace."""
+    """Did the generation actually draw an ear here? Measured off the rendered trace.
+
+    Not from path bounding boxes: a half-covered ear traces as a crescent merged into the
+    face path, far wider than an ear, and the size test missed it.
+    """
     from PIL import Image
     import numpy as np
     with tempfile.TemporaryDirectory() as t:
@@ -186,10 +211,11 @@ def face_mask(traced: list[str], base_paths: list[str], traced_path: str = "") -
         return ""
     # Only a solid-blob trace needs the mask. If the hair is already the VISIBLE hair,
     # masking it hides legitimate hair inside the head outline — sideburns especially.
+    # Does the hair ACTUALLY cover the nose? Measured by rasterising, not by bounding box.
+    # A long side panel's box spans the centre while the panel itself is nowhere near the
+    # nose — that false positive masked f13-longstraight's crown away entirely (194,650px).
     hair = find_hair(traced)
-    big = max(hair, key=lambda p: (max(xs_of(p)) - min(xs_of(p))) * (max(ys_of(p)) - min(ys_of(p))))
-    nx, ny = NOSE_POINT
-    if not (min(xs_of(big)) < nx < max(xs_of(big)) and min(ys_of(big)) < ny < max(ys_of(big))):
+    if not hair_covers_nose(hair):
         return ""                                  # hair does not cover the face
     shapes = "".join(f'<path d="{d_of(p)}" fill="black"/>' for p in face)
     # Intersect the hole with the head's actual SHAPE. The traced "face" is not reliably
@@ -360,7 +386,7 @@ def main() -> None:
 
     inv = inverted_trace(traced)
     if inv:
-        base_shape, white = inv
+        base_shape, cover = inv
         texture = [p for p in find_hair(traced) if p is not base_shape]
         # Two things must be punched out of the flood-filled hair: the background (the white
         # path, whose holes ARE the hair silhouette) and the face — the white path's holes
@@ -368,10 +394,7 @@ def main() -> None:
         # Everything the base itself draws — face, nose, neck, shadow AND the shirt — is
         # painted after the white path, so all of it falls inside the silhouette holes and
         # must be punched out too. Anything base-coloured except white.
-        wanted = [c for c in BASE_COLOURS if not close(c, (255, 255, 255), 24)]
-        faces = [p for p in traced if any(close(fill_of(p), c, 24) for c in wanted)]
-        holes = f'<path d="{d_of(white)}" fill="black"/>'
-        holes += "".join(f'<path d="{d_of(p)}" fill="black"/>' for p in faces)
+        holes = "".join(f'<path d="{d_of(p)}" fill="black"/>' for p in cover)
         mask = ('<defs><mask id="facehole" maskUnits="userSpaceOnUse" x="0" y="0" '
                 'width="2048" height="2048">'
                 '<rect x="0" y="0" width="2048" height="2048" fill="white"/>'

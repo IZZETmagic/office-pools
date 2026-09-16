@@ -30,6 +30,9 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f08-topknot.asset.svg` | 10 | single high bun; 55px brow band |
 | `hair-f09-midwavy.asset.svg` | 9 | INVERTED trace; mid-length; covers the ears |
 | `hair-f11-lowbun.asset.svg` | 6 | masked; sleek, bun at the nape; 99px brow band |
+| `hair-f12-halfup.asset.svg` | 13 | masked; small bun with loose length; ⚠ 27px brow band |
+| `hair-f13-longstraight.asset.svg` | 7 | INVERTED trace; 46px brow band |
+| `hair-f14-shag.asset.svg` | 9 | masked; stepped layers; 106px brow band |
 
 ## What an asset is
 
@@ -79,8 +82,14 @@ path AS the mask, then punching out everything the base draws (face, nose, neck,
 the shirt), because all of that is painted after the white path and therefore falls inside
 the holes.
 
-`extract-hair.py` detects it by shape, not colour: path 0 and path 1 both spanning the
-canvas, the first non-white and the second white.
+`extract-hair.py` detects it by the FLOOD, not by what covers it: path 0 spanning the canvas
+in a hair colour. Everything base-coloured painted after it becomes the mask.
+
+Requiring a single full-canvas WHITE cover was too narrow — the locs used one white path, but
+long straight hair used TWO (left and right of the hair), so the detector missed it and the
+crown vanished entirely (194,650px). Requiring only "non-white then white" was too broad — box
+braids flooded with SKIN and the extractor took that as the hair mass, composing to a bald
+head. The flood must be a hair colour, and what covers it is irrelevant.
 
 ## Ears
 
