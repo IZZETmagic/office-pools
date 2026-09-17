@@ -34,6 +34,35 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f13-longstraight.asset.svg` | 7 | INVERTED trace; 46px brow band |
 | `hair-f14-shag.asset.svg` | 9 | masked; stepped layers; 106px brow band |
 
+## The sideburn cut (six styles, 2026-09-17)
+
+⭐ Six SHORT styles — `m01-buzz`, `m02-sidepart`, `m07-curls`, `m10-mohawk`, `m11-receding`,
+`m12-shortsides` — carry two extra BLACK polygons inside their existing `<mask id="facehole">`,
+thinning each sideburn down to the facial hair's own width at the junction. Applied by
+`../../thin-sideburn.py --apply`, which marks the file `<!--sideburn-thinned-->` and refuses to
+run twice. Ryan asked for this on 2026-09-17.
+
+**The junction never failed on HEIGHT.** A hair sideburn ends y396-489 and a beard's starts
+y409-452 — the same place. It failed on WIDTH: the beard arrives as a 2-8px needle and the hair
+met it with a 16-25px block ending in a flat cut. After the cut the six measure 8px at y440 and
+10px at y460, against fullbeard's 4px and 8px.
+
+⚠⚠ **IT IS A MASK BECAUSE IT MUST NOT REACH THE FACIAL HAIR.** The first attempt painted a
+SKIN-coloured polygon at the end of the hair asset. Hair composes LAST, over everything, so it
+also erased whatever facial hair lay under it — and that was written up as a feature. It is not
+what was asked for. A mask applies only to the group referencing it, so the facial hair, a
+sibling in the composed document, is unreachable. Proved rather than asserted: across all
+6 x 3 hair/beard combinations, **zero** beard pixels become skin.
+
+⚠ The painted version also had to stay within 60px of the head edge, because `laughing` brings
+ink to +74px and the polygon crossed the EYE WHITE, rendering it as a white block. A mask cannot
+affect the expression either, so that ceiling is gone — the band is now bounded only by where
+the hair legitimately is.
+
+The band's top is at y760: the widest listed sideburn there is `curls` at 53px, inside the
+60px band, so the first edge lands on bare skin and no horizontal step appears. A flat-topped
+strip was an earlier attempt and its step fell at a different height on every style.
+
 ## What an asset is
 
 An SVG fragment containing only its own paths, in the locked base's coordinate space
