@@ -34,34 +34,6 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f13-longstraight.asset.svg` | 7 | INVERTED trace; 46px brow band |
 | `hair-f14-shag.asset.svg` | 9 | masked; stepped layers; 106px brow band |
 
-## The sideburn cut (six styles, 2026-09-17)
-
-⭐ Six SHORT styles — `m01-buzz`, `m02-sidepart`, `m07-curls`, `m10-mohawk`, `m11-receding`,
-`m12-shortsides` — now carry two extra polygons **in the face tone**, `rgb(254,205,180)`, at
-the head's left and right edges. They are an ERASER: painted over the style's own sideburn to
-cap its width where the facial hair meets it. Applied by `../../thin-sideburn.py --apply`, which
-marks the file `<!--sideburn-thinned-->` and refuses to run twice.
-
-Ryan asked for this on 2026-09-17: *"for the short hair assets have the sideburns thinned to
-match the tops of the facial hair"*. It replaced six rejected attempts at the same junction,
-including two rounds of regenerating the beards.
-
-**The junction never failed on HEIGHT.** Measured at 1024px, a hair sideburn ends y396-489 and a
-beard's starts y409-452 — the same place. It failed on WIDTH: the beard arrives as a 2-8px
-needle and the hair met it with a 16-25px block ending in a flat horizontal cut. Two shapes of
-different thickness butted end to end. After the cut every one of the six measures 10-11px
-through y440-460, against the beards' 8-12px.
-
-⚠ The polygon also lies over the FACIAL hair, which composes underneath. That is deliberate —
-it is what makes both sides of the junction obey one envelope — but it means the cap line must
-stay wider than the beard everywhere it exists, or a hairline crack of skin opens inside the
-beard. Both failures were built and seen; the knots and the reasoning are in the script.
-
-⚠ It is legal because the ears sit ENTIRELY OUTSIDE the head edge (y400-511, all of it at
-x < 258 of 1024), so the strip just inboard of the edge is flat skin with no feature in it. The
-band is capped at 60px inboard because `laughing` brings ink to +74px. Nothing here is a
-transform and nothing is a mask, so `react-native-svg` renders it.
-
 ## What an asset is
 
 An SVG fragment containing only its own paths, in the locked base's coordinate space
