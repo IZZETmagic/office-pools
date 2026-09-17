@@ -47,14 +47,26 @@ def main() -> None:
     im = np.asarray(Image.open(src).convert("RGB").resize((1024, 1024))).astype(int)
     r, g, b = im[:, :, 0], im[:, :, 1], im[:, :, 2]
 
-    # Skin family: warm, ordered r>g>b, and not near-white.
-    skin_family = (r > 195) & (r > g) & (g > b) & (g > 140) & (b > 110)
+    # Skin family: warm, ordered r>g>b, and genuinely SATURATED.
+    #
+    # ⚠ The saturation floor is the load-bearing part. "r > g > b" is trivially true of any
+    # slightly warm white — the antialiased pixels along an eye's edge measure rgb(255,253,248)
+    # and sailed through — so white was being counted as skin, scattering stray texture through
+    # the eye and biting a 20px notch out of `sleepy`'s lower lid edge. Real skin here has
+    # r-b of 78 (face) to 98 (lid); that warm white has 7.
+    skin_family = ((r > 195) & (r > g) & (g > b) & (g > 140) & (b > 110)
+                   & ((r - b) > 30))
     darker = np.abs(im - FACE).sum(axis=2) > 24
     texture = skin_family & darker
 
     # Only inside the face, never the neck, ears or shoulder.
+    #
+    # ⚠ The floor must clear the MOUTH, not just the eyes. At 720 it sliced straight through
+    # `laughing`'s lower lip, which sits at y710-721 — only the two end fragments survived and
+    # the lip came back as a pair of disconnected blobs. The chin is at y759 and the base's
+    # own neck shadow starts below that, so 752 takes the whole face and none of the neck.
     band = np.zeros(im.shape[:2], bool)
-    band[200:720, 280:745] = True
+    band[200:752, 280:745] = True
     texture &= band
 
     x0, x1, y0, y1 = NOSE_BOX
@@ -79,8 +91,19 @@ def main() -> None:
                 out |= np.roll(np.roll(m, dy, axis=0), dx, axis=1)
         return out
 
-    K = 2                                   # removes anything under ~5px across
-    texture = shift_or(shift_and(texture, K), K)
+    # Two different kernels on purpose. The protrusions to delete are the 1-3px antialiasing
+    # ramps, so opening stays small or it eats real detail. The notches to fill are wider —
+    # a threshold wandering across a soft boundary bites several pixels at a time — so
+    # closing has to reach further. Matching them left `sleepy`'s lid edge visibly stepped.
+    K, K_CLOSE = 2, 5
+    texture = shift_or(shift_and(texture, K), K)          # OPENING: drop thin edge ramps
+    # ...then CLOSING, which is not the same thing and is equally necessary. Opening deletes
+    # thin protrusions but leaves NOTCHES untouched, and a threshold cutting across an
+    # antialiased boundary produces notches all along it. On `sleepy` that came out as a
+    # chunky, wavy lower lid edge with spikes biting down into the iris. Dilating then eroding
+    # fills any gap narrower than the kernel while leaving the shape's true outline where it
+    # was.
+    texture = shift_and(shift_or(texture, K_CLOSE), K_CLOSE)
 
     if texture.sum() < 300:
         sys.exit(f"{src}: only {int(texture.sum())}px of face texture — nothing to recover")

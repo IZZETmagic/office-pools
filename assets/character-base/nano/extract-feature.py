@@ -80,6 +80,25 @@ def fill_of(path: str):
     return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
 
 
+def poly_area(path: str) -> float:
+    """Shoelace area of the path's points — how much ink the shape actually lays down."""
+    n = nums(path)
+    xs, ys = n[0::2], n[1::2]
+    k = min(len(xs), len(ys))
+    if k < 3:
+        return 0.0
+    return abs(sum(xs[i] * ys[(i + 1) % k] - xs[(i + 1) % k] * ys[i] for i in range(k))) / 2
+
+
+def solidity(path: str) -> float:
+    """Area / bounding-box area. A curved STROKE fills about 0.39 of its box; a filled
+    OPENING fills 0.76 or more. Measured across the set: closed smile 0.39, closed frown
+    0.39, open-with-teeth 0.76, open "O" 0.87."""
+    x0, x1, y0, y1 = box(path)
+    b = (x1 - x0) * (y1 - y0)
+    return poly_area(path) / b if b else 0.0
+
+
 def lum(c) -> float:
     return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2] if c else 0.0
 
@@ -133,11 +152,37 @@ def main() -> None:
         # fixed y band. A fixed band cannot work: `g03-pleading` has eyes so large that its
         # irises sit at y357, which is inside any band tight enough to call `f04-disgusted`'s
         # brows at y325 a brow. The eye white is the only landmark that moves with the art.
+        # An eye white must be IN THE EYE BAND. Without that test the white band of TEETH in
+        # an open mouth is taken for an eye — it is near-white and wider than 120 — and then
+        # everything above it, including the actual eyes, is classified as eyebrows. That is
+        # exactly what `laughing` did: crescent eyes at y874 read as brows because the teeth
+        # at y1220 had been adopted as the eye line.
+        #
+        # The band is fixed rather than measured because every generated image registers to
+        # the locked base by construction: the nose lands at y954-1131 in all of them, so the
+        # eyes can only be here.
+        EYE_BAND = (700, 1150)
+        # ⚠ The width floor must be SMALL. A narrowed eye's white is cut into slivers by the
+        # iris — `angry` measured 54-118px against a wide-open eye's 270 — so a floor of 120
+        # found no eye whites at all, decided the eyes were shut, and turned the irises and
+        # both eyebrows into "lids". 30 admits the slivers. Teeth cannot sneak in because the
+        # band already excludes them, and a highlight dot inside an iris is harmless here: it
+        # is inside the eye, so it cannot move eye_top or eye_bot anywhere wrong.
         whites = [box(p) for p in picked
                   if close(fill_of(p), (255, 255, 255), 24)
-                  and (box(p)[1] - box(p)[0]) > 120]
-        eye_top = min((b[2] for b in whites), default=0)
-        eye_bot = max((b[3] for b in whites), default=2048)
+                  and (box(p)[1] - box(p)[0]) > 30
+                  and EYE_BAND[0] <= (box(p)[2] + box(p)[3]) / 2 <= EYE_BAND[1]]
+        # Closed or crescent eyes have no white at all, so fall back to the band itself.
+        eyes_open = bool(whites)
+        # ⚠ PER SIDE, not per face. A wink has an open eye on one side and a shut one on the
+        # other, so an asset-wide "are the eyes open?" recolours the winking lid — it was
+        # tagged as an iris and --eye-colour painted it blue, which reads as paint rather than
+        # a shut eye. Same rule the locked eye assets already use.
+        white_side = {"L": False, "R": False}
+        for w in whites:
+            white_side["L" if (w[0] + w[1]) / 2 < 1024 else "R"] = True
+        eye_top = min((b[2] for b in whites), default=EYE_BAND[0])
+        eye_bot = max((b[3] for b in whites), default=EYE_BAND[1])
 
         def in_an_eye(b):
             return any(wx0 - 8 <= b[0] and b[1] <= wx1 + 8 and wy0 - 8 <= b[2] and b[3] <= wy1 + 8
@@ -148,13 +193,24 @@ def main() -> None:
                 and not (fill_of(p)[0] > 190 and lum(fill_of(p)) > 150)]
         darkest = min((lum(fill_of(p)) for p in inks), default=0)
 
-        # Is there anything INSIDE the mouth? Teeth read as near-white below the eyes; a
-        # tongue reads as a second, lighter tone down there. Either means the dark shape
-        # around them is an opening rather than a lip.
-        below = [p for p in picked if (box(p)[2] + box(p)[3]) / 2 > eye_bot and fill_of(p)]
-        mouth_has_contents = (
-            any(close(fill_of(p), (255, 255, 255), 24) for p in below)
-            or len({round(lum(fill_of(p)) / 25) for p in below}) > 1)
+        # --- the mouth region, worked out once -------------------------------------------
+        # Solidity alone cannot sort an open mouth with a TONGUE: on `cheeky` the dark opening
+        # measured 0.53 and the tongue 0.56, straddling the cut, and they came out swapped —
+        # the dark hole rendered as a pale lip and the rose tongue as the dark interior.
+        #
+        # So darkness picks out the interior, shape rescues a thin one, and a mid tone that
+        # hangs BELOW the interior is the tongue.
+        mouth = [p for p in picked if (box(p)[2] + box(p)[3]) / 2 > eye_bot and fill_of(p)
+                 and not close(fill_of(p), (255, 255, 255), 24)
+                 and not (fill_of(p)[0] > 190 and lum(fill_of(p)) > 150)]
+        m_dark = [p for p in mouth if lum(fill_of(p)) < 100]
+        m_mid = [p for p in mouth if lum(fill_of(p)) >= 100]
+
+        def overlaps_a_mid(b):
+            return any(not (b[1] < box(q)[0] or b[0] > box(q)[1]
+                            or b[3] < box(q)[2] or b[2] > box(q)[3]) for q in m_mid)
+
+        deepest_dark = max((box(p)[3] for p in m_dark), default=None)
 
         out = []
         for p in picked:
@@ -178,26 +234,59 @@ def main() -> None:
                 # +88/+95. A lid is face and follows skin; a brow follows hair.
                 over = [w for w in whites if not (b[1] < w[0] or b[0] > w[1])]
                 sep = min((w[2] - b[3] for w in over), default=999)
-                token = BROW_INK if sep >= 40 else (
+                # OVERLAP, not a gap threshold. A drooping LID intrudes into the eye (measured
+                # -52 and -57); a BROW stops short of it. A fixed "at least 40px clear" cut
+                # rejected angry's brows, which clear the eye by only 8px BY BOUNDING BOX —
+                # the brow is angled, so its lowest corner and the eye's highest corner are
+                # nowhere near the same column. Zero is the honest boundary: touch the eye and
+                # you are a lid, stay out of it and you are a brow.
+                token = BROW_INK if sep >= 0 else (
                     BLUSH if (c[0] > 190 and sat >= 105) else FACE_SHADE)
             elif in_an_eye(b):
                 token = FEATURE_INK if lum(c) - darkest <= 14 else FEATURE_INK_RIM
+            elif cy <= eye_bot and not white_side["L" if (b[0] + b[1]) / 2 < 1024 else "R"]:
+                # No white anywhere in the eye band means no eyeball is showing: these marks
+                # are closed LIDS, not irises, and must not take --eye-colour. Recolouring a
+                # shut eye to blue reads as paint. Same rule the locked eye assets use.
+                token = FEATURE_LINE
             elif cy > eye_bot:
-                # Darkness alone does not make a mouth an INTERIOR. A closed-lip smile is a
-                # single dark stroke and must stay a LIP, or --mouth-colour darkens it to 0.65
-                # and the smile turns near-black. An interior is only an interior when there
-                # is something inside the mouth to be behind — teeth or a tongue.
-                token = MOUTH_DARK if (lum(c) < 100 and mouth_has_contents) else MOUTH_INK
+                # SHAPE decides lip versus interior, not darkness and not contents.
+                #
+                # Darkness alone fails: a closed-lip smile is a single dark stroke, and called
+                # an interior it gets darkened to 0.65 by --mouth-colour and turns near-black.
+                #
+                # "Does it contain teeth or a tongue?" was the next attempt and it fails the
+                # other way: a surprised open "O" has neither, so it was called a LIP and
+                # rendered in the pale rose lip token — a dark hole came out light pink.
+                #
+                # Solidity separates a stroke (~0.39) from an opening (0.76+) where the
+                # mouth holds nothing; where it holds a tongue, darkness and overlap decide.
+                if lum(c) < 100:
+                    # A dark shape is an INTERIOR if it is filled, or if something lighter
+                    # sits inside it — a thin dark opening above a tongue is still an opening.
+                    token = MOUTH_DARK if (solidity(p) >= 0.55 or overlaps_a_mid(b)) \
+                        else MOUTH_INK
+                elif deepest_dark is not None and b[3] > deepest_dark:
+                    # Lighter than the interior AND hanging below it: a tongue. Lightness
+                    # alone cannot do this — lip and tongue tones overlap — so the bottom
+                    # edge is what separates them, same as in the mouth-only assets.
+                    token = MOUTH_TONGUE
+                else:
+                    token = MOUTH_INK
             else:
                 token = FEATURE_INK
             out.append(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{token}"', p))
 
         open(dst, "w").write(SVG_OPEN + "".join(out) + "</svg>")
         from collections import Counter
-        names = {FEATURE_WHITE: "white", MOUTH_TEETH: "teeth", BROW_INK: "brow",
+        names = {FEATURE_WHITE: "white", BROW_INK: "brow", FEATURE_LINE: "lid",
                  FEATURE_INK: "iris", FEATURE_INK_RIM: "iris-rim", MOUTH_DARK: "mouth-in",
-                 MOUTH_INK: "lip", BLUSH: "blush", FACE_SHADE: "shade"}
-        tally = Counter(next(n for t, n in names.items() if t in p) for p in out)
+                 MOUTH_INK: "lip", MOUTH_TONGUE: "tongue", BLUSH: "blush",
+                 FACE_SHADE: "shade"}
+        # `next(...)` with no default raises StopIteration inside a generator, which Python
+        # turns into a RuntimeError that looks nothing like the real cause. A token missing
+        # from this map should be reported, not crash the run.
+        tally = Counter(next((n for t, n in names.items() if t in p), "?") for p in out)
         print(f"{dst}: {len(out)} paths ({', '.join(f'{v} {k}' for k, v in tally.most_common())})")
         return
 

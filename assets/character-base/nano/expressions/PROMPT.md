@@ -23,6 +23,7 @@ Both eyes are soft ROUNDED OVALS, slightly taller than wide, and CLOSE-SET — t
 === THE MOUTH IS YOURS TO INVENT. ===
 Be genuinely creative and expressive with the mouth — curved, wavy, squiggly, lopsided, tiny, wide, open, closed, showing teeth or a tongue, gritted, whatever reads strongest. Do not default to a plain line. It sits below the nose. Because there are no eyebrows, the mouth has to do more work: push it.
 
-You may add soft SKIN-TONED SHADING as flat shapes in a slightly deeper peach — hollows under the eyes, a shadow under the lip, warmth on the cheeks, a heavy upper eyelid — but only as shading on the skin itself, never as a separate coloured disc.
+=== NO FACE SHADING UNLESS IT IS ASKED FOR BELOW. ===
+Do NOT add hollows or bags under the eyes, shadows on the cheeks, cheek blush, nasolabial lines, chin creases or any other soft skin-toned modelling. The skin of the face is FLAT and CLEAN. Only add such shading if the feeling described below explicitly calls for it — and then only as flat shapes in a slightly deeper peach on the skin itself, never as a separate coloured disc.
 
 Everything is SOLID FLAT SHAPES with hard crisp edges. No outlines, no gradients, no soft blends.

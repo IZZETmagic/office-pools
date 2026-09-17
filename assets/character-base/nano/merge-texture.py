@@ -34,15 +34,14 @@ im = np.asarray(Image.open(source_png).convert("RGB").resize((2048, 2048))).asty
 # The eye line, read off the asset the extractor already tokenised. Eye whites are the only
 # landmark that moves with the art; a fixed y band cannot work across expressions.
 _asset = open(asset_path).read()
-_tops = []
-for _m in re.finditer(r"<path[^>]*/?>", _asset):
-    _p = _m.group(0)
-    if 'fill="rgb(255,255,255)"' not in _p:
-        continue
-    _n = [float(x) for x in re.findall(r"-?\d+\.?\d*", re.search(r'd="([^"]*)"', _p).group(1))]
-    _xs, _ys = _n[0::2], _n[1::2]
-    if max(_xs) - min(_xs) > 120:
-        _tops.append(min(_ys))
+# ⚠ An eye white must be IN THE EYE BAND. Without that test the white band of TEETH in an
+# open mouth is adopted as the eye line — it is near-white and wide — and then every cheek
+# shape below the eyes measures as being ABOVE the (false) eye line and is classified as a
+# BROW. On `laughing` that turned both cheek blushes into hair-coloured patches.
+#
+# The band is fixed because every generated image registers to the locked base by
+# construction: the nose lands at y954-1131 in all of them, so the eyes can only be here.
+EYE_BAND = (700, 1150)
 _eyes = []
 for _m in re.finditer(r"<path[^>]*/?>", _asset):
     _p = _m.group(0)
@@ -50,9 +49,10 @@ for _m in re.finditer(r"<path[^>]*/?>", _asset):
         continue
     _n = [float(x) for x in re.findall(r"-?\d+\.?\d*", re.search(r'd="([^"]*)"', _p).group(1))]
     _xs, _ys = _n[0::2], _n[1::2]
-    if max(_xs) - min(_xs) > 120:
+    if max(_xs) - min(_xs) > 30 and EYE_BAND[0] <= (min(_ys) + max(_ys)) / 2 <= EYE_BAND[1]:
         _eyes.append((min(_xs), max(_xs), min(_ys), max(_ys)))
-eye_top = min(_tops) if _tops else 0
+# Closed or crescent eyes leave no white at all; fall back to the band itself.
+eye_top = min((e[2] for e in _eyes), default=EYE_BAND[0])
 
 
 def gap_to_eye(x0, x1, y1):
@@ -64,9 +64,11 @@ def gap_to_eye(x0, x1, y1):
     drawn dark or skin-toned depending on the expression.
     """
     over = [e for e in _eyes if not (x1 < e[0] or x0 > e[1])]
-    return min((e[2] - y1 for e in over), default=999)
+    # No eye beneath this column means nothing to be a brow ABOVE — a lone shape out on the
+    # cheek is not a brow. Defaulting to "very far above an eye" was what let cheeks qualify.
+    return min((e[2] - y1 for e in over), default=-999)
 
-keep = []
+under, over = [], []
 for m in re.finditer(r"<path[^>]*/?>", open(texture_svg).read()):
     p = m.group(0)
     fl = re.search(r'fill="rgb\((\d+),\s*(\d+),\s*(\d+)\)"', p)
@@ -89,7 +91,7 @@ for m in re.finditer(r"<path[^>]*/?>", open(texture_svg).read()):
     lum = 0.299 * r + 0.587 * g + 0.114 * b
     sat = max(r, g, b) - min(r, g, b)
     g = gap_to_eye(min(xs), max(xs), max(ys))
-    if g >= 40:
+    if g >= 0:
         # A BROW: above the eye and clearly clear of it. Whatever tone it was drawn in, it
         # follows hair — `f05-exhausted` and `f01-furious` draw theirs as pale skin-toned
         # ridges, and left as skin they stayed light against black hair.
@@ -103,10 +105,18 @@ for m in re.finditer(r"<path[^>]*/?>", open(texture_svg).read()):
         token = BLUSH
     else:
         token = FACE_SHADE
-    keep.append(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{token}"', p))
+    painted = re.sub(r'fill="rgb\([^)]*\)"', f'fill="{token}"', p)
+    # Paint order matters as much as colour. Skin modelling normally belongs UNDER the
+    # features — a cheek shadow must not wash over an eye. But an upper EYELID is skin drawn
+    # ON TOP of the eyeball, and inserted underneath it simply vanishes: `smug`'s half-mast
+    # lids were both present in the asset and invisible in the render, which removed the
+    # entire expression. Overlapping the eye is what tells them apart.
+    (over if g < 0 else under).append(painted)
 
 a = open(asset_path).read()
 cut = a.index(">", a.index("<svg")) + 1
 # Texture paints FIRST: it is skin modelling, and must sit under the eyes and mouth.
-open(asset_path, "w").write(a[:cut] + "".join(keep) + a[cut:a.rindex("</svg>")] + "</svg>")
-print(f"{asset_path}: merged {len(keep)} texture paths at their generated colours")
+open(asset_path, "w").write(
+    a[:cut] + "".join(under) + a[cut:a.rindex("</svg>")] + "".join(over) + "</svg>")
+print(f"{asset_path}: merged {len(under)} texture paths under the features"
+      + (f", {len(over)} over (eyelids)" if over else ""))
