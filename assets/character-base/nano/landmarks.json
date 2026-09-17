@@ -88,14 +88,14 @@
   "facialhair": {
     "_note": "The lower face \u2014 moustache, beard, chin and jaw. Runs from ear level down to the jawline. The NOSE sits inside this band and is excluded by colour, being a base tone, exactly as it is for the mouth.",
     "placement": {
-      "x0": 245,
-      "x1": 780,
+      "x0": 210,
+      "x1": 815,
       "y0": 380,
       "y1": 790
     },
     "extract": {
-      "x0": 245,
-      "x1": 780,
+      "x0": 210,
+      "x1": 815,
       "y0": 380,
       "y1": 790
     }
