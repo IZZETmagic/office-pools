@@ -53,6 +53,8 @@ MOUTH_TONGUE = "rgb(206,116,112)"
 
 # Brows get their own token so they can follow the HAIR colour without being hair.
 BROW_INK = "rgb(101,70,52)"
+HAIR_BASE = "rgb(140,122,110)"   # facial hair follows the head-hair colour
+STUBBLE = "rgb(164,150,140)"     # five o'clock shadow: hair colour blended toward skin
 FACE_SHADE = "rgb(245,178,150)"   # skin modelling — follows --skin, same token as the base
 BLUSH = "rgb(240,158,138)"        # warmer than shade; follows --skin but keeps a rosy cast
 
@@ -212,6 +214,17 @@ def main() -> None:
 
         deepest_dark = max((box(p)[3] for p in m_dark), default=None)
 
+        def inside_the_interior(b, tol: int = 6):
+            """A tongue sitting INSIDE an open mouth, rather than lolling out below it.
+
+            Containment is safe in this direction only: a tongue is enclosed by the opening,
+            whereas a LIP would enclose the opening instead. `excited` needed it because its
+            tongue shares a bottom edge with the interior exactly (both y1472), so the
+            "hangs lower" test failed on a tie and the tongue was tagged a lip."""
+            return any(box(q)[0] - tol <= b[0] and b[1] <= box(q)[1] + tol
+                       and box(q)[2] - tol <= b[2] and b[3] <= box(q)[3] + tol
+                       for q in m_dark)
+
         out = []
         for p in picked:
             c = fill_of(p)
@@ -266,7 +279,7 @@ def main() -> None:
                     # sits inside it — a thin dark opening above a tongue is still an opening.
                     token = MOUTH_DARK if (solidity(p) >= 0.55 or overlaps_a_mid(b)) \
                         else MOUTH_INK
-                elif deepest_dark is not None and b[3] > deepest_dark:
+                elif deepest_dark is not None and (b[3] > deepest_dark or inside_the_interior(b)):
                     # Lighter than the interior AND hanging below it: a tongue. Lightness
                     # alone cannot do this — lip and tongue tones overlap — so the bottom
                     # edge is what separates them, same as in the mouth-only assets.
@@ -299,6 +312,20 @@ def main() -> None:
         fills = {re.search(r'fill="(rgb\([^)]*\))"', p).group(1) for p in picked
                  if re.search(r'fill="rgb\([^)]*\)"', p)}
         print(f"{dst}: {len(picked)} paths kept verbatim, {len(fills)} distinct fills")
+        return
+
+    if zone_name == "facialhair":
+        # One flat mass, so there is nothing to classify — every path in the band is facial
+        # hair. It takes the HAIR token so it follows --hair-colour: a blonde avatar with a
+        # black beard looks like a mistake, and nobody wants to pick the colour twice.
+        # --stubble marks a five o'clock shadow, which must stay LIGHTER than a real beard.
+        # Tokenised as hair it would render at full hair strength and read as a short beard,
+        # losing the only thing that distinguishes it.
+        tok = STUBBLE if "--stubble" in sys.argv else HAIR_BASE
+        out = [re.sub(r'fill="rgb\([^)]*\)"', f'fill="{tok}"', p) for p in picked]
+        open(dst, "w").write(SVG_OPEN + "".join(out) + "</svg>")
+        print(f"{dst}: {len(out)} facial-hair paths"
+              + ("  [stubble tone]" if tok is STUBBLE else ""))
         return
 
     if zone_name == "brow":

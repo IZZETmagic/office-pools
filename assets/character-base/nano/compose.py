@@ -14,6 +14,7 @@ Colour is never baked into an asset. Hair assets use two canonical tokens
 this script swaps them at compose time. The texture tone is derived by darkening
 the requested hair colour, so a single colour input drives both.
 """
+import math
 import re
 import sys
 
@@ -31,6 +32,7 @@ MOUTH_DARK = "rgb(118,72,68)"   # the inside of an open mouth
 MOUTH_TONGUE = "rgb(206,116,112)"
 BROW_INK = "rgb(101,70,52)"
 BLUSH = "rgb(240,158,138)"
+STUBBLE = "rgb(164,150,140)"
 
 
 def hex_to_rgb(h: str) -> tuple[int, int, int]:
@@ -87,6 +89,17 @@ def main() -> None:
     # ⚠ If a future hair style DOES reach the eyes, this order will occlude them. That is the
     # intended behaviour, but it makes eye clearance a property of the HAIR asset now, which
     # is where it belongs. Re-run the overlap check when adding hair.
+    # FACIAL HAIR paints before the expression, so the mouth is always drawn ON TOP of it.
+    #
+    # ⚠ And that is ALL it does. A previous version derived a clean-shaven patch from each
+    # expression's mouth box and punched it through the beard. It sized correctly, but it made
+    # the beard a different shape in every expression, which is not a beard — it is twelve
+    # beards. Facial hair is ONE asset with ONE appearance; the mouth overprints it, which is
+    # what a real beard does anyway.
+    for flag in ("--facial-hair",):
+        if p := arg(flag):
+            svg = svg.replace("</svg>", inner(p) + "</svg>")
+
     for flag in ("--eyes", "--mouth", "--expression", "--brows", "--hair"):
         if p := arg(flag):
             svg = svg.replace("</svg>", inner(p) + "</svg>")
@@ -115,6 +128,12 @@ def main() -> None:
 
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)
+        # Stubble is the hair colour mixed 55% toward the skin — it has to track hair (a
+        # blonde with black stubble looks wrong) while staying obviously lighter than a beard,
+        # which is the only thing that makes it read as stubble at all.
+        if sk := arg("--skin"):
+            mix = tuple(int(h + (s2 - h) * 0.55) for h, s2 in zip(rgb, hex_to_rgb(sk)))
+            svg = svg.replace(f'fill="{STUBBLE}"', f'fill="{rgb_str(mix)}"')
         svg = svg.replace(f'fill="{HAIR_BASE}"', f'fill="{rgb_str(rgb)}"')
         svg = svg.replace(f'fill="{HAIR_SHADE}"', f'fill="{darken(rgb)}"')
         svg = svg.replace(f'fill="{HAIR_LIGHT}"', f'fill="{lighten(rgb)}"')
