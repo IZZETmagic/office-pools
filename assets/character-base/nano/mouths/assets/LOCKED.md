@@ -15,6 +15,19 @@ without an explicit request naming the asset. Same rule as `../../bases/LOCKED.m
 | `mouth-08-wavy.asset.svg` | 1 | nervous squiggle |
 | `mouth-09-laugh.asset.svg` | 3 | open: teeth + interior + tongue |
 | `mouth-10-tongue.asset.svg` | 2 | playful; tongue hangs BELOW a closed line |
+| `mouth-11-ajar.asset.svg` | 1 | lips resting slightly parted; a narrow dark gap |
+| `mouth-12-smile-ajar.asset.svg` | 3 | a small open smile, thin sliver of teeth |
+| `mouth-13-oh.asset.svg` | 1 | a quiet small "oh", ~a third the size of `05-open-o` |
+| `mouth-14-yawn.asset.svg` | 2 | sleepy yawn; taller than wide, tongue low inside |
+| `mouth-15-teeth.asset.svg` | 5 | ⚠ OFF-BRIEF: fully rendered LIPS, a different design
+language from the other fourteen. Kept deliberately as a distinct look, not because it matched. |
+
+⚠ These five were lost once. The locking step that should have saved them ran inside a
+directory whose permissions had just been broken, so the copy, this table's edit and the
+checksum regeneration all failed silently. The only copies then sat in `mouths/pending/`,
+which was deleted during a cleanup after a comparison reported DIFF on all five — a signal
+that was explained away rather than investigated. Recovered from the traces. A DIFF against
+a file you believe is a duplicate means one of the two beliefs is wrong.
 
 Generated with Nano Banana Pro against `../../bases/base-neck-100.png`, traced with Recraft
 `vectorize`, extracted by `../../extract-feature.py mouth`. Sources in `../nano/`.
