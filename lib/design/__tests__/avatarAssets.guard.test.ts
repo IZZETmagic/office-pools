@@ -55,6 +55,13 @@ const HAIR_BASE = 'rgb(140,122,110)'
 const HAIR_SHADE = 'rgb(114,97,86)'
 const HAIR_LIGHT = 'rgb(168,150,138)'
 
+/** The base's face tone. Six SHORT hair styles carry a polygon in it, painted over their own
+ *  sideburn to cap its width where the beard meets it — see `thin-sideburn.py`. It is legal
+ *  in a hair asset ONLY as that cut, which is why the marker is required alongside it: an
+ *  off-palette fill that arrives by accident has no marker and still fails. */
+const FACE_SKIN = 'rgb(254,205,180)'
+const THINNED = '<!--sideburn-thinned-->'
+
 /** The shared coordinate space. Assets register by living in the base's viewBox. */
 const VIEWBOX = 'viewBox="0 0 2048 2048"'
 
@@ -89,9 +96,13 @@ describe('avatar assets stay cross-platform', () => {
   it('paints hair only in the canonical tones', () => {
     for (const f of svgsIn(HAIR)) {
       const fills = [...f.body.matchAll(/fill="(rgb\([^)]*\))"/g)].map((m) => m[1])
-      const allowed = new Set([HAIR_BASE, HAIR_SHADE, HAIR_LIGHT])
+      const allowed = new Set([HAIR_BASE, HAIR_SHADE, HAIR_LIGHT, FACE_SKIN])
       const unexpected = [...new Set(fills)].filter((c) => !allowed.has(c))
       expect(unexpected, `${f.name} has off-palette fills`).toEqual([])
+      if (fills.includes(FACE_SKIN)) {
+        expect(f.body, `${f.name} paints in the face tone without the sideburn-cut marker`)
+          .toContain(THINNED)
+      }
     }
   })
 
