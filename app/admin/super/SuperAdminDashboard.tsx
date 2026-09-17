@@ -23,8 +23,9 @@ import { AutomatedEmailsTab } from './AutomatedEmailsTab'
 import { BrandedPoolsTab } from './BrandedPoolsTab'
 import { SubscriptionsTab } from './SubscriptionsTab'
 import { SP } from './SpTable'
+import { AvatarsTab } from './AvatarsTab'
 
-type Tab = 'matches' | 'users' | 'pools' | 'branded' | 'audit' | 'stats' | 'templates' | 'broadcast' | 'email_history' | 'automated_emails' | 'subscriptions'
+type Tab = 'matches' | 'users' | 'pools' | 'branded' | 'audit' | 'stats' | 'templates' | 'broadcast' | 'email_history' | 'automated_emails' | 'subscriptions' | 'avatars'
 
 type TabItem = { key: Tab; label: string; icon: React.ReactNode }
 type TabSection = { heading: string; items: TabItem[] }
@@ -45,6 +46,13 @@ const TAB_SECTIONS: TabSection[] = [
         label: 'Audit Log',
         icon: (
           <Icon name="doc.text" className="w-[18px] h-[18px]" />
+        ),
+      },
+      {
+        key: 'avatars',
+        label: 'Avatars',
+        icon: (
+          <Icon name="person.crop.circle" className="w-[18px] h-[18px]" />
         ),
       },
     ],
@@ -274,6 +282,7 @@ export function SuperAdminDashboard({
               setAuditLogs={setAuditLogs}
             />
           )}
+          {activeTab === 'avatars' && <AvatarsTab />}
           {activeTab === 'users' && (
             <UsersTab
               users={users}

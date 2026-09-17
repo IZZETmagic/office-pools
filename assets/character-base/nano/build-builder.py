@@ -51,6 +51,13 @@ data = {
                    if not k.startswith("_")},
 }
 
+# Also emit the data for the in-app builder. It is FETCHED at runtime rather than imported,
+# so 376KB of asset markup never enters the admin bundle.
+repo = HERE.parents[2]
+(repo / "public" / "avatar-assets.json").write_text(json.dumps(data, separators=(",", ":")))
+print(f"public/avatar-assets.json  "
+      f"{(repo / 'public' / 'avatar-assets.json').stat().st_size / 1024:.0f}KB")
+
 html = (HERE / "builder-template.html").read_text()
 out = html.replace("/*__DATA__*/", "const ASSETS = " + json.dumps(data) + ";")
 (HERE / "avatar-builder.html").write_text(out)
