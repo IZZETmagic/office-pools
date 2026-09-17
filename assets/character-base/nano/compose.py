@@ -14,6 +14,7 @@ Colour is never baked into an asset. Hair assets use two canonical tokens
 this script swaps them at compose time. The texture tone is derived by darkening
 the requested hair colour, so a single colour input drives both.
 """
+import json
 import math
 import re
 import sys
@@ -89,20 +90,67 @@ def main() -> None:
     # ⚠ If a future hair style DOES reach the eyes, this order will occlude them. That is the
     # intended behaviour, but it makes eye clearance a property of the HAIR asset now, which
     # is where it belongs. Re-run the overlap check when adding hair.
-    # FACIAL HAIR paints before the expression, so the mouth is always drawn ON TOP of it.
+    # FACIAL HAIR: where it sits in the stack, which is three separate questions.
+    #
+    # 1. UNDER OR OVER THE MOUTH — declared per style in facialhair/manifest.json. A
+    #    moustache hangs over the lip, so the mouth is drawn first and the hair covers its
+    #    top edge. A beard is a mass the mouth sits IN, so the mouth must be drawn last or a
+    #    solid beard simply hides it. Coverage cannot decide this: the moustache overlaps the
+    #    mouth region by 34% and stubble by 78%, with nothing clean in between.
+    #
+    # 2. ALWAYS UNDER THE NOSE. A moustache sits against the nose's underside; painted over
+    #    it, a raised moustache swallows the nose tip.
+    #
+    # 3. Which means for an "over" style the NOSE HAS TO MOVE. It lives in the base, which is
+    #    painted before everything, so it is re-inserted after the hair — otherwise "mouth
+    #    under the moustache" and "nose over the moustache" cannot both hold.
     #
     # ⚠ And that is ALL it does. A previous version derived a clean-shaven patch from each
-    # expression's mouth box and punched it through the beard. It sized correctly, but it made
-    # the beard a different shape in every expression, which is not a beard — it is twelve
-    # beards. Facial hair is ONE asset with ONE appearance; the mouth overprints it, which is
-    # what a real beard does anyway.
-    for flag in ("--facial-hair",):
+    # expression's mouth box and punched it through the beard. It sized correctly but made the
+    # beard a different shape in every expression, which is not a beard, it is twelve beards.
+    fh = arg("--facial-hair")
+    fh_over = False
+    if fh:
+        name = fh.rsplit("/", 1)[-1].replace(".asset.svg", "")
+        manifest = f"{__file__.rsplit('/', 1)[0]}/facialhair/manifest.json"
+        try:
+            fh_over = bool(json.load(open(manifest)).get(name, {}).get("over"))
+        except Exception:
+            fh_over = False
+
+    def find_nose(doc: str):
+        for m in re.finditer(r"<path[^>]*/?>", doc):
+            path = m.group(0)
+            if BASE_SHADE not in path:
+                continue
+            n = [float(x) for x in re.findall(r"-?\d+\.?\d*",
+                                              re.search(r'd="([^"]*)"', path).group(1))]
+            xs, ys = n[0::2], n[1::2]
+            # Narrow, centred, upper-middle. The ears share this tone but sit out at the
+            # sides; the neck shadow shares it too but is far wider and lower.
+            if (max(xs) - min(xs) < 200 and 900 < (min(xs) + max(xs)) / 2 < 1150
+                    and 900 < min(ys) < 1200):
+                return path
+        return None
+
+    if fh and not fh_over:
+        nose = find_nose(svg)
+        svg = svg.replace(nose, inner(fh) + nose, 1) if nose \
+            else svg.replace("</svg>", inner(fh) + "</svg>")
+
+    for flag in ("--eyes", "--mouth", "--expression", "--brows"):
         if p := arg(flag):
             svg = svg.replace("</svg>", inner(p) + "</svg>")
 
-    for flag in ("--eyes", "--mouth", "--expression", "--brows", "--hair"):
-        if p := arg(flag):
-            svg = svg.replace("</svg>", inner(p) + "</svg>")
+    # An "over" style goes on after the face, taking the nose with it so the nose stays on top.
+    if fh and fh_over:
+        nose = find_nose(svg)
+        if nose:
+            svg = svg.replace(nose, "", 1)
+        svg = svg.replace("</svg>", inner(fh) + (nose or "") + "</svg>")
+
+    if p := arg("--hair"):
+        svg = svg.replace("</svg>", inner(p) + "</svg>")
 
     if c := arg("--eye-colour"):
         # The iris has TWO tones — a darker core and a lighter rim — and both come from one
