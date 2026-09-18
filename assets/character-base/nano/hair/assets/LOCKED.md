@@ -8,7 +8,7 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 |---|---|---|
 | `hair-m01-buzz.asset.svg` | 4 | face mask |
 | `hair-m02-sidepart.asset.svg` | 4 | two base shapes — the parting splits the mass |
-| `hair-m03-quiff.asset.svg` | 5 | face mask |
+| `hair-m03-quiff.asset.svg` | 5 | ⭐ REPLACED 2026-09-18 with v2 — see below |
 | `hair-m05-undercut.asset.svg` | 9 | 3 base shapes — top mass plus both shaved sides; no mask |
 | `hair-m06-slickback.asset.svg` | 5 | 70px brow band — the roomiest |
 | `hair-m07-curls.asset.svg` | 6 | scalloped silhouette |
@@ -32,6 +32,43 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f12-halfup.asset.svg` | 13 | masked; small bun with loose length; ⚠ 27px brow band |
 | `hair-f13-longstraight.asset.svg` | 7 | INVERTED trace; 46px brow band |
 | `hair-f14-shag.asset.svg` | 9 | masked; stepped layers; 106px brow band |
+
+## m03-quiff REPLACED with v2 (2026-09-18)
+
+⭐ The first asset rebuilt to the **seam contract**. Ryan approved it and asked for it to be
+locked. A render of the outgoing v1 is kept at `../v2/quiff-v1-for-comparison.png`.
+
+What changed, and only this:
+
+- **No hair in front of the ears.** v1 hung a small strip down beside each ear; both ears now
+  sit clear, with bare skin in front of and below them.
+- **The lower edge sweeps instead of stopping.** v1 ended on a blunt vertical cut with a square
+  corner. The edge now runs 284 → 279 → 275 → 271 → 267 → 264 → 261 → 259 → 258 → 257 across
+  y344-402: a curvature jump of 1, where a shorter sweep left 4.
+
+The quiff itself — volume, hairline, all four swoosh strokes, both ash browns — is unchanged.
+
+⚠ The sweep is GEOMETRY, not generation, and Ryan approved that route explicitly. Nine Nano
+Banana attempts across three framings all reintroduced a strand in FRONT of the ear. The reason
+is the base: the ears sit ENTIRELY OUTSIDE the head edge (x201-258) and `extract-hair.py` blacks
+them out of the hair mask, so hair drawn "behind" an ear is invisible, and the only hair that can
+be SEEN beside one is a sideburn on the cheek. The script only ever REMOVES hair — filling the
+step the other way would have put hair back in front of the ear.
+
+⚠⚠ THIS ASSET FOUND A REAL CLASSIFIER BUG, now fixed in `../../extract-hair.py`. A traced path
+that was not the base tone was called texture regardless of WHERE it sat, so the quiff absorbed
+four base features as "lighter texture": the neck's crescent shadow (y1519-1648, which rendered
+as a dark disc on the neck and which Ryan spotted), BOTH ears (y798-1024) and the NOSE
+(y954-1130). All four are FACE_SHADE in the base; nothing in their tone distinguishes them from
+hair texture, only their position does. Texture must now fall inside the hair mass's bounding
+box. buzz, mohawk and receding were re-checked and are clean — this only bit the quiff because
+its mass sits high enough to leave those features exposed to the trace.
+
+⚠ Traced SINGLE-PASS, deliberately. The two-pass texture route LOSES this style's swooshes:
+`isolate-texture.py` takes the largest-area tone as the base, and the quiff's dark strokes
+dominate, so it picked them as the base and isolated the lighter mass as "texture" — 6 paths with
+the strokes gone, against 5 with them intact. The two-pass helps buzz and receding and harms the
+quiff. Check per style; never apply it by default.
 
 ## m12-shortsides was REMOVED (2026-09-17)
 

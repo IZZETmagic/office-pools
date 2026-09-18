@@ -331,14 +331,43 @@ def normalise(hair: list[str], areas: dict) -> str:
     texture, so "lightest is the base" inverts it. Only area is reliable.
     """
     base_tone = max(areas, key=lambda c: areas[c])
-    out = []
+
+    # ⚠⚠ A TEXTURE PATH MUST LIE INSIDE THE HAIR MASS. Without this the quiff picked up FOUR
+    # base features as "lighter texture" — the neck's crescent shadow (y1519-1648, which
+    # rendered as a dark disc on the neck), BOTH ears (y798-1024) and the NOSE (y954-1130).
+    # They are all FACE_SHADE in the base, and a trace reads them as a lighter tone sitting
+    # beside the hair. Nothing in the tone told them apart; their POSITION does.
+    mass = [p for p in hair if close(fill_of(p), base_tone, tol=8)]
+    if mass:
+        mxs = [v for p in mass for v in xs_of(p)]
+        mys = [v for p in mass for v in ys_of(p)]
+        mx0, mx1, my0, my1 = min(mxs), max(mxs), min(mys), max(mys)
+    else:
+        mx0 = my0 = -1e9
+        mx1 = my1 = 1e9
+
+    def inside_mass(p: str) -> bool:
+        """Is this path's centre within the hair mass's own bounding box?"""
+        x, y = xs_of(p), ys_of(p)
+        if not x:
+            return False
+        cx, cy = (min(x) + max(x)) / 2, (min(y) + max(y)) / 2
+        return mx0 <= cx <= mx1 and my0 <= cy <= my1
+
+    out, dropped = [], 0
     for p in hair:
         c = fill_of(p)
         if close(c, base_tone, tol=8):
             token = HAIR_BASE
         else:
+            if not inside_mass(p):
+                dropped += 1
+                continue
             token = HAIR_SHADE if lum(c) < lum(base_tone) else HAIR_LIGHT
         out.append(re.sub(r'fill="rgb\([^)]*\)"', f'fill="{token}"', p))
+    if dropped:
+        print(f"  dropped {dropped} texture path(s) outside the hair mass "
+              f"(nose / ears / neck shadow read as texture)")
     return "".join(out)
 
 
