@@ -56,9 +56,27 @@ out at 51px against buzz's 51px, first try.
 `buzz-APPROVED.png` as IMAGE 3, the authority on how far down the sideburn reaches. Results
 oscillate; take the good one and carry on.
 
-⚠ Expect to fix the haircut afterwards. Reproducing buzz brings buzz's hairline with it, so the
-style ends up under-expressed — receding came back barely receding at all and needs a follow-up
-pass that deepens the recession while explicitly freezing the sideburns.
+⚠ Expect to fix the haircut afterwards, and expect to PAY for it. Reproducing buzz brings buzz's
+hairline with it, so the style comes out under-expressed. The repair pass works — one pass with
+the sideburns explicitly frozen gave a strongly receding hairline — but it lengthens the
+sideburn again (y398 -> y511), and the cut prompt then has to be chained back down.
+
+⭐ **And every chained cut pass leaks a little of IMAGE 3's hairline back in.** That is the real
+tension and there is no prompt that escapes it:
+
+| protect the hairline | result |
+|---|---|
+| hard ("if your hairline looks fuller than IMAGE 2 you have failed") | recession survives, cut **stalls at y472** and will not move |
+| normally | cut reaches **y399**, recession erodes back toward buzz's |
+
+Receding was approved on the second of those — `receding-APPROVED.png`, four chained passes to
+y399 with a milder recession than the repair pass produced. Worth knowing before spending more:
+the milder result is still slightly MORE receding than the locked asset it replaces, so it is
+not a regression on the current art.
+
+If a future style needs both, the untried idea is to use `mohawk-APPROVED.png` as IMAGE 3 for
+the cut instead of `buzz-APPROVED.png` — a hairline that looks nothing like the target leaks
+less into it.
 
 ## The four passes
 
@@ -193,11 +211,10 @@ model and reference — went the WRONG WAY, to y443.
 | `receding-locked.png` | render of the locked receding asset |
 | `receding-step1.png` | pass 1 height donor, y398 — the four-pass route then STALLED at y473 |
 | `receding-sq.png` | pass 2, y474 — the stall |
-| `receding-c3.png`, `receding-c5.png` | the inverted-reference route: sideburn correct at y398/51px |
-
-⚠ `receding-c5.png` has the approved sideburn but Ryan says the hair does not read as receding —
-the hairline needs to pull much further back. NOT approved. Next step is a follow-up pass that
-deepens the recession with the sideburns explicitly frozen.
+| `receding-c5.png` | inverted-reference route: sideburn right, but hairline barely receded — rejected |
+| `receding-h1.png` | the recession repair pass — strongest hairline, sideburn back out to y511 |
+| `receding-n2.png`, `receding-q3.png` | hairline protected hard: recession holds, cut stalls at y472 |
+| `receding-APPROVED.png` | approved 2026-09-17, y399 — four chained cut passes from h1 |
 
 ⚠ Not traced, not extracted, not locked. The hair assets in `hair/assets/` are untouched — this
 is a shape Ryan has approved, not an asset yet.
