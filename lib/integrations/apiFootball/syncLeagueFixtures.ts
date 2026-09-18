@@ -84,6 +84,50 @@ const FEED_TIMEOUT_MS = 4_000
 // leaves headroom without letting a misconfigured season run away.
 const LINEUP_LIMIT = 12
 
+// ⚠⚠ THE LATE-xG PASS, AND WHY IT CANNOT RIDE ANY OF THE GATES ABOVE.
+//
+// api-football publishes `expected_goals` and `goals_prevented` DAYS after full
+// time for most competitions — measured 2026-09-16, fixture 1557404 (Man Utd–
+// Man City, 13 Sep) was stored `expected_goals: null` while the live endpoint
+// returned 1.00 for it three days later. Every other gate in this file is a
+// change gate or a window gate, and neither can ever fire again for a fixture
+// that finished last week: 7b4 rides `res.changed` and a completed fixture
+// stops changing, the window is 2h30 wide, and 1b's catch-up takes only
+// `is_completed = false`. So the xG simply never arrived. Coverage on the day
+// this was written: Serie A 78/78, but Premier League 60/80, La Liga 80/106,
+// Ligue 1 50/72, Bundesliga 34/54 — and Serie A is the outlier only because
+// that competition publishes xG immediately, inside the window.
+//
+// ⚠ AND IT RUNS BEFORE STEP 2's CHEAP EXIT, which is the whole reason it is its
+// own pass rather than a third contributor to 7b2c's `wanted` set. The moment
+// the provider publishes is precisely the moment `rows.length === 0` — three
+// days after the match, on a day this league is not playing. Folding it into
+// 7b2c would have made it fire only on matchdays, which is exactly when the xG
+// does NOT yet exist. It would have looked implemented and done nothing.
+//
+// The four bounds: do not ask before the provider could plausibly have it, ask
+// again at most every six hours, and stop asking after four days — some
+// fixtures are never given an xG at all (Bundesliga's 63% is partly that, not
+// all lateness), and a retry with no horizon spends quota on them forever.
+const XG_MIN_AGE_MS = 3 * 60 * 60 * 1000
+const XG_RETRY_MS = 6 * 60 * 60 * 1000
+const XG_MAX_AGE_MS = 4 * 24 * 60 * 60 * 1000
+const XG_LIMIT = 20
+
+// ⚠ THE SWEEP IS RATIONED BY THE CLOCK, not by a change. Without this the two
+// candidate reads below run every tick for every season — 14,400 extra queries
+// a day across five leagues to find nothing, on a database where reads are
+// already the dominant cost. A ten-minute cadence against a SIX HOUR retry
+// means a missed tick costs nothing at all: the fixture is picked up at the
+// next sweep, hours inside its own window.
+const XG_SWEEP_EVERY_MINUTES = 10
+
+// ⚠ A DEFENSIVE CAP ON THE CANDIDATE READ, not a functional limit. Four days of
+// one league is a dozen or two fixtures, nowhere near PostgREST's silent
+// 1,000-row truncation — but an unbounded `.select()` is the bug that cap
+// causes, and the guard costs nothing.
+const XG_CANDIDATE_CAP = 200
+
 // How often a feed failure for one season may enter `errors[]`.
 //
 // `finishRun` computes `ok: errors.length === 0` and the status panel renders
@@ -134,6 +178,17 @@ export type LeagueSyncResult = {
   timelineRows: number
   /** Team-stat rows written across all fixtures this tick (two per fixture). */
   statsRows: number
+  /**
+   * Settled fixtures the late-xG pass re-read this tick, and how many of them
+   * came back carrying an xG at last.
+   *
+   * ⚠ BOTH NUMBERS, because either one alone lies. `asked` without `got` is the
+   * ordinary answer — the provider has not published yet — and is how you tell
+   * that from an arm that never looked. `got` climbing while `asked` stays flat
+   * would mean the retry marker has stopped advancing.
+   */
+  xgAsked: number
+  xgGot: number
   /** Line-up rows written across all fixtures this tick (two per fixture). */
   lineupRows: number
   /** Player-stat rows written this tick (about forty per fixture). */
@@ -206,6 +261,8 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     bundleCalls: 0,
     bundleFixtures: 0,
     statsRows: 0,
+    xgAsked: 0,
+    xgGot: 0,
     lineupRows: 0,
     playerRows: 0,
     timelineRows: 0,
@@ -347,6 +404,150 @@ export async function syncLeagueFixtures(
   )
   result.window = windowRows?.length ?? 0
   result.stale = strayRows?.length ?? 0
+
+  // ⚠ ONE BUDGET FOR THE WHOLE TICK. Retrying is safe per write (140 made
+  // every replace atomic) but not free in aggregate: forty failing writes at
+  // 750ms of backoff each would add half a minute to a sync that runs every
+  // minute. After a handful of transport faults the run stops retrying and
+  // reports instead — a tick that overruns is worse than one that says so.
+  //
+  // Declared HERE rather than at 7b2c because 1c writes too, and two budgets
+  // would quietly double the allowance the comment above exists to cap.
+  const writeBudget = createRetryBudget()
+
+  // ------------------------------------------------------------- 1c. late xG
+  // The one pass in this file that goes looking for data the provider publishes
+  // AFTER it has stopped telling us anything. See the `XG_*` constants for why
+  // it can ride none of the other gates, and why it has to run BEFORE step 2's
+  // cheap exit: the day the xG lands is a day this league is not playing.
+  //
+  // ⚠ IT TOUCHES `match_team_stats` AND NOTHING ELSE, and that is the point.
+  // These fixtures are deliberately NOT added to `rows`. Putting a settled match
+  // back through the step 6 diff and the step 7 RPC would rewrite its score and
+  // stamp `last_synced_at` on a result that finished days ago, to collect two
+  // decimal columns nothing scores from. The blast radius is one table, by
+  // construction rather than by care.
+  if (new Date(opts.now).getUTCMinutes() % XG_SWEEP_EVERY_MINUTES === 0) {
+    try {
+      const { data: aged, error: agedErr } = await admin
+        .from('league_fixtures')
+        .select('fixture_id, external_fixture_id')
+        .eq('season_id', target.seasonId)
+        .eq('is_completed', true)
+        .not('external_fixture_id', 'is', null)
+        .lt('kickoff_at', new Date(opts.now - XG_MIN_AGE_MS).toISOString())
+        .gt('kickoff_at', new Date(opts.now - XG_MAX_AGE_MS).toISOString())
+        .order('kickoff_at', { ascending: true })
+        .limit(XG_CANDIDATE_CAP)
+      if (agedErr) throw new Error(agedErr.message)
+
+      const extByFixture = new Map(
+        ((aged ?? []) as { fixture_id: string; external_fixture_id: string | null }[])
+          .filter((r) => r.external_fixture_id !== null)
+          .map((r) => [r.fixture_id, r.external_fixture_id as string]),
+      )
+
+      if (extByFixture.size > 0) {
+        // ⚠ A FIXTURE WITH NO STAT ROW AT ALL IS NOT THIS PASS'S PROBLEM, and
+        // leaving it out is deliberate. `created_at` is the retry marker (see
+        // below), so a fixture that has never been written has no marker to
+        // throttle on and would be asked every sweep for four days. Those are
+        // `scripts/backfill-match-lineups-stats.ts`'s job, which is bounded by
+        // being run by a human.
+        const { data: holes, error: holeErr } = await admin
+          .from('match_team_stats')
+          .select('fixture_id, created_at')
+          .in('fixture_id', [...extByFixture.keys()])
+          .is('expected_goals', null)
+        if (holeErr) throw new Error(holeErr.message)
+
+        // ⚠⚠ `created_at` IS THE RETRY MARKER, AND IT COSTS NO MIGRATION.
+        // `replace_match_team_stats` (140) DELETEs then INSERTs without naming
+        // the column, and it defaults to `now()` — so every rewrite advances it
+        // and it already means "when we last refreshed this fixture's stats".
+        // Verified in production: fixture 1557404's rows carried
+        // `created_at 17:25Z` against a `last_synced_at` of `17:59Z`, half an
+        // hour apart, because the stats write stopped before the sync did.
+        //
+        // The MAX across the two sides, not the min: either side being null is
+        // reason to re-ask, but the pair is written together, so the later
+        // timestamp is the real attempt.
+        const lastAttempt = new Map<string, number>()
+        for (const h of (holes ?? []) as { fixture_id: string; created_at: string }[]) {
+          const t = Date.parse(h.created_at)
+          if (!Number.isFinite(t)) continue
+          const prev = lastAttempt.get(h.fixture_id)
+          if (prev === undefined || t > prev) lastAttempt.set(h.fixture_id, t)
+        }
+
+        // Least-recently-asked first, so a fixture can never be starved by a
+        // busier matchweek arriving behind it.
+        const due = [...lastAttempt.entries()]
+          .filter(([, t]) => t < opts.now - XG_RETRY_MS)
+          .sort((a, b) => a[1] - b[1])
+          .slice(0, XG_LIMIT)
+
+        if (due.length > 0) {
+          const ids = due
+            .map(([fixtureId]) => Number(extByFixture.get(fixtureId)))
+            .filter((n) => Number.isFinite(n) && n > 0)
+
+          const got = await getFixturesByIds(ids)
+          // Counted as bundle rather than `apiCalls`, exactly as 7b2c does —
+          // step 3 ASSIGNS `apiCalls` a few lines below and would erase it.
+          result.bundleCalls += got.calls
+          result.bundleFixtures += got.fixtures.length
+          result.xgAsked += due.length
+          for (const msg of got.failures) push('league_xg', msg, { season_id: target.seasonId })
+
+          const fetchedByExt = new Map(got.fixtures.map((f) => [String(f.fixture.id), f]))
+
+          for (const [fixtureId] of due) {
+            const ext = extByFixture.get(fixtureId)
+            if (!ext) continue
+            // ⚠ AN ABSENT FIXTURE IS "NOT FETCHED", NEVER "HAS NOTHING" — the
+            // same rule as 7b2c, and it matters more here because every write
+            // below deletes first. A refused chunk must not reach a delete.
+            const fx = fetchedByExt.get(ext)
+            if (!fx?.statistics) continue
+
+            // ⚠ THE HOME TEAM ID COMES FROM THE FETCHED FIXTURE, not `byExt`.
+            // These matches are outside step 3's date window and are completed,
+            // so 1b's catch-up skipped them too — they are in neither map, and
+            // reaching for `byExt` here would silently do nothing at all.
+            const statRows = statisticsToRows(fx.statistics, {
+              fixtureId,
+              homeExternalTeamId: fx.teams.home.id,
+            })
+            if (statRows.length === 0) continue
+
+            const { error: wErr } = await replaceRows(
+              admin,
+              'replace_match_team_stats',
+              fixtureId,
+              statRows,
+              writeBudget,
+            )
+            if (wErr) {
+              push('league_xg', wErr.message, { fixture_id: fixtureId })
+              continue
+            }
+            result.statsRows += statRows.length
+            // Still null is the ORDINARY answer, not a failure: the provider has
+            // not published yet. The write still happened, so the marker moved
+            // and this fixture waits its six hours like everything else.
+            if (statRows.some((r) => r.expected_goals !== null)) result.xgGot++
+          }
+        }
+      }
+    } catch (e) {
+      // Never fatal. A settled match's two decimal columns must not be able to
+      // stop this season's live fixtures from syncing.
+      push('league_xg', e instanceof Error ? e.message : String(e), {
+        season_id: target.seasonId,
+      })
+    }
+  }
 
   // ------------------------------------------------------------ 2. cheap exit
   // The between-matchday case: one index seek on idx_league_fixtures_season and
@@ -614,12 +815,8 @@ export async function syncLeagueFixtures(
   // ⚠ THE GATES STILL DECIDE WHO IS IN THE CALL, because the call is only free
   // once it exists: adding a twenty-first fixture costs a whole extra request.
   // What HAS gone is the separate statistics cadence — see 7b4.
-  // ⚠ ONE BUDGET FOR THE WHOLE TICK. Retrying is safe per write (140 made
-  // every replace atomic) but not free in aggregate: forty failing writes at
-  // 750ms of backoff each would add half a minute to a sync that runs every
-  // minute. After a handful of transport faults the run stops retrying and
-  // reports instead — a tick that overruns is worse than one that says so.
-  const writeBudget = createRetryBudget()
+  // ⚠ `writeBudget` IS DECLARED AT 1c, NOT HERE — one budget for the whole
+  // tick, and 1c writes before this point. The reasoning is on it there.
 
   const bundle = new Map<string, ApiFootballFixture>()
   // Worked out while deciding what to fetch, consumed by 7b5 when it writes.
@@ -1172,6 +1369,9 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     r.awarded > 0 ? `awarded=${r.awarded}` : null,
     r.finalWithoutGoals > 0 ? `ft_no_goals=${r.finalWithoutGoals}` : null,
     r.scoredEntries > 0 ? `pts_entries=${r.scoredEntries}` : null,
+    // Both halves or neither — `xg=0/3` (asked three, none published yet) is the
+    // ordinary answer and the one worth being able to read.
+    r.xgAsked > 0 ? `xg=${r.xgGot}/${r.xgAsked}` : null,
     // From `feedError`, NOT from `errors[]` — a rate-limited failure must still
     // be visible in the note, otherwise the limiter hides the outage itself.
     r.feedError !== null ? 'feed_error' : null,

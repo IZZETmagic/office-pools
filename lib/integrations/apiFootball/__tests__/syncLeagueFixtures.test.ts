@@ -53,6 +53,12 @@ const getFixturesByIds = vi.fn(async (ids: number[]) => {
   for (const id of carried) {
     fixtures.push({
       fixture: { id },
+      // ⚠ `teams` IS PART OF THE REAL `/fixtures?ids=` PAYLOAD and the mock was
+      // omitting it, which was harmless only for as long as every arm took the
+      // home side from `byExt` instead. 1c cannot: its fixtures finished days
+      // ago and are in neither the window nor the catch-up, so the bundle is
+      // the only place the home id exists. Same ids as `feedFixture`.
+      teams: { home: { id: 1, name: 'H', winner: null }, away: { id: 2, name: 'A', winner: null } },
       events: await getFixtureEvents(),
       statistics: await getFixtureStatistics(),
       lineups: await getFixtureLineups(),
@@ -105,6 +111,19 @@ function fakeDb(opts: {
   league_matchweeks?: Res[]
   /** What 7b5's "which of these do we already hold a line-up for" read returns. */
   match_lineups?: Res[]
+  /**
+   * 1c's two reads — the settled fixtures it may re-ask for an xG, and the stat
+   * rows that say which of them still lack one.
+   *
+   * ⚠ `league_fixtures_xg` IS ITS OWN QUEUE EVEN THOUGH 1c READS
+   * `league_fixtures`, and that is what keeps the fifteen existing three-entry
+   * queues meaning what they meant: window, catch-up, season id set. Routed by
+   * what the query ASKS for (`is_completed = true`, which no other read of that
+   * table uses) rather than by read order, so it holds whether or not the sweep
+   * fires on a given test's clock.
+   */
+  league_fixtures_xg?: Res[]
+  match_team_stats?: Res[]
   rpc?: { data: unknown; error: { message: string } | null }
   /** Value returned for a sync_settings lookup, and whether the read errors. */
   sync_settings?: { value: string | null; error?: { message: string } | null }
@@ -113,6 +132,8 @@ function fakeDb(opts: {
     league_fixtures: [...(opts.league_fixtures ?? [])],
     league_matchweeks: [...(opts.league_matchweeks ?? [])],
     match_lineups: [...(opts.match_lineups ?? [])],
+    league_fixtures_xg: [...(opts.league_fixtures_xg ?? [])],
+    match_team_stats: [...(opts.match_team_stats ?? [])],
   }
   const calls: Array<{ table: string; filters: string[] }> = []
   const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = []
@@ -123,7 +144,6 @@ function fakeDb(opts: {
 
   const client = {
     from(table: string) {
-      const res: Res = queues[table]?.shift() ?? { data: [], error: null }
       const filters: string[] = []
       calls.push({ table, filters })
       const api: Record<string, unknown> = {}
@@ -131,7 +151,11 @@ function fakeDb(opts: {
       // window's fixtures it already holds. Without it every test that reaches
       // the line-up arm dies on `.in is not a function`, which is a harness
       // gap and not a defect in the arm.
-      for (const m of ['select', 'order', 'range', 'not', 'eq', 'gte', 'lte', 'lt', 'gt', 'or', 'limit', 'in']) {
+      // ⚠ `is` was added for 1c, which asks `match_team_stats` which rows still
+      // have a null `expected_goals`. Same harness gap `in` was: without it the
+      // arm dies on `.is is not a function` and reports a `league_xg` error,
+      // which looks like a defect in the arm and is not one.
+      for (const m of ['select', 'order', 'range', 'not', 'eq', 'gte', 'lte', 'lt', 'gt', 'or', 'limit', 'in', 'is']) {
         api[m] = (...args: unknown[]) => {
           filters.push(`${m}(${args.map((a) => String(a)).join(',')})`)
           return api
@@ -169,7 +193,17 @@ function fakeDb(opts: {
         }
         return { data: null, error: null }
       }
-      api.then = (resolve: (v: Res) => unknown) => resolve(res)
+      // ⚠ THE QUEUE IS SHIFTED HERE, NOT IN `from`, because which queue this
+      // read belongs to is only knowable once its filters have been applied.
+      // 1c reads `league_fixtures` like the window and the catch-up do; the
+      // `is_completed = true` it asks for is what tells them apart.
+      api.then = (resolve: (v: Res) => unknown) => {
+        const key =
+          table === 'league_fixtures' && filters.includes('eq(is_completed,true)')
+            ? 'league_fixtures_xg'
+            : table
+        return resolve(queues[key]?.shift() ?? { data: [], error: null })
+      }
       return api
     },
     rpc(fn: string, args: Record<string, unknown>) {
@@ -1353,5 +1387,177 @@ describe('syncLeagueFixtures — the live gate', () => {
     const { client } = db(() => ({ data: changedLive(), error: null }), null)
     await syncLeagueFixtures(client, TARGET, OPTS)
     expect(getFixturesByIds).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// 1c — THE LATE xG
+// ===========================================================================
+// api-football publishes `expected_goals` and `goals_prevented` days after full
+// time for most competitions, and every other gate in the file is a change gate
+// or a window gate — neither of which can fire again for a match that finished
+// last week. These pin the three things that make the pass work at all: that it
+// runs on a quiet day, that it throttles itself, and that a refusal cannot reach
+// a delete.
+describe('syncLeagueFixtures — 1c, the late xG', () => {
+  const AGED = 'fx-aged'
+  const AGED_EXT = '1557404'
+  const HOURS = 60 * 60 * 1000
+
+  beforeEach(() => {
+    getFixtureEvents.mockResolvedValue([] as never)
+    getFixtureLineups.mockResolvedValue([] as never)
+    getFixtureStatistics.mockResolvedValue([] as never)
+  })
+
+  /** One side's statistics, with or without the xG the provider adds later. */
+  function statLine(teamId: number, xg: string | null) {
+    return {
+      team: { id: teamId },
+      statistics: [
+        { type: 'Ball Possession', value: teamId === 1 ? '55%' : '45%' },
+        ...(xg === null ? [] : [{ type: 'expected_goals', value: xg }]),
+      ],
+    }
+  }
+
+  /**
+   * A season with NOTHING in the window — which is the ordinary state of the
+   * day the provider finally publishes, three days after the match.
+   */
+  function quietDb(over: { candidates?: Res[]; holes?: Res[] } = {}) {
+    return fakeDb({
+      league_fixtures: [
+        { data: [], error: null }, // window: nothing playing
+        { data: [], error: null }, // catch-up: nothing stranded
+      ],
+      league_fixtures_xg: over.candidates ?? [
+        { data: [{ fixture_id: AGED, external_fixture_id: AGED_EXT }], error: null },
+      ],
+      match_team_stats: over.holes ?? [
+        { data: [{ fixture_id: AGED, created_at: new Date(NOW - 7 * HOURS).toISOString() }], error: null },
+      ],
+    })
+  }
+
+  it('⚠⚠ runs on a day this league is not playing — the whole reason it is not part of 7b2c', async () => {
+    getFixtureStatistics.mockResolvedValue([statLine(1, '1.00'), statLine(2, '2.81')] as never)
+    const { client, rpcCalls } = quietDb()
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+
+    // Nothing is in the window, so step 2's cheap exit fires immediately after
+    // this pass — and the xG still arrived. Folding it into 7b2c's `wanted` set
+    // would have made it fire only on matchdays, which is precisely when the
+    // provider has NOT published yet. It would have looked implemented.
+    expect(r.window).toBe(0)
+    expect(r.xgAsked).toBe(1)
+    expect(r.xgGot).toBe(1)
+
+    const w = rpcCalls.find((c) => c.fn === 'replace_match_team_stats')
+    expect(w).toBeDefined()
+    expect(w!.args.p_fixture_id).toBe(AGED)
+  })
+
+  it('⚠ takes the home side from the BUNDLE, not from `byExt` — it is in neither map', async () => {
+    // The fixture finished days ago: the window skipped it and 1b's catch-up
+    // takes only `is_completed = false`, so `byExt` has never heard of it.
+    // Reading the home id from there would silently map both sides to 'away'.
+    getFixtureStatistics.mockResolvedValue([statLine(1, '1.00'), statLine(2, '2.81')] as never)
+    const { client, rpcCalls } = quietDb()
+    await syncLeagueFixtures(client, TARGET, OPTS)
+
+    const rows = rpcCalls.find((c) => c.fn === 'replace_match_team_stats')!.args
+      .p_rows as Array<{ side: string; expected_goals: number | null }>
+    expect(rows.map((x) => [x.side, x.expected_goals])).toEqual([
+      ['home', 1.0],
+      ['away', 2.81],
+    ])
+  })
+
+  it('does not re-ask a fixture inside the retry interval', async () => {
+    const { client, rpcCalls } = quietDb({
+      holes: [{ data: [{ fixture_id: AGED, created_at: new Date(NOW - 1 * HOURS).toISOString() }], error: null }],
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.xgAsked).toBe(0)
+    expect(getFixturesByIds).not.toHaveBeenCalled()
+    expect(rpcCalls.find((c) => c.fn === 'replace_match_team_stats')).toBeUndefined()
+  })
+
+  it('⚠⚠ a REFUSED re-fetch deletes nothing — the same guard as 7b3 and 7b4', async () => {
+    // An exhausted allowance answers HTTP 200 with an empty response. Reaching
+    // replace-all with that would clear the stats of a settled match to collect
+    // a column the provider simply had not published.
+    omitFromBundle.add(Number(AGED_EXT))
+    bundleFailures.push('api-football /fixtures?ids refused: {"requests":"limit reached"}')
+    const { client, rpcCalls, deletes } = quietDb()
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+
+    expect(rpcCalls.find((c) => c.fn === 'replace_match_team_stats')).toBeUndefined()
+    expect(deletes.find((d) => d.table === 'match_team_stats')).toBeUndefined()
+    expect(r.xgGot).toBe(0)
+    // Silent is worse than refused: the failure still has to be reportable.
+    expect(r.errors.map((e) => e.stage)).toContain('league_xg')
+  })
+
+  it('still writes when the provider STILL has no xG — that is what moves the marker', async () => {
+    getFixtureStatistics.mockResolvedValue([statLine(1, null), statLine(2, null)] as never)
+    const { client, rpcCalls } = quietDb()
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+
+    expect(r.xgAsked).toBe(1)
+    expect(r.xgGot).toBe(0)
+    // The write is the throttle. `created_at` defaults to now() and the replace
+    // re-inserts, so skipping the write because the xG is still missing would
+    // leave the fixture eligible on every sweep for four days.
+    expect(rpcCalls.find((c) => c.fn === 'replace_match_team_stats')).toBeDefined()
+    // And "not published yet" is the ordinary answer, not a fault.
+    expect(r.errors).toHaveLength(0)
+  })
+
+  it('reads nothing at all on a minute the sweep does not fall on', async () => {
+    const off = Date.parse('2026-08-22T12:03:00Z')
+    const { client, calls } = quietDb()
+    const r = await syncLeagueFixtures(client, TARGET, {
+      now: off,
+      nowIso: new Date(off).toISOString(),
+    })
+    expect(r.xgAsked).toBe(0)
+    expect(calls.some((c) => c.filters.includes('eq(is_completed,true)'))).toBe(false)
+  })
+
+  it('asks only inside its horizon — not before the provider could have it, not forever after', async () => {
+    const { client, calls } = quietDb()
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    const read = calls.find(
+      (c) => c.table === 'league_fixtures' && c.filters.includes('eq(is_completed,true)'),
+    )
+    expect(read).toBeDefined()
+    expect(read!.filters).toContain(`lt(kickoff_at,${new Date(NOW - 3 * HOURS).toISOString()})`)
+    expect(read!.filters).toContain(`gt(kickoff_at,${new Date(NOW - 96 * HOURS).toISOString()})`)
+  })
+
+  it('⚠ never writes to the fixture itself — the blast radius is one table', async () => {
+    // Adding these to `rows` would have been the small change: it would also
+    // have put a settled match back through the step 6 diff and the step 7 RPC,
+    // rewriting its score and stamping `last_synced_at` days after the whistle.
+    getFixtureStatistics.mockResolvedValue([statLine(1, '1.00'), statLine(2, '2.81')] as never)
+    const { client, updates, rpcCalls, inserts } = quietDb()
+    await syncLeagueFixtures(client, TARGET, OPTS)
+
+    expect(updates.find((u) => u.table === 'league_fixtures')).toBeUndefined()
+    expect(inserts.find((i) => i.table === 'league_fixtures')).toBeUndefined()
+    expect(rpcCalls.find((c) => c.fn === 'league_apply_fixture_sync')).toBeUndefined()
+  })
+
+  it('reports the pass in the run note only when it did something', async () => {
+    getFixtureStatistics.mockResolvedValue([statLine(1, '1.00'), statLine(2, '2.81')] as never)
+    const { client } = quietDb()
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(formatLeagueNoteParts(r).join(' ')).toContain('xg=1/1')
+
+    const { client: idle } = quietDb({ candidates: [{ data: [], error: null }] })
+    const r2 = await syncLeagueFixtures(idle, TARGET, OPTS)
+    expect(formatLeagueNoteParts(r2).join(' ')).not.toContain('xg=')
   })
 })
