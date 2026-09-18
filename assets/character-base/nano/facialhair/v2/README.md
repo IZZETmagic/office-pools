@@ -1,0 +1,55 @@
+# Facial hair v2 — the beard side of the seam
+
+⚠ **Not assets yet.** Nano Banana PNGs that Ryan has approved as the target shape. Nothing here
+is traced, extracted, tokenised or locked. v1 in `../assets/` is untouched and still what the
+product renders.
+
+## stubble — approved 2026-09-18
+
+`stubble.png`, with the current asset beside it as `stubble-v1-for-comparison.png`.
+
+| | v1 (live) | v2 (approved) |
+|---|---|---|
+| band flat top | y472 | **y454** — mid-ear |
+| band thickness | **4px** — a needle | **51px** |
+| centre under the nose | y582 | y572 |
+| cheek boundary | y613 | y612 |
+| tone | one flat tone | one flat tone |
+
+The band is the change that matters. v1's sideburn tapers to a 4px needle, which is why it never
+met the hair — see `../../hair/seam/SIDEBURN-RECIPE.md`. v2's 51px band with a flat square top at
+mid-ear is the same spec the three approved hair shapes are built to.
+
+Check any candidate with:
+
+```sh
+uv run check-facialhair.py facialhair/v2/stubble.png
+```
+
+## The three things that went wrong, so they get checked and not eyeballed
+
+⭐ **The locked "stubble" is a full beard in a lighter tone.** Measured against `fullbeard` it is
+**80.2% the same pixels** — 74,716 vs 92,751, with only 161px that stubble has and fullbeard does
+not. Ryan spotted this by eye. It is why the asset never read as stubble whatever we did to its
+shape, and it is worth checking the same way before trusting any other "variant" in the set.
+
+⚠ **A gradient cannot be tokenised.** Several rounds came back with the band fading smoothly at
+the top. It looks right and it is unusable: `compose.py` recolours by swapping flat `fill` values,
+so a faded beard would stay fixed-grey while the rest of the avatar recoloured — wrong on dark
+skin, which is the exact failure the derived `STUBBLE` token exists to prevent. The checker now
+fails anything with a tone spread over 6.
+
+⚠ **It will punch a mouth-shaped hole in the beard.** Two of the three final samples did, 8,535px
+and 6,387px of skin inside the mass, with the prompt explicitly forbidding it. A hole in the beard
+is what killed the per-expression beard approach earlier in this project. Checked automatically.
+
+## Two things still open
+
+1. **The cheek notch depth.** Nano Banana puts it at y603-616 and will not move it — ~24 attempts
+   across six framings, both models, with and without references. A geometry script did move it
+   (603 → 543) but Ryan chose the generated shape, so the script was deleted rather than left
+   lying around in a pipeline that forbids hand-editing art.
+2. **The `STUBBLE` mix ratio.** Currently 0.55 in `compose.py` and `lib/avatar/compose.ts`. At
+   0.55 a solid mass reads as a beard at every hair/skin combination; **0.80** is where it reads
+   as shadow and it is still legible at 56px. One number, not an art change, and it improves the
+   existing v1 asset too.
