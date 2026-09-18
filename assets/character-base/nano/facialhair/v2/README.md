@@ -4,9 +4,33 @@
 is traced, extracted, tokenised or locked. v1 in `../assets/` is untouched and still what the
 product renders.
 
+## Approved so far
+
+| asset | approved | band flat top | band thickness | was |
+|---|---|---|---|---|
+| `stubble.png` | 2026-09-18 | y454 | 51px | y472 / **4px** |
+| `fullbeard.png` | 2026-09-18 | y454 | 50px | y438 / **10px** |
+| `chinstrap.png` | 2026-09-18 | y454 | 51px | y479 / **3px** |
+
+All three now share one band: flat square top at mid-ear, ~50px thick, outer edge flush, ears
+clear, one flat tone. Every v1 sideburn was a needle of 3-10px, which is why none of them ever
+met the hair.
+
+Check any of them with:
+
+```sh
+uv run check-facialhair.py facialhair/v2/fullbeard.png
+uv run check-facialhair.py facialhair/v2/chinstrap.png --strap
+```
+
+⚠ `--strap` skips the mouth-hole test. A chinstrap is a strap around the jaw and is SUPPOSED to
+be bare in the middle — without the flag it reported 19,100px of "hole" on the locked chinstrap,
+which is just its face. A permanently-red signal is one people learn to ignore.
+
 ## stubble — approved 2026-09-18
 
-`stubble.png`, with the current asset beside it as `stubble-v1-for-comparison.png`.
+`stubble.png`, with the current asset beside it as `stubble-v1-for-comparison.png`. Each
+approved shape has its live counterpart beside it the same way.
 
 | | v1 (live) | v2 (approved) |
 |---|---|---|

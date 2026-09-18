@@ -41,7 +41,13 @@ def main() -> None:
         # 2. ⚠ no hole where the mouth would be. Two of three samples punched one despite the
         #    prompt forbidding it, and a hole in the beard is what killed the per-expression
         #    beard approach earlier in this project.
-        hole = int((np.abs(a[600:700, 420:611] - SKIN).sum(2) < 45).sum())
+        #
+        # ⚠⚠ ONLY MEANINGFUL FOR A FULL-COVERAGE BEARD. A chinstrap is a strap around the jaw
+        # and is SUPPOSED to be bare in the middle — the check reported 19,100px of "hole" on
+        # the locked chinstrap, which is just its face. A permanently-red signal is one people
+        # learn to ignore, so pass --strap to skip it.
+        hole = (0 if "--strap" in sys.argv
+                else int((np.abs(a[600:700, 420:611] - SKIN).sum(2) < 45).sum()))
 
         # 3. ⚠ no overhang past the head edge. The ears sit OUTSIDE it (x201-258, y400-511), so
         #    anything outboard there lands on top of them. Found on m12-shortsides only after
@@ -64,7 +70,9 @@ def main() -> None:
         print(f"  moustache y{ctr}   cheek y{top(374)}   (probed beside the nose, not on it)")
         print(f"  tone      spread {spread}" + ("  ✔ one flat tone" if spread <= 6
                                                 else "  ⚠ NOT FLAT — cannot be tokenised"))
-        print(f"  mouth     {hole}px of skin inside the mass"
+        print("  mouth     n/a (--strap: a chinstrap is bare in the middle by design)"
+              if "--strap" in sys.argv else
+              f"  mouth     {hole}px of skin inside the mass"
               + ("  ✔" if hole < 200 else "  ⚠ HOLE PUNCHED IN THE BEARD"))
         print(f"  ears      overhang {ob}px" + ("  ✔" if ob <= 2 else "  ⚠ SITS ON THE EAR"))
 
