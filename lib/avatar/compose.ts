@@ -44,6 +44,17 @@ export type AvatarConfig = {
   mouthColour: string
   shirt: string
   background: string
+  /**
+   * ⚠⚠ BACK-OUT: the beard fade is behind this flag and defaults to OFF. With it off the
+   * fade token is swapped for the flat hair colour — exactly what this did before the
+   * feature existed — and no <linearGradient> is emitted. Remove the feature entirely with
+   * `git revert` of the commit that added it; the guard test asserts the default path emits
+   * no gradient, so a regression fails the build rather than shipping a violet sideburn.
+   *
+   * ⚠ <linearGradient> is supported by react-native-svg but has never been proven on a
+   * device in this project. It joins the <mask> on three hair assets in that same pile.
+   */
+  fade?: boolean
 }
 
 /** Tokens exactly as the asset files carry them. */
@@ -64,7 +75,21 @@ const T = {
   browInk: 'rgb(101,70,52)',
   blush: 'rgb(240,158,138)',
   stubble: 'rgb(164,150,140)',
+  /**
+   * The BEARD FADE marker. A facial hair asset paints its sideburn band in this tone and
+   * compose turns that one path into a vertical gradient, skin at the top to hair at the
+   * bottom, so the beard dissolves into the face the way a barber fade does.
+   *
+   * Measured off Ryan's reference: 63 distinct tones across 64 rows, all on the hair-to-skin
+   * blend line. A true gradient, not steps — which is why it is composed rather than drawn.
+   *
+   * ⚠ Deliberately OFF the avatar palette (a violet nothing else uses) so it cannot be
+   * confused with a hair or stubble tone.
+   */
+  fade: 'rgb(126,110,150)',
 } as const
+
+const FADE_ID = 'beardfade'
 
 type RGB = [number, number, number]
 
@@ -160,6 +185,26 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   svg = swap(svg, T.mouthInk, rgbStr(mouth))
   svg = swap(svg, T.mouthDark, darken(mouth, 0.65))
   svg = swap(svg, T.mouthTongue, lighten(mouth, 1.13))
+
+  // ---- the beard fade, off unless cfg.fade ---------------------------------------------
+  if (svg.includes(T.fade)) {
+    if (cfg.fade) {
+      // objectBoundingBox units, so the gradient spans whatever path carries it and no
+      // coordinates have to be kept in step with the artwork.
+      const grad =
+        `<defs><linearGradient id="${FADE_ID}" x1="0" y1="0" x2="0" y2="1">` +
+        `<stop offset="0" stop-color="${rgbStr(skin)}"/>` +
+        `<stop offset="1" stop-color="${rgbStr(hair)}"/>` +
+        `</linearGradient></defs>`
+      const cut = svg.indexOf('>', svg.indexOf('<svg')) + 1
+      svg = svg.slice(0, cut) + grad + svg.slice(cut)
+      svg = swap(svg, T.fade, `url(#${FADE_ID})`)
+    } else {
+      // ⭐ Graceful fallback, and why the flag is safe: with the feature off the band is
+      // simply solid hair, rather than an unswapped marker rendering as violet.
+      svg = swap(svg, T.fade, rgbStr(hair))
+    }
+  }
 
   svg = swap(svg, T.browInk, darken(hair, 0.82)) // brows track hair, not skin
   svg = swap(svg, T.stubble, mix(hair, skin, 0.55))

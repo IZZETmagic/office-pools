@@ -130,3 +130,75 @@ describe('avatar assets stay cross-platform', () => {
     }
   })
 })
+
+// =============================================================
+// The beard fade is OFF by default — this is the back-out
+// =============================================================
+// `compose.ts` can turn a facial-hair asset's sideburn band into a vertical gradient running
+// from the skin colour to the hair colour, so the beard dissolves into the face. It is behind
+// `cfg.fade` and defaults to off.
+//
+// ⚠⚠ Two things make that back-out real rather than a promise:
+//
+//   1. with the flag off the marker is swapped for the FLAT HAIR COLOUR — the behaviour that
+//      existed before the feature — so nothing renders differently and nothing renders violet
+//   2. these tests fail if either property breaks, so a regression stops the build instead of
+//      shipping a gradient nobody asked for, or a raw marker tone on a customer's avatar
+//
+// To remove the feature entirely: `git revert` the commit that introduced it. Nothing else
+// depends on it — no asset carries the marker yet, which is why `composes clean` below holds.
+//
+// ⚠ <linearGradient> is supported by react-native-svg but has NEVER been proven on a device in
+// this project. It is in the same unverified pile as the <mask> on three hair assets.
+// =============================================================
+
+import { composeAvatar, type AvatarAssets } from '@/lib/avatar/compose'
+
+const FADE_MARKER = 'rgb(126,110,150)'
+
+/** The smallest thing that exercises the compositor: a base plus one facial-hair band. */
+const fixture = (): AvatarAssets => ({
+  bases: {
+    b: '<svg viewBox="0 0 2048 2048"><path d="M 0 0 L 1 0 L 1 1 Z" fill="rgb(254,205,180)"/></svg>',
+  },
+  hair: {},
+  expressions: {},
+  facialhair: { f: `<path d="M 516 860 L 616 860 L 616 1200 Z" fill="${FADE_MARKER}"/>` },
+  eyes: {},
+  specialEyes: {},
+  mouths: {},
+  fhManifest: {},
+})
+
+const cfg = {
+  base: 'b', skin: '#F5C9A6', hair: null, hairColour: '#8B5E3C', facialHair: 'f',
+  eyeColour: '#5B3A1E', mouthColour: '#B67A70', shirt: '#3B6EFF', background: '#FFFFFF',
+}
+
+describe('the beard fade is opt-in', () => {
+  it('emits no gradient by default, and leaves no raw marker behind', () => {
+    const svg = composeAvatar(cfg, fixture())
+    expect(svg, 'default must not emit a gradient').not.toContain('linearGradient')
+    expect(svg, 'default must not reference one').not.toContain('url(#')
+    expect(svg, 'the marker must never reach the output').not.toContain(FADE_MARKER)
+    expect(svg, 'with the fade off the band is flat hair colour').toContain('rgb(139,94,60)')
+  })
+
+  it('emits a hair-to-skin gradient when asked', () => {
+    const svg = composeAvatar({ ...cfg, fade: true }, fixture())
+    expect(svg).toContain('<linearGradient id="beardfade"')
+    expect(svg).toContain('url(#beardfade)')
+    expect(svg, 'the marker must never reach the output').not.toContain(FADE_MARKER)
+    // skin at the top, hair at the bottom — the direction is the whole point
+    expect(svg).toContain('offset="0" stop-color="rgb(245,201,166)"')
+    expect(svg).toContain('offset="1" stop-color="rgb(139,94,60)"')
+  })
+
+  it('no shipped asset carries the marker yet, so the feature is inert', () => {
+    for (const dir of [HAIR, EYES, MOUTHS, 'assets/character-base/nano/facialhair/assets']) {
+      for (const f of svgsIn(dir)) {
+        expect(f.body, `${f.name} carries the fade marker`).not.toContain(FADE_MARKER)
+      }
+    }
+  })
+})

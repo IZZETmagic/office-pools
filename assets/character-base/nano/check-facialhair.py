@@ -57,7 +57,11 @@ def main() -> None:
 
         print(f"\n{p}")
         print(f"  band      flat top y{top(262)}  thickness {w}px  (spec: y454, ~50px)")
-        print(f"  centre    y{top(512)}   cheek y{top(374)}")
+        # ⚠ The centre probe must NOT sit at x512 — the NOSE is there (x484-540, y477-565) and
+        # a moustache wrapping it shifts those pixels, so x512 reported y478 on a fullbeard whose
+        # moustache actually sits at y565. Probe just OUTSIDE the nose on both sides.
+        ctr = min(top(470), top(554))
+        print(f"  moustache y{ctr}   cheek y{top(374)}   (probed beside the nose, not on it)")
         print(f"  tone      spread {spread}" + ("  ✔ one flat tone" if spread <= 6
                                                 else "  ⚠ NOT FLAT — cannot be tokenised"))
         print(f"  mouth     {hole}px of skin inside the mass"

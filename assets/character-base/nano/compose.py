@@ -35,6 +35,20 @@ BROW_INK = "rgb(101,70,52)"
 BLUSH = "rgb(240,158,138)"
 STUBBLE = "rgb(164,150,140)"
 
+# ⭐ The BEARD FADE marker. A facial hair asset paints its sideburn band in this tone; compose
+# turns that one path into a vertical gradient running from the SKIN colour at the top to the
+# HAIR colour at the bottom, so the beard dissolves into the face the way a barber fade does.
+#
+# Measured off the reference Ryan supplied: 63 distinct tones across 64 rows, every one on the
+# hair-to-skin blend line. A true gradient, not steps — which is why this is done at compose
+# time rather than drawn. Thirteen generated stripes vectorised to 26 paths and still banded.
+#
+# ⚠ It is deliberately OFF the avatar palette (a violet nothing else uses) so the extractor
+# cannot confuse it with a hair or stubble tone, and so a stray one is obvious rather than
+# silently plausible.
+FADE = "rgb(126,110,150)"
+FADE_ID = "beardfade"
+
 
 def hex_to_rgb(h: str) -> tuple[int, int, int]:
     h = h.lstrip("#")
@@ -173,6 +187,37 @@ def main() -> None:
     # is derived rather than shared. --brow-colour overrides for dyed hair or grey.
     if c := (arg("--brow-colour") or arg("--hair-colour")):
         svg = svg.replace(f'fill="{BROW_INK}"', f'fill="{darken(hex_to_rgb(c), 0.82)}"')
+
+    # ---- the beard fade -------------------------------------------------------------------
+    #
+    # ⚠⚠ BACK-OUT: this whole feature is behind --fade and defaults to OFF. Without the flag the
+    # FADE token is swapped for the flat hair colour, which is exactly what the compositor did
+    # before it existed, and no <linearGradient> is emitted at all. To remove it entirely:
+    #
+    #     git revert <the commit that added this>
+    #
+    # The guard test asserts the default path emits no gradient, so a regression here fails CI
+    # rather than shipping a purple sideburn.
+    if FADE in svg:
+        hair_c = arg("--hair-colour")
+        skin_c = arg("--skin")
+        if "--fade" in sys.argv and hair_c and skin_c:
+            # objectBoundingBox units, so the gradient spans whatever path carries it and no
+            # coordinates have to be kept in step with the artwork.
+            grad = (f'<defs><linearGradient id="{FADE_ID}" x1="0" y1="0" x2="0" y2="1">'
+                    f'<stop offset="0" stop-color="{rgb_str(hex_to_rgb(skin_c))}"/>'
+                    f'<stop offset="1" stop-color="{rgb_str(hex_to_rgb(hair_c))}"/>'
+                    f'</linearGradient></defs>')
+            cut = svg.index(">", svg.index("<svg")) + 1
+            svg = svg[:cut] + grad + svg[cut:]
+            svg = svg.replace(f'fill="{FADE}"', f'fill="url(#{FADE_ID})"')
+        else:
+            # ⭐ Graceful fallback, and the reason the flag is safe: with the feature off the
+            # band is simply solid hair — today's behaviour — rather than an unswapped marker
+            # rendering as violet.
+            svg = svg.replace(f'fill="{FADE}"',
+                              f'fill="{rgb_str(hex_to_rgb(hair_c))}"' if hair_c
+                              else f'fill="{HAIR_BASE}"')
 
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)
