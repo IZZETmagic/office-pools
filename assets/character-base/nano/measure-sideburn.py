@@ -26,14 +26,17 @@ for p in sys.argv[1:]:
     dark = (a.sum(2) < 480)                      # the hair/beard mass
     print(f"\n{p}")
     for side, edge, step in (("L", LO, 1), ("R", HI, -1)):
+        def u_row(y):
+            return dark[y, edge + step*2]
         widths, breaks = {}, []
         for y in range(300, 720):
             w = 0
             while 0 <= edge + step*w < 1024 and dark[y, edge + step*w]: w += 1
             if y % 40 == 0: widths[y] = w
             if 320 <= y <= 700 and w == 0: breaks.append(y)
-        # ⚠ Not an error. For a hair asset this is the PASS condition — it is where the
-        # sideburn stops. The contract wants it at y399. It only means a gap when the row is
-        # ABOVE where the hair still is, i.e. a hole punched in the middle of the band.
-        run = f"  hair stops at y{breaks[0]}" if breaks else "  continuous to y615"
+        # ⚠ Report the LOWEST row that still has hair, not the first bare one. A mohawk is
+        # shaved at the sides high up, so "first bare row" reported y320 on it — the number
+        # that matters is where the sideburn ENDS. The contract wants that at y399.
+        lowest = max([y for y in range(320, 700) if u_row(y)], default=0)
+        run = f"  >> SIDEBURN ENDS y{lowest}" if lowest else "  >> no hair at the edge"
         print(f"  {side}: " + " ".join(f"y{y}:{w}" for y, w in widths.items()) + run)

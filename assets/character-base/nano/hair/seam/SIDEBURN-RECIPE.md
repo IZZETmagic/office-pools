@@ -1,7 +1,7 @@
 # The sideburn recipe
 
-How `buzz-APPROVED.png` was made. Ryan approved it 2026-09-17 as the target shape for hair
-sideburns: **a band at full thickness ending in a square flat horizontal cut, level with the top
+How `buzz-APPROVED.png` and `mohawk-APPROVED.png` were made. Ryan approved buzz on 2026-09-17
+and mohawk the same day, as the target shape for hair sideburns: **a band at full thickness ending in a square flat horizontal cut, level with the top
 of the ear (y399 at 1024), outer edge flush with the head's silhouette, both sides identical.**
 
 Follow this exactly for the next style. It took about twenty generations to find and almost
@@ -76,7 +76,16 @@ Then the change:
 > with clippers. The corner where the flat bottom meets the front edge is a SQUARE CORNER, a
 > clean right angle. Not a point, not a curve, not a rounded end, not a taper, not a notch.
 
-Gets the square end and the right texture, but lands **too low, ~y455**. Expected.
+Gets the square end and the right texture, but lands **too low**. Expected.
+
+⚠⚠ **HOW LOW MATTERS.** Buzz landed at y455 and passes 3–4 walked it up from there. Mohawk landed
+at **y512**, and from y512 passes 3 and 4 did NOTHING — three attempts returned the same y511.
+The shortening steps only bite from around **y455**.
+
+If pass 2 overshoots past ~y470, do not continue. Repeat the PASS 4 prompt against pass 2's own
+output until one lands in range — mohawk took three tries and the results oscillated
+(y511 → y511 → **y453** → y511), so take the good one and carry on from it. Then run passes 3
+and 4 normally. Mohawk needed eight passes in total rather than four.
 
 ### Pass 3 — SHORTEN (model **2**, not Pro)
 
@@ -123,6 +132,10 @@ model and reference — went the WRONG WAY, to y443.
 - **Pushing one attribute too hard.** One attempt re-rolled the whole head — narrower skull,
   nose lost, ears moved — which breaks registration by construction. Always check the head, not
   just the sideburn.
+- ⚠ **Writing style language from the FILENAME.** `m10-mohawk` is not a strip mohawk with shaved
+  sides — it is a swept-up crest. A prompt describing "a central strip along the middle of the
+  skull, sides cut right down" fought the real art and made the output worse. **Open the locked
+  render and describe what is actually there** before writing a word about the haircut.
 - **Avoiding the word "sideburn"** ("the bottom edge of the hair mass") helps for pass 1, where
   the answer is "no hair below the ear". It does not help once a thickness is required.
 
@@ -136,6 +149,12 @@ model and reference — went the WRONG WAY, to y443.
 | `buzz-sq-v1.png` | pass 2 output, y455 |
 | `buzz-m2.png` | pass 3 output, y428 |
 | `buzz-hi-b.png` | pass 4 output = `buzz-APPROVED.png`, y399 |
+| `mohawk-APPROVED.png` | approved 2026-09-17, y398 — eight passes, see the pass-2 warning |
+| `mohawk-locked.png` | render of the locked mohawk asset — the pass-2 texture authority |
+| `mohawk-step1.png` | pass 1, the height donor |
+| `mohawk-sq.png` | pass 2 output, y512 — OVERSHOT, this is what the warning is about |
+| `mohawk-r2.png` | the raise-pass retry that got back into range, y453 |
+| `mohawk-m2.png`, `mohawk-p4.png` | passes 3 and 4 from r2 |
 
 ⚠ Not traced, not extracted, not locked. The hair assets in `hair/assets/` are untouched — this
 is a shape Ryan has approved, not an asset yet.
