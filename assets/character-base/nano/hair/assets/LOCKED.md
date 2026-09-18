@@ -33,6 +33,29 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f13-longstraight.asset.svg` | 7 | INVERTED trace; 46px brow band |
 | `hair-f14-shag.asset.svg` | 9 | masked; stepped layers; 106px brow band |
 
+## m05-undercut REPLACED with v2 (2026-09-18)
+
+Sixth asset on the **seam contract**. v1 render at `../v2/undercut-v1-for-comparison.png`.
+
+| | v1 | v2 |
+|---|---|---|
+| sideburn ends | y460, tapering to a point | **y399, square flat cut** |
+| thickness | 54px dwindling to 0 | **51px, no taper** |
+| hair on the ear | 67px | **31px** (buzz measures 23) |
+
+The undercut is unchanged: the heavy mass swept up, back and to one side, the same volume, the
+same short sides, the same hairline.
+
+⚠ Its texture is LIGHTER strokes on a DARKER base, the same polarity that flipped on other
+styles. Called out explicitly in both the build and cut prompts so it survived.
+
+⚠ Traced TWO-PASS: 6 paths with 5 highlight sweeps, against the single pass's 4 with only 3 —
+the single pass drops sweeps on this style. The opposite of the quiff and the crop. There is no
+universal answer; compare both and look.
+
+⭐ Built with the corrected default route (reproduce the style's own locked render, buzz as the
+sideburn authority only): two generations plus two cut passes, with no style erosion.
+
 ## buzz, mohawk and receding REPLACED with v2 (2026-09-18)
 
 `hair-m01-buzz`, `hair-m10-mohawk` and `hair-m11-receding` rebuilt to the **seam contract**,
