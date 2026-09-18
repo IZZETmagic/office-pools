@@ -30,6 +30,14 @@ const DEFAULT: AvatarConfig = {
   mouthColour: '#B67A70',
   shirt: '#3B6EFF',
   background: '#FFFFFF',
+  // The beard fade is a flag in compose.ts that defaults to OFF, so it has to be asked for.
+  // Left unset, a fullbeard or chinstrap sideburn band renders as solid hair colour — a hard
+  // bar up the side of the face with no dissolve at the top, which is what shipped to dev.
+  //
+  // ⚠ Turned on HERE and not by flipping the default, deliberately. <linearGradient> is
+  // unproven on react-native-svg, and this is the one surface where the fade has actually been
+  // looked at. The back-out in compose.ts stays intact: drop this line and it is off again.
+  fade: true,
 }
 
 function Swatches({

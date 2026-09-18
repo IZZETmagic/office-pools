@@ -216,6 +216,18 @@ describe('the beard fade is opt-in', () => {
     }
   })
 
+  // ⚠⚠ The flag being opt-in is the back-out, but it also means the fade is INVISIBLE until a
+  // caller asks for it — and that is exactly how a build reached dev with the fullbeard and
+  // chinstrap sideburn bands rendering as solid hair bars. Every asset was correct; nobody
+  // turned it on. The admin builder is the surface where the fade was approved, so it must ask.
+  it('the admin builder asks for the fade — the flag is useless unless a caller sets it', () => {
+    const tab = readFileSync(
+      join(process.cwd(), 'app/admin/super/AvatarsTab.tsx'),
+      'utf8',
+    )
+    expect(tab, 'AvatarsTab must set fade: true in its DEFAULT config').toMatch(/fade:\s*true/)
+  })
+
   it('no HAIR asset carries the fade marker — it is a facial-hair token', () => {
     for (const dir of [HAIR, EYES, MOUTHS]) {
       for (const f of svgsIn(dir)) {
