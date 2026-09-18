@@ -8,7 +8,7 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 |---|---|---|
 | `hair-m01-buzz.asset.svg` | 4 | face mask |
 | `hair-m02-sidepart.asset.svg` | 4 | two base shapes — the parting splits the mass |
-| `hair-m03-quiff.asset.svg` | 5 | ⭐ REPLACED 2026-09-18 with v2 — see below |
+| `hair-m03-quiff.asset.svg` | 5 | ⭐ REPLACED TWICE on 2026-09-18 — v2, then v3 with the sideburn |
 | `hair-m05-undercut.asset.svg` | 9 | 3 base shapes — top mass plus both shaved sides; no mask |
 | `hair-m06-slickback.asset.svg` | 5 | 70px brow band — the roomiest |
 | `hair-m07-curls.asset.svg` | 6 | scalloped silhouette |
@@ -106,6 +106,33 @@ Reproduce the TARGET asset and change the one detail:
 That preserved the crop perfectly in a single generation, then one cut pass for length and one
 for ear clearance.
 
+## m03-quiff REPLACED AGAIN with v3 — the sideburn (2026-09-18)
+
+⭐ **Seventh asset on the seam contract, and the only one replaced twice in a day.** v2 (below)
+deliberately had NO sideburn — Ryan asked for the hair in front of the ears removed and approved
+it that way. He then asked for the quiff to carry the same sideburn as the other six, which
+supersedes that: *"can you take the QUIFF hair base headset and run through nano banada to try to
+get the same sideburns"*. This is a DESIGN CHANGE, not a fix, and the bare-sided variant no
+longer exists in the set.
+
+| | v2 | v3 |
+|---|---|---|
+| sideburn | none — bare skin in front of and below the ear | **y399, square flat cut** |
+| thickness | — | **51px (L and R identical), no taper** |
+| hair on the ear | 0px | **11px** (buzz measures 23) |
+
+Built with the corrected default route, unchanged: base + the v2 locked render reproduced
+exactly + `../v2/buzz.png` declared the authority on the sideburn only, then two cut passes. The
+second cut used the *"delete roughly the bottom TWO THIRDS… err on the side of TOO SHORT"*
+framing, which is what finally cleared the ear.
+
+⚠⚠ **Traced TWO-PASS — the opposite of v2, on the same style.** v2's note below says the two-pass
+inverts on the quiff. That was true of v2's art and is NOT true of v3's: here it reported 1 base
++ 4 texture against the single pass's 1 + 2, and composed side by side the single pass had
+dropped the right-hand rim shading that the generation actually has. The trace route is a
+property of the GENERATION's tone balance, not of the style name. Compose both and look, every
+time — do not carry a previous verdict forward, not even for the same asset.
+
 ## m03-quiff REPLACED with v2 (2026-09-18)
 
 ⭐ The first asset rebuilt to the **seam contract**. Ryan approved it and asked for it to be
@@ -137,7 +164,8 @@ hair texture, only their position does. Texture must now fall inside the hair ma
 box. buzz, mohawk and receding were re-checked and are clean — this only bit the quiff because
 its mass sits high enough to leave those features exposed to the trace.
 
-⚠ Traced SINGLE-PASS, deliberately. The two-pass texture route LOSES this style's swooshes:
+⚠ Traced SINGLE-PASS, deliberately — TRUE OF v2's ART ONLY; v3 traced two-pass, see above. The
+two-pass texture route LOST this generation's swooshes:
 `isolate-texture.py` takes the largest-area tone as the base, and the quiff's dark strokes
 dominate, so it picked them as the base and isolated the lighter mass as "texture" — 6 paths with
 the strokes gone, against 5 with them intact. The two-pass helps buzz and receding and harms the
