@@ -43,7 +43,8 @@ for p in sys.argv[1:]:
         # blind to hair sticking OUT past the edge — and that is what makes a sideburn look
         # like it is sitting on the ear. The ear occupies x201-258 (left) from y400 to y511,
         # so any hair outboard of the edge in the rows just above y400 lands on top of it.
-        # buzz, mohawk and receding all measure 0 here; shortsides measures +18 to +22.
+        # buzz, mohawk and receding all measure 0 here. m12-shortsides measured +22 and was removed
+        # from the set for that reason among others — check this BEFORE starting a style.
         ob = []
         for y in (370, 385, 395):
             if side == "L":

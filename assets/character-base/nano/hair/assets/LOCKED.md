@@ -16,7 +16,6 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-m09-afro.asset.svg` | 7 | masked; covers the ears |
 | `hair-m10-mohawk.asset.svg` | 11 | 90px brow band |
 | `hair-m11-receding.asset.svg` | 4 | 104px brow band — the roomiest |
-| `hair-m12-shortsides.asset.svg` | 6 | 59px brow band |
 | `hair-m13-manbun.asset.svg` | 10 | bun sits above the crown |
 | `hair-m14-longhair.asset.svg` | 10 | masked; first style with length past the jaw |
 | `hair-m15-locs.asset.svg` | 12 | INVERTED trace — see below |
@@ -33,6 +32,19 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f12-halfup.asset.svg` | 13 | masked; small bun with loose length; ⚠ 27px brow band |
 | `hair-f13-longstraight.asset.svg` | 7 | INVERTED trace; 46px brow band |
 | `hair-f14-shag.asset.svg` | 9 | masked; stepped layers; 106px brow band |
+
+## m12-shortsides was REMOVED (2026-09-17)
+
+Ryan dropped it: *"we're just gonna remove short sides because it's very close to slick back"*.
+Side by side with `m06-slickback` they share the same rounded swept-back mass, the same diagonal
+fan of texture strokes and the same hairline — the only real difference is that shortsides
+traces as a DARK base with LIGHTER strokes while slickback is the usual lighter base with darker
+ones.
+
+Slickback is also the better of the two against the sideburn seam contract: its hair clears the
+ear by 0px where shortsides overhangs it by 22px (see `../seam/SIDEBURN-RECIPE.md`).
+
+Its generation sources are still in `../men/12-short-sides*.png` if it is ever wanted back.
 
 ## What an asset is
 

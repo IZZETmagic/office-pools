@@ -31,9 +31,14 @@ What exposed it was the new sideburn: a 51px slab with a hard flat bottom lands 
 where the old thin tapered one slipped past it. So the overhang was always there and the new
 design made it visible.
 
-🔴 UNRESOLVED on shortsides. Every attempt to remove the overhang while keeping the style either
-left the overhang at +22 or collapsed the haircut into buzz's (texture flipping from its
-light-on-dark back to dark-on-light). About 40 generations. Not approved.
+✅ CLOSED by removing the asset. About 40 generations went into `m12-shortsides` and every route
+either left the overhang at +22px or collapsed the haircut into buzz's, with the texture flipping
+from its light-on-dark back to dark-on-light. Ryan then dropped the style entirely — it was very
+close to `m06-slickback`, which does the same swept-back shape AND already clears the ear by 0px.
+
+⭐ The lesson is worth more than the asset: **check the overhang before starting a style, not
+after.** If a style's locked art already overhangs the ear, the sideburn work will fight it the
+whole way, and the right question is whether that style earns its place at all.
 
 ## The measurements it must hit
 
@@ -242,6 +247,8 @@ model and reference — went the WRONG WAY, to y443.
 | `receding-h1.png` | the recession repair pass — strongest hairline, sideburn back out to y511 |
 | `receding-n2.png`, `receding-q3.png` | hairline protected hard: recession holds, cut stalls at y472 |
 | `receding-APPROVED.png` | approved 2026-09-17, y399 — four chained cut passes from h1 |
+
+`m12-shortsides` files were deleted with the asset — see `../assets/LOCKED.md`.
 
 ⚠ Not traced, not extracted, not locked. The hair assets in `hair/assets/` are untouched — this
 is a shape Ryan has approved, not an asset yet.
