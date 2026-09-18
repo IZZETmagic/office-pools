@@ -33,6 +33,43 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f13-longstraight.asset.svg` | 7 | INVERTED trace; 46px brow band |
 | `hair-f14-shag.asset.svg` | 9 | masked; stepped layers; 106px brow band |
 
+## m04-crop REPLACED with v2 (2026-09-18)
+
+The second asset rebuilt to the **seam contract**. v1 render kept at
+`../v2/crop-v1-for-comparison.png`.
+
+| | v1 | v2 |
+|---|---|---|
+| sideburn ends | y424, tapering to a point | **y398, square flat cut** |
+| thickness | 11px dwindling to 5px | **51px, no taper** |
+| hair on the ear | 34px | 309px ⚠ |
+
+The crop itself is unchanged: same volume, same rounded sweep, same spiky fringe with its points
+in the same places, same swoosh strokes, same two ash browns.
+
+⚠ 309px of hair still sits over the ear's top-front corner, against 23px on buzz and 34px on the
+v1 crop. Visible at 2x, not at avatar size, and Ryan accepted it. Worth improving if this style
+is ever regenerated.
+
+⚠ BROW BAND 22px (hair reaches y341, eyes start y363). `../../hair-prompt.md` wants 20-30px for
+a slim brow, so this style can carry brows but only just — an earlier `04-crop` generation was
+rejected for leaving 1px. Check before pairing it with a browed expression.
+
+⭐⭐ THE ROUTE MATTERS, AND GETTING IT WRONG IS OBVIOUS. The first attempt used
+`buzz-APPROVED` as the image to REPRODUCE with the crop as "a change to it", which is the
+inverted route from `../seam/SIDEBURN-RECIPE.md`. Five chained cut passes later the crop had
+become a flatter, buzz-shaped haircut and Ryan called it out: *"Why are you making everything
+just look like variations of the buzz cut?"*
+
+The inverted route exists for ONE stubborn case (`m11-receding`) and must not be the default.
+Reproduce the TARGET asset and change the one detail:
+
+    IMAGE 2 = the style's own locked render, reproduced exactly
+    IMAGE 3 = buzz, the authority on the SIDEBURN ONLY
+
+That preserved the crop perfectly in a single generation, then one cut pass for length and one
+for ear clearance.
+
 ## m03-quiff REPLACED with v2 (2026-09-18)
 
 ⭐ The first asset rebuilt to the **seam contract**. Ryan approved it and asked for it to be

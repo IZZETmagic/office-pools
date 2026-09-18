@@ -45,13 +45,13 @@ for p in sys.argv[1:]:
         # so any hair outboard of the edge in the rows just above y400 lands on top of it.
         # buzz, mohawk and receding all measure 0 here. m12-shortsides measured +22 and was removed
         # from the set for that reason among others — check this BEFORE starting a style.
-        ob = []
-        for y in (370, 385, 395):
-            if side == "L":
-                xs = np.where(dark[y, :edge])[0]
-                ob.append(edge - xs.min() if len(xs) else 0)
-            else:
-                xs = np.where(dark[y, edge:])[0]
-                ob.append(xs.max() if len(xs) else 0)
-        flag = "" if max(ob) == 0 else f"   ⚠ OVERHANGS THE EAR by {max(ob)}px"
+        # ⚠⚠ Hair ABOVE the ear is not a fault — the locked crop has 288px of it at the temple
+        # and always did. Only hair OUTBOARD OF THE HEAD EDGE IN THE EAR'S OWN ROWS (y400-511)
+        # sits on the ear. Measuring a band that straddled both reported "overhangs by 12px"
+        # identically for an asset with 2px on the ear and one with 1014px, which sent me
+        # chasing the wrong thing.
+        # the ear's own rows, outboard of the head edge — this is the number that matters
+        lo2, hi2 = (180, LO) if side == "L" else (HI, 844)
+        on_ear = int(dark[400:512, lo2:hi2].sum())
+        flag = "" if on_ear < 60 else f"   ⚠ {on_ear}px OF HAIR ON THE EAR"
         print(f"  {side}: " + " ".join(f"y{y}:{w}" for y, w in widths.items()) + run + flag)

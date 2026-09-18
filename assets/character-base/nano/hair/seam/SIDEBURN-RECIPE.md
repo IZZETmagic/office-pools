@@ -57,6 +57,29 @@ Check any candidate with:
 uv run measure-sideburn.py hair/seam/<candidate>.png    # width at the edge per row + where it stops
 ```
 
+## ⭐⭐ START HERE: REPRODUCE THE TARGET, CHANGE ONE DETAIL
+
+    IMAGE 1 = bases/base-neck-100.png          the canvas and head
+    IMAGE 2 = the style's own locked render    REPRODUCE THIS EXACTLY
+    IMAGE 3 = hair/v2/buzz.png                 the SIDEBURN ONLY, nothing else
+
+Then one cut pass for length, and one more if the sideburn sits on the ear.
+
+⚠⚠ THIS IS THE DEFAULT. The inverted route below — buzz as the thing reproduced, the target
+style as a delta — exists for ONE stubborn case and must not be reached for first. Applied to
+`m04-crop` it produced, after five chained cut passes, a flatter buzz-shaped haircut, and Ryan
+said: *"Why are you making everything just look like variations of the buzz cut?"* He was right;
+every chained pass redraws the whole image and the target style erodes a little each time.
+
+Reproducing the crop directly preserved its volume, its spiky fringe and its swoosh strokes in a
+single generation.
+
+⚠ Check hair ON THE EAR (outboard of the head edge, rows y400-511) — NOT a band that straddles
+the temple. Hair above the ear is normal: the locked crop has 611px of it. A probe spanning both
+reported "overhangs by 12px" identically for an asset with 2px on the ear and one with 1,014px.
+Use `/tmp/earcheck.py`-style luminance on a raw PNG; `measure-sideburn.py` matches canonical
+tokens and is meaningless before extraction.
+
 ## ⭐⭐ THE RULE THAT CHANGES EVERYTHING (Ryan, 2026-09-17)
 
 > "the side burns must all look the same — if you have to change the rest of the asset then
