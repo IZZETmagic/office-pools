@@ -346,9 +346,16 @@ def main() -> None:
             if not xs:
                 return False
             x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+            # ⚠ NOT "above the jaw". That test was tuned to a beard whose band had only its
+            # TOP THIRD as a separate region; once the whole band is its own path it reaches
+            # well below the jaw line and every band silently failed to match.
+            #
+            # What actually identifies the band: it is NARROW, it HUGS one of the head's
+            # straight vertical sides, and it REACHES UP into the band zone. The beard mass
+            # fails the first test (800+ units wide) and stray slivers fail the third.
             near_edge = x0 < 516 + 160 or x1 > 1532 - 160
-            above_jaw = y1 < 1150                       # the jaw mass starts below this
-            return near_edge and above_jaw and (x1 - x0) < 400
+            reaches_up = y0 < 1000                      # the band's flat top sits near y908
+            return near_edge and reaches_up and (x1 - x0) < 400
 
         if "--fade-band" in sys.argv:
             out = [re.sub(r'fill="rgb\([^)]*\)"',

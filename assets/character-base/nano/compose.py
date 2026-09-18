@@ -49,6 +49,16 @@ STUBBLE = "rgb(164,150,140)"
 FADE = "rgb(126,110,150)"
 FADE_ID = "beardfade"
 
+# ⚠⚠ HOW FAR DOWN THE BAND THE FADE REACHES, as a fraction of the band's own height.
+#
+# The gradient uses objectBoundingBox units, so without this it stretches over the WHOLE marked
+# path — and the band runs from its flat top all the way down into the beard. The result was
+# every side strip fading along its entire length instead of just dissolving at the top.
+#
+# Three stops, not two: skin at the top, full hair by FADE_SPAN, and full hair again at the
+# bottom. Everything below FADE_SPAN is therefore solid beard.
+FADE_SPAN = 0.30
+
 
 def hex_to_rgb(h: str) -> tuple[int, int, int]:
     h = h.lstrip("#")
@@ -201,12 +211,23 @@ def main() -> None:
     if FADE in svg:
         hair_c = arg("--hair-colour")
         skin_c = arg("--skin")
+        # ⚠⚠ THE FADE MUST END AT THE ASSET'S OWN BODY TONE, NOT ALWAYS THE HAIR COLOUR.
+        #
+        # A stubble asset's body is the STUBBLE token — the hair mixed 55% toward the skin — so
+        # fading its band to full hair made the band far DARKER than the stubble it joins. It
+        # read as a dark bar, not a fade, which is exactly what it looked like.
+        body = (rgb_str(tuple(int(h + (s2 - h) * 0.55)
+                              for h, s2 in zip(hex_to_rgb(hair_c), hex_to_rgb(skin_c))))
+                if (hair_c and skin_c and STUBBLE in svg) else
+                (rgb_str(hex_to_rgb(hair_c)) if hair_c else HAIR_BASE))
+
         if "--fade" in sys.argv and hair_c and skin_c:
             # objectBoundingBox units, so the gradient spans whatever path carries it and no
             # coordinates have to be kept in step with the artwork.
             grad = (f'<defs><linearGradient id="{FADE_ID}" x1="0" y1="0" x2="0" y2="1">'
                     f'<stop offset="0" stop-color="{rgb_str(hex_to_rgb(skin_c))}"/>'
-                    f'<stop offset="1" stop-color="{rgb_str(hex_to_rgb(hair_c))}"/>'
+                    f'<stop offset="{FADE_SPAN}" stop-color="{body}"/>'
+                    f'<stop offset="1" stop-color="{body}"/>'
                     f'</linearGradient></defs>')
             cut = svg.index(">", svg.index("<svg")) + 1
             svg = svg[:cut] + grad + svg[cut:]
@@ -215,9 +236,7 @@ def main() -> None:
             # ⭐ Graceful fallback, and the reason the flag is safe: with the feature off the
             # band is simply solid hair — today's behaviour — rather than an unswapped marker
             # rendering as violet.
-            svg = svg.replace(f'fill="{FADE}"',
-                              f'fill="{rgb_str(hex_to_rgb(hair_c))}"' if hair_c
-                              else f'fill="{HAIR_BASE}"')
+            svg = svg.replace(f'fill="{FADE}"', f'fill="{body}"')
 
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)

@@ -91,6 +91,18 @@ const T = {
 
 const FADE_ID = 'beardfade'
 
+/**
+ * ⚠⚠ How far down the band the fade reaches, as a fraction of the band's own height.
+ *
+ * The gradient uses objectBoundingBox units, so without this it stretches over the WHOLE
+ * marked path — and the band runs from its flat top all the way down into the beard. The
+ * result was every side strip fading along its entire length instead of dissolving at the top.
+ *
+ * Three stops, not two: skin at the top, full hair by FADE_SPAN, full hair again at the
+ * bottom. Everything below FADE_SPAN is solid beard.
+ */
+const FADE_SPAN = 0.3
+
 type RGB = [number, number, number]
 
 const hex2rgb = (h: string): RGB => {
@@ -188,13 +200,19 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
 
   // ---- the beard fade, off unless cfg.fade ---------------------------------------------
   if (svg.includes(T.fade)) {
+    // ⚠⚠ The fade must end at the asset's OWN body tone, not always the hair colour. A
+    // stubble asset's body is the STUBBLE token — hair mixed 55% toward skin — so fading its
+    // band to full hair made the band far darker than the stubble it joins. It read as a dark
+    // bar rather than a fade.
+    const body = svg.includes(T.stubble) ? mix(hair, skin, 0.55) : rgbStr(hair)
     if (cfg.fade) {
       // objectBoundingBox units, so the gradient spans whatever path carries it and no
       // coordinates have to be kept in step with the artwork.
       const grad =
         `<defs><linearGradient id="${FADE_ID}" x1="0" y1="0" x2="0" y2="1">` +
         `<stop offset="0" stop-color="${rgbStr(skin)}"/>` +
-        `<stop offset="1" stop-color="${rgbStr(hair)}"/>` +
+        `<stop offset="${FADE_SPAN}" stop-color="${body}"/>` +
+        `<stop offset="1" stop-color="${body}"/>` +
         `</linearGradient></defs>`
       const cut = svg.indexOf('>', svg.indexOf('<svg')) + 1
       svg = svg.slice(0, cut) + grad + svg.slice(cut)
@@ -202,7 +220,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
     } else {
       // ⭐ Graceful fallback, and why the flag is safe: with the feature off the band is
       // simply solid hair, rather than an unswapped marker rendering as violet.
-      svg = swap(svg, T.fade, rgbStr(hair))
+      svg = swap(svg, T.fade, body)
     }
   }
 
