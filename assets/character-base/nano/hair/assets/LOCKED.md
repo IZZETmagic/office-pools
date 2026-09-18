@@ -33,6 +33,19 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f13-longstraight.asset.svg` | 7 | INVERTED trace; 46px brow band |
 | `hair-f14-shag.asset.svg` | 9 | masked; stepped layers; 106px brow band |
 
+## buzz, mohawk and receding REPLACED with v2 (2026-09-18)
+
+`hair-m01-buzz`, `hair-m10-mohawk` and `hair-m11-receding` rebuilt to the **seam contract**,
+joining the quiff and the crop. All five now end on a square flat cut at **y398-399, ~50px
+thick**, outer edge flush with the head's silhouette. Every v1 sideburn tapered to a point at a
+different height, which is why none of them ever met a beard.
+
+⚠ buzz, mohawk and receding were traced TWO-PASS (`isolate-texture.py` + `extract-hair.py
+--texture`), which recovers texture the single pass drops — buzz went 2 -> 4 texture paths. The
+quiff and the crop are single-pass: the two-pass INVERTS on them, because
+`isolate-texture.py` takes the largest-area tone as the base and their dark strokes dominate.
+Check per style; never apply it by default.
+
 ## m04-crop REPLACED with v2 (2026-09-18)
 
 The second asset rebuilt to the **seam contract**. v1 render kept at

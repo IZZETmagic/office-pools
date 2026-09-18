@@ -45,6 +45,7 @@ const BASES = 'assets/character-base/nano/bases'
 const HAIR = 'assets/character-base/nano/hair/assets'
 const EYES = 'assets/character-base/nano/eyes/assets'
 const MOUTHS = 'assets/character-base/nano/mouths/assets'
+const FACIALHAIR = 'assets/character-base/nano/facialhair/assets'
 
 /** Recraft emits this on every path; it is a no-op and the locked assets carry it. */
 const GRANDFATHERED = 'translate(0,0)'
@@ -117,7 +118,7 @@ describe('avatar assets stay cross-platform', () => {
   })
 
   it('has not altered a locked file', () => {
-    for (const dir of [BASES, HAIR, EYES, MOUTHS]) {
+    for (const dir of [BASES, HAIR, EYES, MOUTHS, FACIALHAIR]) {
       const manifest = resolve(ROOT, dir, 'LOCKED.sha256')
       if (!existsSync(manifest)) continue
       for (const line of readFileSync(manifest, 'utf8').trim().split('\n')) {
@@ -194,8 +195,29 @@ describe('the beard fade is opt-in', () => {
     expect(svg).toContain('offset="1" stop-color="rgb(139,94,60)"')
   })
 
-  it('no shipped asset carries the marker yet, so the feature is inert', () => {
-    for (const dir of [HAIR, EYES, MOUTHS, 'assets/character-base/nano/facialhair/assets']) {
+  // ⚠ This test USED to assert that no shipped asset carried the marker, which is how the
+  // feature stayed inert. Three beards now carry it deliberately, so the assertion that matters
+  // has moved: a marked asset must still render correctly with the fade OFF. That is the
+  // back-out — `cfg.fade` false must produce today's flat behaviour and never a raw violet.
+  it('a marked asset still renders flat with the fade off', () => {
+    const marked = svgsIn(FACIALHAIR)
+      .filter((f) => f.body.includes(FADE_MARKER))
+    expect(marked.length, 'the marked beards should be present').toBeGreaterThan(0)
+
+    for (const f of marked) {
+      const assets = { ...fixture(), facialhair: { f: f.body } }
+      const off = composeAvatar(cfg, assets)
+      expect(off, `${f.name}: no gradient with the fade off`).not.toContain('linearGradient')
+      expect(off, `${f.name}: the marker must never reach output`).not.toContain(FADE_MARKER)
+
+      const on = composeAvatar({ ...cfg, fade: true }, assets)
+      expect(on, `${f.name}: gradient when asked`).toContain('linearGradient')
+      expect(on, `${f.name}: the marker must never reach output`).not.toContain(FADE_MARKER)
+    }
+  })
+
+  it('no HAIR asset carries the fade marker — it is a facial-hair token', () => {
+    for (const dir of [HAIR, EYES, MOUTHS]) {
       for (const f of svgsIn(dir)) {
         expect(f.body, `${f.name} carries the fade marker`).not.toContain(FADE_MARKER)
       }
