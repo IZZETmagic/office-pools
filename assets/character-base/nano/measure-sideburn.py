@@ -39,4 +39,18 @@ for p in sys.argv[1:]:
         # that matters is where the sideburn ENDS. The contract wants that at y399.
         lowest = max([y for y in range(320, 700) if u_row(y)], default=0)
         run = f"  >> SIDEBURN ENDS y{lowest}" if lowest else "  >> no hair at the edge"
-        print(f"  {side}: " + " ".join(f"y{y}:{w}" for y, w in widths.items()) + run)
+        # ⚠⚠ The OUTBOARD check. Everything above walks INWARD from the head edge, so it is
+        # blind to hair sticking OUT past the edge — and that is what makes a sideburn look
+        # like it is sitting on the ear. The ear occupies x201-258 (left) from y400 to y511,
+        # so any hair outboard of the edge in the rows just above y400 lands on top of it.
+        # buzz, mohawk and receding all measure 0 here; shortsides measures +18 to +22.
+        ob = []
+        for y in (370, 385, 395):
+            if side == "L":
+                xs = np.where(dark[y, :edge])[0]
+                ob.append(edge - xs.min() if len(xs) else 0)
+            else:
+                xs = np.where(dark[y, edge:])[0]
+                ob.append(xs.max() if len(xs) else 0)
+        flag = "" if max(ob) == 0 else f"   ⚠ OVERHANGS THE EAR by {max(ob)}px"
+        print(f"  {side}: " + " ".join(f"y{y}:{w}" for y, w in widths.items()) + run + flag)

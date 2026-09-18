@@ -8,6 +8,33 @@ Follow this exactly for the next style. It took about twenty generations to find
 every shortcut in it was tried and failed first — the failures are listed at the bottom because
 they are the part that saves the time.
 
+## ⚠⚠ THE THIRD DIMENSION: NO OVERHANG OVER THE EAR
+
+Found on `m12-shortsides`, 2026-09-17, after the sideburn already measured correct on thickness
+AND height and Ryan still said it looked wrong.
+
+`measure-sideburn.py` walks INWARD from the head edge, so for a long time it was blind to hair
+sticking OUT past that edge. The ear occupies x201-258 (left) between y400 and y511 — entirely
+outside the head — so any hair outboard of x258 in the rows just above y400 lands on top of it.
+A sideburn can be the right thickness at the right height and still look like a slab resting on
+the ear.
+
+    asset                         hair outboard of the head edge at y370/385/395
+    buzz / mohawk / receding      0px          <- what a correct asset looks like
+    shortsides (locked AND every
+      generated candidate)        +18 to +22px <- drapes over the ear
+
+The checker now reports this as `⚠ OVERHANGS THE EAR`. **Check it before showing anything.**
+
+⚠ It is NOT new damage on shortsides — the LOCKED asset overhangs by exactly the same +22px.
+What exposed it was the new sideburn: a 51px slab with a hard flat bottom lands ON the ear,
+where the old thin tapered one slipped past it. So the overhang was always there and the new
+design made it visible.
+
+🔴 UNRESOLVED on shortsides. Every attempt to remove the overhang while keeping the style either
+left the overhang at +22 or collapsed the haircut into buzz's (texture flipping from its
+light-on-dark back to dark-on-light). About 40 generations. Not approved.
+
 ## The measurements it must hit
 
 Read at 1024px against the locked base:
