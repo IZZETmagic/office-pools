@@ -25,6 +25,41 @@ Check any candidate with:
 uv run measure-sideburn.py hair/seam/<candidate>.png    # width at the edge per row + where it stops
 ```
 
+## ⭐⭐ THE RULE THAT CHANGES EVERYTHING (Ryan, 2026-09-17)
+
+> "the side burns must all look the same — if you have to change the rest of the asset then
+> okay, just make sure that the type of textures follow"
+
+**The sideburn is not negotiable; the haircut is.** That inverts the references, and it is the
+difference between four passes and giving up.
+
+`m11-receding` resisted twelve generations across both models and six framings, never moving off
+y473, for one reason: every attempt treated the RECEDING HAIRCUT as the thing to preserve and the
+sideburn as the thing to adjust. The moment that flipped, it worked.
+
+**So for any style that resists, do this instead of passes 1–4:**
+
+| image | role |
+|---|---|
+| 1 | `bases/base-neck-100.png` — canvas and head |
+| 2 | **`buzz-APPROVED.png` — the avatar to REPRODUCE**, sideburns included, verbatim |
+| 3 | the target style's locked render — **the hairline / style authority, and nothing else** |
+
+Frame it as: *reproduce IMAGE 2, keep its sideburns exactly, keep its texture style; CHANGE ONE
+THING — the hairline, which comes from IMAGE 3.*
+
+The sideburn then transfers wholesale because it is being copied, not described. Thickness came
+out at 51px against buzz's 51px, first try.
+
+⚠ It still needs the cut prompt chained afterwards, and more of it than the other styles:
+**y593 → 569 → 546 → 454 → 454 → y398.** Feed each output back in as IMAGE 2 with
+`buzz-APPROVED.png` as IMAGE 3, the authority on how far down the sideburn reaches. Results
+oscillate; take the good one and carry on.
+
+⚠ Expect to fix the haircut afterwards. Reproducing buzz brings buzz's hairline with it, so the
+style ends up under-expressed — receding came back barely receding at all and needs a follow-up
+pass that deepens the recession while explicitly freezing the sideburns.
+
 ## The four passes
 
 Each pass feeds the next. **The model is the variable in passes 3 and 4 — do not use Pro there.**
@@ -155,6 +190,14 @@ model and reference — went the WRONG WAY, to y443.
 | `mohawk-sq.png` | pass 2 output, y512 — OVERSHOT, this is what the warning is about |
 | `mohawk-r2.png` | the raise-pass retry that got back into range, y453 |
 | `mohawk-m2.png`, `mohawk-p4.png` | passes 3 and 4 from r2 |
+| `receding-locked.png` | render of the locked receding asset |
+| `receding-step1.png` | pass 1 height donor, y398 — the four-pass route then STALLED at y473 |
+| `receding-sq.png` | pass 2, y474 — the stall |
+| `receding-c3.png`, `receding-c5.png` | the inverted-reference route: sideburn correct at y398/51px |
+
+⚠ `receding-c5.png` has the approved sideburn but Ryan says the hair does not read as receding —
+the hairline needs to pull much further back. NOT approved. Next step is a follow-up pass that
+deepens the recession with the sideburns explicitly frozen.
 
 ⚠ Not traced, not extracted, not locked. The hair assets in `hair/assets/` are untouched — this
 is a shape Ryan has approved, not an asset yet.
