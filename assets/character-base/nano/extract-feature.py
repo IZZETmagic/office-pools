@@ -54,7 +54,8 @@ MOUTH_TONGUE = "rgb(206,116,112)"
 # Brows get their own token so they can follow the HAIR colour without being hair.
 BROW_INK = "rgb(101,70,52)"
 HAIR_BASE = "rgb(140,122,110)"   # facial hair follows the head-hair colour
-STUBBLE = "rgb(164,150,140)"     # five o'clock shadow: hair colour blended toward skin
+STUBBLE = "rgb(164,150,140)"   # five o'clock shadow: hair colour blended toward skin
+FADE = "rgb(126,110,150)"      # the beard-fade marker; see facialhair/FADE.md
 FACE_SHADE = "rgb(245,178,150)"   # skin modelling — follows --skin, same token as the base
 BLUSH = "rgb(240,158,138)"        # warmer than shade; follows --skin but keeps a rosy cast
 
@@ -322,6 +323,42 @@ def main() -> None:
         # Tokenised as hair it would render at full hair strength and read as a short beard,
         # losing the only thing that distinguishes it.
         tok = STUBBLE if "--stubble" in sys.argv else HAIR_BASE
+
+        # ⭐ --fade-band: tokenise the SIDEBURN BAND separately so compose.py can fill it with
+        # a hair-to-skin gradient. See facialhair/FADE.md.
+        #
+        # ⚠⚠ BACK-OUT: without the flag this whole branch is skipped and every path takes the
+        # single token exactly as before. `git revert` of the fade commits removes it.
+        #
+        # The band is identified by POSITION, not colour: it is the part of the beard hugging
+        # the head's straight vertical sides (x516 / x1532 in 2048 units) above the jaw. Colour
+        # cannot do it — a generated band may be painted a distinct tone or may not, and the
+        # trace quantises tones unpredictably.
+        def is_band(path: str) -> bool:
+            # ⚠ Parse the `d` attribute ONLY. Running the number regex over the whole element
+            # swallows the fill's rgb() components as coordinates — 140,122,110 dragged every
+            # bounding box toward the origin and no band ever matched.
+            m = re.search(r'd="([^"]*)"', path)
+            if not m:
+                return False
+            n = [float(v) for v in re.findall(r"-?\d+\.?\d*", m.group(1))]
+            xs, ys = n[0::2], n[1::2]
+            if not xs:
+                return False
+            x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+            near_edge = x0 < 516 + 160 or x1 > 1532 - 160
+            above_jaw = y1 < 1150                       # the jaw mass starts below this
+            return near_edge and above_jaw and (x1 - x0) < 400
+
+        if "--fade-band" in sys.argv:
+            out = [re.sub(r'fill="rgb\([^)]*\)"',
+                          f'fill="{FADE}"' if is_band(p) else f'fill="{tok}"', p)
+                   for p in picked]
+            nb = sum(1 for p in picked if is_band(p))
+            open(dst, "w").write(SVG_OPEN + "".join(out) + "</svg>")
+            print(f"{dst}: {len(out)} facial-hair paths, {nb} tokenised as the FADE band")
+            return
+
         out = [re.sub(r'fill="rgb\([^)]*\)"', f'fill="{tok}"', p) for p in picked]
         open(dst, "w").write(SVG_OPEN + "".join(out) + "</svg>")
         print(f"{dst}: {len(out)} facial-hair paths"
