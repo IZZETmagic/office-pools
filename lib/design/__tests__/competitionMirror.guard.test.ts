@@ -103,13 +103,28 @@ describe('the mobile competition palette mirrors the web', () => {
       fail('oklch.ts: the mobile copy has diverged from lib/design/oklch.ts below the banner')
     }
 
+    // ---- the competition NAMES agree ----------------------------------------
+    const webName = entries(web, 'export const COMPETITION_NAME')
+    const rnName = entries(rn, 'export const COMPETITION_NAME')
+    if (Object.keys(webName).length === 0) fail('could not read COMPETITION_NAME out of lib/design/competitionColor.ts')
+    for (const [k, v] of Object.entries(webName)) {
+      if (rnName[k] !== v) fail(`COMPETITION_NAME.${k}: web ${v}, mobile ${rnName[k] ?? '(missing)'}`)
+    }
+    for (const k of Object.keys(rnName)) {
+      if (!(k in webName)) fail(`COMPETITION_NAME.${k} exists on mobile only`)
+    }
+
     // ---- every web mark exists on mobile, as a file or as inlined markup ----
     const railSrc = read('mobile/components/CompetitionRail.tsx')
 
     function setBody(src: string, decl: string): string[] {
       const m = src.match(new RegExp(`${decl}[^[]*\\[([^\\]]*)\\]`))
       if (!m) return []
+      // ⚠ COMMENTS OUT FIRST. An empty set is the expected state now, and the
+      // note explaining why lives inside the brackets — its commas parsed as
+      // members and the guard reported three imaginary competitions.
       return m[1]
+        .replace(/\/\/[^\n]*/g, '')
         .split(',')
         .map((s) => s.trim().replace('LEAGUE_ID.', ''))
         .filter(Boolean)
@@ -117,7 +132,10 @@ describe('the mobile competition palette mirrors the web', () => {
 
     const marked = setBody(webMark, 'const MARKED = new Set<number>')
     const svgOnWeb = new Set(setBody(webMark, 'const SVG_MARKS = new Set<number>'))
-    if (marked.length === 0) fail('could not read MARKED out of lib/design/competitionMark.ts')
+    // ⚠ EMPTY IS THE EXPECTED STATE NOW. The league marks came out on
+    // 2026-09-19 (see competitionIdentity.test.ts), so an empty MARKED means
+    // "no marks", not "the file could not be parsed". This loop guards the
+    // mirror for any mark that ever comes back; today it runs zero times.
 
     /** Comments out, whitespace collapsed — so formatting is not a mismatch. */
     const normalizeSvg = (s: string) =>

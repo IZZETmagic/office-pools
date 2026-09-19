@@ -120,6 +120,34 @@ export const COMPETITION_COLOR: Record<number, string> = {
 }
 
 /**
+ * What a competition is called, for the rail.
+ *
+ * ⚠ THIS IS WHAT REPLACED THE MARK (2026-09-19). The logos were the provider's
+ * artwork, recoloured by scripts/build-competition-silhouettes.ts and served
+ * from our own domain — see drafts/2026-09-13_ip_exposure_audit.md §2. A
+ * competition's NAME is a fact and free to use referentially; its device mark
+ * is not.
+ *
+ * ⚠ MIRRORED — mobile/lib/design/competition.ts holds the same map and
+ * __tests__/competitionMirror.guard.test.ts fails if the two drift.
+ */
+export const COMPETITION_NAME: Record<number, string> = {
+  [LEAGUE_ID.premierLeague]: 'PREMIER LEAGUE',
+  [LEAGUE_ID.laLiga]: 'LA LIGA',
+  [LEAGUE_ID.bundesliga]: 'BUNDESLIGA',
+  [LEAGUE_ID.serieA]: 'SERIE A',
+  [LEAGUE_ID.ligue1]: 'LIGUE 1',
+  [LEAGUE_ID.championsLeague]: 'CHAMPIONS LEAGUE',
+  [LEAGUE_ID.worldCup]: 'WORLD CUP',
+}
+
+/** The competition's name for the rail, or null for one nobody has named. */
+export function getCompetitionName(externalLeagueId: number | null | undefined): string | null {
+  if (externalLeagueId == null) return null
+  return COMPETITION_NAME[externalLeagueId] ?? null
+}
+
+/**
  * Fallback for a competition nobody has themed yet.
  *
  * A neutral slate rather than a guess. It reads as deliberate beside the mode

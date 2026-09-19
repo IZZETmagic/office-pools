@@ -80,6 +80,34 @@ export function getPoolStripe(externalLeagueId: number | null | undefined): [str
 }
 
 /**
+ * What a competition is called, for the rail.
+ *
+ * ⚠ THIS IS WHAT REPLACED THE MARK. The logos were the provider's artwork,
+ * recoloured and committed here — see drafts/2026-09-13_ip_exposure_audit.md.
+ * A competition's NAME is a fact and is free to use referentially; its device
+ * mark is not. The rail now says the name it always should have said: the card
+ * never named its competition, which is the whole reason the mark existed.
+ *
+ * ⚠ MIRRORED — lib/design/competitionColor.ts holds the same map and the guard
+ * test fails if the two drift.
+ */
+export const COMPETITION_NAME: Record<number, string> = {
+  [LEAGUE_ID.premierLeague]: 'PREMIER LEAGUE',
+  [LEAGUE_ID.laLiga]: 'LA LIGA',
+  [LEAGUE_ID.bundesliga]: 'BUNDESLIGA',
+  [LEAGUE_ID.serieA]: 'SERIE A',
+  [LEAGUE_ID.ligue1]: 'LIGUE 1',
+  [LEAGUE_ID.championsLeague]: 'CHAMPIONS LEAGUE',
+  [LEAGUE_ID.worldCup]: 'WORLD CUP',
+}
+
+/** The competition's name for the rail, or null for one nobody has named. */
+export function getCompetitionName(externalLeagueId: number | null | undefined): string | null {
+  if (externalLeagueId == null) return null
+  return COMPETITION_NAME[externalLeagueId] ?? null
+}
+
+/**
  * Every competition with a mark bundled in the app.
  *
  * ⚠ `require` TAKES A LITERAL. Metro resolves these at build time, so the map
@@ -95,13 +123,14 @@ export function getPoolStripe(externalLeagueId: number | null | undefined): [str
  * there is no raster to derive.
  */
 const MARK_PNG: Record<number, ImageSourcePropType> = {
-  [LEAGUE_ID.championsLeague]: require('@/assets/competitions/2.png'),
-  [LEAGUE_ID.premierLeague]: require('@/assets/competitions/39.png'),
-  [LEAGUE_ID.ligue1]: require('@/assets/competitions/61.png'),
-  [LEAGUE_ID.bundesliga]: require('@/assets/competitions/78.png'),
-  [LEAGUE_ID.serieA]: require('@/assets/competitions/135.png'),
-  [LEAGUE_ID.laLiga]: require('@/assets/competitions/140.png'),
-};
+  // ⚠ DELIBERATELY EMPTY, AND THE API STAYS. The six league marks were the
+  // provider's logos, recoloured and bundled into both binaries — they came out
+  // on 2026-09-19. The functions below are kept because CompetitionHeader,
+  // CompetitionPickerSheet and LeagueTableSliceCard all still call them and all
+  // three already render a fallback when the mark is null, so emptying the data
+  // degrades those surfaces instead of breaking them. Delete the API once each
+  // of them has its own answer.
+}
 
 /** The bundled PNG mark, or null for the World Cup and anything unbuilt. */
 export function getCompetitionMarkPng(

@@ -47,13 +47,15 @@ const SVG_MARKS = new Set<number>([LEAGUE_ID.worldCup])
  * against the filesystem, so the two cannot drift silently.
  */
 const MARKED = new Set<number>([
-  LEAGUE_ID.worldCup,
-  LEAGUE_ID.championsLeague,
-  LEAGUE_ID.premierLeague,
-  LEAGUE_ID.ligue1,
-  LEAGUE_ID.bundesliga,
-  LEAGUE_ID.serieA,
-  LEAGUE_ID.laLiga,
+  // ⚠ DELIBERATELY EMPTY (2026-09-19). Every id in here used to name one of the
+  // provider's league logos, recoloured and committed. The rail says the
+  // competition's NAME now — see COMPETITION_NAME in ./competitionColor.ts and
+  // drafts/2026-09-13_ip_exposure_audit.md §2.
+  //
+  // The module stays because `getCompetitionMark` returning null is the path
+  // every caller already handles, and because an empty set is a clearer record
+  // of the decision than a deleted file. Do not repopulate it: the assets it
+  // pointed at are gone, and so is the script that made them.
 ])
 
 /**

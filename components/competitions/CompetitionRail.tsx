@@ -25,7 +25,7 @@
 
 import type { CSSProperties } from 'react'
 import { getPoolStripe } from '@/lib/design/poolMode'
-import { getCompetitionMark } from '@/lib/design/competitionMark'
+import { getCompetitionName } from '@/lib/design/competitionColor'
 
 /**
  * Rail geometry per size. See `.competition-rail`.
@@ -45,14 +45,12 @@ import { getCompetitionMark } from '@/lib/design/competitionMark'
  * exactly that. Do not reuse `compact` on a card that can afford `default`.
  */
 const SIZES = {
-  default: { rail: 46, mark: [36, 66], pad: '6px 5px' },
-  compact: { rail: 30, mark: [22, 44], pad: '5px 4px' },
+  default: { rail: 46, font: 12 },
+  compact: { rail: 30, font: 10 },
 } as const
 
 export type RailSize = keyof typeof SIZES
 
-const MARK_W = SIZES.default.mark[0]
-const MARK_H = SIZES.default.mark[1]
 
 type Competition = { externalLeagueId?: number | null }
 
@@ -83,38 +81,19 @@ function stripeVars(externalLeagueId: number | null | undefined): CSSProperties 
  * in the wizard before anyone runs
  * `scripts/build-competition-silhouettes.ts` for it.
  */
-export function CompetitionMark({
-  externalLeagueId,
-  width = MARK_W,
-  height = MARK_H,
-  ink = '#fff',
-  opacity,
-  className = '',
-}: Competition & {
+export function CompetitionMark(_: Competition & {
   width?: number
   height?: number
-  /** Colour to paint the mark. Anything a CSS colour accepts. */
   ink?: string
   opacity?: number
   className?: string
 }) {
-  const mark = getCompetitionMark(externalLeagueId)
-  if (!mark) return null
-  return (
-    <span
-      aria-hidden="true"
-      className={`competition-mark ${className}`}
-      style={
-        {
-          width,
-          height,
-          backgroundColor: ink,
-          opacity,
-          '--mark': `url(${mark})`,
-        } as CSSProperties
-      }
-    />
-  )
+  // ⚠ RENDERS NOTHING, ON PURPOSE (2026-09-19). This painted one of the
+  // provider's league logos through a CSS mask; the assets are gone and MARKED
+  // is empty, so there is nothing to paint. The export stays so callers keep
+  // compiling while each one is given its own answer — the rail already has
+  // one, below.
+  return null
 }
 
 /**
@@ -129,20 +108,38 @@ export function CompetitionMark({
  * styling — see `SIZES` above before reaching for `compact`.
  */
 export function CompetitionRail({ externalLeagueId, size = 'default' }: Competition & { size?: RailSize }) {
-  const mark = getCompetitionMark(externalLeagueId)
+  const name = getCompetitionName(externalLeagueId)
   const stripe = stripeVars(externalLeagueId)
 
-  if (!mark) {
+  // ⚠ THE NARROW FALLBACK IS LOAD-BEARING — a competition nobody has named yet
+  // renders the original 5px bar rather than a blank 46px block. A league is a
+  // row rather than a deploy, so it can be created in the admin and picked in
+  // the wizard before anyone names it.
+  if (!name) {
     return <span aria-hidden="true" className="w-[5px] shrink-0 pool-stripe" style={stripe} />
   }
-  const { rail, mark: [w, h], pad } = SIZES[size]
+
+  const { rail, font } = SIZES[size]
   return (
     <span
       aria-hidden="true"
       className="shrink-0 competition-rail"
-      style={{ ...stripe, width: rail, padding: pad }}
+      style={{ ...stripe, width: rail }}
     >
-      <CompetitionMark externalLeagueId={externalLeagueId} width={w} height={h} />
+      {/* `writing-mode` + a half turn is the CSS half of what RN does with a
+          rotated <Text>; the two files have to agree, and the guard test is
+          what keeps them agreeing. */}
+      <span
+        className="font-black uppercase text-white/95 whitespace-nowrap"
+        style={{
+          writingMode: 'vertical-rl',
+          transform: 'rotate(180deg)',
+          fontSize: font,
+          letterSpacing: '0.16em',
+        }}
+      >
+        {name}
+      </span>
     </span>
   )
 }
