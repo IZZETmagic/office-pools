@@ -161,6 +161,27 @@ function findNose(doc: string): string | null {
   return null
 }
 
+/**
+ * The two ear paths. They share the nose's tone and the neck shadow's, so colour cannot
+ * separate them — what makes an ear an ear is that it sits OUTBOARD of the head's straight
+ * sides, where nothing else in the base does.
+ */
+function findEars(doc: string): string[] {
+  const out: string[] = []
+  for (const m of doc.matchAll(/<path[^>]*\/?>/g)) {
+    const p = m[0]
+    if (!p.includes(`fill="${T.skinShade}"`)) continue
+    const d = /d="([^"]*)"/.exec(p)
+    if (!d) continue
+    const n = (d[1].match(/-?\d+\.?\d*/g) || []).map(Number)
+    const xs = n.filter((_, i) => i % 2 === 0)
+    if (!xs.length) continue
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+    if (cx < 600 || cx > 1448) out.push(p)
+  }
+  return out
+}
+
 export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   let svg = A.bases[cfg.base]
   if (!svg) throw new Error(`unknown base: ${cfg.base}`)
@@ -175,10 +196,20 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   //
   // Facial hair that sits UNDER the mouth goes in before the NOSE, so a moustache tucks
   // behind the nose rather than swallowing its tip when it is raised.
+  //
+  // ⭐ THE EARS MOVE WITH IT. The base paints the ears LAST, so a beard whose sideburns
+  // grow outboard was being clipped by them. Ryan asked for the bushy beard's hair to sit
+  // slightly IN FRONT of the ears, and re-inserting them ahead of the facial hair does it.
+  // It also makes "under" styles agree with "over" ones, which already paint after the
+  // ears by construction. For a flush-sided beard it is a no-op: the band's outer edge and
+  // the ear's inner edge share about one unit.
   if (fh && !fhOver) {
+    const ears = findEars(svg)
+    for (const e of ears) svg = svg.replace(e, '')
+    const frag = ears.join('') + fh
     const nose = findNose(svg)
-    if (nose) svg = svg.replace(nose, fh + nose)
-    else add(fh)
+    if (nose) svg = svg.replace(nose, frag + nose)
+    else add(frag)
   }
 
   if (cfg.expression) {

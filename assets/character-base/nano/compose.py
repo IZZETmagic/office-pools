@@ -171,10 +171,37 @@ def main() -> None:
                 return path
         return None
 
+    def find_ears(doc: str) -> list:
+        # Same tone as the nose AND the neck shadow, so colour cannot separate them. What
+        # makes an ear an ear is that it sits OUTBOARD of the head's straight sides; the
+        # nose and the neck shadow are both centred.
+        out = []
+        for m in re.finditer(r"<path[^>]*/?>", doc):
+            path = m.group(0)
+            if BASE_SHADE not in path:
+                continue
+            n = [float(x) for x in re.findall(r"-?\d+\.?\d*",
+                                              re.search(r'd="([^"]*)"', path).group(1))]
+            xs = n[0::2]
+            cx = (min(xs) + max(xs)) / 2
+            if cx < 600 or cx > 1448:
+                out.append(path)
+        return out
+
+    # ⭐ THE EARS MOVE WITH IT. The base paints the ears LAST, so a beard whose sideburns
+    # grow outboard was being clipped by them. Ryan asked for the bushy beard's hair to sit
+    # slightly IN FRONT of the ears, and re-inserting them ahead of the facial hair does it.
+    # It also makes "under" styles agree with "over" ones, which already paint after the
+    # ears by construction. For a flush-sided beard it is a no-op: the band's outer edge and
+    # the ear's inner edge share about one unit.
     if fh and not fh_over:
+        ears = find_ears(svg)
+        for e in ears:
+            svg = svg.replace(e, "", 1)
+        frag = "".join(ears) + inner(fh)
         nose = find_nose(svg)
-        svg = svg.replace(nose, inner(fh) + nose, 1) if nose \
-            else svg.replace("</svg>", inner(fh) + "</svg>")
+        svg = svg.replace(nose, frag + nose, 1) if nose \
+            else svg.replace("</svg>", frag + "</svg>")
 
     for flag in ("--eyes", "--mouth", "--expression", "--brows"):
         if p := arg(flag):

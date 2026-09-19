@@ -293,3 +293,72 @@ describe('stubble is derived as a shadow, identically everywhere', () => {
     expect(ts).toMatch(/STUBBLE_TOWARD_GREY = 0\.55\b/)
   })
 })
+
+// =============================================================
+// Facial hair paints OVER the ears
+// =============================================================
+// The base paints the ears last, so a beard whose sideburns grow outboard was clipped by
+// them — the bushy beard's tufts hit a square edge at the ear. Ryan asked for that hair to
+// sit slightly in front. The ears are therefore re-inserted ahead of the facial hair, which
+// also makes "under" styles agree with "over" ones: a moustache is appended after the whole
+// face and so has always painted over the ears.
+//
+// ⚠ The nose still goes LAST of the three. A moustache tucks behind the nose rather than
+// swallowing its tip, and that ordering is what this test pins alongside the ears.
+// =============================================================
+
+const SKIN_SHADE = 'rgb(245,178,150)'
+// ⚠ Match on the PATH DATA, never the whole element: phase 2 recolours every fill, so the
+// ear you put in is not the string that comes out. `d` is the only stable handle.
+const D_EAR_L = 'M 371 799 L 517 799 L 517 1024 L 371 1024 Z'
+const D_EAR_R = 'M 1531 799 L 1649 799 L 1649 1024 L 1531 1024 Z'
+const D_NOSE = 'M 961 955 L 1084 955 L 1084 1131 L 961 1131 Z'
+const D_BEARD = 'M 700 1200 L 1300 1200 L 1300 1500 Z'
+
+const earedFixture = (over: boolean): AvatarAssets => ({
+  ...fixture(),
+  bases: {
+    b:
+      `<svg viewBox="0 0 2048 2048">` +
+      `<path d="${D_EAR_L}" fill="${SKIN_SHADE}"/>` +
+      `<path d="${D_EAR_R}" fill="${SKIN_SHADE}"/>` +
+      `<path d="${D_NOSE}" fill="${SKIN_SHADE}"/>` +
+      `</svg>`,
+  },
+  facialhair: { f: `<path d="${D_BEARD}" fill="rgb(140,122,110)"/>` },
+  fhManifest: { f: { over } },
+})
+
+describe('facial hair paints over the ears', () => {
+  it('puts both ears before the beard, and the nose after it', () => {
+    const svg = composeAvatar(cfg, earedFixture(false))
+    const at = (d: string) => svg.indexOf(`d="${d}"`)
+    for (const [name, d] of [['left ear', D_EAR_L], ['right ear', D_EAR_R],
+                             ['beard', D_BEARD], ['nose', D_NOSE]] as const) {
+      expect(at(d), `${name} must survive composition`).toBeGreaterThan(-1)
+    }
+    expect(at(D_EAR_L), 'the left ear must paint before the beard').toBeLessThan(at(D_BEARD))
+    expect(at(D_EAR_R), 'the right ear must paint before the beard').toBeLessThan(at(D_BEARD))
+    expect(at(D_BEARD), 'the nose must still paint after the beard').toBeLessThan(at(D_NOSE))
+    expect(svg.split(`d="${D_EAR_L}"`).length - 1, 'the ear is MOVED, never duplicated').toBe(1)
+  })
+
+  it('leaves an "over" style alone — it already lands after the ears', () => {
+    const svg = composeAvatar(cfg, earedFixture(true))
+    const at = (d: string) => svg.indexOf(`d="${d}"`)
+    expect(at(D_EAR_L), 'ear before the moustache').toBeLessThan(at(D_BEARD))
+    expect(at(D_BEARD), 'nose still last').toBeLessThan(at(D_NOSE))
+    expect(svg.split(`d="${D_EAR_L}"`).length - 1, 'never duplicated').toBe(1)
+  })
+
+  it('keeps the same ear move in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+      'lib/avatar/compose.ts',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must locate the ears`).toMatch(/find_ears|findEars/)
+    }
+  })
+})
