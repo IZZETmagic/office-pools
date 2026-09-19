@@ -2,10 +2,16 @@
   "_comment": "Does this style paint OVER the mouth or UNDER it? It cannot be inferred from coverage — a moustache overlaps the mouth region by 34% and must go over, stubble by 78% and must go under, and there is no clean cut between them. It is a property of the style, so it is declared here once rather than guessed per render.",
   "_over": "the hair hangs over the lip: the mouth is drawn first and the hair covers its top edge",
   "_under": "the hair is a mass the mouth sits in: the mouth is drawn last, on top, so it is never hidden",
-
-  "moustache": { "over": true },
-  "soulpatch": { "over": true },
-  "chinstrap": { "over": true },
-  "stubble":   { "over": false },
-  "fullbeard": { "over": false }
+  "moustache": {
+    "over": true
+  },
+  "soulpatch": {
+    "over": true
+  },
+  "stubble": {
+    "over": false
+  },
+  "fullbeard": {
+    "over": false
+  }
 }

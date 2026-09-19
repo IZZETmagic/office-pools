@@ -7,9 +7,12 @@ without an explicit request naming the asset. Same rule as `../../bases/LOCKED.m
 |---|---|---|
 | `stubble.asset.svg` | 3 | ⭐ v3 2026-09-19 — same contract as the full beard, no notch |
 | `fullbeard.asset.svg` | 3 | ⭐ v3 2026-09-19 — straight cheek line, arched corners, buried joints |
-| `chinstrap.asset.svg` | 3 | ⭐ v2 2026-09-18 — seam band + fade marker |
 | `moustache.asset.svg` | — | v1, not yet converted |
 | `soulpatch.asset.svg` | — | v1, not yet converted |
+
+⚠ **Chin strap removed 2026-09-19.** Ryan: *"I'm not sure how to do it properly right now."* Its
+generated art stays in `../v2/` and `../nano/` as provenance; the asset, its checksum and its
+manifest entry are gone. Next in its place: a **messy, bushy full beard** on the v3 contract.
 
 ## v2: the seam band (2026-09-18)
 
@@ -57,15 +60,14 @@ both, so this version is a **geometry edit of the locked v2 paths**, not a new g
    joint is one shape painted over the solid interior of another.
 
 ⚠ The rule from the base: **never butt two same-colour edges — overlap the lower shape and let
-the upper one clip it.** The chinstrap still carries the v2 butt joint and the v2 square
-corner.
+the upper one clip it.**
 
 Verified: no mid-tone pixels along either joint in flat or fade mode; the beard's outer
 silhouette is unchanged to within rasteriser noise (≤6 levels on single edge pixels).
 
 ## The fade marker
 
-Each of the three carries its sideburn band in `rgb(126,110,150)`, which `compose.py --fade`
+Each of the two v3 assets carries its sideburn band in `rgb(126,110,150)`, which `compose.py --fade`
 fills with a hair-to-skin gradient. See `../FADE.md`.
 
 ⚠⚠ BACK-OUT: with the fade OFF the marker is swapped for the asset's own body tone — the flat
@@ -78,5 +80,4 @@ Guard tests enforce both directions.
 ```sh
 shasum -a 256 -c LOCKED.sha256
 uv run ../../check-facialhair.py ../v2/fullbeard.png
-uv run ../../check-facialhair.py ../v2/chinstrap.png --strap   # a strap is bare in the middle
 ```
