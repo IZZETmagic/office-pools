@@ -279,7 +279,70 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ SUMMARY ============================ -->
 <section id="summary">
-  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span></h2>
+  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span></h2>
+
+  <div class="card warnc" id="update-2026-09-19">
+    <h3 style="margin:0 0 8px">2026-09-19 — League ingestion: the crons are finally scheduled, and the first drain found a strand and a replay</h3>
+    <p class="sec-sub" style="margin:0 0 10px">Scope: the league ingestion area only. Checked against git, the working tree, the test file and
+      read-only production queries. Where production could not be read from here it says so. <strong>The cards below this one are
+      2026-09-02 text and have drifted — see Drift.</strong></p>
+
+    <p style="margin:0 0 6px"><strong>Since last update — verified</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li>✅ <strong>Migration 135 scheduled the four league crons</strong> — reported applied via Supabase MCP. <code>cron.job</code> is
+        <strong>not readable from this session</strong> (the <code>cron</code> schema is not exposed to PostgREST), so the apply is
+        Ryan's report. <strong>Two of four are corroborated from the data:</strong> <code>league_score_events</code> went from a 223-event
+        backlog to <strong>0 pending of 243</strong> at 21:52–21:54 UTC, then events created <code>22:00:01</code> were claimed
+        <code>22:02:01</code> and events created <code>22:19:52</code> claimed <code>22:20:01</code> — an even-minute <code>*/2</code>
+        cadence (<code>league-outbox</code>); <code>matchweek_opened</code> + <code>lock_reminder</code> rows appeared at exactly
+        <code>22:00:01</code> (hourly <code>league-notices</code>). <code>league-standings</code> (Mon 06:00) and
+        <code>league-reconcile</code> (03:00 daily) cannot have fired yet — first due 2026-09-20 03:00 and 2026-09-21 06:00. All four
+        <code>/api/cron/league-*</code> answer <strong>401</strong> tonight, the deployment proof 135's own header demands.</li>
+      <li>✅ <strong>Root cause of the missing La Liga MW5 results, verified.</strong> Providers publish a TBD placeholder kickoff
+        (La Liga: Sunday 15:00Z) and move the game later. The live sync and its hourly catch-up build the request from the
+        <strong>stored</strong> kickoff; the daily reconcile reads only kickoffs <strong>ahead</strong> of the live window
+        (<code>reconcileLeagueSchedule.ts:127</code>). Once the placeholder date passed, a game played before it was unreachable by every
+        arm, every tick, at <code>ok: true</code>. Production tonight: <strong>235</strong> fixtures carry a moved kickoff,
+        <strong>111</strong> to an earlier date; <strong>206 stamped in the 21:xx UTC hour</strong> of the hand-run reconcile (Ryan's 202 is
+        consistent; the exact split is not reproducible from stored columns).</li>
+      <li>✅ <strong>Seven stranded fixtures recovered</strong> — all <code>completed_at = 2026-09-19 22:19:46Z</code>: Osasuna–Espanyol,
+        Racing–Alavés, Real Madrid–Rayo, Sevilla–Valencia, Athletic–Elche, Lazio–AC Milan, Monaco–Lens. Six sat <strong>7 days</strong>,
+        Monaco–Lens <strong>1</strong>. Standings for La Liga / Serie A / Ligue 1 refreshed at 22:19:5x.</li>
+      <li>✅ <strong><code>fc23239</code></strong> (local, <strong>unpushed</strong>) — step 3b fetches strays <strong>by fixture id</strong>
+        (<code>getFixturesByIds</code>, <code>client.ts:242</code>; <code>syncLeagueFixtures.ts:600-643</code>); note gains
+        <code>stray_by_id=fetched/asked</code>; tests V3.13–V3.15, file <strong>60/60</strong>. <strong><code>6eb14e4</code></strong> —
+        <code>scripts/run-league-sync.ts</code> was dead at import since <code>a3c3e19</code> (2 Sep); shim
+        <code>scripts/lib/no-server-only.cjs</code>.</li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Now</strong></p>
+    <ol style="margin:0 0 10px 18px">
+      <li><strong>Push + deploy <code>fc23239</code></strong> — the scheduled sync runs the old arm until then; the next
+        placeholder-before-kickoff game strands again, silently. <strong>R30.</strong></li>
+      <li><strong>Decide what the outbox does with a stale event</strong> — the first drain <strong>replayed 38
+        <code>matchweek_completed</code> events from MW2–MW4</strong> (oldest 19 days); no age guard in
+        <code>league-outbox/route.ts</code>. Allowlist limited it to 7 pickem/showdown pools, ≤104 emails, ≤16 distinct users, mostly UX
+        test accounts. Delivery <strong>unverified</strong>. <strong>R31.</strong></li>
+      <li><strong>Watch the first scheduled <code>league-reconcile</code> (2026-09-20 03:00 UTC) and <code>league-standings</code>
+        (2026-09-21 06:00)</strong> — scheduled on report, not on evidence, until they fire.</li>
+    </ol>
+
+    <p style="margin:0 0 6px"><strong>Risk moves</strong> — <strong>R30</strong> opened 🟠, <strong>R31</strong> opened 🟡. The
+      <em>"no league cron is scheduled"</em> finding is closed; both 🔴 rows in the Pick'em season table are updated in the markdown.
+      <strong>R25</strong>'s "other half" has landed (annotated, not rewritten). <strong>R21</strong> not re-levelled — see Drift.</p>
+
+    <div class="note warn"><strong>Drift.</strong> <strong>R21 is stale in the load-bearing way:</strong> the register still says production is
+      <code>6dc5710</code> (24 Aug), 225 commits behind. <code>origin/master</code> is <strong><code>a8dee7f</code> (12 Sep)</strong> and the four
+      league routes answer 401 — the deploy the register calls "not attempted" happened. The current gap is <strong>109 commits unpushed</strong>
+      (incl. <code>fc23239</code>). A full re-audit of R21 and <em>Ship what is built</em> is owed; not done in this pass. The sentences
+      <em>"league-notices is undeployed and therefore unschedulable"</em> and <em>"cron.job holds no league job of any kind"</em> were true on
+      2026-09-02 and are false tonight; annotated in the markdown.</div>
+
+    <p style="margin:8px 0 0"><strong>Needs Ryan</strong> — push <code>fc23239</code> + <code>6eb14e4</code> (pushing <code>master</code> is a
+      production deploy; only he does it). <strong>R31:</strong> drop or mark-without-sending any notification event older than N hours? Today it
+      sends. <em>"We tell you how you did when a matchweek finishes"</em> passes the disclosure gate; <em>"…three weeks later, in a batch"</em>
+      does not.</p>
+  </div>
 
   <div class="card crit">
     <p style="margin:0 0 10px"><strong>The World Cup is closed. The programme is now a Premier League programme.</strong> What the
@@ -379,20 +442,25 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     separately, not deleted.</p>
   <div class="strip">
     <div class="stat crit"><div class="n">2</div><div class="l">🔴 Critical risks</div></div>
-    <div class="stat high"><div class="n">12</div><div class="l">🟠 High risks</div></div>
-    <div class="stat med"><div class="n">7</div><div class="l">🟡 Medium risks</div></div>
+    <div class="stat high"><div class="n">13</div><div class="l">🟠 High risks</div></div>
+    <div class="stat med"><div class="n">8</div><div class="l">🟡 Medium risks</div></div>
     <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
     <div class="stat low"><div class="n">6</div><div class="l">✅ Closed (4 prod-verified)</div></div>
     <div class="stat pri"><div class="n">6</div><div class="l">Items in 🔥 Now</div></div>
     <div class="stat neu"><div class="n">9</div><div class="l">Projects</div></div>
     <div class="stat neu"><div class="n">14+5</div><div class="l">Settled decisions · product + infra</div></div>
     <div class="stat neu"><div class="n">23</div><div class="l">Decisions needing Ryan</div></div>
-    <div class="stat neu"><div class="n">R29</div><div class="l">Highest risk id on the register</div></div>
+    <div class="stat neu"><div class="n">R31</div><div class="l">Highest risk id on the register</div></div>
   </div>
-  <p class="strip-note"><strong>Current levels, R1–R29, as the markdown has them on 2026-09-02.</strong>
-    <strong>🔴</strong> R2 · R21. &nbsp;
-    <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27. &nbsp;
-    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29. &nbsp;
+  <p class="strip-note"><strong>Moved 2026-09-19 (league ingestion pass only).</strong> <strong>R30 is new</strong> 🟠 — a fixture
+    played before its placeholder date is unreachable by every sync arm; fix <code>fc23239</code> built, <strong>unpushed</strong>.
+    <strong>R31 is new</strong> 🟡 — the outbox has no age guard and its first drain replayed 38 stale matchweek recaps.
+    ⚠ <strong>R21 is counted 🔴 below as written, but is stale:</strong> <code>origin/master</code> moved to <code>a8dee7f</code> on 12 Sep and
+    the league routes are live; the current gap is 109 unpushed commits. Re-levelling owed after a full pass.</p>
+  <p class="strip-note"><strong>Current levels, R1–R31, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19).</strong>
+    <strong>🔴</strong> R2 · R21 (stale, see above). &nbsp;
+    <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27 · <strong>R30</strong>. &nbsp;
+    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong>. &nbsp;
     <strong>🟢</strong> R11 · R15. &nbsp;
     <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 — of which <strong>R4, R13, R17 and R26 are prod-verified</strong>;
     R1 and R22 are closed <em>in code only</em>, and code is not production while <strong>R21</strong> stands.</p>
@@ -407,7 +475,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R29 · 6 closed · R20–R29 added to this view 2026-09-02</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R31 · 6 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19</span></h2>
   <div class="note warn" style="margin-bottom:14px">
     <strong>⚠️ Mixed vintage — read the row dates.</strong> <strong>R1–R19</strong> below are <strong>2026-07-30 text</strong> and
     several have since closed or changed level; <strong>R20–R29</strong> were added on <strong>2026-09-02</strong> and are current.
@@ -823,7 +891,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
       <tr class="risk-crit">
         <td class="id">R21</td>
-        <td><strong>Production is 225 commits and ~30 migrations behind the code.</strong> <code>origin/master</code> =
+        <td><div class="note warn" style="margin:0 0 8px">⚠ <strong>STALE AS WRITTEN — noted 2026-09-19, not re-levelled.</strong>
+          <code>origin/master</code> is <strong><code>a8dee7f</code> (12 Sep)</strong>; all four <code>/api/cron/league-*</code> routes answer
+          <strong>401</strong> in production. Current gap: <strong>109 commits unpushed</strong> on local <code>master</code>, including the
+          R30 fix. Everything below describes 2026-09-02; full re-audit owed.</div>
+          <strong>Production is 225 commits and ~30 migrations behind the code.</strong> <code>origin/master</code> =
           <code>6dc5710</code> (24 Aug), unmoved; <code>Development</code> = <code>c98a037</code> (2 Sep). Migrations have been
           applied to the <strong>shared</strong> production database past the deployed code — <strong>121 makes a duel worth 500
           while the deployed <code>DuelsTab</code> treats anything that is not 3 or 1 as a LOSS</strong>, and <strong>110
@@ -981,6 +1053,55 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td>New — no call made. ⚠ It does <strong>not</strong> retire R9: <code>.next/types/routes.d 3.ts</code> is in the program
           right now and produces five more errors. This corrects an attribution, it does not close a risk</td>
         <td>R9; iCloud corrupts the local checkout</td>
+      </tr>
+
+      <tr><td colspan="8" style="background:var(--mist);font-size:12px;color:var(--slate);padding:8px 12px">
+        ➕ R30–R31 — added 2026-09-19 from the league ingestion pass. Condensed; full cells in the markdown.
+      </td></tr>
+
+      <tr class="risk-high">
+        <td class="id">R30</td>
+        <td><strong>A fixture played before the placeholder date we hold for it is unreachable by every sync arm — fix built, NOT
+          deployed.</strong> ⚠️ New 2026-09-19, verified in code and production. Providers publish TBD placeholder kickoffs (La Liga: Sunday
+          15:00Z) and move the game later. The live sync and hourly catch-up build the request from the <strong>stored</strong> kickoff
+          (<code>lib/integrations/apiFootball/syncLeagueFixtures.ts</code>); the daily reconcile reads only kickoffs <strong>ahead</strong> of
+          the live window (<code>reconcileLeagueSchedule.ts:127</code>). Once the placeholder date passes, the game is asked for at the wrong
+          date every tick — <code>stale=N unmatched=N</code> at <code>ok: true</code> — and never scored. <strong>111</strong> fixtures in
+          production now carry a kickoff earlier than their original. <strong>Fix:</strong> <code>fc23239</code>, step 3b — strays fetched
+          <strong>by id</strong> (<code>getFixturesByIds</code>, <code>client.ts:242</code>); note <code>stray_by_id=fetched/asked</code>; tests
+          V3.13–V3.15, file 60/60</td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast"><strong>Every league pool, every mode</strong> — an unscored fixture is a silently wrong leaderboard, duel and LMS
+          round for as long as it lasts. Tonight: 7 fixtures (5 La Liga MW5, Lazio–AC Milan, Monaco–Lens), six of them for
+          <strong>7 days</strong>. All recovered, <code>completed_at = 22:19:46Z</code></td>
+        <td><strong>One provider reschedule to an earlier day</strong> after the daily reconcile has passed it. La Liga does this weekly</td>
+        <td><strong>Half.</strong> Reconcile now scheduled (135) — catches a move while the placeholder is still ahead. The by-id fallback
+          is <strong>committed locally, unpushed</strong>; the scheduled sync runs the old arm. Manual recovery:
+          <code>scripts/run-league-sync.ts</code> from the local checkout (<code>6eb14e4</code>)</td>
+        <td>⏳ <strong>NEEDS RYAN — push + deploy <code>fc23239</code>.</strong> Pushing <code>master</code> is a production deploy</td>
+        <td>Decision 10 → league-reconcile; League ingestion; R21</td>
+      </tr>
+
+      <tr class="risk-med">
+        <td class="id">R31</td>
+        <td><strong>The outbox has no age guard — a backlog, once drained, is delivered as if it were fresh.</strong> ⚠️ New 2026-09-19,
+          incident already happened. <code>app/api/cron/league-outbox/route.ts</code> hands every claimed notification event to
+          <code>sendLeagueNotice</code> with no check on <code>created_at</code>. The first scheduled drain at <strong>21:52 UTC</strong>
+          processed <strong>38 <code>matchweek_completed</code> events from MW2–MW4</strong> (oldest 19 days). The allowlist
+          (<code>notify.ts:110</code>, pickem + showdown) left <strong>7 pools / 20 events</strong> — <em>Showdown Duels</em> (10 members),
+          <em>Matchweek Pick'em</em> (10), <em>Showdown: Exact Scores</em> (7), <em>Pick'em: Exact Scores</em> (4), <em>Premier League
+          2026/2027 Pool</em> (3), <em>Test La Liga</em> (1), <em>Ligue My Crack</em> (1) — three stale "Matchweek N is scored" emails each for
+          the first five. ⚠ <strong>Delivery unverified</strong>: no send-log table, Vercel log not readable from here; the code path sends
+          unconditionally</td>
+        <td><span class="chip lvl-med">🟡 MEDIUM</span></td>
+        <td class="blast">Trust, not data. ≤104 emails to <strong>≤16 distinct users</strong>, mostly UX test accounts; 1 push token among
+          them. Recurs on any future backlog — an outage, <code>league_outbox_enabled=false</code>, a failed deploy</td>
+        <td><strong>Any gap in the <code>*/2</code> job longer than a matchweek</strong>, then its resumption</td>
+        <td><strong>None.</strong> Fix shape: skip-and-mark any notification event older than N hours (fixture/cache events are harmless to
+          replay). Small; not started</td>
+        <td>⏳ <strong>NEEDS RYAN</strong> — set N, or say stale sends are acceptable. <em>"…in a batch, three weeks later"</em> fails the
+          disclosure gate</td>
+        <td>Pick'em season → The outbox is never drained; R30</td>
       </tr>
 
       <tr class="risk-high">
@@ -2084,6 +2205,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       has moved past the deployed code. <strong>The largest single item in the programme, and it is not a build.</strong></p>
     <p style="margin:0">Carries <strong>R21</strong>. Every ✅ below the Premier League heading in the markdown describes code no
       member can reach.</p>
+    <div class="note warn" style="margin-top:8px">⚠ <strong>2026-09-19:</strong> stale. <code>origin/master</code> = <code>a8dee7f</code>
+      (12 Sep) and the league cron routes are live (401). Current gap is <strong>109 commits unpushed</strong>, including <code>fc23239</code>
+      (<strong>R30</strong>). This card is owed a rewrite after a full deploy audit; not done in the league ingestion pass.</div>
   </div>
 
   <div class="card warnc">
@@ -4092,6 +4216,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       every league fixture is billed at <strong>knockout</strong> rates. Fixing the price without the gate changes nothing; fixing Node
       without shadow changes nothing a member sees. Importing fixtures is <strong>not</strong> the last step before a working league
       pool.</div>
+    <div class="note warn" style="margin-top:8px">⚠ <strong>2026-09-19:</strong> the text above is 2026-07-30; league ingestion has since shipped
+      on its own <code>league_*</code> tables across five leagues. Tonight in this area: the four league crons scheduled (migration
+      <strong>135</strong>, applied — outbox and notices corroborated from data, standings and reconcile awaiting first firing); the
+      <strong>placeholder-kickoff strand</strong> found and half-fixed — <code>fc23239</code> unpushed (<strong>R30</strong>); the first outbox drain
+      replayed 38 stale recaps (<strong>R31</strong>). See <a href="#update-2026-09-19">the 2026-09-19 block</a>.</div>
   </div>
 
   <div class="card warnc" id="i-advance-teams">
@@ -4269,7 +4398,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 <footer>
   <div class="wrap">
     <p><strong>SportPool Programme</strong> — hand-built view of <code>SPORTPOOL_PROGRAMME.md</code> at commit
-      <code>6f3980d</code> + the uncommitted 2026-07-30 audit corrections. Rebuilt 2026-07-30. Self-contained: no network calls, no external
+      <code>6f3980d</code> + the uncommitted 2026-07-30 audit corrections. Rebuilt 2026-07-30; 2026-09-02 audit added;
+      <strong>2026-09-19 league ingestion update</strong> (R30, R31, the 2026-09-19 status block, R21 stale note). Self-contained: no network calls, no external
       fonts, no CDN. Colours are the SportPool tokens from
       <code>mobile/theme/colors.ts</code>, light/dark via <code>prefers-color-scheme</code>.</p>
     <p>The markdown is the source of truth. This file is a view of it and is updated in the same piece of work — if they
