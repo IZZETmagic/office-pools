@@ -96,6 +96,14 @@ const rgbStr  = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 const darken  = (c,f=0.78) => rgbStr(c.map(v => Math.max(0, Math.trunc(v*f))));
 const lighten = (c,f=1.22) => rgbStr(c.map(v => Math.min(255, Math.trunc(v*f))));
 const mix     = (a,b,t)    => rgbStr(a.map((v,i) => Math.trunc(v + (b[i]-v)*t)));
+// stubble is a shadow: toward the skin, then toward grey. ⚠ Same numbers as compose.ts/.py.
+const STUBBLE_TOWARD_SKIN = 0.83;
+const STUBBLE_TOWARD_GREY = 0.55;
+const stubbleTone = (hair, skin) => {
+  const m = hair.map((v,i) => v + (skin[i]-v)*STUBBLE_TOWARD_SKIN);
+  const grey = 0.2126*m[0] + 0.7152*m[1] + 0.0722*m[2];
+  return rgbStr(m.map(v => Math.trunc(v + (grey-v)*STUBBLE_TOWARD_GREY)));
+};
 
 /* ---- tokens, exactly as the assets carry them -------------------------------------- */
 const T = {
@@ -171,7 +179,7 @@ function compose(c){
   svg = swapAll(svg, T.mouthTongue, lighten(mouth,1.13));
 
   svg = swapAll(svg, T.browInk, darken(hair,0.82));          // brows follow hair
-  svg = swapAll(svg, T.stubble, mix(hair, skin, 0.55));      // stubble: hair toward skin
+  svg = swapAll(svg, T.stubble, stubbleTone(hair, skin));    // stubble: a shadow, not a short beard
   svg = swapAll(svg, T.hairBase,  rgbStr(hair));
   svg = swapAll(svg, T.hairShade, darken(hair));
   svg = swapAll(svg, T.hairLight, lighten(hair));

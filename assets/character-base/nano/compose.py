@@ -35,6 +35,20 @@ BROW_INK = "rgb(101,70,52)"
 BLUSH = "rgb(240,158,138)"
 STUBBLE = "rgb(164,150,140)"
 
+# Stubble is a SHADOW on the skin, not a short beard. Measured off the art Ryan approved on
+# 2026-09-18: 84% of the way from the beard to the skin in lightness, and clearly greyer than
+# the hair-to-skin line. A plain 55% mix gave a mid brown that read as a lighter full beard.
+# ⚠⚠ The same two numbers live in lib/avatar/compose.ts and builder-template.html; the guard
+# test asserts all three agree.
+STUBBLE_TOWARD_SKIN = 0.83
+STUBBLE_TOWARD_GREY = 0.55
+
+
+def stubble_tone(hair, skin) -> str:
+    m = [h + (s - h) * STUBBLE_TOWARD_SKIN for h, s in zip(hair, skin)]
+    grey = 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]
+    return rgb_str(tuple(int(v + (grey - v) * STUBBLE_TOWARD_GREY) for v in m))
+
 # ⭐ The BEARD FADE marker. A facial hair asset paints its sideburn band in this tone; compose
 # turns that one path into a vertical gradient running from the SKIN colour at the top to the
 # HAIR colour at the bottom, so the beard dissolves into the face the way a barber fade does.
@@ -213,11 +227,10 @@ def main() -> None:
         skin_c = arg("--skin")
         # ⚠⚠ THE FADE MUST END AT THE ASSET'S OWN BODY TONE, NOT ALWAYS THE HAIR COLOUR.
         #
-        # A stubble asset's body is the STUBBLE token — the hair mixed 55% toward the skin — so
-        # fading its band to full hair made the band far DARKER than the stubble it joins. It
-        # read as a dark bar, not a fade, which is exactly what it looked like.
-        body = (rgb_str(tuple(int(h + (s2 - h) * 0.55)
-                              for h, s2 in zip(hex_to_rgb(hair_c), hex_to_rgb(skin_c))))
+        # A stubble asset's body is the STUBBLE token — the derived shadow tone — so fading its
+        # band to full hair made the band far DARKER than the stubble it joins. It read as a
+        # dark bar, not a fade, which is exactly what it looked like.
+        body = (stubble_tone(hex_to_rgb(hair_c), hex_to_rgb(skin_c))
                 if (hair_c and skin_c and STUBBLE in svg) else
                 (rgb_str(hex_to_rgb(hair_c)) if hair_c else HAIR_BASE))
 
@@ -240,12 +253,10 @@ def main() -> None:
 
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)
-        # Stubble is the hair colour mixed 55% toward the skin — it has to track hair (a
-        # blonde with black stubble looks wrong) while staying obviously lighter than a beard,
-        # which is the only thing that makes it read as stubble at all.
+        # Stubble tracks the hair (a blonde with black stubble looks wrong) but is derived as a
+        # shadow — see stubble_tone — which is the only thing that makes it read as stubble.
         if sk := arg("--skin"):
-            mix = tuple(int(h + (s2 - h) * 0.55) for h, s2 in zip(rgb, hex_to_rgb(sk)))
-            svg = svg.replace(f'fill="{STUBBLE}"', f'fill="{rgb_str(mix)}"')
+            svg = svg.replace(f'fill="{STUBBLE}"', f'fill="{stubble_tone(rgb, hex_to_rgb(sk))}"')
         svg = svg.replace(f'fill="{HAIR_BASE}"', f'fill="{rgb_str(rgb)}"')
         svg = svg.replace(f'fill="{HAIR_SHADE}"', f'fill="{darken(rgb)}"')
         svg = svg.replace(f'fill="{HAIR_LIGHT}"', f'fill="{lighten(rgb)}"')

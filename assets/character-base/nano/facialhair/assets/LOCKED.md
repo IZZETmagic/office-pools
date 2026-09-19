@@ -33,8 +33,11 @@ That is why it never read as stubble whatever was done to its shape.
 **Stubble got the identical treatment the same day** — straight top at y1105.8, radius-100
 arches, buried joints — but with a flat top under the nose instead of the beard's notch: stubble
 has no moustache to carve, and the nose simply overlaps it. Ryan picked straight over notch.
-⚠ Ryan's note on locking it: at this point the stubble is the full beard in a lighter tone and
-*reads as one*. The shape contract is settled; what makes it read as stubble is still open.
+⚠ Ryan's note on locking it: at this point the stubble was the full beard in a lighter tone and
+*read as one*. Every stubble artefact in the repo is a flat shape — the thing that made the
+approved art read as stubble was its TONE (pale, 84% to skin, greyer than the hair line), and it
+was lost when the tone became a token filled at 55%. Fixed the same day in the composers, not the
+asset: `stubbleTone` = 83% toward skin, then 55% toward grey. See `../v2/README.md`.
 
 Ryan asked for two visible changes to the full beard and chose vectors over regeneration for
 both, so this version is a **geometry edit of the locked v2 paths**, not a new generation.

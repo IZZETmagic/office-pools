@@ -14,9 +14,10 @@
 //
 // ## The derived colours are not decoration
 //
-// A blush is the skin pulled 22% toward rose, and stubble is the hair pulled 55% toward the
-// skin. Both exist because fixed colours were wrong on dark skin: a fixed pink blush read as
-// clown makeup, and stubble at full hair strength read as a second short beard.
+// A blush is the skin pulled 22% toward rose, and stubble is the hair pulled 83% toward the
+// skin and then 55% toward its own grey. Both exist because fixed colours were wrong on dark
+// skin: a fixed pink blush read as clown makeup, and stubble at full hair strength read as a
+// second short beard.
 // =============================================================
 
 export type AvatarAssets = {
@@ -114,6 +115,24 @@ const darken = (c: RGB, f = 0.78) => rgbStr(c.map((v) => Math.max(0, Math.trunc(
 const lighten = (c: RGB, f = 1.22) => rgbStr(c.map((v) => Math.min(255, Math.trunc(v * f))))
 const mix = (a: RGB, b: RGB, t: number) => rgbStr(a.map((v, i) => Math.trunc(v + (b[i] - v) * t)))
 
+/**
+ * Stubble is a SHADOW on the skin, not a short beard. Measured off the art Ryan approved on
+ * 2026-09-18: 84% of the way from the beard to the skin in lightness, and clearly greyer than
+ * the hair-to-skin line. A plain 55% mix gave a mid brown that read as a lighter full beard,
+ * which is what the stubble looked like for a week. So: toward the skin, then toward grey.
+ *
+ * ⚠⚠ The same two numbers live in compose.py and builder-template.html. The guard test
+ * asserts all three agree, because a builder that lies about the product's colour is worse
+ * than no builder.
+ */
+const STUBBLE_TOWARD_SKIN = 0.83
+const STUBBLE_TOWARD_GREY = 0.55
+const stubbleTone = (hair: RGB, skin: RGB) => {
+  const m = hair.map((v, i) => v + (skin[i] - v) * STUBBLE_TOWARD_SKIN)
+  const grey = 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]
+  return rgbStr(m.map((v) => Math.trunc(v + (grey - v) * STUBBLE_TOWARD_GREY)))
+}
+
 const swap = (s: string, find: string, rep: string) => s.split(`fill="${find}"`).join(`fill="${rep}"`)
 
 /**
@@ -201,10 +220,10 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   // ---- the beard fade, off unless cfg.fade ---------------------------------------------
   if (svg.includes(T.fade)) {
     // ⚠⚠ The fade must end at the asset's OWN body tone, not always the hair colour. A
-    // stubble asset's body is the STUBBLE token — hair mixed 55% toward skin — so fading its
+    // stubble asset's body is the STUBBLE token — the derived shadow tone — so fading its
     // band to full hair made the band far darker than the stubble it joins. It read as a dark
     // bar rather than a fade.
-    const body = svg.includes(T.stubble) ? mix(hair, skin, 0.55) : rgbStr(hair)
+    const body = svg.includes(T.stubble) ? stubbleTone(hair, skin) : rgbStr(hair)
     if (cfg.fade) {
       // objectBoundingBox units, so the gradient spans whatever path carries it and no
       // coordinates have to be kept in step with the artwork.
@@ -225,7 +244,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   }
 
   svg = swap(svg, T.browInk, darken(hair, 0.82)) // brows track hair, not skin
-  svg = swap(svg, T.stubble, mix(hair, skin, 0.55))
+  svg = swap(svg, T.stubble, stubbleTone(hair, skin))
   svg = swap(svg, T.hairBase, rgbStr(hair))
   svg = swap(svg, T.hairShade, darken(hair))
   svg = swap(svg, T.hairLight, lighten(hair))

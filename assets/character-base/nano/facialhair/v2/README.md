@@ -73,7 +73,9 @@ is what killed the per-expression beard approach earlier in this project. Checke
    across six framings, both models, with and without references. A geometry script did move it
    (603 → 543) but Ryan chose the generated shape, so the script was deleted rather than left
    lying around in a pipeline that forbids hand-editing art.
-2. **The `STUBBLE` mix ratio.** Currently 0.55 in `compose.py` and `lib/avatar/compose.ts`. At
-   0.55 a solid mass reads as a beard at every hair/skin combination; **0.80** is where it reads
-   as shadow and it is still legible at 56px. One number, not an art change, and it improves the
-   existing v1 asset too.
+2. ~~**The `STUBBLE` mix ratio.**~~ **Resolved 2026-09-19.** At 0.55 a solid mass read as a beard
+   at every hair/skin combination. Measured off `stubble.png`, the approved tone is 84% of the way
+   to the skin in lightness *and greyer than the hair-to-skin line*, so a bigger ratio alone was
+   not enough. The derivation is now `stubbleTone`: 83% toward the skin, then 55% toward its own
+   grey — in `compose.py`, `lib/avatar/compose.ts` and `builder-template.html`, with a guard test
+   that fails if any of the three drifts.

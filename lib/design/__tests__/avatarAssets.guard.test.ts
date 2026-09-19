@@ -236,3 +236,60 @@ describe('the beard fade is opt-in', () => {
     }
   })
 })
+
+// =============================================================
+// Stubble is a shadow, not a short beard — and every composer must agree
+// =============================================================
+// Measured off the art Ryan approved on 2026-09-18, stubble is 84% of the way from the beard
+// to the skin in lightness and clearly greyer than the hair-to-skin line. The token used to
+// be filled with a plain 55% mix, a mid brown that read as a lighter full beard for a week.
+//
+// ⚠⚠ The derivation lives in THREE places: lib/avatar/compose.ts (the product), compose.py
+// (the asset pipeline) and builder-template.html (the admin builder's port). If they drift,
+// the builder lies about what the product renders. These tests pin the product's output to a
+// literal and pin the other two files to the same constants.
+// =============================================================
+
+const STUBBLE_TOKEN = 'rgb(164,150,140)'
+/** stubbleTone(#8B5E3C, #F5C9A6) — 83% toward skin, then 55% toward its own grey. */
+const STUBBLE_EXPECTED = 'rgb(206,186,170)'
+
+const stubbleFixture = (): AvatarAssets => ({
+  ...fixture(),
+  facialhair: {
+    f:
+      `<path d="M 700 1200 L 1300 1200 L 1300 1500 Z" fill="${STUBBLE_TOKEN}"/>` +
+      `<path d="M 516 860 L 616 860 L 616 1200 Z" fill="${FADE_MARKER}"/>`,
+  },
+})
+
+describe('stubble is derived as a shadow, identically everywhere', () => {
+  it('fills the stubble token with the derived shadow tone', () => {
+    const svg = composeAvatar(cfg, stubbleFixture())
+    expect(svg, 'the token must never reach the output').not.toContain(STUBBLE_TOKEN)
+    expect(svg).toContain(`fill="${STUBBLE_EXPECTED}"`)
+    expect(svg, 'a 55% mix is the old beard-coloured stubble').not.toContain('rgb(197,152,118)')
+  })
+
+  it('fades a stubble band to the stubble tone, not to full hair', () => {
+    const off = composeAvatar(cfg, stubbleFixture())
+    expect(off, 'fade off: the band is flat stubble').not.toContain('rgb(139,94,60)')
+    const on = composeAvatar({ ...cfg, fade: true }, stubbleFixture())
+    expect(on).toContain(`offset="1" stop-color="${STUBBLE_EXPECTED}"`)
+  })
+
+  it('keeps the same two constants in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file}: STUBBLE_TOWARD_SKIN`).toMatch(/STUBBLE_TOWARD_SKIN\s*=\s*0\.83\b/)
+      expect(src, `${file}: STUBBLE_TOWARD_GREY`).toMatch(/STUBBLE_TOWARD_GREY\s*=\s*0\.55\b/)
+      expect(src, `${file}: still mixes stubble the old way`).not.toMatch(/stubble[^\n]*0\.55\)/i)
+    }
+    const ts = readFileSync(join(process.cwd(), 'lib/avatar/compose.ts'), 'utf8')
+    expect(ts).toMatch(/STUBBLE_TOWARD_SKIN = 0\.83\b/)
+    expect(ts).toMatch(/STUBBLE_TOWARD_GREY = 0\.55\b/)
+  })
+})
