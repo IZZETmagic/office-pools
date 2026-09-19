@@ -94,3 +94,4 @@ scripts/*.sent
 # leftover node_modules snapshot + image backups
 mobile/.doomed_node_modules_*/
 *.bak
+__pycache__/

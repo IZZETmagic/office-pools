@@ -7,12 +7,13 @@ without an explicit request naming the asset. Same rule as `../../bases/LOCKED.m
 |---|---|---|
 | `stubble.asset.svg` | 3 | ⭐ v3 2026-09-19 — same contract as the full beard, no notch |
 | `fullbeard.asset.svg` | 3 | ⭐ v3 2026-09-19 — straight cheek line, arched corners, buried joints |
+| `bushybeard.asset.svg` | 4 | ⭐ NEW 2026-09-19 — the v3 beard plus a ragged outer growth; **no fade** |
 | `moustache.asset.svg` | — | v1, not yet converted |
 | `soulpatch.asset.svg` | — | v1, not yet converted |
 
 ⚠ **Chin strap removed 2026-09-19.** Ryan: *"I'm not sure how to do it properly right now."* Its
 generated art stays in `../v2/` and `../nano/` as provenance; the asset, its checksum and its
-manifest entry are gone. Next in its place: a **messy, bushy full beard** on the v3 contract.
+manifest entry are gone. `bushybeard` took its slot.
 
 ## v2: the seam band (2026-09-18)
 
@@ -65,9 +66,46 @@ the upper one clip it.**
 Verified: no mid-tone pixels along either joint in flat or fade mode; the beard's outer
 silhouette is unchanged to within rasteriser noise (≤6 levels on single edge pixels).
 
+## bushybeard — the v3 beard with a ragged outer growth (2026-09-19)
+
+Ryan wanted a messy, bushy beard. Round 1 asked for the whole beard to go unkempt and all four
+generations broke the design: the top edge climbed the cheeks, the sideburns overhung the ears
+and every one punched a mouth hole. He corrected the brief — *"I like the current beard design;
+something on the OUTSIDES that makes it scruffier or bigger — wider and lower, but nothing
+around the nose area"* — and round 2 landed it on all four tries, measured identical to the
+locked beard at the notch, both sideburn tops and the cheek line.
+
+⭐⭐ **The asset is the locked v3 beard with ONE path added underneath.** Body, both sideburn
+bands, the buried joints and the arches are the locked geometry, carried over unchanged. Only
+the ragged outer growth is new. That is deliberate: a trace can only see VISIBLE edges, so
+re-tracing the whole beard would have lost every buried joint and handed the hairline back.
+
+How the new path was derived, reproducibly — `../bushy/build-bushy.py`:
+
+1. Recraft `vectorize` on the chosen render (10 units). ⚠ The traced beard is **not** the
+   visible beard: it carries a hidden skirt down to y2048 behind the shirt, because the tracer
+   draws each shape as a region and overpaints. Subtracting the shirt and the neck patch
+   recovers the real silhouette — 99.2% IoU against the generated art.
+2. ⚠⚠ The mass is CLIPPED so it can never add anything on the face above the approved top edge.
+   The forbidden region is *inside the head's straight sides, above y1200, and not already
+   covered by the locked beard* — which is exactly the cheeks and the philtrum notch. Below
+   y1200 nothing is clipped, so the downward growth is untouched. It also may not rise above
+   the bands' flat top (y909.1); the trace put them half a unit higher, and half a unit of
+   solid beard above a band reads as a dark lip.
+3. Simplified at tolerance 1.5 — 206 points, 0.02% area change.
+
+⭐ **No fade on this one** (Ryan). The bands' fade marker is swapped for the plain hair token, so
+it renders solid whether or not `--fade` is set. Doing it in the ASSET rather than relying on the
+flag matters: the admin builder turns the fade on by default.
+
+⚠ This is the first style that paints OVER the ears — see the same-day commit that moves the ear
+paths ahead of the facial hair. Its tufts reach ~230px onto the left ear and ~160 onto the right.
+The old ear-overhang rule from the hair work does NOT apply here: hair paints last and would bury
+the ear, facial hair does not.
+
 ## The fade marker
 
-Each of the two v3 assets carries its sideburn band in `rgb(126,110,150)`, which `compose.py --fade`
+`fullbeard` and `stubble` carry their sideburn band in `rgb(126,110,150)`, which `compose.py --fade`
 fills with a hair-to-skin gradient. See `../FADE.md`.
 
 ⚠⚠ BACK-OUT: with the fade OFF the marker is swapped for the asset's own body tone — the flat
@@ -80,4 +118,14 @@ Guard tests enforce both directions.
 ```sh
 shasum -a 256 -c LOCKED.sha256
 uv run ../../check-facialhair.py ../v2/fullbeard.png
+uv run ../../build-builder.py        # after ANY asset change — two tracked bundles depend on it
 ```
+
+⚠ **`check-facialhair.py` cannot judge `bushybeard`.** Its band, moustache and cheek probes walk
+inward from the head edge assuming a flush sideburn, so on a ragged style they report a 200px
+"band" at y430 and read tufts as the cheek line. Only the **tone**, **mouth** and **ears** rows
+mean anything there, and all three pass. Do not chase the other numbers; the guard tests and the
+checksum are what hold this asset.
+
+⭐ The asset is rebuilt, not hand-edited: `uv run ../bushy/build-bushy.py out.svg` reproduces
+`bushybeard.asset.svg` byte for byte from the locked full beard and the trace.
