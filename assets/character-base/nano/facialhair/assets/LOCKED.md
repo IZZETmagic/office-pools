@@ -5,7 +5,7 @@ without an explicit request naming the asset. Same rule as `../../bases/LOCKED.m
 
 | asset | paths | notes |
 |---|---|---|
-| `stubble.asset.svg` | 3 | ⭐ v2 2026-09-18 — seam band + fade marker |
+| `stubble.asset.svg` | 3 | ⭐ v3 2026-09-19 — same contract as the full beard, no notch |
 | `fullbeard.asset.svg` | 3 | ⭐ v3 2026-09-19 — straight cheek line, arched corners, buried joints |
 | `chinstrap.asset.svg` | 3 | ⭐ v2 2026-09-18 — seam band + fade marker |
 | `moustache.asset.svg` | — | v1, not yet converted |
@@ -30,6 +30,12 @@ That is why it never read as stubble whatever was done to its shape.
 
 ## v3: the cheek line (2026-09-19)
 
+**Stubble got the identical treatment the same day** — straight top at y1105.8, radius-100
+arches, buried joints — but with a flat top under the nose instead of the beard's notch: stubble
+has no moustache to carve, and the nose simply overlaps it. Ryan picked straight over notch.
+⚠ Ryan's note on locking it: at this point the stubble is the full beard in a lighter tone and
+*reads as one*. The shape contract is settled; what makes it read as stubble is still open.
+
 Ryan asked for two visible changes to the full beard and chose vectors over regeneration for
 both, so this version is a **geometry edit of the locked v2 paths**, not a new generation.
 
@@ -48,8 +54,8 @@ both, so this version is a **geometry edit of the locked v2 paths**, not a new g
    joint is one shape painted over the solid interior of another.
 
 ⚠ The rule from the base: **never butt two same-colour edges — overlap the lower shape and let
-the upper one clip it.** The chinstrap and stubble still carry the v2 butt joint and the v2
-square corner.
+the upper one clip it.** The chinstrap still carries the v2 butt joint and the v2 square
+corner.
 
 Verified: no mid-tone pixels along either joint in flat or fade mode; the beard's outer
 silhouette is unchanged to within rasteriser noise (≤6 levels on single edge pixels).
