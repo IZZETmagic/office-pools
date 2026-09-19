@@ -41,8 +41,17 @@ describe('CLUB_COLOR', () => {
     }
   });
 
-  it('covers a full twenty-club Premier League', () => {
-    expect(Object.keys(CLUB_COLOR)).toHaveLength(20);
+  it('covers every club in the five imported leagues', () => {
+    // ⚠ WAS `toHaveLength(20)` — the Premier League only. The Results tab
+    // dropped club crests for colour bars on 2026-09-19, at which point 76 of
+    // the 96 clubs in play would have rendered nothing, so the other four
+    // leagues were added. 20 PL + 20 La Liga + 20 Serie A + 18 Bundesliga +
+    // 18 Ligue 1 = 96.
+    expect(Object.keys(CLUB_COLOR)).toHaveLength(96);
+    // The original twenty must survive any future edit to the map.
+    for (const id of [42, 66, 35, 55, 51, 49, 1346, 52, 45, 36, 64, 57, 63, 40, 50, 33, 34, 65, 746, 47]) {
+      expect(CLUB_COLOR[id], `Premier League club ${id} lost its colour`).toBeTruthy();
+    }
   });
 
   it('is all six-digit hex — a shorthand would break the distance maths', () => {
@@ -78,8 +87,10 @@ describe('clubColorFromCrestUrl', () => {
     expect(clubColorFromCrestUrl(crest(42))).toBe(CLUB_COLOR[42]);
   });
 
-  it('is null for a club outside the map — La Liga keeps the app colours', () => {
-    expect(clubColorFromCrestUrl(crest(529))).toBeNull(); // Barcelona
+  it('is null for a club outside the map — an unimported league keeps the app colours', () => {
+    // ⚠ 529 (Barcelona) USED TO BE THE EXAMPLE HERE and now has a colour. The
+    // case still matters: a club in a league nobody has imported yet.
+    expect(clubColorFromCrestUrl(crest(999999))).toBeNull();
   });
 });
 
@@ -121,8 +132,8 @@ describe('fixturePalette', () => {
   });
 
   it('falls back when either club is outside the map', () => {
-    expect(fixturePalette(crest(42), crest(529), FALLBACK).usingClubColors).toBe(false);
-    expect(fixturePalette(crest(529), crest(42), FALLBACK).usingClubColors).toBe(false);
+    expect(fixturePalette(crest(42), crest(999999), FALLBACK).usingClubColors).toBe(false);
+    expect(fixturePalette(crest(999999), crest(42), FALLBACK).usingClubColors).toBe(false);
     expect(fixturePalette(null, null, FALLBACK).usingClubColors).toBe(false);
   });
 

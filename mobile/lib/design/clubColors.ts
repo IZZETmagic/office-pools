@@ -54,6 +54,90 @@ export const CLUB_COLOR: Record<number, string> = {
   65: '#C40000',   // Nottingham Forest
   746: '#C81428',  // Sunderland
   47: '#132257',   // Tottenham
+
+  // ── Bundesliga ──────────────────────────────────────────────────────────
+  157: '#DC052D',  // Bayern München
+  165: '#1B1B1B',  // Borussia Dortmund  ⚠ the BLACK half — yellow is ~1.1:1
+  168: '#E32221',  // Bayer Leverkusen
+  169: '#E1000F',  // Eintracht Frankfurt
+  173: '#D50032',  // RB Leipzig
+  172: '#E32219',  // VfB Stuttgart
+  160: '#C8102E',  // SC Freiburg
+  164: '#C3141E',  // FSV Mainz 05
+  192: '#C8102E',  // 1. FC Köln
+  182: '#C8102E',  // Union Berlin
+  1660: '#B4202A', // SV Elversberg
+  170: '#BA3733',  // FC Augsburg
+  174: '#004D9D',  // FC Schalke 04
+  175: '#0E52A1',  // Hamburger SV
+  185: '#004E95',  // SC Paderborn 07
+  167: '#1C63B8',  // 1899 Hoffenheim
+  162: '#1B7A43',  // Werder Bremen
+  163: '#00733E',  // Borussia Mönchengladbach ⚠ the GREEN — black would twin Dortmund
+
+  // ── La Liga ─────────────────────────────────────────────────────────────
+  541: '#00529F',  // Real Madrid        ⚠ the club BLUE — the shirt is white
+  529: '#A50044',  // Barcelona
+  530: '#C8102E',  // Atletico Madrid
+  531: '#D6161C',  // Athletic Club
+  536: '#D4021D',  // Sevilla
+  543: '#007A3D',  // Real Betis
+  548: '#004A98',  // Real Sociedad
+  532: '#A85C10',  // Valencia           ⚠ darkened orange, twice — #C4701A was 4.2:1
+  533: '#005187',  // Villarreal         ⚠ the NAVY — yellow is ~1.2:1
+  546: '#004B9B',  // Getafe
+  540: '#0069B4',  // Espanyol
+  542: '#0761AF',  // Alaves
+  538: '#1E7BB8',  // Celta Vigo         ⚠ darkened sky
+  539: '#8E1B3A',  // Levante
+  727: '#A21C28',  // Osasuna
+  728: '#C8202A',  // Rayo Vallecano
+  535: '#0067B1',  // Malaga
+  544: '#00519E',  // Deportivo La Coruna
+  797: '#00713A',  // Elche
+  4665: '#00843D', // Racing Santander
+
+  // ── Serie A ─────────────────────────────────────────────────────────────
+  496: '#1B1B1B',  // Juventus           ⚠ the BLACK half
+  505: '#0B5FA5',  // Inter
+  489: '#C4141A',  // AC Milan
+  497: '#8E1F2F',  // AS Roma
+  487: '#1E6F8F',  // Lazio              ⚠ darkened sky
+  492: '#0B6FA4',  // Napoli             ⚠ darkened azure
+  499: '#1B4B9B',  // Atalanta
+  502: '#7B2D8E',  // Fiorentina
+  503: '#7A1E1E',  // Torino
+  494: '#2B2B2B',  // Udinese
+  500: '#8F1B2C',  // Bologna
+  495: '#9B1B30',  // Genoa
+  490: '#A6192E',  // Cagliari
+  488: '#007A3D',  // Sassuolo
+  867: '#8A6D00',  // Lecce              ⚠ darkened yellow
+  523: '#1B3A6B',  // Parma              ⚠ the BLUE half
+  512: '#1B4B9B',  // Frosinone          ⚠ the BLUE half
+  1579: '#C8102E', // Monza
+  895: '#0B2E6F',  // Como
+  517: '#1B5E3A',  // Venezia
+
+  // ── Ligue 1 ─────────────────────────────────────────────────────────────
+  85: '#004170',   // Paris Saint Germain
+  81: '#10689B',   // Marseille          ⚠ darkened sky, twice — #1580B8 was 4.1:1
+  80: '#0A3D91',   // Lyon
+  91: '#B01126',   // Monaco
+  79: '#D2001F',   // Lille
+  116: '#D20A11',  // Lens
+  94: '#C8102E',   // Rennes
+  84: '#D2122E',   // Nice
+  95: '#005CA9',   // Strasbourg
+  96: '#6A2C8F',   // Toulouse
+  114: '#003C7E',  // Paris FC
+  111: '#0B3B8C',  // Le Havre
+  108: '#10316B',  // Auxerre
+  97: '#C4551A',   // Lorient            ⚠ darkened orange
+  77: '#1B1B1B',   // Angers
+  106: '#C8102E',  // Stade Brestois 29
+  110: '#1B3D7A',  // Estac Troyes
+  1298: '#C8102E', // Le Mans
 };
 
 /**
