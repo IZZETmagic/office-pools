@@ -47,10 +47,20 @@ const getFixtureLineups = vi.fn(async () => [])
 // bug this whole area exists to prevent — an absent fixture reaching a delete.
 const bundleFailures: string[] = []
 const omitFromBundle = new Set<number>()
+// ⚠ A FULL FIXTURE, FOR 3b. The bundle synthesised below carries only what the
+// sub-resource arms read — no date, status, goals or round — because until 3b
+// nothing that came back by id was ever put through the step 6 diff. A stray
+// fetched by id IS, so a test of that path hands the mock the whole object.
+const fullFixturesById = new Map<number, ApiFootballFixture>()
 const getFixturesByIds = vi.fn(async (ids: number[]) => {
   const carried = ids.filter((id) => !omitFromBundle.has(id))
   const fixtures = []
   for (const id of carried) {
+    const full = fullFixturesById.get(id)
+    if (full) {
+      fixtures.push(full)
+      continue
+    }
     fixtures.push({
       fixture: { id },
       // ⚠ `teams` IS PART OF THE REAL `/fixtures?ids=` PAYLOAD and the mock was
@@ -272,6 +282,7 @@ beforeEach(() => {
   // test that happened to clear it".
   getFixturesByIds.mockClear()
   omitFromBundle.clear()
+  fullFixturesById.clear()
   bundleFailures.length = 0
 })
 
@@ -489,6 +500,10 @@ describe('syncLeagueFixtures — the catch-up pass', () => {
       external_fixture_id: '1557300',
       kickoff_at: '2026-08-16T14:00:00+00:00', // 6 days before NOW
     })
+    // This test is about the RANGE. With the day feed empty, 3b would ask for
+    // the stray by id and the synthesised bundle object has no `league.round`;
+    // omit it so the ids call carries nothing, as a refused chunk would.
+    omitFromBundle.add(1557300)
     const { client } = fakeDb({
       league_fixtures: [
         { data: [], error: null },
@@ -502,8 +517,110 @@ describe('syncLeagueFixtures — the catch-up pass', () => {
     const call = getFixturesAllPages.mock.calls[0][0] as { from: string; to: string }
     // Without widening, the stray's day is outside the request and it can never
     // recover — the failure that strands a fixture for the rest of the season.
+    //
+    // ⚠ NECESSARY, NOT SUFFICIENT. The widened range still starts at the date
+    // we HOLD, so a game played before that date is as unreachable as ever.
+    // That is V3.13's case, and it was real: five La Liga fixtures, six days,
+    // `stale=5 unmatched=5` every tick.
     expect(call.from).toBe('2026-08-16')
     expect(call.to).toBe('2026-08-22')
+  })
+
+  it('V3.13 asks BY ID for a stray the day feed did not carry, and writes its real kickoff with the score', async () => {
+    getFixturesAllPages.mockResolvedValue({ fixtures: [], calls: 1 })
+    // Stored on the 17th; actually played on the 15th. No day range built from
+    // the stored kickoff can ever reach the 15th.
+    const stray = dbRow({
+      fixture_id: 'f-old',
+      external_fixture_id: '1570381',
+      kickoff_at: '2026-08-17T15:00:00+00:00',
+    })
+    const real = feedFixture(1570381, { home: 1, away: 0 })
+    real.fixture.date = '2026-08-15T19:00:00+00:00'
+    fullFixturesById.set(1570381, real)
+    const { client, rpcCalls } = fakeDb({
+      league_fixtures: [
+        { data: [], error: null },
+        { data: [stray], error: null },
+        { data: [{ external_fixture_id: '1570381' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+      rpc: { data: { seen: 1, changed: [] }, error: null },
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+
+    expect(getFixturesByIds).toHaveBeenCalledTimes(1)
+    expect(getFixturesByIds.mock.calls[0][0]).toEqual([1570381])
+    expect(r.strayAsked).toBe(1)
+    expect(r.strayFetched).toBe(1)
+    // The day feed's call plus the ids call: both are feed cost.
+    expect(r.apiCalls).toBe(2)
+    expect(r.unmatched).toBe(0)
+    expect(r.proposed).toBe(1)
+    // The fake RPC writes nothing, so step 8 reports a shortfall of one; that
+    // is the harness, not the arm. Nothing ELSE may be reported.
+    expect(r.errors.map((e) => e.stage)).toEqual(['league_write_shortfall'])
+
+    const apply = rpcCalls.find((c) => c.fn === 'league_apply_fixture_sync')
+    const row = (apply?.args.p_rows as Array<Record<string, unknown>>)[0]
+    expect(row.external_fixture_id).toBe('1570381')
+    // The real date lands WITH the result — the ordinary step 6 diff, untouched.
+    expect(row.set_kickoff).toBe(true)
+    expect(row.kickoff_at).toBe('2026-08-15T19:00:00+00:00')
+    expect(row.is_completed).toBe(true)
+    expect(row.home_goals).toBe(1)
+    expect(row.away_goals).toBe(0)
+    expect(formatLeagueNoteParts(r).join(' ')).toContain('stray_by_id=1/1')
+  })
+
+  it('V3.14 spends no ids call when the day feed already carried the stray', async () => {
+    const stray = dbRow({
+      fixture_id: 'f-old',
+      external_fixture_id: '1557300',
+      kickoff_at: '2026-08-16T14:00:00+00:00',
+    })
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture(1557300)], calls: 1 })
+    const { client } = fakeDb({
+      league_fixtures: [
+        { data: [], error: null },
+        { data: [stray], error: null },
+        { data: [{ external_fixture_id: '1557300' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+      rpc: { data: { seen: 1, changed: [] }, error: null },
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(getFixturesByIds).not.toHaveBeenCalled()
+    expect(r.strayAsked).toBe(0)
+    expect(r.apiCalls).toBe(1)
+    expect(r.unmatched).toBe(0)
+    expect(formatLeagueNoteParts(r).join(' ')).not.toContain('stray_by_id=')
+  })
+
+  it('V3.15 a refused ids call is an error and a 0/N note, never a silent unmatched', async () => {
+    getFixturesAllPages.mockResolvedValue({ fixtures: [], calls: 1 })
+    const stray = dbRow({
+      fixture_id: 'f-old',
+      external_fixture_id: '1570381',
+      kickoff_at: '2026-08-17T15:00:00+00:00',
+    })
+    omitFromBundle.add(1570381)
+    bundleFailures.push('api-football /fixtures?ids refused: quota')
+    const { client } = fakeDb({
+      league_fixtures: [
+        { data: [], error: null },
+        { data: [stray], error: null },
+        { data: [{ external_fixture_id: '1570381' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.strayAsked).toBe(1)
+    expect(r.strayFetched).toBe(0)
+    expect(r.errors.map((e) => e.stage)).toContain('league_stray_fetch')
+    // Still unmatched this tick — 1b retries in an hour — but now it SAYS so.
+    expect(r.unmatched).toBe(1)
+    expect(formatLeagueNoteParts(r).join(' ')).toContain('stray_by_id=0/1')
   })
 
   it('V3.11 applies an hourly throttle to the catch-up selector', async () => {

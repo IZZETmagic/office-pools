@@ -151,6 +151,14 @@ export type LeagueSyncResult = {
   window: number
   /** Stray rows pulled in by the catch-up pass. */
   stale: number
+  /**
+   * Strays the day feed did not carry and so were asked for BY ID (3b), and
+   * how many of them the provider returned. Both halves, for the same reason
+   * as `xgAsked`/`xgGot`: `asked` without `fetched` is a refused call, and
+   * neither moving is the ordinary tick where the day feed carried everything.
+   */
+  strayAsked: number
+  strayFetched: number
   /** api-football HTTP calls this arm made. One of the three non-vacuity proofs. */
   apiCalls: number
   /** Provider fixtures the feed returned. */
@@ -252,6 +260,8 @@ function emptyResult(target: LeagueSyncTarget): LeagueSyncResult {
     name: target.name,
     window: 0,
     stale: 0,
+    strayAsked: 0,
+    strayFetched: 0,
     apiCalls: 0,
     fetched: 0,
     seen: 0,
@@ -585,6 +595,52 @@ export async function syncLeagueFixtures(
       )
     }
     return result
+  }
+
+  // ------------------------------------------------------- 3b. strays, BY ID
+  // ⚠⚠ A GAME PLAYED BEFORE THE DATE WE HOLD FOR IT IS INVISIBLE TO STEP 3, and
+  // 1b's hourly retry cannot help, because both build their request from the
+  // STORED kickoff. Found 2026-09-19: La Liga publishes a TBD placeholder of
+  // Sunday 15:00 and moves games to Friday and Saturday weeks later. Five
+  // matchweek-5 fixtures were played on the 11th and 12th against a stored
+  // 13th; the day feed for the 13th never carried them; the catch-up asked
+  // again every hour for six days with the same `from`; and every tick logged
+  // `stale=5 unmatched=5` at `ok: true`. Lazio–Milan and Monaco–Lens went the
+  // same way. The daily reconcile cannot reach them either — it reads only
+  // kickoffs an hour or more AHEAD, by design.
+  //
+  // So a stray the day feed did not carry is asked for BY ID, which knows no
+  // date. `/fixtures?ids=` returns the whole fixture object — date, status,
+  // goals, round — so it drops into `byExt` below and the ordinary step 6 diff
+  // writes the real kickoff along with the score. Nothing downstream changes.
+  //
+  // Cost: one call per twenty such strays, at most once an hour per season
+  // (1b's throttle), and NO call on a tick where the day feed carried every
+  // stray — which is the ordinary case, and why this is a fallback rather than
+  // the way strays are always fetched.
+  //
+  // Manual overrides are excluded here as well as at step 6: asking about a
+  // row the diff will then refuse to write is a call spent for nothing.
+  {
+    const feedIds = new Set(feed.map((f) => String(f.fixture.id)))
+    const missing = ((strayRows ?? []) as unknown as LeagueFixtureRow[]).filter(
+      (r) => !r.manual_override && !feedIds.has(r.external_fixture_id),
+    )
+    if (missing.length > 0) {
+      const ids = missing
+        .map((r) => Number(r.external_fixture_id))
+        .filter((n) => Number.isFinite(n) && n > 0)
+      const got = await getFixturesByIds(ids)
+      // `+=`, after step 3's assignment: this is a feed call in the same sense
+      // and belongs in the same `calls=` figure.
+      result.apiCalls += got.calls
+      result.strayAsked = ids.length
+      result.strayFetched = got.fixtures.length
+      for (const msg of got.failures) {
+        push('league_stray_fetch', msg, { season_id: target.seasonId, ids })
+      }
+      feed = [...feed, ...got.fixtures]
+    }
   }
 
   // ------------------------------------------------------ 4. matchweek lookup
@@ -1372,6 +1428,9 @@ export function formatLeagueNoteParts(r: LeagueSyncResult): string[] {
     // Both halves or neither — `xg=0/3` (asked three, none published yet) is the
     // ordinary answer and the one worth being able to read.
     r.xgAsked > 0 ? `xg=${r.xgGot}/${r.xgAsked}` : null,
+    // `stray_by_id=0/5` is a refused call; `5/5` is the recovery this exists
+    // for; absent is the ordinary tick. See 3b.
+    r.strayAsked > 0 ? `stray_by_id=${r.strayFetched}/${r.strayAsked}` : null,
     // From `feedError`, NOT from `errors[]` — a rate-limited failure must still
     // be visible in the note, otherwise the limiter hides the outage itself.
     r.feedError !== null ? 'feed_error' : null,
