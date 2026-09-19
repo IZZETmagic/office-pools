@@ -22,6 +22,12 @@
 // had nothing to do.
 // =============================================================
 
+// ⚠ FIRST, and a side-effect import rather than an IIFE: `lib/league/season.ts`
+// imports `server-only`, which throws outside a Next server bundle, and the
+// imports below are hoisted above any statement in this file. Import order is
+// the only ordering tsx preserves. See the shim for why this is safe.
+import './lib/no-server-only.cjs'
+
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
