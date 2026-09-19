@@ -1,8 +1,10 @@
-import { Image, View, type TextStyle } from 'react-native';
+import { View, type TextStyle } from 'react-native';
+
+import { clubColorFromCrestUrl } from '@/lib/design/clubColors';
 
 import { Text } from '@/components/ui';
 import { pickMissed, type FixtureOutcome, type SheetRow } from '@/lib/duelSheet';
-import { fontFamilies, useTheme } from '@/theme';
+import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
 // THE TEAM SHEET — one row per fixture, both sides' picks
@@ -101,23 +103,30 @@ export function TeamSheetRows({
  * deleting a glyph.
  *
  * ⚠ 46, NOT 52. Every point taken from the two chips is a point the club codes
- * and crests get back, and "DRAW" is only about 25pt of text at this size — the
- * old width was padding, not need. Budgeted against a 360pt phone, the
- * narrowest this product runs on: each club side lands at 53pt, which holds a
+ * and their marks get back, and "DRAW" is only about 25pt of text at this size
+ * — the old width was padding, not need. Budgeted against a 360pt phone, the
+ * narrowest this product runs on: each club side landed at 53pt, which held a
  * 26pt crest and a three-letter code with room to spare.
+ *
+ * ⚠ AND IT HAS 16pt MORE SINCE 2026-09-19, because the crest became a 6pt bar
+ * in a 14pt slot. Nothing was re-tuned to spend it — the row is Ryan's by eye
+ * and the slack sits where it is harmless, out by the chips.
  */
 export const CHIP_W = 44;
 
 /**
- * The crest, now that it is the club's main identifier rather than decoration.
+ * The club's colour bar, where the crest used to be.
  *
- * ⚠ IT IS THE EXPENSIVE ONE. Every point here comes off the club code beside
- * it, and the code is the thing that has to stay legible — three letters that
- * ellipsize to two are worse than a slightly smaller badge. 30 is what a 375pt
- * phone affords next to a 13pt code; below that (a 360pt mini) the code
- * compresses rather than the layout breaking.
+ * ⚠ IT WAS A 30pt CREST UNTIL 2026-09-19 — the provider's artwork, see
+ * drafts/2026-09-13_ip_exposure_audit.md §5. The slot keeps a fixed width so
+ * the column stays straight, but a 6pt bar needs far less of it than a badge
+ * did, and the 16pt that frees goes back to the row rather than to the code:
+ * the code was never the thing under pressure here, the crest was.
+ *
+ * 6×30 is the bar every other surface draws — Results rows, both Pick'em
+ * depths — so a club looks the same wherever it appears.
  */
-const CREST = 30;
+const BAR_SLOT = 14;
 
 /**
  * The middle column: a scoreline, or the day over the kickoff.
@@ -268,12 +277,12 @@ function PickChip({
  * One club on a team-sheet row: three-letter code and crest, mirrored about the
  * middle column so the two sides carry the same weight.
  *
- * ⚠ CODE ONLY — the full name is gone. On a phone the crest IS the club, and
+ * ⚠ CODE ONLY — the full name is gone. On a phone the code IS the club, and
  * the name was spending the row's width to repeat it; "CRY" beside the Palace
  * badge is unambiguous where a clipped "Crystal Pal…" is just worse. It is also
  * what a broadcast scoreboard does at this size.
  *
- * ⚠ SO THE NAME STILL HAS TO REACH A SCREEN READER. A crest with no accessible
+ * ⚠ SO THE NAME STILL HAS TO REACH A SCREEN READER. A bar with no accessible
  * name beside a three-letter code is an unlabelled image where the content is —
  * hence `accessibilityLabel` carrying the real name.
  *
@@ -301,18 +310,28 @@ function Club({
   // letters taken off the front of its own name.
   const code = abbr ?? (name ? name.slice(0, 3).toUpperCase() : 'TBD');
 
-  const badge = crest ? (
-    <Image
-      alt=""
-      source={{ uri: crest }}
-      // ⚠ NO `flexShrink: 0` HERE, DELIBERATELY — this is the half that gives.
-      // On a phone too narrow for both (a 360pt mini), `contain` lets the box
-      // narrow and renders the crest smaller inside it, undistorted. A crest
-      // one step down is still the club; "AR…" is not.
-      style={{ width: CREST, height: CREST }}
-      resizeMode="contain"
-    />
-  ) : null;
+  // ⚠ THE CREST URL IS STILL THE KEY, even though nothing draws it now:
+  // `clubColorFromCrestUrl` reads the club's provider id out of the last path
+  // segment. See lib/design/clubColors.ts.
+  const colour = clubColorFromCrestUrl(crest);
+  const badge = (
+    <View style={{ width: BAR_SLOT, alignItems: 'center', flexShrink: 0 }}>
+      {colour ? (
+        <View style={{ width: 6, height: 30, borderRadius: 999, backgroundColor: colour }} />
+      ) : (
+        // A club we have no colour for keeps the slot, so the column does not
+        // step in and out down the card.
+        <View
+          style={{
+            width: 6,
+            height: 30,
+            borderRadius: 999,
+            backgroundColor: withOpacity(theme.colors.slate, 0.35),
+          }}
+        />
+      )}
+    </View>
+  );
   const label = (
     <Text
       numberOfLines={1}

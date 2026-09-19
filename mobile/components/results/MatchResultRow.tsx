@@ -96,8 +96,10 @@ function awayDisplayName(match: ResultsMatch): string {
  * null. Club → bar, flag → image, one branch.
  *
  * ⚠ THE BOX STAYS 26 SQUARE either way, because the row's alignment is built on
- * it — every mark on the same x down the list. The bar is 4×24 centred in that
- * box, the same bar the Pick'em control and the score row draw.
+ * it — every mark on the same x down the list. The bar is **6×30** centred in
+ * that box, matching the Pick'em control and the score row: one bar, one size,
+ * wherever a club appears. It costs nothing here — the box was sized for a
+ * crest, so the bar has 10pt of air either side.
  */
 function TeamMark({ url, size = 26 }: { url: string | null | undefined; size?: number }) {
   const theme = useTheme();
@@ -107,7 +109,7 @@ function TeamMark({ url, size = 26 }: { url: string | null | undefined; size?: n
   if (colour) {
     return (
       <View style={{ width: size, alignItems: 'center' }}>
-        <View style={{ width: 4, height: 24, borderRadius: 999, backgroundColor: colour }} />
+        <View style={{ width: 6, height: 30, borderRadius: 999, backgroundColor: colour }} />
       </View>
     );
   }
@@ -120,8 +122,8 @@ function TeamMark({ url, size = 26 }: { url: string | null | undefined; size?: n
       <View style={{ width: size, alignItems: 'center' }}>
         <View
           style={{
-            width: 4,
-            height: 24,
+            width: 6,
+            height: 30,
             borderRadius: 999,
             backgroundColor: withOpacity(theme.colors.slate, 0.35),
           }}
