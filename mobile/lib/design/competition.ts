@@ -108,6 +108,35 @@ export function getCompetitionName(externalLeagueId: number | null | undefined):
 }
 
 /**
+ * A competition's two-letter monogram, for a box too small to hold its name.
+ *
+ * ⚠ DERIVED FROM THE NAME, not a second list to keep in step. Initials of the
+ * first two words — PREMIER LEAGUE → PL, LA LIGA → LL, SERIE A → SA, LIGUE 1 →
+ * L1, CHAMPIONS LEAGUE → CL, WORLD CUP → WC — so a competition named above gets
+ * a monogram without anybody adding a row here.
+ *
+ * ⚠ ONE-WORD NAMES NEED THE OVERRIDE. "BUNDESLIGA" derives to BU, which is not
+ * what anybody calls it. That is the only case in the seven, and the override
+ * exists for it rather than for a rule nobody could state.
+ */
+const MONOGRAM_OVERRIDE: Record<number, string> = {
+  [LEAGUE_ID.bundesliga]: 'BL',
+}
+
+export function getCompetitionMonogram(
+  externalLeagueId: number | null | undefined,
+): string | null {
+  if (externalLeagueId == null) return null
+  const override = MONOGRAM_OVERRIDE[externalLeagueId]
+  if (override) return override
+  const name = COMPETITION_NAME[externalLeagueId]
+  if (!name) return null
+  const words = name.split(/\s+/).filter(Boolean)
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase()
+  return name.slice(0, 2).toUpperCase()
+}
+
+/**
  * Every competition with a mark bundled in the app.
  *
  * ⚠ `require` TAKES A LITERAL. Metro resolves these at build time, so the map

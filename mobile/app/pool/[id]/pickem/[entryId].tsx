@@ -2,11 +2,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MatchScoutSheet } from '@/components/scouting/MatchScoutSheet';
 import { OutcomePicker, type Outcome } from '@/components/pool-detail/OutcomePicker';
+import { clubColorFromCrestUrl } from '@/lib/design/clubColors';
 import { TapScoreField } from '@/components/pool-detail/TapScoreField';
 import { Icon, Text } from '@/components/ui';
 import { saveLeaguePicks, type LeaguePickBody } from '@/lib/api';
@@ -606,11 +607,13 @@ function FixtureRow({
           onChange={onOutcome}
           home={{
             name: home?.country_name ?? 'Home',
+            shortName: home?.short_name ?? null,
             abbr: home?.country_code ?? null,
             crestUrl: home?.flag_url ?? null,
           }}
           away={{
             name: away?.country_name ?? 'Away',
+            shortName: away?.short_name ?? null,
             abbr: away?.country_code ?? null,
             crestUrl: away?.flag_url ?? null,
           }}
@@ -623,18 +626,23 @@ function FixtureRow({
           belongs to, so which box is whose needs no working out.
           `name · crest · [ ] · [ ] · crest · name`
 
-          The budget, measured at 375pt: 319 after screen and card padding, less
-          103 for the scoreline block, 52 for the crests and 32 of gaps leaves
-          ~66 a name.
+          The budget, re-measured at 375pt on 2026-09-19 when the crests became
+          colour bars: 319 after screen and card padding, less 99 for the
+          scoreline block, 28 for the two 14pt bar slots and 16 of gaps leaves
+          **88 a name** — up from 66.
 
-          ⚠ THAT IS MARGINAL, and it is handled rather than hoped. "Bournemouth"
-          is the longest club name across the three live seasons that CANNOT
-          wrap — one word, 11 characters — and it wants 72-79 at this size. So
-          the name is allowed to SHRINK a little rather than truncate; see
-          `Club`. Everything longer ("Crystal Palace", "Nott'm Forest") is more
-          than one word and breaks across two lines instead.
+          ⚠ AND THAT ENDED THE SHRINKING. At 66 the row was already scaling
+          "Bournemouth" down to ~0.92 just to fit at 12pt, which is why the
+          names read small. It needs 83.2 at 14pt and now has 88, so every name
+          renders at full size. Everything longer ("Crystal Palace", "Nott'm
+          Forest") is more than one word and breaks across two lines instead.
+
+          ⚠ THE FIELDS ARE 42, DOWN FROM 44. Thickening the bar to 6 cost 4pt
+          and the names had 4.8 of slack, so it came off the fields instead —
+          they keep their full HEIGHT, which is the half of a tap target that
+          matters when the thumb is travelling down a list.
         */
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <ClubName team={home} side="home" />
           <Crest team={home} />
           {/*
@@ -652,7 +660,7 @@ function FixtureRow({
               value={score.home}
               onChange={(v) => onScore('home', v)}
               disabled={!canEdit}
-              width={44}
+              width={42}
             />
             <Text variant="detail" color="slate">
               –
@@ -661,7 +669,7 @@ function FixtureRow({
               value={score.away}
               onChange={(v) => onScore('away', v)}
               disabled={!canEdit}
-              width={44}
+              width={42}
             />
           </View>
           <Crest team={away} />
@@ -673,7 +681,7 @@ function FixtureRow({
 }
 
 /**
- * The crest, in a slot of its own.
+ * The club's colour, in a slot of its own.
  *
  * ⚠⚠ A FIXED-WIDTH SIBLING, not a child of the name. Ryan, 2026-09-03: *"the
  * logos should all be aligned straight down on either side of the scores."*
@@ -681,21 +689,25 @@ function FixtureRow({
  * the name, so its x drifted with the length of the word beside it and no two
  * rows agreed. Everything except the two names is now a fixed width, which
  * makes the row symmetric BY CONSTRUCTION — the score block lands dead centre
- * and both crests land on the same x on every card in the list.
+ * and both bars land on the same x on every card in the list.
+ *
+ * ⚠ IT WAS THE CREST UNTIL 2026-09-19. That was the provider's artwork
+ * (drafts/2026-09-13_ip_exposure_audit.md §5). The slot narrowed from 26pt to
+ * 14 with it, and the 24pt that freed went to the names (14pt) and then to the
+ * bar itself (6×28). Fixed width either way, so the alignment this comment
+ * argues for survives.
  */
 function Crest({ team }: { team: LeagueMatch['home_team'] }) {
-  const theme = useTheme();
-  return team?.flag_url ? (
-    <Image source={{ uri: team.flag_url }} style={{ width: 26, height: 26 }} resizeMode="contain" />
-  ) : (
-    <View
-      style={{
-        width: 26,
-        height: 26,
-        borderRadius: theme.radii.pill,
-        backgroundColor: withOpacity(theme.colors.slate, 0.15),
-      }}
-    />
+  // ⚠ THE CREST URL IS STILL THE KEY, even though nothing draws it any more:
+  // `clubColorFromCrestUrl` reads the club's provider id out of the last path
+  // segment. See mobile/lib/design/clubColors.ts.
+  const colour = clubColorFromCrestUrl(team?.flag_url ?? null);
+  return (
+    <View style={{ width: 14, alignItems: 'center' }}>
+      {colour ? (
+        <View style={{ width: 6, height: 28, borderRadius: 999, backgroundColor: colour }} />
+      ) : null}
+    </View>
   );
 }
 
@@ -712,7 +724,7 @@ function Crest({ team }: { team: LeagueMatch['home_team'] }) {
  * names again. Every fixture in the three live seasons carries a `short_name`,
  * so the fallback should never fire.
  *
- * ⚠⚠ HOME IS RIGHT-ALIGNED, AWAY IS LEFT-ALIGNED — both toward their crest.
+ * ⚠⚠ HOME IS RIGHT-ALIGNED, AWAY IS LEFT-ALIGNED — both toward their colour bar.
  *
  * This was CENTRED for one commit, on the reasoning that a short name like
  * "Leeds" would otherwise hang off an edge. That was backwards. Centring is
@@ -720,7 +732,7 @@ function Crest({ team }: { team: LeagueMatch['home_team'] }) {
  * "Bournemouth" filled it, so the gap between a name and its own crest changed
  * on every row and nothing lined up down the list.
  *
- * Aligned toward the crest, the slot's inner edge is fixed — so every home
+ * Aligned toward the bar, the slot's inner edge is fixed — so every home
  * name ENDS on the same x and every away name BEGINS on the same x, all the
  * way down. Ryan, 2026-09-03: *"the last letter of the names matches all the
  * way down… the first letter of all the teams matches."*
@@ -734,14 +746,19 @@ function ClubName({ team, side }: { team: LeagueMatch['home_team']; side: 'home'
   const label = team?.short_name?.trim() || team?.country_name || 'TBD';
   return (
     /*
-      ⚠ 12pt, NOT 13, AND THE POINT IS UNIFORMITY. Squaring the inputs and
-      widening the gaps cost the names 12pt of slot — they get ~66 now. At 13pt
-      "Bournemouth" (the longest club name across the three live seasons that
-      cannot wrap, being one word) needed to shrink to 0.84, under the 0.85
-      floor, so it would have truncated anyway — and every other name would
-      have rendered at 13 beside it, which is the inconsistency Ryan would see
-      before he saw the ellipsis. At 12 it fits at ~0.90-1.0 and the whole list
-      renders at one size.
+      ⚠ 14pt SINCE 2026-09-19, MATCHING `OutcomePicker`. This was 12 because
+      the names only had ~66pt: at 13 "Bournemouth" (the longest club name
+      across the three live seasons that cannot wrap, being one word) needed to
+      shrink to 0.84, under the 0.85 floor, so it would have truncated.
+
+      The crests became 4pt colour bars and their slots went 26pt → 12, and the
+      row gap went 8 → 4, which gives a name 88. "Bournemouth" needs 83.2 at
+      14pt, so it fits at full size with 4.8 to spare — and nothing on the row
+      is being scaled down any more.
+
+      ⚠ THE TWO DEPTHS MUST AGREE. Results renders its names in a button at
+      14pt; a member switching pools sees the same club at the same size. If one
+      moves, move the other — Ryan asked for exactly this on 2026-09-19.
 
       ⚠ The shrink net stays as the backstop for a competition with a longer
       name than any of the 58 measured here. Floored at 0.85 so nothing can
@@ -755,11 +772,11 @@ function ClubName({ team, side }: { team: LeagueMatch['home_team']; side: 'home'
       minimumFontScale={0.85}
       style={{
         flex: 1,
-        fontSize: 12,
-        lineHeight: 15,
+        fontSize: 14,
+        lineHeight: 17,
         color: theme.colors.ink,
-        // Toward the crest: the home name ends against it, the away name
-        // starts against it. That inner edge is fixed, so the column lines up.
+        // Toward the bar: the home name ends against it, the away name starts
+        // against it. That inner edge is fixed, so the column lines up.
         textAlign: side === 'home' ? 'right' : 'left',
       }}
     >

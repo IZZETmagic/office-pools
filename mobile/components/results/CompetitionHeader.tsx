@@ -1,7 +1,7 @@
-import { Image, Text as RNText, View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { getCompetitionMarkPng, getPoolStripe } from '@/lib/design/competition';
+import { getCompetitionMonogram, getPoolStripe } from '@/lib/design/competition';
 import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
@@ -18,11 +18,11 @@ import { fontFamilies, useTheme } from '@/theme';
 //
 // ## Why a chip and not just the words
 //
-// The mark PNGs are WHITE ON TRANSPARENT (see `getCompetitionMarkPng`) because
-// they were built to sit on the pool card's coloured rail. Drawn straight onto
-// the light surface here they would be invisible. So the chip is the rail's own
-// gradient, miniaturised — which is also why it reads as the same object a
-// member already knows from their pool cards rather than as new furniture.
+// The monogram is WHITE, because it sits on the competition's own gradient —
+// the rail's, miniaturised. Drawn straight onto the light surface here the
+// letters would be invisible, and the chip is also why this reads as the same
+// object a member already knows from their pool cards rather than as new
+// furniture. It held the league's logo until 2026-09-19.
 //
 // ⚠ SUBORDINATE TO THE DAY, ON PURPOSE. The day header above it is bold 14 ink;
 // this is 11 uppercase slate. The day is the thing being navigated and the
@@ -50,7 +50,7 @@ export function CompetitionHeader({ competition, competitionId, divided }: Props
   if (!competition) return null;
 
   const stripe = getPoolStripe(competitionId);
-  const mark = getCompetitionMarkPng(competitionId);
+  const monogram = getCompetitionMonogram(competitionId);
 
   return (
     <View>
@@ -85,14 +85,21 @@ export function CompetitionHeader({ competition, competitionId, divided }: Props
             justifyContent: 'center',
           }}
         >
-          {mark ? (
-            <Image
-              source={mark}
-              style={{ width: 12, height: 12 }}
-              resizeMode="contain"
-              // Already white-on-transparent — the same file the rail draws.
-              fadeDuration={0}
-            />
+          {/* ⚠ WAS THE LEAGUE'S LOGO UNTIL 2026-09-19 — the provider's artwork
+              (drafts/2026-09-13_ip_exposure_audit.md §2), which left this chip a
+              blank colour block when the marks came out. Two letters say which
+              competition it is at a size no mark could. */}
+          {monogram ? (
+            <RNText
+              style={{
+                fontFamily: fontFamilies.black,
+                fontSize: 9,
+                letterSpacing: 0.2,
+                color: '#FFFFFF',
+              }}
+            >
+              {monogram}
+            </RNText>
           ) : null}
         </LinearGradient>
         <RNText

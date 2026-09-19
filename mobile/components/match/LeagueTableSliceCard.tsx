@@ -1,10 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Image, Pressable, Text as RNText, View } from 'react-native';
+import { Pressable, Text as RNText, View } from 'react-native';
 
 import { ClubRow, HeaderRow } from '@/components/league/leagueTableRow';
 import { Icon } from '@/components/ui';
-import { getCompetitionMarkPng, getPoolStripe } from '@/lib/design/competition';
+import { getCompetitionMonogram, getPoolStripe } from '@/lib/design/competition';
 import type { LeagueStandingRow } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme } from '@/theme';
 
@@ -45,7 +45,7 @@ export function LeagueTableSliceCard({
   seasonId: string;
 }) {
   const theme = useTheme();
-  const mark = getCompetitionMarkPng(competitionId);
+  const monogram = getCompetitionMonogram(competitionId);
 
   return (
     <View
@@ -85,11 +85,12 @@ export function LeagueTableSliceCard({
         })}
       >
         {/*
-          ⚠ THE MARK IS A WHITE KNOCKOUT, so it needs the competition's own
-          gradient behind it — on the card's white surface it would be invisible.
-          Same chip the competition picker and the rail draw.
+          ⚠ WHITE ON THE COMPETITION'S OWN GRADIENT, because on the card's white
+          surface the letters would be invisible. Same chip the competition
+          picker and the Results header draw — it held the league's logo until
+          2026-09-19 (drafts/2026-09-13_ip_exposure_audit.md §2).
         */}
-        {mark && competitionId != null ? (
+        {monogram && competitionId != null ? (
           <LinearGradient
             colors={getPoolStripe(competitionId)}
             start={{ x: 0, y: 0 }}
@@ -102,12 +103,16 @@ export function LeagueTableSliceCard({
               justifyContent: 'center',
             }}
           >
-            <Image
-              source={mark}
-              style={{ width: 17, height: 17 }}
-              resizeMode="contain"
-              fadeDuration={0}
-            />
+            <RNText
+              style={{
+                fontFamily: fontFamilies.black,
+                fontSize: 12,
+                letterSpacing: 0.2,
+                color: '#FFFFFF',
+              }}
+            >
+              {monogram}
+            </RNText>
           </LinearGradient>
         ) : null}
 

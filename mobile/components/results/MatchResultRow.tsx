@@ -1,4 +1,6 @@
 import { Image } from 'expo-image';
+
+import { clubColorFromCrestUrl, clubIdFromCrestUrl } from '@/lib/design/clubColors';
 import { Platform, Pressable, Text as RNText, View } from 'react-native';
 
 import { getLiveClock, getMatchStatusBadge } from '@/lib/matchStatus';
@@ -76,33 +78,58 @@ function awayDisplayName(match: ResultsMatch): string {
 }
 
 /**
- * THE TEAM MARK — a national flag OR a club crest, both arriving in `flagUrl`.
+ * THE TEAM MARK — a national flag, or a club's colour.
  *
- * ⚠ SQUARE, AND `contain`. This box used to be 3:2 with `contentFit="cover"`,
- * which is a flag's own aspect ratio: right for the World Cup, and wrong for
- * everything played since. `/api/users/:id/fixtures` maps a club's `crest_url`
- * into `flag_url` (the shaping that route exists for), and a crest is NOT 3:2 —
- * so a 26×17 box cropping to fill sliced the top and bottom off every Premier
- * League badge on the phone. Nothing errored; the badge just arrived beheaded.
+ * ⚠ TWO KINDS OF THING ARRIVE IN `flagUrl`, AND ONLY ONE IS STILL DRAWN.
+ * `/api/users/:id/fixtures` maps a club's `crest_url` into `flag_url` (the
+ * shaping that route exists for), so this one field carries both a World Cup
+ * flag and a Premier League badge.
  *
- * ⚠ AND DO NOT ASSUME THE CREST IS SQUARE EITHER. Most are (the feed serves
- * 150×150), but Liverpool's is 78×150 — PORTRAIT. Under the old box that one
- * lost about two thirds of its height: the wings clipped, the "L.F.C." gone.
- * Any fit that reasons from an assumed ratio has the same bug waiting in it,
- * which is why this is `contain` rather than a smarter crop.
+ * The badges came out on 2026-09-19 — they were the provider's artwork
+ * (drafts/2026-09-13_ip_exposure_audit.md §5). The flags did not: a national
+ * flag is public domain, ours came from flagcdn, and the World Cup surfaces
+ * should be unchanged if one is ever opened again.
  *
- * `contain` in a square box fits every mark without a branch: a square crest
- * fills it, a portrait one fits its height, and a 3:2 flag letterboxes inside
- * at exactly the width it drew before — so the World Cup surfaces are unchanged
- * if one is ever opened again. It is also the treatment the web already settled
- * on: `object-contain` on a square, `MatchweekResultsForm.tsx:260`.
+ * ⚠ THE URL ITSELF TELLS THEM APART, and no extra field was needed for it.
+ * `clubIdFromCrestUrl` matches the provider's numeric last segment
+ * (`…/teams/42.png`); a flag is `…/gb.png`, which has no number, so it returns
+ * null. Club → bar, flag → image, one branch.
  *
- * ⚠ The row grows by the difference (17 → 26 here). That is the fix, not a
- * side effect: a mark that is not 3:2 needs a box that is not 3:2, and cropping
- * it to keep the row short is the bug.
+ * ⚠ THE BOX STAYS 26 SQUARE either way, because the row's alignment is built on
+ * it — every mark on the same x down the list. The bar is 4×24 centred in that
+ * box, the same bar the Pick'em control and the score row draw.
  */
 function TeamMark({ url, size = 26 }: { url: string | null | undefined; size?: number }) {
   const theme = useTheme();
+  const colour = clubColorFromCrestUrl(url);
+
+  // A club: its colour, not its crest.
+  if (colour) {
+    return (
+      <View style={{ width: size, alignItems: 'center' }}>
+        <View style={{ width: 4, height: 24, borderRadius: 999, backgroundColor: colour }} />
+      </View>
+    );
+  }
+
+  // ⚠ A CLUB WE HAVE NO COLOUR FOR LANDS HERE TOO, not just a flag — and it
+  // must not fall through to drawing the crest again. `clubIdFromCrestUrl`
+  // returning an id is the test for "this is a club".
+  if (url && clubIdFromCrestUrl(url) !== null) {
+    return (
+      <View style={{ width: size, alignItems: 'center' }}>
+        <View
+          style={{
+            width: 4,
+            height: 24,
+            borderRadius: 999,
+            backgroundColor: withOpacity(theme.colors.slate, 0.35),
+          }}
+        />
+      </View>
+    );
+  }
+
   if (!url) {
     return (
       <View
@@ -115,6 +142,8 @@ function TeamMark({ url, size = 26 }: { url: string | null | undefined; size?: n
       />
     );
   }
+
+  // A national flag — public domain, and still drawn.
   return (
     <Image
       source={{ uri: url }}

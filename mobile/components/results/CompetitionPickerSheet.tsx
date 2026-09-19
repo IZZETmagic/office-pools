@@ -3,7 +3,6 @@ import {
   Animated,
   Dimensions,
   Easing,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -14,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/ui';
-import { getCompetitionMarkPng, getPoolStripe } from '@/lib/design/competition';
+import { getCompetitionMonogram, getPoolStripe } from '@/lib/design/competition';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -211,7 +210,7 @@ function Row({
   divided: boolean;
 }) {
   const theme = useTheme();
-  const mark = competitionId != null ? getCompetitionMarkPng(competitionId) : null;
+  const monogram = competitionId != null ? getCompetitionMonogram(competitionId) : null;
   return (
     <View>
       {divided ? (
@@ -240,13 +239,17 @@ function Row({
               justifyContent: 'center',
             }}
           >
-            {mark ? (
-              <Image
-                source={mark}
-                style={{ width: 17, height: 17 }}
-                resizeMode="contain"
-                fadeDuration={0}
-              />
+            {monogram ? (
+              <RNText
+                style={{
+                  fontFamily: fontFamilies.black,
+                  fontSize: 12,
+                  letterSpacing: 0.2,
+                  color: '#FFFFFF',
+                }}
+              >
+                {monogram}
+              </RNText>
             ) : null}
           </LinearGradient>
         ) : (
