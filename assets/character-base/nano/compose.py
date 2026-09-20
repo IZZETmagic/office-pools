@@ -117,18 +117,28 @@ def main() -> None:
         a = open(path).read()
         return a[a.index(">", a.index("<svg")) + 1: a.rindex("</svg>")]
 
-    # Paint order, first to last. HAIR GOES LAST, over the face — that is the physical
-    # truth: a lock falling past the eye should pass in front of it, not behind.
+    # ---------------------------------------------------------------------------------
+    # THE STACK. Everything that goes on top of the head is laid out in ONE place, in one
+    # order. The base's own NOSE and EARS are lifted out and re-laid with it, because where
+    # the base puts them (last) cannot satisfy all of these at once:
     #
-    # The face used to go last, to guarantee a fringe could never bury the eyes. Measured
-    # against all 28 hair assets that guarantee was protecting against nothing: not one
-    # overlaps the eye whites by a single pixel, and the closest — the bob — clears them by
-    # 6px. So the safeguard cost correctness and bought nothing.
+    #   ears          hair falls OVER the ear; a beard's tufts grow in FRONT of it
+    #   eyes, brows   a lock falling past the eye passes in front of it, so hair is later
+    #   hair          ⭐⭐ ...but EARLIER than facial hair. Ryan, 2026-09-19: with long hair
+    #                 the bushy beard was buried behind it. A beard is on the FACE and the
+    #                 hair falls beside it, so the beard wins. These two are not in tension:
+    #                 the eyes are high and the beard is low, and both rules hold at once.
+    #   facial hair   over the hair, under the nose
+    #   mouth         UNDER a moustache, OVER a beard — see below
+    #   nose          always last
     #
-    # ⚠ If a future hair style DOES reach the eyes, this order will occlude them. That is the
-    # intended behaviour, but it makes eye clearance a property of the HAIR asset now, which
-    # is where it belongs. Re-run the overlap check when adding hair.
-    # FACIAL HAIR: where it sits in the stack, which is three separate questions.
+    # ⚠ Hair is still after the eyes. The face used to go last to guarantee a fringe could
+    # never bury them; measured against all 27 hair assets that guarantee was protecting
+    # against nothing — not one overlaps the eye whites by a pixel, and the closest, the bob,
+    # clears them by 6px. If a future style DOES reach the eyes it will occlude them, which
+    # is intended: eye clearance is a property of the HAIR asset. Re-run the check.
+    #
+    # FACIAL HAIR: where it sits, which is three separate questions.
     #
     # 1. UNDER OR OVER THE MOUTH — declared per style in facialhair/manifest.json. A
     #    moustache hangs over the lip, so the mouth is drawn first and the hair covers its
@@ -139,9 +149,9 @@ def main() -> None:
     # 2. ALWAYS UNDER THE NOSE. A moustache sits against the nose's underside; painted over
     #    it, a raised moustache swallows the nose tip.
     #
-    # 3. Which means for an "over" style the NOSE HAS TO MOVE. It lives in the base, which is
-    #    painted before everything, so it is re-inserted after the hair — otherwise "mouth
-    #    under the moustache" and "nose over the moustache" cannot both hold.
+    # 3. Which means the NOSE HAS TO MOVE. It lives in the base, painted before everything,
+    #    so it is lifted out and re-laid last — otherwise "mouth under the moustache" and
+    #    "nose over the moustache" cannot both hold.
     #
     # ⚠ And that is ALL it does. A previous version derived a clean-shaven patch from each
     # expression's mouth box and punched it through the beard. It sized correctly but made the
@@ -188,34 +198,56 @@ def main() -> None:
                 out.append(path)
         return out
 
-    # ⭐ THE EARS MOVE WITH IT. The base paints the ears LAST, so a beard whose sideburns
-    # grow outboard was being clipped by them. Ryan asked for the bushy beard's hair to sit
-    # slightly IN FRONT of the ears, and re-inserting them ahead of the facial hair does it.
-    # It also makes "under" styles agree with "over" ones, which already paint after the
-    # ears by construction. For a flush-sided beard it is a no-op: the band's outer edge and
-    # the ear's inner edge share about one unit.
-    if fh and not fh_over:
-        ears = find_ears(svg)
-        for e in ears:
-            svg = svg.replace(e, "", 1)
-        frag = "".join(ears) + inner(fh)
-        nose = find_nose(svg)
-        svg = svg.replace(nose, frag + nose, 1) if nose \
-            else svg.replace("</svg>", frag + "</svg>")
+    # ⭐ THE EARS MOVE TOO. The base paints them last, so a beard whose sideburns grow
+    # outboard was clipped square by them. Ryan asked for the bushy beard's hair to sit
+    # slightly IN FRONT of the ears. For a flush-sided beard it is a no-op: the band's outer
+    # edge and the ear's inner edge share about one unit.
+    ears = find_ears(svg)
+    for e in ears:
+        svg = svg.replace(e, "", 1)
+    nose = find_nose(svg)
+    if nose:
+        svg = svg.replace(nose, "", 1)
 
-    for flag in ("--eyes", "--mouth", "--expression", "--brows"):
-        if p := arg(flag):
-            svg = svg.replace("</svg>", inner(p) + "</svg>")
+    def part(flag: str) -> str:
+        p = arg(flag)
+        return inner(p) if p else ""
 
-    # An "over" style goes on after the face, taking the nose with it so the nose stays on top.
-    if fh and fh_over:
-        nose = find_nose(svg)
-        if nose:
-            svg = svg.replace(nose, "", 1)
-        svg = svg.replace("</svg>", inner(fh) + (nose or "") + "</svg>")
+    # ⚠⚠ An EXPRESSION is a whole face in ONE fragment — eyes, brows, cheeks AND mouth — so
+    # there is no single place for it: its brows must sit UNDER the hair and its mouth must
+    # sit OVER a beard. It is therefore SPLIT, on each path's TOP edge.
+    #
+    # ⭐ The line is not arbitrary. Measured across all 102 paths in the 12 shipped
+    # expressions: the upper group — eyes, irises, brows, cheeks, tears — never starts below
+    # y999.5, and the lower group — lips, mouth interior, tongue, teeth and chin marks —
+    # never starts above y1145.5. y1072 is the middle of that gap, and it sits just above the
+    # beard's own top edge at y1105.8, which is the boundary the split exists for.
+    #
+    # ⚠ Classifying by TOKEN does not work: an open mouth's TEETH carry the eye-white token
+    # and `laughing`/`sad` put a skin-shade chin mark below the lip. Position does work.
+    # A guard test re-derives the gap from the shipped assets, so a new expression that
+    # straddles the line fails the build instead of rendering a brow over a fringe.
+    EXPRESSION_SPLIT = 1072.0
 
-    if p := arg("--hair"):
-        svg = svg.replace("</svg>", inner(p) + "</svg>")
+    def split_expression(frag: str):
+        upper, lower = [], []
+        for path in re.findall(r"<path[^>]*/?>", frag):
+            d = re.search(r'd="([^"]*)"', path)
+            ys = [float(v) for v in re.findall(r"-?\d+\.?\d*", d.group(1))][1::2] if d else []
+            (lower if ys and min(ys) >= EXPRESSION_SPLIT else upper).append(path)
+        return "".join(upper), "".join(lower)
+
+    expr_upper, expr_lower = split_expression(part("--expression"))
+    mouth = part("--mouth") + expr_lower
+    svg = svg.replace("</svg>", (
+        "".join(ears)
+        + part("--eyes") + part("--brows") + expr_upper
+        + (mouth if fh_over else "")
+        + part("--hair")
+        + (inner(fh) if fh else "")
+        + ("" if fh_over else mouth)
+        + (nose or "")
+    ) + "</svg>")
 
     if c := arg("--eye-colour"):
         # The iris has TWO tones — a darker core and a lighter rim — and both come from one

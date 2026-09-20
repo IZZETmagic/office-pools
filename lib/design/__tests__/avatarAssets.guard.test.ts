@@ -362,3 +362,100 @@ describe('facial hair paints over the ears', () => {
     }
   })
 })
+
+// =============================================================
+// THE STACK — one order, and an expression is split to satisfy it
+// =============================================================
+// Three rules have to hold at once and the base's own paint order cannot give all three:
+// hair falls over the brows, a beard sits over the hair, and the mouth sits over the beard.
+// ⭐ Ryan, 2026-09-19: with long hair the bushy beard was buried behind it.
+//
+// An expression is a whole face in ONE fragment, so it is split on each path's TOP edge at
+// y1072 — brows and eyes above, mouth and teeth below. The third test here re-derives that
+// gap from the SHIPPED expression assets, so a new expression that straddles the line fails
+// the build instead of quietly rendering a brow on top of a fringe.
+// =============================================================
+
+const EXPRESSIONS = 'assets/character-base/nano/expressions/assets'
+const SPLIT = 1072
+const D_HAIR = 'M 300 300 L 800 300 L 800 900 Z'
+const D_FH = 'M 700 1200 L 1300 1200 L 1300 1500 Z'
+const D_EYES = 'M 700 700 L 900 700 L 900 900 Z'
+const D_MOUTH = 'M 900 1250 L 1150 1250 L 1150 1350 Z'
+
+const stackFixture = (over: boolean): AvatarAssets => ({
+  ...fixture(),
+  bases: {
+    b:
+      `<svg viewBox="0 0 2048 2048">` +
+      `<path d="${D_EAR_L}" fill="${SKIN_SHADE}"/>` +
+      `<path d="${D_NOSE}" fill="${SKIN_SHADE}"/>` +
+      `</svg>`,
+  },
+  hair: { h: `<path d="${D_HAIR}" fill="rgb(140,122,110)"/>` },
+  eyes: { e: `<path d="${D_EYES}" fill="rgb(255,255,255)"/>` },
+  mouths: { m: `<path d="${D_MOUTH}" fill="rgb(182,122,112)"/>` },
+  facialhair: { f: `<path d="${D_FH}" fill="rgb(140,122,110)"/>` },
+  fhManifest: { f: { over } },
+})
+
+describe('the stack paints in one order', () => {
+  const full = { ...cfg, hair: 'h', eyes: 'e', mouth: 'm', facialHair: 'f' }
+
+  it('puts a beard over the hair, the mouth over the beard and the nose last', () => {
+    const svg = composeAvatar(full, stackFixture(false))
+    const at = (d: string) => svg.indexOf(`d="${d}"`)
+    for (const [n, d] of [['ear', D_EAR_L], ['eyes', D_EYES], ['hair', D_HAIR],
+                          ['beard', D_FH], ['mouth', D_MOUTH], ['nose', D_NOSE]] as const) {
+      expect(at(d), `${n} must survive composition`).toBeGreaterThan(-1)
+    }
+    expect(at(D_EAR_L), 'ear before hair').toBeLessThan(at(D_HAIR))
+    expect(at(D_EYES), 'eyes before hair — a lock passes in front of the eye')
+      .toBeLessThan(at(D_HAIR))
+    expect(at(D_HAIR), '⭐ hair before the beard — the beard is on the FACE')
+      .toBeLessThan(at(D_FH))
+    expect(at(D_FH), 'the mouth sits IN a beard, so it goes over it').toBeLessThan(at(D_MOUTH))
+    expect(at(D_MOUTH), 'the nose is always last').toBeLessThan(at(D_NOSE))
+  })
+
+  it('puts the mouth UNDER an "over" style, but still the hair under it', () => {
+    const svg = composeAvatar(full, stackFixture(true))
+    const at = (d: string) => svg.indexOf(`d="${d}"`)
+    expect(at(D_MOUTH), 'a moustache hangs over the lip').toBeLessThan(at(D_FH))
+    expect(at(D_HAIR), 'hair still goes under the facial hair').toBeLessThan(at(D_FH))
+    expect(at(D_FH), 'the nose is always last').toBeLessThan(at(D_NOSE))
+  })
+
+  it('splits a shipped expression cleanly at the line — no path straddles it', () => {
+    const MOUTH_TOKENS = ['rgb(182,122,112)', 'rgb(118,72,68)', 'rgb(206,116,112)']
+    let highestUpperTop = 0
+    let lowestMouthTop = Infinity
+    let seen = 0
+    for (const f of svgsIn(EXPRESSIONS)) {
+      for (const m of f.body.matchAll(/<path[^>]*\/?>/g)) {
+        const d = /d="([^"]*)"/.exec(m[0])
+        if (!d) continue
+        const n = (d[1].match(/-?\d+\.?\d*/g) || []).map(Number)
+        const ys = n.filter((_, i) => i % 2 === 1)
+        if (!ys.length) continue
+        seen++
+        const top = Math.min(...ys)
+        if (MOUTH_TOKENS.some((t) => m[0].includes(t))) lowestMouthTop = Math.min(lowestMouthTop, top)
+        else if (top < SPLIT) highestUpperTop = Math.max(highestUpperTop, top)
+      }
+    }
+    expect(seen, 'the expression assets should be present').toBeGreaterThan(50)
+    expect(highestUpperTop, 'nothing above the line may reach it').toBeLessThan(SPLIT)
+    expect(lowestMouthTop, 'no mouth path may start above the line').toBeGreaterThan(SPLIT)
+  })
+
+  it('keeps the same split line in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must carry the split line`).toMatch(/1072/)
+    }
+  })
+})

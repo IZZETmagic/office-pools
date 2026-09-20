@@ -182,6 +182,23 @@ function findEars(doc: string): string[] {
   return out
 }
 
+/** See THE STACK below: an expression is split so its brows go under the hair and its
+ *  mouth over a beard. Paths are grouped by their TOP edge against this line. */
+const EXPRESSION_SPLIT = 1072
+
+function splitExpression(frag: string): [string, string] {
+  const upper: string[] = []
+  const lower: string[] = []
+  for (const m of frag.matchAll(/<path[^>]*\/?>/g)) {
+    const p = m[0]
+    const d = /d="([^"]*)"/.exec(p)
+    const n = d ? (d[1].match(/-?\d+\.?\d*/g) || []).map(Number) : []
+    const ys = n.filter((_, i) => i % 2 === 1)
+    ;(ys.length && Math.min(...ys) >= EXPRESSION_SPLIT ? lower : upper).push(p)
+  }
+  return [upper.join(''), lower.join('')]
+}
+
 export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   let svg = A.bases[cfg.base]
   if (!svg) throw new Error(`unknown base: ${cfg.base}`)
@@ -194,41 +211,58 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
 
   // ---- phase 1: stack every layer -----------------------------------------------------
   //
-  // Facial hair that sits UNDER the mouth goes in before the NOSE, so a moustache tucks
-  // behind the nose rather than swallowing its tip when it is raised.
+  // THE STACK. Everything that goes on top of the head is laid out in ONE place, in one
+  // order. The base's own NOSE and EARS are lifted out and re-laid with it, because where
+  // the base puts them (last) cannot satisfy all of these at once:
   //
-  // ⭐ THE EARS MOVE WITH IT. The base paints the ears LAST, so a beard whose sideburns
-  // grow outboard was being clipped by them. Ryan asked for the bushy beard's hair to sit
-  // slightly IN FRONT of the ears, and re-inserting them ahead of the facial hair does it.
-  // It also makes "under" styles agree with "over" ones, which already paint after the
-  // ears by construction. For a flush-sided beard it is a no-op: the band's outer edge and
-  // the ear's inner edge share about one unit.
-  if (fh && !fhOver) {
-    const ears = findEars(svg)
-    for (const e of ears) svg = svg.replace(e, '')
-    const frag = ears.join('') + fh
-    const nose = findNose(svg)
-    if (nose) svg = svg.replace(nose, frag + nose)
-    else add(frag)
-  }
+  //   ears          hair falls OVER the ear; a beard's tufts grow in FRONT of it
+  //   eyes, brows   a lock falling past the eye passes in front of it, so hair is later
+  //   hair          ...but EARLIER than facial hair. Ryan, 2026-09-19: with long hair the
+  //                 bushy beard was buried behind it. A beard is on the FACE and the hair
+  //                 falls beside it, so the beard wins. The two rules are not in tension:
+  //                 the eyes are high and the beard is low, and both hold at once.
+  //   facial hair   over the hair, under the nose
+  //   mouth         UNDER a moustache (it hangs over the lip) but OVER a beard (the mouth
+  //                 sits in the mass) — declared per style in facialhair/manifest.json,
+  //                 because coverage cannot decide it: a moustache overlaps the mouth
+  //                 region by 34% and stubble by 78%, with nothing clean in between
+  //   nose          always last: a raised moustache must never swallow its tip
+  const ears = findEars(svg)
+  for (const e of ears) svg = svg.replace(e, '')
+  const nose = findNose(svg)
+  if (nose) svg = svg.replace(nose, '')
 
-  if (cfg.expression) {
-    add(A.expressions[cfg.expression] ?? '')
-  } else {
-    if (cfg.eyes) add(A.eyes[cfg.eyes] ?? A.specialEyes[cfg.eyes] ?? '')
-    if (cfg.mouth) add(A.mouths[cfg.mouth] ?? '')
-  }
+  // ⚠⚠ An EXPRESSION is a whole face in ONE fragment — eyes, brows, cheeks AND mouth — so
+  // there is no single place for it: its brows must sit UNDER the hair and its mouth must
+  // sit OVER a beard. It is therefore SPLIT, on each path's TOP edge.
+  //
+  // ⭐ The line is not arbitrary. Measured across all 102 paths in the 12 shipped
+  // expressions: the upper group — eyes, irises, brows, cheeks, tears — never starts below
+  // y999.5, and the lower group — lips, mouth interior, tongue, teeth and chin marks —
+  // never starts above y1145.5. y1072 is the middle of that gap and sits just above the
+  // beard's own top edge at y1105.8, which is the boundary the split exists for.
+  //
+  // ⚠ Classifying by TOKEN does not work: an open mouth's TEETH carry the eye-white token,
+  // and `laughing`/`sad` put a skin-shade chin mark below the lip. Position does work. A
+  // guard test re-derives the gap from the shipped assets, so a new expression straddling
+  // the line fails the build instead of rendering a brow over a fringe.
+  const [exprUpper, exprLower] = splitExpression(
+    cfg.expression ? A.expressions[cfg.expression] ?? '' : '',
+  )
+  const eyeLayer = cfg.eyes ? A.eyes[cfg.eyes] ?? A.specialEyes[cfg.eyes] ?? '' : ''
+  // ⚠ not `mouth` — phase 2 binds that name to the mouth COLOUR.
+  const mouthLayer = (cfg.mouth ? A.mouths[cfg.mouth] ?? '' : '') + exprLower
 
-  // An "over" style goes on after the face, taking the nose with it so the nose stays on
-  // top. Declared per style in facialhair/manifest.json — it cannot be inferred, because a
-  // moustache overlaps the mouth region by 34% and stubble by 78% with nothing clean between.
-  if (fh && fhOver) {
-    const nose = findNose(svg)
-    if (nose) svg = svg.replace(nose, '')
-    add(fh + (nose || ''))
-  }
-
-  if (cfg.hair) add(A.hair[cfg.hair] ?? '')
+  add(
+    ears.join('') +
+      eyeLayer +
+      exprUpper +
+      (fhOver ? mouthLayer : '') +
+      (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
+      (fh ?? '') +
+      (fhOver ? '' : mouthLayer) +
+      (nose || ''),
+  )
 
   // ---- phase 2: recolour, once, over the finished document ----------------------------
   //
