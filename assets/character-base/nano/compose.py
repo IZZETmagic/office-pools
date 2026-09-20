@@ -62,6 +62,23 @@ def stubble_tone(hair, skin) -> str:
 # silently plausible.
 FADE = "rgb(126,110,150)"
 FADE_ID = "beardfade"
+# ⭐ THE BEARD MARKER. Facial hair and head hair used to share the HAIR_BASE token, so they
+# were filled with the SAME colour — and against long hair a beard vanished into it. Ryan,
+# 2026-09-19: "the full beard blends into the long hair in the background."
+#
+# A facial-hair fragment therefore has its HAIR_BASE swapped for this marker as it is
+# stacked, and the recolour pass fills the marker with the hair colour LIGHTENED. One colour
+# input still drives both, so nothing is added to the config, and it is correct on every
+# hair and skin combination — the same shape as STUBBLE and the fade.
+#
+# ⚠ Deliberately OFF the avatar palette (a green nothing else uses) so a stray one is
+# obvious rather than silently plausible. It must never reach the output; a guard test says so.
+BEARD = "rgb(110,150,126)"
+
+# ⚠ 1.14, not more. Measured against the long-hair styles: below ~1.10 the boundary is still
+# mush at 48px, and by 1.24 the beard reads as a DIFFERENT colour from the head — a dyed
+# beard rather than the same person's hair. Ryan picked 14% from 14 / 24 / -18.
+BEARD_LIGHTEN = 1.14
 
 # ⚠⚠ HOW FAR DOWN THE BAND THE FADE REACHES, as a fraction of the band's own height.
 #
@@ -244,7 +261,7 @@ def main() -> None:
         + part("--eyes") + part("--brows") + expr_upper
         + (mouth if fh_over else "")
         + part("--hair")
-        + (inner(fh) if fh else "")
+        + (inner(fh).replace(f'fill="{HAIR_BASE}"', f'fill="{BEARD}"') if fh else "")
         + ("" if fh_over else mouth)
         + (nose or "")
     ) + "</svg>")
@@ -271,6 +288,15 @@ def main() -> None:
     if c := (arg("--brow-colour") or arg("--hair-colour")):
         svg = svg.replace(f'fill="{BROW_INK}"', f'fill="{darken(hex_to_rgb(c), 0.82)}"')
 
+    # The beard tone, derived from the hair colour so one input still drives both. Computed
+    # here because the fade block below needs it as the tone its gradient ends at.
+    # ⚠ Unconditional: with no --hair-colour the marker must still be filled, or it reaches
+    # the output as raw green.
+    _hair_rgb = (hex_to_rgb(arg("--hair-colour")) if arg("--hair-colour")
+                 else tuple(int(v) for v in re.findall(r"\d+", HAIR_BASE)))
+    beard_tone = lighten(_hair_rgb, BEARD_LIGHTEN)
+    svg = svg.replace(f'fill="{BEARD}"', f'fill="{beard_tone}"')
+
     # ---- the beard fade -------------------------------------------------------------------
     #
     # ⚠⚠ BACK-OUT: this whole feature is behind --fade and defaults to OFF. Without the flag the
@@ -289,9 +315,11 @@ def main() -> None:
         # A stubble asset's body is the STUBBLE token — the derived shadow tone — so fading its
         # band to full hair made the band far DARKER than the stubble it joins. It read as a
         # dark bar, not a fade, which is exactly what it looked like.
+        # ⚠ For anything that is not stubble the body is now the BEARD tone, not the raw hair
+        # colour — otherwise the band ends darker than the beard it joins, which is the same
+        # dark-bar failure the stubble case above was written for.
         body = (stubble_tone(hex_to_rgb(hair_c), hex_to_rgb(skin_c))
-                if (hair_c and skin_c and STUBBLE in svg) else
-                (rgb_str(hex_to_rgb(hair_c)) if hair_c else HAIR_BASE))
+                if (hair_c and skin_c and STUBBLE in svg) else beard_tone)
 
         if "--fade" in sys.argv and hair_c and skin_c:
             # objectBoundingBox units, so the gradient spans whatever path carries it and no

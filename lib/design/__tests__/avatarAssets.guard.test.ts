@@ -156,6 +156,9 @@ describe('avatar assets stay cross-platform', () => {
 import { composeAvatar, type AvatarAssets } from '@/lib/avatar/compose'
 
 const FADE_MARKER = 'rgb(126,110,150)'
+const BEARD_MARKER = 'rgb(110,150,126)'
+/** lighten(hex2rgb('#8B5E3C'), 1.14) — the tone facial hair is filled with. */
+const BEARD_TONE = 'rgb(158,107,68)'
 
 /** The smallest thing that exercises the compositor: a base plus one facial-hair band. */
 const fixture = (): AvatarAssets => ({
@@ -182,7 +185,9 @@ describe('the beard fade is opt-in', () => {
     expect(svg, 'default must not emit a gradient').not.toContain('linearGradient')
     expect(svg, 'default must not reference one').not.toContain('url(#')
     expect(svg, 'the marker must never reach the output').not.toContain(FADE_MARKER)
-    expect(svg, 'with the fade off the band is flat hair colour').toContain('rgb(139,94,60)')
+    // ⚠ the BEARD tone, not the raw hair colour — facial hair is the hair colour lightened
+    // 14% so a beard does not vanish into long hair. lighten('#8B5E3C', 1.14).
+    expect(svg, 'with the fade off the band is the flat beard tone').toContain(BEARD_TONE)
   })
 
   it('emits a hair-to-skin gradient when asked', () => {
@@ -192,7 +197,8 @@ describe('the beard fade is opt-in', () => {
     expect(svg, 'the marker must never reach the output').not.toContain(FADE_MARKER)
     // skin at the top, hair at the bottom — the direction is the whole point
     expect(svg).toContain('offset="0" stop-color="rgb(245,201,166)"')
-    expect(svg).toContain('offset="1" stop-color="rgb(139,94,60)"')
+    expect(svg, 'the fade ends at the BEARD tone, or the band is darker than the beard it joins')
+      .toContain(`offset="1" stop-color="${BEARD_TONE}"`)
   })
 
   // ⚠ This test USED to assert that no shipped asset carried the marker, which is how the
@@ -456,6 +462,60 @@ describe('the stack paints in one order', () => {
     ]) {
       const src = readFileSync(join(process.cwd(), file), 'utf8')
       expect(src, `${file} must carry the split line`).toMatch(/1072/)
+    }
+  })
+})
+
+// =============================================================
+// Facial hair is the hair colour LIGHTENED
+// =============================================================
+// Beard and head hair shared the hairBase token, so they got the same fill — and once the
+// beard painted OVER the hair it vanished into it. Ryan, 2026-09-19: "the full beard blends
+// into the long hair in the background." The facial-hair fragment is now marked as it is
+// stacked and filled with the hair colour lightened 14%, so one colour input still drives
+// both and nothing is added to the config.
+// =============================================================
+
+describe('facial hair is lighter than the head hair', () => {
+  const hairPath = `<path d="M 300 300 L 800 300 L 800 900 Z" fill="rgb(140,122,110)"/>`
+  const beardPath = `<path d="M 700 1200 L 1300 1200 L 1300 1500 Z" fill="rgb(140,122,110)"/>`
+  const both = (): AvatarAssets => ({
+    ...fixture(),
+    hair: { h: hairPath },
+    facialhair: { f: beardPath },
+    fhManifest: { f: { over: false } },
+  })
+
+  it('lightens the beard but leaves the head hair alone', () => {
+    const svg = composeAvatar({ ...cfg, hair: 'h', facialHair: 'f' }, both())
+    expect(svg, 'the marker must never reach the output').not.toContain(BEARD_MARKER)
+    expect(svg, 'the beard takes the lightened tone').toContain(BEARD_TONE)
+    expect(svg, 'the head hair keeps the raw hair colour').toContain('rgb(139,94,60)')
+  })
+
+  it('does not lighten hair when there is no facial hair', () => {
+    const svg = composeAvatar({ ...cfg, hair: 'h', facialHair: null }, both())
+    expect(svg).toContain('rgb(139,94,60)')
+    expect(svg, 'nothing should be lightened').not.toContain(BEARD_TONE)
+  })
+
+  it('leaves stubble on its own derivation — it is not a beard tone', () => {
+    const stub = `<path d="M 700 1200 L 1300 1200 L 1300 1500 Z" fill="${STUBBLE_TOKEN}"/>`
+    const svg = composeAvatar({ ...cfg, facialHair: 'f' },
+      { ...fixture(), facialhair: { f: stub }, fhManifest: { f: { over: false } } })
+    expect(svg, 'the stubble token must not reach the output').not.toContain(STUBBLE_TOKEN)
+    expect(svg, 'stubble keeps its shadow tone, not the beard tone').not.toContain(BEARD_TONE)
+    expect(svg).toContain(STUBBLE_EXPECTED)
+  })
+
+  it('keeps the same marker and factor in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must carry the beard marker`).toContain('110,150,126')
+      expect(src, `${file} must carry the factor`).toMatch(/BEARD_LIGHTEN\s*=\s*1\.14\b/)
     }
   })
 })

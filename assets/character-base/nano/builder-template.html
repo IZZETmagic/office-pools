@@ -113,7 +113,11 @@ const T = {
   irisCore:'rgb(117,62,21)', irisRim:'rgb(150,84,34)',
   mouthInk:'rgb(182,122,112)', mouthDark:'rgb(118,72,68)', mouthTongue:'rgb(206,116,112)',
   browInk:'rgb(101,70,52)', blush:'rgb(240,158,138)', stubble:'rgb(164,150,140)',
+  // ⭐ facial hair is filled from the hair colour LIGHTENED, so a beard does not vanish into
+  // long hair. Marked here, filled in the recolour pass. ⚠ off-palette green on purpose.
+  beard:'rgb(110,150,126)', fade:'rgb(126,110,150)',
 };
+const BEARD_LIGHTEN = 1.14;
 const swapAll = (s,find,rep) => s.split(`fill="${find}"`).join(`fill="${rep}"`);
 
 /* ---- find the base's nose, by shape ------------------------------------------------
@@ -211,7 +215,7 @@ function compose(c){
       + eyes + upper.join('')
       + (fhOver ? mouth : '')
       + (c.hair ? ASSETS.hair[c.hair] : '')
-      + (fh || '')
+      + (fh ? swapAll(fh, T.hairBase, T.beard) : '')
       + (fhOver ? '' : mouth)
       + (nose || ''));
 
@@ -227,6 +231,11 @@ function compose(c){
   svg = swapAll(svg, T.mouthTongue, lighten(mouth,1.13));
 
   svg = swapAll(svg, T.browInk, darken(hair,0.82));          // brows follow hair
+  const beardTone = lighten(hair, BEARD_LIGHTEN);
+  svg = swapAll(svg, T.beard, beardTone);                    // facial hair: lighter than the head
+  // ⚠ The standalone builder has no fade gradient (compose.ts does). Without this the marker
+  // rendered as raw violet on every fullbeard and stubble — flatten it the way `fade: false` does.
+  svg = swapAll(svg, T.fade, svg.includes(T.stubble) ? stubbleTone(hair, skin) : beardTone);
   svg = swapAll(svg, T.stubble, stubbleTone(hair, skin));    // stubble: a shadow, not a short beard
   svg = swapAll(svg, T.hairBase,  rgbStr(hair));
   svg = swapAll(svg, T.hairShade, darken(hair));

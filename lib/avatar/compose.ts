@@ -88,7 +88,28 @@ const T = {
    * confused with a hair or stubble tone.
    */
   fade: 'rgb(126,110,150)',
+  /**
+   * ⭐ THE BEARD MARKER. Facial hair and head hair used to share the hairBase token, so they
+   * were filled with the SAME colour — and against long hair a beard vanished into it. Ryan,
+   * 2026-09-19: "the full beard blends into the long hair in the background."
+   *
+   * A facial-hair fragment has its hairBase swapped for this marker as it is stacked, and the
+   * recolour pass fills the marker with the hair colour LIGHTENED. One colour input still
+   * drives both, so nothing is added to the config, and it is right on every hair and skin
+   * combination — the same shape as stubble and the fade.
+   *
+   * ⚠ Deliberately OFF the avatar palette (a green nothing else uses) so a stray one is
+   * obvious rather than silently plausible. It must never reach the output.
+   */
+  beard: 'rgb(110,150,126)',
 } as const
+
+/**
+ * ⚠ 1.14, not more. Measured against the long-hair styles: below ~1.10 the boundary is still
+ * mush at 48px, and by 1.24 the beard reads as a DIFFERENT colour from the head — a dyed
+ * beard rather than the same person's hair. Ryan picked 14% from 14 / 24 / -18.
+ */
+const BEARD_LIGHTEN = 1.14
 
 const FADE_ID = 'beardfade'
 
@@ -259,7 +280,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       exprUpper +
       (fhOver ? mouthLayer : '') +
       (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
-      (fh ?? '') +
+      (fh ? swap(fh, T.hairBase, T.beard) : '') +
       (fhOver ? '' : mouthLayer) +
       (nose || ''),
   )
@@ -282,13 +303,21 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   svg = swap(svg, T.mouthDark, darken(mouth, 0.65))
   svg = swap(svg, T.mouthTongue, lighten(mouth, 1.13))
 
+  // The beard tone, derived from the hair colour so one input still drives both. Computed
+  // here because the fade below ends at it.
+  const beardTone = lighten(hair, BEARD_LIGHTEN)
+  svg = swap(svg, T.beard, beardTone)
+
   // ---- the beard fade, off unless cfg.fade ---------------------------------------------
   if (svg.includes(T.fade)) {
     // ⚠⚠ The fade must end at the asset's OWN body tone, not always the hair colour. A
     // stubble asset's body is the STUBBLE token — the derived shadow tone — so fading its
     // band to full hair made the band far darker than the stubble it joins. It read as a dark
     // bar rather than a fade.
-    const body = svg.includes(T.stubble) ? stubbleTone(hair, skin) : rgbStr(hair)
+    // ⚠ For anything that is not stubble the body is now the BEARD tone, not the raw hair
+    // colour — otherwise the band ends darker than the beard it joins, which is the same
+    // dark-bar failure the stubble case was written for.
+    const body = svg.includes(T.stubble) ? stubbleTone(hair, skin) : beardTone
     if (cfg.fade) {
       // objectBoundingBox units, so the gradient spans whatever path carries it and no
       // coordinates have to be kept in step with the artwork.
