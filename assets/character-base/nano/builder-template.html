@@ -96,13 +96,25 @@ const rgbStr  = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 const darken  = (c,f=0.78) => rgbStr(c.map(v => Math.max(0, Math.trunc(v*f))));
 const lighten = (c,f=1.22) => rgbStr(c.map(v => Math.min(255, Math.trunc(v*f))));
 const mix     = (a,b,t)    => rgbStr(a.map((v,i) => Math.trunc(v + (b[i]-v)*t)));
+const lum2 = c => 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
 // stubble is a shadow: toward the skin, then toward grey. ⚠ Same numbers as compose.ts/.py.
 const STUBBLE_TOWARD_SKIN = 0.83;
 const STUBBLE_TOWARD_GREY = 0.55;
+// ⚠⚠ ...then a FLOOR against the SKIN. The derivation tracks the hair and says nothing about
+// the skin; over all 72 hair x skin combinations 35 landed within 12 luminance of it and 20
+// came out lighter. Lighter is not wrong (white hair on dark skin), so the floor is on the
+// DISTANCE, and it only bites when they are too close.
+const STUBBLE_MIN = 14;
 const stubbleTone = (hair, skin) => {
-  const m = hair.map((v,i) => v + (skin[i]-v)*STUBBLE_TOWARD_SKIN);
-  const grey = 0.2126*m[0] + 0.7152*m[1] + 0.0722*m[2];
-  return rgbStr(m.map(v => Math.trunc(v + (grey-v)*STUBBLE_TOWARD_GREY)));
+  let m = hair.map((v,i) => v + (skin[i]-v)*STUBBLE_TOWARD_SKIN);
+  const grey = lum2(m);
+  m = m.map(v => v + (grey-v)*STUBBLE_TOWARD_GREY);
+  const d = lum2(m) - lum2(skin);
+  if (Math.abs(d) < STUBBLE_MIN) {
+    const k = (lum2(skin) + (d > 0 ? STUBBLE_MIN : -STUBBLE_MIN)) - lum2(m);
+    m = m.map(v => Math.max(0, Math.min(255, v + k)));
+  }
+  return rgbStr(m.map(v => Math.trunc(v)));
 };
 
 /* ---- tokens, exactly as the assets carry them -------------------------------------- */
@@ -117,7 +129,9 @@ const T = {
   // long hair. Marked here, filled in the recolour pass. ⚠ off-palette green on purpose.
   beard:'rgb(110,150,126)', fade:'rgb(126,110,150)',
 };
-const BEARD_LIGHTEN = 1.14;
+// ⚠⚠ ADDITIVE, not a factor: ×1.14 gave +2.2 luminance on black hair (no separation) and
+// clamped platinum to pure white. A constant moves every swatch by the same amount.
+const BEARD_LIFT = 12;
 const swapAll = (s,find,rep) => s.split(`fill="${find}"`).join(`fill="${rep}"`);
 
 /* ---- find the base's nose, by shape ------------------------------------------------
@@ -209,14 +223,15 @@ function compose(c){
     (ys.length && Math.min(...ys) >= 1072 ? lower : upper).push(m[0]);
   }
   const eyes  = (c.mode !== 'expression' && c.eyes)  ? (ASSETS.eyes[c.eyes] || ASSETS.specialEyes[c.eyes]) : '';
-  const mouth = ((c.mode !== 'expression' && c.mouth) ? ASSETS.mouths[c.mouth] : '') + lower.join('');
+  // ⚠ not `mouth` — the recolour pass below binds that name to the mouth COLOUR.
+  const mouthLayer = ((c.mode !== 'expression' && c.mouth) ? ASSETS.mouths[c.mouth] : '') + lower.join('');
 
   add(ears.join('')
       + eyes + upper.join('')
-      + (fhOver ? mouth : '')
+      + (fhOver ? mouthLayer : '')
       + (c.hair ? ASSETS.hair[c.hair] : '')
       + (fh ? swapAll(fh, T.hairBase, T.beard) : '')
-      + (fhOver ? '' : mouth)
+      + (fhOver ? '' : mouthLayer)
       + (nose || ''));
 
   /* --- recolour, once, over the finished document --- */
@@ -231,7 +246,7 @@ function compose(c){
   svg = swapAll(svg, T.mouthTongue, lighten(mouth,1.13));
 
   svg = swapAll(svg, T.browInk, darken(hair,0.82));          // brows follow hair
-  const beardTone = lighten(hair, BEARD_LIGHTEN);
+  const beardTone = rgbStr(hair.map(v => Math.min(255, v + BEARD_LIFT)));
   svg = swapAll(svg, T.beard, beardTone);                    // facial hair: lighter than the head
   // ⚠ The standalone builder has no fade gradient (compose.ts does). Without this the marker
   // rendered as raw violet on every fullbeard and stubble — flatten it the way `fade: false` does.

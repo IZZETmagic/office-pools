@@ -43,11 +43,35 @@ STUBBLE = "rgb(164,150,140)"
 STUBBLE_TOWARD_SKIN = 0.83
 STUBBLE_TOWARD_GREY = 0.55
 
+# ⚠⚠ ...and then a FLOOR against the skin it sits on. The derivation above tracks the hair,
+# which is right — a blonde with black stubble looks wrong — but it says nothing about the
+# skin, and on half the palette the two landed on top of each other. Measured over all 72
+# hair x skin combinations: 35 put stubble within 12 luminance of the skin, and on 20 of them
+# stubble came out LIGHTER than the skin.
+#
+# ⭐ Lighter is not itself wrong — white hair on dark skin SHOULD give pale stubble — so the
+# floor is on the DISTANCE, not the direction. It pushes the tone further along whichever side
+# it already sits, and only when it is too close, so every combination Ryan has approved is
+# untouched (the default palette sits at 18.1 and never moves).
+STUBBLE_MIN_CONTRAST = 14
+
+
+def _lum(c) -> float:
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
 
 def stubble_tone(hair, skin) -> str:
     m = [h + (s - h) * STUBBLE_TOWARD_SKIN for h, s in zip(hair, skin)]
-    grey = 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]
-    return rgb_str(tuple(int(v + (grey - v) * STUBBLE_TOWARD_GREY) for v in m))
+    grey = _lum(m)
+    m = [v + (grey - v) * STUBBLE_TOWARD_GREY for v in m]
+    # ⭐ adding a constant to every channel shifts the luminance by exactly that constant, so
+    # the correction is one subtraction and the hue is untouched.
+    d = _lum(m) - _lum(skin)
+    if abs(d) < STUBBLE_MIN_CONTRAST:
+        target = _lum(skin) + (STUBBLE_MIN_CONTRAST if d > 0 else -STUBBLE_MIN_CONTRAST)
+        k = target - _lum(m)
+        m = [max(0.0, min(255.0, v + k)) for v in m]
+    return rgb_str(tuple(int(v) for v in m))
 
 # ⭐ The BEARD FADE marker. A facial hair asset paints its sideburn band in this tone; compose
 # turns that one path into a vertical gradient running from the SKIN colour at the top to the
@@ -75,10 +99,18 @@ FADE_ID = "beardfade"
 # obvious rather than silently plausible. It must never reach the output; a guard test says so.
 BEARD = "rgb(110,150,126)"
 
-# ⚠ 1.14, not more. Measured against the long-hair styles: below ~1.10 the boundary is still
-# mush at 48px, and by 1.24 the beard reads as a DIFFERENT colour from the head — a dyed
-# beard rather than the same person's hair. Ryan picked 14% from 14 / 24 / -18.
-BEARD_LIGHTEN = 1.14
+# ⚠⚠ ADDITIVE, not a factor. This was ×1.14 and that is wrong at both ends of the palette,
+# because a multiplier moves a colour in proportion to how bright it already is:
+#
+#     #1A1110 (black)     ×1.14 -> +2.2 luminance   <- no separation at all, the original bug
+#     #2B1B12             ×1.14 -> +3.6             <- likewise
+#     #4A3B32 (default)   ×1.14 -> +8.3             <- what Ryan actually approved, on one swatch
+#     #E8E8ED (platinum)  ×1.14 -> clamps to pure WHITE
+#
+# Adding a constant to each channel moves the luminance by exactly that constant, whatever the
+# input, so all nine hair swatches get the same visible step and none clamps. 12 is close to
+# the +8.3 Ryan approved on the default swatch and enough to read on black.
+BEARD_LIFT = 12
 
 # ⚠⚠ HOW FAR DOWN THE BAND THE FADE REACHES, as a fraction of the band's own height.
 #
@@ -294,7 +326,7 @@ def main() -> None:
     # the output as raw green.
     _hair_rgb = (hex_to_rgb(arg("--hair-colour")) if arg("--hair-colour")
                  else tuple(int(v) for v in re.findall(r"\d+", HAIR_BASE)))
-    beard_tone = lighten(_hair_rgb, BEARD_LIGHTEN)
+    beard_tone = rgb_str(tuple(min(255, v + BEARD_LIFT) for v in _hair_rgb))
     svg = svg.replace(f'fill="{BEARD}"', f'fill="{beard_tone}"')
 
     # ---- the beard fade -------------------------------------------------------------------

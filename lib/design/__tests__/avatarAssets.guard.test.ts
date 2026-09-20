@@ -153,12 +153,12 @@ describe('avatar assets stay cross-platform', () => {
 // this project. It is in the same unverified pile as the <mask> on three hair assets.
 // =============================================================
 
-import { composeAvatar, type AvatarAssets } from '@/lib/avatar/compose'
+import { composeAvatar, PALETTE, type AvatarAssets } from '@/lib/avatar/compose'
 
 const FADE_MARKER = 'rgb(126,110,150)'
 const BEARD_MARKER = 'rgb(110,150,126)'
-/** lighten(hex2rgb('#8B5E3C'), 1.14) — the tone facial hair is filled with. */
-const BEARD_TONE = 'rgb(158,107,68)'
+/** hex2rgb('#8B5E3C') + BEARD_LIFT on each channel — the tone facial hair is filled with. */
+const BEARD_TONE = 'rgb(151,106,72)'
 
 /** The smallest thing that exercises the compositor: a base plus one facial-hair band. */
 const fixture = (): AvatarAssets => ({
@@ -515,7 +515,103 @@ describe('facial hair is lighter than the head hair', () => {
     ]) {
       const src = readFileSync(join(process.cwd(), file), 'utf8')
       expect(src, `${file} must carry the beard marker`).toContain('110,150,126')
-      expect(src, `${file} must carry the factor`).toMatch(/BEARD_LIGHTEN\s*=\s*1\.14\b/)
+      expect(src, `${file} must carry the lift`).toMatch(/BEARD_LIFT\s*=\s*12\b/)
+    }
+  })
+
+  // ⚠⚠ THE GAP THIS LEAVES. Only hairBase is marked, so a facial-hair asset painted in the
+  // hair TEXTURE tones would keep them verbatim and match the head hair exactly — the very
+  // blending this feature exists to stop, and silent, because it would look fine on a bald
+  // avatar. No shipped asset does it today. If one needs a second tone, mark it too rather
+  // than deleting this test.
+  it('no facial-hair asset paints in the hair TEXTURE tones — they are not marked', () => {
+    for (const f of svgsIn(FACIALHAIR)) {
+      for (const [name, tone] of [['shade', HAIR_SHADE], ['light', HAIR_LIGHT]] as const) {
+        expect(f.body, `${f.name} uses the hair ${name} tone, which is never lightened`)
+          .not.toContain(tone)
+      }
+    }
+  })
+
+  // ⭐ Stubble is NOT given the beard's lift: it is already the hair pulled 83% toward the
+  // skin, and lifting it again would push it into the skin. What it gets instead is a FLOOR
+  // against the skin — the same idea, a guaranteed minimum separation from its neighbour.
+  // This walks the REAL palette, all 72 hair x skin pairs, because that is where it broke:
+  // 35 of them landed within 12 luminance of the skin and 20 came out lighter than it.
+  it('keeps stubble clear of the skin on every palette combination', () => {
+    const lumOf = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    const hex = (h: string) => (h.replace('#', '').match(/../g) || []).map((x) => parseInt(x, 16))
+    const nums = (t: string) => (t.match(/\d+/g) || []).map(Number)
+    const D = 'M 1 1 L 2 2 Z'
+    const tone = (hair: string, skin: string, token: string) => {
+      const svg = composeAvatar(
+        { ...cfg, hairColour: hair, skin, facialHair: 'f' },
+        {
+          ...fixture(),
+          facialhair: { f: `<path d="${D}" fill="${token}"/>` },
+          fhManifest: { f: { over: false } },
+        },
+      )
+      // ⚠ the fill on OUR path, not the first rgb in the document — the base's own skin path
+      // comes first, and an earlier version of this test measured that by mistake.
+      const m = new RegExp(`<path[^>]*d="${D}"[^>]*>`).exec(svg)
+      return nums(/fill="(rgb\([^)]*\))"/.exec(m![0])![1])
+    }
+    const worst: string[] = []
+    for (const hair of PALETTE.hair) {
+      for (const skin of PALETTE.skin) {
+        const gap = Math.abs(lumOf(tone(hair, skin, STUBBLE_TOKEN)) - lumOf(hex(skin)))
+        // ⚠ 13, not the floor's 14: the tone is truncated to whole channels afterwards,
+        // which costs up to a unit. Before the floor the worst pair sat at 0.3.
+        if (gap < 13) worst.push(`${hair} on ${skin}: ${gap.toFixed(1)}`)
+      }
+    }
+    expect(worst, 'stubble must stay clear of the skin everywhere').toEqual([])
+  })
+
+  it('still lifts a beard by the same amount on every hair swatch', () => {
+    const lumOf = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    const hex = (h: string) => (h.replace('#', '').match(/../g) || []).map((x) => parseInt(x, 16))
+    const nums = (t: string) => (t.match(/\d+/g) || []).map(Number)
+    const D = 'M 1 1 L 2 2 Z'
+    for (const hair of PALETTE.hair) {
+      const svg = composeAvatar(
+        { ...cfg, hairColour: hair, facialHair: 'f' },
+        {
+          ...fixture(),
+          facialhair: { f: `<path d="${D}" fill="rgb(140,122,110)"/>` },
+          fhManifest: { f: { over: false } },
+        },
+      )
+      const m = new RegExp(`<path[^>]*d="${D}"[^>]*>`).exec(svg)
+      const gap = lumOf(nums(/fill="(rgb\([^)]*\))"/.exec(m![0])![1])) - lumOf(hex(hair))
+      // ⚠ this is what a MULTIPLIER could not do: ×1.14 gave +2.2 on #1A1110 and clamped
+      // #E8E8ED to white. A constant gives the same step on all nine.
+      expect(gap, `beard separation on ${hair}`).toBeGreaterThan(10)
+      expect(gap, `beard separation on ${hair}`).toBeLessThan(14)
+    }
+  })
+})
+
+// =============================================================
+// The standalone builder must at least PARSE
+// =============================================================
+// ⚠⚠ avatar-builder.html is generated from builder-template.html and nothing type-checks it.
+// A duplicate `const mouth` — the layer and the mouth COLOUR, in one scope — shipped in it and
+// would have blanked the page; tsc caught the identical mistake in compose.ts and said nothing
+// about the template. One cheap parse is the whole safety net this file has.
+// =============================================================
+
+describe('the standalone avatar builder', () => {
+  it('parses as JavaScript', () => {
+    for (const file of [
+      'assets/character-base/nano/builder-template.html',
+      'assets/character-base/nano/avatar-builder.html',
+    ]) {
+      const html = readFileSync(join(process.cwd(), file), 'utf8')
+      const blocks = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1])
+      expect(blocks.length, `${file} should carry a script`).toBeGreaterThan(0)
+      expect(() => new Function(blocks.join('\n')), `${file} must parse`).not.toThrow()
     }
   })
 })
