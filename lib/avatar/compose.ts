@@ -199,6 +199,63 @@ const swap = (s: string, find: string, rep: string) =>
   s.split(`fill="${find}"`).join(`fill="${rep}"`).split(`stroke="${find}"`).join(`stroke="${rep}"`)
 
 /**
+ * ⭐⭐ EVERY ID IN A COMPOSED DOCUMENT IS SUFFIXED, because an id is scoped to the DOCUMENT
+ * and an avatar is not a document — it is one element among many on a page.
+ *
+ * A composed avatar declares up to four: `facehole` (the face cut-out every hair asset
+ * carries), `facehole-front` (its renamed second copy), `faceonly` (the head silhouette) and
+ * `beardfade`. Inline two avatars and the browser resolves every `url(#facehole)` to the
+ * FIRST definition in the document, so avatars 2..n silently borrow avatar 1's mask.
+ *
+ * ⚠⚠ It is not subtle. Several hair styles paint their mass as a full-canvas fill and rely
+ * entirely on the mask to cut it to shape; handed the wrong mask the tile FLOODS with hair.
+ * The admin contact sheet inlines a whole grid and has been wrong this whole time; the
+ * leaderboard, member list and every other planned surface show more than one too.
+ *
+ * ⭐ THE SUFFIX IS A HASH OF THE DOCUMENT ITSELF — not a counter, not a random value:
+ *
+ *   deterministic   one config composes to the same bytes every time, so a server render and
+ *                   the client render that hydrates it agree. A counter or a random suffix is
+ *                   a hydration mismatch on every avatar, and unstable test fixtures.
+ *   drift-proof     compose.py, this file and builder-template.html hash the SAME string, so
+ *                   they cannot disagree about the suffix unless they already disagree about
+ *                   the document — which is what the byte-for-byte parity check tests.
+ *   safe to collide two documents can only share a suffix if they are IDENTICAL, and
+ *                   identical documents carry identical masks, so sharing an id changes
+ *                   nothing about what is drawn.
+ */
+const idHash = (s: string): string => {
+  // FNV-1a, 32-bit. Over UTF-16 code units, which for ASCII are also the bytes and the code
+  // points — so JS charCodeAt and Python ord agree exactly. ⚠ That equivalence is the whole
+  // reason the three composers land on the same suffix, and a guard test asserts the composed
+  // document is ASCII so it cannot quietly stop being true.
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  // ⚠ The LENGTH rides along. 32 bits is already four billion values against a page holding
+  // tens of avatars, so this is belt and braces — but it costs one expression and it makes a
+  // collision need two documents that agree on both.
+  return (h >>> 0).toString(36) + s.length.toString(36)
+}
+
+/**
+ * ⚠ `(\s)id=` and not `\bid=`: a word boundary also sits inside `data-fade-id="…"`, so the
+ * looser pattern would rewrite an attribute that merely ENDS in id as though it were one.
+ * ⚠ `id="…"` and `url(#…)` are every reference form the assets actually use. A guard test
+ * fails the build if one ever arrives carrying `href="#…"`, which would sail straight past
+ * this and re-introduce the bug silently.
+ */
+function uniquifyIds(svg: string): string {
+  if (!svg.includes('id="')) return svg
+  const uid = idHash(svg)
+  return svg
+    .replace(/(\s)id="([^"]+)"/g, (_, sp, id) => `${sp}id="${id}--${uid}"`)
+    .replace(/url\(#([^)]+)\)/g, (_, id) => `url(#${id}--${uid})`)
+}
+
+/**
  * Locate the base's nose path BY SHAPE.
  *
  * Colour alone cannot do it: the ears carry the same tone, and so does the neck shadow.
@@ -452,7 +509,10 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   svg = swap(svg, T.shirt, rgbStr(shirt))
   svg = swap(svg, T.shirt2, darken(shirt, 0.9))
   svg = swap(svg, T.bg, rgbStr(hex2rgb(cfg.background)))
-  return svg
+
+  // ⚠ LAST, over the finished document. Before this point the hair copy is still being
+  // renamed by literal id and the gradient is still being referenced by name.
+  return uniquifyIds(svg)
 }
 
 /** Palettes offered in the customiser. Values, not assets — see AVATAR_CONFIG.md. */

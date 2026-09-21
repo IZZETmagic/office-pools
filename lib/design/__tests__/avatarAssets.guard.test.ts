@@ -192,8 +192,9 @@ describe('the beard fade is opt-in', () => {
 
   it('emits a hair-to-skin gradient when asked', () => {
     const svg = composeAvatar({ ...cfg, fade: true }, fixture())
-    expect(svg).toContain('<linearGradient id="beardfade"')
-    expect(svg).toContain('url(#beardfade)')
+    // ⚠ the id carries a per-document suffix — see 'ids are scoped to the document' below.
+    expect(svg).toMatch(/<linearGradient id="beardfade--[a-z0-9]+"/)
+    expect(svg).toMatch(/url\(#beardfade--[a-z0-9]+\)/)
     expect(svg, 'the marker must never reach the output').not.toContain(FADE_MARKER)
     // skin at the top, hair at the bottom — the direction is the whole point
     expect(svg).toContain('offset="0" stop-color="rgb(245,201,166)"')
@@ -775,7 +776,7 @@ describe('hair over the face passes in front of a beard', () => {
     const svg = composeAvatar({ ...cfg, base: 'b', hair: 'h', facialHair: 'f' }, faceFixture())
     const copies = svg.split(`d="${D_HAIR3}"`).length - 1
     expect(copies, 'the hair is painted twice').toBe(2)
-    expect(svg, 'the second copy is masked to the head').toContain('mask="url(#faceonly)"')
+    expect(svg, 'the second copy is masked to the head').toMatch(/mask="url\(#faceonly--[a-z0-9]+\)"/)
     expect(svg, 'the mask is the head silhouette').toContain(`<path d="${D_HEAD}" fill="white"/>`)
     // order: first hair, then the beard, then the masked copy
     const first = svg.indexOf(`d="${D_HAIR3}"`)
@@ -804,8 +805,10 @@ describe('hair over the face passes in front of a beard', () => {
         `<g mask="url(#facehole)"><path d="${D_HAIR3}" fill="rgb(140,122,110)"/></g>`,
     }
     const svg = composeAvatar({ ...cfg, base: 'b', hair: 'h', facialHair: 'f' }, A)
-    expect(svg.split('id="facehole"').length - 1, 'only one facehole definition').toBe(1)
-    expect(svg).toContain('id="facehole-front"')
+    // ⚠ matched with the per-document suffix attached, and `facehole--` must not also match
+    // `facehole-front--` — the point of the test is that the two copies are told apart.
+    const holes = [...svg.matchAll(/id="(facehole(?:-front)?)--[a-z0-9]+"/g)].map((m) => m[1])
+    expect(holes.sort(), 'the copy keeps its own mask').toEqual(['facehole', 'facehole-front'])
   })
 
   it('keeps the same layer in the Python composer and the builder port', () => {
@@ -816,6 +819,149 @@ describe('hair over the face passes in front of a beard', () => {
       const src = readFileSync(join(process.cwd(), file), 'utf8')
       expect(src, `${file} must emit the face-only layer`).toContain('faceonly')
       expect(src, `${file} must rename the copy's mask`).toContain('facehole-front')
+    }
+  })
+})
+
+// =============================================================
+// Ids are scoped to the DOCUMENT, so a composed avatar suffixes its own
+// =============================================================
+// An avatar declares up to four ids — `facehole` (the face cut-out every hair asset carries),
+// `facehole-front` (its renamed second copy), `faceonly` and `beardfade`. Inline two avatars
+// and the browser resolves every `url(#facehole)` to the FIRST definition in the document, so
+// avatars 2..n silently borrow avatar 1's mask.
+//
+// ⚠⚠ It is not subtle: several hair styles paint their mass as a full-canvas fill and rely
+// entirely on the mask to cut it to shape, so the wrong mask floods the tile with hair. The
+// admin contact sheet inlines a whole grid and was wrong the entire time this shipped.
+//
+// The suffix is a HASH OF THE DOCUMENT, which buys three things a counter cannot: it is
+// deterministic (so a server render and the client render that hydrates it agree), it is the
+// same in all three composers without them having to share anything but the document, and a
+// collision is harmless because only identical documents can collide.
+// =============================================================
+
+describe('ids are scoped to the document', () => {
+  const D_HEAD4 = 'M 506 298 L 1534 298 L 1534 1530 L 506 1530 Z'
+  const masked = (d: string): AvatarAssets => ({
+    ...fixture(),
+    bases: { b: `<svg viewBox="0 0 2048 2048"><path d="${D_HEAD4}" fill="rgb(254,205,180)"/></svg>` },
+    hair: {
+      h:
+        '<defs><mask id="facehole"><rect width="2048" height="2048" fill="white"/></mask></defs>' +
+        `<g mask="url(#facehole)"><path d="${d}" fill="rgb(140,122,110)"/></g>`,
+    },
+    facialhair: { f: `<path d="M 700 1200 L 1300 1200 L 1300 1500 Z" fill="${FADE_MARKER}"/>` },
+    fhManifest: { f: { over: false } },
+  })
+  const idsIn = (s: string) => [...s.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])
+  const refsIn = (s: string) => [...s.matchAll(/url\(#([^)]+)\)/g)].map((m) => m[1])
+
+  it('suffixes every id it declares, and every reference still resolves', () => {
+    const svg = composeAvatar(
+      { ...cfg, base: 'b', hair: 'h', facialHair: 'f', fade: true },
+      masked('M 300 300 L 800 300 L 800 900 Z'),
+    )
+    const ids = idsIn(svg)
+    expect(ids.length, 'facehole, faceonly, facehole-front, beardfade').toBe(4)
+    for (const id of ids) expect(id, `${id} is not suffixed`).toMatch(/--[a-z0-9]+$/)
+    expect(new Set(ids).size, 'no id is declared twice in one document').toBe(ids.length)
+    const dangling = refsIn(svg).filter((r) => !ids.includes(r))
+    expect(dangling, 'every url(#..) must point at an id in the same document').toEqual([])
+  })
+
+  it('gives two different avatars no id in common — the actual bug', () => {
+    // Two DIFFERENT avatars on one page. Before the suffix both declared `facehole`, and the
+    // second one's masked <g> resolved to the first one's mask.
+    const a = composeAvatar({ ...cfg, base: 'b', hair: 'h' }, masked('M 300 300 L 800 300 L 800 900 Z'))
+    const b = composeAvatar({ ...cfg, base: 'b', hair: 'h' }, masked('M 300 300 L 700 300 L 700 950 Z'))
+    const shared = idsIn(a).filter((id) => idsIn(b).includes(id))
+    expect(shared, 'two avatars inlined together must not share an id').toEqual([])
+  })
+
+  it('composes the same bytes every time, or SSR and hydration disagree', () => {
+    // ⚠ This is why the suffix is a hash and not a counter or a random value: a counter makes
+    // the markup depend on call order, and either makes the server and the client emit
+    // different ids for the same avatar — a hydration mismatch on every one of them.
+    const c = { ...cfg, base: 'b', hair: 'h', facialHair: 'f', fade: true }
+    const A = masked('M 300 300 L 800 300 L 800 900 Z')
+    expect(composeAvatar(c, A)).toBe(composeAvatar(c, A))
+  })
+
+  it('leaves a document with no ids alone', () => {
+    const svg = composeAvatar(cfg, fixture())
+    expect(svg).not.toContain('id="')
+    expect(svg).not.toContain('--')
+  })
+
+  it('never lets two real avatars collide, across the whole shipped set', () => {
+    // The fixtures above are three paths each; this is the real thing. Every hair style on
+    // every base, with and without a beard — the population a leaderboard actually draws from.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const byId = new Map<string, string>()
+    let withIds = 0
+    for (const base of Object.keys(A.bases)) {
+      for (const hair of Object.keys(A.hair)) {
+        for (const facialHair of [null, 'fullbeard'] as const) {
+          const svg = composeAvatar({ ...cfg, base, hair, facialHair }, A)
+          const ids = idsIn(svg)
+          if (!ids.length) continue
+          withIds++
+          const suffix = ids[0].split('--').pop()!
+          for (const id of ids) {
+            expect(id.endsWith(`--${suffix}`), `${id} disagrees with its own document`).toBe(true)
+          }
+          const prev = byId.get(suffix)
+          // ⭐ Identical documents SHARING a suffix is fine and expected — they carry
+          // identical masks. Two DIFFERENT documents sharing one is the failure.
+          if (prev !== undefined) expect(prev, `suffix ${suffix} collides`).toBe(svg)
+          else byId.set(suffix, svg)
+        }
+      }
+    }
+    expect(withIds, 'the shipped set should produce plenty of masked avatars').toBeGreaterThan(50)
+  })
+
+  it('composes only ASCII — the three composers hash code units and must agree', () => {
+    // ⚠⚠ FNV-1a runs over code units, so JS charCodeAt and Python ord only agree while the
+    // document stays ASCII. A non-ASCII asset would make compose.py and compose.ts pick
+    // DIFFERENT suffixes for the same avatar, which the parity check would then report as a
+    // drift with no obvious cause. Catch it here instead.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    for (const hair of Object.keys(A.hair)) {
+      const svg = composeAvatar({ ...cfg, base: 'base-neck-100', hair, facialHair: 'fullbeard' }, A)
+      expect(/[^\x00-\x7F]/.test(svg), `${hair} composes a non-ASCII document`).toBe(false)
+    }
+  })
+
+  it('uses no reference form the pass does not rewrite', () => {
+    // The pass rewrites `id="…"` and `url(#…)`. `href="#…"` — <use>, a gradient inheriting
+    // another's stops, an animation target — would sail straight past it and re-introduce the
+    // bug silently. No asset uses one today; this fails the build on the day one does.
+    for (const dir of [HAIR, BASES, FACIALHAIR, EYES, MOUTHS, EXPRESSIONS]) {
+      for (const f of svgsIn(dir)) {
+        expect(f.body, `${f.name} uses href="#" — teach uniquifyIds about it`)
+          .not.toMatch(/href="#/)
+      }
+    }
+  })
+
+  it('carries the same pass in the Python composer and the builder port', () => {
+    // ⚠⚠ The third composer is type-checked by NOTHING. If the suffix drifts between the
+    // three, the pipeline and the product disagree about the bytes of the same avatar.
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must suffix its ids`).toMatch(/uniquify_?[iI]ds/)
+      expect(src, `${file} must use the same FNV-1a offset basis`).toContain('811')
+      expect(src, `${file} must use the same FNV-1a prime`).toContain('01000193')
+      expect(src, `${file} must mix the length in`).toMatch(/len\(s\)|s\.length/)
     }
   })
 })

@@ -50,27 +50,12 @@ const dAttrs = (frag: string) =>
   new Set([...frag.matchAll(/d="([^"]*)"/g)].map((m) => m[1]))
 
 /**
- * ⚠⚠ A composed avatar uses FIXED element ids — `facehole`, `facehole-front`, `faceonly`,
- * `beardfade`. Put two on one page and the browser resolves every `url(#facehole)` to the
- * FIRST definition in the document, so avatars 2..n silently borrow avatar 1's mask.
- *
- * It is not subtle. Several hair styles paint their mass as a full-canvas fill and rely
- * entirely on the mask to cut it to shape; handed the wrong mask, the tile floods with hair.
- * Caught here with six on one page — a leaderboard would hit it too.
- */
-function uniquifyIds(svg: string, n: number): string {
-  return svg
-    .replace(/id="([^"]+)"/g, (_, id) => `id="${id}--${n}"`)
-    .replace(/url\(#([^)]+)\)/g, (_, id) => `url(#${id}--${n})`)
-}
-
-/**
  * Wrap the eye and hair paths of a composed avatar so CSS can move them.
  *
  * ⚠ Matching is on `d`, never on fill: the recolour pass rewrites every fill, so the colour a
  * path ends up with tells you nothing about which asset it came from. `d` survives untouched.
  */
-function groupForMotion(svg: string, assets: AvatarAssets, cfg: AvatarConfig, idSuffix: number): string {
+function groupForMotion(svg: string, assets: AvatarAssets, cfg: AvatarConfig): string {
   const eyeFrag = cfg.eyes ? assets.eyes[cfg.eyes] ?? assets.specialEyes[cfg.eyes] ?? '' : ''
   const hairFrag = cfg.hair ? assets.hair[cfg.hair] ?? '' : ''
 
@@ -130,9 +115,11 @@ function groupForMotion(svg: string, assets: AvatarAssets, cfg: AvatarConfig, id
   //
   // ⚠ Match the mask ids EXACTLY. The face-only copy is `<g mask="faceonly">` wrapping another
   // `<g mask="facehole-front">`; tagging both would nest two rotations and double the angle.
+  // ⚠ The compositor suffixes every id per document, so the names are matched with the suffix
+  // left open. This page used to do that suffixing itself — it does not need to any more.
   if (/<g[^>]*mask="url\(#facehole/.test(hairFrag)) {
     out = out.replace(
-      new RegExp(`<g([^>]*mask="url\\(#(?:facehole|faceonly)--${idSuffix}\\)"[^>]*)>`, 'g'),
+      /<g([^>]*mask="url\(#(?:facehole|faceonly)--[a-z0-9]+\)"[^>]*)>/g,
       '<g class="av-hair"$1>',
     )
   } else {
@@ -168,8 +155,9 @@ export default function AvatarMotionHarness() {
     if (!assets) return []
     return CAST.map((c, i) => {
       const cfg = { ...BASE, ...c } as AvatarConfig
-      const composed = uniquifyIds(composeAvatar(cfg, assets), i)
-      return { name: c.name, i, svg: groupForMotion(composed, assets, cfg, i) }
+      // ⚠ No id munging here any more: composeAvatar suffixes its own ids per document, so
+      // six avatars on one page no longer share a mask. That was fixed in the compositor.
+      return { name: c.name, i, svg: groupForMotion(composeAvatar(cfg, assets), assets, cfg) }
     })
   }, [assets])
 

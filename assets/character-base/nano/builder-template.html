@@ -188,6 +188,31 @@ function findEars(doc){
   return out;
 }
 
+/* ⭐⭐ EVERY ID IN A COMPOSED DOCUMENT IS SUFFIXED — an id is scoped to the DOCUMENT and an
+   avatar is one element among many on a page. Two inline avatars and the browser resolves
+   every url(#facehole) to the FIRST definition, so avatars 2..n borrow avatar 1's mask and
+   the styles that rely wholly on it flood with hair.
+
+   The suffix is a hash of the document ITSELF: deterministic, so a config always composes to
+   the same bytes; drift-proof, because all three composers hash the same string; and safe to
+   collide, because only identical documents can, and those carry identical masks.
+   ⚠ This builder shows ONE avatar, so it does not need the fix — it carries it so the three
+   composers do not drift. See lib/avatar/compose.ts for the long form. */
+const idHash = s => {
+  // FNV-1a, 32-bit, over code units — for ASCII also the bytes, so this matches Python's ord.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(36) + s.length.toString(36);   // ⚠ the LENGTH rides along
+};
+// ⚠ (\s)id= and not \bid=, or an attribute merely ENDING in id — data-fade-id — is rewritten.
+function uniquifyIds(svg){
+  if (!svg.includes('id="')) return svg;
+  const uid = idHash(svg);
+  return svg
+    .replace(/(\s)id="([^"]+)"/g, (_, sp, id) => `${sp}id="${id}--${uid}"`)
+    .replace(/url\(#([^)]+)\)/g, (_, id) => `url(#${id}--${uid})`);
+}
+
 function compose(c){
   let svg = ASSETS.bases[c.base];
   const add = frag => { svg = svg.replace('</svg>', frag + '</svg>'); };
@@ -292,7 +317,8 @@ function compose(c){
   svg = swapAll(svg, T.shirt,  rgbStr(shirt));
   svg = swapAll(svg, T.shirt2, darken(shirt,0.9));
   svg = swapAll(svg, T.bg,     rgbStr(hex2rgb(c.bg)));
-  return svg;
+  // ⚠ LAST, over the finished document: until here the hair copy is renamed by literal id.
+  return uniquifyIds(svg);
 }
 
 /* ---- state ------------------------------------------------------------------------- */

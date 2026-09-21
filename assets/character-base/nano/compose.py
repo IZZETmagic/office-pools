@@ -140,6 +140,56 @@ def rgb_str(rgb) -> str:
     return "rgb({},{},{})".format(*rgb)
 
 
+# ⭐⭐ EVERY ID IN A COMPOSED DOCUMENT IS SUFFIXED, because an id is scoped to the DOCUMENT and
+# an avatar is not a document — it is one element among many on a page.
+#
+# A composed avatar declares up to four: `facehole` (the face cut-out every hair asset carries),
+# `facehole-front` (its renamed second copy), `faceonly` (the head silhouette) and `beardfade`.
+# Inline two avatars and the browser resolves every `url(#facehole)` to the FIRST definition in
+# the document, so avatars 2..n silently borrow avatar 1's mask.
+#
+# ⚠⚠ It is not subtle. Several hair styles paint their mass as a full-canvas fill and rely
+# entirely on the mask to cut it to shape; handed the wrong mask the tile FLOODS with hair.
+#
+# ⭐ THE SUFFIX IS A HASH OF THE DOCUMENT ITSELF — not a counter, not a random value. It is
+# deterministic (one config composes to the same bytes every time, so a server render and the
+# client render that hydrates it agree), drift-proof (all three composers hash the SAME string,
+# so they cannot disagree about the suffix unless they already disagree about the document), and
+# safe to collide (two documents share a suffix only when they are IDENTICAL, and identical
+# documents carry identical masks). See lib/avatar/compose.ts for the long form.
+def _b36(n: int) -> str:
+    """JS `n.toString(36)`: lowercase, unpadded, "0" for zero."""
+    if n == 0:
+        return "0"
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    out = ""
+    while n:
+        n, r = divmod(n, 36)
+        out = digits[r] + out
+    return out
+
+
+def id_hash(s: str) -> str:
+    # FNV-1a, 32-bit, over code units. For ASCII those are also the bytes, so Python ord and
+    # JS charCodeAt agree exactly — which is the whole reason the three composers land on the
+    # same suffix. A guard test asserts the composed document is ASCII.
+    h = 0x811C9DC5
+    for ch in s:
+        h = ((h ^ ord(ch)) * 0x01000193) & 0xFFFFFFFF
+    # ⚠ The LENGTH rides along; a collision then needs two documents agreeing on both.
+    return _b36(h) + _b36(len(s))
+
+
+def uniquify_ids(svg: str) -> str:
+    # ⚠ `(\s)id=` and not `\bid=`: a word boundary also sits inside `data-fade-id="…"`, so the
+    # looser pattern would rewrite an attribute that merely ENDS in id as though it were one.
+    if 'id="' not in svg:
+        return svg
+    uid = id_hash(svg)
+    svg = re.sub(r'(\s)id="([^"]+)"', lambda m: f'{m.group(1)}id="{m.group(2)}--{uid}"', svg)
+    return re.sub(r"url\(#([^)]+)\)", lambda m: f"url(#{m.group(1)}--{uid})", svg)
+
+
 def arg(name: str, default=None):
     return sys.argv[sys.argv.index(name) + 1] if name in sys.argv else default
 
@@ -471,6 +521,10 @@ def main() -> None:
         svg = svg.replace(f'fill="{BASE_SHIRT2}"', f'fill="{darken(rgb, 0.9)}"')
     if c := arg("--bg"):
         svg = svg.replace(f'fill="{BASE_BG}"', f'fill="{rgb_str(hex_to_rgb(c))}"')
+
+    # ⚠ LAST, over the finished document. Before this point the hair copy is still being
+    # renamed by literal id and the gradient is still referenced by name.
+    svg = uniquify_ids(svg)
 
     open(dst, "w").write(svg)
     print(f"{dst}")
