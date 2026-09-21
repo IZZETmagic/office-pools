@@ -410,9 +410,17 @@ def main() -> None:
         # shadow — see stubble_tone — which is the only thing that makes it read as stubble.
         if sk := arg("--skin"):
             svg = svg.replace(f'fill="{STUBBLE}"', f'fill="{stubble_tone(rgb, hex_to_rgb(sk))}"')
-        svg = svg.replace(f'fill="{HAIR_BASE}"', f'fill="{rgb_str(rgb)}"')
-        svg = svg.replace(f'fill="{HAIR_SHADE}"', f'fill="{darken(rgb)}"')
-        svg = svg.replace(f'fill="{HAIR_LIGHT}"', f'fill="{lighten(rgb)}"')
+        # ⚠⚠ STROKE as well as fill. Every hair path carries a hairline stroke of its own
+        # fill, which is how the tracer's butted edges are sealed — see seal-hair-seams.py.
+        # The stroke holds the same TOKEN, so swapping only the fill would leave grey-brown
+        # outlines on every recoloured avatar. A guard test pins all three compositors.
+        def swap_tone(doc: str, token: str, value: str) -> str:
+            return (doc.replace(f'fill="{token}"', f'fill="{value}"')
+                       .replace(f'stroke="{token}"', f'stroke="{value}"'))
+
+        svg = swap_tone(svg, HAIR_BASE, rgb_str(rgb))
+        svg = swap_tone(svg, HAIR_SHADE, darken(rgb))
+        svg = swap_tone(svg, HAIR_LIGHT, lighten(rgb))
     if c := arg("--skin"):
         rgb = hex_to_rgb(c)
         svg = svg.replace(f'fill="{BASE_SKIN}"', f'fill="{rgb_str(rgb)}"')

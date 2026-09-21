@@ -684,3 +684,60 @@ describe('long hair works on every neck width', () => {
     expect(on).toBeLessThan(Object.keys(A.hair).length)
   })
 })
+
+// =============================================================
+// Hair paths are sealed with a hairline stroke
+// =============================================================
+// The tracer butts same-colour shapes against each other, and two anti-aliased edges on one
+// line leak a light one-pixel crack. Ryan, 2026-09-20: "hairline breaking points that make it
+// look bad" — 17 of 27 styles, 1,613 crack pixels. Every hair path now carries a stroke of its
+// own fill, which makes the shapes OVERLAP instead of meet. See seal-hair-seams.py.
+// =============================================================
+
+describe('hair is sealed against hairline cracks', () => {
+  it('gives every hair path a stroke of its own fill', () => {
+    const offenders: string[] = []
+    for (const f of svgsIn(HAIR)) {
+      for (const m of f.body.matchAll(/<path[^>]*\/?>/g)) {
+        const p = m[0]
+        const fill = /fill="(rgb\([^)]*\))"/.exec(p)
+        if (!fill) continue // the mask's black silhouettes
+        const stroke = /stroke="(rgb\([^)]*\))"/.exec(p)
+        if (!stroke) offenders.push(`${f.name}: a path with no stroke`)
+        else if (stroke[1] !== fill[1]) offenders.push(`${f.name}: stroke ${stroke[1]} != fill ${fill[1]}`)
+        else if (!/stroke-width="1\.2"/.test(p)) offenders.push(`${f.name}: wrong stroke-width`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it('recolours the stroke, not just the fill', () => {
+    const svg = composeAvatar(
+      { ...cfg, hair: 'h' },
+      { ...fixture(), hair: { h: '<path d="M 1 1 L 2 2 Z" fill="rgb(140,122,110)" stroke="rgb(140,122,110)" stroke-width="1.2"/>' } },
+    )
+    expect(svg, 'the token must not survive as a stroke').not.toContain('stroke="rgb(140,122,110)"')
+    expect(svg, 'the stroke takes the hair colour').toContain('stroke="rgb(139,94,60)"')
+    expect(svg).toContain('fill="rgb(139,94,60)"')
+  })
+
+  it('keeps the stroke out of every other asset family', () => {
+    // ⚠ only HAIR is sealed this way. A stroke on a mouth or an iris would fatten a feature
+    // that was drawn at its final weight, and on facial hair it would fight the fade.
+    for (const dir of [BASES, EYES, MOUTHS, FACIALHAIR]) {
+      for (const f of svgsIn(dir)) {
+        expect(f.body, `${f.name} should not carry a stroke`).not.toContain('stroke="rgb(')
+      }
+    }
+  })
+
+  it('keeps the same stroke swap in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must swap stroke too`).toMatch(/stroke="/)
+    }
+  })
+})

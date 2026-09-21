@@ -189,7 +189,14 @@ const stubbleTone = (hair: RGB, skin: RGB) => {
   return rgbStr(m.map((v) => Math.trunc(v)))
 }
 
-const swap = (s: string, find: string, rep: string) => s.split(`fill="${find}"`).join(`fill="${rep}"`)
+/**
+ * ⚠⚠ ...and STROKE as well as fill. Every hair path carries a hairline stroke of its own
+ * fill, which is how the tracer's butted edges are sealed — see seal-hair-seams.py. The stroke
+ * holds the same TOKEN, so a recolour that only swapped fill would leave grey-brown outlines on
+ * every recoloured avatar.
+ */
+const swap = (s: string, find: string, rep: string) =>
+  s.split(`fill="${find}"`).join(`fill="${rep}"`).split(`stroke="${find}"`).join(`stroke="${rep}"`)
 
 /**
  * Locate the base's nose path BY SHAPE.

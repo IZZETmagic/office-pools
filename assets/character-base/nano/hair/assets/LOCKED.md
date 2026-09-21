@@ -289,3 +289,33 @@ once the base is behind it.
 
 Any style with a deliberate gap inside the hair silhouette has this problem. The fix is in the
 generation: the shapes must be fused into one continuous silhouette, not merely adjacent.
+
+## Sealed against hairline cracks (2026-09-20)
+
+⭐ Every path in every one of these assets now carries a **hairline stroke of its own fill**,
+`stroke-width="1.2"`. Nothing was re-traced and no outline moved.
+
+**Why.** The tracer cuts each shape to exactly its visible region and BUTTS it against its
+neighbour, so two same-colour shapes share an edge. Each anti-aliases against what is behind
+it, and 50% + 50% is 75%, not 100% — a one-pixel LIGHT line runs along the join. Ryan:
+*"in a lot of the long hair options there are hairline breaking points that make it look bad."*
+Measured across the set: **17 of 27 styles, 1,613 crack pixels**, worst `m13-manbun` at 377.
+It is the same defect the beard's sideburn joint had.
+
+**Result: 1,613 → 117 crack pixels, 93% gone**, for 217–1,879 bytes an asset. A backing shape
+was tried first and removed only three quarters of them at 7–10KB each; merging same-tone paths
+made two styles *worse* and moved silhouettes.
+
+⚠ 1.2, not more. The silhouette grows by 0.6 units — 0.3px at 1024, invisible. Wider closes the
+last handful and starts to fatten the art.
+
+⚠⚠ **The stroke carries a TOKEN**, so all three compositors must recolour `stroke="…"` as well
+as `fill="…"`. They do, and a guard test pins it; without that every recoloured avatar would
+keep grey-brown outlines.
+
+Re-run or verify with:
+
+```sh
+uv run ../../seal-hair-seams.py --check     # every path has its stroke
+shasum -a 256 -c LOCKED.sha256
+```

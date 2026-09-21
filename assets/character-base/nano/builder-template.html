@@ -132,7 +132,10 @@ const T = {
 // ⚠⚠ ADDITIVE, not a factor: ×1.14 gave +2.2 luminance on black hair (no separation) and
 // clamped platinum to pure white. A constant moves every swatch by the same amount.
 const BEARD_LIFT = 12;
-const swapAll = (s,find,rep) => s.split(`fill="${find}"`).join(`fill="${rep}"`);
+// ⚠⚠ stroke as well as fill: every hair path carries a hairline stroke of its own fill (see
+// seal-hair-seams.py), holding the same token, so fill-only would leave grey-brown outlines.
+const swapAll = (s,find,rep) =>
+  s.split(`fill="${find}"`).join(`fill="${rep}"`).split(`stroke="${find}"`).join(`stroke="${rep}"`);
 
 /* ---- find the base's nose, by shape ------------------------------------------------
    The ears share its exact tone and so does the neck shadow, so colour alone cannot do it.
