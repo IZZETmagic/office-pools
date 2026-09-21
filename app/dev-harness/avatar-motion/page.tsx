@@ -16,6 +16,7 @@
 // =============================================================
 
 import { useEffect, useMemo, useState } from 'react'
+import { notFound } from 'next/navigation'
 import { composeAvatar, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 
 /** Tokens as the assets carry them, before the recolour pass. */
@@ -145,6 +146,10 @@ function groupForMotion(svg: string, assets: AvatarAssets, cfg: AvatarConfig, id
 }
 
 export default function AvatarMotionHarness() {
+  // ⚠ 404 IN PRODUCTION. This is a routable path under `app/`, so without this it ships as a
+  // public page on sportpool.io. Same guard the other dev harnesses carry.
+  if (process.env.NODE_ENV === 'production') notFound()
+
   const [assets, setAssets] = useState<AvatarAssets | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [blink, setBlink] = useState(true)
