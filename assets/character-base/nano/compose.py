@@ -456,17 +456,24 @@ def main() -> None:
         # and a clear pair has no lens path at all. Nothing to keep in step.
         + ("" if tinted else part("--eyes")) + part("--brows")
         + (strip_eyes(expr_upper) if tinted else expr_upper)
-        # ⭐ EYEWEAR SITS OVER THE EYES AND UNDER THE HAIR. Over the eyes is not a choice.
-        # Under the hair is: a temple arm runs from the outer corner back to the ear bump and
-        # real arms disappear into hair, so a style that legitimately covers the ears
-        # (m15-locs, f09-midwavy) swallows the arm — which is what should happen.
-        # ⚠ No conflict with "the nose is always last": the eyes span y674-1026 and the nose
-        # starts at y954.7, so the bridge sits above it and the two never meet.
-        + part("--glasses")
         + (mouth if fh_over else "")
         + backfill + part("--hair") + front_body
         + (inner(fh).replace(f'fill="{HAIR_BASE}"', f'fill="{BEARD}"') if fh else "")
         + hair_front
+        # ⭐⭐ EYEWEAR GOES IN FRONT OF THE HAIR. Ryan, 2026-09-21: "The sunglasses should also
+        # be in front of some hair of some the hair assets."
+        #
+        # It first sat UNDER the hair, reasoning that a temple arm disappears into hair the way
+        # a real one does. Sound reasoning, wrong placement: the hair that covers eyewear is not
+        # mostly at the ear, it is at the TEMPLE, and the temple is inside the head. Measured
+        # against the head silhouette (x506..1534), 98.4-99.5% of every eyewear asset sits
+        # INSIDE it — only the arm tips fall outside. So no placement puts the lenses in front
+        # and leaves the arms behind; the choice is binary, and in front is the one that reads.
+        #
+        # ⭐ "Some hair assets" needs no per-style flag: putting eyewear in front only changes
+        # the styles whose hair actually reaches it, and a buzz cut never does.
+        # ⚠ Still BEFORE the nose, which stays last.
+        + part("--glasses")
         + ("" if fh_over else mouth)
         + (nose or "")
     ) + "</svg>")

@@ -489,12 +489,23 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       `<g mask="url(#faceonly)">${(A.hair[cfg.hair!] ?? '').split('facehole').join('facehole-front')}</g>`
     : ''
   const frontBody = cfg.hair ? A.frontBody?.[/(\d+)$/.exec(cfg.base)?.[1] ?? ''] ?? '' : ''
-  // ⭐ EYEWEAR SITS OVER THE EYES AND UNDER THE HAIR. Over the eyes is not a choice. Under the
-  // hair is: a temple arm runs from the outer corner back to the ear bump, and real arms
-  // disappear into hair — so the styles that legitimately cover the ears (m15-locs, f09-midwavy)
-  // swallow the arm, which is what should happen.
-  // ⚠ No conflict with "the nose is always last": the eyes span y674-1026 and the nose starts
-  // at y954.7, so the bridge sits above it and the two never meet.
+  // ⭐⭐ EYEWEAR GOES IN FRONT OF THE HAIR. Ryan, 2026-09-21: "The sunglasses should also be in
+  // front of some hair of some the hair assets."
+  //
+  // It first sat UNDER the hair, on the reasoning that a temple arm disappears into hair the way
+  // a real one does. That reasoning was sound and the placement still wrong, because the hair
+  // that covers eyewear is not mostly at the ear: it is at the TEMPLE, and the temple is inside
+  // the head. Measured against the head silhouette (x506..1534), 98.4-99.5% of every eyewear
+  // asset sits INSIDE it — only the arm tips beyond the head's own edge fall outside. So there
+  // was never a placement that put the lenses in front and left the arms behind; the choice is
+  // binary, and in front is the one that reads.
+  //
+  // ⭐ "Some hair assets" is satisfied by a single global move: putting eyewear in front only
+  // changes the styles whose hair actually reaches it — 13.4% of the lens zone on the bob's
+  // fringe, nothing at all on a buzz cut.
+  //
+  // ⚠ Still BEFORE the nose, which stays last: the eyes span y674-1026 and the nose starts at
+  // y954.7, so the bridge is above it and the two never meet.
   const glassesLayer = cfg.glasses ? A.glasses?.[cfg.glasses] ?? '' : ''
 
   // ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset rather
@@ -509,13 +520,13 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
     ears.join('') +
       eyeLayer +
       (tinted ? stripEyes(exprUpper) : exprUpper) +
-      glassesLayer +
       (fhOver ? mouthLayer : '') +
       backfill +
       (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
       frontBody +
       (fh ? swap(fh, T.hairBase, T.beard) : '') +
       hairFront +
+      glassesLayer +
       (fhOver ? '' : mouthLayer) +
       (nose || ''),
   )

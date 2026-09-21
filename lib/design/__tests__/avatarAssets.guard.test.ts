@@ -1023,13 +1023,56 @@ describe('eyewear', () => {
     }
   })
 
-  it('sits over the eyes and under the hair', () => {
+  it('sits over the eyes AND over the hair', () => {
+    // ⭐⭐ Eyewear was under the hair at first, on the reasoning that a temple arm disappears
+    // into hair the way a real one does. Ryan, 2026-09-21: "The sunglasses should also be in
+    // front of some hair of some the hair assets." The reasoning was sound and the placement
+    // wrong — the hair that covers eyewear is at the TEMPLE, not the ear, and 98.4-99.5% of
+    // every eyewear asset sits inside the head silhouette, so no order fronts the lenses and
+    // leaves the arms behind. ⚠ The nose still comes last.
     const svg = composeAvatar({ ...base, hair: 'h' }, eyewearFixture(false))
     const eye = svg.indexOf(`d="${D_EYE}"`)
-    const frame = svg.indexOf(`d="${D_FRAME}"`)
     const hair = svg.indexOf(`d="${D_HAIR5}"`)
+    const frame = svg.indexOf(`d="${D_FRAME}"`)
     expect(eye, 'the eye is painted first').toBeLessThan(frame)
-    expect(frame, 'the hair covers the temple arm, not the other way round').toBeLessThan(hair)
+    expect(hair, 'the eyewear goes over the hair, not under it').toBeLessThan(frame)
+  })
+
+  it('still lets the nose come last', () => {
+    // The bridge sits above the nose (eyes y674-1026, nose starts y954.7) so they never meet —
+    // but the rule that a raised moustache must not swallow the nose tip is not negotiable, and
+    // eyewear moved later in the stack is exactly the kind of change that could break it.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const svg = composeAvatar(
+      { ...cfg, base: 'base-neck-100', hair: 'm03-quiff', facialHair: 'moustache',
+        glasses: 's01-classic' }, A,
+    )
+    // ⚠ The nose is found the way compose finds it — by SHAPE in the base, narrow and centred
+    // in the upper middle. Matching on the recoloured fill would depend on the skin swatch, and
+    // a fallback that silently picks "the last path" would make this test pass vacuously.
+    const baseSvg = readFileSync(
+      join(process.cwd(), 'assets/character-base/nano/bases/base-neck-100.svg'), 'utf8')
+    let noseD = ''
+    for (const m of baseSvg.matchAll(/<path[^>]*\/?>/g)) {
+      if (!m[0].includes('fill="rgb(245,178,150)"')) continue
+      const d = /d="([^"]*)"/.exec(m[0])?.[1] ?? ''
+      const n = (d.match(/-?\d+\.?\d*/g) ?? []).map(Number)
+      const xs = n.filter((_, i) => i % 2 === 0)
+      const ys = n.filter((_, i) => i % 2 === 1)
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+      if (Math.max(...xs) - Math.min(...xs) < 200 && cx > 900 && cx < 1150
+          && Math.min(...ys) > 900 && Math.min(...ys) < 1200) noseD = d
+    }
+    expect(noseD, 'the nose should be findable in the base').not.toBe('')
+    const nose = svg.indexOf(`d="${noseD}"`)
+    expect(nose, 'the nose should be in the composed document').toBeGreaterThan(-1)
+    const lastGlass = Math.max(
+      ...[...A.glasses!['s01-classic'].matchAll(/d="([^"]*)"/g)].map((m) => svg.indexOf(`d="${m[1]}"`)),
+    )
+    expect(lastGlass, 'the eyewear should be in the document').toBeGreaterThan(-1)
+    expect(nose, 'the nose is still painted after the eyewear').toBeGreaterThan(lastGlass)
   })
 
   it('adds nothing when no eyewear is chosen', () => {

@@ -305,10 +305,14 @@ function compose(c){
   const mouthLayer = ((c.mode !== 'expression' && c.mouth) ? ASSETS.mouths[c.mouth] : '') + lower.join('');
 
   add(ears.join('')
-      + eyes + (tinted ? stripEyes(upper.join('')) : upper.join('')) + glassesLayer
+      + eyes + (tinted ? stripEyes(upper.join('')) : upper.join(''))
       + (fhOver ? mouthLayer : '')
       + backfill + (c.hair ? ASSETS.hair[c.hair] : '') + frontBody
       + (fh ? swapAll(fh, T.hairBase, T.beard) : '') + hairFront
+      // ⭐⭐ eyewear goes IN FRONT of the hair — 98.4-99.5% of every eyewear asset sits inside
+      // the head silhouette, temple included, so there is no placement that fronts the lenses
+      // and leaves the arms behind. See compose.ts for the measurement.
+      + glassesLayer
       + (fhOver ? '' : mouthLayer)
       + (nose || ''));
 
