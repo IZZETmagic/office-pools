@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './auth';
+import { poolNeedsPredictions } from './needsPredictions';
 import { supabase } from './supabase';
 import {
   fetchHomeScoring,
@@ -70,6 +71,10 @@ export type PoolSummary = {
   // pool's best entry has `entry_round_submissions.has_submitted = false`,
   // the user still needs to predict for that round even though the entry's
   // top-level `has_submitted_predictions` may be true from an earlier round.
+  //
+  // ⚠ AND FOR A LEAGUE POOL IT IS THE SERVER'S ANSWER, not either of those.
+  // See the note at the assignment: nothing writes
+  // `pool_entries.has_submitted_predictions` for a league.
   needsPredictions: boolean;
   predictionsCompleted: number;
   predictionsTotal: number;
@@ -595,12 +600,20 @@ export function useHomeDataInternal() {
             // entry lists), so this guard only changes behavior for the
             // full / bracket branch — but applying it uniformly keeps the
             // semantics obvious to future readers.
-            needsPredictions:
-              entries.length === 0
-                ? false
-                : pool.prediction_mode === 'progressive'
-                  ? progressiveNeedsPredictions[pool.pool_id] ?? false
-                  : !(best?.has_submitted_predictions ?? false),
+            //
+            // ⚠ AND A LEAGUE POOL'S ANSWER IS THE SERVER'S. The rule moved to
+            // lib/needsPredictions, which is where the reasoning is written
+            // down and the only place it can be tested — nothing in this hook
+            // can be imported by vitest. The short version: no league flow
+            // writes `has_submitted_predictions`, so the branch this replaced
+            // said "Predictions needed" for every league pool for ever.
+            needsPredictions: poolNeedsPredictions({
+              entryCount: entries.length,
+              predictionMode: pool.prediction_mode,
+              leagueHasSubmitted: poolFacts?.[pool.pool_id]?.hasSubmitted ?? null,
+              progressiveUnsubmitted: progressiveNeedsPredictions[pool.pool_id] ?? false,
+              entryHasSubmitted: best?.has_submitted_predictions ?? false,
+            }),
             // ⚠ THE UNIT DIFFERS BY COMPETITION, and the server decides it for
             // a league. A World Cup ring counts the whole tournament; a league
             // ring counts the OPEN MATCHWEEK, because "12 of 380" is true and
