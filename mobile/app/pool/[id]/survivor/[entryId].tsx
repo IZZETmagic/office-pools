@@ -6,6 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Icon, Text } from '@/components/ui';
 import { fetchLmsState, saveLmsPick, type LmsState } from '@/lib/api';
+import { useHomeData } from '@/lib/HomeDataProvider';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -100,6 +101,10 @@ function Content({
 }) {
   const theme = useTheme();
   const qc = useQueryClient();
+  // ⚠ THE POOLS TAB IS NOT ON THIS QUERY CLIENT. The dashboard lives in
+  // `useHomeData`, a hand-rolled hook behind its own provider, so invalidating
+  // a react-query key below does nothing to the card that sent you here.
+  const { refresh: refreshHome } = useHomeData();
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [pending, setPending] = useState<string | null>(null);
 
@@ -125,6 +130,28 @@ function Content({
       // starts disagreeing with the database.
       await qc.invalidateQueries({ queryKey: ['lms', poolId] });
       await qc.invalidateQueries({ queryKey: ['pool-detail', poolId] });
+      // The pool card you came from. Its prediction pill and Picks ring are
+      // both answers to "have you decided yet", and until this call landed
+      // nothing told them the answer had changed: the Pools tab only refetches
+      // on focus, and only when its cache is already older than 30s. Pick a
+      // club, tap back inside that window, and the card still said you owed
+      // one. The save finishes well before anyone can navigate, so the card is
+      // right by the time it is on screen.
+      //
+      // ⚠ A REFETCH, NOT A LOCAL PATCH, and the difference is the mode. An
+      // optimistic setter would have to say what "saved" MEANS — for Last Man
+      // Standing and Table it is the whole decision, for Pick'em it is one
+      // fixture of ten — so it would bake in this screen's answer and be
+      // wrong at the first other caller. It would also leave the Clubs tile
+      // beside it stale, which is the same "one card, two answers" the pill
+      // was fixed for. Asking the server costs a round trip nobody is waiting
+      // on and cannot drift.
+      //
+      // ⚠ NOT AWAITED. `refreshIfStale` and pull-to-refresh both tolerate a
+      // failure here by fetching later, and the "Saved" message must not wait
+      // on the dashboard. ⚠ No spinner flashes: both tabs bind their
+      // RefreshControl to `useManualRefresh`, which only flips on a real pull.
+      void Promise.resolve(refreshHome());
     },
     onError: (e) =>
       setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'That pick could not be saved.' }),
