@@ -29,6 +29,8 @@ export type AvatarAssets = {
   hairBackfill?: Record<string, string>
   hairManifest?: Record<string, boolean>
   facialhair: Record<string, string>
+  /** Eyewear — glasses and sunglasses. Optional so older fixtures still compose. */
+  glasses?: Record<string, string>
   eyes: Record<string, string>
   specialEyes: Record<string, string>
   mouths: Record<string, string>
@@ -41,6 +43,7 @@ export type AvatarConfig = {
   hair: string | null
   hairColour: string
   facialHair: string | null
+  glasses?: string | null
   /** Whole-face expression. Mutually exclusive with eyes+mouth. */
   expression?: string | null
   eyes?: string | null
@@ -49,6 +52,8 @@ export type AvatarConfig = {
   mouthColour: string
   shirt: string
   background: string
+  /** Eyewear frame. One input drives the lens too — see LENS_TOWARD_GLASS. */
+  frameColour?: string
   /**
    * ⚠⚠ BACK-OUT: the beard fade is behind this flag and defaults to OFF. With it off the
    * fade token is swapped for the flat hair colour — exactly what this did before the
@@ -106,6 +111,18 @@ const T = {
    * obvious rather than silently plausible. It must never reach the output.
    */
   beard: 'rgb(110,150,126)',
+  /**
+   * ⭐ EYEWEAR, two tokens from one input. The frame takes `frameColour` verbatim and the lens
+   * is derived from it, the same shape as the iris (core + rim from one colour) and the mouth
+   * (ink + interior + tongue from one). `AVATAR_CONFIG.md` is explicit about why: "ask whether
+   * it is a parameter" — 5 frames x 6 colours is 5 assets and 6 values, never 30 assets.
+   *
+   * ⚠ A CLEAR pair has no lens path at all. The opening is cut out of the frame for real (see
+   * extract-glasses.py), because eyewear composes OVER the eyes and anything opaque there
+   * hides them. Only tinted styles carry the lens token.
+   */
+  frameInk: 'rgb(64,70,78)',
+  lensTint: 'rgb(96,126,156)',
 } as const
 
 /**
@@ -121,6 +138,24 @@ const T = {
  * the +8.3 approved on the default swatch and enough to read on black.
  */
 const BEARD_LIFT = 12
+
+/**
+ * ⚠⚠ A LENS LEANS TOWARD GLASS, it is not the frame lightened. Measured off the approved
+ * generation: frame rgb(56,63,70) with lens rgb(92,125,155) — the lens is 59 luminance above
+ * the frame AND bluer, because it is tinted glass rather than a paler frame.
+ *
+ * Lightening by a constant reproduces that on a black frame and falls apart everywhere else:
+ * on the gold swatch it gave a pale primrose yellow that read as a novelty, not a lens. Mixing
+ * toward a fixed glass tint keeps every frame colour in the same family — gold lands on a
+ * muted olive-grey, which is what gold-framed sunglasses actually look like.
+ *
+ * Same lesson as BEARD_LIFT and the stubble floor: fix the RELATIONSHIP, never scale the input.
+ */
+const GLASS: RGB = [120, 162, 205]
+const LENS_TOWARD_GLASS = 0.58
+
+/** The frame colour used when a config names eyewear but no colour. */
+const DEFAULT_FRAME = '#22262E'
 
 const FADE_ID = 'beardfade'
 
@@ -427,6 +462,13 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
     : ''
   const frontBody = cfg.hair ? A.frontBody?.[/(\d+)$/.exec(cfg.base)?.[1] ?? ''] ?? '' : ''
   const eyeLayer = cfg.eyes ? A.eyes[cfg.eyes] ?? A.specialEyes[cfg.eyes] ?? '' : ''
+  // ⭐ EYEWEAR SITS OVER THE EYES AND UNDER THE HAIR. Over the eyes is not a choice. Under the
+  // hair is: a temple arm runs from the outer corner back to the ear bump, and real arms
+  // disappear into hair — so the styles that legitimately cover the ears (m15-locs, f09-midwavy)
+  // swallow the arm, which is what should happen.
+  // ⚠ No conflict with "the nose is always last": the eyes span y674-1026 and the nose starts
+  // at y954.7, so the bridge sits above it and the two never meet.
+  const glassesLayer = cfg.glasses ? A.glasses?.[cfg.glasses] ?? '' : ''
   // ⚠ not `mouth` — phase 2 binds that name to the mouth COLOUR.
   const mouthLayer = (cfg.mouth ? A.mouths[cfg.mouth] ?? '' : '') + exprLower
 
@@ -434,6 +476,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
     ears.join('') +
       eyeLayer +
       exprUpper +
+      glassesLayer +
       (fhOver ? mouthLayer : '') +
       backfill +
       (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
@@ -496,6 +539,12 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
     }
   }
 
+  if (svg.includes(T.frameInk) || svg.includes(T.lensTint)) {
+    const frame = hex2rgb(cfg.frameColour ?? DEFAULT_FRAME)
+    svg = swap(svg, T.frameInk, rgbStr(frame))
+    svg = swap(svg, T.lensTint, mix(frame, GLASS, LENS_TOWARD_GLASS))
+  }
+
   svg = swap(svg, T.browInk, darken(hair, 0.82)) // brows track hair, not skin
   svg = swap(svg, T.stubble, stubbleTone(hair, skin))
   svg = swap(svg, T.hairBase, rgbStr(hair))
@@ -523,4 +572,5 @@ export const PALETTE = {
   mouth: ['#B67A70', '#C4736B', '#A85E58', '#D08A82'],
   shirt: ['#3B6EFF', '#16A34A', '#C2410C', '#7C3AED', '#0F766E', '#DB2777', '#111827', '#F59E0B'],
   background: ['#FFFFFF', '#EEF2FF', '#ECFDF5', '#FEF3C7', '#FCE7F3', '#F3F4F6'],
+  frame: ['#22262E', '#6B4A2F', '#C9A227', '#9AA3AD', '#1F3A64', '#B36A72'],
 } as const

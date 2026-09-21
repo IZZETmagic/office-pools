@@ -35,6 +35,26 @@ BROW_INK = "rgb(101,70,52)"
 BLUSH = "rgb(240,158,138)"
 STUBBLE = "rgb(164,150,140)"
 
+# ⭐ EYEWEAR, two tokens from one input. The frame takes --frame-colour verbatim and the lens is
+# derived from it, the same shape as the iris (core + rim from one colour) and the mouth (ink +
+# interior + tongue from one). AVATAR_CONFIG.md: "ask whether it is a parameter" — 5 frames x 6
+# colours is 5 assets and 6 values, never 30 assets.
+#
+# ⚠ A CLEAR pair has no lens path at all: the opening is cut out of the frame for real (see
+# extract-glasses.py), because eyewear composes OVER the eyes and anything opaque there hides
+# them. Only tinted styles carry the lens token.
+FRAME_INK = "rgb(64,70,78)"
+LENS_TINT = "rgb(96,126,156)"
+
+# ⚠⚠ A LENS LEANS TOWARD GLASS, it is not the frame lightened. Measured off the approved
+# generation: frame rgb(56,63,70) with lens rgb(92,125,155) — 59 luminance above the frame AND
+# bluer, because it is tinted glass and not a paler frame. Lightening by a constant reproduces
+# that on a black frame and falls apart elsewhere: on gold it gave a pale primrose that read as
+# a novelty. Mixing toward a fixed glass tint keeps every frame in the same family.
+GLASS = (120, 162, 205)
+LENS_TOWARD_GLASS = 0.58
+DEFAULT_FRAME = "#22262E"
+
 # Stubble is a SHADOW on the skin, not a short beard. Measured off the art Ryan approved on
 # 2026-09-18: 84% of the way from the beard to the skin in lightness, and clearly greyer than
 # the hair-to-skin line. A plain 55% mix gave a mid brown that read as a lighter full beard.
@@ -409,6 +429,13 @@ def main() -> None:
     svg = svg.replace("</svg>", (
         "".join(ears)
         + part("--eyes") + part("--brows") + expr_upper
+        # ⭐ EYEWEAR SITS OVER THE EYES AND UNDER THE HAIR. Over the eyes is not a choice.
+        # Under the hair is: a temple arm runs from the outer corner back to the ear bump and
+        # real arms disappear into hair, so a style that legitimately covers the ears
+        # (m15-locs, f09-midwavy) swallows the arm — which is what should happen.
+        # ⚠ No conflict with "the nose is always last": the eyes span y674-1026 and the nose
+        # starts at y954.7, so the bridge sits above it and the two never meet.
+        + part("--glasses")
         + (mouth if fh_over else "")
         + backfill + part("--hair") + front_body
         + (inner(fh).replace(f'fill="{HAIR_BASE}"', f'fill="{BEARD}"') if fh else "")
@@ -436,6 +463,12 @@ def main() -> None:
     # Brows default to the HAIR colour, darkened. Real brows track hair, and a bald avatar
     # still needs them coloured — so the token is the brow's own, not hair's, and the default
     # is derived rather than shared. --brow-colour overrides for dyed hair or grey.
+    if FRAME_INK in svg or LENS_TINT in svg:
+        fr = hex_to_rgb(arg("--frame-colour") or DEFAULT_FRAME)
+        svg = svg.replace(f'fill="{FRAME_INK}"', f'fill="{rgb_str(fr)}"')
+        lens = tuple(int(a + (b - a) * LENS_TOWARD_GLASS) for a, b in zip(fr, GLASS))
+        svg = svg.replace(f'fill="{LENS_TINT}"', f'fill="{rgb_str(lens)}"')
+
     if c := (arg("--brow-colour") or arg("--hair-colour")):
         svg = svg.replace(f'fill="{BROW_INK}"', f'fill="{darken(hex_to_rgb(c), 0.82)}"')
 

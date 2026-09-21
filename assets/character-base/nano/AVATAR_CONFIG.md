@@ -18,6 +18,11 @@ What gets stored per member. **A config, never an image.**
   "mouth":      "mouth-02-smile", // 10 assets
   "mouthColour": "#B67A70",       // optional; drives lip, interior and tongue
 
+  "facialHair": null,              // null for clean-shaven; see facialhair/manifest.json
+
+  "glasses":    null,              // null for none; "g.." clear, "s.." tinted
+  "frameColour": "#22262E",        // drives the frame AND the lens derived from it
+
   "shirt":      "#3B6EFF",
   "background": "#FFFFFF"
 }

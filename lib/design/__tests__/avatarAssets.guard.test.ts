@@ -46,6 +46,7 @@ const HAIR = 'assets/character-base/nano/hair/assets'
 const EYES = 'assets/character-base/nano/eyes/assets'
 const MOUTHS = 'assets/character-base/nano/mouths/assets'
 const FACIALHAIR = 'assets/character-base/nano/facialhair/assets'
+const GLASSES = 'assets/character-base/nano/glasses/assets'
 
 /** Recraft emits this on every path; it is a no-op and the locked assets carry it. */
 const GRANDFATHERED = 'translate(0,0)'
@@ -73,7 +74,8 @@ const svgsIn = (dir: string) =>
 describe('avatar assets stay cross-platform', () => {
   it('uses no transform that react-native-svg would silently drop', () => {
     const offenders: string[] = []
-    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES), ...svgsIn(MOUTHS)]) {
+    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES), ...svgsIn(MOUTHS),
+                     ...svgsIn(GLASSES)]) {
       for (const m of f.body.matchAll(/transform="([^"]*)"/g)) {
         if (m[1].replace(/\s/g, '') !== GRANDFATHERED) offenders.push(`${f.name}: ${m[1]}`)
       }
@@ -82,7 +84,8 @@ describe('avatar assets stay cross-platform', () => {
   })
 
   it('keeps every asset in the base coordinate space', () => {
-    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES), ...svgsIn(MOUTHS)]) {
+    for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES), ...svgsIn(MOUTHS),
+                     ...svgsIn(GLASSES)]) {
       expect(f.body, `${f.name} must declare ${VIEWBOX}`).toContain(VIEWBOX)
     }
   })
@@ -118,7 +121,7 @@ describe('avatar assets stay cross-platform', () => {
   })
 
   it('has not altered a locked file', () => {
-    for (const dir of [BASES, HAIR, EYES, MOUTHS, FACIALHAIR]) {
+    for (const dir of [BASES, HAIR, EYES, MOUTHS, FACIALHAIR, GLASSES]) {
       const manifest = resolve(ROOT, dir, 'LOCKED.sha256')
       if (!existsSync(manifest)) continue
       for (const line of readFileSync(manifest, 'utf8').trim().split('\n')) {
@@ -731,7 +734,7 @@ describe('hair is sealed against hairline cracks', () => {
   it('keeps the stroke out of every other asset family', () => {
     // ⚠ only HAIR is sealed this way. A stroke on a mouth or an iris would fatten a feature
     // that was drawn at its final weight, and on facial hair it would fight the fade.
-    for (const dir of [BASES, EYES, MOUTHS, FACIALHAIR]) {
+    for (const dir of [BASES, EYES, MOUTHS, FACIALHAIR, GLASSES]) {
       for (const f of svgsIn(dir)) {
         expect(f.body, `${f.name} should not carry a stroke`).not.toContain('stroke="rgb(')
       }
@@ -942,7 +945,7 @@ describe('ids are scoped to the document', () => {
     // The pass rewrites `id="…"` and `url(#…)`. `href="#…"` — <use>, a gradient inheriting
     // another's stops, an animation target — would sail straight past it and re-introduce the
     // bug silently. No asset uses one today; this fails the build on the day one does.
-    for (const dir of [HAIR, BASES, FACIALHAIR, EYES, MOUTHS, EXPRESSIONS]) {
+    for (const dir of [HAIR, BASES, FACIALHAIR, EYES, MOUTHS, EXPRESSIONS, GLASSES]) {
       for (const f of svgsIn(dir)) {
         expect(f.body, `${f.name} uses href="#" — teach uniquifyIds about it`)
           .not.toMatch(/href="#/)
@@ -962,6 +965,116 @@ describe('ids are scoped to the document', () => {
       expect(src, `${file} must use the same FNV-1a offset basis`).toContain('811')
       expect(src, `${file} must use the same FNV-1a prime`).toContain('01000193')
       expect(src, `${file} must mix the length in`).toMatch(/len\(s\)|s\.length/)
+    }
+  })
+})
+
+// =============================================================
+// Eyewear — glasses and sunglasses
+// =============================================================
+// The first accessory family. Two things about it are load-bearing and neither is obvious from
+// looking at an asset:
+//
+// ⭐⭐ THE LENS OPENING IS A REAL HOLE. A trace is a jigsaw: the vectorizer paints the frame as
+// a SOLID blob and butts the openings back over it as skin-coloured discs. extract-glasses.py
+// subtracts them for real, because eyewear composes OVER the eyes and anything opaque there
+// hides them. Take the frame path alone and every pair of spectacles is filled in.
+//
+// ⭐ IT SITS OVER THE EYES AND UNDER THE HAIR. Over the eyes is not a choice. Under the hair is:
+// a temple arm runs back to the ear bump, and real arms disappear into hair.
+// =============================================================
+
+describe('eyewear', () => {
+  const D_EYE = 'M 700 700 L 980 700 L 980 1020 Z'
+  const D_FRAME = 'M 500 720 L 1550 720 L 1550 1080 Z'
+  const D_LENS = 'M 560 760 L 950 760 L 950 1040 Z'
+  const D_HAIR5 = 'M 300 300 L 800 300 L 800 900 Z'
+  const FRAME_INK = 'rgb(64,70,78)'
+  const LENS_TINT = 'rgb(96,126,156)'
+
+  const eyewearFixture = (tinted: boolean): AvatarAssets => ({
+    ...fixture(),
+    bases: { b: '<svg viewBox="0 0 2048 2048"><path d="M 0 0 L 1 0 L 1 1 Z" fill="rgb(254,205,180)"/></svg>' },
+    eyes: { e: `<path d="${D_EYE}" fill="rgb(255,255,255)"/>` },
+    hair: { h: `<path d="${D_HAIR5}" fill="rgb(140,122,110)"/>` },
+    glasses: {
+      g: `<path d="${D_FRAME}" fill="${FRAME_INK}"/>` +
+         (tinted ? `<path d="${D_LENS}" fill="${LENS_TINT}"/>` : ''),
+    },
+  })
+
+  const base = { ...cfg, base: 'b', facialHair: null, eyes: 'e', glasses: 'g', frameColour: '#22262E' }
+
+  it('paints the frame in the chosen colour, and the lens derived from it', () => {
+    const svg = composeAvatar({ ...base, glasses: 'g' }, eyewearFixture(true))
+    expect(svg, 'the frame takes the input verbatim').toContain('fill="rgb(34,38,46)"')
+    // mix(#22262E, GLASS rgb(120,162,205), 0.58) — one input drives both
+    expect(svg, 'the lens leans toward glass, it is not the frame lightened')
+      .toContain('fill="rgb(83,109,138)"')
+  })
+
+  it('never lets either token reach the output, on any frame in the palette', () => {
+    for (const frameColour of PALETTE.frame) {
+      for (const tinted of [true, false]) {
+        const svg = composeAvatar({ ...base, frameColour }, eyewearFixture(tinted))
+        expect(svg, `${frameColour}: the frame marker leaked`).not.toContain(FRAME_INK)
+        expect(svg, `${frameColour}: the lens marker leaked`).not.toContain(LENS_TINT)
+      }
+    }
+  })
+
+  it('sits over the eyes and under the hair', () => {
+    const svg = composeAvatar({ ...base, hair: 'h' }, eyewearFixture(false))
+    const eye = svg.indexOf(`d="${D_EYE}"`)
+    const frame = svg.indexOf(`d="${D_FRAME}"`)
+    const hair = svg.indexOf(`d="${D_HAIR5}"`)
+    expect(eye, 'the eye is painted first').toBeLessThan(frame)
+    expect(frame, 'the hair covers the temple arm, not the other way round').toBeLessThan(hair)
+  })
+
+  it('adds nothing when no eyewear is chosen', () => {
+    const svg = composeAvatar({ ...base, glasses: null }, eyewearFixture(true))
+    expect(svg).not.toContain(`d="${D_FRAME}"`)
+    expect(svg).not.toContain(FRAME_INK)
+  })
+
+  it('cuts a real hole in every clear style, and none in a tinted one', () => {
+    // ⭐⭐ The whole reason extract-glasses.py does a boolean subtraction. A clear frame whose
+    // interior is solid renders as two opaque discs over the eyes — which is what taking the
+    // traced frame path at face value gives you. A hole shows as an INTERIOR RING in the path
+    // data: shapely emits it as a second subpath, so a holed frame has more than one 'M'.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const styles = Object.keys(A.glasses ?? {})
+    expect(styles.length, 'the eyewear family should be bundled').toBeGreaterThan(0)
+    for (const k of styles) {
+      const frag = A.glasses![k]
+      const tinted = frag.includes(LENS_TINT)
+      const framePath = /<path[^>]*fill="rgb\(64,70,78\)"[^>]*d="([^"]*)"/.exec(frag)
+        ?? /d="([^"]*)"[^>]*fill="rgb\(64,70,78\)"/.exec(frag)
+      expect(framePath, `${k} has no frame path`).toBeTruthy()
+      const subpaths = (framePath![1].match(/M /g) ?? []).length
+      if (tinted) {
+        expect(frag, `${k} is tinted so it must carry a lens`).toContain(LENS_TINT)
+      } else {
+        expect(subpaths, `${k} is clear but its frame has no opening cut out`).toBeGreaterThan(1)
+      }
+    }
+  })
+
+  it('keeps the same lens derivation in the Python composer and the builder port', () => {
+    // ⚠⚠ The builder is type-checked by nothing, and a builder that lies about the product's
+    // colour is worse than no builder.
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must carry the frame token`).toContain('64,70,78')
+      expect(src, `${file} must carry the lens token`).toContain('96,126,156')
+      expect(src, `${file} must mix toward the same glass tint`).toMatch(/120,\s*162,\s*205/)
+      expect(src, `${file} must use the same coefficient`).toContain('0.58')
     }
   })
 })
