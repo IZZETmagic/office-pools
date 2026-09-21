@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Showdown chips — where they land on the Duel tab</title>
+<style>
+:root{
+  --snow:#121520; --surface:#1C2030; --mist:#232840; --silver:#2E3448;
+  --slate:#8B97B8; --ink:#E8EAF0; --midnight:#0B0F1A;
+  --primary:#5B8AFF; --primaryLight:#1A2440;
+  --accent:#F5C518; --accentLight:#2A2210;
+  --green:#34D972; --red:#F87171; --amber:#FBBF24;
+  --tierExact:#E2B830;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#07090F;color:var(--ink);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+  padding:40px 24px 80px}
+.wrap{max-width:1500px;margin:0 auto}
+h1{font-size:26px;letter-spacing:-.02em;margin-bottom:6px}
+.sub{color:var(--slate);margin-bottom:8px;max-width:820px}
+.stamp{color:#5A648A;font-size:12px;margin-bottom:34px}
+h2{font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--slate);
+  margin:44px 0 18px;padding-bottom:10px;border-bottom:1px solid var(--silver)}
+
+/* ---------- phone ---------- */
+.rail{display:flex;gap:26px;overflow-x:auto;padding-bottom:18px;align-items:flex-start}
+.col{flex:0 0 310px}
+.cap{font-size:12px;color:var(--slate);margin-bottom:10px;height:34px}
+.cap b{color:var(--ink);display:block;font-size:13px}
+.phone{width:310px;background:var(--snow);border:1px solid var(--silver);
+  border-radius:26px;overflow:hidden}
+
+/* the band — dark in BOTH themes */
+.band{background:var(--midnight);padding:10px 8px 0}
+.chrome{display:flex;align-items:center;justify-content:space-between;height:34px;
+  color:var(--slate);font-size:11px}
+.chrome .nm{color:#fff;font-size:13px;font-weight:600}
+.mwk{text-align:center;color:var(--slate);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;margin:2px 0 8px}
+.matchup{display:flex;align-items:flex-start;justify-content:space-between;padding:0 8px 12px}
+.corner{width:64px;text-align:center}
+.av{width:56px;height:56px;border-radius:999px;margin:0 auto 6px;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;color:#fff}
+.av.you{background:linear-gradient(140deg,#5B8AFF,#7A5BFF);box-shadow:0 0 0 2px #5B8AFF}
+.av.them{background:linear-gradient(140deg,#F87171,#C0392B);box-shadow:0 0 0 2px #F87171}
+.corner span{font-size:10px;color:#C7CEE4;display:block;line-height:1.35}
+.middle{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;height:56px;gap:3px}
+.clock{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);
+  font-size:17px;letter-spacing:.04em}
+.mlabel{font-size:9px;color:var(--slate);letter-spacing:.12em;text-transform:uppercase}
+.score{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:21px;color:#fff}
+.strip{display:flex;gap:16px;padding:0 12px;border-top:1px solid #1C2233}
+.strip div{font-size:11px;color:var(--slate);padding:9px 0;white-space:nowrap}
+.strip div.on{color:#fff;box-shadow:inset 0 -2px 0 var(--primary)}
+
+/* body + cards */
+.body{padding:14px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--silver);border-radius:14px;padding:13px}
+.ch{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ct{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.cm{font-size:11px;color:var(--slate);white-space:nowrap}
+.cs{font-size:12px;color:var(--slate);margin-top:4px}
+.ghost{opacity:.42}
+.tiny{font-size:11px;color:var(--slate)}
+
+/* tape rows */
+.tr{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 0;border-top:1px solid var(--mist);font-size:12px}
+.tr .l{color:var(--slate);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.tr b{font-size:13px}
+
+/* ---------- the chip row ---------- */
+.chips{display:flex;flex-direction:column;gap:8px;margin-top:11px}
+.chip{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;
+  background:var(--mist);border:1px solid transparent}
+.chip .ic{width:28px;height:28px;border-radius:9px;flex:0 0 28px;
+  display:flex;align-items:center;justify-content:center;font-size:14px}
+.chip .tx{flex:1;min-width:0}
+.chip .tx b{display:block;font-size:12.5px;font-weight:650}
+.chip .tx span{display:block;font-size:10.5px;color:var(--slate);line-height:1.35}
+.chip .st{font-size:10px;color:var(--slate);white-space:nowrap;letter-spacing:.04em}
+.chip.live{border-color:var(--accent);background:var(--accentLight)}
+.chip.live .st{color:var(--accent);font-weight:700}
+.chip.spent{opacity:.4}
+.i-bolt{background:rgba(245,197,24,.16);color:var(--accent)}
+.i-room{background:rgba(91,138,255,.16);color:var(--primary)}
+.i-target{background:rgba(52,217,114,.14);color:var(--green)}
+
+/* team sheet rows */
+.fx{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--mist);font-size:11.5px}
+.fx .nmz{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pick{font-size:10px;padding:2px 6px;border-radius:6px;background:var(--mist);color:var(--slate)}
+.pick.hit{background:rgba(52,217,114,.16);color:var(--green)}
+.pick.miss{background:rgba(248,113,113,.14);color:var(--red)}
+.fx.called{background:var(--accentLight);border-radius:9px;
+  margin:0 -6px;padding:8px 6px;border-top:1px solid var(--accent)}
+.calledtag{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700}
+
+.btn{display:block;text-align:center;background:var(--primary);color:#fff;
+  border-radius:10px;padding:10px;font-size:12.5px;font-weight:650;margin-top:11px}
+.btn.q{background:transparent;border:1px solid var(--silver);color:var(--ink)}
+
+/* notes */
+.notes{margin-top:34px;display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
+.note{background:var(--surface);border:1px solid var(--silver);border-left:3px solid var(--primary);
+  border-radius:0 12px 12px 0;padding:15px 17px}
+.note.warn{border-left-color:var(--amber)}
+.note.bad{border-left-color:var(--red)}
+.note.good{border-left-color:var(--green)}
+.note h3{font-size:13px;margin-bottom:7px;letter-spacing:-.01em}
+.note p{font-size:12.5px;color:#B6BFD8;margin-bottom:7px}
+.note p:last-child{margin-bottom:0}
+.note code{font-family:ui-monospace,Menlo,monospace;font-size:11px;
+  background:var(--mist);padding:1px 5px;border-radius:4px;color:#CBD3EA}
+.k{color:var(--accent);font-weight:650}
+</style></head><body><div class="wrap">
+
+<h1>Showdown chips — where they actually land on the Duel tab</h1>
+<p class="sub">Drawn against the tab <strong>as built today</strong> (<code>mobile/components/pool-detail/DuelTab.tsx</code>,
+1,597 lines) using its real palette, its real card order and its real <code>CardHeader</code> shape.
+Includes Ryan's rule: <strong>chips renew and expire at the halfway point.</strong></p>
+<p class="stamp">2026-09-21 · exploration only, nothing built · HTML because the design does not exist yet — anything built gets shown in Metro</p>
+
+<h2>The five states</h2>
+<div class="rail">
+
+<!-- 1. SCOUTING, chips available -->
+<div class="col">
+  <div class="cap"><b>1 · Scouting phase</b>Pre-lock. The chips card sits 4th — after everything you need to decide.</div>
+  <div class="phone">
+    <div class="band">
+      <div class="chrome"><span>‹</span><span class="nm">The Sunday Lot</span><span>↗</span></div>
+      <div class="mwk">Matchweek 12</div>
+      <div class="matchup">
+        <div class="corner"><div class="av you">RS</div><span>You<br>4th</span></div>
+        <div class="middle"><div class="clock">2d 04:11:38</div><div class="mlabel">until lock</div></div>
+        <div class="corner"><div class="av them">MK</div><span>Mia K.<br>2nd</span></div>
+      </div>
+      <div class="strip"><div class="on">Duel</div><div>Table</div><div>The Room</div><div>Banter</div></div>
+    </div>
+    <div class="body">
+      <div class="card">
+        <div class="ch"><span class="ct">Tale of the tape</span><span class="cm">Met 2×</span></div>
+        <div class="cs">How you and Mia K. compare this season.</div>
+        <div class="tr"><b>6,340</b><span class="l">Season points</span><b style="color:#fff">7,105</b></div>
+        <div class="tr"><b>71</b><span class="l">Correct picks</span><b style="color:#fff">78</b></div>
+        <div class="tr"><b>4th</b><span class="l">Table</span><b style="color:#fff">2nd</b></div>
+      </div>
+      <div class="card"><div class="ch"><span class="ct">Your sheet</span><span class="cm">7 / 10</span></div>
+        <div class="cs">Three fixtures still open.</div>
+        <div class="btn">Finish your picks</div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">Scouting Mia K.</span><span class="cm">W5 D1 L2</span></div>
+        <div class="cs">Backs the home side 64% of the time.</div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">What it will be decided on</span><span class="cm">10 games</span></div></div>
+
+      <!-- THE NEW CARD -->
+      <div class="card" style="border-color:var(--primary)">
+        <div class="ch"><span class="ct">Your chips</span><span class="cm">3 left · to MW19</span></div>
+        <div class="cs">Three each half of the season. Unused ones don't carry over.</div>
+        <div class="chips">
+          <div class="chip"><div class="ic i-bolt">⚡</div><div class="tx"><b>Double Stakes</b>
+            <span>Worth 1,000 if you win, nothing if you don't.</span></div><div class="st">USE</div></div>
+          <div class="chip"><div class="ic i-room">👥</div><div class="tx"><b>Take the Room</b>
+            <span>Score the pool average instead of picking.</span></div><div class="st">USE</div></div>
+          <div class="chip"><div class="ic i-target">◎</div><div class="tx"><b>The Call-Out</b>
+            <span>Name a match. Double to whoever's right — if you disagreed.</span></div><div class="st">USE</div></div>
+        </div>
+      </div>
+      <div class="card ghost"><div class="ch"><span class="ct">Against the room</span></div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">Your season</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. DECLARED -->
+<div class="col">
+  <div class="cap"><b>2 · Double Stakes declared</b>One chip lit. Nothing else on the tab moves.</div>
+  <div class="phone">
+    <div class="band">
+      <div class="chrome"><span>‹</span><span class="nm">The Sunday Lot</span><span>↗</span></div>
+      <div class="mwk">Matchweek 12</div>
+      <div class="matchup">
+        <div class="corner"><div class="av you">RS</div><span>You<br>4th</span></div>
+        <div class="middle"><div class="clock">2d 03:52:10</div><div class="mlabel">until lock</div></div>
+        <div class="corner"><div class="av them">MK</div><span>Mia K.<br>2nd</span></div>
+      </div>
+      <div class="strip"><div class="on">Duel</div><div>Table</div><div>The Room</div><div>Banter</div></div>
+    </div>
+    <div class="body">
+      <div class="card" style="border-color:var(--accent);background:var(--accentLight)">
+        <div class="ch"><span class="ct" style="color:var(--accent)">⚡ Double stakes</span><span class="cm">You called it</span></div>
+        <div class="cs" style="color:#D9C99A">This duel is worth 1,000 if you win it, and nothing if you draw or
+          lose it. Mia K. can see that you've called it.</div>
+      </div>
+      <div class="card"><div class="ch"><span class="ct">Tale of the tape</span><span class="cm">Met 2×</span></div>
+        <div class="cs">How you and Mia K. compare this season.</div>
+        <div class="tr"><b>6,340</b><span class="l">Season points</span><b style="color:#fff">7,105</b></div>
+        <div class="tr"><b>4th</b><span class="l">Table</span><b style="color:#fff">2nd</b></div></div>
+      <div class="card"><div class="ch"><span class="ct">Your sheet</span><span class="cm">7 / 10</span></div>
+        <div class="btn">Finish your picks</div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">Scouting Mia K.</span><span class="cm">W5 D1 L2</span></div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">What it will be decided on</span></div></div>
+      <div class="card">
+        <div class="ch"><span class="ct">Your chips</span><span class="cm">2 left · to MW19</span></div>
+        <div class="cs">Three each half of the season. Unused ones don't carry over.</div>
+        <div class="chips">
+          <div class="chip live"><div class="ic i-bolt">⚡</div><div class="tx"><b>Double Stakes</b>
+            <span>Live on this duel. Cannot be taken back.</span></div><div class="st">LIVE</div></div>
+          <div class="chip"><div class="ic i-room">👥</div><div class="tx"><b>Take the Room</b>
+            <span>Score the pool average instead of picking.</span></div><div class="st">USE</div></div>
+          <div class="chip"><div class="ic i-target">◎</div><div class="tx"><b>The Call-Out</b>
+            <span>Name a match. Double to whoever's right.</span></div><div class="st">USE</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. IN PLAY -->
+<div class="col">
+  <div class="cap"><b>3 · In play</b>The band needs <strong>no change</strong> — it shows accuracy, which a chip never touches.</div>
+  <div class="phone">
+    <div class="band">
+      <div class="chrome"><span>‹</span><span class="nm">The Sunday Lot</span><span>↗</span></div>
+      <div class="mwk">Matchweek 12 · LIVE</div>
+      <div class="matchup">
+        <div class="corner"><div class="av you">RS</div><span>You</span></div>
+        <div class="middle"><div class="score">420 – 380</div><div class="mlabel">accuracy</div></div>
+        <div class="corner"><div class="av them">MK</div><span>Mia K.</span></div>
+      </div>
+      <div class="strip"><div class="on">Duel</div><div>Table</div><div>The Room</div><div>Banter</div></div>
+    </div>
+    <div class="body">
+      <div class="card" style="border-color:var(--accent);background:var(--accentLight)">
+        <div class="ch"><span class="ct" style="color:var(--accent)">⚡ Double stakes</span><span class="cm">1,000 or nothing</span></div>
+        <div class="cs" style="color:#D9C99A">You're 40 ahead with 3 games left.</div>
+      </div>
+      <div class="card">
+        <div class="ch"><span class="ct">Team sheet</span><span class="cm">7 of 10 played</span></div>
+        <div class="fx"><span class="pick hit">H</span><span class="nmz">ARS v NFO</span><span class="pick hit">H</span></div>
+        <div class="fx called">
+          <div style="display:flex;align-items:center;gap:8px;width:100%">
+            <span class="pick hit">A</span><span class="nmz">LIV v CHE</span><span class="pick miss">H</span></div>
+          <div style="width:100%;margin-top:5px" class="calledtag">◎ Called out · you disagreed · doubled to you</div>
+        </div>
+        <div class="fx"><span class="pick miss">D</span><span class="nmz">MCI v TOT</span><span class="pick hit">H</span></div>
+        <div class="fx"><span class="pick">—</span><span class="nmz">BHA v EVE</span><span class="pick">—</span></div>
+      </div>
+      <div class="card ghost"><div class="ch"><span class="ct">Elsewhere on the card</span><span class="cm">4 duels</span></div>
+        <div class="cs">Two other members have chips live this week.</div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">Your season</span></div></div>
+      <div class="tiny" style="text-align:center">Next week's sheet · 0 / 10 →</div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. APPROACHING HALFWAY -->
+<div class="col">
+  <div class="cap"><b>4 · Approaching halfway</b>The only thing that changes is the <code>meta</code>. No badge, no banner, no push.</div>
+  <div class="phone">
+    <div class="band">
+      <div class="chrome"><span>‹</span><span class="nm">The Sunday Lot</span><span>↗</span></div>
+      <div class="mwk">Matchweek 18</div>
+      <div class="matchup">
+        <div class="corner"><div class="av you">RS</div><span>You<br>3rd</span></div>
+        <div class="middle"><div class="clock">1d 19:02:44</div><div class="mlabel">until lock</div></div>
+        <div class="corner"><div class="av them">JD</div><span>Joe D.<br>7th</span></div>
+      </div>
+      <div class="strip"><div class="on">Duel</div><div>Table</div><div>The Room</div><div>Banter</div></div>
+    </div>
+    <div class="body">
+      <div class="card ghost"><div class="ch"><span class="ct">Tale of the tape</span><span class="cm">First meeting</span></div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">Your sheet</span><span class="cm">10 / 10</span></div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">Scouting Joe D.</span></div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">What it will be decided on</span></div></div>
+      <div class="card" style="border-color:var(--amber)">
+        <div class="ch"><span class="ct">Your chips</span><span class="cm" style="color:var(--amber)">2 left · last week to use them</span></div>
+        <div class="cs">Three each half. These two end after Matchweek 19; three new ones arrive at Matchweek 20.</div>
+        <div class="chips">
+          <div class="chip spent"><div class="ic i-bolt">⚡</div><div class="tx"><b>Double Stakes</b>
+            <span>Used in Matchweek 12 — won.</span></div><div class="st">SPENT</div></div>
+          <div class="chip"><div class="ic i-room">👥</div><div class="tx"><b>Take the Room</b>
+            <span>Score the pool average instead of picking.</span></div><div class="st">USE</div></div>
+          <div class="chip"><div class="ic i-target">◎</div><div class="tx"><b>The Call-Out</b>
+            <span>Name a match. Double to whoever's right.</span></div><div class="st">USE</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. RENEWED -->
+<div class="col">
+  <div class="cap"><b>5 · Second half, renewed</b>MW20. Three fresh. The expired two are stated plainly, once, then never again.</div>
+  <div class="phone">
+    <div class="band">
+      <div class="chrome"><span>‹</span><span class="nm">The Sunday Lot</span><span>↗</span></div>
+      <div class="mwk">Matchweek 20</div>
+      <div class="matchup">
+        <div class="corner"><div class="av you">RS</div><span>You<br>3rd</span></div>
+        <div class="middle"><div class="clock">4d 11:20:07</div><div class="mlabel">until lock</div></div>
+        <div class="corner"><div class="av them">AP</div><span>Ade P.<br>5th</span></div>
+      </div>
+      <div class="strip"><div class="on">Duel</div><div>Table</div><div>The Room</div><div>Banter</div></div>
+    </div>
+    <div class="body">
+      <div class="card ghost"><div class="ch"><span class="ct">Tale of the tape</span><span class="cm">Met 1×</span></div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">Your sheet</span><span class="cm">0 / 10</span></div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">Scouting Ade P.</span></div></div>
+      <div class="card ghost"><div class="ch"><span class="ct">What it will be decided on</span></div></div>
+      <div class="card" style="border-color:var(--primary)">
+        <div class="ch"><span class="ct">Your chips</span><span class="cm">3 left · to MW38</span></div>
+        <div class="cs">Second half. You used one of your first three; the other two ended at Matchweek 19.</div>
+        <div class="chips">
+          <div class="chip"><div class="ic i-bolt">⚡</div><div class="tx"><b>Double Stakes</b>
+            <span>Worth 1,000 if you win, nothing if you don't.</span></div><div class="st">USE</div></div>
+          <div class="chip"><div class="ic i-room">👥</div><div class="tx"><b>Take the Room</b>
+            <span>Score the pool average instead of picking.</span></div><div class="st">USE</div></div>
+          <div class="chip"><div class="ic i-target">◎</div><div class="tx"><b>The Call-Out</b>
+            <span>Name a match. Double to whoever's right.</span></div><div class="st">USE</div></div>
+        </div>
+      </div>
+      <div class="card ghost"><div class="ch"><span class="ct">Against the room</span></div></div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<h2>What reading the built tab actually decided</h2>
+<div class="notes">
+
+<div class="note bad"><h3>❌ It cannot go on the Tale of the Tape</h3>
+<p>That was my first instinct — the Tape is the input to the decision, so hang the chips off its foot.
+The file refuses it in writing (<code>DuelTab.tsx:1319</code>):</p>
+<p><em>"EVERY ROW IS A COMPARISON, so the winning side is BOLDED rather than labelled — the shape of the
+card <span class="k">is</span> the comparison. Adding a 'leader' chip to each row would say the same
+thing twice and take the width to say it."</em></p>
+<p>A chips footer is not a comparison. It would be the first thing on that card that isn't.</p></div>
+
+<div class="note"><h3>✅ It goes 4th, after "What it will be decided on"</h3>
+<p>The tab states its own pre-lock logic: <em>"your sheet, the opponent scouted, and the fixtures the
+duel will be decided on — <span class="k">every one of those cards exists to inform a pick</span>."</em></p>
+<p>A chip doesn't inform a pick; it's a separate decision about the <em>stake</em>. So it sits after
+that trio and before the records — you've seen the tape, scouted them, and seen the ten games, and
+only then are you asked whether to raise.</p>
+<p>It also keeps the <strong>"Finish your picks" button at position 2</strong>, out of the chip's way.
+That is the whole banker defence made physical: the route to picking never passes through a chip.</p></div>
+
+<div class="note good"><h3>⭐ The band needs no change at all</h3>
+<p>The band shows <code>accuracy_a/_b</code>, never <code>points_a/_b</code> — "500–0 is not a
+scoreline anybody played". <strong>A chip changes the payout, never the accuracy</strong>, so the
+most expensive surface in the mode is untouched by Double Stakes and Take the Room.</p>
+<p>That matters because the band is not safely editable: <code>COLLAPSED_SPREAD = 108</code> is
+<em>derived</em> from the live score's widest half, and <code>MIDDLE_COL = 160</code> only just clears
+<code>HH:MM:SS</code>. Ryan tuned those by eye over ~20 rounds. <strong>Do not put a chip mark in the
+collapsed row.</strong></p></div>
+
+<div class="note"><h3>The card wears CardHeader, like everything else</h3>
+<p><code>DuelTab.tsx:1524</code>: <em>"Six cards each inventing their own heading is how a tab reads as
+six screens that happen to be stacked."</em> So: <code>title</code> = "Your chips",
+<code>meta</code> = the count hard right, <code>subtitle</code> = the one line of disclosure.</p>
+<p>⭐ The <code>meta</code> slot is <strong>exactly where the expiry belongs</strong> — "3 left · to
+MW19". The whole renew/expire rule fits in the header shape the tab already wears, with no new
+furniture invented for it.</p>
+<p>Icons all exist in the map already: <code>bolt.fill</code>, <code>person.2.fill</code>,
+<code>target</code> (<code>binoculars</code> is taken, by scouting).</p></div>
+
+<div class="note warn"><h3>⚠ Only The Call-Out touches the in-play surface</h3>
+<p>Double Stakes and Take the Room are invisible once football starts. The Call-Out has to mark
+<strong>one row of the team sheet</strong> — and that row already has a fixed shape
+(<code>TeamSheetRows</code>, shared web/mobile via <code>lib/league/duelSheet.ts</code> + its byte
+mirror). A marked row is a real change to a <strong>mirrored, guard-tested</strong> module on both
+platforms.</p>
+<p>It's also the most <em>watchable</em> thing here: the called-out row is the one you refresh for.</p></div>
+
+<div class="note warn"><h3>⚠ Web and mobile already disagree about card order</h3>
+<p>RN leads with the Tape (Ryan, 2026-09-03: <em>"the tape leads"</em>). Web puts Your sheet first and
+the Tape fourth (<code>DuelsTab.tsx:1554</code> vs <code>:1697</code>).</p>
+<p>So "4th" isn't one answer. Either place the chips card <strong>relative to "What it will be decided
+on"</strong> on both — which is what the mockup does — or decide the two tabs are allowed to differ,
+as the two walkouts already are.</p></div>
+
+</div>
+
+<h2>The halfway rule — what it fixes, and the one place it can fail</h2>
+<div class="notes">
+
+<div class="note good"><h3>✅ It fixes the real failure mode of a season chip</h3>
+<p>A once-a-season chip gets hoarded and never played — everyone waits for the perfect week and the
+perfect week never announces itself. Halving the term forces the decision twice and takes the volume
+to <strong>six a season, about one every six matchweeks</strong>. That's a rhythm rather than a rare
+event, which is also what makes it teachable: you see someone else do it before your turn comes.</p>
+<p>It resets <strong>everyone equally regardless of standing</strong>, so it is a catch-up beat that
+isn't rich-get-richer. FPL landed on the same answer for the same reason.</p></div>
+
+<div class="note warn"><h3>⚠ The mechanic passes gate 2. A notification about it would not.</h3>
+<p>This is the whole risk and it is worth being exact about. <strong>The expiry itself is fine</strong>
+— disclosed up front, costs you nothing you earned, and the deadline is the competition's own halfway
+point rather than a clock we invented.</p>
+<p><strong>"⏰ Your Double Stakes expires in 2 days — use it or lose it!"</strong> is manufactured
+FOMO and fails gate 2 outright. The line: the count lives <em>on the card</em>, permanently,
+non-escalating, and it never leaves the app. State 4 above turns one word amber and adds one clause.
+That is the entire treatment.</p>
+<p>⚠ It also has to survive its own tooltip, and it does: <em>"Three chips each half of the season.
+Unused ones don't carry over."</em></p></div>
+
+<div class="note bad"><h3>🔴 "Halfway" is not defined yet — and migration 143 is why</h3>
+<p><code>pools.league_start_matchweek</code> means a pool can start at <em>any</em> matchweek. So:</p>
+<p><strong>Season halfway (MW19)</strong> is sport-inherited and identical for everyone — but a pool
+starting at MW25 gets zero first-half chips and then a full second set. Broken.</p>
+<p><strong>Pool halfway</strong> (midpoint of the pool's own matchweek span) always gives two equal
+halves. My recommendation — <em>and it must be resolved to a named matchweek at pool creation</em>
+("your chips renew at Matchweek 20"), never a rolling clock. That satisfies migration 128's standing
+rule: an interval from a football event, never an hour of the day.</p>
+<p>⚠ <strong>Floor it.</strong> A pool starting at MW36 has three matchweeks and a halfway of 1.5.
+Below ~10 matchweeks, don't renew at all — one set for the whole pool.</p></div>
+
+<div class="note warn"><h3>⚠ A chip you could not have played must not expire</h3>
+<p>If your last matchweek before halfway is a <strong>bye</strong> (<code>entry_b IS NULL</code>),
+every chip here is dead — there is no opponent to raise against and a bye pays a flat 250 regardless.
+Expiring a chip you were never able to spend is us taking something back for a reason that is ours,
+not football's.</p>
+<p>Rule: <strong>an unplayable half rolls one chip forward.</strong> Disclosed in the same sentence.</p></div>
+
+<div class="note"><h3>Knock-on: the Handshake gets more dangerous</h3>
+<p>Six chips a season instead of three makes the draw-offer's collusion case materially easier to
+farm. If the Handshake survives at all, it should stay <strong>one per season</strong> while the other
+three renew — or be dropped.</p>
+<p>The Return Fixture is unaffected: it spends no chip.</p></div>
+
+<div class="note"><h3>What this does to the numbers</h3>
+<p>Six chips × ~7.6 members ≈ <strong>46 chip-weeks a season</strong> in a typical pool, across 38
+matchweeks and ~5 round-robin cycles. So roughly <strong>one duel in eight carries a chip</strong>
+— common enough to be part of the mode's rhythm, rare enough that it is still an event when the band
+lights up.</p>
+<p>⚠ Worth deciding on purpose: <code>ShowdownLadder</code>'s Duels board sorts
+<code>duel_points ↓ → wins ↓ → season total ↓</code>. Six doubled duels a season means
+<code>duel_points</code> and <code>wins</code> come apart far more often, so that second rung starts
+doing real work for the first time.</p></div>
+
+</div>
+</div></body></html>
