@@ -747,3 +747,75 @@ describe('hair is sealed against hairline cracks', () => {
     }
   })
 })
+
+// =============================================================
+// Hair that falls in front of the FACE goes back on top of the beard
+// =============================================================
+// The stack puts facial hair over the hair, which is right for the length hanging BESIDE the
+// head — but wrong for the strands falling across the cheek. Ryan, 2026-09-20: "for the long
+// hair options that go in front of the face the beard should be under that hair."
+//
+// The hair fragment is painted a SECOND time after the facial hair, masked to the head's own
+// silhouette, so only the part over the face comes back. Nothing is added to the bundle.
+// =============================================================
+
+describe('hair over the face passes in front of a beard', () => {
+  const D_HEAD = 'M 506 298 L 1534 298 L 1534 1530 L 506 1530 Z'
+  const D_HAIR3 = 'M 300 300 L 800 300 L 800 900 Z'
+  const D_BEARD3 = 'M 700 1200 L 1300 1200 L 1300 1500 Z'
+  const faceFixture = (): AvatarAssets => ({
+    ...fixture(),
+    bases: { b: `<svg viewBox="0 0 2048 2048"><path d="${D_HEAD}" fill="rgb(254,205,180)"/></svg>` },
+    hair: { h: `<path d="${D_HAIR3}" fill="rgb(140,122,110)"/>` },
+    facialhair: { f: `<path d="${D_BEARD3}" fill="rgb(140,122,110)"/>` },
+    fhManifest: { f: { over: false } },
+  })
+
+  it('paints the hair again, masked to the head, after the facial hair', () => {
+    const svg = composeAvatar({ ...cfg, base: 'b', hair: 'h', facialHair: 'f' }, faceFixture())
+    const copies = svg.split(`d="${D_HAIR3}"`).length - 1
+    expect(copies, 'the hair is painted twice').toBe(2)
+    expect(svg, 'the second copy is masked to the head').toContain('mask="url(#faceonly)"')
+    expect(svg, 'the mask is the head silhouette').toContain(`<path d="${D_HEAD}" fill="white"/>`)
+    // order: first hair, then the beard, then the masked copy
+    const first = svg.indexOf(`d="${D_HAIR3}"`)
+    const beard = svg.indexOf(`d="${D_BEARD3}"`)
+    const second = svg.indexOf(`d="${D_HAIR3}"`, first + 1)
+    expect(first).toBeLessThan(beard)
+    expect(beard, 'the face copy goes over the beard').toBeLessThan(second)
+  })
+
+  it('adds nothing when there is no facial hair', () => {
+    const svg = composeAvatar({ ...cfg, base: 'b', hair: 'h', facialHair: null }, faceFixture())
+    expect(svg.split(`d="${D_HAIR3}"`).length - 1, 'a single copy').toBe(1)
+    expect(svg).not.toContain('faceonly')
+  })
+
+  it('adds nothing when there is no hair', () => {
+    const svg = composeAvatar({ ...cfg, base: 'b', hair: null, facialHair: 'f' }, faceFixture())
+    expect(svg).not.toContain('faceonly')
+  })
+
+  it('renames the copy\'s own mask id so no two elements share one', () => {
+    const A = faceFixture()
+    A.hair = {
+      h:
+        `<defs><mask id="facehole"><rect width="2048" height="2048" fill="white"/></mask></defs>` +
+        `<g mask="url(#facehole)"><path d="${D_HAIR3}" fill="rgb(140,122,110)"/></g>`,
+    }
+    const svg = composeAvatar({ ...cfg, base: 'b', hair: 'h', facialHair: 'f' }, A)
+    expect(svg.split('id="facehole"').length - 1, 'only one facehole definition').toBe(1)
+    expect(svg).toContain('id="facehole-front"')
+  })
+
+  it('keeps the same layer in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must emit the face-only layer`).toContain('faceonly')
+      expect(src, `${file} must rename the copy's mask`).toContain('facehole-front')
+    }
+  })
+})

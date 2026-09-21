@@ -229,6 +229,20 @@ function findNose(doc: string): string | null {
  * separate them — what makes an ear an ear is that it sits OUTBOARD of the head's straight
  * sides, where nothing else in the base does.
  */
+/** The head: the only skin path that spans the canvas. The neck shares its tone but is narrow. */
+function findHead(doc: string): string | null {
+  for (const m of doc.matchAll(/<path[^>]*\/?>/g)) {
+    const p = m[0]
+    if (!p.includes(`fill="${T.skin}"`)) continue
+    const d = /d="([^"]*)"/.exec(p)
+    if (!d) continue
+    const n = (d[1].match(/-?\d+\.?\d*/g) || []).map(Number)
+    const xs = n.filter((_, i) => i % 2 === 0)
+    if (xs.length && Math.max(...xs) - Math.min(...xs) > 900) return d[1]
+  }
+  return null
+}
+
 function findEars(doc: string): string[] {
   const out: string[] = []
   for (const m of doc.matchAll(/<path[^>]*\/?>/g)) {
@@ -335,6 +349,25 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   // reaches it, and filling the dip for one would paint hair beside a narrow neck.
   const backfill =
     cfg.hair && A.hairManifest?.[cfg.hair] ? A.hairBackfill?.[cfg.hair] ?? '' : ''
+
+  // ⭐ HAIR THAT FALLS IN FRONT OF THE FACE GOES BACK ON TOP OF THE BEARD. The stack puts
+  // facial hair over the hair, which is right for the length hanging BESIDE the head — but
+  // wrong for the strands falling across the cheek, which should pass in front of a beard the
+  // way they pass in front of everything else on the face. Ryan, 2026-09-20.
+  //
+  // ⭐⭐ The hair fragment is simply painted A SECOND TIME after the facial hair, masked to the
+  // head's own silhouette, so only the part over the face comes back. No asset changes and no
+  // new geometry — the bundle does not grow at all, only the composed document.
+  //
+  // ⚠ Only when there is BOTH hair and facial hair; otherwise it is a copy that cannot change
+  // a pixel. ⚠ The copy's own <mask id="facehole"> is renamed, or two elements in one document
+  // would carry the same id.
+  const headD = fh && cfg.hair ? findHead(svg) : null
+  const hairFront = headD
+    ? `<defs><mask id="faceonly" maskUnits="userSpaceOnUse" x="0" y="0" width="2048" ` +
+      `height="2048"><path d="${headD}" fill="white"/></mask></defs>` +
+      `<g mask="url(#faceonly)">${(A.hair[cfg.hair!] ?? '').split('facehole').join('facehole-front')}</g>`
+    : ''
   const frontBody = cfg.hair ? A.frontBody?.[/(\d+)$/.exec(cfg.base)?.[1] ?? ''] ?? '' : ''
   const eyeLayer = cfg.eyes ? A.eyes[cfg.eyes] ?? A.specialEyes[cfg.eyes] ?? '' : ''
   // ⚠ not `mouth` — phase 2 binds that name to the mouth COLOUR.
@@ -349,6 +382,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
       frontBody +
       (fh ? swap(fh, T.hairBase, T.beard) : '') +
+      hairFront +
       (fhOver ? '' : mouthLayer) +
       (nose || ''),
   )

@@ -230,6 +230,19 @@ def main() -> None:
                 return path
         return None
 
+    def find_head(doc: str):
+        # The only skin path that spans the canvas. The neck shares its tone but is narrow.
+        for m in re.finditer(r"<path[^>]*/?>", doc):
+            path = m.group(0)
+            if BASE_SKIN not in path:
+                continue
+            n = [float(x) for x in re.findall(r"-?\d+\.?\d*",
+                                              re.search(r'd="([^"]*)"', path).group(1))]
+            xs = n[0::2]
+            if max(xs) - min(xs) > 900:
+                return re.search(r'd="([^"]*)"', path).group(1)
+        return None
+
     def find_ears(doc: str) -> list:
         # Same tone as the nose AND the neck shadow, so colour cannot separate them. What
         # makes an ear an ear is that it sits OUTBOARD of the head's straight sides; the
@@ -310,7 +323,20 @@ def main() -> None:
     # ⚠ The backfill is only for styles long enough to BRACKET the neck (hair/manifest.json).
     # A buzz cut never reaches it, and filling the dip for one would paint hair beside a
     # narrow neck out of nowhere.
-    backfill = front_body = ""
+    # ⭐ HAIR THAT FALLS IN FRONT OF THE FACE GOES BACK ON TOP OF THE BEARD. The stack puts
+    # facial hair over the hair, which is right for the length hanging BESIDE the head — but
+    # wrong for the strands falling across the cheek, which should pass in front of a beard the
+    # way they pass in front of everything else on the face. Ryan, 2026-09-20.
+    #
+    # ⭐⭐ The hair fragment is simply painted A SECOND TIME after the facial hair, masked to
+    # the head's own silhouette, so only the part over the face comes back. No asset changes and
+    # no new geometry — the bundle does not grow at all, only the composed document.
+    #
+    # ⚠ Emitted ONLY when there is both hair and facial hair; otherwise it is a second copy of
+    # the hair that could never change a pixel.
+    # ⚠ The copy's own <mask id="facehole"> is renamed, or two elements in one document would
+    # carry the same id.
+    backfill = front_body = hair_front = ""
     if arg("--hair"):
         here = __file__.rsplit("/", 1)[0]
         style = arg("--hair").rsplit("/", 1)[-1].replace(".asset.svg", "").replace("hair-", "")
@@ -324,12 +350,19 @@ def main() -> None:
             front_body = inner(f"{here}/bases/front-neck-{m.group(1)}.svg") if m else ""
         except Exception:
             front_body = ""
+        if fh and (head_d := find_head(svg)):
+            copy = part("--hair").replace("facehole", "facehole-front")
+            hair_front = (
+                '<defs><mask id="faceonly" maskUnits="userSpaceOnUse" x="0" y="0"'
+                f' width="2048" height="2048"><path d="{head_d}" fill="white"/></mask></defs>'
+                f'<g mask="url(#faceonly)">{copy}</g>')
     svg = svg.replace("</svg>", (
         "".join(ears)
         + part("--eyes") + part("--brows") + expr_upper
         + (mouth if fh_over else "")
         + backfill + part("--hair") + front_body
         + (inner(fh).replace(f'fill="{HAIR_BASE}"', f'fill="{BEARD}"') if fh else "")
+        + hair_front
         + ("" if fh_over else mouth)
         + (nose or "")
     ) + "</svg>")

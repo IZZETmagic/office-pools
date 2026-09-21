@@ -161,6 +161,19 @@ function findNose(doc){
 /* ---- the two ears, by position ------------------------------------------------------
    They share the nose's tone and the neck shadow's, so colour cannot separate them: an ear
    is the one OUTBOARD of the head's straight sides. Same test as compose.py.            */
+/* the head: the only skin path spanning the canvas. Same test as compose.py. */
+function findHead(doc){
+  for (const m of doc.matchAll(/<path[^>]*\/?>/g)) {
+    const p = m[0];
+    if (!p.includes(`fill="${T.skin}"`)) continue;
+    const d = /d="([^"]*)"/.exec(p); if (!d) continue;
+    const n = (d[1].match(/-?\d+\.?\d*/g) || []).map(Number);
+    const xs = n.filter((_,i)=>i%2===0);
+    if (xs.length && Math.max(...xs) - Math.min(...xs) > 900) return d[1];
+  }
+  return null;
+}
+
 function findEars(doc){
   const out = [];
   for (const m of doc.matchAll(/<path[^>]*\/?>/g)) {
@@ -221,6 +234,14 @@ function compose(c){
   // ⚠ per style — one shared fill leaves a hair-coloured rim on the shoulders.
   const backfill = (c.hair && (ASSETS.hairManifest||{})[c.hair]) ? ((ASSETS.hairBackfill||{})[c.hair] || '') : '';
   const frontBody = c.hair ? ((ASSETS.frontBody||{})[(/(\d+)$/.exec(c.base)||[])[1] || ''] || '') : '';
+  // ⭐ hair falling in front of the FACE goes back on top of the beard — the fragment painted a
+  // second time, masked to the head. See compose.ts for why.
+  const headD = (fh && c.hair) ? findHead(svg) : null;
+  const hairFront = headD
+    ? `<defs><mask id="faceonly" maskUnits="userSpaceOnUse" x="0" y="0" width="2048" height="2048">`
+      + `<path d="${headD}" fill="white"/></mask></defs>`
+      + `<g mask="url(#faceonly)">${(ASSETS.hair[c.hair]||'').split('facehole').join('facehole-front')}</g>`
+    : '';
 
   const expr = (c.mode === 'expression' && c.expression) ? ASSETS.expressions[c.expression] : '';
   const upper = [], lower = [];
@@ -238,7 +259,7 @@ function compose(c){
       + eyes + upper.join('')
       + (fhOver ? mouthLayer : '')
       + backfill + (c.hair ? ASSETS.hair[c.hair] : '') + frontBody
-      + (fh ? swapAll(fh, T.hairBase, T.beard) : '')
+      + (fh ? swapAll(fh, T.hairBase, T.beard) : '') + hairFront
       + (fhOver ? '' : mouthLayer)
       + (nose || ''));
 
