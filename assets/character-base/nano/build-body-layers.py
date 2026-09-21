@@ -125,6 +125,7 @@ def clean(g, floor: float = 500):
 
 
 def main() -> None:
+    head_100 = None
     bases = sorted(HERE.glob("bases/base-neck-*.svg"))
     notch = None
     for b in bases:
@@ -144,6 +145,7 @@ def main() -> None:
         if n == "100":
             body = unary_union([flatten(d_of(p)) for p in P["shirt"] + P["neck"] + P["shadow"]])
             notch = clean(body.difference(head).buffer(0)).simplify(0.8)
+            head_100 = head
 
     # ⚠ GROWN by a few units, because the dip traced into the hair is very slightly LARGER
     # than the body it was traced from — about 2-4 units — and that difference shows as a
@@ -154,7 +156,15 @@ def main() -> None:
     # shoulder dome would read as a dark outline round the shirt for the whole lower canvas.
     from shapely.geometry import box
     grown = notch.buffer(GROW, join_style=2)
-    notch = unary_union([grown.intersection(box(0, 0, 2048, 1780)), notch]).simplify(0.8)
+    notch = unary_union([grown.intersection(box(0, 0, 2048, 1780)), notch])
+    # ⚠⚠ ...and then CUT BACK OUT OF THE HEAD. The backfill paints after the head, so anything
+    # of it that crosses the jaw draws a hair-coloured band across the chin — Ryan spotted
+    # exactly that, "a brown hairline between the head and the neck", once the grow above was
+    # added. The head is subtracted with a 2-unit margin so flattening and simplification
+    # cannot creep back over the edge. Nothing is lost: the hair is masked away from the face,
+    # so the backfill was never needed up there.
+    notch = notch.difference(head_100.buffer(2)).buffer(0)
+    notch = clean(notch).simplify(0.8)
     (HERE / "bases/hair-backfill.svg").write_text(
         HEAD + f'<path transform="translate(0,0)" fill="{HAIR_BASE}" d="{to_d(notch)}"/></svg>')
     print(f"  hair-backfill.svg   area {notch.area:,.0f} (grown {GROW}u above y1780)")
