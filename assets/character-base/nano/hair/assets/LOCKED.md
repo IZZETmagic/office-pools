@@ -12,8 +12,6 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-m05-undercut.asset.svg` | 9 | 3 base shapes — top mass plus both shaved sides; no mask |
 | `hair-m06-slickback.asset.svg` | 5 | 70px brow band — the roomiest |
 | `hair-m07-curls.asset.svg` | 6 | scalloped silhouette |
-| `hair-m08-bowl.asset.svg` | 6 | masked; covers the ears |
-| `hair-m09-afro.asset.svg` | 7 | masked; covers the ears |
 | `hair-m10-mohawk.asset.svg` | 11 | 90px brow band |
 | `hair-m11-receding.asset.svg` | 4 | 104px brow band — the roomiest |
 | `hair-m13-manbun.asset.svg` | 10 | bun sits above the crown |
@@ -32,6 +30,17 @@ the asset. Same rule as `../../bases/LOCKED.md`.
 | `hair-f12-halfup.asset.svg` | 13 | masked; small bun with loose length; ⚠ 27px brow band |
 | `hair-f13-longstraight.asset.svg` | 7 | INVERTED trace; 46px brow band |
 | `hair-f14-shag.asset.svg` | 9 | masked; stepped layers; 106px brow band |
+
+
+## Removed 2026-09-20: `m08-bowl` and `m09-afro`
+
+Ryan dropped both after seeing the set rendered WITH a beard: each wraps the sides of the head
+and meets the beard with no gap, so the face ends up ringed by one continuous mass with only the
+eyes and nose showing. Behaving as designed; the combination is just unflattering.
+
+⚠ Both were in the small group that stays legible at 80px — see the silhouette note below — so
+the set loses two of its distinct shapes. `m07-curls` and `m15-locs` remain as textured styles.
+Their art is still in git; `git revert` of this commit brings them back.
 
 ## m05-undercut REPLACED with v2 (2026-09-18)
 
