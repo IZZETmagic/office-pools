@@ -214,6 +214,10 @@ function compose(c){
   // and `laughing`/`sad` put a skin-shade chin mark below the lip. Position does work. A
   // guard test re-derives the gap from the shipped assets, so a new expression straddling
   // the line fails the build instead of rendering a brow over a fringe.
+  // ⭐ the two derived body layers — see compose.ts's THE STACK for why they exist.
+  const backfill = (c.hair && (ASSETS.hairManifest||{})[c.hair]) ? (ASSETS.hairBackfill || '') : '';
+  const frontBody = c.hair ? ((ASSETS.frontBody||{})[(/(\d+)$/.exec(c.base)||[])[1] || ''] || '') : '';
+
   const expr = (c.mode === 'expression' && c.expression) ? ASSETS.expressions[c.expression] : '';
   const upper = [], lower = [];
   for (const m of (expr || '').matchAll(/<path[^>]*\/?>/g)) {
@@ -229,7 +233,7 @@ function compose(c){
   add(ears.join('')
       + eyes + upper.join('')
       + (fhOver ? mouthLayer : '')
-      + (c.hair ? ASSETS.hair[c.hair] : '')
+      + backfill + (c.hair ? ASSETS.hair[c.hair] : '') + frontBody
       + (fh ? swapAll(fh, T.hairBase, T.beard) : '')
       + (fhOver ? '' : mouthLayer)
       + (nose || ''));

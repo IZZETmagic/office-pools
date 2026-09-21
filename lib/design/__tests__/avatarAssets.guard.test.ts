@@ -615,3 +615,72 @@ describe('the standalone avatar builder', () => {
     }
   })
 })
+
+// =============================================================
+// The body goes in front of the hair — every neck width works
+// =============================================================
+// Every hair asset was traced against base-neck-100 and carries that base's body silhouette as
+// a DIP in its own outline. On any other base the hair was wrong: a narrower neck left a
+// background crack beside it, and a wider one was simply covered, so neck-125 and neck-140
+// rendered almost identically to the default. Two derived layers fix it without touching a
+// locked hair asset — see build-body-layers.py.
+// =============================================================
+
+describe('long hair works on every neck width', () => {
+  const D_HAIR2 = 'M 300 300 L 800 300 L 800 900 Z'
+  const D_BACK = 'M 850 1500 L 1200 1500 L 1200 1700 Z'
+  const D_FRONT = 'M 840 1500 L 1210 1500 L 1210 1700 Z'
+  const layered = (): AvatarAssets => ({
+    ...fixture(),
+    // ⚠ the base must be named like the real ones: the front body is looked up by the neck
+    // number at the end of the base key, which is what ties a base to its derived layer.
+    bases: { 'base-neck-100': '<svg viewBox="0 0 2048 2048"><path d="M 0 0 L 1 0 L 1 1 Z" fill="rgb(254,205,180)"/></svg>' },
+    hair: { long: `<path d="${D_HAIR2}" fill="rgb(140,122,110)"/>` },
+    hairBackfill: `<path d="${D_BACK}" fill="rgb(140,122,110)"/>`,
+    frontBody: { '100': `<path d="${D_FRONT}" fill="rgb(30,118,214)"/>` },
+    hairManifest: { long: true, short: false },
+  })
+
+  it('sandwiches the hair between the backfill and the body', () => {
+    const svg = composeAvatar({ ...cfg, base: 'base-neck-100', hair: 'long' }, layered())
+    const at = (d: string) => svg.indexOf(`d="${d}"`)
+    expect(at(D_BACK), 'the backfill must be present').toBeGreaterThan(-1)
+    expect(at(D_BACK), 'backfill goes behind the hair').toBeLessThan(at(D_HAIR2))
+    expect(at(D_HAIR2), 'the body goes in front of the hair').toBeLessThan(at(D_FRONT))
+  })
+
+  it('does not backfill a style that never reaches the neck', () => {
+    const A = layered()
+    A.hair = { short: `<path d="${D_HAIR2}" fill="rgb(140,122,110)"/>` }
+    const svg = composeAvatar({ ...cfg, base: 'base-neck-100', hair: 'short' }, A)
+    expect(svg, 'a buzz cut must not gain hair beside the neck').not.toContain(`d="${D_BACK}"`)
+    expect(svg, 'but the body still goes in front').toContain(`d="${D_FRONT}"`)
+  })
+
+  it('adds neither layer when there is no hair', () => {
+    const svg = composeAvatar({ ...cfg, base: 'base-neck-100', hair: null }, layered())
+    expect(svg).not.toContain(`d="${D_BACK}"`)
+    expect(svg).not.toContain(`d="${D_FRONT}"`)
+  })
+
+  it('ships a front body for every base, and a backfill flag for every hair style', () => {
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const bases = Object.keys(A.bases)
+    expect(bases.length, 'the four locked bases').toBeGreaterThan(0)
+    for (const b of bases) {
+      const key = /(\d+)$/.exec(b)?.[1] ?? ''
+      expect(A.frontBody?.[key], `no front body for ${b}`).toBeTruthy()
+    }
+    for (const h of Object.keys(A.hair)) {
+      expect(A.hairManifest?.[h], `no backfill flag for ${h}`).toBeDefined()
+    }
+    expect(A.hairBackfill, 'the backfill itself').toBeTruthy()
+    // ⚠ the flag is what stops a buzz cut gaining hair beside a narrow neck; if this ever
+    // becomes all-true or all-false, build-body-layers.py's bracket test has broken.
+    const on = Object.values(A.hairManifest ?? {}).filter(Boolean).length
+    expect(on).toBeGreaterThan(3)
+    expect(on).toBeLessThan(Object.keys(A.hair).length)
+  })
+})

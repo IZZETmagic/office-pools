@@ -288,11 +288,45 @@ def main() -> None:
 
     expr_upper, expr_lower = split_expression(part("--expression"))
     mouth = part("--mouth") + expr_lower
+
+    # ---- the body goes in FRONT of the hair ------------------------------------------------
+    #
+    # ⭐⭐ Every hair asset was traced against base-neck-100 and carries that base's body
+    # silhouette as a DIP in its own outline, so on any other base the hair is wrong: a
+    # narrower neck leaves a background crack between the hair and the neck, and a wider one is
+    # simply covered — at neck-140 the hair hid 35px of neck on each side, which is why the two
+    # wider necks rendered almost identically to the default. Ryan, 2026-09-20.
+    #
+    # Two derived layers fix it without touching a single locked hair asset — see
+    # build-body-layers.py, which generates both from the locked bases:
+    #
+    #   hair-backfill    the neck-100 body in the HAIR token, painted BEFORE the hair so the
+    #                    hair is solid behind the body and the dip cannot show through
+    #   front-neck-<N>   this base's own body MINUS the head, painted AFTER the hair so the
+    #                    body sits in front of it at its true width
+    #
+    # ⚠ The backfill is only for styles long enough to BRACKET the neck (hair/manifest.json).
+    # A buzz cut never reaches it, and filling the dip for one would paint hair beside a
+    # narrow neck out of nowhere.
+    backfill = front_body = ""
+    if arg("--hair"):
+        here = __file__.rsplit("/", 1)[0]
+        style = arg("--hair").rsplit("/", 1)[-1].replace(".asset.svg", "").replace("hair-", "")
+        try:
+            if json.load(open(f"{here}/hair/manifest.json"))["backfill"].get(style):
+                backfill = inner(f"{here}/bases/hair-backfill.svg")
+        except Exception:
+            backfill = ""
+        m = re.search(r"base-neck-(\d+)", base_path)
+        try:
+            front_body = inner(f"{here}/bases/front-neck-{m.group(1)}.svg") if m else ""
+        except Exception:
+            front_body = ""
     svg = svg.replace("</svg>", (
         "".join(ears)
         + part("--eyes") + part("--brows") + expr_upper
         + (mouth if fh_over else "")
-        + part("--hair")
+        + backfill + part("--hair") + front_body
         + (inner(fh).replace(f'fill="{HAIR_BASE}"', f'fill="{BEARD}"') if fh else "")
         + ("" if fh_over else mouth)
         + (nose or "")

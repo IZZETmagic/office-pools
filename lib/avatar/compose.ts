@@ -24,6 +24,10 @@ export type AvatarAssets = {
   bases: Record<string, string>
   hair: Record<string, string>
   expressions: Record<string, string>
+  /** Derived body layers — see THE STACK. Optional so older fixtures still compose. */
+  frontBody?: Record<string, string>
+  hairBackfill?: string
+  hairManifest?: Record<string, boolean>
   facialhair: Record<string, string>
   eyes: Record<string, string>
   specialEyes: Record<string, string>
@@ -301,6 +305,27 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   const [exprUpper, exprLower] = splitExpression(
     cfg.expression ? A.expressions[cfg.expression] ?? '' : '',
   )
+
+  // ---- the body goes in FRONT of the hair ----------------------------------------------
+  //
+  // ⭐⭐ Every hair asset was traced against base-neck-100 and carries that base's body
+  // silhouette as a DIP in its own outline, so on any other base the hair was wrong: a
+  // narrower neck left a background crack between the hair and the neck, and a wider one was
+  // simply covered — at neck-140 the hair hid 35px of neck on each side, which is why the two
+  // wider necks rendered almost identically to the default. Ryan, 2026-09-20.
+  //
+  // Two derived layers fix it without touching a single locked hair asset:
+  //   hairBackfill   the neck-100 body in the HAIR token, painted BEFORE the hair so the hair
+  //                  is solid behind the body and the dip cannot show through
+  //   frontBody[N]   this base's own body MINUS the head, painted AFTER the hair so the body
+  //                  sits in front of it at its true width
+  //
+  // ⚠ "minus the head" is the trick: the neck's top extends 170 units up into the skull and is
+  // meant to be hidden there, so re-painting the whole neck later would block the chin.
+  // ⚠ The backfill is only for styles long enough to BRACKET the neck — a buzz cut never
+  // reaches it, and filling the dip for one would paint hair beside a narrow neck.
+  const backfill = cfg.hair && A.hairManifest?.[cfg.hair] ? A.hairBackfill ?? '' : ''
+  const frontBody = cfg.hair ? A.frontBody?.[/(\d+)$/.exec(cfg.base)?.[1] ?? ''] ?? '' : ''
   const eyeLayer = cfg.eyes ? A.eyes[cfg.eyes] ?? A.specialEyes[cfg.eyes] ?? '' : ''
   // ⚠ not `mouth` — phase 2 binds that name to the mouth COLOUR.
   const mouthLayer = (cfg.mouth ? A.mouths[cfg.mouth] ?? '' : '') + exprLower
@@ -310,7 +335,9 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       eyeLayer +
       exprUpper +
       (fhOver ? mouthLayer : '') +
+      backfill +
       (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
+      frontBody +
       (fh ? swap(fh, T.hairBase, T.beard) : '') +
       (fhOver ? '' : mouthLayer) +
       (nose || ''),
