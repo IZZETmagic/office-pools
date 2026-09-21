@@ -45,7 +45,11 @@ GROW = 5.0
 HEAD = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048" width="1024" height="1024">'
 
 
-def flatten(d: str, n: int = 14):
+# ⚠ 48, not 14. These polygons are SUBTRACTED from each other, so a chord that cuts a corner
+# makes the head WIDER than it really is and eats into the backfill beside the neck — at 14 it
+# left a 9px background gap on f12-halfup at neck-085. The output is simplified afterwards, so
+# the extra points cost nothing in the file.
+def flatten(d: str, n: int = 48):
     toks = re.findall(r"[MLCZz]|-?\d+\.?\d*", d)
     i, cur, rings, ring = 0, None, [], []
     while i < len(toks):
@@ -160,10 +164,12 @@ def main() -> None:
     # ⚠⚠ ...and then CUT BACK OUT OF THE HEAD. The backfill paints after the head, so anything
     # of it that crosses the jaw draws a hair-coloured band across the chin — Ryan spotted
     # exactly that, "a brown hairline between the head and the neck", once the grow above was
-    # added. The head is subtracted with a 2-unit margin so flattening and simplification
-    # cannot creep back over the edge. Nothing is lost: the hair is masked away from the face,
+    # added. The head is subtracted with a 1-unit margin — enough that flattening cannot creep
+    # back over the jaw, small enough that the backfill still reaches the neck's own edge. ⚠ It
+    # was 2, which cost a 9px background gap beside the neck on f12-halfup at neck-085; 1 is
+    # only safe because flatten() now runs at 48 segments and the head hugs its real curve. Nothing is lost: the hair is masked away from the face,
     # so the backfill was never needed up there.
-    notch = notch.difference(head_100.buffer(2)).buffer(0)
+    notch = notch.difference(head_100.buffer(1)).buffer(0)
     notch = clean(notch).simplify(0.8)
     (HERE / "bases/hair-backfill.svg").write_text(
         HEAD + f'<path transform="translate(0,0)" fill="{HAIR_BASE}" d="{to_d(notch)}"/></svg>')
