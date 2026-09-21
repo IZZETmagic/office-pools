@@ -218,7 +218,8 @@ function compose(c){
   // guard test re-derives the gap from the shipped assets, so a new expression straddling
   // the line fails the build instead of rendering a brow over a fringe.
   // ⭐ the two derived body layers — see compose.ts's THE STACK for why they exist.
-  const backfill = (c.hair && (ASSETS.hairManifest||{})[c.hair]) ? (ASSETS.hairBackfill || '') : '';
+  // ⚠ per style — one shared fill leaves a hair-coloured rim on the shoulders.
+  const backfill = (c.hair && (ASSETS.hairManifest||{})[c.hair]) ? ((ASSETS.hairBackfill||{})[c.hair] || '') : '';
   const frontBody = c.hair ? ((ASSETS.frontBody||{})[(/(\d+)$/.exec(c.base)||[])[1] || ''] || '') : '';
 
   const expr = (c.mode === 'expression' && c.expression) ? ASSETS.expressions[c.expression] : '';

@@ -54,7 +54,9 @@ data = {
     # ⚠ Re-run build-body-layers.py first if a base ever changes; this only bundles them.
     "frontBody": {f.stem.split("-")[-1]: inner(f)
                   for f in sorted(HERE.glob("bases/front-neck-*.svg"))},
-    "hairBackfill": inner(HERE / "bases/hair-backfill.svg"),
+    # ⚠ per STYLE — one shared fill leaves a hair-coloured rim on the shoulders of every
+    # style that does not cover it. See build-body-layers.py.
+    "hairBackfill": {f.stem: inner(f) for f in sorted(HERE.glob("hair/backfill/*.svg"))},
     "hairManifest": json.loads((HERE / "hair/manifest.json").read_text())["backfill"],
 }
 

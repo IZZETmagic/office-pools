@@ -300,8 +300,10 @@ def main() -> None:
     # Two derived layers fix it without touching a single locked hair asset — see
     # build-body-layers.py, which generates both from the locked bases:
     #
-    #   hair-backfill    the neck-100 body in the HAIR token, painted BEFORE the hair so the
-    #                    hair is solid behind the body and the dip cannot show through
+    #   hair/backfill/   PER STYLE: the part of the dip that sits next to THAT style's own
+    #                    hair, in the HAIR token, painted BEFORE the hair. ⚠ Per style because
+    #                    one shared fill draws a hair-coloured rim along the shoulder and down
+    #                    the neck of every style that does not cover it.
     #   front-neck-<N>   this base's own body MINUS the head, painted AFTER the hair so the
     #                    body sits in front of it at its true width
     #
@@ -314,7 +316,7 @@ def main() -> None:
         style = arg("--hair").rsplit("/", 1)[-1].replace(".asset.svg", "").replace("hair-", "")
         try:
             if json.load(open(f"{here}/hair/manifest.json"))["backfill"].get(style):
-                backfill = inner(f"{here}/bases/hair-backfill.svg")
+                backfill = inner(f"{here}/hair/backfill/{style}.svg")
         except Exception:
             backfill = ""
         m = re.search(r"base-neck-(\d+)", base_path)

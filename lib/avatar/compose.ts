@@ -26,7 +26,7 @@ export type AvatarAssets = {
   expressions: Record<string, string>
   /** Derived body layers — see THE STACK. Optional so older fixtures still compose. */
   frontBody?: Record<string, string>
-  hairBackfill?: string
+  hairBackfill?: Record<string, string>
   hairManifest?: Record<string, boolean>
   facialhair: Record<string, string>
   eyes: Record<string, string>
@@ -322,8 +322,10 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   // wider necks rendered almost identically to the default. Ryan, 2026-09-20.
   //
   // Two derived layers fix it without touching a single locked hair asset:
-  //   hairBackfill   the neck-100 body in the HAIR token, painted BEFORE the hair so the hair
-  //                  is solid behind the body and the dip cannot show through
+  //   hairBackfill[h] PER STYLE: the part of the dip next to THAT style's own hair, in the
+  //                  HAIR token, painted BEFORE the hair. ⚠ Per style because one shared fill
+  //                  draws a hair-coloured rim along the shoulder and down the neck of every
+  //                  style that does not cover it — Ryan saw it on the shorter ones.
   //   frontBody[N]   this base's own body MINUS the head, painted AFTER the hair so the body
   //                  sits in front of it at its true width
   //
@@ -331,7 +333,8 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   // meant to be hidden there, so re-painting the whole neck later would block the chin.
   // ⚠ The backfill is only for styles long enough to BRACKET the neck — a buzz cut never
   // reaches it, and filling the dip for one would paint hair beside a narrow neck.
-  const backfill = cfg.hair && A.hairManifest?.[cfg.hair] ? A.hairBackfill ?? '' : ''
+  const backfill =
+    cfg.hair && A.hairManifest?.[cfg.hair] ? A.hairBackfill?.[cfg.hair] ?? '' : ''
   const frontBody = cfg.hair ? A.frontBody?.[/(\d+)$/.exec(cfg.base)?.[1] ?? ''] ?? '' : ''
   const eyeLayer = cfg.eyes ? A.eyes[cfg.eyes] ?? A.specialEyes[cfg.eyes] ?? '' : ''
   // ⚠ not `mouth` — phase 2 binds that name to the mouth COLOUR.

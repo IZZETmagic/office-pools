@@ -15,8 +15,11 @@ on each side, which is why the two wider necks render almost identically to the 
 
 ⭐⭐ THE FIX, without touching a single locked hair asset. Two derived layers:
 
-  hair-backfill.svg    the neck-100 body silhouette, in the HAIR token. Painted just BEFORE
-                       the hair, it fills the dip, so the hair is solid behind the body.
+  hair/backfill/<s>    per style: the part of the neck-100 body dip that sits next to THAT
+                       style's own hair, in the HAIR token. Painted just BEFORE the hair, it
+                       fills the dip so the hair is solid behind the body. ⚠ Per style because
+                       one shared shape leaves a hair-coloured rim on the shoulders of every
+                       style that does not cover it.
   front-neck-<N>.svg   that base's own body (shirt, neck, neck shadow) MINUS the head,
                        painted just AFTER the hair, so the body sits in front of it at its
                        true width whatever the hair does.
@@ -42,6 +45,8 @@ SKIN, SHADE = "rgb(254,205,180)", "rgb(245,178,150)"
 SHIRT, SHIRT2 = "rgb(30,118,214)", "rgb(50,118,183)"
 HAIR_BASE = "rgb(140,122,110)"
 GROW = 5.0
+BRIDGE = 44.0   # must span the dip beside the NARROWEST neck (~30 units), with margin
+SEAL = 3.0      # the grown rim is kept only this close to the hair, or it reads as an outline
 HEAD = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048" width="1024" height="1024">'
 
 
@@ -151,51 +156,71 @@ def main() -> None:
             notch = clean(body.difference(head).buffer(0)).simplify(0.8)
             head_100 = head
 
-    # ⚠ GROWN by a few units, because the dip traced into the hair is very slightly LARGER
-    # than the body it was traced from — about 2-4 units — and that difference shows as a
-    # one-pixel background crack where the hair meets the shoulder. The halo is hidden under
-    # the hair above and under the front body below, so it never shows as a rim.
-    #
-    # ⚠⚠ ...but only down to y1780. Below that the hair has ended, and a halo on the bare
-    # shoulder dome would read as a dark outline round the shirt for the whole lower canvas.
-    from shapely.geometry import box
-    grown = notch.buffer(GROW, join_style=2)
-    notch = unary_union([grown.intersection(box(0, 0, 2048, 1780)), notch])
-    # ⚠⚠ ...and then CUT BACK OUT OF THE HEAD. The backfill paints after the head, so anything
-    # of it that crosses the jaw draws a hair-coloured band across the chin — Ryan spotted
-    # exactly that, "a brown hairline between the head and the neck", once the grow above was
-    # added. The head is subtracted with a 1-unit margin — enough that flattening cannot creep
-    # back over the jaw, small enough that the backfill still reaches the neck's own edge. ⚠ It
-    # was 2, which cost a 9px background gap beside the neck on f12-halfup at neck-085; 1 is
-    # only safe because flatten() now runs at 48 segments and the head hugs its real curve. Nothing is lost: the hair is masked away from the face,
-    # so the backfill was never needed up there.
-    notch = notch.difference(head_100.buffer(1)).buffer(0)
-    notch = clean(notch).simplify(0.8)
-    (HERE / "bases/hair-backfill.svg").write_text(
-        HEAD + f'<path transform="translate(0,0)" fill="{HAIR_BASE}" d="{to_d(notch)}"/></svg>')
-    print(f"  hair-backfill.svg   area {notch.area:,.0f} (grown {GROW}u above y1780)")
-
-    # ⭐ Which hair styles need the backfill? Only the ones long enough to BRACKET the neck —
-    # a buzz cut never reaches it, and filling the dip for one would paint hair beside a narrow
-    # neck out of nowhere. Tested by asking whether the style has ink on BOTH sides of the neck
-    # at the rows where the dip is.
+    # ⭐ Which hair styles need a backfill at all? Only the ones long enough to BRACKET the
+    # neck — a buzz cut never reaches it, and filling the dip for one would paint hair beside a
+    # narrow neck out of nowhere. Tested by asking whether the style has ink on BOTH sides of
+    # the neck at the rows where the dip is.
     flags = {}
+    hairs = {}
     for f in sorted(HERE.glob("hair/assets/*.asset.svg")):
         g = unary_union([flatten(d_of(p)) for p in paths_of(f.read_text())
-                         if re.search(r'fill="rgb\(', p)])
-        def hits(x, y):
-            return g is not None and not g.is_empty and g.contains(Point(x, y))
-        brackets = any(hits(820, y) and hits(1230, y) for y in (1540, 1580, 1620))
-        flags[f.name.replace(".asset.svg", "").replace("hair-", "")] = brackets
+                         if re.search(r'fill="rgb\(', p)]).buffer(0)
+        style = f.name.replace(".asset.svg", "").replace("hair-", "")
+        hairs[style] = g
+        flags[style] = any(g.contains(Point(820, y)) and g.contains(Point(1230, y))
+                           for y in (1540, 1580, 1620))
+
+    # ⭐⭐ THE BACKFILL IS PER STYLE, and this is why. One shape covering the whole body notch
+    # draws a HAIR-COLOURED RIM along the shoulder and down the neck wherever the hair does not
+    # happen to cover it — up to 899px on f03-bobswept. Ryan saw it at once on the shorter
+    # styles: "for short long hair there is like a brown outline over the shoulders and down
+    # the neck." The fill has to be restricted to the hair that needs it.
+    #
+    # Two pieces, clipped to two different distances from that style's own silhouette:
+    #
+    #   inside the notch  within BRIDGE of the hair — the fill that closes the gap beside a
+    #                     narrower neck, so it has to reach right across the dip
+    #   the grown rim     within SEAL of the hair — two or three units, just enough to cover
+    #                     the one-pixel crack where the hair's traced dip sits very slightly
+    #                     outside the body it was traced from
+    #
+    # ⚠⚠ ...and the whole thing is CUT OUT OF THE HEAD. The backfill paints after the head, so
+    # anything crossing the jaw draws a band across the chin — Ryan saw that too. The margin is
+    # 1 unit: enough that flattening cannot creep back over the jaw, small enough that the fill
+    # still reaches the neck's own edge. It is only safe because flatten() runs at 48 segments.
+    from shapely.geometry import box
+    grown = notch.buffer(GROW, join_style=2).intersection(box(0, 0, 2048, 1780))
+    rim = grown.difference(notch)
+
+    out_dir = HERE / "hair/backfill"
+    out_dir.mkdir(exist_ok=True)
+    for old in out_dir.glob("*.svg"):
+        old.unlink()
+    made = []
+    for style, g in hairs.items():
+        if not flags[style] or g.is_empty:
+            continue
+        fill = unary_union([notch.intersection(g.buffer(BRIDGE)),
+                            rim.intersection(g.buffer(SEAL))])
+        fill = clean(fill.difference(head_100.buffer(1)).buffer(0))
+        if fill.is_empty:
+            continue
+        fill = fill.simplify(0.8)
+        (out_dir / f"{style}.svg").write_text(
+            HEAD + f'<path transform="translate(0,0)" fill="{HAIR_BASE}" d="{to_d(fill)}"/></svg>')
+        made.append(style)
+
     (HERE / "hair/manifest.json").write_text(json.dumps({
         "_comment": "backfill: this style is long enough to BRACKET the neck, so the body-shaped "
                     "dip traced into it shows as a background crack on a narrower neck. compose "
-                    "paints bases/hair-backfill.svg behind these styles to fill it. Generated by "
+                    "paints hair/backfill/<style>.svg behind it to fill that dip. The fill is "
+                    "PER STYLE because one shared shape leaves a hair-coloured rim on the "
+                    "shoulders of every style that does not cover it. Generated by "
                     "build-body-layers.py — do not hand-edit.",
         "backfill": flags,
     }, indent=2) + "\n")
-    yes = [k for k, v in flags.items() if v]
-    print(f"  hair/manifest.json  {len(yes)} of {len(flags)} styles need the backfill: {', '.join(yes)}")
+    print(f"  hair/backfill/      {len(made)} per-style fills: {', '.join(made)}")
+    print(f"  hair/manifest.json  {sum(flags.values())} of {len(flags)} styles flagged")
 
 
 if __name__ == "__main__":

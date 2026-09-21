@@ -636,7 +636,9 @@ describe('long hair works on every neck width', () => {
     // number at the end of the base key, which is what ties a base to its derived layer.
     bases: { 'base-neck-100': '<svg viewBox="0 0 2048 2048"><path d="M 0 0 L 1 0 L 1 1 Z" fill="rgb(254,205,180)"/></svg>' },
     hair: { long: `<path d="${D_HAIR2}" fill="rgb(140,122,110)"/>` },
-    hairBackfill: `<path d="${D_BACK}" fill="rgb(140,122,110)"/>`,
+    // ⚠ keyed by STYLE — one shared fill drew a hair-coloured rim along the shoulder of
+    // every style that did not cover it.
+    hairBackfill: { long: `<path d="${D_BACK}" fill="rgb(140,122,110)"/>` },
     frontBody: { '100': `<path d="${D_FRONT}" fill="rgb(30,118,214)"/>` },
     hairManifest: { long: true, short: false },
   })
@@ -676,7 +678,11 @@ describe('long hair works on every neck width', () => {
     for (const h of Object.keys(A.hair)) {
       expect(A.hairManifest?.[h], `no backfill flag for ${h}`).toBeDefined()
     }
-    expect(A.hairBackfill, 'the backfill itself').toBeTruthy()
+    // every flagged style must ship its OWN fill, and no unflagged style may have one
+    for (const [h, on] of Object.entries(A.hairManifest ?? {})) {
+      if (on) expect(A.hairBackfill?.[h], `${h} is flagged but has no backfill`).toBeTruthy()
+      else expect(A.hairBackfill?.[h], `${h} is not flagged but ships a backfill`).toBeUndefined()
+    }
     // ⚠ the flag is what stops a buzz cut gaining hair beside a narrow neck; if this ever
     // becomes all-true or all-false, build-body-layers.py's bracket test has broken.
     const on = Object.values(A.hairManifest ?? {}).filter(Boolean).length
