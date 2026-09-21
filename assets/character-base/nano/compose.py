@@ -55,6 +55,28 @@ GLASS = (120, 162, 205)
 LENS_TOWARD_GLASS = 0.58
 DEFAULT_FRAME = "#22262E"
 
+# ⭐⭐ THE EYE TOKENS, for one purpose: a tinted lens is OPAQUE, so nothing behind it is drawn.
+# Ryan, 2026-09-21: "When wearing sunglasses, the eyes should not be able to be seen."
+#
+# ⚠ Painting the eyes and letting the lens cover them is NOT enough, because THE EYE IS BIGGER
+# THAN THE LENS. Measured across all 13 eye assets: the default leaks 8.8% of its area past
+# s01-classic and 11.1% past s02-aviator, eye-04-wide leaks 27.8% and eye-hearts 29.5% — a rim
+# of white and iris standing proud of the frame on every one of them.
+#
+# ⭐ Dropped BY TOKEN, not by position: position needs polygon geometry and this must give the
+# same answer in all three composers, none of which share one.
+# ⚠ BROWS ARE NOT IN THIS LIST and must not be. They sit at y700..817 against a frame whose top
+# edge is y715, so paint order already hides all but the sliver standing above the rim — which
+# is what brows do above real sunglasses. Cheeks and tear tracks stay for the same reason.
+# ⚠ The eye white shares its token with an open mouth's TEETH; only the expression's UPPER half
+# is stripped, and the teeth are in the lower one.
+EYE_TOKENS = ("rgb(255,255,255)", "rgb(117,62,21)", "rgb(150,84,34)", "rgb(90,60,45)")
+
+
+def strip_eyes(frag: str) -> str:
+    return "".join(m.group(0) for m in re.finditer(r"<path[^>]*/?>", frag)
+                   if not any(f'fill="{t}"' in m.group(0) for t in EYE_TOKENS))
+
 # Stubble is a SHADOW on the skin, not a short beard. Measured off the art Ryan approved on
 # 2026-09-18: 84% of the way from the beard to the skin in lightness, and clearly greyer than
 # the hair-to-skin line. A plain 55% mix gave a mid brown that read as a lighter full beard.
@@ -426,9 +448,14 @@ def main() -> None:
                 '<defs><mask id="faceonly" maskUnits="userSpaceOnUse" x="0" y="0"'
                 f' width="2048" height="2048"><path d="{head_d}" fill="white"/></mask></defs>'
                 f'<g mask="url(#faceonly)">{copy}</g>')
+    tinted = LENS_TINT in part("--glasses")
     svg = svg.replace("</svg>", (
         "".join(ears)
-        + part("--eyes") + part("--brows") + expr_upper
+        # ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset
+        # rather than declared in a manifest: a style is tinted exactly when it paints a lens,
+        # and a clear pair has no lens path at all. Nothing to keep in step.
+        + ("" if tinted else part("--eyes")) + part("--brows")
+        + (strip_eyes(expr_upper) if tinted else expr_upper)
         # ⭐ EYEWEAR SITS OVER THE EYES AND UNDER THE HAIR. Over the eyes is not a choice.
         # Under the hair is: a temple arm runs from the outer corner back to the ear bump and
         # real arms disappear into hair, so a style that legitimately covers the ears

@@ -1063,6 +1063,92 @@ describe('eyewear', () => {
     }
   })
 
+  // ---------------------------------------------------------------------------------
+  // ⭐⭐ A TINTED LENS IS OPAQUE — Ryan, 2026-09-21: "When wearing sunglasses, the eyes should
+  // not be able to be seen." Painting the eyes and letting the lens cover them is NOT enough,
+  // because THE EYE IS BIGGER THAN THE LENS: measured across all 13 eye assets, the default
+  // leaks 8.8% of its area past s01-classic and 11.1% past s02-aviator, eye-04-wide leaks
+  // 27.8% and eye-hearts 29.5% — a rim of white and iris standing proud of the frame.
+  // ---------------------------------------------------------------------------------
+
+  it('hides the eyes behind a tinted lens, and only behind a tinted one', () => {
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const eyeKeys = [...Object.keys(A.eyes), ...Object.keys(A.specialEyes)]
+    expect(eyeKeys.length, 'eyes should be bundled').toBeGreaterThan(5)
+    for (const g of Object.keys(A.glasses ?? {})) {
+      const isTinted = A.glasses![g].includes(LENS_TINT)
+      for (const e of eyeKeys) {
+        const svg = composeAvatar(
+          { ...cfg, base: 'base-neck-100', hair: null, facialHair: null, eyes: e, glasses: g }, A,
+        )
+        const ds = [...(A.eyes[e] ?? A.specialEyes[e]).matchAll(/d="([^"]*)"/g)].map((m) => m[1])
+        const kept = ds.filter((d) => svg.includes(`d="${d}"`)).length
+        if (isTinted) expect(kept, `${g} + ${e}: an eye showed through a tinted lens`).toBe(0)
+        // ⚠ the other half of the rule: a CLEAR frame must not eat the eyes
+        else expect(kept, `${g} + ${e}: a clear frame dropped the eyes`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('strips an expression\'s eyes but keeps its brows, cheeks and teeth', () => {
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const EYE_TOKENS = ['rgb(255,255,255)', 'rgb(117,62,21)', 'rgb(150,84,34)', 'rgb(90,60,45)']
+    const BROW = 'rgb(101,70,52)'
+    const topY = (d: string) => {
+      const n = (d.match(/-?\d+\.?\d*/g) ?? []).map(Number)
+      const ys = n.filter((_, i) => i % 2 === 1)
+      return ys.length ? Math.min(...ys) : 0
+    }
+    const tinted = Object.keys(A.glasses ?? {}).filter((k) => A.glasses![k].includes(LENS_TINT))
+    expect(tinted.length, 'there should be tinted styles').toBeGreaterThan(0)
+
+    let sawTeeth = false
+    for (const g of tinted) {
+      for (const x of Object.keys(A.expressions)) {
+        const svg = composeAvatar(
+          { ...cfg, base: 'base-neck-100', hair: null, facialHair: null,
+            eyes: null, mouth: null, expression: x, glasses: g }, A,
+        )
+        for (const m of A.expressions[x].matchAll(/<path[^>]*\/?>/g)) {
+          const d = /d="([^"]*)"/.exec(m[0])?.[1]
+          if (!d) continue
+          const isEyeToken = EYE_TOKENS.some((t) => m[0].includes(`fill="${t}"`))
+          const present = svg.includes(`d="${d}"`)
+          if (isEyeToken && topY(d) < 1072) {   // the split compose uses, pinned above
+            expect(present, `${g} + ${x}: an expression eye survived`).toBe(false)
+          } else if (isEyeToken) {
+            // ⭐ the eye white is ALSO an open mouth's teeth, at y1192. They must survive —
+            // this is exactly why the strip is confined to the expression's upper half.
+            expect(present, `${g} + ${x}: the teeth were stripped with the eyes`).toBe(true)
+            sawTeeth = true
+          }
+          if (m[0].includes(`fill="${BROW}"`)) {
+            expect(present, `${g} + ${x}: a brow was dropped`).toBe(true)
+          }
+        }
+      }
+    }
+    expect(sawTeeth, 'an open-mouth expression should have exercised the teeth case').toBe(true)
+  })
+
+  it('keeps the same eye-token list in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must strip the eyes behind a tinted lens`).toMatch(/strip_?[eE]yes/)
+      for (const t of ['255,255,255', '117,62,21', '150,84,34', '90,60,45']) {
+        expect(src, `${file} is missing eye token ${t}`).toContain(t)
+      }
+      expect(src, `${file} must not strip the brow token`).not.toMatch(/EYE_TOKENS[^\n]*101,70,52/)
+    }
+  })
+
   it('keeps the same lens derivation in the Python composer and the builder port', () => {
     // ⚠⚠ The builder is type-checked by nothing, and a builder that lies about the product's
     // colour is worse than no builder.

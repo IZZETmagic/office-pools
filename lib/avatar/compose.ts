@@ -351,6 +351,34 @@ function findEars(doc: string): string[] {
   return out
 }
 
+/**
+ * ⭐⭐ THE EYE TOKENS, for one purpose: a tinted lens is OPAQUE, so nothing behind it is drawn.
+ * Ryan, 2026-09-21: "When wearing sunglasses, the eyes should not be able to be seen."
+ *
+ * ⚠ Painting the eyes and letting the lens cover them is not enough, because THE EYE IS BIGGER
+ * THAN THE LENS. Measured across all 13 eye assets: the default leaks 8.8% of its area past
+ * `s01-classic` and 11.1% past `s02-aviator`, `eye-04-wide` leaks 27.8%, and `eye-hearts` 29.5%
+ * — a rim of white and iris standing proud of the frame on every one of them.
+ *
+ * ⭐ Dropped BY TOKEN and not by position, because position needs polygon geometry and this has
+ * to give the same answer in compose.py and in the builder, neither of which has shapely.
+ * ⚠ BROWS ARE NOT IN THIS LIST and must not be. They sit at y700..817 against a frame whose top
+ * edge is y715, so paint order already hides all but the sliver that stands above the rim —
+ * which is what brows do above real sunglasses. Cheeks, blush and tear tracks stay for the same
+ * reason. ⚠ The eye white shares its token with an open mouth's TEETH; only the expression's
+ * UPPER half is stripped, and teeth are in the lower one.
+ */
+const EYE_TOKENS = [
+  'rgb(255,255,255)', // the eye white
+  'rgb(117,62,21)',   // the iris core
+  'rgb(150,84,34)',   // the iris rim
+  'rgb(90,60,45)',    // the lid line
+]
+
+const stripEyes = (frag: string) =>
+  frag.replace(/<path[^>]*\/?>/g, (p) =>
+    EYE_TOKENS.some((t) => p.includes(`fill="${t}"`)) ? '' : p)
+
 /** See THE STACK below: an expression is split so its brows go under the hair and its
  *  mouth over a beard. Paths are grouped by their TOP edge against this line. */
 const EXPRESSION_SPLIT = 1072
@@ -461,7 +489,6 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       `<g mask="url(#faceonly)">${(A.hair[cfg.hair!] ?? '').split('facehole').join('facehole-front')}</g>`
     : ''
   const frontBody = cfg.hair ? A.frontBody?.[/(\d+)$/.exec(cfg.base)?.[1] ?? ''] ?? '' : ''
-  const eyeLayer = cfg.eyes ? A.eyes[cfg.eyes] ?? A.specialEyes[cfg.eyes] ?? '' : ''
   // ⭐ EYEWEAR SITS OVER THE EYES AND UNDER THE HAIR. Over the eyes is not a choice. Under the
   // hair is: a temple arm runs from the outer corner back to the ear bump, and real arms
   // disappear into hair — so the styles that legitimately cover the ears (m15-locs, f09-midwavy)
@@ -469,13 +496,19 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   // ⚠ No conflict with "the nose is always last": the eyes span y674-1026 and the nose starts
   // at y954.7, so the bridge sits above it and the two never meet.
   const glassesLayer = cfg.glasses ? A.glasses?.[cfg.glasses] ?? '' : ''
+
+  // ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset rather
+  // than declared in a manifest: a style is tinted exactly when it paints a lens, and a clear
+  // pair has no lens path at all. Nothing to keep in step.
+  const tinted = glassesLayer.includes(T.lensTint)
+  const eyeLayer = tinted ? '' : cfg.eyes ? A.eyes[cfg.eyes] ?? A.specialEyes[cfg.eyes] ?? '' : ''
   // ⚠ not `mouth` — phase 2 binds that name to the mouth COLOUR.
   const mouthLayer = (cfg.mouth ? A.mouths[cfg.mouth] ?? '' : '') + exprLower
 
   add(
     ears.join('') +
       eyeLayer +
-      exprUpper +
+      (tinted ? stripEyes(exprUpper) : exprUpper) +
       glassesLayer +
       (fhOver ? mouthLayer : '') +
       backfill +

@@ -140,6 +140,17 @@ const BEARD_LIFT = 12;
    ⚠⚠ A LENS LEANS TOWARD GLASS, it is not the frame lightened. Lightening by a constant
    matches the approved art on a black frame and gives a pale primrose on gold. */
 const GLASS = [120,162,205], LENS_TOWARD_GLASS = 0.58, DEFAULT_FRAME = '#22262E';
+/* ⭐⭐ A TINTED LENS IS OPAQUE, so nothing behind it is drawn. Ryan, 2026-09-21: "When wearing
+   sunglasses, the eyes should not be able to be seen."
+   ⚠ Letting the lens cover them is NOT enough — THE EYE IS BIGGER THAN THE LENS. The default
+   eye leaks 8.8% of its area past s01-classic and eye-hearts leaks 29.5%.
+   ⚠ BROWS ARE NOT IN THIS LIST: they sit at y700..817 against a frame top edge of y715, so
+   paint order already hides all but the sliver above the rim. Cheeks and tear tracks likewise.
+   ⚠ The eye white shares its token with an open mouth's TEETH — only the expression's UPPER
+   half is stripped, and teeth are in the lower one. */
+const EYE_TOKENS = ['rgb(255,255,255)','rgb(117,62,21)','rgb(150,84,34)','rgb(90,60,45)'];
+const stripEyes = frag => frag.replace(/<path[^>]*\/?>/g,
+  p => EYE_TOKENS.some(t => p.includes(`fill="${t}"`)) ? '' : p);
 // ⚠⚠ stroke as well as fill: every hair path carries a hairline stroke of its own fill (see
 // seal-hair-seams.py), holding the same token, so fill-only would leave grey-brown outlines.
 const swapAll = (s,find,rep) =>
@@ -229,6 +240,8 @@ function compose(c){
   // ⭐ eyewear sits OVER the eyes and UNDER the hair — a temple arm disappears into hair the
   // way a real one does. See compose.ts for why the nose rule is untouched.
   const glassesLayer = c.glasses ? ((ASSETS.glasses||{})[c.glasses] || '') : '';
+  // ⭐ tinted is INFERRED from the asset — a style is tinted exactly when it paints a lens.
+  const tinted = glassesLayer.includes(T.lensTint);
   const fhOver = !!(c.facialhair && (ASSETS.fhManifest[c.facialhair]||{}).over);
 
   // THE STACK. Everything that goes on top of the head is laid out in ONE place, in one
@@ -287,12 +300,12 @@ function compose(c){
     const ys = n.filter((_, i) => i % 2 === 1);
     (ys.length && Math.min(...ys) >= 1072 ? lower : upper).push(m[0]);
   }
-  const eyes  = (c.mode !== 'expression' && c.eyes)  ? (ASSETS.eyes[c.eyes] || ASSETS.specialEyes[c.eyes]) : '';
+  const eyes  = (!tinted && c.mode !== 'expression' && c.eyes) ? (ASSETS.eyes[c.eyes] || ASSETS.specialEyes[c.eyes]) : '';
   // ⚠ not `mouth` — the recolour pass below binds that name to the mouth COLOUR.
   const mouthLayer = ((c.mode !== 'expression' && c.mouth) ? ASSETS.mouths[c.mouth] : '') + lower.join('');
 
   add(ears.join('')
-      + eyes + upper.join('') + glassesLayer
+      + eyes + (tinted ? stripEyes(upper.join('')) : upper.join('')) + glassesLayer
       + (fhOver ? mouthLayer : '')
       + backfill + (c.hair ? ASSETS.hair[c.hair] : '') + frontBody
       + (fh ? swapAll(fh, T.hairBase, T.beard) : '') + hairFront
