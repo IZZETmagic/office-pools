@@ -58,10 +58,14 @@ LENS_TOWARD_GLASS = 0.58
 # highlight band. ⚠⚠ It cannot keep the tone it traced as: the generator draws it near-white and
 # Recraft quantises that to rgb(255,255,255), which is the BACKGROUND token — left alone every
 # highlight is repainted with the background colour and vanishes on a white one.
-# ⭐ Derived from the SKIN so it is guaranteed lighter than whatever it sits on, on every swatch.
+# ⭐⭐ IT IS TRANSLUCENT, AND THAT IS WHY IT IS A CONSTANT. It was opaque and derived from the
+# skin so it would stay lighter than whatever it sat on — a derivation whose only job was to
+# fake what transparency does for free. With fill-opacity (carried in the ASSET, see
+# extract-glasses.py) the highlight lightens the skin, the eye white and the iris alike, which
+# is what glass does. ⚠ The tint is COOL against warm skin, which is what carries it on the
+# palest swatch, where there is nowhere lighter to go.
 GLINT = "rgb(226,240,250)"
-GLASS_WHITE = (245, 250, 255)
-GLINT_TOWARD_WHITE = 0.82
+GLASS_TINT = (214, 234, 250)
 DEFAULT_FRAME = "#22262E"
 
 # ⭐⭐ THE EYE TOKENS, for one purpose: a tinted lens is OPAQUE, so nothing behind it is drawn.
@@ -511,10 +515,7 @@ def main() -> None:
         svg = svg.replace(f'fill="{FRAME_INK}"', f'fill="{rgb_str(fr)}"')
         lens = tuple(int(a + (b - a) * LENS_TOWARD_GLASS) for a, b in zip(fr, GLASS))
         svg = svg.replace(f'fill="{LENS_TINT}"', f'fill="{rgb_str(lens)}"')
-        if sk := arg("--skin"):
-            g = tuple(int(a + (b - a) * GLINT_TOWARD_WHITE)
-                      for a, b in zip(hex_to_rgb(sk), GLASS_WHITE))
-            svg = svg.replace(f'fill="{GLINT}"', f'fill="{rgb_str(g)}"')
+        svg = svg.replace(f'fill="{GLINT}"', f'fill="{rgb_str(GLASS_TINT)}"')
 
     if c := (arg("--brow-colour") or arg("--hair-colour")):
         svg = svg.replace(f'fill="{BROW_INK}"', f'fill="{darken(hex_to_rgb(c), 0.82)}"')

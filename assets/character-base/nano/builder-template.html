@@ -143,9 +143,9 @@ const BEARD_LIFT = 12;
    ⚠⚠ A LENS LEANS TOWARD GLASS, it is not the frame lightened. Lightening by a constant
    matches the approved art on a black frame and gives a pale primrose on gold. */
 const GLASS = [120,162,205], LENS_TOWARD_GLASS = 0.58, DEFAULT_FRAME = '#22262E';
-// ⭐ the highlight is derived from the SKIN so it is lighter than whatever it sits on, on every
-// swatch — a fixed near-white is nearly invisible on the palest one.
-const GLASS_WHITE = [245,250,255], GLINT_TOWARD_WHITE = 0.82;
+// ⭐⭐ the highlight is TRANSLUCENT (fill-opacity lives in the asset), so it lightens whatever
+// is behind it and the derivation that used to fake that is gone. One cool constant.
+const GLASS_TINT = [214,234,250];
 /* ⭐⭐ A TINTED LENS IS OPAQUE, so nothing behind it is drawn. Ryan, 2026-09-21: "When wearing
    sunglasses, the eyes should not be able to be seen."
    ⚠ Letting the lens cover them is NOT enough — THE EYE IS BIGGER THAN THE LENS. The default
@@ -337,7 +337,7 @@ function compose(c){
     const frame = hex2rgb(c.frameColour || DEFAULT_FRAME);
     svg = swapAll(svg, T.frameInk, rgbStr(frame));
     svg = swapAll(svg, T.lensTint, mix(frame, GLASS, LENS_TOWARD_GLASS));
-    svg = swapAll(svg, T.glint, mix(skin, GLASS_WHITE, GLINT_TOWARD_WHITE));
+    svg = swapAll(svg, T.glint, rgbStr(GLASS_TINT));
   }
   svg = swapAll(svg, T.browInk, darken(hair,0.82));          // brows follow hair
   const beardTone = rgbStr(hair.map(v => Math.min(255, v + BEARD_LIFT)));

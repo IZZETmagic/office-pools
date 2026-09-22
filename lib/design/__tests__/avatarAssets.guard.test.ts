@@ -1205,32 +1205,47 @@ describe('eyewear', () => {
     expect(clear, 'there should be clear styles').toBeGreaterThan(0)
   })
 
-  it('keeps the highlight lighter than the skin it sits on, on every swatch', () => {
-    // ⚠⚠ THE HIGHLIGHT IS DERIVED FROM THE SKIN, not fixed. A fixed near-white is nearly
-    // invisible on the palest swatch, and the whole point of it is that the lens reads as glass
-    // on every one. Same shape as the stubble floor: guarantee the separation.
+  it('makes the highlight translucent, so the eye reads through the glass', () => {
+    // ⭐⭐ Ryan, 2026-09-21: "The glint is there but you can't see through it. It is glass and
+    // should be subtle so you can still see through it." An opaque band is a blind. This is
+    // the first fill-opacity in the avatar system, so it is worth a test of its own: without
+    // it the highlight is a solid stripe across the iris and nobody notices until they look.
     const A = JSON.parse(
       readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
     ) as AvatarAssets
-    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
-    const hex = (h: string) => [0, 2, 4].map((i) => parseInt(h.replace('#', '').slice(i, i + 2), 16))
+    const GLINT = 'rgb(226,240,250)'
+    let checked = 0
+    for (const g of Object.keys(A.glasses ?? {})) {
+      const frag = A.glasses![g]
+      if (!frag.includes(GLINT)) continue
+      checked++
+      const path = new RegExp(`<path[^>]*fill="${GLINT.replace(/[()]/g, '\\$&')}"[^>]*/?>`).exec(frag)
+      expect(path, `${g}: no highlight path`).toBeTruthy()
+      const a = /fill-opacity="([0-9.]+)"/.exec(path![0])
+      expect(a, `${g}: the highlight is opaque — it will read as a blind, not glass`).toBeTruthy()
+      const v = Number(a![1])
+      expect(v, `${g}: the highlight is too solid to see through`).toBeLessThanOrEqual(0.45)
+      expect(v, `${g}: the highlight is too faint to read as glass`).toBeGreaterThanOrEqual(0.25)
+    }
+    expect(checked, 'some style should carry a highlight').toBeGreaterThan(0)
+  })
+
+  it('paints the glass as one constant tint, not a derivation', () => {
+    // ⚠ The highlight USED to be derived from the skin, purely so it would stay lighter than
+    // whatever it sat on. Transparency does that for free, so the derivation went. If someone
+    // reintroduces a per-skin glint they have rebuilt a workaround for a solved problem.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const seen = new Set<string>()
     for (const skin of PALETTE.skin) {
       const svg = composeAvatar({ ...cfg, base: 'base-neck-100', hair: null, facialHair: null,
         glasses: 'g02-rect', skin }, A)
-      // mix(skin, [245,250,255], 0.82)
-      const want = hex(skin).map((v, i) => Math.trunc(v + ([245, 250, 255][i] - v) * 0.82))
-      expect(svg, `${skin}: the derived highlight is missing`).toContain(`rgb(${want.join(',')})`)
-      const sk = hex(skin)
-      // ⚠⚠ TWO AXES, because luminance alone is not available on the palest swatch. Skin
-      // #FFE0C4 is already at luminance 228, so a highlight can only be 16.6 lighter — it
-      // reads by being COOL against warm skin instead, which is how a reflection on a light
-      // face actually reads. Measured across the palette: luminance 16.6..163.8, warm/cool
-      // shift 52..116. Both floors below sit just under the real minimum.
-      expect(lum(want) - lum(sk), `${skin}: the highlight is not lighter than the skin`)
-        .toBeGreaterThan(15)
-      expect((want[2] - want[0]) - (sk[2] - sk[0]),
-        `${skin}: the highlight is not cool enough to read against the skin`).toBeGreaterThan(50)
+      const m = /fill="(rgb\(214,234,250\))"/.exec(svg)
+      expect(m, `${skin}: the glass tint is missing`).toBeTruthy()
+      seen.add(m![1])
     }
+    expect(seen.size, 'the glass tint must not vary with the skin').toBe(1)
   })
 
   it('keeps the highlight inside the lens, never over the frame', () => {
@@ -1265,8 +1280,7 @@ describe('eyewear', () => {
     ]) {
       const src = readFileSync(join(process.cwd(), file), 'utf8')
       expect(src, `${file} must carry the glint token`).toContain('226,240,250')
-      expect(src, `${file} must mix toward the same glass white`).toMatch(/245,\s*250,\s*255/)
-      expect(src, `${file} must use the same coefficient`).toContain('0.82')
+      expect(src, `${file} must use the same glass tint`).toMatch(/214,\s*234,\s*250/)
     }
   })
 

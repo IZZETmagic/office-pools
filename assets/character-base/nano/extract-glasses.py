@@ -54,6 +54,14 @@ LENS_TINT = "rgb(96,126,156)"
 # Recraft quantises it to rgb(255,255,255) — which is the BACKGROUND token. Left alone, every
 # glint would be repainted with the avatar's background colour and vanish on a white one.
 GLINT = "rgb(226,240,250)"
+# ⭐⭐ AND IT IS TRANSLUCENT. Ryan, 2026-09-21: "The glint is there but you can't see through it.
+# It is glass and should [be] subtle so you can still see through it." An opaque band is a
+# blind; glass lightens what is behind it and lets it read. 0.35 was picked off a strip of
+# candidates from 0.18 to 0.55 — below 0.25 it disappears, above 0.45 it starts hiding the iris.
+#
+# ⚠ This is the first `fill-opacity` in the avatar system. It joins <mask> and <linearGradient>
+# in the pile that has never been proven on a device with react-native-svg.
+GLINT_ALPHA = 0.35
 DARK_MAX_LUM = 110.0
 GLINT_MIN_LUM = 195.0
 
@@ -195,7 +203,8 @@ def add_glint(trace_path: str, asset_path: str) -> None:
     if glint.is_empty:
         sys.exit(f"{trace_path}: the highlight vanished once the corners were subtracted")
     glint = glint.simplify(0.6)
-    frag = f'<path transform="translate(0,0)" fill="{GLINT}" d="{to_d(glint)}"/>'
+    frag = (f'<path transform="translate(0,0)" fill="{GLINT}" '
+            f'fill-opacity="{GLINT_ALPHA}" d="{to_d(glint)}"/>')
     Path(asset_path).write_text(asset.replace("</svg>", frag + "</svg>"))
     print(f"  {Path(asset_path).name:<26} highlight {glint.area:7.0f}u²  "
           f"= {100 * glint.area / holes.area:4.1f}% of the lens openings")

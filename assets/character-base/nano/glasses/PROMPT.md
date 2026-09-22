@@ -73,6 +73,20 @@ generate `g02-rect` first, decide its two thin streaks were right, and hand that
 IMAGE 3 — "the same pair of separate parallel diagonal streaks per lens, at the same slant, at
 the same narrow thickness relative to the lens". All three now sit in a 25–33% band.
 
+⭐⭐ **AND IT IS TRANSLUCENT.** Ryan, straight after: *"The glint is there but you can't see
+through it. It is glass and should be subtle so you can still see through it."* An opaque band
+is a blind. `fill-opacity="0.35"`, picked off a strip from 0.18 to 0.55 — below 0.25 it
+disappears, above 0.45 it starts hiding the iris.
+
+⭐ Transparency also **deleted a derivation**. The highlight had been derived from the skin
+(82% toward a cool white) purely so it would stay lighter than whatever it sat on — a
+workaround for not having alpha. Compositing does that for free, so the tint is now one cool
+constant, `rgb(214,234,250)`. ⚠ Cool is what carries it on the palest swatch, where the skin is
+already at luminance 228.6 and there is nowhere lighter to go.
+
+⚠⚠ This is the **first `fill-opacity` in the avatar system**. It joins `<mask>` and
+`<linearGradient>` in the pile never proven on a device with react-native-svg.
+
 ⚠ `rings_of()` exists because **`flatten()` cannot read a hole.** It unions the subpaths, and a
 hole unioned with the shape it sits in is a filled disc on top — the interiors vanish. An SVG
 hole is a subpath resolved by fill-rule at paint time, so the rings have to be kept apart and
