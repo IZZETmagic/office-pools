@@ -10,11 +10,41 @@
 ⭐ A GARMENT IS PAINTED IN THE BASE'S OWN SHIRT TOKENS, so `--shirt` recolours it exactly as it
 recolours the default shirt. No new token, no new config field, no new palette.
 
-⚠⚠ THE ART COMES BACK WITH MORE THAN TWO BLUES and the system has exactly two shirt tokens.
-w01-crew traced three (the ribbed collar split into two darks) and w04-polo three. Everything
-that is not the main body tone is collapsed into the SHADOW token. That is not a loss: the
-collapse merges the rib's spokes into one band, and the gaps between them are the MAIN tone,
-which is not in the dark set — so the rib survives as light gaps in a dark arc.
+⚠⚠ THE ART COMES BACK WITH THREE OR FOUR TONES and there are three tokens, so they are sorted
+by LUMINANCE against the body tone rather than counted:
+
+  lighter than the body   -> SHIRT3, the light token (the sports top's panels)
+  the body itself         -> SHIRT, taken verbatim from --shirt
+  darker                  -> SHIRT2, the shadow token (collars, pockets, plackets, ribbing)
+
+⚠ Anything darker collapses into ONE token, so two dark tones in one design merge. That is why
+the direction of the third token matters: `shirt -> shirt2` was already the dark step, and a
+second dark one would have left the sports top's LIGHT panel with nowhere to go but a dark
+token, rendering it backwards.
+
+⚠⚠ THE BODY TONE IS THE ONE THAT OWNS THE DOME'S OUTER RIM. Three rules were tried and two
+are wrong:
+
+  closest to the base's blue   the generator designs in its OWN hue — these came back green,
+                               olive and teal, and none of them matches
+  the largest area             the sports top's biggest area is its LIGHT PANEL at 39% against
+                               a 22% body, so this inverts the garment
+  a probe point                landed inside the knitwear's fair-isle band, which crosses the
+                               whole chest, and inverted that one instead
+
+  the outer rim                the SHADOW PANEL is large and owns the whole right rim, so it
+                               wins the vote and inverts the garment again
+
+⚠⚠ AND ALL THREE SHARE ONE BLIND SPOT: THE JIGSAW. The vectorizer lays ONE tone down as the
+whole dome and butts every other shape on top of it, and which tone it picks is arbitrary — on
+the knitwear it chose the DARK one, so the dark has 547k of area against the body's 318k and
+wins any vote taken on raw geometry. Worse, emitting that dark blob as the detail layer paints
+it back over the whole garment.
+
+So every path is first reduced to what is actually VISIBLE — painter's algorithm, each shape
+minus everything drawn after it. Then the body is whichever visible tone owns the outer rim of
+the LEFT half: collars, plackets and pockets sit inboard, and the prompt pins the shadow panel
+to the right.
 
 ⚠ THE GARMENT IS ALSO CUT BY THE HEAD, for the same reason the body layers are: the body slot
 is painted AFTER the head, so anything a garment puts above the shoulder would land on the jaw.
@@ -52,9 +82,13 @@ REGION = box(300, 1400, 1760, 2060)
 BASE_SHIRT = (30, 118, 214)
 SHIRT_TOK = "rgb(30,118,214)"
 SHADE_TOK = "rgb(50,118,183)"
+LIGHT_TOK = "rgb(96,170,240)"
 SKIN_TOK = "rgb(254,205,180)"
 SEAM_BURY = 6.0
+RIM_BAND = 40.0
+VERBOSE = "-v" in sys.argv
 SKIN = (254, 205, 180)
+SHADE = (245, 178, 150)      # the neck shadow, which is skin as far as a garment is concerned
 
 HEAD = ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '
         'viewBox="0 0 2048 2048" width="1024" height="1024">')
@@ -105,6 +139,10 @@ def close(a, b, tol: int = 20) -> bool:
     return all(abs(x - y) <= tol for x, y in zip(a, b))
 
 
+def lum(c) -> float:
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
 def clean(g, floor: float = 250):
     if g.is_empty:
         return g
@@ -142,23 +180,56 @@ def main() -> None:
     if neck100 is None:
         sys.exit("could not find the neck in base-neck-100.svg")
 
-    main_g, dark, skin = [], [], []
+    # every garment-coloured path in the body band, kept with its colour
+    cand = []
     for p in re.findall(r"<path[^>]*/?>", Path(src).read_text()):
         f = re.search(r'fill="rgb\((\d+),\s*(\d+),\s*(\d+)\)"', p)
         if not f:
             continue
         c = tuple(int(x) for x in f.groups())
-        if c[2] - c[0] <= 40:                       # not a blue
-            continue
+        if close(c, SKIN, 26) or close(c, SHADE, 26) or min(c) > 240:
+            continue                                 # skin, its shade, or the background
         d = re.search(r'd="([^"]*)"', p).group(1)
         v = [float(x) for x in re.findall(r"-?\d+\.?\d*", d)]
         xs, ys = v[0::2], v[1::2]
         if not REGION.contains(box(min(xs), min(ys), max(xs), max(ys))):
             continue
         g = flatten(d)
-        if g is None or g.is_empty:
-            continue
-        (main_g if close(c, BASE_SHIRT) else dark).append(g)
+        if g is not None and not g.is_empty:
+            cand.append((c, g))
+
+    if not cand:
+        sys.exit(f"{src}: no garment found in the body band — check the trace")
+
+    silhouette = unary_union([g for _, g in cand]).buffer(0)
+
+    # ⭐⭐ PAINTER'S ALGORITHM FIRST. Each shape minus everything drawn after it, so what is
+    # measured and emitted is what is actually seen — not the tracer's arbitrary base blob.
+    vis = []
+    for i, (c, g) in enumerate(cand):
+        later = [h for _, h in cand[i + 1:]]
+        v = g.difference(unary_union(later).buffer(0)).buffer(0) if later else g
+        if not v.is_empty:
+            vis.append((c, v))
+
+    rim = (silhouette.difference(silhouette.buffer(-RIM_BAND))
+           .intersection(box(0, 0, 1024, 2048)).buffer(0))
+    tally: dict = {}
+    for c, v in vis:
+        tally[c] = tally.get(c, 0.0) + v.intersection(rim).area
+    body_c = max(tally, key=tally.get) if tally else max(vis, key=lambda t: t[1].area)[0]
+    if VERBOSE:
+        for c, a in sorted(tally.items(), key=lambda kv: -kv[1]):
+            print(f"      rgb{str(c):<18} visible left rim {a:8.0f}"
+                  + ("   <- body" if c == body_c else ""))
+
+    main_g, dark, light = [], [], []
+    for c, v in vis:
+        if close(c, body_c):
+            main_g.append(v)
+        else:
+            (light if lum(c) > lum(body_c) else dark).append(v)
+    skin = []
 
     # the skin the garment invents below the neckline — everything the trace paints in skin
     # inside the body band, minus what the body already provides
@@ -180,8 +251,9 @@ def main() -> None:
 
     # The garment's whole silhouette: the body plus every detail laid on it. Solid, because the
     # per-base neck is what cuts the collar.
-    whole = clean(unary_union(main_g + dark).buffer(0).difference(head).buffer(0))
+    whole = clean(silhouette.difference(head).buffer(0))
     shade = clean(unary_union(dark).buffer(0).difference(head).buffer(0)) if dark else None
+    panel = clean(unary_union(light).buffer(0).difference(head).buffer(0)) if light else None
     # ⚠⚠ THE SEAM IS BURIED, NOT BUTTED. Subtracting the neck exactly leaves the chest's top
     # edge coincident with the neck compose paints on top of it — two anti-aliased edges on one
     # line cover ~75% between them, and the garment BLUE leaks through as a dashed hairline
@@ -197,13 +269,17 @@ def main() -> None:
     if chest is not None and not chest.is_empty:
         frags.append(f'<path transform="translate(0,0)" fill="{SKIN_TOK}" '
                      f'd="{to_d(chest.simplify(0.7))}"/>')
+    if panel is not None and not panel.is_empty:
+        frags.append(f'<path transform="translate(0,0)" fill="{LIGHT_TOK}" '
+                     f'd="{to_d(panel.simplify(0.7))}"/>')
     if shade is not None and not shade.is_empty:
         frags.append(f'<path transform="translate(0,0)" fill="{SHADE_TOK}" '
                      f'd="{to_d(shade.simplify(0.7))}"/>')
     Path(dst).write_text(HEAD + "".join(frags) + "</svg>")
     print(f"  {Path(dst).name:<24} body {whole.area:8.0f}u²  "
           f"detail {(shade.area if shade is not None else 0):7.0f}u²  "
-          f"chest {(chest.area if chest is not None else 0):7.0f}u²")
+          f"light {(panel.area if panel is not None else 0):7.0f}u²  "
+          f"chest {(chest.area if chest is not None else 0):6.0f}u²")
 
 
 if __name__ == "__main__":

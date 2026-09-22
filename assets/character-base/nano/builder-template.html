@@ -122,6 +122,9 @@ const T = {
   hairBase:'rgb(140,122,110)', hairShade:'rgb(114,97,86)', hairLight:'rgb(168,150,138)',
   skin:'rgb(254,205,180)', skinShade:'rgb(245,178,150)',
   shirt:'rgb(30,118,214)', shirt2:'rgb(50,118,183)', bg:'rgb(255,255,255)',
+  // ⭐ the third GARMENT tone, LIGHT on purpose — shirt->shirt2 is already the dark step, and
+  // the sports top's largest panel is lighter than its body. ⚠ garments only; bases have two.
+  shirtLight:'rgb(96,170,240)',
   irisCore:'rgb(117,62,21)', irisRim:'rgb(150,84,34)',
   mouthInk:'rgb(182,122,112)', mouthDark:'rgb(118,72,68)', mouthTongue:'rgb(206,116,112)',
   browInk:'rgb(101,70,52)', blush:'rgb(240,158,138)', stubble:'rgb(164,150,140)',
@@ -376,6 +379,7 @@ function compose(c){
 
   svg = swapAll(svg, T.shirt,  rgbStr(shirt));
   svg = swapAll(svg, T.shirt2, darken(shirt,0.9));
+  svg = swapAll(svg, T.shirtLight, lighten(shirt,1.25));
   svg = swapAll(svg, T.bg,     rgbStr(hex2rgb(c.bg)));
   // ⚠ LAST, over the finished document: until here the hair copy is renamed by literal id.
   return uniquifyIds(svg);

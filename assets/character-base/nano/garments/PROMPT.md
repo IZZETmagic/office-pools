@@ -67,3 +67,40 @@ edge coincident with the neck compose paints on top — two anti-aliased edges o
 visible at 4x. `SEAM_BURY = 6` pushes the seam inside the neck's solid interior. Same cure as
 the beard bands: **overlap hidden geometry, never butt edges.**
 
+
+---
+
+## Letting the generator design them (2026-09-22)
+
+Ryan: *"Can you ask Nano banana for it to make the garments? Within our style on the base
+avatar."* Six open briefs — one per family (knitwear, outerwear, sport, formal, casual,
+layered) — with the design itself left to the model. Five shipped.
+
+⭐⭐ **THE SHOULDER DOME IS THE BODY.** That is the one constraint that is not taste: a garment
+can never be narrower than it, because the avatar has no bare shoulder or chest to expose. A
+collar or hood MAY rise above it. All six respected it.
+
+⭐ **The generator designs in its OWN hue** — these came back green, olive and teal. That is
+fine, because the tones are tokenised on the way in and `--shirt` drives all three. It does mean
+nothing can be identified by matching the base's blue.
+
+⚠⚠ **FINDING THE BODY TONE TOOK FOUR TRIES**, and the first three are all plausible and all
+wrong:
+
+| rule | why it fails |
+|---|---|
+| closest to the base's blue | the design is green, olive or teal |
+| the largest area | the sports top's biggest area is its LIGHT PANEL, 39% against a 22% body |
+| a probe point | landed inside the knitwear's fair-isle band, which crosses the whole chest |
+| the outer rim | the SHADOW PANEL is large and owns the whole right rim |
+
+⚠⚠ **And all four share one blind spot: THE JIGSAW.** The vectorizer lays ONE tone down as the
+whole dome and butts every other shape on top, and which tone it picks is arbitrary — on the
+knitwear it chose the DARK one, giving it 547k of area against the body's 318k. Every path is
+now reduced to what is actually VISIBLE (painter's algorithm: each shape minus everything drawn
+after it) BEFORE anything is measured. Then the body is whatever owns the outer rim of the LEFT
+half — collars and pockets sit inboard, and the prompt pins the shadow panel to the right.
+
+🔴 **`i06-layered` was dropped.** Its art stops the opening around y1920 but the trace carried
+skin to the canvas bottom, so it rendered as a bare strip down the chest. Regenerable; not worth
+shipping as it was.

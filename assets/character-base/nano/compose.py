@@ -27,6 +27,11 @@ BASE_SKIN = "rgb(254,205,180)"
 BASE_SHADE = "rgb(245,178,150)"
 BASE_SHIRT = "rgb(30,118,214)"
 BASE_SHIRT2 = "rgb(50,118,183)"
+# ⭐ THE THIRD GARMENT TONE, a LIGHT one on purpose: shirt -> shirt2 is already the dark step, so
+# the direction the ramp was missing is up — and the sports top's largest panel is LIGHTER than
+# its body, which a third dark token would render backwards. Derived from the one shirt colour,
+# the same shape as the mouth's ink/interior/tongue. ⚠ Garments only; the locked bases have two.
+BASE_SHIRT3 = "rgb(96,170,240)"
 BASE_BG = "rgb(255,255,255)"
 MOUTH_INK = "rgb(182,122,112)"
 MOUTH_DARK = "rgb(118,72,68)"   # the inside of an open mouth
@@ -668,6 +673,7 @@ def main() -> None:
         rgb = hex_to_rgb(c)
         svg = svg.replace(f'fill="{BASE_SHIRT}"', f'fill="{rgb_str(rgb)}"')
         svg = svg.replace(f'fill="{BASE_SHIRT2}"', f'fill="{darken(rgb, 0.9)}"')
+        svg = svg.replace(f'fill="{BASE_SHIRT3}"', f'fill="{lighten(rgb, 1.25)}"')
     if c := arg("--bg"):
         svg = svg.replace(f'fill="{BASE_BG}"', f'fill="{rgb_str(hex_to_rgb(c))}"')
 

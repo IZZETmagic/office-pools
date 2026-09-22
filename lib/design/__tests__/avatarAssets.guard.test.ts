@@ -1517,12 +1517,16 @@ describe('garments', () => {
   const SHIRT = 'rgb(30,118,214)'
   const SHIRT2 = 'rgb(50,118,183)'
   const SKIN = 'rgb(254,205,180)'
+  const SHIRT3 = 'rgb(96,170,240)'
   const bundle = () => JSON.parse(
     readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
   ) as AvatarAssets
 
   it('paints only in the shirt tokens and the skin token', () => {
-    // ⭐ The shirt tokens mean `--shirt` recolours a garment with no new token or config field.
+    // ⭐ THREE shirt tokens, all from the one `--shirt` input: the body verbatim, a darker
+    // shadow, and a LIGHTER one for panelling. The light token is the third, added because
+    // `shirt -> shirt2` was already the dark step — and the sports top's largest panel is
+    // lighter than its body, which a second dark token would have rendered backwards.
     // ⭐⭐ The SKIN token is the other half, and it is not a leak: a garment whose neckline opens
     // below the neck has to bring the chest it exposes, because the avatar is a bust and there
     // is none. Ryan, 2026-09-22: "The crew and v neck doesn't show any more skin." Carried in
@@ -1532,7 +1536,8 @@ describe('garments', () => {
     expect(keys.length, 'garments should be bundled').toBeGreaterThan(0)
     for (const k of keys) {
       const fills = [...A.garments![k].matchAll(/fill="(rgb\([^)]*\))"/g)].map((m) => m[1])
-      const off = [...new Set(fills)].filter((c) => c !== SHIRT && c !== SHIRT2 && c !== SKIN)
+      const off = [...new Set(fills)]
+        .filter((c) => c !== SHIRT && c !== SHIRT2 && c !== SHIRT3 && c !== SKIN)
       expect(off, `${k} paints off palette — nothing would recolour it`).toEqual([])
     }
   })
@@ -1544,6 +1549,7 @@ describe('garments', () => {
     const A = bundle()
     const withChest = Object.keys(A.garments ?? {}).filter((k) => A.garments![k].includes(SKIN))
     expect(withChest.length, 'some garment should open below the neck').toBeGreaterThan(0)
+    expect(A.garments!['g03-sport'], 'the light tone should be in use').toContain('rgb(96,170,240)')
     for (const k of withChest) {
       for (const skin of PALETTE.skin) {
         const svg = composeAvatar(
@@ -1564,7 +1570,7 @@ describe('garments', () => {
       .map((m) => /d="([^"]*)"/.exec(m[0])![1])
     expect(shirtDs.length, 'the base should have shirt paths').toBe(2)
     const c = { ...cfg, base: 'base-neck-100', hair: null, facialHair: null }
-    const withG = composeAvatar({ ...c, garment: 'w02-vneck' }, A)
+    const withG = composeAvatar({ ...c, garment: Object.keys(A.garments!)[0] }, A)
     for (const d of shirtDs) {
       expect(withG.includes(`d="${d}"`), 'the base shirt must be lifted out').toBe(false)
     }
@@ -1617,7 +1623,13 @@ describe('garments', () => {
     // width (x506..1534) and failed on points nowhere near it: the head is a squircle and
     // narrows sharply at its base — at y1470 it spans x687..1361.
     const A = bundle()
-    const gd = /fill="rgb\(30,118,214\)"[^>]*d="([^"]*)"/.exec(A.garments!['w03-hoodie'])![1]
+    // whichever garment rises highest above the shoulder is the one worth testing
+    const highest = Object.keys(A.garments!).sort((a, b) => {
+      const top = (k: string) => Math.min(...(A.garments![k].match(/-?\d+\.?\d*/g) ?? [])
+        .map(Number).filter((_, i) => i % 2 === 1))
+      return top(a) - top(b)
+    })[0]
+    const gd = /fill="rgb\(30,118,214\)"[^>]*d="([^"]*)"/.exec(A.garments![highest])![1]
     const rings: Array<Array<[number, number]>> = gd.split('M ').filter(Boolean).map((sub) => {
       const n = ('M ' + sub).match(/-?\d+\.?\d*/g)!.map(Number)
       const r: Array<[number, number]> = []

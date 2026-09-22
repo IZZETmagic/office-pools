@@ -92,6 +92,18 @@ const T = {
   skinShade: 'rgb(245,178,150)',
   shirt: 'rgb(30,118,214)',
   shirt2: 'rgb(50,118,183)',
+  /**
+   * ⭐ THE THIRD GARMENT TONE, and it is a LIGHT one on purpose. `shirt` → `shirt2` is already
+   * the dark step, so the direction the ramp was missing is up — and it is what the designs
+   * actually need: the sports top's largest panel is LIGHTER than its body, and a third dark
+   * token would render it backwards.
+   *
+   * Derived from the one shirt colour like the other two, the same shape as the mouth's ink,
+   * interior and tongue. Nothing is added to the config.
+   *
+   * ⚠ Only garments use it. The four locked bases carry two shirt tones and always will.
+   */
+  shirtLight: 'rgb(96,170,240)',
   bg: 'rgb(255,255,255)',
   irisCore: 'rgb(117,62,21)',
   irisRim: 'rgb(150,84,34)',
@@ -700,6 +712,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
 
   svg = swap(svg, T.shirt, rgbStr(shirt))
   svg = swap(svg, T.shirt2, darken(shirt, 0.9))
+  svg = swap(svg, T.shirtLight, lighten(shirt, 1.25))
   svg = swap(svg, T.bg, rgbStr(hex2rgb(cfg.background)))
 
   // ⚠ LAST, over the finished document. Before this point the hair copy is still being
