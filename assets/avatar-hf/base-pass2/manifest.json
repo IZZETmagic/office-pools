@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ideogram-blank-1",
+    "endpoint": "ideogram/v4.0",
+    "request_id": "73e32e9c-6d19-41a7-bf7d-3715108bde3c",
+    "status_url": "https://platform.higgsfield.ai/requests/73e32e9c-6d19-41a7-bf7d-3715108bde3c/status"
+  },
+  {
+    "id": "ideogram-blank-2",
+    "endpoint": "ideogram/v4.0",
+    "request_id": "7f59dc11-0f7f-4edd-a8af-b9678c8f99d6",
+    "status_url": "https://platform.higgsfield.ai/requests/7f59dc11-0f7f-4edd-a8af-b9678c8f99d6/status"
+  },
+  {
+    "id": "ideogram-blank-3",
+    "endpoint": "ideogram/v4.0",
+    "request_id": "57e894d2-5e39-42e4-baa0-753591383da8",
+    "status_url": "https://platform.higgsfield.ai/requests/57e894d2-5e39-42e4-baa0-753591383da8/status"
+  },
+  {
+    "id": "ideogram-blank-4",
+    "endpoint": "ideogram/v4.0",
+    "request_id": "a8fdbf4e-9197-43d7-9275-be7abbcf233d",
+    "status_url": "https://platform.higgsfield.ai/requests/a8fdbf4e-9197-43d7-9275-be7abbcf233d/status"
+  }
+]

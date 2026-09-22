@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ideogram-1",
+    "endpoint": "ideogram/v4.0",
+    "request_id": "e5ea7da1-089e-4df8-957c-0505f7e9182d",
+    "status_url": "https://platform.higgsfield.ai/requests/e5ea7da1-089e-4df8-957c-0505f7e9182d/status"
+  },
+  {
+    "id": "recraft-vector-1",
+    "endpoint": "recraft/v4.1/text-to-image",
+    "request_id": "7a173641-532b-47bb-ad7b-4a9b16a6df0a",
+    "status_url": "https://platform.higgsfield.ai/requests/7a173641-532b-47bb-ad7b-4a9b16a6df0a/status"
+  },
+  {
+    "id": "recraft-vector-2",
+    "endpoint": "recraft/v4.1/text-to-image",
+    "request_id": "ec62bcf4-5f74-4295-8909-b0b07900a00c",
+    "status_url": "https://platform.higgsfield.ai/requests/ec62bcf4-5f74-4295-8909-b0b07900a00c/status"
+  },
+  {
+    "id": "recraft-vector-3",
+    "endpoint": "recraft/v4.1/text-to-image",
+    "request_id": "435303ce-9e94-45cd-941a-d21d4ada8ca1",
+    "status_url": "https://platform.higgsfield.ai/requests/435303ce-9e94-45cd-941a-d21d4ada8ca1/status"
+  },
+  {
+    "id": "recraft-standard-1",
+    "endpoint": "recraft/v4.1/text-to-image",
+    "request_id": "14671ff7-40e7-407a-90fb-3f01e274f25d",
+    "status_url": "https://platform.higgsfield.ai/requests/14671ff7-40e7-407a-90fb-3f01e274f25d/status"
+  },
+  {
+    "id": "recraft-standard-2",
+    "endpoint": "recraft/v4.1/text-to-image",
+    "request_id": "933e1a21-5a5c-4221-a757-067e5e55c6be",
+    "status_url": "https://platform.higgsfield.ai/requests/933e1a21-5a5c-4221-a757-067e5e55c6be/status"
+  }
+]

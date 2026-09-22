@@ -149,3 +149,37 @@ Error shape is `{"code": "...", "message": "..."}`. Validation order puts `promp
 so a prompt error can mask a style error.
 
 Re-run any of these with `scripts/recraft.sh probe <path> '<json>'`.
+
+---
+
+## Vector output, verified 2026-09-15 (avatar base run)
+
+- **`negative_prompt` is rejected on the V4.1 line.** `recraftv4_1_utility_vector` + `negative_prompt`
+  returns `400 invalid_request_parameter: "negative prompt cannot be specified for the selected
+  model"`. Free failure, but it means exclusions have to be carried positively in the prompt
+  ("the same flat skin colour simply continues across the eye line"), which works.
+- **A `…_vector` SVG comes back as `viewBox="0 0 2048 2048" width="1024" height="1024"`.** So the
+  *only* route to a specific pixel size — the API takes aspect ratios for vector, never `WxH` — is
+  the root `width`/`height`. That touches no path data.
+- ⚠️ **Rasterising to check it: match the window to the SVG's declared `width`, not the size you
+  want.** Headless Chrome at `--window-size=800,800` on a `width="1024"` SVG returns the top-left
+  800×800 **crop**, not a scaled render. Two candidates looked off-centre and cropped at the crown
+  when they were neither.
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu \
+  --hide-scrollbars --screenshot=/tmp/p.png --window-size=1024,1024 "file://$PWD/out.svg"
+```
+
+### Killing an artefact the model keeps re-adding
+
+"No shading" / "no shadows" failed three rounds running — a darker band kept reappearing where the
+neck met the jaw. What worked was **counting the palette and rationing the offending colour**:
+
+> ONLY FOUR COLOURS EXIST IN THIS IMAGE. […] One slightly deeper peach that appears exactly once,
+> and only once, in the entire picture: the tiny nose. It is used nowhere else — not on the neck,
+> not under the chin, not at the jaw, not as a collar.
+
+Same idea as framing a hole as a positive object: give the unwanted thing a budget and spend it
+somewhere you do want, rather than negating it. Grep the output's `fill="…"` values to check —
+an exact colour count is a cheap pass/fail before rendering anything.

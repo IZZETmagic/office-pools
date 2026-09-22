@@ -146,6 +146,7 @@ def stubble_tone(hair, skin) -> str:
 # silently plausible.
 FADE = "rgb(126,110,150)"
 FADE_ID = "beardfade"
+
 # ⭐ THE BEARD MARKER. Facial hair and head hair used to share the HAIR_BASE token, so they
 # were filled with the SAME colour — and against long hair a beard vanished into it. Ryan,
 # 2026-09-19: "the full beard blends into the long hair in the background."
@@ -592,13 +593,42 @@ def main() -> None:
                 if (hair_c and skin_c and STUBBLE in svg) else beard_tone)
 
         if "--fade" in sys.argv and hair_c and skin_c:
+            # ⚠⚠ THE SPAN IS PER-ASSET, because the fade's length is a property of the ARTWORK
+            # and not a global constant. An asset states its own by putting data-fade-span on
+            # the marked band; anything that does not say defaults to FADE_SPAN, so every
+            # existing asset renders exactly as before.
+            #
+            # This exists because the v3 quiff/fullbeard pair fades over 114px while 0.30 of
+            # its band is 28px — composed at the global span the beard jumped from nothing to
+            # solid in fifteen rows and read as a hard bar, not a fade.
+            m = re.search(r'data-fade-span="([0-9.]+)"', svg)
+            span = float(m.group(1)) if m else FADE_SPAN
+
+            # ⚠⚠ A REAL FADE IS NOT LINEAR. Measured off the approved art, the beard is still
+            # only 10% strength a third of the way down and 33% at half — it hangs back near
+            # the skin and then climbs. A straight ramp read as a grey wash sitting too high on
+            # the cheek. `data-fade-ease` is that exponent; 1 is the old straight line, so any
+            # asset without it is unchanged.
+            e = re.search(r'data-fade-ease="([0-9.]+)"', svg)
+            ease = float(e.group(1)) if e else 1.0
+            sk = hex_to_rgb(skin_c)
+            bd = tuple(int(v) for v in re.findall(r"\d+", body))
+            # ⚠ A fade can run EITHER WAY. On a beard the band's top dissolves into the
+            # cheek (skin at the top); on the bottom of a sideburn it is the reverse — solid
+            # at the top, dissolving into skin below. `data-fade-flip` swaps the ends.
+            flip = 'data-fade-flip="1"' in svg
+            stops = ""
+            STEPS = 6
+            for i in range(STEPS + 1):
+                t = i / STEPS
+                k = (1 - t) ** ease if flip else t ** ease
+                col = rgb_str(tuple(int(a + (b - a) * k) for a, b in zip(sk, bd)))
+                stops += f'<stop offset="{round(t * span, 4)}" stop-color="{col}"/>'
             # objectBoundingBox units, so the gradient spans whatever path carries it and no
             # coordinates have to be kept in step with the artwork.
+            tail = '' if flip else f'<stop offset="1" stop-color="{body}"/>'
             grad = (f'<defs><linearGradient id="{FADE_ID}" x1="0" y1="0" x2="0" y2="1">'
-                    f'<stop offset="0" stop-color="{rgb_str(hex_to_rgb(skin_c))}"/>'
-                    f'<stop offset="{FADE_SPAN}" stop-color="{body}"/>'
-                    f'<stop offset="1" stop-color="{body}"/>'
-                    f'</linearGradient></defs>')
+                    + stops + tail + '</linearGradient></defs>')
             cut = svg.index(">", svg.index("<svg")) + 1
             svg = svg[:cut] + grad + svg[cut:]
             svg = svg.replace(f'fill="{FADE}"', f'fill="url(#{FADE_ID})"')
