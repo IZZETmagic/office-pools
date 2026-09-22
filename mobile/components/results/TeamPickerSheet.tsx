@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -13,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui';
+import { TeamMark, Icon } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type TeamOption = {
@@ -225,12 +224,7 @@ export const TeamPickerSheet = forwardRef<TeamPickerSheetHandle, Props>(function
                   cut the top and bottom off it. Reasoning in full on
                   `MatchResultRow`'s `TeamMark`. */}
               {item.flagUrl ? (
-                <Image
-                  source={{ uri: item.flagUrl }}
-                  style={{ width: 30, height: 30 }}
-                  contentFit="contain"
-                  cachePolicy="memory-disk"
-                />
+                <TeamMark url={item.flagUrl} height={26} flagWidth={30} flagHeight={20} />
               ) : (
                 <View
                   style={{

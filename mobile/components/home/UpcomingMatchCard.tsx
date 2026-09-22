@@ -1,6 +1,11 @@
 import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 
-import { Text } from '@/components/ui';
+import { ClubBar, Text } from '@/components/ui';
+import {
+  clubColorFromCrestUrl,
+  clubIdFromCrestUrl,
+  fixturePalette,
+} from '@/lib/design/clubColors';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme } from '@/theme';
 
@@ -9,9 +14,39 @@ type UpcomingMatchCardProps = {
   onPress?: () => void;
 };
 
+/**
+ * ⚠ THE FIXTURE IS STACKED, NOT MIRRORED (Ryan, 2026-09-19).
+ *
+ * It used to be `crest·CODE  vs  crest·CODE` across the left of the card. Two
+ * things were wrong with that once the crests came out
+ * (drafts/2026-09-13_ip_exposure_audit.md §5): a three-letter code with no
+ * badge beside it is the least legible thing the app could show a casual
+ * member, and the mirrored layout spent its width on a "vs" that a stacked pair
+ * states by position.
+ *
+ * Home above, away below, each with its colour bar on the left of its NAME. The
+ * card reads top-to-bottom like a fixture list rather than left-to-right like a
+ * scoreboard, which is what the right-hand column (date over venue) already did.
+ */
 export function UpcomingMatchCard({ match, onPress }: UpcomingMatchCardProps) {
   const theme = useTheme();
   const hasScore = match.homeScoreFt !== null && match.awayScoreFt !== null;
+
+  // ⚠ THE AWAY SIDE CHANGES KIT, as it does on every surface that shows two
+  // clubs at once. Stacked one above the other, two blues are if anything
+  // worse than side by side — there is no gap between them to read across.
+  //
+  // ⚠ BOTH CLUBS KNOWN OR NEITHER IS COLOURED. `fixturePalette` returns the
+  // app's own pair when either side is missing, which would take a known club's
+  // colour away because its opponent is from outside the five leagues.
+  const known =
+    clubColorFromCrestUrl(match.homeTeam?.flagUrl) !== null &&
+    clubColorFromCrestUrl(match.awayTeam?.flagUrl) !== null;
+  const palette = fixturePalette(match.homeTeam?.flagUrl, match.awayTeam?.flagUrl, {
+    home: theme.colors.primary,
+    away: theme.colors.accent,
+  });
+  const colors = known && palette.usingClubColors ? palette : null;
 
   return (
     <Pressable
@@ -27,27 +62,23 @@ export function UpcomingMatchCard({ match, onPress }: UpcomingMatchCardProps) {
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <TeamSlot team={match.homeTeam} placeholder={match.homeTeamPlaceholder} />
-
-      <View style={{ width: 48, alignItems: 'center' }}>
-        {hasScore ? (
-          <RNText
-            style={{
-              fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-              fontSize: 20,
-              color: theme.colors.ink,
-            }}
-          >
-            {match.homeScoreFt} - {match.awayScoreFt}
-          </RNText>
-        ) : (
-          <Text variant="body" color="slate">
-            vs
-          </Text>
-        )}
+      {/* ⚠ THE RIGHT-HAND COLUMN IS UNTOUCHED — Ryan, 2026-09-19. Its flex,
+          its gap and the row's spacing are exactly what they were when the
+          fixture was mirrored; only the left side changed. */}
+      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+        <TeamLine
+          team={match.homeTeam}
+          placeholder={match.homeTeamPlaceholder}
+          score={hasScore ? match.homeScoreFt : null}
+          colour={colors?.home}
+        />
+        <TeamLine
+          team={match.awayTeam}
+          placeholder={match.awayTeamPlaceholder}
+          score={hasScore ? match.awayScoreFt : null}
+          colour={colors?.away}
+        />
       </View>
-
-      <TeamSlot team={match.awayTeam} placeholder={match.awayTeamPlaceholder} />
 
       <View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}>
         <Text
@@ -76,52 +107,77 @@ export function UpcomingMatchCard({ match, onPress }: UpcomingMatchCardProps) {
   );
 }
 
-function TeamSlot({
+/**
+ * One club on its own line: colour bar, name, and its score if the match is done.
+ *
+ * ⚠ `shortName`, NOT `countryName`. The contract carries `shortClubName`'s
+ * output — "Man United", "Nott'm Forest" — and the full name is the fallback.
+ * On this card the difference is "Borussia Mönchengladbach" at 24 characters
+ * against "M'gladbach", and the column is shared with a venue.
+ */
+function TeamLine({
   team,
   placeholder,
+  score,
+  colour,
 }: {
   team: ResultsMatch['homeTeam'];
   placeholder: string | null;
+  score: number | null;
+  /** The fixture's verdict for this side — see `UpcomingMatchCard`. */
+  colour?: string;
 }) {
   const theme = useTheme();
+  const name = team?.shortName?.trim() || team?.countryName?.trim() || placeholder || 'TBD';
+
   return (
-    <View style={{ width: 48, alignItems: 'center', gap: 4 }}>
-      {/* ⚠ Square box + `contain` — `flagUrl` also carries a club CREST, which
-          is not 3:2, and the old 32×22 box cropped to fill cut the top and
-          bottom off it. Reasoning in full on `MatchResultRow`'s `TeamMark`. */}
-      {team?.flagUrl ? (
-        <Image
-          source={{ uri: team.flagUrl }}
-          style={{ width: 32, height: 32 }}
-          resizeMode="contain"
-        />
-      ) : (
-        <View
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <TeamMark url={team?.flagUrl} colour={colour} />
+      <Text
+        numberOfLines={1}
+        style={{
+          flex: 1,
+          fontFamily: fontFamilies.semibold,
+          fontSize: 14,
+          color: theme.colors.ink,
+        }}
+      >
+        {name}
+      </Text>
+      {score !== null ? (
+        <RNText
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 3,
-            backgroundColor: theme.colors.mist,
-            alignItems: 'center',
-            justifyContent: 'center',
+            fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
+            fontSize: 14,
+            color: theme.colors.ink,
           }}
         >
-          <RNText
-            style={{
-              fontFamily: 'Nunito_700Bold',
-              fontSize: 9,
-              color: theme.colors.slate,
-            }}
-          >
-            {(team?.countryCode ?? placeholder ?? '??').slice(0, 2).toUpperCase()}
-          </RNText>
-        </View>
-      )}
-      <Text variant="caption" color="ink">
-        {team?.countryCode ?? placeholder ?? 'TBD'}
-      </Text>
+          {score}
+        </RNText>
+      ) : null}
     </View>
   );
+}
+
+/**
+ * ⚠ CLUB → BAR, FLAG → FLAG. `flagUrl` carries both, the same as it does on
+ * `MatchResultRow` — and the branch is the same one: a club's URL ends in the
+ * provider's numeric id, a national flag's does not. Flags are public domain
+ * and still drawn; crests are not and are gone.
+ */
+function TeamMark({ url, colour }: { url: string | null | undefined; colour?: string }) {
+  const isClub = url ? clubIdFromCrestUrl(url) !== null : false;
+
+  if (isClub) return <ClubBar url={url} colour={colour} height={20} />;
+
+  if (url) {
+    // A national flag — 3:2, and the only mark still drawn here.
+    return <Image source={{ uri: url }} style={{ width: 18, height: 12 }} resizeMode="contain" />;
+  }
+
+  // ⚠ THE SLOT SURVIVES AN UNKNOWN TEAM, so a placeholder fixture does not
+  // shift its name left of every other row on the card.
+  return <View style={{ width: 6, height: 20 }} />;
 }
 
 function formatDate(iso: string): string {

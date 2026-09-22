@@ -1,7 +1,7 @@
-import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Pressable, Text as RNText, View } from 'react-native';
 
 import { MovementPill, rankColor } from './leaderboard-shared';
-import { Icon, Text } from '@/components/ui';
+import { ClubBar, Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry, LeagueLeaderboardMeta } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -371,7 +371,7 @@ function ChampionLine({
       }}
     >
       {crest_url ? (
-        <Image source={{ uri: crest_url }} style={{ width: 13, height: 13 }} resizeMode="contain" />
+        <ClubBar url={crest_url} height={14} />
       ) : null}
       <Text variant="detail" color="slate" numberOfLines={1} style={{ flexShrink: 1 }}>
         {club_name}

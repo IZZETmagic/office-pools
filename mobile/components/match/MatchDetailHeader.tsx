@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -22,6 +21,7 @@ import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 
 import { MatchStatusBadge } from '@/components/MatchStatusBadge';
 import { Icon } from '@/components/ui';
+import { clubOnSurface, fixturePalette } from '@/lib/design/clubColors';
 import { getCompetitionBand, getCompetitionGlow, GLOW_HEIGHT } from '@/lib/design/competitionBand';
 import { hasScorers, matchScorers, type ScorerLine } from '@/lib/matchScorers';
 import { useMatchClock } from '@/lib/useMatchClock';
@@ -72,24 +72,116 @@ import {
 // sure".
 // =============================================================
 
-/** Height of the fixed chrome row — back button and title. */
+/** Height of the fixed chrome row — the back button and the competition line. */
 const CHROME_ROW = 34;
 
 /** The crest at rest, and what it shrinks to. */
-const CREST = 64;
-const COLLAPSED_CREST = 34;
+/**
+ * The team's mark, expanded and collapsed.
+ *
+ * ⚠⚠ IT WAS THE CREST UNTIL 2026-09-20 — 64pt, the biggest piece of the
+ * provider's artwork in the app, and the last one (see
+ * drafts/2026-09-13_ip_exposure_audit.md §5). What replaces it is not another
+ * mark: per drafts/2026-09-14_chosen_design.html §3 the club is carried by the
+ * NAME and by a rule in its colour, and the band itself is the competition.
+ *
+ * ⚠ SO `MARK_H` IS A NAME BOX, NOT A BADGE. 44 is two lines of 19pt at 1.12 —
+ * "Manchester United" is the case that needs both, and nothing in the league
+ * needs three. It is fixed rather than measured because the morph arithmetic
+ * aims at its CENTRE, and a box whose height depends on whether a name wrapped
+ * would land the collapse in a different place for Arsenal than for Brighton.
+ *
+ * ⚠ AND THE COLLAPSED MARK IS THE THREE-LETTER CODE at 13pt — Ryan's choice of
+ * the two candidates. The full name does not fit a pinned strip: at 13pt
+ * "Manchester United" is about 118pt on one line and the strip has to hold two
+ * of them plus the score. The code is what the Results list and the form card
+ * already use.
+ */
+const MARK_H = 44;
+
+/**
+ * The code's line box, collapsed.
+ *
+ * ⚠⚠ THE CODE IS 23pt, MATCHED TO THE SCORE (Ryan, 2026-09-21). The scoreline
+ * is 34pt and it scales to 0.68 on the collapse, so it RENDERS at 23.1 — and a
+ * 13pt code beside it read as a caption on a scoreline rather than as one of
+ * the two clubs playing. Every constant in this block follows that type.
+ */
+const COLLAPSED_MARK = 28;
+
+/**
+ * The club's rule: under its name expanded, beside its code collapsed.
+ *
+ * ⚠⚠ IT ROTATES ON THE WAY (Ryan, 2026-09-21). Expanded it is the approved
+ * design's 34×4 underline; collapsed it is the 3×18 vertical bar the rest of
+ * the app uses for a club — the Results row, Pick'em, the team sheet, the
+ * scout report. So the same object ends the scroll as the mark every other
+ * screen already draws, rather than as a shrunken underline that appears
+ * nowhere else.
+ *
+ * ⚠ THE NUMBERS ARE PRE-ROTATION, which is the only way they make sense. A
+ * quarter turn swaps the axes: to finish 22 TALL the 34-wide has to scale by
+ * 22/34. Writing the collapsed size as a width and a height would be wrong
+ * by 90°.
+ */
+const RULE_W = 34;
+const RULE_H = 4;
+const COLLAPSED_RULE_LENGTH = 22;
+/**
+ * ⚠ THE SAME AS `RULE_H`, so the bar does not thin as it turns — beside 23pt
+ * type a 3pt bar is a hairline. The Y scale is therefore exactly 1; the term
+ * stays in the transform so the day the two differ again it is already there.
+ */
+const COLLAPSED_RULE_THICK = 4;
+
+/**
+ * The slot the three-letter code sits in.
+ *
+ * ⚠⚠ FIXED, BECAUSE THE BAR AIMS AT ITS EDGE. Measured at 23pt Nunito Black
+ * with 0.8 tracking, the codes run from `LIL` at 38.2 to `WHU` at 57.3 —
+ * nineteen points. If the bar's landing offset were computed from the text it
+ * would sit further out for West Ham than for Liverpool, and the two sides of
+ * one fixture would not mirror.
+ *
+ * ⚠⚠ AND IT IS A CEILING, NOT A PREFERENCE. This slot is 58 because the TYPE is
+ * 23. When the code was 13pt the slot was 34, and raising the font without
+ * raising this ellipsised every club to a single letter — "B…" against "A…" on
+ * Ryan's screen. The two numbers move together or not at all.
+ */
+const CODE_W = 58;
+
+/** Air between the code and the bar once it has turned. */
+const CODE_BAR_GAP = 5;
+
+/**
+ * The column's own gap, between the name box and the rule.
+ *
+ * ⚠ NAMED BECAUSE THE TRAVEL IS DERIVED FROM IT. The rule has to climb from
+ * below the name box to the code's line, and that distance is half the box plus
+ * this gap plus half the rule. Leave it inline in the style and the two drift
+ * the first time somebody nudges the spacing.
+ */
+const COLUMN_GAP = 8;
 
 /**
  * The strip of band that survives the collapse, holding the shrunken matchup.
  *
- * ⚠ IT IS THE CREST PLUS ITS AIR: 34 + 11 above + 11 below. The crests land in
- * a row of their own rather than sharing the chrome row, so the title above
- * them never moves — the same call Ryan made on the Showdown band.
+ * ⚠ THE CODE DRIVES IT, NOT THE BAR. Turned sideways the bar is 22 long; the
+ * code's line box is 28. So this is 28 plus 8 of air above and below. It was 56
+ * when a 34pt crest had to fit.
  */
-const COLLAPSED_ROW = 56;
+const COLLAPSED_ROW = 44;
 
-/** How far from the screen's centre a collapsed crest settles. */
-const COLLAPSED_SPREAD = 62;
+/**
+ * How far from the screen's centre a collapsed side settles.
+ *
+ * ⚠⚠ THE SCORE'S WIDTH SETS IT. "1 - 0" in 23.1pt mono with its gaps is 81.5
+ * across, so the scoreline reaches 41 either side of centre; the code's slot
+ * reaches 29 back from its column centre. 80 leaves 10pt between them. It was
+ * 62 when the code was 13pt — at that spread with a 58pt slot the code would
+ * sit ON the score.
+ */
+const COLLAPSED_SPREAD = 80;
 
 /**
  * The centre column's width and the row's outer padding.
@@ -145,10 +237,36 @@ export function MatchDetailHeader({
    * leaving the base gradient to carry on alone as a flat bar under the tabs.
    */
   const [bandH, setBandH] = useState(0);
-  /** Where the crest row starts inside the matchup block — what the morph aims at. */
-  const [crestY, setCrestY] = useState(0);
+  /** Where the mark row starts inside the matchup block — what the morph aims at. */
+  const [markY, setMarkY] = useState(0);
 
-  const [bandLeft, bandRight] = getCompetitionBand(match.competitionId);
+  const bandStops = getCompetitionBand(match.competitionId);
+
+  /**
+   * The colour of each club's rule.
+   *
+   * ⚠⚠ THROUGH THE FIXTURE RULE, THEN LIFTED FOR THE BAND — both steps matter
+   * and they are separate problems. `fixturePalette` stops two clubs in the
+   * same colour drawing two identical rules (the away side changes kit);
+   * `clubOnSurface` stops a near-black club drawing a rule nobody can see on a
+   * dark band — Newcastle's #241F20 measures about 1:1 against the tail of the
+   * Premier League sweep.
+   *
+   * ⚠ MEASURED AGAINST THE DARKEST STOP, which is the worst case rather than
+   * the average: the sweep runs bright-to-dark across the header and a rule can
+   * sit anywhere along it.
+   */
+  const markColours = useMemo(() => {
+    const surface = bandStops[bandStops.length - 1];
+    const palette = fixturePalette(match.homeTeam?.flagUrl, match.awayTeam?.flagUrl, {
+      home: theme.colors.primary,
+      away: theme.colors.accent,
+    });
+    return {
+      home: clubOnSurface(palette.home, surface, 3),
+      away: clubOnSurface(palette.away, surface, 3),
+    };
+  }, [bandStops, match.homeTeam?.flagUrl, match.awayTeam?.flagUrl, theme.colors.primary, theme.colors.accent]);
   const scorers = useMemo(() => matchScorers(timeline), [timeline]);
 
   const chromeH = insets.top + theme.spacing.xs + CHROME_ROW;
@@ -177,10 +295,9 @@ export function MatchDetailHeader({
    * notched phone, nearly 100pt. The band's content starts at `chromeH` (its
    * own paddingTop), so that is the offset between the two spaces.
    */
-  const crestCentreY = chromeH + crestY + CREST / 2;
+  const markCentreY = chromeH + markY + MARK_H / 2;
   const collapsedCentreY = chromeH + COLLAPSED_ROW / 2;
-  const wantedY = crestCentreY - collapsedCentreY;
-  const crestScale = COLLAPSED_CREST / CREST;
+  const wantedY = markCentreY - collapsedCentreY;
 
   /** Centre of a side column at rest, and how far in it has to come. */
   const sideCentreX = ROW_PAD + (width - ROW_PAD * 2 - MIDDLE_COL) / 4;
@@ -217,19 +334,123 @@ export function MatchDetailHeader({
   });
 
   /**
-   * The shrink, on the crest box ALONE.
+   * The handover: the full name out, the three-letter code in.
    *
-   * ⚠ TRANSLATE AND SCALE ARE ON DIFFERENT NODES, on purpose. The column
-   * translates — crest and name together — so the name follows the crest out.
-   * The crest alone scales, because a scale applies about its own node's
-   * centre: shrinking the whole column would pivot around the centre of
-   * crest-plus-name, which is below the crest, and the landing position
-   * `wantedY` aims at would no longer be where it arrives.
+   * ⚠⚠ THE TWO CROSS-FADE IN THE SAME WINDOW THE REST OF THE HEADER ALREADY
+   * USES. The kicker, the status badge and "FULL TIME" all finish by `p = 0.45`
+   * (see `labelFade`), so the code arriving there costs no new timing and the
+   * strip never shows two labels at once.
+   *
+   * ⚠ THE NAME SCALES AS IT GOES, so it shrinks toward the code rather than
+   * dissolving in place — the morph reads as one object changing size, which is
+   * what it was when a crest did it.
    */
-  const crestShrink = useAnimatedStyle(() => {
+  const nameOut = useAnimatedStyle(() => {
     if (slideBy === 0) return {};
     const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
-    return { transform: [{ scale: 1 - p * (1 - crestScale) }] };
+    return {
+      opacity: interpolate(p, [0, 0.45], [1, 0], Extrapolation.CLAMP),
+      transform: [{ scale: interpolate(p, [0, 0.45], [1, 0.72], Extrapolation.CLAMP) }],
+    };
+  });
+  const codeIn = useAnimatedStyle(() => {
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
+    return { opacity: interpolate(p, [0.45, 0.85], [0, 1], Extrapolation.CLAMP) };
+  });
+
+  /**
+   * The rule closes the gap the name leaves behind.
+   *
+   * ⚠⚠ WITHOUT THIS IT LANDS 13pt LOW. The rule sits below a FIXED 44pt name
+   * box, and the morph aims that box's CENTRE at the collapsed row — so the
+   * code arrives centred while the rule is still hanging off the bottom of a
+   * box that is now mostly empty. Half the difference between the box and the
+   * code is exactly the slack: (44 - 18) / 2.
+   */
+  /**
+   * ⚠⚠ HOW FAR OUT THE BAR LANDS, and it is measured from the code's slot
+   * rather than from the column. Half the slot clears the letters, the gap is
+   * the air, and half the bar's own turned thickness puts its EDGE against that
+   * air rather than its centre.
+   */
+  const ruleOut = CODE_W / 2 + CODE_BAR_GAP + COLLAPSED_RULE_THICK / 2;
+
+  /**
+   * ⚠⚠ TRANSFORM ORDER IS THE WHOLE TRICK HERE, and it reads backwards. React
+   * Native composes this list as a matrix product, so the LAST entry is applied
+   * FIRST: the bar is scaled down, then turned a quarter, and only then carried
+   * out to the side. List the translations after the rotate and they would be
+   * measured along the bar's own turned axes — the home bar would travel UP the
+   * screen instead of left, which is precisely the bug this comment exists to
+   * stop somebody reintroducing by tidying the array.
+   *
+   * ⚠ AND `close` IS UNCHANGED BY THE ROTATION. It answers a layout question —
+   * the bar hangs below a fixed 44pt name box and the code arrives centred in
+   * it — so it is half the difference between the two, whichever way the bar is
+   * pointing when it gets there.
+   *
+   * ⚠ TWO NAMED HOOKS, NOT A FACTORY. Same rule the move styles above follow;
+   * only the sign of X differs.
+   */
+  /**
+   * How far the rule climbs to reach the code's line.
+   *
+   * ⚠⚠ IT IS NOT `(MARK_H - COLLAPSED_MARK) / 2`, WHICH IS WHAT I HAD AND WHAT
+   * RYAN CAUGHT ON A SCREENSHOT. That number closes the gap between a fixed
+   * name box and the smaller code centred inside it — a real distance, but not
+   * this one. The rule does not start inside the box; it starts BELOW it. So
+   * the climb is from its own resting centre — `MARK_H + COLUMN_GAP + RULE_H/2`
+   * under the box's top — up to the code's centre at `MARK_H / 2`. That is 32,
+   * not 13, and at 13 the bars sat a clear line below the codes they belong to.
+   *
+   * ⚠ THE Y-SCALE DOES NOT CHANGE IT. A scale applies about the node's own
+   * centre, so the rule thins in place and its centre is wherever this put it.
+   */
+  const ruleClimb = MARK_H / 2 + COLUMN_GAP + RULE_H / 2;
+  const lengthScale = COLLAPSED_RULE_LENGTH / RULE_W;
+  const thickScale = COLLAPSED_RULE_THICK / RULE_H;
+
+  // ⚠⚠ WRITTEN OUT TWICE ON PURPOSE, AND NOT FACTORED. These bodies run on the
+  // UI thread: a helper called from inside `useAnimatedStyle` has to be a
+  // worklet itself, and a plain arrow function captured from the component
+  // body is a runtime crash rather than a type error — the kind that survives
+  // review because it reads perfectly. The two differ only in the sign of X,
+  // which is the same trade `leftMove`/`rightMove` above already made.
+  const leftRule = useAnimatedStyle(() => {
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
+    return {
+      transform: [
+        { translateX: -p * ruleOut },
+        { translateY: -p * ruleClimb },
+        // ⚠⚠ CLOCKWISE, AND THE AWAY BAR GOES THE OTHER WAY (Ryan, 2026-09-21).
+        // A rectangle looks identical at +90° and −90°, so this is not about
+        // where it lands — it is about the MOTION, and the two directions are
+        // not equivalent to watch. Both bars turn INWARD, toward the score:
+        // they sweep across the ground they are about to leave rather than out
+        // over the empty margin. Tried outward first; it reads as two things
+        // flying apart.
+        { rotate: `${p * 90}deg` },
+        { scaleX: 1 - p * (1 - lengthScale) },
+        { scaleY: 1 - p * (1 - thickScale) },
+      ],
+    };
+  });
+  const rightRule = useAnimatedStyle(() => {
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
+    return {
+      transform: [
+        { translateX: p * ruleOut },
+        { translateY: -p * ruleClimb },
+        // ⚠ ANTICLOCKWISE — the mirror of the home bar, and inward for the
+        // same reason. See the note there.
+        { rotate: `${-p * 90}deg` },
+        { scaleX: 1 - p * (1 - lengthScale) },
+        { scaleY: 1 - p * (1 - thickScale) },
+      ],
+    };
   });
 
   /** The scoreline rides up to sit between the two shrunken crests. */
@@ -237,12 +458,27 @@ export function MatchDetailHeader({
     if (slideBy === 0) return {};
     const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
     return {
-      transform: [{ translateY: p * (slideBy - wantedY) }, { scale: 1 - p * 0.32 }],
+      transform: [{ translateY: p * (slideBy - wantedY) }],
     };
   });
 
   /**
-   * Names, the competition line and the status badge fade rather than travel.
+   * ⚠ THE SCORE SHRINKS ON ITS OWN NODE, not with its column — see the note at
+   * the call site. 0.68 is what takes 34pt type to the 23 the codes are set at,
+   * which is the whole reason the two now match.
+   */
+  const scoreShrink = useAnimatedStyle(() => {
+    if (slideBy === 0) return {};
+    const p = interpolate(scrollY.value, [0, slideBy], [0, 1], Extrapolation.CLAMP);
+    return { transform: [{ scale: 1 - p * 0.32 }] };
+  });
+
+  /**
+   * The names and the status badge fade rather than travel.
+   *
+   * ⚠ THE COMPETITION LINE IS NO LONGER ON THIS. It moved to the chrome row on
+   * 2026-09-21, which does not move and does not fade — that is the point of
+   * moving it.
    * At the collapsed scale they would be four-point type — shrinking them is
    * not a smaller version of the information, it is an unreadable one.
    */
@@ -318,8 +554,7 @@ export function MatchDetailHeader({
           style={{ paddingTop: chromeH, overflow: 'hidden' }}
         >
           <BandFill
-            left={bandLeft}
-            right={bandRight}
+            stops={bandStops}
             competitionId={match.competitionId}
             idPrefix="band"
             glowHeight={glowCanvas}
@@ -353,28 +588,26 @@ export function MatchDetailHeader({
               `crestY` the crests' real top, with no second constant that the
               arithmetic has to remember to add.
             */}
-            <Animated.View
-              style={[{ paddingHorizontal: ROW_PAD, paddingTop: 6, paddingBottom: 14 }, labelFade]}
-            >
-              <RNText
-                numberOfLines={1}
-                style={{
-                  fontFamily: fontFamilies.bold,
-                  fontSize: 10.5,
-                  letterSpacing: 1.3,
-                  textTransform: 'uppercase',
-                  color: 'rgba(255,255,255,0.68)',
-                  textAlign: 'center',
-                }}
-              >
-                {competitionLine(match)}
-              </RNText>
-            </Animated.View>
+            {/*
+              ⚠⚠ A SPACER, AND IT HAS TO STAY A SPACER. The competition line
+              moved to the chrome row on 2026-09-21, and the block it left
+              behind was carrying the gap above the marks as its `paddingBottom`
+              — see the note above. Deleting it outright would close that gap;
+              moving the 14 into the mark row's `paddingTop` would break the
+              morph, because `onLayout` reports the BOX's top and the marks
+              would then start 14pt below what `markY` says. So the gap keeps
+              its own box.
+
+              ⚠ 20 IS THE OLD BLOCK MINUS ITS TEXT: `paddingTop: 6` plus
+              `paddingBottom: 14`. The air either side of the line is exactly
+              what it was; only the line itself left.
+            */}
+            <View style={{ height: 20 }} />
 
             <View
               onLayout={(e) => {
                 const y = Math.round(e.nativeEvent.layout.y);
-                if (y !== crestY) setCrestY(y);
+                if (y !== markY) setMarkY(y);
               }}
               style={{
                 flexDirection: 'row',
@@ -383,26 +616,53 @@ export function MatchDetailHeader({
               }}
             >
               <Side
-                url={match.homeTeam?.flagUrl}
                 name={homeDisplayName(match)}
+                code={sideCode(match.homeTeam, 'Home')}
+                colour={markColours.home}
                 move={leftMove}
-                shrink={crestShrink}
-                fade={labelFade}
+                nameOut={nameOut}
+                codeIn={codeIn}
+                ruleStyle={leftRule}
               />
+              {/*
+                ⚠⚠ THE SCORE SITS IN THE SAME 44pt BOX THE CODES DO, and that is
+                what makes the collapsed strip line up (Ryan, 2026-09-21: "it
+                all needs to horizontally aligned"). Before this the middle
+                column was a stack with its own `paddingTop`, and the whole
+                stack scaled — so the score's centre was wherever the caption
+                underneath happened to put the column's centre, which was not
+                where the codes landed. Three identical boxes centred on one
+                row cannot disagree.
+
+                ⚠ SO THE SCALE MOVED OFF THE COLUMN AND ONTO THE BOX. A scale
+                applies about its own node's centre: scaling the column pivots
+                around score-plus-caption, scaling the box pivots around the
+                score itself, which is the thing that has to stay on the line.
+                Same reasoning the sides already use for the name.
+              */}
               <Animated.View
-                style={[
-                  { width: MIDDLE_COL, alignItems: 'center', gap: 4, paddingTop: 6 },
-                  middleStyle,
-                ]}
+                style={[{ width: MIDDLE_COL, alignItems: 'center', gap: 4 }, middleStyle]}
               >
-                <Centre match={match} />
+                <Animated.View
+                  style={[
+                    { height: MARK_H, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+                    scoreShrink,
+                  ]}
+                >
+                  <CentreFigure match={match} />
+                </Animated.View>
+                <Animated.View style={labelFade}>
+                  <CentreCaption match={match} />
+                </Animated.View>
               </Animated.View>
               <Side
-                url={match.awayTeam?.flagUrl}
                 name={awayDisplayName(match)}
+                code={sideCode(match.awayTeam, 'Away')}
+                colour={markColours.away}
                 move={rightMove}
-                shrink={crestShrink}
-                fade={labelFade}
+                nameOut={nameOut}
+                codeIn={codeIn}
+                ruleStyle={rightRule}
               />
             </View>
 
@@ -457,19 +717,34 @@ export function MatchDetailHeader({
         }}
       >
         <BandFill
-          left={bandLeft}
-          right={bandRight}
+          stops={bandStops}
           competitionId={match.competitionId}
           idPrefix="chrome"
           glowHeight={glowCanvas}
         />
         {/*
-          ⚠ THE BACK BUTTON, AND NOTHING ELSE. This row carried "Arsenal v
-          Chelsea" as a title, which named the match a second time directly
-          above two crests and two team names doing the same job — Ryan,
-          2026-09-06. The crests survive the collapse at reduced size, so the
-          matchup is still identified once the band is folded away and the title
-          is not standing in for anything.
+          ⚠ NO MATCH TITLE HERE, STILL. This row carried "Arsenal v Chelsea"
+          and it was removed on 2026-09-06 for naming the match a second time
+          directly above two team names doing the same job. That reasoning is
+          untouched by what follows: the competition is not the match, and it is
+          the one fact the band below has never repeated.
+
+          ⚠⚠ THE COMPETITION LINE LIVES HERE NOW (Ryan, 2026-09-21). It used to
+          sit inside the band and fade away with everything else on the
+          collapse, which meant the pinned strip could tell you Manchester
+          United drew with Manchester City but not which competition you were
+          looking at. The chrome does not move, so putting it here is what makes
+          it survive.
+
+          ⚠ ABSOLUTELY POSITIONED, NOT A FLEX CHILD. Centring it in the row
+          would centre it in the space LEFT OVER by the back button, which is
+          32pt of asymmetry — it would sit visibly right of the score beneath
+          it. Pinned left-to-right and centred in its own full width, it lands
+          on the screen's axis, which is the axis everything else in this header
+          is built on.
+
+          ⚠ AND IT IS BEHIND THE BUTTON IN THE TREE, so a long competition name
+          can never eat the back button's touch target.
         */}
         <View
           style={{
@@ -479,6 +754,36 @@ export function MatchDetailHeader({
             paddingHorizontal: theme.spacing.lg,
           }}
         >
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              // ⚠ CLEARS THE BUTTON AT BOTH ENDS. The back button is 32 inside
+              // `spacing.lg`, and the row is mirrored, so the text's own box
+              // stops short of it rather than relying on the tree order alone.
+              paddingHorizontal: theme.spacing.lg + 32 + theme.spacing.sm,
+            }}
+          >
+            <RNText
+              numberOfLines={1}
+              style={{
+                fontFamily: fontFamilies.bold,
+                fontSize: 10.5,
+                letterSpacing: 1.3,
+                textTransform: 'uppercase',
+                color: 'rgba(255,255,255,0.68)',
+                textAlign: 'center',
+              }}
+            >
+              {competitionLine(match)}
+            </RNText>
+          </View>
           <Pressable
             onPress={() => router.back()}
             hitSlop={12}
@@ -521,15 +826,14 @@ export function MatchDetailHeader({
  * gets its own namespace.
  */
 function BandFill({
-  left,
-  right,
+  stops,
   competitionId,
   idPrefix,
   glowHeight,
   glowStyle,
 }: {
-  left: string;
-  right: string;
+  /** ⚠ FIVE LIGHTNESSES OF ONE BRAND — see `BAND_STOPS`. Never a second hue. */
+  stops: readonly [string, string, ...string[]];
   competitionId: number | null;
   idPrefix: string;
   /**
@@ -548,7 +852,7 @@ function BandFill({
     <>
       <LinearGradient
         pointerEvents="none"
-        colors={[left, right]}
+        colors={stops}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
@@ -585,16 +889,32 @@ function BandFill({
   );
 }
 
-/** One team's column: the crest, which survives the collapse, and the name, which does not. */
+/**
+ * One team's column: its name, its code, and a rule in its colour.
+ *
+ * ⚠⚠ NO CREST. It was the last one in the app, at 64pt the biggest, and the
+ * approved design does not replace it with another mark — the club is the name
+ * plus the rule, and the competition is the band behind them
+ * (drafts/2026-09-14_chosen_design.html §3).
+ *
+ * ⚠ THE NAME AND THE CODE SHARE ONE FIXED BOX, both absolutely centred in it.
+ * That is what lets the morph aim at a single point: the box's height cannot
+ * change when a name wraps to two lines, so Arsenal and Manchester United
+ * collapse to the same place. Whichever is visible is centred on that point.
+ */
 function Side({
-  url,
   name,
+  code,
+  colour,
   move,
-  shrink,
-  fade,
+  nameOut,
+  codeIn,
+  ruleStyle,
 }: {
-  url: string | null | undefined;
   name: string;
+  code: string;
+  /** Already through the fixture rule and lifted for the band — see `markColours`. */
+  colour: string;
   // ⚠ `StyleProp<ViewStyle>`, NOT `ReturnType<typeof useAnimatedStyle>`. The
   // hook returns `DefaultStyle` (ViewStyle & ImageStyle & TextStyle), which
   // Reanimated 4's own `Animated.View` will not accept as a style prop — that
@@ -602,109 +922,157 @@ function Side({
   // deserve. The intersection IS assignable to ViewStyle, so this satisfies
   // both the call site and the consumer without a cast.
   move: StyleProp<ViewStyle>;
-  shrink: StyleProp<ViewStyle>;
-  fade: StyleProp<ViewStyle>;
+  nameOut: StyleProp<ViewStyle>;
+  codeIn: StyleProp<ViewStyle>;
+  ruleStyle: StyleProp<ViewStyle>;
 }) {
   return (
-    <Animated.View style={[{ flex: 1, alignItems: 'center', gap: 8 }, move]}>
-      <Animated.View style={shrink}>
-        <TeamMark url={url} />
-      </Animated.View>
-      <Animated.View style={fade}>
-        <RNText
-          numberOfLines={2}
-          style={{
-            fontFamily: fontFamilies.semibold,
-            fontSize: 16,
-            color: '#FFFFFF',
-            textAlign: 'center',
-          }}
-        >
-          {name}
-        </RNText>
-      </Animated.View>
+    <Animated.View style={[{ flex: 1, alignItems: 'center', gap: COLUMN_GAP }, move]}>
+      <View
+        style={{
+          height: MARK_H,
+          alignSelf: 'stretch',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Animated.View style={[{ position: 'absolute', left: 0, right: 0 }, nameOut]}>
+          <RNText
+            numberOfLines={2}
+            style={{
+              fontFamily: fontFamilies.black,
+              fontSize: 19,
+              lineHeight: 21,
+              color: '#FFFFFF',
+              textAlign: 'center',
+            }}
+          >
+            {name}
+          </RNText>
+        </Animated.View>
+        <Animated.View style={[{ position: 'absolute', left: 0, right: 0 }, codeIn]}>
+          {/* ⚠ A FIXED SLOT, CENTRED — see `CODE_W`. The bar lands relative to
+              this edge, so the letters may vary in width but the landing point
+              may not. */}
+          <RNText
+            numberOfLines={1}
+            style={{
+              width: CODE_W,
+              alignSelf: 'center',
+              fontFamily: fontFamilies.black,
+              // ⚠ THE SCORE'S RENDERED SIZE: 34pt scaled by the middle column's
+              // 0.68 on the collapse. The code is NOT inside that column and is
+              // never scaled, so it carries the product as its own size.
+              fontSize: 23,
+              lineHeight: COLLAPSED_MARK,
+              letterSpacing: 0.8,
+              color: '#FFFFFF',
+              textAlign: 'center',
+            }}
+          >
+            {code}
+          </RNText>
+        </Animated.View>
+      </View>
+
+      {/* ⚠ SCALED, NOT RESIZED. A width change would re-lay-out the column on
+          every frame of the scroll; `scaleX`/`scaleY` stay on the compositor,
+          which is the rule the rest of this header already follows. */}
+      <Animated.View
+        style={[{ width: RULE_W, height: RULE_H, borderRadius: 2, backgroundColor: colour }, ruleStyle]}
+      />
     </Animated.View>
   );
 }
 
-/** Score, clock or kickoff time — whichever the match's state calls for. */
-function Centre({ match }: { match: ResultsMatch }) {
+/**
+ * The three letters a side collapses to.
+ *
+ * ⚠ THE CLUB'S OWN ABBREVIATION FIRST. Slicing the display name gives "1. " for
+ * 1. FC Köln and "AC " for AC Milan, so it is the fallback rather than the rule
+ * — the same order the Last Man Standing wall uses.
+ */
+function sideCode(team: ResultsMatch['homeTeam'], fallback: string): string {
+  const abbr = team?.countryCode?.trim();
+  if (abbr) return abbr.toUpperCase();
+  const name = team?.shortName?.trim() || team?.countryName?.trim() || fallback;
+  return name.slice(0, 3).toUpperCase();
+}
+
+/**
+ * The figure in the middle: the score, or the kickoff time.
+ *
+ * ⚠⚠ SPLIT FROM ITS CAPTION ON 2026-09-21, AND THE SPLIT IS THE ALIGNMENT.
+ * They used to be one component in one stack, which meant the caption's height
+ * decided where the column's centre was — and the column was what scaled and
+ * translated on the collapse, so the score landed wherever the caption left it
+ * rather than on the codes' line. The figure now owns a box the same height as
+ * the codes' and scales about its own centre.
+ *
+ * ⚠ AND THE SPLIT IS ALSO THE RULE FROM YESTERDAY: figures survive the
+ * collapse, captions fade. Having them in separate components is what stops
+ * that being a thing somebody has to remember.
+ */
+function CentreFigure({ match }: { match: ResultsMatch }) {
   const theme = useTheme();
   const isLive = match.status === 'live';
   const isFinished = match.status === 'completed';
 
-  if (isLive) {
+  if (isLive || isFinished) {
     return (
-      <>
+      <View style={{ alignItems: 'center', gap: 2 }}>
         <ScoreRow home={match.homeScoreFt ?? 0} away={match.awayScoreFt ?? 0} />
-        <MatchClock match={match} />
-      </>
-    );
-  }
-  if (isFinished) {
-    return (
-      <>
-        <ScoreRow home={match.homeScoreFt ?? 0} away={match.awayScoreFt ?? 0} />
-        {match.homeScorePso !== null && match.awayScorePso !== null ? (
+        {isFinished && match.homeScorePso !== null && match.awayScorePso !== null ? (
+          // ⚠ A FIGURE, NOT A CAPTION — it is a second scoreline, and a match
+          // decided on penalties is not described by the one above it.
           <RNText
             style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.accent }}
           >
             ({match.homeScorePso}-{match.awayScorePso} PSO)
           </RNText>
         ) : null}
-        <RNText
-          style={{
-            fontFamily: fontFamilies.medium,
-            fontSize: 10,
-            color: 'rgba(255,255,255,0.68)',
-          }}
-        >
-          Full Time
-        </RNText>
-      </>
+      </View>
     );
   }
+
   return (
-    <>
-      <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 26, color: '#FFFFFF' }}>
-        {formattedTime(match.matchDate)}
-      </RNText>
-      <RNText
-        style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: 'rgba(255,255,255,0.68)' }}
-      >
-        {formattedShortDate(match.matchDate)}
-      </RNText>
-    </>
+    <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 26, color: '#FFFFFF' }}>
+      {formattedTime(match.matchDate)}
+    </RNText>
   );
 }
 
-/**
- * The header's team mark — a flag or a club crest, both from `flagUrl`.
- *
- * ⚠ Square box + `contain`, for the reason written out in full on
- * `components/results/MatchResultRow.tsx`'s `TeamMark`: a league fixture puts a
- * crest that is not 3:2 through a field named after a flag, and a `cover` fit
- * cropped it. At 64 this is the biggest mark in the app, so it was also the
- * most obviously beheaded one.
- */
-function TeamMark({ url, size = CREST }: { url: string | null | undefined; size?: number }) {
-  const theme = useTheme();
-  if (!url) {
+/** The line under the figure: the clock, "Full Time", or the date. */
+function CentreCaption({ match }: { match: ResultsMatch }) {
+  const isLive = match.status === 'live';
+  const isFinished = match.status === 'completed';
+
+  // ⚠ THE LIVE CLOCK IS HERE AND IT IS STILL A FIGURE, which looks like a
+  // contradiction and is not. It fades with the captions because the collapsed
+  // strip cannot hold it beside a 23pt code and a 23pt score — but it keeps its
+  // own ticking component rather than being reduced to a word.
+  if (isLive) return <MatchClock match={match} />;
+
+  if (isFinished) {
     return (
-      <View
-        style={{ width: size, height: size, borderRadius: 4, backgroundColor: theme.colors.mist }}
-      />
+      <RNText
+        style={{ fontFamily: fontFamilies.medium, fontSize: 10, color: 'rgba(255,255,255,0.68)' }}
+      >
+        Full Time
+      </RNText>
     );
   }
+
   return (
-    <Image
-      source={{ uri: url }}
-      style={{ width: size, height: size }}
-      contentFit="contain"
-      cachePolicy="memory-disk"
-    />
+    <RNText
+      style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: 'rgba(255,255,255,0.68)' }}
+    >
+      {formattedShortDate(match.matchDate)}
+    </RNText>
   );
 }
+
+
 
 // Live clock line — a red dot + a locally-ticking MM:SS estimate. Isolated as
 // its own component so the once-a-second tick re-renders only this row, not the

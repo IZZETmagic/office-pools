@@ -39,7 +39,7 @@ import { LineupsTab } from '@/components/match/LineupsTab';
 import { MatchTabBar } from '@/components/match/MatchTabBar';
 import { StatsTab } from '@/components/match/StatsTab';
 import { SubstitutionIcon } from '@/components/match/SubstitutionIcon';
-import { Icon, Text } from '@/components/ui';
+import { TeamMark, Icon, Text } from '@/components/ui';
 import type { BracketStatsResponse, MatchStatsResponse } from '@/lib/api';
 import { getCompetitionBand } from '@/lib/design/competitionBand';
 import { displayPlayerName } from '@/lib/playerName';
@@ -243,6 +243,8 @@ export default function MatchDetailScreen() {
                 competition={leagueContext.table.competition}
                 competitionId={m.competitionId}
                 seasonId={leagueContext.table.season_id}
+                homeCrestUrl={m.homeTeam?.flagUrl ?? null}
+                awayCrestUrl={m.awayTeam?.flagUrl ?? null}
               />
             ) : null}
             {groupStandings.length > 0 ? (
@@ -421,12 +423,12 @@ export default function MatchDetailScreen() {
 function FallbackShell({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const [left, right] = getCompetitionBand(null);
+  const bandStops = getCompetitionBand(null);
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
       <StatusBar style="light" animated />
       <LinearGradient
-        colors={[left, right]}
+        colors={bandStops}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
         style={{ paddingTop: insets.top + theme.spacing.xs }}
@@ -1103,12 +1105,9 @@ function GroupStandingsCard({
                   {position}
                 </RNText>
                 {s.flagUrl ? (
-                  <Image
-                    source={{ uri: s.flagUrl }}
-                    style={{ width: 22, height: 15, borderRadius: 3, marginRight: 8 }}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                  />
+                  <View style={{ marginRight: 8 }}>
+                    <TeamMark url={s.flagUrl} height={16} />
+                  </View>
                 ) : (
                   <View
                     style={{
@@ -1551,12 +1550,7 @@ function PositionBar({
     <View style={{ gap: theme.spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
         {team.flag_url ? (
-          <Image
-            source={{ uri: team.flag_url }}
-            style={{ width: 22, height: 15, borderRadius: 2 }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
+          <TeamMark url={team.flag_url} height={16} />
         ) : (
           <View
             style={{ width: 22, height: 15, borderRadius: 2, backgroundColor: theme.colors.mist }}

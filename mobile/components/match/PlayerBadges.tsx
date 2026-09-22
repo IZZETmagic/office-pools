@@ -9,36 +9,35 @@ import { formatRating, ratingScaleColor, type PlayerMarkers } from '@/lib/player
 // =============================================================
 // What goes where around a player
 // =============================================================
-// ⚠⚠ SIX SLOTS, ONE FACT EACH, AND THE MAP BELOW IS THE SPEC. Every badge on
+// ⚠⚠ FIVE SLOTS, ONE FACT EACH, AND THE MAP BELOW IS THE SPEC. Every badge on
 // the pitch is placed from `slots()` and nowhere else, so the layout can be
 // read in one place instead of inferred from scattered `position: absolute`
 // blocks. They collided twice while this was inline — the rating and the goal
 // both claimed bottom-right, and the armband and a booking were both amber
 // sitting one above the other.
 //
-//              66'
-//        substitution  ( )  rating
+//                     ( )  rating
 //                     (   )
 //             yellow  (   )  red
 //                     ( _ )
 //            assists   ` '   goals
 //
-//                    C  17  Tzolis
+//                 C  66' ←  Tzolis
 //
 // ⚠ THE PAIRINGS ARE DELIBERATE, NOT ARBITRARY. Each edge holds two facts of
 // the same kind, so the eye never has to hunt for the other half of a pair:
 // yellow opposite red across the middle, and what he MADE opposite what he
-// SCORED across the bottom. The top pair is "he left" and "how well he played",
-// which are the two read first.
+// SCORED across the bottom.
 //
-// ⚠⚠ THE MINUTE FLOATS ABOVE THE ARROW AND DOES NOT MOVE IT. The arrow's slot
-// is the anchor; the minute is positioned off it. Stacking them in one column
-// pushed the arrow DOWN by the height of a line of text whenever a minute was
-// present — far enough to collide with the booking below it, which is exactly
-// what the pitch showed.
+// ⚠⚠ THE SUBSTITUTION IS NOT HERE ANY MORE — IT IS ON THE NAME ROW (Ryan,
+// 2026-09-19), as `66' ←` ahead of the surname. Top-left was the wrong home for
+// it twice over: it is the one thing on a shirt that needs TWO pieces of type
+// to say (a minute and a direction), and it was the only badge whose minute had
+// to be floated off its own slot to stop it shoving the arrow into the booking
+// below. A row of text reads a pair left-to-right for free.
 //
-// ⚠ THE ARMBAND IS NOT HERE — IT IS ON THE NAME ROW, ahead of the number. It is
-// the one marker that is not about this match: a captain is a captain before
+// ⚠ THE ARMBAND IS NOT HERE EITHER, for the same reason and the older one: it
+// is the one marker that is not about this match. A captain is a captain before
 // kickoff and stays one whether or not he touches the ball, so it belongs with
 // the things that identify him rather than with the things that happened to
 // him. Vacating bottom-left is what let the assists come out from behind the
@@ -47,7 +46,8 @@ import { formatRating, ratingScaleColor, type PlayerMarkers } from '@/lib/player
 // ⚠⚠ MULTIPLES STACK, THEY DO NOT COUNT. Two goals are two footballs fanned
 // behind each other, not a ball with a "2" beside it. A count is a thing you
 // read; a stack is a thing you SEE, and at this size the difference is whether
-// the information arrives before or after you have decided to look.
+// the information arrives before or after you have decided to look. They fan
+// ACROSS, never up — see `Fan`.
 // =============================================================
 
 // ⚠ Re-exported rather than declared: the spacing maths in `lineupLayout`
@@ -55,18 +55,42 @@ import { formatRating, ratingScaleColor, type PlayerMarkers } from '@/lib/player
 export { MARK } from '@/lib/lineupLayout';
 
 /**
- * The six anchors. `chip` is the circle's diameter, passed in because the
- * pitch owns that number and this file should not have a second opinion on it.
+ * The five anchors. `chip` is the shirt's width, passed in because the pitch
+ * owns that number and this file should not have a second opinion on it.
+ *
+ * ⚠ TOP-LEFT IS DELIBERATELY EMPTY. The substitution used to sit there; nothing
+ * has been moved up to fill the gap, because the rating is the one fact that
+ * earns the top of the shirt on its own.
  */
 export function slots(chip: number) {
   const mid = chip / 2 - 8;
   return {
-    substitution: { top: -4, left: -MARK / 2 },
     rating: { top: -5, right: -MARK / 2 },
-    yellow: { top: mid, left: -MARK / 2 + 2 },
-    red: { top: mid, right: -MARK / 2 + 2 },
-    assist: { bottom: -3, left: -MARK / 2 },
-    goal: { bottom: -3, right: -MARK / 2 },
+    // ⚠ THE BOX GREW WITH THE HALO, AND THESE ABSORB IT. The card used to hang
+    // in a 13x15 box with the glyph at its top-left corner, which put its
+    // centre on the shirt's edge and `mid + 6.5` down. The box is now a
+    // 16-square with both glyphs centred in it, so the offsets are worked back
+    // from that centre — the card has not moved a point.
+    yellow: { top: mid - 1.5, left: -CARD_HALO / 2 },
+    red: { top: mid - 1.5, right: -CARD_HALO / 2 },
+    // ⚠⚠ FLUSH AGAINST THE HEM, UP AND IN (Ryan, 2026-09-19) — 5 up and 9.5 in
+    // from where they hung, in two passes. `chip` is the shirt's SQUARE and the
+    // shirt does not fill it: measured off the artwork's own path, at 56pt the
+    // hem runs from 16.1 to 39.8 across and ends 49.1 down, so the bottom
+    // corners of the box are empty grass. The discs were centred on the box's
+    // edges and floating in it, which made a scorer visibly wider than a
+    // defender for no reason anyone could see.
+    //
+    // ⚠ AND 3 IS WHERE IT STOPS, NOT A ROUND NUMBER. At `left: 3` the disc runs
+    // 3 → 16.0 and the hem begins at 16.1: it is touching the shirt. Any
+    // further in and a badge starts covering the jersey rather than sitting
+    // beside it, which is a different decision from "closer".
+    //
+    // ⚠ AND IT LIFTS THEM OFF THE NAME. At `bottom: -1` a disc hung BELOW the
+    // shirt entirely, into the 3pt gap the surname starts in — which is why a
+    // scorer's badge sat level with his own name. It now ends 4pt clear of it.
+    assist: { bottom: 4, left: 3 },
+    goal: { bottom: 4, right: 3 },
   } as const;
 }
 
@@ -84,9 +108,22 @@ const FAN = 4;
  * the others peeking out behind it. Front-to-back would bury the only one that
  * is completely visible under the ones that are not.
  *
- * ⚠ `away` IS WHICH WAY THE PILE GROWS, and it points INTO the pitch rather
- * than off it — a stack on the left edge fans right, one on the right edge fans
- * left. Growing outward would push the second card off the touchline.
+ * ⚠⚠ `away` IS WHICH WAY THE PILE GROWS, AND IT GROWS AWAY FROM THE SHIRT
+ * (Ryan, 2026-09-19): assists and the yellow fan LEFT off the left of the
+ * jersey, goals and the red fan RIGHT off the right of it. Each slot's stack
+ * therefore runs outward on the side it already sits on.
+ *
+ * ⚠ IT USED TO POINT INWARD, on the reasoning that a pile growing outward would
+ * push the second badge off the touchline. It does not: a 56pt shirt sits in a
+ * column at least 79 wide, so there are 11.5pt of margin either side and a
+ * third copy reaches 5. What inward actually did was walk the pile ACROSS the
+ * jersey — a scorer's second goal covered his own number.
+ *
+ * ⚠⚠ AND IT FANS SIDEWAYS ONLY (Ryan, 2026-09-19). It used to step 4 across AND
+ * 4 up per copy, so a second booking climbed the shirt diagonally — which put
+ * it nearer the rating badge above and read as two different things at two
+ * heights rather than as two of one thing. Along a line they are obviously a
+ * count. Every slot has room across and none of them has room upward.
  */
 function Fan({
   count,
@@ -106,7 +143,6 @@ function Fan({
           style={{
             position: 'absolute',
             left: i * FAN * away,
-            top: -i * FAN,
           }}
         >
           {children}
@@ -116,30 +152,77 @@ function Fan({
   );
 }
 
+/** The card itself, and the white one sitting behind it. */
+const CARD = 13;
+const CARD_HALO = 16;
+
 /**
- * A booking.
+ * A booking, with a thin white edge (Ryan, 2026-09-19).
  *
- * ⚠ NO OUTLINE, UNLIKE EVERY OTHER BADGE HERE — tried, and it read badly: a
- * white border around a 9x13 rectangle turns a card into a sticker.
+ * ⚠⚠ THE BORDER IS A SECOND COPY OF THE GLYPH BEHIND THE FIRST — Ryan's idea,
+ * and the right one. My first attempt threw the icon away and drew a plain
+ * rounded rectangle so it could take `borderWidth`, because a glyph has no edge
+ * to outline. That worked, but it quietly changed the card's SHAPE: the
+ * Hugeicons rectangle is a squircle, 16x20 in a 24 box with a corner radius of
+ * about a quarter of its width, and a `borderRadius: 2` rectangle is a squarer,
+ * taller thing. Nobody asked for a new card. Stacking two sizes of the same
+ * glyph keeps the silhouette exactly and follows those corners for free.
  *
- * ⚠ AND IT DOES NOT NEED ONE, WHICH THE CONTRAST FIGURES UNDERSTATE. Yellow
- * measures 2.36:1 against the light pitch and red 1.35:1, which sounds dire —
- * but that is LUMINANCE contrast, the metric for reading text. A red rectangle
- * on green grass is about as hue-distinct as two colours get, and hue is what
- * separates two shapes. The badges that DO carry a hairline need it because
- * they are dark on dark or white on light, where hue cannot help.
+ * ⚠ 16 BEHIND 13 IS A 1pt EDGE. The glyph fills two thirds of its box, so the
+ * halo is (16-13) x 16/24 / 2 = 1.00 across and 1.25 down — even enough to read
+ * as an outline rather than as a drop shadow. Going to 15 gives 0.67, which
+ * disappears against the grass at this size.
+ *
+ * ⚠ THIS FILE USED TO ARGUE AGAINST THE BORDER, and the argument was about
+ * legibility — which is not what was asked. Kept for the record, since it is
+ * good reasoning that simply lost: yellow measures 2.36:1 against the light
+ * pitch and red 1.35:1, which sounds dire, but that is LUMINANCE contrast, the
+ * metric for reading TEXT. A red rectangle on green grass is about as
+ * hue-distinct as two colours get. The edge is not holding the card together;
+ * it is making it match the other badges, all of which carry one.
  */
 function Card({ tone }: { tone: 'amber' | 'red' }) {
-  return <Icon name="rectangle.portrait.fill" size={13} tint={CARD_COLOR[tone]} filled />;
+  return (
+    <View
+      style={{
+        width: CARD_HALO,
+        height: CARD_HALO,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Icon name="rectangle.portrait.fill" size={CARD_HALO} tint="#FFFFFF" filled />
+      {/* ⚠ ABSOLUTE, SO THE TWO SHARE A CENTRE. In the flow the coloured card
+          would sit BELOW the white one instead of on it. */}
+      <View style={{ position: 'absolute' }}>
+        <Icon name="rectangle.portrait.fill" size={CARD} tint={CARD_COLOR[tone]} filled />
+      </View>
+    </View>
+  );
 }
+
+/**
+ * The white disc behind a goal or an assist.
+ *
+ * ⚠⚠ THE DISC SHRANK AND THE ICONS DID NOT (Ryan, 2026-09-19). It was 19×17
+ * around an 11pt football — three points of padding on each side plus a border,
+ * which read as a white sticker with a small ball on it rather than as a badge.
+ * It is 13×13 now, and the football and the 'A' are untouched at 11 and 9pt.
+ * The whole reduction came out of the padding.
+ *
+ * ⚠ AND IT IS A CIRCLE NOW, WHICH IT WAS NOT BEFORE. The old padding was 3
+ * across and 2 down, so a goal badge was two points wider than it was tall — an
+ * oval nobody chose. With no padding at all the icon's own 11pt plus the 1pt
+ * border make 13 in both directions, and `minWidth` holds the narrow 'A' to the
+ * same 13 rather than letting it collapse into a lozenge.
+ */
+const PILL = 13;
 
 function Pill({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <View
       style={{
-        minWidth: MARK,
-        paddingHorizontal: 3,
-        paddingVertical: 2,
+        minWidth: PILL,
         borderRadius: radii.pill,
         backgroundColor: color,
         alignItems: 'center',
@@ -176,19 +259,18 @@ const ON_WHITE = '#111827';
  * their edge. There has never been one.)
  */
 const CARD_COLOR = { amber: '#F59E0B', red: '#EF4444' } as const;
-const white = { fontFamily: MONO_BOLD, fontSize: 9, lineHeight: 12, color: '#FFFFFF' } as const;
-const dark = { fontFamily: MONO_BOLD, fontSize: 9, lineHeight: 12, color: ON_WHITE } as const;
+// ⚠ `lineHeight` 11, NOT 12 — it is what makes the assist disc square. The
+// text box is the badge's height, so a 12 line inside a 1pt border came to 14
+// against the goal badge's 13. The 'A' itself is still 9pt.
+const dark = { fontFamily: MONO_BOLD, fontSize: 9, lineHeight: 11, color: ON_WHITE } as const;
 
 export function PlayerBadges({
   marks,
   rating,
-  subMinute,
   chip,
 }: {
   marks: PlayerMarkers | null;
   rating: number | null;
-  /** Null unless the timeline corroborated it — see `subMinute` in playerStats. */
-  subMinute: number | null;
   chip: number;
 }) {
   if (!marks) return null;
@@ -198,51 +280,6 @@ export function PlayerBadges({
 
   return (
     <>
-      {/* ---- top left: he left, or he arrived ------------------------ */}
-      {marks.cameOff || marks.cameOn ? (
-        <View style={{ position: 'absolute', ...S.substitution, width: MARK, height: MARK }}>
-          {/* ⚠⚠ ABSOLUTE, SO THE ARROW DOES NOT MOVE. In a column the minute
-              pushed the arrow down by a whole line of text — into the booking
-              below it. The arrow owns the slot; the minute hangs off it.
-
-              ⚠ It appears only when the timeline confirmed it: `minutes` alone
-              is out by more than a minute for 5.9% of players, and a made-up
-              minute beside a face is worse than no minute at all. */}
-          {subMinute !== null ? (
-            <RNText
-              style={{
-                position: 'absolute',
-                bottom: MARK + 1,
-                left: -8,
-                right: -8,
-                textAlign: 'center',
-                fontFamily: MONO_BOLD,
-                fontSize: 9,
-                color: '#FFFFFF',
-                textShadowColor: 'rgba(0,0,0,0.7)',
-                textShadowRadius: 3,
-              }}
-            >
-              {subMinute}&apos;
-            </RNText>
-          ) : null}
-          <View
-            style={{
-              width: MARK,
-              height: MARK,
-              borderRadius: radii.pill,
-              backgroundColor: marks.cameOff ? '#B91C1C' : '#15803D',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.9)',
-            }}
-          >
-            <RNText style={{ ...white, fontSize: 10 }}>{marks.cameOff ? '↓' : '↑'}</RNText>
-          </View>
-        </View>
-      ) : null}
-
       {/* ---- top right: how he played -------------------------------- */}
       {/* ⚠ NO OUTLINE, UNLIKE EVERY OTHER BADGE HERE. The others are pale and
           need a white hairline to hold an edge against the grass; the rating
@@ -284,8 +321,8 @@ export function PlayerBadges({
 
       {/* ---- left: bookings, fanned --------------------------------- */}
       {marks.yellow > 0 ? (
-        <View style={{ position: 'absolute', ...S.yellow, width: 13, height: 15 }}>
-          <Fan count={marks.yellow} away={1}>
+        <View style={{ position: 'absolute', ...S.yellow, width: CARD_HALO, height: CARD_HALO }}>
+          <Fan count={marks.yellow} away={-1}>
             <Card tone="amber" />
           </Fan>
         </View>
@@ -293,8 +330,8 @@ export function PlayerBadges({
 
       {/* ---- right: sendings-off, opposite the yellows --------------- */}
       {marks.red > 0 ? (
-        <View style={{ position: 'absolute', ...S.red, width: 13, height: 15 }}>
-          <Fan count={marks.red} away={-1}>
+        <View style={{ position: 'absolute', ...S.red, width: CARD_HALO, height: CARD_HALO }}>
+          <Fan count={marks.red} away={1}>
             <Card tone="red" />
           </Fan>
         </View>
@@ -302,10 +339,10 @@ export function PlayerBadges({
 
       {/* ---- bottom left: what he made ------------------------------ */}
       {marks.assists > 0 ? (
-        <View style={{ position: 'absolute', ...S.assist, width: MARK, height: MARK }}>
+        <View style={{ position: 'absolute', ...S.assist, width: PILL, height: PILL }}>
           {/* ⚠ 'A', NOT A BOOT. There is no boot in this icon set, and
               borrowing another glyph would invent a symbol nobody was taught. */}
-          <Fan count={marks.assists} away={1}>
+          <Fan count={marks.assists} away={-1}>
             <Pill color="#FFFFFF">
               <RNText style={dark}>A</RNText>
             </Pill>
@@ -315,14 +352,14 @@ export function PlayerBadges({
 
       {/* ---- bottom right: what he scored --------------------------- */}
       {marks.goals > 0 ? (
-        <View style={{ position: 'absolute', ...S.goal, width: MARK, height: MARK }}>
-          <Fan count={marks.goals} away={-1}>
+        <View style={{ position: 'absolute', ...S.goal, width: PILL, height: PILL }}>
+          <Fan count={marks.goals} away={1}>
             <Pill color="#FFFFFF">
               {/* ⚠ `solid`, NOT `filled` — `filled` paints the free glyph's
                   closed paths and a football's outer ring is closed, so it
-                  rendered as a plain dark disc until this was corrected. The
-                  cards are the reverse: RectangleVerticalIcon has no solid
-                  variant at all, which is why `filled` exists.
+                  rendered as a plain dark disc until this was corrected.
+                  The cards are the reverse: RectangleVerticalIcon has no
+                  solid variant at all, which is why `filled` exists.
 
                   ⚠ And `tint`, NOT `color`: `color` takes a THEME token and the
                   pill it sits on is a hard-coded white. See ON_WHITE. */}

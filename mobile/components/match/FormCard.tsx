@@ -1,9 +1,9 @@
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Pressable, Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
-import { Text } from '@/components/ui';
+import { clubColorFromCrestUrl, fixturePalette } from '@/lib/design/clubColors';
+import { ClubBar, Text } from '@/components/ui';
 import type { FormResult } from '@/lib/matchContext';
 import type { ResultsMatch, ResultsTeam } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -23,14 +23,14 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 //
 // ## The shape, and why it is both crests
 //
-// A row is `[crest] [score] [crest]` — the fixture as it was played, left to
+// A row is `CODE [bar] [score] [bar] CODE` — the fixture as it was played, left to
 // right, with the club whose form this is on the side it actually played.
 //
 // ⚠ THE SCORE IS IN MATCH ORDER, NOT "OURS FIRST", and that is the whole point
-// of drawing both crests. An earlier version showed the opponent's crest and
+// of drawing both marks. An earlier version showed the opponent's crest and
 // `2-1` from this club's point of view, which reads as a home win whichever way
 // round it was — so a 1-0 away win and a 1-0 home defeat looked identical apart
-// from a colour. Here the crests say who was at home and the numbers stay in
+// from a colour. Here the bars say who was at home and the numbers stay in
 // the order the scoreboard had them.
 //
 // ⚠ THE COLOUR IS FROM THIS CLUB'S POINT OF VIEW THOUGH. Green, grey and red
@@ -156,9 +156,9 @@ function SideForm({
 }
 
 /**
- * One result: `[crest] [score] [crest]`, the fixture as it was played.
+ * One result: `CODE [bar] [score] [bar] CODE`, the fixture as it was played.
  *
- * ⚠ THE CLUB GOES ON THE SIDE IT PLAYED. `wasHome` decides which crest is which
+ * ⚠ THE CLUB GOES ON THE SIDE IT PLAYED. `wasHome` decides which bar is which
  * and which way round the goals read — the derivation in `matchContext` stores
  * them from the club's point of view (`goalsFor`/`goalsAgainst`), so they are
  * put back into match order here rather than being stored twice.
@@ -179,6 +179,10 @@ function FormRow({
   const right = result.wasHome ? result.opponent : club;
   const leftGoals = result.wasHome ? result.goalsFor : result.goalsAgainst;
   const rightGoals = result.wasHome ? result.goalsAgainst : result.goalsFor;
+  const colors = rowColors(left, right, {
+    home: theme.colors.primary,
+    away: theme.colors.accent,
+  });
 
   return (
     <Pressable
@@ -193,7 +197,8 @@ function FormRow({
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <Crest team={left} />
+      <ClubCode team={left} align="right" />
+      <Crest team={left} colour={colors?.home} />
       <View style={{ alignItems: 'center' }}>
         <View
           style={{
@@ -233,8 +238,77 @@ function FormRow({
           />
         ) : null}
       </View>
-      <Crest team={right} />
+      <Crest team={right} colour={colors?.away} />
+      <ClubCode team={right} align="left" />
     </Pressable>
+  );
+}
+
+/**
+ * The club's three letters, outboard of its colour bar.
+ *
+ * ⚠ ADDED WHEN THE CREST WENT (Ryan, 2026-09-19). A badge told you who played
+ * without being read; a colour bar does not, and this row is the one place in
+ * the card where the opponent CHANGES line to line. Without the code the row
+ * said "someone, 2-1, someone".
+ *
+ * ⚠ CODES OUTBOARD, BARS INBOARD — `CODE bar [score] bar CODE`. The bar sits
+ * against the number it belongs to, which is the arrangement the score row on
+ * the Pick'em screen already uses, so which goals are whose needs no working
+ * out.
+ *
+ * ⚠ SLATE, NOT INK. The score is what the row is for and it must stay the
+ * loudest thing on it; the codes are the context that makes it legible.
+ *
+ * ⚠ 12pt, AND THE SCORE'S 12 IS THE CEILING (Ryan, 2026-09-19 — 10 was too
+ * small to read at arm's length). It is deliberately not larger: a code set
+ * above the scoreline would invert the hierarchy the paragraph above describes.
+ * If these need to grow again, the score has to grow with them.
+ *
+ * ⚠⚠ FIXED WIDTH, AND THAT IS WHAT KEEPS THE COLUMN STRAIGHT (Ryan,
+ * 2026-09-20: "the last matches indicators are not aligned on each side"). The
+ * row is centred and everything in it was intrinsically sized, so a row's
+ * contents were only as wide as its own two codes — and Nunito is proportional,
+ * so those differ by a lot: measured at 12pt bold, `LIL` is 17.8 and `WHU` is
+ * 32.4. Bournemouth's four rows carried MCI, NEW and BOU twice, which recentred
+ * the score pill on every line and made the bars wander. Pinning the code slot
+ * makes every row the same width by construction.
+ *
+ * ⚠ AND THE TEXT ALIGNS INWARD, toward the score. Left-hand codes are
+ * right-aligned and right-hand codes left-aligned, so the gap between a code
+ * and its bar is constant while the slack falls on the OUTSIDE of the row where
+ * nothing lines up against it.
+ *
+ * Measured over all 96 clubs we carry plus the English three-letter codes:
+ * widest is `WHU` at 32.4pt. 33 covers it, and the row comes to 146pt of the
+ * ~170 each card gets when two sit side by side — the same worst case it always
+ * had, now paid on every row instead of only the wide ones.
+ */
+const CODE_W = 33;
+
+function ClubCode({ team, align }: { team: ResultsTeam | null; align: 'left' | 'right' }) {
+  const theme = useTheme();
+  const code = team?.countryCode?.trim() || team?.shortName?.slice(0, 3).toUpperCase() || null;
+
+  // ⚠ THE SLOT SURVIVES A CLUB WE HAVE NO CODE FOR. Returning null would pull
+  // that one row 33pt narrower than the three above it — the very bug this
+  // width exists to fix.
+  if (!code) return <View style={{ width: CODE_W }} />;
+
+  return (
+    <RNText
+      numberOfLines={1}
+      style={{
+        width: CODE_W,
+        textAlign: align,
+        fontFamily: fontFamilies.bold,
+        fontSize: 12,
+        letterSpacing: 0.3,
+        color: theme.colors.slate,
+      }}
+    >
+      {code}
+    </RNText>
   );
 }
 
@@ -265,19 +339,47 @@ function LetterBox({ outcome }: { outcome: 'W' | 'D' | 'L' }) {
  * crest is not 3:2, so it needs a square box and `contain`. Boxing it 22×15
  * like a national flag crops it, which is a bug this app has already had once.
  */
-function Crest({ team }: { team: ResultsTeam | null }) {
+function Crest({ team, colour }: { team: ResultsTeam | null; colour?: string }) {
   const theme = useTheme();
+  // ⚠ THE SLOT SURVIVES A MISSING CLUB, unlike the dossier's mark. This row is
+  // `[mark] [score] [mark]` and the score has to stay centred down the list, so
+  // an unknown club keeps its width rather than sliding the numbers sideways.
   if (!team?.flagUrl) {
-    return <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.mist }} />;
+    return <View style={{ width: 6, height: 20, borderRadius: 999, backgroundColor: theme.colors.mist }} />;
   }
-  return (
-    <Image
-      source={{ uri: team.flagUrl }}
-      style={{ width: 20, height: 20 }}
-      contentFit="contain"
-      cachePolicy="memory-disk"
-    />
-  );
+  return <ClubBar url={team.flagUrl} colour={colour} height={20} />;
+}
+
+/**
+ * What the two clubs on ONE ROW wear.
+ *
+ * ⚠⚠ PER ROW, NOT PER CARD, AND THAT IS THE DIFFERENCE FROM EVERY OTHER SURFACE
+ * (Ryan, 2026-09-20). The results list, the scout report and the line-ups all
+ * colour ONE fixture. This card is five past fixtures stacked up, each against a
+ * different opponent, so the away side that changes kit changes with the row.
+ * Bournemouth's own five open with BOU v BRE — two reds — and Liverpool's with
+ * LIV v NOT, another two.
+ *
+ * ⚠ AND THE CLUB THE CARD IS ABOUT IS NOT ALWAYS THE HOME SIDE. `wasHome`
+ * already decides which end of the row it sits at; whoever is on the right is
+ * the away team that week, and that is who changes. On a week Bournemouth
+ * travelled, Bournemouth are the ones in the change kit — which is exactly what
+ * happened, so it is right.
+ *
+ * ⚠ BOTH CLUBS KNOWN OR NEITHER IS COLOURED — the same gate the other surfaces
+ * use, so an opponent from outside the five leagues cannot take the subject
+ * club's own colour away with it.
+ */
+function rowColors(
+  left: ResultsTeam | null,
+  right: ResultsTeam | null,
+  fallback: { home: string; away: string },
+): { home: string; away: string } | null {
+  const leftUrl = left?.flagUrl;
+  const rightUrl = right?.flagUrl;
+  if (!clubColorFromCrestUrl(leftUrl) || !clubColorFromCrestUrl(rightUrl)) return null;
+  const palette = fixturePalette(leftUrl, rightUrl, fallback);
+  return palette.usingClubColors ? { home: palette.home, away: palette.away } : null;
 }
 
 /**

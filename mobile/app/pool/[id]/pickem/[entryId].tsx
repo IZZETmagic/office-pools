@@ -7,7 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { MatchScoutSheet } from '@/components/scouting/MatchScoutSheet';
 import { OutcomePicker, type Outcome } from '@/components/pool-detail/OutcomePicker';
-import { clubColorFromCrestUrl } from '@/lib/design/clubColors';
+import { ClubBar } from '@/components/ui';
 import { TapScoreField } from '@/components/pool-detail/TapScoreField';
 import { Icon, Text } from '@/components/ui';
 import { saveLeaguePicks, type LeaguePickBody } from '@/lib/api';
@@ -701,12 +701,9 @@ function Crest({ team }: { team: LeagueMatch['home_team'] }) {
   // ⚠ THE CREST URL IS STILL THE KEY, even though nothing draws it any more:
   // `clubColorFromCrestUrl` reads the club's provider id out of the last path
   // segment. See mobile/lib/design/clubColors.ts.
-  const colour = clubColorFromCrestUrl(team?.flag_url ?? null);
   return (
     <View style={{ width: 14, alignItems: 'center' }}>
-      {colour ? (
-        <View style={{ width: 6, height: 28, borderRadius: 999, backgroundColor: colour }} />
-      ) : null}
+      <ClubBar url={team?.flag_url ?? null} height={28} />
     </View>
   );
 }

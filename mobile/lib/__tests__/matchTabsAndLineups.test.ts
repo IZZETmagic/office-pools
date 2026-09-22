@@ -14,7 +14,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { CHIP, GK_DEPTH, OUTFIELD_FROM, OUTFIELD_TO, REACH_DOWN, REACH_UP, groupByRow, parseGrid, rowDepths, surnameOf } from '../lineupLayout';
+import { CHIP, GK_DEPTH, MARK, OUTFIELD_FROM, OUTFIELD_TO, REACH_DOWN, REACH_UP, groupByRow, parseGrid, rowDepths, surnameOf } from '../lineupLayout';
 import { BLEED, PITCH_L } from '../pitchGeometry';
 import {
   leadingSide,
@@ -438,6 +438,24 @@ describe('⚠⚠ the two front rows must not collide', () => {
     const depths = rowDepths(5, true);
     const gap = pct(depths[2] - depths[1]);
     expect(gap).toBeGreaterThan(CHIP / 2 + REACH_DOWN);
+  });
+
+  it('⚠⚠ five shirts fit across a row', () => {
+    // THE CONSTRAINT THAT BINDS `CHIP`, and until 2026-09-19 nothing measured
+    // it — the three tests above are all vertical. A shirt was grown from 48 to
+    // 56 for its number's sake, and height was never going to be what stopped
+    // it: a five-man midfield is the tightest row football plays, and a player
+    // is `MARK` wider than his shirt because the rating hangs off one shoulder
+    // and a booking off the other.
+    //
+    // ⚠ THE COLUMN IS THE FULL SCREEN DIVIDED BY THE ROW, not the pitch inside
+    // its bleed: `Half` gives each player `100 / row.length` percent of the
+    // pitch VIEW, and the view is edge to edge on this tab.
+    const column = SCREEN / 5;
+    const player = CHIP + MARK;
+    expect(column, `${player}pt of player in a ${column.toFixed(0)}pt column`).toBeGreaterThan(
+      player,
+    );
   });
 
   it('⚠ the keeper’s badge stays on the pitch', () => {

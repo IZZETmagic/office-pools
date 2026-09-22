@@ -245,7 +245,17 @@ export type LeagueLeaderboardEntry = LeaderboardEntryCore & {
     /** Rounds taken this season, and the only memory a closed round leaves. */
     rounds_won: number;
     /** The club they are backing in `LeagueLeaderboardMeta.lms.pick_matchweek`. */
-    pick: { club_name: string; crest_url: string | null } | null;
+    pick: {
+      club_name: string;
+      /**
+       * ⚠ OPTIONAL BECAUSE THE SERVER MAY BE OLDER THAN THIS BUNDLE. Shortened
+       * server-side by `shortClubName` — "Man City", "Nott'm Forest" — the same
+       * way every other club label on the contract is. Absent means an older
+       * API, and the row draws the full name.
+       */
+      short_name?: string | null;
+      crest_url: string | null;
+    } | null;
     /**
      * ⚠ Their club is hidden from you because the matchweek has not locked —
      * migration 086, so the pool cannot copy the best player. NOT the same as
@@ -1545,6 +1555,15 @@ export type LmsPickCell = {
   matchweek_number: number;
   club_id: string;
   club_name: string;
+  /**
+   * The three letters the wall prints on the shirt — "ARS", "NOT".
+   *
+   * ⚠ OPTIONAL ON THE CLIENT because an older API behind a newer bundle sends
+   * no such field; the cell falls back to slicing the name. Nullable on the
+   * wire for a different reason: the importer fills it from the provider and a
+   * club can arrive without one.
+   */
+  abbreviation?: string | null;
   crest_url: string | null;
   /** NULL until the matchweek settles. */
   result: 'survived' | 'eliminated' | null;
@@ -2060,6 +2079,14 @@ export async function fetchDossier(
 export type PlayerForm = {
   externalPlayerId: number;
   name: string;
+  /**
+   * The number he wore most recently.
+   *
+   * ⚠ OPTIONAL ON THE CLIENT — an older API behind a newer bundle sends no such
+   * field. Nullable on the wire too: the provider omits it often enough to
+   * matter, and the row falls back to his position.
+   */
+  shirtNumber?: number | null;
   position: 'G' | 'D' | 'M' | 'F' | null;
   appearances: number;
   minutes: number;

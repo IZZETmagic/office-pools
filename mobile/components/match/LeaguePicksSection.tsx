@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
-import { Text } from '@/components/ui';
+import { TeamMark, Text } from '@/components/ui';
 import type { FixturePick, TablePick } from '@/lib/api';
 import { pickLabel, tierLabel } from '@/lib/leaguePickLabel';
 import { ordinal } from '@/lib/ordinal';
@@ -191,12 +191,7 @@ function ClubPositionRow({
     >
       {/* ⚠ A crest is not a flag — square box, `contain`. */}
       {team?.flagUrl ? (
-        <Image
-          source={{ uri: team.flagUrl }}
-          style={{ width: 20, height: 20 }}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-        />
+        <TeamMark url={team.flagUrl} height={20} flagWidth={20} flagHeight={14} />
       ) : (
         <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.mist }} />
       )}

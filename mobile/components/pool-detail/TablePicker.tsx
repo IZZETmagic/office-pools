@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Pressable, Text as RNText, View } from 'react-native';
 import {
   NestedReorderableList,
   ScrollViewContainer,
@@ -8,7 +8,7 @@ import {
   type ReorderableListReorderEvent,
 } from 'react-native-reorderable-list';
 
-import { Icon, Text } from '@/components/ui';
+import { ClubBar, Icon, Text } from '@/components/ui';
 import { saveTablePrediction, type SeasonClub, type TableSettings } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -310,7 +310,7 @@ function PickerRow({
       </View>
 
       {club.crest_url ? (
-        <Image source={{ uri: club.crest_url }} style={{ width: 22, height: 22 }} resizeMode="contain" />
+        <ClubBar url={club.crest_url} height={22} />
       ) : (
         <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: theme.colors.mist }} />
       )}

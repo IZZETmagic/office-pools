@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Image } from 'expo-image';
 import { Pressable, Text as RNText, View } from 'react-native';
 
+import { Jersey } from '@/components/match/Jersey';
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
 import { PlayerBadges } from '@/components/match/PlayerBadges';
 import { PlayerStatSheet } from '@/components/match/PlayerStatSheet';
@@ -12,19 +12,19 @@ import {
   VIEW_L,
   VIEW_W,
 } from '@/components/match/PitchMarkings';
-import { Text } from '@/components/ui';
+import { ClubBar, Icon, Text } from '@/components/ui';
 import { fixturePalette } from '@/lib/design/clubColors';
 import { CHIP, groupByRow, rowDepths, surnameOf } from '@/lib/lineupLayout';
 import {
   formatRating,
   indexByPlayerId,
   playerMarkers,
-  playerPhotoUrl,
   ratingScaleColor,
   statsClock,
   subMinute,
   teamRating,
   type MatchPlayerStat,
+  type PlayerMarkers,
 } from '@/lib/playerStats';
 import type { LineupPlayer, MatchLineup } from '@/lib/useMatchDetail';
 import type { ResultsTeam } from '@/lib/useTournamentMatches';
@@ -64,8 +64,11 @@ import { fontFamilies, radii, useTheme, withOpacity } from '@/theme';
 /** The shirt. Big enough to read a number in, small enough for five across. */
 // ⚠ CHIP AND THE ROW DEPTHS LIVE TOGETHER IN `lineupLayout`, because whether
 // two facing strikers overlap depends on both and no test could see a size
-// declared in a component. 48 is itself geometry: rows sit 94pt apart, and a
-// 48pt circle plus a 3pt gap plus an 11pt label ends 42pt below its own centre.
+// declared in a component. The size is itself geometry: rows sit 94pt apart,
+// and a 56pt shirt plus a 3pt gap plus an 11pt label ends 46pt below its own
+// centre. Both limits — vertical clearance and five men across a row — are
+// asserted in `matchTabsAndLineups.test.ts`, so the number cannot be nudged
+// here without something saying so.
 /** How wide a name may run before it truncates — five of these across 68m. */
 // ⚠⚠ THE LABEL TAKES ITS OWN COLUMN, WHICH IS WHY THERE IS NO `NAME_W` ANY
 // MORE. A fixed 62pt was narrower than every column on the pitch — even the
@@ -77,6 +80,21 @@ import { fontFamilies, radii, useTheme, withOpacity } from '@/theme';
 // So the width is `100 / row.length` percent of the pitch, and the label is
 // centred by a matching negative margin. Each player gets exactly the room his
 // row affords him.
+
+/**
+ * How much room the markers to the LEFT of a surname are given.
+ *
+ * ⚠ IT IS A CEILING, NOT A SIZE. The cluster is right-aligned inside it, so a
+ * player with only an armband uses 13pt of it and a captain who was replaced on
+ * 83 minutes uses 52 — the armband (13) + gap (3) + the minute at 9pt mono (~16)
+ * + gap (3) + the arrow disc (13) + the gap before the name (4). 60 clears the
+ * worst case with room for a three-character minute like `90'`.
+ *
+ * ⚠ AND IT MUST NOT BE MEAN. The box is what the children are measured against,
+ * so a value below the true width does not crop the cluster — it wraps or
+ * squeezes it, which is how the last two attempts failed.
+ */
+const MARKER_GUTTER = 60;
 
 export function LineupsTab({
   lineups,
@@ -374,14 +392,8 @@ function TeamBar({
       )}
 
       {crestUrl ? (
-        <Image
-          source={{ uri: crestUrl }}
-          style={{ width: 22, height: 22 }}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-          // Decorative: the club's name is the very next thing read out.
-          alt=""
-        />
+        // Decorative: the club's name is the very next thing read out.
+        <ClubBar url={crestUrl} height={22} />
       ) : (
         <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: tint }} />
       )}
@@ -540,105 +552,101 @@ function Shirt({
   clock: number;
 }) {
   const rating = stat?.rating ?? null;
-  const photo = playerPhotoUrl(player.playerId);
   const marks = stat ? playerMarkers(stat, clock) : null;
 
   return (
     <View style={{ alignItems: 'center', gap: 3 }}>
-      {/* ⚠⚠ TWO VIEWS, AND THE SPLIT IS LOAD-BEARING. The circle must CLIP: the
-          photograph is a square and without `overflow: hidden` it renders as
-          one, corners and all. But every marker hangs OUTSIDE the circle on a
-          negative offset, and while they were children of the clipping view
-          they were clipped away — the rating, the card, the armband and the
-          arrow all vanished silently the moment the photograph landed. This
-          anchor does not clip, and the markers are siblings of the circle
-          rather than children of it. */}
+      {/* ⚠⚠ TWO VIEWS, AND THE SPLIT IS LOAD-BEARING. Every marker hangs
+          OUTSIDE the shirt on a negative offset, and while they were children
+          of the clipping view they were clipped away — the rating, the card,
+          the armband and the arrow all vanished silently the moment the
+          photograph landed. This anchor does not clip, and the markers are
+          siblings of the shirt rather than children of it. */}
       <View style={{ width: CHIP, height: CHIP, alignItems: 'center', justifyContent: 'center' }}>
-        <View
-          style={{
-            width: CHIP,
-            height: CHIP,
-            borderRadius: CHIP / 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: tint,
-            // A hairline of white, so a dark shirt still separates from the grass.
-            borderWidth: 1.5,
-            borderColor: 'rgba(255,255,255,0.85)',
-            overflow: 'hidden',
-          }}
-        >
-          {/* ⚠ THE FALLBACK IS DRAWN FIRST. `expo-image` renders nothing when a
-              source fails — the provider answers an unknown id with HTML — so
-              whatever sits underneath shows through, with no error handling and
-              no empty circle while it loads. */}
-          <RNText style={{ fontFamily: MONO_BOLD, fontSize: 15, color: 'rgba(255,255,255,0.9)' }}>
-            {player.pos ?? '\u00b7'}
-          </RNText>
-          {photo ? (
-            <Image
-              source={{ uri: photo }}
-              style={{ position: 'absolute', width: CHIP, height: CHIP }}
-              // `cover`, not `contain`: these are 150x150 head-and-shoulders
-              // cutouts, and letterboxing one inside a circle wastes the little
-              // room a face has.
-              contentFit="cover"
-              // Twenty-two load at once; the disk cache means that cost is paid
-              // on the first look at a fixture and never again.
-              cachePolicy="memory-disk"
-              transition={120}
-              // Decorative: the Pressable around it announces the player.
-              alt=""
-            />
-          ) : null}
-        </View>
+        {/* ⚠ THE SHIRT REPLACED A SQUAD PHOTOGRAPH — see `Jersey`. It also puts
+            the NUMBER back where it belongs: the number used to be drawn in
+            here purely as the photo's fallback, was covered on every player
+            who had one, and had to be moved out beside the surname to be seen
+            at all. It is inside the shirt again, so the row below is just the
+            name. */}
+        <Jersey colour={tint} number={player.number} position={player.pos} size={CHIP} />
 
-        <PlayerBadges marks={marks} rating={rating} subMinute={subbedAt} chip={CHIP} />
+        <PlayerBadges marks={marks} rating={rating} chip={CHIP} />
       </View>
 
 
-      {/* ⚠⚠ THE NUMBER LIVES HERE NOW, NOT IN THE CIRCLE. It used to be drawn
-          inside the shirt purely as the photograph's fallback — and since every
-          player has a photograph, it was covered on every single one. We were
-          rendering it and then hiding it. Beside the surname it is visible
-          again, which is also how the reference app reads.
+      {/* ⚠⚠ THE NAME IS CENTRED ON THE SHIRT, AND THE MARKERS HANG OFF IT
+          (Ryan, 2026-09-19). They were in the flow, in a centred row — so every
+          marker shoved the name sideways and a captain's surname sat off the
+          axis of his own jersey. Eleven shirts stand in straight rows; eleven
+          names wandering left and right underneath them do not read as a team.
 
-          ⚠ AND IT DOES NOT TRUNCATE. `numberOfLines` is gone: a name too long
-          for its column wraps to a second line rather than losing its ending,
-          because the ending is the part that identifies a player. */}
-      {/* ⚠ `center`, NOT `baseline`. The armband is a View and a View has no
-          baseline, so it would drop out of alignment with the two texts. At
-          10pt against 11pt the centre and the baseline are a fraction apart. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        {stat?.isCaptain ? (
+          ⚠ SO THIS WRAPPER SHRINKS TO THE NAME and the markers are absolute,
+          hung off its left edge. Out of the flow they cost the text no width,
+          which is why the name lands in the same place whether a player was
+          booked, capped, subbed or none of it.
+
+          ⚠⚠ AND IT IS A FIXED GUTTER, NOT `right: '100%'`. That was the first
+          attempt and it printed the minute and the arrow straight ACROSS the
+          surname — "83Bos‹gli" on Ryan's screen. A percentage offset on an
+          absolutely-positioned child resolves against a parent whose width is
+          itself still being measured from its own text, and it came back 0, so
+          the cluster started at the name's left edge instead of ending there.
+
+          ⚠ A ZERO-WIDTH ANCHOR WOULD HAVE THE SAME SHAPE OF BUG. Hanging the
+          cluster off a `width: 0` box by `right: 0` positions correctly, but
+          then its children are MEASURED against 0pt of available width, and a
+          text that wraps to nothing is the same invisible failure by another
+          route. So the box has a real width and the row inside it is
+          `flex-end`: the cluster ends at the name's left edge whatever it
+          contains, and every number in the chain is a pixel.
+
+          ⚠ AND IT MAY OVERHANG THE COLUMN, which is deliberate rather than
+          overlooked. The cluster is at most ~52pt and a surname rarely fills
+          its column, so it spends slack that is already there; a marker
+          occasionally close to a neighbour is a far smaller cost than every
+          name being off-centre. Nothing clips it — the pitch draws overflow.
+
+          ⚠ `center`, NOT `baseline`. The armband is a View and a View has no
+          baseline, so it would drop out of alignment with the minute beside it.
+          At 9pt against 13pt the centre and the baseline are a fraction apart. */}
+      <View>
+        {stat?.isCaptain || marks?.cameOff || marks?.cameOn ? (
           <View
             style={{
-              width: 13,
-              height: 13,
-              // `radii`, not `theme.radii` — Shirt has no theme, and the token
-              // is a plain export.
-              borderRadius: radii.pill,
-              backgroundColor: '#FFFFFF',
+              position: 'absolute',
+              left: -MARKER_GUTTER,
+              width: MARKER_GUTTER,
+              top: 0,
+              bottom: 0,
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
+              justifyContent: 'flex-end',
+              gap: 3,
+              paddingRight: 4,
             }}
           >
-            <RNText style={{ fontFamily: MONO_BOLD, fontSize: 8, color: '#111827' }}>C</RNText>
+            {stat?.isCaptain ? (
+              <View
+                style={{
+                  width: 13,
+                  height: 13,
+                  // `radii`, not `theme.radii` — Shirt has no theme, and the
+                  // token is a plain export.
+                  borderRadius: radii.pill,
+                  backgroundColor: '#FFFFFF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <RNText style={{ fontFamily: MONO_BOLD, fontSize: 8, color: '#111827' }}>C</RNText>
+              </View>
+            ) : null}
+            {/* ⚠ THE NUMBER IS NOT HERE ANY MORE — it went back inside the
+                shirt on 2026-09-19, where the photograph used to cover it.
+                Printing it twice was the cost of the photo, not a design. */}
+            <SubMark marks={marks} minute={subbedAt} />
           </View>
-        ) : null}
-        {player.number !== null && player.number !== undefined ? (
-          <RNText
-            style={{
-              fontFamily: MONO_BOLD,
-              fontSize: 10,
-              color: 'rgba(255,255,255,0.72)',
-              fontVariant: ['tabular-nums'],
-              textShadowColor: 'rgba(0,0,0,0.6)',
-              textShadowRadius: 3,
-            }}
-          >
-            {player.number}
-          </RNText>
         ) : null}
         <RNText
           numberOfLines={1}
@@ -660,6 +668,72 @@ function Shirt({
         >
           {surnameOf(player.name)}
         </RNText>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * `66' ←` — he was replaced, and when.
+ *
+ * ⚠ IT MOVED HERE FROM THE SHIRT on 2026-09-19 (Ryan). It was the top-left
+ * badge, a coloured disc with the minute floating above it on its own absolute
+ * offset — machinery that existed only because a badge slot cannot hold two
+ * pieces of type. On a row, the minute sits to the LEFT of the arrow and the
+ * pair reads as one phrase, in reading order, with no offsets at all.
+ *
+ * ⚠ A LEFT ARROW, NOT A DOWN ONE. Down was the old glyph and it meant nothing
+ * in particular — a player does not go downwards. He goes OFF, which on a pitch
+ * drawn left-to-right is sideways: off the field and back to the bench.
+ *
+ * ⚠ THE PITCH ONLY EVER SHOWS THE OFF CASE, because it only ever draws
+ * starters, and `playerMarkers` sets `cameOn` for substitutes alone. The other
+ * direction is still handled rather than asserted away: it costs one ternary,
+ * and a side whose feed marks a late arrival as a starter should not render a
+ * man leaving.
+ *
+ * ⚠ THE MINUTE IS OFTEN ABSENT AND THE ARROW IS NOT. `subMinute` returns null
+ * unless the timeline corroborates it — `minutes` alone is out by more than a
+ * minute for 5.9% of players — so the fact that he came off is shown either
+ * way, and only the invented number is withheld.
+ */
+function SubMark({ marks, minute }: { marks: PlayerMarkers | null; minute: number | null }) {
+  if (!marks || (!marks.cameOff && !marks.cameOn)) return null;
+  const off = marks.cameOff;
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+      {minute !== null ? (
+        <RNText
+          style={{
+            fontFamily: MONO_BOLD,
+            fontSize: 9,
+            color: '#FFFFFF',
+            fontVariant: ['tabular-nums'],
+            // Same as the surname beside it: the grass is mid-green and a
+            // pitch marking underneath would otherwise swallow it.
+            textShadowColor: 'rgba(0,0,0,0.6)',
+            textShadowRadius: 3,
+          }}
+        >
+          {minute}&apos;
+        </RNText>
+      ) : null}
+      {/* ⚠ A DISC, MATCHING THE ARMBAND BESIDE IT — 13pt, the same circle. The
+          arrow is a thin stroke and white-on-grass is 2.4:1: a bare glyph on
+          the pitch would be the one thing in this row with nothing behind it.
+          The colours are the two it already wore as a badge. */}
+      <View
+        style={{
+          width: 13,
+          height: 13,
+          borderRadius: radii.pill,
+          backgroundColor: off ? '#B91C1C' : '#15803D',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Icon name={off ? 'arrow.left' : 'arrow.right'} size={9} tint="#FFFFFF" weight="bold" />
       </View>
     </View>
   );

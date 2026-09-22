@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { ClubBar, Icon, Text } from '@/components/ui';
 import { fetchLmsState, saveLmsPick, type LmsState } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -273,7 +273,7 @@ function Content({
               })}
             >
               {club.crest_url ? (
-                <Image source={{ uri: club.crest_url }} style={{ width: 26, height: 26 }} resizeMode="contain" />
+                <ClubBar url={club.crest_url} height={26} />
               ) : null}
               <View style={{ flex: 1, minWidth: 0 }}>
                 <RNText

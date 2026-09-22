@@ -1,13 +1,13 @@
-import { Image } from 'expo-image';
 import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
 import type { PlayerForm, SideScout } from '@/lib/api';
-import { playerPhotoUrl } from '@/lib/playerStats';
+import { clubOnSurface } from '@/lib/design/clubColors';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 import { ScoutCard, ScoutBlurb } from './ScoutCard';
+import { useFixtureColors } from './fixtureColors';
 import { useScoutPalette } from './tone';
 
 // =============================================================
@@ -53,17 +53,23 @@ export function PeopleCard({
   away,
   homeName,
   awayName,
+  homeCrestUrl,
+  awayCrestUrl,
 }: {
   home: SideScout;
   away: SideScout;
   homeName: string;
   awayName: string;
+  /** For the number's colour, and for the away side's change kit. */
+  homeCrestUrl: string | null;
+  awayCrestUrl: string | null;
 }) {
   // ⚠ A FIXTURE WITH NOBODY RATED SKIPS BOTH SIDE CARDS RATHER THAN PRINTING
   // TWO IDENTICAL APOLOGIES. In August that is both clubs, and two stacked
   // "nobody rated yet" panels read as a broken screen. One club rated and the
   // other not IS worth saying — that is a fact about the two squads — so the
   // empty state lives on the side card rather than here.
+  const colors = useFixtureColors(homeCrestUrl, awayCrestUrl);
   const anyRated = home.inForm.length > 0 || away.inForm.length > 0;
 
   if (!anyRated) {
@@ -76,8 +82,12 @@ export function PeopleCard({
 
   return (
     <>
-      <SideCard title={homeName} scout={home} />
-      <SideCard title={awayName} scout={away} />
+      {/* ⚠ THE FIXTURE RULE, NOT TWO CLUB LOOKUPS. Both cards are on one screen,
+          so if the two clubs clash the away side's numbers take its change
+          colour — the same call the header and the form card above already
+          made. `useFixtureColors` is what guarantees all three agree. */}
+      <SideCard title={homeName} scout={home} colour={colors?.home ?? null} />
+      <SideCard title={awayName} scout={away} colour={colors?.away ?? null} />
       <View style={{ marginHorizontal: 20, gap: 2 }}>
         <Text variant="detail" color="slate">
           Form over each club&apos;s last ten completed fixtures
@@ -92,7 +102,16 @@ export function PeopleCard({
   );
 }
 
-function SideCard({ title, scout }: { title: string; scout: SideScout }) {
+function SideCard({
+  title,
+  scout,
+  colour,
+}: {
+  title: string;
+  scout: SideScout;
+  /** The club's colour, already through the fixture rule — see `PeopleCard`. */
+  colour: string | null;
+}) {
   const empty = scout.inForm.length === 0;
 
   if (empty) {
@@ -107,7 +126,7 @@ function SideCard({ title, scout }: { title: string; scout: SideScout }) {
     <ScoutCard title={title}>
       <Section label="In form">
         {scout.inForm.map((p, i) => (
-          <PlayerRow key={p.externalPlayerId} player={p} first={i === 0} />
+          <PlayerRow key={p.externalPlayerId} player={p} first={i === 0} colour={colour} />
         ))}
       </Section>
     </ScoutCard>
@@ -136,7 +155,15 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function PlayerRow({ player, first }: { player: PlayerForm; first: boolean }) {
+function PlayerRow({
+  player,
+  first,
+  colour,
+}: {
+  player: PlayerForm;
+  first: boolean;
+  colour: string | null;
+}) {
   const theme = useTheme();
   const palette = useScoutPalette();
 
@@ -150,7 +177,7 @@ function PlayerRow({ player, first }: { player: PlayerForm; first: boolean }) {
         paddingVertical: 9,
       }}
     >
-      <PlayerFace player={player} />
+      <PlayerMark player={player} colour={colour} />
 
       <View style={{ flex: 1, minWidth: 0 }}>
         <RNText
@@ -194,69 +221,67 @@ function PlayerRow({ player, first }: { player: PlayerForm; first: boolean }) {
   );
 }
 
-/** How big a face is on a scout row. */
-const FACE = 32;
-
 /**
- * The player's photograph.
+ * The player, as the shirt number.
  *
- * ## ⚠⚠ THE FALLBACK IS DRAWN FIRST, UNDERNEATH — NOT AS AN ELSE BRANCH
+ * ⚠⚠ THIS IS THE APPROVED ANSWER, NOT A NEW ONE. drafts/2026-09-14_chosen_design.html
+ * §6: "the people card uses the shirt number as the typography, coloured by
+ * club". It replaced a photograph on 2026-09-19 and spent a day showing the
+ * POSITION LETTER instead — which was only ever the photograph's fallback, and
+ * identifies a role rather than a player: every forward on the card looked the
+ * same.
  *
- * `expo-image` renders NOTHING when a source fails, and the provider answers an
- * unknown id with HTML rather than a 404. So there is no error event to hang an
- * `onError` on: whatever sits beneath the image simply shows through. A
- * conditional fallback — the shape the old peek list used — leaves an empty
- * circle instead, because the ternary has already chosen the image branch by the
- * time the load fails. Same call `LineupsTab` makes, and it carries the note.
+ * ⚠ TYPOGRAPHY, NOT A BADGE. The number is set large and in the club's own
+ * colour, with the bar muted beside it. A disc would make it a second crest;
+ * the point of the approved design is that the number IS the mark.
  *
- * ⚠ THE POSITION IS THE FALLBACK, NOT THE CLUB CREST. The peek list used a crest
- * because its one list mixed both sides; here the card title already names the
- * club, so a crest would repeat it. The position is the next most useful thing
- * about a face you cannot see.
+ * ⚠ THE BAR IS AT 35% AND THAT IS DELIBERATE. Both it and the number carry the
+ * same club, and two statements of one fact at full strength is how the scout
+ * palette stopped meaning anything (see `SplitBar`). The number is the one that
+ * is read; the bar is what makes the column scannable.
  *
- * ⚠ `cover`, NOT `contain`. These are 150×150 head-and-shoulders cutouts and
- * letterboxing one inside a circle wastes the little room a face has.
- *
- * ⚠ AND THE IMAGES COST NO PROVIDER QUOTA. `media.api-sports.io` is not the API
- * host — no key is sent and the daily counter does not move. The app already
- * hotlinks this exact CDN for club crests.
+ * ⚠ THE POSITION IS THE FALLBACK NOW. `shirtNumber` is nullable on the wire and
+ * absent from an older API, so a player with no number still gets a mark rather
+ * than a gap — the letter is simply demoted from the answer to the exception.
  */
-function PlayerFace({ player }: { player: PlayerForm }) {
+const MARK_W = 26;
+
+function PlayerMark({ player, colour }: { player: PlayerForm; colour: string | null }) {
   const theme = useTheme();
-  const photo = playerPhotoUrl(player.externalPlayerId);
+  // ⚠⚠ LIFTED FOR THE SURFACE, NOT USED RAW (Ryan, 2026-09-20: "the teams that
+  // have black in the light mode should have white in the dark or we will not
+  // be able to see the number"). The number is TEXT in the club's own colour,
+  // and against the dark card 77 of our 96 clubs fail even the 3:1 asked of a
+  // shape — Newcastle measures 1.01:1, which is not a dark number, it is no
+  // number. `clubOnSurface` keeps the hue and raises the lightness, so Everton
+  // stays a blue; a black club has no hue to keep and goes to white.
+  const tint = clubOnSurface(colour ?? theme.colors.slate, theme.colors.surface);
+  const number = player.shirtNumber ?? null;
 
   return (
-    <View
-      style={{
-        width: FACE,
-        height: FACE,
-        borderRadius: theme.radii.pill,
-        backgroundColor: theme.colors.mist,
-        alignItems: 'center',
-        justifyContent: 'center',
-        // ⚠ THE CIRCLE MUST CLIP. The photograph is a square and without this it
-        // renders as one, corners and all.
-        overflow: 'hidden',
-      }}
-    >
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
       <RNText
-        style={{ fontFamily: MONO_BOLD, fontSize: 10, color: theme.colors.slate }}
+        // ⚠ RIGHT-ALIGNED IN A FIXED SLOT so 7 and 47 put their bars on the same
+        // line down the card. Five rows of a wandering bar reads as a mistake.
+        style={{
+          width: MARK_W,
+          textAlign: 'right',
+          fontFamily: MONO_BOLD,
+          fontSize: 17,
+          color: tint,
+          fontVariant: ['tabular-nums'],
+        }}
       >
-        {player.position ?? '\u00b7'}
+        {number ?? player.position ?? '\u00b7'}
       </RNText>
-      {photo ? (
-        <Image
-          source={{ uri: photo }}
-          style={{ position: 'absolute', width: FACE, height: FACE }}
-          contentFit="cover"
-          // Twelve can load at once on a two-club card; the disk cache means that
-          // cost is paid on the first look at a fixture and never again.
-          cachePolicy="memory-disk"
-          transition={120}
-          // Decorative — the name sits beside it.
-          alt=""
-        />
-      ) : null}
+      <View
+        style={{
+          width: 4,
+          height: 26,
+          borderRadius: 999,
+          backgroundColor: withOpacity(tint, 0.35),
+        }}
+      />
     </View>
   );
 }

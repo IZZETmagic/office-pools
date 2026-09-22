@@ -72,15 +72,40 @@ const BAND_L_LEFT = 0.42;
 const BAND_L_RIGHT = 0.31;
 
 /**
+ * The sweep, as five lightnesses rather than two (Ryan, 2026-09-20).
+ *
+ * ⚠⚠ 0.42 IS STILL THE CEILING, AND THAT IS THE WHOLE CONSTRAINT. Everything
+ * the paragraph above says about `BAND_L_LEFT` still holds: a label dimmed to
+ * white-at-0.68 has to clear 4.5:1, La Liga is the band that fails first, and
+ * it manages 4.73 only because the brightest point of the sweep is 0.42. Adding
+ * stops is free; adding a BRIGHTER one is not, and would break a contrast
+ * measurement taken across seven competitions.
+ *
+ * So the extra shades all go DOWNWARD. The tail reaches 0.21 where it used to
+ * stop at 0.31, which is what gives the band somewhere to fall away to — two
+ * stops read as one colour fading, five read as a lit surface.
+ *
+ * ⚠ AND THE ORDER IS BRIGHT-TO-DARK ACROSS THE SWEEP, left to right, because
+ * the sweep is horizontal and must stay so: the pinned chrome and the sliding
+ * band paint this same gradient twice, and they are seamless ONLY while it is
+ * constant down the screen.
+ */
+const BAND_STOPS = [0.42, 0.36, 0.31, 0.26, 0.21] as const;
+
+/**
  * A competition with no colour of its own still needs a band. This is the same
  * neutral `UNTHEMED_COMPETITION` resolves to, run through the same lightness —
  * so an unthemed league looks deliberately plain rather than broken.
  */
 export function getCompetitionBand(
   externalLeagueId: number | null | undefined,
-): [string, string] {
+): readonly [string, string, ...string[]] {
   const brand = getCompetitionColor(externalLeagueId);
-  return [withLightness(brand, BAND_L_LEFT), withLightness(brand, BAND_L_RIGHT)];
+  // ⚠ THE TUPLE SHAPE IS FOR `expo-linear-gradient`, which types `colors` as at
+  // least two entries. A plain `string[]` compiles everywhere except the one
+  // place it is used.
+  const [a, b, ...rest] = BAND_STOPS.map((L) => withLightness(brand, L));
+  return [a, b, ...rest] as const;
 }
 
 // =============================================================
@@ -196,6 +221,22 @@ export function getCompetitionGlow(
       ry: 120,
       color: withLightness(brand, 0.52),
       opacity: 0.28,
+    },
+    // ⚠ THE FIFTH BLOB, ADDED WITH THE FIVE-STOP SWEEP (2026-09-20). Mid-left
+    // and mid-depth, it fills the one dead zone the other four leave: the band
+    // brightened at both shoulders and darkened at both feet, and the middle —
+    // where the scoreline actually sits — was the flattest part of it.
+    //
+    // ⚠ 0.38, UNDER THE 0.42 CEILING. Same rule as the sweep: a blob brighter
+    // than the ceiling puts a bright patch behind type that was measured
+    // against the ceiling.
+    {
+      cx: width * 0.34,
+      cy: height * 0.46,
+      rx: width * 0.5,
+      ry: 150,
+      color: withLightness(brand, 0.38),
+      opacity: 0.3,
     },
   ];
 }

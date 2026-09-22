@@ -1,6 +1,6 @@
-import { Image, Platform, Text as RNText, View } from 'react-native';
+import { Platform, Text as RNText, View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { ClubBar, Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry, LeagueLeaderboardMeta } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -346,44 +346,64 @@ function StateChip({ lms, isCurrentUser }: { lms: LeagueLeaderboardEntry['lms'];
   return <Chip label="NO PICK" color={isCurrentUser ? theme.colors.red : theme.colors.slate} />;
 }
 
+/** The pick as the contract carries it — see `LeagueLeaderboardEntry.lms`. */
+type LmsPick = { club_name: string; short_name?: string | null; crest_url: string | null };
+
 /**
- * The club carrying them this matchweek — the crest alone.
+ * The club carrying them this matchweek — the bar, and its name.
  *
- * Ryan, 3 Sep: no pill and no name. The green pill was saying "still in" a
- * second time; the dot at the head of the row already does that, and a badge
- * carries its own club faster than a name does to anyone who follows football.
+ * ⚠⚠ THE NAME IS BACK, AND THE REASON IT LEFT NO LONGER HOLDS (Ryan,
+ * 2026-09-20). On 3 Sep this was a crest alone: "a badge carries its own club
+ * faster than a name does to anyone who follows football", and the green pill
+ * beside it was saying "still in" a second time when the dot already did. The
+ * first half of that stopped being true on 2026-09-19, when the badges came out
+ * — a colour bar does NOT carry its own club, and a reader who does not know
+ * that Everton play in #003399 was left with a blue rectangle. The pill is
+ * still gone, and the dot still says "still in".
  *
- * ⚠ `crest_url` is NULLABLE in the feed, so the name is the fallback and never
- * the other way round. Without it a club with no badge is a blank cell, which
- * reads as a member who has not picked — the one thing this chip must never be
+ * ⚠ SHORTENED, NOT FULL. `short_name` is `shortClubName`'s output — "Man City",
+ * "Nott'm Forest" — computed on the server like every other club label on the
+ * contract. `club_name` is the fallback for an older API, and it is the only
+ * reason a name here can overflow.
+ *
+ * ⚠ `crest_url` is NULLABLE in the feed, so the bar is what drops out, never
+ * the name. A club with no colour must not become a blank cell: blank reads as
+ * a member who has not picked, which is the one thing this chip cannot be
  * confused with.
  */
-function ClubChip({ club }: { club: { club_name: string; crest_url: string | null } }) {
+function ClubChip({ club }: { club: LmsPick }) {
   const theme = useTheme();
-
-  if (!club.crest_url) {
-    return (
-      <RNText
-        numberOfLines={1}
-        style={{ fontFamily: fontFamilies.bold, fontSize: 10, color: theme.colors.ink, maxWidth: 92 }}
-      >
-        {club.club_name}
-      </RNText>
-    );
-  }
+  const label = club.short_name?.trim() || club.club_name;
 
   return (
-    <Image
-      source={{ uri: club.crest_url }}
-      // 34 is the ceiling that keeps rows the height they are: the name and
-      // handle beside it stack to 36 (cardTitle 20 + gap 3 + detail 13), and a
-      // crest taller than that starts driving the row instead of sitting in it.
-      style={{ width: 34, height: 34 }}
-      resizeMode="contain"
-      // The badge IS the label once the name is gone, so it has to be one to
-      // anything that cannot see it.
+    // ⚠ 34 WAS THE CREST'S CEILING and stays the bar's: the name and handle on
+    // the left stack to 36 (cardTitle 20 + gap 3 + detail 13), and a mark
+    // taller than that starts driving the row instead of sitting in it.
+    //
+    // ⚠ THE LABEL IS THE ACCESSIBLE NAME, so the pair is one node rather than a
+    // decorative bar and a stray word.
+    <View
+      accessible
       accessibilityLabel={club.club_name}
-    />
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}
+    >
+      <RNText
+        numberOfLines={1}
+        style={{
+          fontFamily: fontFamilies.bold,
+          fontSize: 13,
+          color: theme.colors.ink,
+          // ⚠ A CEILING, NOT A WIDTH. The row's name and handle have first call
+          // on the space; this shrinks to whatever is left and truncates rather
+          // than pushing them. 92 fits "Nott'm Forest", the longest form
+          // `shortClubName` produces, at 13pt bold.
+          maxWidth: 92,
+        }}
+      >
+        {label}
+      </RNText>
+      {club.crest_url ? <ClubBar url={club.crest_url} height={34} /> : null}
+    </View>
   );
 }
 

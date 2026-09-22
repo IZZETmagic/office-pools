@@ -24,6 +24,7 @@ export { ScoreChip } from './ScoreChip';
 export { ScoutBlurb, ScoutCard, ScoutCardBody } from './ScoutCard';
 export { ScoutFootnote } from './ScoutFootnote';
 export { FixtureSubject, MemberSubject, ScoutHeader } from './ScoutHeader';
+export { useFixtureColors, type FixtureColors } from './fixtureColors';
 export { ScoutRow, ScoutRows } from './ScoutRow';
 export { SplitBar, type SplitCounts } from './SplitBar';
 export { StatTiles, type StatTile } from './StatTiles';

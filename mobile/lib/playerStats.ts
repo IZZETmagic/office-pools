@@ -315,27 +315,30 @@ export function headlineParts(s: MatchPlayerStat, cameOnAt?: number | null): str
 }
 
 /**
- * Where the provider keeps this player's photograph.
+ * Where the provider KEPT this player's photograph. It no longer returns one.
  *
- * ⚠⚠ DERIVED, NOT STORED, AND THAT IS THE WHOLE DESIGN. Measured across 958
- * player entries in three competitions on 2026-09-09: every single `photo` in
- * the feed was exactly
- *   https://media.api-sports.io/football/players/<player.id>.png
- * — 958 of 958. Adding a `photo_url` column would store the same derivable
- * string 6,312 times and give it a second chance to go stale.
+ * ⚠⚠ IT RETURNS NULL ON PURPOSE (2026-09-19), AND THE FUNCTION STAYS. Three
+ * separate rights stack on a squad photograph and the fixtures provider holds
+ * none of them: the photographer's or agency's copyright, the player's own
+ * personality rights (passing off in the UK, KUG §22 in Germany, Art 9 in
+ * France), and data protection — a photograph of an identifiable living person
+ * is personal data needing a lawful basis and an Art 14 notice we cannot give
+ * 958 footballers. See drafts/2026-09-13_ip_exposure_audit.md §3, where it is
+ * the highest-risk item in the document.
  *
- * ⚠ THE ONLY ENTRIES WITH NO PHOTO WERE THE id-0 SENTINELS, which the mapper
- * already refuses. So a stored player always has a photograph.
+ * ⚠ NOTHING WAS EVER COPIED, and that is the one piece of luck here. The URL
+ * was derived rather than stored — measured at 958 of 958 in three competitions
+ * — so no photograph has ever been written to our servers. Turning this off is
+ * the whole remedy; there is nothing to delete.
  *
- * ⚠ AND THE IMAGES COST NO QUOTA. `media.api-sports.io` is not the API host:
- * ten image fetches left the daily counter unmoved at 177, and no key is sent
- * with them. The app already hotlinks this exact CDN for club crests — a
- * `flagUrl` is `/football/teams/<id>.png` from the same place.
+ * ⚠ THE SIGNATURE SURVIVES so the three callers keep compiling and fall back
+ * to what they already drew underneath: the line-ups pitch now renders a
+ * `Jersey`, and the dossier's people card and player sheet fall back to the
+ * position letter they have always drawn first. Delete this once each of them
+ * has been given its own answer — the people card's is a number, not a face.
  */
-export function playerPhotoUrl(externalPlayerId: number | null | undefined): string | null {
-  if (typeof externalPlayerId !== 'number' || externalPlayerId <= 0) return null;
-  if (!Number.isInteger(externalPlayerId)) return null;
-  return `https://media.api-sports.io/football/players/${externalPlayerId}.png`;
+export function playerPhotoUrl(_externalPlayerId: number | null | undefined): string | null {
+  return null;
 }
 
 /** What to draw around a player's circle. Everything here is on his own row. */

@@ -1,8 +1,9 @@
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui';
-import { splitShares } from '@/lib/scoutTone';
-import { useTheme } from '@/theme';
+import { clubBarNeedsHairline } from '@/lib/design/clubColors';
+import { splitShares, type ScoutTone } from '@/lib/scoutTone';
+import { useTheme, withOpacity } from '@/theme';
 
 import { useScoutPalette } from './tone';
 
@@ -17,8 +18,7 @@ import { useScoutPalette } from './tone';
 //   · club colours            on the match-detail tab (`ScoutingTab`)
 //
 // So Arsenal was green in one bar and blue in the next, and gold stopped meaning
-// "the finding" and became Chelsea. Worse, green-for-the-home-club is a value
-// judgement — "Arsenal = good" — that the card is explicitly not making.
+// "the finding" and became Chelsea.
 //
 // ## ⚠ THE POINT IS NOT TIDINESS, IT IS A COMPARISON THAT DID NOT EXIST
 //
@@ -27,6 +27,23 @@ import { useScoutPalette } from './tone';
 // AWAY. That is the most interesting thing the scout report knows, and it was
 // unreadable purely because the two bars were drawn in different colours four
 // cards apart.
+//
+// ## ⚠⚠ CLUB COLOURS ARE BACK, AND THE RULE ABOVE IS WHAT MADE IT SAFE
+//
+// Ryan, 2026-09-20: "the pairing card has a line bar chart with the two teams on
+// it". It does, and the two teams are exactly what the colours should carry.
+// What broke last time was not club colour — it was club colour in ONE of the
+// two bars, so the pair could no longer be compared. `ScoutReport` now resolves
+// the fixture ONCE and hands the same two colours to both bars, so the stacking
+// comparison survives intact.
+//
+// ⚠ AND IT REMOVES A VALUE JUDGEMENT RATHER THAN ADDING ONE. The old note here
+// argued green-for-the-home-club says "Arsenal = good", which the card is not
+// claiming. A club's own colour says nothing of the kind — it is the one
+// encoding of a football result with no valence in it at all.
+//
+// ⚠ THE DRAW SEGMENT STAYS NEUTRAL. It belongs to neither club, and reaching for
+// a third colour would reintroduce exactly the problem this file exists to stop.
 //
 // ## ⚠ A SPLIT BAR IS ONLY HONEST WHERE THE PARTS ARE ONE WHOLE
 //
@@ -57,15 +74,29 @@ export function SplitBar({
    * the honest unit and the caller should say so by choosing `count`.
    */
   keyFormat = 'count',
+  /**
+   * The two clubs' colours, when the caller knows the fixture.
+   *
+   * ⚠⚠ BOTH BARS ON A REPORT MUST BE GIVEN THE SAME PAIR OR NEITHER. See the
+   * header — one bar in club colours beside one in the palette's is the exact
+   * regression this file was written to end. `ScoutReport` resolves it once for
+   * that reason; nothing else should call `fixturePalette` for these bars.
+   */
+  clubColors,
 }: {
   caption?: string;
   note?: string;
   counts: SplitCounts;
   names: { home: string; draw: string; away: string };
   keyFormat?: 'count' | 'pct';
+  clubColors?: { home: string; away: string } | null;
 }) {
-  const theme = useTheme();
   const palette = useScoutPalette();
+
+  // ⚠ ONLY THE TWO CLUB SEGMENTS ARE OVERRIDDEN. `level` is the draw and stays
+  // the neutral it always was.
+  const colorFor = (tone: ScoutTone) =>
+    clubColors && (tone === 'home' || tone === 'away') ? clubColors[tone] : palette[tone].fg;
 
   // ⚠ COUNTS IN, PERCENTAGES OUT, AND THE DIVISION HAPPENS ONCE — see
   // `splitShares`. The flex weights are the raw counts, so the bar stays exact
@@ -100,7 +131,7 @@ export function SplitBar({
 
       <View style={{ flexDirection: 'row', height: 9, gap: 2 }}>
         {shares.map((s) => (
-          <Segment key={s.tone} flex={s.flex} color={palette[s.tone].fg} />
+          <Segment key={s.tone} flex={s.flex} color={colorFor(s.tone)} />
         ))}
       </View>
 
@@ -110,14 +141,7 @@ export function SplitBar({
             key={s.tone}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
           >
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: theme.radii.pill,
-                backgroundColor: palette[s.tone].fg,
-              }}
-            />
+            <Dot color={colorFor(s.tone)} />
             <Text variant="body" numberOfLines={1}>
               {keyFormat === 'pct'
                 ? // ⚠ `?? 0` IS SAFE HERE AND ONLY HERE: a null pct means the
@@ -141,7 +165,38 @@ export function SplitBar({
 function Segment({ flex, color }: { flex: number; color: string }) {
   const theme = useTheme();
   if (flex <= 0) return null;
+  // ⚠ A PALE CLUB NEEDS AN EDGE. Fifteen of twenty Serie A sides change into
+  // white or cream, and a white segment on a white card is not a segment. The
+  // same test the colour bars use decides it, so one club is outlined on every
+  // surface or none of them is.
+  const hairline = clubBarNeedsHairline(color);
   return (
-    <View style={{ flex, backgroundColor: color, borderRadius: theme.radii.pill }} />
+    <View
+      style={{
+        flex,
+        backgroundColor: color,
+        borderRadius: theme.radii.pill,
+        borderWidth: hairline ? 1 : 0,
+        borderColor: hairline ? withOpacity(theme.colors.ink, 0.25) : 'transparent',
+      }}
+    />
+  );
+}
+
+/** The key's colour chip. Outlined on the same test as the segment. */
+function Dot({ color }: { color: string }) {
+  const theme = useTheme();
+  const hairline = clubBarNeedsHairline(color);
+  return (
+    <View
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: theme.radii.pill,
+        backgroundColor: color,
+        borderWidth: hairline ? 1 : 0,
+        borderColor: hairline ? withOpacity(theme.colors.ink, 0.25) : 'transparent',
+      }}
+    />
   );
 }

@@ -2,7 +2,7 @@ import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
-import { fixturePalette } from '@/lib/design/clubColors';
+import { clubInk, fixturePalette } from '@/lib/design/clubColors';
 import { leadingSide, visibleStatSections, type StatRow, type StatSection } from '@/lib/matchStatRows';
 import type { MatchTeamStats } from '@/lib/useMatchDetail';
 import type { ResultsTeam } from '@/lib/useTournamentMatches';
@@ -221,7 +221,9 @@ function PossessionBar({
           }}
         >
           <RNText
-            style={{ fontFamily: MONO_BOLD, fontSize: 13, color: '#FFFFFF', fontVariant: ['tabular-nums'] }}
+            // ⚠ THE FOREGROUND FOLLOWS THE FILL. Hardcoding white here is what
+            // forced five clubs off their own colour — see `clubInk`.
+            style={{ fontFamily: MONO_BOLD, fontSize: 13, color: clubInk(palette.home), fontVariant: ['tabular-nums'] }}
           >
             {h === null ? '—' : `${h}%`}
           </RNText>
@@ -237,7 +239,7 @@ function PossessionBar({
           }}
         >
           <RNText
-            style={{ fontFamily: MONO_BOLD, fontSize: 13, color: '#FFFFFF', fontVariant: ['tabular-nums'] }}
+            style={{ fontFamily: MONO_BOLD, fontSize: 13, color: clubInk(palette.away), fontVariant: ['tabular-nums'] }}
           >
             {a === null ? '—' : `${a}%`}
           </RNText>

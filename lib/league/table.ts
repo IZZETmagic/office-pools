@@ -26,6 +26,15 @@ export type SeasonClub = {
   club_name: string
   crest_url: string | null
   short_name: string | null
+  /**
+   * The three-letter form — "ARS", "NOT".
+   *
+   * ⚠ NULLABLE, AND THE IMPORTER FILLS IT FROM THE PROVIDER, so a club can
+   * arrive without one. Every caller needs a fallback; none should slice the
+   * full name blind, because "1. FC Köln" gives "1. " and "AC Milan" gives
+   * "AC ".
+   */
+  abbreviation: string | null
 }
 
 export type TableBreakdownRow = {
@@ -78,7 +87,7 @@ export async function readSeasonClubs(
     // `league_clubs` names the column `name`; every other league read aliases it
     // the same way rather than renaming the column out from under the World Cup
     // shapes that also use it.
-    .select('club_id, club_name:name, crest_url, short_name')
+    .select('club_id, club_name:name, crest_url, short_name, abbreviation')
     .eq('season_id', seasonId)
     // ⚠ Order by the REAL column, never the alias. The `club_name:name` above
     // renames the column in the RESPONSE; `order` travels as a query parameter

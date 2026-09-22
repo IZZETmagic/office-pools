@@ -234,6 +234,7 @@ const ICON_MAP: Record<string, IconConstant> = {
   'arrow.down.circle.fill': CircleArrowDown02Icon,
   'arrow.down.right': ArrowDownRight01Icon,
   'arrow.forward.circle': CircleArrowRight02Icon,
+  'arrow.left': ArrowLeft01Icon,
   'arrow.right': ArrowRight01Icon,
   'arrow.right.circle.fill': CircleArrowRight02Icon,
   'arrow.triangle.branch': GitBranchIcon,

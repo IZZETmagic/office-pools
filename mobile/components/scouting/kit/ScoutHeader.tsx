@@ -6,6 +6,7 @@ import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 import { Crest } from './Crest';
+import { useFixtureColors } from './fixtureColors';
 
 // =============================================================
 // One header, two subjects
@@ -104,9 +105,14 @@ export function FixtureSubject({
 }) {
   const theme = useTheme();
 
+  // ⚠ THE SAME FIXTURE RULE THE CARDS BELOW USE. The header names both clubs
+  // and draws both bars; if it resolved each colour on its own it would
+  // contradict the form card two inches underneath it, which does not.
+  const colors = useFixtureColors(home.crestUrl, away.crestUrl);
+
   return (
     <>
-      <Crest url={home.crestUrl} size={MARK} />
+      <Crest url={home.crestUrl} colour={colors?.home} size={MARK} />
       <RNText
         numberOfLines={1}
         style={{
@@ -132,7 +138,7 @@ export function FixtureSubject({
       >
         {away.name}
       </RNText>
-      <Crest url={away.crestUrl} size={MARK} />
+      <Crest url={away.crestUrl} colour={colors?.away} size={MARK} />
     </>
   );
 }

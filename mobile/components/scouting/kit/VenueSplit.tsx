@@ -6,6 +6,7 @@ import type { ScoutFormLetter } from '@/lib/scoutTone';
 import { fontFamilies, useTheme } from '@/theme';
 
 import { Crest } from './Crest';
+import { useFixtureColors } from './fixtureColors';
 import { FormStrip } from './FormStrip';
 
 // =============================================================
@@ -45,15 +46,25 @@ export type VenueSide = {
 };
 
 export function VenueSplit({ home, away }: { home: VenueSide; away: VenueSide }) {
+  // ⚠⚠ THE AWAY SIDE WEARS ITS CHANGE KIT HERE TOO (Ryan, 2026-09-20). These
+  // two columns sit side by side and each was resolving its own club's colour,
+  // so a fixture between two blues put two identical bars a centimetre apart —
+  // the same bug the results list had. `useFixtureColors` is the one rule that
+  // answers it, and using it here means the card agrees with the header above
+  // it, the bars on the pairing card, and the line-ups on the tab next door.
+  const colors = useFixtureColors(home.club.crestUrl, away.club.crestUrl);
+
   return (
     <View style={{ flexDirection: 'row', gap: 10 }}>
-      <SideColumn side={home} />
-      <SideColumn side={away} />
+      {/* ⚠ NULL MEANS BOTH COLUMNS DRAW THEIR OWN, so a club we hold no colour
+          for cannot drag its opponent onto the app's palette. */}
+      <SideColumn side={home} colour={colors?.home} />
+      <SideColumn side={away} colour={colors?.away} />
     </View>
   );
 }
 
-function SideColumn({ side }: { side: VenueSide }) {
+function SideColumn({ side, colour }: { side: VenueSide; colour?: string }) {
   const theme = useTheme();
 
   return (
@@ -68,7 +79,7 @@ function SideColumn({ side }: { side: VenueSide }) {
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-        <Crest url={side.club.crestUrl} size={18} />
+        <Crest url={side.club.crestUrl} colour={colour} size={18} />
         <RNText
           numberOfLines={1}
           style={{

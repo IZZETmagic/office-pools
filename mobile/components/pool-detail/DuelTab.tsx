@@ -1,8 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ActivityIndicator, Image, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
-import { Button, Card, Icon, Text } from '@/components/ui';
+import { Button, Card, ClubBar, Icon, Text } from '@/components/ui';
+import { clubColorFromCrestUrl, fixturePalette } from '@/lib/design/clubColors';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { Scoreline, TeamSheetRows } from './TeamSheet';
 import type { SheetRow, Verdict } from '@/lib/duelSheet';
@@ -394,15 +395,55 @@ function DecidedOnCard({
               borderTopColor: theme.colors.silver,
             }}
           >
-            <Side name={f.home_team?.country_name} crest={f.home_team?.flag_url} />
-            <Text variant="detail" color="slate">
-              v
-            </Text>
-            <Side name={f.away_team?.country_name} crest={f.away_team?.flag_url} align="right" />
+            <FixtureRow home={f.home_team} away={f.away_team} />
           </View>
         ))}
       </View>
     </Card>
+  );
+}
+
+/**
+ * The two clubs of one fixture, and what they wear.
+ *
+ * ⚠⚠ THE AWAY SIDE CHANGES KIT, the same rule as every other surface that
+ * shows two clubs at once. Each row here is its own fixture — this card is ten
+ * of them — so the palette is resolved per row, exactly as it is on the facts
+ * tab's form card and for the same reason.
+ *
+ * ⚠ BOTH CLUBS KNOWN OR NEITHER IS COLOURED. `fixturePalette` hands back the
+ * app's own pair when either side is missing, which would take a known club's
+ * colour away because its opponent is not one we hold.
+ */
+function FixtureRow({
+  home,
+  away,
+}: {
+  home?: { country_name?: string | null; flag_url?: string | null } | null;
+  away?: { country_name?: string | null; flag_url?: string | null } | null;
+}) {
+  const theme = useTheme();
+  const known =
+    clubColorFromCrestUrl(home?.flag_url) !== null && clubColorFromCrestUrl(away?.flag_url) !== null;
+  const palette = fixturePalette(home?.flag_url, away?.flag_url, {
+    home: theme.colors.primary,
+    away: theme.colors.accent,
+  });
+  const colors = known && palette.usingClubColors ? palette : null;
+
+  return (
+    <>
+      <Side name={home?.country_name} crest={home?.flag_url} colour={colors?.home} />
+      <Text variant="detail" color="slate">
+        v
+      </Text>
+      <Side
+        name={away?.country_name}
+        crest={away?.flag_url}
+        colour={colors?.away}
+        align="right"
+      />
+    </>
   );
 }
 
@@ -417,10 +458,13 @@ function DecidedOnCard({
 function Side({
   name,
   crest,
+  colour,
   align = 'left',
 }: {
   name?: string | null;
   crest?: string | null;
+  /** The fixture's verdict for this side — see `FixtureRow`. */
+  colour?: string;
   align?: 'left' | 'right';
 }) {
   const theme = useTheme();
@@ -433,15 +477,11 @@ function Side({
       {name ?? 'TBD'}
     </Text>
   );
-  const badge = crest ? (
-    <Image
-      // Decorative — the club's name is the label right next to it.
-      alt=""
-      source={{ uri: crest }}
-      style={{ width: theme.spacing.lg, height: theme.spacing.lg }}
-      resizeMode="contain"
-    />
-  ) : null;
+  // ⚠ IT WAS THE PROVIDER'S CREST UNTIL 2026-09-20 — one of the last two places
+  // still drawing one, missed when the rest came out on 2026-09-19
+  // (drafts/2026-09-13_ip_exposure_audit.md §5). The bar is decorative in the
+  // same way the badge was: the club's name is the label right beside it.
+  const badge = crest ? <ClubBar url={crest} colour={colour} height={theme.spacing.lg} /> : null;
 
   return (
     <View

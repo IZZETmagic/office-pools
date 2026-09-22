@@ -1,6 +1,6 @@
-import { Image, Platform, Text as RNText, View } from 'react-native';
+import { Platform, Text as RNText, View } from 'react-native';
 
-import { Text } from '@/components/ui';
+import { ClubBar, Text } from '@/components/ui';
 import type { TableBreakdownRow, TableSettings, TableSummary } from '@/lib/api';
 import { fontFamilies, useTheme } from '@/theme';
 
@@ -116,7 +116,7 @@ function ClubRow({
 
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {row.crest_url ? (
-          <Image source={{ uri: row.crest_url }} style={{ width: 18, height: 18 }} resizeMode="contain" />
+          <ClubBar url={row.crest_url} height={18} />
         ) : (
           <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: theme.colors.mist }} />
         )}

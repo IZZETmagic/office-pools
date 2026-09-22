@@ -1,10 +1,9 @@
 import { View, type TextStyle } from 'react-native';
 
-import { clubColorFromCrestUrl } from '@/lib/design/clubColors';
 
-import { Text } from '@/components/ui';
+import { ClubBar, Text } from '@/components/ui';
 import { pickMissed, type FixtureOutcome, type SheetRow } from '@/lib/duelSheet';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
 // THE TEAM SHEET — one row per fixture, both sides' picks
@@ -125,8 +124,13 @@ export const CHIP_W = 44;
  *
  * 6×30 is the bar every other surface draws — Results rows, both Pick'em
  * depths — so a club looks the same wherever it appears.
+ *
+ * ⚠ 10, NOT 14 — the slot was trimmed again on 2026-09-19 to pay for a 16pt
+ * club code. A 6pt bar needs 2pt of air either side and no more; a crest needed
+ * a box. This and CENTRE_AIR are where the code's three extra points came from,
+ * deliberately NOT the chips — see CHIP_W.
  */
-const BAR_SLOT = 14;
+const BAR_SLOT = 10;
 
 /**
  * The middle column: a scoreline, or the day over the kickoff.
@@ -147,8 +151,13 @@ const CENTRE_W = 54;
  * kickoff they belong to on exactly the phones with room to look nice. A fixed
  * margin reads the same on every device, and the leftover goes where it is
  * harmless — out by the chips.
+ *
+ * ⚠ 6, DOWN FROM 8 (2026-09-19). The principle is untouched — still a fixed
+ * margin, still not pooled flex — it is just two points smaller, spent on the
+ * club code. If the scoreline starts to feel crowded, this is the first thing
+ * to give back.
  */
-const CENTRE_AIR = 8;
+const CENTRE_AIR = 6;
 
 /**
  * One member's pick for one fixture.
@@ -313,23 +322,11 @@ function Club({
   // ⚠ THE CREST URL IS STILL THE KEY, even though nothing draws it now:
   // `clubColorFromCrestUrl` reads the club's provider id out of the last path
   // segment. See lib/design/clubColors.ts.
-  const colour = clubColorFromCrestUrl(crest);
   const badge = (
+    // The slot survives a club with no colour, so the column does not step in
+    // and out down the card — `ClubBar` renders the neutral bar for it.
     <View style={{ width: BAR_SLOT, alignItems: 'center', flexShrink: 0 }}>
-      {colour ? (
-        <View style={{ width: 6, height: 30, borderRadius: 999, backgroundColor: colour }} />
-      ) : (
-        // A club we have no colour for keeps the slot, so the column does not
-        // step in and out down the card.
-        <View
-          style={{
-            width: 6,
-            height: 30,
-            borderRadius: 999,
-            backgroundColor: withOpacity(theme.colors.slate, 0.35),
-          }}
-        />
-      )}
+      <ClubBar url={crest} />
     </View>
   );
   const label = (
@@ -337,12 +334,22 @@ function Club({
       numberOfLines={1}
       style={{
         fontFamily: fontFamilies.bold,
-        fontSize: 13,
-        lineHeight: 18,
+        // ⚠ 16pt SINCE 2026-09-19, UP FROM 13. The crest used to take 30pt of
+        // a 55pt club side and the code got what was left; a 6pt bar in a 10pt
+        // slot hands most of that back. Measured against all 92 abbreviations
+        // in the five imported leagues — the widest is "COM" at 39.1pt, and
+        // the side now affords 43.
+        //
+        // ⚠ THE BUDGET IS A 360pt PHONE, not this one. On anything wider the
+        // slack only grows.
+        fontSize: 16,
+        lineHeight: 21,
         color: theme.colors.ink,
         // ⚠ THE CODE NEVER SHRINKS. It is three letters carrying the whole
         // club now that the name is gone, and flex would happily ellipsize it
-        // to two before touching the image beside it.
+        // to two before touching the bar beside it. Which is also why the
+        // size above is measured rather than chosen: nothing here will save a
+        // code that does not fit, it will just overflow.
         flexShrink: 0,
       }}
     >

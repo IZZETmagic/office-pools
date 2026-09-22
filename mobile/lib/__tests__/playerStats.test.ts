@@ -218,15 +218,18 @@ describe('indexByPlayerId', () => {
 });
 
 describe('playerPhotoUrl', () => {
-  it('⚠ derives the provider URL from the id', () => {
-    // Measured: 958 of 958 feed photos matched this exactly, so a stored
-    // column would be the same string written 6,312 times.
-    expect(playerPhotoUrl(199578)).toBe('https://media.api-sports.io/football/players/199578.png');
-  });
-
-  it('⚠ has nothing for the id-0 sentinel', () => {
-    // The two feed entries that carried no photo were exactly these, and the
-    // mapper already drops them — but the pitch must not request `/0.png`.
+  it('⚠⚠ returns NOTHING, for every id, and must keep doing so', () => {
+    // This used to derive the provider's URL — measured at 958 of 958 — and
+    // the pitch drew a squad photograph for every player. It was turned off on
+    // 2026-09-19: three rights stack on one of those photographs (the
+    // photographer's copyright, the player's personality rights, and data
+    // protection) and the fixtures provider holds none of them. See
+    // drafts/2026-09-13_ip_exposure_audit.md §3.
+    //
+    // ⚠ IF THIS TEST FAILS, THE APP IS SERVING PLAYER PHOTOGRAPHS AGAIN. It is
+    // not a formatting check; it is the remedy.
+    expect(playerPhotoUrl(199578)).toBeNull();
+    expect(playerPhotoUrl(1)).toBeNull();
     expect(playerPhotoUrl(0)).toBeNull();
     expect(playerPhotoUrl(-1)).toBeNull();
     expect(playerPhotoUrl(null)).toBeNull();

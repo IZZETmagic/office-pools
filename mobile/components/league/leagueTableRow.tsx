@@ -1,6 +1,6 @@
-import { Image, Platform, Text as RNText, View } from 'react-native';
+import { Platform, Text as RNText, View } from 'react-native';
 
-import { Text } from '@/components/ui';
+import { ClubBar, Text } from '@/components/ui';
 import type { LeagueStandingRow } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -122,10 +122,22 @@ export function ClubRow({
   highlight = false,
   /** The full table draws a divider above every row but its first. */
   divider = true,
+  /**
+   * An explicit bar colour for this club.
+   *
+   * ⚠⚠ OPT-IN, AND THE FULL TABLE MUST NEVER PASS IT (Ryan, 2026-09-20: "I do
+   * not want to change the actual table standings"). The away-kit rule is a
+   * fact about a FIXTURE — who is at home, and who therefore changes — and a
+   * league table is not a fixture. Twenty clubs in a column have no home side
+   * between them, so every one of them wears its own colour and always should.
+   * Only the two-club extract on a match page has an opinion to pass down here.
+   */
+  colour,
 }: {
   row: LeagueStandingRow;
   highlight?: boolean;
   divider?: boolean;
+  colour?: string;
 }) {
   const theme = useTheme();
   return (
@@ -159,7 +171,7 @@ export function ClubRow({
 
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 4 }}>
         {row.crest_url ? (
-          <Image source={{ uri: row.crest_url }} style={{ width: 20, height: 20 }} resizeMode="contain" />
+          <ClubBar url={row.crest_url} colour={colour} height={20} />
         ) : (
           <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.mist }} />
         )}

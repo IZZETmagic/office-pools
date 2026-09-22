@@ -40,6 +40,15 @@ type LmsPickCell = {
   matchweek_number: number
   club_id: string
   club_name: string
+  /**
+   * The three letters the wall prints on the shirt.
+   *
+   * ⚠ IT IS THE CLUB'S OWN ABBREVIATION, NOT THE FIRST THREE LETTERS OF ITS
+   * NAME. The wall used to slice `club_name` when a crest was missing, which
+   * gives "1. " for 1. FC Köln and "AC " for AC Milan. Nullable, because the
+   * importer fills it from the provider.
+   */
+  abbreviation: string | null
   crest_url: string | null
   /** NULL until the matchweek settles. */
   result: 'survived' | 'eliminated' | null
@@ -148,6 +157,7 @@ export async function GET(
       matchweek_number: p.matchweek_number,
       club_id: p.club_id,
       club_name: club?.club_name ?? 'Unknown club',
+      abbreviation: club?.abbreviation ?? null,
       crest_url: club?.crest_url ?? null,
       result: p.result,
     }

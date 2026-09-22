@@ -113,21 +113,37 @@ export const GK_DEPTH = 4;
  * the front rows collided: the away striker's substitution minute landed on the
  * home striker's name, and the name itself crossed the halfway line.
  */
-export const CHIP = 48;
-/** How far a badge hangs outside the circle. */
+/**
+ * ⚠ 56, UP FROM 48 ON 2026-09-19 (Ryan: "a bit bigger to fit double digit
+ * player numbers"). The shirt is square and the number is 34% of it, so 48 gave
+ * a two-digit number 16pt of type on a 30pt chest — legible held still, not
+ * legible at a glance across twenty-two of them. 56 makes it 19pt.
+ *
+ * ⚠⚠ AND THE HEADROOM CAME FROM THE SUBSTITUTION MOVING OFF THE SHIRT, in the
+ * same pass. While the minute floated above the arrow at the top-left, a player
+ * reached 41pt above his own centre and the keeper — pinned 46pt from the top
+ * of the drawing — had 5pt of clearance. Growing the shirt then would have put
+ * his rating off the pitch. With `REACH_UP` now 33 there is 13pt spare.
+ *
+ * ⚠ WHAT BINDS IT NOW IS WIDTH, NOT HEIGHT. Five across a 393pt phone is 79pt a
+ * man, and a shirt carries badges `MARK` wider than itself, so the ceiling is
+ * about 61. The vertical checks all still pass at 60. See the row-width test.
+ */
+export const CHIP = 56;
+/** How far a badge hangs outside the shirt. */
 export const MARK = 17;
 
 /**
- * The highest thing on a player: his substitution minute.
+ * The highest thing on a player: the top edge of his rating badge.
  *
- * ⚠ TRACED, NOT GUESSED — I added `MARK` twice on the first attempt and it
- * cancels. From the player's centre: the circle top is CHIP/2; the arrow's
- * wrapper sits 4 above that at `top: -4`; the wrapper is MARK tall so its
- * BOTTOM is MARK lower again; and the minute is `bottom: MARK + 1` inside it,
- * which puts its bottom edge 1 above the wrapper's top. So the two MARKs
- * cancel and only the +1 and the line's own 12 survive.
+ * ⚠ IT USED TO BE HIS SUBSTITUTION MINUTE, and that was a much taller thing —
+ * `CHIP / 2 + 4 + 1 + 12`, a floating line of text above an arrow badge. Both
+ * went to the name row on 2026-09-19, so the tallest thing on a shirt is now
+ * simply the rating, which hangs 5 above the shirt's top edge (`slots().rating`
+ * is `top: -5`) and grows DOWNWARD from there. Nothing else reaches past the
+ * box: the bookings sit inside it and the goal and assist pills hang below.
  */
-export const REACH_UP = CHIP / 2 + 4 + 1 + 12;
+export const REACH_UP = CHIP / 2 + 5;
 /** The lowest: circle bottom, the gap, and the name label. */
 export const REACH_DOWN = CHIP / 2 + 3 + 11 * 1.32;
 

@@ -33,6 +33,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { shortClubName } from './clubName'
 import { inPlayMatchweekId, openMatchweekId, readLeagueFormByEntry, type MatchweekRow } from './read'
 
 /** The champion an entry backed, and where that club actually sits today. */
@@ -94,7 +95,15 @@ export type LmsRowState = {
    * NULL means one of two different things, and `pick_sealed` is what tells
    * them apart: sealed, or genuinely not picked.
    */
-  pick: { club_name: string; crest_url: string | null } | null
+  /**
+   * ⚠ `short_name` IS `shortClubName(club_name)`, SHORTENED HERE AND NOT ON THE
+   * PHONE. Every other club label on the contract works this way — see
+   * `useTournamentMatches` — so the browser and the phone cannot end up calling
+   * Nottingham Forest two different things. It is optional on the client for
+   * the ordinary reason: an older API behind a newer bundle sends no such
+   * field, and the row falls back to the full name rather than breaking.
+   */
+  pick: { club_name: string; short_name: string; crest_url: string | null } | null
   /**
    * ⚠ THE SEAL. Migration 086: *"showing it early would let the pool copy the
    * best player."* A rival's club is visible only once that matchweek has
@@ -571,7 +580,7 @@ async function readLmsRound(
 ): Promise<{
   meta: Omit<LmsRoundMeta, 'standing' | 'in_round'> | null
   survivors: Map<string, { eliminated_matchweek: number | null; is_winner: boolean }>
-  picks: Map<string, { club_name: string; crest_url: string | null }>
+  picks: Map<string, { club_name: string; short_name: string; crest_url: string | null }>
   error: string | null
 }> {
   const empty = { meta: null, survivors: new Map(), picks: new Map(), error: null }
@@ -647,7 +656,7 @@ async function readLmsRound(
     .eq('matchweek_number', week.matchweek_number)
   if (pErr) return { ...empty, error: `lms picks: ${pErr.message}` }
 
-  const picks = new Map<string, { club_name: string; crest_url: string | null }>()
+  const picks = new Map<string, { club_name: string; short_name: string; crest_url: string | null }>()
   for (const p of (pickRows ?? []) as unknown as Array<{
     entry_id: string
     league_clubs: { name: string | null; crest_url: string | null } | null
@@ -661,8 +670,10 @@ async function readLmsRound(
     // PostgREST types an embedded to-one either way depending on how it infers
     // the relationship — normalise rather than trust.
     const club = Array.isArray(p.league_clubs) ? p.league_clubs[0] ?? null : p.league_clubs
+    const name = club?.name ?? 'Unknown club'
     picks.set(p.entry_id, {
-      club_name: club?.name ?? 'Unknown club',
+      club_name: name,
+      short_name: shortClubName(name),
       crest_url: club?.crest_url ?? null,
     })
   }

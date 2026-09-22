@@ -215,7 +215,7 @@ const BOARD: LeagueLeaderboard = {
     // You, still in, pick sealed because MW5 has not locked.
     boardRow('e1', 'You', 'izzetmagic', { is_round_winner: false, in_round: true, eliminated_matchweek: null, rounds_won: 1, pick: null, pick_sealed: true }),
     // Still in, and their club is public — the crest chip.
-    boardRow('e7', 'Ana Lucia', 'analucia', { is_round_winner: false, in_round: true, eliminated_matchweek: null, rounds_won: 0, pick: { club_name: 'Chelsea', crest_url: crest('%23034694', 'C') }, pick_sealed: false }),
+    boardRow('e7', 'Ana Lucia', 'analucia', { is_round_winner: false, in_round: true, eliminated_matchweek: null, rounds_won: 0, pick: { club_name: 'Chelsea', short_name: 'Chelsea', crest_url: crest('%23034694', 'C') }, pick_sealed: false }),
     // Out, later — sorts above the earlier exit.
     boardRow('e3', 'Priya Raman', 'priyar', { is_round_winner: false, in_round: true, eliminated_matchweek: 4, rounds_won: 0, pick: null, pick_sealed: false }),
     boardRow('e4', 'Danny O’Shea', 'dannyo', { is_round_winner: false, in_round: true, eliminated_matchweek: 3, rounds_won: 0, pick: null, pick_sealed: false }),

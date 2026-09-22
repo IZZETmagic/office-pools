@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text as RNText, View } from 'react-native';
 
-import { Icon, Text } from '@/components/ui';
+import { Jersey } from '@/components/match/Jersey';
+import { ClubBar, Icon, Text } from '@/components/ui';
+import { clubColorFromCrestUrl } from '@/lib/design/clubColors';
 import type { LmsMember, LmsPickCell, LmsState } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -34,9 +36,16 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // would accuse half the pool of not turning up.
 // =============================================================
 
-const ROW_H = 44;
+// ⚠ 52, AND IT HAS FOLLOWED THE SHIRT TWICE (44 → 48 → 52, 2026-09-20). The
+// shirt is the tallest thing in a cell, so the row is sized off it rather than
+// chosen: 46 of shirt plus 3pt of air top and bottom. Ten rows cost 80pt more
+// than they did this morning; the wall already scrolls and the alternative is
+// a code nobody can read.
+const ROW_H = 52;
 const NAME_W = 112;
-const CELL_W = 52;
+// ⚠ WIDE ENOUGH FOR THE SHIRT AND ITS PIP. The pip hangs 1pt past the right
+// edge of the 46pt shirt, so 56 leaves 4pt a side rather than 3 and 2.
+const CELL_W = 56;
 
 type Props = {
   poolId: string;
@@ -241,7 +250,6 @@ function WeekBlock({
   sub: string;
   danger: boolean;
 }) {
-  const theme = useTheme();
   return (
     <View style={{ flex: 1, gap: 3 }}>
       <Text variant="caption" color="slate">
@@ -250,7 +258,7 @@ function WeekBlock({
       {club ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {club.crest ? (
-            <Image source={{ uri: club.crest }} style={{ width: 20, height: 20 }} resizeMode="contain" />
+            <ClubBar url={club.crest} height={20} />
           ) : null}
           <Text variant="cardTitle" numberOfLines={1} style={{ flexShrink: 1 }}>
             {club.name}
@@ -470,40 +478,101 @@ function WallCell({ cell }: { cell: CellState }) {
   }
 
   const { pick } = cell;
-  const tint =
+  const colour = clubColorFromCrestUrl(pick.crest_url);
+  const stroke =
     pick.result === 'survived'
       ? theme.colors.green
       : pick.result === 'eliminated'
         ? theme.colors.red
         : null;
 
+  // ⚠ THE ABBREVIATION, AND A LAST-RESORT SLICE. The feed's `abbreviation` is
+  // nullable; slicing the club name is what this cell used to do for every
+  // crestless club and it is wrong for "1. FC Köln" and "AC Milan", so it is
+  // the fallback rather than the rule.
+  const code = pick.abbreviation?.trim() || pick.club_name.slice(0, 3).toUpperCase();
+
   return (
     <View style={base}>
-      <View
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 17,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: tint ? withOpacity(tint, 0.14) : 'transparent',
-        }}
-      >
-        {pick.crest_url ? (
-          <Image
-            source={{ uri: pick.crest_url }}
-            style={{ width: 24, height: 24 }}
-            resizeMode="contain"
-            accessibilityLabel={pick.club_name}
+      {/* ⚠⚠ A SHIRT, NOT A BADGE OR A BAR (Ryan, 2026-09-20). The crest used to
+          fill this cell and carried the club on its own; a colour bar does not,
+          and this grid is the one screen where every cell is a different club.
+          The jersey is the shape the pitch already uses, and with the club's
+          three letters on the chest it says WHICH club without a caption.
+
+          ⚠ AND THE OUTCOME SHRANK TO A PIP. It was a tinted disc behind the
+          mark — the loudest thing in the cell — for a fact the row already
+          states twice: the dot beside the member's name, and the column they
+          stop at. The club is what this wall is for, so the club gets the
+          space and survived/out gets the corner. */}
+      <View accessible accessibilityLabel={`${pick.club_name}, ${outcomeWord(pick.result)}`}>
+        {colour ? (
+          <Jersey
+            colour={colour}
+            number={null}
+            position={null}
+            label={code}
+            // ⚠⚠ 46 AND 9pt ARE A PAIR, both measured, and 46 is the THIRD
+            // size this cell has had. 30 put the letters off the shape
+            // entirely; 38 got them onto colour but only just — at 9pt the
+            // widest real abbreviation is `WHU` at 21.5pt against a 26.3pt
+            // chest, which is 2.4pt a side and reads as a code wearing a shirt
+            // rather than a shirt carrying a code (Ryan: "still a little bit
+            // too big"). 46 gives 31.8pt: 5.2pt a side on the worst code and
+            // 8.4 on a typical one like `LIV`.
+            //
+            // ⚠ THE TYPE DID NOT MOVE, DELIBERATELY. Shrinking the code would
+            // have bought the same margin for free and cost the thing the cell
+            // exists to say. The shirt grows instead — the same call as the
+            // pitch, where the number stayed at 16.3 while the jersey went 48
+            // to 56.
+            labelPt={9}
+            size={46}
           />
         ) : (
-          // ⚠ `crest_url` is nullable in the feed. An abbreviation beats a blank,
-          // which would read as a cell where nobody picked.
-          <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 9, color: theme.colors.ink }}>
-            {pick.club_name.slice(0, 3).toUpperCase()}
-          </RNText>
+          // A club we hold no colour for: the code alone, on the neutral bar's
+          // slate, so the cell is still a club rather than a gap.
+          <View
+            style={{
+              width: 46,
+              height: 46,
+              borderRadius: 8,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: withOpacity(theme.colors.slate, 0.18),
+            }}
+          >
+            <RNText style={{ fontFamily: fontFamilies.black, fontSize: 9, color: theme.colors.ink }}>
+              {code}
+            </RNText>
+          </View>
         )}
+
+        {/* ⚠ RINGED IN THE CARD'S OWN WHITE so it reads as a pip sitting ON the
+            shirt rather than a dot that happens to overlap it. */}
+        {stroke ? (
+          <View
+            style={{
+              position: 'absolute',
+              right: -1,
+              bottom: 0,
+              width: 9,
+              height: 9,
+              borderRadius: 5,
+              backgroundColor: stroke,
+              borderWidth: 1.5,
+              borderColor: theme.colors.surface,
+            }}
+          />
+        ) : null}
       </View>
     </View>
   );
+}
+
+/** For the screen reader — the pip is a colour and a colour reads as nothing. */
+function outcomeWord(result: 'survived' | 'eliminated' | null): string {
+  if (result === 'survived') return 'survived';
+  if (result === 'eliminated') return 'eliminated';
+  return 'not settled yet';
 }

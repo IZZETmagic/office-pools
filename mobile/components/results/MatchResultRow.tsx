@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 
-import { clubColorFromCrestUrl, clubIdFromCrestUrl } from '@/lib/design/clubColors';
+import { ClubBar } from '@/components/ui';
+import { clubColorFromCrestUrl, clubIdFromCrestUrl, fixturePalette } from '@/lib/design/clubColors';
 import { Platform, Pressable, Text as RNText, View } from 'react-native';
 
 import { getLiveClock, getMatchStatusBadge } from '@/lib/matchStatus';
@@ -101,33 +102,25 @@ function awayDisplayName(match: ResultsMatch): string {
  * wherever a club appears. It costs nothing here — the box was sized for a
  * crest, so the bar has 10pt of air either side.
  */
-function TeamMark({ url, size = 26 }: { url: string | null | undefined; size?: number }) {
+function TeamMark({
+  url,
+  colour,
+  size = 26,
+}: {
+  url: string | null | undefined;
+  /** The fixture's verdict for this side — see `rowPalette`. */
+  colour?: string | null;
+  size?: number;
+}) {
   const theme = useTheme();
-  const colour = clubColorFromCrestUrl(url);
 
-  // A club: its colour, not its crest.
-  if (colour) {
-    return (
-      <View style={{ width: size, alignItems: 'center' }}>
-        <View style={{ width: 6, height: 30, borderRadius: 999, backgroundColor: colour }} />
-      </View>
-    );
-  }
-
-  // ⚠ A CLUB WE HAVE NO COLOUR FOR LANDS HERE TOO, not just a flag — and it
-  // must not fall through to drawing the crest again. `clubIdFromCrestUrl`
-  // returning an id is the test for "this is a club".
+  // ⚠ A CLUB WE HAVE NO COLOUR FOR IS STILL A CLUB — `ClubBar` renders the
+  // neutral bar for it rather than falling through to a crest that is gone.
+  // `clubIdFromCrestUrl` returning an id is the test for "this is a club".
   if (url && clubIdFromCrestUrl(url) !== null) {
     return (
       <View style={{ width: size, alignItems: 'center' }}>
-        <View
-          style={{
-            width: 6,
-            height: 30,
-            borderRadius: 999,
-            backgroundColor: withOpacity(theme.colors.slate, 0.35),
-          }}
-        />
+        <ClubBar url={url} colour={colour} />
       </View>
     );
   }
@@ -195,8 +188,46 @@ function KickoffTime({ iso }: { iso: string }) {
   );
 }
 
+/**
+ * What the two bars on one row wear.
+ *
+ * ⚠⚠ THE SAME RULE THE MATCH PAGE USES, DELIBERATELY (Ryan, 2026-09-20). This
+ * row draws the only two marks on the screen and it was resolving each club's
+ * colour independently, so a fixture between two blues — Getafe and Malaga,
+ * Frosinone and Como — arrived as two identical bars. `fixturePalette` is the
+ * thing that already answers this: the away club changes into its 2026/27 kit,
+ * and the pair falls back together when it cannot.
+ *
+ * ⚠⚠ AND IT MUST BE THE SAME RULE, not merely a similar one. Tapping this row
+ * opens the match page, whose line-ups and stats tabs already call
+ * `fixturePalette` for these two clubs. A second, kinder rule here would mean
+ * the same fixture wore different colours on the list and on the page the list
+ * opens — which is worse than either rule on its own.
+ *
+ * ⚠ BOTH CLUBS MUST BE KNOWN BEFORE IT IS ASKED. `fixturePalette` returns the
+ * app's own pair whenever EITHER side is missing, which is right where the two
+ * colours have to be told apart but wrong here: a cup opponent from outside the
+ * five leagues would take the home club's real colour away with it. When only
+ * one side is known this returns nothing and each bar resolves itself, exactly
+ * as the row did before.
+ */
+function rowPalette(
+  match: ResultsMatch,
+  fallback: { home: string; away: string },
+): { home: string; away: string } | null {
+  const homeUrl = match.homeTeam?.flagUrl;
+  const awayUrl = match.awayTeam?.flagUrl;
+  if (!clubColorFromCrestUrl(homeUrl) || !clubColorFromCrestUrl(awayUrl)) return null;
+  const palette = fixturePalette(homeUrl, awayUrl, fallback);
+  return { home: palette.home, away: palette.away };
+}
+
 export function MatchResultRow({ match, onPress }: Props) {
   const theme = useTheme();
+  const palette = rowPalette(match, {
+    home: theme.colors.primary,
+    away: theme.colors.accent,
+  });
   const isLive = match.status === 'live';
   const isFinished = match.status === 'completed';
   const badge = getMatchStatusBadge(match);
@@ -283,7 +314,7 @@ export function MatchResultRow({ match, onPress }: Props) {
       >
         {homeDisplayName(match)}
       </RNText>
-      <TeamMark url={match.homeTeam?.flagUrl} />
+      <TeamMark url={match.homeTeam?.flagUrl} colour={palette?.home} />
 
       {/* Center: score / time / status badge */}
       <View style={{ width: 58, alignItems: 'center' }}>
@@ -400,7 +431,7 @@ export function MatchResultRow({ match, onPress }: Props) {
 
       {/* Away name — the mirror of the home side above; see its note on why
           this is `flex: 1` and not a fixed width. */}
-      <TeamMark url={match.awayTeam?.flagUrl} />
+      <TeamMark url={match.awayTeam?.flagUrl} colour={palette?.away} />
       <RNText
         numberOfLines={1}
         style={{

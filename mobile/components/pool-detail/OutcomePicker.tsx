@@ -67,7 +67,7 @@
 
 import { Pressable, Text as RNText, View } from 'react-native'
 
-import { clubColorFromCrestUrl } from '@/lib/design/clubColors'
+import { ClubBar } from '@/components/ui'
 import { fontFamilies, useTheme, withOpacity } from '@/theme'
 
 export type Outcome = 'home' | 'draw' | 'away'
@@ -194,7 +194,6 @@ function ClubChoice({
   // ⚠ SHORT NAME FIRST, CODE AS THE FALLBACK. See the header: the crest's 28pt
   // bought the room for a name, and a name beats a code when it fits.
   const label = club.shortName?.trim() || club.abbr?.trim() || club.name
-  const bar = clubColorFromCrestUrl(club.crestUrl)
 
   return (
     <Pressable
@@ -234,7 +233,7 @@ function ClubChoice({
           reversed, the children are ordered. `row-reverse` would also flip
           which end `justifyContent` packs to, and the alignment above is the
           whole point. */}
-      {side === 'home' ? <ClubBar colour={bar} side="home" /> : null}
+      {side === 'home' ? <ClubMark url={club.crestUrl} side="home" /> : null}
       {/*
         ⚠ The label stays at FULL strength whether or not it is selected. The
         web learned this the hard way: tinting the selected one looked right in
@@ -262,7 +261,7 @@ function ClubChoice({
       >
         {label}
       </RNText>
-      {side === 'away' ? <ClubBar colour={bar} side="away" /> : null}
+      {side === 'away' ? <ClubMark url={club.crestUrl} side="away" /> : null}
     </Pressable>
   )
 }
@@ -275,26 +274,21 @@ function ClubChoice({
  * club has no colour on file. A grey bar would say "this club's colour is
  * grey", which is false; no bar says nothing, and the name still carries it.
  */
-function ClubBar({ colour, side }: { colour: string | null; side: 'home' | 'away' }) {
-  const theme = useTheme()
-  if (!colour) return null
+function ClubMark({ url, side }: { url: string | null; side: 'home' | 'away' }) {
   return (
     <View
       style={{
-        // ⚠ 6×30, UP FROM 4×24 (Ryan, 2026-09-19). Height is free — the button
-        // is 48 tall — and the 2pt of width came from Draw, not from the name.
-        width: 6,
-        height: 30,
-        borderRadius: theme.radii.pill,
-        backgroundColor: colour,
-        // ⚠ INSET OFF THE OUTER EDGE, not padded on both. The button's 8pt
-        // padding put the bar hard against its own border; this walks it in
-        // another 4. Done as a margin on the bar rather than more padding on
-        // the button because padding would charge the NAME for it twice — and
-        // the name has 4.4pt of slack, not 12.
+        // ⚠ INSET OFF THE OUTER EDGE, not padded on both. The button's padding
+        // put the bar hard against its own border; this walks it in another 4.
+        // Done as a margin rather than more padding on the button because
+        // padding would charge the NAME for it twice.
         marginLeft: side === 'home' ? 4 : 0,
         marginRight: side === 'away' ? 4 : 0,
       }}
-    />
+    >
+      {/* ⚠ 6×30 comes from `ClubBar` now — one bar, every surface. It also
+          brings the hairline a light club needs; see that file. */}
+      <ClubBar url={url} />
+    </View>
   )
 }

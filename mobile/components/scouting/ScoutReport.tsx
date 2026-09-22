@@ -15,6 +15,7 @@ import {
   ScoutRow,
   ScoutRows,
   SplitBar,
+  useFixtureColors,
   VenueSplit,
 } from './kit';
 
@@ -48,7 +49,16 @@ import {
 // it tried and failed. Those are different sentences.
 // =============================================================
 
+/**
+ * ⚠⚠ RESOLVED ONCE FOR THE WHOLE REPORT, AND THAT IS THE POINT — see the header
+ * of `SplitBar`. The pairing bar and the crowd bar are meant to be read stacked
+ * against each other ("history says home, the crowd says away"), and that only
+ * works while they share an encoding. Resolving the fixture per card would let
+ * the two drift apart the moment one of them changed, which is the regression
+ * that killed club colours on these bars the first time.
+ */
 export function ScoutReport({ data }: { data: MatchScoutResponse }) {
+  const clubColors = useFixtureColors(data.fixture.home.crestUrl, data.fixture.away.crestUrl);
   return (
     <View style={{ gap: 16 }}>
       {/* ⚠ THE PAIRING LEADS. Ryan, 2026-09-11. It is the question the fixture
@@ -61,6 +71,7 @@ export function ScoutReport({ data }: { data: MatchScoutResponse }) {
         homeName={data.fixture.home.name}
         awayName={data.fixture.away.name}
         venue={data.fixture.venue}
+        clubColors={clubColors}
       />
       <FormCard form={data.form} />
       {data.people === undefined ? null : data.people === null ? (
@@ -73,12 +84,15 @@ export function ScoutReport({ data }: { data: MatchScoutResponse }) {
           away={data.people.away}
           homeName={data.fixture.home.name}
           awayName={data.fixture.away.name}
+          homeCrestUrl={data.fixture.home.crestUrl}
+          awayCrestUrl={data.fixture.away.crestUrl}
         />
       )}
       <CrowdCard
         crowd={data.crowd}
         homeName={data.fixture.home.name}
         awayName={data.fixture.away.name}
+        clubColors={clubColors}
       />
       <ReportFootnote data={data} />
     </View>
@@ -124,11 +138,13 @@ function PairingCard({
   homeName,
   awayName,
   venue,
+  clubColors,
 }: {
   h2h: MatchScoutResponse['h2h'];
   homeName: string;
   awayName: string;
   venue: string | null;
+  clubColors: { home: string; away: string } | null;
 }) {
   if (h2h === undefined) return null;
   if (h2h === null) {
@@ -179,6 +195,7 @@ function PairingCard({
           caption={s.atVenue ? `At ${venue ?? 'this ground'}` : 'All meetings'}
           counts={{ home: bar.wins, draw: bar.draws, away: bar.losses }}
           names={{ home: homeName, draw: 'draw', away: awayName }}
+          clubColors={clubColors}
         />
 
         <ScoutRows>
@@ -291,10 +308,13 @@ function CrowdCard({
   crowd,
   homeName,
   awayName,
+  clubColors,
 }: {
   crowd: MatchScoutResponse['crowd'];
   homeName: string;
   awayName: string;
+  /** ⚠ THE SAME PAIR THE PAIRING BAR GOT — never resolved again here. */
+  clubColors: { home: string; away: string } | null;
 }) {
   // ⚠ ABSENT AND NULL BOTH DRAW NOTHING HERE, unlike the other cards. A fixture
   // below the anonymity gate has no crowd — that is the guard working, not a
@@ -308,6 +328,7 @@ function CrowdCard({
           caption="How SportPool picked it"
           note={`${crowd.picks} picks`}
           counts={{ home: crowd.home, draw: crowd.draw, away: crowd.away }}
+          clubColors={clubColors}
           names={{ home: homeName, draw: 'Draw', away: awayName }}
           keyFormat="pct"
         />

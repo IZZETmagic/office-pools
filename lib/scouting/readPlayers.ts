@@ -69,6 +69,7 @@ type RawStat = {
   side: 'home' | 'away'
   external_player_id: number
   player_name: string
+  shirt_number: number | null
   position: 'G' | 'D' | 'M' | 'F' | null
   minutes: number | null
   rating: number | string | null
@@ -115,8 +116,9 @@ export async function readClubPlayerForm(
   const { data: rawStats, error: statErr } = await admin
     .from('match_player_stats')
     .select(
-      'fixture_id, side, external_player_id, player_name, position, minutes, rating, ' +
-        'assists, key_passes, shots_on, duels_won, duels_total, saves, yellow_cards, red_cards',
+      'fixture_id, side, external_player_id, player_name, shirt_number, position, minutes, ' +
+        'rating, assists, key_passes, shots_on, duels_won, duels_total, saves, yellow_cards, ' +
+        'red_cards',
     )
     .in('fixture_id', fixtureIds)
     .limit(MAX_STAT_ROWS)
@@ -131,13 +133,24 @@ export async function readClubPlayerForm(
     )
   }
 
+  // ⚠⚠ SORTED NEWEST-FIRST HERE, BECAUSE THE SELECT ABOVE HAS NO ORDER AND
+  // POSTGREST DOES NOT PRESERVE THE ORDER OF AN `.in()` LIST. `scoutSide` takes
+  // a player's shirt number from the first row it sees, on the rule that the
+  // most recent fixture is the truthful one — a player who changed number
+  // mid-season has two. That rule is only correct if this order is real, so it
+  // is made real rather than assumed. `fixtureIds` is already kickoff
+  // descending; this maps each row back onto its position in that list.
+  const recency = new Map(fixtureIds.map((id, i) => [id, i]))
+
   const stats: PlayerStatRow[] = statRows
     // Only this club's half of each fixture.
     .filter((r) => sideOf.get(r.fixture_id) === r.side)
+    .sort((a, b) => (recency.get(a.fixture_id) ?? 0) - (recency.get(b.fixture_id) ?? 0))
     .map((r) => ({
       externalPlayerId: r.external_player_id,
       playerName: r.player_name,
       clubId,
+      shirtNumber: r.shirt_number,
       position: r.position,
       minutes: r.minutes,
       // ⚠ THE PROVIDER SENDS THE RATING AS A STRING and 141 stores it

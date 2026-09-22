@@ -60,6 +60,8 @@ export type PlayerStatRow = {
   playerName: string
   /** Which club this row belongs to, resolved by the reader from side + fixture. */
   clubId: string
+  /** ⚠ PER FIXTURE, and nullable — see `shirtNumber` on `PlayerForm`. */
+  shirtNumber: number | null
   position: 'G' | 'D' | 'M' | 'F' | null
   minutes: number | null
   rating: number | null
@@ -165,6 +167,19 @@ const TOP_DANGER = 3
 export type PlayerForm = {
   externalPlayerId: number
   name: string
+  /**
+   * The number he wore MOST RECENTLY, not the one he wore most often.
+   *
+   * ⚠⚠ IT IS A PER-FIXTURE FACT, WHICH IS WHY THIS NEEDS A RULE. `shirt_number`
+   * lives on `match_player_stats`, so a player who changed number mid-season —
+   * or came on as an emergency keeper — has two. The scout report describes a
+   * squad as it is TODAY, so the latest row wins; a mode would answer "what he
+   * usually wore", which is a different question nobody asked.
+   *
+   * ⚠ NULLABLE. The provider omits it often enough to matter, and the card
+   * falls back to his position rather than printing a gap.
+   */
+  shirtNumber: number | null
   position: 'G' | 'D' | 'M' | 'F' | null
   appearances: number
   minutes: number
@@ -214,6 +229,7 @@ export function scoutSide(
   type Acc = {
     id: number
     name: string
+    shirtNumber: number | null
     position: 'G' | 'D' | 'M' | 'F' | null
     appearances: number
     minutes: number
@@ -233,6 +249,7 @@ export function scoutSide(
       a = {
         id: r.externalPlayerId,
         name: r.playerName,
+        shirtNumber: r.shirtNumber,
         position: r.position,
         appearances: 0,
         minutes: 0,
@@ -243,6 +260,12 @@ export function scoutSide(
       }
       byPlayer.set(r.externalPlayerId, a)
     }
+
+    // ⚠ LAST NON-NULL WINS. `rows` arrives newest-first from the reader, so the
+    // first one seen is the most recent; later rows only fill a gap the newer
+    // fixture left. Overwriting unconditionally would walk it backwards through
+    // the season.
+    if (a.shirtNumber === null) a.shirtNumber = r.shirtNumber
 
     a.appearances++
     a.minutes += r.minutes
@@ -279,6 +302,7 @@ export function scoutSide(
   const all: PlayerForm[] = [...byPlayer.values()].map((a) => ({
     externalPlayerId: a.id,
     name: a.name,
+    shirtNumber: a.shirtNumber,
     position: a.position,
     appearances: a.appearances,
     minutes: a.minutes,
