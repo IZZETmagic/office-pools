@@ -1005,12 +1005,17 @@ describe('eyewear', () => {
 
   const base = { ...cfg, base: 'b', facialHair: null, eyes: 'e', glasses: 'g', frameColour: '#22262E' }
 
-  it('paints the frame in the chosen colour, and the lens derived from it', () => {
+  it('paints the frame in the chosen colour and the lens black, whatever the frame', () => {
+    // ⭐ Ryan, 2026-09-22: "Just leave them black the lenses that is." The lens used to be
+    // derived from the frame; a black lens is what reads as sunglasses at any size, and the
+    // frame colour still does visible work as the rim around it.
     const svg = composeAvatar({ ...base, glasses: 'g' }, eyewearFixture(true))
     expect(svg, 'the frame takes the input verbatim').toContain('fill="rgb(34,38,46)"')
-    // mix(#22262E, GLASS rgb(120,162,205), 0.58) — one input drives both
-    expect(svg, 'the lens leans toward glass, it is not the frame lightened')
-      .toContain('fill="rgb(83,109,138)"')
+    expect(svg, 'the lens is black').toContain('fill="rgb(18,20,25)"')
+    for (const frameColour of PALETTE.frame) {
+      const s2 = composeAvatar({ ...base, frameColour }, eyewearFixture(true))
+      expect(s2, `${frameColour}: the lens must stay black`).toContain('fill="rgb(18,20,25)"')
+    }
   })
 
   it('never lets either token reach the output, on any frame in the palette', () => {
@@ -1308,8 +1313,7 @@ describe('eyewear', () => {
       const src = readFileSync(join(process.cwd(), file), 'utf8')
       expect(src, `${file} must carry the frame token`).toContain('64,70,78')
       expect(src, `${file} must carry the lens token`).toContain('96,126,156')
-      expect(src, `${file} must mix toward the same glass tint`).toMatch(/120,\s*162,\s*205/)
-      expect(src, `${file} must use the same coefficient`).toContain('0.58')
+      expect(src, `${file} must paint the lens the same black`).toMatch(/18,\s*20,\s*25/)
     }
   })
 })

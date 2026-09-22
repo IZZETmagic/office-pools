@@ -142,7 +142,9 @@ const BEARD_LIFT = 12;
    eyewear composes OVER the eyes and anything opaque there hides them.
    ⚠⚠ A LENS LEANS TOWARD GLASS, it is not the frame lightened. Lightening by a constant
    matches the approved art on a black frame and gives a pale primrose on gold. */
-const GLASS = [120,162,205], LENS_TOWARD_GLASS = 0.58, DEFAULT_FRAME = '#22262E';
+// ⭐ the lens is BLACK, not derived from the frame — a slate tint is photographic, black is
+// what sunglasses read as. ⚠ NEAR-black so the frame still reads as a rim on a black pair.
+const LENS_BLACK = [18,20,25], DEFAULT_FRAME = '#22262E';
 // ⭐⭐ the highlight is TRANSLUCENT (fill-opacity lives in the asset), so it lightens whatever
 // is behind it and the derivation that used to fake that is gone. One cool constant.
 const GLASS_TINT = [214,234,250];
@@ -336,7 +338,7 @@ function compose(c){
   if (svg.includes(T.frameInk) || svg.includes(T.lensTint) || svg.includes(T.glint)) {
     const frame = hex2rgb(c.frameColour || DEFAULT_FRAME);
     svg = swapAll(svg, T.frameInk, rgbStr(frame));
-    svg = swapAll(svg, T.lensTint, mix(frame, GLASS, LENS_TOWARD_GLASS));
+    svg = swapAll(svg, T.lensTint, rgbStr(LENS_BLACK));
     svg = swapAll(svg, T.glint, rgbStr(GLASS_TINT));
   }
   svg = swapAll(svg, T.browInk, darken(hair,0.82));          // brows follow hair

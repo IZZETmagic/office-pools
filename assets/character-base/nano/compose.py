@@ -46,13 +46,13 @@ STUBBLE = "rgb(164,150,140)"
 FRAME_INK = "rgb(64,70,78)"
 LENS_TINT = "rgb(96,126,156)"
 
-# ⚠⚠ A LENS LEANS TOWARD GLASS, it is not the frame lightened. Measured off the approved
-# generation: frame rgb(56,63,70) with lens rgb(92,125,155) — 59 luminance above the frame AND
-# bluer, because it is tinted glass and not a paler frame. Lightening by a constant reproduces
-# that on a black frame and falls apart elsewhere: on gold it gave a pale primrose that read as
-# a novelty. Mixing toward a fixed glass tint keeps every frame in the same family.
-GLASS = (120, 162, 205)
-LENS_TOWARD_GLASS = 0.58
+# ⭐ THE LENS IS BLACK, FULL STOP. It used to be derived from the frame, leaned toward a glass
+# blue so one swatch drove both — defensible, and also a slate-blue lens, which is a
+# photographic tint rather than what sunglasses read as. A black lens reads as sunglasses at any
+# size and the frame colour still does visible work as the rim around it.
+# ⚠ NEAR-black: at rgb(0,0,0) the rim on a black frame reads too hard against this pastel
+# palette, and at rgb(30,33,40) lens and black frame merge into one blob.
+LENS_BLACK = (18, 20, 25)
 
 # ⭐ THE GLASS HIGHLIGHT. An empty opening reads as an empty frame, so a clear lens carries a
 # highlight band. ⚠⚠ It cannot keep the tone it traced as: the generator draws it near-white and
@@ -513,8 +513,7 @@ def main() -> None:
     if FRAME_INK in svg or LENS_TINT in svg or GLINT in svg:
         fr = hex_to_rgb(arg("--frame-colour") or DEFAULT_FRAME)
         svg = svg.replace(f'fill="{FRAME_INK}"', f'fill="{rgb_str(fr)}"')
-        lens = tuple(int(a + (b - a) * LENS_TOWARD_GLASS) for a, b in zip(fr, GLASS))
-        svg = svg.replace(f'fill="{LENS_TINT}"', f'fill="{rgb_str(lens)}"')
+        svg = svg.replace(f'fill="{LENS_TINT}"', f'fill="{rgb_str(LENS_BLACK)}"')
         svg = svg.replace(f'fill="{GLINT}"', f'fill="{rgb_str(GLASS_TINT)}"')
 
     if c := (arg("--brow-colour") or arg("--hair-colour")):

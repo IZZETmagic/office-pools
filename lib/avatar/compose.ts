@@ -52,7 +52,7 @@ export type AvatarConfig = {
   mouthColour: string
   shirt: string
   background: string
-  /** Eyewear frame. One input drives the lens too — see LENS_TOWARD_GLASS. */
+  /** Eyewear frame. On a tinted style the lens is black regardless — see LENS_BLACK. */
   frameColour?: string
   /**
    * ⚠⚠ BACK-OUT: the beard fade is behind this flag and defaults to OFF. With it off the
@@ -150,19 +150,18 @@ const T = {
 const BEARD_LIFT = 12
 
 /**
- * ⚠⚠ A LENS LEANS TOWARD GLASS, it is not the frame lightened. Measured off the approved
- * generation: frame rgb(56,63,70) with lens rgb(92,125,155) — the lens is 59 luminance above
- * the frame AND bluer, because it is tinted glass rather than a paler frame.
+ * ⭐ THE LENS IS BLACK, FULL STOP. Ryan, 2026-09-22: "Just leave them black the lenses that is."
  *
- * Lightening by a constant reproduces that on a black frame and falls apart everywhere else:
- * on the gold swatch it gave a pale primrose yellow that read as a novelty, not a lens. Mixing
- * toward a fixed glass tint keeps every frame colour in the same family — gold lands on a
- * muted olive-grey, which is what gold-framed sunglasses actually look like.
+ * It used to be derived from the frame — leaned toward a glass blue so one swatch drove both,
+ * the way the iris core drives its rim. That was defensible and it was also a slate-blue lens,
+ * which is a photographic tint, not what sunglasses read as. A black lens reads as sunglasses
+ * at any size, and the frame colour still does visible work as the rim around it.
  *
- * Same lesson as BEARD_LIFT and the stubble floor: fix the RELATIONSHIP, never scale the input.
+ * ⚠ Near-black, not pure black. At rgb(0,0,0) the rim on a BLACK frame reads too hard against
+ * this pastel palette; at rgb(30,33,40) the lens and a black frame merge into one blob. 18/20/25
+ * keeps the frame legible as a rim on the darkest swatch and stays black everywhere else.
  */
-const GLASS: RGB = [120, 162, 205]
-const LENS_TOWARD_GLASS = 0.58
+const LENS_BLACK: RGB = [18, 20, 25]
 
 /**
  * ⭐⭐ THE HIGHLIGHT IS TRANSLUCENT, AND THAT IS WHY IT IS A CONSTANT. Ryan, 2026-09-21: "The
@@ -617,7 +616,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   if (svg.includes(T.frameInk) || svg.includes(T.lensTint) || svg.includes(T.glint)) {
     const frame = hex2rgb(cfg.frameColour ?? DEFAULT_FRAME)
     svg = swap(svg, T.frameInk, rgbStr(frame))
-    svg = swap(svg, T.lensTint, mix(frame, GLASS, LENS_TOWARD_GLASS))
+    svg = swap(svg, T.lensTint, rgbStr(LENS_BLACK))
     svg = swap(svg, T.glint, rgbStr(GLASS_TINT))
   }
 
