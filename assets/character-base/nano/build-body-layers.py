@@ -143,7 +143,13 @@ def main() -> None:
         P = classify(svg)
         head = flatten(d_of(P["head"]))
         frags = []
-        for p in P["shirt"] + P["shadow"] + P["neck"]:
+        # ⚠⚠ SHIRT, NECK, THEN SHADOW — the base's own order, and it is load-bearing. This read
+        # shirt + shadow + neck, so the re-painted neck covered its own crescent shadow and
+        # every avatar WITH HAIR lost it: bald showed the shadow (the base's order applies),
+        # anything else did not (this layer's order won). 24 of the 25 hair options have hair,
+        # so that was nearly every avatar. neck-width.py calls the order out as EXPLICIT for
+        # exactly this reason; this file quietly disagreed with it.
+        for p in P["shirt"] + P["neck"] + P["shadow"]:
             g = clean(flatten(d_of(p)).difference(head).buffer(0))
             if g.is_empty:
                 continue

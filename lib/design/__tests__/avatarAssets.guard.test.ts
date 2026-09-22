@@ -664,6 +664,44 @@ describe('long hair works on every neck width', () => {
     expect(svg, 'but the body still goes in front').toContain(`d="${D_FRONT}"`)
   })
 
+  it('paints the neck BEFORE its shadow, the same order the base does', () => {
+    // ⚠⚠ This layer read shirt + shadow + neck while the base reads shirt + neck + shadow, so
+    // the re-painted neck covered its own crescent shadow. Bald avatars showed the shadow (no
+    // front-body layer, so the base's order applied) and every avatar WITH HAIR lost it — 24 of
+    // the 25 hair options. neck-width.py calls this order out as EXPLICIT; the derived layer
+    // quietly disagreed, and nothing compared the two.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const bases = Object.keys(A.frontBody ?? {})
+    expect(bases.length, 'the front-body layers should be bundled').toBeGreaterThan(0)
+    for (const b of bases) {
+      const frag = A.frontBody![b]
+      const neck = frag.indexOf('fill="rgb(254,205,180)"')
+      const shadow = frag.indexOf('fill="rgb(245,178,150)"')
+      expect(neck, `front-neck-${b}: no neck path`).toBeGreaterThan(-1)
+      expect(shadow, `front-neck-${b}: no neck shadow path`).toBeGreaterThan(-1)
+      expect(neck, `front-neck-${b}: the neck must come before its shadow, or the shadow is hidden`)
+        .toBeLessThan(shadow)
+    }
+  })
+
+  it('shows the same neck shadow with hair as without', () => {
+    // The invariant the order exists for, checked end to end rather than on the fragment.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const shadowD = /fill="rgb\(245,178,150\)"[^>]*d="([^"]*)"/.exec(A.frontBody!['100'])![1]
+    const withHair = composeAvatar(
+      { ...cfg, base: 'base-neck-100', facialHair: null, hair: 'm01-buzz' }, A)
+    const i = withHair.indexOf(`d="${shadowD}"`)
+    expect(i, 'the shadow should be in the composed document').toBeGreaterThan(-1)
+    // nothing from the body layer may be painted after it
+    const neckD = /fill="rgb\(254,205,180\)"[^>]*d="([^"]*)"/.exec(A.frontBody!['100'])![1]
+    expect(withHair.indexOf(`d="${neckD}"`), 'the neck must not be painted over the shadow')
+      .toBeLessThan(i)
+  })
+
   it('adds neither layer when there is no hair', () => {
     const svg = composeAvatar({ ...cfg, base: 'base-neck-100', hair: null }, layered())
     expect(svg).not.toContain(`d="${D_BACK}"`)
