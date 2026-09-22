@@ -37,3 +37,33 @@ painted on top cuts the right collar. **The collar is paint order, not geometry.
 
 ⚠ A garment paints in the base's own SHIRT tokens, so `--shirt` recolours it with no new token,
 config field or palette.
+
+---
+
+## A lower neckline has to bring its own chest (2026-09-22)
+
+Ryan: *"The crew and v neck doesn't show any more skin."* Correct, and the reason was not the
+art.
+
+⭐⭐ **THE NECK IS ALREADY PAINTED OVER THE SHIRT**, all the way down to its bottom at y1763, by
+`front-neck-<N>`. So every garment already shows the WHOLE neck, and cutting a neckline lower
+cannot reveal any more of it — there is nothing below. The avatar is a bust with no chest.
+
+So a garment that opens below the neck **carries the skin it exposes**, as a `BASE_SKIN` path of
+its own: `traced skin MINUS the base-100 neck`, which is exactly the part the generation
+invented. `--skin` recolours it with the face.
+
+⭐ **The prompt has to say the neckline is an OPENING, not a drawing.** The first pass asked for
+a V "edged by a narrow band in the darker blue" and got exactly that — a blue V painted ON the
+blue, with no skin anywhere. The wording that worked:
+
+> Cut the neckline out of the blue so that THE PALE PEACH SKIN OF THE NECK SHOWS THROUGH IT …
+> Do NOT draw the neckline as a blue line, a blue band or a darker blue shape on top of the
+> blue: there must be real peach skin inside it.
+
+⚠⚠ **AND THE SEAM IS BURIED, NOT BUTTED.** Subtracting the neck exactly leaves the chest's top
+edge coincident with the neck compose paints on top — two anti-aliased edges on one line cover
+~75% between them and the garment BLUE leaks through as a dashed hairline across the opening,
+visible at 4x. `SEAM_BURY = 6` pushes the seam inside the neck's solid interior. Same cure as
+the beard bands: **overlap hidden geometry, never butt edges.**
+

@@ -27,6 +27,16 @@ four bases, so one subtraction serves them all.
 ⚠ The garment is NOT cut by the neck. It stays SOLID and the per-base neck is painted on top of
 it by compose — that is what gives the right collar on all four bases from one asset. See
 build-body-layers.py.
+
+⭐⭐ A LOWER NECKLINE HAS TO BRING ITS OWN CHEST. Ryan, 2026-09-22: "The crew and v neck doesn't
+show any more skin." The reason is not the art: THE NECK IS ALREADY PAINTED OVER THE SHIRT all
+the way to its bottom at y1763, by front-neck-<N>. So every garment already shows the whole
+neck, and cutting the neckline lower cannot reveal any more of it — there is nothing below.
+
+The avatar is a bust with no chest. So a garment that opens below the neck carries the skin it
+exposes, as a BASE_SKIN path of its own: `traced skin MINUS the base-100 neck`, which is exactly
+the part the generation invented. Compose paints it after the garment and before the per-base
+neck, and `--skin` recolours it like any other skin.
 """
 import re
 import sys
@@ -42,6 +52,8 @@ REGION = box(300, 1400, 1760, 2060)
 BASE_SHIRT = (30, 118, 214)
 SHIRT_TOK = "rgb(30,118,214)"
 SHADE_TOK = "rgb(50,118,183)"
+SKIN_TOK = "rgb(254,205,180)"
+SEAM_BURY = 6.0
 SKIN = (254, 205, 180)
 
 HEAD = ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '
@@ -116,7 +128,21 @@ def main() -> None:
     if head is None:
         sys.exit("could not find the head in base-neck-100.svg")
 
-    main_g, dark = [], []
+    # base-100's neck — what the body already provides, and therefore what a garment must NOT
+    # carry, or a narrow-necked base would render a base-100-width neck.
+    neck100 = None
+    for p in re.findall(r"<path[^>]*/?>", base):
+        if f'fill="rgb({SKIN[0]},{SKIN[1]},{SKIN[2]})"' not in p:
+            continue
+        d = re.search(r'd="([^"]*)"', p).group(1)
+        v = [float(x) for x in re.findall(r"-?\d+\.?\d*", d)]
+        xs, ys = v[0::2], v[1::2]
+        if max(xs) - min(xs) < 900 and min(ys) > 1200:
+            neck100 = flatten(d)
+    if neck100 is None:
+        sys.exit("could not find the neck in base-neck-100.svg")
+
+    main_g, dark, skin = [], [], []
     for p in re.findall(r"<path[^>]*/?>", Path(src).read_text()):
         f = re.search(r'fill="rgb\((\d+),\s*(\d+),\s*(\d+)\)"', p)
         if not f:
@@ -134,6 +160,21 @@ def main() -> None:
             continue
         (main_g if close(c, BASE_SHIRT) else dark).append(g)
 
+    # the skin the garment invents below the neckline — everything the trace paints in skin
+    # inside the body band, minus what the body already provides
+    for p in re.findall(r"<path[^>]*/?>", Path(src).read_text()):
+        f = re.search(r'fill="rgb\((\d+),\s*(\d+),\s*(\d+)\)"', p)
+        if not f or not close(tuple(int(x) for x in f.groups()), SKIN):
+            continue
+        d = re.search(r'd="([^"]*)"', p).group(1)
+        v = [float(x) for x in re.findall(r"-?\d+\.?\d*", d)]
+        xs, ys = v[0::2], v[1::2]
+        if max(ys) < 1400 or min(ys) < 1300:        # the head, not a neckline
+            continue
+        g = flatten(d)
+        if g is not None and not g.is_empty:
+            skin.append(g)
+
     if not main_g:
         sys.exit(f"{src}: no garment body found — check the trace")
 
@@ -141,15 +182,28 @@ def main() -> None:
     # per-base neck is what cuts the collar.
     whole = clean(unary_union(main_g + dark).buffer(0).difference(head).buffer(0))
     shade = clean(unary_union(dark).buffer(0).difference(head).buffer(0)) if dark else None
+    # ⚠⚠ THE SEAM IS BURIED, NOT BUTTED. Subtracting the neck exactly leaves the chest's top
+    # edge coincident with the neck compose paints on top of it — two anti-aliased edges on one
+    # line cover ~75% between them, and the garment BLUE leaks through as a dashed hairline
+    # across the opening. Visible at 4x on the v-neck. Shrinking the neck first pushes the seam
+    # SEAM_BURY units inside the neck's solid interior, where nothing can show through it.
+    # Same cure as the beard bands: overlap hidden geometry, never butt edges.
+    chest = (clean(unary_union(skin).buffer(0)
+                   .difference(neck100.buffer(-SEAM_BURY)).buffer(0), floor=600)
+             if skin else None)
 
     frags = [f'<path transform="translate(0,0)" fill="{SHIRT_TOK}" d="{to_d(whole.simplify(0.7))}"/>']
+    # ⚠ the chest goes between the body and the details, so a collar rib still edges the opening
+    if chest is not None and not chest.is_empty:
+        frags.append(f'<path transform="translate(0,0)" fill="{SKIN_TOK}" '
+                     f'd="{to_d(chest.simplify(0.7))}"/>')
     if shade is not None and not shade.is_empty:
         frags.append(f'<path transform="translate(0,0)" fill="{SHADE_TOK}" '
                      f'd="{to_d(shade.simplify(0.7))}"/>')
     Path(dst).write_text(HEAD + "".join(frags) + "</svg>")
     print(f"  {Path(dst).name:<24} body {whole.area:8.0f}u²  "
-          f"detail {(shade.area if shade is not None else 0):8.0f}u²  "
-          f"{len(main_g)} main + {len(dark)} dark path(s)")
+          f"detail {(shade.area if shade is not None else 0):7.0f}u²  "
+          f"chest {(chest.area if chest is not None else 0):7.0f}u²")
 
 
 if __name__ == "__main__":

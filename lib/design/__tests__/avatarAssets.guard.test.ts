@@ -1516,18 +1516,40 @@ describe('earrings', () => {
 describe('garments', () => {
   const SHIRT = 'rgb(30,118,214)'
   const SHIRT2 = 'rgb(50,118,183)'
+  const SKIN = 'rgb(254,205,180)'
   const bundle = () => JSON.parse(
     readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
   ) as AvatarAssets
 
-  it('paints only in the shirt tokens, so the shirt colour drives it', () => {
+  it('paints only in the shirt tokens and the skin token', () => {
+    // ⭐ The shirt tokens mean `--shirt` recolours a garment with no new token or config field.
+    // ⭐⭐ The SKIN token is the other half, and it is not a leak: a garment whose neckline opens
+    // below the neck has to bring the chest it exposes, because the avatar is a bust and there
+    // is none. Ryan, 2026-09-22: "The crew and v neck doesn't show any more skin." Carried in
+    // the skin token so `--skin` recolours it with the face.
     const A = bundle()
     const keys = Object.keys(A.garments ?? {})
     expect(keys.length, 'garments should be bundled').toBeGreaterThan(0)
     for (const k of keys) {
       const fills = [...A.garments![k].matchAll(/fill="(rgb\([^)]*\))"/g)].map((m) => m[1])
-      const off = [...new Set(fills)].filter((c) => c !== SHIRT && c !== SHIRT2)
-      expect(off, `${k} paints off the shirt palette — --shirt would not recolour it`).toEqual([])
+      const off = [...new Set(fills)].filter((c) => c !== SHIRT && c !== SHIRT2 && c !== SKIN)
+      expect(off, `${k} paints off palette — nothing would recolour it`).toEqual([])
+    }
+  })
+
+  it('recolours the exposed chest with the SKIN, not the shirt', () => {
+    // ⚠ The failure worth catching: the chest emitted in a shirt token instead of the skin
+    // token. It would look right on the default palette and turn blue the moment anyone
+    // changed their shirt.
+    const A = bundle()
+    const withChest = Object.keys(A.garments ?? {}).filter((k) => A.garments![k].includes(SKIN))
+    expect(withChest.length, 'some garment should open below the neck').toBeGreaterThan(0)
+    for (const k of withChest) {
+      for (const skin of PALETTE.skin) {
+        const svg = composeAvatar(
+          { ...cfg, base: 'base-neck-100', hair: null, facialHair: null, garment: k, skin }, A)
+        expect(svg, `${k} on ${skin}: the chest kept the raw skin token`).not.toContain(SKIN)
+      }
     }
   })
 
