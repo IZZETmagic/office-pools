@@ -1,0 +1,95 @@
+<!doctype html><meta charset=utf-8><title>Header — purple, more shades</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel=stylesheet>
+<style>
+body{font-family:Nunito,system-ui;background:#F7F8FC;color:#1B2340;margin:0;padding:28px 20px 60px}
+h1{font-size:21px;margin:0 0 4px}.sub{color:#6B7391;font-size:13.5px;margin:0 0 24px;max-width:560px;line-height:1.55}
+h2{font-size:14.5px;margin:0 0 2px}h2 span{color:#5B2FD4;font-weight:900;margin-right:8px}
+p.note{color:#6B7391;font-size:12.5px;line-height:1.5;margin:0 0 10px;max-width:470px}
+section{margin:0 0 26px;max-width:420px}
+.hdr{position:relative;padding:34px 22px 14px;border-radius:16px;overflow:hidden}
+.glow{position:absolute;width:300px;height:300px;border-radius:50%;filter:blur(6px)}
+.hdrc{position:relative}
+.kicker{margin:0;text-align:center;color:rgba(255,255,255,.62);font-size:10.5px;font-weight:800;letter-spacing:2px}
+.hmirror{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:18px}
+.hteam{flex:1;display:grid;justify-items:center;gap:9px}
+.hname{font-weight:900;font-size:19px;line-height:1.12;color:#fff;text-align:center}
+.hrule{display:block;width:34px;height:4px;border-radius:2px}
+.hscore{flex-shrink:0;text-align:center}
+.hscore b{font-family:ui-monospace,Menlo,monospace;font-size:32px;color:#fff;font-weight:700;display:block}
+.hscore b i{font-style:normal;color:rgba(255,255,255,.45);padding:0 4px}
+.hscore span{display:block;color:rgba(255,255,255,.6);font-size:10px;font-weight:800;letter-spacing:1.6px;margin-top:2px}
+.scorer{text-align:center;color:rgba(255,255,255,.88);font-size:13px;margin:12px 0 0;font-weight:700}
+.tabs{display:flex;gap:7px;margin-top:16px;justify-content:center}
+.tabs span{font-size:12.5px;font-weight:700;color:#fff;background:rgba(255,255,255,.14);padding:7px 13px;border-radius:99px}
+.tabs .on{background:#fff;color:#1B2340}
+.swatches{display:flex;gap:0;margin:0 0 22px;max-width:420px;border-radius:8px;overflow:hidden}
+.swatches i{flex:1;height:26px;display:block}
+</style>
+<h1>The header in Premier League purple, with more shades</h1>
+<p class=sub>Every purple below is the brand <b>#3D195B</b> at a different lightness, produced by the app&rsquo;s own <code>withLightness</code> &mdash; the same function <code>competitionBand.ts</code> uses. No second hue is invented.</p>
+<div class=swatches><i style="background:#1C0032" title="L 0.18 · #1C0032"></i><i style="background:#2D0549" title="L 0.24 · #2D0549"></i><i style="background:#3F1B5D" title="L 0.31 · #3F1B5D"></i><i style="background:#512E72" title="L 0.38 · #512E72"></i><i style="background:#5C3A7E" title="L 0.42 · #5C3A7E"></i><i style="background:#735096" title="L 0.5 · #735096"></i><i style="background:#8B67B0" title="L 0.58 · #8B67B0"></i><i style="background:#A37FCA" title="L 0.66 · #A37FCA"></i></div>
+<section><h2><span>A</span>Today — two shades, flat sweep</h2><p class=note>What ships now: the brand at two lightnesses, swept left to right. It is the thing the crests were sitting on.</p><div class="hdr" style="background:linear-gradient(100deg, #5C3A7E, #3F1B5D)">
+    <div class="hdrc">
+      <p class="kicker">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="hmirror">
+        <div class="hteam"><div class="hname">Manchester<br>United</div><span class="hrule" style="background:#DA291C"></span></div>
+        <div class="hscore"><b>0<i>–</i>1</b><span>FULL TIME</span></div>
+        <div class="hteam"><div class="hname">Manchester<br>City</div><span class="hrule" style="background:#1C6FB5"></span></div>
+      </div>
+      <p class="scorer">⚽ Haaland 60'</p>
+      <div class="tabs"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+    </div></div></section><section><h2><span>B</span>Five shades, same sweep</h2><p class=note>The same idea with three more stops. Deeper at the tail, brighter at the head — more like a lit surface and less like one colour fading.</p><div class="hdr" style="background:linear-gradient(105deg, #735096, #5C3A7E 28%, #3F1B5D 58%, #2D0549 82%, #1C0032)">
+    <div class="hdrc">
+      <p class="kicker">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="hmirror">
+        <div class="hteam"><div class="hname">Manchester<br>United</div><span class="hrule" style="background:#DA291C"></span></div>
+        <div class="hscore"><b>0<i>–</i>1</b><span>FULL TIME</span></div>
+        <div class="hteam"><div class="hname">Manchester<br>City</div><span class="hrule" style="background:#1C6FB5"></span></div>
+      </div>
+      <p class="scorer">⚽ Haaland 60'</p>
+      <div class="tabs"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+    </div></div></section><section><h2><span>C</span>Five shades + the brand’s own blooms</h2><p class=note>The multi-stop base with four radial blooms, each the brand at a different lightness — the rule competitionBand.ts already follows: never a second hue.</p><div class="hdr" style="background:linear-gradient(105deg, #5C3A7E, #3F1B5D 55%, #2D0549)">
+ <span class="glow" style="right:-140px;top:-90px;width:380px;height:300px;background:radial-gradient(closest-side, #8B67B0, transparent);opacity:.5"></span>
+ <span class="glow" style="left:-150px;top:10px;width:400px;height:320px;background:radial-gradient(closest-side, #5C3A7E, transparent);opacity:.45"></span>
+ <span class="glow" style="right:-60px;bottom:-120px;width:360px;height:280px;background:radial-gradient(closest-side, #1C0032, transparent);opacity:.65"></span>
+ <span class="glow" style="left:30%;bottom:-140px;width:320px;height:260px;background:radial-gradient(closest-side, #A37FCA, transparent);opacity:.22"></span>
+    <div class="hdrc">
+      <p class="kicker">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="hmirror">
+        <div class="hteam"><div class="hname">Manchester<br>United</div><span class="hrule" style="background:#DA291C"></span></div>
+        <div class="hscore"><b>0<i>–</i>1</b><span>FULL TIME</span></div>
+        <div class="hteam"><div class="hname">Manchester<br>City</div><span class="hrule" style="background:#1C6FB5"></span></div>
+      </div>
+      <p class="scorer">⚽ Haaland 60'</p>
+      <div class="tabs"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+    </div></div></section><section><h2><span>D</span>Purple base + the two clubs as light</h2><p class=note>The approved layout, on purple instead of ink. United reds the left, City blues the right — but the purple is still underneath, so the club colours arrive muddied.</p><div class="hdr" style="background:linear-gradient(105deg, #512E72, #2D0549)"><span class="glow" style="left:-120px;top:-70px;background:radial-gradient(closest-side, rgba(218,41,28,.55), transparent)"></span><span class="glow" style="right:-120px;top:-70px;background:radial-gradient(closest-side, rgba(28,111,181,.5), transparent)"></span>
+    <div class="hdrc">
+      <p class="kicker">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="hmirror">
+        <div class="hteam"><div class="hname">Manchester<br>United</div><span class="hrule" style="background:#DA291C"></span></div>
+        <div class="hscore"><b>0<i>–</i>1</b><span>FULL TIME</span></div>
+        <div class="hteam"><div class="hname">Manchester<br>City</div><span class="hrule" style="background:#1C6FB5"></span></div>
+      </div>
+      <p class="scorer">⚽ Haaland 60'</p>
+      <div class="tabs"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+    </div></div></section><section><h2><span>E</span>Purple, deeper, clubs stronger</h2><p class=note>Same as D with the base dropped two shades. The darker the purple, the more the club colours read as themselves — which is the argument the ink base wins outright.</p><div class="hdr" style="background:linear-gradient(105deg, #2D0549, #1C0032)"><span class="glow" style="left:-120px;top:-70px;background:radial-gradient(closest-side, rgba(218,41,28,.55), transparent)"></span><span class="glow" style="right:-120px;top:-70px;background:radial-gradient(closest-side, rgba(28,111,181,.5), transparent)"></span>
+    <div class="hdrc">
+      <p class="kicker">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="hmirror">
+        <div class="hteam"><div class="hname">Manchester<br>United</div><span class="hrule" style="background:#DA291C"></span></div>
+        <div class="hscore"><b>0<i>–</i>1</b><span>FULL TIME</span></div>
+        <div class="hteam"><div class="hname">Manchester<br>City</div><span class="hrule" style="background:#1C6FB5"></span></div>
+      </div>
+      <p class="scorer">⚽ Haaland 60'</p>
+      <div class="tabs"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+    </div></div></section><section><h2><span>F</span>The approved one, for comparison</h2><p class=note>No purple at all. The clubs are the only hues on the surface.</p><div class="hdr" style="background:linear-gradient(180deg,#161D33,#0B0F1A)"><span class="glow" style="left:-120px;top:-70px;background:radial-gradient(closest-side, rgba(218,41,28,.55), transparent)"></span><span class="glow" style="right:-120px;top:-70px;background:radial-gradient(closest-side, rgba(28,111,181,.5), transparent)"></span>
+    <div class="hdrc">
+      <p class="kicker">PREMIER LEAGUE · MATCHWEEK 4</p>
+      <div class="hmirror">
+        <div class="hteam"><div class="hname">Manchester<br>United</div><span class="hrule" style="background:#DA291C"></span></div>
+        <div class="hscore"><b>0<i>–</i>1</b><span>FULL TIME</span></div>
+        <div class="hteam"><div class="hname">Manchester<br>City</div><span class="hrule" style="background:#1C6FB5"></span></div>
+      </div>
+      <p class="scorer">⚽ Haaland 60'</p>
+      <div class="tabs"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+    </div></div></section>

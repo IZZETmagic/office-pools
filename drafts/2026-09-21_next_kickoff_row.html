@@ -1,0 +1,91 @@
+<!doctype html><meta charset=utf-8><title>Next kickoff — what gives</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel=stylesheet>
+<style>
+body{font-family:Nunito,system-ui;background:#F7F8FC;color:#1B2340;margin:0;padding:26px 20px 50px}
+h1{font-size:21px;margin:0 0 4px}.sub{color:#6B7391;font-size:13.5px;margin:0 0 22px;max-width:600px;line-height:1.55}
+h2{font-size:15px;margin:0 0 2px}h2 span{color:#5B2FD4;font-weight:900;margin-right:8px}
+p.note{color:#6B7391;font-size:12.5px;line-height:1.5;margin:0 0 12px;max-width:520px}
+p.wc{color:#8A91A8;font-size:11px;margin:10px 0 6px;font-weight:700}
+section{margin:0 0 30px}
+.card{background:linear-gradient(140deg,#0F0F1A,#1A1830);border-radius:20px;padding:16px 18px 18px;color:#fff;width:350px;box-sizing:border-box}
+.kohead{display:flex;justify-content:space-between;font-size:10px;font-weight:900;letter-spacing:2px;color:rgba(255,255,255,.55)}
+.badgewrap{display:flex;justify-content:center;margin-top:10px}
+.badge{background:rgba(245,158,11,.18);color:#F59E0B;font-size:10px;font-weight:900;letter-spacing:1.2px;padding:5px 11px;border-radius:99px}
+.row{display:flex;align-items:center;gap:8px;margin:12px 0 2px}
+.vbar{width:6px;height:30px;border-radius:99px;flex:none}
+.nm{flex:1;min-width:0;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15}
+.nm.wrap{white-space:normal}
+.clockwrap{flex:none;display:flex;flex-direction:column;align-items:center}
+.clock{font-family:ui-monospace,Menlo,monospace;font-weight:700;white-space:nowrap;line-height:1}
+.clock i{font-style:normal;font-size:.38em;color:rgba(255,255,255,.5);margin-left:1px}
+.clock em{font-style:normal;color:rgba(255,255,255,.45);padding:0 4px}
+.units{font-size:8.5px;letter-spacing:1px;color:rgba(255,255,255,.4);font-weight:800;margin-top:3px}
+.date{text-align:center;color:rgba(255,255,255,.62);font-size:12.5px;margin:10px 0 0}
+.venue{text-align:center;color:rgba(255,255,255,.4);font-size:12px;margin:7px 0 0}
+</style>
+<h1>One row will not hold both names at once</h1>
+<p class=sub>314pt of card, two 13-character names and a clock. At 12pt names it is still 2pt over &mdash; &ldquo;Werder Bremen&rdquo; clips. So something has to give; these are the three candidates.</p>
+<section><h2><span>A</span>Names wrap to two lines</h2><p class=note>The match header&rsquo;s own answer, brought here: 13pt, wrapping. Nothing truncates, ever, because a name that does not fit on one line gets two. The row grows about 16pt.</p><div class="card">
+    <div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 5</span></div>
+    <div class="badgewrap"><span class="badge">● DELAYED</span></div>
+    <div class="row">
+    <span class="vbar" style="background:#FDE100"></span>
+    <span class="nm wrap" style="font-size:13px;text-align:right">Dortmund</span>
+    <span class="clockwrap"><span class="clock" style="font-size:30px"><b>18</b><i>D</i><em>:</em><b>02</b><i>H</i></span></span>
+    <span class="nm wrap" style="font-size:13px;text-align:left">Werder Bremen</span>
+    <span class="vbar" style="background:#1B7A43"></span>
+  </div>
+    <p class="date">Friday, Oct 9</p><p class="venue">Signal Iduna Park, Dortmund</p></div>
+  <p class="wc">longest pairing the five leagues can produce &mdash;</p>
+  <div class="card">
+    <div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 5</span></div>
+    <div class="row">
+    <span class="vbar" style="background:#1B458F"></span>
+    <span class="nm wrap" style="font-size:13px;text-align:right">Crystal Palace</span>
+    <span class="clockwrap"><span class="clock" style="font-size:30px"><b>18</b><i>D</i><em>:</em><b>02</b><i>H</i></span></span>
+    <span class="nm wrap" style="font-size:13px;text-align:left">Nott&rsquo;m Forest</span>
+    <span class="vbar" style="background:#C40000"></span>
+  </div>
+    <p class="date">Saturday, Oct 10</p></div></section><section><h2><span>B</span>Drop the D and H from the clock</h2><p class=note>&ldquo;18 : 02&rdquo; with the units named once underneath. Buys back roughly 16pt of width and keeps every name on one line &mdash; except the very longest pair, which still just clips.</p><div class="card">
+    <div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 5</span></div>
+    <div class="badgewrap"><span class="badge">● DELAYED</span></div>
+    <div class="row">
+    <span class="vbar" style="background:#FDE100"></span>
+    <span class="nm " style="font-size:13px;text-align:right">Dortmund</span>
+    <span class="clockwrap"><span class="clock" style="font-size:30px"><b>18</b><em>:</em><b>02</b></span><span class="units">days &middot; hours</span></span>
+    <span class="nm " style="font-size:13px;text-align:left">Werder Bremen</span>
+    <span class="vbar" style="background:#1B7A43"></span>
+  </div>
+    <p class="date">Friday, Oct 9</p><p class="venue">Signal Iduna Park, Dortmund</p></div>
+  <p class="wc">longest pairing the five leagues can produce &mdash;</p>
+  <div class="card">
+    <div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 5</span></div>
+    <div class="row">
+    <span class="vbar" style="background:#1B458F"></span>
+    <span class="nm " style="font-size:13px;text-align:right">Crystal Palace</span>
+    <span class="clockwrap"><span class="clock" style="font-size:30px"><b>18</b><em>:</em><b>02</b></span><span class="units">days &middot; hours</span></span>
+    <span class="nm " style="font-size:13px;text-align:left">Nott&rsquo;m Forest</span>
+    <span class="vbar" style="background:#C40000"></span>
+  </div>
+    <p class="date">Saturday, Oct 10</p></div></section><section><h2><span>C</span>Both &mdash; wrap, and lose the units</h2><p class=note>Belt and braces. The most room of the three, and the clock reads as a clock rather than as a sentence with subscripts.</p><div class="card">
+    <div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 5</span></div>
+    <div class="badgewrap"><span class="badge">● DELAYED</span></div>
+    <div class="row">
+    <span class="vbar" style="background:#FDE100"></span>
+    <span class="nm wrap" style="font-size:13px;text-align:right">Dortmund</span>
+    <span class="clockwrap"><span class="clock" style="font-size:32px"><b>18</b><em>:</em><b>02</b></span><span class="units">days &middot; hours</span></span>
+    <span class="nm wrap" style="font-size:13px;text-align:left">Werder Bremen</span>
+    <span class="vbar" style="background:#1B7A43"></span>
+  </div>
+    <p class="date">Friday, Oct 9</p><p class="venue">Signal Iduna Park, Dortmund</p></div>
+  <p class="wc">longest pairing the five leagues can produce &mdash;</p>
+  <div class="card">
+    <div class="kohead"><span>NEXT KICKOFF</span><span>MATCHWEEK 5</span></div>
+    <div class="row">
+    <span class="vbar" style="background:#1B458F"></span>
+    <span class="nm wrap" style="font-size:13px;text-align:right">Crystal Palace</span>
+    <span class="clockwrap"><span class="clock" style="font-size:32px"><b>18</b><em>:</em><b>02</b></span><span class="units">days &middot; hours</span></span>
+    <span class="nm wrap" style="font-size:13px;text-align:left">Nott&rsquo;m Forest</span>
+    <span class="vbar" style="background:#C40000"></span>
+  </div>
+    <p class="date">Saturday, Oct 10</p></div></section>

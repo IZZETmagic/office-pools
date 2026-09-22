@@ -1,0 +1,137 @@
+<!doctype html><meta charset=utf-8><title>The collapse</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel=stylesheet>
+<style>
+body{font-family:Nunito,system-ui;background:#F7F8FC;color:#1B2340;margin:0;padding:26px 20px 50px}
+h1{font-size:21px;margin:0 0 4px}.sub{color:#6B7391;font-size:13.5px;margin:0 0 22px;max-width:620px;line-height:1.55}
+h2{font-size:15px;margin:0 0 2px}h2 span{color:#5B2FD4;font-weight:900;margin-right:8px}
+p.note{color:#6B7391;font-size:12.5px;line-height:1.5;margin:0 0 12px;max-width:600px}
+section{margin:0 0 30px}
+.frames{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:940px;align-items:start}
+.fl{font-size:10px;font-weight:800;letter-spacing:.7px;color:#8A91A8;margin:0 0 5px}
+.hdr{position:relative;border-radius:13px;overflow:hidden;padding-left:14px;padding-right:14px}
+.glow{position:absolute;border-radius:50%;filter:blur(6px)}
+.hdrc{position:relative}
+.kicker{text-align:center;color:rgba(255,255,255,.6);font-size:8px;font-weight:800;letter-spacing:1.4px;overflow:hidden;margin-top:0}
+.hmirror{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hteam{flex:1;display:grid;justify-items:center}
+.nm{font-weight:900;line-height:1.1;color:#fff;text-align:center;display:block}
+.code{font-weight:900;color:#fff;letter-spacing:.8px;display:block;line-height:1.1}
+.hrule{display:block;border-radius:2px}
+.hscore{flex-shrink:0;text-align:center}
+.hscore b{font-family:ui-monospace,Menlo,monospace;color:#fff;font-weight:700;display:block;line-height:1}
+.hscore b i{font-style:normal;color:rgba(255,255,255,.45);padding:0 3px}
+.hscore span{display:block;color:rgba(255,255,255,.55);font-size:6.5px;font-weight:800;letter-spacing:1px;margin-top:3px;overflow:hidden}
+.scorer{text-align:center;color:rgba(255,255,255,.88);font-size:9px;font-weight:700;overflow:hidden}
+.tabs{display:flex;gap:4px;justify-content:center}
+.tabs span{font-size:8px;font-weight:700;color:#fff;background:rgba(255,255,255,.14);padding:4px 7px;border-radius:99px}
+.tabs .on{background:#fff;color:#1B2340}
+</style>
+<h1>What survives the collapse</h1>
+<p class=sub>Option C&rsquo;s background, scrolled. <b>p</b> is the same scroll progress the header already interpolates on &mdash; 0 at rest, 1 pinned. Today the crest is the only thing that reaches the pinned strip; these are the two candidates for replacing it.</p>
+<section><h2><span>1</span>The name shrinks instead of fading</h2><p class=note>Today the crest survives and the name dies &mdash; because at the crest&rsquo;s 0.53 scale the name would be four-point type. With no crest the name IS the identity, so it shrinks 19&rarr;13 and stays. Nothing disappears; two lines become one.</p>
+<div class=frames><div><p class=fl>p = 0 · AT REST</p><div class="hdr" style="background:linear-gradient(105deg, #512E72, #3F1B5D 55%, #2D0549);padding-bottom:14px;padding-top:30px">
+ <span class="glow" style="right:-130px;top:-85px;width:360px;height:290px;background:radial-gradient(closest-side, #8B67B0, transparent);opacity:.5"></span>
+ <span class="glow" style="left:-140px;top:5px;width:380px;height:300px;background:radial-gradient(closest-side, #512E72, transparent);opacity:.45"></span>
+ <span class="glow" style="right:-60px;bottom:-115px;width:340px;height:270px;background:radial-gradient(closest-side, #1C0032, transparent);opacity:.65"></span>
+   <div class="hdrc">
+    <p class="kicker" style="opacity:1;margin-bottom:13px">PREMIER LEAGUE · MATCHWEEK 4</p>
+    <div class="hmirror">
+      <div class="hteam" style="gap:8px"><span class="nm" style="font-size:19.0px">Manchester<br>United</span><span class="hrule" style="background:#DA291C;width:34px;height:4px"></span></div>
+      <div class="hscore"><b style="font-size:32px">0<i>–</i>1</b><span style="opacity:1;">FULL TIME</span></div>
+      <div class="hteam" style="gap:8px"><span class="nm" style="font-size:19.0px">Manchester<br>City</span><span class="hrule" style="background:#1C6FB5;width:34px;height:4px"></span></div>
+    </div>
+    <p class="scorer" style="opacity:1;margin:11px 0 0">⚽ Haaland 60'</p>
+    <div class="tabs" style="margin-top:15px"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+   </div></div></div><div><p class=fl>p = 0.35</p><div class="hdr" style="background:linear-gradient(105deg, #512E72, #3F1B5D 55%, #2D0549);padding-bottom:12px;padding-top:23px">
+ <span class="glow" style="right:-130px;top:-85px;width:360px;height:290px;background:radial-gradient(closest-side, #8B67B0, transparent);opacity:.5"></span>
+ <span class="glow" style="left:-140px;top:5px;width:380px;height:300px;background:radial-gradient(closest-side, #512E72, transparent);opacity:.45"></span>
+ <span class="glow" style="right:-60px;bottom:-115px;width:340px;height:270px;background:radial-gradient(closest-side, #1C0032, transparent);opacity:.65"></span>
+   <div class="hdrc">
+    <p class="kicker" style="opacity:0.22222222222222232;margin-bottom:13px">PREMIER LEAGUE · MATCHWEEK 4</p>
+    <div class="hmirror">
+      <div class="hteam" style="gap:6.6px"><span class="nm" style="font-size:16.9px">Manchester<br>United</span><span class="hrule" style="background:#DA291C;width:29.8px;height:3.65px"></span></div>
+      <div class="hscore"><b style="font-size:28px">0<i>–</i>1</b><span style="opacity:0.22222222222222232;">FULL TIME</span></div>
+      <div class="hteam" style="gap:6.6px"><span class="nm" style="font-size:16.9px">Manchester<br>City</span><span class="hrule" style="background:#1C6FB5;width:29.8px;height:3.65px"></span></div>
+    </div>
+    <p class="scorer" style="opacity:0;height:0;margin:0">⚽ Haaland 60'</p>
+    <div class="tabs" style="margin-top:12.9px"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+   </div></div></div><div><p class=fl>p = 0.7</p><div class="hdr" style="background:linear-gradient(105deg, #512E72, #3F1B5D 55%, #2D0549);padding-bottom:10px;padding-top:16px">
+ <span class="glow" style="right:-130px;top:-85px;width:360px;height:290px;background:radial-gradient(closest-side, #8B67B0, transparent);opacity:.5"></span>
+ <span class="glow" style="left:-140px;top:5px;width:380px;height:300px;background:radial-gradient(closest-side, #512E72, transparent);opacity:.45"></span>
+ <span class="glow" style="right:-60px;bottom:-115px;width:340px;height:270px;background:radial-gradient(closest-side, #1C0032, transparent);opacity:.65"></span>
+   <div class="hdrc">
+    <p class="kicker" style="opacity:0;height:0;margin:0">PREMIER LEAGUE · MATCHWEEK 4</p>
+    <div class="hmirror">
+      <div class="hteam" style="gap:5.2px"><span class="nm" style="font-size:14.8px">Manchester United</span><span class="hrule" style="background:#DA291C;width:25.6px;height:3.3px"></span></div>
+      <div class="hscore"><b style="font-size:24px">0<i>–</i>1</b><span style="opacity:0;height:0;margin:0">FULL TIME</span></div>
+      <div class="hteam" style="gap:5.2px"><span class="nm" style="font-size:14.8px">Manchester City</span><span class="hrule" style="background:#1C6FB5;width:25.6px;height:3.3px"></span></div>
+    </div>
+    <p class="scorer" style="opacity:0;height:0;margin:0">⚽ Haaland 60'</p>
+    <div class="tabs" style="margin-top:10.8px"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+   </div></div></div><div><p class=fl>p = 1 · PINNED</p><div class="hdr" style="background:linear-gradient(105deg, #512E72, #3F1B5D 55%, #2D0549);padding-bottom:8px;padding-top:10px">
+ <span class="glow" style="right:-130px;top:-85px;width:360px;height:290px;background:radial-gradient(closest-side, #8B67B0, transparent);opacity:.5"></span>
+ <span class="glow" style="left:-140px;top:5px;width:380px;height:300px;background:radial-gradient(closest-side, #512E72, transparent);opacity:.45"></span>
+ <span class="glow" style="right:-60px;bottom:-115px;width:340px;height:270px;background:radial-gradient(closest-side, #1C0032, transparent);opacity:.65"></span>
+   <div class="hdrc">
+    <p class="kicker" style="opacity:0;height:0;margin:0">PREMIER LEAGUE · MATCHWEEK 4</p>
+    <div class="hmirror">
+      <div class="hteam" style="gap:4px"><span class="nm" style="font-size:13.0px">Manchester United</span><span class="hrule" style="background:#DA291C;width:22px;height:3px"></span></div>
+      <div class="hscore"><b style="font-size:21px">0<i>–</i>1</b><span style="opacity:0;height:0;margin:0">FULL TIME</span></div>
+      <div class="hteam" style="gap:4px"><span class="nm" style="font-size:13.0px">Manchester City</span><span class="hrule" style="background:#1C6FB5;width:22px;height:3px"></span></div>
+    </div>
+    <p class="scorer" style="opacity:0;height:0;margin:0">⚽ Haaland 60'</p>
+    <div class="tabs" style="margin-top:9px"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+   </div></div></div></div></section><section><h2><span>2</span>The name hands over to its three-letter code</h2><p class=note>The full name fades out and the code fades in across the same stretch. Tightest pinned strip, and it is the code the Results list and the form card already use.</p>
+<div class=frames><div><p class=fl>p = 0 · AT REST</p><div class="hdr" style="background:linear-gradient(105deg, #512E72, #3F1B5D 55%, #2D0549);padding-bottom:14px;padding-top:30px">
+ <span class="glow" style="right:-130px;top:-85px;width:360px;height:290px;background:radial-gradient(closest-side, #8B67B0, transparent);opacity:.5"></span>
+ <span class="glow" style="left:-140px;top:5px;width:380px;height:300px;background:radial-gradient(closest-side, #512E72, transparent);opacity:.45"></span>
+ <span class="glow" style="right:-60px;bottom:-115px;width:340px;height:270px;background:radial-gradient(closest-side, #1C0032, transparent);opacity:.65"></span>
+   <div class="hdrc">
+    <p class="kicker" style="opacity:1;margin-bottom:13px">PREMIER LEAGUE · MATCHWEEK 4</p>
+    <div class="hmirror">
+      <div class="hteam" style="gap:8px"><span class="nm" style="opacity:1;font-size:19.0px;">Manchester<br>United</span><span class="code" style="opacity:0;font-size:13px;height:0;overflow:hidden">MUN</span><span class="hrule" style="background:#DA291C;width:34px;height:4px"></span></div>
+      <div class="hscore"><b style="font-size:32px">0<i>–</i>1</b><span style="opacity:1;">FULL TIME</span></div>
+      <div class="hteam" style="gap:8px"><span class="nm" style="opacity:1;font-size:19.0px;">Manchester<br>City</span><span class="code" style="opacity:0;font-size:13px;height:0;overflow:hidden">MCI</span><span class="hrule" style="background:#1C6FB5;width:34px;height:4px"></span></div>
+    </div>
+    <p class="scorer" style="opacity:1;margin:11px 0 0">⚽ Haaland 60'</p>
+    <div class="tabs" style="margin-top:15px"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+   </div></div></div><div><p class=fl>p = 0.35</p><div class="hdr" style="background:linear-gradient(105deg, #512E72, #3F1B5D 55%, #2D0549);padding-bottom:12px;padding-top:23px">
+ <span class="glow" style="right:-130px;top:-85px;width:360px;height:290px;background:radial-gradient(closest-side, #8B67B0, transparent);opacity:.5"></span>
+ <span class="glow" style="left:-140px;top:5px;width:380px;height:300px;background:radial-gradient(closest-side, #512E72, transparent);opacity:.45"></span>
+ <span class="glow" style="right:-60px;bottom:-115px;width:340px;height:270px;background:radial-gradient(closest-side, #1C0032, transparent);opacity:.65"></span>
+   <div class="hdrc">
+    <p class="kicker" style="opacity:0.22222222222222232;margin-bottom:13px">PREMIER LEAGUE · MATCHWEEK 4</p>
+    <div class="hmirror">
+      <div class="hteam" style="gap:6.6px"><span class="nm" style="opacity:0.22222222222222232;font-size:16.6px;">Manchester<br>United</span><span class="code" style="opacity:0;font-size:13px;height:0;overflow:hidden">MUN</span><span class="hrule" style="background:#DA291C;width:29.8px;height:3.65px"></span></div>
+      <div class="hscore"><b style="font-size:28px">0<i>–</i>1</b><span style="opacity:0.22222222222222232;">FULL TIME</span></div>
+      <div class="hteam" style="gap:6.6px"><span class="nm" style="opacity:0.22222222222222232;font-size:16.6px;">Manchester<br>City</span><span class="code" style="opacity:0;font-size:13px;height:0;overflow:hidden">MCI</span><span class="hrule" style="background:#1C6FB5;width:29.8px;height:3.65px"></span></div>
+    </div>
+    <p class="scorer" style="opacity:0;height:0;margin:0">⚽ Haaland 60'</p>
+    <div class="tabs" style="margin-top:12.9px"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+   </div></div></div><div><p class=fl>p = 0.7</p><div class="hdr" style="background:linear-gradient(105deg, #512E72, #3F1B5D 55%, #2D0549);padding-bottom:10px;padding-top:16px">
+ <span class="glow" style="right:-130px;top:-85px;width:360px;height:290px;background:radial-gradient(closest-side, #8B67B0, transparent);opacity:.5"></span>
+ <span class="glow" style="left:-140px;top:5px;width:380px;height:300px;background:radial-gradient(closest-side, #512E72, transparent);opacity:.45"></span>
+ <span class="glow" style="right:-60px;bottom:-115px;width:340px;height:270px;background:radial-gradient(closest-side, #1C0032, transparent);opacity:.65"></span>
+   <div class="hdrc">
+    <p class="kicker" style="opacity:0;height:0;margin:0">PREMIER LEAGUE · MATCHWEEK 4</p>
+    <div class="hmirror">
+      <div class="hteam" style="gap:5.2px"><span class="nm" style="opacity:0;font-size:14.1px;height:0;overflow:hidden">Manchester<br>United</span><span class="code" style="opacity:0.4545454545454544;font-size:13px;">MUN</span><span class="hrule" style="background:#DA291C;width:25.6px;height:3.3px"></span></div>
+      <div class="hscore"><b style="font-size:24px">0<i>–</i>1</b><span style="opacity:0;height:0;margin:0">FULL TIME</span></div>
+      <div class="hteam" style="gap:5.2px"><span class="nm" style="opacity:0;font-size:14.1px;height:0;overflow:hidden">Manchester<br>City</span><span class="code" style="opacity:0.4545454545454544;font-size:13px;">MCI</span><span class="hrule" style="background:#1C6FB5;width:25.6px;height:3.3px"></span></div>
+    </div>
+    <p class="scorer" style="opacity:0;height:0;margin:0">⚽ Haaland 60'</p>
+    <div class="tabs" style="margin-top:10.8px"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+   </div></div></div><div><p class=fl>p = 1 · PINNED</p><div class="hdr" style="background:linear-gradient(105deg, #512E72, #3F1B5D 55%, #2D0549);padding-bottom:8px;padding-top:10px">
+ <span class="glow" style="right:-130px;top:-85px;width:360px;height:290px;background:radial-gradient(closest-side, #8B67B0, transparent);opacity:.5"></span>
+ <span class="glow" style="left:-140px;top:5px;width:380px;height:300px;background:radial-gradient(closest-side, #512E72, transparent);opacity:.45"></span>
+ <span class="glow" style="right:-60px;bottom:-115px;width:340px;height:270px;background:radial-gradient(closest-side, #1C0032, transparent);opacity:.65"></span>
+   <div class="hdrc">
+    <p class="kicker" style="opacity:0;height:0;margin:0">PREMIER LEAGUE · MATCHWEEK 4</p>
+    <div class="hmirror">
+      <div class="hteam" style="gap:4px"><span class="nm" style="opacity:0;font-size:12.0px;height:0;overflow:hidden">Manchester<br>United</span><span class="code" style="opacity:1;font-size:13px;">MUN</span><span class="hrule" style="background:#DA291C;width:22px;height:3px"></span></div>
+      <div class="hscore"><b style="font-size:21px">0<i>–</i>1</b><span style="opacity:0;height:0;margin:0">FULL TIME</span></div>
+      <div class="hteam" style="gap:4px"><span class="nm" style="opacity:0;font-size:12.0px;height:0;overflow:hidden">Manchester<br>City</span><span class="code" style="opacity:1;font-size:13px;">MCI</span><span class="hrule" style="background:#1C6FB5;width:22px;height:3px"></span></div>
+    </div>
+    <p class="scorer" style="opacity:0;height:0;margin:0">⚽ Haaland 60'</p>
+    <div class="tabs" style="margin-top:9px"><span class="on">Facts</span><span>Line-ups</span><span>Stats</span><span>Scouting</span></div>
+   </div></div></div></div></section>
