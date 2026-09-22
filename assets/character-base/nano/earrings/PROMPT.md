@@ -30,6 +30,12 @@ genuine ring and needed none. Both outcomes are normal — the extractor reports
 the stud painted on top of it — so "subtract the base-coloured paths" erases the jewellery
 outright. A hole is one CONTAINED IN THE METAL'S OWN GEOMETRY.
 
-⭐ **Only 2 of 25 hair styles cover the ear lobe** — `f09-midwavy` and `m15-locs`, and both
-cover it completely. Earrings sit in FRONT, so on those two they read as sitting on the hair
-rather than disappearing.
+⭐⭐ **AN EARRING IS PAINTED WITH THE EAR** — first in the stack, before anything that could
+cover it. Ryan: *"if you can't see the ears then there should be no seen earring."* It first
+went in FRONT of the hair, reasoning that a chosen accessory should never be invisible; that is
+the wrong instinct, because hair over an ear hides an earring in life and one floating on top
+reads as a mistake. Painting it with the ear makes the rule automatic — no per-style flag, no
+coverage test to keep in step.
+
+⚠ Binary in practice: only `f09-midwavy` and `m15-locs` reach the ear at all, and both cover it
+COMPLETELY — so an earring is fully visible or fully hidden, never half-eaten.

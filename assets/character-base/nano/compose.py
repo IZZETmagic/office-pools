@@ -469,6 +469,15 @@ def main() -> None:
     tinted = LENS_TINT in part("--glasses")
     svg = svg.replace("</svg>", (
         "".join(ears)
+        # ⭐⭐ AN EARRING BELONGS TO THE EAR, so it is painted WITH the ear — first, before
+        # anything that could cover it. Ryan, 2026-09-22: "if you can't see the ears then there
+        # should be no seen earring." It first went in front of the hair on the reasoning that
+        # a chosen accessory should never be invisible; that is the wrong instinct, because
+        # hair over an ear hides an earring in life and one floating on top reads as a mistake.
+        # Painting it with the ear makes the rule automatic — no per-style flag, no coverage
+        # test. ⚠ Binary in practice: only f09-midwavy and m15-locs reach the ear, and both
+        # cover it COMPLETELY, so an earring is fully visible or fully hidden, never half-eaten.
+        + part("--earrings")
         # ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset
         # rather than declared in a manifest: a style is tinted exactly when it paints a lens,
         # and a clear pair has no lens path at all. Nothing to keep in step.
@@ -491,11 +500,6 @@ def main() -> None:
         # ⭐ "Some hair assets" needs no per-style flag: putting eyewear in front only changes
         # the styles whose hair actually reaches it, and a buzz cut never does.
         # ⚠ Still BEFORE the nose, which stays last.
-        # ⭐ EARRINGS SIT WITH THE EYEWEAR — over the hair, under the nose. Only 2 of the 25
-        # hair styles cover the ear lobe at all (f09-midwavy, m15-locs) and those cover it
-        # completely, so the slot is nearly free; in front is what never leaves a chosen
-        # accessory invisible. ⚠ BEFORE the eyewear so a temple arm wins if they ever meet.
-        + part("--earrings")
         + part("--glasses")
         + ("" if fh_over else mouth)
         + (nose or "")

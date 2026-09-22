@@ -1356,16 +1356,38 @@ describe('earrings', () => {
     expect(svg, 'the metal takes the input verbatim').toContain('fill="rgb(212,160,23)"')
   })
 
-  it('sits over the hair and before the eyewear', () => {
-    // ⚠ Before the eyewear so a temple arm wins if the two ever meet. They do not today — the
-    // arms end at the top of the ear and an earring hangs from the lobe — but the arm is in
-    // front of the ear in life and the order should say so.
+  it('is painted WITH the ear, so anything covering the ear covers it too', () => {
+    // ⭐⭐ Ryan, 2026-09-22: "if you can't see the ears then there should be no seen earring."
+    // The first version put earrings in FRONT of the hair so a chosen accessory was never
+    // invisible. Wrong instinct: hair over an ear hides an earring in life, and one floating on
+    // top of the hair reads as a mistake. Painting it with the ear makes that automatic — no
+    // per-style flag and no coverage test to keep in step.
     const svg = composeAvatar({ ...base6, hair: 'h', glasses: 'g' }, fixture6())
-    const hair = svg.indexOf(`d="${D_HAIR6}"`)
     const ear = svg.indexOf(`d="${D_EAR}"`)
+    const hair = svg.indexOf(`d="${D_HAIR6}"`)
     const frame = svg.indexOf(`d="${D_FRAME6}"`)
-    expect(hair, 'the earring goes over the hair').toBeLessThan(ear)
-    expect(ear, 'the eyewear goes over the earring').toBeLessThan(frame)
+    expect(ear, 'the earring is painted before the hair, so the hair can cover it')
+      .toBeLessThan(hair)
+    expect(ear, 'and before the eyewear').toBeLessThan(frame)
+  })
+
+  it('really is hidden by the two styles that cover the ear', () => {
+    // The rule is only worth anything if it bites on the real assets. f09-midwavy and m15-locs
+    // are the only two styles that reach the ear, and they cover it completely.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const earD = /d="([^"]*)"/.exec(A.earrings!['e04-bighoop'])![1]
+    for (const hair of ['f09-midwavy', 'm15-locs']) {
+      const svg = composeAvatar(
+        { ...cfg, base: 'base-neck-100', facialHair: null, hair, earrings: 'e04-bighoop' }, A)
+      const ear = svg.indexOf(`d="${earD}"`)
+      expect(ear, `${hair}: the earring should be in the document`).toBeGreaterThan(-1)
+      const hairDs = [...A.hair[hair].matchAll(/d="([^"]*)"/g)].map((m) => m[1])
+      const firstHair = Math.min(...hairDs.map((d) => svg.indexOf(`d="${d}"`)).filter((i) => i > -1))
+      expect(ear, `${hair}: the earring must be painted before the hair that covers the ear`)
+        .toBeLessThan(firstHair)
+    }
   })
 
   it('adds nothing when none is chosen', () => {

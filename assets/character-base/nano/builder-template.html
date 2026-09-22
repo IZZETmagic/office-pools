@@ -254,7 +254,8 @@ function compose(c){
   const glassesLayer = c.glasses ? ((ASSETS.glasses||{})[c.glasses] || '') : '';
   // ⭐ tinted is INFERRED from the asset — a style is tinted exactly when it paints a lens.
   const tinted = glassesLayer.includes(T.lensTint);
-  // ⭐ earrings sit with the eyewear — over the hair, BEFORE the glasses so a temple arm wins.
+  // ⭐⭐ an earring belongs to the EAR, so it is painted WITH the ear — first, before anything
+  // that could cover it. If the hair hides the ear it hides the earring, automatically.
   const earringsLayer = c.earrings ? ((ASSETS.earrings||{})[c.earrings] || '') : '';
   const fhOver = !!(c.facialhair && (ASSETS.fhManifest[c.facialhair]||{}).over);
 
@@ -318,7 +319,7 @@ function compose(c){
   // ⚠ not `mouth` — the recolour pass below binds that name to the mouth COLOUR.
   const mouthLayer = ((c.mode !== 'expression' && c.mouth) ? ASSETS.mouths[c.mouth] : '') + lower.join('');
 
-  add(ears.join('')
+  add(ears.join('') + earringsLayer
       + eyes + (tinted ? stripEyes(upper.join('')) : upper.join(''))
       + (fhOver ? mouthLayer : '')
       + backfill + (c.hair ? ASSETS.hair[c.hair] : '') + frontBody
@@ -326,7 +327,7 @@ function compose(c){
       // ⭐⭐ eyewear goes IN FRONT of the hair — 98.4-99.5% of every eyewear asset sits inside
       // the head silhouette, temple included, so there is no placement that fronts the lenses
       // and leaves the arms behind. See compose.ts for the measurement.
-      + earringsLayer + glassesLayer
+      + glassesLayer
       + (fhOver ? '' : mouthLayer)
       + (nose || ''));
 

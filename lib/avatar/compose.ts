@@ -552,13 +552,18 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   // y954.7, so the bridge is above it and the two never meet.
   const glassesLayer = cfg.glasses ? A.glasses?.[cfg.glasses] ?? '' : ''
 
-  // ⭐ EARRINGS SIT WITH THE EYEWEAR — over the hair, under the nose. Measured across the whole
-  // hair set: only 2 of 25 styles cover the ear lobe at all (f09-midwavy and m15-locs), and
-  // those cover it completely. So the slot is nearly free, and in front is the choice that
-  // never leaves a chosen accessory invisible.
-  // ⚠ BEFORE the eyewear, so a temple arm wins if the two ever meet. They do not today — the
-  // arms end at the top of the ear and an earring hangs from the lobe — but the arm is in front
-  // of the ear in life and the order should say so.
+  // ⭐⭐ AN EARRING BELONGS TO THE EAR, so it is painted WITH the ear — first, before anything
+  // that could cover it. Ryan, 2026-09-22: "if you can't see the ears then there should be no
+  // seen earring."
+  //
+  // It first went in front of the hair, reasoning that a chosen accessory should never be
+  // invisible. That is the wrong instinct here: hair hanging over an ear hides an earring in
+  // life, and an earring floating on top of the hair reads as a mistake. Painting it with the
+  // ear makes the rule automatic — no per-style flag, no test of what covers what.
+  //
+  // ⚠ It is binary in practice. Measured across all 25 hair styles, only f09-midwavy and
+  // m15-locs reach the ear at all, and both cover it COMPLETELY — so an earring is either
+  // fully visible or fully hidden, never half-eaten.
   const earringsLayer = cfg.earrings ? A.earrings?.[cfg.earrings] ?? '' : ''
 
   // ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset rather
@@ -571,6 +576,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
 
   add(
     ears.join('') +
+      earringsLayer +
       eyeLayer +
       (tinted ? stripEyes(exprUpper) : exprUpper) +
       (fhOver ? mouthLayer : '') +
@@ -579,7 +585,6 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       frontBody +
       (fh ? swap(fh, T.hairBase, T.beard) : '') +
       hairFront +
-      earringsLayer +
       glassesLayer +
       (fhOver ? '' : mouthLayer) +
       (nose || ''),
