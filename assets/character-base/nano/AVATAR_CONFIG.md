@@ -21,7 +21,10 @@ What gets stored per member. **A config, never an image.**
   "facialHair": null,              // null for clean-shaven; see facialhair/manifest.json
 
   "glasses":    null,              // null for none; "g.." clear, "s.." tinted
-  "frameColour": "#22262E",        // drives the frame AND the lens derived from it
+  "frameColour": "#22262E",        // the frame; a tinted lens is black regardless
+
+  "earrings":   null,              // null for none
+  "metalColour": "#D4A017",        // one flat tone, taken verbatim
 
   "shirt":      "#3B6EFF",
   "background": "#FFFFFF"

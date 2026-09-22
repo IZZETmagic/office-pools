@@ -133,6 +133,8 @@ const T = {
   // ⭐ the glass highlight. ⚠⚠ it traces as pure white, which is the BACKGROUND token —
   // extract-glasses.py retokenises it or it would vanish on a white background.
   glint:'rgb(226,240,250)',
+  // ⭐ earring metal: one flat tone, taken verbatim — the art has no second highlight tone.
+  metal:'rgb(212,160,54)',
 };
 // ⚠⚠ ADDITIVE, not a factor: ×1.14 gave +2.2 luminance on black hair (no separation) and
 // clamped platinum to pure white. A constant moves every swatch by the same amount.
@@ -146,7 +148,7 @@ const BEARD_LIFT = 12;
 // what sunglasses read as. ⚠⚠ "slightly lighter than black", and the floor is set by the
 // DARKEST FRAME: at rgb(38,42,50) it sits 6.6 luminance off rgb(34,38,46) and the frame stops
 // reading on a black pair. This keeps 20.
-const LENS_BLACK = [52,58,68], DEFAULT_FRAME = '#22262E';
+const LENS_BLACK = [52,58,68], DEFAULT_FRAME = '#22262E', DEFAULT_METAL = '#D4A017';
 // ⭐⭐ the highlight is TRANSLUCENT (fill-opacity lives in the asset), so it lightens whatever
 // is behind it and the derivation that used to fake that is gone. One cool constant.
 const GLASS_TINT = [214,234,250];
@@ -252,6 +254,8 @@ function compose(c){
   const glassesLayer = c.glasses ? ((ASSETS.glasses||{})[c.glasses] || '') : '';
   // ⭐ tinted is INFERRED from the asset — a style is tinted exactly when it paints a lens.
   const tinted = glassesLayer.includes(T.lensTint);
+  // ⭐ earrings sit with the eyewear — over the hair, BEFORE the glasses so a temple arm wins.
+  const earringsLayer = c.earrings ? ((ASSETS.earrings||{})[c.earrings] || '') : '';
   const fhOver = !!(c.facialhair && (ASSETS.fhManifest[c.facialhair]||{}).over);
 
   // THE STACK. Everything that goes on top of the head is laid out in ONE place, in one
@@ -322,7 +326,7 @@ function compose(c){
       // ⭐⭐ eyewear goes IN FRONT of the hair — 98.4-99.5% of every eyewear asset sits inside
       // the head silhouette, temple included, so there is no placement that fronts the lenses
       // and leaves the arms behind. See compose.ts for the measurement.
-      + glassesLayer
+      + earringsLayer + glassesLayer
       + (fhOver ? '' : mouthLayer)
       + (nose || ''));
 
@@ -343,6 +347,7 @@ function compose(c){
     svg = swapAll(svg, T.lensTint, rgbStr(LENS_BLACK));
     svg = swapAll(svg, T.glint, rgbStr(GLASS_TINT));
   }
+  if (svg.includes(T.metal)) svg = swapAll(svg, T.metal, rgbStr(hex2rgb(c.metalColour || DEFAULT_METAL)));
   svg = swapAll(svg, T.browInk, darken(hair,0.82));          // brows follow hair
   const beardTone = rgbStr(hair.map(v => Math.min(255, v + BEARD_LIFT)));
   svg = swapAll(svg, T.beard, beardTone);                    // facial hair: lighter than the head
@@ -373,10 +378,12 @@ const MOUTHS = ['#B67A70','#C4736B','#A85E58','#D08A82'];
 const SHIRTS = ['#3B6EFF','#16A34A','#C2410C','#7C3AED','#0F766E','#DB2777','#111827','#F59E0B'];
 const BGS    = ['#FFFFFF','#EEF2FF','#ECFDF5','#FEF3C7','#FCE7F3','#F3F4F6'];
 const FRAMES = ['#22262E','#6B4A2F','#C9A227','#9AA3AD','#1F3A64','#B36A72'];
+const METALS = ['#D4A017','#B8BCC4','#C08878','#2A2A2E','#E8E0C8','#8C6239'];
 
 const cfg = {
   mode:'expression', base:'base-neck-100',
   hair:'m03-quiff', expression:'x-happy', facialhair:'', glasses:'', frameColour:'#22262E',
+  earrings:'', metalColour:'#D4A017',
   eyes:'eye-01-base', mouth:'mouth-02-smile',
   skin:'#F5C9A6', hairColour:'#4A3B32', eyeColour:'#5B3A1E',
   mouthColour:'#B67A70', shirt:'#3B6EFF', bg:'#FFFFFF',
@@ -440,6 +447,8 @@ function buildPanel(){
                         v=>cfg.facialhair=v, k=>k===''?'none':k));
   p.appendChild(chipRow('Eyewear', ['', ...Object.keys(ASSETS.glasses||{})], ()=>cfg.glasses,
                         v=>cfg.glasses=v, k=>k===''?'none':k.replace(/^[gs]\d+-/,'')));
+  p.appendChild(chipRow('Earrings', ['', ...Object.keys(ASSETS.earrings||{})], ()=>cfg.earrings,
+                        v=>cfg.earrings=v, k=>k===''?'none':k.replace(/^e\d+-/,'')));
   p.appendChild(chipRow('Build', Object.keys(ASSETS.bases), ()=>cfg.base, v=>cfg.base=v,
                         k=>k.replace('base-neck-','neck ')));
   p.appendChild(swatchRow('Skin',  SKINS,  ()=>cfg.skin,        v=>cfg.skin=v));
@@ -447,6 +456,7 @@ function buildPanel(){
   p.appendChild(swatchRow('Eyes',  EYECOL, ()=>cfg.eyeColour,   v=>cfg.eyeColour=v));
   p.appendChild(swatchRow('Mouth', MOUTHS, ()=>cfg.mouthColour, v=>cfg.mouthColour=v));
   if (cfg.glasses) p.appendChild(swatchRow('Frame', FRAMES, ()=>cfg.frameColour, v=>cfg.frameColour=v));
+  if (cfg.earrings) p.appendChild(swatchRow('Metal', METALS, ()=>cfg.metalColour, v=>cfg.metalColour=v));
   p.appendChild(swatchRow('Shirt', SHIRTS, ()=>cfg.shirt,       v=>cfg.shirt=v));
   p.appendChild(swatchRow('Background', BGS, ()=>cfg.bg,        v=>cfg.bg=v));
 }
@@ -455,6 +465,7 @@ function publicConfig(){
   const c = { base:cfg.base.replace('base-neck-',''), skin:cfg.skin,
               hair:cfg.hair||null, hairColour:cfg.hairColour,
               facialHair:cfg.facialhair||null, glasses:cfg.glasses||null,
+              earrings:cfg.earrings||null, metalColour:cfg.metalColour,
               frameColour:cfg.frameColour, shirt:cfg.shirt, background:cfg.bg };
   if (cfg.mode==='expression') { c.expression=cfg.expression; c.eyeColour=cfg.eyeColour;
                                  c.mouthColour=cfg.mouthColour; }
@@ -498,6 +509,7 @@ document.getElementById('counts').textContent =
   `${Object.keys(ASSETS.expressions).length} expressions · ` +
   `${Object.keys(ASSETS.facialhair).length} facial hair · ` +
   `${Object.keys(ASSETS.glasses||{}).length} eyewear · ` +
+  `${Object.keys(ASSETS.earrings||{}).length} earrings · ` +
   `${Object.keys(ASSETS.eyes).length + Object.keys(ASSETS.specialEyes).length} eyes · ` +
   `${Object.keys(ASSETS.mouths).length} mouths`;
 render();

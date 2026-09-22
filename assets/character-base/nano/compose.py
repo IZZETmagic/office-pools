@@ -65,6 +65,10 @@ LENS_BLACK = (52, 58, 68)
 # extract-glasses.py) the highlight lightens the skin, the eye white and the iris alike, which
 # is what glass does. ⚠ The tint is COOL against warm skin, which is what carries it on the
 # palest swatch, where there is nowhere lighter to go.
+# ⭐ EARRING METAL. One flat tone taken verbatim from --metal-colour — the generated art
+# carries no second highlight tone, so there is nothing to derive.
+METAL = "rgb(212,160,54)"
+DEFAULT_METAL = "#D4A017"
 GLINT = "rgb(226,240,250)"
 GLASS_TINT = (214, 234, 250)
 DEFAULT_FRAME = "#22262E"
@@ -487,6 +491,11 @@ def main() -> None:
         # ⭐ "Some hair assets" needs no per-style flag: putting eyewear in front only changes
         # the styles whose hair actually reaches it, and a buzz cut never does.
         # ⚠ Still BEFORE the nose, which stays last.
+        # ⭐ EARRINGS SIT WITH THE EYEWEAR — over the hair, under the nose. Only 2 of the 25
+        # hair styles cover the ear lobe at all (f09-midwavy, m15-locs) and those cover it
+        # completely, so the slot is nearly free; in front is what never leaves a chosen
+        # accessory invisible. ⚠ BEFORE the eyewear so a temple arm wins if they ever meet.
+        + part("--earrings")
         + part("--glasses")
         + ("" if fh_over else mouth)
         + (nose or "")
@@ -511,6 +520,10 @@ def main() -> None:
     # Brows default to the HAIR colour, darkened. Real brows track hair, and a bald avatar
     # still needs them coloured — so the token is the brow's own, not hair's, and the default
     # is derived rather than shared. --brow-colour overrides for dyed hair or grey.
+    if METAL in svg:
+        svg = svg.replace(f'fill="{METAL}"',
+                          f'fill="{rgb_str(hex_to_rgb(arg("--metal-colour") or DEFAULT_METAL))}"')
+
     if FRAME_INK in svg or LENS_TINT in svg or GLINT in svg:
         fr = hex_to_rgb(arg("--frame-colour") or DEFAULT_FRAME)
         svg = svg.replace(f'fill="{FRAME_INK}"', f'fill="{rgb_str(fr)}"')

@@ -31,6 +31,7 @@ export type AvatarAssets = {
   facialhair: Record<string, string>
   /** Eyewear — glasses and sunglasses. Optional so older fixtures still compose. */
   glasses?: Record<string, string>
+  earrings?: Record<string, string>
   eyes: Record<string, string>
   specialEyes: Record<string, string>
   mouths: Record<string, string>
@@ -44,6 +45,7 @@ export type AvatarConfig = {
   hairColour: string
   facialHair: string | null
   glasses?: string | null
+  earrings?: string | null
   /** Whole-face expression. Mutually exclusive with eyes+mouth. */
   expression?: string | null
   eyes?: string | null
@@ -54,6 +56,8 @@ export type AvatarConfig = {
   background: string
   /** Eyewear frame. On a tinted style the lens is black regardless — see LENS_BLACK. */
   frameColour?: string
+  /** Earring metal. One flat tone — the art carries no second highlight tone. */
+  metalColour?: string
   /**
    * ⚠⚠ BACK-OUT: the beard fade is behind this flag and defaults to OFF. With it off the
    * fade token is swapped for the flat hair colour — exactly what this did before the
@@ -133,6 +137,11 @@ const T = {
    * on a white one. extract-glasses.py retokenises it on the way in.
    */
   glint: 'rgb(226,240,250)',
+  /**
+   * ⭐ EARRING METAL. One flat tone, taken verbatim from `metalColour` — the generated art
+   * carries no second highlight tone, so there is nothing to derive and no derivation to write.
+   */
+  metal: 'rgb(212,160,54)',
 } as const
 
 /**
@@ -190,6 +199,7 @@ const GLASS_TINT: RGB = [214, 234, 250]
 
 /** The frame colour used when a config names eyewear but no colour. */
 const DEFAULT_FRAME = '#22262E'
+const DEFAULT_METAL = '#D4A017'
 
 const FADE_ID = 'beardfade'
 
@@ -542,6 +552,15 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   // y954.7, so the bridge is above it and the two never meet.
   const glassesLayer = cfg.glasses ? A.glasses?.[cfg.glasses] ?? '' : ''
 
+  // ⭐ EARRINGS SIT WITH THE EYEWEAR — over the hair, under the nose. Measured across the whole
+  // hair set: only 2 of 25 styles cover the ear lobe at all (f09-midwavy and m15-locs), and
+  // those cover it completely. So the slot is nearly free, and in front is the choice that
+  // never leaves a chosen accessory invisible.
+  // ⚠ BEFORE the eyewear, so a temple arm wins if the two ever meet. They do not today — the
+  // arms end at the top of the ear and an earring hangs from the lobe — but the arm is in front
+  // of the ear in life and the order should say so.
+  const earringsLayer = cfg.earrings ? A.earrings?.[cfg.earrings] ?? '' : ''
+
   // ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset rather
   // than declared in a manifest: a style is tinted exactly when it paints a lens, and a clear
   // pair has no lens path at all. Nothing to keep in step.
@@ -560,6 +579,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       frontBody +
       (fh ? swap(fh, T.hairBase, T.beard) : '') +
       hairFront +
+      earringsLayer +
       glassesLayer +
       (fhOver ? '' : mouthLayer) +
       (nose || ''),
@@ -624,6 +644,10 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
     svg = swap(svg, T.glint, rgbStr(GLASS_TINT))
   }
 
+  if (svg.includes(T.metal)) {
+    svg = swap(svg, T.metal, rgbStr(hex2rgb(cfg.metalColour ?? DEFAULT_METAL)))
+  }
+
   svg = swap(svg, T.browInk, darken(hair, 0.82)) // brows track hair, not skin
   svg = swap(svg, T.stubble, stubbleTone(hair, skin))
   svg = swap(svg, T.hairBase, rgbStr(hair))
@@ -652,4 +676,5 @@ export const PALETTE = {
   shirt: ['#3B6EFF', '#16A34A', '#C2410C', '#7C3AED', '#0F766E', '#DB2777', '#111827', '#F59E0B'],
   background: ['#FFFFFF', '#EEF2FF', '#ECFDF5', '#FEF3C7', '#FCE7F3', '#F3F4F6'],
   frame: ['#22262E', '#6B4A2F', '#C9A227', '#9AA3AD', '#1F3A64', '#B36A72'],
+  metal: ['#D4A017', '#B8BCC4', '#C08878', '#2A2A2E', '#E8E0C8', '#8C6239'],
 } as const

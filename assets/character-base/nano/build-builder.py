@@ -44,6 +44,7 @@ data = {
     "expressions": collect("expressions/assets/*.asset.svg"),
     "facialhair": collect("facialhair/assets/*.asset.svg"),
     "glasses": collect("glasses/assets/*.asset.svg"),
+    "earrings": collect("earrings/assets/*.asset.svg"),
     "eyes": collect("eyes/assets/*.asset.svg"),
     "specialEyes": collect("eyes/special/assets/*.asset.svg"),
     "mouths": collect("mouths/assets/*.asset.svg"),
@@ -76,5 +77,6 @@ print(f"avatar-builder.html  {kb:.0f}KB  "
       f"({len(data['hair'])} hair ({sum(data['hairManifest'].values())} backfilled), "
       f"{len(data['expressions'])} expressions, "
       f"{len(data['facialhair'])} facial hair, {len(data['glasses'])} eyewear, "
+      f"{len(data['earrings'])} earrings, "
       f"{len(data['eyes'])}+{len(data['specialEyes'])} eyes, "
       f"{len(data['mouths'])} mouths, {len(bases)} bases)")

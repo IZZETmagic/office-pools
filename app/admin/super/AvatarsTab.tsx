@@ -26,6 +26,8 @@ const DEFAULT: AvatarConfig = {
   hairColour: '#4A3B32',
   facialHair: null,
   glasses: null,
+  earrings: null,
+  metalColour: '#D4A017',
   // ⭐ One input drives both the frame and the lens — see LENS_TOWARD_GLASS in compose.ts.
   frameColour: '#22262E',
   expression: 'x-happy',
@@ -247,6 +249,13 @@ export function AvatarsTab() {
               format={(s) => s.replace(/^[gs]\d+-/, '')}
             />
             <Chips
+              label="Earrings"
+              options={[null, ...Object.keys(assets.earrings ?? {})]}
+              value={cfg.earrings ?? null}
+              onChange={(v) => set('earrings', v)}
+              format={(s) => s.replace(/^e\d+-/, '')}
+            />
+            <Chips
               label="Build"
               options={Object.keys(assets.bases)}
               value={cfg.base}
@@ -257,6 +266,9 @@ export function AvatarsTab() {
             <Swatches label="Hair colour" colours={PALETTE.hair} value={cfg.hairColour} onChange={(c) => set('hairColour', c)} />
             <Swatches label="Eyes" colours={PALETTE.eye} value={cfg.eyeColour} onChange={(c) => set('eyeColour', c)} />
             <Swatches label="Mouth" colours={PALETTE.mouth} value={cfg.mouthColour} onChange={(c) => set('mouthColour', c)} />
+            {cfg.earrings ? (
+              <Swatches label="Metal" colours={PALETTE.metal} value={cfg.metalColour ?? '#D4A017'} onChange={(c) => set('metalColour', c)} />
+            ) : null}
             {cfg.glasses ? (
               <Swatches label="Frame" colours={PALETTE.frame} value={cfg.frameColour ?? '#22262E'} onChange={(c) => set('frameColour', c)} />
             ) : null}
