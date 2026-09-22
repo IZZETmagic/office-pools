@@ -44,3 +44,36 @@ sit in; it was 13%. Nose drift on the trace: 0px.
 🔴 **`s01-classic` has the same defect in a different form** — its arm is a thick wedge running
 straight DOWN the head edge rather than back over the ear. Its horizontal reach measures 28%,
 so the numbers do not catch it; only the crop does. Not fixed, not asked for.
+
+---
+
+## The glass highlight (2026-09-21)
+
+Ryan: *"for the glasses they need to look like they have glass in them. if not it just seems
+like they are empty frames."* A clear lens was a real hole with nothing in it.
+
+⭐⭐ **THE FRAME IS NOT RE-TRACED.** `extract-glasses.py --glint <trace> <asset>` lifts ONLY the
+highlight out of a new generation and adds it to the approved asset, clipped to the openings
+that asset already has. Same discipline as `build-bushy.py`. It earned its keep immediately:
+the `g03-bold` regeneration came back with a **much thinner frame** — it took the frame from the
+highlight reference despite being told not to — and none of that reached the asset.
+
+⚠⚠ **THE HIGHLIGHT IS THE SAME JIGSAW AS THE FRAME, one level down.** The vectorizer fills the
+WHOLE lens white and butts the two skin-coloured corners back over it. Taking the white path
+whole gives 99.8% of the opening — a blind, not a highlight. The band is what is left after the
+corners are subtracted.
+
+⚠⚠ **IT TRACES AS PURE WHITE, WHICH IS THE BACKGROUND TOKEN.** Left alone every highlight would
+be repainted with the avatar's background colour and vanish on a white one. The extractor
+retokenises it to `rgb(226,240,250)` on the way in.
+
+⭐ **Width arrives as a PICTURE.** The first pass asked for "a single straight diagonal
+highlight band" and got one so wide it covered 38% of the eye on `g03-bold`. The fix was to
+generate `g02-rect` first, decide its two thin streaks were right, and hand that image back as
+IMAGE 3 — "the same pair of separate parallel diagonal streaks per lens, at the same slant, at
+the same narrow thickness relative to the lens". All three now sit in a 25–33% band.
+
+⚠ `rings_of()` exists because **`flatten()` cannot read a hole.** It unions the subpaths, and a
+hole unioned with the shape it sits in is a filled disc on top — the interiors vanish. An SVG
+hole is a subpath resolved by fill-rule at paint time, so the rings have to be kept apart and
+the nesting worked out by containment.

@@ -123,6 +123,16 @@ const T = {
    */
   frameInk: 'rgb(64,70,78)',
   lensTint: 'rgb(96,126,156)',
+  /**
+   * ⭐ THE GLASS HIGHLIGHT. Ryan, 2026-09-21: an empty opening "just seems like they are empty
+   * frames" — a clear lens needs something in it that says glass.
+   *
+   * ⚠⚠ It cannot keep the tone it traced as. The generator draws the highlight in near-white
+   * and Recraft quantises that to rgb(255,255,255) — which is the BACKGROUND token. Left
+   * alone, every highlight would be repainted with the avatar's background colour and vanish
+   * on a white one. extract-glasses.py retokenises it on the way in.
+   */
+  glint: 'rgb(226,240,250)',
 } as const
 
 /**
@@ -153,6 +163,21 @@ const BEARD_LIFT = 12
  */
 const GLASS: RGB = [120, 162, 205]
 const LENS_TOWARD_GLASS = 0.58
+
+/**
+ * ⭐ The highlight is derived from the SKIN, not fixed, for the reason every derived tone here
+ * exists: the lens has to read as glass on every swatch. Pulling the skin 82% toward a cool
+ * white lands it 33.8 luminance clear of the default skin and 163.8 clear of the darkest.
+ *
+ * ⚠⚠ ON THE PALEST SKIN IT READS BY TEMPERATURE, NOT BY LIGHTNESS. #FFE0C4 is already at
+ * luminance 228.6, so the most a highlight can be is 16.6 lighter — there is nowhere to go.
+ * What carries it there is that the glass white is COOL and the skin is warm: measured across
+ * the palette the blue-minus-red shift never drops below 52. That is how a reflection on a
+ * light face reads in life too, and the guard test asserts BOTH axes because asserting
+ * luminance alone would fail on the swatch the derivation is weakest on.
+ */
+const GLASS_WHITE: RGB = [245, 250, 255]
+const GLINT_TOWARD_WHITE = 0.82
 
 /** The frame colour used when a config names eyewear but no colour. */
 const DEFAULT_FRAME = '#22262E'
@@ -583,10 +608,11 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
     }
   }
 
-  if (svg.includes(T.frameInk) || svg.includes(T.lensTint)) {
+  if (svg.includes(T.frameInk) || svg.includes(T.lensTint) || svg.includes(T.glint)) {
     const frame = hex2rgb(cfg.frameColour ?? DEFAULT_FRAME)
     svg = swap(svg, T.frameInk, rgbStr(frame))
     svg = swap(svg, T.lensTint, mix(frame, GLASS, LENS_TOWARD_GLASS))
+    svg = swap(svg, T.glint, mix(skin, GLASS_WHITE, GLINT_TOWARD_WHITE))
   }
 
   svg = swap(svg, T.browInk, darken(hair, 0.82)) // brows track hair, not skin

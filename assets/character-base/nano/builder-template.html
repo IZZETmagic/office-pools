@@ -130,6 +130,9 @@ const T = {
   beard:'rgb(110,150,126)', fade:'rgb(126,110,150)',
   // ⭐ eyewear: the frame takes the input verbatim, the lens is derived from it.
   frameInk:'rgb(64,70,78)', lensTint:'rgb(96,126,156)',
+  // ⭐ the glass highlight. ⚠⚠ it traces as pure white, which is the BACKGROUND token —
+  // extract-glasses.py retokenises it or it would vanish on a white background.
+  glint:'rgb(226,240,250)',
 };
 // ⚠⚠ ADDITIVE, not a factor: ×1.14 gave +2.2 luminance on black hair (no separation) and
 // clamped platinum to pure white. A constant moves every swatch by the same amount.
@@ -140,6 +143,9 @@ const BEARD_LIFT = 12;
    ⚠⚠ A LENS LEANS TOWARD GLASS, it is not the frame lightened. Lightening by a constant
    matches the approved art on a black frame and gives a pale primrose on gold. */
 const GLASS = [120,162,205], LENS_TOWARD_GLASS = 0.58, DEFAULT_FRAME = '#22262E';
+// ⭐ the highlight is derived from the SKIN so it is lighter than whatever it sits on, on every
+// swatch — a fixed near-white is nearly invisible on the palest one.
+const GLASS_WHITE = [245,250,255], GLINT_TOWARD_WHITE = 0.82;
 /* ⭐⭐ A TINTED LENS IS OPAQUE, so nothing behind it is drawn. Ryan, 2026-09-21: "When wearing
    sunglasses, the eyes should not be able to be seen."
    ⚠ Letting the lens cover them is NOT enough — THE EYE IS BIGGER THAN THE LENS. The default
@@ -327,10 +333,11 @@ function compose(c){
   svg = swapAll(svg, T.mouthDark,   darken(mouth,0.65));
   svg = swapAll(svg, T.mouthTongue, lighten(mouth,1.13));
 
-  if (svg.includes(T.frameInk) || svg.includes(T.lensTint)) {
+  if (svg.includes(T.frameInk) || svg.includes(T.lensTint) || svg.includes(T.glint)) {
     const frame = hex2rgb(c.frameColour || DEFAULT_FRAME);
     svg = swapAll(svg, T.frameInk, rgbStr(frame));
     svg = swapAll(svg, T.lensTint, mix(frame, GLASS, LENS_TOWARD_GLASS));
+    svg = swapAll(svg, T.glint, mix(skin, GLASS_WHITE, GLINT_TOWARD_WHITE));
   }
   svg = swapAll(svg, T.browInk, darken(hair,0.82));          // brows follow hair
   const beardTone = rgbStr(hair.map(v => Math.min(255, v + BEARD_LIFT)));

@@ -1178,6 +1178,98 @@ describe('eyewear', () => {
     expect(sawTeeth, 'an open-mouth expression should have exercised the teeth case').toBe(true)
   })
 
+  // ---------------------------------------------------------------------------------
+  // ⭐ THE GLASS HIGHLIGHT. Ryan, 2026-09-21: an empty opening "just seems like they are empty
+  // frames". A clear lens carries a highlight so it reads as glass rather than a hole.
+  // ---------------------------------------------------------------------------------
+
+  it('gives every clear style a highlight, and never lets its token reach the output', () => {
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const GLINT = 'rgb(226,240,250)'
+    let clear = 0
+    for (const g of Object.keys(A.glasses ?? {})) {
+      const frag = A.glasses![g]
+      if (!frag.includes(LENS_TINT)) {
+        clear++
+        expect(frag, `${g} is clear but has no glass highlight — it reads as an empty frame`)
+          .toContain(GLINT)
+      }
+      for (const skin of PALETTE.skin) {
+        const svg = composeAvatar({ ...cfg, base: 'base-neck-100', hair: null, facialHair: null,
+          glasses: g, skin }, A)
+        expect(svg, `${g} on ${skin}: the glint marker leaked`).not.toContain(GLINT)
+      }
+    }
+    expect(clear, 'there should be clear styles').toBeGreaterThan(0)
+  })
+
+  it('keeps the highlight lighter than the skin it sits on, on every swatch', () => {
+    // ⚠⚠ THE HIGHLIGHT IS DERIVED FROM THE SKIN, not fixed. A fixed near-white is nearly
+    // invisible on the palest swatch, and the whole point of it is that the lens reads as glass
+    // on every one. Same shape as the stubble floor: guarantee the separation.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    const hex = (h: string) => [0, 2, 4].map((i) => parseInt(h.replace('#', '').slice(i, i + 2), 16))
+    for (const skin of PALETTE.skin) {
+      const svg = composeAvatar({ ...cfg, base: 'base-neck-100', hair: null, facialHair: null,
+        glasses: 'g02-rect', skin }, A)
+      // mix(skin, [245,250,255], 0.82)
+      const want = hex(skin).map((v, i) => Math.trunc(v + ([245, 250, 255][i] - v) * 0.82))
+      expect(svg, `${skin}: the derived highlight is missing`).toContain(`rgb(${want.join(',')})`)
+      const sk = hex(skin)
+      // ⚠⚠ TWO AXES, because luminance alone is not available on the palest swatch. Skin
+      // #FFE0C4 is already at luminance 228, so a highlight can only be 16.6 lighter — it
+      // reads by being COOL against warm skin instead, which is how a reflection on a light
+      // face actually reads. Measured across the palette: luminance 16.6..163.8, warm/cool
+      // shift 52..116. Both floors below sit just under the real minimum.
+      expect(lum(want) - lum(sk), `${skin}: the highlight is not lighter than the skin`)
+        .toBeGreaterThan(15)
+      expect((want[2] - want[0]) - (sk[2] - sk[0]),
+        `${skin}: the highlight is not cool enough to read against the skin`).toBeGreaterThan(50)
+    }
+  })
+
+  it('keeps the highlight inside the lens, never over the frame', () => {
+    // The extractor clips it to the openings the asset already has. If that ever stops
+    // happening a highlight paints over the frame and the spectacles lose their outline.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    for (const g of Object.keys(A.glasses ?? {})) {
+      const frag = A.glasses![g]
+      const glint = /fill="rgb\(226,240,250\)"[^>]*d="([^"]*)"/.exec(frag)
+      if (!glint) continue
+      const frame = /fill="rgb\(64,70,78\)"[^>]*d="([^"]*)"/.exec(frag)
+      expect(frame, `${g} has a highlight but no frame`).toBeTruthy()
+      const bbox = (d: string) => {
+        const n = (d.match(/-?\d+\.?\d*/g) ?? []).map(Number)
+        const xs = n.filter((_, i) => i % 2 === 0)
+        const ys = n.filter((_, i) => i % 2 === 1)
+        return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+      }
+      const [gx0, gy0, gx1, gy1] = bbox(glint[1])
+      const [fx0, fy0, fx1, fy1] = bbox(frame[1])
+      expect(gx0 >= fx0 && gy0 >= fy0 && gx1 <= fx1 && gy1 <= fy1,
+        `${g}: the highlight escapes the frame's own bounds`).toBe(true)
+    }
+  })
+
+  it('keeps the same highlight derivation in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must carry the glint token`).toContain('226,240,250')
+      expect(src, `${file} must mix toward the same glass white`).toMatch(/245,\s*250,\s*255/)
+      expect(src, `${file} must use the same coefficient`).toContain('0.82')
+    }
+  })
+
   it('keeps the same eye-token list in the Python composer and the builder port', () => {
     for (const file of [
       'assets/character-base/nano/compose.py',

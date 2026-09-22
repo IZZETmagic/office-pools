@@ -53,6 +53,15 @@ LENS_TINT = "rgb(96,126,156)"
 # a novelty. Mixing toward a fixed glass tint keeps every frame in the same family.
 GLASS = (120, 162, 205)
 LENS_TOWARD_GLASS = 0.58
+
+# ⭐ THE GLASS HIGHLIGHT. An empty opening reads as an empty frame, so a clear lens carries a
+# highlight band. ⚠⚠ It cannot keep the tone it traced as: the generator draws it near-white and
+# Recraft quantises that to rgb(255,255,255), which is the BACKGROUND token — left alone every
+# highlight is repainted with the background colour and vanishes on a white one.
+# ⭐ Derived from the SKIN so it is guaranteed lighter than whatever it sits on, on every swatch.
+GLINT = "rgb(226,240,250)"
+GLASS_WHITE = (245, 250, 255)
+GLINT_TOWARD_WHITE = 0.82
 DEFAULT_FRAME = "#22262E"
 
 # ⭐⭐ THE EYE TOKENS, for one purpose: a tinted lens is OPAQUE, so nothing behind it is drawn.
@@ -497,11 +506,15 @@ def main() -> None:
     # Brows default to the HAIR colour, darkened. Real brows track hair, and a bald avatar
     # still needs them coloured — so the token is the brow's own, not hair's, and the default
     # is derived rather than shared. --brow-colour overrides for dyed hair or grey.
-    if FRAME_INK in svg or LENS_TINT in svg:
+    if FRAME_INK in svg or LENS_TINT in svg or GLINT in svg:
         fr = hex_to_rgb(arg("--frame-colour") or DEFAULT_FRAME)
         svg = svg.replace(f'fill="{FRAME_INK}"', f'fill="{rgb_str(fr)}"')
         lens = tuple(int(a + (b - a) * LENS_TOWARD_GLASS) for a, b in zip(fr, GLASS))
         svg = svg.replace(f'fill="{LENS_TINT}"', f'fill="{rgb_str(lens)}"')
+        if sk := arg("--skin"):
+            g = tuple(int(a + (b - a) * GLINT_TOWARD_WHITE)
+                      for a, b in zip(hex_to_rgb(sk), GLASS_WHITE))
+            svg = svg.replace(f'fill="{GLINT}"', f'fill="{rgb_str(g)}"')
 
     if c := (arg("--brow-colour") or arg("--hair-colour")):
         svg = svg.replace(f'fill="{BROW_INK}"', f'fill="{darken(hex_to_rgb(c), 0.82)}"')
