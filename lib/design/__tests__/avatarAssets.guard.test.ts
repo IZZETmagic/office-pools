@@ -48,6 +48,7 @@ const MOUTHS = 'assets/character-base/nano/mouths/assets'
 const FACIALHAIR = 'assets/character-base/nano/facialhair/assets'
 const GLASSES = 'assets/character-base/nano/glasses/assets'
 const EARRINGS = 'assets/character-base/nano/earrings/assets'
+const GARMENTS = 'assets/character-base/nano/garments/assets'
 
 /** Recraft emits this on every path; it is a no-op and the locked assets carry it. */
 const GRANDFATHERED = 'translate(0,0)'
@@ -76,7 +77,7 @@ describe('avatar assets stay cross-platform', () => {
   it('uses no transform that react-native-svg would silently drop', () => {
     const offenders: string[] = []
     for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES), ...svgsIn(MOUTHS),
-                     ...svgsIn(GLASSES), ...svgsIn(EARRINGS)]) {
+                     ...svgsIn(GLASSES), ...svgsIn(EARRINGS), ...svgsIn(GARMENTS)]) {
       for (const m of f.body.matchAll(/transform="([^"]*)"/g)) {
         if (m[1].replace(/\s/g, '') !== GRANDFATHERED) offenders.push(`${f.name}: ${m[1]}`)
       }
@@ -86,7 +87,7 @@ describe('avatar assets stay cross-platform', () => {
 
   it('keeps every asset in the base coordinate space', () => {
     for (const f of [...svgsIn(BASES), ...svgsIn(HAIR), ...svgsIn(EYES), ...svgsIn(MOUTHS),
-                     ...svgsIn(GLASSES), ...svgsIn(EARRINGS)]) {
+                     ...svgsIn(GLASSES), ...svgsIn(EARRINGS), ...svgsIn(GARMENTS)]) {
       expect(f.body, `${f.name} must declare ${VIEWBOX}`).toContain(VIEWBOX)
     }
   })
@@ -122,7 +123,7 @@ describe('avatar assets stay cross-platform', () => {
   })
 
   it('has not altered a locked file', () => {
-    for (const dir of [BASES, HAIR, EYES, MOUTHS, FACIALHAIR, GLASSES, EARRINGS]) {
+    for (const dir of [BASES, HAIR, EYES, MOUTHS, FACIALHAIR, GLASSES, EARRINGS, GARMENTS]) {
       const manifest = resolve(ROOT, dir, 'LOCKED.sha256')
       if (!existsSync(manifest)) continue
       for (const line of readFileSync(manifest, 'utf8').trim().split('\n')) {
@@ -644,7 +645,8 @@ describe('long hair works on every neck width', () => {
     // ⚠ keyed by STYLE — one shared fill drew a hair-coloured rim along the shoulder of
     // every style that did not cover it.
     hairBackfill: { long: `<path d="${D_BACK}" fill="rgb(140,122,110)"/>` },
-    frontBody: { '100': `<path d="${D_FRONT}" fill="rgb(30,118,214)"/>` },
+    frontShirt: { '100': `<path d="${D_FRONT}" fill="rgb(30,118,214)"/>` },
+    frontNeck: { '100': '' },
     hairManifest: { long: true, short: false },
   })
 
@@ -673,10 +675,10 @@ describe('long hair works on every neck width', () => {
     const A = JSON.parse(
       readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
     ) as AvatarAssets
-    const bases = Object.keys(A.frontBody ?? {})
+    const bases = Object.keys(A.frontNeck ?? {})
     expect(bases.length, 'the front-body layers should be bundled').toBeGreaterThan(0)
     for (const b of bases) {
-      const frag = A.frontBody![b]
+      const frag = A.frontNeck![b]
       const neck = frag.indexOf('fill="rgb(254,205,180)"')
       const shadow = frag.indexOf('fill="rgb(245,178,150)"')
       expect(neck, `front-neck-${b}: no neck path`).toBeGreaterThan(-1)
@@ -691,13 +693,13 @@ describe('long hair works on every neck width', () => {
     const A = JSON.parse(
       readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
     ) as AvatarAssets
-    const shadowD = /fill="rgb\(245,178,150\)"[^>]*d="([^"]*)"/.exec(A.frontBody!['100'])![1]
+    const shadowD = /fill="rgb\(245,178,150\)"[^>]*d="([^"]*)"/.exec(A.frontNeck!['100'])![1]
     const withHair = composeAvatar(
       { ...cfg, base: 'base-neck-100', facialHair: null, hair: 'm01-buzz' }, A)
     const i = withHair.indexOf(`d="${shadowD}"`)
     expect(i, 'the shadow should be in the composed document').toBeGreaterThan(-1)
     // nothing from the body layer may be painted after it
-    const neckD = /fill="rgb\(254,205,180\)"[^>]*d="([^"]*)"/.exec(A.frontBody!['100'])![1]
+    const neckD = /fill="rgb\(254,205,180\)"[^>]*d="([^"]*)"/.exec(A.frontNeck!['100'])![1]
     expect(withHair.indexOf(`d="${neckD}"`), 'the neck must not be painted over the shadow')
       .toBeLessThan(i)
   })
@@ -716,7 +718,8 @@ describe('long hair works on every neck width', () => {
     expect(bases.length, 'the four locked bases').toBeGreaterThan(0)
     for (const b of bases) {
       const key = /(\d+)$/.exec(b)?.[1] ?? ''
-      expect(A.frontBody?.[key], `no front body for ${b}`).toBeTruthy()
+      expect(A.frontShirt?.[key], `no front shirt for ${b}`).toBeTruthy()
+      expect(A.frontNeck?.[key], `no front neck for ${b}`).toBeTruthy()
     }
     for (const h of Object.keys(A.hair)) {
       expect(A.hairManifest?.[h], `no backfill flag for ${h}`).toBeDefined()
@@ -773,7 +776,7 @@ describe('hair is sealed against hairline cracks', () => {
   it('keeps the stroke out of every other asset family', () => {
     // ⚠ only HAIR is sealed this way. A stroke on a mouth or an iris would fatten a feature
     // that was drawn at its final weight, and on facial hair it would fight the fade.
-    for (const dir of [BASES, EYES, MOUTHS, FACIALHAIR, GLASSES, EARRINGS]) {
+    for (const dir of [BASES, EYES, MOUTHS, FACIALHAIR, GLASSES, EARRINGS, GARMENTS]) {
       for (const f of svgsIn(dir)) {
         expect(f.body, `${f.name} should not carry a stroke`).not.toContain('stroke="rgb(')
       }
@@ -984,7 +987,7 @@ describe('ids are scoped to the document', () => {
     // The pass rewrites `id="…"` and `url(#…)`. `href="#…"` — <use>, a gradient inheriting
     // another's stops, an animation target — would sail straight past it and re-introduce the
     // bug silently. No asset uses one today; this fails the build on the day one does.
-    for (const dir of [HAIR, BASES, FACIALHAIR, EYES, MOUTHS, EXPRESSIONS, GLASSES, EARRINGS]) {
+    for (const dir of [HAIR, BASES, FACIALHAIR, EYES, MOUTHS, EXPRESSIONS, GLASSES, EARRINGS, GARMENTS]) {
       for (const f of svgsIn(dir)) {
         expect(f.body, `${f.name} uses href="#" — teach uniquifyIds about it`)
           .not.toMatch(/href="#/)
@@ -1494,6 +1497,136 @@ describe('earrings', () => {
       const src = readFileSync(join(process.cwd(), file), 'utf8')
       expect(src, `${file} must carry the metal token`).toContain('212,160,54')
       expect(src, `${file} must stack the earrings`).toMatch(/earrings/i)
+    }
+  })
+})
+
+// =============================================================
+// Garments
+// =============================================================
+// ⭐ A garment is painted in the base's OWN SHIRT TOKENS, so `--shirt` recolours it exactly as
+// it recolours the default shirt. No new token, no new config field, no new palette.
+//
+// ⭐⭐ ONE ASSET SERVES ALL FOUR BASES even though their shirts differ — base-140's is 2.16%
+// larger in area than base-100's, because the collar opening widens with the neck. A traced
+// garment comes back SOLID and the per-base neck painted on top cuts the right collar. The
+// collar is paint order, not geometry.
+// =============================================================
+
+describe('garments', () => {
+  const SHIRT = 'rgb(30,118,214)'
+  const SHIRT2 = 'rgb(50,118,183)'
+  const bundle = () => JSON.parse(
+    readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+  ) as AvatarAssets
+
+  it('paints only in the shirt tokens, so the shirt colour drives it', () => {
+    const A = bundle()
+    const keys = Object.keys(A.garments ?? {})
+    expect(keys.length, 'garments should be bundled').toBeGreaterThan(0)
+    for (const k of keys) {
+      const fills = [...A.garments![k].matchAll(/fill="(rgb\([^)]*\))"/g)].map((m) => m[1])
+      const off = [...new Set(fills)].filter((c) => c !== SHIRT && c !== SHIRT2)
+      expect(off, `${k} paints off the shirt palette — --shirt would not recolour it`).toEqual([])
+    }
+  })
+
+  it('replaces the base shirt rather than sitting on top of it', () => {
+    // ⚠ The base's shirt is LIFTED OUT. A garment defines its own silhouette and may be
+    // narrower somewhere; the old shirt left underneath would show as a second collar.
+    const A = bundle()
+    const baseSvg = readFileSync(
+      join(process.cwd(), 'assets/character-base/nano/bases/base-neck-100.svg'), 'utf8')
+    const shirtDs = [...baseSvg.matchAll(/<path[^>]*\/?>/g)]
+      .filter((m) => m[0].includes(SHIRT) || m[0].includes(SHIRT2))
+      .map((m) => /d="([^"]*)"/.exec(m[0])![1])
+    expect(shirtDs.length, 'the base should have shirt paths').toBe(2)
+    const c = { ...cfg, base: 'base-neck-100', hair: null, facialHair: null }
+    const withG = composeAvatar({ ...c, garment: 'w02-vneck' }, A)
+    for (const d of shirtDs) {
+      expect(withG.includes(`d="${d}"`), 'the base shirt must be lifted out').toBe(false)
+    }
+    // ...and with no garment it is still there
+    const without = composeAvatar(c, A)
+    for (const d of shirtDs) {
+      expect(without.includes(`d="${d}"`), 'no garment must leave the base shirt alone').toBe(true)
+    }
+  })
+
+  it('covers the shirt it replaces, on the widest neck', () => {
+    // ⭐ The failure this exists for: a garment narrower than the base shirt leaves BACKGROUND
+    // showing at the shoulder, because the shirt underneath was lifted out. Measured at
+    // extraction: every garment leaves under 0.1% of the base shirt uncovered, and that is
+    // anti-aliasing at the outline. A bounding box is the cheap version of the same check.
+    const A = bundle()
+    const baseSvg = readFileSync(
+      join(process.cwd(), 'assets/character-base/nano/bases/base-neck-140.svg'), 'utf8')
+    const bbox = (d: string) => {
+      const n = (d.match(/-?\d+\.?\d*/g) ?? []).map(Number)
+      const xs = n.filter((_, i) => i % 2 === 0)
+      const ys = n.filter((_, i) => i % 2 === 1)
+      return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+    }
+    const shirtD = [...baseSvg.matchAll(/<path[^>]*\/?>/g)]
+      .filter((m) => m[0].includes(SHIRT))
+      .map((m) => /d="([^"]*)"/.exec(m[0])![1])[0]
+    const [sx0, , sx1, sy1] = bbox(shirtD)
+    for (const k of Object.keys(A.garments ?? {})) {
+      const gd = /fill="rgb\(30,118,214\)"[^>]*d="([^"]*)"/.exec(A.garments![k])![1]
+      const [gx0, , gx1, gy1] = bbox(gd)
+      expect(gx0, `${k}: narrower than the shirt on the left`).toBeLessThanOrEqual(sx0 + 2)
+      expect(gx1, `${k}: narrower than the shirt on the right`).toBeGreaterThanOrEqual(sx1 - 2)
+      expect(gy1, `${k}: does not reach the bottom`).toBeGreaterThanOrEqual(sy1 - 2)
+    }
+  })
+
+  it('never reaches the jaw, whatever rises above the shoulder', () => {
+    // ⚠ The body layer is painted AFTER the head, so anything a garment puts above the
+    // shoulder — a hood, a scarf, a raised collar — lands on the jaw if it reaches that far.
+    //
+    // ⚠⚠ THIS PASSES TRIVIALLY ON TODAY'S ART, and it is worth saying so. The tracer only ever
+    // sees VISIBLE pixels: the hood was generated BEHIND the head, so its blue path already
+    // stopped at the head's edge. extract-garments.py subtracts the head as well, and on this
+    // art that removes 89.5u² — 0.015% of the garment, pure anti-aliasing. So the subtraction
+    // is insurance, not the thing under test here. What this catches is a FUTURE garment whose
+    // art covers the chin and whose extraction lets it through.
+    //
+    // ⚠ Tested by CONTAINMENT, not by a bounding box. My first attempt used the head's full
+    // width (x506..1534) and failed on points nowhere near it: the head is a squircle and
+    // narrows sharply at its base — at y1470 it spans x687..1361.
+    const A = bundle()
+    const gd = /fill="rgb\(30,118,214\)"[^>]*d="([^"]*)"/.exec(A.garments!['w03-hoodie'])![1]
+    const rings: Array<Array<[number, number]>> = gd.split('M ').filter(Boolean).map((sub) => {
+      const n = ('M ' + sub).match(/-?\d+\.?\d*/g)!.map(Number)
+      const r: Array<[number, number]> = []
+      for (let i = 0; i + 1 < n.length; i += 2) r.push([n[i], n[i + 1]])
+      return r
+    })
+    const contains = (x: number, y: number) => {
+      let inside = false
+      for (const r of rings) {
+        for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+          const [xi, yi] = r[i], [xj, yj] = r[j]
+          if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+        }
+      }
+      return inside
+    }
+    // points solidly inside the head's lower half, where no garment may reach
+    for (const [x, y] of [[1024, 1400], [1024, 1450], [900, 1420], [1150, 1420]]) {
+      expect(contains(x, y), `the garment covers the jaw at ${x},${y}`).toBe(false)
+    }
+  })
+
+  it('keeps the same two body layers in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must use the split shirt layer`).toMatch(/front[-_]?shirt/i)
+      expect(src, `${file} must use the split neck layer`).toMatch(/front[-_]?neck/i)
+      expect(src, `${file} must stack garments`).toMatch(/garment/i)
     }
   })
 })

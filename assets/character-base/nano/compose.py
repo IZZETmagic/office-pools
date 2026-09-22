@@ -377,6 +377,16 @@ def main() -> None:
     ears = find_ears(svg)
     for e in ears:
         svg = svg.replace(e, "", 1)
+
+    # ⭐ A GARMENT REPLACES THE BASE'S SHIRT, so the base's shirt is LIFTED OUT the way the ears
+    # and the nose are. ⚠ Lifted, not painted over: a garment defines its own silhouette and may
+    # be narrower somewhere, and the old shirt peeking out as a second collar reads far worse
+    # than a gap. A garment that does not cover enough is an art problem to catch in review.
+    garment = inner(arg("--garment")) if arg("--garment") else ""
+    if garment:
+        for p in re.findall(r"<path[^>]*/?>", svg):
+            if f'fill="{BASE_SHIRT}"' in p or f'fill="{BASE_SHIRT2}"' in p:
+                svg = svg.replace(p, "", 1)
     nose = find_nose(svg)
     if nose:
         svg = svg.replace(nose, "", 1)
@@ -447,19 +457,30 @@ def main() -> None:
     # ⚠ The copy's own <mask id="facehole"> is renamed, or two elements in one document would
     # carry the same id.
     backfill = front_body = hair_front = ""
+    here = __file__.rsplit("/", 1)[0]
+    nb = re.search(r"base-neck-(\d+)", base_path)
+    # ⚠ The body layer is painted when there is hair OR a garment. With hair it is what puts
+    # the body back in FRONT of the hair; with a garment it is the only thing painting a body
+    # at all, because the base's own shirt has just been lifted out.
+    #
+    # ⭐⭐ TWO fragments now: the shirt half (which a garment substitutes for) and the neck half
+    # (painted after either). The neck is what CUTS THE COLLAR — a traced garment comes back
+    # SOLID and the per-base neck laid on top gives the right collar for that base. That is why
+    # one garment asset serves all four, even though the four shirts differ: base-140's shirt is
+    # 2.16% larger in area than base-100's, because the collar widens with the neck.
+    if (arg("--hair") or garment) and nb:
+        try:
+            shirt_part = garment or inner(f"{here}/bases/front-shirt-{nb.group(1)}.svg")
+            front_body = shirt_part + inner(f"{here}/bases/front-neck-{nb.group(1)}.svg")
+        except Exception:
+            front_body = ""
     if arg("--hair"):
-        here = __file__.rsplit("/", 1)[0]
         style = arg("--hair").rsplit("/", 1)[-1].replace(".asset.svg", "").replace("hair-", "")
         try:
             if json.load(open(f"{here}/hair/manifest.json"))["backfill"].get(style):
                 backfill = inner(f"{here}/hair/backfill/{style}.svg")
         except Exception:
             backfill = ""
-        m = re.search(r"base-neck-(\d+)", base_path)
-        try:
-            front_body = inner(f"{here}/bases/front-neck-{m.group(1)}.svg") if m else ""
-        except Exception:
-            front_body = ""
         if fh and (head_d := find_head(svg)):
             copy = part("--hair").replace("facehole", "facehole-front")
             hair_front = (

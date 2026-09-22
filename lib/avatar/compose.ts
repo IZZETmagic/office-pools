@@ -24,8 +24,19 @@ export type AvatarAssets = {
   bases: Record<string, string>
   hair: Record<string, string>
   expressions: Record<string, string>
-  /** Derived body layers — see THE STACK. Optional so older fixtures still compose. */
-  frontBody?: Record<string, string>
+  /**
+   * Derived body layers — see THE STACK. Optional so older fixtures still compose.
+   *
+   * ⭐⭐ TWO of them, split so a GARMENT can replace the shirt without going near the neck.
+   * `frontShirt` is what a garment substitutes for; `frontNeck` is painted after either, and
+   * it is what cuts the collar: a traced garment comes back SOLID, so the per-base neck laid
+   * on top gives the right collar for that base. The collar is paint order, not geometry —
+   * which is why a garment needs only ONE asset even though the four bases' shirts differ.
+   */
+  frontShirt?: Record<string, string>
+  frontNeck?: Record<string, string>
+  /** Garments — a whole alternative shirt silhouette, in the SHIRT tokens. */
+  garments?: Record<string, string>
   hairBackfill?: Record<string, string>
   hairManifest?: Record<string, boolean>
   facialhair: Record<string, string>
@@ -46,6 +57,7 @@ export type AvatarConfig = {
   facialHair: string | null
   glasses?: string | null
   earrings?: string | null
+  garment?: string | null
   /** Whole-face expression. Mutually exclusive with eyes+mouth. */
   expression?: string | null
   eyes?: string | null
@@ -379,6 +391,20 @@ function findHead(doc: string): string | null {
   return null
 }
 
+/**
+ * The base's own shirt, lifted out when a garment replaces it.
+ *
+ * ⚠ Lifted, not painted over. A garment defines its own silhouette and may be narrower than
+ * the default shirt somewhere; leaving the old one underneath would show it peeking out as a
+ * second collar, which reads far worse than the background showing through a garment that does
+ * not cover enough. If a garment leaves a gap, that is an art problem to catch in review.
+ */
+function findShirt(doc: string): string[] {
+  return [...doc.matchAll(/<path[^>]*\/?>/g)]
+    .map((m) => m[0])
+    .filter((p) => p.includes(`fill="${T.shirt}"`) || p.includes(`fill="${T.shirt2}"`))
+}
+
 function findEars(doc: string): string[] {
   const out: string[] = []
   for (const m of doc.matchAll(/<path[^>]*\/?>/g)) {
@@ -470,6 +496,8 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   //   nose          always last: a raised moustache must never swallow its tip
   const ears = findEars(svg)
   for (const e of ears) svg = svg.replace(e, '')
+  const garment = cfg.garment ? A.garments?.[cfg.garment] ?? '' : ''
+  if (garment) for (const sh of findShirt(svg)) svg = svg.replace(sh, '')
   const nose = findNose(svg)
   if (nose) svg = svg.replace(nose, '')
 
@@ -532,7 +560,14 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       `height="2048"><path d="${headD}" fill="white"/></mask></defs>` +
       `<g mask="url(#faceonly)">${(A.hair[cfg.hair!] ?? '').split('facehole').join('facehole-front')}</g>`
     : ''
-  const frontBody = cfg.hair ? A.frontBody?.[/(\d+)$/.exec(cfg.base)?.[1] ?? ''] ?? '' : ''
+  // ⚠ Painted when there is hair OR a garment. With hair it is what puts the body back in
+  // front of the hair; with a garment it is the only thing painting a body at all, because the
+  // base's own shirt has just been lifted out.
+  const neckKey = /(\d+)$/.exec(cfg.base)?.[1] ?? ''
+  const bodyFront =
+    cfg.hair || garment
+      ? (garment || (A.frontShirt?.[neckKey] ?? '')) + (A.frontNeck?.[neckKey] ?? '')
+      : ''
   // ⭐⭐ EYEWEAR GOES IN FRONT OF THE HAIR. Ryan, 2026-09-21: "The sunglasses should also be in
   // front of some hair of some the hair assets."
   //
@@ -582,7 +617,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       (fhOver ? mouthLayer : '') +
       backfill +
       (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
-      frontBody +
+      bodyFront +
       (fh ? swap(fh, T.hairBase, T.beard) : '') +
       hairFront +
       glassesLayer +

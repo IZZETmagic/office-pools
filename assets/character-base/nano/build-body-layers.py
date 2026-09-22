@@ -142,21 +142,37 @@ def main() -> None:
         svg = b.read_text()
         P = classify(svg)
         head = flatten(d_of(P["head"]))
-        frags = []
         # ⚠⚠ SHIRT, NECK, THEN SHADOW — the base's own order, and it is load-bearing. This read
         # shirt + shadow + neck, so the re-painted neck covered its own crescent shadow and
         # every avatar WITH HAIR lost it: bald showed the shadow (the base's order applies),
         # anything else did not (this layer's order won). 24 of the 25 hair options have hair,
         # so that was nearly every avatar. neck-width.py calls the order out as EXPLICIT for
         # exactly this reason; this file quietly disagreed with it.
-        for p in P["shirt"] + P["neck"] + P["shadow"]:
-            g = clean(flatten(d_of(p)).difference(head).buffer(0))
-            if g.is_empty:
-                continue
-            fill = re.search(r'fill="([^"]*)"', p).group(1)
-            frags.append(f'<path transform="translate(0,0)" fill="{fill}" d="{to_d(g.simplify(0.8))}"/>')
-        (HERE / f"bases/front-neck-{n}.svg").write_text(HEAD + "".join(frags) + "</svg>")
-        print(f"  front-neck-{n}.svg  {len(frags)} paths")
+        #
+        # ⭐⭐ AND IT IS EMITTED AS TWO FILES, so a GARMENT can replace the shirt without going
+        # anywhere near the neck:
+        #
+        #   front-shirt-<N>   the shirt, minus the head — what a garment substitutes for
+        #   front-neck-<N>    the neck and its shadow, minus the head — painted AFTER either
+        #
+        # ⚠ Per base, both of them. The shirts are NOT interchangeable: the collar opening
+        # widens with the neck, so base-140's shirt differs from base-100's by 2.16% of its
+        # area and one coordinate moves 70 units. Measured, after assuming otherwise.
+        #
+        # ⭐ It is also why a garment needs only ONE asset. A traced garment comes back SOLID
+        # (the vectorizer butts the neck back over it), and the per-base neck painted on top
+        # cuts the right collar for that base. The collar is paint order, not geometry.
+        for group, name in ((P["shirt"], "front-shirt"), (P["neck"] + P["shadow"], "front-neck")):
+            frags = []
+            for p in group:
+                g = clean(flatten(d_of(p)).difference(head).buffer(0))
+                if g.is_empty:
+                    continue
+                fill = re.search(r'fill="([^"]*)"', p).group(1)
+                frags.append(f'<path transform="translate(0,0)" fill="{fill}" '
+                             f'd="{to_d(g.simplify(0.8))}"/>')
+            (HERE / f"bases/{name}-{n}.svg").write_text(HEAD + "".join(frags) + "</svg>")
+            print(f"  {name}-{n}.svg  {len(frags)} paths")
         if n == "100":
             body = unary_union([flatten(d_of(p)) for p in P["shirt"] + P["neck"] + P["shadow"]])
             notch = clean(body.difference(head).buffer(0)).simplify(0.8)
