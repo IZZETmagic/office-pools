@@ -91,3 +91,27 @@ already at luminance 228.6 and there is nowhere lighter to go.
 hole unioned with the shape it sits in is a filled disc on top — the interiors vanish. An SVG
 hole is a subpath resolved by fill-rule at paint time, so the rings have to be kept apart and
 the nesting worked out by containment.
+
+---
+
+## The sunglasses glare, and the lens tone (2026-09-22)
+
+Ryan: *"The sunglasses lens tint should be slightly lighter than black and also have a lens
+glare that shows it's glass."*
+
+⚠⚠ **`--glint` had to learn that the two families keep their glass in different places.** On a
+CLEAR style the glass is the hole cut in the frame — the frame path's interior rings. On a
+TINTED style the frame is SOLID and the lens is its own painted path: `s01-classic` has no
+interior rings at all and `s02-aviator`'s only one is the gap between its double bridge bars,
+nowhere near a lens. Clipping a sunglass glare to "the openings" would have thrown all of it
+away. `glass_of()` takes the LENS path when there is one and falls back to the rings.
+
+⭐ **The lens tone floor is set by the DARKEST FRAME, not by taste.** "Slightly lighter than
+black" read literally is about `rgb(38,42,50)` — but the default frame is `rgb(34,38,46)`, so
+that sits 6.6 luminance away and the frame stops reading as a rim on a black pair altogether.
+`rgb(52,58,68)` keeps 20 luminance of separation. `rgb(68,75,87)` starts reading as mid-grey
+rather than a sunglass lens.
+
+⚠ The glare reuses the clear styles' highlight token and its 0.35 alpha, so a single opacity
+rule covers both families.
+

@@ -157,11 +157,15 @@ const BEARD_LIFT = 12
  * which is a photographic tint, not what sunglasses read as. A black lens reads as sunglasses
  * at any size, and the frame colour still does visible work as the rim around it.
  *
- * ⚠ Near-black, not pure black. At rgb(0,0,0) the rim on a BLACK frame reads too hard against
- * this pastel palette; at rgb(30,33,40) the lens and a black frame merge into one blob. 18/20/25
- * keeps the frame legible as a rim on the darkest swatch and stays black everywhere else.
+ * ⚠ NOT pure black — Ryan, 2026-09-22: "slightly lighter than black". A dark slate that still
+ * reads as a black lens at a glance, with the frame legible as a rim around it.
+ *
+ * ⚠⚠ The floor is set by the DARKEST FRAME, not by taste. The default frame is rgb(34,38,46),
+ * so a lens at rgb(38,42,50) sits 6.6 luminance from it and the frame stops reading at all on
+ * a black pair. rgb(52,58,68) keeps 20 luminance of separation, which holds the rim. Going
+ * further — rgb(68,75,87) — starts reading as mid-grey rather than a sunglass lens.
  */
-const LENS_BLACK: RGB = [18, 20, 25]
+const LENS_BLACK: RGB = [52, 58, 68]
 
 /**
  * ⭐⭐ THE HIGHLIGHT IS TRANSLUCENT, AND THAT IS WHY IT IS A CONSTANT. Ryan, 2026-09-21: "The

@@ -143,8 +143,10 @@ const BEARD_LIFT = 12;
    ⚠⚠ A LENS LEANS TOWARD GLASS, it is not the frame lightened. Lightening by a constant
    matches the approved art on a black frame and gives a pale primrose on gold. */
 // ⭐ the lens is BLACK, not derived from the frame — a slate tint is photographic, black is
-// what sunglasses read as. ⚠ NEAR-black so the frame still reads as a rim on a black pair.
-const LENS_BLACK = [18,20,25], DEFAULT_FRAME = '#22262E';
+// what sunglasses read as. ⚠⚠ "slightly lighter than black", and the floor is set by the
+// DARKEST FRAME: at rgb(38,42,50) it sits 6.6 luminance off rgb(34,38,46) and the frame stops
+// reading on a black pair. This keeps 20.
+const LENS_BLACK = [52,58,68], DEFAULT_FRAME = '#22262E';
 // ⭐⭐ the highlight is TRANSLUCENT (fill-opacity lives in the asset), so it lightens whatever
 // is behind it and the derivation that used to fake that is gone. One cool constant.
 const GLASS_TINT = [214,234,250];

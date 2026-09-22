@@ -1011,10 +1011,10 @@ describe('eyewear', () => {
     // frame colour still does visible work as the rim around it.
     const svg = composeAvatar({ ...base, glasses: 'g' }, eyewearFixture(true))
     expect(svg, 'the frame takes the input verbatim').toContain('fill="rgb(34,38,46)"')
-    expect(svg, 'the lens is black').toContain('fill="rgb(18,20,25)"')
+    expect(svg, 'the lens is a near-black slate').toContain('fill="rgb(52,58,68)"')
     for (const frameColour of PALETTE.frame) {
       const s2 = composeAvatar({ ...base, frameColour }, eyewearFixture(true))
-      expect(s2, `${frameColour}: the lens must stay black`).toContain('fill="rgb(18,20,25)"')
+      expect(s2, `${frameColour}: the lens must stay black`).toContain('fill="rgb(52,58,68)"')
     }
   })
 
@@ -1313,7 +1313,7 @@ describe('eyewear', () => {
       const src = readFileSync(join(process.cwd(), file), 'utf8')
       expect(src, `${file} must carry the frame token`).toContain('64,70,78')
       expect(src, `${file} must carry the lens token`).toContain('96,126,156')
-      expect(src, `${file} must paint the lens the same black`).toMatch(/18,\s*20,\s*25/)
+      expect(src, `${file} must paint the lens the same black`).toMatch(/52,\s*58,\s*68/)
     }
   })
 })

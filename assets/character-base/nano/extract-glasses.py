@@ -145,8 +145,18 @@ def rings_of(d: str, n: int = 48):
     return out
 
 
-def openings_of(asset: str):
-    """The lens holes already cut into a finished asset: a ring that sits inside another one."""
+def glass_of(asset: str):
+    """Where the glass is in a finished asset — the region a highlight may occupy.
+
+    ⚠⚠ THE TWO FAMILIES ANSWER THIS DIFFERENTLY. On a CLEAR style the glass is the hole cut in
+    the frame, so it is the frame path's interior rings. On a TINTED style the frame is SOLID
+    and the lens is its own painted path, so there are no interiors to find — s01-classic has
+    none at all and s02-aviator's single one is the gap between its double bridge bars, nowhere
+    near a lens. Clipping a sunglass glare to "the openings" would throw all of it away.
+    """
+    lens = re.search(rf'fill="{re.escape(LENS_TINT)}"[^>]*d="([^"]*)"', asset)
+    if lens:
+        return flatten(lens.group(1))
     m = re.search(rf'fill="{re.escape(FRAME_INK)}"[^>]*d="([^"]*)"', asset)
     if not m:
         m = re.search(rf'd="([^"]*)"[^>]*fill="{re.escape(FRAME_INK)}"', asset)
@@ -165,13 +175,13 @@ def add_glint(trace_path: str, asset_path: str) -> None:
     reused byte-for-byte and exactly one new path is layered onto it, so a highlight pass cannot
     silently move a frame Ryan has already signed off.
 
-    ⚠ The highlight is CLIPPED to the openings the asset already has, so it can never spill over
-    the frame even if the generation painted a little past it.
+    ⚠ The highlight is CLIPPED to the asset's own glass — see glass_of — so it can never spill
+    over the frame even if the generation painted a little past it.
     """
     asset = Path(asset_path).read_text()
-    holes = openings_of(asset)
+    holes = glass_of(asset)
     if holes is None or holes.is_empty:
-        sys.exit(f"{asset_path}: no lens opening to put a highlight in")
+        sys.exit(f"{asset_path}: no glass to put a highlight in")
     # ⚠⚠ THE SAME JIGSAW AS THE FRAME, one level down. The vectorizer fills the WHOLE lens
     # white and then butts the two skin-coloured corners back over it, so the white path is the
     # entire opening and taking it whole gives an opaque lens — 99.8% of the hole, which is a
@@ -207,7 +217,7 @@ def add_glint(trace_path: str, asset_path: str) -> None:
             f'fill-opacity="{GLINT_ALPHA}" d="{to_d(glint)}"/>')
     Path(asset_path).write_text(asset.replace("</svg>", frag + "</svg>"))
     print(f"  {Path(asset_path).name:<26} highlight {glint.area:7.0f}u²  "
-          f"= {100 * glint.area / holes.area:4.1f}% of the lens openings")
+          f"= {100 * glint.area / holes.area:4.1f}% of the glass")
 
 
 def main() -> None:

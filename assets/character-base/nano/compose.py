@@ -50,9 +50,10 @@ LENS_TINT = "rgb(96,126,156)"
 # blue so one swatch drove both — defensible, and also a slate-blue lens, which is a
 # photographic tint rather than what sunglasses read as. A black lens reads as sunglasses at any
 # size and the frame colour still does visible work as the rim around it.
-# ⚠ NEAR-black: at rgb(0,0,0) the rim on a black frame reads too hard against this pastel
-# palette, and at rgb(30,33,40) lens and black frame merge into one blob.
-LENS_BLACK = (18, 20, 25)
+# ⚠ NOT pure black — "slightly lighter than black". ⚠⚠ The floor is set by the DARKEST FRAME,
+# not by taste: the default frame is rgb(34,38,46), so a lens at rgb(38,42,50) sits 6.6
+# luminance away and the frame stops reading at all on a black pair. This keeps 20.
+LENS_BLACK = (52, 58, 68)
 
 # ⭐ THE GLASS HIGHLIGHT. An empty opening reads as an empty frame, so a clear lens carries a
 # highlight band. ⚠⚠ It cannot keep the tone it traced as: the generator draws it near-white and
