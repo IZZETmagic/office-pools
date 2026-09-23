@@ -140,9 +140,10 @@ base's neck: the HIGHEST a 130×73 crest fits is y1640, centred x1325.
 ⚠⚠ **AND THAT CEILING IS NOT THE ANSWER.** Ryan, on seeing it there: *"the logo is too high it
 should be lower."* A real crest does sit high — but high on a REAL chest is well below the
 collar, and this avatar's chest *starts* at the collar, so the geometric ceiling read as a badge
-stuck to the collarbone. **Shipped at y1780**, about a third down the visible chest. The lesson
-is that solving for the extreme of a constraint is not the same as solving the design; the
-search tells you where it CAN go, not where it BELONGS.
+stuck to the collarbone. Lowered to y1780, then again on *"a little lower"* to **y1845 — 61% of
+the way down the visible chest** (y1519..2048). The lesson is that solving for the extreme of a
+constraint is not the same as solving the design; the search tells you where it CAN go, not
+where it BELONGS.
 
 ⚠ Nothing to dodge going down: the shadow panel covers that whole column on every garment, so
 the crest always sits on it. Its own token is mixed most of the way to white, which is why it

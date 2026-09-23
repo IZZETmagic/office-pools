@@ -62,14 +62,14 @@ FONT = (HERE.parents[2] / "mobile/node_modules/@expo-google-fonts/nunito"
 # ⚠ THAT IS THE CEILING, NOT THE ANSWER. Ryan, on seeing it there: "the logo is too high it
 # should be lower." A real crest does sit high, but high on a REAL chest is well below the
 # collar, and this avatar's chest starts at the collar — so the honest ceiling read as a badge
-# stuck to the collarbone. y1780 puts it about a third down the visible chest, which is where
-# it reads as a crest rather than as trim.
+# stuck to the collarbone. Lowered once to y1780, then again — Ryan: "a little lower" — to
+# y1845 — measured, that is 61% of the way down the visible chest (y1519..2048).
 #
 # ⚠ Nothing to dodge going down: the shadow panel covers that whole column on every garment, so
 # the crest always sits on it. Its own token is mixed most of the way to white, which is why it
 # reads against the body and the shadow alike.
 MARK_W = 130.0
-MARK_CX, MARK_TOP = 1325.0, 1780.0
+MARK_CX, MARK_TOP = 1325.0, 1845.0
 
 # ⭐ The mark gets its OWN token rather than reusing the garment's light tone. Two reasons: a
 # crest wants more contrast than one step of lightening gives, and the sports top already paints
