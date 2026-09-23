@@ -1546,17 +1546,44 @@ describe('garments', () => {
     // ⚠ The failure worth catching: the chest emitted in a shirt token instead of the skin
     // token. It would look right on the default palette and turn blue the moment anyone
     // changed their shirt.
+    //
+    // ⭐⭐ THE CHEST IS INJECTED, NOT LOOKED FOR. This test used to filter the bundle for a
+    // garment carrying the skin token and assert there was one. That held while the set
+    // included a v-neck and a crew; the textured set that replaced them is six closed
+    // necklines, so the filter went empty and the test failed — reporting the ART, not the
+    // code. The mechanism still has to work the day a v-neck comes back, so the garment is
+    // fabricated here and the assertion is about `composeAvatar`. That also makes it a real
+    // test rather than one that passes trivially whenever nothing exercises it.
     const A = bundle()
-    const withChest = Object.keys(A.garments ?? {}).filter((k) => A.garments![k].includes(SKIN))
-    expect(withChest.length, 'some garment should open below the neck').toBeGreaterThan(0)
-    expect(A.garments!['g03-sport'], 'the light tone should be in use').toContain('rgb(96,170,240)')
-    for (const k of withChest) {
-      for (const skin of PALETTE.skin) {
-        const svg = composeAvatar(
-          { ...cfg, base: 'base-neck-100', hair: null, facialHair: null, garment: k, skin }, A)
-        expect(svg, `${k} on ${skin}: the chest kept the raw skin token`).not.toContain(SKIN)
-      }
+    const key = Object.keys(A.garments ?? {})[0]
+    // ⚠ A bundled asset is INNER MARKUP — no <svg> wrapper and no closing tag. The first
+    // version of this injected by replacing '</svg>', which is not there, so nothing was added
+    // and `not.toContain(SKIN)` passed on a garment that had no chest. Appending is the only
+    // thing that works, and the positive assertion below is what proves it did.
+    const chestD = 'M 900 1800 L 1150 1800 L 1025 1980 z'
+    const withChest = {
+      ...A,
+      garments: { ...A.garments,
+        [key]: `${A.garments![key]}<path fill="${SKIN}" d="${chestD}"/>` },
     }
+    const rgbOf = (hex: string) => {
+      const n = parseInt(hex.replace('#', ''), 16)
+      return `rgb(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255})`
+    }
+    for (const skin of PALETTE.skin) {
+      const svg = composeAvatar(
+        { ...cfg, base: 'base-neck-100', hair: null, facialHair: null, garment: key, skin },
+        withChest)
+      expect(svg, `${key}: the injected chest never reached the output`).toContain(chestD)
+      expect(svg, `${key} on ${skin}: the chest kept the raw skin token`).not.toContain(SKIN)
+      expect(svg, `${key} on ${skin}: the chest should be painted in the chosen skin`)
+        .toContain(rgbOf(skin))
+    }
+    // and the light tone is in use by the art as it stands — by ANY garment, never by name.
+    // ⚠ The old assertion named `g03-sport`, which no longer exists: a key is a filename and
+    // filenames change every time the set is regenerated.
+    expect(Object.values(A.garments ?? {}).some((g) => g.includes(SHIRT3)),
+      'some garment should use the light tone').toBe(true)
   })
 
   it('replaces the base shirt rather than sitting on top of it', () => {

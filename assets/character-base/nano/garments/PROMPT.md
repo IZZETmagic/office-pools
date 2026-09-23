@@ -179,3 +179,99 @@ nothing throws. H and V are now handled and **any unrecognised command raises**.
 ⭐ The structural tell is the **counter** — the enclosed hole in the P. A whole P is two
 subpaths; the mangled one was a single contour. A guard test pins S=1, P=2.
 
+
+---
+
+## Textured garments, and what the extractor learned (2026-09-23)
+
+Ryan: *"can you kind of keep the team but give more creative freedom to nano banana to see what
+it can create like a bit more texture in the shirts … if something happened to be knitted, for
+example you can see all the knitting and stuff not high Fidelity."*
+
+The set is six, replacing the five plain ones: **cable, hoops, quilt, track, waffle, fairisle**.
+
+⭐⭐ **MY OWN BRIEF WAS THE THING BLOCKING IT.** The first one said *"no outlines, no gradients,
+no shading, no texture, no stitching"* — written to keep the house style flat, and it forbade
+exactly what Ryan asked for. The replacement asks for the opposite and bounds it by TECHNIQUE
+rather than by amount: *"Show what the garment is MADE of … as SOLID FLAT SHAPES — repeated
+blocks, bars, chevrons, diamonds — never as thin outlines, hatching, noise or gradients. Low
+fidelity is right."* Flatness was never the constraint; thin marks and soft edges were.
+
+### Two generations had to be redone, and neither was a design problem
+
+⚠⚠ **`track` came back as a giant zip-up jacket filling the frame, no avatar in it.** The cause
+was a contradiction I wrote: the silhouette clause says NO SLEEVES and NO SEAMS BREAKING THE
+OUTLINE, and four lines later the sport clause asked for *"the panels, the hoops, the sleeve
+seams."* Given two instructions the model picked the one that described a real garment. ⭐ The
+fix was to the prompt, not the model — and the framing clause was hardened at the same time,
+because the failure was one of FRAMING: *"Your picture must be the SAME PICTURE as image 1 with
+a different garment painted on it … DO NOT ZOOM IN. DO NOT CROP. The garment must never be the
+subject of the picture — the avatar is."*
+
+⚠ **`quilt` came back as a life jacket** with lobes outside the dome. Regenerated asking for the
+quilting as *"a grid of big rounded rectangular puff panels … each panel a solid flat block with
+a darker channel between them."* Naming the STRUCTURE gets a quilt; naming the garment gets
+whatever the model thinks a quilted thing looks like.
+
+### Five extractor bugs, all of one shape
+
+Every one was the extractor treating base-100 — the base the art is traced against — as though
+it were the only base, or treating a containment test as though it were a clip.
+
+⚠⚠⚠ **CONTAINMENT DROPS WHAT A CLIP WOULD TRIM.** `REGION.contains(bbox)` threw away any path
+that poked outside the body band. `track`'s entire right-hand body reached x1801 against a
+region ending at x1760, so **41 units of overhang cost it half its garment** — 270k against a
+530k shirt, a hole where the shoulder is, because compose LIFTS the base shirt out. The region
+is now a majority-overlap sanity gate and the dome clip is the only boundary.
+
+⭐⭐ **AND THE INVARIANT THAT CATCHES IT: A GARMENT MUST COVER THE SHIRT IT REPLACES.** `bare`
+is now computed against the dome and the extractor EXITS rather than writing an undersized
+asset. Four of the six would have shipped with holes.
+
+⚠⚠ **SOLID UNDER THE NECK.** The trace paints skin in base-100's neck column, so a garment came
+back with a base-100-shaped hole — and base-085's neck is 26 units narrower on each side, which
+is 26 units of background beside the neck. The necks are strictly nested (085 ⊂ 100 ⊂ 125 ⊂
+140), so the garment is filled to the WIDEST and every base's own neck is painted on top of it.
+
+⚠⚠ **SAME BUG ONE LAYER ON: the exposed chest was cut to base-100 too**, and stuck out past
+base-085's neck as a pale RING of skin. Cut to the widest neck instead.
+
+⚠⚠ **A DETAIL IS PAINT ON THE GARMENT.** `shade` and `panel` were only cut by the head, never
+clipped — `track`'s stripes ran out to x1800 and rendered as bars floating in the background.
+They are clipped to the body now.
+
+⚠⚠ **ABOVE THE SHOULDER, ONLY A COLLAR — AND IT MUST BE ATTACHED.** The old allowance was the
+whole canvas above the shirt line, which is almost all background: `quilt` put a band across
+x625..1423 beside a neck that is 780..1268 at its widest, and it rendered as two sharp blue
+WINGS under the jaw. Clamping to a collar envelope bounds WHERE a fragment may sit; it does not
+say WHETHER it belongs, and two small tabs survived inside the envelope touching nothing. ⭐ So
+only pieces CONTIGUOUS WITH THE DOME survive. A real collar rises out of the garment, always.
+
+### The body tone is not a geometry question
+
+⭐⭐ Five rules have now been tried for "which traced tone is the body": closest-to-blue, largest
+area, a probe point, the outer rim, and the rim minus the canvas crop. **Each is right on some
+of the art and wrong on the rest.** The cable knit settles it — its light cables run the full
+height and reach the outline, so on any measure that looks at edges they ARE the ground.
+
+So the vote stays as the DEFAULT (right on five of six) and `--body R,G,B` states the answer when
+it is not. A guess that is reviewed and written into the build command beats a guess that is
+inferred and trusted.
+
+### Rebuild
+
+```
+uv run extract-garments.py /tmp/tx-t01-cable/vectorize-00.svg   garments/assets/g01-cable.asset.svg --body 37,115,195
+uv run extract-garments.py /tmp/tx-t02-hoops/vectorize-00.svg   garments/assets/g02-hoops.asset.svg
+uv run extract-garments.py /tmp/tx-t03-quilt/vectorize-00.svg   garments/assets/g03-quilt.asset.svg
+uv run extract-garments.py /tmp/tx-t04-track/vectorize-00.svg   garments/assets/g04-track.asset.svg
+uv run extract-garments.py /tmp/tx-t05-waffle/vectorize-00.svg  garments/assets/g05-waffle.asset.svg
+uv run extract-garments.py /tmp/tx-t06-fairisle/vectorize-00.svg garments/assets/g06-fairisle.asset.svg
+uv run build-builder.py
+```
+
+⚠ Only `g01-cable` carries an override. `-v` prints the rim tally, which is how to check the
+vote before trusting it.
+
+⚠ **NOT LOCKED.** These are pending Ryan's review; no `LOCKED.sha256` and no `chmod 444` until
+he says so.
