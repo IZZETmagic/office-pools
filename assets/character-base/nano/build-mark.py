@@ -58,8 +58,18 @@ FONT = (HERE.parents[2] / "mobile/node_modules/@expo-google-fonts/nunito"
 #   every garment  the slot must be on all five, not just the default shirt
 # Searched over the intersection of all four bases' shirts and all five garments, minus every
 # base's neck: the HIGHEST a 130x73 crest fits is y1640, centred x1325.
+#
+# ⚠ THAT IS THE CEILING, NOT THE ANSWER. Ryan, on seeing it there: "the logo is too high it
+# should be lower." A real crest does sit high, but high on a REAL chest is well below the
+# collar, and this avatar's chest starts at the collar — so the honest ceiling read as a badge
+# stuck to the collarbone. y1780 puts it about a third down the visible chest, which is where
+# it reads as a crest rather than as trim.
+#
+# ⚠ Nothing to dodge going down: the shadow panel covers that whole column on every garment, so
+# the crest always sits on it. Its own token is mixed most of the way to white, which is why it
+# reads against the body and the shadow alike.
 MARK_W = 130.0
-MARK_CX, MARK_TOP = 1325.0, 1640.0
+MARK_CX, MARK_TOP = 1325.0, 1780.0
 
 # ⭐ The mark gets its OWN token rather than reusing the garment's light tone. Two reasons: a
 # crest wants more contrast than one step of lightening gives, and the sports top already paints
