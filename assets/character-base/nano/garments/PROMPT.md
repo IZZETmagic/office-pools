@@ -123,10 +123,20 @@ bar, a favicon"; mono is "for surfaces that require all-white or all-black — a
 brand-coloured header … where the brand blue would either clash with the background or
 disappear into it." A garment is exactly that surface.
 
-⚠⚠ **MEASURE THE SHOULDER; DO NOT EYEBALL IT.** The dome is a CURVE. Placed by eye at y1636 the
-mark hung **8.5% of itself off the shoulder into the background** — at that height the shirt
-only reaches x1421. The first row where a 180x100 crest fits entirely on the garment is y1700,
-centred x1400.
+⚠⚠ **THE SLOT IS SOLVED, NOT CHOSEN.** Ryan on the first attempt: *"the mark is bad and not
+positioned properly. it should be where the team logo would normally go on a jersey."* It was 66
+units too low and 75 too far out — a badge on the arm, not a crest on the chest. Three
+constraints bind it at once:
+
+| | |
+|---|---|
+| the shoulder | the dome is a CURVE — at y1650 the shirt only reaches x1421 |
+| every neck | the neck is painted OVER the garment and base-140's reaches x1268 |
+| every garment | the slot must be on all five, not just the default shirt |
+
+Searched over the intersection of all four bases' shirts and all five garments, minus every
+base's neck: the HIGHEST a 130×73 crest fits is **y1640, centred x1325**. Verified 0% hidden on
+every neck width and 100% on every garment.
 
 ⚠⚠ **A TRUETYPE OUTLINE IS QUADRATIC.** The font pen emits `Q`, which renders correctly in a
 browser and in react-native-svg and is **invisible to every tool in this pipeline**, all of

@@ -46,12 +46,20 @@ FONT = (HERE.parents[2] / "mobile/node_modules/@expo-google-fonts/nunito"
 # ⭐ The crest slot: the wearer's LEFT chest, which is the VIEWER'S RIGHT — where a crest
 # actually sits, and what Ryan asked for.
 #
-# ⚠⚠ MEASURED AGAINST THE SHOULDER, not eyeballed. The dome is a curve, not a rectangle: at
-# y1650 it only reaches x1421, so a mark centred at x1372 hung 8.5% of itself off the shoulder
-# and into the background. The first row where a 180x100 crest fits ENTIRELY on the garment is
-# y1700, centred at x1400 — which is also clear of the neck (x849..1199 at its widest).
-MARK_W = 180.0
-MARK_CX, MARK_TOP = 1400.0, 1706.0
+# ⚠⚠ A JERSEY CREST SITS HIGH AND INBOARD — just under the collar, roughly between the neck
+# and the shoulder seam. Ryan, 2026-09-22: "it should be where the team logo would normally go
+# on a jersey." The first placement was 66 units too low and 75 too far out, which read as a
+# badge on the arm rather than a crest on the chest.
+#
+# ⚠ Three things bound the slot at once, so it is SOLVED, not chosen:
+#   the shoulder   the dome is a CURVE — at y1650 the shirt only reaches x1421
+#   every neck     the neck is painted OVER the garment and base-140's reaches x1268, so a
+#                  crest inboard of that is swallowed on the widest base
+#   every garment  the slot must be on all five, not just the default shirt
+# Searched over the intersection of all four bases' shirts and all five garments, minus every
+# base's neck: the HIGHEST a 130x73 crest fits is y1640, centred x1325.
+MARK_W = 130.0
+MARK_CX, MARK_TOP = 1325.0, 1640.0
 
 # ⭐ The mark gets its OWN token rather than reusing the garment's light tone. Two reasons: a
 # crest wants more contrast than one step of lightening gives, and the sports top already paints

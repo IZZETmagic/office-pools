@@ -1720,9 +1720,11 @@ describe('the SP chest mark', () => {
   })
 
   it('sits entirely ON the garment, never off the shoulder', () => {
-    // ⚠⚠ The dome is a CURVE, not a rectangle. Placed by eye at y1636 the mark hung 8.5% of
-    // itself off the shoulder into the background, because the shirt only reaches x1421 at that
-    // height. Every corner of the mark must be inside every garment.
+    // ⚠⚠ Three things bound this slot at once, so it is SOLVED rather than chosen: the dome is
+    // a CURVE (at y1650 the shirt only reaches x1421, and placed by eye the mark hung 8.5% of
+    // itself off the shoulder); the NECK is painted OVER the garment and base-140's reaches
+    // x1268, so anything inboard of that is swallowed on the widest base; and the slot has to
+    // be on all five garments, not just the default shirt. Every corner, every garment.
     const A = bundle()
     const rings = (d: string): Array<Array<[number, number]>> =>
       d.split('M ').filter(Boolean).map((sub) => {
