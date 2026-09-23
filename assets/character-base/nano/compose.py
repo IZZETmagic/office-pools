@@ -32,6 +32,10 @@ BASE_SHIRT2 = "rgb(50,118,183)"
 # its body, which a third dark token would render backwards. Derived from the one shirt colour,
 # the same shape as the mouth's ink/interior/tongue. ⚠ Garments only; the locked bases have two.
 BASE_SHIRT3 = "rgb(96,170,240)"
+# ⭐ the chest mark's OWN tone — not the light token, because the sports top paints PANELS in
+# that and a mark in the same tone would vanish where it crossed one. Pulled most of the way to
+# white so it reads on the near-black shirt and the amber one alike.
+MARK_INK = "rgb(200,225,255)"
 BASE_BG = "rgb(255,255,255)"
 MOUTH_INK = "rgb(182,122,112)"
 MOUTH_DARK = "rgb(118,72,68)"   # the inside of an open mouth
@@ -389,6 +393,11 @@ def main() -> None:
     # be narrower somewhere, and the old shirt peeking out as a second collar reads far worse
     # than a gap. A garment that does not cover enough is an art problem to catch in review.
     garment = inner(arg("--garment")) if arg("--garment") else ""
+    # ⭐ The SP chest mark — ONE asset, not a family. 🔴 This slot takes the SportPool mark ONLY,
+    # never a club crest or name: those are protected marks and the licence covers showing a
+    # crest in a fixture list, not putting one on a garment. Colourways, never badges.
+    mark = inner(f"{__file__.rsplit('/', 1)[0]}/garments/mark/sp-mark.asset.svg") \
+        if "--mark" in sys.argv else ""
     if garment:
         for p in re.findall(r"<path[^>]*/?>", svg):
             if f'fill="{BASE_SHIRT}"' in p or f'fill="{BASE_SHIRT2}"' in p:
@@ -474,7 +483,7 @@ def main() -> None:
     # SOLID and the per-base neck laid on top gives the right collar for that base. That is why
     # one garment asset serves all four, even though the four shirts differ: base-140's shirt is
     # 2.16% larger in area than base-100's, because the collar widens with the neck.
-    if (arg("--hair") or garment) and nb:
+    if (arg("--hair") or garment or mark) and nb:
         try:
             shirt_part = garment or inner(f"{here}/bases/front-shirt-{nb.group(1)}.svg")
             front_body = shirt_part + inner(f"{here}/bases/front-neck-{nb.group(1)}.svg")
@@ -511,7 +520,7 @@ def main() -> None:
         + ("" if tinted else part("--eyes")) + part("--brows")
         + (strip_eyes(expr_upper) if tinted else expr_upper)
         + (mouth if fh_over else "")
-        + backfill + part("--hair") + front_body
+        + backfill + part("--hair") + front_body + mark
         + (inner(fh).replace(f'fill="{HAIR_BASE}"', f'fill="{BEARD}"') if fh else "")
         + hair_front
         # ⭐⭐ EYEWEAR GOES IN FRONT OF THE HAIR. Ryan, 2026-09-21: "The sunglasses should also
@@ -674,6 +683,8 @@ def main() -> None:
         svg = svg.replace(f'fill="{BASE_SHIRT}"', f'fill="{rgb_str(rgb)}"')
         svg = svg.replace(f'fill="{BASE_SHIRT2}"', f'fill="{darken(rgb, 0.9)}"')
         svg = svg.replace(f'fill="{BASE_SHIRT3}"', f'fill="{lighten(rgb, 1.25)}"')
+        mk = tuple(int(v + (255 - v) * 0.72) for v in rgb)
+        svg = svg.replace(f'fill="{MARK_INK}"', f'fill="{rgb_str(mk)}"')
     if c := arg("--bg"):
         svg = svg.replace(f'fill="{BASE_BG}"', f'fill="{rgb_str(hex_to_rgb(c))}"')
 

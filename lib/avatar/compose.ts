@@ -37,6 +37,14 @@ export type AvatarAssets = {
   frontNeck?: Record<string, string>
   /** Garments — a whole alternative shirt silhouette, in the SHIRT tokens. */
   garments?: Record<string, string>
+  /**
+   * The SP chest mark. ONE asset, not a family — see build-mark.py.
+   *
+   * 🔴 THIS SLOT TAKES THE SPORTPOOL MARK ONLY. Never a club crest, name or kit design: those
+   * are protected marks, and the licence covers showing a crest in a fixture list, not putting
+   * one on a garment. The recorded rule is colourways, never badges.
+   */
+  mark?: string
   hairBackfill?: Record<string, string>
   hairManifest?: Record<string, boolean>
   facialhair: Record<string, string>
@@ -58,6 +66,8 @@ export type AvatarConfig = {
   glasses?: string | null
   earrings?: string | null
   garment?: string | null
+  /** Wear the SP chest mark. A boolean, because there is exactly one and only ever will be. */
+  mark?: boolean
   /** Whole-face expression. Mutually exclusive with eyes+mouth. */
   expression?: string | null
   eyes?: string | null
@@ -104,6 +114,13 @@ const T = {
    * ⚠ Only garments use it. The four locked bases carry two shirt tones and always will.
    */
   shirtLight: 'rgb(96,170,240)',
+  /**
+   * ⭐ THE CHEST MARK'S OWN TONE. Not the garment's light token, for two reasons: a crest wants
+   * more contrast than one step of lightening gives, and the sports top paints PANELS in the
+   * light token — a mark in the same tone would vanish wherever it crossed one. Pulled most of
+   * the way to white, so it reads on the near-black shirt and the amber one alike.
+   */
+  markInk: 'rgb(200,225,255)',
   bg: 'rgb(255,255,255)',
   irisCore: 'rgb(117,62,21)',
   irisRim: 'rgb(150,84,34)',
@@ -575,9 +592,11 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   // ⚠ Painted when there is hair OR a garment. With hair it is what puts the body back in
   // front of the hair; with a garment it is the only thing painting a body at all, because the
   // base's own shirt has just been lifted out.
+  // ⭐ The mark rides on the body layer, so it needs one too even on a bare default shirt.
+  const markLayer = cfg.mark ? A.mark ?? '' : ''
   const neckKey = /(\d+)$/.exec(cfg.base)?.[1] ?? ''
   const bodyFront =
-    cfg.hair || garment
+    cfg.hair || garment || markLayer
       ? (garment || (A.frontShirt?.[neckKey] ?? '')) + (A.frontNeck?.[neckKey] ?? '')
       : ''
   // ⭐⭐ EYEWEAR GOES IN FRONT OF THE HAIR. Ryan, 2026-09-21: "The sunglasses should also be in
@@ -630,6 +649,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       backfill +
       (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
       bodyFront +
+      markLayer +
       (fh ? swap(fh, T.hairBase, T.beard) : '') +
       hairFront +
       glassesLayer +
@@ -713,6 +733,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   svg = swap(svg, T.shirt, rgbStr(shirt))
   svg = swap(svg, T.shirt2, darken(shirt, 0.9))
   svg = swap(svg, T.shirtLight, lighten(shirt, 1.25))
+  svg = swap(svg, T.markInk, mix(shirt, [255, 255, 255], 0.72))
   svg = swap(svg, T.bg, rgbStr(hex2rgb(cfg.background)))
 
   // ⚠ LAST, over the finished document. Before this point the hair copy is still being

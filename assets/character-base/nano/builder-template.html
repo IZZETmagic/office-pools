@@ -125,6 +125,9 @@ const T = {
   // ⭐ the third GARMENT tone, LIGHT on purpose — shirt->shirt2 is already the dark step, and
   // the sports top's largest panel is lighter than its body. ⚠ garments only; bases have two.
   shirtLight:'rgb(96,170,240)',
+  // ⭐ the chest mark's own tone — the sports top paints panels in the light token, so a mark
+  // sharing it would vanish where it crossed one.
+  markInk:'rgb(200,225,255)',
   irisCore:'rgb(117,62,21)', irisRim:'rgb(150,84,34)',
   mouthInk:'rgb(182,122,112)', mouthDark:'rgb(118,72,68)', mouthTongue:'rgb(206,116,112)',
   browInk:'rgb(101,70,52)', blush:'rgb(240,158,138)', stubble:'rgb(164,150,140)',
@@ -307,8 +310,10 @@ function compose(c){
   // ⚠ painted when there is hair OR a garment; with a garment it is the only body layer.
   // ⭐⭐ two fragments: the shirt half (which a garment substitutes for) and the neck half,
   // which is what CUTS THE COLLAR — a traced garment is solid, the per-base neck cuts it.
+  // ⭐ the SP chest mark — one asset. 🔴 this slot takes OUR mark only, never a club crest.
+  const markLayer = c.mark ? (ASSETS.mark || '') : '';
   const neckKey = (/(\d+)$/.exec(c.base)||[])[1] || '';
-  const frontBody = (c.hair || garment)
+  const frontBody = (c.hair || garment || markLayer)
     ? (garment || ((ASSETS.frontShirt||{})[neckKey] || '')) + ((ASSETS.frontNeck||{})[neckKey] || '')
     : '';
   // ⭐ hair falling in front of the FACE goes back on top of the beard — the fragment painted a
@@ -335,7 +340,7 @@ function compose(c){
   add(ears.join('') + earringsLayer
       + eyes + (tinted ? stripEyes(upper.join('')) : upper.join(''))
       + (fhOver ? mouthLayer : '')
-      + backfill + (c.hair ? ASSETS.hair[c.hair] : '') + frontBody
+      + backfill + (c.hair ? ASSETS.hair[c.hair] : '') + frontBody + markLayer
       + (fh ? swapAll(fh, T.hairBase, T.beard) : '') + hairFront
       // ⭐⭐ eyewear goes IN FRONT of the hair — 98.4-99.5% of every eyewear asset sits inside
       // the head silhouette, temple included, so there is no placement that fronts the lenses
@@ -380,6 +385,7 @@ function compose(c){
   svg = swapAll(svg, T.shirt,  rgbStr(shirt));
   svg = swapAll(svg, T.shirt2, darken(shirt,0.9));
   svg = swapAll(svg, T.shirtLight, lighten(shirt,1.25));
+  svg = swapAll(svg, T.markInk, mix(shirt,[255,255,255],0.72));
   svg = swapAll(svg, T.bg,     rgbStr(hex2rgb(c.bg)));
   // ⚠ LAST, over the finished document: until here the hair copy is renamed by literal id.
   return uniquifyIds(svg);
@@ -398,7 +404,7 @@ const METALS = ['#D4A017','#B8BCC4','#C08878','#2A2A2E','#E8E0C8','#8C6239'];
 const cfg = {
   mode:'expression', base:'base-neck-100',
   hair:'m03-quiff', expression:'x-happy', facialhair:'', glasses:'', frameColour:'#22262E',
-  earrings:'', metalColour:'#D4A017', garment:'',
+  earrings:'', metalColour:'#D4A017', garment:'', mark:false,
   eyes:'eye-01-base', mouth:'mouth-02-smile',
   skin:'#F5C9A6', hairColour:'#4A3B32', eyeColour:'#5B3A1E',
   mouthColour:'#B67A70', shirt:'#3B6EFF', bg:'#FFFFFF',
@@ -462,6 +468,8 @@ function buildPanel(){
                         v=>cfg.facialhair=v, k=>k===''?'none':k));
   p.appendChild(chipRow('Eyewear', ['', ...Object.keys(ASSETS.glasses||{})], ()=>cfg.glasses,
                         v=>cfg.glasses=v, k=>k===''?'none':k.replace(/^[gs]\d+-/,'')));
+  p.appendChild(chipRow('SP mark', ['', 'on'], ()=>cfg.mark?'on':'',
+                        v=>cfg.mark=(v==='on'), k=>k===''?'off':'on'));
   p.appendChild(chipRow('Garment', ['', ...Object.keys(ASSETS.garments||{})], ()=>cfg.garment,
                         v=>cfg.garment=v, k=>k===''?'shirt':k.replace(/^w\d+-/,'')));
   p.appendChild(chipRow('Earrings', ['', ...Object.keys(ASSETS.earrings||{})], ()=>cfg.earrings,
@@ -483,7 +491,7 @@ function publicConfig(){
               hair:cfg.hair||null, hairColour:cfg.hairColour,
               facialHair:cfg.facialhair||null, glasses:cfg.glasses||null,
               earrings:cfg.earrings||null, metalColour:cfg.metalColour,
-              garment:cfg.garment||null,
+              garment:cfg.garment||null, mark:cfg.mark||false,
               frameColour:cfg.frameColour, shirt:cfg.shirt, background:cfg.bg };
   if (cfg.mode==='expression') { c.expression=cfg.expression; c.eyeColour=cfg.eyeColour;
                                  c.mouthColour=cfg.mouthColour; }

@@ -28,6 +28,7 @@ const DEFAULT: AvatarConfig = {
   glasses: null,
   earrings: null,
   garment: null,
+  mark: true,
   metalColour: '#D4A017',
   // ⭐ One input drives both the frame and the lens — see LENS_TOWARD_GLASS in compose.ts.
   frameColour: '#22262E',
@@ -248,6 +249,13 @@ export function AvatarsTab() {
               value={cfg.glasses ?? null}
               onChange={(v) => set('glasses', v)}
               format={(s) => s.replace(/^[gs]\d+-/, '')}
+            />
+            <Chips
+              label="SP mark"
+              options={[null, 'on']}
+              value={cfg.mark ? 'on' : null}
+              onChange={(v) => set('mark', v === 'on')}
+              format={() => 'on'}
             />
             <Chips
               label="Garment"

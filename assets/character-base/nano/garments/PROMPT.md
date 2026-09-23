@@ -104,3 +104,35 @@ half — collars and pockets sit inboard, and the prompt pins the shadow panel t
 🔴 **`i06-layered` was dropped.** Its art stops the opening around y1920 but the trace carried
 skin to the canvas bottom, so it rendered as a bare strip down the chest. Regenerable; not worth
 shipping as it was.
+
+---
+
+## The SP chest mark (2026-09-22)
+
+🔴🔴 **THIS SLOT TAKES THE SPORTPOOL MARK ONLY.** Never a club crest, club name or kit design.
+Those are protected marks, and the licence we hold covers displaying a crest in a fixture list
+— not putting one on a garment a user wears. The recorded rule is **colourways, never badges**.
+
+⭐⭐ **IT IS THE ONE ASSET HERE THAT IS NOT GENERATED.** The SportPool mark is TYPE:
+`components/ui/Wordmark.tsx` is one word set in Nunito 900, and its compact form is `SP`. Asking
+a generator for letters returns something letter-SHAPED, and a garbled mark is worse than no
+mark — so `build-mark.py` takes the outlines from the font the product actually ships.
+
+⭐ **Compact and mono, both per the wordmark's own rules.** `SP` is the form "for a band, a tab
+bar, a favicon"; mono is "for surfaces that require all-white or all-black — a pool's
+brand-coloured header … where the brand blue would either clash with the background or
+disappear into it." A garment is exactly that surface.
+
+⚠⚠ **MEASURE THE SHOULDER; DO NOT EYEBALL IT.** The dome is a CURVE. Placed by eye at y1636 the
+mark hung **8.5% of itself off the shoulder into the background** — at that height the shirt
+only reaches x1421. The first row where a 180x100 crest fits entirely on the garment is y1700,
+centred x1400.
+
+⚠⚠ **A TRUETYPE OUTLINE IS QUADRATIC.** The font pen emits `Q`, which renders correctly in a
+browser and in react-native-svg and is **invisible to every tool in this pipeline**, all of
+which parse M, L, C and Z only — measured through one, the mark read 26 units wide instead of
+180. `build-mark.py` converts to cubics, and a guard test pins the vocabulary.
+
+⚠ The mark gets its OWN token rather than the garment's light one: a crest wants more contrast
+than one step of lightening, and the sports top paints PANELS in the light token, so a mark
+sharing it would vanish wherever it crossed one.

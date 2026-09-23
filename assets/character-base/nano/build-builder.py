@@ -60,6 +60,7 @@ data = {
     "frontNeck": {f.stem.split("-")[-1]: inner(f)
                   for f in sorted(HERE.glob("bases/front-neck-*.svg"))},
     "garments": collect("garments/assets/*.asset.svg"),
+    "mark": inner(HERE / "garments/mark/sp-mark.asset.svg"),
     # ⚠ per STYLE — one shared fill leaves a hair-coloured rim on the shoulders of every
     # style that does not cover it. See build-body-layers.py.
     "hairBackfill": {f.stem: inner(f) for f in sorted(HERE.glob("hair/backfill/*.svg"))},

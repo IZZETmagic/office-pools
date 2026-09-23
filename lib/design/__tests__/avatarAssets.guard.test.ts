@@ -1664,3 +1664,115 @@ describe('garments', () => {
     }
   })
 })
+
+// =============================================================
+// The SP chest mark
+// =============================================================
+// ⭐⭐ The one asset here that is NOT generated. The SportPool mark is TYPE — Wordmark.tsx is
+// one word in Nunito 900 — so the outlines come from the real font (build-mark.py). A generator
+// asked for letters returns something letter-SHAPED, and a garbled mark is worse than none.
+//
+// 🔴 THIS SLOT TAKES THE SPORTPOOL MARK ONLY. Never a club crest, name or kit design: those are
+// protected marks, and the licence covers showing a crest in a fixture list, not putting one on
+// a garment. The recorded rule is colourways, never badges.
+// =============================================================
+
+describe('the SP chest mark', () => {
+  const MARK = 'rgb(200,225,255)'
+  const bundle = () => JSON.parse(
+    readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+  ) as AvatarAssets
+
+  it('speaks the same path vocabulary as every other asset', () => {
+    // ⚠⚠ THE TRAP THIS EXISTS FOR. A TrueType outline is QUADRATIC, and the font pen emits it
+    // as `Q`. That renders correctly in a browser and in react-native-svg — and is invisible to
+    // every tool in this pipeline, all of which parse M, L, C and Z only. Measured through one,
+    // a Q path came back 26 units wide instead of 180. An asset that speaks a different dialect
+    // is a trap for the next person, not just for the check that caught it.
+    const A = bundle()
+    expect(A.mark, 'the mark should be bundled').toBeTruthy()
+    // ⚠ the `d` attributes ONLY. Scanning the whole file picks up letters from `height`,
+    // `width` and `translate`, and reports commands that are not there.
+    const ds = [...A.mark!.matchAll(/ d="([^"]*)"/g)].map((m) => m[1])
+    expect(ds.length, 'the mark should have path data').toBeGreaterThan(0)
+    const cmds = new Set(ds.join(' ').match(/[A-Za-z]/g) ?? [])
+    for (const c of cmds) {
+      expect('MLCz', `the mark uses "${c}" — this pipeline parses M, L, C and Z only`)
+        .toContain(c)
+    }
+  })
+
+  it('never lets its token reach the output, on any shirt', () => {
+    const A = bundle()
+    for (const shirt of PALETTE.shirt) {
+      const svg = composeAvatar(
+        { ...cfg, base: 'base-neck-100', hair: null, facialHair: null, mark: true, shirt }, A)
+      expect(svg, `${shirt}: the mark token leaked`).not.toContain(MARK)
+    }
+  })
+
+  it('appears only when asked', () => {
+    const A = bundle()
+    const c = { ...cfg, base: 'base-neck-100', hair: null, facialHair: null }
+    const d = /d="([^"]*)"/.exec(A.mark!)![1]
+    expect(composeAvatar({ ...c, mark: true }, A)).toContain(`d="${d}"`)
+    expect(composeAvatar({ ...c, mark: false }, A)).not.toContain(`d="${d}"`)
+  })
+
+  it('sits entirely ON the garment, never off the shoulder', () => {
+    // ⚠⚠ The dome is a CURVE, not a rectangle. Placed by eye at y1636 the mark hung 8.5% of
+    // itself off the shoulder into the background, because the shirt only reaches x1421 at that
+    // height. Every corner of the mark must be inside every garment.
+    const A = bundle()
+    const rings = (d: string): Array<Array<[number, number]>> =>
+      d.split('M ').filter(Boolean).map((sub) => {
+        const n = ('M ' + sub).match(/-?\d+\.?\d*/g)!.map(Number)
+        const r: Array<[number, number]> = []
+        for (let i = 0; i + 1 < n.length; i += 2) r.push([n[i], n[i + 1]])
+        return r
+      })
+    const inside = (rs: Array<Array<[number, number]>>, x: number, y: number) => {
+      let o = false
+      for (const r of rs) {
+        for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+          const [xi, yi] = r[i], [xj, yj] = r[j]
+          if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) o = !o
+        }
+      }
+      return o
+    }
+    // ⚠ the `d` attributes ONLY, or the viewBox's "0 0 2048 2048" drags a corner to 0,0.
+    const mn = [...A.mark!.matchAll(/ d="([^"]*)"/g)]
+      .flatMap((m) => m[1].match(/-?\d+\.?\d*/g) ?? []).map(Number)
+    const mx = mn.filter((_, i) => i % 2 === 0), my = mn.filter((_, i) => i % 2 === 1)
+    const corners: Array<[number, number]> = [
+      [Math.min(...mx), Math.min(...my)], [Math.max(...mx), Math.min(...my)],
+      [Math.min(...mx), Math.max(...my)], [Math.max(...mx), Math.max(...my)],
+    ]
+    const targets: Record<string, string> = { ...(A.garments ?? {}) }
+    const baseSvg = readFileSync(
+      join(process.cwd(), 'assets/character-base/nano/bases/base-neck-100.svg'), 'utf8')
+    targets['the default shirt'] =
+      [...baseSvg.matchAll(/<path[^>]*\/?>/g)].filter((m) => m[0].includes('rgb(30,118,214)'))
+        .map((m) => m[0]).join('')
+    for (const [name, frag] of Object.entries(targets)) {
+      const body = /fill="rgb\(30,118,214\)"[^>]*d="([^"]*)"/.exec(frag)
+      expect(body, `${name}: no body path`).toBeTruthy()
+      const rs = rings(body![1])
+      for (const [x, y] of corners) {
+        expect(inside(rs, x, y), `${name}: the mark hangs off the garment at ${x},${y}`).toBe(true)
+      }
+    }
+  })
+
+  it('keeps the same mark token in the Python composer and the builder port', () => {
+    for (const file of [
+      'assets/character-base/nano/compose.py',
+      'assets/character-base/nano/builder-template.html',
+    ]) {
+      const src = readFileSync(join(process.cwd(), file), 'utf8')
+      expect(src, `${file} must carry the mark token`).toContain('200,225,255')
+      expect(src, `${file} must stack the mark`).toMatch(/mark/i)
+    }
+  })
+})
