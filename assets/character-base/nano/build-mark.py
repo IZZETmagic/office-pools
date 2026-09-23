@@ -104,12 +104,21 @@ def transform(d: str, sx: float, sy: float, dx: float, dy: float) -> str:
 
     ⚠⚠ QUADRATICS ARE CONVERTED TO CUBICS. A TrueType outline is quadratic and SVGPathPen emits
     it as `Q`, which renders fine in a browser and in react-native-svg — and is invisible to
-    every tool in this pipeline, all of which parse M, L, C and Z only. A Q path measured by
-    them comes back as a fraction of its real size (this mark read 26 units wide instead of
-    180), so an asset that speaks a different dialect is a trap for the next person, not just
-    for the check that caught it. C1 = P0 + 2/3(Q-P0), C2 = P2 + 2/3(Q-P2) is exact.
+    every tool in this pipeline, all of which parse M, L, C and Z only. C1 = P0 + 2/3(Q-P0),
+    C2 = P2 + 2/3(Q-P2) is exact.
+
+    ⚠⚠⚠ AND H AND V ARE REAL COMMANDS. SVGPathPen emits horizontal and vertical linetos as an
+    optimisation, and the FIRST version of this function skipped anything it did not recognise:
+    `else: i += 1`. The S has no H or V and came out perfect; the P is full of them, so every
+    coordinate after the first one was read as the wrong axis and the letter rendered as a
+    slashed wedge. Ryan spotted it as "the SP logo is not right" and he was looking at a parser
+    bug, not a design.
+
+    So: H and V are handled, and ANYTHING UNRECOGNISED RAISES. A parser that silently drops what
+    it does not understand turns a missing branch into a corrupted glyph that still looks like a
+    glyph — the worst kind of failure, because it renders.
     """
-    toks = re.findall(r"[MLCQZz]|-?\d+\.?\d*", d)
+    toks = re.findall(r"[A-Za-z]|-?\d+\.?\d*", d)
     out, i, cur, start = [], 0, (0.0, 0.0), (0.0, 0.0)
     T = lambda x, y: (x * sx + dx, y * sy + dy)
     def fmt(pt):
@@ -135,8 +144,19 @@ def transform(d: str, sx: float, sy: float, dx: float, dy: float) -> str:
             c2 = (p2[0] + 2 / 3 * (q[0] - p2[0]), p2[1] + 2 / 3 * (q[1] - p2[1]))
             out.append("C " + " ".join(fmt(T(*p)) for p in (c1, c2, p2)))
             cur = p2
+        elif c == "H":
+            cur = (float(toks[i + 1]), cur[1]); i += 2
+            out.append("L " + fmt(T(*cur)))
+        elif c == "V":
+            cur = (cur[0], float(toks[i + 1])); i += 2
+            out.append("L " + fmt(T(*cur)))
         elif c in "Zz":
             out.append("z"); cur = start; i += 1
+        elif re.fullmatch(r"[A-Za-z]", c):
+            # ⚠⚠ NEVER SILENTLY SKIP. This branch used to be `i += 1`, which is how H and V got
+            # dropped and the P came out as a slashed wedge that still looked like a letter.
+            raise SystemExit(f"build-mark.py: unhandled path command {c!r}. Add it — do not "
+                             f"let it fall through, or the glyph will corrupt and still render.")
         else:
             i += 1
     return " ".join(out)

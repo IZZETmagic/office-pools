@@ -158,3 +158,24 @@ which parse M, L, C and Z only — measured through one, the mark read 26 units 
 ⚠ The mark gets its OWN token rather than the garment's light one: a crest wants more contrast
 than one step of lightening, and the sports top paints PANELS in the light token, so a mark
 sharing it would vanish wherever it crossed one.
+
+---
+
+## The P was corrupt, and it still looked like a P (2026-09-22)
+
+Ryan: *"the SP logo is not right though. you can use nano banana."* It was not a design problem
+and the generator was not needed — **`build-mark.py` was corrupting the glyph.**
+
+⚠⚠⚠ `SVGPathPen` emits **H and V** (horizontal and vertical lineto) as an optimisation, and the
+first parser ended in `else: i += 1` — silently skipping anything it did not recognise. The
+**S contains no H or V and came out perfect**; the **P is full of them**, so every coordinate
+after the first was read as the wrong axis and it rendered as a slashed wedge with an angular
+foot. It shipped that way and Ryan caught it by eye.
+
+⭐⭐ **A PARSER THAT SILENTLY DROPS WHAT IT DOES NOT UNDERSTAND turns a missing branch into a
+corrupted glyph that still looks like a glyph** — the worst failure mode, because it renders and
+nothing throws. H and V are now handled and **any unrecognised command raises**.
+
+⭐ The structural tell is the **counter** — the enclosed hole in the P. A whole P is two
+subpaths; the mangled one was a single contour. A guard test pins S=1, P=2.
+

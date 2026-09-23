@@ -1702,6 +1702,25 @@ describe('the SP chest mark', () => {
     }
   })
 
+  it('keeps the counter in the P — the glyphs are whole', () => {
+    // ⚠⚠⚠ THE BUG THIS EXISTS FOR, and it is the nastiest kind: a corrupted glyph that still
+    // looks like a glyph. build-mark.py's first parser skipped any command it did not
+    // recognise, and SVGPathPen emits H and V as an optimisation. The S contains neither and
+    // came out perfect; the P is full of them, so every coordinate after the first was read as
+    // the wrong axis and it rendered as a slashed wedge. It shipped, and Ryan caught it by eye.
+    //
+    // The structural tell is the COUNTER — the enclosed hole in the P. A whole P is two
+    // subpaths (outer contour plus counter); the mangled one was a single contour.
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const ds = [...A.mark!.matchAll(/ d="([^"]*)"/g)].map((m) => m[1])
+    expect(ds.length, 'the mark is S and P, one path each').toBe(2)
+    const subpaths = ds.map((d) => (d.match(/M /g) ?? []).length)
+    expect(subpaths[0], 'the S is one closed contour').toBe(1)
+    expect(subpaths[1], 'the P has lost its counter — the glyph is corrupt').toBe(2)
+  })
+
   it('never lets its token reach the output, on any shirt', () => {
     const A = bundle()
     for (const shirt of PALETTE.shirt) {
