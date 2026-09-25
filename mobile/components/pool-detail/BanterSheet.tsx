@@ -86,6 +86,7 @@ import {
   AVATAR_GRADIENTS,
   getInitials,
   hashUserIdToIndex,
+  avatarIndexFor,
 } from '@/lib/avatarGradient';
 import { fetchLeaderboard, type LeaderboardEntryCore } from '@/lib/api';
 import {
@@ -235,6 +236,12 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheet | null>(null);
   const banter = usePoolBanter(poolId);
+  // ⚠ A gifted-chat message row carries only a user id, so the picked colour has to be looked
+  // up. Built once here rather than inside renderAvatar, which runs per message.
+  const colourByUserId = useMemo(
+    () => new Map(banter.members.map((m) => [m.userId, m.avatarColour] as const)),
+    [banter.members],
+  );
   const { clearPoolUnread, data: homeData } = useHomeData();
   // Routing key for the flex-badge picker. BP pools score on a
   // different endpoint so loadFlexBadges() needs to know which one
@@ -523,8 +530,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
               userId: uid,
               name,
               initials: getInitials(name),
-              gradient:
-                AVATAR_GRADIENTS[hashUserIdToIndex(uid, AVATAR_GRADIENTS.length)],
+              gradient: AVATAR_GRADIENTS[avatarIndexFor(uid, member?.avatarColour)],
               isYou: uid === banter.appUserId,
             };
           }),
@@ -1136,6 +1142,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
                 userId={String(msg?.user._id ?? '')}
                 name={String(msg?.user.name ?? '?')}
                 visible={!!msg?._isLastOfGroup}
+                avatarColour={colourByUserId.get(String(msg?.user._id ?? '')) ?? null}
               />
             );
           }}
@@ -2094,8 +2101,7 @@ function MentionAutocomplete({
       showsVerticalScrollIndicator={false}
     >
       {matches.map((member, idx) => {
-        const gradient =
-          AVATAR_GRADIENTS[hashUserIdToIndex(member.userId, AVATAR_GRADIENTS.length)];
+        const gradient = AVATAR_GRADIENTS[avatarIndexFor(member.userId, member.avatarColour)];
         return (
           <Pressable
             key={member.userId}
@@ -2449,17 +2455,26 @@ function AvatarSlot({
   userId,
   name,
   visible,
+  avatarColour,
 }: {
   userId: string;
   name: string;
   visible: boolean;
+  /**
+   * The colour this member picked, looked up from the roster by the caller.
+   *
+   * ⚠ A message row carries only a user id, so this has to be threaded in. Leaving it
+   * undefined is not a crash, it is worse — the member quietly falls back to their hashed
+   * colour here while showing their chosen one everywhere else.
+   */
+  avatarColour?: string | null;
 }) {
-  // Pick a gradient based on userId hash so every viewer sees the
-  // same colors for the same person. useMemo keeps the gradient
-  // stable across re-renders of this slot.
+  // ⭐ The member's PICKED colour if they have one, else the hash of their id — so every
+  // viewer still sees the same colour for the same person. useMemo keeps it stable across
+  // re-renders of this slot.
   const gradient = useMemo(
-    () => AVATAR_GRADIENTS[hashUserIdToIndex(userId, AVATAR_GRADIENTS.length)],
-    [userId],
+    () => AVATAR_GRADIENTS[avatarIndexFor(userId, avatarColour)],
+    [userId, avatarColour],
   );
   return (
     <View

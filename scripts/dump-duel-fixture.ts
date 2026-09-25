@@ -94,7 +94,7 @@ type DuelRow = {
 async function personFor(entryId: string) {
   const { data, error } = await db
     .from('pool_entries')
-    .select('entry_id, entry_name, pool_members!inner(user_id, users!inner(full_name, username, email))')
+    .select('entry_id, entry_name, pool_members!inner(user_id, users!inner(full_name, username, email, avatar_colour))')
     .eq('entry_id', entryId)
     .single()
   if (error) throw new Error(`entry ${entryId}: ${error.message}`)
@@ -102,7 +102,12 @@ async function personFor(entryId: string) {
     entry_name: string | null
     pool_members: {
       user_id: string
-      users: { full_name: string | null; username: string | null; email: string | null }
+      users: {
+        full_name: string | null
+        username: string | null
+        email: string | null
+        avatar_colour: string | null
+      }
     }
   }
   const u = row.pool_members.users
@@ -114,6 +119,9 @@ async function personFor(entryId: string) {
         user_id: row.pool_members.user_id,
         full_name: u.full_name,
         username: u.username,
+        // ⚠ Without this the next fixture refresh silently drops the field and Root.tsx
+        // stops type-checking — the fixture IS the prop type's only witness in Studio.
+        avatar_colour: u.avatar_colour ?? null,
       },
     },
   }

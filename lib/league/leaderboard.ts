@@ -212,6 +212,14 @@ export type LeagueLeaderboardRow = {
   user_id: string
   full_name: string
   username: string
+  /**
+   * The colour this member picked — `users.avatar_colour`, migration 146.
+   *
+   * ⚠ Rides on the leaderboard because that is where the RN Showdown screens get their user
+   * ids from: the duel header, the walkout and the recap all take a bare `userId` prop and
+   * have no other way to reach it. Without this the glow on a duel falls back to the hash.
+   */
+  avatar_colour: string | null
   total_points: number
   /**
    * ⚠ NULL IN LAST MAN STANDING, deliberately. The stored `final_rank` is
@@ -264,7 +272,12 @@ export type LeagueLeaderboard = {
 type MemberRow = {
   member_id: string
   user_id: string
-  users: { user_id: string; username: string | null; full_name: string | null } | null
+  users: {
+    user_id: string
+    username: string | null
+    full_name: string | null
+    avatar_colour: string | null
+  } | null
 }
 
 /**
@@ -318,7 +331,7 @@ export async function readLeagueLeaderboard(
 
   const { data: memberRows, error: memberErr } = await admin
     .from('pool_members')
-    .select('member_id, user_id, users(user_id, username, full_name)')
+    .select('member_id, user_id, users(user_id, username, full_name, avatar_colour)')
     .eq('pool_id', poolId)
   if (memberErr) return { leaderboard: null, error: `pool members: ${memberErr.message}` }
 
@@ -426,6 +439,7 @@ export async function readLeagueLeaderboard(
       user_id: member.user_id,
       full_name: member.users?.full_name ?? 'Unknown',
       username: member.users?.username ?? '',
+      avatar_colour: member.users?.avatar_colour ?? null,
       total_points: t?.total_points ?? 0,
       // ⚠ Withheld in LMS. See `LmsRowState` — the stored rank there is entry_id
       // order, and passing it on is passing on a wrong answer that looks right.

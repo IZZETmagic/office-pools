@@ -183,7 +183,10 @@ export default async function PoolPage({
       const entryNames = new Map<string, string>()
       // The person behind each entry, so a corner can carry a face rather than
       // two letters. Same rows the names come from — no extra read.
-      const entryPeople = new Map<string, { user_id: string; full_name: string | null; username: string | null }>()
+      const entryPeople = new Map<
+        string,
+        { user_id: string; full_name: string | null; username: string | null; avatar_colour: string | null }
+      >()
       for (const m of members) {
         for (const e of m.entries ?? []) {
           entryNames.set(e.entry_id, e.entry_name || m.users?.username || 'Entry')
@@ -192,6 +195,9 @@ export default async function PoolPage({
               user_id: m.users.user_id,
               full_name: m.users.full_name ?? null,
               username: m.users.username ?? null,
+              // ⚠ The member's PICKED colour. Undefined here would silently drop every
+              // Showdown side back to its hashed colour — see avatarIndexFor.
+              avatar_colour: m.users.avatar_colour ?? null,
             })
           }
         }

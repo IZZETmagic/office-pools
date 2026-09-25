@@ -73,7 +73,7 @@ export function FeesTab({ pool, members, setMembers, currentUserId }: FeesTabPro
   async function refreshMembers() {
     const { data, error } = await supabase
       .from('pool_members')
-      .select('*, users!inner(user_id, username, full_name, email), pool_entries(*)')
+      .select('*, users!inner(user_id, username, full_name, email, avatar_colour), pool_entries(*)')
       .eq('pool_id', pool.pool_id)
       // ⚠ MONEY. A retired entry owes nothing and is owed nothing, so it must
       // not sit in "expected" or in the unpaid count — `lib/poolData.ts` filters

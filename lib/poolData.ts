@@ -181,7 +181,10 @@ export async function getPoolDataUncached(poolId: string, throwOnFetchError = fa
     admin.from('pools').select('*').eq('pool_id', poolId).single(),
     admin
       .from('pool_members')
-      .select(`${POOL_MEMBER_COLUMNS}, users!inner(user_id, username, full_name, email), pool_entries(*)`)
+      // ⚠ `avatar_colour` rides along here rather than being fetched separately: this is THE
+      // gathering point for members pool-wide, and every avatar downstream is built from these
+      // same rows. A second query would be a second chance to disagree about a member's colour.
+      .select(`${POOL_MEMBER_COLUMNS}, users!inner(user_id, username, full_name, email, avatar_colour), pool_entries(*)`)
       .eq('pool_id', poolId)
       // Migration 057: a RETIRED entry is not on the leaderboard.
       //

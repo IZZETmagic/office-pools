@@ -200,6 +200,14 @@ export type LeaderboardEntryCore = {
   user_id: string;
   full_name: string;
   username: string;
+  /**
+   * The colour this member picked — `users.avatar_colour`, migration 146.
+   *
+   * ⚠ Null means they have not chosen, so the hash of their id decides. It rides on the
+   * leaderboard because the RN Showdown screens have no other route to it: the duel header,
+   * the walkout and the recap sheet all take a bare `userId` and nothing else.
+   */
+  avatar_colour: string | null;
   total_points: number;
   current_rank: number | null;
   previous_rank: number | null;

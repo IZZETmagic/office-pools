@@ -460,7 +460,7 @@ export function ShowdownBand({
    */
   const colourOf = (e: string | null) => {
     const p = person(e)
-    return p ? avatarColor(p.user_id) : 'rgba(255,255,255,0.20)'
+    return p ? avatarColor(p.user_id, p.avatar_colour) : 'rgba(255,255,255,0.20)'
   }
   const youColour = colourOf(youEntry)
   // ⚠ SLATE, not a colour, while the opponent is unknown. An absent person has

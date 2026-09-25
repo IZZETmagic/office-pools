@@ -51,6 +51,8 @@ export type RecapPerson = {
   user_id: string
   full_name: string | null
   username: string | null
+  /** The colour they picked — `users.avatar_colour`. Null means fall back to the hash. */
+  avatar_colour: string | null
 }
 
 export type RecapSide = { name: string; person: RecapPerson; score: number }
@@ -211,17 +213,25 @@ async function readSide(
 ): Promise<Omit<RecapSide, 'score'> | null> {
   const { data } = await admin
     .from('pool_entries')
-    .select('entry_name, pool_members!inner(user_id, users!inner(full_name, username))')
+    .select('entry_name, pool_members!inner(user_id, users!inner(full_name, username, avatar_colour))')
     .eq('entry_id', entryId)
     .maybeSingle()
   if (!data) return null
   const row = data as unknown as {
     entry_name: string | null
-    pool_members: { user_id: string; users: { full_name: string | null; username: string | null } }
+    pool_members: {
+      user_id: string
+      users: { full_name: string | null; username: string | null; avatar_colour: string | null }
+    }
   }
   const u = row.pool_members.users
   return {
     name: u.full_name?.trim() || u.username?.trim() || row.entry_name || 'Unknown',
-    person: { user_id: row.pool_members.user_id, full_name: u.full_name, username: u.username },
+    person: {
+      user_id: row.pool_members.user_id,
+      full_name: u.full_name,
+      username: u.username,
+      avatar_colour: u.avatar_colour ?? null,
+    },
   }
 }

@@ -733,7 +733,7 @@ export function ScoringTab({
     // `current_rank`, so the ordering could not have worked at any point.
     const { data: refreshedMembers, error: refreshErr } = await supabase
       .from('pool_members')
-      .select('*, users!inner(user_id, username, full_name, email)')
+      .select('*, users!inner(user_id, username, full_name, email, avatar_colour)')
       .eq('pool_id', pool.pool_id)
 
     if (refreshErr) {

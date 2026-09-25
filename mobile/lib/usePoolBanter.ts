@@ -38,6 +38,8 @@ export type PoolMember = {
   userId: string;
   fullName: string;
   username: string;
+  /** The colour they picked. Null = not chosen, so the hash of their id decides. */
+  avatarColour: string | null;
 };
 
 export type ReactionAggregate = {
@@ -68,6 +70,7 @@ type DbUserRow = {
   user_id: string;
   full_name: string | null;
   username: string | null;
+  avatar_colour: string | null;
 };
 
 const PAGE_SIZE = 50;
@@ -433,7 +436,7 @@ export function usePoolBanter(poolId: string | undefined) {
       }
       const { data: userRows } = await supabase
         .from('users')
-        .select('user_id, full_name, username')
+        .select('user_id, full_name, username, avatar_colour')
         .in('user_id', userIds);
       const ms: PoolMember[] = ((userRows as DbUserRow[] | null) ?? [])
         .filter((u) => u.username)
@@ -441,6 +444,7 @@ export function usePoolBanter(poolId: string | undefined) {
           userId: u.user_id,
           fullName: u.full_name ?? u.username ?? 'Member',
           username: u.username ?? '',
+          avatarColour: u.avatar_colour ?? null,
         }));
       setMembers(ms);
     } catch (err) {

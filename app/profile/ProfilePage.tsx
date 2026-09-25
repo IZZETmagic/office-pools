@@ -3,6 +3,11 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
+import {
+  AVATAR_COLOUR_NAMES,
+  AVATAR_GRADIENTS,
+  isAvatarColourName,
+} from '@/lib/design/avatarGradient'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
@@ -32,6 +37,8 @@ type Profile = {
   email: string
   created_at: string
   is_super_admin?: boolean
+  /** The palette colour they picked. Null means they have not, so the hash decides. */
+  avatar_colour: string | null
 }
 
 type PoolMembership = {
@@ -1554,13 +1561,18 @@ function AccountSettingsTab({
   const [username, setUsername] = useState(profile.username)
   const [fullName, setFullName] = useState(profile.full_name ?? '')
   const [email, setEmail] = useState(profile.email)
+  const [avatarColour, setAvatarColour] = useState<string | null>(profile.avatar_colour)
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
 
   const usernameChanged = username !== profile.username
   const emailChanged = email !== profile.email
-  const hasProfileChanges = usernameChanged || emailChanged || fullName !== (profile.full_name ?? '')
+  const hasProfileChanges =
+    usernameChanged ||
+    emailChanged ||
+    fullName !== (profile.full_name ?? '') ||
+    avatarColour !== profile.avatar_colour
 
   async function checkUsername(value: string) {
     if (value === profile.username) {
@@ -1609,6 +1621,10 @@ function AccountSettingsTab({
         .update({
           username,
           full_name: fullName || null,
+          // ⚠ Validated before it leaves: the column has no CHECK listing the names
+          // (migration 146 says why), so this is the only thing standing between a typo and
+          // a member who resolves to their hashed colour forever without knowing it.
+          avatar_colour: isAvatarColourName(avatarColour) ? avatarColour : null,
         })
         .eq('user_id', profile.user_id)
 
@@ -1797,6 +1813,36 @@ function AccountSettingsTab({
             />
           </FormField>
 
+          <FormField
+            label="Your colour"
+            helperText={
+              profileEditing
+                ? 'This is you across the app — your avatar, and the glow on your side of a duel.'
+                : undefined
+            }
+          >
+            <div className="flex flex-wrap gap-2">
+              {AVATAR_COLOUR_NAMES.map((name, i) => {
+                const selected = avatarColour === name
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    aria-label={name}
+                    aria-pressed={selected}
+                    title={name}
+                    disabled={!profileEditing}
+                    onClick={() => setAvatarColour(selected ? null : name)}
+                    className={`w-8 h-8 rounded-pill border-2 transition disabled:opacity-60 disabled:cursor-not-allowed ${
+                      selected ? 'border-ink scale-110' : 'border-transparent'
+                    }`}
+                    style={{ backgroundImage: `linear-gradient(135deg, ${AVATAR_GRADIENTS[i][0]}, ${AVATAR_GRADIENTS[i][1]})` }}
+                  />
+                )
+              })}
+            </div>
+          </FormField>
+
           <FormField label="Email" helperText={profileEditing ? "Email changes require verification" : undefined}>
             <Input
               type="email"
@@ -1819,6 +1865,7 @@ function AccountSettingsTab({
                 onClick={() => {
                   setUsername(profile.username)
                   setFullName(profile.full_name ?? '')
+                  setAvatarColour(profile.avatar_colour)
                   setEmail(profile.email)
                   setProfileError(null)
                   setUsernameStatus('idle')

@@ -78,7 +78,7 @@ export default async function DuelDecisionPage({
   // Names and faces for both sides, from the members already visible to us.
   const { data: members } = await supabase
     .from('pool_members')
-    .select('users!inner(user_id, username, full_name), pool_entries(entry_id, entry_name)')
+    .select('users!inner(user_id, username, full_name, avatar_colour), pool_entries(entry_id, entry_name)')
     .eq('pool_id', pool_id)
   type MemberRow = {
     users: { user_id: string; username: string | null; full_name: string | null } | null

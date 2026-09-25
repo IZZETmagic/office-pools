@@ -241,7 +241,7 @@ export function MembersTab({
   async function refreshMembers() {
     const { data } = await supabase
       .from('pool_members')
-      .select('*, users!inner(user_id, username, full_name, email), pool_entries(*)')
+      .select('*, users!inner(user_id, username, full_name, email, avatar_colour), pool_entries(*)')
       .eq('pool_id', pool.pool_id)
 
     if (data) {

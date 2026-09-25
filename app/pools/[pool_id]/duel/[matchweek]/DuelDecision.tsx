@@ -182,7 +182,7 @@ function FormRun({ form, streak }: {
 }
 
 function Face({ side, dim }: { side: Side; dim: boolean }) {
-  const ring = side.person ? avatarColor(side.person.user_id) : 'rgba(255,255,255,0.2)'
+  const ring = side.person ? avatarColor(side.person.user_id, side.person.avatar_colour) : 'rgba(255,255,255,0.2)'
   return (
     <span
       className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full shrink-0 ${dim ? 'opacity-55' : ''}`}
@@ -260,8 +260,8 @@ export function DuelDecision({
         : verdict.outcome === 'tied' ? `Level with ${them!.name}`
           : `${them!.name} beat you`
 
-  const youColour = you.person ? avatarColor(you.person.user_id) : 'rgba(255,255,255,0.5)'
-  const themColour = them?.person ? avatarColor(them.person.user_id) : 'rgba(255,255,255,0.5)'
+  const youColour = you.person ? avatarColor(you.person.user_id, you.person.avatar_colour) : 'rgba(255,255,255,0.5)'
+  const themColour = them?.person ? avatarColor(them.person.user_id, them.person.avatar_colour) : 'rgba(255,255,255,0.5)'
 
   // The history line. ⚠ `record` counts THIS duel too, so a first meeting is
   // a total of one — not zero.

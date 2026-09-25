@@ -264,7 +264,7 @@ export function ShowdownRoom({
    */
   const inkFor = useCallback((entry: string | null): AvatarInk => {
     const p = entry ? entryPeople.get(entry) : null
-    return avatarInk(p?.user_id ?? entry ?? '')
+    return avatarInk(p?.user_id ?? entry ?? '', p?.avatar_colour)
   }, [entryPeople])
 
   const own = useMemo(() => new Set(ownEntryIds), [ownEntryIds])

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   AVATAR_GRADIENTS, AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES,
-  hashUserIdToIndex, avatarGradient,
+  hashUserIdToIndex, avatarGradient, avatarIndexFor, avatarColor, isAvatarColourName,
 } from '../avatarGradient'
 
 // Drift guard for the avatar palette.
@@ -55,6 +55,18 @@ describe('avatar palette matches the RN app', () => {
 
   it('is the same length, so the modulo lands on the same bucket', () => {
     expect(AVATAR_GRADIENTS.length).toBe(rn!.length)
+  })
+
+  it('names the colours identically, because the NAME is what gets stored', () => {
+    // ⚠⚠ `users.avatar_colour` stores a NAME, so the name → index mapping is now as
+    // load-bearing as the palette itself. If the two platforms disagree about which entry
+    // 'teal' is, a member who picked teal is one colour on web and another in the app —
+    // the exact failure this whole palette exists to prevent, arriving by a new route.
+    const block = rnSource.slice(rnSource.indexOf('const AVATAR_COLOUR_NAMES'))
+    const rnNames = [...block.slice(0, block.indexOf('];')).matchAll(/'([a-z][a-z0-9-]*)'/g)]
+      .map((m) => m[1])
+    expect(rnNames, 'could not parse AVATAR_COLOUR_NAMES from the RN copy').not.toEqual([])
+    expect(rnNames).toEqual([...AVATAR_COLOUR_NAMES])
   })
 })
 
@@ -170,5 +182,70 @@ describe('no two members can be handed colours that read as one', () => {
     AVATAR_GRADIENTS.forEach(([from, to], i) => {
       expect(lum(from), `${AVATAR_COLOUR_NAMES[i]} runs dark → light`).toBeGreaterThan(lum(to))
     })
+  })
+})
+
+
+describe("a member's chosen colour", () => {
+  const SOMEBODY = 'e2b6f0a4-1c3d-4f5e-9a7b-8c0d1e2f3a4b'
+
+  it('uses the choice when there is one', () => {
+    AVATAR_COLOUR_NAMES.forEach((name, i) => {
+      expect(avatarIndexFor(SOMEBODY, name)).toBe(i)
+    })
+  })
+
+  it('is the same colour for everyone who picks it', () => {
+    // ⭐ The point of storing a NAME. Two members who both pick teal are both teal —
+    // which is also why a duel between them has to shift one side (stage 3).
+    const a = avatarColor('11111111-1111-1111-1111-111111111111', 'teal')
+    const b = avatarColor('99999999-9999-9999-9999-999999999999', 'teal')
+    expect(a).toBe(b)
+  })
+
+  it('falls back to the hash when nothing is chosen', () => {
+    const hashed = hashUserIdToIndex(SOMEBODY, AVATAR_GRADIENTS.length)
+    expect(avatarIndexFor(SOMEBODY)).toBe(hashed)
+    expect(avatarIndexFor(SOMEBODY, null)).toBe(hashed)
+    expect(avatarIndexFor(SOMEBODY, '')).toBe(hashed)
+  })
+
+  it('treats a colour that no longer exists exactly like no choice', () => {
+    // ⚠⚠ THE ONE THAT MATTERS ON A PALETTE CHANGE. `users.avatar_colour` has no CHECK listing
+    // the names, so dropping a colour leaves stored rows pointing at nothing. Those members
+    // must degrade to their hashed colour — looking like they never chose is recoverable,
+    // whereas throwing would take out every surface that renders them.
+    const hashed = hashUserIdToIndex(SOMEBODY, AVATAR_GRADIENTS.length)
+    for (const gone of ['violet', 'indigo', 'amber', 'chartreuse', 'NOT A COLOUR']) {
+      expect(avatarIndexFor(SOMEBODY, gone)).toBe(hashed)
+    }
+  })
+
+  it('never returns an index outside the palette', () => {
+    for (const chosen of [null, 'teal', 'nonsense', '']) {
+      for (const id of ['a', 'bb', SOMEBODY, '']) {
+        const i = avatarIndexFor(id, chosen)
+        expect(i).toBeGreaterThanOrEqual(0)
+        expect(i).toBeLessThan(AVATAR_GRADIENTS.length)
+      }
+    }
+  })
+
+  it('only accepts real palette names on the write path', () => {
+    // ⚠ This is the ONLY validation between a typo and a member silently stuck on their
+    // hashed colour, because the column deliberately has no CHECK constraint.
+    AVATAR_COLOUR_NAMES.forEach((n) => expect(isAvatarColourName(n)).toBe(true))
+    for (const bad of ['Teal', 'violet', '', null, undefined, 7, {}, 'teal ']) {
+      expect(isAvatarColourName(bad), `${String(bad)} should be rejected`).toBe(false)
+    }
+  })
+
+  it('matches the shape the database will accept', () => {
+    // ⚠ Migration 146 constrains the column to ^[a-z][a-z0-9-]{1,23}$. A name that fails it
+    // would pass app validation and then be rejected by Postgres at save time.
+    for (const n of AVATAR_COLOUR_NAMES) {
+      expect(n, `${n} would be refused by users_avatar_colour_shape_ck`)
+        .toMatch(/^[a-z][a-z0-9-]{1,23}$/)
+    }
   })
 })

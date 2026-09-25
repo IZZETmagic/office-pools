@@ -183,6 +183,14 @@ const COLLAPSED_ROW = 56;
  */
 export type Standing = {
   userId: string | null;
+  /**
+   * The colour this member PICKED — `users.avatar_colour`, migration 146.
+   *
+   * ⚠ It rides on the standing because that is the only thing this header is handed that
+   * knows who a side IS. Null means they have not chosen and the hash of their id decides,
+   * which is what everybody got before members could pick.
+   */
+  avatarColour?: string | null;
   rank: number | null;
   /**
    * Where they sat before the most recent settlement, for "what it moved".
@@ -367,14 +375,16 @@ export function ShowdownDuelHeader({
   // ⚠ FALLS BACK TO `you` SO THE BAND KEEPS YOUR COLOUR WHILE SEALED. Your own
   // side is not the secret; only the right-hand throw goes neutral, which is
   // what makes a sealed band read as half-lit rather than switched off.
-  const youUserId =
-    (bout ? standings.get(bout.you.entryId)?.userId : null) ??
-    (you ? standings.get(you.entryId)?.userId ?? null : null);
+  const youStanding =
+    (bout ? standings.get(bout.you.entryId) : undefined) ??
+    (you ? standings.get(you.entryId) : undefined);
+  const youUserId = youStanding?.userId ?? null;
   // ⚠ See `Props.opponentVisible`: the colour identifies them as surely as the
   // name does, and `bout.them` outlives the week it belonged to.
-  const themUserId =
-    opponentVisible && bout?.them ? standings.get(bout.them.entryId)?.userId ?? null : null;
-  const leftGlow = youUserId ? gradientForUser(youUserId)[0] : BAND.primary;
+  const themStanding =
+    opponentVisible && bout?.them ? standings.get(bout.them.entryId) : undefined;
+  const themUserId = themStanding?.userId ?? null;
+  const leftGlow = youUserId ? gradientForUser(youUserId, youStanding?.avatarColour)[0] : BAND.primary;
   /**
    * ⚠ NEUTRAL, NOT ABSENT. With no throw at all the band goes visibly lopsided —
    * lit from the left, flat on the right — which reads as a rendering fault
@@ -382,7 +392,7 @@ export function ShowdownDuelHeader({
    * identifies nobody: it is the same grey the locked silhouette and its ring
    * take, so the whole right-hand side says one thing.
    */
-  const rightGlow = themUserId ? gradientForUser(themUserId)[0] : BAND.slate;
+  const rightGlow = themUserId ? gradientForUser(themUserId, themStanding?.avatarColour)[0] : BAND.slate;
   // ⚠ One value, not a light/dark pair: the band is dark in BOTH app themes, so
   // there is no pale surface for this to be restrained against any more.
   const glowAlpha = 0.28;

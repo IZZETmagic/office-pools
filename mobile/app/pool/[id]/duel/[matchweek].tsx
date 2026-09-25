@@ -70,6 +70,7 @@ export default function DuelDecisionScreen() {
     for (const e of detail.data?.leagueLeaderboard ?? []) {
       m.set(e.entry_id, {
         userId: e.user_id ?? null,
+        avatarColour: e.avatar_colour ?? null,
         rank: e.current_rank ?? null,
         previousRank: e.previous_rank ?? null,
         points: e.total_points ?? 0,

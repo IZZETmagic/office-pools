@@ -8,7 +8,8 @@
     "person": {
       "user_id": "b503b5a2-c817-4fbc-9707-9ccb37d0fc9f",
       "full_name": "Marcus Bell",
-      "username": "Marcus"
+      "username": "Marcus",
+      "avatar_colour": null
     },
     "score": 400
   },
@@ -17,7 +18,8 @@
     "person": {
       "user_id": "39c4cc6c-da19-441b-92ee-b65a8c17e7d7",
       "full_name": "Mia Torres",
-      "username": "Mia T"
+      "username": "Mia T",
+      "avatar_colour": null
     },
     "score": 0
   },

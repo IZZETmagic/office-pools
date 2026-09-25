@@ -114,9 +114,40 @@ export function hashUserIdToIndex(userId: string, count: number): number {
   return Math.abs(h) % count
 }
 
+/**
+ * The palette index for a member: THEIR CHOICE if they have one, otherwise the hash.
+ *
+ * ⭐ This is the one place the two schemes meet, and every accessor goes through it so they
+ * cannot disagree. A member who has picked is that colour everywhere; a member who has not is
+ * exactly as they were before — nobody is left colourless and nobody is silently moved.
+ *
+ * ⚠⚠ AN UNRECOGNISED NAME FALLS BACK RATHER THAN THROWING. `users.avatar_colour` has no CHECK
+ * listing the names (migration 146 explains why), so a colour dropped from the palette leaves
+ * stored rows pointing at nothing. Degrading to the hash means those members look like they
+ * never chose, which is recoverable; throwing would take out every surface that renders them.
+ *
+ * ⚠ `chosen` is OPTIONAL on purpose. Several leaf components — the community message rows, most
+ * of the RN screens — hold a bare user id and no way to reach the stored value yet. They keep
+ * working on the hash until the value is threaded to them. That is a KNOWN half-wired state,
+ * not an oversight: while it lasts, a member who has picked can see their chosen colour on one
+ * surface and their hashed colour on another. Finish the threading before shipping the picker.
+ */
+export function avatarIndexFor(userId: string, chosen?: string | null): number {
+  if (chosen) {
+    const picked = AVATAR_COLOUR_NAMES.indexOf(chosen)
+    if (picked !== -1) return picked
+  }
+  return hashUserIdToIndex(userId, AVATAR_GRADIENTS.length)
+}
+
+/** Is this a colour a member is allowed to store? Used on the WRITE path. */
+export function isAvatarColourName(value: unknown): value is string {
+  return typeof value === 'string' && AVATAR_COLOUR_NAMES.includes(value)
+}
+
 /** The CSS gradient for a user's avatar. */
-export function avatarGradient(userId: string): string {
-  const [from, to] = AVATAR_GRADIENTS[hashUserIdToIndex(userId, AVATAR_GRADIENTS.length)]
+export function avatarGradient(userId: string, chosen?: string | null): string {
+  const [from, to] = AVATAR_GRADIENTS[avatarIndexFor(userId, chosen)]
   return `linear-gradient(135deg, ${from}, ${to})`
 }
 
@@ -139,8 +170,8 @@ export function avatarGradient(userId: string): string {
  * across platforms (`avatarGradient.test.ts` guards it); this is a web-side
  * accessor over it and adds no new colour.
  */
-export function avatarColor(userId: string): string {
-  return AVATAR_GRADIENTS[hashUserIdToIndex(userId, AVATAR_GRADIENTS.length)][0]
+export function avatarColor(userId: string, chosen?: string | null): string {
+  return AVATAR_GRADIENTS[avatarIndexFor(userId, chosen)][0]
 }
 
 /** A user's colour, adjusted so it survives on a light card and a dark one. */
@@ -183,7 +214,7 @@ export type AvatarInk = {
  * Derived rather than hand-listed so a colour added to the palette, or one a
  * member eventually picks on their profile, gets the same treatment for free.
  */
-export function avatarInk(userId: string): AvatarInk {
-  const base = avatarColor(userId)
+export function avatarInk(userId: string, chosen?: string | null): AvatarInk {
+  const base = avatarColor(userId, chosen)
   return { strong: withLightness(base, 0.52), soft: withLightness(base, 0.70) }
 }

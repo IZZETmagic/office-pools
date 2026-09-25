@@ -69,6 +69,8 @@ export type DuelPerson = {
   user_id: string
   full_name: string | null
   username: string | null
+  /** The colour they picked — `users.avatar_colour`. Null means fall back to the hash. */
+  avatar_colour: string | null
 }
 
 export type DuelSide = {
@@ -112,8 +114,8 @@ export const DuelRecap: React.FC<DuelRecapProps> = ({
         ? `Level with ${them!.name}`
         : `${them!.name} beat you`
 
-  const youInk = avatarInk(you.person.user_id)
-  const themInk = them ? avatarInk(them.person.user_id) : null
+  const youInk = avatarInk(you.person.user_id, you.person.avatar_colour)
+  const themInk = them ? avatarInk(them.person.user_id, them.person.avatar_colour) : null
 
   const enter = (delay: number) =>
     spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.7 } })
@@ -296,7 +298,7 @@ function Side({
   loser: boolean
   frame: number
 }) {
-  const ring = avatarColor(side.person.user_id)
+  const ring = avatarColor(side.person.user_id, side.person.avatar_colour)
   // The score counts up rather than appearing — the number IS the argument, so
   // it should take a moment to land.
   const shown = Math.round(interpolate(frame, [30, 62], [0, side.score], CLAMP))
@@ -317,7 +319,7 @@ function Side({
           width: 260,
           height: 260,
           borderRadius: '50%',
-          backgroundImage: avatarGradient(side.person.user_id),
+          backgroundImage: avatarGradient(side.person.user_id, side.person.avatar_colour),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

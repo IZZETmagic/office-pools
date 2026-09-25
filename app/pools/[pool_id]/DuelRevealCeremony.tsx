@@ -246,7 +246,7 @@ export function DuelRevealCeremony({
       ]
     : []
 
-  const accent = opponent ? avatarColor(opponent.person.user_id) : 'rgba(255,255,255,0.3)'
+  const accent = opponent ? avatarColor(opponent.person.user_id, opponent.person.avatar_colour) : 'rgba(255,255,255,0.3)'
   return (
     <div
       role="dialog"

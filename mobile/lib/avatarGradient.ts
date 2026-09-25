@@ -62,6 +62,29 @@ export const AVATAR_GRADIENTS: readonly [string, string][] = [
 ];
 
 /**
+ * What each entry is called — the value stored in `users.avatar_colour`.
+ *
+ * ⚠ SAME ORDER as AVATAR_GRADIENTS; the index is shared. Mirrored from
+ * lib/design/avatarGradient.ts and byte-compared by a drift guard, because a member's stored
+ * 'teal' must resolve to the same colour on both platforms or they are two different people.
+ */
+export const AVATAR_COLOUR_NAMES: readonly string[] = [
+  'red',
+  'orange',
+  'yellow',
+  'lime',
+  'green',
+  'emerald',
+  'teal',
+  'cyan',
+  'sky',
+  'blue',
+  'purple',
+  'magenta',
+  'pink',
+];
+
+/**
  * Deterministic hash → palette index. djb2 variant — small, stable, no crypto.
  *
  * The same userId always lands on the same gradient, on every device and for
@@ -76,9 +99,32 @@ export function hashUserIdToIndex(userId: string, count: number): number {
   return Math.abs(h) % count;
 }
 
-/** The two-stop gradient for a person. */
-export function gradientForUser(userId: string): readonly [string, string] {
-  return AVATAR_GRADIENTS[hashUserIdToIndex(userId, AVATAR_GRADIENTS.length)];
+/**
+ * The palette index for a member: THEIR CHOICE if they have one, otherwise the hash.
+ *
+ * ⚠ Mirrors `avatarIndexFor` in lib/design/avatarGradient.ts, which carries the reasoning.
+ * An unrecognised name falls back rather than throwing, because `users.avatar_colour` has no
+ * CHECK listing the names and a colour dropped from the palette must degrade, not crash.
+ */
+export function avatarIndexFor(userId: string, chosen?: string | null): number {
+  if (chosen) {
+    const picked = AVATAR_COLOUR_NAMES.indexOf(chosen);
+    if (picked !== -1) return picked;
+  }
+  return hashUserIdToIndex(userId, AVATAR_GRADIENTS.length);
+}
+
+/**
+ * The two-stop gradient for a person.
+ *
+ * ⚠⚠ `chosen` is optional because most RN screens hold a bare user id and nothing else —
+ * ShowdownDuelHeader, ShowdownLeaderboard, ScoutHeader and the rest take `userId: string`
+ * props from three separate loaders. Until the stored colour is threaded to them they render
+ * the hash, so a member who has picked can see two different colours in one app. Known and
+ * deliberate for now; it must be finished before a picker ships to members.
+ */
+export function gradientForUser(userId: string, chosen?: string | null): readonly [string, string] {
+  return AVATAR_GRADIENTS[avatarIndexFor(userId, chosen)];
 }
 
 /**

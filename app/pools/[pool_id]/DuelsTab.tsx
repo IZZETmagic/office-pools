@@ -705,7 +705,7 @@ export default function DuelsTab({
    */
   const inkOf = (e: string | null): AvatarInk => {
     const p = person(e)
-    return p ? avatarInk(p.user_id) : { strong: 'var(--neutral-500)', soft: 'var(--neutral-400)' }
+    return p ? avatarInk(p.user_id, p.avatar_colour) : { strong: 'var(--neutral-500)', soft: 'var(--neutral-400)' }
   }
   const youInk = inkOf(inPlay?.you.entry ?? null)
   const themInk = inkOf(inPlay?.them?.entry ?? null)
@@ -792,7 +792,7 @@ export default function DuelsTab({
 
   const ownWash = (() => {
     const p = person(ownEntryIds[0] ?? null)
-    return p ? avatarInk(p.user_id).soft : 'var(--sp-slate)'
+    return p ? avatarInk(p.user_id, p.avatar_colour).soft : 'var(--sp-slate)'
   })()
   /** Running points for an entry in the matchweek being played. */
   const live = (e: string | null) => (e ? livePoints.get(e) ?? 0 : 0)
@@ -1418,7 +1418,7 @@ export default function DuelsTab({
               background:
                 'linear-gradient(105deg,' +
                 ` color-mix(in srgb, ${
-                  youPerson ? avatarInk(youPerson.user_id).soft : 'var(--sp-slate)'
+                  youPerson ? avatarInk(youPerson.user_id, youPerson.avatar_colour).soft : 'var(--sp-slate)'
                 } 22%, transparent) 0%,` +
                 ' transparent 52%, color-mix(in srgb, var(--sp-slate) 14%, transparent) 100%)',
             }}
@@ -1462,7 +1462,7 @@ export default function DuelsTab({
                   className="w-16 h-16 rounded-full shrink-0"
                   style={{
                     boxShadow: `0 0 0 3px color-mix(in srgb, ${
-                      youPerson ? avatarColor(youPerson.user_id) : 'rgba(255,255,255,0.20)'
+                      youPerson ? avatarColor(youPerson.user_id, youPerson.avatar_colour) : 'rgba(255,255,255,0.20)'
                     } 45%, transparent)`,
                   }}
                 >
@@ -2130,7 +2130,7 @@ function DuelPanel({
   /** A duellist's own colour — the one their avatar opens with. */
   const colourOf = (e: string | null) => {
     const p = person(e)
-    return p ? avatarColor(p.user_id) : 'rgba(255,255,255,0.35)'
+    return p ? avatarColor(p.user_id, p.avatar_colour) : 'rgba(255,255,255,0.35)'
   }
   // Resolved once, out here: inside the strip's `.map` the `m.them` null-check
   // does not narrow, and it would recompute the hash per segment anyway.
@@ -2139,7 +2139,7 @@ function DuelPanel({
   /** The corner wash: lightness-normalised, so neither corner outshines the other. */
   const washOf = (e: string | null) => {
     const p = person(e)
-    return p ? avatarInk(p.user_id).soft : 'var(--sp-slate)'
+    return p ? avatarInk(p.user_id, p.avatar_colour).soft : 'var(--sp-slate)'
   }
   const yourWash = washOf(m.you.entry)
   const theirWash = m.them ? washOf(m.them.entry) : 'var(--sp-slate)'
@@ -2345,7 +2345,7 @@ function AvatarRing({ person }: { person: AvatarPerson | null }) {
   // — the one thing a ring must never do, since it is drawn touching the very
   // colour it contradicts. There is no `side` any more: nothing on this card
   // is blue-versus-red, it is one member's colour against another's.
-  const ring = person ? avatarColor(person.user_id) : 'rgba(255,255,255,0.20)'
+  const ring = person ? avatarColor(person.user_id, person.avatar_colour) : 'rgba(255,255,255,0.20)'
   return (
     <div
       className="w-12 h-12 sm:w-14 sm:h-14 rounded-full shrink-0"

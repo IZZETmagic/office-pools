@@ -17,7 +17,7 @@ export default async function ProfileServerPage() {
   // Get user profile from users table
   const { data: profile } = await supabase
     .from('users')
-    .select('user_id, username, full_name, email, created_at, is_super_admin')
+    .select('user_id, username, full_name, email, created_at, is_super_admin, avatar_colour')
     .eq('auth_user_id', user.id)
     .single()
 
@@ -350,6 +350,7 @@ export default async function ProfileServerPage() {
         user_id: profile.user_id,
         username: profile.username,
         full_name: profile.full_name,
+        avatar_colour: profile.avatar_colour ?? null,
         email: user.email ?? '',
         created_at: profile.created_at,
         is_super_admin: profile.is_super_admin ?? false,

@@ -66,7 +66,7 @@ export type DuelRecap = {
 }
 
 function Face({ person, dim = false }: { person: AvatarPerson | null; dim?: boolean }) {
-  const ring = person ? avatarColor(person.user_id) : 'rgba(255,255,255,0.2)'
+  const ring = person ? avatarColor(person.user_id, person.avatar_colour) : 'rgba(255,255,255,0.2)'
   return (
     <span
       className={`w-16 h-16 rounded-full shrink-0 ${dim ? 'opacity-45' : ''}`}
@@ -129,7 +129,7 @@ export function DuelRecapSheet({
             background:
               'linear-gradient(150deg,' +
               ` color-mix(in srgb, ${
-                recap.you.person ? avatarColor(recap.you.person.user_id) : 'var(--sp-slate)'
+                recap.you.person ? avatarColor(recap.you.person.user_id, recap.you.person.avatar_colour) : 'var(--sp-slate)'
               } 18%, transparent) 0%, transparent 55%)`,
           }}
         />

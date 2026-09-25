@@ -55,7 +55,7 @@ export function useMemberRoster(poolId: string | undefined) {
       const { data, error: err } = await supabase
         .from('pool_members')
         .select(
-          'member_id, user_id, role, joined_at, users:user_id(full_name, username), pool_entries(entry_id, entry_name, entry_number, scored_total_points, has_submitted_predictions)',
+          'member_id, user_id, role, joined_at, users:user_id(full_name, username, avatar_colour), pool_entries(entry_id, entry_name, entry_number, scored_total_points, has_submitted_predictions)',
         )
         .eq('pool_id', poolId);
       if (err) throw err;

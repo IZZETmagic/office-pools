@@ -94,6 +94,14 @@ export type MemberData = {
     username: string
     full_name: string
     email: string
+    /**
+     * The colour this member PICKED — `users.avatar_colour`, migration 146.
+     *
+     * ⚠ Nullable because most members have not chosen: null means "fall back to the hash of
+     * their user id", not "no colour". Every query filling a MemberData must select it, or a
+     * member who has chosen renders in two different colours depending on the screen.
+     */
+    avatar_colour: string | null
   }
   entries?: EntryData[]
 }

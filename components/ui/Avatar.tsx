@@ -23,6 +23,15 @@ export type AvatarPerson = {
   user_id: string
   full_name?: string | null
   username?: string | null
+  /**
+   * The palette colour this member PICKED, by name — `users.avatar_colour`.
+   *
+   * ⚠ Optional, and undefined is not the same as "no colour": it means this call site has not
+   * been given the value yet, so the member falls back to their hashed colour. Every query that
+   * builds an AvatarPerson should select it, or a member who has chosen will be one colour on
+   * one screen and another elsewhere. See `avatarIndexFor`.
+   */
+  avatar_colour?: string | null
 }
 
 export function personName(p: AvatarPerson): string {
@@ -77,7 +86,7 @@ export function Avatar({
         width: size,
         height: size,
         fontSize: fontSize ?? (typeof size === 'number' ? Math.round(size * 0.38) : undefined),
-        backgroundImage: avatarGradient(person.user_id),
+        backgroundImage: avatarGradient(person.user_id, person.avatar_colour),
       }}
     >
       {getInitials(person.full_name, person.username)}

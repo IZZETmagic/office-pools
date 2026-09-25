@@ -7,7 +7,8 @@
     "person": {
       "user_id": "b95acab7-1e48-418e-8a77-2c084c30db94",
       "full_name": "Priya Nair",
-      "username": "Priya"
+      "username": "Priya",
+      "avatar_colour": null
     },
     "season": {
       "duelPoints": 500,
@@ -22,7 +23,8 @@
     "person": {
       "user_id": "047b7f8a-be8a-4555-b632-d34e01845532",
       "full_name": "Sarah Chen",
-      "username": "Sarah C"
+      "username": "Sarah C",
+      "avatar_colour": null
     },
     "season": {
       "duelPoints": 500,

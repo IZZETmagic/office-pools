@@ -73,6 +73,8 @@ export type RevealPerson = {
   user_id: string
   full_name: string | null
   username: string | null
+  /** The colour they picked — `users.avatar_colour`. Null means fall back to the hash. */
+  avatar_colour: string | null
 }
 
 /** What a side has done so far. Derived — no column holds the record. */
@@ -163,8 +165,8 @@ export const DuelReveal: React.FC<DuelRevealProps> = ({
   const lit = interpolate(frame, [BEAT.reveal, BEAT.reveal + 10], [0, 1], CLAMP)
   const revealed = frame >= BEAT.reveal
 
-  const ink = them ? avatarInk(them.person.user_id) : null
-  const ring = them ? avatarColor(them.person.user_id) : '#FFFFFF'
+  const ink = them ? avatarInk(them.person.user_id, them.person.avatar_colour) : null
+  const ring = them ? avatarColor(them.person.user_id, them.person.avatar_colour) : '#FFFFFF'
 
   const blowout = interpolate(
     frame,
@@ -289,7 +291,7 @@ export const DuelReveal: React.FC<DuelRevealProps> = ({
                 width: 380,
                 height: 380,
                 borderRadius: '50%',
-                backgroundImage: avatarGradient(them.person.user_id),
+                backgroundImage: avatarGradient(them.person.user_id, them.person.avatar_colour),
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -641,7 +643,7 @@ function YouChip({ side, t, dim }: { side: RevealSide; t: number; dim: number })
           width: 92,
           height: 92,
           borderRadius: '50%',
-          backgroundImage: avatarGradient(side.person.user_id),
+          backgroundImage: avatarGradient(side.person.user_id, side.person.avatar_colour),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
