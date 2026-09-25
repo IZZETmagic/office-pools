@@ -772,14 +772,34 @@ export const PALETTE = {
   eye: ['#3E2612', '#5B3A1E', '#8B5E3C', '#2E7D32', '#2E6FD9', '#4B5563'],
   mouth: ['#B67A70', '#C4736B', '#A85E58', '#D08A82'],
   shirt: ['#3B6EFF', '#16A34A', '#C2410C', '#7C3AED', '#0F766E', '#DB2777', '#111827', '#F59E0B'],
-  // ⭐ BOLD, AND NO WHITE. Ryan, 2026-09-25, picking off a render: "teal, plum, crimson
-  // and charcoal — don't keep white". The pale tints they replace barely separated from
-  // pale skin at all (contrast 1.07–1.26), so the silhouette was carried by the hair and
-  // the shirt rather than by the head. ⚠ Blue and amber were rendered and REJECTED, not
-  // overlooked: any blue collides with the default #3B6EFF shirt at the shoulder, and
-  // amber goes muddy against light and mid skin.
-  // ⚠⚠ Duplicated in builder-template.html's BGS — a guard test pins them together.
-  background: ['#0E7490', '#581C87', '#BE123C', '#1F2937'],
+  // ⭐⭐ THE SAME LIST A PERSON IS RECOGNISED BY, not a palette of its own. Ryan,
+  // 2026-09-25: the avatar's background IS the member's colour, and that colour is
+  // what a Showdown duel glows with. Two lists would let a member's avatar and their
+  // duel side disagree, which is the one thing this colour exists to prevent.
+  //
+  // ⚠ These are the DARK tone of each entry. The glow stop is light so it survives
+  // the midnight duel ground; a background has the opposite job, because the head is
+  // pale skin and needs a dark ground to have an edge. See AVATAR_BACKGROUNDS.
+  //
+  // ⚠⚠ COPIED, NOT IMPORTED — and that is deliberate. This file has no imports: it is
+  // a port of compose.py and is itself mirrored into builder-template.html, which is
+  // plain HTML that can import nothing. So the same thirteen values exist in three
+  // places and TWO guard tests pin them together. Change one, change all three.
+  background: [
+    '#8D000A', // red
+    '#773000', // orange
+    '#715500', // yellow
+    '#3D6600', // lime
+    '#006A2D', // green
+    '#006746', // emerald
+    '#00665B', // teal
+    '#005F70', // cyan
+    '#004F72', // sky
+    '#00418A', // blue
+    '#5D1F9A', // purple
+    '#770088', // magenta
+    '#86014F', // pink
+  ],
   frame: ['#22262E', '#6B4A2F', '#C9A227', '#9AA3AD', '#1F3A64', '#B36A72'],
   metal: ['#D4A017', '#B8BCC4', '#C08878', '#2A2A2E', '#E8E0C8', '#8C6239'],
 } as const

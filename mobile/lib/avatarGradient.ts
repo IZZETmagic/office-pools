@@ -4,13 +4,21 @@
 // The shaded avatar every surface draws: a two-stop gradient chosen from the
 // user's id, with their initials in white.
 //
-// ## ⚠⚠ THE ARRAY'S LENGTH AND ORDER ARE FROZEN
+// ## ⚠⚠⚠ ANY RESIZE RE-COLOURS PEOPLE — "APPEND ONLY" WAS WRONG
 //
 // The gradient is `hash(userId) % AVATAR_GRADIENTS.length`, so inserting a
-// colour, removing one, or reordering them RE-COLOURS EVERY EXISTING MEMBER —
-// silently, on the next app update. People recognise each other by colour in a
-// busy Banter thread; changing it is a visible regression with no error and no
-// migration. Append only, and only if you have thought about that.
+// colour, removing one, or reordering them RE-COLOURS EXISTING MEMBERS —
+// silently, on the next app update. This header used to say "append only", as
+// though adding to the end were safe. It is not: appending changes the MODULUS.
+// Measured over 20,000 ids, 10 → 20 entries re-colours 49.6% of members.
+//
+// People recognise each other by colour in a busy Banter thread, so this is a
+// visible change with no error and no migration. The only way to grow the list
+// without churn is to STORE each member's colour, which nothing does yet.
+//
+// ⚠ This file is the hand-mirror of `lib/design/avatarGradient.ts`. The web copy
+// carries the full reasoning for these thirteen; a drift guard byte-compares the
+// two, so change both or neither.
 //
 // This warning was already in `BanterSheet` when this file was extracted from
 // it. It has moved here because the constant did.
@@ -32,21 +40,25 @@
 // =============================================================
 
 /**
- * Saturated mid-tones with enough contrast for white text at 24–68px.
+ * Thirteen nameable colours, each at the lightness where its hue holds the most
+ * chroma in sRGB, with enough contrast for white text at 24–68px.
  *
- * ⚠ FROZEN — read the header before touching this.
+ * ⚠ Read the header before touching this. Mirrored in lib/design/avatarGradient.ts.
  */
 export const AVATAR_GRADIENTS: readonly [string, string][] = [
-  ['#FF6B6B', '#EE5A6F'], // coral / rose
-  ['#4ECDC4', '#44A08D'], // teal / sea
-  ['#5B8AFF', '#3B6EFF'], // sky / primary blue
-  ['#FFB347', '#FF8C42'], // peach / amber
-  ['#A855F7', '#7C3AED'], // violet / purple
-  ['#10B981', '#059669'], // emerald
-  ['#F472B6', '#EC4899'], // pink
-  ['#6366F1', '#4F46E5'], // indigo
-  ['#FB7185', '#E11D48'], // rose / red
-  ['#06B6D4', '#0891B2'], // cyan
+  ['#FE624E', '#CA3329'], // red
+  ['#FF7000', '#BB5000'], // orange
+  ['#FFC301', '#B88C00'], // yellow
+  ['#94E804', '#69A701'], // lime
+  ['#0AF170', '#00AD4E'], // green
+  ['#01EBA4', '#06A975'], // emerald
+  ['#06E8D1', '#00A796'], // teal
+  ['#0ED9FC', '#009CB6'], // cyan
+  ['#00B0F9', '#0080B6'], // sky
+  ['#6192FF', '#226AD0'], // blue
+  ['#BD74FE', '#8E4ACF'], // purple
+  ['#E852FF', '#B812D0'], // magenta
+  ['#FE55A7', '#CD1B7D'], // pink
 ];
 
 /**

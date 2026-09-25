@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Directions, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { gradientForUser } from '@/lib/avatarGradient';
 import Animated, {
   Easing,
   Extrapolation,
@@ -136,24 +137,14 @@ function beatInterpolate(t: number, segments: BeatSeg[]): number {
 // Stable per-user colour palette. Hash the user_id → pick from a curated set
 // of distinguishable hues. Same user always gets the same colour across
 // surfaces, which matters once this data wiring is real in production.
-const CHIP_PALETTE = [
-  '#7c3aed', // violet
-  '#0891b2', // teal
-  '#16a34a', // green
-  '#dc2626', // red
-  '#f59e0b', // amber
-  '#8b5cf6', // purple
-  '#06b6d4', // cyan
-  '#10b981', // emerald
-  '#ef4444', // rose
-  '#f97316', // orange
-];
-
+// ⚠⚠ THIS FILE USED TO CARRY ITS OWN PALETTE AND ITS OWN HASH. `CHIP_PALETTE` held
+// ten different colours from `lib/avatarGradient.ts` and hashed with `h * 31` where
+// the real one uses djb2 — while its comment claimed "same user always gets the same
+// colour across surfaces". It did not: this playground showed a member a colour they
+// were nowhere else in the product, which is the opposite of what a reveal playground
+// is for. A playground that lies about identity cannot be used to judge a reveal.
 function colourFromId(id: string | null | undefined): string {
-  if (!id) return CHIP_PALETTE[0];
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return CHIP_PALETTE[Math.abs(h) % CHIP_PALETTE.length];
+  return gradientForUser(id ?? 'placeholder')[0];
 }
 
 function initialOf(name: string | null | undefined): string {

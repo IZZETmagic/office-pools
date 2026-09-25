@@ -8,23 +8,94 @@ import { withLightness } from './oklch'
  * .vercelignore, so web code cannot import from it and still build on Vercel.
  * The same hand-mirror + test-only drift guard pattern as lib/email/brand.ts.
  *
- * The order is load-bearing: the index comes from a hash of the user id, so
- * reordering or resizing this list reassigns everyone's colour and the same
- * person would show up differently on web than in the app. Append only.
+ * ⚠⚠⚠ "APPEND ONLY" IS NOT SAFE, AND THIS FILE USED TO SAY IT WAS. The index is
+ * `hash(userId) % AVATAR_GRADIENTS.length`, so appending changes the MODULUS and
+ * re-colours people nowhere near the end of the list. Measured over 20,000 ids:
+ * 10 → 20 entries re-colours 49.6% of members, 10 → 16 re-colours 87.4%, 10 → 12
+ * re-colours 83.1%. Any resize is a re-colour; the only question is how much. The
+ * sole way to grow this without churn is to STORE each member's choice.
+ *
+ * ⭐ WHY THESE THIRTEEN. Ryan, 2026-09-25, on the ten that were here before: "I'd
+ * like it so that the shadows and glows don't clash super often, where they have
+ * blue and blue, purple and purple, and red and red." That was measurable — 6 of
+ * the old 45 pairings sat under CIELAB dE 40 and read as ONE colour in a duel:
+ * coral+rose 14, sky+indigo 22, teal+cyan 23, violet+indigo 24, pink+rose 27,
+ * teal+emerald 30.
+ *
+ * Chosen by NAMEABLE CATEGORY, not by even spacing, because "clash" is a thing a
+ * person judges rather than a distance. Even perceptual spacing put five cyans in
+ * eighteen slots; even HSL spacing scored worse than what it replaced. Each colour
+ * sits at the lightness where its hue holds the most chroma in sRGB, which is why
+ * the L* values vary instead of being normalised.
+ *
+ * ⚠ THIRTEEN IS NOT ROUND ON PURPOSE. From sixteen names, dropping the closer of
+ * each clashing pair converges here: violet and indigo fall to purple and blue,
+ * amber falls to yellow. Closest surviving pair is emerald+teal at dE 25, was 14.
+ *
+ * ⚠ Still not clash-FREE, and no palette this size can be: 9 of the 78 pairings
+ * (12%) sit under dE 40. Those are meant to be resolved by shifting one side at
+ * duel time — every colour has at least 10 of the other 12 to shift into. Until
+ * that lands, a duel can still show two close colours.
  */
 
 /** Diagonal top-left → bottom-right pairs, tuned to keep white initials legible. */
 export const AVATAR_GRADIENTS: readonly (readonly [string, string])[] = [
-  ['#FF6B6B', '#EE5A6F'], // coral / rose
-  ['#4ECDC4', '#44A08D'], // teal / sea
-  ['#5B8AFF', '#3B6EFF'], // sky / primary blue
-  ['#FFB347', '#FF8C42'], // peach / amber
-  ['#A855F7', '#7C3AED'], // violet / purple
-  ['#10B981', '#059669'], // emerald
-  ['#F472B6', '#EC4899'], // pink
-  ['#6366F1', '#4F46E5'], // indigo
-  ['#FB7185', '#E11D48'], // rose / red
-  ['#06B6D4', '#0891B2'], // cyan
+  ['#FE624E', '#CA3329'], // red
+  ['#FF7000', '#BB5000'], // orange
+  ['#FFC301', '#B88C00'], // yellow
+  ['#94E804', '#69A701'], // lime
+  ['#0AF170', '#00AD4E'], // green
+  ['#01EBA4', '#06A975'], // emerald
+  ['#06E8D1', '#00A796'], // teal
+  ['#0ED9FC', '#009CB6'], // cyan
+  ['#00B0F9', '#0080B6'], // sky
+  ['#6192FF', '#226AD0'], // blue
+  ['#BD74FE', '#8E4ACF'], // purple
+  ['#E852FF', '#B812D0'], // magenta
+  ['#FE55A7', '#CD1B7D'], // pink
+]
+
+/**
+ * The flat canvas tone behind a composed avatar — one per entry, SAME ORDER.
+ *
+ * ⚠ A separate list rather than a derivation. The glow stops are light so they
+ * survive on the midnight duel ground; an avatar background has the opposite job,
+ * because the head is pale skin and needs a dark ground to have an edge at all.
+ * One value cannot do both, and a derivation would have to be mirrored into
+ * `builder-template.html`, which is plain HTML with no imports and is type-checked
+ * by nothing. Explicit values, pinned by a guard test, instead.
+ */
+export const AVATAR_BACKGROUNDS: readonly string[] = [
+  '#8D000A', // red
+  '#773000', // orange
+  '#715500', // yellow
+  '#3D6600', // lime
+  '#006A2D', // green
+  '#006746', // emerald
+  '#00665B', // teal
+  '#005F70', // cyan
+  '#004F72', // sky
+  '#00418A', // blue
+  '#5D1F9A', // purple
+  '#770088', // magenta
+  '#86014F', // pink
+]
+
+/** What each entry is called — for a picker, and for talking about them. */
+export const AVATAR_COLOUR_NAMES: readonly string[] = [
+  'red',
+  'orange',
+  'yellow',
+  'lime',
+  'green',
+  'emerald',
+  'teal',
+  'cyan',
+  'sky',
+  'blue',
+  'purple',
+  'magenta',
+  'pink',
 ]
 
 /**

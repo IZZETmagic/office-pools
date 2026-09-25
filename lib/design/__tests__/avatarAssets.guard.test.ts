@@ -159,6 +159,7 @@ describe('avatar assets stay cross-platform', () => {
 // =============================================================
 
 import { composeAvatar, PALETTE, type AvatarAssets } from '@/lib/avatar/compose'
+import { AVATAR_BACKGROUNDS } from '@/lib/design/avatarGradient'
 
 const FADE_MARKER = 'rgb(126,110,150)'
 const BEARD_MARKER = 'rgb(110,150,126)'
@@ -1517,6 +1518,21 @@ describe('background', () => {
   const bundle = () => JSON.parse(
     readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
   ) as AvatarAssets
+
+  it('offers the same backgrounds the identity palette does', () => {
+    // ⚠⚠ THE SAME THIRTEEN VALUES LIVE IN THREE PLACES. `AVATAR_BACKGROUNDS` is the
+    // source; `PALETTE.background` in lib/avatar/compose.ts copies them because that
+    // file has NO imports by design (it is a port of compose.py and is itself mirrored
+    // into builder-template.html, which can import nothing); and `BGS` in the builder
+    // copies them again. Two tests pin the chain — this one, and the BGS one below.
+    //
+    // ⭐ Why they must agree: the avatar's background IS the member's colour, and that
+    // colour is what a Showdown duel glows with. A drift here would let a member's
+    // avatar and their duel side be different colours, which is the single thing this
+    // colour exists to prevent.
+    expect(PALETTE.background.map((c) => c.toUpperCase()))
+      .toEqual(AVATAR_BACKGROUNDS.map((c) => c.toUpperCase()))
+  })
 
   it('offers the same swatches in the builder as in the product', () => {
     // ⚠⚠ `PALETTE.background` and builder-template's `BGS` are the SAME LIST WRITTEN TWICE.

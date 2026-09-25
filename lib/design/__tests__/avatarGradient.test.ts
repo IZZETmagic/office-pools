@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { AVATAR_GRADIENTS, hashUserIdToIndex, avatarGradient } from '../avatarGradient'
+import {
+  AVATAR_GRADIENTS, AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES,
+  hashUserIdToIndex, avatarGradient,
+} from '../avatarGradient'
 
 // Drift guard for the avatar palette.
 //
@@ -79,5 +82,93 @@ describe('avatarGradient', () => {
   it('emits a diagonal CSS gradient from the chosen pair', () => {
     const [from, to] = AVATAR_GRADIENTS[hashUserIdToIndex('u1', AVATAR_GRADIENTS.length)]
     expect(avatarGradient('u1')).toBe(`linear-gradient(135deg, ${from}, ${to})`)
+  })
+})
+
+
+// ---------------------------------------------------------------------------
+// The palette's own shape, and the property it exists for.
+// ---------------------------------------------------------------------------
+
+/** CIELAB ΔE between two hex colours — "do these read as two colours or one". */
+function deltaE(hexA: string, hexB: string): number {
+  const lab = (hex: string) => {
+    const n = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+    const Y0 = [
+      n[0] * 0.4124 + n[1] * 0.3576 + n[2] * 0.1805,
+      n[0] * 0.2126 + n[1] * 0.7152 + n[2] * 0.0722,
+      n[0] * 0.0193 + n[1] * 0.1192 + n[2] * 0.9505,
+    ]
+    const [X, Y, Z] = [Y0[0] / 0.95047, Y0[1], Y0[2] / 1.08883]
+    const g = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116)
+    const [fx, fy, fz] = [g(X), g(Y), g(Z)]
+    return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)]
+  }
+  const [a, b] = [lab(hexA), lab(hexB)]
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
+}
+
+describe('the palette keeps its three lists in step', () => {
+  it('has a background and a name for every gradient', () => {
+    // ⚠ The three are indexed by the SAME hash. A short list would silently hand
+    // some members an undefined background rather than throwing.
+    expect(AVATAR_BACKGROUNDS.length).toBe(AVATAR_GRADIENTS.length)
+    expect(AVATAR_COLOUR_NAMES.length).toBe(AVATAR_GRADIENTS.length)
+  })
+
+  it('names every colour distinctly', () => {
+    expect(new Set(AVATAR_COLOUR_NAMES).size).toBe(AVATAR_COLOUR_NAMES.length)
+  })
+})
+
+describe('no two members can be handed colours that read as one', () => {
+  // ⭐ THIS IS THE PROPERTY THE PALETTE EXISTS FOR. Ryan, 2026-09-25: "I'd like it
+  // so that the shadows and glows don't clash super often, where they have blue and
+  // blue, purple and purple, and red and red." The ten this replaced had SIX pairs
+  // under ΔE 40 — coral+rose at 14 was two names for one colour.
+  //
+  // ⚠ The floor is 25, not 40. No palette of this size can put every pair above 40;
+  // at thirteen colours, 9 of the 78 pairings still sit under it and are meant to be
+  // resolved by shifting one side at duel time. 25 is the line below which two
+  // colours are indistinguishable rather than merely close, and it is what the
+  // current set clears. Raising it means dropping colours.
+  const FLOOR = 25
+
+  it('keeps every pair of glow tones at least ΔE 25 apart', () => {
+    const fails: string[] = []
+    for (let i = 0; i < AVATAR_GRADIENTS.length; i++) {
+      for (let j = i + 1; j < AVATAR_GRADIENTS.length; j++) {
+        const d = deltaE(AVATAR_GRADIENTS[i][0], AVATAR_GRADIENTS[j][0])
+        if (d < FLOOR) {
+          fails.push(`${AVATAR_COLOUR_NAMES[i]} + ${AVATAR_COLOUR_NAMES[j]} = ${d.toFixed(0)}`)
+        }
+      }
+    }
+    expect(fails, `these pairs are too close to tell apart: ${fails.join(', ')}`).toEqual([])
+  })
+
+  it('gives every colour somewhere safe to shift to', () => {
+    // A duel resolves a close pairing by moving one side. That only works if every
+    // colour has clearly-separated alternatives; a colour with none would strand it.
+    for (let i = 0; i < AVATAR_GRADIENTS.length; i++) {
+      const safe = AVATAR_GRADIENTS
+        .filter((_, j) => j !== i && deltaE(AVATAR_GRADIENTS[i][0], AVATAR_GRADIENTS[j][0]) >= 40)
+      expect(safe.length, `${AVATAR_COLOUR_NAMES[i]} has too few colours to shift into`)
+        .toBeGreaterThanOrEqual(6)
+    }
+  })
+
+  it('opens each gradient on its lighter stop', () => {
+    // ⚠ `avatarColor` returns stop ONE and the duel glow uses it, on the strength of
+    // every pair running light → dark. A pair entered the other way round would put a
+    // dark colour on the midnight ground and that member's side would vanish.
+    const lum = (hex: string) =>
+      [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+        .reduce((a, c, k) => a + c * [0.2126, 0.7152, 0.0722][k], 0)
+    AVATAR_GRADIENTS.forEach(([from, to], i) => {
+      expect(lum(from), `${AVATAR_COLOUR_NAMES[i]} runs dark → light`).toBeGreaterThan(lum(to))
+    })
   })
 })
