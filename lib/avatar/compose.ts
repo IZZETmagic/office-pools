@@ -402,31 +402,55 @@ function findNose(doc: string, fill: string = T.skinShade): string | null {
 }
 
 /**
+ * Where the body starts. Every base's shirt, neck and neck shadow begin here, and so does every
+ * derived backfill — `build-body-layers.py` derives them all from the same silhouette.
+ */
+const SHOULDER_LINE = 1520
+
+/**
  * A composed avatar reduced to the HEAD — for an asset picker, nothing else.
  *
  * ⭐ Ryan, 2026-09-25: a hair option should be shown "on the base avatars head ONLY (no eyes,
- * no mouth, no nose, only the ears)". Eyes and mouth take null already. The nose, the neck and
- * the shirt do not, because they are part of the base rather than slots.
+ * no mouth, no nose, only the ears)", and then, of the result: "it should show the full hair,
+ * that is the only option". Eyes and mouth take null already. The nose, the neck and the shirt
+ * do not, because they are part of the base rather than slots.
  *
- * ⚠⚠ THE BODY IS HIDDEN, NOT DELETED — and getting that wrong is what broke every long style.
- * compose paints BACKFILL → HAIR → BODY-IN-FRONT, so the body is the thing that occludes hair
- * falling behind the shoulders. Delete it and that hair has nothing in front of it: bob,
- * bobswept, halfup and shag showed the cut ends as stubs hanging under the chin, and longcurly
- * and midwavy showed a whole dark slab. The body must still be PAINTED, in the preview's own
- * ground colour, so it goes on occluding exactly as it does in a real avatar while being
- * invisible against the card.
+ * ⭐⭐⭐ THE HAIR ART IS ALREADY COMPLETE — THE ASSET'S OWN MASK CUTS THE BODY OUT OF IT. Five
+ * styles (`f01-bob`, `f04-longcurly`, `f09-midwavy`, `f13-longstraight`, `m15-locs`) are a
+ * full-canvas rect under `<mask id="facehole">`, and that mask subtracts the head, the nose,
+ * the ears, the background AND the shirt, the neck and the neck shadow. Drop the last three and
+ * the hair behind the shoulders comes back — art that was drawn and has been hidden ever since,
+ * with nothing invented. `f13-longstraight`'s shading paths run to y1841, well past the
+ * shoulder line at y1519, which is the proof it was drawn full.
  *
- * ⚠ The BACKFILL is deleted rather than hidden. It sits BEHIND the hair, so painting it the
- * ground colour would achieve nothing — it is already covered by the hair where they overlap,
- * and where they do not it is the slab.
+ * ⚠ The subtractions are picked by where they START: a body path begins exactly at the shoulder
+ * line, y1519–1520. Nothing else in a mask begins below y955 (the nose), so the window
+ * 1500–1525 separates them with 545 units to spare — and it is a window, not a floor, because
+ * `f04-longcurly` also subtracts a gap between two curls starting at y1775, which is real art
+ * and must stay. Every document has exactly one mask, the hair's.
+ *
+ * ⚠⚠ THEN THE BODY MUST GO, not be hidden. An earlier version painted it in the card's ground
+ * colour so it went on occluding invisibly — which was right while the hair still had the bite,
+ * and is wrong now: with the mask opened, ground-painted shoulders cover the very hair this
+ * just recovered. Nothing is left to occlude, because the only hair below the shoulder line is
+ * hair that hangs in FRONT of them — braid tips, locs, curls.
+ *
+ * ⚠ The BACKFILL goes too. It is the body silhouette in the hair tone, painted behind the hair
+ * so no background shows beside a narrower neck; with the body gone it is exposed, and it was
+ * never drawn to be seen — on `f01-bob` its two nubs hang below the hair like prongs.
  *
  * ⚠⚠ IT IS IDENTIFIED BY ITS OWN GEOMETRY, and it has to be. Every backfill starts at the
- * shoulder line (y1520) and a first version deleted hair-toned paths starting below y1390 for
- * that reason — but `f04-longcurly`, `m15-locs` and `f07-braids` all carry real hair that
- * starts lower than that, down to y1775, so the rule was one asset away from eating the very
- * styles it was written to fix. Composition never rewrites a `d`, only the fill and the ids,
- * so the backfill's own path data matches verbatim. Pass `A.hairBackfill[cfg.hair]`; passing
- * nothing removes nothing, which is correct for every style that has no backfill.
+ * shoulder line too, and a first version deleted hair-toned paths starting below y1390 for that
+ * reason — but `f04-longcurly`, `m15-locs` and `f07-braids` all carry real hair that starts
+ * lower than that, down to y1775, so the rule was one asset away from eating the very styles it
+ * was written to fix. Composition never rewrites a `d`, only the fill and the ids, so the
+ * backfill's own path data matches verbatim. Pass `A.hairBackfill[cfg.hair]`; passing nothing
+ * removes nothing, which is correct for every style that has no backfill.
+ *
+ * 🔴 FOUR STYLES ARE NOT FIXABLE HERE. `f03-bobswept`, `f12-halfup`, `f14-shag` and
+ * `m14-longhair` draw their silhouette as real paths and carry the neck notch cut INTO that
+ * geometry, so no mask opens it. They still show a light notch under the chin. That needs the
+ * art regenerated, not another compositing rule.
  *
  * ⚠ A POST-PROCESS, NOT A CONFIG FLAG. `AvatarConfig` is the contract three compositors share,
  * and this is display-only. Composition is unchanged and parity is unaffected.
@@ -437,7 +461,7 @@ function findNose(doc: string, fill: string = T.skinShade): string | null {
  */
 export function headOnly(
   svg: string,
-  colours: { skin: string; shirt: string; ground: string },
+  colours: { skin: string; shirt: string },
   backfill = '',
 ): string {
   const shade = darken(hex2rgb(colours.skin), 0.88)
@@ -455,7 +479,14 @@ export function headOnly(
     return xs.length ? { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) } : null
   }
 
-  let out = svg
+  // the body, cut out of the hair by the hair's own mask — see the header
+  let out = svg.replace(/<mask[^>]*>[\s\S]*?<\/mask>/g, (mask) =>
+    mask.replace(/<path[^>]*\/?>/g, (p) => {
+      const y0 = box(p)?.y0
+      return y0 !== undefined && y0 >= SHOULDER_LINE - 20 && y0 <= SHOULDER_LINE + 5 ? '' : p
+    }),
+  )
+
   const nose = findNose(out, shade)
   if (nose) out = out.replace(nose, '')
 
@@ -475,14 +506,12 @@ export function headOnly(
       out = out.replace(p, '')
       continue
     }
-    // the body, front copy AND back copy: repainted so it still occludes, invisibly.
+    // the body, front copy AND back copy.
     // ⚠ The ears are skin-shaded and narrow too, which is why the test is "reaches past the
     // chin" — they stop at y1024.
     const isShirt = f === shirt || f === shirt2
     const isNeck = (f === skin || f === shade) && b.x1 - b.x0 < 500 && b.y1 > chin - 10
-    if (isShirt || isNeck) {
-      out = out.replace(p, p.replace(/fill="[^"]*"/, `fill="${colours.ground}"`))
-    }
+    if (isShirt || isNeck) out = out.replace(p, '')
   }
   return out
 }
