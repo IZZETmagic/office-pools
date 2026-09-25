@@ -776,6 +776,16 @@ describe('long hair works on every neck width', () => {
       for (const f of [...markup.matchAll(/fill="([^"]*)"/g)].map((m) => m[1])) {
         expect(['rgb(140,122,110)', 'rgb(114,97,86)'], `${style} fill ${f}`).toContain(f)
       }
+      // ⚠ Sealed like every other hair path: a stroke of its OWN fill, or the edge where it
+      // meets the locked hair leaks a light line. Ryan, 2026-09-25: "there's a hairline
+      // different all the way around what you put in there". Wider than hair's 1.2 because
+      // this seam cannot be closed by burying the shape — see extract-behind.py.
+      for (const m of markup.matchAll(/<path[^>]*\/?>/g)) {
+        const fill = /fill="([^"]*)"/.exec(m[0])?.[1]
+        const stroke = /stroke="([^"]*)"/.exec(m[0])?.[1]
+        expect(stroke, `${style} has a path with no stroke`).toBe(fill)
+        expect(m[0], `${style} stroke-width`).toMatch(/stroke-width="8(\.0)?"/)
+      }
     }
   })
 })

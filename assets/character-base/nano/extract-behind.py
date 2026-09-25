@@ -89,6 +89,24 @@ HEAD = ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '
 # do not measure 138 and 158, so there is no judgement in the number.
 SEAM_MAX = 12
 
+# Sealing the neck fill against the hair beside it. ⚠⚠ Burying the shape sideways does NOT
+# work here and the reason is worth keeping: at the fill's own y the body IS the neck, nothing
+# wider, so `∩ region` pulls any sideways growth straight back to x849/x1199 and the two
+# anti-aliased edges still meet on a line. One column read rgb(83,72,66) against rgb(57,46,39).
+#
+# ⭐ So the OVERLAP comes from the stroke instead, and it has to be wider than hair's usual 1.2:
+# that is 0.6 units a side, a quarter of a pixel at card size, and it left the seam reading
+# rgb(83,72,66). 4.0 took `f01-bob` to within 4/255 but left `f03-bobswept` at 18. 8.0 is 4
+# units a side, just under two pixels on a 900px card, and closes both.
+#
+# ⚠ A stroke grows EVERY edge, including the top, and the top edge sits on the chin — the head
+# is painted before this layer, so 2 units of stroke would paint 2 units of hair onto the jaw.
+# CHIN_CLEAR holds the fill back from the skull by exactly what the stroke puts on, so the two
+# cancel and the top edge lands where it always did. ⚠ It also caps the BOTTOM: the fill is cut
+# at the hem, and the stroke would hang half its width below it, so the cut is raised to match.
+SEAL_STROKE = 8.0
+CHIN_CLEAR = SEAL_STROKE / 2
+
 # The two hair tones the reference was composed with — hair/behind/PROMPT.md records the
 # palette. Everything else in the reference is a body tone.
 REF_HAIR = ((140, 122, 110), (109, 95, 85))
@@ -188,6 +206,29 @@ def hem(ref_png: str, x0: float, x1: float):
     return max(lows) if lows else None
 
 
+def dominant_tone(ref_png: str, x0: float, x1: float, y0: float, y1: float):
+    """Which of the two hair tones the locked hair actually uses beside a region.
+
+    ⭐ Ryan, 2026-09-25: the neck fill "is a hairline different all the way around". It was —
+    filled with HAIR_BASE while the hair either side of the neck on `f01-bob` and
+    `f03-bobswept` is HAIR_SHADE, rgb(74,59,50) against rgb(57,46,39). A patch that has to
+    disappear into its neighbours takes its tone FROM them; there is nothing to derive.
+    """
+    from PIL import Image
+    im = Image.open(ref_png).convert("RGB")
+    w, h = im.size
+    px = im.load()
+    votes = {t: 0 for t in REF_HAIR}
+    for col in range(max(0, int(x0 / 2048 * w)), min(w, int(x1 / 2048 * w)), 2):
+        for row in range(max(0, int(y0 / 2048 * h)), min(h, int(y1 / 2048 * h)), 2):
+            c = px[col, row]
+            near = min(REF_HAIR, key=lambda t: sum((a - b) ** 2 for a, b in zip(c, t)))
+            if sum((a - b) ** 2 for a, b in zip(c, near)) < 700:
+                votes[near] += 1
+    best = max(votes, key=lambda t: votes[t])
+    return None if votes[best] == 0 else (HAIR_BASE if best == REF_HAIR[0] else HAIR_SHADE)
+
+
 def seam_gap(ref_png: str, piece):
     """How far one PIECE of new length sits below the locked hair, in viewBox units.
 
@@ -249,7 +290,7 @@ def body_minus_head(base_svg: str):
     skull = flatten(d_of(head))
     body = unary_union([flatten(d_of(p)) for p in shirt + neck]).difference(skull).buffer(0)
     just_neck = unary_union([flatten(d_of(p)) for p in neck]).difference(skull).buffer(0)
-    return body, just_neck
+    return body, just_neck, skull
 
 
 def main():
@@ -257,7 +298,7 @@ def main():
     REF_HAIR = ref_hair_from_argv()
     trace, style, ref_png = sys.argv[1], sys.argv[2], sys.argv[3]
     svg = Path(trace).read_text()
-    region, neck_region = body_minus_head((HERE / "bases/base-neck-100.svg").read_text())
+    region, neck_region, skull = body_minus_head((HERE / "bases/base-neck-100.svg").read_text())
 
     # every tone the reference actually carries — the nearest one decides what a traced path is
     ref_svg = Path(ref_png).with_suffix(".svg")
@@ -306,11 +347,20 @@ def main():
     nx0, nx1 = neck_region.bounds[0], neck_region.bounds[2]
     floors = [f for f in (hem(ref_png, nx0 - 110, nx0), hem(ref_png, nx1, nx1 + 110))
               if f is not None]
-    neck_hair = None
+    neck_hair = neck_tone = None
     if floors:
         g = neck_region.intersection(
-            Polygon([(0, 0), (2048, 0), (2048, max(floors)), (0, max(floors))])).buffer(0)
-        neck_hair = None if g.is_empty else g
+            Polygon([(0, 0), (2048, 0), (2048, max(floors) - CHIN_CLEAR),
+                     (0, max(floors) - CHIN_CLEAR)])).buffer(0)
+        if not g.is_empty:
+            # ⚠ held clear of the chin by what the stroke will add back — see SEAL_STROKE
+            neck_hair = g.difference(skull.buffer(CHIN_CLEAR)).buffer(0)
+            neck_hair = None if neck_hair.is_empty else neck_hair
+            # ⭐ the tone the hair BESIDE the neck actually uses — see dominant_tone()
+            ny0 = g.bounds[1]
+            neck_tone = (dominant_tone(ref_png, nx0 - 110, nx0, ny0, max(floors))
+                         or dominant_tone(ref_png, nx1, nx1 + 110, ny0, max(floors))
+                         or HAIR_BASE)
 
     # ⚠ the SHOULDER half, gated on the seam — PIECE BY PIECE, see seam_gap()
     whole = unary_union([g for g in tone.values() if g is not None]).buffer(0)
@@ -332,7 +382,7 @@ def main():
 
     out = []
     for token, g in ((HAIR_BASE, shoulders), (HAIR_SHADE, None)):
-        if token is HAIR_BASE and neck_hair is not None:
+        if neck_hair is not None and token == neck_tone:
             g = neck_hair if g is None else g.union(neck_hair).buffer(0)
         if g is None or g.is_empty:
             continue
@@ -343,7 +393,12 @@ def main():
             g = unary_union([q for q in g.geoms if q.area > 400])
         if g.is_empty:
             continue
-        out.append(f'<path transform="translate(0,0)" fill="{token}" d="{to_d(g)}"/>')
+        # ⚠ SEALED WITH A STROKE OF ITS OWN FILL, the same convention every hair path carries
+        # (see seal-hair-seams.py). Two anti-aliased edges meeting on one line leak a light
+        # one-pixel crack; a stroke makes the shapes OVERLAP instead of meet. The compositors
+        # already swap stroke as well as fill, and a guard test holds that.
+        out.append(f'<path transform="translate(0,0)" fill="{token}" stroke="{token}" '
+                   f'stroke-width="{SEAL_STROKE}" d="{to_d(g)}"/>')
 
     if not out:
         sys.exit(f"\n{style}: nothing fell inside the body — did the hair actually extend?")
