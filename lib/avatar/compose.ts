@@ -786,19 +786,29 @@ export const PALETTE = {
   // plain HTML that can import nothing. So the same thirteen values exist in three
   // places and TWO guard tests pin them together. Change one, change all three.
   background: [
-    '#8D000A', // red
-    '#773000', // orange
-    '#715500', // yellow
-    '#3D6600', // lime
-    '#006A2D', // green
-    '#006746', // emerald
-    '#00665B', // teal
-    '#005F70', // cyan
-    '#004F72', // sky
-    '#00418A', // blue
-    '#5D1F9A', // purple
-    '#770088', // magenta
-    '#86014F', // pink
+    '#9E0C11', // red
+    '#8B3B02', // orange
+    '#9F7910', // yellow
+    '#5F9211', // lime
+    '#1C9848', // green
+    '#1B9367', // emerald
+    '#1C9183', // teal
+    '#1C859A', // cyan
+    '#16628A', // sky
+    '#134B9A', // blue
+    '#6D0DC5', // purple
+    '#860D98', // magenta
+    '#960E5A', // pink
+    '#FA4D3C', // coral
+    '#AF8510', // butter
+    '#2594CF', // powder
+    '#B366F8', // lilac
+    '#584102', // olive
+    '#2F4D02', // moss
+    '#054B1F', // forest
+    '#084A32', // pine
+    '#06463F', // deepteal
+    '#084450', // ocean
   ],
   frame: ['#22262E', '#6B4A2F', '#C9A227', '#9AA3AD', '#1F3A64', '#B36A72'],
   metal: ['#D4A017', '#B8BCC4', '#C08878', '#2A2A2E', '#E8E0C8', '#8C6239'],

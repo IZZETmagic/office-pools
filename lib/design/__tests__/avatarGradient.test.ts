@@ -141,14 +141,18 @@ describe('no two members can be handed colours that read as one', () => {
   // blue, purple and purple, and red and red." The ten this replaced had SIX pairs
   // under ΔE 40 — coral+rose at 14 was two names for one colour.
   //
-  // ⚠ The floor is 25, not 40. No palette of this size can put every pair above 40;
-  // at thirteen colours, 9 of the 78 pairings still sit under it and are meant to be
-  // resolved by shifting one side at duel time. 25 is the line below which two
-  // colours are indistinguishable rather than merely close, and it is what the
-  // current set clears. Raising it means dropping colours.
-  const FLOOR = 25
+  // ⚠⚠ THIS IS THE PICKER FLOOR, NOT THE DUEL FLOOR, and they are different questions. A
+  // picker needs two options a member can tell apart while choosing. Two sides of a DUEL must
+  // not read as one person — that bar is 40 and is enforced by COLOUR_SHIFT, not here.
+  //
+  // ⚠ It dropped from 25 to 19 when the palette grew to 23 (2026-09-25). That was only
+  // affordable because the duel shift already existed: without it, 23 colours at this spacing
+  // would put 32 of the 253 pairings on screen as one colour. Raising it back means dropping
+  // colours; lowering it further starts reproducing the complaint the palette was rebuilt for
+  // ("blue and blue"), whose worst case measured 14.
+  const FLOOR = 19
 
-  it('keeps every pair of glow tones at least ΔE 25 apart', () => {
+  it('keeps every pair of glow tones far enough apart to choose between', () => {
     const fails: string[] = []
     for (let i = 0; i < AVATAR_GRADIENTS.length; i++) {
       for (let j = i + 1; j < AVATAR_GRADIENTS.length; j++) {
@@ -319,11 +323,13 @@ describe('two sides of a duel never read as one colour', () => {
   it('moves the one who did not choose', () => {
     // ⭐ What makes a shift at reveal acceptable: a member who picked their colour keeps it.
     //
-    // ⚠ `user-2` HASHES onto teal — verified below rather than assumed. The first version of
-    // this test used an arbitrary id and would have passed without the two sides ever
-    // colliding, proving nothing.
+    // ⚠ `user-28` HASHES onto teal — verified below rather than assumed. An earlier version
+    // used an arbitrary id and would have passed without the two sides ever colliding, proving
+    // nothing. ⚠⚠ The id had to CHANGE when the palette grew from 13 to 23: the index is
+    // hash % length, so the previous one stopped landing on teal. That is the same modulus
+    // move that re-colours every member still on the hash.
     const tealIndex = AVATAR_COLOUR_NAMES.indexOf('teal')
-    const HASHES_TO_TEAL = 'user-2'
+    const HASHES_TO_TEAL = 'user-28'
     expect(hashUserIdToIndex(HASHES_TO_TEAL, AVATAR_GRADIENTS.length),
       'this id must actually collide, or the test is vacuous').toBe(tealIndex)
 
@@ -357,5 +363,53 @@ describe('two sides of a duel never read as one colour', () => {
     const B = { entryId: 'e2', userId: 'u2', chosen: 'blue' }
     const once = duelColourIndices(A, B)
     for (let i = 0; i < 50; i++) expect(duelColourIndices(A, B)).toEqual(once)
+  })
+})
+
+
+describe('backgrounds stay usable as a palette of their own', () => {
+  // ⚠⚠ THE BACKGROUND IS A SECOND SURFACE WITH ITS OWN CLASH QUESTION, and the duel shift does
+  // NOT cover it. Two members side by side in a member list are their avatars, not their duel
+  // glows. The old rule — glow lightness x 0.46 — squashed every background into one dark band
+  // and put `yellow` and `butter` 2.2 apart: two different picks, one indistinguishable avatar.
+  const SKIN = ['#FFE0C4', '#F7D9BC', '#F5C9A6', '#E0AC7E', '#C68642', '#8D5524', '#6B4226', '#4A2C14']
+  const relLum = (hex: string) =>
+    [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+      .reduce((a, c, k) => a + c * [0.2126, 0.7152, 0.0722][k], 0)
+
+  it('keeps a lighter sibling visibly lighter than its parent', () => {
+    // ⭐ The specific regression. These pairs share a hue and differ ONLY in lightness, so if
+    // the background derivation compresses lightness they become the same colour.
+    for (const [light, parent] of [['coral', 'red'], ['butter', 'yellow'],
+                                   ['powder', 'sky'], ['lilac', 'purple']] as [string, string][]) {
+      const l = AVATAR_BACKGROUNDS[AVATAR_COLOUR_NAMES.indexOf(light)]
+      const p = AVATAR_BACKGROUNDS[AVATAR_COLOUR_NAMES.indexOf(parent)]
+      expect(relLum(l), `${light} must be a lighter background than ${parent}`)
+        .toBeGreaterThan(relLum(p))
+    }
+  })
+
+  it('never makes a head vanish into its own background', () => {
+    // ⚠⚠ MEASURED BY ΔE, NOT BY WCAG CONTRAST, and the first version of this test got that
+    // wrong. WCAG contrast is a LUMINANCE ratio built for text legibility and it ignores hue
+    // completely — by that measure a dark blue ground behind a mid-brown face scores 1.03, as
+    // though the head were invisible. It plainly is not: the silhouette of a flat shape on a
+    // flat ground is carried by hue as much as by lightness, and ΔE counts both.
+    //
+    // ⚠ The bar is WHAT ALREADY SHIPPED (the thirteen sat at 16.1), not an ideal. This is a
+    // ratchet against making it worse, not a claim that 16 is comfortable. The worst pair is
+    // an orange ground behind a mid-brown skin — two warm browns — and it predates the growth
+    // to twenty-three.
+    let worst = Infinity
+    let where = ''
+    for (let i = 0; i < AVATAR_BACKGROUNDS.length; i++) {
+      for (const skin of SKIN) {
+        const d = deltaE(AVATAR_BACKGROUNDS[i], skin)
+        if (d < worst) { worst = d; where = `${AVATAR_COLOUR_NAMES[i]} vs ${skin}` }
+      }
+    }
+    expect(worst, `a background got closer to a skin tone than anything shipped: ${where}`)
+      .toBeGreaterThanOrEqual(16)
   })
 })
