@@ -264,6 +264,34 @@ def arg(name: str, default=None):
     return sys.argv[sys.argv.index(name) + 1] if name in sys.argv else default
 
 
+
+def paint_canvas(svg: str, colour: str) -> str:
+    """Repaint ONLY the canvas rectangle, never every white path in the document.
+
+    ⚠⚠⚠ THE BACKGROUND AND THE EYE WHITE ARE THE SAME TOKEN, rgb(255,255,255). A global replace
+    repaints every eye white — and the teeth, which share the eye-white token — with the
+    background colour. It always has; it was never VISIBLE because every background in the
+    palette is a near-white tint. Put a bold colour in and the avatar gets coloured eyeballs.
+
+    ⭐ Fixed by POSITION, because tone cannot tell them apart and both the bases and the eye
+    assets are LOCKED. The background is the canvas rect the base paints first: the FIRST path
+    in all four bases, and the only one starting at the canvas origin. Matching `M 0 0` too
+    means a base that stopped leading with it fails to recolour — visibly, on a white avatar —
+    rather than silently painting an eyeball again.
+    """
+    done = False
+
+    def one(m):
+        nonlocal done
+        p = m.group(0)
+        if done or f'fill="{BASE_BG}"' not in p or not re.search(r'd="M\s*0[.,\s]+0[\s,]', p):
+            return p
+        done = True
+        return p.replace(f'fill="{BASE_BG}"', f'fill="{colour}"')
+
+    return re.sub(r"<path[^>]*/?>", one, svg)
+
+
 def main() -> None:
     positional = [a for a in sys.argv[1:] if not a.startswith("--")
                   and not (sys.argv.index(a) > 0 and sys.argv[sys.argv.index(a) - 1].startswith("--"))]
@@ -686,7 +714,7 @@ def main() -> None:
         mk = tuple(int(v + (255 - v) * 0.72) for v in rgb)
         svg = svg.replace(f'fill="{MARK_INK}"', f'fill="{rgb_str(mk)}"')
     if c := arg("--bg"):
-        svg = svg.replace(f'fill="{BASE_BG}"', f'fill="{rgb_str(hex_to_rgb(c))}"')
+        svg = paint_canvas(svg, rgb_str(hex_to_rgb(c)))
 
     # ⚠ LAST, over the finished document. Before this point the hair copy is still being
     # renamed by literal id and the gradient is still referenced by name.

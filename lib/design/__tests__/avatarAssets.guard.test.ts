@@ -1513,6 +1513,51 @@ describe('earrings', () => {
 // collar is paint order, not geometry.
 // =============================================================
 
+describe('background', () => {
+  const bundle = () => JSON.parse(
+    readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+  ) as AvatarAssets
+
+  it('repaints the canvas only, never the eye whites', () => {
+    // ⚠⚠⚠ THE BACKGROUND AND THE EYE WHITE ARE THE SAME TOKEN, rgb(255,255,255), and the
+    // recolour used to be a global swap — so every eye white, and every tooth, was painted the
+    // background colour. It shipped that way for as long as the palette has existed and NOBODY
+    // COULD SEE IT, because every background offered is a near-white tint: the pink one tints
+    // the eyes pink by a degree no eye can catch. It only became visible when a bold colour was
+    // tried and the avatar looked back with red eyeballs.
+    //
+    // ⭐ This test exists because the bug is INVISIBLE AT THE PALETTE WE SHIP. It deliberately
+    // uses a colour that is not in the palette, so it keeps biting even if every background is
+    // pale again tomorrow.
+    const A = bundle()
+    const BOLD = '#BE123C'
+    for (const expression of ['laughing', 'x-happy']) {
+      const svg = composeAvatar(
+        { ...cfg, base: 'base-neck-100', hair: null, facialHair: null,
+          eyes: null, mouth: null, expression, background: BOLD }, A)
+      const white = (svg.match(/fill="rgb\(255,255,255\)"/g) ?? []).length
+      const bold = (svg.match(/fill="rgb\(190,18,60\)"/g) ?? []).length
+      expect(bold, `${expression}: exactly one path — the canvas — takes the background`).toBe(1)
+      expect(white, `${expression}: the eye white must survive a bold background`)
+        .toBeGreaterThan(0)
+    }
+  })
+
+  it('leaves no path holding the raw background token once recoloured', () => {
+    // ⚠ The other direction: the canvas must actually BE repainted. Position-matching could
+    // miss it if a base ever stopped leading with its canvas rect, and the failure would be a
+    // white background that silently ignores the setting.
+    const A = bundle()
+    for (const base of Object.keys(A.bases)) {
+      const svg = composeAvatar(
+        { ...cfg, base, hair: null, facialHair: null, eyes: null, mouth: null,
+          expression: null, background: '#BE123C' }, A)
+      expect(svg, `${base}: the canvas kept the raw background token`)
+        .toContain('fill="rgb(190,18,60)"')
+    }
+  })
+})
+
 describe('garments', () => {
   const SHIRT = 'rgb(30,118,214)'
   const SHIRT2 = 'rgb(50,118,183)'

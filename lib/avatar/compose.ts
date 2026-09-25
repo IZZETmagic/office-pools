@@ -478,6 +478,30 @@ const stripEyes = (frag: string) =>
   frag.replace(/<path[^>]*\/?>/g, (p) =>
     EYE_TOKENS.some((t) => p.includes(`fill="${t}"`)) ? '' : p)
 
+/**
+ * Repaint ONLY the canvas rectangle, never every white path in the document.
+ *
+ * ⚠⚠⚠ THE BACKGROUND AND THE EYE WHITE ARE THE SAME TOKEN, rgb(255,255,255). A global swap
+ * therefore repaints every eye white — and the teeth, which share the eye-white token — with
+ * the background colour. It has always done this; it has never been VISIBLE because every
+ * background in the palette is a near-white tint, so the eye shifted by a degree nobody could
+ * see. Put a bold colour in and the avatar gets blue, red or orange eyeballs.
+ *
+ * ⭐ Fixed by position rather than by tone, because tone cannot tell them apart and BOTH the
+ * bases and the eye assets are LOCKED. The background is the canvas rect the base paints first:
+ * it is the FIRST path in all four bases and the only one that starts at the canvas origin.
+ * Matching `M 0 0` as well as the position means a base that ever stopped leading with it fails
+ * to recolour — visibly, on a white avatar — rather than silently painting an eyeball again.
+ */
+const paintCanvas = (svg: string, colour: string): string => {
+  let done = false
+  return svg.replace(/<path[^>]*\/?>/g, (p) => {
+    if (done || !p.includes(`fill="${T.bg}"`) || !/d="M\s*0[.,\s]+0[\s,]/.test(p)) return p
+    done = true
+    return p.replace(`fill="${T.bg}"`, `fill="${colour}"`)
+  })
+}
+
 /** See THE STACK below: an expression is split so its brows go under the hair and its
  *  mouth over a beard. Paths are grouped by their TOP edge against this line. */
 const EXPRESSION_SPLIT = 1072
@@ -734,7 +758,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   svg = swap(svg, T.shirt2, darken(shirt, 0.9))
   svg = swap(svg, T.shirtLight, lighten(shirt, 1.25))
   svg = swap(svg, T.markInk, mix(shirt, [255, 255, 255], 0.72))
-  svg = swap(svg, T.bg, rgbStr(hex2rgb(cfg.background)))
+  svg = paintCanvas(svg, rgbStr(hex2rgb(cfg.background)))
 
   // ⚠ LAST, over the finished document. Before this point the hair copy is still being
   // renamed by literal id and the gradient is still being referenced by name.

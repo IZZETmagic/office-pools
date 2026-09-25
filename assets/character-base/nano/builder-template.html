@@ -166,6 +166,21 @@ const GLASS_TINT = [214,234,250];
    paint order already hides all but the sliver above the rim. Cheeks and tear tracks likewise.
    ⚠ The eye white shares its token with an open mouth's TEETH — only the expression's UPPER
    half is stripped, and teeth are in the lower one. */
+// ⚠⚠⚠ THE BACKGROUND AND THE EYE WHITE ARE THE SAME TOKEN, rgb(255,255,255). swapAll on it
+// repaints every eye white — and the teeth, which share that token — with the background
+// colour. It always has; it was invisible only because every palette background is a
+// near-white tint. A bold colour gives the avatar coloured eyeballs.
+// ⭐ Fixed by POSITION: the background is the canvas rect the base paints FIRST, and the only
+// path starting at the origin. Both the bases and the eye assets are LOCKED, so tone cannot be
+// made to tell them apart. Mirrors compose.py and lib/avatar/compose.ts exactly.
+function paintCanvas(svg, colour){
+  let done = false;
+  return svg.replace(/<path[^>]*\/?>/g, p => {
+    if (done || !p.includes('fill="'+T.bg+'"') || !/d="M\s*0[.,\s]+0[\s,]/.test(p)) return p;
+    done = true;
+    return p.replace('fill="'+T.bg+'"', 'fill="'+colour+'"');
+  });
+}
 const EYE_TOKENS = ['rgb(255,255,255)','rgb(117,62,21)','rgb(150,84,34)','rgb(90,60,45)'];
 const stripEyes = frag => frag.replace(/<path[^>]*\/?>/g,
   p => EYE_TOKENS.some(t => p.includes(`fill="${t}"`)) ? '' : p);
@@ -386,7 +401,7 @@ function compose(c){
   svg = swapAll(svg, T.shirt2, darken(shirt,0.9));
   svg = swapAll(svg, T.shirtLight, lighten(shirt,1.25));
   svg = swapAll(svg, T.markInk, mix(shirt,[255,255,255],0.72));
-  svg = swapAll(svg, T.bg,     rgbStr(hex2rgb(c.bg)));
+  svg = paintCanvas(svg, rgbStr(hex2rgb(c.bg)));
   // ⚠ LAST, over the finished document: until here the hair copy is renamed by literal id.
   return uniquifyIds(svg);
 }
