@@ -21,15 +21,22 @@ test holds that. Only the asset picker, which deletes the body, ever sees it.
 
   the SHOULDERS  from the generated art. The body cut the hair off along the top of the shirt,
                  and only a redraw knows what was there.
-  the NECK       from `hair/backfill/<style>.svg`, which already IS the hair behind the neck,
-                 per style, derived from the locked geometry. ⚠ Generation cannot supply this:
-                 the generated image still has a neck, and the model will not draw hair in
-                 front of one — correctly.
+  the NECK       the neck silhouette filled solid, capped at the hem of the hair beside it.
+                 ⚠ Generation cannot supply this: the generated image still HAS a neck, and the
+                 model will not draw hair in front of one — correctly. ⚠ Nor can the backfill:
+                 it is a RIM built to seal the dip beside a narrower neck, so using its own
+                 shape left `f03-bobswept` a hole in the middle. Hair behind a neck is solid.
 
-⚠ THE NECK HALF RIDES ON THE SHOULDER HALF and is dropped with it. On its own it is two thin
-legs of backfill hanging below the chin: the backfill carries nubs that were only ever meant to
-sit behind the shirt, and `f01-bob` sprouted them the moment the body went. Hair behind the
-neck only means anything underneath hair that reaches the neck, which is the same condition.
+⚠⚠ THE TWO HALVES ARE INDEPENDENT, and believing otherwise cost a whole pass. `f01-bob` and
+`f03-bobswept` fail the seam gate — their redrawn length lands 130 and 153 units adrift — but
+they are exactly the two styles that need the NECK half most: neither has a single path across
+x849..1199, because the trace cut the neck out of a blunt hem that runs dead flat at y1554 and
+y1560. Dropping the neck half with the shoulder half left them with the hole they started with.
+
+⚠ The nubs that looked like a reason to drop it were never in this layer at all. They are the
+BACKFILL's own, visible only in a scratch preview that had not deleted it; `headOnly()` does.
+Capping the neck fill at the hem is still right — it keeps the fill flush with a blunt cut —
+but it is a tidiness rule, not a reason to refuse.
 
 ⚠⚠ THE SHOULDER HALF IS GATED ON THE SEAM, measured, not eyeballed. The generation redraws the
 style and can put the new length somewhere the locked hair never reaches: `f01-bob` and
@@ -147,6 +154,25 @@ def d_of(p: str) -> str:
     return re.search(r'd="([^"]*)"', p).group(1)
 
 
+def hem(ref_png: str, x0: float, x1: float):
+    """How far down the locked hair reaches in a band of columns, in viewBox units.
+
+    ⚠ The neck fill is clipped to this. The backfill is the WHOLE neck silhouette and carries
+    two downward nubs that only ever sat behind the shirt; uncapped they hang below a blunt hem.
+    `f01-bob` is cut dead flat at y1554 and `f03-bobswept` at y1560, so the cap is the hem.
+    """
+    from PIL import Image
+    im = Image.open(ref_png).convert("RGB")
+    w, h = im.size
+    px = im.load()
+    lows = [max(ys) / h * 2048
+            for col in range(int(x0 / 2048 * w), int(x1 / 2048 * w), 2)
+            if (ys := [y for y in range(h)
+                       if min(sum((a - b) ** 2 for a, b in zip(px[col, y], t))
+                              for t in REF_HAIR) < 700])]
+    return max(lows) if lows else None
+
+
 def seam_gap(ref_png: str, behind, region):
     """How far the new length sits below the locked hair, per column, in viewBox units.
 
@@ -248,26 +274,25 @@ def main():
             for k in tone:
                 sub(k, g)
 
-    # ⭐ the NECK half, from this style's backfill — see the header
-    bf = HERE / "hair/backfill" / f"{style}.svg"
+    # ⭐ the NECK half — see the header. The neck silhouette filled SOLID, capped at the hem of
+    # the hair beside it. ⚠ Not the backfill's own shape: that is a RIM, built to seal the dip
+    # beside a narrower neck, and it left `f03-bobswept` a hole in the middle of the fill. Hair
+    # behind a neck is solid.
+    nx0, nx1 = neck_region.bounds[0], neck_region.bounds[2]
+    floors = [f for f in (hem(ref_png, nx0 - 110, nx0), hem(ref_png, nx1, nx1 + 110))
+              if f is not None]
     neck_hair = None
-    if bf.exists():
-        gs = [flatten(d_of(p)) for p in re.findall(r"<path[^>]*/?>", bf.read_text())]
-        gs = [g for g in gs if g is not None and not g.is_empty]
-        if gs:
-            neck_hair = unary_union(gs).buffer(0).intersection(neck_region).buffer(0)
+    if floors:
+        g = neck_region.intersection(
+            Polygon([(0, 0), (2048, 0), (2048, max(floors)), (0, max(floors))])).buffer(0)
+        neck_hair = None if g.is_empty else g
+
     # ⚠ the SHOULDER half, gated on the seam — see the header
     shoulders = unary_union([g for g in tone.values() if g is not None]).buffer(0)
     gap = seam_gap(ref_png, shoulders, region) if not shoulders.is_empty else None
     attached = gap is not None and gap <= SEAM_MAX
     print(f"   seam {'-' if gap is None else f'{gap:.0f}u'}"
           f"  {'attached' if attached else 'DETACHED — shoulder half dropped'}", end="")
-
-    # ⚠ THE NECK HALF RIDES ON THE SHOULDER HALF. It is the hair BEHIND the neck, which only
-    # means anything underneath hair that reaches the neck in the first place. Kept on its own
-    # it is two thin legs of backfill hanging below the chin — see the nubs in hem().
-    if not attached:
-        neck_hair = None
 
     out = []
     for token in (HAIR_BASE, HAIR_SHADE):
