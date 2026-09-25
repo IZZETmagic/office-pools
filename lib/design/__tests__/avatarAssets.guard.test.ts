@@ -1549,20 +1549,18 @@ describe('background', () => {
       .toEqual(PALETTE.background.map((c) => c.toUpperCase()))
   })
 
-  it('offers no near-white background', () => {
-    // ⭐ Ryan, 2026-09-25: "teal, plum, crimson and charcoal — don't keep white." The pale set
-    // this replaced sat at contrast 1.07–1.26 against pale skin, so the head had almost no edge
-    // of its own. ⚠ This is a DECISION, not a law of the art — if a pale background is wanted
-    // back, delete this test rather than working around it.
-    const relLum = (hex: string) => {
-      const v = [0, 2, 4].map((i) => parseInt(hex.slice(1 + i, 3 + i), 16) / 255)
-        .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
-      return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
-    }
-    for (const bg of PALETTE.background) {
-      expect(relLum(bg), `${bg} is too pale to give the head an edge`).toBeLessThan(0.45)
-    }
-  })
+  // ⚠⚠ REMOVED 2026-09-25: 'offers no near-white background'.
+  //
+  // It asserted every background sat under relative luminance 0.45, written when Ryan said
+  // "don't keep white" and the palette was four deep colours. He has since chosen the
+  // opposite — 22 soft tones "just slightly darker than pastel" — so the assertion now
+  // contradicts the design rather than protecting it.
+  //
+  // ⭐ Its own comment said to DELETE it rather than work around it if a pale background was
+  // ever wanted back, precisely so this moment would not turn into a fudged threshold. The
+  // thing actually worth guarding — that a head never disappears into its own background — is
+  // in avatarGradient.test.ts, measured by ΔE against every skin tone.
+
 
   it('repaints the canvas only, never the eye whites', () => {
     // ⚠⚠⚠ THE BACKGROUND AND THE EYE WHITE ARE THE SAME TOKEN, rgb(255,255,255), and the

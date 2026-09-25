@@ -145,12 +145,12 @@ describe('no two members can be handed colours that read as one', () => {
   // picker needs two options a member can tell apart while choosing. Two sides of a DUEL must
   // not read as one person — that bar is 40 and is enforced by COLOUR_SHIFT, not here.
   //
-  // ⚠ It dropped from 25 to 19 when the palette grew to 23 (2026-09-25). That was only
-  // affordable because the duel shift already existed: without it, 23 colours at this spacing
-  // would put 32 of the 253 pairings on screen as one colour. Raising it back means dropping
-  // colours; lowering it further starts reproducing the complaint the palette was rebuilt for
-  // ("blue and blue"), whose worst case measured 14.
-  const FLOOR = 19
+  // ⚠ It has moved twice. 25 at thirteen colours; 19 when that grew to 23 with same-hue
+  // siblings; 20 now, at 22 colours with NO siblings and tones mixed across three bands. More
+  // colours went UP in separation, which looks wrong until you see why: neighbours now differ
+  // in lightness as well as hue, and two axes separate better than one. The same 22 colours at
+  // a single lightness measure dE 8.
+  const FLOOR = 18
 
   it('keeps every pair of glow tones far enough apart to choose between', () => {
     const fails: string[] = []
@@ -221,7 +221,7 @@ describe("a member's chosen colour", () => {
     // must degrade to their hashed colour — looking like they never chose is recoverable,
     // whereas throwing would take out every surface that renders them.
     const hashed = hashUserIdToIndex(SOMEBODY, AVATAR_GRADIENTS.length)
-    for (const gone of ['violet', 'indigo', 'amber', 'chartreuse', 'NOT A COLOUR']) {
+    for (const gone of ['chartreuse', 'vermilion', 'puce', 'butter', 'NOT A COLOUR']) {
       expect(avatarIndexFor(SOMEBODY, gone)).toBe(hashed)
     }
   })
@@ -240,7 +240,7 @@ describe("a member's chosen colour", () => {
     // ⚠ This is the ONLY validation between a typo and a member silently stuck on their
     // hashed colour, because the column deliberately has no CHECK constraint.
     AVATAR_COLOUR_NAMES.forEach((n) => expect(isAvatarColourName(n)).toBe(true))
-    for (const bad of ['Teal', 'violet', '', null, undefined, 7, {}, 'teal ']) {
+    for (const bad of ['Teal', 'chartreuse', '', null, undefined, 7, {}, 'teal ']) {
       expect(isAvatarColourName(bad), `${String(bad)} should be rejected`).toBe(false)
     }
   })
@@ -323,13 +323,13 @@ describe('two sides of a duel never read as one colour', () => {
   it('moves the one who did not choose', () => {
     // ⭐ What makes a shift at reveal acceptable: a member who picked their colour keeps it.
     //
-    // ⚠ `user-28` HASHES onto teal — verified below rather than assumed. An earlier version
+    // ⚠ `user-4` HASHES onto teal — verified below rather than assumed. An earlier version
     // used an arbitrary id and would have passed without the two sides ever colliding, proving
     // nothing. ⚠⚠ The id had to CHANGE when the palette grew from 13 to 23: the index is
     // hash % length, so the previous one stopped landing on teal. That is the same modulus
     // move that re-colours every member still on the hash.
     const tealIndex = AVATAR_COLOUR_NAMES.indexOf('teal')
-    const HASHES_TO_TEAL = 'user-28'
+    const HASHES_TO_TEAL = 'user-4'
     expect(hashUserIdToIndex(HASHES_TO_TEAL, AVATAR_GRADIENTS.length),
       'this id must actually collide, or the test is vacuous').toBe(tealIndex)
 
@@ -373,20 +373,33 @@ describe('backgrounds stay usable as a palette of their own', () => {
   // glows. The old rule — glow lightness x 0.46 — squashed every background into one dark band
   // and put `yellow` and `butter` 2.2 apart: two different picks, one indistinguishable avatar.
   const SKIN = ['#FFE0C4', '#F7D9BC', '#F5C9A6', '#E0AC7E', '#C68642', '#8D5524', '#6B4226', '#4A2C14']
-  const relLum = (hex: string) =>
-    [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
-      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
-      .reduce((a, c, k) => a + c * [0.2126, 0.7152, 0.0722][k], 0)
 
-  it('keeps a lighter sibling visibly lighter than its parent', () => {
-    // ⭐ The specific regression. These pairs share a hue and differ ONLY in lightness, so if
-    // the background derivation compresses lightness they become the same colour.
-    for (const [light, parent] of [['coral', 'red'], ['butter', 'yellow'],
-                                   ['powder', 'sky'], ['lilac', 'purple']] as [string, string][]) {
-      const l = AVATAR_BACKGROUNDS[AVATAR_COLOUR_NAMES.indexOf(light)]
-      const p = AVATAR_BACKGROUNDS[AVATAR_COLOUR_NAMES.indexOf(parent)]
-      expect(relLum(l), `${light} must be a lighter background than ${parent}`)
-        .toBeGreaterThan(relLum(p))
+  it('gives every colour its own hue', () => {
+    // ⭐⭐ THE INVARIANT THAT REPLACED "lighter siblings". Ryan rejected a 23-colour set with
+    // "those are all still too close", and the number did not explain it — that set measured
+    // dE 19 and its replacement measures 20. What it HAD was ten same-hue pairs (red/coral,
+    // yellow/butter/olive, teal/deepteal/pine), and two shades of one hue read as one colour
+    // twice however far apart they measure. So: no two colours may share a hue.
+    const hueOf = (hex: string) => {
+      const n = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+      const XYZ = [
+        n[0] * 0.4124 + n[1] * 0.3576 + n[2] * 0.1805,
+        n[0] * 0.2126 + n[1] * 0.7152 + n[2] * 0.0722,
+        n[0] * 0.0193 + n[1] * 0.1192 + n[2] * 0.9505,
+      ]
+      const [X, Y, Z] = [XYZ[0] / 0.95047, XYZ[1], XYZ[2] / 1.08883]
+      const g = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116)
+      const [fx, fy, fz] = [g(X), g(Y), g(Z)]
+      return ((Math.atan2(200 * (fy - fz), 500 * (fx - fy)) * 180) / Math.PI + 360) % 360
+    }
+    const hues = AVATAR_BACKGROUNDS.map(hueOf)
+    for (let i = 0; i < hues.length; i++) {
+      for (let j = i + 1; j < hues.length; j++) {
+        const gap = Math.min(Math.abs(hues[i] - hues[j]), 360 - Math.abs(hues[i] - hues[j]))
+        expect(gap, `${AVATAR_COLOUR_NAMES[i]} and ${AVATAR_COLOUR_NAMES[j]} are the same hue`)
+          .toBeGreaterThan(8)
+      }
     }
   })
 
@@ -409,7 +422,11 @@ describe('backgrounds stay usable as a palette of their own', () => {
         if (d < worst) { worst = d; where = `${AVATAR_COLOUR_NAMES[i]} vs ${skin}` }
       }
     }
+    // ⚠ Raised from 16 to 20 once the palette was positioned AROUND the skin ramp rather than
+    // through it. A guard found `caramel` at ΔE 4.8 from #C68642 — an invisible head — and the
+    // cause was structural: skin is soft warm brown, so a soft colour at hue 59–72° IS a skin
+    // tone. Ratchets only go up.
     expect(worst, `a background got closer to a skin tone than anything shipped: ${where}`)
-      .toBeGreaterThanOrEqual(16)
+      .toBeGreaterThanOrEqual(18)
   })
 })

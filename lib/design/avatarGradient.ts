@@ -15,70 +15,65 @@ import { withLightness } from './oklch'
  * re-colours 83.1%. Any resize is a re-colour; the only question is how much. The
  * sole way to grow this without churn is to STORE each member's choice.
  *
- * ⭐ WHY THESE THIRTEEN. Ryan, 2026-09-25, on the ten that were here before: "I'd
- * like it so that the shadows and glows don't clash super often, where they have
- * blue and blue, purple and purple, and red and red." That was measurable — 6 of
- * the old 45 pairings sat under CIELAB dE 40 and read as ONE colour in a duel:
- * coral+rose 14, sky+indigo 22, teal+cyan 23, violet+indigo 24, pink+rose 27,
- * teal+emerald 30.
+ * ⭐⭐ WHY THESE TWENTY-TWO. Ryan rejected two earlier sets. The second — 13 vivid colours plus
+ * 4 lighter and 6 deeper siblings — got "those are all still too close", and the number did not
+ * explain it: that set measured dE 19 at its closest, and THIS one measures 17. The metric was
+ * not describing what he was reacting to.
  *
- * Chosen by NAMEABLE CATEGORY, not by even spacing, because "clash" is a thing a
- * person judges rather than a distance. Even perceptual spacing put five cyans in
- * eighteen slots; even HSL spacing scored worse than what it replaced. Each colour
- * sits at the lightness where its hue holds the most chroma in sRGB, which is why
- * the L* values vary instead of being normalised.
+ * ⚠⚠⚠ TWO SHADES OF ONE HUE READ AS ONE COLOUR TWICE, however far apart they measure. That set
+ * had TEN same-hue siblings — red/coral, yellow/butter/olive, teal/deepteal/pine — so a third
+ * of the picker looked like duplicates. Every colour here is its OWN HUE. There are no siblings.
  *
- * ⭐⭐ GREW TO TWENTY-THREE, 2026-09-25: "I want 20 - 23 different options and some of the
- * options can be lighter options than the ones we currently have." The first thirteen are
- * UNCHANGED and in their original order, so every member who has already chosen keeps exactly
- * the colour they picked — that is the payoff of storing a NAME rather than an index. Members
- * still on the hash move, because the modulus changed; that was accepted when stage 2 landed.
+ * ⭐ And the tone VARIES BETWEEN NEIGHBOURS rather than being constant. Ryan asked for colours
+ * "just slightly darker than pastel", and 22 of those at one lightness sit dE 8 apart — worse
+ * than what he rejected. Mixing three bands (L*82/73/64) across distinct hues takes the same
+ * 22 colours from dE 8 to dE 17, because neighbours then differ in two ways instead of one.
  *
- * ⚠⚠ ONLY FOUR CAN BE LIGHTER, and that is the gamut, not a preference. A hue can only lighten
- * if its base sits dark: yellow, lime, green, emerald, teal and cyan are already at L*80–84 and
- * a lighter version of them measures dE 3–17 from the original — the same colour twice. Worse,
- * pale hues CONVERGE — a light red and a light orange are dE 8 apart, both just "pale peach".
- * So coral, butter, powder and lilac are every lighter option there is room for.
+ * ⭐ THE GLOW AND THE BACKGROUND ARE NOW THE SAME VALUE. Earlier palettes needed a light stop
+ * for the midnight duel ground and a separate dark one for the avatar canvas. These sit high
+ * enough to read on midnight (dimmest 6.9:1) and soft enough to carry a face, so one value does
+ * both — and white initials on the gradient's middle improved to 2.37 against the 1.52 that
+ * shipped. Both arrays are kept because they answer different questions and may diverge again.
  *
- * ⭐ The other six go the other way: DEEPER versions of exactly the hues that cannot lighten,
- * which is where the gamut did have room — olive, moss, forest, pine, deepteal, ocean.
+ * 🔴🔴 AND NO COLOUR MAY SIT ON THE SKIN RAMP. A guard caught `caramel` at ΔE 4.8 from the
+ * #C68642 skin tone — that member's head would have been invisible against their own
+ * background. It is not a coincidence and it is not fixable by nudging: SKIN IS SOFT WARM
+ * BROWN, so a soft colour in that hue region simply IS a skin tone. Pushing the three
+ * offenders away turned them into vivid oranges, which destroyed the tone that was asked for.
  *
- * ⚠⚠ The closest pair is now dE 19 (pine+deepteal), down from 25, and that is only safe BECAUSE
- * the duel shift exists. A picker needs two options a member can tell apart; two sides of a
- * duel must not read as one person. Those are different bars, and only the second is 40 —
- * enforced by COLOUR_SHIFT, not by the palette.
+ * ⭐ Measured, the skin ramp occupies only hue 59–72° in CIELAB. So the twenty-two hues are
+ * positioned AROUND that arc rather than through it, which costs almost nothing — and the
+ * result is better than what shipped: ΔE 20 from the nearest skin tone against the old 16.
  *
- * ⚠ Still not clash-FREE, and no palette this size can be: 9 of the 78 pairings
- * (12%) sit under dE 40. Those are meant to be resolved by shifting one side at
- * duel time — every colour has at least 10 of the other 12 to shift into. Until
- * that lands, a duel can still show two close colours.
+ * ⚠ The duel shifts 72 of the 231 pairings, up from 13%, because a softer palette is a closer
+ * one. Every colour still has 12 of the other 21 to shift into, so it always resolves. That
+ * trade is the cost of the tone, and it is paid where the member never sees it.
  */
 
 /** Diagonal top-left → bottom-right pairs, tuned to keep white initials legible. */
 export const AVATAR_GRADIENTS: readonly (readonly [string, string])[] = [
-  ['#FE624E', '#CA3329'], // red
-  ['#FF7000', '#BB5000'], // orange
-  ['#FFC301', '#B88C00'], // yellow
-  ['#94E804', '#69A701'], // lime
-  ['#0AF170', '#00AD4E'], // green
-  ['#01EBA4', '#06A975'], // emerald
-  ['#06E8D1', '#00A796'], // teal
-  ['#0ED9FC', '#009CB6'], // cyan
-  ['#00B0F9', '#0080B6'], // sky
-  ['#6192FF', '#226AD0'], // blue
-  ['#BD74FE', '#8E4ACF'], // purple
-  ['#E852FF', '#B812D0'], // magenta
-  ['#FE55A7', '#CD1B7D'], // pink
-  ['#FFCFC5', '#FF6F5A'], // coral  lighter
-  ['#FFD480', '#C49500'], // butter  lighter
-  ['#BADEFE', '#00A6EB'], // powder  lighter
-  ['#EBD0FE', '#C27DFE'], // lilac  lighter
-  ['#B08500', '#816100'], // olive  deeper
-  ['#619B00', '#457100'], // moss  deeper
-  ['#049B46', '#027131'], // forest  deeper
-  ['#0A996A', '#00704C'], // pine  deeper
-  ['#0D9485', '#046C61'], // deepteal  deeper
-  ['#0190A9', '#09697B'], // ocean  deeper
+  ['#F47A93', '#C32458'], // rose
+  ['#FFC3C4', '#E74E63'], // blush
+  ['#FE9F98', '#D14246'], // salmon
+  ['#E98661', '#B34219'], // coral
+  ['#BB9E43', '#7C6500'], // olive
+  ['#BDBD71', '#747C00'], // sage
+  ['#88AC52', '#477300'], // moss
+  ['#BDDAA9', '#4D9528'], // fern
+  ['#7EC993', '#048846'], // jade
+  ['#0DB68B', '#007658'], // emerald
+  ['#93E0CE', '#0E9681'], // mint
+  ['#0DB3A9', '#04736D'], // teal
+  ['#17CBDE', '#06828F'], // lagoon
+  ['#8CDDFA', '#0591B1'], // ice
+  ['#5AC3FE', '#0A7EAE'], // sky
+  ['#41A6FA', '#036BAB'], // azure
+  ['#BFD2FE', '#0487ED'], // powder
+  ['#A6B5FF', '#3971DE'], // periwinkle
+  ['#AB92EB', '#6C55C0'], // lilac
+  ['#D285D3', '#9E3FA3'], // orchid
+  ['#F8C1E7', '#D056B2'], // petal
+  ['#EA7CB4', '#B9297E'], // pink
 ]
 
 /**
@@ -104,56 +99,54 @@ export const AVATAR_GRADIENTS: readonly (readonly [string, string])[] = [
  * by nothing. Explicit values, pinned by a guard test, instead.
  */
 export const AVATAR_BACKGROUNDS: readonly string[] = [
-  '#9E0C11', // red
-  '#8B3B02', // orange
-  '#9F7910', // yellow
-  '#5F9211', // lime
-  '#1C9848', // green
-  '#1B9367', // emerald
-  '#1C9183', // teal
-  '#1C859A', // cyan
-  '#16628A', // sky
-  '#134B9A', // blue
-  '#6D0DC5', // purple
-  '#860D98', // magenta
-  '#960E5A', // pink
-  '#FA4D3C', // coral
-  '#AF8510', // butter
-  '#2594CF', // powder
-  '#B366F8', // lilac
-  '#584102', // olive
-  '#2F4D02', // moss
-  '#054B1F', // forest
-  '#084A32', // pine
-  '#06463F', // deepteal
-  '#084450', // ocean
+  '#F47A93', // rose
+  '#FFC3C4', // blush
+  '#FE9F98', // salmon
+  '#E98661', // coral
+  '#BB9E43', // olive
+  '#BDBD71', // sage
+  '#88AC52', // moss
+  '#BDDAA9', // fern
+  '#7EC993', // jade
+  '#0DB68B', // emerald
+  '#93E0CE', // mint
+  '#0DB3A9', // teal
+  '#17CBDE', // lagoon
+  '#8CDDFA', // ice
+  '#5AC3FE', // sky
+  '#41A6FA', // azure
+  '#BFD2FE', // powder
+  '#A6B5FF', // periwinkle
+  '#AB92EB', // lilac
+  '#D285D3', // orchid
+  '#F8C1E7', // petal
+  '#EA7CB4', // pink
 ]
 
 /** What each entry is called — for a picker, and for talking about them. */
 export const AVATAR_COLOUR_NAMES: readonly string[] = [
-  'red',
-  'orange',
-  'yellow',
-  'lime',
-  'green',
-  'emerald',
-  'teal',
-  'cyan',
-  'sky',
-  'blue',
-  'purple',
-  'magenta',
-  'pink',
+  'rose',
+  'blush',
+  'salmon',
   'coral',
-  'butter',
-  'powder',
-  'lilac',
   'olive',
+  'sage',
   'moss',
-  'forest',
-  'pine',
-  'deepteal',
-  'ocean',
+  'fern',
+  'jade',
+  'emerald',
+  'mint',
+  'teal',
+  'lagoon',
+  'ice',
+  'sky',
+  'azure',
+  'powder',
+  'periwinkle',
+  'lilac',
+  'orchid',
+  'petal',
+  'pink',
 ]
 
 /**
@@ -312,29 +305,28 @@ export function inkFromIndex(index: number): AvatarInk {
  * this can never fail to find one.
  */
 export const COLOUR_SHIFT: readonly (readonly number[])[] = [
-  [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 3, 2, 2, 2, 2, 2],
-  [3, 3, 3, 5, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 3, 3, 3, 3],
-  [4, 4, 4, 5, 6, 7, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6, 4, 4, 4],
-  [5, 5, 5, 5, 6, 7, 8, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 7, 5, 5],
-  [6, 6, 6, 6, 6, 7, 8, 9, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 8, 6],
-  [7, 7, 7, 7, 7, 7, 8, 9, 10, 7, 7, 7, 7, 7, 7, 9, 7, 7, 7, 7, 7, 8, 9],
-  [8, 8, 8, 8, 8, 8, 8, 9, 10, 11, 8, 8, 8, 8, 8, 9, 8, 8, 8, 8, 8, 8, 9],
-  [9, 9, 9, 9, 9, 9, 9, 9, 10, 11, 12, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
-  [10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 12, 12, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
-  [11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11],
-  [12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
-  [13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 17, 15, 14, 14, 13, 13, 13, 13, 13, 13],
-  [14, 14, 15, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 17, 15, 14, 14, 15, 14, 14, 14, 14, 14],
-  [15, 15, 15, 15, 15, 15, 15, 16, 16, 15, 15, 15, 15, 17, 15, 17, 17, 15, 15, 15, 15, 15, 16],
-  [16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 16, 17, 17, 16, 16, 16, 16, 16, 16],
-  [17, 17, 18, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 17, 17, 18, 17, 17, 17, 17, 17],
-  [18, 18, 18, 19, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 20, 21, 18, 18, 18],
-  [19, 19, 19, 19, 20, 21, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 21, 22, 19, 19],
-  [20, 20, 20, 20, 20, 21, 22, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 22, 0, 20],
-  [21, 21, 21, 21, 21, 21, 22, 0, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 0, 0],
-  [22, 22, 22, 22, 22, 22, 22, 0, 0, 22, 22, 22, 22, 22, 22, 0, 22, 22, 22, 22, 22, 0, 0],
+  [4, 4, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 3],
+  [4, 4, 4, 5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 3, 3],
+  [4, 4, 4, 5, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3],
+  [4, 4, 4, 5, 8, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+  [4, 4, 4, 5, 8, 9, 10, 12, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+  [5, 5, 5, 5, 8, 9, 10, 12, 12, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+  [6, 6, 6, 6, 8, 9, 10, 12, 12, 13, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+  [7, 7, 7, 7, 8, 9, 10, 12, 12, 13, 14, 14, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+  [8, 8, 8, 8, 8, 9, 10, 12, 12, 13, 14, 14, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+  [9, 9, 9, 9, 9, 9, 10, 12, 12, 13, 14, 14, 15, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+  [10, 10, 10, 10, 10, 10, 10, 12, 12, 13, 14, 14, 15, 18, 10, 10, 11, 10, 10, 10, 10, 10],
+  [11, 11, 11, 11, 11, 11, 11, 12, 12, 13, 14, 14, 15, 18, 11, 11, 11, 11, 11, 11, 11, 11],
+  [12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 14, 14, 15, 18, 18, 12, 19, 12, 12, 12, 12, 12],
+  [13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 15, 18, 18, 19, 19, 21, 13, 13, 13, 13],
+  [14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 18, 18, 19, 19, 21, 14, 14, 14, 14],
+  [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 18, 18, 19, 19, 21, 0, 15, 15, 15],
+  [16, 17, 16, 16, 16, 16, 16, 16, 16, 16, 17, 16, 17, 18, 18, 19, 19, 21, 0, 16, 3, 16],
+  [17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 19, 19, 21, 0, 1, 3, 17],
+  [18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 21, 0, 1, 3, 3],
+  [4, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 21, 0, 1, 3, 3],
+  [4, 4, 4, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 0, 1, 3, 3],
+  [4, 4, 4, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 0, 1, 3, 3],
 ]
 
 /**

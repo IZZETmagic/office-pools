@@ -786,29 +786,28 @@ export const PALETTE = {
   // plain HTML that can import nothing. So the same thirteen values exist in three
   // places and TWO guard tests pin them together. Change one, change all three.
   background: [
-    '#9E0C11', // red
-    '#8B3B02', // orange
-    '#9F7910', // yellow
-    '#5F9211', // lime
-    '#1C9848', // green
-    '#1B9367', // emerald
-    '#1C9183', // teal
-    '#1C859A', // cyan
-    '#16628A', // sky
-    '#134B9A', // blue
-    '#6D0DC5', // purple
-    '#860D98', // magenta
-    '#960E5A', // pink
-    '#FA4D3C', // coral
-    '#AF8510', // butter
-    '#2594CF', // powder
-    '#B366F8', // lilac
-    '#584102', // olive
-    '#2F4D02', // moss
-    '#054B1F', // forest
-    '#084A32', // pine
-    '#06463F', // deepteal
-    '#084450', // ocean
+    '#F47A93', // rose
+    '#FFC3C4', // blush
+    '#FE9F98', // salmon
+    '#E98661', // coral
+    '#BB9E43', // olive
+    '#BDBD71', // sage
+    '#88AC52', // moss
+    '#BDDAA9', // fern
+    '#7EC993', // jade
+    '#0DB68B', // emerald
+    '#93E0CE', // mint
+    '#0DB3A9', // teal
+    '#17CBDE', // lagoon
+    '#8CDDFA', // ice
+    '#5AC3FE', // sky
+    '#41A6FA', // azure
+    '#BFD2FE', // powder
+    '#A6B5FF', // periwinkle
+    '#AB92EB', // lilac
+    '#D285D3', // orchid
+    '#F8C1E7', // petal
+    '#EA7CB4', // pink
   ],
   frame: ['#22262E', '#6B4A2F', '#C9A227', '#9AA3AD', '#1F3A64', '#B36A72'],
   metal: ['#D4A017', '#B8BCC4', '#C08878', '#2A2A2E', '#E8E0C8', '#8C6239'],
