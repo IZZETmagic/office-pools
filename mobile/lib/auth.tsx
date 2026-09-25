@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { clearCache } from './cache/persistentCache';
 import { supabase } from './supabase';
 
 type AuthState = {
@@ -108,6 +109,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       async signOut() {
         await supabase.auth.signOut();
+        // ⚠ THE COLD-START CACHE IS PER-DEVICE, NOT PER-SESSION. The envelope's
+        // `userId` stops the next person being *shown* this person's pools, but
+        // it does not stop the payload — pool names, member initials, standings
+        // — sitting in the app sandbox after they have signed out. On a shared
+        // phone that is someone else's data left behind, so it goes here.
+        clearCache();
       },
 
       async checkUsernameAvailable(username) {

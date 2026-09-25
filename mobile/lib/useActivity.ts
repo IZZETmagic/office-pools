@@ -2,10 +2,11 @@
 // Synthesizes the Activity feed from pool membership / entry / point-adjustment
 // data — no `user_activity` table is read; events are computed client-side.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fetchEntryAnalytics, fetchUserActivity, type ActivityFeedItemRaw } from './api';
 import { useAuth } from './auth';
+import { CACHE_KEYS, readCache, writeCache } from './cache/persistentCache';
 import { supabase } from './supabase';
 
 export type ActivityType =
@@ -477,17 +478,34 @@ async function appendXPEvents(memberships: MembershipRow[], items: ActivityItem[
 
 // --- Hook --------------------------------------------------------------
 
+/**
+ * ⚠ How many items go to disk. The feed itself is unbounded, but this blob is
+ * `JSON.parse`d synchronously during the first render, so its size is paid in
+ * milliseconds on the cold-start path. Fifty is several screenfuls; the rest
+ * arrives with the refresh that is already running behind it.
+ */
+const CACHED_ACTIVITY_LIMIT = 50;
+
 export function useActivity() {
-  const { user } = useAuth();
-  const [items, setItems] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
+  // Synchronous hydrate — see the long note in `lib/cache/persistentCache.ts`.
+  // Provisional until auth resolves; the adopt/revoke effect below settles it.
+  const [cached] = useState(() => readCache<ActivityItem[]>(CACHE_KEYS.activity));
+  const [items, setItems] = useState<ActivityItem[]>(cached?.data ?? []);
+  // ⚠ NOT `items.length === 0`. An empty feed is a legitimate answer for a new
+  // member, and treating it as "no data" would hold the splash up for exactly
+  // the people with the least to look at.
+  const [loading, setLoading] = useState(!cached);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasDataRef = useRef<boolean>(!!cached);
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh') => {
       if (!user) return;
-      if (mode === 'refresh') setRefreshing(true);
+      // Hydrated from cache? Then this is a refresh over real content, not a
+      // load behind the splash.
+      if (mode === 'refresh' || hasDataRef.current) setRefreshing(true);
       else setLoading(true);
       setError(null);
 
@@ -503,6 +521,9 @@ export function useActivity() {
         const appUserId = (userData as { user_id: string }).user_id;
         const next = await fetchActivity(appUserId);
         setItems(next);
+        hasDataRef.current = true;
+        // Stamped with the AUTH id, matching what the reader compares against.
+        writeCache(CACHE_KEYS.activity, user.id, next.slice(0, CACHED_ACTIVITY_LIMIT));
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load activity';
         setError(msg);
@@ -514,6 +535,21 @@ export function useActivity() {
     },
     [user],
   );
+
+  // Same adopt/revoke contract as `useHomeData`: the cache was read before auth
+  // resolved, so it is only kept once the restored session proves it belongs to
+  // this person. The splash gate holds on `authLoading`, so nothing wrong is
+  // ever visible while this settles.
+  const revokedRef = useRef(false);
+  useEffect(() => {
+    if (!cached || revokedRef.current) return;
+    if (authLoading) return;
+    if (user && user.id === cached.userId) return;
+    revokedRef.current = true;
+    setItems([]);
+    hasDataRef.current = false;
+    setLoading(!!user);
+  }, [authLoading, user, cached]);
 
   useEffect(() => {
     if (user) load('initial');

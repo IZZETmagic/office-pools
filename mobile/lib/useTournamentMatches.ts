@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiFetch } from './api';
+import { useAuth } from './auth';
+import { CACHE_KEYS, readCache, writeCache } from './cache/persistentCache';
 import { applyFixturesUpdate, type FixturesUpdateMessage } from './fixturesBroadcast';
 import { useHomeData } from './HomeDataProvider';
 import { leaseBroadcast } from './realtimeLease';
@@ -240,20 +242,48 @@ export function useTournamentMatchesInternal() {
     return Array.from(set);
   }, [homeData?.pools]);
 
-  const [matches, setMatches] = useState<ResultsMatch[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
+  // Synchronous hydrate, on a SHORTER leash than home/activity — see the
+  // max-age override in `lib/cache/persistentCache.ts` for why a scoreline is
+  // not a pool card.
+  const [cachedMatches] = useState(() => readCache<ResultsMatch[]>(CACHE_KEYS.matches));
+  const [matches, setMatches] = useState<ResultsMatch[]>(cachedMatches?.data ?? []);
+  const [loading, setLoading] = useState(!cachedMatches);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastLoadedAtRef = useRef(0);
+  const hasMatchesRef = useRef<boolean>(!!cachedMatches);
+  // ⚠ A REF, NOT A DEPENDENCY. `load` needs the auth id only to stamp the cache
+  // envelope. Putting `user` in its dependency array would change `load`'s
+  // identity on every session object change and retrigger the effects that hold
+  // it — a refetch storm in exchange for a value that is only ever read at the
+  // end of a successful fetch.
+  const userIdRef = useRef<string | null>(null);
+  userIdRef.current = user?.id ?? null;
+
+  // Same adopt/revoke contract as the other two hooks — the cache was read
+  // before auth resolved, so it is kept only once the session proves it belongs
+  // to this person.
+  const revokedRef = useRef(false);
+  useEffect(() => {
+    if (!cachedMatches || revokedRef.current) return;
+    if (authLoading) return;
+    if (user && user.id === cachedMatches.userId) return;
+    revokedRef.current = true;
+    setMatches([]);
+    hasMatchesRef.current = false;
+    setLoading(!!user);
+  }, [authLoading, user, cachedMatches]);
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh') => {
       if (tournamentIds.length === 0) {
         setMatches([]);
+        hasMatchesRef.current = false;
         setLoading(false);
         return;
       }
-      if (mode === 'refresh') setRefreshing(true);
+      if (mode === 'refresh' || hasMatchesRef.current) setRefreshing(true);
       else setLoading(true);
       setError(null);
       try {
@@ -262,7 +292,13 @@ export function useTournamentMatchesInternal() {
           .select(MATCH_SELECT)
           .in('tournament_id', tournamentIds);
         if (err) throw err;
-        setMatches(((data ?? []) as Record<string, unknown>[]).map(normalizeMatch));
+        const nextMatches = ((data ?? []) as Record<string, unknown>[]).map(normalizeMatch);
+        setMatches(nextMatches);
+        hasMatchesRef.current = true;
+        // ⚠ Only when we know who this is. `useTournamentMatches` can run a
+        // beat before the session resolves; an unstamped envelope would be
+        // unreadable on the next launch anyway, so skip rather than guess.
+        if (userIdRef.current) writeCache(CACHE_KEYS.matches, userIdRef.current, nextMatches);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load matches');
         console.warn('[useTournamentMatches]', err);

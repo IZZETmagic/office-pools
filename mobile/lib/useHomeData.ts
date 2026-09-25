@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './auth';
+import { CACHE_KEYS, readCache, writeCache } from './cache/persistentCache';
 import { poolNeedsPredictions } from './needsPredictions';
 import { supabase } from './supabase';
 import {
@@ -155,20 +156,46 @@ function computeDaysUntilKickoff(now = new Date()): number {
 }
 
 export function useHomeDataInternal() {
-  const { user } = useAuth();
-  const [data, setData] = useState<HomeData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
+  // ⚠ READ ONCE, SYNCHRONOUSLY, IN THE INITIALISER — this is the whole reason
+  // the cache is MMKV and not expo-file-system. By the time React commits the
+  // first frame the pool cards are already real, so there is no empty state to
+  // paint. An effect would be one frame too late and would flicker.
+  //
+  // The payload is PROVISIONAL until auth resolves — see the adopt/revoke
+  // effect below, which is what stops it being someone else's pools.
+  const [cached] = useState(() => readCache<HomeData>(CACHE_KEYS.home));
+  // ⚠ `daysUntilKickoff` IS RECOMPUTED, NEVER RESTORED. It is derived from the
+  // current date, so a value written to disk three days ago is wrong by three
+  // days the moment it is read back. Every other field is a fact about the
+  // server; this one is a fact about now.
+  const [data, setData] = useState<HomeData | null>(
+    cached ? { ...cached.data, daysUntilKickoff: computeDaysUntilKickoff() } : null,
+  );
+  // ⚠ `loading` MEANS "THERE IS NOTHING TO SHOW", and the splash gate in
+  // `app/_layout.tsx` already reads it as exactly that. On a cache hit there IS
+  // something to show, so a cold start becomes a REFRESH over real data instead
+  // of a load behind the splash. That is the whole win, and the gate did not
+  // have to change to get it.
+  const [loading, setLoading] = useState(!cached);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Timestamp of the last successful (or initial) load. Used by
   // `refreshIfStale` so tab-focus refetches are skipped when the cache is
   // still fresh, eliminating the loading flicker on every tab switch.
   const lastLoadedAtRef = useRef<number>(0);
+  // Mirrors `data` so `load` can tell a first paint from a background refresh
+  // without closing over a stale value on its initial run.
+  const dataRef = useRef<HomeData | null>(null);
+  dataRef.current = data;
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh') => {
       if (!user) return;
-      if (mode === 'refresh') setRefreshing(true);
+      // A cold start that hydrated from cache is a REFRESH, not a load — the
+      // user is already looking at real cards while this runs. Flipping
+      // `loading` here instead would put the splash back up over data we have.
+      if (mode === 'refresh' || dataRef.current) setRefreshing(true);
       else setLoading(true);
       setError(null);
 
@@ -714,7 +741,7 @@ export function useHomeDataInternal() {
         // mirrored the one in `useTournamentMatches`.
         const daysUntilKickoff = computeDaysUntilKickoff();
 
-        setData({
+        const next: HomeData = {
           appUserId: userData.user_id,
           fullName: userData.full_name,
           username: userData.username,
@@ -726,7 +753,14 @@ export function useHomeDataInternal() {
           bestRank,
           bestStreak,
           daysUntilKickoff,
-        });
+        };
+        setData(next);
+        // ⚠ SUCCESS PATH ONLY, and stamped with the AUTH user id — not
+        // `userData.user_id`. The reader compares this against a restored
+        // Supabase session, which knows the auth id and has never heard of the
+        // app one. Mixing the two would make every hit look like a different
+        // person and silently turn the cache off for everybody.
+        writeCache(CACHE_KEYS.home, user.id, next);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load home data';
         setError(message);
@@ -739,6 +773,25 @@ export function useHomeDataInternal() {
     },
     [user],
   );
+
+  // ⚠ THE CACHE IS READ BEFORE AUTH RESOLVES — that is what makes first paint
+  // instant, and it is exactly why the hydrated payload cannot be trusted yet.
+  // Once the restored session lands we either keep it (same person) or drop it
+  // (a different person, or nobody).
+  //
+  // Nothing wrong is ever on screen while this settles: the splash gate holds
+  // on `authLoading`, so the revoke happens before the tabs are ever revealed.
+  const revokedRef = useRef(false);
+  useEffect(() => {
+    if (!cached || revokedRef.current) return;
+    if (authLoading) return;
+    if (user && user.id === cached.userId) return;
+    revokedRef.current = true;
+    setData(null);
+    // A different person will trigger a load below; nobody signed in will not,
+    // and must not be left behind a splash that never lifts.
+    setLoading(!!user);
+  }, [authLoading, user, cached]);
 
   useEffect(() => {
     if (user) load('initial');
