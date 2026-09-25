@@ -772,7 +772,14 @@ export const PALETTE = {
   eye: ['#3E2612', '#5B3A1E', '#8B5E3C', '#2E7D32', '#2E6FD9', '#4B5563'],
   mouth: ['#B67A70', '#C4736B', '#A85E58', '#D08A82'],
   shirt: ['#3B6EFF', '#16A34A', '#C2410C', '#7C3AED', '#0F766E', '#DB2777', '#111827', '#F59E0B'],
-  background: ['#FFFFFF', '#EEF2FF', '#ECFDF5', '#FEF3C7', '#FCE7F3', '#F3F4F6'],
+  // ⭐ BOLD, AND NO WHITE. Ryan, 2026-09-25, picking off a render: "teal, plum, crimson
+  // and charcoal — don't keep white". The pale tints they replace barely separated from
+  // pale skin at all (contrast 1.07–1.26), so the silhouette was carried by the hair and
+  // the shirt rather than by the head. ⚠ Blue and amber were rendered and REJECTED, not
+  // overlooked: any blue collides with the default #3B6EFF shirt at the shoulder, and
+  // amber goes muddy against light and mid skin.
+  // ⚠⚠ Duplicated in builder-template.html's BGS — a guard test pins them together.
+  background: ['#0E7490', '#581C87', '#BE123C', '#1F2937'],
   frame: ['#22262E', '#6B4A2F', '#C9A227', '#9AA3AD', '#1F3A64', '#B36A72'],
   metal: ['#D4A017', '#B8BCC4', '#C08878', '#2A2A2E', '#E8E0C8', '#8C6239'],
 } as const

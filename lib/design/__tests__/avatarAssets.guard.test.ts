@@ -1518,6 +1518,36 @@ describe('background', () => {
     readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
   ) as AvatarAssets
 
+  it('offers the same swatches in the builder as in the product', () => {
+    // ⚠⚠ `PALETTE.background` and builder-template's `BGS` are the SAME LIST WRITTEN TWICE.
+    // Nothing type-checks the builder, so a palette changed in one place and not the other
+    // drifts silently and the admin builder quietly previews colours nobody can pick — or
+    // misses ones they can. This is the same drift the three compositors are already guarded
+    // against; the palettes were not.
+    const html = readFileSync(
+      join(process.cwd(), 'assets/character-base/nano/builder-template.html'), 'utf8')
+    const m = /const BGS\s*=\s*\[([^\]]*)\]/.exec(html)
+    expect(m, 'builder-template.html should declare BGS').toBeTruthy()
+    const bgs = [...m![1].matchAll(/'(#[0-9A-Fa-f]{6})'/g)].map((x) => x[1].toUpperCase())
+    expect(bgs, 'the builder\'s backgrounds must match PALETTE.background exactly')
+      .toEqual(PALETTE.background.map((c) => c.toUpperCase()))
+  })
+
+  it('offers no near-white background', () => {
+    // ⭐ Ryan, 2026-09-25: "teal, plum, crimson and charcoal — don't keep white." The pale set
+    // this replaced sat at contrast 1.07–1.26 against pale skin, so the head had almost no edge
+    // of its own. ⚠ This is a DECISION, not a law of the art — if a pale background is wanted
+    // back, delete this test rather than working around it.
+    const relLum = (hex: string) => {
+      const v = [0, 2, 4].map((i) => parseInt(hex.slice(1 + i, 3 + i), 16) / 255)
+        .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+      return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+    }
+    for (const bg of PALETTE.background) {
+      expect(relLum(bg), `${bg} is too pale to give the head an edge`).toBeLessThan(0.45)
+    }
+  })
+
   it('repaints the canvas only, never the eye whites', () => {
     // ⚠⚠⚠ THE BACKGROUND AND THE EYE WHITE ARE THE SAME TOKEN, rgb(255,255,255), and the
     // recolour used to be a global swap — so every eye white, and every tooth, was painted the
