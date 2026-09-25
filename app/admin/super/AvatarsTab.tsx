@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import { composeAvatar, stripNose, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
+import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 import {
   AVATAR_BACKGROUNDS,
   AVATAR_COLOUR_NAMES,
@@ -167,15 +167,26 @@ function Options({
 }
 
 /**
- * The frame a head preview is cropped to.
+ * The frame a head preview is cropped to, and the ground it sits on.
  *
- * ⭐ Chosen by rendering, not arithmetic. The asset bounding boxes are useless here — several
- * hair styles carry a full-canvas <mask> rect, so every one of them measures 0..2048. Four
- * crops were rendered against a bald head, a quiff, floor-length hair, locs, spacebuns and a
- * topknot; this is the only one that holds the tall styles without clipping AND ends above the
- * shirt line at y1520, which is what "the head only" means.
+ * ⭐ Chosen by rendering, not arithmetic — twice. Asset bounding boxes are useless here because
+ * several hair styles carry a full-canvas <mask> rect, so every one of them measures 0..2048.
+ * Measured from the geometry instead, hair spans x101..1948 and y19..1939 across the set, which
+ * is far wider than the head: a frame that suits a buzz cut has braids and locs hanging off the
+ * edges. Seven candidates were rendered against a bald head, buzz, quiff, ponytail, braids,
+ * floor-length hair, spacebuns and locs.
+ *
+ * ⚠ It is centred on (1020, 960), NOT on the head at (1010, 913). Hair reaches further below
+ * the chin than above the crown, so centring on the head alone pushes long styles off the
+ * bottom. The centre is the content's, not the face's.
+ *
+ * ⚠⚠ THE FRAME REACHES OUTSIDE THE 2048 CANVAS, which is why the card carries the same colour.
+ * The avatar's own background path stops at the canvas edge, so the strip above y0 paints
+ * nothing — on a white card that reads as a bite out of the corner. Matching the two makes the
+ * overflow invisible. Change one and change the other.
  */
-const HEAD_CROP = '300 60 1440 1440'
+const HEAD_CROP = '-5 -65 2050 2050'
+const HEAD_GROUND = '#EEF1F8'
 
 /**
  * One asset, shown on a bare head in its own square card.
@@ -211,7 +222,8 @@ function AssetCards({
             className="group text-left"
           >
             <div
-              className={`aspect-square rounded-card overflow-hidden bg-surface transition ${
+              style={{ background: HEAD_GROUND }}
+              className={`aspect-square rounded-card overflow-hidden transition ${
                 selected
                   ? 'ring-2 ring-primary-600 ring-offset-2 ring-offset-surface'
                   : 'border border-silver/50 group-hover:border-silver'
@@ -254,18 +266,18 @@ function SelectorMock({ assets, cfg, set }: {
       const key = hair ?? '—'
       const hit = cache.get(key)
       if (hit) return hit
-      const svg = stripNose(
+      const svg = headOnly(
         composeAvatar(
           {
             ...cfg,
             hair,
             expression: null, eyes: null, mouth: null,
             facialHair: null, glasses: null, earrings: null, garment: null, mark: false,
-            background: '#EEF1F8',
+            background: HEAD_GROUND,
           },
           assets,
         ),
-        cfg.skin,
+        { skin: cfg.skin, shirt: cfg.shirt },
       ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
       cache.set(key, svg)
       return svg

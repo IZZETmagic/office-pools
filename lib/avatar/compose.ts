@@ -402,27 +402,57 @@ function findNose(doc: string, fill: string = T.skinShade): string | null {
 }
 
 /**
- * A composed avatar with the nose taken back out — FOR PREVIEWS ONLY.
+ * A composed avatar reduced to HEAD, EARS AND HAIR — for an asset picker, nothing else.
  *
- * ⭐ Why this exists at all: an asset picker shows one feature at a time, and a hair thumbnail
- * with a nose in the middle of it is showing the member the wrong thing. Eyes and mouth are
- * already suppressible (`expression`/`eyes`/`mouth` take null); the nose is not, because it is
- * part of the base and compose lifts and re-lays it rather than treating it as a slot.
+ * ⭐ Ryan, 2026-09-25: a hair option should be shown "on the base avatars head ONLY (no eyes,
+ * no mouth, no nose, only the ears)". Eyes and mouth take null already. Three things do not:
+ * the nose, the neck and the shirt, because they are part of the base rather than slots.
  *
- * ⚠⚠ A POST-PROCESS, NOT A CONFIG FLAG, and deliberately. `AvatarConfig` is the contract three
- * compositors share — compose.py and builder-template.html would both have to grow the same
- * field, and a display-only concern is not worth widening that contract for. Nothing about
- * composition changes here; a rendered document simply has one path removed afterwards.
+ * ⚠⚠ REMOVING THE BODY IS WHAT MAKES THE FRAMING POSSIBLE, which is not obvious. The chin sits
+ * at y1530 and the shirt begins at y1519 — they touch. So there is no crop that leaves ANY
+ * margin under the chin and still excludes the shirt; a frame tight enough to hide the body
+ * also cuts the head off at the jaw. Take the body out and the head can be centred with air
+ * around it at whatever size suits.
  *
- * ⚠ It takes the SKIN because by this point the document has been recoloured: the nose no
- * longer carries `T.skinShade`, it carries whatever that token was swapped to. The shape rule
- * itself is not repeated — `findNose` is the single owner of "which path is the nose", and it
- * is told which fill to look for.
+ * ⚠ A POST-PROCESS, NOT A CONFIG FLAG. `AvatarConfig` is the contract three compositors share,
+ * and compose.py and builder-template.html would both have to grow the same field. Nothing
+ * about composition changes here — a rendered document has four paths removed afterwards, and
+ * parity between the compositors is unaffected.
+ *
+ * ⚠ It takes the colours because the document has already been recoloured by this point: the
+ * nose and neck no longer carry `T.skinShade` and the shirt no longer carries `T.shirt`. The
+ * shape rules are not repeated — `findNose` and `findShirt` stay the single owners of "which
+ * path is that" and are simply told what to look for.
  */
-export function stripNose(svg: string, skin: string): string {
-  const shade = darken(hex2rgb(skin), 0.88)
-  const nose = findNose(svg, shade)
-  return nose ? svg.replace(nose, '') : svg
+export function headOnly(svg: string, colours: { skin: string; shirt: string }): string {
+  const shade = darken(hex2rgb(colours.skin), 0.88)
+  const shirt = rgbStr(hex2rgb(colours.shirt))
+  const shirt2 = darken(hex2rgb(colours.shirt), 0.9)
+
+  let out = svg
+  const nose = findNose(out, shade)
+  if (nose) out = out.replace(nose, '')
+  for (const p of findShirt(out, [shirt, shirt2])) out = out.replace(p, '')
+
+  // The neck and its shadow: skin-toned, NARROW, and reaching below the head's own chin.
+  // ⚠ The width test is what keeps the head itself (1032 wide) out of this, and the chin test
+  // is what keeps the EARS out — they are narrow too, but they stop at y1024.
+  const head = findHead(out)
+  const chin = head ? Math.max(...(/d="([^"]*)"/.exec(head)?.[1].match(/-?\d+\.?\d*/g) ?? ['0'])
+    .map(Number).filter((_, i) => i % 2 === 1)) : 1530
+  for (const m of [...out.matchAll(/<path[^>]*\/?>/g)]) {
+    const p = m[0]
+    if (p === head) continue
+    if (!p.includes(`fill="${shade}"`) && !p.includes(`fill="${rgbStr(hex2rgb(colours.skin))}"`)) continue
+    const d = /d="([^"]*)"/.exec(p)
+    if (!d) continue
+    const n = (d[1].match(/-?\d+\.?\d*/g) || []).map(Number)
+    const xs = n.filter((_, i) => i % 2 === 0)
+    const ys = n.filter((_, i) => i % 2 === 1)
+    if (!xs.length) continue
+    if (Math.max(...xs) - Math.min(...xs) < 500 && Math.max(...ys) > chin - 10) out = out.replace(p, '')
+  }
+  return out
 }
 
 /**
@@ -452,10 +482,10 @@ function findHead(doc: string): string | null {
  * second collar, which reads far worse than the background showing through a garment that does
  * not cover enough. If a garment leaves a gap, that is an art problem to catch in review.
  */
-function findShirt(doc: string): string[] {
+function findShirt(doc: string, fills: string[] = [T.shirt, T.shirt2]): string[] {
   return [...doc.matchAll(/<path[^>]*\/?>/g)]
     .map((m) => m[0])
-    .filter((p) => p.includes(`fill="${T.shirt}"`) || p.includes(`fill="${T.shirt2}"`))
+    .filter((p) => fills.some((f) => p.includes(`fill="${f}"`)))
 }
 
 function findEars(doc: string): string[] {
