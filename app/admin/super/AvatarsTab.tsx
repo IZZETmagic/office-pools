@@ -16,8 +16,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { composeAvatar, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
+import {
+  AVATAR_BACKGROUNDS,
+  AVATAR_COLOUR_NAMES,
+  AVATAR_GRADIENTS,
+  duelColourIndices,
+} from '@/lib/design/avatarGradient'
 
-type View = 'build' | 'grid'
+type View = 'build' | 'grid' | 'selector'
 
 const DEFAULT: AvatarConfig = {
   base: 'base-neck-100',
@@ -105,6 +111,226 @@ function Chips({
   )
 }
 
+// =============================================================
+// What a member would actually see
+// =============================================================
+// ⚠⚠ A MOCK, AND DELIBERATELY NOT WIRED. It writes nothing and saves nothing — the Save button
+// is inert. Its job is to answer "what would this look like?" before anyone builds the real
+// screen, which is cheaper to argue about here than in a member-facing route.
+//
+// ⭐ It is NOT the Builder with nicer paint. The Builder is a debug tool: every asset, raw keys,
+// a JSON dump. A member gets a small number of choices in plain words, and — the part that only
+// matters for SportPool — is SHOWN WHAT THEIR COLOUR DOES. The colour is not decoration; it is
+// the glow on their side of a Showdown duel and the ring beside their name on a leaderboard,
+// so the mock previews those two surfaces live rather than describing them.
+//
+// ⚠ Desktop only for now, as asked. The two-column layout collapses at lg: but no phone
+// layout has been designed, so do not read this as the responsive answer.
+
+const TITLE = (s: string) =>
+  s.replace(/^(x-|[a-z]\d+-|base-neck-)/, '').replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-7">
+      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      {hint ? <p className="text-xs text-gray-500 mt-0.5 mb-2.5">{hint}</p> : <div className="mb-2.5" />}
+      {children}
+    </section>
+  )
+}
+
+/** A row of choices as words, the way a member would read them. */
+function Options({
+  options, value, onChange, allowNone = true,
+}: { options: string[]; value: string | null; onChange: (v: string | null) => void; allowNone?: boolean }) {
+  const all: (string | null)[] = allowNone ? [null, ...options] : options
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {all.map((o) => (
+        <button
+          key={o ?? 'none'}
+          type="button"
+          onClick={() => onChange(o)}
+          aria-pressed={o === value}
+          className={`px-3 py-1.5 rounded-lg text-[13px] border transition ${
+            o === value
+              ? 'bg-gray-900 text-white border-gray-900'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+          }`}
+        >
+          {o === null ? 'None' : TITLE(o)}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function SelectorMock({ assets, cfg, set }: {
+  assets: AvatarAssets
+  cfg: AvatarConfig
+  set: <K extends keyof AvatarConfig>(k: K, v: AvatarConfig[K]) => void
+}) {
+  const me = useMemo(() => composeAvatar(cfg, assets), [cfg, assets])
+
+  // ⭐ The colour's PURPOSE, shown rather than described. `duelColourIndices` is the real
+  // function the duel uses, so if a member picks a colour an opponent already has, this
+  // preview moves one side exactly as the duel will.
+  const myIndex = AVATAR_BACKGROUNDS.indexOf(cfg.background)
+  const OPPONENT = { entryId: 'zzz-opponent', userId: 'demo-opponent', chosen: 'teal' }
+  const pair = duelColourIndices(
+    { entryId: 'aaa-you', userId: 'demo-you', chosen: AVATAR_COLOUR_NAMES[myIndex] ?? null },
+    OPPONENT,
+  )
+  const myGlow = AVATAR_GRADIENTS[pair.a][0]
+  const theirGlow = AVATAR_GRADIENTS[pair.b][0]
+
+  // ⚠ WHICH SIDE MOVED, not "did mine". The first version of this only watched the member's own
+  // side and the explanation could therefore NEVER appear: both sides here have chosen, so rule
+  // 2 applies and the lower entry id keeps the colour — which in this mock is always the
+  // member. The opponent was quietly moving off teal and nothing said why.
+  const theirIndex = AVATAR_COLOUR_NAMES.indexOf(OPPONENT.chosen)
+  const iMoved = myIndex >= 0 && pair.a !== myIndex
+  const theyMoved = theirIndex >= 0 && pair.b !== theirIndex
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
+      {/* -------------------------------------------------- the person */}
+      <div className="lg:sticky lg:top-4 space-y-4">
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <div
+            className="w-full aspect-square rounded-xl overflow-hidden [&>svg]:w-full [&>svg]:h-full [&>svg]:block"
+            dangerouslySetInnerHTML={{ __html: me }}
+          />
+          <p className="text-center text-sm font-semibold text-gray-900 mt-3">Alex Mercer</p>
+          <p className="text-center text-xs text-gray-500">@alexm</p>
+        </div>
+
+        {/* ⭐ Why the colour matters, at the size it is actually seen. */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-3">
+            Where people see you
+          </p>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div
+              className="w-9 h-9 rounded-full overflow-hidden shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:block"
+              dangerouslySetInnerHTML={{ __html: me }}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="h-2 w-24 bg-gray-200 rounded mb-1.5" />
+              <div className="h-2 w-14 bg-gray-100 rounded" />
+            </div>
+            <span className="text-xs font-semibold text-gray-400">2nd</span>
+          </div>
+          <div
+            className="rounded-xl h-16 relative overflow-hidden"
+            style={{ background: '#0B0F1A' }}
+          >
+            <div className="absolute inset-0" style={{
+              background: `radial-gradient(60% 120% at 8% 50%, ${myGlow}44 0%, transparent 60%),`
+                        + `radial-gradient(60% 120% at 92% 50%, ${theirGlow}38 0%, transparent 60%)`,
+            }} />
+            <div className="relative h-full flex items-center justify-between px-4">
+              <span className="text-[11px] font-semibold" style={{ color: myGlow }}>You</span>
+              <span className="text-[10px] text-white/40">Showdown</span>
+              <span className="text-[11px] font-semibold" style={{ color: theirGlow }}>Sam</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-500 mt-2 leading-snug">
+            {iMoved
+              ? 'Sam already has this colour, so the duel moves YOUR side apart for this week — you keep what you picked everywhere else.'
+              : theyMoved
+                ? 'Sam picked this colour too, so the duel moves THEIR side apart. You keep yours.'
+                : 'Your colour is the glow on your side of a duel.'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled
+          className="w-full py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold opacity-40 cursor-not-allowed"
+        >
+          Save
+        </button>
+        <p className="text-[11px] text-center text-gray-400 -mt-2">Mock — saves nothing</p>
+      </div>
+
+      {/* -------------------------------------------------- the choices */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-6">
+        <Section title="Your colour" hint="This is you across the app — your avatar, and your side of a duel.">
+          <div className="grid grid-cols-11 gap-2">
+            {AVATAR_BACKGROUNDS.map((c, i) => (
+              <button
+                key={c}
+                type="button"
+                title={AVATAR_COLOUR_NAMES[i]}
+                aria-label={AVATAR_COLOUR_NAMES[i]}
+                aria-pressed={cfg.background === c}
+                onClick={() => set('background', c)}
+                className={`aspect-square rounded-lg transition ${
+                  cfg.background === c ? 'ring-2 ring-offset-2 ring-gray-900 scale-105' : 'ring-1 ring-black/10'
+                }`}
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            {AVATAR_COLOUR_NAMES[myIndex] ? TITLE(AVATAR_COLOUR_NAMES[myIndex]) : 'Custom'}
+          </p>
+        </Section>
+
+        <Section title="Face">
+          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Skin</div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {PALETTE.skin.map((c) => (
+              <button key={c} type="button" onClick={() => set('skin', c)} aria-label={c}
+                aria-pressed={cfg.skin === c}
+                className={`w-8 h-8 rounded-full ${cfg.skin === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
+                style={{ background: c }} />
+            ))}
+          </div>
+          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Expression</div>
+          <Options options={Object.keys(assets.expressions)} value={cfg.expression ?? null}
+            onChange={(v) => set('expression', v)} allowNone={false} />
+        </Section>
+
+        <Section title="Hair">
+          <div className="flex flex-wrap gap-2 mb-3">
+            {PALETTE.hair.map((c) => (
+              <button key={c} type="button" onClick={() => set('hairColour', c)} aria-label={c}
+                aria-pressed={cfg.hairColour === c}
+                className={`w-8 h-8 rounded-full ${cfg.hairColour === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
+                style={{ background: c }} />
+            ))}
+          </div>
+          <Options options={Object.keys(assets.hair)} value={cfg.hair} onChange={(v) => set('hair', v)} />
+        </Section>
+
+        <Section title="Facial hair">
+          <Options options={Object.keys(assets.facialhair)} value={cfg.facialHair}
+            onChange={(v) => set('facialHair', v)} />
+        </Section>
+
+        <Section title="Extras">
+          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Eyewear</div>
+          <div className="mb-4">
+            <Options options={Object.keys(assets.glasses ?? {})} value={cfg.glasses ?? null}
+              onChange={(v) => set('glasses', v)} />
+          </div>
+          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Earrings</div>
+          <div className="mb-4">
+            <Options options={Object.keys(assets.earrings ?? {})} value={cfg.earrings ?? null}
+              onChange={(v) => set('earrings', v)} />
+          </div>
+          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Top</div>
+          <Options options={Object.keys(assets.garments ?? {})} value={cfg.garment ?? null}
+            onChange={(v) => set('garment', v)} />
+        </Section>
+      </div>
+    </div>
+  )
+}
+
 export function AvatarsTab() {
   const [assets, setAssets] = useState<AvatarAssets | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -170,7 +396,7 @@ export function AvatarsTab() {
     <div>
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="flex gap-1.5">
-          {(['build', 'grid'] as View[]).map((v) => (
+          {(['build', 'grid', 'selector'] as View[]).map((v) => (
             <button
               key={v}
               type="button"
@@ -182,14 +408,16 @@ export function AvatarsTab() {
                   : 'bg-white text-gray-700 border-gray-200'
               }`}
             >
-              {v === 'build' ? 'Builder' : 'Combination grid'}
+              {v === 'build' ? 'Builder' : v === 'grid' ? 'Combination grid' : 'Member selector'}
             </button>
           ))}
         </div>
         <span className="text-xs text-gray-500">{counts}</span>
       </div>
 
-      {view === 'build' ? (
+      {view === 'selector' ? (
+        <SelectorMock assets={assets} cfg={cfg} set={set} />
+      ) : view === 'build' ? (
         <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
           <div className="bg-white border border-gray-200 rounded-2xl p-5 lg:sticky lg:top-4">
             <div
