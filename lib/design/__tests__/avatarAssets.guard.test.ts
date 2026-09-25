@@ -738,51 +738,53 @@ describe('long hair works on every neck width', () => {
   })
 
   // =============================================================
-  // The BEHIND layer never escapes the body
+  // The BEHIND layer is display-only
   // =============================================================
-  // `hair/behind/<style>.svg` is the hair the body cut out of five drawn assets — generated
-  // art, extracted by assets/character-base/nano/extract-behind.py and painted between the
-  // backfill and the hair. It exists for the asset picker, which deletes the body; on a real
-  // avatar the body is painted over it and NOTHING may change.
-  //
-  // ⚠ That guarantee is geometric, not procedural: every point must sit below the shoulder
-  // line and inside the shirt's own span. A layer that strayed past either would show on a
-  // shipped avatar, and no rendering test in here would catch it.
-  it('the behind layer stays inside the body, so a real avatar cannot change', () => {
+  // `hair/behind/<style>.svg` is art for the region the body cut out of five styles. It is
+  // painted ONLY by headOnly(), for the asset picker, and never by composeAvatar — which is
+  // what makes a real avatar incapable of changing. It used to be painted by every compositor
+  // and clipped to the body silhouette to stay hidden; that clip cut Ryan's locs, which hang
+  // past the shirt dome, so it went. The guarantee is now structural, and this is the test of
+  // it: compose has to produce the SAME BYTES with the layer and without it.
+  it('composeAvatar never paints the behind layer', () => {
     const A = JSON.parse(
       readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
     ) as AvatarAssets
     const behind = A.hairBehind ?? {}
-    // it is a small, deliberate set — a sudden jump means extract-behind.py's seam gate broke
     expect(Object.keys(behind).length, 'styles with a behind layer').toBeGreaterThan(0)
-    expect(Object.keys(behind).length).toBeLessThanOrEqual(9)
+    const without = { ...A, hairBehind: {} }
+    for (const style of Object.keys(behind)) {
+      for (const base of Object.keys(A.bases)) {
+        const cfg2 = { ...cfg, base, hair: style }
+        expect(
+          composeAvatar(cfg2, A),
+          `${style} on ${base} differs when the behind layer is present`,
+        ).toBe(composeAvatar(cfg2, without))
+      }
+    }
+  })
 
-    // base-neck-100's shirt: x343..1698, top edge y1519. Every base shares this shirt — the
-    // four differ only in the neck — so one span covers all of them.
+  it('the behind layer stays below the shoulder line and carries only tokens', () => {
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const behind = A.hairBehind ?? {}
+    expect(Object.keys(behind).length).toBeLessThanOrEqual(9)
     const SHOULDER = 1519
-    const [X0, X1] = [343, 1698]
     for (const [style, markup] of Object.entries(behind)) {
       expect(A.hair[style], `${style} has a behind layer but no hair asset`).toBeTruthy()
       const ds = [...markup.matchAll(/ d="([^"]*)"/g)].map((m) => m[1])
       expect(ds.length, `${style}'s behind layer has no paths`).toBeGreaterThan(0)
-      const n = ds.flatMap((d) => (d.match(/-?\d+\.?\d*/g) || []).map(Number))
-      const xs = n.filter((_, i) => i % 2 === 0)
-      const ys = n.filter((_, i) => i % 2 === 1)
+      const ys = ds.flatMap((d) => (d.match(/-?\d+\.?\d*/g) || []).map(Number))
+        .filter((_, i) => i % 2 === 1)
       expect(Math.min(...ys), `${style} reaches above the shoulder line`).toBeGreaterThanOrEqual(SHOULDER)
-      expect(Math.min(...xs), `${style} reaches left of the shirt`).toBeGreaterThanOrEqual(X0)
-      expect(Math.max(...xs), `${style} reaches right of the shirt`).toBeLessThanOrEqual(X1)
-      // ⚠ Tokens, not literals — the compositors recolour by token and an un-tokenised fill
-      // would ship a fixed ash brown on every hair colour.
-      for (const f of [...markup.matchAll(/fill="([^"]*)"/g)].map((m) => m[1])) {
-        expect(['rgb(140,122,110)', 'rgb(114,97,86)'], `${style} fill ${f}`).toContain(f)
-      }
-      // ⚠ Sealed like every other hair path: a stroke of its OWN fill, or the edge where it
-      // meets the locked hair leaks a light line. Ryan, 2026-09-25: "there's a hairline
-      // different all the way around what you put in there". Wider than hair's 1.2 because
-      // this seam cannot be closed by burying the shape — see extract-behind.py.
+      // ⚠ Tokens, not literals. headOnly recolours this markup by token AFTER phase 2 has
+      // finished with the document, so an un-tokenised fill ships a grey-taupe patch on every
+      // hair colour — which is exactly what happened the first time it was painted there.
       for (const m of markup.matchAll(/<path[^>]*\/?>/g)) {
         const fill = /fill="([^"]*)"/.exec(m[0])?.[1]
         const stroke = /stroke="([^"]*)"/.exec(m[0])?.[1]
+        expect(['rgb(140,122,110)', 'rgb(114,97,86)'], `${style} fill ${fill}`).toContain(fill)
         expect(stroke, `${style} has a path with no stroke`).toBe(fill)
         expect(m[0], `${style} stroke-width`).toMatch(/stroke-width="8(\.0)?"/)
       }

@@ -322,8 +322,6 @@ function compose(c){
   // ⭐ the two derived body layers — see compose.ts's THE STACK for why they exist.
   // ⚠ per style — one shared fill leaves a hair-coloured rim on the shoulders.
   const backfill = (c.hair && (ASSETS.hairManifest||{})[c.hair]) ? ((ASSETS.hairBackfill||{})[c.hair] || '') : '';
-  // the hair the body cut out of the art — hair/behind/PROMPT.md. Covered by the body here.
-  const behind = c.hair ? ((ASSETS.hairBehind||{})[c.hair] || '') : '';
   // ⚠ painted when there is hair OR a garment; with a garment it is the only body layer.
   // ⭐⭐ two fragments: the shirt half (which a garment substitutes for) and the neck half,
   // which is what CUTS THE COLLAR — a traced garment is solid, the per-base neck cuts it.
@@ -357,7 +355,7 @@ function compose(c){
   add(ears.join('') + earringsLayer
       + eyes + (tinted ? stripEyes(upper.join('')) : upper.join(''))
       + (fhOver ? mouthLayer : '')
-      + backfill + behind + (c.hair ? ASSETS.hair[c.hair] : '') + frontBody + markLayer
+      + backfill + (c.hair ? ASSETS.hair[c.hair] : '') + frontBody + markLayer
       + (fh ? swapAll(fh, T.hairBase, T.beard) : '') + hairFront
       // ⭐⭐ eyewear goes IN FRONT of the hair — 98.4-99.5% of every eyewear asset sits inside
       // the head silhouette, temple included, so there is no placement that fronts the lenses

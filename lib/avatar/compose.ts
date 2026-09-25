@@ -417,6 +417,23 @@ const SHOULDER_LINE = 1520
 /**
  * A composed avatar reduced to the HEAD — for an asset picker, nothing else.
  *
+ * ⭐⭐⭐ THE FILL IS PAINTED HERE AND NOWHERE ELSE. `hair/behind/<style>.svg` is art for the
+ * region the body cut out of five styles, and it used to be painted by every compositor,
+ * clipped to the body silhouette so a real avatar could not change. Ryan, 2026-09-25: "we need
+ * to keep it like it is and fix it like the image I showed you" — the locked asset stays, the
+ * card matches his art. Clipping to the body was what stopped that: his locs hang PAST the
+ * shirt dome, so the clip cut them and left a hairline along the dome and a loc sliced in two.
+ * Painting the fill only in the picker drops the clip entirely, and the product is then
+ * unchanged BY CONSTRUCTION rather than by an invariant a guard test has to police.
+ *
+ * ⚠ It goes in directly after the canvas rect, at the very bottom of the stack, so the head,
+ * the ears and the locked hair all paint over it. Only what the locked art does not cover
+ * shows — which is exactly the piece that was missing.
+ *
+ * ⚠ THE CARD CAN THEREFORE SHOW HAIR A REAL AVATAR DOES NOT HAVE, where the fill reaches past
+ * the body. That is Ryan's call and it is deliberate; it is the price of not touching a locked
+ * asset.
+ *
  * ⭐ Ryan, 2026-09-25: a hair option should be shown "on the base avatars head ONLY (no eyes,
  * no mouth, no nose, only the ears)", and then, of the result: "it should show the full hair,
  * that is the only option". Eyes and mouth take null already. The nose, the neck and the shirt
@@ -473,10 +490,11 @@ const SHOULDER_LINE = 1520
  */
 export function headOnly(
   svg: string,
-  colours: { skin: string; shirt: string },
+  colours: { skin: string; shirt: string; hair: string },
   backfill = '',
   behind = '',
 ): string {
+  let svgIn = svg
   const shade = darken(hex2rgb(colours.skin), 0.88)
   const skin = rgbStr(hex2rgb(colours.skin))
   const shirt = rgbStr(hex2rgb(colours.shirt))
@@ -492,13 +510,27 @@ export function headOnly(
     return xs.length ? { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) } : null
   }
 
+  // ⭐ The fill is painted HERE and nowhere else — see the header.
+  const canvas = /<path[^>]*d="M 0 0 L 2048 0[^"]*"[^>]*\/?>/.exec(svgIn)?.[0]
+  if (behind && canvas) {
+    // ⚠⚠ RECOLOUR IT HERE. This runs on a document phase 2 has already finished with, so a
+    // fill dropped in now never meets the token swap and renders in the raw ash browns — every
+    // card came back with a grey-taupe patch under the chin. Same derivation compose uses.
+    const hairRgb = hex2rgb(colours.hair)
+    const painted = swap(
+      swap(behind, T.hairBase, rgbStr(hairRgb)),
+      T.hairShade, darken(hairRgb, 0.78),
+    )
+    svgIn = svgIn.replace(canvas, canvas + painted)
+  }
+
   // ⚠⚠ THE ART SUPERSEDES THE MASK. Opening the mask gives back whatever the asset holds
   // under the body — and for `m15-locs` that is a full-canvas rect, so it came back as a solid
   // slab across the whole bottom of the card where the style should be separate locs with gaps
   // between them. Ryan, 2026-09-25. A style that ships a `hair/behind` layer has real drawn
   // geometry for that region, so its mask stays SHUT and the layer is what fills the bite.
   // `f01-bob` is the other one: mask (neck only) plus a fill.
-  let out = behind ? svg : svg.replace(/<mask[^>]*>[\s\S]*?<\/mask>/g, (mask) =>
+  let out = behind ? svgIn : svgIn.replace(/<mask[^>]*>[\s\S]*?<\/mask>/g, (mask) =>
     mask.replace(/<path[^>]*\/?>/g, (p) => {
       const y0 = box(p)?.y0
       return y0 !== undefined && y0 >= SHOULDER_LINE - 20 && y0 <= SHOULDER_LINE + 5 ? '' : p
@@ -728,11 +760,6 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   const backfill =
     cfg.hair && A.hairManifest?.[cfg.hair] ? A.hairBackfill?.[cfg.hair] ?? '' : ''
 
-  // ⭐ The hair the body cut out of the art — see `hairBehind`. Only five styles were bitten in
-  // their paths and only three could be given the piece back; the rest have no entry and get
-  // nothing, which is correct because their hair never reaches the shoulder line.
-  const behind = cfg.hair ? A.hairBehind?.[cfg.hair] ?? '' : ''
-
   // ⭐ HAIR THAT FALLS IN FRONT OF THE FACE GOES BACK ON TOP OF THE BEARD. The stack puts
   // facial hair over the hair, which is right for the length hanging BESIDE the head — but
   // wrong for the strands falling across the cheek, which should pass in front of a beard the
@@ -809,7 +836,6 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       (tinted ? stripEyes(exprUpper) : exprUpper) +
       (fhOver ? mouthLayer : '') +
       backfill +
-      behind +
       (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
       bodyFront +
       markLayer +

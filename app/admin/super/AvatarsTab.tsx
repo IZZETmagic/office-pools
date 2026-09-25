@@ -277,7 +277,7 @@ function SelectorMock({ assets, cfg, set }: {
           },
           assets,
         ),
-        { skin: cfg.skin, shirt: cfg.shirt },
+        { skin: cfg.skin, shirt: cfg.shirt, hair: cfg.hairColour },
         (hair && assets.hairBackfill?.[hair]) || '',
         (hair && assets.hairBehind?.[hair]) || '',
       ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)

@@ -89,6 +89,9 @@ HEAD = ('<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '
 # do not measure 138 and 158, so there is no judgement in the number.
 SEAM_MAX = 12
 
+# Where the body starts, and the only bound the fill needs.
+SHOULDER_LINE = 1519
+
 # Sealing the neck fill against the hair beside it. ⚠⚠ Burying the shape sideways does NOT
 # work here and the reason is worth keeping: at the fill's own y the body IS the neck, nothing
 # wider, so `∩ region` pulls any sideways growth straight back to x849/x1199 and the two
@@ -312,7 +315,18 @@ def main():
     REF_HAIR = ref_hair_from_argv()
     trace, style, ref_png = sys.argv[1], sys.argv[2], sys.argv[3]
     svg = Path(trace).read_text()
-    region, neck_region, skull = body_minus_head((HERE / "bases/base-neck-100.svg").read_text())
+    body, neck_region, skull = body_minus_head((HERE / "bases/base-neck-100.svg").read_text())
+    # ⚠⚠ NOT the body silhouette. The fill is painted only by headOnly() now, so it no longer
+    # has to hide inside the body — and clipping it there was what cut Ryan's locs, which hang
+    # past the shirt dome: a hairline along the dome edge and a loc sliced in two. The bound is
+    # simply "below the shoulder line", where the bite always is.
+    region = Polygon([(0, SHOULDER_LINE), (2048, SHOULDER_LINE), (2048, 2048), (0, 2048)])
+    # ⚠⚠ ...but the GATE still judges against the body silhouette. With the half-plane the
+    # pieces merge into one mass that touches the locked hair somewhere, so `f01-bob` and
+    # `f03-bobswept` went from 130u/153u adrift to -35u and their detached blobs sailed through.
+    # The body is the shape that separated them cleanly; it stays the ruler even though it is
+    # no longer the clip.
+    gate_region = body
 
     # every tone the reference actually carries — the nearest one decides what a traced path is
     ref_svg = Path(ref_png).with_suffix(".svg")
@@ -378,9 +392,12 @@ def main():
 
     # ⚠ the SHOULDER half, gated on the seam — PIECE BY PIECE, see seam_gap()
     whole = unary_union([g for g in tone.values() if g is not None]).buffer(0)
+    gated = whole.intersection(gate_region).buffer(0) if not whole.is_empty else whole
+    pieces = ([] if gated.is_empty else
+              [gated] if gated.geom_type == "Polygon" else list(gated.geoms))
     whole = whole.intersection(region).buffer(0) if not whole.is_empty else whole
-    pieces = ([] if whole.is_empty else
-              [whole] if whole.geom_type == "Polygon" else list(whole.geoms))
+    out_parts = ([] if whole.is_empty else
+                 [whole] if whole.geom_type == "Polygon" else list(whole.geoms))
     keep, report = [], []
     for piece in pieces:
         if piece.area < 400:
@@ -389,7 +406,8 @@ def main():
         ok = gap is not None and gap <= SEAM_MAX
         report.append(f"{'-' if gap is None else f'{gap:.0f}'}{'' if ok else '✗'}")
         if ok:
-            keep.append(piece)
+            # the OUTPUT part this gated piece belongs to — the half-plane version of it
+            keep += [q for q in out_parts if q.intersects(piece)]
     attached = bool(keep)
     # ⚠⚠ THE PIECES ARE A MASK, NOT THE OUTPUT. Gating works on the union of both tones,
     # because a light mass and the dark mass inside it are one connected piece of hair — but
