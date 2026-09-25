@@ -112,6 +112,20 @@ CHIN_CLEAR = SEAL_STROKE / 2
 REF_HAIR = ((140, 122, 110), (109, 95, 85))
 
 
+def shade_trace_from_argv():
+    """`--shade <traced.svg>` — the darker hair tone, traced on its own. See isolate-tone.py.
+
+    ⚠ Recraft MERGES two close tones into one path. Ryan's fill for `m14-longhair` separates
+    rgb(69,59,50) curtains from an rgb(55,45,38) mass behind the neck by 14/255 and the
+    vectorizer returned a single shape for both, so the hair extracted as a flat slab. The
+    second pass is the same trick `hair-prompt.md` rule 5 uses for texture.
+    """
+    for i, a in enumerate(sys.argv):
+        if a == "--shade":
+            return sys.argv[i + 1]
+    return None
+
+
 def ref_hair_from_argv():
     """Override the two hair tones — `--tones #4A3B32,#38271F`.
 
@@ -377,13 +391,43 @@ def main():
         if ok:
             keep.append(piece)
     attached = bool(keep)
-    shoulders = unary_union(keep).buffer(0) if keep else None
+    # ⚠⚠ THE PIECES ARE A MASK, NOT THE OUTPUT. Gating works on the union of both tones,
+    # because a light mass and the dark mass inside it are one connected piece of hair — but
+    # the union is all this ever emitted for a while, so every shoulder half shipped as flat
+    # HAIR_BASE. Ryan, 2026-09-25: "the colours and feeling of depth is not" right. The two
+    # tones ARE the depth: the curtain that hangs in front is the light one, the mass behind
+    # the neck is the dark one, and with both collapsed the hair reads as a slab.
+    kept = unary_union(keep).buffer(0) if keep else None
     print(f"   seam [{' '.join(report) or '-'}]  {len(keep)}/{len(report)} kept", end="")
 
+    # ⚠ HAIR_BASE first, HAIR_SHADE second: they are disjoint by construction (the painter's
+    # replay subtracts one from the other), but the order is the one the hair assets use.
+    # ⭐ the darker tone from its own pass, when the single trace could not separate them
+    shade_svg = shade_trace_from_argv()
+    if shade_svg:
+        gs = []
+        for p in re.findall(r"<path[^>]*/?>", Path(shade_svg).read_text()):
+            c = rgb_of(p)
+            if c is None or sum(c) > 200:      # keep only the near-black mass
+                continue
+            g = flatten(d_of(p))
+            if g is not None and not g.is_empty and g.area > 400:
+                gs.append(g)
+        if gs:
+            dark = unary_union(gs).buffer(0)
+            whole_hair = unary_union([g for g in tone.values() if g is not None]).buffer(0)
+            tone[HAIR_SHADE] = dark.intersection(whole_hair).buffer(0)
+            tone[HAIR_BASE] = whole_hair.difference(dark).buffer(0)
+
     out = []
-    for token, g in ((HAIR_BASE, shoulders), (HAIR_SHADE, None)):
+    for token in (HAIR_BASE, HAIR_SHADE):
+        g = tone[token]
+        if g is not None and kept is not None:
+            g = g.intersection(region).intersection(kept).buffer(0)
+        elif g is not None:
+            g = None
         if neck_hair is not None and token == neck_tone:
-            g = neck_hair if g is None else g.union(neck_hair).buffer(0)
+            g = neck_hair if g is None or g.is_empty else g.union(neck_hair).buffer(0)
         if g is None or g.is_empty:
             continue
         g = g.simplify(0.6)
