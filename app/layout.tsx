@@ -79,13 +79,16 @@ export const metadata: Metadata = {
     siteName: "SportPool",
     title: "SportPool - Prediction Pools for You and Your Group",
     description: "Run a prediction pool for whatever your group is watching. Set the scoring, share one link, and watch the leaderboard move as results come in.",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "SportPool - Prediction Pools for You and Your Group" }],
+    // Alt describes the PICTURE, not the product — a screen reader announcing
+    // this in a chat thread should say what unfurled, and the title and
+    // description right beside it already carry the pitch.
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "The SportPool logo: the SP mark beside the SportPool wordmark, on brand blue." }],
   },
   twitter: {
     card: "summary_large_image",
     title: "SportPool - Prediction Pools for You and Your Group",
     description: "Run a prediction pool for whatever your group is watching. Set the scoring, share one link, and watch the leaderboard move as results come in.",
-    images: ["/og-image.png"],
+    images: [{ url: "/og-image.png", alt: "The SportPool logo: the SP mark beside the SportPool wordmark, on brand blue." }],
   },
   verification: {
     google: "googlebbdfb25f2108115e",
