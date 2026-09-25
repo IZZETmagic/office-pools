@@ -279,6 +279,7 @@ function SelectorMock({ assets, cfg, set }: {
         ),
         { skin: cfg.skin, shirt: cfg.shirt },
         (hair && assets.hairBackfill?.[hair]) || '',
+        (hair && assets.hairBehind?.[hair]) || '',
       ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
       cache.set(key, svg)
       return svg

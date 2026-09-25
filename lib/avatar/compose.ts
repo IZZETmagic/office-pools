@@ -431,6 +431,8 @@ const SHOULDER_LINE = 1520
  * and its shadow, never the shirt, so its shirt bite is drawn into the paths and survives. `f13-longstraight`'s shading paths run to y1841, well past the
  * shoulder line at y1519, which is the proof it was drawn full.
  *
+ * ⚠ Only for a style with NO `hair/behind` layer — see the note on the mask below.
+ *
  * ⚠ The subtractions are picked by where they START: a body path begins exactly at the shoulder
  * line, y1519–1520. Nothing else in a mask begins below y955 (the nose), so the window
  * 1500–1525 separates them with 545 units to spare — and it is a window, not a floor, because
@@ -473,6 +475,7 @@ export function headOnly(
   svg: string,
   colours: { skin: string; shirt: string },
   backfill = '',
+  behind = '',
 ): string {
   const shade = darken(hex2rgb(colours.skin), 0.88)
   const skin = rgbStr(hex2rgb(colours.skin))
@@ -489,8 +492,13 @@ export function headOnly(
     return xs.length ? { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) } : null
   }
 
-  // the body, cut out of the hair by the hair's own mask — see the header
-  let out = svg.replace(/<mask[^>]*>[\s\S]*?<\/mask>/g, (mask) =>
+  // ⚠⚠ THE ART SUPERSEDES THE MASK. Opening the mask gives back whatever the asset holds
+  // under the body — and for `m15-locs` that is a full-canvas rect, so it came back as a solid
+  // slab across the whole bottom of the card where the style should be separate locs with gaps
+  // between them. Ryan, 2026-09-25. A style that ships a `hair/behind` layer has real drawn
+  // geometry for that region, so its mask stays SHUT and the layer is what fills the bite.
+  // `f01-bob` is the other one: mask (neck only) plus a fill.
+  let out = behind ? svg : svg.replace(/<mask[^>]*>[\s\S]*?<\/mask>/g, (mask) =>
     mask.replace(/<path[^>]*\/?>/g, (p) => {
       const y0 = box(p)?.y0
       return y0 !== undefined && y0 >= SHOULDER_LINE - 20 && y0 <= SHOULDER_LINE + 5 ? '' : p
