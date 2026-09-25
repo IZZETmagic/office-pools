@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import { composeAvatar, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
+import { composeAvatar, stripNose, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 import {
   AVATAR_BACKGROUNDS,
   AVATAR_COLOUR_NAMES,
@@ -166,12 +166,112 @@ function Options({
   )
 }
 
+/**
+ * The frame a head preview is cropped to.
+ *
+ * ⭐ Chosen by rendering, not arithmetic. The asset bounding boxes are useless here — several
+ * hair styles carry a full-canvas <mask> rect, so every one of them measures 0..2048. Four
+ * crops were rendered against a bald head, a quiff, floor-length hair, locs, spacebuns and a
+ * topknot; this is the only one that holds the tall styles without clipping AND ends above the
+ * shirt line at y1520, which is what "the head only" means.
+ */
+const HEAD_CROP = '300 60 1440 1440'
+
+/**
+ * One asset, shown on a bare head in its own square card.
+ *
+ * ⚠⚠ THE PREVIEW IS THE ASSET AND NOTHING ELSE. Ryan, 2026-09-25: hair should be shown "on the
+ * base avatars head ONLY (no eyes, no mouth, no nose, only the ears)". Eyes and mouth take null
+ * already; the NOSE does not, because compose lifts and re-lays it rather than treating it as a
+ * slot — hence `stripNose`. A face looking out of a hair swatch is showing the member a
+ * decision they are not making.
+ *
+ * ⚠ Every card is the same square whatever the asset does, so the grid does not reflow between
+ * a buzz cut and floor-length hair.
+ */
+function AssetCards({
+  options, value, onChange, render, columns = 4,
+}: {
+  options: (string | null)[]
+  value: string | null
+  onChange: (v: string | null) => void
+  render: (key: string | null) => string
+  columns?: number
+}) {
+  return (
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+      {options.map((o) => {
+        const selected = o === value
+        return (
+          <button
+            key={o ?? 'none'}
+            type="button"
+            onClick={() => onChange(o)}
+            aria-pressed={selected}
+            className="group text-left"
+          >
+            <div
+              className={`aspect-square rounded-card overflow-hidden bg-surface transition ${
+                selected
+                  ? 'ring-2 ring-primary-600 ring-offset-2 ring-offset-surface'
+                  : 'border border-silver/50 group-hover:border-silver'
+              } [&>svg]:w-full [&>svg]:h-full [&>svg]:block`}
+              dangerouslySetInnerHTML={{ __html: render(o) }}
+            />
+            <div className={`mt-1.5 text-center text-[11px] truncate ${
+              selected ? 'text-ink font-semibold' : 'text-muted'
+            }`}>
+              {o === null ? 'None' : TITLE(o)}
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function SelectorMock({ assets, cfg, set }: {
   assets: AvatarAssets
   cfg: AvatarConfig
   set: <K extends keyof AvatarConfig>(k: K, v: AvatarConfig[K]) => void
 }) {
   const me = useMemo(() => composeAvatar(cfg, assets), [cfg, assets])
+
+  /**
+   * A bare head wearing one asset, cropped to the head, for the picker cards.
+   *
+   * ⚠ Memoised on the FOUR THINGS THE PREVIEW ACTUALLY SHOWS — the build, the skin and the hair
+   * colour. Keying it on the whole config would recompose 26 heads every time the member tried
+   * an expression or a top, and each compose is a full rewrite of the base document.
+   *
+   * ⚠ `--sp-mist`, not the member's own colour: 26 swatches in a saturated background would be
+   * a wall of colour with the hair lost inside it. The card is the neutral, the hair is the
+   * subject.
+   */
+  const headPreview = useMemo(() => {
+    const cache = new Map<string, string>()
+    return (hair: string | null) => {
+      const key = hair ?? '—'
+      const hit = cache.get(key)
+      if (hit) return hit
+      const svg = stripNose(
+        composeAvatar(
+          {
+            ...cfg,
+            hair,
+            expression: null, eyes: null, mouth: null,
+            facialHair: null, glasses: null, earrings: null, garment: null, mark: false,
+            background: '#EEF1F8',
+          },
+          assets,
+        ),
+        cfg.skin,
+      ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
+      cache.set(key, svg)
+      return svg
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets, cfg.base, cfg.skin, cfg.hairColour])
 
   // ⭐ The colour's PURPOSE, shown rather than described. `duelColourIndices` is the real
   // function the duel uses, so if a member picks a colour an opponent already has, this
@@ -295,7 +395,7 @@ function SelectorMock({ assets, cfg, set }: {
         </Section>
 
         <Section title="Hair">
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div className="flex flex-wrap gap-2 mb-4">
             {PALETTE.hair.map((c) => (
               <button key={c} type="button" onClick={() => set('hairColour', c)} aria-label={c}
                 aria-pressed={cfg.hairColour === c}
@@ -303,7 +403,13 @@ function SelectorMock({ assets, cfg, set }: {
                 style={{ background: c }} />
             ))}
           </div>
-          <Options options={Object.keys(assets.hair)} value={cfg.hair} onChange={(v) => set('hair', v)} />
+          <AssetCards
+            options={[null, ...Object.keys(assets.hair)]}
+            value={cfg.hair}
+            onChange={(v) => set('hair', v)}
+            render={headPreview}
+            columns={5}
+          />
         </Section>
 
         <Section title="Facial hair">

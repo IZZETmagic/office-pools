@@ -381,10 +381,10 @@ function uniquifyIds(svg: string): string {
  * Colour alone cannot do it: the ears carry the same tone, and so does the neck shadow.
  * The nose is the narrow, centred, upper-middle one.
  */
-function findNose(doc: string): string | null {
+function findNose(doc: string, fill: string = T.skinShade): string | null {
   for (const m of doc.matchAll(/<path[^>]*\/?>/g)) {
     const p = m[0]
-    if (!p.includes(`fill="${T.skinShade}"`)) continue
+    if (!p.includes(`fill="${fill}"`)) continue
     const d = /d="([^"]*)"/.exec(p)
     if (!d) continue
     const n = (d[1].match(/-?\d+\.?\d*/g) || []).map(Number)
@@ -399,6 +399,30 @@ function findNose(doc: string): string | null {
     }
   }
   return null
+}
+
+/**
+ * A composed avatar with the nose taken back out — FOR PREVIEWS ONLY.
+ *
+ * ⭐ Why this exists at all: an asset picker shows one feature at a time, and a hair thumbnail
+ * with a nose in the middle of it is showing the member the wrong thing. Eyes and mouth are
+ * already suppressible (`expression`/`eyes`/`mouth` take null); the nose is not, because it is
+ * part of the base and compose lifts and re-lays it rather than treating it as a slot.
+ *
+ * ⚠⚠ A POST-PROCESS, NOT A CONFIG FLAG, and deliberately. `AvatarConfig` is the contract three
+ * compositors share — compose.py and builder-template.html would both have to grow the same
+ * field, and a display-only concern is not worth widening that contract for. Nothing about
+ * composition changes here; a rendered document simply has one path removed afterwards.
+ *
+ * ⚠ It takes the SKIN because by this point the document has been recoloured: the nose no
+ * longer carries `T.skinShade`, it carries whatever that token was swapped to. The shape rule
+ * itself is not repeated — `findNose` is the single owner of "which path is the nose", and it
+ * is told which fill to look for.
+ */
+export function stripNose(svg: string, skin: string): string {
+  const shade = darken(hex2rgb(skin), 0.88)
+  const nose = findNose(svg, shade)
+  return nose ? svg.replace(nose, '') : svg
 }
 
 /**
