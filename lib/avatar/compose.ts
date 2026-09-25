@@ -402,55 +402,87 @@ function findNose(doc: string, fill: string = T.skinShade): string | null {
 }
 
 /**
- * A composed avatar reduced to HEAD, EARS AND HAIR — for an asset picker, nothing else.
+ * A composed avatar reduced to the HEAD — for an asset picker, nothing else.
  *
  * ⭐ Ryan, 2026-09-25: a hair option should be shown "on the base avatars head ONLY (no eyes,
- * no mouth, no nose, only the ears)". Eyes and mouth take null already. Three things do not:
- * the nose, the neck and the shirt, because they are part of the base rather than slots.
+ * no mouth, no nose, only the ears)". Eyes and mouth take null already. The nose, the neck and
+ * the shirt do not, because they are part of the base rather than slots.
  *
- * ⚠⚠ REMOVING THE BODY IS WHAT MAKES THE FRAMING POSSIBLE, which is not obvious. The chin sits
- * at y1530 and the shirt begins at y1519 — they touch. So there is no crop that leaves ANY
- * margin under the chin and still excludes the shirt; a frame tight enough to hide the body
- * also cuts the head off at the jaw. Take the body out and the head can be centred with air
- * around it at whatever size suits.
+ * ⚠⚠ THE BODY IS HIDDEN, NOT DELETED — and getting that wrong is what broke every long style.
+ * compose paints BACKFILL → HAIR → BODY-IN-FRONT, so the body is the thing that occludes hair
+ * falling behind the shoulders. Delete it and that hair has nothing in front of it: bob,
+ * bobswept, halfup and shag showed the cut ends as stubs hanging under the chin, and longcurly
+ * and midwavy showed a whole dark slab. The body must still be PAINTED, in the preview's own
+ * ground colour, so it goes on occluding exactly as it does in a real avatar while being
+ * invisible against the card.
+ *
+ * ⚠ The BACKFILL is deleted rather than hidden. It sits BEHIND the hair, so painting it the
+ * ground colour would achieve nothing — it is already covered by the hair where they overlap,
+ * and where they do not it is the slab.
+ *
+ * ⚠⚠ IT IS IDENTIFIED BY ITS OWN GEOMETRY, and it has to be. Every backfill starts at the
+ * shoulder line (y1520) and a first version deleted hair-toned paths starting below y1390 for
+ * that reason — but `f04-longcurly`, `m15-locs` and `f07-braids` all carry real hair that
+ * starts lower than that, down to y1775, so the rule was one asset away from eating the very
+ * styles it was written to fix. Composition never rewrites a `d`, only the fill and the ids,
+ * so the backfill's own path data matches verbatim. Pass `A.hairBackfill[cfg.hair]`; passing
+ * nothing removes nothing, which is correct for every style that has no backfill.
  *
  * ⚠ A POST-PROCESS, NOT A CONFIG FLAG. `AvatarConfig` is the contract three compositors share,
- * and compose.py and builder-template.html would both have to grow the same field. Nothing
- * about composition changes here — a rendered document has four paths removed afterwards, and
- * parity between the compositors is unaffected.
+ * and this is display-only. Composition is unchanged and parity is unaffected.
  *
- * ⚠ It takes the colours because the document has already been recoloured by this point: the
- * nose and neck no longer carry `T.skinShade` and the shirt no longer carries `T.shirt`. The
- * shape rules are not repeated — `findNose` and `findShirt` stay the single owners of "which
- * path is that" and are simply told what to look for.
+ * ⚠ It takes the colours because the document has already been recoloured: the nose and neck
+ * no longer carry `T.skinShade`, the shirt no longer carries `T.shirt`. `findNose` and
+ * `findShirt` stay the single owners of "which path is that" and are told what to look for.
  */
-export function headOnly(svg: string, colours: { skin: string; shirt: string }): string {
+export function headOnly(
+  svg: string,
+  colours: { skin: string; shirt: string; ground: string },
+  backfill = '',
+): string {
   const shade = darken(hex2rgb(colours.skin), 0.88)
+  const skin = rgbStr(hex2rgb(colours.skin))
   const shirt = rgbStr(hex2rgb(colours.shirt))
   const shirt2 = darken(hex2rgb(colours.shirt), 0.9)
+  const fill = new Set((backfill.match(/ d="[^"]*"/g) || []).map((d) => d.trim()))
+
+  const box = (p: string) => {
+    const d = /d="([^"]*)"/.exec(p)
+    if (!d) return null
+    const n = (d[1].match(/-?\d+\.?\d*/g) || []).map(Number)
+    const xs = n.filter((_, i) => i % 2 === 0)
+    const ys = n.filter((_, i) => i % 2 === 1)
+    return xs.length ? { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) } : null
+  }
 
   let out = svg
   const nose = findNose(out, shade)
   if (nose) out = out.replace(nose, '')
-  for (const p of findShirt(out, [shirt, shirt2])) out = out.replace(p, '')
 
-  // The neck and its shadow: skin-toned, NARROW, and reaching below the head's own chin.
-  // ⚠ The width test is what keeps the head itself (1032 wide) out of this, and the chin test
-  // is what keeps the EARS out — they are narrow too, but they stop at y1024.
   const head = findHead(out)
-  const chin = head ? Math.max(...(/d="([^"]*)"/.exec(head)?.[1].match(/-?\d+\.?\d*/g) ?? ['0'])
-    .map(Number).filter((_, i) => i % 2 === 1)) : 1530
+  const chin = (head && box(head)?.y1) || 1530
+
   for (const m of [...out.matchAll(/<path[^>]*\/?>/g)]) {
     const p = m[0]
     if (p === head) continue
-    if (!p.includes(`fill="${shade}"`) && !p.includes(`fill="${rgbStr(hex2rgb(colours.skin))}"`)) continue
-    const d = /d="([^"]*)"/.exec(p)
-    if (!d) continue
-    const n = (d[1].match(/-?\d+\.?\d*/g) || []).map(Number)
-    const xs = n.filter((_, i) => i % 2 === 0)
-    const ys = n.filter((_, i) => i % 2 === 1)
-    if (!xs.length) continue
-    if (Math.max(...xs) - Math.min(...xs) < 500 && Math.max(...ys) > chin - 10) out = out.replace(p, '')
+    const f = /fill="([^"]*)"/.exec(p)?.[1]
+    const b = box(p)
+    if (!f || !b) continue
+
+    // the backfill, matched on its own path data — see the header.
+    const d = / d="[^"]*"/.exec(p)?.[0].trim()
+    if (d && fill.has(d)) {
+      out = out.replace(p, '')
+      continue
+    }
+    // the body, front copy AND back copy: repainted so it still occludes, invisibly.
+    // ⚠ The ears are skin-shaded and narrow too, which is why the test is "reaches past the
+    // chin" — they stop at y1024.
+    const isShirt = f === shirt || f === shirt2
+    const isNeck = (f === skin || f === shade) && b.x1 - b.x0 < 500 && b.y1 > chin - 10
+    if (isShirt || isNeck) {
+      out = out.replace(p, p.replace(/fill="[^"]*"/, `fill="${colours.ground}"`))
+    }
   }
   return out
 }
