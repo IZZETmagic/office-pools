@@ -458,7 +458,11 @@ export function AvatarsTab() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/avatar-assets.json')
+    // ⚠⚠ no-store, and it is load-bearing. This is a STATIC file in public/, so the browser
+    // caches it by URL — and the URL never changes when the assets are rebuilt. Ryan spent an
+    // afternoon judging hair cards that had already been fixed, because the page kept serving
+    // the copy it had. A stale asset bundle looks exactly like a change that did not work.
+    fetch('/avatar-assets.json', { cache: 'no-store' })
       .then((r) => {
         if (!r.ok) throw new Error(`${r.status}`)
         return r.json()
