@@ -55,7 +55,16 @@ export type RecapPerson = {
   avatar_colour: string | null
 }
 
-export type RecapSide = { name: string; person: RecapPerson; score: number }
+export type RecapSide = {
+  /**
+   * ⚠ The entry's own id. A recap is rendered with NO VIEWER at all — there is no "you" — so
+   * the colour tie-break has to key off something both sides agree on. See duelColourIndices.
+   */
+  entryId: string
+  name: string
+  person: RecapPerson
+  score: number
+}
 
 /** Exactly the props `remotion/DuelRecap.tsx` takes. */
 export type DuelRecapProps = {
@@ -226,6 +235,7 @@ async function readSide(
   }
   const u = row.pool_members.users
   return {
+    entryId,
     name: u.full_name?.trim() || u.username?.trim() || row.entry_name || 'Unknown',
     person: {
       user_id: row.pool_members.user_id,

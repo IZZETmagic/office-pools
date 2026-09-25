@@ -11,7 +11,8 @@
       "username": "Marcus",
       "avatar_colour": null
     },
-    "score": 400
+    "score": 400,
+    "entryId": "entry-you-fixture"
   },
   "them": {
     "name": "Mia Torres",
@@ -21,7 +22,8 @@
       "username": "Mia T",
       "avatar_colour": null
     },
-    "score": 0
+    "score": 0,
+    "entryId": "entry-them-fixture"
   },
   "points": 500
 }

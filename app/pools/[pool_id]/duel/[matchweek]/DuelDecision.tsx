@@ -28,7 +28,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
-import { avatarColor } from '@/lib/design/avatarGradient'
+import { avatarColor, duelColourIndices, AVATAR_GRADIENTS } from '@/lib/design/avatarGradient'
 import type {
   DuelScoreline, DuelVerdict, DuelFormResult,
 } from '@/lib/league/duelVerdict'
@@ -39,7 +39,16 @@ export type FixtureBadge = {
   away: { name: string; crest: string | null }
 }
 
-type Side = { name: string; person: AvatarPerson | null }
+type Side = {
+  /**
+   * ⚠ NOT "you" or "them" — the entry's own id, which every viewer agrees on. It is what
+   * `duelColourIndices` breaks a colour tie with, and keying that off the viewer would show
+   * the two participants each other's colours changed.
+   */
+  entryId: string
+  name: string
+  person: AvatarPerson | null
+}
 
 /**
  * "Monday" — or a date once it is old enough for a weekday to be ambiguous.
@@ -260,8 +269,28 @@ export function DuelDecision({
         : verdict.outcome === 'tied' ? `Level with ${them!.name}`
           : `${them!.name} beat you`
 
-  const youColour = you.person ? avatarColor(you.person.user_id, you.person.avatar_colour) : 'rgba(255,255,255,0.5)'
-  const themColour = them?.person ? avatarColor(them.person.user_id, them.person.avatar_colour) : 'rgba(255,255,255,0.5)'
+  /**
+   * ⭐ Resolved as a PAIR. Two members can both be teal — one chose it, one hashed into it —
+   * and this screen shows them facing each other. `duelColourIndices` moves whichever side has
+   * the weaker claim to the colour, from the entry ids, so it composes the same for both.
+   */
+  const duelPair =
+    you.person && them?.person
+      ? duelColourIndices(
+          { entryId: you.entryId, userId: you.person.user_id, chosen: you.person.avatar_colour },
+          { entryId: them.entryId, userId: them.person.user_id, chosen: them.person.avatar_colour },
+        )
+      : null
+  const youColour = duelPair
+    ? AVATAR_GRADIENTS[duelPair.a][0]
+    : you.person
+      ? avatarColor(you.person.user_id, you.person.avatar_colour)
+      : 'rgba(255,255,255,0.5)'
+  const themColour = duelPair
+    ? AVATAR_GRADIENTS[duelPair.b][0]
+    : them?.person
+      ? avatarColor(them.person.user_id, them.person.avatar_colour)
+      : 'rgba(255,255,255,0.5)'
 
   // The history line. ⚠ `record` counts THIS duel too, so a first meeting is
   // a total of one — not zero.

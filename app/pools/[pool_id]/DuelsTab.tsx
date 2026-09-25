@@ -63,7 +63,14 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Avatar, type AvatarPerson } from '@/components/ui/Avatar'
 import { Countdown } from '@/components/ui/Countdown'
-import { avatarColor, avatarInk, type AvatarInk } from '@/lib/design/avatarGradient'
+import {
+  avatarColor,
+  avatarInk,
+  duelColourIndices,
+  inkFromIndex,
+  AVATAR_GRADIENTS,
+  type AvatarInk,
+} from '@/lib/design/avatarGradient'
 import { DuelRevealCeremony, type RevealOpponent } from './DuelRevealCeremony'
 import { DUEL_WIN, DUEL_TIE, duelResult } from '@/lib/league/duelPoints'
 import { createClient } from '@/lib/supabase/client'
@@ -2127,22 +2134,47 @@ function DuelPanel({
   }>
 }) {
   const decided = m.duel.settled_at && m.them
-  /** A duellist's own colour — the one their avatar opens with. */
-  const colourOf = (e: string | null) => {
-    const p = person(e)
-    return p ? avatarColor(p.user_id, p.avatar_colour) : 'rgba(255,255,255,0.35)'
-  }
+  /**
+   * ⭐⭐ BOTH SIDES AT ONCE. This card bleeds your corner in from the left and theirs from the
+   * right, so two members who are the same colour would make it one flat wash. The pair is
+   * resolved together and keyed on the ENTRY IDS, which every viewer agrees on — see
+   * `duelColourIndices`.
+   *
+   * ⚠ Only when there IS an opposing side. A bye keeps slate on the right, as before.
+   */
+  const youPersonHere = person(m.you.entry)
+  const themPersonHere = m.them ? person(m.them.entry) : null
+  const pair =
+    youPersonHere && themPersonHere && m.them
+      ? duelColourIndices(
+          {
+            entryId: m.you.entry ?? '',
+            userId: youPersonHere.user_id,
+            chosen: youPersonHere.avatar_colour,
+          },
+          {
+            entryId: m.them.entry ?? '',
+            userId: themPersonHere.user_id,
+            chosen: themPersonHere.avatar_colour,
+          },
+        )
+      : null
+
   // Resolved once, out here: inside the strip's `.map` the `m.them` null-check
   // does not narrow, and it would recompute the hash per segment anyway.
-  const yourColour = colourOf(m.you.entry)
-  const theirColour = m.them ? colourOf(m.them.entry) : ''
+  const yourColour = pair
+    ? AVATAR_GRADIENTS[pair.a][0]
+    : youPersonHere
+      ? avatarColor(youPersonHere.user_id, youPersonHere.avatar_colour)
+      : 'rgba(255,255,255,0.35)'
+  const theirColour = pair ? AVATAR_GRADIENTS[pair.b][0] : ''
   /** The corner wash: lightness-normalised, so neither corner outshines the other. */
-  const washOf = (e: string | null) => {
-    const p = person(e)
-    return p ? avatarInk(p.user_id, p.avatar_colour).soft : 'var(--sp-slate)'
-  }
-  const yourWash = washOf(m.you.entry)
-  const theirWash = m.them ? washOf(m.them.entry) : 'var(--sp-slate)'
+  const yourWash = pair
+    ? inkFromIndex(pair.a).soft
+    : youPersonHere
+      ? avatarInk(youPersonHere.user_id, youPersonHere.avatar_colour).soft
+      : 'var(--sp-slate)'
+  const theirWash = pair ? inkFromIndex(pair.b).soft : 'var(--sp-slate)'
   return (
     <div className="rounded-card overflow-hidden bg-midnight relative">
       {/* YOUR corner bleeding in from the left, THEIRS from the right — the

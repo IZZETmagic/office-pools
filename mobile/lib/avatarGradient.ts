@@ -140,3 +140,65 @@ export function getInitials(name: string): string {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
+
+/**
+ * Where a colour moves when the other side of a duel is too close to it.
+ *
+ * ⚠ MIRRORED from lib/design/avatarGradient.ts, which carries the reasoning. A table rather
+ * than a ΔE calculation precisely so the two platforms cannot drift; a guard test regenerates
+ * it from the palette and byte-compares both copies.
+ */
+export const COLOUR_SHIFT: readonly (readonly number[])[] = [
+  [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  [2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+  [3, 3, 3, 5, 6, 3, 3, 3, 3, 3, 3, 3, 3],
+  [4, 4, 4, 5, 6, 7, 4, 4, 4, 4, 4, 4, 4],
+  [5, 5, 5, 5, 6, 7, 8, 5, 5, 5, 5, 5, 5],
+  [6, 6, 6, 6, 6, 7, 8, 9, 6, 6, 6, 6, 6],
+  [7, 7, 7, 7, 7, 7, 8, 9, 10, 7, 7, 7, 7],
+  [8, 8, 8, 8, 8, 8, 8, 9, 10, 11, 8, 8, 8],
+  [9, 9, 9, 9, 9, 9, 9, 9, 10, 11, 12, 9, 9],
+  [10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 12, 12, 10],
+  [11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 11],
+  [12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 0],
+];
+
+/**
+ * One side of a duel, for colouring purposes.
+ *
+ * ⚠⚠ `entryId` is NOT "you" or "them" — Showdown's sides are VIEWER-RELATIVE and `useDuel.ts`
+ * warns that `entry_a`/`entry_b` carry no meaning. Keying the decision off the viewer would
+ * show the two participants each other's colours changed.
+ */
+export type DuelSideColour = {
+  entryId: string;
+  userId: string;
+  chosen?: string | null;
+};
+
+/**
+ * The palette index each side of a duel renders in. Mirrors the web implementation exactly.
+ *
+ * ⭐⭐ Who moves: if exactly one side actually PICKED the clashing colour, the other moves —
+ * a member who chose teal keeps it against somebody who merely hashed into it. Otherwise the
+ * side whose entry id sorts higher moves. Both rules are viewer-independent, so a duel composes
+ * the same for both participants and for a spectator.
+ *
+ * ⚠ A sealed week cannot use this: the opponent's colour is withheld until
+ * `duelPhase().opponentVisible`, so a shift resolves only AT reveal.
+ */
+export function duelColourIndices(
+  a: DuelSideColour,
+  b: DuelSideColour,
+): { a: number; b: number } {
+  const ia = avatarIndexFor(a.userId, a.chosen);
+  const ib = avatarIndexFor(b.userId, b.chosen);
+  if (COLOUR_SHIFT[ia][ib] === ia) return { a: ia, b: ib };
+
+  const aPicked = !!a.chosen && AVATAR_COLOUR_NAMES.indexOf(a.chosen) === ia;
+  const bPicked = !!b.chosen && AVATAR_COLOUR_NAMES.indexOf(b.chosen) === ib;
+
+  const bMoves = aPicked !== bPicked ? aPicked : a.entryId < b.entryId;
+  return bMoves ? { a: ia, b: COLOUR_SHIFT[ib][ia] } : { a: COLOUR_SHIFT[ia][ib], b: ib };
+}

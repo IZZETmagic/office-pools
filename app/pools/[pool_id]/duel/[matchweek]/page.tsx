@@ -81,11 +81,19 @@ export default async function DuelDecisionPage({
     .select('users!inner(user_id, username, full_name, avatar_colour), pool_entries(entry_id, entry_name)')
     .eq('pool_id', pool_id)
   type MemberRow = {
-    users: { user_id: string; username: string | null; full_name: string | null } | null
+    users: {
+      user_id: string
+      username: string | null
+      full_name: string | null
+      avatar_colour: string | null
+    } | null
     pool_entries: { entry_id: string; entry_name: string | null }[] | null
   }
   const names = new Map<string, string>()
-  const people = new Map<string, { user_id: string; full_name: string | null; username: string | null }>()
+  const people = new Map<
+    string,
+    { user_id: string; full_name: string | null; username: string | null; avatar_colour: string | null }
+  >()
   for (const m of (members ?? []) as unknown as MemberRow[]) {
     for (const e of m.pool_entries ?? []) {
       names.set(e.entry_id, e.entry_name || m.users?.username || 'Entry')
@@ -94,6 +102,7 @@ export default async function DuelDecisionPage({
           user_id: m.users.user_id,
           full_name: m.users.full_name,
           username: m.users.username,
+          avatar_colour: m.users.avatar_colour ?? null,
         })
       }
     }
@@ -291,9 +300,13 @@ export default async function DuelDecisionPage({
       topOfWeek={topOfWeek}
       streak={streak}
       form={form}
-      you={{ name: names.get(myEntry) ?? 'You', person: people.get(myEntry) ?? null }}
+      you={{ entryId: myEntry, name: names.get(myEntry) ?? 'You', person: people.get(myEntry) ?? null }}
       them={theirEntry
-        ? { name: names.get(theirEntry) ?? 'Unknown', person: people.get(theirEntry) ?? null }
+        ? {
+            entryId: theirEntry,
+            name: names.get(theirEntry) ?? 'Unknown',
+            person: people.get(theirEntry) ?? null,
+          }
         : null}
       // ⚠ headToHead over EVERY settled duel between the two, this one included.
       // It read `=== 3` until 2026-08-31 and would have called them all losses.

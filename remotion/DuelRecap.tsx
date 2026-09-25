@@ -58,7 +58,13 @@ import {
 // ⚠ RELATIVE, not `@/`. Remotion bundles this outside Next, so the tsconfig
 // `@/*` alias is not guaranteed to resolve in its webpack config. These are
 // pure functions with no Tailwind and no React, so they travel fine.
-import { avatarGradient, avatarColor, avatarInk } from '../lib/design/avatarGradient'
+import {
+  avatarGradient,
+  avatarColor,
+  avatarInk,
+  duelColourIndices,
+  inkFromIndex,
+} from '../lib/design/avatarGradient'
 import { getInitials } from '../lib/design/initials'
 import { duelResult } from '../lib/league/duelPoints'
 import { palette } from '../lib/design/tokens'
@@ -74,6 +80,8 @@ export type DuelPerson = {
 }
 
 export type DuelSide = {
+  /** The entry's own id — the viewer-independent key the colour tie-break uses. */
+  entryId: string
   name: string
   person: DuelPerson
   /** The weekly accuracy the duel was judged on. */
@@ -114,8 +122,21 @@ export const DuelRecap: React.FC<DuelRecapProps> = ({
         ? `Level with ${them!.name}`
         : `${them!.name} beat you`
 
-  const youInk = avatarInk(you.person.user_id, you.person.avatar_colour)
-  const themInk = them ? avatarInk(them.person.user_id, them.person.avatar_colour) : null
+  /**
+   * ⭐ Resolved as a PAIR, and this is the case the viewer-independent rule exists for: a recap
+   * card is rendered on the server with no viewer, so "shift the opponent" would have no
+   * meaning here. The entry ids decide, exactly as they do on both members' screens.
+   */
+  const duelPair = them
+    ? duelColourIndices(
+        { entryId: you.entryId, userId: you.person.user_id, chosen: you.person.avatar_colour },
+        { entryId: them.entryId, userId: them.person.user_id, chosen: them.person.avatar_colour },
+      )
+    : null
+  const youInk = duelPair
+    ? inkFromIndex(duelPair.a)
+    : avatarInk(you.person.user_id, you.person.avatar_colour)
+  const themInk = duelPair ? inkFromIndex(duelPair.b) : null
 
   const enter = (delay: number) =>
     spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.7 } })

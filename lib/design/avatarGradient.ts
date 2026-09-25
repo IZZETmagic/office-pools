@@ -215,6 +215,107 @@ export type AvatarInk = {
  * member eventually picks on their profile, gets the same treatment for free.
  */
 export function avatarInk(userId: string, chosen?: string | null): AvatarInk {
-  const base = avatarColor(userId, chosen)
+  return inkFromIndex(avatarIndexFor(userId, chosen))
+}
+
+/**
+ * The same two steps, for a palette index that has already been decided.
+ *
+ * ⚠ Needed because a DUEL resolves both sides together — `duelColourIndices` may move one of
+ * them off the colour their user id would give, so there is no user id left to ask.
+ */
+export function inkFromIndex(index: number): AvatarInk {
+  const base = AVATAR_GRADIENTS[index][0]
   return { strong: withLightness(base, 0.52), soft: withLightness(base, 0.70) }
+}
+
+// ---------------------------------------------------------------------------------------
+// TWO SIDES OF A DUEL
+// ---------------------------------------------------------------------------------------
+
+/**
+ * Where a colour must move to when the other side is too close to it.
+ *
+ * `COLOUR_SHIFT[from][against]` is the index `from` becomes so it reads clearly against
+ * `against`. When they are already far enough apart it is `from` itself, so "does this pair
+ * clash" and "what does it become" are one lookup.
+ *
+ * ⭐ A TABLE, NOT A CALCULATION, and deliberately so. The alternative is a CIELAB ΔE function
+ * duplicated into the RN copy, where the two could drift silently and a duel would compose
+ * differently on each platform. Numbers cannot drift without a guard test noticing. The test
+ * REGENERATES this from the palette, so it also cannot fall out of step with the colours.
+ *
+ * ⚠ The rule that built it: walk forward from `from` through the palette — which is in hue
+ * order — and take the FIRST colour at least ΔE 40 from `against`. Smallest change that works,
+ * rather than jumping to the opposite of the wheel, so a shifted side still looks like a
+ * near neighbour of what that member picked.
+ *
+ * ⚠ 9 of the 78 pairings move. Every colour has at least 10 of the other 12 to move into, so
+ * this can never fail to find one.
+ */
+export const COLOUR_SHIFT: readonly (readonly number[])[] = [
+  [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  [2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+  [3, 3, 3, 5, 6, 3, 3, 3, 3, 3, 3, 3, 3],
+  [4, 4, 4, 5, 6, 7, 4, 4, 4, 4, 4, 4, 4],
+  [5, 5, 5, 5, 6, 7, 8, 5, 5, 5, 5, 5, 5],
+  [6, 6, 6, 6, 6, 7, 8, 9, 6, 6, 6, 6, 6],
+  [7, 7, 7, 7, 7, 7, 8, 9, 10, 7, 7, 7, 7],
+  [8, 8, 8, 8, 8, 8, 8, 9, 10, 11, 8, 8, 8],
+  [9, 9, 9, 9, 9, 9, 9, 9, 10, 11, 12, 9, 9],
+  [10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 12, 12, 10],
+  [11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 11],
+  [12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 0],
+]
+
+/**
+ * One side of a duel, for colouring purposes.
+ *
+ * ⚠⚠ `entryId` IS NOT "you" OR "them". Showdown's sides are VIEWER-RELATIVE — `useDuel.ts`
+ * warns that `entry_a`/`entry_b` carry no meaning and are safe to flip for display. If the
+ * decision below keyed off which side the viewer is, the two participants would each see the
+ * other's colour changed and neither would be looking at the same duel. It keys off the entry
+ * id, which every viewer agrees on.
+ */
+export type DuelSideColour = {
+  entryId: string
+  userId: string
+  /** `users.avatar_colour` — the name they picked, or null/undefined if they have not. */
+  chosen?: string | null
+}
+
+/**
+ * The palette index each side of a duel renders in.
+ *
+ * ⭐⭐ WHO MOVES, when two sides are too close:
+ *
+ *   1. If exactly ONE of them actually PICKED the clashing colour, the other moves. A member
+ *      who chose teal keeps teal against somebody who merely hashed into it — nothing is taken
+ *      from the person who made a choice, which is the whole reason choosing exists.
+ *   2. Otherwise — both picked it, or neither did — the side whose entry id sorts HIGHER moves.
+ *      Arbitrary, but stable and identical for everyone looking.
+ *
+ * ⚠ Both rules are viewer-independent on purpose, so a duel composes the same for both
+ * participants, for a spectator, and for a server-rendered recap card.
+ *
+ * ⚠⚠ A SEALED WEEK CANNOT USE THIS. Until `duelPhase().opponentVisible`, the opponent's colour
+ * is deliberately withheld — it identifies them as surely as their name — so there is nothing
+ * to compare against and the right-hand side stays neutral. That means a shift can only resolve
+ * AT reveal. Rule 1 is what keeps that acceptable: a member who chose their colour never sees
+ * it change at the reveal, because only the one who did not choose moves.
+ */
+export function duelColourIndices(
+  a: DuelSideColour,
+  b: DuelSideColour,
+): { a: number; b: number } {
+  const ia = avatarIndexFor(a.userId, a.chosen)
+  const ib = avatarIndexFor(b.userId, b.chosen)
+  if (COLOUR_SHIFT[ia][ib] === ia) return { a: ia, b: ib }
+
+  const aPicked = isAvatarColourName(a.chosen) && AVATAR_COLOUR_NAMES.indexOf(a.chosen) === ia
+  const bPicked = isAvatarColourName(b.chosen) && AVATAR_COLOUR_NAMES.indexOf(b.chosen) === ib
+
+  const bMoves = aPicked !== bPicked ? aPicked : a.entryId < b.entryId
+  return bMoves ? { a: ia, b: COLOUR_SHIFT[ib][ia] } : { a: COLOUR_SHIFT[ia][ib], b: ib }
 }

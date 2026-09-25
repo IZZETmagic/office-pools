@@ -99,6 +99,7 @@ async function personFor(entryId: string) {
     .single()
   if (error) throw new Error(`entry ${entryId}: ${error.message}`)
   const row = data as unknown as {
+    entry_id: string
     entry_name: string | null
     pool_members: {
       user_id: string
@@ -114,6 +115,7 @@ async function personFor(entryId: string) {
   return {
     seeded: (u.email ?? '').startsWith(TEST_EMAIL_PREFIX),
     side: {
+      entryId: row.entry_id,
       name: u.full_name?.trim() || u.username?.trim() || row.entry_name || 'Unknown',
       person: {
         user_id: row.pool_members.user_id,

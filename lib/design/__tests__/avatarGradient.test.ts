@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AVATAR_GRADIENTS, AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES,
   hashUserIdToIndex, avatarGradient, avatarIndexFor, avatarColor, isAvatarColourName,
+  COLOUR_SHIFT, duelColourIndices,
 } from '../avatarGradient'
 
 // Drift guard for the avatar palette.
@@ -247,5 +248,114 @@ describe("a member's chosen colour", () => {
       expect(n, `${n} would be refused by users_avatar_colour_shape_ck`)
         .toMatch(/^[a-z][a-z0-9-]{1,23}$/)
     }
+  })
+})
+
+
+describe('two sides of a duel never read as one colour', () => {
+  const FLOOR = 40
+  const N = AVATAR_GRADIENTS.length
+  const glow = (i: number) => AVATAR_GRADIENTS[i][0]
+
+  it('the shift table is what the palette says it should be', () => {
+    // ⭐ REGENERATED, not eyeballed. The table is hand-embedded data in two files; the only
+    // thing stopping it drifting from the colours it describes is this recomputation.
+    for (let from = 0; from < N; from++) {
+      for (let against = 0; against < N; against++) {
+        let expected = from
+        for (let step = 0; step < N; step++) {
+          const cand = (from + step) % N
+          if (deltaE(glow(cand), glow(against)) >= FLOOR) { expected = cand; break }
+        }
+        expect(COLOUR_SHIFT[from][against],
+          `COLOUR_SHIFT[${AVATAR_COLOUR_NAMES[from]}][${AVATAR_COLOUR_NAMES[against]}]`)
+          .toBe(expected)
+      }
+    }
+  })
+
+  it('matches the RN copy exactly', () => {
+    const block = rnSource.slice(rnSource.indexOf('const COLOUR_SHIFT'))
+    const rows = [...block.slice(0, block.indexOf('];')).matchAll(/\[([\d,\s]+)\]/g)]
+      .map((m) => m[1].split(',').map((v) => Number(v.trim())))
+    expect(rows, 'could not parse COLOUR_SHIFT from the RN copy').not.toEqual([])
+    expect(rows).toEqual(COLOUR_SHIFT.map((r) => [...r]))
+  })
+
+  it('leaves every pairing clearly readable, whatever the two sides picked', () => {
+    // ⭐⭐ THE PROPERTY THE WHOLE STAGE EXISTS FOR. Every pair of colours, both orderings,
+    // chosen and unchosen — after the rule runs, no duel shows two colours under ΔE 40.
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        for (const [ac, bc] of [
+          [AVATAR_COLOUR_NAMES[i], AVATAR_COLOUR_NAMES[j]],
+          [AVATAR_COLOUR_NAMES[i], null],
+          [null, AVATAR_COLOUR_NAMES[j]],
+        ] as (string | null)[][]) {
+          const out = duelColourIndices(
+            { entryId: 'aaa', userId: 'user-one', chosen: ac },
+            { entryId: 'bbb', userId: 'user-two', chosen: bc },
+          )
+          expect(deltaE(glow(out.a), glow(out.b)),
+            `${AVATAR_COLOUR_NAMES[out.a]} vs ${AVATAR_COLOUR_NAMES[out.b]}`)
+            .toBeGreaterThanOrEqual(FLOOR)
+        }
+      }
+    }
+  })
+
+  it('composes the same duel for both participants and for a spectator', () => {
+    // ⚠⚠ THE TRAP. Showdown's sides are viewer-relative — useDuel.ts warns entry_a/entry_b
+    // carry no meaning. If the rule keyed off "you", the two people in a duel would each see
+    // the other's colour changed and neither would be looking at the same thing.
+    const A = { entryId: 'entry-aaa', userId: 'u-a', chosen: 'teal' }
+    const B = { entryId: 'entry-bbb', userId: 'u-b', chosen: 'teal' }
+    const seenByA = duelColourIndices(A, B)
+    const seenByB = duelColourIndices(B, A)
+    expect(seenByA.a).toBe(seenByB.b)
+    expect(seenByA.b).toBe(seenByB.a)
+  })
+
+  it('moves the one who did not choose', () => {
+    // ⭐ What makes a shift at reveal acceptable: a member who picked their colour keeps it.
+    //
+    // ⚠ `user-2` HASHES onto teal — verified below rather than assumed. The first version of
+    // this test used an arbitrary id and would have passed without the two sides ever
+    // colliding, proving nothing.
+    const tealIndex = AVATAR_COLOUR_NAMES.indexOf('teal')
+    const HASHES_TO_TEAL = 'user-2'
+    expect(hashUserIdToIndex(HASHES_TO_TEAL, AVATAR_GRADIENTS.length),
+      'this id must actually collide, or the test is vacuous').toBe(tealIndex)
+
+    // the chooser sorts LAST by entry id, so rule 2 would have moved them — rule 1 must win
+    const chooser = { entryId: 'zzz', userId: 'someone-else', chosen: 'teal' }
+    const hashed = { entryId: 'aaa', userId: HASHES_TO_TEAL, chosen: null }
+
+    const out = duelColourIndices(chooser, hashed)
+    expect(out.a, 'the member who CHOSE teal must keep it').toBe(tealIndex)
+    expect(out.b, 'the member who merely hashed into teal must move').not.toBe(tealIndex)
+
+    // and the same from the other side of the table
+    const flipped = duelColourIndices(hashed, chooser)
+    expect(flipped.b).toBe(tealIndex)
+    expect(flipped.a).not.toBe(tealIndex)
+  })
+
+  it('falls back to entry id order when both chose the same colour', () => {
+    // Nothing separates them on merit, so it has to be arbitrary — but STABLE, and the same
+    // for everyone looking.
+    const teal = AVATAR_COLOUR_NAMES.indexOf('teal')
+    const first = { entryId: 'aaa', userId: 'u-1', chosen: 'teal' }
+    const second = { entryId: 'bbb', userId: 'u-2', chosen: 'teal' }
+    const out = duelColourIndices(first, second)
+    expect(out.a, 'the lower entry id keeps the colour').toBe(teal)
+    expect(out.b).not.toBe(teal)
+  })
+
+  it('is stable — the same duel always composes the same way', () => {
+    const A = { entryId: 'e1', userId: 'u1', chosen: 'blue' }
+    const B = { entryId: 'e2', userId: 'u2', chosen: 'blue' }
+    const once = duelColourIndices(A, B)
+    for (let i = 0; i < 50; i++) expect(duelColourIndices(A, B)).toEqual(once)
   })
 })

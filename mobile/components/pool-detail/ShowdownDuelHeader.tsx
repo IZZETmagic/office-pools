@@ -11,7 +11,12 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text } from '@/components/ui';
-import { getInitials, gradientForUser } from '@/lib/avatarGradient';
+import {
+  getInitials,
+  gradientForUser,
+  duelColourIndices,
+  AVATAR_GRADIENTS,
+} from '@/lib/avatarGradient';
 import { formatDhms, formatHms, useCountdown } from '@/lib/useCountdown';
 import { duelResult } from '@/lib/duelPoints';
 import type { DuelPhase } from '@/lib/duelPhase';
@@ -384,7 +389,31 @@ export function ShowdownDuelHeader({
   const themStanding =
     opponentVisible && bout?.them ? standings.get(bout.them.entryId) : undefined;
   const themUserId = themStanding?.userId ?? null;
-  const leftGlow = youUserId ? gradientForUser(youUserId, youStanding?.avatarColour)[0] : BAND.primary;
+  /**
+   * ⭐⭐ THE TWO SIDES ARE RESOLVED TOGETHER, not one at a time. Two members can both be teal —
+   * one picked it, the other hashed into it — and a duel between them would be one colour
+   * facing itself. `duelColourIndices` moves whichever side has the weaker claim, and does it
+   * from the ENTRY IDS so both participants and any spectator see the same composition.
+   *
+   * ⚠ Only possible once the opponent is visible. While sealed there is nothing to compare
+   * against and the right-hand side is neutral anyway, so your own colour stands alone — which
+   * is also why the shift lands at reveal rather than before it.
+   */
+  const youEntryId = bout?.you.entryId ?? you?.entryId ?? null;
+  const themEntryId = opponentVisible && bout?.them ? bout.them.entryId : null;
+  const duelPair =
+    youUserId && themUserId && youEntryId && themEntryId
+      ? duelColourIndices(
+          { entryId: youEntryId, userId: youUserId, chosen: youStanding?.avatarColour },
+          { entryId: themEntryId, userId: themUserId, chosen: themStanding?.avatarColour },
+        )
+      : null;
+
+  const leftGlow = duelPair
+    ? AVATAR_GRADIENTS[duelPair.a][0]
+    : youUserId
+      ? gradientForUser(youUserId, youStanding?.avatarColour)[0]
+      : BAND.primary;
   /**
    * ⚠ NEUTRAL, NOT ABSENT. With no throw at all the band goes visibly lopsided —
    * lit from the left, flat on the right — which reads as a rendering fault
@@ -392,7 +421,7 @@ export function ShowdownDuelHeader({
    * identifies nobody: it is the same grey the locked silhouette and its ring
    * take, so the whole right-hand side says one thing.
    */
-  const rightGlow = themUserId ? gradientForUser(themUserId, themStanding?.avatarColour)[0] : BAND.slate;
+  const rightGlow = duelPair ? AVATAR_GRADIENTS[duelPair.b][0] : BAND.slate;
   // ⚠ One value, not a light/dark pair: the band is dark in BOTH app themes, so
   // there is no pale surface for this to be restrained against any more.
   const glowAlpha = 0.28;
