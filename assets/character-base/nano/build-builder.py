@@ -64,6 +64,9 @@ data = {
     # ⚠ per STYLE — one shared fill leaves a hair-coloured rim on the shoulders of every
     # style that does not cover it. See build-body-layers.py.
     "hairBackfill": {f.stem: inner(f) for f in sorted(HERE.glob("hair/backfill/*.svg"))},
+    # ⭐ The hair the body cut out of the art, for the styles that carry the bite in their drawn
+    # paths rather than in a <mask>. hair/behind/PROMPT.md. Invisible on a real avatar.
+    "hairBehind": {f.stem: inner(f) for f in sorted(HERE.glob("hair/behind/*.svg"))},
     "hairManifest": json.loads((HERE / "hair/manifest.json").read_text())["backfill"],
 }
 
@@ -79,7 +82,8 @@ out = html.replace("/*__DATA__*/", "const ASSETS = " + json.dumps(data) + ";")
 (HERE / "avatar-builder.html").write_text(out)
 kb = len(out) / 1024
 print(f"avatar-builder.html  {kb:.0f}KB  "
-      f"({len(data['hair'])} hair ({sum(data['hairManifest'].values())} backfilled), "
+      f"({len(data['hair'])} hair ({sum(data['hairManifest'].values())} backfilled, "
+      f"{len(data['hairBehind'])} with a behind layer), "
       f"{len(data['expressions'])} expressions, "
       f"{len(data['facialhair'])} facial hair, {len(data['glasses'])} eyewear, "
       f"{len(data['earrings'])} earrings, {len(data['garments'])} garments, "

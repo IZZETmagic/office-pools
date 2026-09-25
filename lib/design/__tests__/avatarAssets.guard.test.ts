@@ -736,6 +736,48 @@ describe('long hair works on every neck width', () => {
     expect(on).toBeGreaterThan(3)
     expect(on).toBeLessThan(Object.keys(A.hair).length)
   })
+
+  // =============================================================
+  // The BEHIND layer never escapes the body
+  // =============================================================
+  // `hair/behind/<style>.svg` is the hair the body cut out of five drawn assets — generated
+  // art, extracted by assets/character-base/nano/extract-behind.py and painted between the
+  // backfill and the hair. It exists for the asset picker, which deletes the body; on a real
+  // avatar the body is painted over it and NOTHING may change.
+  //
+  // ⚠ That guarantee is geometric, not procedural: every point must sit below the shoulder
+  // line and inside the shirt's own span. A layer that strayed past either would show on a
+  // shipped avatar, and no rendering test in here would catch it.
+  it('the behind layer stays inside the body, so a real avatar cannot change', () => {
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const behind = A.hairBehind ?? {}
+    // it is a small, deliberate set — a sudden jump means extract-behind.py's seam gate broke
+    expect(Object.keys(behind).length, 'styles with a behind layer').toBeGreaterThan(0)
+    expect(Object.keys(behind).length).toBeLessThanOrEqual(9)
+
+    // base-neck-100's shirt: x343..1698, top edge y1519. Every base shares this shirt — the
+    // four differ only in the neck — so one span covers all of them.
+    const SHOULDER = 1519
+    const [X0, X1] = [343, 1698]
+    for (const [style, markup] of Object.entries(behind)) {
+      expect(A.hair[style], `${style} has a behind layer but no hair asset`).toBeTruthy()
+      const ds = [...markup.matchAll(/ d="([^"]*)"/g)].map((m) => m[1])
+      expect(ds.length, `${style}'s behind layer has no paths`).toBeGreaterThan(0)
+      const n = ds.flatMap((d) => (d.match(/-?\d+\.?\d*/g) || []).map(Number))
+      const xs = n.filter((_, i) => i % 2 === 0)
+      const ys = n.filter((_, i) => i % 2 === 1)
+      expect(Math.min(...ys), `${style} reaches above the shoulder line`).toBeGreaterThanOrEqual(SHOULDER)
+      expect(Math.min(...xs), `${style} reaches left of the shirt`).toBeGreaterThanOrEqual(X0)
+      expect(Math.max(...xs), `${style} reaches right of the shirt`).toBeLessThanOrEqual(X1)
+      // ⚠ Tokens, not literals — the compositors recolour by token and an un-tokenised fill
+      // would ship a fixed ash brown on every hair colour.
+      for (const f of [...markup.matchAll(/fill="([^"]*)"/g)].map((m) => m[1])) {
+        expect(['rgb(140,122,110)', 'rgb(114,97,86)'], `${style} fill ${f}`).toContain(f)
+      }
+    }
+  })
 })
 
 // =============================================================

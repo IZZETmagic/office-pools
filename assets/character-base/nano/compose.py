@@ -499,7 +499,7 @@ def main() -> None:
     # the hair that could never change a pixel.
     # ⚠ The copy's own <mask id="facehole"> is renamed, or two elements in one document would
     # carry the same id.
-    backfill = front_body = hair_front = ""
+    backfill = behind = front_body = hair_front = ""
     here = __file__.rsplit("/", 1)[0]
     nb = re.search(r"base-neck-(\d+)", base_path)
     # ⚠ The body layer is painted when there is hair OR a garment. With hair it is what puts
@@ -524,6 +524,14 @@ def main() -> None:
                 backfill = inner(f"{here}/hair/backfill/{style}.svg")
         except Exception:
             backfill = ""
+        # ⭐ The hair the BODY cut out of the art. Invisible on a real avatar — the body is
+        # painted over it a few lines below — and only an asset picker that deletes the body
+        # ever sees it. hair/behind/PROMPT.md says which styles have one and why. ⚠ Painted
+        # AFTER the backfill and BEFORE the hair, so the locked art always wins the overlap.
+        try:
+            behind = inner(f"{here}/hair/behind/{style}.svg")
+        except Exception:
+            behind = ""
         if fh and (head_d := find_head(svg)):
             copy = part("--hair").replace("facehole", "facehole-front")
             hair_front = (
@@ -548,7 +556,7 @@ def main() -> None:
         + ("" if tinted else part("--eyes")) + part("--brows")
         + (strip_eyes(expr_upper) if tinted else expr_upper)
         + (mouth if fh_over else "")
-        + backfill + part("--hair") + front_body + mark
+        + backfill + behind + part("--hair") + front_body + mark
         + (inner(fh).replace(f'fill="{HAIR_BASE}"', f'fill="{BEARD}"') if fh else "")
         + hair_front
         # ⭐⭐ EYEWEAR GOES IN FRONT OF THE HAIR. Ryan, 2026-09-21: "The sunglasses should also

@@ -46,6 +46,13 @@ export type AvatarAssets = {
    */
   mark?: string
   hairBackfill?: Record<string, string>
+  /**
+   * ⭐ The hair the BODY cut out of the art, for the styles that carry that bite in their drawn
+   * paths rather than in a `<mask>`. Painted after the backfill and before the hair, so it is
+   * covered by the body on every real avatar — only `headOnly`, which deletes the body, sees
+   * it. `assets/character-base/nano/hair/behind/PROMPT.md` records how it was generated.
+   */
+  hairBehind?: Record<string, string>
   hairManifest?: Record<string, boolean>
   facialhair: Record<string, string>
   /** Eyewear — glasses and sunglasses. Optional so older fixtures still compose. */
@@ -713,6 +720,11 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   const backfill =
     cfg.hair && A.hairManifest?.[cfg.hair] ? A.hairBackfill?.[cfg.hair] ?? '' : ''
 
+  // ⭐ The hair the body cut out of the art — see `hairBehind`. Only five styles were bitten in
+  // their paths and only three could be given the piece back; the rest have no entry and get
+  // nothing, which is correct because their hair never reaches the shoulder line.
+  const behind = cfg.hair ? A.hairBehind?.[cfg.hair] ?? '' : ''
+
   // ⭐ HAIR THAT FALLS IN FRONT OF THE FACE GOES BACK ON TOP OF THE BEARD. The stack puts
   // facial hair over the hair, which is right for the length hanging BESIDE the head — but
   // wrong for the strands falling across the cheek, which should pass in front of a beard the
@@ -789,6 +801,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       (tinted ? stripEyes(exprUpper) : exprUpper) +
       (fhOver ? mouthLayer : '') +
       backfill +
+      behind +
       (cfg.hair ? A.hair[cfg.hair] ?? '' : '') +
       bodyFront +
       markLayer +
