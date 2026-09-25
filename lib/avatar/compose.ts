@@ -420,7 +420,8 @@ const SHOULDER_LINE = 1520
  * full-canvas rect under `<mask id="facehole">`, and that mask subtracts the head, the nose,
  * the ears, the background AND the shirt, the neck and the neck shadow. Drop the last three and
  * the hair behind the shoulders comes back — art that was drawn and has been hidden ever since,
- * with nothing invented. `f13-longstraight`'s shading paths run to y1841, well past the
+ * with nothing invented. Four of the five come back WHOLE; `f01-bob` subtracts only the neck
+ * and its shadow, never the shirt, so its shirt bite is drawn into the paths and survives. `f13-longstraight`'s shading paths run to y1841, well past the
  * shoulder line at y1519, which is the proof it was drawn full.
  *
  * ⚠ The subtractions are picked by where they START: a body path begins exactly at the shoulder
@@ -447,10 +448,12 @@ const SHOULDER_LINE = 1520
  * backfill's own path data matches verbatim. Pass `A.hairBackfill[cfg.hair]`; passing nothing
  * removes nothing, which is correct for every style that has no backfill.
  *
- * 🔴 FOUR STYLES ARE NOT FIXABLE HERE. `f03-bobswept`, `f12-halfup`, `f14-shag` and
- * `m14-longhair` draw their silhouette as real paths and carry the neck notch cut INTO that
- * geometry, so no mask opens it. They still show a light notch under the chin. That needs the
- * art regenerated, not another compositing rule.
+ * 🔴 FIVE STYLES ARE NOT FIXABLE HERE. `f03-bobswept`, `f12-halfup`, `f14-shag` and
+ * `m14-longhair` draw their silhouette as real paths and carry the body notch cut INTO that
+ * geometry, so no mask opens it, and `f01-bob` carries half of one for the same reason. They
+ * still show a light notch under the chin. That needs the art regenerated, not another
+ * compositing rule — and the rest of the set is unaffected, because hair that never reaches
+ * the shoulder line was never bitten.
  *
  * ⚠ A POST-PROCESS, NOT A CONFIG FLAG. `AvatarConfig` is the contract three compositors share,
  * and this is display-only. Composition is unchanged and parity is unaffected.
