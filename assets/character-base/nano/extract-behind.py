@@ -173,32 +173,40 @@ def hem(ref_png: str, x0: float, x1: float):
     return max(lows) if lows else None
 
 
-def seam_gap(ref_png: str, behind, region):
-    """How far the new length sits below the locked hair, per column, in viewBox units.
+def seam_gap(ref_png: str, piece):
+    """How far one PIECE of new length sits below the locked hair, in viewBox units.
 
     ⚠ Read off the RASTER. A hair asset keeps its silhouette inside a `<mask>`, so there is no
     polygon to measure against — but the reference PNG is that style composed and rendered.
+
+    ⚠⚠ PER PIECE, never over the whole layer. `f02-ponytail`'s redraw put the tail back where
+    it belongs AND invented a second fall of hair on the empty left side; one figure over both
+    threw the good half away with the bad. Each connected component is judged on its own.
     """
     from PIL import Image
     im = Image.open(ref_png).convert("RGB")
     w, h = im.size
     px = im.load()
+    x0, _, x1, _ = piece.bounds
     gaps = []
-    for col in range(0, w, 3):
+    for col in range(max(0, int(x0 / 2048 * w)), min(w, int(x1 / 2048 * w) + 1), 3):
         x = col / w * 2048
         lock = [y for y in range(h)
                 if min(sum((a - b) ** 2 for a, b in zip(px[col, y], t)) for t in REF_HAIR) < 700]
         if not lock:
             continue
-        strip = behind.intersection(region).intersection(
+        strip = piece.intersection(
             Polygon([(x - 1, 0), (x + 1, 0), (x + 1, 2048), (x - 1, 2048)]))
         if strip.is_empty:
             continue
         gaps.append(strip.bounds[1] - max(lock) / h * 2048)
     if not gaps:
         return None
-    gaps.sort()
-    return gaps[len(gaps) // 2]
+    # ⚠⚠ THE MINIMUM, not the median. A piece is a continuation if it meets the locked hair
+    # ANYWHERE along it. `f02-ponytail` has hair only at the crown for most of the columns its
+    # tail passes through — at x1200 the lowest locked pixel is y468 — so a median read 1115u
+    # and rejected the tail that was the entire point of the exercise.
+    return min(gaps)
 
 
 def body_minus_head(base_svg: str):
@@ -287,25 +295,30 @@ def main():
             Polygon([(0, 0), (2048, 0), (2048, max(floors)), (0, max(floors))])).buffer(0)
         neck_hair = None if g.is_empty else g
 
-    # ⚠ the SHOULDER half, gated on the seam — see the header
-    shoulders = unary_union([g for g in tone.values() if g is not None]).buffer(0)
-    gap = seam_gap(ref_png, shoulders, region) if not shoulders.is_empty else None
-    attached = gap is not None and gap <= SEAM_MAX
-    print(f"   seam {'-' if gap is None else f'{gap:.0f}u'}"
-          f"  {'attached' if attached else 'DETACHED — shoulder half dropped'}", end="")
+    # ⚠ the SHOULDER half, gated on the seam — PIECE BY PIECE, see seam_gap()
+    whole = unary_union([g for g in tone.values() if g is not None]).buffer(0)
+    whole = whole.intersection(region).buffer(0) if not whole.is_empty else whole
+    pieces = ([] if whole.is_empty else
+              [whole] if whole.geom_type == "Polygon" else list(whole.geoms))
+    keep, report = [], []
+    for piece in pieces:
+        if piece.area < 400:
+            continue
+        gap = seam_gap(ref_png, piece)
+        ok = gap is not None and gap <= SEAM_MAX
+        report.append(f"{'-' if gap is None else f'{gap:.0f}'}{'' if ok else '✗'}")
+        if ok:
+            keep.append(piece)
+    attached = bool(keep)
+    shoulders = unary_union(keep).buffer(0) if keep else None
+    print(f"   seam [{' '.join(report) or '-'}]  {len(keep)}/{len(report)} kept", end="")
 
     out = []
-    for token in (HAIR_BASE, HAIR_SHADE):
-        g = tone[token]
-        if g is None:
+    for token, g in ((HAIR_BASE, shoulders), (HAIR_SHADE, None)):
+        if token is HAIR_BASE and neck_hair is not None:
+            g = neck_hair if g is None else g.union(neck_hair).buffer(0)
+        if g is None or g.is_empty:
             continue
-        g = g.intersection(region).buffer(0) if attached else None
-        if g is None:
-            g = neck_hair if token is HAIR_BASE else None
-            if g is None:
-                continue
-        elif token is HAIR_BASE and neck_hair is not None:
-            g = g.union(neck_hair).buffer(0)
         g = g.simplify(0.6)
         # ⚠ Specks: the tracer leaves slivers along the clip edge. 400 sq units is under a
         # pixel at the size these render, and they cost bytes in every bundle.
