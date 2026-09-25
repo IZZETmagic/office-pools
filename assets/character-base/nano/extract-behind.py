@@ -94,6 +94,21 @@ SEAM_MAX = 12
 REF_HAIR = ((140, 122, 110), (109, 95, 85))
 
 
+def ref_hair_from_argv():
+    """Override the two hair tones — `--tones #4A3B32,#38271F`.
+
+    ⭐ For art that did NOT come from this pipeline. Ryan generates fills straight from a
+    PICKER CARD, which is already in the product's own palette, so the tones the tracer returns
+    are the member's hair colour and its derived shade rather than the house ash browns.
+    Everything downstream is identical; only what counts as "hair" changes.
+    """
+    for i, a in enumerate(sys.argv):
+        if a == "--tones":
+            return tuple(tuple(int(h[k:k + 2], 16) for k in (1, 3, 5))
+                         for h in sys.argv[i + 1].split(","))
+    return REF_HAIR
+
+
 def close(a, b, tol=6):
     return all(abs(x - y) <= tol for x, y in zip(a, b))
 
@@ -238,6 +253,8 @@ def body_minus_head(base_svg: str):
 
 
 def main():
+    global REF_HAIR
+    REF_HAIR = ref_hair_from_argv()
     trace, style, ref_png = sys.argv[1], sys.argv[2], sys.argv[3]
     svg = Path(trace).read_text()
     region, neck_region = body_minus_head((HERE / "bases/base-neck-100.svg").read_text())
