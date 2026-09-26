@@ -15,9 +15,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
+// ⭐ SOLID ROUNDED, from the PRO package — Ryan, 2026-09-26. The free package ships the
+// stroke style only, and at tile size a 1.6px outline reads as grey texture where a filled
+// glyph reads as a shape. ⚠ `@hugeicons-pro/core-solid-rounded` IS installed (it is a
+// dependency and all 5,442 icons are present); the comment in components/ui/Icon.tsx claiming
+// otherwise is stale, and its `solid` prop has in fact worked for some time.
 import {
   ChairBarberIcon, ColorsIcon, ContrastIcon, GlassesIcon, HatIcon, ScissorIcon, ViewIcon,
-} from '@hugeicons/core-free-icons'
+} from '@hugeicons-pro/core-solid-rounded'
 import { Button } from '@/components/ui/Button'
 import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 import {
@@ -511,12 +516,12 @@ function SelectorMock({ assets, cfg, set }: {
                   : 'sp-text-slate sp-hover-snow'
               }`}
             >
-              <HugeiconsIcon
-                icon={s.icon}
-                size={34}
-                strokeWidth={1.6}
-                className="mx-auto mb-1.5 block"
-              />
+              {/* ⚠ NO strokeWidth ON A SOLID ICON. The Hugeicons wrapper spreads
+                  stroke="currentColor" onto every path whenever strokeWidth is defined, which
+                  lays an outline over the filled body and fattens the glyph — components/ui/
+                  Icon.tsx records the same trap. Verified here: the rendered path carried both
+                  fill and stroke until this was removed. */}
+              <HugeiconsIcon icon={s.icon} size={34} className="mx-auto mb-1.5 block" />
               {s.label}
             </button>
           ))}

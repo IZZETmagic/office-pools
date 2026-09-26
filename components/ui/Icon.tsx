@@ -185,8 +185,12 @@ type IconProps = {
   /**
    * Opt into the Hugeicons Pro solid-rounded variant. Only names present in
    * SOLID_ICON_MAP respond; everything else falls back to the free outline icon.
-   * See the note on SOLID_ICON_MAP — the Pro package is not installed yet, so
-   * this is currently a no-op on web.
+   *
+   * ⚠ CORRECTED 2026-09-26: this used to say the Pro package was "not installed
+   * yet, so this is currently a no-op on web". It IS installed — it is a
+   * dependency in package.json and all 5,442 solid-rounded icons are present —
+   * and the import above has been resolving for some time, so `solid` works.
+   * The note was stale and read as "do not bother passing this".
    */
   solid?: boolean
   className?: string
