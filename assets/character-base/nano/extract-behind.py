@@ -247,20 +247,13 @@ def strand_corridor(light, chin: float):
     would be the whole silhouette and every shading swoosh in the style would be erased.
     """
     x0, _, x1, y1 = light.bounds
-    # ⚠ 2, not 6. The corridor's edge is a staircase of exactly this width and `simplify` will
-    # not remove it — at 6 it read as visible steps down the inside of the strand.
-    cols, STEP = [], 2.0
+    cols, STEP = [], 6.0
     x = x0
     while x < x1:
         strip = light.intersection(Polygon([(x, chin), (x + STEP, chin), (x + STEP, y1), (x, y1)]))
         if not strip.is_empty:
-            # ⚠⚠ FROM THE CHIN, not from the column's highest light. On `f12-halfup` the dark
-            # wedge sits ABOVE the light in those columns — light resumes only at y1620 while
-            # the wedge runs from y1500 — so a corridor that started at the light started BELOW
-            # the thing it was meant to remove and the hook survived. Ryan: "the front colour
-            # hair should continue UP to the top."
-            cols.append(Polygon([(x, chin), (x + STEP, chin),
-                                 (x + STEP, strip.bounds[3]), (x, strip.bounds[3])]))
+            _, sy0, _, sy1 = strip.bounds
+            cols.append(Polygon([(x, sy0), (x + STEP, sy0), (x + STEP, sy1), (x, sy1)]))
         x += STEP
     return unary_union(cols).buffer(0) if cols else None
 
@@ -534,19 +527,10 @@ def main():
             kept = back if kept is None else unary_union([kept, back]).buffer(0)
 
     # ⭐ the front strands run unbroken — see strand_corridor()
-    #
-    # ⚠⚠ IT IS PAINTED IN FRONT, and it has to be. The dark wedge that broke `f12-halfup`'s
-    # strands is in the LOCKED ASSET — it renders with no fill present at all — so a fill under
-    # the hair can never reach it. The fill is display-only, so a piece of it may sit OVER the
-    # locked art in the card without a real avatar changing by a pixel. `data-front` marks it
-    # and headOnly paints those paths last.
-    front = None
-    if tone[HAIR_BASE] is not None:
+    if tone[HAIR_BASE] is not None and tone[HAIR_SHADE] is not None:
         corridor = strand_corridor(tone[HAIR_BASE], skull.bounds[3])
         if corridor is not None and not corridor.is_empty:
-            front = corridor.simplify(0.6)
-            if tone[HAIR_SHADE] is not None:
-                tone[HAIR_SHADE] = tone[HAIR_SHADE].difference(corridor).buffer(0)
+            tone[HAIR_SHADE] = tone[HAIR_SHADE].difference(corridor).buffer(0)
             tone[HAIR_BASE] = tone[HAIR_BASE].union(corridor).buffer(0)
             kept = corridor if kept is None else unary_union([kept, corridor]).buffer(0)
 
@@ -574,10 +558,6 @@ def main():
         # already swap stroke as well as fill, and a guard test holds that.
         out.append(f'<path transform="translate(0,0)" fill="{token}" stroke="{token}" '
                    f'stroke-width="{SEAL_STROKE}" d="{to_d(g)}"/>')
-
-    if front is not None and not front.is_empty:
-        out.append(f'<path data-front="1" transform="translate(0,0)" fill="{HAIR_BASE}" '
-                   f'stroke="{HAIR_BASE}" stroke-width="{SEAL_STROKE}" d="{to_d(front)}"/>')
 
     if not out:
         sys.exit(f"\n{style}: nothing fell inside the body — did the hair actually extend?")
