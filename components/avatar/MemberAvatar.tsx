@@ -24,13 +24,25 @@ import { composeAvatar } from '@/lib/avatar/compose'
 import { readStoredAvatarBuild, toAvatarConfig } from '@/lib/avatar/storedConfig'
 import { avatarBackgroundFor, avatarIndexFor } from '@/lib/design/avatarGradient'
 
+/** The round-slot default: fill the width, let height follow the square viewBox. */
+const DEFAULT_SVG = '[&>svg]:w-full [&>svg]:h-auto [&>svg]:block'
+
 export function MemberAvatar({
-  userId, avatarColour, avatarBuild, className = '', fallback,
+  userId, avatarColour, avatarBuild, className = '', svgClassName = DEFAULT_SVG, fallback,
 }: {
   userId: string
   avatarColour: string | null
   avatarBuild: unknown
   className?: string
+  /**
+   * How the composed SVG sizes itself inside the wrapper. The default fills the wrapper's WIDTH
+   * and lets height follow the square viewBox, which is what a round 96px slot wants.
+   *
+   * ⭐ A banner wants the opposite — see `AvatarCard`, where the card is far wider than the
+   * avatar and the square is sized to the card's HEIGHT instead. Overridable rather than
+   * hardcoded because these two are genuinely different shapes, not one shape with a modifier.
+   */
+  svgClassName?: string
   /** What to show while the art loads, or forever if this member has not built a face. */
   fallback: React.ReactNode
 }) {
@@ -50,7 +62,7 @@ export function MemberAvatar({
 
   return (
     <div
-      className={`overflow-hidden [&>svg]:w-full [&>svg]:h-auto [&>svg]:block ${className}`}
+      className={`overflow-hidden ${svgClassName} ${className}`}
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   )

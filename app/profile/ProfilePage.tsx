@@ -17,7 +17,7 @@ import { BADGE_DEFINITIONS, type BadgeDefinition } from '@/app/pools/[pool_id]/a
 import { BP_BADGE_DEFINITIONS } from '@/app/pools/[pool_id]/analytics/bracketPickerXpSystem'
 import { BadgeMedallion } from '@/components/BadgeMedallion'
 import { Button } from '@/components/ui/Button'
-import { MemberAvatar } from '@/components/avatar/MemberAvatar'
+import { AvatarCard } from '@/components/avatar/AvatarCard'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { Alert } from '@/components/ui/Alert'
@@ -242,84 +242,56 @@ export default function ProfilePage({
   const router = useRouter()
   const supabase = createClient()
 
+  // The three headline numbers. Computed once — the gradient hero worked them out FOUR times
+  // (a mobile copy and a desktop copy, each recomputing both reduces) and the two could drift
+  // the moment one of them was edited.
+  const heroStats = [
+    { label: 'Pools', value: poolMemberships.length },
+    {
+      label: 'Total Points',
+      value: poolMemberships.reduce((sum, p) => {
+        const ps = playerScoresMap[p.entry_id || p.member_id]
+        return sum + (ps ? ps.total_points : p.total_points)
+      }, 0),
+    },
+    {
+      label: 'Predictions',
+      value: poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0),
+    },
+  ]
+
   return (
     <div className="min-h-screen bg-surface-secondary">
       <AppHeader isSuperAdmin={profile.is_super_admin} />
 
-      {/* Hero header */}
-      <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-10">
-          <div className="flex items-center gap-3 sm:gap-5">
-            {/* ⭐ The member's own face, if they have built one. Falls back to the initials
-                block that has always been here — a member who has not opened the builder sees
-                exactly what they saw before, and pays nothing for the art fetch. */}
-            <MemberAvatar
-              userId={profile.user_id}
-              avatarColour={profile.avatar_colour}
-              avatarBuild={profile.avatar_build}
-              className="w-12 h-12 sm:w-24 sm:h-24 rounded-pill border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0"
-              fallback={
-                <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-pill bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
-                  {getInitials(profile.full_name, profile.username)}
-                </div>
-              }
-            />
-            <div className="min-w-0">
-              <h2 className="text-lg sm:text-3xl font-bold text-white truncate">
-                {profile.full_name || profile.username}
-              </h2>
-              <p className="text-primary-100 dark:text-white/60 text-xs sm:text-base">@{profile.username}</p>
-              <p className="text-primary-200 dark:text-white/50 text-[10px] sm:text-sm mt-0.5 sm:mt-1">
-                Member since {formatMemberSince(profile.created_at)}
-              </p>
-            </div>
-          </div>
+      {/* ⭐ The avatar card, in place of the gradient hero band it replaced. Ryan asked for the
+          avatar and editing it to be "more of a focus", and a 96px circle in the slot the
+          initials had always used was not that. The card owns the identity block (name and
+          handle) because they belong with the face; the numbers stay below as their own row. */}
+      <AvatarCard
+        userId={profile.user_id}
+        avatarColour={profile.avatar_colour}
+        avatarBuild={profile.avatar_build}
+        fullName={profile.full_name}
+        username={profile.username}
+        memberSince={formatMemberSince(profile.created_at)}
+        initials={getInitials(profile.full_name, profile.username)}
+      />
 
-          {/* Quick stats in hero — compact on mobile, glass cards on desktop */}
-          <div className="flex items-center justify-around mt-3 sm:hidden">
-            <div className="text-center">
-              <p className="t-num text-lg text-white">{poolMemberships.length}</p>
-              <p className="text-[10px] text-primary-200 dark:text-white/50">Pools</p>
+      {/* ⚠ House tokens, not the glass treatment these tiles used to carry. `bg-white/10` and
+          `text-white` only worked because they sat on a saturated gradient; on the page ground
+          they would be an invisible smear in light mode. */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-4 sm:mt-6">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          {heroStats.map((s) => (
+            <div
+              key={s.label}
+              className="bg-surface border border-silver/50 rounded-card px-3 py-2.5 sm:py-3 text-center"
+            >
+              <p className="t-num text-lg sm:text-2xl text-ink">{formatNumber(s.value)}</p>
+              <p className="text-[10px] sm:text-xs text-muted">{s.label}</p>
             </div>
-            <div className="w-px h-8 bg-white/20" />
-            <div className="text-center">
-              <p className="t-num text-lg text-white">
-                {formatNumber(poolMemberships.reduce((sum, p) => {
-                  const ps = playerScoresMap[p.entry_id || p.member_id]
-                  return sum + (ps ? ps.total_points : p.total_points)
-                }, 0))}
-              </p>
-              <p className="text-[10px] text-primary-200 dark:text-white/50">Total Points</p>
-            </div>
-            <div className="w-px h-8 bg-white/20" />
-            <div className="text-center">
-              <p className="t-num text-lg text-white">
-                {formatNumber(poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0))}
-              </p>
-              <p className="text-[10px] text-primary-200 dark:text-white/50">Predictions</p>
-            </div>
-          </div>
-          <div className="hidden sm:grid grid-cols-3 gap-3 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-2.5 text-center border border-white/10">
-              <p className="t-num text-2xl text-white">{poolMemberships.length}</p>
-              <p className="text-xs text-primary-200 dark:text-white/50">Pools</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-2.5 text-center border border-white/10">
-              <p className="t-num text-2xl text-white">
-                {formatNumber(poolMemberships.reduce((sum, p) => {
-                  const ps = playerScoresMap[p.entry_id || p.member_id]
-                  return sum + (ps ? ps.total_points : p.total_points)
-                }, 0))}
-              </p>
-              <p className="text-xs text-primary-200 dark:text-white/50">Total Points</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-control px-3 py-2.5 text-center border border-white/10">
-              <p className="t-num text-2xl text-white">
-                {formatNumber(poolMemberships.reduce((sum, p) => sum + p.prediction_count, 0))}
-              </p>
-              <p className="text-xs text-primary-200 dark:text-white/50">Predictions</p>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
