@@ -346,6 +346,21 @@ function AssetCards({
             title={label ? label(o) : o === null ? 'None' : TITLE(o)}
             className="group text-left"
           >
+            {/* ⚠⚠ `h-auto` ON THE SVG, NOT `h-full`, AND IT IS NOT COSMETIC. With `h-full` the
+                tile is square ONLY IF the browser honours `aspect-ratio`: Chrome does, so the
+                box measured 120x120 for me on both localhost and the deployed site, at 375px
+                and at 430px. On Ryan's phone it did not — the SVG took 100% of a height that
+                was never constrained, and padding (12) plus border (4) pushed the tile to
+                120x136. Measured off his own screenshot: 359x407 device px at 3x.
+
+                `h-auto` makes the SVG's height follow its own square viewBox, so the tile is
+                square whether or not `aspect-ratio` applies — the two paths agree instead of
+                one silently winning. A layout that depends on ONE property being honoured is a
+                layout that is broken on some device you do not own.
+
+                ⚠ I asserted twice that these were square on the strength of
+                getBoundingClientRect in MY browser. The device that disagreed was the only
+                evidence that mattered, and it was in the screenshots all along. */}
             {/* ⭐ THE SAME TILE AS A COLOUR SWATCH — a bordered card with its subject inset,
                 SportPool blue on its tint when chosen. An asset and a colour are the same kind
                 of choice, so they should not be two different controls. ⚠ `border-2` on BOTH
@@ -356,7 +371,7 @@ function AssetCards({
                 selected
                   ? 'border-primary-600 bg-primary-100'
                   : 'border-gray-200 bg-white group-hover:border-gray-300'
-              } [&>svg]:w-full [&>svg]:h-full [&>svg]:block`}
+              } [&>svg]:w-full [&>svg]:h-auto [&>svg]:block`}
               dangerouslySetInnerHTML={{ __html: render(o) }}
             />
           </button>
