@@ -209,11 +209,18 @@ function ColourCard({
   )
 }
 
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+// ⚠ NO `hint` PROP. Every section carried a line of explanation under its title and Ryan,
+// 2026-09-26, wanted them gone — the titles are the navigation, and a paragraph under each one
+// is noise in a panel that is already seven steps deep. The prop is REMOVED rather than left unused
+// so a future section cannot quietly reintroduce them one at a time.
+//
+// ⚠ This is not the same as the notes that remain inside two steps — that stubble reads as a
+// shadow, and that Cheeky and Laughing are drawn eyes-closed. Those sit under the CONTROL they
+// qualify, not under the title, and Ryan asked for them explicitly.
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-7">
-      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-      {hint ? <p className="text-xs text-gray-500 mt-0.5 mb-2.5">{hint}</p> : <div className="mb-2.5" />}
+      <h3 className="text-lg font-bold text-gray-900 mb-3">{title}</h3>
       {children}
     </section>
   )
@@ -385,7 +392,7 @@ function AssetCards({
 // ⭐ The real fix, when it matters: draw the seven from the avatar art we already own. Every
 // step's subject exists as a composed asset, so the icon for `Facial hair` could BE a beard.
 const STEPS = [
-  { key: 'skin', label: 'Skin', icon: ContrastIcon },
+  { key: 'skin', label: 'Skin tone', icon: ContrastIcon },
   { key: 'eyes', label: 'Eyes', icon: ViewIcon },
   { key: 'hair', label: 'Hair', icon: ScissorIcon },
   { key: 'eyewear', label: 'Glasses & earrings', icon: GlassesIcon },
@@ -657,13 +664,13 @@ function SelectorMock({ assets, cfg, set }: {
         </div>
 
         {step === 'skin' && (
-          <Section title="Skin" hint="Fifteen tones, evenly spaced.">
+          <Section title="Skin tone">
             <ColourCard colours={PALETTE.skin} value={cfg.skin} onChange={(c) => set('skin', c)} />
           </Section>
         )}
 
         {step === 'eyes' && (
-          <Section title="Eyes" hint="The colour shows in every expression that has its eyes open.">
+          <Section title="Eyes">
             <div className="mb-5">
               <ColourCard colours={PALETTE.eye} value={cfg.eyeColour}
                 onChange={(c) => set('eyeColour', c)} />
@@ -772,7 +779,7 @@ function SelectorMock({ assets, cfg, set }: {
         )}
 
         {step === 'colour' && (
-          <Section title="Your colour" hint="This is you across the app — your avatar, and your side of a duel.">
+          <Section title="Your colour">
             <ColourCard colours={AVATAR_BACKGROUNDS} names={AVATAR_COLOUR_NAMES}
               value={cfg.background} onChange={(c) => set('background', c)} />
             <p className="text-xs text-gray-500 mt-2">
