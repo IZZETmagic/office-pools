@@ -832,6 +832,20 @@ function SelectorMock({ assets, cfg, set }: {
                 </p>
               </div>
             </Section>
+            {/* ⭐⭐ ONE COLOUR DRIVES ALL SEVEN. Ryan asked for either a shirt colour or the
+                same shirt in standard colours — and the first is strictly better here, because
+                every garment asset carries the SHIRT TOKEN (checked all six), so `cfg.shirt`
+                recolours the base shirt AND every pattern. The alternative would be 7 garments
+                x 8 colours = 56 cards to say what one row of swatches says.
+
+                ⚠ It was already wired end to end and simply never offered: `PALETTE.shirt` has
+                eight colours and composeAvatar has always swapped them — the member selector
+                was the only surface that did not expose it. The Builder has had it all along. */}
+            <Section title="Shirt colour">
+              <ColourCard colours={PALETTE.shirt} value={cfg.shirt}
+                onChange={(c) => set('shirt', c)} />
+            </Section>
+
             {/* ⚠ "None" is the BASE SHIRT, not the absence of clothing — the avatar always
                 wears something — so the first tile is a real choice and shows what it gives. */}
             <Section title="Shirt">
