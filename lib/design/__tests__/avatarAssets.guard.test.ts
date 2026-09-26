@@ -855,6 +855,52 @@ describe('long hair works on every neck width', () => {
     expect(seen, 'no full-canvas path was examined — the check proved nothing').toBeGreaterThan(0)
   })
 
+  // ⭐⭐ EARRING PAINT ORDER IS PER-STYLE, and the rule it replaced was justified by a claim
+  // that measurement disproved: "only f09-midwavy and m15-locs reach the ear, and both cover it
+  // COMPLETELY, so an earring is fully visible or fully hidden, never half-eaten". With a big
+  // hoop, ELEVEN of twenty-five hide some of it, and the half-eaten cases are exactly the ones
+  // that claim ruled out — f12-halfup 48.5% visible, f02-ponytail 52.7%, f11-lowbun 86.7%.
+  // Hair TIED BACK clips an earring instead of covering it. Those styles now paint it late.
+  it('paints the earring after the hair only for a tied-back style', () => {
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    const front = A.hairEarringsFront ?? []
+    expect(front.length, 'no style is listed as tied back').toBeGreaterThan(0)
+    for (const h of front) {
+      expect(A.hair[h], `${h} is listed as tied back but has no hair asset`).toBeTruthy()
+    }
+
+    // a long path is unique enough to locate a layer in the composed document, and `d`
+    // survives phase 2 untouched — only fills and ids are rewritten.
+    const longestD = (markup: string) =>
+      [...markup.matchAll(/ d="([^"]+)"/g)].map((m) => m[1]).sort((a, b) => b.length - a.length)[0]
+    const earD = longestD(A.earrings!['e04-bighoop'])
+    expect(earD, 'the earring fixture should have a path').toBeTruthy()
+
+    // ⚠ Both branches, in one test. Asserting only the tied-back case would pass just as well
+    // if earrings had simply been moved to the front for EVERY style, which is the change Ryan
+    // explicitly did not want.
+    for (const style of [front[0], 'f09-midwavy'] as const) {
+      const svg = composeAvatar(
+        { ...cfg, base: 'base-neck-100', hair: style, facialHair: null, earrings: 'e04-bighoop' },
+        A,
+      )
+      const hairD = longestD(A.hair[style])
+      const atHair = svg.indexOf(hairD)
+      const atEar = svg.indexOf(earD)
+      expect(atHair, `${style}: hair not found in the document`).toBeGreaterThan(-1)
+      expect(atEar, `${style}: earring not found in the document`).toBeGreaterThan(-1)
+      if (front.includes(style)) {
+        expect(atEar, `${style} is tied back, so the earring must paint AFTER the hair`)
+          .toBeGreaterThan(atHair)
+      } else {
+        expect(atEar, `${style} covers the ear, so the earring must paint BEFORE the hair`)
+          .toBeLessThan(atHair)
+      }
+    }
+  })
+
   it('the behind layer carries only tokens, sealed', () => {
     const A = JSON.parse(
       readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),

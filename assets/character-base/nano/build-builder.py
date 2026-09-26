@@ -68,6 +68,8 @@ data = {
     # paths rather than in a <mask>. hair/behind/PROMPT.md. Invisible on a real avatar.
     "hairBehind": {f.stem: inner(f) for f in sorted(HERE.glob("hair/behind/*.svg"))},
     "hairManifest": json.loads((HERE / "hair/manifest.json").read_text())["backfill"],
+    # ⭐ The styles whose ear is exposed, so an earring paints AFTER the hair — see the manifest.
+    "hairEarringsFront": json.loads((HERE / "hair/manifest.json").read_text())["earringsInFront"],
 }
 
 # Also emit the data for the in-app builder. It is FETCHED at runtime rather than imported,

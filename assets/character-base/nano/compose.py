@@ -517,11 +517,15 @@ def main() -> None:
             front_body = shirt_part + inner(f"{here}/bases/front-neck-{nb.group(1)}.svg")
         except Exception:
             front_body = ""
+    earrings_front = False
     if arg("--hair"):
         style = arg("--hair").rsplit("/", 1)[-1].replace(".asset.svg", "").replace("hair-", "")
         try:
-            if json.load(open(f"{here}/hair/manifest.json"))["backfill"].get(style):
+            manifest = json.load(open(f"{here}/hair/manifest.json"))
+            if manifest["backfill"].get(style):
                 backfill = inner(f"{here}/hair/backfill/{style}.svg")
+            # ⭐ Tied-back styles expose the ear, so the earring paints after the hair.
+            earrings_front = style in manifest.get("earringsInFront", [])
         except Exception:
             backfill = ""
         if fh and (head_d := find_head(svg)):
@@ -538,10 +542,16 @@ def main() -> None:
         # should be no seen earring." It first went in front of the hair on the reasoning that
         # a chosen accessory should never be invisible; that is the wrong instinct, because
         # hair over an ear hides an earring in life and one floating on top reads as a mistake.
-        # Painting it with the ear makes the rule automatic — no per-style flag, no coverage
-        # test. ⚠ Binary in practice: only f09-midwavy and m15-locs reach the ear, and both
-        # cover it COMPLETELY, so an earring is fully visible or fully hidden, never half-eaten.
-        + part("--earrings")
+        #
+        # ⚠⚠ THE CLAIM THAT USED TO JUSTIFY HAVING NO FLAG HERE WAS FALSE. It said only
+        # f09-midwavy and m15-locs reach the ear and both cover it COMPLETELY, "so an earring is
+        # fully visible or fully hidden, never half-eaten". Measured with a big hoop, ELEVEN of
+        # the twenty-five hide some of it, and the half-eaten cases are precisely the ones that
+        # claim ruled out: f12-halfup 48.5% visible, f02-ponytail 52.7%, f11-lowbun 86.7%.
+        # Hair that is TIED BACK clips an earring rather than covering it, and it reads as a
+        # fault because the ear is plainly exposed. Those four now paint the earring LATE —
+        # hair/manifest.json, earringsInFront. Ryan, 2026-09-26.
+        + ("" if earrings_front else part("--earrings"))
         # ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset
         # rather than declared in a manifest: a style is tinted exactly when it paints a lens,
         # and a clear pair has no lens path at all. Nothing to keep in step.
@@ -551,6 +561,7 @@ def main() -> None:
         + backfill + part("--hair") + front_body + mark
         + (inner(fh).replace(f'fill="{HAIR_BASE}"', f'fill="{BEARD}"') if fh else "")
         + hair_front
+        + (part("--earrings") if earrings_front else "")
         # ⭐⭐ EYEWEAR GOES IN FRONT OF THE HAIR. Ryan, 2026-09-21: "The sunglasses should also
         # be in front of some hair of some the hair assets."
         #

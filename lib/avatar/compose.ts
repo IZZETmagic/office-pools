@@ -54,6 +54,13 @@ export type AvatarAssets = {
    */
   hairBehind?: Record<string, string>
   hairManifest?: Record<string, boolean>
+  /**
+   * ⭐ Styles that are tied BACK, so the ear is exposed and an earring paints AFTER the hair.
+   * ⚠ A LIST, not a per-style boolean, because the default is "behave normally" — a map would
+   * have 25 entries, 21 of them false, and a new style silently missing from it is a bug where
+   * a new style silently missing from a list is simply the common case.
+   */
+  hairEarringsFront?: string[]
   facialhair: Record<string, string>
   /** Eyewear — glasses and sunglasses. Optional so older fixtures still compose. */
   glasses?: Record<string, string>
@@ -838,6 +845,23 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   // fully visible or fully hidden, never half-eaten.
   const earringsLayer = cfg.earrings ? A.earrings?.[cfg.earrings] ?? '' : ''
 
+  /**
+   * ⭐⭐ AN EARRING IS PAINTED WITH THE EAR — EXCEPT WHERE THE HAIR IS TIED BACK.
+   *
+   * ⚠⚠ THE OLD RULE WAS JUSTIFIED BY A CLAIM THAT IS SIMPLY FALSE. It read: "only f09-midwavy
+   * and m15-locs reach the ear, and both cover it COMPLETELY, so an earring is fully visible or
+   * fully hidden, never half-eaten" — and therefore no flag was needed. Measured with a big
+   * hoop, ELEVEN of the twenty-five hide some of it, and the half-eaten cases are exactly the
+   * ones that claim said could not exist: f12-halfup 48.5% visible, f02-ponytail 52.7%,
+   * f11-lowbun 86.7%. Hair that is TIED BACK clips an earring instead of covering it, which is
+   * the tell, and it reads as a paint-order fault because the ear is plainly exposed.
+   *
+   * ⭐ Ryan, 2026-09-26, chose the four tied-back styles only. The six that genuinely fall over
+   * the ear keep hiding it, because there a hoop floating on top would be the wrong picture —
+   * and so do the bobs. Facial hair is unchanged, also his call.
+   */
+  const earringsFront = !!(cfg.hair && A.hairEarringsFront?.includes(cfg.hair))
+
   // ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset rather
   // than declared in a manifest: a style is tinted exactly when it paints a lens, and a clear
   // pair has no lens path at all. Nothing to keep in step.
@@ -848,7 +872,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
 
   add(
     ears.join('') +
-      earringsLayer +
+      (earringsFront ? '' : earringsLayer) +
       eyeLayer +
       (tinted ? stripEyes(exprUpper) : exprUpper) +
       (fhOver ? mouthLayer : '') +
@@ -858,6 +882,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
       markLayer +
       (fh ? swap(fh, T.hairBase, T.beard) : '') +
       hairFront +
+      (earringsFront ? earringsLayer : '') +
       glassesLayer +
       (fhOver ? '' : mouthLayer) +
       (nose || ''),

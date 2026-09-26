@@ -26,5 +26,12 @@
     "m13-manbun": false,
     "m14-longhair": true,
     "m15-locs": true
-  }
+  },
+  "_comment_earrings": "earringsInFront: these styles are tied BACK, so the ear is exposed and an earring must paint after the hair. Every other style either does not reach the ear (14 of 25 are already unaffected) or genuinely falls over it, where hiding the earring is correct. MEASURED, not assumed \u2014 with a big hoop, f12-halfup showed 48.5% and f02-ponytail 52.7%, which is the tell: hair that is tied back half-eats an earring rather than covering it. Ryan chose these four, 2026-09-26.",
+  "earringsInFront": [
+    "f02-ponytail",
+    "f06-spacebuns",
+    "f11-lowbun",
+    "f12-halfup"
+  ]
 }

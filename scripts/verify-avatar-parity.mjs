@@ -59,6 +59,15 @@ const CASES = [
   },
   // ⚠ Stubble is derived differently again — a shadow floored against the SKIN — so it is the
   // case most likely to drift, and the one where an off-by-one in either half is invisible.
+  // ⭐ Earrings, because their PAINT ORDER is now per-style: a tied-back hair style paints the
+  // earring after the hair and every other style paints it with the ear. Two branches, and the
+  // matrix below runs this against a tied-back style, a covering style and no hair at all.
+  {
+    label: 'earrings',
+    cfg: { earrings: 'e04-bighoop', metalColour: '#D4A017' },
+    args: ['--earrings', `${NANO}/earrings/assets/e04-bighoop.asset.svg`,
+           '--metal-colour', '#D4A017'],
+  },
   {
     label: 'stubble, colour set',
     cfg: { facialHair: 'stubble', facialHairColour: '#B33A3A' },
@@ -72,7 +81,8 @@ const bad = []
 
 for (const neck of NECK) {
   for (const g of BG) {
-    for (const hair of [null, 'f09-midwavy']) {
+    // ⚠ f12-halfup is TIED BACK (earring in front); f09-midwavy COVERS the ear.
+    for (const hair of [null, 'f09-midwavy', 'f12-halfup']) {
       for (const c of CASES) {
         const cfg = { ...BASE, ...c.cfg, base: `base-neck-${neck}`, hair, background: g }
         const dst = join(out, `${neck}-${g.slice(1)}-${hair ? 'h' : 'b'}-${n}.svg`)
