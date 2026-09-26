@@ -84,7 +84,7 @@ function ColourCard({
           className={`aspect-square rounded-control border-2 grid place-items-center transition ${
             value === c
               ? 'border-primary-600 bg-primary-100'
-              : 'border-gray-200 bg-white hover:border-gray-300'
+              : 'border-gray-200 bg-surface hover:border-gray-300'
           }`}
         >
           {/* ⚠ `rounded-chip`, not `rounded-inset`. Concentric rounding says a nested shape
@@ -264,7 +264,7 @@ function AssetCards({
               className={`aspect-square rounded-control border-2 p-1.5 transition ${
                 selected
                   ? 'border-primary-600 bg-primary-100'
-                  : 'border-gray-200 bg-white group-hover:border-gray-300'
+                  : 'border-gray-200 bg-surface group-hover:border-gray-300'
               } [&>svg]:w-full [&>svg]:h-auto [&>svg]:block`}
               dangerouslySetInnerHTML={{ __html: render(o) }}
             />
@@ -473,8 +473,15 @@ export function AvatarBuilder({ assets, cfg, set }: {
   // this — a stored row holds the colour name and the background is derived from it.
   const myIndex = AVATAR_BACKGROUNDS.indexOf(cfg.background)
 
+  // ⚠⚠ `bg-surface`, NEVER `bg-white` — here and on every tile below. globals.css remaps the
+  // whole Tailwind gray ramp onto the app's neutral ramp, so each `text-gray-*` and
+  // `border-gray-*` in this file INVERTS in dark mode — but `bg-white` is stock Tailwind and
+  // does not. Written the obvious way, this card stayed white while its own titles went light:
+  // measured at a 1.20:1 contrast ratio, which is invisible. It never showed while the builder
+  // lived only on the admin tab, because that surface was only ever looked at in light mode.
+  // `--surface` is #FFFFFF in light, so this is a no-op there and a fix in dark.
   return (
-      <div className="bg-white border border-gray-200 rounded-2xl p-6">
+      <div className="bg-surface border border-gray-200 rounded-2xl p-6">
         {/* ⭐ A SCROLLING PILL STRIP, not a segmented control. Seven labels do not fit in
             equal-width segments at phone width — which is exactly why PoolDetail stopped using
             one. Same structure as `app/pools/[pool_id]/PoolDetail.tsx`.
@@ -618,8 +625,8 @@ export function AvatarBuilder({ assets, cfg, set }: {
                 aria-pressed={!cfg.facialHairColour}
                 className={`mb-2.5 px-3 py-1.5 rounded-chip text-[12px] border transition ${
                   !cfg.facialHairColour
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}>
+                    ? 'bg-ink text-surface border-ink'
+                    : 'bg-surface text-gray-700 border-gray-200 hover:border-gray-400'}`}>
                 Match hair
               </button>
               <ColourCard colours={PALETTE.hair} value={cfg.facialHairColour}

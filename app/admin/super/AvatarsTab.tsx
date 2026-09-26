@@ -100,8 +100,8 @@ function Chips({
             aria-pressed={o === value}
             className={`px-2.5 py-1 rounded-full text-xs border ${
               o === value
-                ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                ? 'bg-ink text-surface border-ink'
+                : 'bg-surface text-gray-700 border-gray-200 hover:border-gray-300'
             }`}
           >
             {o === null ? 'none' : format(o)}
@@ -160,7 +160,7 @@ function SelectorMock({ assets, cfg, set }: {
     <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
       {/* -------------------------------------------------- the person */}
       <div className="lg:sticky lg:top-4 space-y-4">
-        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <div className="bg-surface border border-gray-200 rounded-2xl p-5">
           <div
             className="w-full aspect-square rounded-xl overflow-hidden [&>svg]:w-full [&>svg]:h-full [&>svg]:block"
             dangerouslySetInnerHTML={{ __html: me }}
@@ -170,7 +170,7 @@ function SelectorMock({ assets, cfg, set }: {
         </div>
 
         {/* ⭐ Why the colour matters, at the size it is actually seen. */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-2xl p-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-3">
             Where people see you
           </p>
@@ -211,7 +211,7 @@ function SelectorMock({ assets, cfg, set }: {
         <button
           type="button"
           disabled
-          className="w-full py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold opacity-40 cursor-not-allowed"
+          className="w-full py-2.5 rounded-xl bg-ink text-surface text-sm font-semibold opacity-40 cursor-not-allowed"
         >
           Save
         </button>
@@ -304,8 +304,8 @@ export function AvatarsTab() {
               aria-pressed={view === v}
               className={`px-3 py-1.5 rounded-lg text-sm border ${
                 view === v
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-200'
+                  ? 'bg-ink text-surface border-ink'
+                  : 'bg-surface text-gray-700 border-gray-200'
               }`}
             >
               {v === 'build' ? 'Builder' : v === 'grid' ? 'Combination grid' : 'Member selector'}
@@ -319,7 +319,7 @@ export function AvatarsTab() {
         <SelectorMock assets={assets} cfg={cfg} set={set} />
       ) : view === 'build' ? (
         <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 lg:sticky lg:top-4">
+          <div className="bg-surface border border-gray-200 rounded-2xl p-5 lg:sticky lg:top-4">
             <div
               className="w-full aspect-square rounded-xl overflow-hidden [&>svg]:w-full [&>svg]:h-full [&>svg]:block"
               dangerouslySetInnerHTML={{ __html: svg }}
@@ -351,7 +351,7 @@ export function AvatarsTab() {
             </Button>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <div className="bg-surface border border-gray-200 rounded-2xl p-5">
             <Chips
               label="Expression"
               options={Object.keys(assets.expressions)}
@@ -421,7 +421,7 @@ export function AvatarsTab() {
           </div>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 overflow-x-auto">
+        <div className="bg-surface border border-gray-200 rounded-2xl p-5 overflow-x-auto">
           <p className="text-xs text-gray-500 mb-3">
             Every facial hair style against every expression, at the current colours. This is the view
             that catches layering faults — a beard has to work with all twelve mouths, not one.
