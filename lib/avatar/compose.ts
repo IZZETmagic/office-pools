@@ -409,12 +409,6 @@ function findNose(doc: string, fill: string = T.skinShade): string | null {
 }
 
 /**
- * Where the body starts. Every base's shirt, neck and neck shadow begin here, and so does every
- * derived backfill — `build-body-layers.py` derives them all from the same silhouette.
- */
-const SHOULDER_LINE = 1520
-
-/**
  * A composed avatar reduced to the HEAD — for an asset picker, nothing else.
  *
  * ⭐⭐⭐ THE FILL IS PAINTED HERE AND NOWHERE ELSE. `hair/behind/<style>.svg` is art for the
@@ -493,15 +487,6 @@ export function headOnly(
   colours: { skin: string; shirt: string; hair: string },
   backfill = '',
   behind = '',
-  /**
-   * ⚠ TEMPORARY, and it should end at ONE style. Opening a hair mask reveals whatever the
-   * asset holds under the body, which for an inverted trace is a full-canvas rect — a slab
-   * across the bottom of the card. It is the right thing ONLY for a style that has neither a
-   * fill nor a complete asset, and after the migration that is `f13-longstraight` alone. It
-   * used to be inferred from "no fill", which broke the moment a fill was MERGED into its
-   * asset: f09-midwavy then had no fill, opened its mask, and the slab came back.
-   */
-  openMask = false,
 ): string {
   let svgIn = svg
   const shade = darken(hex2rgb(colours.skin), 0.88)
@@ -533,18 +518,14 @@ export function headOnly(
     svgIn = svgIn.replace(canvas, canvas + painted)
   }
 
-  // ⚠⚠ THE ART SUPERSEDES THE MASK. Opening the mask gives back whatever the asset holds
-  // under the body — and for `m15-locs` that is a full-canvas rect, so it came back as a solid
-  // slab across the whole bottom of the card where the style should be separate locs with gaps
-  // between them. Ryan, 2026-09-25. A style that ships a `hair/behind` layer has real drawn
-  // geometry for that region, so its mask stays SHUT and the layer is what fills the bite.
-  // `f01-bob` is the other one: mask (neck only) plus a fill.
-  let out = !openMask ? svgIn : svgIn.replace(/<mask[^>]*>[\s\S]*?<\/mask>/g, (mask) =>
-    mask.replace(/<path[^>]*\/?>/g, (p) => {
-      const y0 = box(p)?.y0
-      return y0 !== undefined && y0 >= SHOULDER_LINE - 20 && y0 <= SHOULDER_LINE + 5 ? '' : p
-    }),
-  )
+  // ⚠⚠ THE ART SUPERSEDES THE MASK, ALWAYS. There used to be an `openMask` flag here that
+  // stripped the body holes out of a hair mask, to give back whatever the asset held
+  // underneath. For an inverted trace that is a full-canvas rect, so it returned a solid slab
+  // across the bottom of the card — Ryan, on `m15-locs`, 2026-09-25. It survived as a
+  // single-style exception for `f13-longstraight` until that style got a complete asset too,
+  // and then had no users at all. Every style now either IS complete or ships a
+  // `hair/behind` layer, so the mask is simply left shut.
+  let out = svgIn
 
   const nose = findNose(out, shade)
   if (nose) out = out.replace(nose, '')
