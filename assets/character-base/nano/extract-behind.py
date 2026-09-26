@@ -220,7 +220,13 @@ def hem(ref_png: str, x0: float, x1: float):
             if (ys := [y for y in range(h)
                        if min(sum((a - b) ** 2 for a, b in zip(px[col, y], t))
                               for t in REF_HAIR) < 700])]
-    return max(lows) if lows else None
+    if not lows:
+        return None
+    # ⚠ The MEDIAN of a narrow band, not the max of a wide one. Taking the deepest point over
+    # 110 units let one dip set the floor, and the fill then hung below the hair either side of
+    # it as a hard-edged rectangular tab under the chin — visible on longcurly and midwavy.
+    lows.sort()
+    return lows[len(lows) // 2]
 
 
 def dominant_tone(ref_png: str, x0: float, x1: float, y0: float, y1: float):
