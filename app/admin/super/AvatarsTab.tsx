@@ -169,23 +169,25 @@ function Options({
 /**
  * The frame a head preview is cropped to, and the ground it sits on.
  *
- * ⭐ Chosen by rendering, not arithmetic — twice. Asset bounding boxes are useless here because
- * several hair styles carry a full-canvas <mask> rect, so every one of them measures 0..2048.
- * Measured from the geometry instead, hair spans x101..1948 and y19..1939 across the set, which
- * is far wider than the head: a frame that suits a buzz cut has braids and locs hanging off the
- * edges. Seven candidates were rendered against a bald head, buzz, quiff, ponytail, braids,
- * floor-length hair, spacebuns and locs.
+ * ⭐ Chosen by rendering, not arithmetic — three times now. Asset bounding boxes are useless
+ * here because several hair styles carry a full-canvas <mask> rect, so every one of them
+ * measures 0..2048. The frame is measured off the RENDER instead: every style composed through
+ * `headOnly`, drawn on an oversized field, and the non-background pixels bounded.
  *
- * ⚠ It is centred on (1020, 960), NOT on the head at (1010, 913). Hair reaches further below
- * the chin than above the crown, so centring on the head alone pushes long styles off the
- * bottom. The centre is the content's, not the face's.
+ * ⭐ Ryan, 2026-09-25: "have the head and hair all fit within the card". Measured across all 26
+ * styles the content spans x37..2003 and y5..2051 — `m15-locs` is both the widest and the
+ * lowest, and the old frame cut it off at y1985. This holds every style with 60 units to spare
+ * and costs 5.7% of the head's size.
+ *
+ * ⚠ It is one frame for all 26 cards, so it is sized by the LARGEST. Re-measure it whenever a
+ * style gains length — a fill that reaches lower than locs would be clipped silently.
  *
  * ⚠⚠ THE FRAME REACHES OUTSIDE THE 2048 CANVAS, which is why the card carries the same colour.
- * The avatar's own background path stops at the canvas edge, so the strip above y0 paints
+ * The avatar's own background path stops at the canvas edge, so the strip beyond it paints
  * nothing — on a white card that reads as a bite out of the corner. Matching the two makes the
  * overflow invisible. Change one and change the other.
  */
-const HEAD_CROP = '-5 -65 2050 2050'
+const HEAD_CROP = '-63 -55 2166 2166'
 const HEAD_GROUND = '#EEF1F8'
 
 /**
