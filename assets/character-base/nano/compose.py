@@ -607,7 +607,25 @@ def main() -> None:
     # the output as raw green.
     _hair_rgb = (hex_to_rgb(arg("--hair-colour")) if arg("--hair-colour")
                  else tuple(int(v) for v in re.findall(r"\d+", HAIR_BASE)))
-    beard_tone = rgb_str(tuple(min(255, v + BEARD_LIFT) for v in _hair_rgb))
+
+    # ⭐⭐ FACIAL HAIR'S OWN COLOUR, AND THE LIFT BELONGS TO THE FALLBACK ALONE. BEARD_LIFT
+    # exists for one problem — a beard vanishing into head hair of the SAME colour — which
+    # choosing a different colour rules out. Applying it anyway would make the swatch lie.
+    # Ryan, 2026-09-26. Mirrors lib/avatar/compose.ts.
+    #
+    # ⚠ RESOLVED ONCE, and every gate below tests the RESOLVED VALUE, never `arg(...)`. The
+    # stubble swap used to live inside `if c := arg("--hair-colour")`, so
+    # `--facial-hair-colour X --skin Y` with no --hair-colour emitted a RAW stubble token while
+    # composeAvatar emitted the derived tone. compose.ts cannot reach that state because
+    # hairColour is a required field, so parity would never have caught it.
+    #
+    # ⚠ `arg()` is an exact argv-token match, so `--facial-hair-colour=#8E8E93` is ignored and
+    # falls silently back to the hair. That failure is invisible here precisely BECAUSE the
+    # fallback is legitimate — pass the value as a separate argv token.
+    _fh_arg = arg("--facial-hair-colour")
+    _fh_rgb = hex_to_rgb(_fh_arg) if _fh_arg else _hair_rgb
+    beard_tone = (rgb_str(_fh_rgb) if _fh_arg
+                  else rgb_str(tuple(min(255, v + BEARD_LIFT) for v in _fh_rgb)))
     svg = svg.replace(f'fill="{BEARD}"', f'fill="{beard_tone}"')
 
     # ---- the beard fade -------------------------------------------------------------------
@@ -631,10 +649,13 @@ def main() -> None:
         # ⚠ For anything that is not stubble the body is now the BEARD tone, not the raw hair
         # colour — otherwise the band ends darker than the beard it joins, which is the same
         # dark-bar failure the stubble case above was written for.
-        body = (stubble_tone(hex_to_rgb(hair_c), hex_to_rgb(skin_c))
-                if (hair_c and skin_c and STUBBLE in svg) else beard_tone)
+        # ⚠ The FACIAL-HAIR colour, resolved above — and NOT gated on --hair-colour. See the
+        # note beside _fh_rgb: gating on a flag rather than a resolved value is what let this
+        # diverge from compose.ts.
+        body = (stubble_tone(_fh_rgb, hex_to_rgb(skin_c))
+                if (skin_c and STUBBLE in svg) else beard_tone)
 
-        if "--fade" in sys.argv and hair_c and skin_c:
+        if "--fade" in sys.argv and skin_c:
             # ⚠⚠ THE SPAN IS PER-ASSET, because the fade's length is a property of the ARTWORK
             # and not a global constant. An asset states its own by putting data-fade-span on
             # the marked band; anything that does not say defaults to FADE_SPAN, so every
@@ -680,12 +701,14 @@ def main() -> None:
             # rendering as violet.
             svg = svg.replace(f'fill="{FADE}"', f'fill="{body}"')
 
+    # Stubble tracks the facial hair (a blonde with black stubble looks wrong) but is derived
+    # as a shadow — see stubble_tone — which is the only thing that makes it read as stubble.
+    # ⚠ OUTSIDE the --hair-colour block, on the resolved colour. It used to be inside.
+    if sk := arg("--skin"):
+        svg = svg.replace(f'fill="{STUBBLE}"', f'fill="{stubble_tone(_fh_rgb, hex_to_rgb(sk))}"')
+
     if c := arg("--hair-colour"):
         rgb = hex_to_rgb(c)
-        # Stubble tracks the hair (a blonde with black stubble looks wrong) but is derived as a
-        # shadow — see stubble_tone — which is the only thing that makes it read as stubble.
-        if sk := arg("--skin"):
-            svg = svg.replace(f'fill="{STUBBLE}"', f'fill="{stubble_tone(rgb, hex_to_rgb(sk))}"')
         # ⚠⚠ STROKE as well as fill. Every hair path carries a hairline stroke of its own
         # fill, which is how the tracer's butted edges are sealed — see seal-hair-seams.py.
         # The stroke holds the same TOKEN, so swapping only the fill would leave grey-brown

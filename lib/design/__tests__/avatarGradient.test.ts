@@ -7,6 +7,7 @@ import {
   hashUserIdToIndex, avatarGradient, avatarIndexFor, avatarColor, isAvatarColourName,
   COLOUR_SHIFT, duelColourIndices,
 } from '../avatarGradient'
+import { PALETTE } from '@/lib/avatar/compose'
 
 // Drift guard for the avatar palette.
 //
@@ -372,7 +373,11 @@ describe('backgrounds stay usable as a palette of their own', () => {
   // NOT cover it. Two members side by side in a member list are their avatars, not their duel
   // glows. The old rule — glow lightness x 0.46 — squashed every background into one dark band
   // and put `yellow` and `butter` 2.2 apart: two different picks, one indistinguishable avatar.
-  const SKIN = ['#FFE0C4', '#F7D9BC', '#F5C9A6', '#E0AC7E', '#C68642', '#8D5524', '#6B4226', '#4A2C14']
+  // ⚠⚠ IMPORTED, NOT COPIED — it used to be a hand-written list of the eight, and that is the
+  // WRONG half of a drift guard: the ratchet below only protects the palette it is shown. When
+  // PALETTE.skin grew to fifteen this copy would have gone on guarding the old eight and passed
+  // while proving nothing, which is worse than failing.
+  const SKIN = PALETTE.skin
 
   it('gives every colour its own hue', () => {
     // ⭐⭐ THE INVARIANT THAT REPLACED "lighter siblings". Ryan rejected a 23-colour set with

@@ -382,13 +382,22 @@ function compose(c){
     svg = swapAll(svg, T.glint, rgbStr(GLASS_TINT));
   }
   if (svg.includes(T.metal)) svg = swapAll(svg, T.metal, rgbStr(hex2rgb(c.metalColour || DEFAULT_METAL)));
-  svg = swapAll(svg, T.browInk, darken(hair,0.82));          // brows follow hair
-  const beardTone = rgbStr(hair.map(v => Math.min(255, v + BEARD_LIFT)));
-  svg = swapAll(svg, T.beard, beardTone);                    // facial hair: lighter than the head
+  svg = swapAll(svg, T.browInk, darken(hair,0.82));          // brows follow hair, NOT the beard
+  // ⭐⭐ Facial hair's own colour. The LIFT belongs to the fallback alone: BEARD_LIFT exists so
+  // a beard does not vanish into head hair of the SAME colour, which choosing a colour rules
+  // out — applying it anyway would make the swatch lie. Mirrors lib/avatar/compose.ts.
+  // ⚠ `||`, not `??`: publicConfig() below coerces unset optional fields to '', and hex2rgb('')
+  // is NaN, which would paint rgb(NaN,NaN,NaN) over the whole beard.
+  const fhChosen = !!c.facialHairColour;
+  const fhRgb = fhChosen ? hex2rgb(c.facialHairColour || c.hairColour) : hair;
+  const beardTone = fhChosen
+    ? rgbStr(fhRgb)
+    : rgbStr(fhRgb.map(v => Math.min(255, v + BEARD_LIFT)));
+  svg = swapAll(svg, T.beard, beardTone);
   // ⚠ The standalone builder has no fade gradient (compose.ts does). Without this the marker
   // rendered as raw violet on every fullbeard and stubble — flatten it the way `fade: false` does.
-  svg = swapAll(svg, T.fade, svg.includes(T.stubble) ? stubbleTone(hair, skin) : beardTone);
-  svg = swapAll(svg, T.stubble, stubbleTone(hair, skin));    // stubble: a shadow, not a short beard
+  svg = swapAll(svg, T.fade, svg.includes(T.stubble) ? stubbleTone(fhRgb, skin) : beardTone);
+  svg = swapAll(svg, T.stubble, stubbleTone(fhRgb, skin));   // stubble: a shadow, not a short beard
   svg = swapAll(svg, T.hairBase,  rgbStr(hair));
   svg = swapAll(svg, T.hairShade, darken(hair));
   svg = swapAll(svg, T.hairLight, lighten(hair));
@@ -407,7 +416,7 @@ function compose(c){
 }
 
 /* ---- state ------------------------------------------------------------------------- */
-const SKINS  = ['#FFE0C4','#F7D9BC','#F5C9A6','#E0AC7E','#C68642','#8D5524','#6B4226','#4A2C14'];
+const SKINS  = ['#FFE0C4','#F7D9BC','#F5C9A6','#EBBA92','#E0AC7E','#D39960','#C68642','#B7793A','#A96D33','#9B612B','#8D5524','#7C4B25','#6B4226','#5A371D','#4A2C14'];
 const HAIRS  = ['#1A1110','#2B1B12','#4A3B32','#6B4A2F','#A9713B','#D4A857','#B33A3A','#8E8E93','#E8E8ED'];
 const EYECOL = ['#3E2612','#5B3A1E','#8B5E3C','#2E7D32','#2E6FD9','#4B5563'];
 const MOUTHS = ['#B67A70','#C4736B','#A85E58','#D08A82'];
@@ -421,7 +430,7 @@ const cfg = {
   hair:'m03-quiff', expression:'x-happy', facialhair:'', glasses:'', frameColour:'#22262E',
   earrings:'', metalColour:'#D4A017', garment:'', mark:false,
   eyes:'eye-01-base', mouth:'mouth-02-smile',
-  skin:'#F5C9A6', hairColour:'#4A3B32', eyeColour:'#5B3A1E',
+  skin:'#F5C9A6', hairColour:'#4A3B32', facialHairColour:'', eyeColour:'#5B3A1E',
   mouthColour:'#B67A70', shirt:'#3B6EFF', bg:'#0E7490',
 };
 
@@ -493,6 +502,10 @@ function buildPanel(){
                         k=>k.replace('base-neck-','neck ')));
   p.appendChild(swatchRow('Skin',  SKINS,  ()=>cfg.skin,        v=>cfg.skin=v));
   p.appendChild(swatchRow('Hair colour', HAIRS, ()=>cfg.hairColour, v=>cfg.hairColour=v));
+  // ⚠ '' is a REAL choice here, not an empty field: it means "follow the hair", which is the
+  // only path that applies BEARD_LIFT. Clicking the swatch already selected clears back to it.
+  p.appendChild(swatchRow('Facial hair colour', HAIRS, ()=>cfg.facialHairColour,
+    v=>cfg.facialHairColour = (cfg.facialHairColour===v ? '' : v)));
   p.appendChild(swatchRow('Eyes',  EYECOL, ()=>cfg.eyeColour,   v=>cfg.eyeColour=v));
   p.appendChild(swatchRow('Mouth', MOUTHS, ()=>cfg.mouthColour, v=>cfg.mouthColour=v));
   if (cfg.glasses) p.appendChild(swatchRow('Frame', FRAMES, ()=>cfg.frameColour, v=>cfg.frameColour=v));
@@ -508,6 +521,10 @@ function publicConfig(){
               earrings:cfg.earrings||null, metalColour:cfg.metalColour,
               garment:cfg.garment||null, mark:cfg.mark||false,
               frameColour:cfg.frameColour, shirt:cfg.shirt, background:cfg.bg };
+  // ⚠⚠ OMITTED WHEN UNSET, never written as a copy of hairColour. The two are different
+  // renders: absent means "follow the hair, lifted by BEARD_LIFT", present means "verbatim".
+  // Emitting the hair's own hex here would quietly darken every beard by 12 per channel.
+  if (cfg.facialHairColour) c.facialHairColour = cfg.facialHairColour;
   if (cfg.mode==='expression') { c.expression=cfg.expression; c.eyeColour=cfg.eyeColour;
                                  c.mouthColour=cfg.mouthColour; }
   else { c.eyes=cfg.eyes; c.mouth=cfg.mouth; c.eyeColour=cfg.eyeColour;

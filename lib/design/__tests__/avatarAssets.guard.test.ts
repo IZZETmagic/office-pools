@@ -500,6 +500,48 @@ describe('facial hair is lighter than the head hair', () => {
     expect(svg, 'the head hair keeps the raw hair colour').toContain('rgb(139,94,60)')
   })
 
+  // ⭐⭐ THE LIFT BELONGS TO THE FALLBACK ALONE, and this is the test of the one consequence
+  // that surprises people: UNSET and SET-TO-THE-SAME-HEX are DIFFERENT RENDERS, by exactly
+  // BEARD_LIFT. `BEARD_LIFT` exists for one problem — a beard vanishing into head hair of the
+  // same colour — which choosing a colour rules out, and every other colour input in this
+  // system (frame, metal, shirt, hair, iris, lip) is applied verbatim. Ryan, 2026-09-26.
+  //
+  // ⚠ So a config must NEVER be written with facialHairColour copied from hairColour. The
+  // builder's publicConfig() omits it when unset for exactly this reason.
+  it('applies a chosen facial hair colour verbatim, and lifts only the fallback', () => {
+    const lift = (h: string) => {
+      const n = (h.replace('#', '').match(/../g) || []).map((x) => parseInt(x, 16))
+      return `rgb(${n.map((v) => Math.min(255, v + 12)).join(',')})`
+    }
+    const HAIR = '#8B5E3C'
+    const CHOSEN = '#8E8E93'
+
+    const chosen = composeAvatar(
+      { ...cfg, hairColour: HAIR, facialHair: 'f', facialHairColour: CHOSEN }, both())
+    expect(chosen, 'a chosen colour is the colour — no lift').toContain('rgb(142,142,147)')
+    expect(chosen, 'the lifted form must not appear').not.toContain(lift(CHOSEN))
+
+    const fallback = composeAvatar({ ...cfg, hairColour: HAIR, facialHair: 'f' }, both())
+    expect(fallback, 'unset still follows the hair, lifted').toContain(lift(HAIR))
+
+    // the deliberate asymmetry, pinned so it cannot be "fixed" by accident
+    const copied = composeAvatar(
+      { ...cfg, hairColour: HAIR, facialHair: 'f', facialHairColour: HAIR }, both())
+    expect(copied, 'copying the hair hex in is NOT the same as leaving it out')
+      .not.toBe(fallback)
+    expect(copied, 'it renders the hair colour verbatim instead').toContain('rgb(139,94,60)')
+  })
+
+  // ⚠ An empty string is a real input — the builder's publicConfig() coerces unset optional
+  // fields to '' — and `'' ?? x` is '', which reaches hex2rgb as NaN and paints
+  // rgb(NaN,NaN,NaN) over the whole beard. Hence `||`, not `??`.
+  it('treats an empty facial hair colour as unset, not as a colour', () => {
+    const svg = composeAvatar(
+      { ...cfg, hairColour: '#8B5E3C', facialHair: 'f', facialHairColour: '' }, both())
+    expect(svg, 'an empty string must never reach the paint').not.toContain('NaN')
+    expect(svg).toBe(composeAvatar({ ...cfg, hairColour: '#8B5E3C', facialHair: 'f' }, both()))
+  })
+
   it('does not lighten hair when there is no facial hair', () => {
     const svg = composeAvatar({ ...cfg, hair: 'h', facialHair: null }, both())
     expect(svg).toContain('rgb(139,94,60)')
@@ -523,6 +565,11 @@ describe('facial hair is lighter than the head hair', () => {
       const src = readFileSync(join(process.cwd(), file), 'utf8')
       expect(src, `${file} must carry the beard marker`).toContain('110,150,126')
       expect(src, `${file} must carry the lift`).toMatch(/BEARD_LIFT\s*=\s*12\b/)
+      // ⚠⚠ A GREP IS ALL THAT HOLDS THE THREE TOGETHER for anything the parity harness does
+      // not compose. builder-template.html is executed by nothing in CI, so without this a
+      // facial-hair colour could be honoured in two implementations and ignored in the third.
+      expect(src, `${file} must honour the facial hair colour`)
+        .toMatch(/facial[-_]?hair[-_]?colour/i)
     }
   })
 
@@ -552,7 +599,11 @@ describe('facial hair is lighter than the head hair', () => {
     const D = 'M 1 1 L 2 2 Z'
     const tone = (hair: string, skin: string, token: string) => {
       const svg = composeAvatar(
-        { ...cfg, hairColour: hair, skin, facialHair: 'f' },
+        // ⚠⚠ DRIVEN THROUGH `facialHairColour`, NOT `hairColour`. Once the two are separable
+        // this test measures whatever drives the stubble; passing only `hairColour` would
+        // exercise the FALLBACK and pass forever while proving nothing about the input a
+        // member actually picks. The hair is set to something else on purpose.
+        { ...cfg, hairColour: '#1A1110', facialHairColour: hair, skin, facialHair: 'f' },
         {
           ...fixture(),
           facialhair: { f: `<path d="${D}" fill="${token}"/>` },
@@ -571,12 +622,16 @@ describe('facial hair is lighter than the head hair', () => {
         // ⚠ 13, not the floor's 14: the tone is truncated to whole channels afterwards,
         // which costs up to a unit. Before the floor the worst pair sat at 0.3.
         if (gap < 13) worst.push(`${hair} on ${skin}: ${gap.toFixed(1)}`)
+        // ⚠ 9 x 15 = 135 pairs since the skin ramp grew. The worst sits at ~13.1, so the
+        // margin over the 13 written above is 0.1 — do not "tidy" either number.
       }
     }
     expect(worst, 'stubble must stay clear of the skin everywhere').toEqual([])
   })
 
-  it('still lifts a beard by the same amount on every hair swatch', () => {
+  // ⚠ THE FALLBACK PATH SPECIFICALLY — no `facialHairColour` is passed. That is the only path
+  // the lift survives on; the verbatim case is pinned separately above.
+  it('still lifts a beard by the same amount on every hair swatch (fallback path)', () => {
     const lumOf = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
     const hex = (h: string) => (h.replace('#', '').match(/../g) || []).map((x) => parseInt(x, 16))
     const nums = (t: string) => (t.match(/\d+/g) || []).map(Number)
@@ -1638,6 +1693,23 @@ describe('background', () => {
     const bgs = [...m![1].matchAll(/'(#[0-9A-Fa-f]{6})'/g)].map((x) => x[1].toUpperCase())
     expect(bgs, 'the builder\'s backgrounds must match PALETTE.background exactly')
       .toEqual(PALETTE.background.map((c) => c.toUpperCase()))
+  })
+
+  // ⚠⚠ THE SAME DRIFT, FOR THE OTHER TWO PALETTES. `BGS` was pinned above and `SKINS`/`HAIRS`
+  // were not, which is an arbitrary place to stop: all three are lists written twice, and
+  // nothing type-checks the builder. Skin drifted the moment PALETTE.skin went from eight to
+  // fifteen — the builder went on previewing eight with nothing failing.
+  it.each([
+    ['SKINS', 'skin'],
+    ['HAIRS', 'hair'],
+  ] as const)('offers the same %s swatches in the builder as in the product', (name, key) => {
+    const html = readFileSync(
+      join(process.cwd(), 'assets/character-base/nano/builder-template.html'), 'utf8')
+    const m = new RegExp(`const ${name}\\s*=\\s*\\[([^\\]]*)\\]`).exec(html)
+    expect(m, `builder-template.html should declare ${name}`).toBeTruthy()
+    const got = [...m![1].matchAll(/'(#[0-9A-Fa-f]{6})'/g)].map((x) => x[1].toUpperCase())
+    expect(got, `the builder's ${name} must match PALETTE.${key} exactly`)
+      .toEqual(PALETTE[key].map((c) => c.toUpperCase()))
   })
 
   // ⚠⚠ REMOVED 2026-09-25: 'offers no near-white background'.

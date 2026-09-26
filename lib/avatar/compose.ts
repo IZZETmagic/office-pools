@@ -70,6 +70,18 @@ export type AvatarConfig = {
   hair: string | null
   hairColour: string
   facialHair: string | null
+  /**
+   * ⭐ Facial hair's own colour, and **its absence is meaningful**:
+   *
+   *   unset  — follow the hair, lifted by BEARD_LIFT so a beard cannot vanish into matching
+   *            head hair. This is what every avatar did before the field existed.
+   *   set    — use exactly this colour, verbatim, with no lift. The lift's only job is the
+   *            same-colour case, which choosing a colour rules out.
+   *
+   * ⚠ So the two are NOT interchangeable: writing this as a copy of `hairColour` renders 12
+   * per channel darker than leaving it out. Omit it when the member has not chosen one.
+   */
+  facialHairColour?: string
   glasses?: string | null
   earrings?: string | null
   garment?: string | null
@@ -862,6 +874,25 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   const skin = hex2rgb(cfg.skin)
   const shirt = hex2rgb(cfg.shirt)
 
+  // ⭐⭐ FACIAL HAIR'S OWN COLOUR, AND WHY THE LIFT ONLY APPLIES TO THE FALLBACK.
+  //
+  // `BEARD_LIFT` exists for exactly one problem: a beard vanishing into head hair of the SAME
+  // colour. That problem cannot arise once the member has chosen a different colour, and
+  // applying the lift anyway would make the swatch lie — pick #8E8E93 and get rgb(154,154,159).
+  // Every other colour input here is verbatim (frame, metal, shirt, hair, iris, lip), so a
+  // picker that shifts what you chose is the odd one out. Ryan, 2026-09-26.
+  //
+  // ⚠ THE CONSEQUENCE, DELIBERATE: `facialHairColour` UNSET and `facialHairColour` SET TO THE
+  // SAME HEX AS THE HAIR are NOT the same render — they differ by exactly the lift. So a
+  // config must never be written with this field copied from `hairColour`; omit it when the
+  // member has not chosen one. A guard test pins both paths.
+  //
+  // ⚠ `||`, not `??`. An empty string is a real input — the builder's publicConfig() coerces
+  // unset optional fields to '' — and `'' ?? x` is '', which reaches hex2rgb as NaN and paints
+  // `rgb(NaN,NaN,NaN)` over the whole beard.
+  const fhChosen = !!cfg.facialHairColour
+  const fhRgb = fhChosen ? hex2rgb(cfg.facialHairColour || cfg.hairColour) : hair
+
   svg = swap(svg, T.irisCore, rgbStr(eye))
   svg = swap(svg, T.irisRim, lighten(eye, 1.28))
 
@@ -869,9 +900,11 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   svg = swap(svg, T.mouthDark, darken(mouth, 0.65))
   svg = swap(svg, T.mouthTongue, lighten(mouth, 1.13))
 
-  // The beard tone, derived from the hair colour so one input still drives both. Computed
-  // here because the fade below ends at it.
-  const beardTone = rgbStr(hair.map((v) => Math.min(255, v + BEARD_LIFT)))
+  // The beard tone. Computed here because the fade below ends at it. The lift is the
+  // fallback's alone — see the note on fhRgb above.
+  const beardTone = fhChosen
+    ? rgbStr(fhRgb)
+    : rgbStr(fhRgb.map((v) => Math.min(255, v + BEARD_LIFT)))
   svg = swap(svg, T.beard, beardTone)
 
   // ---- the beard fade, off unless cfg.fade ---------------------------------------------
@@ -883,7 +916,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
     // ⚠ For anything that is not stubble the body is now the BEARD tone, not the raw hair
     // colour — otherwise the band ends darker than the beard it joins, which is the same
     // dark-bar failure the stubble case was written for.
-    const body = svg.includes(T.stubble) ? stubbleTone(hair, skin) : beardTone
+    const body = svg.includes(T.stubble) ? stubbleTone(fhRgb, skin) : beardTone
     if (cfg.fade) {
       // objectBoundingBox units, so the gradient spans whatever path carries it and no
       // coordinates have to be kept in step with the artwork.
@@ -915,7 +948,7 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   }
 
   svg = swap(svg, T.browInk, darken(hair, 0.82)) // brows track hair, not skin
-  svg = swap(svg, T.stubble, stubbleTone(hair, skin))
+  svg = swap(svg, T.stubble, stubbleTone(fhRgb, skin))
   svg = swap(svg, T.hairBase, rgbStr(hair))
   svg = swap(svg, T.hairShade, darken(hair))
   svg = swap(svg, T.hairLight, lighten(hair))
@@ -937,7 +970,35 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
 
 /** Palettes offered in the customiser. Values, not assets — see AVATAR_CONFIG.md. */
 export const PALETTE = {
-  skin: ['#FFE0C4', '#F7D9BC', '#F5C9A6', '#E0AC7E', '#C68642', '#8D5524', '#6B4226', '#4A2C14'],
+  // ⭐⭐ FIFTEEN, SPLIT IN LAB, KEEPING ALL EIGHT ORIGINALS. The eight-tone ramp was badly
+  // spaced — consecutive ΔE ran from 2.7 to 21.2, so the two palest read as one colour twice
+  // while a 21-wide jump sat in the middle. Adding one tone per gap would have made the pale
+  // end worse; greedily splitting the WIDEST gap seven times, in Lab, gives min 2.7 / max 10.0
+  // / mean 6.7. The eight approved tones are all still here (marked below).
+  //
+  // ⚠ The surviving 2.7 is the inherited #FFE0C4/#F7D9BC pair and predates this.
+  //
+  // ⚠⚠ THIS LIST IS COPIED IN TWO OTHER PLACES and nothing but a test holds them together:
+  // `SKINS` in builder-template.html, and a local copy in avatarGradient.test.ts. The
+  // background palette has the same problem and is pinned by a guard; so is this one now.
+  //
+  // ⚠ Skin and the BACKGROUND palette are positioned around each other — a soft colour at hue
+  // 59–72° IS a skin tone, and a guard holds the worst background-vs-skin pair at ΔE ≥ 18.
+  // These fifteen leave it at 18.95, exactly where the eight left it. Re-run that test before
+  // adding any more.
+  skin: [
+    '#FFE0C4', '#F7D9BC', '#F5C9A6', //                     the three palest, all original
+    '#EBBA92', //                                           new
+    '#E0AC7E', //                                           original
+    '#D39960', //                                           new
+    '#C68642', //                                           original
+    '#B7793A', '#A96D33', '#9B612B', //                     new — this was the 21.2 gap
+    '#8D5524', //                                           original
+    '#7C4B25', //                                           new
+    '#6B4226', //                                           original
+    '#5A371D', //                                           new
+    '#4A2C14', //                                           original
+  ],
   hair: ['#1A1110', '#2B1B12', '#4A3B32', '#6B4A2F', '#A9713B', '#D4A857', '#B33A3A', '#8E8E93', '#E8E8ED'],
   eye: ['#3E2612', '#5B3A1E', '#8B5E3C', '#2E7D32', '#2E6FD9', '#4B5563'],
   mouth: ['#B67A70', '#C4736B', '#A85E58', '#D08A82'],
