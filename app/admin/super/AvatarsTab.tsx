@@ -244,6 +244,37 @@ function AssetCards({
   )
 }
 
+/**
+ * The member selector's seven steps, in the order a person actually builds a face: the skin
+ * first, then what is ON it, then what is worn, and the background last.
+ *
+ * ⭐ Ryan, 2026-09-26. Headwear has no art yet and is deliberately still listed — an empty
+ * step says "this is coming" where a missing one says nothing.
+ */
+const STEPS = [
+  { key: 'skin', label: 'Skin' },
+  { key: 'eyes', label: 'Eyes' },
+  { key: 'hair', label: 'Hair' },
+  { key: 'eyewear', label: 'Glasses & earrings' },
+  { key: 'facialhair', label: 'Facial hair' },
+  { key: 'wearables', label: 'Headwear & top' },
+  { key: 'colour', label: 'Your colour' },
+] as const
+type Step = (typeof STEPS)[number]['key']
+
+/**
+ * ⭐ The two metals offered, each as its own ROW of every earring — Ryan, 2026-09-26: "one for
+ * gold and one for silver and show both". A metal swatch beside a list of names cannot show
+ * what the pair will look like, and the pairing is the whole choice; one click sets both.
+ *
+ * ⚠ `PALETTE.metal` has six. The other four are reachable in the builder and are deliberately
+ * not offered here — this surface is the member's, and two is the decision they actually make.
+ */
+const METALS = [
+  { label: 'Gold', colour: PALETTE.metal[0] },
+  { label: 'Silver', colour: PALETTE.metal[1] },
+] as const
+
 function SelectorMock({ assets, cfg, set }: {
   assets: AvatarAssets
   cfg: AvatarConfig
@@ -287,7 +318,83 @@ function SelectorMock({ assets, cfg, set }: {
       return svg
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assets, cfg.base, cfg.skin, cfg.hairColour])
+  }, [assets, cfg.base, cfg.skin, cfg.shirt, cfg.hairColour])
+
+  /**
+   * The other families' cards, each memoised on ONLY what its own card shows.
+   *
+   * ⚠⚠ NEVER key one of these on the whole config. That is the trap the note above records:
+   * a cache keyed on `cfg` recomposes every card in the panel on every keystroke, and each
+   * compose is a full rewrite of the base document. The dependency list IS the contract —
+   * anything a card renders must be in it, and nothing else may be.
+   *
+   * ⭐ These cards wear the member's CURRENT HAIR, where the hair cards wear a bare head. Long
+   * hair covers the ears, so an earring on `m15-locs` either floats or vanishes — a member has
+   * to be able to see that before they choose it, and a bald preview would hide it.
+   *
+   * ⭐ Only the open step renders, so this is CHEAPER than the single long scroll it replaces,
+   * which composed every family at once.
+   */
+  /**
+   * ⚠⚠ A PLAIN FUNCTION, NOT A MEMO, AND IT CLOSES OVER NOTHING BUT `assets`. Memoising it on
+   * `cfg` looked tidier and was a staleness bug by construction: each family below re-runs only
+   * on its OWN narrow dependency list, so it would go on holding a `cardFor` built from an old
+   * config. `cfg.shirt` is the one that bites — `headOnly` is told the shirt colour so it can
+   * find and DELETE the body, so a stale one leaves the shirt painted into every card.
+   *
+   * Each family therefore builds its own `full` config inside its own memo. The dependency list
+   * IS the contract: anything a card renders must be in it.
+   */
+  const cardFor = (cache: Map<string, string>, key: string, full: AvatarConfig) => {
+    const hit = cache.get(key)
+    if (hit) return hit
+    const svg = headOnly(
+      composeAvatar(full, assets),
+      { skin: full.skin, shirt: full.shirt, hair: full.hairColour },
+      (full.hair && assets.hairBackfill?.[full.hair]) || '',
+      (full.hair && assets.hairBehind?.[full.hair]) || '',
+    ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
+    cache.set(key, svg)
+    return svg
+  }
+
+  const expressionPreview = useMemo(() => {
+    const cache = new Map<string, string>()
+    const base = { ...cfg, expression: null, eyes: null, mouth: null, facialHair: null,
+      glasses: null, earrings: null, garment: null, mark: false, background: HEAD_GROUND }
+    return (k: string | null) => cardFor(cache, k ?? '—', { ...base, ...{ hair: cfg.hair, expression: k } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets, cfg.base, cfg.skin, cfg.shirt, cfg.hairColour, cfg.eyeColour, cfg.mouthColour, cfg.hair])
+
+  const glassesPreview = useMemo(() => {
+    const cache = new Map<string, string>()
+    const base = { ...cfg, expression: null, eyes: null, mouth: null, facialHair: null,
+      glasses: null, earrings: null, garment: null, mark: false, background: HEAD_GROUND }
+    return (k: string | null) => cardFor(cache, k ?? '—', { ...base, ...{ hair: cfg.hair, glasses: k } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets, cfg.base, cfg.skin, cfg.shirt, cfg.hairColour, cfg.frameColour, cfg.hair])
+
+  // ⚠ Keyed on the METAL as well as the style: the same hoop appears in both rows and they are
+  // different pictures. A key of the style alone would show gold in the silver row.
+  const earringPreview = useMemo(() => {
+    const cache = new Map<string, string>()
+    const base = { ...cfg, expression: null, eyes: null, mouth: null, facialHair: null,
+      glasses: null, earrings: null, garment: null, mark: false, background: HEAD_GROUND }
+    return (k: string | null, metal: string) =>
+      cardFor(cache, `${k ?? '—'}|${metal}`,
+        { ...base, hair: cfg.hair, earrings: k, metalColour: metal })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets, cfg.base, cfg.skin, cfg.shirt, cfg.hairColour, cfg.hair])
+
+  const facialHairPreview = useMemo(() => {
+    const cache = new Map<string, string>()
+    const base = { ...cfg, expression: null, eyes: null, mouth: null, facialHair: null,
+      glasses: null, earrings: null, garment: null, mark: false, background: HEAD_GROUND }
+    return (k: string | null) => cardFor(cache, k ?? '—', { ...base, ...{ hair: cfg.hair, facialHair: k } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets, cfg.base, cfg.skin, cfg.hairColour, cfg.facialHairColour, cfg.hair])
+
+  const [step, setStep] = useState<Step>('skin')
 
   // ⭐ The colour's PURPOSE, shown rather than described. `duelColourIndices` is the real
   // function the duel uses, so if a member picks a colour an opponent already has, this
@@ -373,81 +480,201 @@ function SelectorMock({ assets, cfg, set }: {
 
       {/* -------------------------------------------------- the choices */}
       <div className="bg-white border border-gray-200 rounded-2xl p-6">
-        <Section title="Your colour" hint="This is you across the app — your avatar, and your side of a duel.">
-          <div className="grid grid-cols-11 gap-2">
-            {AVATAR_BACKGROUNDS.map((c, i) => (
-              <button
-                key={c}
-                type="button"
-                title={AVATAR_COLOUR_NAMES[i]}
-                aria-label={AVATAR_COLOUR_NAMES[i]}
-                aria-pressed={cfg.background === c}
-                onClick={() => set('background', c)}
-                className={`aspect-square rounded-lg transition ${
-                  cfg.background === c ? 'ring-2 ring-offset-2 ring-gray-900 scale-105' : 'ring-1 ring-black/10'
-                }`}
-                style={{ background: c }}
-              />
-            ))}
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            {AVATAR_COLOUR_NAMES[myIndex] ? TITLE(AVATAR_COLOUR_NAMES[myIndex]) : 'Custom'}
-          </p>
-        </Section>
+        {/* ⭐ A SCROLLING PILL STRIP, not a segmented control. Seven labels do not fit in
+            equal-width segments at phone width — which is exactly why PoolDetail stopped using
+            one. Same structure as `app/pools/[pool_id]/PoolDetail.tsx`.
 
-        <Section title="Face">
-          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Skin</div>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {PALETTE.skin.map((c) => (
-              <button key={c} type="button" onClick={() => set('skin', c)} aria-label={c}
-                aria-pressed={cfg.skin === c}
-                className={`w-8 h-8 rounded-full ${cfg.skin === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
-                style={{ background: c }} />
-            ))}
-          </div>
-          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Expression</div>
-          <Options options={Object.keys(assets.expressions)} value={cfg.expression ?? null}
-            onChange={(v) => set('expression', v)} allowNone={false} />
-        </Section>
+            ⚠ The phone gutter (`pl-4`) is INSIDE the scroller. On the wrapper it sits outside
+            the scroll box, so the strip stops short of the screen at both ends and reads as
+            cropped rather than scrollable. */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-6 px-6 pb-1 mb-6">
+          {STEPS.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              data-tab-key={s.key}
+              onClick={() => setStep(s.key)}
+              aria-pressed={step === s.key}
+              className={`shrink-0 px-3.5 py-2 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${
+                // ⚠ NOT `sp-bg-mist`, which the admin sidebar uses for its active tab: mist is
+                // #EEF1F8 and this strip sits on a WHITE card, so the active pill was all but
+                // invisible — I had to read the computed style to tell which one was selected.
+                // The panel's own active treatment (bg-gray-900) would be a second black strip
+                // directly under the view switcher, so: the primary tint, which reads at a
+                // glance and stays lighter than the switcher above it.
+                step === s.key
+                  ? 'sp-bg-primary-light sp-text-primary'
+                  : 'sp-text-slate sp-hover-snow'
+              }`}
+            >
+              <span className="opacity-40 mr-1.5">{i + 1}</span>{s.label}
+            </button>
+          ))}
+        </div>
 
-        <Section title="Hair">
-          <div className="flex flex-wrap gap-2 mb-4">
-            {PALETTE.hair.map((c) => (
-              <button key={c} type="button" onClick={() => set('hairColour', c)} aria-label={c}
-                aria-pressed={cfg.hairColour === c}
-                className={`w-8 h-8 rounded-full ${cfg.hairColour === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
-                style={{ background: c }} />
-            ))}
-          </div>
-          <AssetCards
-            options={[null, ...Object.keys(assets.hair)]}
-            value={cfg.hair}
-            onChange={(v) => set('hair', v)}
-            render={headPreview}
-            columns={5}
-          />
-        </Section>
+        {step === 'skin' && (
+          <Section title="Skin" hint="Fifteen tones, evenly spaced.">
+            <div className="flex flex-wrap gap-2">
+              {PALETTE.skin.map((c) => (
+                <button key={c} type="button" onClick={() => set('skin', c)} aria-label={c}
+                  title={c} aria-pressed={cfg.skin === c}
+                  className={`w-9 h-9 rounded-full ${cfg.skin === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
+                  style={{ background: c }} />
+              ))}
+            </div>
+          </Section>
+        )}
 
-        <Section title="Facial hair">
-          <Options options={Object.keys(assets.facialhair)} value={cfg.facialHair}
-            onChange={(v) => set('facialHair', v)} />
-        </Section>
+        {step === 'eyes' && (
+          <Section title="Eyes" hint="The colour shows in every expression that has its eyes open.">
+            <div className="flex flex-wrap gap-2 mb-5">
+              {PALETTE.eye.map((c) => (
+                <button key={c} type="button" onClick={() => set('eyeColour', c)} aria-label={c}
+                  title={c} aria-pressed={cfg.eyeColour === c}
+                  className={`w-8 h-8 rounded-full ${cfg.eyeColour === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
+                  style={{ background: c }} />
+              ))}
+            </div>
+            <div className="text-[11px] font-medium text-gray-500 mb-2">Expression</div>
+            <AssetCards options={Object.keys(assets.expressions)} value={cfg.expression ?? null}
+              onChange={(v) => set('expression', v)} render={expressionPreview} columns={6} />
+            {/* ⚠ Said rather than left to look broken: these two are drawn with the eyes
+                CLOSED, so the colour above cannot show in them. */}
+            <p className="text-[11px] text-gray-500 mt-3">
+              Cheeky and Laughing are drawn with the eyes closed, so the eye colour does not
+              show on them.
+            </p>
+          </Section>
+        )}
 
-        <Section title="Extras">
-          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Eyewear</div>
-          <div className="mb-4">
-            <Options options={Object.keys(assets.glasses ?? {})} value={cfg.glasses ?? null}
-              onChange={(v) => set('glasses', v)} />
-          </div>
-          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Earrings</div>
-          <div className="mb-4">
-            <Options options={Object.keys(assets.earrings ?? {})} value={cfg.earrings ?? null}
-              onChange={(v) => set('earrings', v)} />
-          </div>
-          <div className="text-[11px] font-medium text-gray-500 mb-1.5">Top</div>
-          <Options options={Object.keys(assets.garments ?? {})} value={cfg.garment ?? null}
-            onChange={(v) => set('garment', v)} />
-        </Section>
+        {step === 'hair' && (
+          <Section title="Hair">
+            <div className="flex flex-wrap gap-2 mb-5">
+              {PALETTE.hair.map((c) => (
+                <button key={c} type="button" onClick={() => set('hairColour', c)} aria-label={c}
+                  title={c} aria-pressed={cfg.hairColour === c}
+                  className={`w-8 h-8 rounded-full ${cfg.hairColour === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
+                  style={{ background: c }} />
+              ))}
+            </div>
+            <AssetCards options={[null, ...Object.keys(assets.hair)]} value={cfg.hair}
+              onChange={(v) => set('hair', v)} render={headPreview} columns={5} />
+          </Section>
+        )}
+
+        {step === 'eyewear' && (
+          <>
+            <Section title="Glasses">
+              <div className="flex flex-wrap gap-2 mb-5">
+                {PALETTE.frame.map((c) => (
+                  <button key={c} type="button" onClick={() => set('frameColour', c)} aria-label={c}
+                    title={c} aria-pressed={(cfg.frameColour ?? PALETTE.frame[0]) === c}
+                    className={`w-8 h-8 rounded-full ${(cfg.frameColour ?? PALETTE.frame[0]) === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
+                    style={{ background: c }} />
+                ))}
+              </div>
+              <AssetCards options={[null, ...Object.keys(assets.glasses ?? {})]}
+                value={cfg.glasses ?? null} onChange={(v) => set('glasses', v)}
+                render={glassesPreview} columns={6} />
+            </Section>
+
+            {/* ⭐ Ryan, 2026-09-26: gold and silver as two rows, both shown. One click picks the
+                earring AND its metal — a metal swatch plus a text list cannot show the member
+                what they are choosing, which is the whole point of the pair. */}
+            <Section title="Earrings">
+              {METALS.map((m) => (
+                <div key={m.colour} className="mb-4 last:mb-0">
+                  <div className="text-[11px] font-medium text-gray-500 mb-2">{m.label}</div>
+                  <AssetCards
+                    options={Object.keys(assets.earrings ?? {})}
+                    value={cfg.earrings && cfg.metalColour === m.colour ? cfg.earrings : null}
+                    onChange={(v) => { set('earrings', v); if (v) set('metalColour', m.colour) }}
+                    render={(k) => earringPreview(k, m.colour)}
+                    columns={6}
+                  />
+                </div>
+              ))}
+              <button type="button" onClick={() => set('earrings', null)}
+                className="text-[12px] text-gray-500 underline underline-offset-2 hover:text-gray-900">
+                No earrings
+              </button>
+            </Section>
+          </>
+        )}
+
+        {step === 'facialhair' && (
+          <Section title="Facial hair">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              {/* ⚠ "Match hair" is UNSET, not a colour. Unset is the only path that lifts the
+                  beard away from the head hair, so it is a real choice and not an empty field —
+                  and it must never be stored as a copy of the hair colour. */}
+              <button type="button" onClick={() => set('facialHairColour', undefined)}
+                aria-pressed={!cfg.facialHairColour}
+                className={`px-3 py-1.5 rounded-lg text-[12px] border transition ${
+                  !cfg.facialHairColour
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}>
+                Match hair
+              </button>
+              {PALETTE.hair.map((c) => (
+                <button key={c} type="button" onClick={() => set('facialHairColour', c)}
+                  aria-label={c} title={c} aria-pressed={cfg.facialHairColour === c}
+                  className={`w-8 h-8 rounded-full ${cfg.facialHairColour === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
+                  style={{ background: c }} />
+              ))}
+            </div>
+            {/* ⚠ Said plainly rather than shipping a control that looks broken: stubble is a
+                SHADOW on the skin, so the whole palette compresses into a few units on it. */}
+            <p className="text-[11px] text-gray-500 mb-5">
+              Stubble is drawn as a shadow on the skin, so colour barely changes it.
+            </p>
+            <AssetCards options={[null, ...Object.keys(assets.facialhair)]}
+              value={cfg.facialHair} onChange={(v) => set('facialHair', v)}
+              render={facialHairPreview} columns={6} />
+          </Section>
+        )}
+
+        {step === 'wearables' && (
+          <>
+            <Section title="Headwear">
+              <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center">
+                <p className="text-[13px] font-semibold text-gray-500">Nothing here yet</p>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  No headwear has been drawn. The slot is deliberately not wired into the
+                  compositor until there is art for it.
+                </p>
+              </div>
+            </Section>
+            <Section title="Top">
+              <Options options={Object.keys(assets.garments ?? {})} value={cfg.garment ?? null}
+                onChange={(v) => set('garment', v)} />
+            </Section>
+          </>
+        )}
+
+        {step === 'colour' && (
+          <Section title="Your colour" hint="This is you across the app — your avatar, and your side of a duel.">
+            <div className="grid grid-cols-11 gap-2">
+              {AVATAR_BACKGROUNDS.map((c, i) => (
+                <button
+                  key={c}
+                  type="button"
+                  title={AVATAR_COLOUR_NAMES[i]}
+                  aria-label={AVATAR_COLOUR_NAMES[i]}
+                  aria-pressed={cfg.background === c}
+                  onClick={() => set('background', c)}
+                  className={`aspect-square rounded-lg transition ${
+                    cfg.background === c ? 'ring-2 ring-offset-2 ring-gray-900 scale-105' : 'ring-1 ring-black/10'
+                  }`}
+                  style={{ background: c }}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {AVATAR_COLOUR_NAMES[myIndex] ? TITLE(AVATAR_COLOUR_NAMES[myIndex]) : 'Custom'}
+            </p>
+          </Section>
+        )}
       </div>
     </div>
   )
