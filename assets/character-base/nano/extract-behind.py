@@ -204,6 +204,37 @@ def d_of(p: str) -> str:
     return re.search(r'd="([^"]*)"', p).group(1)
 
 
+def back_curtain(hair, chin: float):
+    """Close the CENTRAL gap between the two falls, from the chin down to the lowest hair.
+
+    ⭐ Ryan, 2026-09-25: "the hair in the back should come down to the bottom level of the
+    lowest hair point". The fill was stopping where the NECK stopped, leaving the back short
+    while the curls carried on 300 units below it.
+
+    ⚠⚠ ONLY THE GAP THAT CONTAINS THE CENTRE. A first version spanned each row from the hair's
+    leftmost edge to its rightmost, which fills EVERY gap — including the ones between curls at
+    the outside — and the card came back a slab, which is the thing this whole exercise has been
+    removing. The back of a head is the hole in the middle and nothing else.
+
+    ⚠ Rows are stepped, so the raw result is a staircase; `simplify` afterwards makes it a curve.
+    """
+    CENTRE, STEP = 1020.0, 6.0
+    _, _, _, y1 = hair.bounds
+    rows, y = [], chin
+    while y < y1:
+        band = hair.intersection(
+            Polygon([(0, y), (2048, y), (2048, y + STEP), (0, y + STEP)]))
+        parts = ([] if band.is_empty else
+                 [band] if band.geom_type == "Polygon" else list(band.geoms))
+        spans = sorted((p.bounds[0], p.bounds[2]) for p in parts if p.area > 1)
+        for (_, a), (b, _) in zip(spans, spans[1:]):
+            if a <= CENTRE <= b:
+                rows.append(Polygon([(a, y), (b, y), (b, y + STEP), (a, y + STEP)]))
+                break
+        y += STEP
+    return unary_union(rows).buffer(0) if rows else None
+
+
 def hem(ref_png: str, x0: float, x1: float):
     """How far down the locked hair reaches in a band of columns, in viewBox units.
 
@@ -451,6 +482,20 @@ def main():
             whole_hair = unary_union([g for g in tone.values() if g is not None]).buffer(0)
             tone[HAIR_SHADE] = dark.intersection(whole_hair).buffer(0)
             tone[HAIR_BASE] = whole_hair.difference(dark).buffer(0)
+
+    # ⭐ the back curtain — see back_curtain()
+    if keep:
+        back = back_curtain(unary_union(keep).buffer(0), skull.bounds[3])
+        if back is not None and not back.is_empty:
+            darker = HAIR_SHADE if tone[HAIR_SHADE] is not None else HAIR_BASE
+            tone[darker] = back if tone[darker] is None else tone[darker].union(back).buffer(0)
+            other = HAIR_BASE if darker == HAIR_SHADE else HAIR_SHADE
+            if tone[other] is not None:
+                tone[other] = tone[other].difference(back).buffer(0)
+            # ⚠ `kept` is the mask each tone is clipped to and it was built above, before this
+            # existed — without widening it the curtain is computed and then clipped straight
+            # back off, and the card does not move.
+            kept = back if kept is None else unary_union([kept, back]).buffer(0)
 
     out = []
     for token in (HAIR_BASE, HAIR_SHADE):
