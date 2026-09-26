@@ -234,6 +234,30 @@ def back_curtain(hair, chin: float):
         y += STEP
     return unary_union(rows).buffer(0) if rows else None
 
+def strand_corridor(light, chin: float):
+    """Every column's light hair, filled from its highest point to its lowest, below the chin.
+
+    ⭐ Ryan, 2026-09-25: the lighter front strands were being crossed by dark — the fill's own
+    shading swoosh in one place, the curtain's top corners in another — and each break left the
+    strand ending in a little hook beside the chin. He chose "light strand runs unbroken". This
+    is that corridor; the darker tone is cut out of it and the lighter tone fills it, so a
+    strand reads as one fall from the jaw to its tip.
+
+    ⚠ Below the chin ONLY. Above it the light tone covers most of the head, so its corridor
+    would be the whole silhouette and every shading swoosh in the style would be erased.
+    """
+    x0, _, x1, y1 = light.bounds
+    cols, STEP = [], 6.0
+    x = x0
+    while x < x1:
+        strip = light.intersection(Polygon([(x, chin), (x + STEP, chin), (x + STEP, y1), (x, y1)]))
+        if not strip.is_empty:
+            _, sy0, _, sy1 = strip.bounds
+            cols.append(Polygon([(x, sy0), (x + STEP, sy0), (x + STEP, sy1), (x, sy1)]))
+        x += STEP
+    return unary_union(cols).buffer(0) if cols else None
+
+
 def hem(ref_png: str, x0: float, x1: float):
     """How far down the locked hair reaches in a band of columns, in viewBox units.
 
@@ -487,14 +511,28 @@ def main():
         back = back_curtain(unary_union(keep).buffer(0), skull.bounds[3])
         if back is not None and not back.is_empty:
             darker = HAIR_SHADE if tone[HAIR_SHADE] is not None else HAIR_BASE
-            tone[darker] = back if tone[darker] is None else tone[darker].union(back).buffer(0)
             other = HAIR_BASE if darker == HAIR_SHADE else HAIR_SHADE
+            # ⚠⚠ THE CURTAIN GOES BEHIND THE FRONT HAIR, NOT OVER IT. The darker tone is drawn
+            # second, so a curtain that overlaps the lighter strands repaints them — on
+            # `f12-halfup` it ate the middle of each strand and left the ends as little hooks
+            # either side of the chin. Ryan, 2026-09-25. It fills only where the front hair is
+            # not, and the front tone is left alone.
             if tone[other] is not None:
-                tone[other] = tone[other].difference(back).buffer(0)
+                back = back.difference(tone[other]).buffer(0)
+            if not back.is_empty:
+                tone[darker] = back if tone[darker] is None else tone[darker].union(back).buffer(0)
             # ⚠ `kept` is the mask each tone is clipped to and it was built above, before this
             # existed — without widening it the curtain is computed and then clipped straight
             # back off, and the card does not move.
             kept = back if kept is None else unary_union([kept, back]).buffer(0)
+
+    # ⭐ the front strands run unbroken — see strand_corridor()
+    if tone[HAIR_BASE] is not None and tone[HAIR_SHADE] is not None:
+        corridor = strand_corridor(tone[HAIR_BASE], skull.bounds[3])
+        if corridor is not None and not corridor.is_empty:
+            tone[HAIR_SHADE] = tone[HAIR_SHADE].difference(corridor).buffer(0)
+            tone[HAIR_BASE] = tone[HAIR_BASE].union(corridor).buffer(0)
+            kept = corridor if kept is None else unary_union([kept, corridor]).buffer(0)
 
     out = []
     for token in (HAIR_BASE, HAIR_SHADE):
