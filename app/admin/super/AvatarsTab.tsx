@@ -263,7 +263,21 @@ function Options({
  * overflow invisible. Change one and change the other.
  */
 const HEAD_CROP = '-63 -55 2166 2166'
-const HEAD_GROUND = '#EEF1F8'
+/**
+ * ⭐⭐ A SENTINEL, NOT A GROUND COLOUR. Previews used to be composed on `#EEF1F8` with the card
+ * painted to match, so a head sat on a filled square. Ryan's reference insets the head on a
+ * plain tile instead, which means the CARD must supply the background — and it cannot while an
+ * opaque canvas sits on top of it: the selected tint would hide behind a pale square.
+ *
+ * So the canvas is composed in a colour nothing ships and then deleted, leaving the preview
+ * transparent for the card to show through.
+ *
+ * ⚠ The colour is deliberately hideous. If the strip stops matching, every card turns MAGENTA
+ * rather than quietly reverting to a square — a sentinel that looks fine when it leaks is not
+ * a sentinel. Do not "tidy" it to something plausible.
+ */
+const HEAD_GROUND = '#FF00FF'
+const HEAD_CANVAS = /<path[^>]*fill="rgb\(255,0,255\)"[^>]*\/?>/
 
 /**
  * One asset, shown on a bare head in its own square card.
@@ -298,12 +312,16 @@ function AssetCards({
             aria-pressed={selected}
             className="group text-left"
           >
+            {/* ⭐ THE SAME TILE AS A COLOUR SWATCH — a bordered card with its subject inset,
+                SportPool blue on its tint when chosen. An asset and a colour are the same kind
+                of choice, so they should not be two different controls. ⚠ `border-2` on BOTH
+                states, not a border that becomes a ring: a 1px border swapping for a 2px ring
+                shifts the tile by a pixel on selection and the whole grid twitches. */}
             <div
-              style={{ background: HEAD_GROUND }}
-              className={`aspect-square rounded-card overflow-hidden transition ${
+              className={`aspect-square rounded-control border-2 p-1.5 transition ${
                 selected
-                  ? 'ring-2 ring-primary-600 ring-offset-2 ring-offset-surface'
-                  : 'border border-silver/50 group-hover:border-silver'
+                  ? 'border-primary-600 bg-primary-100'
+                  : 'border-gray-200 bg-white group-hover:border-gray-300'
               } [&>svg]:w-full [&>svg]:h-full [&>svg]:block`}
               dangerouslySetInnerHTML={{ __html: render(o) }}
             />
@@ -400,7 +418,7 @@ function SelectorMock({ assets, cfg, set }: {
         { skin: cfg.skin, shirt: cfg.shirt, hair: cfg.hairColour },
         (hair && assets.hairBackfill?.[hair]) || '',
         (hair && assets.hairBehind?.[hair]) || '',
-      ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
+      ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`).replace(HEAD_CANVAS, '')
       cache.set(key, svg)
       return svg
     }
@@ -440,7 +458,7 @@ function SelectorMock({ assets, cfg, set }: {
       { skin: full.skin, shirt: full.shirt, hair: full.hairColour },
       (full.hair && assets.hairBackfill?.[full.hair]) || '',
       (full.hair && assets.hairBehind?.[full.hair]) || '',
-    ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
+    ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`).replace(HEAD_CANVAS, '')
     cache.set(key, svg)
     return svg
   }
