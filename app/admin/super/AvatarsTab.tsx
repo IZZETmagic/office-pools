@@ -139,6 +139,63 @@ function Chips({
 const TITLE = (s: string) =>
   s.replace(/^(x-|[a-z]\d+-|base-neck-)/, '').replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
 
+/**
+ * A palette where EVERY COLOUR IS ITS OWN CARD — a rounded-square chip centred in a bordered
+ * tile. Ryan, 2026-09-26, with a picture: the card is the control and the colour is its
+ * contents, so the selected state can be carried by the CARD (tinted ground, blue border)
+ * instead of a ring drawn around the colour itself.
+ *
+ * ⭐ ONE COMPONENT, SIX CALLERS. Skin, eye, hair, frame, facial-hair and background were six
+ * copy-pasted swatch rows that had already drifted apart — two sizes (w-9 and w-8) and two
+ * shapes (circles and rounded-lg) for rows doing the same job.
+ *
+ * ⚠ THE SELECTED STATE IS ON THE TILE, NOT A RING ROUND THE COLOUR. A ring inherits the
+ * swatch's own colour as its neighbour, so on a pale skin tone it all but vanished — which is
+ * the failure this layout fixes. The tile's border and ground are independent of the colour it
+ * holds, so selection reads the same on #FFE0C4 and on #4A2C14.
+ */
+function ColourCard({
+  colours, value, onChange, names,
+}: {
+  colours: readonly string[]
+  value: string | undefined
+  onChange: (c: string) => void
+  names?: readonly string[]
+}) {
+  return (
+    // ⚠ A FIXED TILE THAT WRAPS, not a fixed COLUMN COUNT that stretches. This panel is a `1fr`
+    // beside a 380px column, so a `repeat(5, 1fr)` grid gave ~100px tiles on a wide screen and
+    // ~55px on a narrow one — the same control at two quite different sizes. `auto-fill, 72px`
+    // keeps the tile constant and lets the row count fall out of the width, which is also what
+    // makes one component work for a 6-colour palette and a 22-colour one.
+    <div
+      className="grid gap-2.5"
+      style={{ gridTemplateColumns: 'repeat(auto-fill, 72px)' }}
+    >
+      {colours.map((c, i) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(c)}
+          title={names?.[i] ?? c}
+          aria-label={names?.[i] ?? c}
+          aria-pressed={value === c}
+          className={`aspect-square rounded-2xl border-2 grid place-items-center transition ${
+            value === c
+              ? 'border-sky-300 bg-sky-50'
+              : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}
+        >
+          <span
+            className="block w-[58%] h-[58%] rounded-xl ring-1 ring-black/5"
+            style={{ background: c }}
+          />
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="mb-7">
@@ -541,26 +598,15 @@ function SelectorMock({ assets, cfg, set }: {
 
         {step === 'skin' && (
           <Section title="Skin" hint="Fifteen tones, evenly spaced.">
-            <div className="flex flex-wrap gap-2">
-              {PALETTE.skin.map((c) => (
-                <button key={c} type="button" onClick={() => set('skin', c)} aria-label={c}
-                  title={c} aria-pressed={cfg.skin === c}
-                  className={`w-9 h-9 rounded-full ${cfg.skin === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
-                  style={{ background: c }} />
-              ))}
-            </div>
+            <ColourCard colours={PALETTE.skin} value={cfg.skin} onChange={(c) => set('skin', c)} />
           </Section>
         )}
 
         {step === 'eyes' && (
           <Section title="Eyes" hint="The colour shows in every expression that has its eyes open.">
-            <div className="flex flex-wrap gap-2 mb-5">
-              {PALETTE.eye.map((c) => (
-                <button key={c} type="button" onClick={() => set('eyeColour', c)} aria-label={c}
-                  title={c} aria-pressed={cfg.eyeColour === c}
-                  className={`w-8 h-8 rounded-full ${cfg.eyeColour === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
-                  style={{ background: c }} />
-              ))}
+            <div className="mb-5">
+              <ColourCard colours={PALETTE.eye} value={cfg.eyeColour}
+                onChange={(c) => set('eyeColour', c)} />
             </div>
             <div className="text-[11px] font-medium text-gray-500 mb-2">Expression</div>
             <AssetCards options={Object.keys(assets.expressions)} value={cfg.expression ?? null}
@@ -576,13 +622,9 @@ function SelectorMock({ assets, cfg, set }: {
 
         {step === 'hair' && (
           <Section title="Hair">
-            <div className="flex flex-wrap gap-2 mb-5">
-              {PALETTE.hair.map((c) => (
-                <button key={c} type="button" onClick={() => set('hairColour', c)} aria-label={c}
-                  title={c} aria-pressed={cfg.hairColour === c}
-                  className={`w-8 h-8 rounded-full ${cfg.hairColour === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
-                  style={{ background: c }} />
-              ))}
+            <div className="mb-5">
+              <ColourCard colours={PALETTE.hair} value={cfg.hairColour}
+                onChange={(c) => set('hairColour', c)} />
             </div>
             <AssetCards options={[null, ...Object.keys(assets.hair)]} value={cfg.hair}
               onChange={(v) => set('hair', v)} render={headPreview} columns={5} />
@@ -592,13 +634,9 @@ function SelectorMock({ assets, cfg, set }: {
         {step === 'eyewear' && (
           <>
             <Section title="Glasses">
-              <div className="flex flex-wrap gap-2 mb-5">
-                {PALETTE.frame.map((c) => (
-                  <button key={c} type="button" onClick={() => set('frameColour', c)} aria-label={c}
-                    title={c} aria-pressed={(cfg.frameColour ?? PALETTE.frame[0]) === c}
-                    className={`w-8 h-8 rounded-full ${(cfg.frameColour ?? PALETTE.frame[0]) === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
-                    style={{ background: c }} />
-                ))}
+              <div className="mb-5">
+                <ColourCard colours={PALETTE.frame} value={cfg.frameColour ?? PALETTE.frame[0]}
+                  onChange={(c) => set('frameColour', c)} />
               </div>
               <AssetCards options={[null, ...Object.keys(assets.glasses ?? {})]}
                 value={cfg.glasses ?? null} onChange={(v) => set('glasses', v)}
@@ -631,25 +669,20 @@ function SelectorMock({ assets, cfg, set }: {
 
         {step === 'facialhair' && (
           <Section title="Facial hair">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              {/* ⚠ "Match hair" is UNSET, not a colour. Unset is the only path that lifts the
-                  beard away from the head hair, so it is a real choice and not an empty field —
-                  and it must never be stored as a copy of the hair colour. */}
-              <button type="button" onClick={() => set('facialHairColour', undefined)}
-                aria-pressed={!cfg.facialHairColour}
-                className={`px-3 py-1.5 rounded-lg text-[12px] border transition ${
-                  !cfg.facialHairColour
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}>
-                Match hair
-              </button>
-              {PALETTE.hair.map((c) => (
-                <button key={c} type="button" onClick={() => set('facialHairColour', c)}
-                  aria-label={c} title={c} aria-pressed={cfg.facialHairColour === c}
-                  className={`w-8 h-8 rounded-full ${cfg.facialHairColour === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'ring-1 ring-black/10'}`}
-                  style={{ background: c }} />
-              ))}
-            </div>
+            {/* ⚠ "Match hair" is UNSET, not a colour — it is the only path that LIFTS the
+                beard away from the head hair, and it must never be stored as a copy of the hair
+                colour. It sits above the grid rather than posing as a tile in it, because a
+                tile in a colour grid promises to be a colour. */}
+            <button type="button" onClick={() => set('facialHairColour', undefined)}
+              aria-pressed={!cfg.facialHairColour}
+              className={`mb-2.5 px-3 py-1.5 rounded-lg text-[12px] border transition ${
+                !cfg.facialHairColour
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}>
+              Match hair
+            </button>
+            <ColourCard colours={PALETTE.hair} value={cfg.facialHairColour}
+              onChange={(c) => set('facialHairColour', c)} />
             {/* ⚠ Said plainly rather than shipping a control that looks broken: stubble is a
                 SHADOW on the skin, so the whole palette compresses into a few units on it. */}
             <p className="text-[11px] text-gray-500 mb-5">
@@ -681,22 +714,8 @@ function SelectorMock({ assets, cfg, set }: {
 
         {step === 'colour' && (
           <Section title="Your colour" hint="This is you across the app — your avatar, and your side of a duel.">
-            <div className="grid grid-cols-11 gap-2">
-              {AVATAR_BACKGROUNDS.map((c, i) => (
-                <button
-                  key={c}
-                  type="button"
-                  title={AVATAR_COLOUR_NAMES[i]}
-                  aria-label={AVATAR_COLOUR_NAMES[i]}
-                  aria-pressed={cfg.background === c}
-                  onClick={() => set('background', c)}
-                  className={`aspect-square rounded-lg transition ${
-                    cfg.background === c ? 'ring-2 ring-offset-2 ring-gray-900 scale-105' : 'ring-1 ring-black/10'
-                  }`}
-                  style={{ background: c }}
-                />
-              ))}
-            </div>
+            <ColourCard colours={AVATAR_BACKGROUNDS} names={AVATAR_COLOUR_NAMES}
+              value={cfg.background} onChange={(c) => set('background', c)} />
             <p className="text-xs text-gray-500 mt-2">
               {AVATAR_COLOUR_NAMES[myIndex] ? TITLE(AVATAR_COLOUR_NAMES[myIndex]) : 'Custom'}
             </p>
