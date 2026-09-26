@@ -280,6 +280,23 @@ export function inkFromIndex(index: number): AvatarInk {
   return { strong: withLightness(base, 0.52), soft: withLightness(base, 0.70) }
 }
 
+/**
+ * The GROUND a character avatar is drawn on, for a palette index that has already been decided.
+ *
+ * ⭐⭐ The avatar's background IS the member's colour — migration 146 exists because "a colour you
+ * were handed is not an identity", and the background is what a Showdown duel glows with. So it
+ * is NOT stored in `users.avatar_build`; it is derived from `avatar_colour` here, and one column
+ * remains the single source of that fact.
+ *
+ * ⚠ INDEX-SHAPED for the same reason as `inkFromIndex` directly above: a duel has already
+ * resolved both sides through `duelColourIndices`, which may move one of them, and there is no
+ * user id left to ask. A `(userId, chosen)` signature could not express the shifted case at all.
+ * Ordinary callers pass `avatarIndexFor(userId, chosen)`; duel callers pass the resolved index.
+ */
+export function avatarBackgroundFor(index: number): string {
+  return AVATAR_BACKGROUNDS[index]
+}
+
 // ---------------------------------------------------------------------------------------
 // TWO SIDES OF A DUEL
 // ---------------------------------------------------------------------------------------
