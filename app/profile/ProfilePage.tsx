@@ -266,8 +266,9 @@ export default function ProfilePage({
 
       {/* ⭐ The avatar card, in place of the gradient hero band it replaced. Ryan asked for the
           avatar and editing it to be "more of a focus", and a 96px circle in the slot the
-          initials had always used was not that. The card owns the identity block (name and
-          handle) because they belong with the face; the numbers stay below as their own row. */}
+          initials had always used was not that — then for the rest of the header to be condensed
+          INTO it, because a centred figure on a very wide banner wastes the space either side
+          while the name and the stat tiles stack up underneath. It owns all three now. */}
       <AvatarCard
         userId={profile.user_id}
         avatarColour={profile.avatar_colour}
@@ -276,24 +277,8 @@ export default function ProfilePage({
         username={profile.username}
         memberSince={formatMemberSince(profile.created_at)}
         initials={getInitials(profile.full_name, profile.username)}
+        stats={heroStats}
       />
-
-      {/* ⚠ House tokens, not the glass treatment these tiles used to carry. `bg-white/10` and
-          `text-white` only worked because they sat on a saturated gradient; on the page ground
-          they would be an invisible smear in light mode. */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-4 sm:mt-6">
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {heroStats.map((s) => (
-            <div
-              key={s.label}
-              className="bg-surface border border-silver/50 rounded-card px-3 py-2.5 sm:py-3 text-center"
-            >
-              <p className="t-num text-lg sm:text-2xl text-ink">{formatNumber(s.value)}</p>
-              <p className="text-[10px] sm:text-xs text-muted">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex flex-col md:flex-row gap-6">
