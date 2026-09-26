@@ -260,6 +260,18 @@ function AssetCards({
  * ⭐ Ryan, 2026-09-26. Headwear has no art yet and is deliberately still listed — an empty
  * step says "this is coming" where a missing one says nothing.
  */
+// ⚠⚠ THE GLYPHS ARE PROVISIONAL. Ryan, 2026-09-26: "I'm still not sold on them but we will go
+// with them for now." They are placeholders that happen to be shipping, not a decision — swap
+// them freely, and do not cite this array as precedent.
+//
+// The reason they are weak is structural rather than a matter of taste: Hugeicons has no beard,
+// razor or moustache glyph anywhere in its 5,442, so `Facial hair` is stuck with a grooming
+// METAPHOR (a barber chair) instead of the thing itself. `HatGlasses` is the only glyph in the
+// set with a moustache, but it carries a hat and spectacles too, which collide with the two
+// steps either side of it — three tiles in a row that all read as headwear.
+//
+// ⭐ The real fix, when it matters: draw the seven from the avatar art we already own. Every
+// step's subject exists as a composed asset, so the icon for `Facial hair` could BE a beard.
 const STEPS = [
   { key: 'skin', label: 'Skin', icon: ContrastIcon },
   { key: 'eyes', label: 'Eyes', icon: ViewIcon },
