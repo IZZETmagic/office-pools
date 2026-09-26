@@ -692,14 +692,16 @@ function SelectorMock({ assets, cfg, set }: {
         )}
 
         {step === 'hair' && (
-          <Section title="Hair">
-            <div className="mb-5">
+          <>
+            <Section title="Hair colour">
               <ColourCard colours={PALETTE.hair} value={cfg.hairColour}
                 onChange={(c) => set('hairColour', c)} />
-            </div>
-            <AssetCards options={[null, ...Object.keys(assets.hair)]} value={cfg.hair}
-              onChange={(v) => set('hair', v)} render={headPreview} />
-          </Section>
+            </Section>
+            <Section title="Hair">
+              <AssetCards options={[null, ...Object.keys(assets.hair)]} value={cfg.hair}
+                onChange={(v) => set('hair', v)} render={headPreview} />
+            </Section>
+          </>
         )}
 
         {step === 'eyewear' && (
