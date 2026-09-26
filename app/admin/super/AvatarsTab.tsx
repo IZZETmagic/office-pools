@@ -291,17 +291,29 @@ const HEAD_CANVAS = /<path[^>]*fill="rgb\(255,0,255\)"[^>]*\/?>/
  * ⚠ Every card is the same square whatever the asset does, so the grid does not reflow between
  * a buzz cut and floor-length hair.
  */
+/**
+ * ⚠⚠ A FIXED TILE THAT WRAPS, NOT A FIXED COLUMN COUNT THAT SHRINKS. `repeat(N, 1fr)` divides
+ * whatever width it is given, so the same control was 104px on a desktop panel and FORTY-NINE
+ * at 375px — a head at 49px is a smudge, and it sat next to colour swatches that held 72px
+ * because they had already been fixed. Ryan, 2026-09-26: "they should remain the same size but
+ * just wrap... the smaller the screen the smaller the amount in a row and more rows".
+ *
+ * ⭐ `auto-fill` at a fixed width is the whole rule: the tile never changes and the COLUMN
+ * COUNT falls out of the space. It is the same rule ColourCard uses, at a larger size because
+ * a hairstyle needs more room to read than a flat colour does.
+ */
+const ASSET_TILE = 104
+
 function AssetCards({
-  options, value, onChange, render, columns = 4,
+  options, value, onChange, render,
 }: {
   options: (string | null)[]
   value: string | null
   onChange: (v: string | null) => void
   render: (key: string | null) => string
-  columns?: number
 }) {
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, ${ASSET_TILE}px)` }}>
       {options.map((o) => {
         const selected = o === value
         return (
@@ -642,7 +654,7 @@ function SelectorMock({ assets, cfg, set }: {
             </div>
             <div className="text-[11px] font-medium text-gray-500 mb-2">Expression</div>
             <AssetCards options={Object.keys(assets.expressions)} value={cfg.expression ?? null}
-              onChange={(v) => set('expression', v)} render={expressionPreview} columns={6} />
+              onChange={(v) => set('expression', v)} render={expressionPreview} />
             {/* ⚠ Said rather than left to look broken: these two are drawn with the eyes
                 CLOSED, so the colour above cannot show in them. */}
             <p className="text-[11px] text-gray-500 mt-3">
@@ -659,7 +671,7 @@ function SelectorMock({ assets, cfg, set }: {
                 onChange={(c) => set('hairColour', c)} />
             </div>
             <AssetCards options={[null, ...Object.keys(assets.hair)]} value={cfg.hair}
-              onChange={(v) => set('hair', v)} render={headPreview} columns={5} />
+              onChange={(v) => set('hair', v)} render={headPreview} />
           </Section>
         )}
 
@@ -672,7 +684,7 @@ function SelectorMock({ assets, cfg, set }: {
               </div>
               <AssetCards options={[null, ...Object.keys(assets.glasses ?? {})]}
                 value={cfg.glasses ?? null} onChange={(v) => set('glasses', v)}
-                render={glassesPreview} columns={6} />
+                render={glassesPreview} />
             </Section>
 
             {/* ⭐ Ryan, 2026-09-26: gold and silver as two rows, both shown. One click picks the
@@ -687,7 +699,6 @@ function SelectorMock({ assets, cfg, set }: {
                     value={cfg.earrings && cfg.metalColour === m.colour ? cfg.earrings : null}
                     onChange={(v) => { set('earrings', v); if (v) set('metalColour', m.colour) }}
                     render={(k) => earringPreview(k, m.colour)}
-                    columns={6}
                   />
                 </div>
               ))}
@@ -722,7 +733,7 @@ function SelectorMock({ assets, cfg, set }: {
             </p>
             <AssetCards options={[null, ...Object.keys(assets.facialhair)]}
               value={cfg.facialHair} onChange={(v) => set('facialHair', v)}
-              render={facialHairPreview} columns={6} />
+              render={facialHairPreview} />
           </Section>
         )}
 
