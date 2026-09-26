@@ -154,6 +154,9 @@ const TITLE = (s: string) =>
  * the failure this layout fixes. The tile's border and ground are independent of the colour it
  * holds, so selection reads the same on #FFE0C4 and on #4A2C14.
  */
+const COLOUR_MIN = 64
+const COLOUR_MAX = 88
+
 function ColourCard({
   colours, value, onChange, names,
 }: {
@@ -170,7 +173,7 @@ function ColourCard({
     // makes one component work for a 6-colour palette and a 22-colour one.
     <div
       className="grid gap-2.5"
-      style={{ gridTemplateColumns: 'repeat(auto-fill, 72px)' }}
+      style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${COLOUR_MIN}px, 1fr))` }}
     >
       {colours.map((c, i) => (
         <button
@@ -185,7 +188,8 @@ function ColourCard({
           // chip 12, inset 6) and a tile IS a control. `border-primary-600` is SportPool blue
           // (#3B6EFF) and `bg-primary-100` its visible tint — `primary-50` is #F7F9FF and reads
           // as white on a white panel, which is how the tab strip's active pill went unnoticed.
-          className={`aspect-square rounded-control border-2 grid place-items-center transition ${
+          style={{ maxWidth: COLOUR_MAX }}
+          className={`aspect-square w-full justify-self-center rounded-control border-2 grid place-items-center transition ${
             value === c
               ? 'border-primary-600 bg-primary-100'
               : 'border-gray-200 bg-white hover:border-gray-300'
@@ -298,11 +302,22 @@ const HEAD_CANVAS = /<path[^>]*fill="rgb\(255,0,255\)"[^>]*\/?>/
  * because they had already been fixed. Ryan, 2026-09-26: "they should remain the same size but
  * just wrap... the smaller the screen the smaller the amount in a row and more rows".
  *
- * ⭐ `auto-fill` at a fixed width is the whole rule: the tile never changes and the COLUMN
- * COUNT falls out of the space. It is the same rule ColourCard uses, at a larger size because
- * a hairstyle needs more room to read than a flat colour does.
+ * ⭐⭐ `auto-fill` with a MINIMUM, not a fixed width. A fixed width fits as many as will go and
+ * then leaves the remainder as dead space at the end of every row — at some widths a very
+ * visible band. Ryan, 2026-09-26: "a little bit of flex so that on awkward screen sizes there
+ * isn't a massive gap on either side... as many in a row as possible, still with breathing
+ * room." So the MIN decides how many fit and the leftover is shared back out as growth.
+ *
+ * ⚠ `1fr` only ever GROWS, so the max has to be capped on the item itself — a one-column
+ * layout would otherwise hand a single tile the whole panel. Hence maxWidth + justify-self.
+ * The pair is the real specification: never below MIN, never above MAX, count derived.
+ *
+ * ⚠ MIN is 96 and not the old fixed 104 ON PURPOSE. 104 was what desktop happened to show, and
+ * holding it as a floor costs a whole column at some widths; 96 lets one more fit and the
+ * shared leftover brings them back to ~106, so desktop keeps the size it had.
  */
-const ASSET_TILE = 104
+const ASSET_MIN = 96
+const ASSET_MAX = 132
 
 function AssetCards({
   options, value, onChange, render,
@@ -313,7 +328,7 @@ function AssetCards({
   render: (key: string | null) => string
 }) {
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, ${ASSET_TILE}px)` }}>
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${ASSET_MIN}px, 1fr))` }}>
       {options.map((o) => {
         const selected = o === value
         return (
@@ -322,7 +337,8 @@ function AssetCards({
             type="button"
             onClick={() => onChange(o)}
             aria-pressed={selected}
-            className="group text-left"
+            className="group text-left justify-self-center w-full"
+            style={{ maxWidth: ASSET_MAX }}
           >
             {/* ⭐ THE SAME TILE AS A COLOUR SWATCH — a bordered card with its subject inset,
                 SportPool blue on its tint when chosen. An asset and a colour are the same kind
