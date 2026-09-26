@@ -204,6 +204,31 @@ def d_of(p: str) -> str:
     return re.search(r'd="([^"]*)"', p).group(1)
 
 
+def back_curtain(hair, chin: float):
+    """Close the gap between the two falls, from the chin down to the lowest hair there is.
+
+    ⭐ Ryan, 2026-09-25: "the hair in the back should come down to the bottom level of the
+    lowest hair point". Hair behind a head hangs as far as the hair beside it — the fill was
+    stopping where the NECK stopped, leaving the back short while the curls carried on another
+    300 units. Scanline the hair between the chin and its own deepest point and span each row
+    from its leftmost edge to its rightmost, which fills the middle and changes nothing at the
+    sides.
+
+    ⚠ Rows are stepped, so the result is a staircase; `simplify` afterwards is what makes it a
+    curve again.
+    """
+    x0, y0, x1, y1 = hair.bounds
+    rows, STEP = [], 6.0
+    y = max(chin, y0)
+    while y < y1:
+        band = hair.intersection(Polygon([(x0 - 1, y), (x1 + 1, y), (x1 + 1, y + STEP), (x0 - 1, y + STEP)]))
+        if not band.is_empty:
+            bx0, _, bx1, _ = band.bounds
+            rows.append(Polygon([(bx0, y), (bx1, y), (bx1, y + STEP), (bx0, y + STEP)]))
+        y += STEP
+    return unary_union(rows).buffer(0) if rows else None
+
+
 def hem(ref_png: str, x0: float, x1: float):
     """How far down the locked hair reaches in a band of columns, in viewBox units.
 
@@ -451,6 +476,20 @@ def main():
             whole_hair = unary_union([g for g in tone.values() if g is not None]).buffer(0)
             tone[HAIR_SHADE] = dark.intersection(whole_hair).buffer(0)
             tone[HAIR_BASE] = whole_hair.difference(dark).buffer(0)
+
+    # ⭐ the back curtain — see back_curtain()
+    if keep:
+        back = back_curtain(unary_union(keep).buffer(0), skull.bounds[3])
+        if back is not None and not back.is_empty:
+            darker = HAIR_SHADE if tone[HAIR_SHADE] is not None else HAIR_BASE
+            tone[darker] = back if tone[darker] is None else tone[darker].union(back).buffer(0)
+            other = HAIR_BASE if darker == HAIR_SHADE else HAIR_SHADE
+            if tone[other] is not None:
+                tone[other] = tone[other].difference(back).buffer(0)
+            # ⚠ `kept` is the mask each tone is clipped to and it was built above, before this
+            # existed — without widening it the curtain is computed and then clipped straight
+            # back off, which is exactly what happened the first time.
+            kept = back if kept is None else unary_union([kept, back]).buffer(0)
 
     out = []
     for token in (HAIR_BASE, HAIR_SHADE):
