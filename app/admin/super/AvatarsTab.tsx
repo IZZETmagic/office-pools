@@ -254,23 +254,21 @@ const HEAD_CROP = '-63 -55 2166 2166'
  * whole job — so the one preview helper in this file is the one thing that cannot show a
  * garment. A shirt card is the avatar composed whole and cropped to the shoulders instead.
  *
- * ⚠⚠ THE TILE IS 2:1, NOT SQUARE, AND THAT IS THE FIX. Ryan: "it looks so square and some
- * stuff is cut off." Both complaints were the same cause — a square tile cannot hold a WIDE,
- * SHALLOW subject. The shirt spans x343..1698 and hair goes wider still (f13-longstraight
- * reaches x216..1828), so any square crop big enough to show the garment was narrower than the
- * head, and the cheeks ran into the tile edges.
+ * ⚠⚠ THE TILE STAYS SQUARE AND THE CONTENT ZOOMS OUT — Ryan, after a 2:1 tile: "it should be
+ * the same size as the other asset squares. I guess maybe we just need to shrink down what's
+ * inside the square." He is right, and a measurement settles where "out" lands.
  *
- * ⭐ FULL CANVAS WIDTH, so nothing can be clipped at the sides — only the height is chosen.
- * Rendered 4:3, 3:2, 16:9 and 2:1 against a short style and a long one:
+ * Rasterising all 25 styles and taking the extent of every non-background pixel, the visible
+ * content spans x61..1987 by y0..2038. So the tightest square that clips NOTHING is, to within
+ * a few units, the canvas itself. There is no clever tighter crop to find — the hair reaches
+ * the edges, and any square small enough to make the garment bigger cuts a style somewhere.
  *
- *   4:3, 3:2   still head-heavy, and the cut lands IN the hair — dark bars in the top corners
- *   16:9       good, but a quiff still catches a sliver of hair at the very top
- *   2:1        the cut falls at y1024, BELOW the hair on short styles, so no bars at all  <-
- *
- * The bottom half of the canvas, exactly. Long styles keep their curtains either side of the
- * shoulders, which is the context that makes the garment readable.
+ * ⚠ THE EARLIER CROPS ALL FAILED FOR ONE REASON: a square big enough to show the garment was
+ * NARROWER THAN THE HEAD (the shirt is x343..1698, hair goes wider still), so the cheeks ran
+ * into the tile edges. Making the tile 2:1 fixed the clipping and broke the grid instead. The
+ * fix was never the frame; it was the zoom.
  */
-const BODY_CROP = '0 1024 2048 1024'
+const BODY_CROP = '0 0 2048 2048'
 /**
  * ⭐⭐ A SENTINEL, NOT A GROUND COLOUR. Previews used to be composed on `#EEF1F8` with the card
  * painted to match, so a head sat on a filled square. Ryan's reference insets the head on a
@@ -325,7 +323,6 @@ const ASSET_MAX = 132
 
 function AssetCards({
   options, value, onChange, render, label,
-  aspect = 'aspect-square', min = ASSET_MIN, max = ASSET_MAX,
 }: {
   options: (string | null)[]
   value: string | null
@@ -333,15 +330,9 @@ function AssetCards({
   render: (key: string | null) => string
   /** For a composite key that cannot name itself — see the earrings grid. */
   label?: (key: string | null) => string
-  /** ⚠ A head is square; a shirt is not. See BODY_CROP. */
-  aspect?: string
-  /** ⚠ MIN AND MAX MOVE TOGETHER WITH THE RATIO. A wide tile needs a wider ceiling or it caps
-   *  early and the row goes back to being mostly gap — the thing the flex rule exists to stop. */
-  min?: number
-  max?: number
 }) {
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${min}px, 1fr))` }}>
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${ASSET_MIN}px, 1fr))` }}>
       {options.map((o) => {
         const selected = o === value
         return (
@@ -357,7 +348,7 @@ function AssetCards({
             aria-label={label ? label(o) : o === null ? 'None' : TITLE(o)}
             title={label ? label(o) : o === null ? 'None' : TITLE(o)}
             className="group text-left justify-self-center w-full"
-            style={{ maxWidth: max }}
+            style={{ maxWidth: ASSET_MAX }}
           >
             {/* ⭐ THE SAME TILE AS A COLOUR SWATCH — a bordered card with its subject inset,
                 SportPool blue on its tint when chosen. An asset and a colour are the same kind
@@ -365,7 +356,7 @@ function AssetCards({
                 states, not a border that becomes a ring: a 1px border swapping for a 2px ring
                 shifts the tile by a pixel on selection and the whole grid twitches. */}
             <div
-              className={`${aspect} rounded-control border-2 p-1.5 transition ${
+              className={`aspect-square rounded-control border-2 p-1.5 transition ${
                 selected
                   ? 'border-primary-600 bg-primary-100'
                   : 'border-gray-200 bg-white group-hover:border-gray-300'
@@ -833,11 +824,9 @@ function SelectorMock({ assets, cfg, set }: {
             {/* ⚠ "None" is the BASE SHIRT, not the absence of clothing — the avatar always
                 wears something — so the first tile is a real choice and shows what it gives. */}
             <Section title="Shirt">
-              {/* ⚠ Wider MIN as well as a wider ratio: at 96px a 2:1 tile is 48px tall and
-                  fairisle stops being distinguishable from waffle. */}
               <AssetCards options={[null, ...Object.keys(assets.garments ?? {})]}
                 value={cfg.garment ?? null} onChange={(v) => set('garment', v)}
-                render={garmentPreview} aspect="aspect-[2/1]" min={150} max={280} />
+                render={garmentPreview} />
             </Section>
           </>
         )}
