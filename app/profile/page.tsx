@@ -17,7 +17,7 @@ export default async function ProfileServerPage() {
   // Get user profile from users table
   const { data: profile } = await supabase
     .from('users')
-    .select('user_id, username, full_name, email, created_at, is_super_admin, avatar_colour')
+    .select('user_id, username, full_name, email, created_at, is_super_admin, avatar_colour, avatar_build')
     .eq('auth_user_id', user.id)
     .single()
 
@@ -351,6 +351,11 @@ export default async function ProfileServerPage() {
         username: profile.username,
         full_name: profile.full_name,
         avatar_colour: profile.avatar_colour ?? null,
+        // ⚠ The prop is rebuilt FIELD BY FIELD, so widening the .select() above is not enough —
+        // a column added there and forgotten here simply never arrives, and because the type is
+        // optional the compiler says nothing. That is this repo's documented hole: there are no
+        // generated database types and createAdminClient() returns `any`.
+        avatar_build: profile.avatar_build ?? null,
         email: user.email ?? '',
         created_at: profile.created_at,
         is_super_admin: profile.is_super_admin ?? false,

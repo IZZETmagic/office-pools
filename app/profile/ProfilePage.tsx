@@ -17,6 +17,7 @@ import { BADGE_DEFINITIONS, type BadgeDefinition } from '@/app/pools/[pool_id]/a
 import { BP_BADGE_DEFINITIONS } from '@/app/pools/[pool_id]/analytics/bracketPickerXpSystem'
 import { BadgeMedallion } from '@/components/BadgeMedallion'
 import { Button } from '@/components/ui/Button'
+import { MemberAvatar } from '@/components/avatar/MemberAvatar'
 import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { Alert } from '@/components/ui/Alert'
@@ -39,6 +40,9 @@ type Profile = {
   is_super_admin?: boolean
   /** The palette colour they picked. Null means they have not, so the hash decides. */
   avatar_colour: string | null
+  /** ⚠ `unknown`, not a typed config — it comes from a jsonb column with a shape-only CHECK and
+   *  may have been written by a DIFFERENT DEPLOY. `readStoredAvatarBuild` is what makes it safe. */
+  avatar_build?: unknown
 }
 
 type PoolMembership = {
@@ -246,9 +250,20 @@ export default function ProfilePage({
       <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-success-600 dark:from-[oklch(0.22_0.08_262)] dark:via-[oklch(0.18_0.06_264)] dark:to-[oklch(0.20_0.05_165)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-10">
           <div className="flex items-center gap-3 sm:gap-5">
-            <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-pill bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
-              {getInitials(profile.full_name, profile.username)}
-            </div>
+            {/* ⭐ The member's own face, if they have built one. Falls back to the initials
+                block that has always been here — a member who has not opened the builder sees
+                exactly what they saw before, and pays nothing for the art fetch. */}
+            <MemberAvatar
+              userId={profile.user_id}
+              avatarColour={profile.avatar_colour}
+              avatarBuild={profile.avatar_build}
+              className="w-12 h-12 sm:w-24 sm:h-24 rounded-pill border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0"
+              fallback={
+                <div className="w-12 h-12 sm:w-24 sm:h-24 rounded-pill bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center text-white text-base sm:text-3xl font-bold border-2 border-white/30 dark:border-white/15 shadow-lg shrink-0">
+                  {getInitials(profile.full_name, profile.username)}
+                </div>
+              }
+            />
             <div className="min-w-0">
               <h2 className="text-lg sm:text-3xl font-bold text-white truncate">
                 {profile.full_name || profile.username}
@@ -1841,6 +1856,24 @@ function AccountSettingsTab({
                 )
               })}
             </div>
+          </FormField>
+
+          {/* ⭐ The way in to the builder. A LINK, not another editor: the builder is its own
+              route so it gets code splitting and the full width it was drawn for — this tab is
+              already 2,153 lines in one un-split client module.
+              ⚠ The colour above and the builder's seventh step write the SAME column, so they
+              are two views of one fact and cannot disagree. */}
+          <FormField label="Your avatar">
+            <Link
+              href="/profile/avatar"
+              className="inline-flex items-center gap-2 text-[13px] font-semibold text-primary-600 hover:underline underline-offset-2"
+            >
+              Build your avatar
+              <span aria-hidden="true">→</span>
+            </Link>
+            <p className="text-xs text-muted mt-1">
+              Beta — choose your skin tone, hair, glasses and more.
+            </p>
           </FormField>
 
           <FormField label="Email" helperText={profileEditing ? "Email changes require verification" : undefined}>

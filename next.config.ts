@@ -37,6 +37,24 @@ const nextConfig: NextConfig = {
         source: "/((?!tv/).*)",
         headers: frameProtectionHeaders,
       },
+      {
+        // ⭐ The avatar art — 564 KB raw, ~169 KB gzipped — fetched by every member who opens
+        // the avatar builder. Next serves public/ with `max-age=0`, which means a revalidation
+        // round trip on every page view. That was fine while one admin was the only reader.
+        //
+        // ⚠⚠ IT CANNOT BE `immutable` ON THIS PATH. The url never changes when the bundle is
+        // rebuilt, so `immutable` would serve the old art until the cache expired — a member
+        // would see a hairstyle that no longer exists and no deploy could fix it. A
+        // content-hashed filename is the durable answer; until then this is the honest
+        // setting: at worst one round trip an hour, and never stale for long.
+        source: "/avatar-assets.json",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=3600, stale-while-revalidate=86400",
+          },
+        ],
+      },
     ];
   },
 };

@@ -1510,7 +1510,7 @@ describe('eyewear', () => {
         return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
       }
       const [gx0, gy0, gx1, gy1] = bbox(glint[1])
-      const [fx0, fy0, fx1, fy1] = bbox(frame[1])
+      const [fx0, fy0, fx1, fy1] = bbox(frame![1])
       expect(gx0 >= fx0 && gy0 >= fy0 && gx1 <= fx1 && gy1 <= fy1,
         `${g}: the highlight escapes the frame's own bounds`).toBe(true)
     }
