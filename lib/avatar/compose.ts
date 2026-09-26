@@ -521,7 +521,14 @@ export function headOnly(
       swap(behind, T.hairBase, rgbStr(hairRgb)),
       T.hairShade, darken(hairRgb, 0.78),
     )
-    svgIn = svgIn.replace(canvas, canvas + painted)
+    // ⚠⚠ `data-front` PAINTS LAST. The dark wedge that breaks `f12-halfup`'s strands lives in
+    // the LOCKED asset, so nothing painted under the hair can reach it. The fill is
+    // display-only, so a marked piece of it sits OVER the locked art here — a real avatar
+    // never sees this function and cannot change.
+    const marked = [...painted.matchAll(/<path[^>]*data-front="1"[^>]*\/?>/g)].map((m) => m[0])
+    const under = marked.reduce((acc, p) => acc.replace(p, ''), painted)
+    svgIn = svgIn.replace(canvas, canvas + under)
+    if (marked.length) svgIn = svgIn.replace('</svg>', marked.join('') + '</svg>')
   }
 
   // ⚠⚠ THE ART SUPERSEDES THE MASK. Opening the mask gives back whatever the asset holds
