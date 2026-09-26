@@ -339,11 +339,17 @@ function AssetCards({
       {options.map((o) => {
         const selected = o === value
         return (
+          /* ⚠ THE NAME MOVES TO THE BUTTON, it is not lost. The caption under each tile is
+             gone — Ryan, 2026-09-26 — but a picker whose options carry no accessible name is
+             unusable with a screen reader, and "Bushybeard" vs "Fullbeard" is worth a hover
+             even when the picture carries the choice. */
           <button
             key={o ?? 'none'}
             type="button"
             onClick={() => onChange(o)}
             aria-pressed={selected}
+            aria-label={o === null ? 'None' : TITLE(o)}
+            title={o === null ? 'None' : TITLE(o)}
             className="group text-left justify-self-center w-full"
             style={{ maxWidth: ASSET_MAX }}
           >
@@ -360,11 +366,6 @@ function AssetCards({
               } [&>svg]:w-full [&>svg]:h-full [&>svg]:block`}
               dangerouslySetInnerHTML={{ __html: render(o) }}
             />
-            <div className={`mt-1.5 text-center text-[11px] truncate ${
-              selected ? 'text-ink font-semibold' : 'text-muted'
-            }`}>
-              {o === null ? 'None' : TITLE(o)}
-            </div>
           </button>
         )
       })}
