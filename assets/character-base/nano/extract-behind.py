@@ -320,7 +320,11 @@ def main():
     # has to hide inside the body — and clipping it there was what cut Ryan's locs, which hang
     # past the shirt dome: a hairline along the dome edge and a loc sliced in two. The bound is
     # simply "below the shoulder line", where the bite always is.
-    region = Polygon([(0, SHOULDER_LINE), (2048, SHOULDER_LINE), (2048, 2048), (0, 2048)])
+    # ⚠ NO BOUND AT ALL. A shoulder-line bound was the last thing cutting Ryan's locs: they are
+    # WIDER than ours above it too, at x120..480 and x1740..2020, and the fill could not reach.
+    # It is painted under the head, the ears and the locked hair, so it can only ever show where
+    # the locked art is absent — which is the definition of the missing piece.
+    region = Polygon([(0, 0), (2048, 0), (2048, 2048), (0, 2048)])
     # ⚠⚠ ...but the GATE still judges against the body silhouette. With the half-plane the
     # pieces merge into one mass that touches the locked hair somewhere, so `f01-bob` and
     # `f03-bobswept` went from 130u/153u adrift to -35u and their detached blobs sailed through.
@@ -392,29 +396,34 @@ def main():
 
     # ⚠ the SHOULDER half, gated on the seam — PIECE BY PIECE, see seam_gap()
     whole = unary_union([g for g in tone.values() if g is not None]).buffer(0)
-    gated = whole.intersection(gate_region).buffer(0) if not whole.is_empty else whole
-    pieces = ([] if gated.is_empty else
-              [gated] if gated.geom_type == "Polygon" else list(gated.geoms))
     whole = whole.intersection(region).buffer(0) if not whole.is_empty else whole
     out_parts = ([] if whole.is_empty else
                  [whole] if whole.geom_type == "Polygon" else list(whole.geoms))
+    # ⭐ `--neck-only`: take the neck half and nothing else. `f01-bob` and `f03-bobswept` have
+    # no art from Ryan, and the fill I GENERATED for them was judged wrong — it redraws the
+    # style longer. With no region bound the seam gate can no longer separate it (bobswept went
+    # from 52u adrift to -21u once its piece could merge with the rest of the hair), so the
+    # decision is stated here instead of being inferred from a measurement that no longer
+    # carries it.
+    if "--neck-only" in sys.argv:
+        out_parts = []
+
     keep, report = [], []
-    for piece in pieces:
-        if piece.area < 400:
+    for part in out_parts:
+        if part.area < 400:
             continue
-        gap = seam_gap(ref_png, piece)
+        # ⚠⚠ MEASURE THE PART THAT OVERLAPS THE BODY, but keep the WHOLE part. The body is
+        # where the pieces separate cleanly — measured on the half-plane they merge into one
+        # mass that touches the locked hair somewhere, and `f01-bob`/`f03-bobswept` went from
+        # 130u/153u adrift to -35u. But a piece that never reaches the body is not therefore
+        # junk: Ryan's locs hang right outside the shirt, at x60..240 and x1740..2020, and
+        # gating on the body alone deleted them. Those are judged on themselves.
+        probe = part.intersection(gate_region).buffer(0)
+        gap = seam_gap(ref_png, probe if not probe.is_empty else part)
         ok = gap is not None and gap <= SEAM_MAX
         report.append(f"{'-' if gap is None else f'{gap:.0f}'}{'' if ok else '✗'}")
         if ok:
-            # the OUTPUT part this gated piece belongs to — the half-plane version of it
-            keep += [q for q in out_parts if q.intersects(piece)]
-    attached = bool(keep)
-    # ⚠⚠ THE PIECES ARE A MASK, NOT THE OUTPUT. Gating works on the union of both tones,
-    # because a light mass and the dark mass inside it are one connected piece of hair — but
-    # the union is all this ever emitted for a while, so every shoulder half shipped as flat
-    # HAIR_BASE. Ryan, 2026-09-25: "the colours and feeling of depth is not" right. The two
-    # tones ARE the depth: the curtain that hangs in front is the light one, the mass behind
-    # the neck is the dark one, and with both collapsed the hair reads as a slab.
+            keep.append(part)
     kept = unary_union(keep).buffer(0) if keep else None
     print(f"   seam [{' '.join(report) or '-'}]  {len(keep)}/{len(report)} kept", end="")
 

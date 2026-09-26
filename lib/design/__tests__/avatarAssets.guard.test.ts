@@ -764,20 +764,21 @@ describe('long hair works on every neck width', () => {
     }
   })
 
-  it('the behind layer stays below the shoulder line and carries only tokens', () => {
+  it('the behind layer carries only tokens, sealed', () => {
     const A = JSON.parse(
       readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
     ) as AvatarAssets
     const behind = A.hairBehind ?? {}
     expect(Object.keys(behind).length).toBeLessThanOrEqual(9)
-    const SHOULDER = 1519
     for (const [style, markup] of Object.entries(behind)) {
       expect(A.hair[style], `${style} has a behind layer but no hair asset`).toBeTruthy()
       const ds = [...markup.matchAll(/ d="([^"]*)"/g)].map((m) => m[1])
       expect(ds.length, `${style}'s behind layer has no paths`).toBeGreaterThan(0)
-      const ys = ds.flatMap((d) => (d.match(/-?\d+\.?\d*/g) || []).map(Number))
-        .filter((_, i) => i % 2 === 1)
-      expect(Math.min(...ys), `${style} reaches above the shoulder line`).toBeGreaterThanOrEqual(SHOULDER)
+      // ⚠ NO GEOMETRIC BOUND ANY MORE, on purpose. A shoulder-line bound was the last thing
+      // cutting Ryan's locs — they are wider than ours above it too — and the layer is painted
+      // under the head, the ears and the locked hair, so it can only show where the locked art
+      // is absent. The guarantee that matters is the byte-identity test above, not where this
+      // geometry sits.
       // ⚠ Tokens, not literals. headOnly recolours this markup by token AFTER phase 2 has
       // finished with the document, so an un-tokenised fill ships a grey-taupe patch on every
       // hair colour — which is exactly what happened the first time it was painted there.
