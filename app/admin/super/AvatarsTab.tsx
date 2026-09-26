@@ -327,12 +327,14 @@ const ASSET_MIN = 96
 const ASSET_MAX = 132
 
 function AssetCards({
-  options, value, onChange, render,
+  options, value, onChange, render, label,
 }: {
   options: (string | null)[]
   value: string | null
   onChange: (v: string | null) => void
   render: (key: string | null) => string
+  /** For a composite key that cannot name itself — see the earrings grid. */
+  label?: (key: string | null) => string
 }) {
   return (
     <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${ASSET_MIN}px, 1fr))` }}>
@@ -348,8 +350,8 @@ function AssetCards({
             type="button"
             onClick={() => onChange(o)}
             aria-pressed={selected}
-            aria-label={o === null ? 'None' : TITLE(o)}
-            title={o === null ? 'None' : TITLE(o)}
+            aria-label={label ? label(o) : o === null ? 'None' : TITLE(o)}
+            title={label ? label(o) : o === null ? 'None' : TITLE(o)}
             className="group text-left justify-self-center w-full"
             style={{ maxWidth: ASSET_MAX }}
           >
@@ -720,22 +722,35 @@ function SelectorMock({ assets, cfg, set }: {
             {/* ⭐ Ryan, 2026-09-26: gold and silver as two rows, both shown. One click picks the
                 earring AND its metal — a metal swatch plus a text list cannot show the member
                 what they are choosing, which is the whole point of the pair. */}
+            {/* ⭐ ONE GRID, EACH STYLE'S METALS SIDE BY SIDE — Ryan, 2026-09-26. Two labelled
+                rows made the metal look like a section and the style like a choice within it,
+                when the real choice is the PAIR. Now stud-gold sits next to stud-silver and you
+                pick along the row.
+                ⚠ "None" is a TILE, not a text link underneath. It was there before as the
+                words "No earrings" and Ryan could not find it — an option that looks nothing
+                like the options is not an option. */}
             <Section title="Earrings">
-              {METALS.map((m) => (
-                <div key={m.colour} className="mb-4 last:mb-0">
-                  <div className="text-[11px] font-medium text-gray-500 mb-2">{m.label}</div>
-                  <AssetCards
-                    options={Object.keys(assets.earrings ?? {})}
-                    value={cfg.earrings && cfg.metalColour === m.colour ? cfg.earrings : null}
-                    onChange={(v) => { set('earrings', v); if (v) set('metalColour', m.colour) }}
-                    render={(k) => earringPreview(k, m.colour)}
-                  />
-                </div>
-              ))}
-              <button type="button" onClick={() => set('earrings', null)}
-                className="text-[12px] text-gray-500 underline underline-offset-2 hover:text-gray-900">
-                No earrings
-              </button>
+              <AssetCards
+                options={[null, ...Object.keys(assets.earrings ?? {})
+                  .flatMap((e) => METALS.map((m) => `${e}|${m.colour}`))]}
+                value={cfg.earrings ? `${cfg.earrings}|${cfg.metalColour ?? METALS[0].colour}` : null}
+                onChange={(v) => {
+                  if (!v) return set('earrings', null)
+                  const [style, metal] = v.split('|')
+                  set('earrings', style)
+                  set('metalColour', metal)
+                }}
+                render={(k) => {
+                  if (!k) return earringPreview(null, METALS[0].colour)
+                  const [style, metal] = k.split('|')
+                  return earringPreview(style, metal)
+                }}
+                label={(k) => {
+                  if (!k) return 'None'
+                  const [style, metal] = k.split('|')
+                  return `${TITLE(style)} — ${METALS.find((m) => m.colour === metal)?.label ?? metal}`
+                }}
+              />
             </Section>
           </>
         )}
