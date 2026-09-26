@@ -669,22 +669,26 @@ function SelectorMock({ assets, cfg, set }: {
           </Section>
         )}
 
+        {/* ⚠ TWO SECTIONS, not one with a small grey sub-label. The step holds two separate
+            choices, so each gets a real heading — Ryan, 2026-09-26. The same shape as Glasses
+            and Earrings in the eyewear step. */}
         {step === 'eyes' && (
-          <Section title="Eyes">
-            <div className="mb-5">
+          <>
+            <Section title="Eye colour">
               <ColourCard colours={PALETTE.eye} value={cfg.eyeColour}
                 onChange={(c) => set('eyeColour', c)} />
-            </div>
-            <div className="text-[11px] font-medium text-gray-500 mb-2">Expression</div>
-            <AssetCards options={Object.keys(assets.expressions)} value={cfg.expression ?? null}
-              onChange={(v) => set('expression', v)} render={expressionPreview} />
-            {/* ⚠ Said rather than left to look broken: these two are drawn with the eyes
-                CLOSED, so the colour above cannot show in them. */}
-            <p className="text-[11px] text-gray-500 mt-3">
-              Cheeky and Laughing are drawn with the eyes closed, so the eye colour does not
-              show on them.
-            </p>
-          </Section>
+            </Section>
+            <Section title="Expression">
+              <AssetCards options={Object.keys(assets.expressions)} value={cfg.expression ?? null}
+                onChange={(v) => set('expression', v)} render={expressionPreview} />
+              {/* ⚠ Said rather than left to look broken: these two are drawn with the eyes
+                  CLOSED, so the colour above cannot show in them. */}
+              <p className="text-[11px] text-gray-500 mt-3">
+                Cheeky and Laughing are drawn with the eyes closed, so the eye colour does not
+                show on them.
+              </p>
+            </Section>
+          </>
         )}
 
         {step === 'hair' && (
