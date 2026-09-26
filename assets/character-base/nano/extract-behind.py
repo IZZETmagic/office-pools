@@ -71,7 +71,8 @@ import re
 import sys
 from pathlib import Path
 
-from shapely.geometry import Polygon
+from shapely import affinity
+from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
 HERE = Path(__file__).parent
@@ -232,7 +233,21 @@ def back_curtain(hair, chin: float):
                 rows.append(Polygon([(a, y), (b, y), (b, y + STEP), (a, y + STEP)]))
                 break
         y += STEP
-    return unary_union(rows).buffer(0) if rows else None
+    if not rows:
+        return None
+    g = unary_union(rows).buffer(0)
+    # ⚠ ROUND THE BOTTOM. The scanline stops at the last row where both falls still have hair,
+    # which is a flat horizontal cut. `f09-midwavy`'s curls happen to sit over theirs;
+    # `f04-longcurly`'s do not, and it read as a slab with a ruled edge. Clipping to an ellipse
+    # that spans the curtain and reaches its deepest point turns that cut into a curve without
+    # touching where the curtain meets the hair at the sides.
+    x0, y0, x1, y1 = g.bounds
+    cx, rx = (x0 + x1) / 2, (x1 - x0) / 2 * 1.08
+    ry = y1 - chin
+    dome = Point(cx, chin).buffer(1.0, quad_segs=96)
+    dome = affinity.scale(dome, rx, ry, origin=(cx, chin))
+    return g.intersection(dome.union(
+        Polygon([(x0 - 1, y0 - 1), (x1 + 1, y0 - 1), (x1 + 1, chin), (x0 - 1, chin)]))).buffer(0)
 
 
 def hem(ref_png: str, x0: float, x1: float):
