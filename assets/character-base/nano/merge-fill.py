@@ -46,6 +46,11 @@ def to_d(g, nd=1):
     gs=[g] if g.geom_type=="Polygon" else list(g.geoms)
     return " ".join(ring(q.exterior.coords)+"".join(" "+ring(h.coords) for h in q.interiors) for q in gs)
 
+# How far the fill is grown so it runs UNDER the locked hair instead of meeting it edge to edge.
+# 4 units is just under two pixels on a 900px card — enough to cover an anti-aliased seam,
+# small enough that nothing reaches past the hair it hides beneath.
+BLEED = 4.0
+
 style = sys.argv[1]
 locked = open(f'{HERE}/hair/assets/hair-{style}.asset.svg').read()
 fill = open(f'{HERE}/hair/behind/{style}.svg').read()
@@ -69,13 +74,23 @@ for p in re.findall(r'<path[^>]*/?>', fill):
     tok = re.search(r'fill="([^"]*)"', p).group(1)
     g = flatten(re.search(r' d="([^"]*)"', p).group(1))
     if g is None or g.is_empty: continue
-    g = g.difference(cut).buffer(0).simplify(0.6)
+    # ⚠⚠ BLEED FIRST, THEN CUT THE FACE. The fill and the locked hair are separate paths that
+    # ABUT, and two anti-aliased edges on one line leak a light hairline — the display-only
+    # version hid it behind a stroke of width 8, which a hair asset may not carry (the guard
+    # holds every hair path at 1.2). So the overlap goes into the GEOMETRY: grow the fill so it
+    # runs under the hair, and only then subtract the head and ears, or the bleed creeps over
+    # the face.
+    g = g.buffer(BLEED).difference(cut).buffer(0).simplify(0.6)
     if g.geom_type == "MultiPolygon":
         g = unary_union([q for q in g.geoms if q.area > 400])
     if g.is_empty: continue
     out.append(f'<path transform="translate(0,0)" fill="{tok}" stroke="{tok}" '
                f'stroke-width="1.2" d="{to_d(g)}"/>')
 
-i = locked.index('>', locked.index('<g mask=')) + 1
+# ⚠⚠ INSIDE the masked group, or AFTER it? The mask is what cuts the ears, so a fill placed
+# after it would cover them — unless the ears have already been subtracted, which they have,
+# a few lines up. And a mask that subtracts the BODY (f09-midwavy, m15-locs) would cut the
+# fill's curls to ribbons if the fill sat inside it. So: after the group, always.
+i = locked.rindex('</g>') + len('</g>')
 open(sys.argv[2], 'w').write(locked[:i] + "".join(out) + locked[i:])
 print(f'   merged {len(out)} fill paths, head and ears cut out')

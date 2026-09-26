@@ -282,6 +282,7 @@ function SelectorMock({ assets, cfg, set }: {
         { skin: cfg.skin, shirt: cfg.shirt, hair: cfg.hairColour },
         (hair && assets.hairBackfill?.[hair]) || '',
         (hair && assets.hairBehind?.[hair]) || '',
+        hair === 'f13-longstraight',   // see headOnly's openMask
       ).replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
       cache.set(key, svg)
       return svg
