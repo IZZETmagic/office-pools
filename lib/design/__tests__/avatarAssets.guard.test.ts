@@ -855,48 +855,51 @@ describe('long hair works on every neck width', () => {
     expect(seen, 'no full-canvas path was examined — the check proved nothing').toBeGreaterThan(0)
   })
 
-  // ⭐⭐ EARRING PAINT ORDER IS PER-STYLE, and the rule it replaced was justified by a claim
-  // that measurement disproved: "only f09-midwavy and m15-locs reach the ear, and both cover it
-  // COMPLETELY, so an earring is fully visible or fully hidden, never half-eaten". With a big
-  // hoop, ELEVEN of twenty-five hide some of it, and the half-eaten cases are exactly the ones
-  // that claim ruled out — f12-halfup 48.5% visible, f02-ponytail 52.7%, f11-lowbun 86.7%.
-  // Hair TIED BACK clips an earring instead of covering it. Those styles now paint it late.
-  it('paints the earring after the hair only for a tied-back style', () => {
+  // ⭐⭐ AN EARRING IS BIGGER THAN AN EAR — the whole bug in one sentence, and two rules missed
+  // it. The original painted the earring WITH the ear, defended by "only f09-midwavy and
+  // m15-locs reach the ear". That premise is TRUE: measured, those two show 0% of the ear and
+  // every other style 96-100%. The INFERENCE was wrong, because a hoop hangs BELOW the ear into
+  // hair that passes behind the ear and in front of the drop.
+  //
+  // ⚠ The first fix was wrong too: it split on "tied back", and Ryan found the hole at once —
+  // f04-longcurly leaves 96.6% of the ear showing and still clipped the earring to 5%. "Tied
+  // back" was a proxy; the real question is whether the EAR IS VISIBLE, and that is measurable.
+  it('paints the earring after the hair unless the style hides the ear', () => {
     const A = JSON.parse(
       readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
     ) as AvatarAssets
-    const front = A.hairEarringsFront ?? []
-    expect(front.length, 'no style is listed as tied back').toBeGreaterThan(0)
-    for (const h of front) {
-      expect(A.hair[h], `${h} is listed as tied back but has no hair asset`).toBeTruthy()
+    const covers = A.hairCoversEar ?? []
+    expect(covers.length, 'no style is listed as covering the ear').toBeGreaterThan(0)
+    expect(covers.length, 'this is an EXCEPTION list — if it grows past a handful, the rule is '
+      + 'wrong again').toBeLessThan(6)
+    for (const h of covers) {
+      expect(A.hair[h], `${h} is listed as covering the ear but has no hair asset`).toBeTruthy()
     }
 
-    // a long path is unique enough to locate a layer in the composed document, and `d`
-    // survives phase 2 untouched — only fills and ids are rewritten.
+    // a long path is unique enough to locate a layer, and `d` survives phase 2 untouched
     const longestD = (markup: string) =>
       [...markup.matchAll(/ d="([^"]+)"/g)].map((m) => m[1]).sort((a, b) => b.length - a.length)[0]
     const earD = longestD(A.earrings!['e04-bighoop'])
     expect(earD, 'the earring fixture should have a path').toBeTruthy()
 
-    // ⚠ Both branches, in one test. Asserting only the tied-back case would pass just as well
-    // if earrings had simply been moved to the front for EVERY style, which is the change Ryan
-    // explicitly did not want.
-    for (const style of [front[0], 'f09-midwavy'] as const) {
+    // ⚠ BOTH branches, and the exposed one is a LONG style on purpose. Testing only a tied-back
+    // style would have passed under the rule Ryan caught — f04-longcurly is exactly the case
+    // that was broken, so it is the case that guards it.
+    for (const style of ['f04-longcurly', covers[0]] as const) {
       const svg = composeAvatar(
         { ...cfg, base: 'base-neck-100', hair: style, facialHair: null, earrings: 'e04-bighoop' },
         A,
       )
-      const hairD = longestD(A.hair[style])
-      const atHair = svg.indexOf(hairD)
+      const atHair = svg.indexOf(longestD(A.hair[style]))
       const atEar = svg.indexOf(earD)
       expect(atHair, `${style}: hair not found in the document`).toBeGreaterThan(-1)
       expect(atEar, `${style}: earring not found in the document`).toBeGreaterThan(-1)
-      if (front.includes(style)) {
-        expect(atEar, `${style} is tied back, so the earring must paint AFTER the hair`)
-          .toBeGreaterThan(atHair)
-      } else {
-        expect(atEar, `${style} covers the ear, so the earring must paint BEFORE the hair`)
+      if (covers.includes(style)) {
+        expect(atEar, `${style} hides the ear, so the earring must paint BEFORE the hair`)
           .toBeLessThan(atHair)
+      } else {
+        expect(atEar, `${style} leaves the ear visible, so the earring must paint AFTER the hair`)
+          .toBeGreaterThan(atHair)
       }
     }
   })
@@ -1590,19 +1593,33 @@ describe('earrings', () => {
     expect(svg, 'the metal takes the input verbatim').toContain('fill="rgb(212,160,23)"')
   })
 
-  it('is painted WITH the ear, so anything covering the ear covers it too', () => {
+  it('is hidden by a style that covers the ear, and only by such a style', () => {
     // ⭐⭐ Ryan, 2026-09-22: "if you can't see the ears then there should be no seen earring."
-    // The first version put earrings in FRONT of the hair so a chosen accessory was never
-    // invisible. Wrong instinct: hair over an ear hides an earring in life, and one floating on
-    // top of the hair reads as a mistake. Painting it with the ear makes that automatic — no
-    // per-style flag and no coverage test to keep in step.
-    const svg = composeAvatar({ ...base6, hair: 'h', glasses: 'g' }, fixture6())
-    const ear = svg.indexOf(`d="${D_EAR}"`)
-    const hair = svg.indexOf(`d="${D_HAIR6}"`)
-    const frame = svg.indexOf(`d="${D_FRAME6}"`)
-    expect(ear, 'the earring is painted before the hair, so the hair can cover it')
-      .toBeLessThan(hair)
-    expect(ear, 'and before the eyewear').toBeLessThan(frame)
+    // That requirement is unchanged and still the point of this test. What changed, 2026-09-26,
+    // is the MECHANISM. It used to be satisfied by painting the earring WITH the ear, which
+    // needed no per-style flag — but it hid the earring whenever hair sat in front of the
+    // DROP, not just when hair covered the ear, and an earring is bigger than an ear. On
+    // f04-longcurly the ear stayed 96.6% visible while the hoop was clipped to 5%.
+    //
+    // So the rule is now declared where it can be measured: hair/manifest.json coversEar.
+    const covering = { ...fixture6(), hairCoversEar: ['h'] }
+    const hidden = composeAvatar({ ...base6, hair: 'h', glasses: 'g' }, covering)
+    expect(hidden.indexOf(`d="${D_EAR}"`),
+      'a style that covers the ear paints the earring BEFORE the hair, so the hair hides it')
+      .toBeLessThan(hidden.indexOf(`d="${D_HAIR6}"`))
+
+    // ⚠ The other half, which is the half that was broken: a style that leaves the ear showing
+    // must NOT clip the earring.
+    const exposed = composeAvatar({ ...base6, hair: 'h', glasses: 'g' }, fixture6())
+    expect(exposed.indexOf(`d="${D_EAR}"`),
+      'a style that leaves the ear visible paints the earring AFTER the hair')
+      .toBeGreaterThan(exposed.indexOf(`d="${D_HAIR6}"`))
+
+    // eyewear stays in front of the earring in both, being the frontmost accessory
+    for (const svg of [hidden, exposed]) {
+      expect(svg.indexOf(`d="${D_EAR}"`), 'eyewear is painted after the earring')
+        .toBeLessThan(svg.indexOf(`d="${D_FRAME6}"`))
+    }
   })
 
   it('really is hidden by the two styles that cover the ear', () => {

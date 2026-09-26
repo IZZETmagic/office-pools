@@ -27,11 +27,9 @@
     "m14-longhair": true,
     "m15-locs": true
   },
-  "_comment_earrings": "earringsInFront: these styles are tied BACK, so the ear is exposed and an earring must paint after the hair. Every other style either does not reach the ear (14 of 25 are already unaffected) or genuinely falls over it, where hiding the earring is correct. MEASURED, not assumed \u2014 with a big hoop, f12-halfup showed 48.5% and f02-ponytail 52.7%, which is the tell: hair that is tied back half-eats an earring rather than covering it. Ryan chose these four, 2026-09-26.",
-  "earringsInFront": [
-    "f02-ponytail",
-    "f06-spacebuns",
-    "f11-lowbun",
-    "f12-halfup"
+  "_comment_earrings": "coversEar: the ONLY styles that hide the ear, so an earring behind them is correct. Everything else paints the earring AFTER the hair. MEASURED, not assumed: rendering a big hoop under all 25 and counting ear pixels, these two sit at 0% ear visible and every other style at 96-100%. The first cut of this flag listed four TIED-BACK styles instead, which was the wrong axis \u2014 f04-longcurly leaves 96.6% of the ear showing and still clipped the earring to 5%, because an earring hangs BELOW the ear and the hair passes behind the ear but in front of the drop. Ryan spotted it.",
+  "coversEar": [
+    "f09-midwavy",
+    "m15-locs"
   ]
 }

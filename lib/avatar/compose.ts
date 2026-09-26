@@ -55,12 +55,11 @@ export type AvatarAssets = {
   hairBehind?: Record<string, string>
   hairManifest?: Record<string, boolean>
   /**
-   * ⭐ Styles that are tied BACK, so the ear is exposed and an earring paints AFTER the hair.
-   * ⚠ A LIST, not a per-style boolean, because the default is "behave normally" — a map would
-   * have 25 entries, 21 of them false, and a new style silently missing from it is a bug where
-   * a new style silently missing from a list is simply the common case.
+   * ⭐ The only styles that HIDE the ear. Every other style paints the earring after the hair.
+   * ⚠ An EXCEPTION list, and a short one — two of twenty-five — so a new style defaults to the
+   * common case. The inverse list was tried first and was both longer and wrong.
    */
-  hairEarringsFront?: string[]
+  hairCoversEar?: string[]
   facialhair: Record<string, string>
   /** Eyewear — glasses and sunglasses. Optional so older fixtures still compose. */
   glasses?: Record<string, string>
@@ -846,21 +845,23 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   const earringsLayer = cfg.earrings ? A.earrings?.[cfg.earrings] ?? '' : ''
 
   /**
-   * ⭐⭐ AN EARRING IS PAINTED WITH THE EAR — EXCEPT WHERE THE HAIR IS TIED BACK.
+   * ⭐⭐ AN EARRING PAINTS OVER THE HAIR UNLESS THE HAIR HIDES THE EAR — and that is only two
+   * styles out of twenty-five.
    *
-   * ⚠⚠ THE OLD RULE WAS JUSTIFIED BY A CLAIM THAT IS SIMPLY FALSE. It read: "only f09-midwavy
-   * and m15-locs reach the ear, and both cover it COMPLETELY, so an earring is fully visible or
-   * fully hidden, never half-eaten" — and therefore no flag was needed. Measured with a big
-   * hoop, ELEVEN of the twenty-five hide some of it, and the half-eaten cases are exactly the
-   * ones that claim said could not exist: f12-halfup 48.5% visible, f02-ponytail 52.7%,
-   * f11-lowbun 86.7%. Hair that is TIED BACK clips an earring instead of covering it, which is
-   * the tell, and it reads as a paint-order fault because the ear is plainly exposed.
+   * ⚠⚠ AN EARRING IS BIGGER THAN AN EAR. That one sentence is the whole bug, and both earlier
+   * rules missed it. The original code painted the earring WITH the ear, reasoning that hair
+   * over an ear hides an earring in life; its comment defended this by saying only f09-midwavy
+   * and m15-locs reach the ear. That premise is TRUE — measured, those two sit at 0% ear
+   * visible and every other style at 96-100%. The INFERENCE was wrong: a hoop hangs BELOW the
+   * ear, into hair that passes behind the ear and in front of the drop.
    *
-   * ⭐ Ryan, 2026-09-26, chose the four tied-back styles only. The six that genuinely fall over
-   * the ear keep hiding it, because there a hoop floating on top would be the wrong picture —
-   * and so do the bobs. Facial hair is unchanged, also his call.
+   * ⚠ My first fix was wrong too, in a more flattering way. I split on "tied back", which
+   * predicted four styles, and Ryan found the hole immediately: f04-longcurly leaves 96.6% of
+   * the ear showing and still clipped the earring to 5%. "Tied back" was a proxy for the real
+   * question, and the real question is measurable — IS THE EAR VISIBLE. If it is, the earring
+   * must be too, whatever the hair is doing elsewhere.
    */
-  const earringsFront = !!(cfg.hair && A.hairEarringsFront?.includes(cfg.hair))
+  const earringsFront = !(cfg.hair && A.hairCoversEar?.includes(cfg.hair))
 
   // ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset rather
   // than declared in a manifest: a style is tinted exactly when it paints a lens, and a clear

@@ -322,10 +322,9 @@ function compose(c){
   // ⭐ the two derived body layers — see compose.ts's THE STACK for why they exist.
   // ⚠ per style — one shared fill leaves a hair-coloured rim on the shoulders.
   const backfill = (c.hair && (ASSETS.hairManifest||{})[c.hair]) ? ((ASSETS.hairBackfill||{})[c.hair] || '') : '';
-  // ⭐ Tied-back styles expose the ear, so the earring paints AFTER the hair — see
-  // hair/manifest.json. ⚠ The old rule claimed an earring was never "half-eaten"; measured, it
-  // is exactly the tied-back styles that half-eat one (f12-halfup 48.5% of a hoop visible).
-  const earringsFront = !!(c.hair && (ASSETS.hairEarringsFront||[]).includes(c.hair));
+  // ⭐ The earring paints AFTER the hair unless the style HIDES THE EAR — only two do.
+  // ⚠ An earring hangs BELOW the ear, so hair passing behind the ear still clips the drop.
+  const earringsFront = !(c.hair && (ASSETS.hairCoversEar||[]).includes(c.hair));
   // ⚠ painted when there is hair OR a garment; with a garment it is the only body layer.
   // ⭐⭐ two fragments: the shirt half (which a garment substitutes for) and the neck half,
   // which is what CUTS THE COLLAR — a traced garment is solid, the per-base neck cuts it.

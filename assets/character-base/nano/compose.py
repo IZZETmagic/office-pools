@@ -517,15 +517,19 @@ def main() -> None:
             front_body = shirt_part + inner(f"{here}/bases/front-neck-{nb.group(1)}.svg")
         except Exception:
             front_body = ""
-    earrings_front = False
+    # ⚠ True when there is NO hair at all: nothing can occlude, and it keeps the two
+    # implementations agreeing on a config compose.ts reaches with `hair: null`.
+    earrings_front = True
     if arg("--hair"):
         style = arg("--hair").rsplit("/", 1)[-1].replace(".asset.svg", "").replace("hair-", "")
         try:
             manifest = json.load(open(f"{here}/hair/manifest.json"))
             if manifest["backfill"].get(style):
                 backfill = inner(f"{here}/hair/backfill/{style}.svg")
-            # ⭐ Tied-back styles expose the ear, so the earring paints after the hair.
-            earrings_front = style in manifest.get("earringsInFront", [])
+            # ⭐ The earring paints after the hair unless the style HIDES THE EAR — only
+            # f09-midwavy and m15-locs do. An earring hangs BELOW the ear, so hair passing
+            # behind the ear still clips the drop.
+            earrings_front = style not in manifest.get("coversEar", [])
         except Exception:
             backfill = ""
         if fh and (head_d := find_head(svg)):
@@ -541,16 +545,13 @@ def main() -> None:
         # anything that could cover it. Ryan, 2026-09-22: "if you can't see the ears then there
         # should be no seen earring." It first went in front of the hair on the reasoning that
         # a chosen accessory should never be invisible; that is the wrong instinct, because
-        # hair over an ear hides an earring in life and one floating on top reads as a mistake.
-        #
-        # ⚠⚠ THE CLAIM THAT USED TO JUSTIFY HAVING NO FLAG HERE WAS FALSE. It said only
-        # f09-midwavy and m15-locs reach the ear and both cover it COMPLETELY, "so an earring is
-        # fully visible or fully hidden, never half-eaten". Measured with a big hoop, ELEVEN of
-        # the twenty-five hide some of it, and the half-eaten cases are precisely the ones that
-        # claim ruled out: f12-halfup 48.5% visible, f02-ponytail 52.7%, f11-lowbun 86.7%.
-        # Hair that is TIED BACK clips an earring rather than covering it, and it reads as a
-        # fault because the ear is plainly exposed. Those four now paint the earring LATE —
-        # hair/manifest.json, earringsInFront. Ryan, 2026-09-26.
+        # ⚠⚠ AN EARRING IS BIGGER THAN AN EAR — the whole bug in one sentence. This used to
+        # paint the earring WITH the ear, defended by the claim that only f09-midwavy and
+        # m15-locs reach the ear. That premise is TRUE (measured: those two at 0% ear visible,
+        # every other style at 96-100%). The inference was not: a hoop hangs BELOW the ear,
+        # into hair that passes behind the ear and in front of the drop. So the earring paints
+        # late for everything except the two styles that actually hide the ear —
+        # hair/manifest.json, coversEar. Ryan, 2026-09-26.
         + ("" if earrings_front else part("--earrings"))
         # ⭐ A TINTED LENS HIDES THE EYES ENTIRELY — see EYE_TOKENS. Inferred from the asset
         # rather than declared in a manifest: a style is tinted exactly when it paints a lens,
