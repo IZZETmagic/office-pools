@@ -226,32 +226,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-/** A row of choices as words, the way a member would read them. */
-function Options({
-  options, value, onChange, allowNone = true,
-}: { options: string[]; value: string | null; onChange: (v: string | null) => void; allowNone?: boolean }) {
-  const all: (string | null)[] = allowNone ? [null, ...options] : options
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {all.map((o) => (
-        <button
-          key={o ?? 'none'}
-          type="button"
-          onClick={() => onChange(o)}
-          aria-pressed={o === value}
-          className={`px-3 py-1.5 rounded-chip text-[13px] border transition ${
-            o === value
-              ? 'bg-gray-900 text-white border-gray-900'
-              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
-          }`}
-        >
-          {o === null ? 'None' : TITLE(o)}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 /**
  * The frame a head preview is cropped to, and the ground it sits on.
  *
@@ -274,6 +248,25 @@ function Options({
  * overflow invisible. Change one and change the other.
  */
 const HEAD_CROP = '-63 -55 2166 2166'
+
+/**
+ * ⭐⭐ A SHIRT CANNOT USE THE HEAD CARD. `headOnly` finds the body and DELETES it — that is its
+ * whole job — so the one preview helper in this file is the one thing that cannot show a
+ * garment. A shirt card is the avatar composed whole and cropped to the shoulders instead.
+ *
+ * ⚠ WHERE THE CUT FALLS IS THE WHOLE DESIGN, and it is not a matter of taste — the shirt is
+ * WIDE and SHALLOW (x343..1698 by y1519..2048), so a square tile cannot hold all of it without
+ * dragging in most of the head. Compared four:
+ *
+ *   299 598 1450  the head is sliced through the HAIR and reads as cut off
+ *   450 900 1148  cuts below the eyes — a deliberate torso shot, garment is the subject  <-
+ *   550 1100 948  garment biggest, but the shoulders lose their edges and the chin dominates
+ *   0 0 2048      nothing sliced, garment too small to tell fairisle from waffle
+ *
+ * The chosen cut passes through the lower face, which reads as intentional where a cut through
+ * hair reads as a mistake, and still leaves a chin and neck above the collar for scale.
+ */
+const BODY_CROP = '450 900 1148 1148'
 /**
  * ⭐⭐ A SENTINEL, NOT A GROUND COLOUR. Previews used to be composed on `#EEF1F8` with the card
  * painted to match, so a head sat on a filled square. Ryan's reference insets the head on a
@@ -400,7 +393,7 @@ const STEPS = [
   { key: 'hair', label: 'Hair', icon: ScissorIcon },
   { key: 'eyewear', label: 'Glasses & earrings', icon: GlassesIcon },
   { key: 'facialhair', label: 'Facial hair', icon: ChairBarberIcon },
-  { key: 'wearables', label: 'Headwear & top', icon: HatIcon },
+  { key: 'wearables', label: 'Headwear & shirt', icon: HatIcon },
   { key: 'colour', label: 'Your colour', icon: ColorsIcon },
 ] as const
 type Step = (typeof STEPS)[number]['key']
@@ -526,6 +519,33 @@ function SelectorMock({ assets, cfg, set }: {
     return (k: string | null, metal: string) =>
       cardFor(cache, `${k ?? '—'}|${metal}`,
         { ...base, hair: cfg.hair, earrings: k, metalColour: metal })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets, cfg.base, cfg.skin, cfg.shirt, cfg.hairColour, cfg.hair])
+
+  /**
+   * ⚠ NO `headOnly` AND NO `cardFor` — both exist to remove the body, which is the thing a
+   * shirt IS. This composes the whole avatar and crops. It still strips the sentinel canvas so
+   * the tile's own background shows through, exactly as the head cards do.
+   *
+   * ⚠ `mark: false` on purpose: the SP chest mark sits ON the garment, and these cards are for
+   * choosing the garment. Left in, every tile would carry the same badge.
+   */
+  const garmentPreview = useMemo(() => {
+    const cache = new Map<string, string>()
+    const base = {
+      ...cfg, expression: null, eyes: null, mouth: null, facialHair: null,
+      glasses: null, earrings: null, mark: false, background: HEAD_GROUND,
+    } as const
+    return (k: string | null) => {
+      const key = k ?? '—'
+      const hit = cache.get(key)
+      if (hit) return hit
+      const svg = composeAvatar({ ...base, garment: k }, assets)
+        .replace(/viewBox="[^"]*"/, `viewBox="${BODY_CROP}"`)
+        .replace(HEAD_CANVAS, '')
+      cache.set(key, svg)
+      return svg
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets, cfg.base, cfg.skin, cfg.shirt, cfg.hairColour, cfg.hair])
 
@@ -799,9 +819,12 @@ function SelectorMock({ assets, cfg, set }: {
                 </p>
               </div>
             </Section>
-            <Section title="Top">
-              <Options options={Object.keys(assets.garments ?? {})} value={cfg.garment ?? null}
-                onChange={(v) => set('garment', v)} />
+            {/* ⚠ "None" is the BASE SHIRT, not the absence of clothing — the avatar always
+                wears something — so the first tile is a real choice and shows what it gives. */}
+            <Section title="Shirt">
+              <AssetCards options={[null, ...Object.keys(assets.garments ?? {})]}
+                value={cfg.garment ?? null} onChange={(v) => set('garment', v)}
+                render={garmentPreview} />
             </Section>
           </>
         )}
