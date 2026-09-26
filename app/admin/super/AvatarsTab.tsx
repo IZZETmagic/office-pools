@@ -180,14 +180,23 @@ function ColourCard({
           title={names?.[i] ?? c}
           aria-label={names?.[i] ?? c}
           aria-pressed={value === c}
-          className={`aspect-square rounded-2xl border-2 grid place-items-center transition ${
+          // ⚠ TOKENS, NOT TAILWIND'S OWN SCALE. `rounded-2xl`/`rounded-xl` are arbitrary here;
+          // the house radii are named for what they wrap (app/globals.css: card 24, control 18,
+          // chip 12, inset 6) and a tile IS a control. `border-primary-600` is SportPool blue
+          // (#3B6EFF) and `bg-primary-100` its visible tint — `primary-50` is #F7F9FF and reads
+          // as white on a white panel, which is how the tab strip's active pill went unnoticed.
+          className={`aspect-square rounded-control border-2 grid place-items-center transition ${
             value === c
-              ? 'border-sky-300 bg-sky-50'
+              ? 'border-primary-600 bg-primary-100'
               : 'border-gray-200 bg-white hover:border-gray-300'
           }`}
         >
+          {/* ⚠ `rounded-chip`, not `rounded-inset`. Concentric rounding says a nested shape
+              should be the parent's radius MINUS the padding, which lands near inset's 6px and
+              looks mean at this size — and Ryan's reference shows a generously rounded chip.
+              The picture is the spec. */}
           <span
-            className="block w-[58%] h-[58%] rounded-xl ring-1 ring-black/5"
+            className="block w-[58%] h-[58%] rounded-chip ring-1 ring-black/5"
             style={{ background: c }}
           />
         </button>
@@ -219,7 +228,7 @@ function Options({
           type="button"
           onClick={() => onChange(o)}
           aria-pressed={o === value}
-          className={`px-3 py-1.5 rounded-lg text-[13px] border transition ${
+          className={`px-3 py-1.5 rounded-chip text-[13px] border transition ${
             o === value
               ? 'bg-gray-900 text-white border-gray-900'
               : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
@@ -573,15 +582,20 @@ function SelectorMock({ assets, cfg, set }: {
               data-tab-key={s.key}
               onClick={() => setStep(s.key)}
               aria-pressed={step === s.key}
-              className={`shrink-0 w-[88px] px-2 py-3 rounded-2xl text-[11px] font-bold leading-tight text-center transition-colors ${
+              className={`shrink-0 w-[88px] px-2 py-3 rounded-control text-[11px] font-bold leading-tight text-center transition-colors ${
                 // ⚠ NOT `sp-bg-mist`, which the admin sidebar uses for its active tab: mist is
                 // #EEF1F8 and this strip sits on a WHITE card, so the active pill was all but
                 // invisible — I had to read the computed style to tell which one was selected.
                 // The panel's own active treatment (bg-gray-900) would be a second black strip
                 // directly under the view switcher, so: the primary tint, which reads at a
                 // glance and stays lighter than the switcher above it.
+                // ⭐ THE SAME SELECTED TREATMENT AS A COLOUR TILE — SportPool blue on its tint.
+                // Two controls on one panel that both mean "this one is chosen" should not say
+                // it two different ways. `sp-bg-primary-light` is primary-50 (#F7F9FF), which
+                // is white enough on a white card that I had to read the computed style to see
+                // which tab was active.
                 step === s.key
-                  ? 'sp-bg-primary-light sp-text-primary'
+                  ? 'bg-primary-100 text-primary-600'
                   : 'sp-text-slate sp-hover-snow'
               }`}
             >
@@ -675,7 +689,7 @@ function SelectorMock({ assets, cfg, set }: {
                 tile in a colour grid promises to be a colour. */}
             <button type="button" onClick={() => set('facialHairColour', undefined)}
               aria-pressed={!cfg.facialHairColour}
-              className={`mb-2.5 px-3 py-1.5 rounded-lg text-[12px] border transition ${
+              className={`mb-2.5 px-3 py-1.5 rounded-chip text-[12px] border transition ${
                 !cfg.facialHairColour
                   ? 'bg-gray-900 text-white border-gray-900'
                   : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}>
@@ -697,7 +711,7 @@ function SelectorMock({ assets, cfg, set }: {
         {step === 'wearables' && (
           <>
             <Section title="Headwear">
-              <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center">
+              <div className="rounded-card border border-dashed border-gray-200 px-4 py-8 text-center">
                 <p className="text-[13px] font-semibold text-gray-500">Nothing here yet</p>
                 <p className="text-[11px] text-gray-400 mt-1">
                   No headwear has been drawn. The slot is deliberately not wired into the
