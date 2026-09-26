@@ -706,11 +706,11 @@ function SelectorMock({ assets, cfg, set }: {
 
         {step === 'eyewear' && (
           <>
+            <Section title="Glasses colour">
+              <ColourCard colours={PALETTE.frame} value={cfg.frameColour ?? PALETTE.frame[0]}
+                onChange={(c) => set('frameColour', c)} />
+            </Section>
             <Section title="Glasses">
-              <div className="mb-5">
-                <ColourCard colours={PALETTE.frame} value={cfg.frameColour ?? PALETTE.frame[0]}
-                  onChange={(c) => set('frameColour', c)} />
-              </div>
               <AssetCards options={[null, ...Object.keys(assets.glasses ?? {})]}
                 value={cfg.glasses ?? null} onChange={(v) => set('glasses', v)}
                 render={glassesPreview} />
@@ -740,30 +740,36 @@ function SelectorMock({ assets, cfg, set }: {
         )}
 
         {step === 'facialhair' && (
-          <Section title="Facial hair">
-            {/* ⚠ "Match hair" is UNSET, not a colour — it is the only path that LIFTS the
-                beard away from the head hair, and it must never be stored as a copy of the hair
-                colour. It sits above the grid rather than posing as a tile in it, because a
-                tile in a colour grid promises to be a colour. */}
-            <button type="button" onClick={() => set('facialHairColour', undefined)}
-              aria-pressed={!cfg.facialHairColour}
-              className={`mb-2.5 px-3 py-1.5 rounded-chip text-[12px] border transition ${
-                !cfg.facialHairColour
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}>
-              Match hair
-            </button>
-            <ColourCard colours={PALETTE.hair} value={cfg.facialHairColour}
-              onChange={(c) => set('facialHairColour', c)} />
-            {/* ⚠ Said plainly rather than shipping a control that looks broken: stubble is a
-                SHADOW on the skin, so the whole palette compresses into a few units on it. */}
-            <p className="text-[11px] text-gray-500 mb-5">
-              Stubble is drawn as a shadow on the skin, so colour barely changes it.
-            </p>
-            <AssetCards options={[null, ...Object.keys(assets.facialhair)]}
-              value={cfg.facialHair} onChange={(v) => set('facialHair', v)}
-              render={facialHairPreview} />
-          </Section>
+          <>
+            <Section title="Facial hair colour">
+              {/* ⚠ "Match hair" is UNSET, not a colour — it is the only path that LIFTS the
+                  beard away from the head hair, and it must never be stored as a copy of the
+                  hair colour. It sits above the grid rather than posing as a tile in it,
+                  because a tile in a colour grid promises to be a colour. */}
+              <button type="button" onClick={() => set('facialHairColour', undefined)}
+                aria-pressed={!cfg.facialHairColour}
+                className={`mb-2.5 px-3 py-1.5 rounded-chip text-[12px] border transition ${
+                  !cfg.facialHairColour
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}>
+                Match hair
+              </button>
+              <ColourCard colours={PALETTE.hair} value={cfg.facialHairColour}
+                onChange={(c) => set('facialHairColour', c)} />
+              {/* ⚠ Said plainly rather than shipping a control that looks broken: stubble is a
+                  SHADOW on the skin, so the whole palette compresses into a few units on it.
+                  ⚠ It stays with the COLOUR, not the styles — it is the colour control it
+                  qualifies, and splitting the section is what made that distinction visible. */}
+              <p className="text-[11px] text-gray-500 mt-3">
+                Stubble is drawn as a shadow on the skin, so colour barely changes it.
+              </p>
+            </Section>
+            <Section title="Facial hair">
+              <AssetCards options={[null, ...Object.keys(assets.facialhair)]}
+                value={cfg.facialHair} onChange={(v) => set('facialHair', v)}
+                render={facialHairPreview} />
+            </Section>
+          </>
         )}
 
         {step === 'wearables' && (
