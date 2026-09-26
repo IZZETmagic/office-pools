@@ -14,6 +14,10 @@
 // =============================================================
 
 import { useEffect, useMemo, useState } from 'react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import {
+  ChairBarberIcon, ColorsIcon, ContrastIcon, GlassesIcon, HatIcon, ScissorIcon, ViewIcon,
+} from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/Button'
 import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 import {
@@ -252,13 +256,13 @@ function AssetCards({
  * step says "this is coming" where a missing one says nothing.
  */
 const STEPS = [
-  { key: 'skin', label: 'Skin' },
-  { key: 'eyes', label: 'Eyes' },
-  { key: 'hair', label: 'Hair' },
-  { key: 'eyewear', label: 'Glasses & earrings' },
-  { key: 'facialhair', label: 'Facial hair' },
-  { key: 'wearables', label: 'Headwear & top' },
-  { key: 'colour', label: 'Your colour' },
+  { key: 'skin', label: 'Skin', icon: ContrastIcon },
+  { key: 'eyes', label: 'Eyes', icon: ViewIcon },
+  { key: 'hair', label: 'Hair', icon: ScissorIcon },
+  { key: 'eyewear', label: 'Glasses & earrings', icon: GlassesIcon },
+  { key: 'facialhair', label: 'Facial hair', icon: ChairBarberIcon },
+  { key: 'wearables', label: 'Headwear & top', icon: HatIcon },
+  { key: 'colour', label: 'Your colour', icon: ColorsIcon },
 ] as const
 type Step = (typeof STEPS)[number]['key']
 
@@ -487,15 +491,15 @@ function SelectorMock({ assets, cfg, set }: {
             ⚠ The phone gutter (`pl-4`) is INSIDE the scroller. On the wrapper it sits outside
             the scroll box, so the strip stops short of the screen at both ends and reads as
             cropped rather than scrollable. */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-6 px-6 pb-1 mb-6">
-          {STEPS.map((s, i) => (
+        <div className="flex items-stretch gap-2 overflow-x-auto scrollbar-hide -mx-6 px-6 pb-1 mb-6">
+          {STEPS.map((s) => (
             <button
               key={s.key}
               type="button"
               data-tab-key={s.key}
               onClick={() => setStep(s.key)}
               aria-pressed={step === s.key}
-              className={`shrink-0 px-3.5 py-2 rounded-pill text-[13px] font-bold whitespace-nowrap transition-colors ${
+              className={`shrink-0 w-[88px] px-2 py-3 rounded-2xl text-[11px] font-bold leading-tight text-center transition-colors ${
                 // ⚠ NOT `sp-bg-mist`, which the admin sidebar uses for its active tab: mist is
                 // #EEF1F8 and this strip sits on a WHITE card, so the active pill was all but
                 // invisible — I had to read the computed style to tell which one was selected.
@@ -507,7 +511,13 @@ function SelectorMock({ assets, cfg, set }: {
                   : 'sp-text-slate sp-hover-snow'
               }`}
             >
-              <span className="opacity-40 mr-1.5">{i + 1}</span>{s.label}
+              <HugeiconsIcon
+                icon={s.icon}
+                size={34}
+                strokeWidth={1.6}
+                className="mx-auto mb-1.5 block"
+              />
+              {s.label}
             </button>
           ))}
         </div>
