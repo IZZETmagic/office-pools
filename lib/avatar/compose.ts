@@ -527,6 +527,21 @@ export function headOnly(
   // `hair/behind` layer, so the mask is simply left shut.
   let out = svgIn
 
+  // ⚠⚠ A FULL-CANVAS PATH'S SEAL STROKE DRAWS A BOX ROUND THE CARD. An inverted trace's base
+  // path IS the 2048×2048 canvas, and hair assets carry a stroke of their own fill at width
+  // 1.2 to seal their seams — so that stroke runs along the canvas boundary. The avatar never
+  // shows it, because its viewBox is exactly 0 0 2048 2048 and the outer half falls outside;
+  // the picker crops to -63 -55 2166 2166 to fit the head, which puts the boundary INSIDE the
+  // frame, and `f09-midwavy` and `m15-locs` each drew a grey hairline rectangle around their
+  // card. Stripped here rather than in the assets: the stroke is correct art, it is this
+  // crop that reveals it, and the locked files stay untouched.
+  out = out.replace(/<path[^>]*\/?>/g, (p) => {
+    const b = box(p)
+    return b && b.x0 <= 0 && b.x1 >= 2047 && b.y0 <= 0 && b.y1 >= 2047
+      ? p.replace(/ stroke="[^"]*"/, '').replace(/ stroke-width="[^"]*"/, '')
+      : p
+  })
+
   const nose = findNose(out, shade)
   if (nose) out = out.replace(nose, '')
 

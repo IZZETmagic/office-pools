@@ -158,7 +158,7 @@ describe('avatar assets stay cross-platform', () => {
 // this project. It is in the same unverified pile as the <mask> on three hair assets.
 // =============================================================
 
-import { composeAvatar, PALETTE, type AvatarAssets } from '@/lib/avatar/compose'
+import { composeAvatar, headOnly, PALETTE, type AvatarAssets } from '@/lib/avatar/compose'
 import { AVATAR_BACKGROUNDS } from '@/lib/design/avatarGradient'
 
 const FADE_MARKER = 'rgb(126,110,150)'
@@ -762,6 +762,42 @@ describe('long hair works on every neck width', () => {
         ).toBe(composeAvatar(cfg2, without))
       }
     }
+  })
+
+  // ⚠⚠ A FULL-CANVAS PATH MUST NOT REACH THE PICKER STROKED. Hair assets carry a stroke of
+  // their own fill at width 1.2 to seal their seams, and an inverted trace's base path IS the
+  // 2048x2048 canvas — so that stroke runs along the canvas boundary. A real avatar never
+  // shows it (its viewBox is exactly the canvas, so the outer half falls outside), but the
+  // picker crops to -63 -55 2166 2166 to fit the head, which brings the boundary inside the
+  // frame: `f09-midwavy` and `m15-locs` each drew a grey hairline rectangle around their card
+  // and it went unnoticed until the whole set was laid out side by side. Ryan found it by
+  // LOOKING; none of the numeric checks were pointed at the card's edge.
+  it('headOnly strips the seal stroke from a full-canvas path', () => {
+    const A = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/avatar-assets.json'), 'utf8'),
+    ) as AvatarAssets
+    let seen = 0
+    for (const style of Object.keys(A.hair)) {
+      const card = headOnly(
+        composeAvatar({ ...cfg, base: 'base-neck-100', hair: style, facialHair: null }, A),
+        { skin: cfg.skin, shirt: cfg.shirt, hair: cfg.hairColour },
+        A.hairBackfill?.[style] || '',
+        A.hairBehind?.[style] || '',
+      )
+      for (const m of card.matchAll(/<path[^>]*\/?>/g)) {
+        const d = / d="([^"]*)"/.exec(m[0])?.[1]
+        if (!d) continue
+        const n = (d.match(/-?\d+\.?\d*/g) || []).map(Number)
+        const xs = n.filter((_, i) => i % 2 === 0)
+        const ys = n.filter((_, i) => i % 2 === 1)
+        if (!xs.length) continue
+        if (Math.min(...xs) > 0 || Math.max(...xs) < 2047) continue
+        if (Math.min(...ys) > 0 || Math.max(...ys) < 2047) continue
+        seen += 1
+        expect(m[0], `${style} ships a STROKED full-canvas path to the picker`).not.toMatch(/stroke=/)
+      }
+    }
+    expect(seen, 'no full-canvas path was examined — the check proved nothing').toBeGreaterThan(0)
   })
 
   it('the behind layer carries only tokens, sealed', () => {
