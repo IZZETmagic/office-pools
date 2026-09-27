@@ -227,6 +227,14 @@ export default function AvatarEditorScreen() {
    * ⚠ The lever for "bigger" remains the divisor below. A third of the screen is the figure; the
    * inset is added on top of it, so the band lands near 39% on a notched phone.
    */
+  /**
+   * ⚠ THREE PER ROW — Ryan: "each asset card should be big enough to able to fit three per row."
+   * Derived from the real width rather than hardcoded, so it holds from an SE to a Pro Max:
+   * the 16pt gutters either side and two 12pt gaps come out first, and the rest splits three ways.
+   * `Math.floor` because a fractional width rounds up somewhere and wraps the third tile.
+   */
+  const tileSize = Math.floor((width - 32 - 24) / 3);
+
   const avatarSize = Math.min(height / 3, width);
   const bandHeight = insets.top + avatarSize;
 
@@ -349,10 +357,11 @@ export default function AvatarEditorScreen() {
                 <Heads
                   assets={assets}
                   cfg={current}
+                  field="expression"
                   options={Object.keys(assets.expressions)}
                   value={current.expression}
                   onPick={(k) => set('expression', k)}
-                  apply={(c, k) => ({ ...c, expression: k, eyes: null, mouth: null })}
+                  tileSize={tileSize}
                 />
               </Section>
             </>
@@ -371,10 +380,11 @@ export default function AvatarEditorScreen() {
                 <Heads
                   assets={assets}
                   cfg={current}
+                  field="hair"
                   options={[null, ...Object.keys(assets.hair)]}
                   value={current.hair}
                   onPick={(k) => set('hair', k)}
-                  apply={(c, k) => ({ ...c, hair: k })}
+                  tileSize={tileSize}
                 />
               </Section>
             </>
@@ -385,10 +395,11 @@ export default function AvatarEditorScreen() {
               <Heads
                 assets={assets}
                 cfg={current}
+                field="glasses"
                 options={[null, ...Object.keys(assets.glasses ?? {})]}
                 value={current.glasses}
                 onPick={(k) => set('glasses', k)}
-                apply={(c, k) => ({ ...c, glasses: k })}
+                tileSize={tileSize}
               />
             </Section>
           )}
@@ -398,10 +409,11 @@ export default function AvatarEditorScreen() {
               <Heads
                 assets={assets}
                 cfg={current}
+                field="facialHair"
                 options={[null, ...Object.keys(assets.facialhair)]}
                 value={current.facialHair}
                 onPick={(k) => set('facialHair', k)}
-                apply={(c, k) => ({ ...c, facialHair: k })}
+                tileSize={tileSize}
               />
             </Section>
           )}
@@ -529,55 +541,89 @@ function Swatches({
 /**
  * Asset tiles: a bare head wearing only the thing being chosen.
  *
- * 🔴 THE PERFORMANCE RISK ON THIS SCREEN. Hair is 25 options, so this is 25 composed SVGs and
- * `SvgXml` re-parses its string on every render. Each tile's string is memoised on the inputs
- * that actually change it, so tapping a colour recomposes the row once rather than per frame.
- * Measure on device before putting this many SVGs anywhere else — nothing else in the app has.
+ * ⚠⚠ EVERY OTHER SLOT IS NULLED, and the first version of this got it wrong — it composed the
+ * member's FULL config per tile, so all twelve expression cards wore his sunglasses, his beard
+ * and his shirt. Ryan: "just like on web each card should JUST have the base avatar head and the
+ * asset on it." The card is the asset; anything else on it is noise competing with the choice.
+ *
+ * ⭐ BUT THE HAIR STAYS, deliberately, for every family except hair itself. The web note records
+ * why: long hair covers the ears, so an earring on `m15-locs` either floats or vanishes, and a
+ * member has to be able to SEE that before choosing. `base` keeps `cfg.hair`; the hair family
+ * simply overrides it, so one expression covers both cases.
+ *
+ * ⚠ `headOnly` is given the BACKFILL and BEHIND layers for whichever hair is drawn. Without them
+ * a long style loses the piece that sits behind the neck — the fix recorded in the fullbeard work.
+ *
+ * 🔴 25 hair tiles are 25 composed SVGs and SvgXml re-parses per render. Memoised on the narrow
+ * set that actually changes a bare head — NOT on `cfg`, which would recompose all of them on
+ * every unrelated tap.
  */
 function Heads({
   assets,
   cfg,
+  field,
   options,
   value,
   onPick,
-  apply,
+  tileSize,
 }: {
   assets: NonNullable<ReturnType<typeof useAvatarAssets>['assets']>;
   cfg: StoredAvatarBuild;
+  /** The one slot this grid varies. Setting it to `hair` makes the cards bare heads. */
+  field: 'hair' | 'expression' | 'glasses' | 'facialHair';
   options: (string | null)[];
-  /** ⚠ `undefined` too: optional slots on AvatarConfig (`glasses?`, `facialHair?`) are absent
-   *  rather than null when unset, and absence is meaningful — see `toStoredAvatarBuild`. */
   value: string | null | undefined;
   onPick: (k: string | null) => void;
-  apply: (c: StoredAvatarBuild, k: string | null) => StoredAvatarBuild;
+  tileSize: number;
 }) {
   const theme = useTheme();
 
-  const tiles = useMemo(
-    () =>
-      options.map((k) => {
-        const full = composeAvatar(
-          { ...apply(cfg, k), background: HEAD_GROUND, mark: false },
-          assets,
-        );
-        const head = headOnly(full, {
-          skin: cfg.skin,
-          shirt: cfg.shirt,
-          hair: cfg.hairColour,
-        })
-          .replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
-          .replace(HEAD_CANVAS, '');
-        return { k, head };
-      }),
-    // ⚠ Only the inputs that change a TILE. Spreading the whole config here would recompose all
-    // twenty-five on every unrelated tap.
-    [assets, options, cfg.skin, cfg.shirt, cfg.hairColour, apply, cfg],
-  );
+  const tiles = useMemo(() => {
+    const base = {
+      ...cfg,
+      expression: null,
+      eyes: null,
+      mouth: null,
+      facialHair: null,
+      glasses: null,
+      earrings: null,
+      garment: null,
+      mark: false,
+      background: HEAD_GROUND,
+    } as AvatarConfig;
+
+    return options.map((k) => {
+      // ⚠ `base` already carries cfg.hair, so this one spread covers both cases: the hair family
+      // overrides it with the option, every other family leaves it alone.
+      const full = { ...base, [field]: k } as AvatarConfig;
+      const head = headOnly(
+        composeAvatar(full, assets),
+        { skin: full.skin, shirt: full.shirt, hair: full.hairColour },
+        (full.hair && assets.hairBackfill?.[full.hair]) || '',
+        (full.hair && assets.hairBehind?.[full.hair]) || '',
+      )
+        .replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
+        .replace(HEAD_CANVAS, '');
+      return { k, head };
+    });
+    // ⚠ THE DEPENDENCY LIST IS THE CONTRACT: everything a card draws, and nothing else. `cfg`
+    // itself must never appear here — a new object every render would defeat the whole memo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    assets,
+    options,
+    field,
+    cfg.base,
+    cfg.skin,
+    cfg.shirt,
+    cfg.hair,
+    cfg.hairColour,
+    cfg.eyeColour,
+    cfg.mouthColour,
+  ]);
 
   return (
-    <View
-      style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 16 }}
-    >
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 16 }}>
       {tiles.map(({ k, head }) => (
         <Pressable
           key={k ?? 'none'}
@@ -585,9 +631,9 @@ function Heads({
           accessibilityState={{ selected: value === k }}
           onPress={() => onPick(k)}
           style={{
-            width: 88,
-            height: 88,
-            borderRadius: 18,
+            width: tileSize,
+            height: tileSize,
+            borderRadius: 20,
             borderWidth: 2,
             borderColor: value === k ? theme.colors.primary : theme.colors.silver,
             backgroundColor: theme.colors.surface,
@@ -596,7 +642,7 @@ function Heads({
             justifyContent: 'center',
           }}
         >
-          <SvgXml xml={head} width={80} height={80} />
+          <SvgXml xml={head} width={tileSize - 12} height={tileSize - 12} />
         </Pressable>
       ))}
     </View>
