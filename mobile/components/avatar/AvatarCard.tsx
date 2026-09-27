@@ -42,14 +42,19 @@ type AvatarMeResponse = {
 
 /**
  * ⚠ THE CARD'S HEIGHT IS FIXED, and the avatar is sized from it rather than from the width.
+ * 224 is the web card's phone height, kept so the two read as the same object.
  *
- * 224 is the web card's phone height, kept so the two read as the same object. The square is
- * 120% of it — over 100% so the figure fills the frame instead of sitting in a letterbox, with
- * the overflow cropped at the bottom.
+ * ⚠⚠ THE SQUARE FITS THE CARD — no overflow. Ryan: "can we zoom out the avatar so we can see the
+ * shirt?" It rendered at 1.2x, which crops the bottom fifth, and the body runs to the bottom of
+ * the 2048 canvas — so the fifth being thrown away was the shirt. The same mistake the editor
+ * had, from the same borrowed reasoning: on the WEB card a head-and-shoulders crop is the
+ * intent, and a member's own profile card is the one place they want to see what they built.
  *
- * ⚠⚠ 269 MUST STAY NARROWER THAN THE CARD or the ears clip. At a 375pt screen the card is ~343
- * wide against a 269 square, so there is room; a taller card would grow the square and eat that
- * margin with nothing to warn you. The web card carries the same note for the same reason.
+ * ⚠ Fitting costs apparent size — the figure is smaller than a cropped one in the same card. The
+ * lever for "bigger" is therefore CARD_HEIGHT, not the multiplier.
+ *
+ * ⚠ It also removes the clipping risk the old note worried about: at 224 the square is narrower
+ * than the card on any phone, where 269 only just fitted 343.
  */
 /**
  * ⚠ A LITERAL, NOT `theme.colors.ink`. Everything painted on the card sits on the member's
@@ -59,7 +64,7 @@ type AvatarMeResponse = {
 const ON_GROUND = '#1B2340';
 
 const CARD_HEIGHT = 224;
-const AVATAR_SIZE = CARD_HEIGHT * 1.2;
+const AVATAR_SIZE = CARD_HEIGHT;
 
 export function AvatarCard({
   fullName,
