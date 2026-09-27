@@ -25,9 +25,9 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  BackgroundIcon, ContrastIcon, HatIcon, RectangleGogglesIcon, Relieved02Icon, ScissorIcon,
+  BackgroundIcon, ContrastIcon, HatIcon, Relieved02Icon, ScissorIcon,
 } from '@hugeicons-pro/core-solid-rounded'
-import { MoustacheIcon } from './stepIcons'
+import { GlassesIcon, MoustacheIcon } from './stepIcons'
 import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 import { AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES } from '@/lib/design/avatarGradient'
 
@@ -304,11 +304,13 @@ const STEPS = [
   // above wants the rest to go.
   { key: 'eyes', label: 'Eyes', icon: Relieved02Icon },
   { key: 'hair', label: 'Hair', icon: ScissorIcon },
-  // ⚠ `RectangleGogglesIcon` DID NOT EXIST IN THE INSTALLED PACK. It arrived in
-  // @hugeicons-pro/core-solid-rounded 4.3.4, one of 630 icons added over the 4.2.3 that was
-  // pinned here (5,442 -> 6,072). The declared range was already `^4.2.3`, so only the lockfile
-  // was holding it back; the bump changes the pin, not the contract.
-  { key: 'eyewear', label: 'Glasses & earrings', icon: RectangleGogglesIcon },
+  // ⭐ OUR OWN SUNGLASSES, the frame path off `s01-classic`. This replaces the packaged
+  // `RectangleGogglesIcon` that briefly sat here — which was VR goggles, near enough to read as
+  // eyewear and not actually a pair of glasses we make.
+  //
+  // ⚠ The 4.3.4 bump that icon needed STAYS. It is what brought `Relieved02Icon` and
+  // `BackgroundIcon` too, both still in use two lines up and down.
+  { key: 'eyewear', label: 'Glasses & earrings', icon: GlassesIcon, iconSize: 32 },
   // ⭐ OUR OWN MOUSTACHE, traced from the avatar art rather than borrowed from the icon pack.
   // `ChairBarberIcon` was a barber's chair — furniture, standing in for a beard.
   //

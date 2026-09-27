@@ -38,6 +38,17 @@ SPAN = 21.0
 
 ICONS = [
     {
+        "name": "GlassesIcon",
+        "asset": "assets/character-base/nano/glasses/assets/s01-classic.asset.svg",
+        # ⚠ THE FRAME ONLY. The asset also carries a lens tint and a glint, and an icon is ONE
+        # colour — flattened together they would merge into a featureless slab. The frame path is
+        # the silhouette that reads as glasses, verified by rendering it alone at 300px and 60px
+        # before this was wired.
+        "fill": "rgb(64,70,78)",
+        # 2.95:1. Full width, same reasoning as the moustache.
+        "span": 23.0,
+    },
+    {
         "name": "MoustacheIcon",
         "asset": "assets/character-base/nano/facialhair/assets/moustache.asset.svg",
         # 4.18:1. Full width, because the vertical margin is free and the width is not.
@@ -53,13 +64,13 @@ def cubic(p0: float, p1: float, p2: float, p3: float, t: float) -> float:
 
 def parse(d: str):
     """Absolute M/C/Z only — every avatar asset is emitted that way by the tracer."""
-    toks = re.findall(r"[MCZz]|-?\d*\.?\d+", d)
+    toks = re.findall(r"[MCLZz]|-?\d*\.?\d+", d)
     used = {t for t in toks if t.isalpha()}
-    unsupported = used - {"M", "C", "Z", "z"}
+    unsupported = used - {"M", "C", "L", "Z", "z"}
     if unsupported:
         raise SystemExit(
             f"unsupported path commands {sorted(unsupported)} — this script only handles the "
-            "absolute M/C/Z the asset tracer emits, and guessing at the rest would silently "
+            "absolute M/C/L/Z the asset tracer emits, and guessing at the rest would silently "
             "distort the art"
         )
     return toks
@@ -86,6 +97,12 @@ def bbox(toks):
                 ys.append(cubic(y0, n[1], n[3], n[5], tt))
             cur = (n[4], n[5])
             i += 7
+        elif t == "L":
+            x, y = float(toks[i + 1]), float(toks[i + 2])
+            cur = (x, y)
+            xs.append(x)
+            ys.append(y)
+            i += 3
         else:
             cur = start
             i += 1
@@ -108,6 +125,9 @@ def transform(toks, s: float, tx: float, ty: float) -> str:
             pairs = [f"{fmt(n[k] * s + tx)} {fmt(n[k + 1] * s + ty)}" for k in (0, 2, 4)]
             out.append("C" + " ".join(pairs))
             i += 7
+        elif t == "L":
+            out.append(f"L{fmt(float(toks[i + 1]) * s + tx)} {fmt(float(toks[i + 2]) * s + ty)}")
+            i += 3
         else:
             out.append("Z")
             i += 1
@@ -116,12 +136,23 @@ def transform(toks, s: float, tx: float, ty: float) -> str:
 
 def derive(spec) -> tuple[str, str]:
     svg = (ROOT / spec["asset"]).read_text()
-    paths = re.findall(r'\sd="([^"]+)"', svg)
-    if len(paths) != 1:
-        raise SystemExit(
-            f"{spec['asset']} has {len(paths)} paths; this script emits ONE path per icon, so a "
-            "multi-path asset needs a deliberate decision about which parts an icon shows"
-        )
+    want = spec.get("fill")
+    if want:
+        found = re.findall(rf'<path[^>]*fill="{re.escape(want)}"[^>]*d="([^"]+)"', svg)
+        if len(found) != 1:
+            raise SystemExit(
+                f"{spec['asset']}: expected exactly one path filled {want}, found {len(found)}. "
+                "An icon is one path; picking silently would be picking at random."
+            )
+        paths = found
+    else:
+        paths = re.findall(r'\sd="([^"]+)"', svg)
+        if len(paths) != 1:
+            raise SystemExit(
+                f"{spec['asset']} has {len(paths)} paths and no `fill` selector; this script emits "
+                "ONE path per icon, so a multi-path asset needs a deliberate decision about which "
+                "part an icon shows"
+            )
     toks = parse(paths[0])
     x0, y0, x1, y1 = bbox(toks)
     w, h = x1 - x0, y1 - y0
