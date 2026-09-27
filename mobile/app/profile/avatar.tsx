@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 
+import { Icon } from '@/components/ui';
 import { composeAvatar, headOnly, PALETTE, type AvatarConfig } from '@/lib/avatar/compose';
 import { GlassesIcon, HeadIcon, MoustacheIcon } from '@/lib/avatar/stepIcons';
 import {
@@ -32,6 +33,7 @@ import {
   avatarBackgroundFor,
   avatarIndexFor,
   GROUND_INK_DARK,
+  inkOn,
   isAvatarColourName,
 } from '@/lib/avatarGradient';
 import { useAuth } from '@/lib/auth';
@@ -473,42 +475,24 @@ export default function AvatarEditorScreen() {
                     `toStoredAvatarBuild` deletes the key on `== null`, and `isStoredAvatarBuild`
                     short-circuits on `!== undefined`, so passing `undefined` here is safe all the
                     way to the column.
-                    ⚠ It sits ABOVE the row rather than posing as a tile in it, because a tile in
-                    a colour grid promises to be a colour. */}
-                <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: !current.facialHairColour }}
-                    onPress={() => set('facialHairColour', undefined)}
-                    style={{
-                      alignSelf: 'flex-start',
-                      paddingHorizontal: 14,
-                      paddingVertical: 7,
-                      borderRadius: 999,
-                      borderWidth: 1,
-                      borderColor: current.facialHairColour
-                        ? theme.colors.silver
-                        : theme.colors.ink,
-                      backgroundColor: current.facialHairColour
-                        ? theme.colors.surface
-                        : theme.colors.ink,
-                    }}
-                  >
-                    <RNText
-                      style={{
-                        fontFamily: fontFamilies.bold,
-                        fontSize: 12,
-                        color: current.facialHairColour ? theme.colors.ink : theme.colors.surface,
-                      }}
-                    >
-                      Match hair
-                    </RNText>
-                  </Pressable>
-                </View>
+
+                    ⚠ THE WEB DELIBERATELY KEEPS THIS OUT OF THE GRID — "a tile in a colour grid
+                    promises to be a colour" — and Ryan asked for the opposite here: its own card,
+                    first in the row. The platforms diverge on purpose. What keeps it honest as a
+                    tile is that it paints the LIFTED tone, which is the colour the beard will
+                    actually be, under a link glyph saying it FOLLOWS something rather than being
+                    a choice of its own. */}
                 <Swatches
                   colours={PALETTE.hair}
                   value={current.facialHairColour ?? null}
                   onPick={(c) => set('facialHairColour', c)}
+                  leading={
+                    <MatchHairTile
+                      hairColour={current.hairColour}
+                      selected={!current.facialHairColour}
+                      onPress={() => set('facialHairColour', undefined)}
+                    />
+                  }
                 />
                 <RNText
                   style={{
@@ -648,12 +632,15 @@ function Swatches({
   value,
   onPick,
   wrap = false,
+  leading,
 }: {
   colours: readonly string[];
   value: string | null;
   onPick: (c: string) => void;
   /** Lay out as a wrapping grid instead of a horizontal scroller. */
   wrap?: boolean;
+  /** A bespoke first tile — see `MatchHairTile` in the facial-hair step. */
+  leading?: React.ReactNode;
 }) {
   const theme = useTheme();
 
@@ -683,6 +670,7 @@ function Swatches({
   if (wrap) {
     return (
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 16 }}>
+        {leading}
         {items}
       </View>
     );
@@ -696,8 +684,75 @@ function Swatches({
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}
     >
+      {leading}
       {items}
     </ScrollView>
+  );
+}
+
+/**
+ * "Match hair" as the first card in the facial-hair colour row.
+ *
+ * ⚠⚠ IT IS THE ABSENCE OF A COLOUR, wearing the costume of one. Picking it clears
+ * `facialHairColour` entirely; the beard then follows the head hair LIFTED by BEARD_LIFT, which
+ * exists so a beard cannot vanish into hair of the same shade.
+ *
+ * ⭐ So the swatch paints the LIFTED tone, not the raw hair colour — the colour the beard will
+ * ACTUALLY be. Painting the raw one would make this tile a lie that is only visible on the face,
+ * and choosing the neighbouring swatch of the same hex would render something different.
+ *
+ * ⚠ The glyph is what stops it reading as just another colour, which is the objection the web
+ * builder raises to putting it in the grid at all. `inkOn` picks dark or light against the
+ * lifted tone, so it stays legible across the whole hair ramp rather than only the dark half.
+ */
+function MatchHairTile({
+  hairColour,
+  selected,
+  onPress,
+}: {
+  hairColour: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  // ⚠ BEARD_LIFT is 12 and is not exported from compose — mirrored here rather than imported,
+  // and clamped the same way (`Math.min(255, …)`). If that constant ever moves, this tile starts
+  // lying about the colour it is promising.
+  const lifted = `#${[1, 3, 5]
+    .map((i) => Math.min(255, parseInt(hairColour.slice(i, i + 2), 16) + 12))
+    .map((v) => v.toString(16).padStart(2, '0'))
+    .join('')}`;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Match hair"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={{
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        borderWidth: 2,
+        borderColor: selected ? theme.colors.primary : theme.colors.silver,
+        backgroundColor: selected ? SELECTED_TINT(theme) : 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <View
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          backgroundColor: lifted,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Icon name="link" size={16} tint={inkOn(lifted)} />
+      </View>
+    </Pressable>
   );
 }
 
