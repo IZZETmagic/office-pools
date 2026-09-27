@@ -25,9 +25,9 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  BackgroundIcon, ContrastIcon, HatIcon, Relieved02Icon, ScissorIcon,
+  BackgroundIcon, HatIcon, Relieved02Icon, ScissorIcon,
 } from '@hugeicons-pro/core-solid-rounded'
-import { GlassesIcon, MoustacheIcon } from './stepIcons'
+import { GlassesIcon, HeadIcon, MoustacheIcon } from './stepIcons'
 import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 import { AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES } from '@/lib/design/avatarGradient'
 
@@ -296,7 +296,10 @@ function AssetCards({
 // ⭐ The real fix, when it matters: draw the seven from the avatar art we already own. Every
 // step's subject exists as a composed asset, so the icon for `Facial hair` could BE a beard.
 const STEPS = [
-  { key: 'skin', label: 'Skin tone', icon: ContrastIcon },
+  // ⭐ OUR OWN HEAD — the base's head path plus both ears, nothing else. `ContrastIcon` was a
+  // half-filled circle: the universal "contrast" glyph, which is a photo-editing idea, not a
+  // skin tone. This one is literally the shape the tone gets painted onto.
+  { key: 'skin', label: 'Skin tone', icon: HeadIcon },
   // ⭐ A FACE, NOT AN EYE — Ryan picked `Relieved02Icon` for this one. The step is really the
   // EXPRESSION step (eye colour, then twelve expressions), and `ViewIcon` is the app's "show /
   // preview" glyph, which promised a different thing entirely. It is also the first of these

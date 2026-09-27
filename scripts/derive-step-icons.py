@@ -38,6 +38,24 @@ SPAN = 21.0
 
 ICONS = [
     {
+        "name": "HeadIcon",
+        "asset": "assets/character-base/nano/bases/base-neck-100.svg",
+        # ⭐ HEAD + BOTH EARS, and nothing else — Ryan: "the outline or shape of our avatars head
+        # (only ears on it)". The same rule the hair tiles already follow: "no eyes, no mouth, no
+        # nose, only the ears".
+        #
+        # ⚠⚠ BY INDEX, because fill cannot separate these. The head is rgb(254,205,180) and so is
+        # the NECK; the ears are rgb(245,178,150) and so are the neck shadow and the NOSE. Only
+        # position tells them apart. Indices are safe here and nowhere else: the bases are LOCKED
+        # art (bases/LOCKED.sha256), so `expect_paths` below fails loudly if that ever stops
+        # being true rather than silently drawing a nose.
+        "paths": [5, 7, 8],
+        "expect_paths": 9,
+        # ⚠ NO evenodd. The ears OVERLAP the head, so an even-odd rule would punch holes where
+        # they meet; nonzero (the default) unions them into one silhouette. Verified by eye at
+        # 220px before this was wired.
+    },
+    {
         "name": "GlassesIcon",
         "asset": "assets/character-base/nano/glasses/assets/s01-classic.asset.svg",
         # ⚠ THE FRAME ONLY. The asset also carries a lens tint and a glint, and an icon is ONE
@@ -137,7 +155,18 @@ def transform(toks, s: float, tx: float, ty: float) -> str:
 def derive(spec) -> tuple[str, str]:
     svg = (ROOT / spec["asset"]).read_text()
     want = spec.get("fill")
-    if want:
+    idx = spec.get("paths")
+    if idx:
+        all_paths = re.findall(r'<path[^>]*d="([^"]+)"', svg)
+        expected = spec.get("expect_paths")
+        if expected is not None and len(all_paths) != expected:
+            raise SystemExit(
+                f"{spec['asset']}: expected {expected} paths, found {len(all_paths)}. This icon "
+                "selects by INDEX, so a changed asset would silently draw the wrong parts — "
+                "re-read the file and update both the indices and expect_paths."
+            )
+        paths = [" ".join(all_paths[i] for i in idx)]
+    elif want:
         found = re.findall(rf'<path[^>]*fill="{re.escape(want)}"[^>]*d="([^"]+)"', svg)
         if len(found) != 1:
             raise SystemExit(
