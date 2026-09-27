@@ -161,6 +161,32 @@ export function AvatarCard({
               and otherwise inherits currentColor. */}
           <Icon name="pencil.line" size={18} weight="semibold" tint={GROUND_INK_DARK} />
         </Link>
+
+        {/* ⭐ THE BETA MARK. It used to be the line "Beta — choose your skin tone, hair, glasses
+            and more" under the builder link in the profile form; that whole section is gone, and
+            the signal should not have gone with it. The avatar is a beta feature and the card is
+            now the only place it is announced.
+            ⚠ It is a LABEL, not a control — no href. The pencil is the way in, and two tappable
+            things in two corners of one card is one too many.
+            ⚠ Bottom RIGHT, under the pencil rather than opposite it. They share the edge but not
+            the row: on the shorter phone card the pencil ends at y52 and this starts near y180,
+            so they never meet. */}
+        <span
+          className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-10 inline-flex items-center
+                     px-2.5 py-1 rounded-pill bg-white/90 text-[11px] font-bold tracking-wide
+                     uppercase shadow-card"
+          style={{ color: GROUND_INK_DARK }}
+        >
+          {/* ⚠⚠ NOT `<Badge>`, and not by oversight. Every one of its variants is a theme-aware
+              pair — `text-primary-700` on `bg-primary-600/12`, `text-muted` on `bg-mist` — and
+              those invert under html.dark while this card's ground does NOT, because the ground
+              is the member's colour and the same value in both themes. The tint is also only
+              12% opaque, so the ground would show straight through and the text would be reading
+              against a colour the badge knows nothing about. This is the pencil chip's recipe
+              instead: a near-white chip, which is near-white on any of the 22, with the pinned
+              dark ink on top. Same reason `text-ink` could not be used anywhere on this card. */}
+          Beta
+        </span>
       </div>
 
       {/* The phone's copy, on the PAGE rather than on the card — see the note above. `ink`
