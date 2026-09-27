@@ -311,7 +311,15 @@ const STEPS = [
   { key: 'eyewear', label: 'Glasses & earrings', icon: RectangleGogglesIcon },
   // ⭐ OUR OWN MOUSTACHE, traced from the avatar art rather than borrowed from the icon pack.
   // `ChairBarberIcon` was a barber's chair — furniture, standing in for a beard.
-  { key: 'facialhair', label: 'Facial hair', icon: MoustacheIcon },
+  //
+  // ⚠⚠ `iconSize` IS THE ONLY LEVER LEFT FOR THIS ONE. Every glyph here is drawn in a 24×24
+  // viewBox that HugeiconsIcon fixes, and the moustache already spans 23 of those 24 — it
+  // cannot be made bigger inside the box. But it is 4.18:1, so filling the width still leaves it
+  // 5.5 units tall against ~21 for a square neighbour, and it reads small however wide it is.
+  // Rendering THIS glyph in a larger box is how icon sets normalise optical weight, and it is
+  // safe here because the tabs are `flex-1` at 84px on desktop and 43px on a phone: the box has
+  // room, and a wide-thin shape is the one case where a bigger box does not look bigger.
+  { key: 'facialhair', label: 'Facial hair', icon: MoustacheIcon, iconSize: 36 },
   { key: 'wearables', label: 'Headwear & shirt', icon: HatIcon },
   // ⭐ `BackgroundIcon`, and the name is the honest one: this step sets the avatar's GROUND,
   // which is also the glow on your side of a Showdown duel. `ColorsIcon` was three paint blobs —
@@ -542,7 +550,10 @@ export function AvatarBuilder({ assets, cfg, set }: {
                   lays an outline over the filled body and fattens the glyph — components/ui/
                   Icon.tsx records the same trap. Verified here: the rendered path carried both
                   fill and stroke until this was removed. */}
-              <HugeiconsIcon icon={s.icon} size={26} />
+              {/* ⚠ `'iconSize' in s`, not `s.iconSize ?? 26` — STEPS is `as const`, so `s` is a
+                  union of seven literal object types and only one of them has the field. The
+                  `in` check is what narrows it; the optional-chain version does not compile. */}
+              <HugeiconsIcon icon={s.icon} size={'iconSize' in s ? s.iconSize : 26} />
             </button>
           ))}
         </div>
