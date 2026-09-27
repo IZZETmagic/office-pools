@@ -494,17 +494,6 @@ export default function AvatarEditorScreen() {
                     />
                   }
                 />
-                <RNText
-                  style={{
-                    fontFamily: fontFamilies.medium,
-                    fontSize: 12,
-                    color: theme.colors.slate,
-                    paddingHorizontal: 16,
-                    marginTop: 10,
-                  }}
-                >
-                  Stubble is drawn as a shadow on the skin, so colour barely changes it.
-                </RNText>
               </Section>
               <Section title="Facial hair">
                 <Heads
