@@ -211,8 +211,24 @@ export default function AvatarEditorScreen() {
    * the band's height, not 1.2× it) but a short wide screen would still overflow sideways, and
    * losing the ears is worse than letterboxing.
    */
-  const bandHeight = height / 3;
-  const avatarSize = Math.min(bandHeight, width);
+  /**
+   * ⚠⚠ THE STATUS BAR WAS EATING THE HEADROOM. Ryan: "the hair is too close to the top of the
+   * screen." The band is edge to edge and starts at y=0, and the avatar filled it exactly — so
+   * the canvas's own headroom (the art starts about an eighth down) sat UNDER the status bar and
+   * the hair emerged right at the clock. Making the band taller alone would not have fixed it:
+   * with an exact fit the headroom is a PERCENTAGE, so it scales up and stays proportionally just
+   * as close to the top.
+   *
+   * ⭐ So the band grows by exactly the inset and the figure starts below it. The ground still
+   * runs under the status bar — the edge-to-edge look Ryan asked for is intact — but the avatar
+   * no longer competes with the clock. The avatar's own size is unchanged, which is the point:
+   * this is a clearance fix, not a scale one.
+   *
+   * ⚠ The lever for "bigger" remains the divisor below. A third of the screen is the figure; the
+   * inset is added on top of it, so the band lands near 39% on a notched phone.
+   */
+  const avatarSize = Math.min(height / 3, width);
+  const bandHeight = insets.top + avatarSize;
 
   if (assetsError) {
     return (
@@ -240,7 +256,7 @@ export default function AvatarEditorScreen() {
           <View
             style={{
               position: 'absolute',
-              top: 0,
+              top: insets.top,
               left: 0,
               right: 0,
               bottom: 0,
