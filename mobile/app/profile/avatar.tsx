@@ -510,13 +510,33 @@ export default function AvatarEditorScreen() {
           )}
 
           {step === 'wearables' && (
-            <Section title="Shirt colour">
-              <Swatches
-                colours={PALETTE.shirt}
-                value={current.shirt}
-                onPick={(c) => set('shirt', c)}
-              />
-            </Section>
+            <>
+              {/* ⭐⭐ ONE COLOUR DRIVES ALL OF THEM. Every garment asset carries the shirt token,
+                  so this row recolours the base shirt AND every pattern. The alternative — a
+                  card per garment per colour — would be seven designs x eight colours to say
+                  what one row of swatches says. */}
+              <Section title="Shirt colour">
+                <Swatches
+                  colours={PALETTE.shirt}
+                  value={current.shirt}
+                  onPick={(c) => set('shirt', c)}
+                />
+              </Section>
+
+              {/* ⚠ "None" is the BASE SHIRT, not the absence of clothing — the avatar always
+                  wears something — so the first tile is a real choice and shows what it gives. */}
+              <Section title="Shirt">
+                <Heads
+                  assets={assets}
+                  cfg={current}
+                  field="garment"
+                  options={[null, ...Object.keys(assets.garments ?? {})]}
+                  value={current.garment}
+                  onPick={(k) => set('garment', k)}
+                  tileSize={tileSize}
+                />
+              </Section>
+            </>
           )}
 
           {step === 'colour' && (
@@ -783,7 +803,7 @@ function Heads({
    * is the pair. A metal swatch beside a list of style names cannot show what the combination
    * looks like, which is the whole point of the grid.
    */
-  field: 'hair' | 'expression' | 'glasses' | 'facialHair' | 'earrings';
+  field: 'hair' | 'expression' | 'glasses' | 'facialHair' | 'earrings' | 'garment';
   options: (string | null)[];
   value: string | null | undefined;
   onPick: (k: string | null) => void;
@@ -815,14 +835,21 @@ function Heads({
             : { ...base, earrings: null }
           : { ...base, [field]: k }
       ) as AvatarConfig;
-      const head = headOnly(
-        composeAvatar(full, assets),
-        { skin: full.skin, shirt: full.shirt, hair: full.hairColour },
-        (full.hair && assets.hairBackfill?.[full.hair]) || '',
-        (full.hair && assets.hairBehind?.[full.hair]) || '',
-      )
-        .replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
-        .replace(HEAD_CANVAS, '');
+      // ⚠⚠ A SHIRT CANNOT USE THE HEAD CARD. `headOnly` finds the body and DELETES it — that is
+      // its entire job — so it is the one helper that cannot show a garment. Garment tiles are
+      // the avatar composed WHOLE, keeping the default full-canvas viewBox; every other family
+      // crops to the head so the asset is not a speck on a full figure.
+      const head =
+        field === 'garment'
+          ? composeAvatar(full, assets).replace(HEAD_CANVAS, '')
+          : headOnly(
+              composeAvatar(full, assets),
+              { skin: full.skin, shirt: full.shirt, hair: full.hairColour },
+              (full.hair && assets.hairBackfill?.[full.hair]) || '',
+              (full.hair && assets.hairBehind?.[full.hair]) || '',
+            )
+              .replace(/viewBox="[^"]*"/, `viewBox="${HEAD_CROP}"`)
+              .replace(HEAD_CANVAS, '');
       return { k, head };
     });
     // ⚠ THE DEPENDENCY LIST IS THE CONTRACT: everything a card draws, and nothing else. `cfg`
