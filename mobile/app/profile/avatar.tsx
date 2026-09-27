@@ -195,21 +195,24 @@ export default function AvatarEditorScreen() {
   }
 
   /**
-   * ⚠⚠ THE SQUARE IS SIZED FROM THE BAND'S HEIGHT, which is what can clip the ears — it renders
-   * 1.2× that height and has to stay narrower than the SCREEN.
+   * ⚠⚠ THE SQUARE FITS THE BAND — no overflow. Ryan: "the avatar is being cropped in and we
+   * cannot see the shirt design."
    *
-   * ⚠ A THIRD, NOT A QUARTER. Ryan asked for a taller card; at a quarter the torso was cut just
-   * below the chin. A third of 812 is a 271 band and a 325 square against 375 of width, so it
-   * still fits — but only because 1.2 × (H/3) < W holds while H/W < 2.5, and every current phone
-   * is around 1.8–2.2. That is an assumption about hardware, not a guarantee.
+   * It used to render at 1.2× the band's height, borrowed from the web CARD where cropping to a
+   * head and shoulders is the intent. In an EDITOR it is exactly wrong: the body runs to the
+   * bottom of the 2048 canvas, so the 20% that overflowed was the shirt — the one thing the
+   * wearables step exists to choose. A preview that hides what you are picking is not a preview.
    *
-   * ⭐ So it is CLAMPED rather than trusted. On any screen proportioned badly enough to break the
-   * arithmetic the avatar letterboxes slightly instead of losing its ears, which is the failure
-   * that degrades rather than the one that looks broken. The art spans x61..1987 of the 2048
-   * canvas, so meeting the screen edge exactly still leaves a ~3% margin around the figure.
+   * ⚠ Fitting costs apparent size: the figure is smaller than a cropped one in the same band.
+   * The way to make it bigger is therefore the BAND, not the scale — grow `height / 3` and the
+   * avatar grows with it, still whole.
+   *
+   * ⚠ Still clamped to the width. Fitting makes that far less likely to bite (the square is now
+   * the band's height, not 1.2× it) but a short wide screen would still overflow sideways, and
+   * losing the ears is worse than letterboxing.
    */
   const bandHeight = height / 3;
-  const avatarSize = Math.min(bandHeight * 1.2, width);
+  const avatarSize = Math.min(bandHeight, width);
 
   if (assetsError) {
     return (
@@ -228,8 +231,23 @@ export default function AvatarEditorScreen() {
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
       {/* ---- 1. the avatar, FROZEN, edge to edge ------------------------------------------- */}
       <View style={{ height: bandHeight, backgroundColor: ground, overflow: 'hidden' }}>
+        {/* ⚠ Centred both ways, not pinned to the top. At the normal size the square fills the
+            band exactly and this makes no difference — it matters only when the width clamp
+            above kicks in and the square is shorter than the band. Any spare room is the
+            member's ground on both sides of a square painted that same colour, so the
+            letterboxing is invisible rather than a visible band of dead space. */}
         {preview ? (
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' }}>
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <SvgXml xml={preview} width={avatarSize} height={avatarSize} />
           </View>
         ) : null}
