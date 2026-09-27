@@ -340,7 +340,12 @@ export default function AvatarEditorScreen() {
         <ScrollView contentContainerStyle={{ paddingVertical: 16, paddingBottom: insets.bottom + 32 }}>
           {step === 'skin' && (
             <Section title="Skin tone">
-              <Swatches colours={PALETTE.skin} value={current.skin} onPick={(c) => set('skin', c)} />
+              <Swatches
+                colours={PALETTE.skin}
+                value={current.skin}
+                onPick={(c) => set('skin', c)}
+                wrap
+              />
             </Section>
           )}
 
@@ -431,6 +436,7 @@ export default function AvatarEditorScreen() {
           {step === 'colour' && (
             <Section title="Your colour">
               <Swatches
+                wrap
                 colours={AVATAR_COLOUR_NAMES.map((_, i) => avatarBackgroundFor(i))}
                 value={ground}
                 onPick={(c) => {
@@ -494,26 +500,33 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+/**
+ * A colour row.
+ *
+ * ⭐ HORIZONTAL BY DEFAULT — Ryan: "For the colours except for the skin tone and background they
+ * should be horizontally scrollable to take up less vertical space." A hair or eye row that wraps
+ * pushes the asset grid below the fold, and the assets are what the step is actually for.
+ *
+ * ⚠ SKIN TONE AND BACKGROUND WRAP INSTEAD, and that is the exception rather than an inconsistency.
+ * Those two are the only rows a member scans as a SET to find themselves in — fifteen skin tones
+ * and twenty-two grounds — and a set you have to swipe through is a set you cannot compare. The
+ * other three are a handful of options each where the current one is the only one that matters.
+ */
 function Swatches({
   colours,
   value,
   onPick,
+  wrap = false,
 }: {
   colours: readonly string[];
   value: string | null;
   onPick: (c: string) => void;
+  /** Lay out as a wrapping grid instead of a horizontal scroller. */
+  wrap?: boolean;
 }) {
   const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-        paddingHorizontal: 16,
-      }}
-    >
-      {colours.map((c) => (
+
+  const items = colours.map((c) => (
         <Pressable
           key={c}
           accessibilityRole="button"
@@ -533,8 +546,26 @@ function Swatches({
         >
           <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: c }} />
         </Pressable>
-      ))}
-    </View>
+  ));
+
+  if (wrap) {
+    return (
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 16 }}>
+        {items}
+      </View>
+    );
+  }
+
+  // ⚠ A horizontal scroller nested in the screen's vertical one. RN handles the gesture split by
+  // axis, so this does not fight the page scroll.
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}
+    >
+      {items}
+    </ScrollView>
   );
 }
 
