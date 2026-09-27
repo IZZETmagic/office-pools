@@ -25,7 +25,7 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  ChairBarberIcon, ColorsIcon, ContrastIcon, GlassesIcon, HatIcon, ScissorIcon, ViewIcon,
+  ChairBarberIcon, ColorsIcon, ContrastIcon, GlassesIcon, HatIcon, Relieved02Icon, ScissorIcon,
 } from '@hugeicons-pro/core-solid-rounded'
 import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 import { AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES } from '@/lib/design/avatarGradient'
@@ -296,7 +296,12 @@ function AssetCards({
 // step's subject exists as a composed asset, so the icon for `Facial hair` could BE a beard.
 const STEPS = [
   { key: 'skin', label: 'Skin tone', icon: ContrastIcon },
-  { key: 'eyes', label: 'Eyes', icon: ViewIcon },
+  // ⭐ A FACE, NOT AN EYE — Ryan picked `Relieved02Icon` for this one. The step is really the
+  // EXPRESSION step (eye colour, then twelve expressions), and `ViewIcon` is the app's "show /
+  // preview" glyph, which promised a different thing entirely. It is also the first of these
+  // seven to be drawn from the same subject as its own content, which is the direction the note
+  // above wants the rest to go.
+  { key: 'eyes', label: 'Eyes', icon: Relieved02Icon },
   { key: 'hair', label: 'Hair', icon: ScissorIcon },
   { key: 'eyewear', label: 'Glasses & earrings', icon: GlassesIcon },
   { key: 'facialhair', label: 'Facial hair', icon: ChairBarberIcon },
