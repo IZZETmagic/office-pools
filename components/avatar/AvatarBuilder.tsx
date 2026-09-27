@@ -25,7 +25,7 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  ChairBarberIcon, ColorsIcon, ContrastIcon, HatIcon, RectangleGogglesIcon, Relieved02Icon,
+  BackgroundIcon, ChairBarberIcon, ContrastIcon, HatIcon, RectangleGogglesIcon, Relieved02Icon,
   ScissorIcon,
 } from '@hugeicons-pro/core-solid-rounded'
 import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
@@ -311,7 +311,10 @@ const STEPS = [
   { key: 'eyewear', label: 'Glasses & earrings', icon: RectangleGogglesIcon },
   { key: 'facialhair', label: 'Facial hair', icon: ChairBarberIcon },
   { key: 'wearables', label: 'Headwear & shirt', icon: HatIcon },
-  { key: 'colour', label: 'Your colour', icon: ColorsIcon },
+  // ⭐ `BackgroundIcon`, and the name is the honest one: this step sets the avatar's GROUND,
+  // which is also the glow on your side of a Showdown duel. `ColorsIcon` was three paint blobs —
+  // it said "pick a colour" next to six other steps that all pick colours too.
+  { key: 'colour', label: 'Your colour', icon: BackgroundIcon },
 ] as const
 type Step = (typeof STEPS)[number]['key']
 
