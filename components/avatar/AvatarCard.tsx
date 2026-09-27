@@ -102,11 +102,16 @@ export function AvatarCard({
             a fixed band on mobile and `h-full` inside a fixed-height card on desktop. A card
             sized only by its content would collapse the percentage and the avatar would vanish.
 
-            ⚠⚠ THESE THREE NUMBERS ARE ONE NUMBER: the card is h-[280px], the fill is 120%, so
-            the square renders 336px wide and the zone must be 336 to hold it. At the 280 I first
-            wrote it clipped 28px off EACH SIDE — measured — which ate the hair and both ears.
-            Change the card height or the fill and this width changes with them. */}
-        <div className="relative h-[168px] sm:h-full w-full sm:w-[336px] shrink-0 overflow-hidden">
+            ⚠⚠ ON DESKTOP THESE THREE NUMBERS ARE ONE NUMBER: the card is h-[280px], the fill is
+            120%, so the square renders 336px wide and the zone must be 336 to hold it. At the 280
+            I first wrote it clipped 28px off EACH SIDE — measured — which ate the hair and both
+            ears. Change the card height or the fill and this width changes with them.
+
+            ⚠ The phone is safe by a different route: the zone is full width, so at 224px tall the
+            square is 269 wide inside a 343 zone and there is room to spare. It only stays true
+            while the zone is wider than 1.2 × its own height — a taller phone band would start
+            clipping the ears with nothing to warn you. */}
+        <div className="relative h-[224px] sm:h-full w-full sm:w-[336px] shrink-0 overflow-hidden">
           {hasAvatar ? (
             <MemberAvatar
               userId={userId}
@@ -123,49 +128,20 @@ export function AvatarCard({
           )}
         </div>
 
-        <div className="flex-1 min-w-0 flex flex-col justify-center gap-4 px-5 pb-5 sm:px-0 sm:pb-0 sm:pr-6">
-          <div className="min-w-0">
-            <h2 className="text-2xl sm:text-3xl font-bold truncate" style={{ color: ink }}>
-              {fullName || username}
-            </h2>
-            <p className="text-sm sm:text-base truncate" style={{ color: ink, opacity: 0.8 }}>
-              @{username}
-            </p>
-            <p className="text-xs sm:text-sm mt-0.5" style={{ color: ink, opacity: 0.7 }}>
-              Member since {memberSince}
-            </p>
-          </div>
-
-          {/* ⚠ No card chrome on these. They used to be three separate tiles in their own row
-              below; giving them borders and a surface again would just rebuild the stack this
-              card exists to collapse. On the ground they are numbers, not boxes. */}
-          <div className="flex items-center gap-5 sm:gap-8">
-            {stats.map((s) => (
-              <div key={s.label} className="min-w-0">
-                <p className="t-num text-xl sm:text-2xl" style={{ color: ink }}>
-                  {formatNumber(s.value)}
-                </p>
-                <p className="text-[11px] sm:text-xs truncate" style={{ color: ink, opacity: 0.7 }}>
-                  {s.label}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* The call to action only exists on the empty card. Once you have a face the pencil is
-              enough — a permanent "Build your avatar" button over your own avatar reads as though
-              the app has not noticed you already did. */}
-          {!hasAvatar && (
-            <Link
-              href="/profile/avatar"
-              className="inline-flex self-start items-center gap-2 px-4 py-2 rounded-control
-                         bg-white/90 hover:bg-white text-[13px] font-semibold transition-colors"
-              style={{ color: GROUND_INK_DARK }}
-            >
-              Build your avatar
-              <span aria-hidden="true">→</span>
-            </Link>
-          )}
+        {/* ⭐ ON THE CARD ONLY FROM `sm` UP. On a phone the details sit BELOW the card instead —
+            Ryan, on the stacked version: "the details need to now come out of the card and sit
+            below the avatar card". Desktop has the width to put them beside the avatar and the
+            card reads as one object; a phone has to stack them, and stacked inside a coloured
+            card they were a block of text marooned in a field of colour. */}
+        <div className="hidden sm:flex flex-1 min-w-0 flex-col justify-center gap-4 pr-6">
+          <Details
+            fullName={fullName}
+            username={username}
+            memberSince={memberSince}
+            stats={stats}
+            hasAvatar={hasAvatar}
+            ink={ink}
+          />
         </div>
 
         {/* ⚠⚠ THIS CHIP AND THE PILL ABOVE ARE ALWAYS DARK, NOT `ink`. They do not sit on the
@@ -186,7 +162,106 @@ export function AvatarCard({
           <Icon name="pencil.line" size={18} weight="semibold" tint={GROUND_INK_DARK} />
         </Link>
       </div>
+
+      {/* The phone's copy, on the PAGE rather than on the card — see the note above. `ink`
+          is deliberately not passed: off the coloured ground the house tokens are correct, and
+          they are the ones that follow the theme. */}
+      <div className="sm:hidden flex flex-col gap-4 mt-4">
+        <Details
+          fullName={fullName}
+          username={username}
+          memberSince={memberSince}
+          stats={stats}
+          hasAvatar={hasAvatar}
+        />
+      </div>
     </div>
+  )
+}
+
+/**
+ * Name, handle, member-since and the headline numbers — rendered twice, once on the card at
+ * `sm` and up, once on the page below it on a phone.
+ *
+ * ⚠⚠ THE DUPLICATION IS DELIBERATE AND IT IS A DOM MOVE, NOT A RESTYLE. The block changes its
+ * PARENT between breakpoints — inside the coloured card on desktop, a sibling of it on mobile —
+ * and no amount of CSS moves a node between two containers. Rendering it in both places and
+ * hiding one with `hidden` is the honest version; `display:none` also takes the hidden copy out
+ * of the accessibility tree, so only one name is ever announced.
+ *
+ * ⭐ `ink` IS THE WHOLE DIFFERENCE. On the card the text sits on the member's colour, which does
+ * not change with the theme, so it takes the derived ink. Off the card it sits on the page, so
+ * it takes `text-ink`/`text-muted`, which DO change with the theme. Passing the derived ink to
+ * the page copy would paint near-black text on a dark page.
+ */
+function Details({
+  fullName, username, memberSince, stats, hasAvatar, ink,
+}: {
+  fullName: string | null
+  username: string
+  memberSince: string
+  stats: { label: string; value: number }[]
+  hasAvatar: boolean
+  /** Set only for the copy that sits on the coloured card. */
+  ink?: string
+}) {
+  const strong = ink ? { color: ink } : undefined
+  const soft = ink ? { color: ink, opacity: 0.7 } : undefined
+  const strongClass = ink ? '' : 'text-ink'
+  const softClass = ink ? '' : 'text-muted'
+
+  return (
+    <>
+      <div className="min-w-0">
+        <h2 className={`text-2xl sm:text-3xl font-bold truncate ${strongClass}`} style={strong}>
+          {fullName || username}
+        </h2>
+        <p
+          className={`text-sm sm:text-base truncate ${softClass}`}
+          style={ink ? { color: ink, opacity: 0.8 } : undefined}
+        >
+          @{username}
+        </p>
+        <p className={`text-xs sm:text-sm mt-0.5 ${softClass}`} style={soft}>
+          Member since {memberSince}
+        </p>
+      </div>
+
+      {/* ⚠ No card chrome on these. They used to be three separate tiles in their own row; giving
+          them borders and a surface again would rebuild the stack this card exists to collapse. */}
+      <div className="flex items-center gap-6 sm:gap-8">
+        {stats.map((s) => (
+          <div key={s.label} className="min-w-0">
+            <p className={`t-num text-xl sm:text-2xl ${strongClass}`} style={strong}>
+              {formatNumber(s.value)}
+            </p>
+            <p className={`text-[11px] sm:text-xs truncate ${softClass}`} style={soft}>
+              {s.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* The call to action only exists on the empty card. Once you have a face the pencil is
+          enough — a permanent "Build your avatar" button over your own avatar reads as though
+          the app has not noticed you already did. */}
+      {!hasAvatar && (
+        <Link
+          href="/profile/avatar"
+          className={
+            ink
+              // On the ground: a near-white chip, so its label is pinned dark like the pencil.
+              ? 'inline-flex self-start items-center gap-2 px-4 py-2 rounded-control bg-white/90 hover:bg-white text-[13px] font-semibold transition-colors'
+              // On the page: the house primary, which already handles both themes.
+              : 'inline-flex self-start items-center gap-2 px-4 py-2 rounded-control bg-primary-600 text-white text-[13px] font-semibold transition-opacity hover:opacity-90'
+          }
+          style={ink ? { color: GROUND_INK_DARK } : undefined}
+        >
+          Build your avatar
+          <span aria-hidden="true">→</span>
+        </Link>
+      )}
+    </>
   )
 }
 
