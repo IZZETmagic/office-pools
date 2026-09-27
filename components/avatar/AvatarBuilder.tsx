@@ -310,7 +310,11 @@ const STEPS = [
   //
   // ⚠ The 4.3.4 bump that icon needed STAYS. It is what brought `Relieved02Icon` and
   // `BackgroundIcon` too, both still in use two lines up and down.
-  { key: 'eyewear', label: 'Glasses & earrings', icon: GlassesIcon, iconSize: 32 },
+  //
+  // ⚠ 36, THE SAME BOX AS THE MOUSTACHE, and that is the ceiling rather than a preference: at
+  // 375px these tabs are `flex-1` at 43px, so a 36px box leaves 3.5px each side and 40 would
+  // leave 1.5. Both derived glyphs share it so the two widest things in the strip agree.
+  { key: 'eyewear', label: 'Glasses & earrings', icon: GlassesIcon, iconSize: 36 },
   // ⭐ OUR OWN MOUSTACHE, traced from the avatar art rather than borrowed from the icon pack.
   // `ChairBarberIcon` was a barber's chair — furniture, standing in for a beard.
   //
