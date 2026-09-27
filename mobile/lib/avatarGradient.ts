@@ -1,3 +1,5 @@
+import { contrastRatio } from './design/oklch';
+
 // =============================================================
 // A PERSON'S COLOUR, IN ONE PLACE
 // =============================================================
@@ -101,6 +103,90 @@ export const AVATAR_COLOUR_NAMES: readonly string[] = [
   'petal',
   'pink',
 ];
+
+/**
+ * The GROUND a character avatar is drawn on — mirrored from `lib/design/avatarGradient.ts`.
+ *
+ * ⚠⚠ ORDER IS THE CONTRACT, exactly as it is for AVATAR_GRADIENTS above: the index comes from
+ * `avatarIndexFor`, so a row out of place silently repaints people. `avatarGradient.test.ts`
+ * parses this block and asserts it matches the web array colour for colour.
+ *
+ * ⭐ NOT THE SAME AS A GRADIENT. The gradient pair is the gloss behind initials; this flat colour
+ * is what the composed avatar's canvas is painted with, and what a Showdown duel glows with.
+ * Migration 146 is why it is one stored column and not two.
+ */
+export const AVATAR_BACKGROUNDS: readonly string[] = [
+  '#F47A93', // rose
+  '#FFC3C4', // blush
+  '#FE9F98', // salmon
+  '#E98661', // coral
+  '#BB9E43', // olive
+  '#BDBD71', // sage
+  '#88AC52', // moss
+  '#BDDAA9', // fern
+  '#7EC993', // jade
+  '#0DB68B', // emerald
+  '#93E0CE', // mint
+  '#0DB3A9', // teal
+  '#17CBDE', // lagoon
+  '#8CDDFA', // ice
+  '#5AC3FE', // sky
+  '#41A6FA', // azure
+  '#BFD2FE', // powder
+  '#A6B5FF', // periwinkle
+  '#AB92EB', // lilac
+  '#D285D3', // orchid
+  '#F8C1E7', // petal
+  '#EA7CB4', // pink
+]
+
+/**
+ * The ground for an index that has already been resolved.
+ *
+ * ⚠ INDEX-SHAPED, like `inkFromIndex` on the web: a duel resolves both sides through
+ * `duelColourIndices`, which may move one of them, leaving no user id to ask. Ordinary callers
+ * pass `avatarIndexFor(userId, chosen)`.
+ */
+export function avatarBackgroundFor(index: number): string {
+  return AVATAR_BACKGROUNDS[index];
+}
+
+/**
+ * ⚠ The write guard. `users.avatar_colour` has no CHECK listing the names (migration 146 explains
+ * why), so this is the only thing between a typo and a member who resolves to their hashed colour
+ * forever without knowing it.
+ */
+export function isAvatarColourName(value: unknown): value is string {
+  return typeof value === 'string' && AVATAR_COLOUR_NAMES.includes(value);
+}
+
+/**
+ * ⚠⚠ BOTH INKS ARE LITERALS AND NEITHER IS A THEME TOKEN. A member's ground does not change with
+ * the theme — it is the same value in light and dark — so a theme-aware colour painted on it is
+ * guaranteed to fail in one of the two.
+ */
+export const GROUND_INK_DARK = '#1B2340';
+export const GROUND_INK_LIGHT = '#FFFFFF';
+
+/**
+ * Which ink reads on a given ground. Mirrored from the web, including the measurement:
+ *
+ *   vs #FFFFFF   1.51 (powder) .. 2.61 (rose)     — every one FAILS 4.5:1
+ *   vs #1B2340   5.90 (rose)   .. 10.19 (powder)  — every one passes
+ *
+ * ⚠ So it answers DARK for all twenty-two today. White on a colour banner is the instinctive
+ * choice and it is wrong for every member; not one ground clears even the 3:1 allowed for large
+ * text. The branch exists because a palette grows.
+ */
+export function inkOn(background: string): string {
+  return contrastRatio(background, GROUND_INK_DARK) >= contrastRatio(background, GROUND_INK_LIGHT)
+    ? GROUND_INK_DARK
+    : GROUND_INK_LIGHT;
+}
+
+export function groundInkFor(index: number): string {
+  return inkOn(AVATAR_BACKGROUNDS[index]);
+}
 
 /**
  * Deterministic hash → palette index. djb2 variant — small, stable, no crypto.

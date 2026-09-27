@@ -43,8 +43,37 @@ function rnGradients(): string[][] | null {
     .map((m) => [m[1], m[2]])
 }
 
+/**
+ * Pull the `'#AAAAAA', // name` entries out of the RN AVATAR_BACKGROUNDS block.
+ *
+ * ⚠ A SEPARATE PARSER because the shape is different — backgrounds are single colours, gradients
+ * are pairs. Reusing the pair regex here would match nothing and quietly assert that an empty
+ * list equals an empty list.
+ */
+function rnBackgrounds(): string[] | null {
+  const start = rnSource.indexOf('const AVATAR_BACKGROUNDS')
+  if (start === -1) return null
+  const end = rnSource.indexOf('];', start)
+  if (end === -1) return null
+  return [...rnSource.slice(start, end).matchAll(/'(#[0-9A-Fa-f]{6})'/g)].map((m) => m[1])
+}
+
 describe('avatar palette matches the RN app', () => {
   const rn = rnGradients()
+  const rnBg = rnBackgrounds()
+
+  // ⭐ The GROUNDS are mirrored too, since the avatar editor on RN composes locally and paints
+  // this canvas itself. A background out of order there would repaint people on one platform
+  // only — the same failure the gradient checks below exist to prevent, one layer down.
+  it('the RN AVATAR_BACKGROUNDS block was found and parsed', () => {
+    expect(rnBg, 'could not parse AVATAR_BACKGROUNDS from mobile/lib/avatarGradient.ts')
+      .not.toBeNull()
+    expect(rnBg!.length).toBeGreaterThan(0)
+  })
+
+  it('has the same GROUNDS in the same order', () => {
+    expect([...AVATAR_BACKGROUNDS]).toEqual(rnBg!)
+  })
 
   it('the RN AVATAR_GRADIENTS block was found and parsed', () => {
     expect(rn, 'could not parse AVATAR_GRADIENTS from mobile/lib/avatarGradient.ts').not.toBeNull()

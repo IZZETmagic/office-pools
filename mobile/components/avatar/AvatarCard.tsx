@@ -1,7 +1,9 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View, Text as RNText } from 'react-native';
+import { View, Text as RNText, Pressable } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 
+import { Icon } from '@/components/ui';
 import { apiFetch } from '@/lib/api';
 import { fontFamilies, useTheme } from '@/theme';
 
@@ -25,10 +27,9 @@ import { fontFamilies, useTheme } from '@/theme';
 // EXPO_PUBLIC_API_BASE_URL while developing. The fallback is correct behaviour, which is also what
 // makes its absence easy to miss.
 //
-// 🔴 VIEW ONLY. The web card's pencil opens the builder at /profile/avatar; there is no builder on
-// RN yet. A "Build your avatar" button that goes nowhere is worse than no button, so there is no
-// edit affordance here — which does leave almost every member looking at a card they cannot fill
-// in. That is the next decision, not an oversight.
+// ⭐ The pencil opens the RN editor at `app/profile/avatar.tsx`, which composes LOCALLY rather
+// than through this card's endpoint — an editor previews on every tap and a round trip per tap
+// would feel broken. See that screen's banner.
 // =============================================================
 
 /** Mirrors `AvatarMeResponse` in `app/api/avatar/me/route.ts`. Redeclared because mobile cannot
@@ -132,6 +133,31 @@ export function AvatarCard({
             </View>
           </View>
         )}
+
+        {/* ⚠ Top right, mirroring the web card's pencil. A near-white chip with a dark glyph for
+            the same reason the BETA mark below is: a white icon would vanish on the pale half of
+            the palette. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={avatar?.hasAvatar ? 'Edit your avatar' : 'Build your avatar'}
+          onPress={() => router.push('/profile/avatar')}
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            width: 40,
+            height: 40,
+            borderRadius: 14,
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* ⚠ `tint`, not `color` — `color` takes a THEME TOKEN NAME and would resolve to a
+              theme-aware value; this glyph sits on the member's ground, which is the same
+              value in both themes. Same distinction the web Icon draws. */}
+          <Icon name="pencil.line" size={18} weight="semibold" tint={ON_GROUND} />
+        </Pressable>
 
         {/* ⚠⚠ A NEAR-WHITE CHIP WITH DARK INK, NOT A THEME COLOUR. The ground is the member's
             colour and is the SAME VALUE in both themes, so anything theme-aware painted on it is

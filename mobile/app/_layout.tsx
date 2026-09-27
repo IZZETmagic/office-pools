@@ -250,6 +250,13 @@ function InnerLayout() {
           name="create-pool"
           options={{ presentation: 'modal', headerShown: false }}
         />
+        {/* ⚠ fullScreenModal, not modal: the avatar band is edge to edge and runs under the
+            status bar, which a sheet-style modal would inset and crop. Same presentation
+            `pool/[id]/entry/[entryId]` uses. */}
+        <Stack.Screen
+          name="profile/avatar"
+          options={{ presentation: 'fullScreenModal', headerShown: false }}
+        />
         <Stack.Screen
           name="pool-preview/[id]"
           options={{ presentation: 'modal', headerShown: false }}
