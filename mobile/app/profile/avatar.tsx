@@ -39,6 +39,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useAvatarAssets } from '@/lib/useAvatarAssets';
+import { invalidateMyAvatar } from '@/lib/useMyAvatar';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -203,6 +204,11 @@ export default function AvatarEditorScreen() {
       console.warn('[avatar editor] save failed:', error.message);
       return;
     }
+    // ⚠ ONLY ON SUCCESS, and only a MARK. The profile card behind this modal never unmounted, so
+    // without this it would keep drawing the face that was just replaced. It deliberately does not
+    // fetch: this screen is about to unmount and the card may not be mounted yet, so a request
+    // fired here would race the navigation. The card refetches on focus.
+    invalidateMyAvatar();
     router.back();
   }
 

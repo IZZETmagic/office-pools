@@ -1,10 +1,11 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { View, Text as RNText, Pressable } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 
 import { Icon } from '@/components/ui';
-import { apiFetch } from '@/lib/api';
+import { useMyAvatar } from '@/lib/useMyAvatar';
 import { fontFamilies, useTheme } from '@/theme';
 
 // =============================================================
@@ -31,14 +32,6 @@ import { fontFamilies, useTheme } from '@/theme';
 // than through this card's endpoint — an editor previews on every tap and a round trip per tap
 // would feel broken. See that screen's banner.
 // =============================================================
-
-/** Mirrors `AvatarMeResponse` in `app/api/avatar/me/route.ts`. Redeclared because mobile cannot
- *  import from the repo root — the same reason the compositor lives on the server. */
-type AvatarMeResponse = {
-  svg: string | null;
-  ground: string;
-  hasAvatar: boolean;
-};
 
 /**
  * ⚠ THE CARD'S HEIGHT IS FIXED, and the avatar is sized from it rather than from the width.
@@ -80,24 +73,23 @@ export function AvatarCard({
   stats: { label: string; value: string }[];
 }) {
   const theme = useTheme();
-  const [avatar, setAvatar] = useState<AvatarMeResponse | null>(null);
+  const { avatar, refreshIfStale } = useMyAvatar();
 
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch<AvatarMeResponse>('/api/avatar/me')
-      .then((r) => {
-        if (!cancelled) setAvatar(r);
-      })
-      .catch(() => {
-        // ⚠ Swallowed ON PURPOSE, unlike a data read. This is decoration around a screen that
-        // works without it: an older build, a device pointed at production, or no signal all land
-        // here, and every one of them should show initials rather than an error.
-        if (!cancelled) setAvatar(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  /**
+   * ⚠⚠ THE PROFILE TAB NEVER UNMOUNTS. The editor opens as a full-screen modal OVER it, so on
+   * `router.back()` this component is not remounted and a mount-time fetch would never run
+   * again — the card would keep showing the face the member just replaced.
+   *
+   * ⚠ STALENESS-GATED, not unconditional. Reloading on every focus would pull ~31 KB each time
+   * the profile tab is touched, for a thing that changes a handful of times in an account's
+   * life. The editor calls `invalidateMyAvatar()` when a save lands and this does the work.
+   * Same shape `(tabs)/index.tsx` uses with `refreshIfStale`.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      refreshIfStale();
+    }, [refreshIfStale]),
+  );
 
   // ⚠ Until the fetch lands there is no ground colour to paint, and guessing one would mean
   // mirroring the palette over here — the thing returning `ground` from the API avoided. The
