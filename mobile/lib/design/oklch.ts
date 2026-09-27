@@ -58,6 +58,29 @@ const toLinear = (v: number): number => {
 const toSrgb = (v: number): number =>
   255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)
 
+/**
+ * WCAG relative luminance. Reuses the same sRGB linearisation OKLab needs, which is why it lives
+ * here rather than in a module of its own.
+ */
+export function relativeLuminance(hex: string): number {
+  const [r, g, b] = parseHex(hex).map(toLinear)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/**
+ * WCAG 2.x contrast ratio, 1:1 to 21:1. Body text wants 4.5, large text 3.
+ *
+ * ⚠⚠ THIS IS FOR TEXT AND ONLY FOR TEXT. It is a LUMINANCE ratio and ignores hue completely, so
+ * it is the wrong tool for asking whether a shape is visible against a ground — by this measure
+ * a dark blue behind a mid-brown face scores 1.03, as though the head were not there. Use ΔE for
+ * silhouettes; `avatarGradient.test.ts` already does, and says so.
+ */
+export function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a)
+  const lb = relativeLuminance(b)
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+
 export function toOklab(hex: string): Oklab {
   const [r, g, b] = parseHex(hex).map(toLinear)
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)

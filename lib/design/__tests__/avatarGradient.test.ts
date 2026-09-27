@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest'
 import {
   AVATAR_GRADIENTS, AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES,
   hashUserIdToIndex, avatarGradient, avatarIndexFor, avatarColor, isAvatarColourName,
-  COLOUR_SHIFT, duelColourIndices,
+  COLOUR_SHIFT, duelColourIndices, groundInkFor, inkOn, GROUND_INK_DARK, GROUND_INK_LIGHT,
 } from '../avatarGradient'
+import { contrastRatio } from '../oklch'
 import { PALETTE } from '@/lib/avatar/compose'
 
 // Drift guard for the avatar palette.
@@ -433,5 +434,46 @@ describe('backgrounds stay usable as a palette of their own', () => {
     // tone. Ratchets only go up.
     expect(worst, `a background got closer to a skin tone than anything shipped: ${where}`)
       .toBeGreaterThanOrEqual(18)
+  })
+
+  it('keeps text on a member\'s own ground readable, whatever colour it is', () => {
+    // ⭐ THE COMPANION TO THE ΔE TEST ABOVE, AND DELIBERATELY THE OTHER METRIC. That one is about
+    // a SILHOUETTE, where hue carries the shape and WCAG is the wrong tool. This one is about
+    // TEXT — the name, the handle and the stat labels on the profile avatar card — which is
+    // exactly what WCAG contrast is for.
+    //
+    // ⚠⚠ WHITE ON A COLOUR BANNER IS THE INSTINCTIVE CHOICE AND IT FAILS ON ALL TWENTY-TWO:
+    // 1.51 (powder) to 2.61 (rose), short even of the 3:1 allowed for large text. So the card
+    // cannot simply use white, and `groundInkFor` picks per colour instead. Today it answers
+    // dark every time; this test is what lets that stay true for a palette nobody has added yet.
+    for (let i = 0; i < AVATAR_BACKGROUNDS.length; i++) {
+      const ground = AVATAR_BACKGROUNDS[i]
+      const ink = groundInkFor(i)
+      expect(
+        contrastRatio(ground, ink),
+        `${AVATAR_COLOUR_NAMES[i]} (${ground}) has no readable ink — best was ${ink}`,
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('only ever offers an ink it has proved, and the controls stay dark on their white chip', () => {
+    // The picker must return one of the two known inks — a third value would be unproved by the
+    // test above, which only checks whatever it is handed.
+    for (let i = 0; i < AVATAR_BACKGROUNDS.length; i++) {
+      expect([GROUND_INK_DARK, GROUND_INK_LIGHT]).toContain(groundInkFor(i))
+    }
+    // ⚠ The pencil chip and the "Build your avatar" pill sit on a near-white chip ON the ground,
+    // not on the ground itself, so they are pinned to the dark ink rather than following the
+    // picker. This is the assumption that makes that safe.
+    expect(contrastRatio('#FFFFFF', GROUND_INK_DARK)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('flips to light ink on a ground dark enough to need it', () => {
+    // ⚠ THE POINT OF THIS TEST IS THE BRANCH THE PALETTE CANNOT REACH. All twenty-two current
+    // colours answer dark, so the test above exercises only half of `inkOn`; without this the
+    // light half would sit unrun until the day someone added a deep colour and trusted it.
+    expect(inkOn('#101828')).toBe(GROUND_INK_LIGHT)   // near-black
+    expect(inkOn('#2E1065')).toBe(GROUND_INK_LIGHT)   // deep violet
+    expect(inkOn('#F8C1E7')).toBe(GROUND_INK_DARK)    // petal, the palette's palest
   })
 })

@@ -1,4 +1,4 @@
-import { withLightness } from './oklch'
+import { contrastRatio, withLightness } from './oklch'
 
 /**
  * Per-user avatar gradients.
@@ -295,6 +295,56 @@ export function inkFromIndex(index: number): AvatarInk {
  */
 export function avatarBackgroundFor(index: number): string {
   return AVATAR_BACKGROUNDS[index]
+}
+
+/**
+ * The two inks that can be painted ON a member's ground — see `groundInkFor`.
+ *
+ * ⚠⚠ BOTH ARE LITERALS AND NEITHER IS A THEME TOKEN. The ground does not change with the theme:
+ * it is the member's colour, the same value under `html.dark` as under `:root`. A theme-aware
+ * token (`text-ink`, `--foreground`) painted on a theme-independent background is guaranteed to
+ * invert into failure in one of the two themes. Anything drawn on a member's ground is pinned
+ * to these.
+ */
+export const GROUND_INK_DARK = '#1B2340'
+export const GROUND_INK_LIGHT = '#FFFFFF'
+
+/**
+ * Which ink to paint on a member's own ground — dark or light, whichever actually reads.
+ *
+ * ⭐ DERIVED, NOT HARDCODED, so the answer follows the palette. Today it returns the dark ink for
+ * all twenty-two, and that is a measurement rather than a preference:
+ *
+ *   vs #FFFFFF   1.51 (powder) .. 2.61 (rose)     — every single one FAILS 4.5:1
+ *   vs #1B2340   5.90 (rose)   .. 10.19 (powder)  — every single one passes
+ *
+ * ⚠⚠ WHITE ON A COLOUR BANNER IS THE INSTINCTIVE CHOICE AND IT IS WRONG FOR EVERY MEMBER HERE.
+ * Not one ground clears even the 3:1 allowed for large text, so it fails for the name as well as
+ * for the caption under it. The old gradient profile hero did use white legitimately — it sat on
+ * primary-600/700, which is dark. These twenty-two are pale-to-mid tints and the habit does not
+ * carry over. The two darkest, emerald and teal, still only reach 2.60.
+ *
+ * So the branch below does not fire today. It exists because the palette is the kind of thing
+ * that grows — and a deep colour added to it would silently make this text unreadable if the ink
+ * were a constant. `avatarGradient.test.ts` pins every ground at 4.5:1 against whatever this
+ * returns, so a colour that breaks the assumption fails the suite instead of shipping.
+ */
+export function groundInkFor(index: number): string {
+  return inkOn(AVATAR_BACKGROUNDS[index])
+}
+
+/**
+ * The same choice for an arbitrary colour.
+ *
+ * ⭐ SPLIT OUT SO THE LIGHT BRANCH IS TESTABLE. `groundInkFor` only ever sees the twenty-two, all
+ * of which answer dark, so through that signature alone the light half of this function could
+ * never be exercised and would rot unnoticed until the day a deep colour needed it. Given a hex
+ * directly, a test can prove both branches today.
+ */
+export function inkOn(background: string): string {
+  return contrastRatio(background, GROUND_INK_DARK) >= contrastRatio(background, GROUND_INK_LIGHT)
+    ? GROUND_INK_DARK
+    : GROUND_INK_LIGHT
 }
 
 // ---------------------------------------------------------------------------------------

@@ -34,26 +34,24 @@ import Link from 'next/link'
 import { MemberAvatar } from './MemberAvatar'
 import { Icon } from '@/components/ui/Icon'
 import { formatNumber } from '@/lib/format'
-import { avatarBackgroundFor, avatarIndexFor } from '@/lib/design/avatarGradient'
+import { GROUND_INK_DARK, avatarBackgroundFor, avatarIndexFor, groundInkFor } from '@/lib/design/avatarGradient'
 
 /**
- * ⚠⚠ EVERYTHING ON THIS CARD IS DARK, AND IT IS A LITERAL, NOT `text-ink`.
+ * ⭐ THE INK FOLLOWS THE GROUND. `groundInkFor` picks dark or light by measured WCAG contrast
+ * against that member's own colour, so this card cannot be made unreadable by a palette change.
  *
- * Two separate reasons, both measured:
+ * ⚠ It resolves to DARK for all twenty-two colours today, and that is a measurement, not a
+ * preference — white fails every one of them, including for the name. The reasoning, the figures
+ * and the guard that holds them live on `groundInkFor` in `lib/design/avatarGradient.ts`.
  *
- * 1. WHITE TEXT FAILS ON ALL TWENTY-TWO GROUNDS — 1.51:1 (powder) to 2.61:1 (rose), against
- *    WCAG's 4.5. Not one passes. White is the instinctive choice for a colour banner and it is
- *    wrong for every member. This same dark ink scores 5.90–10.19 on all 22. The old gradient
- *    hero DID use white, legitimately: it sat on primary-600/700, which is dark. These grounds
- *    are pale tints and the habit does not carry over.
+ * ⚠⚠ INLINE STYLE, NOT A TAILWIND CLASS. The value is decided at runtime from the member's
+ * colour, and Tailwind generates its classes by scanning source text — `text-[${ink}]` produces
+ * a class that was never built and the text silently inherits whatever it inherits.
  *
- * 2. IT CANNOT BE `text-ink`, which inverts to near-white under `html.dark`. The ground does NOT
- *    invert — it is the member's colour, the same value in both themes — so a theme-aware token
- *    on a theme-independent background is guaranteed to fail in one of the two. Anything painted
- *    on this card is pinned to the light palette on purpose.
+ * ⚠ Opacity, not a second colour, for the muted lines: a hand-picked "soft" ink would need its
+ * own contrast proof against all 22, and 70% of a passing ink cannot introduce a new failure the
+ * strong one does not already have.
  */
-const ON_GROUND = 'text-[#1B2340]'
-const ON_GROUND_SOFT = 'text-[#1B2340]/70'
 
 /**
  * ⚠ SIZED TO THE ZONE'S HEIGHT, NOT ITS WIDTH, and deliberately OVER 100%.
@@ -85,7 +83,9 @@ export function AvatarCard({
   /** The headline numbers, in display order. Formatted here, not by the caller. */
   stats: { label: string; value: number }[]
 }) {
-  const ground = avatarBackgroundFor(avatarIndexFor(userId, avatarColour))
+  const index = avatarIndexFor(userId, avatarColour)
+  const ground = avatarBackgroundFor(index)
+  const ink = groundInkFor(index)
 
   // ⚠ The LAYOUT decision, not the "can this deploy draw it" decision. A row that exists but
   // names an asset this bundle does not have still renders initials — that is MemberAvatar's
@@ -116,20 +116,24 @@ export function AvatarCard({
               className={AVATAR_FILL}
               // While the 169 KB of art is in flight the card is already the right colour, so the
               // initials sit on the finished background and nothing jumps but the figure.
-              fallback={<InitialsMark initials={initials} />}
+              fallback={<InitialsMark initials={initials} ink={ink} />}
             />
           ) : (
-            <InitialsMark initials={initials} />
+            <InitialsMark initials={initials} ink={ink} />
           )}
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col justify-center gap-4 px-5 pb-5 sm:px-0 sm:pb-0 sm:pr-6">
           <div className="min-w-0">
-            <h2 className={`text-2xl sm:text-3xl font-bold truncate ${ON_GROUND}`}>
+            <h2 className="text-2xl sm:text-3xl font-bold truncate" style={{ color: ink }}>
               {fullName || username}
             </h2>
-            <p className={`text-sm sm:text-base truncate ${ON_GROUND}/80`}>@{username}</p>
-            <p className={`text-xs sm:text-sm mt-0.5 ${ON_GROUND_SOFT}`}>Member since {memberSince}</p>
+            <p className="text-sm sm:text-base truncate" style={{ color: ink, opacity: 0.8 }}>
+              @{username}
+            </p>
+            <p className="text-xs sm:text-sm mt-0.5" style={{ color: ink, opacity: 0.7 }}>
+              Member since {memberSince}
+            </p>
           </div>
 
           {/* ⚠ No card chrome on these. They used to be three separate tiles in their own row
@@ -138,8 +142,12 @@ export function AvatarCard({
           <div className="flex items-center gap-5 sm:gap-8">
             {stats.map((s) => (
               <div key={s.label} className="min-w-0">
-                <p className={`t-num text-xl sm:text-2xl ${ON_GROUND}`}>{formatNumber(s.value)}</p>
-                <p className={`text-[11px] sm:text-xs truncate ${ON_GROUND_SOFT}`}>{s.label}</p>
+                <p className="t-num text-xl sm:text-2xl" style={{ color: ink }}>
+                  {formatNumber(s.value)}
+                </p>
+                <p className="text-[11px] sm:text-xs truncate" style={{ color: ink, opacity: 0.7 }}>
+                  {s.label}
+                </p>
               </div>
             ))}
           </div>
@@ -150,8 +158,9 @@ export function AvatarCard({
           {!hasAvatar && (
             <Link
               href="/profile/avatar"
-              className={`inline-flex self-start items-center gap-2 px-4 py-2 rounded-control
-                          bg-white/90 hover:bg-white text-[13px] font-semibold transition-colors ${ON_GROUND}`}
+              className="inline-flex self-start items-center gap-2 px-4 py-2 rounded-control
+                         bg-white/90 hover:bg-white text-[13px] font-semibold transition-colors"
+              style={{ color: GROUND_INK_DARK }}
             >
               Build your avatar
               <span aria-hidden="true">→</span>
@@ -159,9 +168,12 @@ export function AvatarCard({
           )}
         </div>
 
-        {/* ⚠ A WHITE CHIP WITH A DARK GLYPH, for the same reason the text is dark — a white icon
-            on `bg-black/15` was invisible on the pale half of the palette. White at 90% is
-            near-white on any of the 22, so the dark glyph always reads. */}
+        {/* ⚠⚠ THIS CHIP AND THE PILL ABOVE ARE ALWAYS DARK, NOT `ink`. They do not sit on the
+            member's ground — they sit on a near-white chip ON that ground, so they need contrast
+            against WHITE, not against the colour. The day `groundInkFor` returns light for some
+            deep colour, `ink` here would paint white on white and the control would disappear.
+            (Before the chip existed this was a white glyph on `bg-black/15`, which was invisible
+            on the pale half of the palette — the same mistake one layer down.) */}
         <Link
           href="/profile/avatar"
           aria-label={hasAvatar ? 'Edit your avatar' : 'Build your avatar'}
@@ -169,7 +181,9 @@ export function AvatarCard({
                      bg-white/90 hover:bg-white shadow-card
                      flex items-center justify-center transition-colors"
         >
-          <Icon name="pencil.line" size={18} weight="semibold" className={ON_GROUND} />
+          {/* ⚠ `tint`, not `style` — Icon takes no style prop; it resolves `tint ?? cssVarFor(color)`
+              and otherwise inherits currentColor. */}
+          <Icon name="pencil.line" size={18} weight="semibold" tint={GROUND_INK_DARK} />
         </Link>
       </div>
     </div>
@@ -177,11 +191,14 @@ export function AvatarCard({
 }
 
 /** Today's initials treatment, kept for the empty card and for art still in flight. */
-function InitialsMark({ initials }: { initials: string }) {
+function InitialsMark({ initials, ink }: { initials: string; ink: string }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center">
-      <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-pill bg-white/35 border-2 border-white/60
-                       flex items-center justify-center text-3xl font-bold ${ON_GROUND}`}>
+      <div
+        className="w-20 h-20 sm:w-24 sm:h-24 rounded-pill bg-white/35 border-2 border-white/60
+                   flex items-center justify-center text-3xl font-bold"
+        style={{ color: ink }}
+      >
         {initials}
       </div>
     </div>
