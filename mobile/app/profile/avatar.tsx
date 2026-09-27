@@ -37,7 +37,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useAvatarAssets } from '@/lib/useAvatarAssets';
-import { fontFamilies, useTheme } from '@/theme';
+import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
 // The avatar editor
@@ -452,6 +452,24 @@ export default function AvatarEditorScreen() {
   );
 }
 
+/**
+ * The fill behind a chosen tile — Ryan: "when selected the background should be shaded and
+ * outlined." Outline alone was doing all the work.
+ *
+ * ⚠⚠ NOT `theme.colors.primaryLight`, which is the obvious token and the wrong one. On mobile
+ * that is #F7F9FF — the web's `primary-50`, the exact value AvatarBuilder's own comment rejects:
+ * "primary-50 is #F7F9FF and reads as white on a white panel, which is how the tab strip's
+ * active pill went unnoticed." The web uses `primary-100` for this, and mobile has no equivalent
+ * token.
+ *
+ * ⭐ So it is the house tint recipe instead — the brand colour composited at 12%, which is what
+ * `Badge` uses for every pill in the app and what `ProfileCard` used for its initials circle. It
+ * follows the theme correctly because `primary` itself does, and it is visible on both grounds
+ * rather than only on the dark one.
+ */
+const SELECTED_TINT = (theme: ReturnType<typeof useTheme>) =>
+  withOpacity(theme.colors.primary, 0.12);
+
 function Chip({
   label,
   onPress,
@@ -540,6 +558,7 @@ function Swatches({
             // ⚠ The unselected border needs its own dark-mode step, as on the web: the resting
             // token is very nearly the surface it sits on and reads as no border at all.
             borderColor: value === c ? theme.colors.primary : theme.colors.silver,
+            backgroundColor: value === c ? SELECTED_TINT(theme) : 'transparent',
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -667,7 +686,7 @@ function Heads({
             borderRadius: 20,
             borderWidth: 2,
             borderColor: value === k ? theme.colors.primary : theme.colors.silver,
-            backgroundColor: theme.colors.surface,
+            backgroundColor: value === k ? SELECTED_TINT(theme) : theme.colors.surface,
             overflow: 'hidden',
             alignItems: 'center',
             justifyContent: 'center',
