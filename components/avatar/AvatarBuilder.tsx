@@ -473,45 +473,53 @@ export function AvatarBuilder({ assets, cfg, set }: {
   // this — a stored row holds the colour name and the background is derived from it.
   const myIndex = AVATAR_BACKGROUNDS.indexOf(cfg.background)
 
-  // ⚠⚠ `bg-surface`, NEVER `bg-white` — here and on every tile below. globals.css remaps the
-  // whole Tailwind gray ramp onto the app's neutral ramp, so each `text-gray-*` and
-  // `border-gray-*` in this file INVERTS in dark mode — but `bg-white` is stock Tailwind and
-  // does not. Written the obvious way, this card stayed white while its own titles went light:
-  // measured at a 1.20:1 contrast ratio, which is invisible. It never showed while the builder
-  // lived only on the admin tab, because that surface was only ever looked at in light mode.
-  // `--surface` is #FFFFFF in light, so this is a no-op there and a fix in dark.
+  // ⚠⚠ NO CARD CHROME HERE — the CALLER supplies it. The profile editor puts the preview and
+  // these controls inside ONE bordered container (the preview full-bleed on the left), and a
+  // card of its own here would draw a second border inside the first. The admin tab wraps it in
+  // the card this used to render itself.
+  //
+  // ⚠⚠ `bg-surface`, NEVER `bg-white`, wherever chrome IS drawn — on every tile below, and in
+  // both callers. globals.css remaps the whole Tailwind gray ramp onto the app's neutral ramp,
+  // so each `text-gray-*` and `border-gray-*` in this file INVERTS in dark mode — but
+  // `bg-white` is stock Tailwind and does not. Written the obvious way, the card stayed white
+  // while its own titles went light: measured at 1.20:1, which is invisible. It never showed
+  // while the builder lived only on the admin tab, because that surface was only ever looked at
+  // in light mode. `--surface` is #FFFFFF in light, so it is a no-op there and a fix in dark.
   return (
-      <div className="bg-surface border border-gray-200 rounded-2xl p-6">
-        {/* ⭐ A SCROLLING PILL STRIP, not a segmented control. Seven labels do not fit in
-            equal-width segments at phone width — which is exactly why PoolDetail stopped using
-            one. Same structure as `app/pools/[pool_id]/PoolDetail.tsx`.
+      <div>
+        {/* ⭐⭐ ICONS ONLY, UNDERLINED — Ryan, with a reference: "Can we have our web avatar
+            editor simple like this?" Seven labelled pills could not fit at phone width, which
+            is why this used to be a horizontally SCROLLING strip with an off-screen half. Drop
+            the labels and all seven fit as equal shares of the width at 375px, so the scroller
+            goes and with it the question of whether anyone ever found step seven.
 
-            ⚠ The phone gutter (`pl-4`) is INSIDE the scroller. On the wrapper it sits outside
-            the scroll box, so the strip stops short of the screen at both ends and reads as
-            cropped rather than scrollable. */}
-        <div className="flex items-stretch gap-2 overflow-x-auto scrollbar-hide -mx-6 px-6 pb-1 mb-6">
+            ⚠⚠ THE GLYPHS NOW CARRY THE WHOLE MEANING, and Ryan has already said of them: "I'm
+            still not sold on them but we will go with them for now." They were provisional when
+            a label sat under each one explaining them; without the labels they are the only
+            thing a member has. Hence `aria-label` AND `title` on every tab — a screen reader
+            gets the name, a hover recovers it, and the section heading below names the step
+            again as soon as it is open. If a glyph has to be guessed at, that is the one to
+            replace rather than re-adding the labels.
+
+            ⚠ `role="tablist"` with `aria-selected`, not `aria-pressed`: these are views of one
+            panel, not seven independent toggles. */}
+        <div role="tablist" aria-label="Avatar steps" className="flex items-stretch border-b border-gray-200 mb-6">
           {STEPS.map((s) => (
             <button
               key={s.key}
               type="button"
+              role="tab"
               data-tab-key={s.key}
               onClick={() => setStep(s.key)}
-              aria-pressed={step === s.key}
-              className={`shrink-0 w-[88px] px-2 py-3 rounded-control text-[11px] font-bold leading-tight text-center transition-colors ${
-                // ⚠ NOT `sp-bg-mist`, which the admin sidebar uses for its active tab: mist is
-                // #EEF1F8 and this strip sits on a WHITE card, so the active pill was all but
-                // invisible — I had to read the computed style to tell which one was selected.
-                // The panel's own active treatment (bg-gray-900) would be a second black strip
-                // directly under the view switcher, so: the primary tint, which reads at a
-                // glance and stays lighter than the switcher above it.
-                // ⭐ THE SAME SELECTED TREATMENT AS A COLOUR TILE — SportPool blue on its tint.
-                // Two controls on one panel that both mean "this one is chosen" should not say
-                // it two different ways. `sp-bg-primary-light` is primary-50 (#F7F9FF), which
-                // is white enough on a white card that I had to read the computed style to see
-                // which tab was active.
+              aria-selected={step === s.key}
+              aria-label={s.label}
+              title={s.label}
+              // ⚠ `-mb-px` pulls the 2px underline over the container's own 1px border so the
+              // active tab sits ON the rule rather than above it, leaving a seam.
+              className={`flex-1 min-w-0 flex items-center justify-center py-3 border-b-2 -mb-px transition-colors ${
                 step === s.key
-                  ? 'bg-primary-100 text-primary-600'
-                  : 'sp-text-slate sp-hover-snow'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent sp-text-slate hover:text-ink'
               }`}
             >
               {/* ⚠ NO strokeWidth ON A SOLID ICON. The Hugeicons wrapper spreads
@@ -519,8 +527,7 @@ export function AvatarBuilder({ assets, cfg, set }: {
                   lays an outline over the filled body and fattens the glyph — components/ui/
                   Icon.tsx records the same trap. Verified here: the rendered path carried both
                   fill and stroke until this was removed. */}
-              <HugeiconsIcon icon={s.icon} size={34} className="mx-auto mb-1.5 block" />
-              {s.label}
+              <HugeiconsIcon icon={s.icon} size={26} />
             </button>
           ))}
         </div>

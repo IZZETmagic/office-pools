@@ -222,7 +222,12 @@ function SelectorMock({ assets, cfg, set }: {
           within a week. What stayed here is what is ADMIN-ONLY and was never member-facing:
           the persona card with its hardcoded "Alex Mercer", the duel preview with its
           hardcoded opponent, and a Save button that is deliberately inert. */}
-      <AvatarBuilder assets={assets} cfg={cfg} set={set} />
+      {/* ⚠ The card chrome lives HERE now, not inside AvatarBuilder. The profile editor puts
+          the builder inside a container it shares with the preview, so a card of its own would
+          have drawn a border inside a border there. */}
+      <div className="bg-surface border border-gray-200 rounded-2xl p-6">
+        <AvatarBuilder assets={assets} cfg={cfg} set={set} />
+      </div>
     </div>
   )
 }
