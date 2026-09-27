@@ -82,10 +82,26 @@ function ColourCard({
           // chip 12, inset 6) and a tile IS a control. `border-primary-600` is SportPool blue
           // (#3B6EFF) and `bg-primary-100` its visible tint — `primary-50` is #F7F9FF and reads
           // as white on a white panel, which is how the tab strip's active pill went unnoticed.
+          //
+          // ⚠⚠ THE UNSELECTED BORDER NEEDS A DARK-MODE STEP, and this is the reason it is
+          // `dark:border-gray-400` here and at four other sites in this file. Measured on the
+          // real card: gray-200 inverts to #232840 against a #1C2030 surface, which is 1.12:1 —
+          // an edge that is present in the DOM and invisible to the eye. Ryan: "the outline for
+          // all non selected cards in dark mode are not very visible." gray-400 is #5D6680 in
+          // dark, 2.83:1, essentially WCAG's 3:1 bar for a UI boundary, and still well under the
+          // selected blue's 6.52:1 so the two never compete.
+          //
+          // ⚠ `dark:` ONLY. gray-400 in LIGHT mode is far heavier than the #D4DAE8 these tiles
+          // have always had on white; applying it to both themes would fix dark by making light
+          // worse. The ramp is not symmetric and the fix cannot be either.
+          //
+          // ⚠⚠ THE HOVER HAD TO MOVE TOO. It was gray-300, which is 1.31:1 in dark — BELOW the
+          // new resting 2.83, so hovering would have made the border fainter. A hover that goes
+          // backwards is worse than no hover.
           className={`aspect-square rounded-control border-2 grid place-items-center transition ${
             value === c
               ? 'border-primary-600 bg-primary-100'
-              : 'border-gray-200 bg-surface hover:border-gray-300'
+              : 'border-gray-200 dark:border-gray-400 bg-surface hover:border-gray-300 dark:hover:border-gray-500'
           }`}
         >
           {/* ⚠ `rounded-chip`, not `rounded-inset`. Concentric rounding says a nested shape
@@ -265,7 +281,7 @@ function AssetCards({
               className={`aspect-square rounded-control border-2 p-1.5 transition ${
                 selected
                   ? 'border-primary-600 bg-primary-100'
-                  : 'border-gray-200 bg-surface group-hover:border-gray-300'
+                  : 'border-gray-200 dark:border-gray-400 bg-surface group-hover:border-gray-300 dark:group-hover:border-gray-500'
               } [&>svg]:w-full [&>svg]:h-auto [&>svg]:block`}
               dangerouslySetInnerHTML={{ __html: render(o) }}
             />
@@ -535,7 +551,7 @@ export function AvatarBuilder({ assets, cfg, set }: {
 
             ⚠ `role="tablist"` with `aria-selected`, not `aria-pressed`: these are views of one
             panel, not seven independent toggles. */}
-        <div role="tablist" aria-label="Avatar steps" className="flex items-stretch border-b border-gray-200 mb-6">
+        <div role="tablist" aria-label="Avatar steps" className="flex items-stretch border-b border-gray-200 dark:border-gray-400 mb-6">
           {STEPS.map((s) => (
             <button
               key={s.key}
@@ -668,7 +684,7 @@ export function AvatarBuilder({ assets, cfg, set }: {
                 className={`mb-2.5 px-3 py-1.5 rounded-chip text-[12px] border transition ${
                   !cfg.facialHairColour
                     ? 'bg-ink text-surface border-ink'
-                    : 'bg-surface text-gray-700 border-gray-200 hover:border-gray-400'}`}>
+                    : 'bg-surface text-gray-700 border-gray-200 dark:border-gray-400 hover:border-gray-400 dark:hover:border-gray-500'}`}>
                 Match hair
               </button>
               <ColourCard colours={PALETTE.hair} value={cfg.facialHairColour}
@@ -692,7 +708,7 @@ export function AvatarBuilder({ assets, cfg, set }: {
         {step === 'wearables' && (
           <>
             <Section title="Headwear">
-              <div className="rounded-card border border-dashed border-gray-200 px-4 py-8 text-center">
+              <div className="rounded-card border border-dashed border-gray-200 dark:border-gray-400 px-4 py-8 text-center">
                 <p className="text-[13px] font-semibold text-gray-500">Nothing here yet</p>
                 <p className="text-[11px] text-gray-400 mt-1">
                   No headwear has been drawn. The slot is deliberately not wired into the
