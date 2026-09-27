@@ -222,12 +222,23 @@ export default function AvatarStudio({
               className="relative lg:w-[42%] shrink-0 overflow-hidden"
               style={{ backgroundColor: background }}
             >
-              {/* ⚠ Anchored TOP, sized to WIDTH. The square is 2048×2048 with its ground painted
-                  edge to edge, so filling the width and letting the bottom fall outside gives
-                  the head-and-torso framing in the reference. The panel already carries the
-                  same colour, so nothing shows where the square does not reach. */}
+              {/* ⚠⚠ ANCHORED TO THE BOTTOM, sized to WIDTH. Ryan: "there is a gap between the
+                  avatar and the bottom of the card and there should be no gap."
+
+                  The square is 2048×2048 and the BODY RUNS TO ITS BOTTOM EDGE, so whichever
+                  edge the square is pinned to is where the figure meets the card. Pinned to the
+                  top it was 463px tall in a 480px panel and left 17px of bare ground under the
+                  torso — the gap. Pinned to the bottom the torso meets the card edge exactly and
+                  the surplus becomes headroom at the TOP, which is invisible because the top of
+                  the canvas is empty ground in the same colour.
+
+                  ⚠ Sizing to width, NOT `object-cover`-style `slice`, is deliberate. Slice would
+                  also close the gap but by cropping the sides, and the margin there is thinner
+                  than it looks: art starts at canvas x61, so a cover crop is only safe while the
+                  panel is at least 94% as wide as it is tall. Width-sizing can never clip the
+                  ears no matter what the panel does. */}
               <div
-                className="absolute inset-x-0 top-0 [&>svg]:w-full [&>svg]:h-auto [&>svg]:block"
+                className="absolute inset-x-0 bottom-0 [&>svg]:w-full [&>svg]:h-auto [&>svg]:block"
                 dangerouslySetInnerHTML={{ __html: preview }}
               />
               {/* Holds the panel open to a sensible height on a phone, where there is no
