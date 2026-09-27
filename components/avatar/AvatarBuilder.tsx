@@ -25,7 +25,8 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  ChairBarberIcon, ColorsIcon, ContrastIcon, GlassesIcon, HatIcon, Relieved02Icon, ScissorIcon,
+  ChairBarberIcon, ColorsIcon, ContrastIcon, HatIcon, RectangleGogglesIcon, Relieved02Icon,
+  ScissorIcon,
 } from '@hugeicons-pro/core-solid-rounded'
 import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 import { AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES } from '@/lib/design/avatarGradient'
@@ -303,7 +304,11 @@ const STEPS = [
   // above wants the rest to go.
   { key: 'eyes', label: 'Eyes', icon: Relieved02Icon },
   { key: 'hair', label: 'Hair', icon: ScissorIcon },
-  { key: 'eyewear', label: 'Glasses & earrings', icon: GlassesIcon },
+  // ⚠ `RectangleGogglesIcon` DID NOT EXIST IN THE INSTALLED PACK. It arrived in
+  // @hugeicons-pro/core-solid-rounded 4.3.4, one of 630 icons added over the 4.2.3 that was
+  // pinned here (5,442 -> 6,072). The declared range was already `^4.2.3`, so only the lockfile
+  // was holding it back; the bump changes the pin, not the contract.
+  { key: 'eyewear', label: 'Glasses & earrings', icon: RectangleGogglesIcon },
   { key: 'facialhair', label: 'Facial hair', icon: ChairBarberIcon },
   { key: 'wearables', label: 'Headwear & shirt', icon: HatIcon },
   { key: 'colour', label: 'Your colour', icon: ColorsIcon },
