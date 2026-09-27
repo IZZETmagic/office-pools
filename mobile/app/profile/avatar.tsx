@@ -75,6 +75,16 @@ type Step = (typeof STEPS)[number]['key'];
  * The colour is deliberately hideous: if the strip ever stops matching, tiles turn MAGENTA rather
  * than quietly reverting to a square.
  */
+/**
+ * ⭐ The two metals offered, gold then silver — Ryan on the web build: "one for gold and one for
+ * silver and show both".
+ *
+ * ⚠ `PALETTE.metal` has six. The other four are reachable in the admin builder and are
+ * deliberately not offered here: this surface is the member's, and two is the decision they
+ * actually make.
+ */
+const METALS = [PALETTE.metal[0], PALETTE.metal[1]] as const;
+
 const HEAD_GROUND = '#FF00FF';
 const HEAD_CANVAS = /<path[^>]*fill="rgb\(255,0,255\)"[^>]*\/?>/;
 /** ⚠ Reaches OUTSIDE the 2048 canvas, which is why the tile carries the same colour behind it. */
@@ -396,17 +406,61 @@ export default function AvatarEditorScreen() {
           )}
 
           {step === 'eyewear' && (
-            <Section title="Glasses">
-              <Heads
-                assets={assets}
-                cfg={current}
-                field="glasses"
-                options={[null, ...Object.keys(assets.glasses ?? {})]}
-                value={current.glasses}
-                onPick={(k) => set('glasses', k)}
-                tileSize={tileSize}
-              />
-            </Section>
+            <>
+              <Section title="Glasses colour">
+                <Swatches
+                  colours={PALETTE.frame}
+                  value={current.frameColour ?? PALETTE.frame[0]}
+                  onPick={(c) => set('frameColour', c)}
+                />
+              </Section>
+              <Section title="Glasses">
+                <Heads
+                  assets={assets}
+                  cfg={current}
+                  field="glasses"
+                  options={[null, ...Object.keys(assets.glasses ?? {})]}
+                  value={current.glasses}
+                  onPick={(k) => set('glasses', k)}
+                  tileSize={tileSize}
+                />
+              </Section>
+
+              {/* ⭐ ONE GRID, EACH STYLE'S METALS SIDE BY SIDE — the web's arrangement, and its
+                  reasoning holds here: the real choice is the PAIR, so stud-gold sits next to
+                  stud-silver and you pick along the row. Two labelled rows made the metal look
+                  like a section and the style like a choice within it.
+                  ⚠ "None" is a TILE, not a text link. It was words once and Ryan could not find
+                  it — an option that looks nothing like the options is not an option. */}
+              <Section title="Earrings">
+                <Heads
+                  assets={assets}
+                  cfg={current}
+                  field="earrings"
+                  options={[
+                    null,
+                    ...Object.keys(assets.earrings ?? {}).flatMap((e) =>
+                      METALS.map((m) => `${e}|${m}`),
+                    ),
+                  ]}
+                  value={
+                    current.earrings
+                      ? `${current.earrings}|${current.metalColour ?? METALS[0]}`
+                      : null
+                  }
+                  onPick={(k) => {
+                    if (!k) {
+                      set('earrings', null);
+                      return;
+                    }
+                    const [style, metal] = k.split('|');
+                    set('earrings', style);
+                    set('metalColour', metal);
+                  }}
+                  tileSize={tileSize}
+                />
+              </Section>
+            </>
           )}
 
           {step === 'facialhair' && (
@@ -619,8 +673,14 @@ function Heads({
 }: {
   assets: NonNullable<ReturnType<typeof useAvatarAssets>['assets']>;
   cfg: StoredAvatarBuild;
-  /** The one slot this grid varies. Setting it to `hair` makes the cards bare heads. */
-  field: 'hair' | 'expression' | 'glasses' | 'facialHair';
+  /**
+   * The one slot this grid varies. Setting it to `hair` makes the cards bare heads.
+   *
+   * ⚠ `earrings` is the odd one: its key is a COMPOSITE `style|metal`, because the real choice
+   * is the pair. A metal swatch beside a list of style names cannot show what the combination
+   * looks like, which is the whole point of the grid.
+   */
+  field: 'hair' | 'expression' | 'glasses' | 'facialHair' | 'earrings';
   options: (string | null)[];
   value: string | null | undefined;
   onPick: (k: string | null) => void;
@@ -645,7 +705,13 @@ function Heads({
     return options.map((k) => {
       // ⚠ `base` already carries cfg.hair, so this one spread covers both cases: the hair family
       // overrides it with the option, every other family leaves it alone.
-      const full = { ...base, [field]: k } as AvatarConfig;
+      const full = (
+        field === 'earrings'
+          ? k
+            ? { ...base, earrings: k.split('|')[0], metalColour: k.split('|')[1] }
+            : { ...base, earrings: null }
+          : { ...base, [field]: k }
+      ) as AvatarConfig;
       const head = headOnly(
         composeAvatar(full, assets),
         { skin: full.skin, shirt: full.shirt, hair: full.hairColour },
@@ -670,6 +736,11 @@ function Heads({
     cfg.hairColour,
     cfg.eyeColour,
     cfg.mouthColour,
+    // ⚠ The accessory COLOURS matter even though the accessories themselves are nulled: the
+    // glasses grid draws frames and the earrings grid draws metal, so a card changes when
+    // either does.
+    cfg.frameColour,
+    cfg.metalColour,
   ]);
 
   return (
