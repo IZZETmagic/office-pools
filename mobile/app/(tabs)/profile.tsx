@@ -27,6 +27,7 @@ import {
 import { SettingsCard, SettingsRow } from '@/components/settings';
 import { Icon, Text } from '@/components/ui';
 import { badgeIcon } from '@/components/pool-detail/badge-icons';
+import { AvatarCard } from '@/components/avatar/AvatarCard';
 import { useAuth } from '@/lib/auth';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import type { PoolSummary } from '@/lib/useHomeData';
@@ -82,23 +83,26 @@ export default function ProfileScreen() {
           />
         }
       >
-        <ProfileCard
+        {/* ⭐ The avatar card, directly under the header — Ryan: "right under the header section I
+            would like to put the avatar card like what we did on the web version". It replaces
+            BOTH `ProfileCard` and `QuickStatsRow`: the web card absorbed exactly those two, and at
+            phone width it carries the avatar with the name and the numbers underneath it. */}
+        <AvatarCard
           fullName={data?.fullName ?? 'User'}
           username={data?.username ?? ''}
-          memberSince={data?.memberSince ?? null}
-          totalPoints={totalPoints}
+          memberSince={data?.memberSince ? formatMemberSince(data.memberSince) : null}
           initials={initials}
+          stats={[
+            { label: 'Pools', value: String(pools.length) },
+            { label: 'Total Points', value: totalPoints.toLocaleString() },
+            { label: 'Predictions', value: totalPredictions.toLocaleString() },
+          ]}
         />
 
         {pools.length === 0 ? (
           <EmptyStatsCard />
         ) : (
           <>
-            <QuickStatsRow
-              poolsCount={pools.length}
-              totalPoints={totalPoints}
-              totalPredictions={totalPredictions}
-            />
             <PoolPerformanceSection pools={pools} />
             <AccuracySection pools={pools} />
           </>
@@ -119,180 +123,6 @@ export default function ProfileScreen() {
       />
       <JoinPoolSheet ref={joinPoolSheetRef} />
     </SafeAreaView>
-  );
-}
-
-function ProfileCard({
-  fullName,
-  username,
-  memberSince,
-  totalPoints,
-  initials,
-}: {
-  fullName: string;
-  username: string;
-  memberSince: string | null;
-  totalPoints: number;
-  initials: string;
-}) {
-  const theme = useTheme();
-  const memberSinceLabel = memberSince ? formatMemberSince(memberSince) : null;
-  return (
-    <View
-      style={{
-        marginHorizontal: theme.spacing.xl,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.md,
-        padding: theme.spacing.md,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radii.lg,
-      }}
-    >
-      <View
-        style={{
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: withOpacity(theme.colors.primary, 0.12),
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <RNText
-          style={{
-            fontFamily: fontFamilies.bold,
-            fontSize: 20,
-            color: theme.colors.primary,
-          }}
-        >
-          {initials}
-        </RNText>
-      </View>
-
-      <View style={{ flex: 1, gap: 2 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-          <RNText
-            numberOfLines={1}
-            style={{ fontFamily: fontFamilies.bold, fontSize: 17, color: theme.colors.ink }}
-          >
-            {fullName}
-          </RNText>
-          {totalPoints > 0 ? (
-            <View
-              style={{
-                paddingHorizontal: 7,
-                paddingVertical: 3,
-                borderRadius: 999,
-                backgroundColor: theme.colors.primaryLight,
-              }}
-            >
-              <RNText
-                style={{
-                  fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-                  fontSize: 10,
-                  color: theme.colors.primary,
-                }}
-              >
-                {totalPoints.toLocaleString()} pts
-              </RNText>
-            </View>
-          ) : null}
-        </View>
-        <RNText
-          style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}
-        >
-          @{username}
-        </RNText>
-        {memberSinceLabel ? (
-          <RNText
-            style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
-          >
-            Member since {memberSinceLabel}
-          </RNText>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-function QuickStatsRow({
-  poolsCount,
-  totalPoints,
-  totalPredictions,
-}: {
-  poolsCount: number;
-  totalPoints: number;
-  totalPredictions: number;
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        gap: theme.spacing.sm + 2,
-        paddingHorizontal: theme.spacing.xl,
-      }}
-    >
-      <StatCard
-        title="Pools"
-        value={String(poolsCount)}
-        icon="person.3.fill"
-        color={theme.colors.primary}
-      />
-      <StatCard
-        title="Points"
-        value={String(totalPoints)}
-        icon="bolt.fill"
-        color={theme.colors.accent}
-      />
-      <StatCard
-        title="Predictions"
-        value={String(totalPredictions)}
-        icon="checkmark.circle.fill"
-        color={theme.colors.green}
-      />
-    </View>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  icon,
-  color,
-}: {
-  title: string;
-  value: string;
-  icon: string;
-  color: string;
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flex: 1,
-        alignItems: 'center',
-        gap: 6,
-        paddingVertical: theme.spacing.md + 2,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radii.lg,
-      }}
-    >
-      <Icon name={icon as never} tint={color} size={16} weight="semibold" />
-      <RNText
-        style={{
-          fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 20,
-          color: theme.colors.ink,
-        }}
-      >
-        {value}
-      </RNText>
-      <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 10, color: theme.colors.slate }}>
-        {title}
-      </RNText>
-    </View>
   );
 }
 
