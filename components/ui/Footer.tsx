@@ -4,7 +4,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Wordmark } from './Wordmark'
 
-const HIDDEN_ROUTES = ['/login', '/signup']
+/**
+ * ⚠ EXACT MATCHES, not prefixes — `includes` on the pathname. `/profile` keeps its footer; only
+ * the avatar editor loses one.
+ *
+ * ⭐ Why the editor is here with the auth screens: all three are a single task with its own way
+ * out, not a page you browse from. The editor already has a back arrow at the top and Done at
+ * the bottom, and a bar of Pricing / FAQ / Terms links under the primary action invites you to
+ * leave halfway through building a face. Ryan: "we do not need a footer for this page."
+ */
+const HIDDEN_ROUTES = ['/login', '/signup', '/profile/avatar']
 
 /**
  * The signed-in check went with the Features and Get Started links — they were
