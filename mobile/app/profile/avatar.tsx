@@ -101,7 +101,7 @@ const STARTING_BUILD: StoredAvatarBuild = {
 export default function AvatarEditorScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const { user } = useAuth();
   const { assets, error: assetsError } = useAvatarAssets();
 
@@ -195,13 +195,21 @@ export default function AvatarEditorScreen() {
   }
 
   /**
-   * ⚠⚠ THE BAND IS THE TOP QUARTER AND THE SQUARE IS SIZED FROM ITS HEIGHT — which is the number
-   * that can clip the ears. The square renders 1.2× the band's height; it must stay narrower than
-   * the SCREEN or the ears go. At 375×812 that is a 203-tall band, a 244 square and 375 of width,
-   * so there is room. A short, wide screen is the case to re-measure.
+   * ⚠⚠ THE SQUARE IS SIZED FROM THE BAND'S HEIGHT, which is what can clip the ears — it renders
+   * 1.2× that height and has to stay narrower than the SCREEN.
+   *
+   * ⚠ A THIRD, NOT A QUARTER. Ryan asked for a taller card; at a quarter the torso was cut just
+   * below the chin. A third of 812 is a 271 band and a 325 square against 375 of width, so it
+   * still fits — but only because 1.2 × (H/3) < W holds while H/W < 2.5, and every current phone
+   * is around 1.8–2.2. That is an assumption about hardware, not a guarantee.
+   *
+   * ⭐ So it is CLAMPED rather than trusted. On any screen proportioned badly enough to break the
+   * arithmetic the avatar letterboxes slightly instead of losing its ears, which is the failure
+   * that degrades rather than the one that looks broken. The art spans x61..1987 of the 2048
+   * canvas, so meeting the screen edge exactly still leaves a ~3% margin around the figure.
    */
-  const bandHeight = height / 4;
-  const avatarSize = bandHeight * 1.2;
+  const bandHeight = height / 3;
+  const avatarSize = Math.min(bandHeight * 1.2, width);
 
   if (assetsError) {
     return (
