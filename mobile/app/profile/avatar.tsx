@@ -464,17 +464,76 @@ export default function AvatarEditorScreen() {
           )}
 
           {step === 'facialhair' && (
-            <Section title="Facial hair">
-              <Heads
-                assets={assets}
-                cfg={current}
-                field="facialHair"
-                options={[null, ...Object.keys(assets.facialhair)]}
-                value={current.facialHair}
-                onPick={(k) => set('facialHair', k)}
-                tileSize={tileSize}
-              />
-            </Section>
+            <>
+              <Section title="Facial hair colour">
+                {/* ⚠⚠ "MATCH HAIR" IS UNSET, NOT A COLOUR, and that distinction is load-bearing.
+                    Absent means "follow the hair, LIFTED by BEARD_LIFT"; a colour means "use this
+                    verbatim". Storing it as a copy of the hair colour would look identical in the
+                    picker and render every beard 12 per channel darker than it should be.
+                    `toStoredAvatarBuild` deletes the key on `== null`, and `isStoredAvatarBuild`
+                    short-circuits on `!== undefined`, so passing `undefined` here is safe all the
+                    way to the column.
+                    ⚠ It sits ABOVE the row rather than posing as a tile in it, because a tile in
+                    a colour grid promises to be a colour. */}
+                <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: !current.facialHairColour }}
+                    onPress={() => set('facialHairColour', undefined)}
+                    style={{
+                      alignSelf: 'flex-start',
+                      paddingHorizontal: 14,
+                      paddingVertical: 7,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: current.facialHairColour
+                        ? theme.colors.silver
+                        : theme.colors.ink,
+                      backgroundColor: current.facialHairColour
+                        ? theme.colors.surface
+                        : theme.colors.ink,
+                    }}
+                  >
+                    <RNText
+                      style={{
+                        fontFamily: fontFamilies.bold,
+                        fontSize: 12,
+                        color: current.facialHairColour ? theme.colors.ink : theme.colors.surface,
+                      }}
+                    >
+                      Match hair
+                    </RNText>
+                  </Pressable>
+                </View>
+                <Swatches
+                  colours={PALETTE.hair}
+                  value={current.facialHairColour ?? null}
+                  onPick={(c) => set('facialHairColour', c)}
+                />
+                <RNText
+                  style={{
+                    fontFamily: fontFamilies.medium,
+                    fontSize: 12,
+                    color: theme.colors.slate,
+                    paddingHorizontal: 16,
+                    marginTop: 10,
+                  }}
+                >
+                  Stubble is drawn as a shadow on the skin, so colour barely changes it.
+                </RNText>
+              </Section>
+              <Section title="Facial hair">
+                <Heads
+                  assets={assets}
+                  cfg={current}
+                  field="facialHair"
+                  options={[null, ...Object.keys(assets.facialhair)]}
+                  value={current.facialHair}
+                  onPick={(k) => set('facialHair', k)}
+                  tileSize={tileSize}
+                />
+              </Section>
+            </>
           )}
 
           {step === 'wearables' && (
@@ -741,6 +800,7 @@ function Heads({
     // either does.
     cfg.frameColour,
     cfg.metalColour,
+    cfg.facialHairColour,
   ]);
 
   return (
