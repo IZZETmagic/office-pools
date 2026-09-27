@@ -25,9 +25,9 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  BackgroundIcon, ChairBarberIcon, ContrastIcon, HatIcon, RectangleGogglesIcon, Relieved02Icon,
-  ScissorIcon,
+  BackgroundIcon, ContrastIcon, HatIcon, RectangleGogglesIcon, Relieved02Icon, ScissorIcon,
 } from '@hugeicons-pro/core-solid-rounded'
+import { MoustacheIcon } from './stepIcons'
 import { composeAvatar, headOnly, PALETTE, type AvatarAssets, type AvatarConfig } from '@/lib/avatar/compose'
 import { AVATAR_BACKGROUNDS, AVATAR_COLOUR_NAMES } from '@/lib/design/avatarGradient'
 
@@ -309,7 +309,9 @@ const STEPS = [
   // pinned here (5,442 -> 6,072). The declared range was already `^4.2.3`, so only the lockfile
   // was holding it back; the bump changes the pin, not the contract.
   { key: 'eyewear', label: 'Glasses & earrings', icon: RectangleGogglesIcon },
-  { key: 'facialhair', label: 'Facial hair', icon: ChairBarberIcon },
+  // ⭐ OUR OWN MOUSTACHE, traced from the avatar art rather than borrowed from the icon pack.
+  // `ChairBarberIcon` was a barber's chair — furniture, standing in for a beard.
+  { key: 'facialhair', label: 'Facial hair', icon: MoustacheIcon },
   { key: 'wearables', label: 'Headwear & shirt', icon: HatIcon },
   // ⭐ `BackgroundIcon`, and the name is the honest one: this step sets the avatar's GROUND,
   // which is also the glow on your side of a Showdown duel. `ColorsIcon` was three paint blobs —
