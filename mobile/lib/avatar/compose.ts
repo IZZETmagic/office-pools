@@ -319,6 +319,52 @@ const lighten = (c: RGB, f = 1.22) => rgbStr(c.map((v) => Math.min(255, Math.tru
 const mix = (a: RGB, b: RGB, t: number) => rgbStr(a.map((v, i) => Math.trunc(v + (b[i] - v) * t)))
 
 /**
+ * ⭐⭐ THE MOUTH MUST NOT DISAPPEAR INTO THE SKIN.
+ *
+ * ⚠⚠ ΔE SAID THIS PALETTE WAS FINE AND ΔE WAS MEASURING THE WRONG THING. Every mouth/skin
+ * pair scores ΔE ≥ 21.9, which looks safe — but a mouth is a THIN LINE, and the eye resolves
+ * fine detail by LIGHTNESS, not by hue. Measured in L*: the four mouth colours cluster at
+ * 48–64 while skin runs 21–91, so mid-brown skins land on top of them — `#B7793A` skin (L*
+ * 56.1) against `#B67A70` lips (L* 57.1) is ΔL* 1.0. Eight of the fifteen skin tones had no
+ * mouth colour reaching even ΔL* 14. They were invisible, exactly as reported.
+ *
+ * ⭐ INTEGER LUMA, NOT Lab, AND THAT IS DELIBERATE. `verify-avatar-parity.mjs` holds three
+ * compositors BYTE-IDENTICAL across TypeScript, Python and the builder's HTML. Lab needs cube
+ * roots, and three languages' floating point would eventually disagree in the last bit and
+ * round to different RGB. `(299r + 587g + 114b) / 1000` with integer division is exact and
+ * identical everywhere.
+ *
+ * ⭐⭐ IT OFFSETS, IT DOES NOT SCALE — the same lesson the stubble floor records. Multiplying
+ * moves a dark colour barely at all (×1.14 bought +2.2 on black), whereas ADDING a constant to
+ * every channel shifts luma by exactly that constant, because the weights sum to 1. So the
+ * separation is GUARANTEED rather than attempted. Measured over all 60 skin × mouth pairs: 22
+ * adjusted, 0 channels clamped, and the worst separation afterwards is exactly FLOOR.
+ *
+ * ⚠ THE DIRECTION IS THE ARTIST'S, NOT OURS. It pushes further the way the chosen colour
+ * already leant — darker lips stay darker, lighter lips stay lighter — so brown skin keeps its
+ * lighter lip rather than being forced into a shadow. Only an exact tie picks a side, and then
+ * it moves away from whichever end of the range the skin is nearer.
+ *
+ * ⚠ THIS SHIFTS WHAT THE MEMBER PICKED, which the beard-lift note above argues against on
+ * principle ("a picker that shifts what you chose is the odd one out"). The difference is the
+ * reason: the lift was cosmetic, this is legibility — the same grounds on which stubble already
+ * has a floor against skin. The swatch and the render can differ by up to FLOOR of luma.
+ */
+const MOUTH_SKIN_FLOOR = 40
+
+const lumaOf = (c: RGB) => Math.trunc((299 * c[0] + 587 * c[1] + 114 * c[2]) / 1000)
+
+const mouthAgainstSkin = (mouth: RGB, skin: RGB): RGB => {
+  const lm = lumaOf(mouth)
+  const ls = lumaOf(skin)
+  const d = lm - ls
+  if (Math.abs(d) >= MOUTH_SKIN_FLOOR) return mouth
+  const dir = d > 0 ? 1 : d < 0 ? -1 : ls > 127 ? -1 : 1
+  const off = ls + dir * MOUTH_SKIN_FLOOR - lm
+  return mouth.map((v) => Math.min(255, Math.max(0, v + off))) as RGB
+}
+
+/**
  * Stubble is a SHADOW on the skin, not a short beard. Measured off the art Ryan approved on
  * 2026-09-18: 84% of the way from the beard to the skin in lightness, and clearly greyer than
  * the hair-to-skin line. A plain 55% mix gave a mid brown that read as a lighter full beard,
@@ -948,9 +994,13 @@ export function composeAvatar(cfg: AvatarConfig, A: AvatarAssets): string {
   svg = swap(svg, T.irisCore, rgbStr(eye))
   svg = swap(svg, T.irisRim, lighten(eye, 1.28))
 
-  svg = swap(svg, T.mouthInk, rgbStr(mouth))
-  svg = swap(svg, T.mouthDark, darken(mouth, 0.65))
-  svg = swap(svg, T.mouthTongue, lighten(mouth, 1.13))
+  // ⚠ The floored tone is what the whole mouth is built from — ink, interior and tongue all
+  // derive from it, so flooring only the ink would leave the other two agreeing with a colour
+  // that is no longer on the face.
+  const mouthLit = mouthAgainstSkin(mouth, skin)
+  svg = swap(svg, T.mouthInk, rgbStr(mouthLit))
+  svg = swap(svg, T.mouthDark, darken(mouthLit, 0.65))
+  svg = swap(svg, T.mouthTongue, lighten(mouthLit, 1.13))
 
   // The beard tone. Computed here because the fade below ends at it. The lift is the
   // fallback's alone — see the note on fhRgb above.

@@ -210,6 +210,39 @@ def rgb_str(rgb) -> str:
     return "rgb({},{},{})".format(*rgb)
 
 
+# ⭐⭐ THE MOUTH MUST NOT DISAPPEAR INTO THE SKIN.
+#
+# ⚠⚠ ΔE said this palette was fine and ΔE was measuring the wrong thing. Every mouth/skin pair
+# scores ΔE >= 21.9, which looks safe — but a mouth is a THIN LINE and the eye resolves fine
+# detail by LIGHTNESS, not hue. In L* the four mouth colours cluster at 48-64 while skin runs
+# 21-91, so mid-brown skins land on top of them: #B7793A skin (L* 56.1) against #B67A70 lips
+# (L* 57.1) is ΔL* 1.0. Eight of fifteen skin tones had no mouth reaching even ΔL* 14.
+#
+# ⭐ INTEGER LUMA, NOT Lab. verify-avatar-parity.mjs holds this file byte-identical to
+# lib/avatar/compose.ts and builder-template.html; Lab needs cube roots and three languages'
+# floats would eventually round to different RGB. This is exact everywhere.
+#
+# ⭐⭐ IT OFFSETS, IT DOES NOT SCALE — the stubble floor's lesson. Adding a constant to every
+# channel shifts luma by exactly that constant, so the separation is guaranteed rather than
+# attempted. Over all 60 skin x mouth pairs: 22 adjusted, 0 clamped, worst separation = FLOOR.
+MOUTH_SKIN_FLOOR = 40
+
+
+def luma_of(rgb) -> int:
+    return int((299 * rgb[0] + 587 * rgb[1] + 114 * rgb[2]) / 1000)
+
+
+def mouth_against_skin(mouth, skin):
+    """Push the mouth away from the skin in lightness, the way it already leant."""
+    lm, ls = luma_of(mouth), luma_of(skin)
+    d = lm - ls
+    if abs(d) >= MOUTH_SKIN_FLOOR:
+        return tuple(mouth)
+    direction = 1 if d > 0 else -1 if d < 0 else (-1 if ls > 127 else 1)
+    off = ls + direction * MOUTH_SKIN_FLOOR - lm
+    return tuple(min(255, max(0, c + off)) for c in mouth)
+
+
 # ⭐⭐ EVERY ID IN A COMPOSED DOCUMENT IS SUFFIXED, because an id is scoped to the DOCUMENT and
 # an avatar is not a document — it is one element among many on a page.
 #
@@ -593,6 +626,14 @@ def main() -> None:
         # interior is the lip colour darkened and the tongue lightened, so a recoloured lip
         # never leaves a mismatched gap behind it.
         rgb = hex_to_rgb(c)
+        # ⚠ Floored against the SKIN before anything derives from it — ink, interior and tongue
+        # all come off this tone, so flooring only the ink would leave the other two agreeing
+        # with a colour no longer on the face. Falls back to the base skin when --skin is unset,
+        # which is what the document actually carries in that case.
+        skin_rgb = hex_to_rgb(arg("--skin")) if arg("--skin") else tuple(
+            int(v) for v in BASE_SKIN[4:-1].split(",")
+        )
+        rgb = mouth_against_skin(rgb, skin_rgb)
         svg = svg.replace(f'fill="{MOUTH_INK}"', f'fill="{rgb_str(rgb)}"')
         svg = svg.replace(f'fill="{MOUTH_DARK}"', f'fill="{darken(rgb, 0.65)}"')
         svg = svg.replace(f'fill="{MOUTH_TONGUE}"', f'fill="{lighten(rgb, 1.13)}"')

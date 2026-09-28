@@ -95,6 +95,24 @@ const hex2rgb = h => { h = h.replace('#',''); return [0,2,4].map(i => parseInt(h
 const rgbStr  = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 const darken  = (c,f=0.78) => rgbStr(c.map(v => Math.max(0, Math.trunc(v*f))));
 const lighten = (c,f=1.22) => rgbStr(c.map(v => Math.min(255, Math.trunc(v*f))));
+/* ⭐⭐ THE MOUTH MUST NOT DISAPPEAR INTO THE SKIN. ΔE said this palette was fine (every pair
+   >= 21.9) and ΔE was the wrong measure: a mouth is a THIN LINE and fine detail is resolved by
+   LIGHTNESS, not hue. In L* the four mouth colours sit at 48-64 while skin runs 21-91, so
+   mid-brown skins landed on top of them — #B7793A skin vs #B67A70 lips is ΔL* 1.0.
+   ⭐ Integer luma rather than Lab: verify-avatar-parity.mjs holds this file byte-identical to
+   compose.ts and compose.py, and three languages' float cube roots would eventually disagree.
+   ⭐⭐ It OFFSETS rather than scales — adding a constant to every channel moves luma by exactly
+   that constant, so the separation is guaranteed. 22 of 60 pairs adjust, none clamp. */
+const MOUTH_SKIN_FLOOR = 40;
+const lumaOf = c => Math.trunc((299*c[0] + 587*c[1] + 114*c[2]) / 1000);
+const mouthAgainstSkin = (mouth, skin) => {
+  const lm = lumaOf(mouth), ls = lumaOf(skin);
+  const d = lm - ls;
+  if (Math.abs(d) >= MOUTH_SKIN_FLOOR) return mouth;
+  const dir = d > 0 ? 1 : d < 0 ? -1 : (ls > 127 ? -1 : 1);
+  const off = ls + dir*MOUTH_SKIN_FLOOR - lm;
+  return mouth.map(v => Math.min(255, Math.max(0, v + off)));
+};
 const mix     = (a,b,t)    => rgbStr(a.map((v,i) => Math.trunc(v + (b[i]-v)*t)));
 const lum2 = c => 0.2126*c[0] + 0.7152*c[1] + 0.0722*c[2];
 // stubble is a shadow: toward the skin, then toward grey. ⚠ Same numbers as compose.ts/.py.
@@ -375,9 +393,11 @@ function compose(c){
   svg = swapAll(svg, T.irisCore, rgbStr(eye));
   svg = swapAll(svg, T.irisRim,  lighten(eye,1.28));
 
-  svg = swapAll(svg, T.mouthInk,    rgbStr(mouth));
-  svg = swapAll(svg, T.mouthDark,   darken(mouth,0.65));
-  svg = swapAll(svg, T.mouthTongue, lighten(mouth,1.13));
+  /* ⚠ Floored first — ink, interior and tongue all derive from this tone. */
+  const mouthLit = mouthAgainstSkin(mouth, skin);
+  svg = swapAll(svg, T.mouthInk,    rgbStr(mouthLit));
+  svg = swapAll(svg, T.mouthDark,   darken(mouthLit,0.65));
+  svg = swapAll(svg, T.mouthTongue, lighten(mouthLit,1.13));
 
   if (svg.includes(T.frameInk) || svg.includes(T.lensTint) || svg.includes(T.glint)) {
     const frame = hex2rgb(c.frameColour || DEFAULT_FRAME);
