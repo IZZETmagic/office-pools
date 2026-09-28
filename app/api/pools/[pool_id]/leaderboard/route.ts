@@ -25,6 +25,16 @@ type LeaderboardEntryResponse = {
   user_id: string
   full_name: string
   username: string
+  /** The colour this member picked — `users.avatar_colour`, migration 146. Null falls back to the hash of their id. */
+  avatar_colour: string | null
+  /**
+   * The member's stored avatar — `users.avatar_build`, migration 147.
+   *
+   * ⚠ Raw JSONB. It is only trustworthy once `readStoredAvatarBuild` has checked it against the
+   * asset bundle the CLIENT shipped with; the server cannot vouch for a config a newer bundle
+   * wrote. A row this build cannot draw falls back to initials, which is correct, not a failure.
+   */
+  avatar_build: unknown
   match_points: number
   bonus_points: number
   point_adjustment: number
@@ -167,7 +177,11 @@ async function handleGET(
       .single(),
     adminClient
       .from('pool_members')
-      .select('member_id, user_id, role, users(user_id, username, full_name)')
+      // ⚠ `avatar_colour` was TYPED on the entry and never actually selected here, so every
+    // World Cup row carried null and the leaderboard fell back to the hash of the id. Both
+    // columns ride along now — this is the only query that gathers members for this route, and
+    // a second one would be a second chance to disagree about a member's colour.
+    .select('member_id, user_id, role, users(user_id, username, full_name, avatar_colour, avatar_build)')
       .eq('pool_id', pool_id),
   ])
 
@@ -261,7 +275,14 @@ async function handleGET(
     const member = memberMap.get(entry.member_id)
     if (!member) continue
 
-    const userInfo = (member as any).users
+    /**
+     * ⚠ Typed here rather than cast at each use. The embedded `users` row arrives untyped from
+     * the `any` above; naming its shape once means the four reads below are checked against
+     * something, and adding a column cannot silently read as `undefined`.
+     */
+    const userInfo = (member as any).users as
+      | { full_name: string | null; username: string | null; avatar_colour: string | null; avatar_build: unknown }
+      | undefined
     const sc = scoreOf(entry.entry_id)
     const adjustment = sc.point_adjustment
     const stats = statsByEntry.get(entry.entry_id)
@@ -297,6 +318,8 @@ async function handleGET(
       user_id: (member as any).user_id,
       full_name: userInfo?.full_name ?? 'Unknown',
       username: userInfo?.username ?? '',
+      avatar_colour: userInfo?.avatar_colour ?? null,
+      avatar_build: userInfo?.avatar_build ?? null,
       match_points: matchPoints,
       bonus_points: bonusPoints,
       point_adjustment: adjustment,

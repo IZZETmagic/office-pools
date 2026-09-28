@@ -1,5 +1,6 @@
 import { Platform, Pressable, Text as RNText, View } from 'react-native';
 
+import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { AwardBadge, FormDots, LevelPill, rankColor } from './leaderboard-shared';
 import { Icon, Text } from '@/components/ui';
 import type { LeaderboardEntry, PoolAward } from '@/lib/api';
@@ -96,6 +97,23 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
           </View>
         ) : null}
       </View>
+
+      {/*
+        ⭐ BETWEEN THE POSITION AND THE NAME — Ryan, 2026-09-28: *"position number, avatar, name,
+        username ... just put the avatar in between the position number, username, and name."*
+
+        ⚠ Outside the `flex: 1` block on purpose. Inside it the face would compete with the name
+        for the remaining width and shrink on a long entry name; as its own fixed column the
+        three parts of the row keep their order at every width.
+      */}
+      <LeaderboardAvatar
+        userId={entry.user_id ?? null}
+        name={name}
+        avatarBuild={entry.avatar_build ?? null}
+        avatarColour={entry.avatar_colour ?? null}
+        size={34}
+        rank={rank}
+      />
 
       <View style={{ flex: 1, gap: 3 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

@@ -312,7 +312,6 @@ export async function readLeagueLeaderboard(
 ): Promise<{ leaderboard: LeagueLeaderboard | null; error: string | null }> {
   const isTable = pool.league_mode === 'table'
   const isLms = pool.league_mode === 'last_man_standing'
-  const isShowdown = pool.league_mode === 'showdown'
   /**
    * Does this mode have a WEEKLY PICKING RECORD to report?
    *
@@ -347,13 +346,14 @@ export async function readLeagueLeaderboard(
       : null
 
   /**
-   * ⚠ THE AVATAR CONFIG IS ASKED FOR ONLY WHERE IT IS DRAWN. See `avatar_build` on the entry
-   * type: ~330 bytes per ENTRY, and only Showdown renders faces — every other mode would pay
-   * ~62 KB on the largest league pool (192 entries) for something it never draws.
+   * ⚠ ~330 bytes per ENTRY, and it used to be Showdown-only for that reason. Now that the
+   * leaderboards themselves draw faces, every mode needs it — and the cost turned out to be
+   * small where it lands: the biggest LEAGUE pool is 10 entries (~3 KB). The 192-entry pools
+   * that motivated the original gate are World Cup, which is a different route entirely
+   * (`app/api/pools/[pool_id]/leaderboard/route.ts`).
    */
-  const memberColumns = isShowdown
-    ? 'member_id, user_id, users(user_id, username, full_name, avatar_colour, avatar_build)'
-    : 'member_id, user_id, users(user_id, username, full_name, avatar_colour)'
+  const memberColumns =
+    'member_id, user_id, users(user_id, username, full_name, avatar_colour, avatar_build)'
 
   const { data: memberRows, error: memberErr } = await admin
     .from('pool_members')
@@ -469,7 +469,7 @@ export async function readLeagueLeaderboard(
       // ⚠ null outside Showdown because the column was never selected there — see the note on
       // the field. A consumer that finds null must fall back to initials, never assume "no
       // avatar built".
-      avatar_build: isShowdown ? member.users?.avatar_build ?? null : null,
+      avatar_build: member.users?.avatar_build ?? null,
       total_points: t?.total_points ?? 0,
       // ⚠ Withheld in LMS. See `LmsRowState` — the stored rank there is entry_id
       // order, and passing it on is passing on a wrong answer that looks right.

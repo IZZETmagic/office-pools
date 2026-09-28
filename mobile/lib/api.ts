@@ -216,10 +216,10 @@ export type LeaderboardEntryCore = {
   /**
    * The member's avatar, as stored — `users.avatar_build`, migration 147.
    *
-   * ⚠⚠ SHOWDOWN ONLY. The server sends it for a Showdown pool and null for every other mode,
-   * because it is ~330 bytes per ENTRY and no other leaderboard draws a face — see the note in
-   * `lib/league/leaderboard.ts`. So null here means "not sent OR not built", and both answers
-   * lead to the same place: initials.
+   * ⚠ ~330 bytes per ENTRY. It was Showdown-only when only Showdown drew faces; every
+   * leaderboard draws them now, so both routes send it — the league one and the World Cup one
+   * (`app/api/pools/[pool_id]/leaderboard/route.ts`, which never populated `avatar_colour`
+   * either until then). Null means "this member has not built one", and the answer is initials.
    *
    * ⚠ `unknown` until `readStoredAvatarBuild` has checked it against the bundle THIS build
    * shipped with.

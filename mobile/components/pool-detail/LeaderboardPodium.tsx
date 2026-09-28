@@ -1,5 +1,6 @@
 import { Platform, Pressable, Text as RNText, View } from 'react-native';
 
+import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { AwardBadge, FormDots, LevelPill } from './leaderboard-shared';
 import { Icon, Text } from '@/components/ui';
 import type { LeaderboardEntry, PoolAward } from '@/lib/api';
@@ -36,7 +37,6 @@ export function LeaderboardPodium({
         pedestalHeight={120}
         ringColor={theme.colors.silver}
         bgTint={withOpacity(theme.colors.silver, 0.15)}
-        medalIcon="medal.fill"
         isCurrentUser={entries[1].user_id === currentUserId}
         awards={awardsByEntry[entries[1].entry_id] ?? []}
         onPress={onEntryPress ? () => onEntryPress(entries[1].entry_id) : undefined}
@@ -47,7 +47,6 @@ export function LeaderboardPodium({
         pedestalHeight={150}
         ringColor={theme.colors.accent}
         bgTint={withOpacity(theme.colors.accent, 0.1)}
-        medalIcon="trophy.fill"
         isCurrentUser={entries[0].user_id === currentUserId}
         awards={awardsByEntry[entries[0].entry_id] ?? []}
         onPress={onEntryPress ? () => onEntryPress(entries[0].entry_id) : undefined}
@@ -58,7 +57,6 @@ export function LeaderboardPodium({
         pedestalHeight={100}
         ringColor={theme.colors.bronze}
         bgTint={withOpacity(theme.colors.bronze, 0.1)}
-        medalIcon="medal.fill"
         isCurrentUser={entries[2].user_id === currentUserId}
         awards={awardsByEntry[entries[2].entry_id] ?? []}
         onPress={onEntryPress ? () => onEntryPress(entries[2].entry_id) : undefined}
@@ -73,7 +71,6 @@ function PodiumColumn({
   pedestalHeight,
   ringColor,
   bgTint,
-  medalIcon,
   isCurrentUser,
   awards,
   onPress,
@@ -83,7 +80,6 @@ function PodiumColumn({
   pedestalHeight: number;
   ringColor: string;
   bgTint: string;
-  medalIcon: string;
   isCurrentUser: boolean;
   awards: PoolAward[];
   onPress?: () => void;
@@ -118,7 +114,29 @@ function PodiumColumn({
             justifyContent: 'center',
           }}
         >
-          <Icon name={medalIcon as never} color="slate" size={22} />
+          {/*
+            ⭐ THE FACE STANDS WHERE THE MEDAL DID — Ryan, 2026-09-28: *"where the trophy icons
+            and the medal icons are right now above the podiums, the avatars should go there
+            instead."*
+
+            ⚠ THE RING IS THE MEDAL NOW. `ringColor` is gold / silver / bronze and it is the only
+            thing left saying which place this is, so it must not be softened — the glyph it used
+            to hold is gone.
+
+            ⚠ 46, not 52: the ring is 3pt on each side of a 52pt circle, so the inside is 46. A
+            52 here would sit under the border and clip.
+
+            ⚠ `rank={1}` deliberately — this is a podium, not the tail of a long list, so
+            `FACE_LIMIT` must never gate it. See the note on that constant.
+          */}
+          <LeaderboardAvatar
+            userId={entry.user_id ?? null}
+            name={name}
+            avatarBuild={entry.avatar_build ?? null}
+            avatarColour={entry.avatar_colour ?? null}
+            size={46}
+            rank={1}
+          />
         </View>
         {rankDelta !== 0 ? (
           <View
