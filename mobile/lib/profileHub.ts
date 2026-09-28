@@ -5,6 +5,9 @@
 // (mobile/lib/__tests__/profileHub.test.ts).
 // =============================================================
 
+import { ordinal } from './ordinal';
+import { poolCardBlocks, type BlockInput } from './poolCardBlocks';
+
 /**
  * Badges that describe a CURRENT state rather than an achievement — `top_dog`
  * is held while you lead and handed on when you don't. Counting its unlocks
@@ -162,5 +165,130 @@ export function versionLabel(params: {
   }
   if (params.isDev) parts.push('dev');
   else if (params.updateId) parts.push(`update ${params.updateId.slice(0, 8)}`);
+  return parts.join(' · ');
+}
+
+// -------------------------------------------------------------
+// Seasons — every competition you've played, grouped
+// -------------------------------------------------------------
+
+export type SeasonTournament = {
+  tournamentId: string;
+  name: string;
+  startDate: string | null;
+  endDate: string | null;
+};
+
+export type SeasonPoolInput = BlockInput & {
+  poolId: string;
+  poolName: string;
+  status: string;
+  tournamentId: string;
+  memberCount: number;
+};
+
+export type SeasonSection<P extends SeasonPoolInput = SeasonPoolInput> = {
+  tournamentId: string;
+  name: string;
+  /**
+   * ⚠ DERIVED FROM YOUR POOLS, NOT `tournaments.status`. That column is not
+   * maintained — the World Cup still reads "upcoming" after its final. A
+   * competition is live for you while any of your pools in it is still open.
+   */
+  live: boolean;
+  pools: P[];
+};
+
+/**
+ * Pools grouped by competition. Live competitions first, then finished ones,
+ * each newest first by end date; pools inside a section open first, then by
+ * name.
+ *
+ * ⚠ ARCHIVED POOLS ARE LEFT OUT. They have their own place — the Archived Pools
+ * row in settings — and Seasons, like the Trophy Room, is the record of what
+ * you are still showing (Ryan, 2026-09-28).
+ */
+export function groupSeasons<P extends SeasonPoolInput>(
+  pools: P[],
+  tournaments: SeasonTournament[],
+  archivedIds: ReadonlySet<string>,
+): SeasonSection<P>[] {
+  const byId = new Map(tournaments.map((t) => [t.tournamentId, t]));
+  const sections = new Map<string, SeasonSection<P>>();
+
+  for (const p of pools) {
+    if (archivedIds.has(p.poolId)) continue;
+    let section = sections.get(p.tournamentId);
+    if (!section) {
+      section = {
+        tournamentId: p.tournamentId,
+        name: byId.get(p.tournamentId)?.name ?? 'Competition',
+        live: false,
+        pools: [],
+      };
+      sections.set(p.tournamentId, section);
+    }
+    section.pools.push(p);
+    if (p.status !== 'completed') section.live = true;
+  }
+
+  const endOf = (id: string) => byId.get(id)?.endDate ?? byId.get(id)?.startDate ?? '';
+  const out = [...sections.values()];
+  for (const s of out) {
+    s.pools.sort(
+      (a, b) =>
+        Number(a.status === 'completed') - Number(b.status === 'completed') ||
+        a.poolName.localeCompare(b.poolName),
+    );
+  }
+  out.sort(
+    (a, b) =>
+      Number(b.live) - Number(a.live) ||
+      endOf(b.tournamentId).localeCompare(endOf(a.tournamentId)) ||
+      a.name.localeCompare(b.name),
+  );
+  return out;
+}
+
+export type SeasonStat = { value: string; label: string; muted?: boolean };
+
+/**
+ * The two figures a Seasons row shows, taken from the SAME per-mode blocks the
+ * Pools tab card uses (`poolCardBlocks`) so the two surfaces cannot disagree.
+ *
+ * A rank reads "3rd · of 14"; a stat reads "112 · Points". Dots and the picks
+ * ring are card furniture and are dropped. Last Man Standing has no rank block
+ * at all — that decision lives in `poolCardBlocks`, and is inherited here.
+ */
+export function seasonRowStats(p: BlockInput): SeasonStat[] {
+  const out: SeasonStat[] = [];
+  for (const b of poolCardBlocks(p)) {
+    if (b.kind === 'rank') {
+      if (b.show && b.rank !== null) {
+        out.push({ value: ordinal(b.rank), label: `of ${b.totalEntries}` });
+      }
+    } else if (b.kind === 'stat') {
+      out.push({ value: b.value, label: b.sub ? `${b.label} ${b.sub}` : b.label, muted: b.muted });
+    }
+    if (out.length === 2) break;
+  }
+  return out;
+}
+
+/** The medal a FINISHED pool's row wears, or null. Same podium rules as the Trophy Room. */
+export function finishMedal(p: PodiumPoolInput): 1 | 2 | 3 | null {
+  const finish = podiumFinishes([p], new Set()).finishes[0];
+  return finish ? finish.rank : null;
+}
+
+/** The Seasons tile's teaser — "2 live · 1 finished". Null while loading. */
+export function seasonsTeaser(sections: { live: boolean }[] | null): string | null {
+  if (sections === null) return null;
+  if (sections.length === 0) return 'Your competitions will collect here';
+  const live = sections.filter((s) => s.live).length;
+  const done = sections.length - live;
+  const parts: string[] = [];
+  if (live > 0) parts.push(`${live} live`);
+  if (done > 0) parts.push(`${done} finished`);
   return parts.join(' · ');
 }

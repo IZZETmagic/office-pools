@@ -2,11 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import {
   badgeSource,
+  finishMedal,
+  groupSeasons,
   podiumFinishes,
+  seasonRowStats,
+  seasonsTeaser,
   tallyBadges,
   trophyTeaser,
   versionLabel,
   type PodiumPoolInput,
+  type SeasonPoolInput,
 } from '../profileHub';
 
 describe('tallyBadges', () => {
@@ -146,5 +151,132 @@ describe('versionLabel', () => {
     expect(
       versionLabel({ appVersion: '1.2.1', runtimeVersion: '1.2.0', updateId: null, isDev: false }),
     ).toBe('SportPool 1.2.1 · runtime 1.2.0');
+  });
+});
+
+const sp = (over: Partial<SeasonPoolInput>): SeasonPoolInput => ({
+  poolId: 'p',
+  poolName: 'Pool',
+  status: 'open',
+  tournamentId: 'pl',
+  memberCount: 10,
+  predictionMode: 'league_pickem',
+  leagueMode: 'pickem',
+  currentRank: 3,
+  totalEntries: 14,
+  totalPoints: 112,
+  hasScoringStarted: true,
+  level: null,
+  formResults: [],
+  league: null,
+  ...over,
+});
+
+const T = [
+  { tournamentId: 'wc', name: 'FIFA World Cup 2026', startDate: '2026-06-11', endDate: '2026-07-19' },
+  { tournamentId: 'pl', name: 'Premier League 2026/27', startDate: '2026-08-21', endDate: '2027-05-30' },
+  { tournamentId: 'll', name: 'La Liga 2026/27', startDate: '2026-08-15', endDate: '2027-05-30' },
+];
+
+describe('groupSeasons', () => {
+  it('groups by competition, live first, then newest finished', () => {
+    const s = groupSeasons(
+      [
+        sp({ poolId: 'a', tournamentId: 'wc', status: 'completed' }),
+        sp({ poolId: 'b', tournamentId: 'pl' }),
+        sp({ poolId: 'c', tournamentId: 'll' }),
+      ],
+      T,
+      new Set(),
+    );
+    expect(s.map((x) => [x.name, x.live])).toEqual([
+      ['La Liga 2026/27', true],
+      ['Premier League 2026/27', true],
+      ['FIFA World Cup 2026', false],
+    ]);
+  });
+
+  it('takes a competition\'s state from YOUR pools, not the stale tournaments.status', () => {
+    const s = groupSeasons(
+      [
+        sp({ poolId: 'a', tournamentId: 'pl', status: 'completed' }),
+        sp({ poolId: 'b', tournamentId: 'pl', status: 'open' }),
+      ],
+      T,
+      new Set(),
+    );
+    expect(s[0].live).toBe(true);
+    // open pools lead inside a section
+    expect(s[0].pools.map((p) => p.poolId)).toEqual(['b', 'a']);
+  });
+
+  it('leaves archived pools out, and drops a competition that only had archived pools', () => {
+    const s = groupSeasons(
+      [sp({ poolId: 'a', tournamentId: 'wc', status: 'completed' }), sp({ poolId: 'b' })],
+      T,
+      new Set(['a']),
+    );
+    expect(s.map((x) => x.tournamentId)).toEqual(['pl']);
+  });
+
+  it('still groups when the names could not be read', () => {
+    expect(groupSeasons([sp({})], [], new Set())[0].name).toBe('Competition');
+  });
+});
+
+describe('seasonRowStats', () => {
+  it('reads rank then points for Pick\'em, from the same blocks as the pool card', () => {
+    const stats = seasonRowStats(
+      sp({
+        league: {
+          leagueMode: 'pickem',
+        } as never,
+      }),
+    );
+    expect(stats[0]).toEqual({ value: '3rd', label: 'of 14' });
+    expect(stats[1].label).toBe('Points');
+  });
+
+  it('shows no rank before scoring has started', () => {
+    const stats = seasonRowStats(sp({ hasScoringStarted: false, league: null, leagueMode: null }));
+    expect(stats[0].label).toBe('Points');
+  });
+
+  it('never shows a rank in Last Man Standing', () => {
+    const stats = seasonRowStats(
+      sp({
+        leagueMode: 'last_man_standing',
+        currentRank: 2,
+        league: {
+          leagueMode: 'last_man_standing',
+          lms: {
+            roundsWon: 1,
+            roundNumber: 2,
+            clubsUsed: 5,
+            clubPool: 20,
+            survivorsLeft: 9,
+            roundEntrants: 23,
+            isEliminated: false,
+          },
+        } as never,
+      }),
+    );
+    expect(stats.map((x) => x.label)).toEqual(['Rounds in 2', 'Clubs of 20']);
+  });
+});
+
+describe('finishMedal', () => {
+  it('uses the Trophy Room rules — a medal only on a finished podium', () => {
+    expect(finishMedal(pool({ currentRank: 2 }))).toBe(2);
+    expect(finishMedal(pool({ status: 'open' }))).toBeNull();
+    expect(finishMedal(pool({ leagueMode: 'last_man_standing' }))).toBeNull();
+  });
+});
+
+describe('seasonsTeaser', () => {
+  it('counts live and finished competitions', () => {
+    expect(seasonsTeaser(null)).toBeNull();
+    expect(seasonsTeaser([])).toBe('Your competitions will collect here');
+    expect(seasonsTeaser([{ live: true }, { live: true }, { live: false }])).toBe('2 live · 1 finished');
   });
 });

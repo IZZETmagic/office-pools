@@ -11,7 +11,7 @@
 // replacement pages each speak one mode's language, or none.
 //
 // The doors:
-//   · Seasons          — not built yet ("Soon")
+//   · Seasons          — app/profile/seasons.tsx
 //   · Trophy Room      — app/profile/trophies.tsx
 //   · Scouting Report  — app/profile/scouting.tsx (needs /api/me/scouting)
 //   · My Crews         — deliberately not built: no derived or suggested
@@ -39,7 +39,7 @@ import {
 import { HubTile } from '@/components/profile/HubTile';
 import { DividedList, SectionWrapper, SettingsRow } from '@/components/settings';
 import { useHomeData } from '@/lib/HomeDataProvider';
-import { trophyTeaser, versionLabel } from '@/lib/profileHub';
+import { groupSeasons, seasonsTeaser, trophyTeaser, versionLabel } from '@/lib/profileHub';
 import { useArchivedPools } from '@/lib/useArchivedPools';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { usePodium } from '@/lib/usePodium';
@@ -82,6 +82,16 @@ export default function ProfileScreen() {
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return (name.slice(0, 2) || '?').toUpperCase();
   }, [data?.fullName]);
+
+  // Competition names are not needed for a count, so the hub groups without
+  // the extra tournaments read the Seasons page makes.
+  const seasonSections = useMemo(
+    () =>
+      data && archived
+        ? groupSeasons(data.allPools, [], new Set(archived.map((a) => a.poolId)))
+        : null,
+    [data, archived],
+  );
 
   const archivedSubtitle = archivedLoading
     ? 'Checking…'
@@ -192,8 +202,9 @@ export default function ProfileScreen() {
             <HubTile
               icon="calendar"
               title="Seasons"
-              teaser="How you finished, competition by competition"
+              teaser={seasonsTeaser(seasonSections)}
               tint={theme.colors.primary}
+              onPress={() => router.push('/profile/seasons')}
             />
             <HubTile
               icon="trophy.fill"
