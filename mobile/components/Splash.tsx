@@ -14,17 +14,26 @@
 // the app PERFORMING a wait it no longer has. A progress indicator for progress
 // that isn't being made is just decoration that makes things feel slower.
 //
-// ⚠ THE DARK GROUND IS LOAD-BEARING, not a leftover. The wordmark is two-tone:
-// "Sport" in white, "Pool" in the brand blue. On a blue ground the second half
-// of the name disappears. Any change of ground has to answer for the wordmark
-// first.
+// ⚠ THE GROUND HAS TO ANSWER FOR THE WORDMARK. It is two-tone, and the second
+// half of the name is the brand blue — so a BLUE ground would hide "Pool"
+// entirely. That is why the two grounds below are the app's own backgrounds and
+// not the brand colour: the name has to be readable on whatever it sits on.
 
-const SPLASH_BG = '#0B0F1A';
+/**
+ * ⚠ THE TABS' OWN BACKGROUND (`snow.light`), not "some white". The splash is
+ * revealing the app, so the colour it fades into should be the colour already
+ * there — anything else makes the reveal a step. There is a test asserting this
+ * still equals the theme token.
+ */
+const SPLASH_BG_LIGHT = '#F7F8FC';
+
+/** The brand's dark ground (`midnight`). */
+const SPLASH_BG_DARK = '#0B0F1A';
 
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useColorScheme, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -64,6 +73,11 @@ function hideNativeSplash() {
 }
 
 export function Splash({ fontsReady, preloadComplete, onDismissed }: Props) {
+  // ⚠ READ HERE, NOT FROM `useTheme()`. This has to be the same signal the OS
+  // used when it picked which `backgroundColor` to paint a moment ago, or the
+  // two layers disagree and the launch gains the step this design removed.
+  const isDark = useColorScheme() === 'dark';
+  const background = isDark ? SPLASH_BG_DARK : SPLASH_BG_LIGHT;
   const rootOpacity = useSharedValue(1);
 
   useEffect(() => {
@@ -90,14 +104,15 @@ export function Splash({ fontsReady, preloadComplete, onDismissed }: Props) {
   return (
     <Animated.View
       pointerEvents={preloadComplete ? 'none' : 'auto'}
-      style={[StyleSheet.absoluteFill, { backgroundColor: SPLASH_BG }, rootStyle]}
+      style={[StyleSheet.absoluteFill, { backgroundColor: background }, rootStyle]}
     >
-      <StatusBar style="light" />
+      {/* ⚠ Follows the ground, or the clock and battery vanish into it. */}
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View style={styles.center}>
         {/* ⚠ The shared `Wordmark`, not a copy of it. This file used to spell
             the two-tone name out itself, which meant the launch screen could
             drift from every other place the name appears. */}
-        {fontsReady ? <Wordmark size={44} onDark /> : null}
+        {fontsReady ? <Wordmark size={44} onDark={isDark} /> : null}
       </View>
     </Animated.View>
   );
