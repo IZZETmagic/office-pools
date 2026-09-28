@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { poolNeedsPredictions, type NeedsPredictionsInput } from '../needsPredictions'
+import {
+  deriveProgressiveNeedsPredictions,
+  poolNeedsPredictions,
+  type NeedsPredictionsInput,
+  type ProgressiveRoundsInput,
+} from '../needsPredictions'
 
 /** A World Cup pool, submitted. Each test names only what it changes. */
 const base: NeedsPredictionsInput = {
@@ -83,5 +88,106 @@ describe('poolNeedsPredictions', () => {
     // card has to keep working against it.
     expect(at({ leagueHasSubmitted: null, entryHasSubmitted: true })).toBe(false)
     expect(at({ leagueHasSubmitted: null, entryHasSubmitted: false })).toBe(true)
+  })
+})
+
+describe('deriveProgressiveNeedsPredictions', () => {
+  // The question is always "does the BEST entry owe anything in a round that is
+  // OPEN right now" — not "has this member ever submitted", which the
+  // entry-level flag answers and which is true from the first round onwards.
+  const POOL = 'pool-1'
+  const ENTRY = 'entry-1'
+  const at = (over: Partial<ProgressiveRoundsInput> = {}) =>
+    deriveProgressiveNeedsPredictions({
+      progressivePoolIds: [POOL],
+      bestEntryByPool: { [POOL]: ENTRY },
+      openRounds: [{ pool_id: POOL, round_key: 'r16' }],
+      submissions: [],
+      ...over,
+    })
+
+  it('owes nothing when no round is open', () => {
+    // Between rounds. The member may be behind on a CLOSED round and still
+    // correctly be told there is nothing to do.
+    expect(at({ openRounds: [] })[POOL]).toBe(false)
+  })
+
+  it('owes a prediction for an open round with no submission', () => {
+    expect(at()[POOL]).toBe(true)
+  })
+
+  it('owes nothing once that round is filed', () => {
+    expect(
+      at({ submissions: [{ entry_id: ENTRY, round_key: 'r16', has_submitted: true }] })[POOL],
+    ).toBe(false)
+  })
+
+  it('treats a `has_submitted: false` row as still owed', () => {
+    // ⚠ The subtle one. A row EXISTS for a round the member has opened and not
+    // filed. Counting the row's presence rather than its value would report the
+    // exact opposite of the truth.
+    expect(
+      at({ submissions: [{ entry_id: ENTRY, round_key: 'r16', has_submitted: false }] })[POOL],
+    ).toBe(true)
+  })
+
+  it('ignores another entry\'s submissions', () => {
+    // A member with two entries can have filed on the one the card does NOT
+    // speak for. That is not an answer for this card.
+    expect(
+      at({ submissions: [{ entry_id: 'other-entry', round_key: 'r16', has_submitted: true }] })[POOL],
+    ).toBe(true)
+  })
+
+  it('owes a prediction when ANY open round is unfiled', () => {
+    expect(
+      at({
+        openRounds: [
+          { pool_id: POOL, round_key: 'r16' },
+          { pool_id: POOL, round_key: 'qf' },
+        ],
+        submissions: [{ entry_id: ENTRY, round_key: 'r16', has_submitted: true }],
+      })[POOL],
+    ).toBe(true)
+  })
+
+  it('is satisfied only when EVERY open round is filed', () => {
+    expect(
+      at({
+        openRounds: [
+          { pool_id: POOL, round_key: 'r16' },
+          { pool_id: POOL, round_key: 'qf' },
+        ],
+        submissions: [
+          { entry_id: ENTRY, round_key: 'r16', has_submitted: true },
+          { entry_id: ENTRY, round_key: 'qf', has_submitted: true },
+        ],
+      })[POOL],
+    ).toBe(false)
+  })
+
+  it('does not let one pool answer for another', () => {
+    const out = deriveProgressiveNeedsPredictions({
+      progressivePoolIds: ['a', 'b'],
+      bestEntryByPool: { a: 'entry-a', b: 'entry-b' },
+      openRounds: [
+        { pool_id: 'a', round_key: 'r16' },
+        { pool_id: 'b', round_key: 'r16' },
+      ],
+      submissions: [{ entry_id: 'entry-a', round_key: 'r16', has_submitted: true }],
+    })
+    expect(out).toEqual({ a: false, b: true })
+  })
+
+  it('answers only for the pools it was asked about', () => {
+    const out = at({ progressivePoolIds: [] })
+    expect(out).toEqual({})
+  })
+
+  it('says "owed" for a pool with an open round and no known best entry', () => {
+    // Defensive: a pool id with no entry in the map. Erring towards "go and
+    // look" is the recoverable direction — the opposite silently hides a
+    // deadline.
+    expect(at({ bestEntryByPool: {} })[POOL]).toBe(true)
   })
 })

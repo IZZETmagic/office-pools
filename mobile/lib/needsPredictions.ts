@@ -64,3 +64,68 @@ export function poolNeedsPredictions(p: NeedsPredictionsInput): boolean {
   if (p.predictionMode === 'progressive') return p.progressiveUnsubmitted;
   return !p.entryHasSubmitted;
 }
+
+// -------------------------------------------------------------------------
+// THE PROGRESSIVE BRANCH'S INPUT
+// -------------------------------------------------------------------------
+// `poolNeedsPredictions` above takes `progressiveUnsubmitted` as a given. This
+// is where that boolean is actually decided, and it is the subtle half: the
+// entry-level flag is useless for a progressive pool because it flips true on
+// the first submission and stays true for ever, so the real question is
+// per-round — does the member's best entry owe anything in a round that is
+// OPEN right now?
+//
+// Lived in the middle of the fetch as two Maps and three loops, where nothing
+// could reach it. It is pure given its two row sets, and those row sets are
+// exactly what the wave-collapse work will change the shape of — so it is worth
+// having an oracle before that happens rather than after.
+// -------------------------------------------------------------------------
+
+export type ProgressiveRoundsInput = {
+  /** The pools to answer for. A pool absent from the result was never asked. */
+  progressivePoolIds: readonly string[];
+  /** Pool id → the entry the card speaks for. See lib/bestEntry.ts. */
+  bestEntryByPool: Readonly<Record<string, string>>;
+  /** `pool_round_states` rows already filtered to `state = 'open'`. */
+  openRounds: readonly { pool_id: string; round_key: string }[];
+  /** `entry_round_submissions` rows for the best entries. */
+  submissions: readonly { entry_id: string; round_key: string; has_submitted: boolean }[];
+};
+
+export function deriveProgressiveNeedsPredictions(
+  input: ProgressiveRoundsInput,
+): Record<string, boolean> {
+  const openRoundsByPool = new Map<string, Set<string>>();
+  for (const r of input.openRounds) {
+    const set = openRoundsByPool.get(r.pool_id) ?? new Set<string>();
+    set.add(r.round_key);
+    openRoundsByPool.set(r.pool_id, set);
+  }
+
+  // ⚠ Only rows that say `true` count as submitted. A row saying `false` is a
+  // round the member has started and not filed, which is precisely the case
+  // this exists to catch — treating its presence as an answer would report the
+  // opposite of the truth.
+  const submittedByEntry = new Map<string, Set<string>>();
+  for (const s of input.submissions) {
+    if (!s.has_submitted) continue;
+    const set = submittedByEntry.get(s.entry_id) ?? new Set<string>();
+    set.add(s.round_key);
+    submittedByEntry.set(s.entry_id, set);
+  }
+
+  const result: Record<string, boolean> = {};
+  for (const poolId of input.progressivePoolIds) {
+    const openRounds = openRoundsByPool.get(poolId);
+    // No round is open, so nothing is owed RIGHT NOW — which is the question.
+    // A member can be behind on a closed round and still correctly be told
+    // there is nothing to do.
+    if (!openRounds || openRounds.size === 0) {
+      result[poolId] = false;
+      continue;
+    }
+    const submitted = submittedByEntry.get(input.bestEntryByPool[poolId]) ?? new Set<string>();
+    result[poolId] = [...openRounds].some((roundKey) => !submitted.has(roundKey));
+  }
+  return result;
+}

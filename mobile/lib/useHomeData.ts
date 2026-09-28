@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAuth } from './auth';
 import { CACHE_KEYS, readCache, writeCache } from './cache/persistentCache';
-import { poolNeedsPredictions } from './needsPredictions';
+import { pickBestEntry, storedPointsOf, storedRankOf, UNRANKED } from './bestEntry';
+import {
+  deriveProgressiveNeedsPredictions,
+  poolNeedsPredictions,
+} from './needsPredictions';
 import { supabase } from './supabase';
 import {
   fetchHomeScoring,
@@ -457,15 +461,15 @@ export function useHomeDataInternal() {
           if (row.pools.prediction_mode !== 'progressive') continue;
           const entries = row.pool_entries ?? [];
           if (entries.length === 0) continue;
-          // Same best-entry rule as the cards: lowest rank, ties on scored
-          // points (total_points is a dead legacy column — always 0)
-          const best = entries.reduce((a, b) => {
-            const aRank = a.current_rank ?? Number.MAX_SAFE_INTEGER;
-            const bRank = b.current_rank ?? Number.MAX_SAFE_INTEGER;
-            if (bRank < aRank) return b;
-            if (bRank === aRank && (b.scored_total_points ?? 0) > (a.scored_total_points ?? 0)) return b;
-            return a;
-          });
+          // ⚠ STORED COLUMNS ONLY — and that is a known divergence, not a
+          // choice. The card below selects its entry with the home-scoring
+          // summary taking precedence, but that summary is fetched a wave later
+          // and does not exist yet here, so where it disagrees with the stored
+          // rank these two can land on DIFFERENT entries. See the long note in
+          // lib/bestEntry.ts; it is pinned by a test so the wave collapse makes
+          // the change visible.
+          const best = pickBestEntry(entries, storedRankOf, storedPointsOf);
+          if (!best) continue;
           progressivePoolIds.push(row.pools.pool_id);
           bestEntryByProgressivePool[row.pools.pool_id] = best.entry_id;
         }
@@ -485,44 +489,25 @@ export function useHomeDataInternal() {
                   .in('entry_id', bestProgressiveEntryIds)
               : Promise.resolve({ data: [] as Array<{ entry_id: string; round_key: string; has_submitted: boolean }> }),
           ]);
-          const openRoundsByPool = new Map<string, Set<string>>();
-          for (const r of (openRoundsRes.data ?? []) as Array<{
-            pool_id: string;
-            round_key: string;
-          }>) {
-            const set = openRoundsByPool.get(r.pool_id) ?? new Set<string>();
-            set.add(r.round_key);
-            openRoundsByPool.set(r.pool_id, set);
-          }
-          const submittedByEntry = new Map<string, Set<string>>();
-          for (const s of (submissionsRes.data ?? []) as Array<{
-            entry_id: string;
-            round_key: string;
-            has_submitted: boolean;
-          }>) {
-            if (!s.has_submitted) continue;
-            const set = submittedByEntry.get(s.entry_id) ?? new Set<string>();
-            set.add(s.round_key);
-            submittedByEntry.set(s.entry_id, set);
-          }
-          for (const poolId of progressivePoolIds) {
-            const openRounds = openRoundsByPool.get(poolId);
-            if (!openRounds || openRounds.size === 0) {
-              // No open rounds → nothing to predict right now.
-              progressiveNeedsPredictions[poolId] = false;
-              continue;
-            }
-            const bestEntryId = bestEntryByProgressivePool[poolId];
-            const submitted = submittedByEntry.get(bestEntryId) ?? new Set<string>();
-            let needs = false;
-            for (const rk of openRounds) {
-              if (!submitted.has(rk)) {
-                needs = true;
-                break;
-              }
-            }
-            progressiveNeedsPredictions[poolId] = needs;
-          }
+          // Two Maps and three loops used to live here, where no test could
+          // reach them. The rule is in lib/needsPredictions.ts now; the row
+          // shapes it takes are exactly what the wave collapse will change.
+          Object.assign(
+            progressiveNeedsPredictions,
+            deriveProgressiveNeedsPredictions({
+              progressivePoolIds,
+              bestEntryByPool: bestEntryByProgressivePool,
+              openRounds: (openRoundsRes.data ?? []) as {
+                pool_id: string;
+                round_key: string;
+              }[],
+              submissions: (submissionsRes.data ?? []) as {
+                entry_id: string;
+                round_key: string;
+                has_submitted: boolean;
+              }[],
+            }),
+          );
         }
 
         const allEntryIdsForPreds = rows.flatMap((r) =>
@@ -617,19 +602,10 @@ export function useHomeDataInternal() {
           // and then showing shadow's points would describe two different
           // entries on the same card.
           const rankOf = (e: { entry_id: string; current_rank: number | null }) =>
-            scoringByEntry[e.entry_id]?.current_rank ?? e.current_rank ?? Number.MAX_SAFE_INTEGER;
+            scoringByEntry[e.entry_id]?.current_rank ?? e.current_rank ?? UNRANKED;
           const pointsOf = (e: { entry_id: string; scored_total_points: number | null }) =>
             scoringByEntry[e.entry_id]?.scored_total_points ?? e.scored_total_points ?? 0;
-          const best =
-            entries.length > 0
-              ? entries.reduce((a, b) => {
-                  const aRank = rankOf(a);
-                  const bRank = rankOf(b);
-                  if (bRank < aRank) return b;
-                  if (bRank === aRank && pointsOf(b) > pointsOf(a)) return b;
-                  return a;
-                })
-              : null;
+          const best = pickBestEntry(entries, rankOf, pointsOf);
 
           const bestScoring = best ? scoringByEntry[best.entry_id] : undefined;
           const matchPoints = bestScoring?.match_points ?? best?.match_points ?? 0;
