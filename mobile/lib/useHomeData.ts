@@ -222,21 +222,31 @@ export function useHomeDataInternal() {
       setError(null);
 
       try {
-        const { data: userData, error: userErr } = await supabase
-          .from('users')
-          .select('user_id, full_name, username, email, created_at')
-          .eq('auth_user_id', user.id)
-          .single();
-        if (userErr || !userData) {
-          throw userErr ?? new Error('User profile not found');
-        }
-
-        const { data: pmRows, error: pmErr } = await supabase
-          .from('pool_members')
-          .select(
-            `
+        // ⚠ PARALLEL, AND DELIBERATELY NOT MERGED INTO ONE QUERY.
+        //
+        // These two both depend only on the AUTH id, so neither has any reason
+        // to wait for the other: the membership read filters on the embedded
+        // `users.auth_user_id` rather than on the app-side `user_id` that the
+        // profile read returns. That was the only thing making them serial.
+        //
+        // Folding them into a single membership query would be tempting and
+        // wrong. A member with no pools matches no rows, and their profile —
+        // their name, their app id — would come back empty with it. The one
+        // person whose home screen has the least on it is not the one to break.
+        const [userRes, pmRes] = await Promise.all([
+          supabase
+            .from('users')
+            .select('user_id, full_name, username, email, created_at')
+            .eq('auth_user_id', user.id)
+            .single(),
+          supabase
+            .from('pool_members')
+            .select(
+              `
             role,
             joined_at,
+            last_read_at,
+            users!inner(auth_user_id),
             pools!inner(
               pool_id, pool_name, pool_code, status, prediction_deadline,
               prediction_mode, league_mode, brand_name, brand_emoji, brand_color, brand_logo_url, tournament_id, is_private
@@ -246,15 +256,26 @@ export function useHomeDataInternal() {
               has_submitted_predictions, point_adjustment, scored_total_points
             )
           `,
-          )
-          .eq('user_id', userData.user_id)
-          .order('joined_at', { ascending: false });
+            )
+            // ⚠ The filter is on the EMBEDDED users row, which is what lets
+            // this run without waiting for the profile read. `!inner` above is
+            // load-bearing: without it the join is a left join and the filter
+            // would not restrict the membership rows at all.
+            .eq('users.auth_user_id', user.id)
+            .order('joined_at', { ascending: false }),
+        ]);
 
+        const { data: userData, error: userErr } = userRes;
+        if (userErr || !userData) {
+          throw userErr ?? new Error('User profile not found');
+        }
+        const { data: pmRows, error: pmErr } = pmRes;
         if (pmErr) throw pmErr;
 
         const rows = (pmRows ?? []) as unknown as Array<{
           role: string;
           joined_at: string;
+          last_read_at: string | null;
           pools: {
             pool_id: string;
             pool_name: string;
@@ -297,13 +318,18 @@ export function useHomeDataInternal() {
         let poolFacts: HomeScoringPools = null;
         const unreadByPool: Record<string, number> = {};
 
-        const { data: memberReads } = await supabase
-          .from('pool_members')
-          .select('pool_id, last_read_at')
-          .eq('user_id', userData.user_id);
+        // ⚠ NO SECOND QUERY HERE ANY MORE. This used to re-read
+        // `pool_members` for `(pool_id, last_read_at)`, filtered by the same
+        // user the membership read above had already filtered by — a whole
+        // serial round trip, on the cold-start path, for a column that was one
+        // word away in a select we were making regardless.
+        //
+        // It also discarded its own error (`const { data } = await ...`), so a
+        // failure would have read as "nobody has read anything" and quietly
+        // marked every pool's banter unread. Both problems leave with it.
         const lastReadByPool: Record<string, string | null> = {};
-        for (const m of (memberReads ?? []) as Array<{ pool_id: string; last_read_at: string | null }>) {
-          lastReadByPool[m.pool_id] = m.last_read_at;
+        for (const r of rows) {
+          lastReadByPool[r.pools.pool_id] = r.last_read_at;
         }
 
         await Promise.all([
