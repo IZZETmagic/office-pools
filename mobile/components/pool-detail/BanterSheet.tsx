@@ -191,6 +191,24 @@ function KeyboardLift({ children }: { children: ReactNode }) {
   return <Animated.View style={[{ flex: 1 }, liftStyle]}>{children}</Animated.View>;
 }
 
+// Scroll-performance tuning for gifted-chat's inner FlatList. Module-scope so
+// the object identity never changes — MessagesContainer keys its scroll and
+// layout callbacks on `listProps`, so an inline object would rebuild them on
+// every render.
+//   - windowSize 7 (FlatList default 21): keep ~3 screens either side mounted,
+//     not ~10. With a 50-message page the default mounts EVERY row, and each
+//     mounted row costs layout + gesture setup.
+//   - onEndReachedThreshold 1 (gifted-chat sets 0.1): the list is inverted, so
+//     "end" is the TOP. Start paging older messages a full screen before the
+//     user hits the top, instead of at the very edge where the load lands
+//     mid-scroll.
+const CHAT_LIST_PROPS = {
+  windowSize: 7,
+  initialNumToRender: 15,
+  maxToRenderPerBatch: 10,
+  onEndReachedThreshold: 1,
+} as const;
+
 const MS_PER_DAY = 86400000;
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -921,6 +939,13 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
           user={me}
           textInputProps={{ placeholder: 'Banter' }}
           maxComposerHeight={120}
+          // ⚠ Off on purpose. gifted-chat's floating date pill (on by default)
+          // runs ~4 Reanimated derived values PER MOUNTED ROW on every scroll
+          // frame, on the UI thread, plus a JS hop per frame — the main cause
+          // of the scroll jitter. We already draw our own inline date pills
+          // via `renderDay` below, which still render with this off.
+          isDayAnimationEnabled={false}
+          listProps={CHAT_LIST_PROPS}
           // Scroll-up pagination. The list is inverted, so gifted-chat's
           // onEndReached fires at the TOP (oldest); with
           // isInfiniteScrollEnabled it auto-calls onPress there, paging in
