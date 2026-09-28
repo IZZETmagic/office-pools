@@ -74,7 +74,6 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
           <PodiumColumn
             entry={entries[1]}
             pedestalHeight={110}
-            ringColor={theme.colors.silver}
             bgTint={withOpacity(theme.colors.silver, 0.15)}
             isCurrentUser={entries[1].user_id === currentUserId}
             onPress={onEntryPress ? () => onEntryPress(entries[1]) : undefined}
@@ -82,7 +81,6 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
           <PodiumColumn
             entry={entries[0]}
             pedestalHeight={136}
-            ringColor={theme.colors.accent}
             bgTint={withOpacity(theme.colors.accent, 0.1)}
             isCurrentUser={entries[0].user_id === currentUserId}
             onPress={onEntryPress ? () => onEntryPress(entries[0]) : undefined}
@@ -90,7 +88,6 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
           <PodiumColumn
             entry={entries[2]}
             pedestalHeight={92}
-            ringColor={theme.colors.bronze}
             bgTint={withOpacity(theme.colors.bronze, 0.1)}
             isCurrentUser={entries[2].user_id === currentUserId}
             onPress={onEntryPress ? () => onEntryPress(entries[2]) : undefined}
@@ -140,14 +137,12 @@ function SettlementNote({ isFinal }: { isFinal: boolean }) {
 function PodiumColumn({
   entry,
   pedestalHeight,
-  ringColor,
   bgTint,
   isCurrentUser,
   onPress,
 }: {
   entry: LeagueLeaderboardEntry;
   pedestalHeight: number;
-  ringColor: string;
   bgTint: string;
   isCurrentUser: boolean;
   onPress?: () => void;
@@ -167,35 +162,23 @@ function PodiumColumn({
       })}
     >
       <View style={{ width: '100%', alignItems: 'center', height: 60, justifyContent: 'center' }}>
-        <View
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            borderWidth: 3,
-            borderColor: ringColor,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {/*
-            ⭐ THE FACE STANDS WHERE THE MEDAL DID. The gold/silver/bronze `ringColor` is now the
-            only thing naming the place, so it must not be softened.
+        {/*
+          ⚠⚠ NO RING. It used to be a 3pt gold/silver/bronze border and it was the last
+          thing on the podium naming the place, after the medal glyph was replaced by the
+          face. Ryan asked for it gone and the face bigger — so placement is now carried by
+          the PEDESTAL: its height, its tint, and the 2nd-1st-3rd column order. Losing the
+          border is also what buys the extra 10pt, since the face no longer sits inside it.
 
-            ⚠ 46, not 52 — the ring is 3pt each side of a 52pt circle, so the inside is 46. A 52
-            here sits under the border and clips.
-
-            ⚠ `rank={1}`: a podium is never the tail of a long list, so FACE_LIMIT must not gate it.
-          */}
-          <LeaderboardAvatar
-            userId={entry.user_id ?? null}
-            name={name}
-            avatarBuild={entry.avatar_build ?? null}
-            avatarColour={entry.avatar_colour ?? null}
-            size={46}
-            rank={1}
-          />
-        </View>
+          ⚠ `rank={1}`: a podium is never the tail of a long list, so FACE_LIMIT must not gate it.
+        */}
+        <LeaderboardAvatar
+          userId={entry.user_id ?? null}
+          name={name}
+          avatarBuild={entry.avatar_build ?? null}
+          avatarColour={entry.avatar_colour ?? null}
+          size={56}
+          rank={1}
+        />
         <MovementPill entry={entry} floating />
       </View>
 
@@ -277,7 +260,19 @@ function TableRow({
         ...theme.shadows.card,
       })}
     >
-      <View style={{ width: 36, alignItems: 'center' }}>
+      {/*
+        ⚠⚠ RIGHT-ALIGNED, NOT CENTRED, AND THAT IS THE FIX FOR THE GAP. Ryan: the avatar "doesn't
+        seem to be centred between the number and the next item". It was not the movement
+        indicator — that already sits under the number. It was this column: a FIXED 36pt with the
+        number CENTRED, so "#1" left ~9pt of dead space on its right and "#100" left none. The gap
+        between the glyph and the face therefore changed with the digit count and always read wider
+        than the gap on the other side of the face.
+
+        ⭐ Aligning to the end pins the number's right edge, so the distance to the face is exactly
+        the row's own `gap` on every row — and numerals line up on their units column, which is how
+        numbers are meant to be set anyway. The movement indicator right-aligns with it.
+      */}
+      <View style={{ width: 36, alignItems: 'flex-end' }}>
         <RNText
           style={{
             fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',

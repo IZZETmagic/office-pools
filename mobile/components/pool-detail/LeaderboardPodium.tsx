@@ -35,7 +35,6 @@ export function LeaderboardPodium({
         entry={entries[1]}
         rank={2}
         pedestalHeight={120}
-        ringColor={theme.colors.silver}
         bgTint={withOpacity(theme.colors.silver, 0.15)}
         isCurrentUser={entries[1].user_id === currentUserId}
         awards={awardsByEntry[entries[1].entry_id] ?? []}
@@ -45,7 +44,6 @@ export function LeaderboardPodium({
         entry={entries[0]}
         rank={1}
         pedestalHeight={150}
-        ringColor={theme.colors.accent}
         bgTint={withOpacity(theme.colors.accent, 0.1)}
         isCurrentUser={entries[0].user_id === currentUserId}
         awards={awardsByEntry[entries[0].entry_id] ?? []}
@@ -55,7 +53,6 @@ export function LeaderboardPodium({
         entry={entries[2]}
         rank={3}
         pedestalHeight={100}
-        ringColor={theme.colors.bronze}
         bgTint={withOpacity(theme.colors.bronze, 0.1)}
         isCurrentUser={entries[2].user_id === currentUserId}
         awards={awardsByEntry[entries[2].entry_id] ?? []}
@@ -69,7 +66,6 @@ function PodiumColumn({
   entry,
   rank,
   pedestalHeight,
-  ringColor,
   bgTint,
   isCurrentUser,
   awards,
@@ -78,7 +74,6 @@ function PodiumColumn({
   entry: LeaderboardEntry;
   rank: number;
   pedestalHeight: number;
-  ringColor: string;
   bgTint: string;
   isCurrentUser: boolean;
   awards: PoolAward[];
@@ -103,41 +98,28 @@ function PodiumColumn({
       })}
     >
       <View style={{ width: '100%', alignItems: 'center', height: 60, justifyContent: 'center' }}>
-        <View
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            borderWidth: 3,
-            borderColor: ringColor,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {/*
-            ⭐ THE FACE STANDS WHERE THE MEDAL DID — Ryan, 2026-09-28: *"where the trophy icons
-            and the medal icons are right now above the podiums, the avatars should go there
-            instead."*
+        {/*
+          ⚠⚠ NO RING. It used to be a 3pt gold/silver/bronze border and it was the last
+          thing on the podium naming the place, after the medal glyph was replaced by the
+          face. Ryan asked for it gone and the face bigger — so placement is now carried by
+          the PEDESTAL: its height, its tint, and the 2nd-1st-3rd column order. Losing the
+          border is also what buys the extra 10pt, since the face no longer sits inside it.
+        
+          ⭐ THE FACE STANDS WHERE THE MEDAL DID — Ryan, 2026-09-28: *"where the trophy icons
+          and the medal icons are right now above the podiums, the avatars should go there
+          instead."*
 
-            ⚠ THE RING IS THE MEDAL NOW. `ringColor` is gold / silver / bronze and it is the only
-            thing left saying which place this is, so it must not be softened — the glyph it used
-            to hold is gone.
-
-            ⚠ 46, not 52: the ring is 3pt on each side of a 52pt circle, so the inside is 46. A
-            52 here would sit under the border and clip.
-
-            ⚠ `rank={1}` deliberately — this is a podium, not the tail of a long list, so
-            `FACE_LIMIT` must never gate it. See the note on that constant.
-          */}
-          <LeaderboardAvatar
-            userId={entry.user_id ?? null}
-            name={name}
-            avatarBuild={entry.avatar_build ?? null}
-            avatarColour={entry.avatar_colour ?? null}
-            size={46}
-            rank={1}
-          />
-        </View>
+          ⚠ `rank={1}` deliberately — this is a podium, not the tail of a long list, so
+          `FACE_LIMIT` must never gate it. See the note on that constant.
+        */}
+        <LeaderboardAvatar
+          userId={entry.user_id ?? null}
+          name={name}
+          avatarBuild={entry.avatar_build ?? null}
+          avatarColour={entry.avatar_colour ?? null}
+          size={56}
+          rank={1}
+        />
         {rankDelta !== 0 ? (
           <View
             style={{

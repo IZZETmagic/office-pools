@@ -67,7 +67,19 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
         ...theme.shadows.card,
       })}
     >
-      <View style={{ width: 36, alignItems: 'center' }}>
+      {/*
+        ⚠⚠ RIGHT-ALIGNED, NOT CENTRED, AND THAT IS THE FIX FOR THE GAP. Ryan: the avatar "doesn't
+        seem to be centred between the number and the next item". It was not the movement
+        indicator — that already sits under the number. It was this column: a FIXED 36pt with the
+        number CENTRED, so "#1" left ~9pt of dead space on its right and "#100" left none. The gap
+        between the glyph and the face therefore changed with the digit count and always read wider
+        than the gap on the other side of the face.
+
+        ⭐ Aligning to the end pins the number's right edge, so the distance to the face is exactly
+        the row's own `gap` on every row — and numerals line up on their units column, which is how
+        numbers are meant to be set anyway. The movement indicator right-aligns with it.
+      */}
+      <View style={{ width: 36, alignItems: 'flex-end' }}>
         <RNText
           style={{
             fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
