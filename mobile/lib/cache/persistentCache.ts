@@ -59,7 +59,19 @@ type KVStore = {
  * blank card or an "NaN" somewhere deep in a stat strip. The version is part of
  * the stored envelope and a mismatch is treated as a miss.
  */
-const CACHE_VERSION = 1;
+/**
+ * ⚠⚠ BUMP THIS WHENEVER A CACHED PAYLOAD'S SHAPE CHANGES. `readCache` drops any
+ * entry whose `v` does not match, which is the ONLY thing standing between a
+ * returning user and a crash: the home payload hydrates synchronously inside a
+ * `useState` initialiser, so a field that an older build wrote and a newer build
+ * dereferences is a white screen on launch, with no way for the user to clear it.
+ *
+ * 2 — 2026-09-27: `PoolSummary.memberInitials: string[]` became
+ * `members: PoolCardMember[]` so the home cards could draw real avatars. A v1
+ * payload has no `members` at all, and 1.2.0 (already on TestFlight) is the first
+ * build that writes a persistent cache, so real devices hold v1 entries today.
+ */
+export const CACHE_VERSION = 2;
 
 /**
  * How long a cached payload may be shown for. This is NOT a refetch trigger —

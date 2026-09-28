@@ -20,6 +20,21 @@ const STALE_AFTER_MS = 30_000;
 
 export type FormResult = 'exact' | 'winner_gd' | 'winner' | 'miss';
 
+/**
+ * One member as the home card's stack needs them.
+ *
+ * ⚠ `avatarBuild` is `unknown` ON PURPOSE. It is whatever JSONB the row holds, and
+ * it is only trustworthy after `readStoredAvatarBuild` has checked it against the
+ * asset bundle THIS build shipped with — a config saved against a newer bundle is a
+ * real case, and the answer to it is the initials fallback, not a crash.
+ */
+export type PoolCardMember = {
+  userId: string;
+  initials: string;
+  avatarBuild: unknown;
+  avatarColour: string | null;
+};
+
 export type PoolSummary = {
   poolId: string;
   poolName: string;
@@ -49,7 +64,14 @@ export type PoolSummary = {
    */
   externalLeagueId: number | null;
   memberCount: number;
-  memberInitials: string[];
+  /**
+   * The first three members by join date — the overlapping stack on the card.
+   *
+   * ⭐ Carries the avatar config rather than a rendered image. The phone composes
+   * locally from `lib/avatar/compose.ts`, so this is ~330 bytes a head instead of
+   * the ~31 KB an SVG would cost, and a member with no avatar costs nothing extra.
+   */
+  members: PoolCardMember[];
   currentRank: number | null;
   totalPoints: number;
   /**
@@ -263,7 +285,7 @@ export function useHomeDataInternal() {
         const tournamentIds = Array.from(new Set(rows.map((r) => r.pools.tournament_id)));
 
         const counts: Record<string, number> = {};
-        const initialsByPool: Record<string, string[]> = {};
+        const membersByPool: Record<string, PoolCardMember[]> = {};
         const entriesByPool: Record<string, number> = {};
         const tournamentMatchCount: Record<string, number> = {};
         const tournamentCompletedCount: Record<string, number> = {};
@@ -317,15 +339,41 @@ export function useHomeDataInternal() {
             counts[pid] = count ?? 0;
           }),
           ...poolIds.map(async (pid) => {
+            // ⭐ THE STACK ON THE CARD, and since 2026-09-27 it draws real faces
+            // rather than initials on a gradient. That costs two more columns on
+            // a query that was already here and already `.limit(3)` — an avatar
+            // config is ~330 bytes, so this is ~660 bytes more per pool and no
+            // extra round trip.
+            //
+            // ⚠ `user_id` is NOT decoration. The ground a member's avatar sits on
+            // is derived from their id (`avatarIndexFor`), so without it the card
+            // cannot colour either the avatar or the initials that stand in for
+            // it. It was missing before because the old stack coloured by
+            // POSITION, which is the bug this replaces.
             const { data: members } = await supabase
               .from('pool_members')
-              .select('users!inner(full_name)')
+              .select('users!inner(user_id, full_name, avatar_build, avatar_colour)')
               .eq('pool_id', pid)
               .order('joined_at', { ascending: true })
               .limit(3);
-            initialsByPool[pid] = ((members ?? []) as Array<{ users: { full_name: string | null } | { full_name: string | null }[] }>)
+            type MemberRow = {
+              user_id: string;
+              full_name: string | null;
+              avatar_build: unknown;
+              avatar_colour: string | null;
+            };
+            membersByPool[pid] = ((members ?? []) as Array<{ users: MemberRow | MemberRow[] }>)
+              // ⚠ PostgREST returns an embedded one-to-one as either an object or
+              // a single-element array depending on how it infers the
+              // relationship. The old code already normalised this; keep doing it.
               .map((m) => (Array.isArray(m.users) ? m.users[0] : m.users))
-              .map((u) => initialsOf(u?.full_name));
+              .filter((u): u is MemberRow => !!u)
+              .map((u) => ({
+                userId: u.user_id,
+                initials: initialsOf(u.full_name),
+                avatarBuild: u.avatar_build ?? null,
+                avatarColour: u.avatar_colour,
+              }));
           }),
           ...poolIds.map(async (pid) => {
             // pool_entries has no pool_id column — link via pool_members
@@ -584,7 +632,7 @@ export function useHomeDataInternal() {
             tournamentId: pool.tournament_id,
             externalLeagueId: externalLeagueByTournament[pool.tournament_id] ?? null,
             memberCount: counts[pool.pool_id] ?? 0,
-            memberInitials: initialsByPool[pool.pool_id] ?? [],
+            members: membersByPool[pool.pool_id] ?? [],
             // "Best position" across all of this user's entries in the pool —
             // lowest non-null current_rank. A user with entries at #4 and #10
             // sees #4 on the pool card, independent of which entry has the

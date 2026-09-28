@@ -17,10 +17,13 @@ import type { AvatarAssets } from './avatar/compose';
 // the bundle is regenerated whenever an asset changes and its url never does, so a disk cache
 // would need an invalidation story that does not exist yet.
 //
-// ⚠⚠ AGAINST PRODUCTION THIS 404s TODAY. /avatar-assets.json is 404 on sportpool.io and 200 on
-// dev, and `api.ts` points at production by default. Until the avatar branch merges, a device has
-// to reach a dev origin — which in `__DEV__` it does automatically, since `api.ts` derives the
-// Metro host's machine.
+// ✅ LIVE ON PRODUCTION since 2026-09-27 — /avatar-assets.json serves 200 from sportpool.io
+// (576 KB, all 18 asset keys). It used to 404 there, which is why an older note here warned that a
+// device had to reach a dev origin; that is no longer true and `api.ts`'s production default is
+// now correct.
+//
+// ⚠ A DEVICE ON AN OLD BUILD STILL GETS NOTHING, and that is fine. Every consumer renders a
+// fallback when the art is missing, so an app that cannot reach the bundle shows initials.
 // =============================================================
 
 /** Shared across every mount for the life of the app process. */
@@ -50,12 +53,26 @@ export type AvatarAssetsState = {
   error: string | null;
 };
 
-export function useAvatarAssets(): AvatarAssetsState {
+/**
+ * @param enabled Whether this caller actually needs the art.
+ *
+ * ⭐⭐ THE GATE EXISTS BECAUSE OF THE HOME TAB. The editor always needs the bundle, but a pool
+ * card needs it only if one of the three members on it has built a face — and pulling 563 KB to
+ * draw three 24 px circles for members who have NOT built one is a straight waste. Measured at the
+ * time of writing: 1 member in 4,839 had an avatar, so effectively nobody paid. As adoption grows
+ * this converges on always-fetch, which is the correct end state; what it never does is fetch for
+ * a screen that would have drawn initials anyway.
+ *
+ * ⚠ It does NOT unload anything. Once the bundle is in the module cache every caller gets it
+ * regardless of `enabled` — the flag governs whether to START a fetch, not whether to use one that
+ * already happened.
+ */
+export function useAvatarAssets(enabled = true): AvatarAssetsState {
   const [assets, setAssets] = useState<AvatarAssets | null>(cached);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (cached) return;
+    if (cached || !enabled) return;
     let cancelled = false;
     load()
       .then((a) => {
@@ -67,7 +84,9 @@ export function useAvatarAssets(): AvatarAssetsState {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // ⚠ `enabled` is a dependency: a card that mounts with no avatars and later receives one — a
+    // member builds a face and the query refetches — must then go and get the art.
+  }, [enabled]);
 
   return { assets, error };
 }

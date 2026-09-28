@@ -2,14 +2,15 @@
 // Where the design harnesses are allowed to exist
 // =============================================================
 // ⭐ ONE OWNER FOR THE RULE, read from two places that cannot share code any
-// other way: `middleware.ts` (the cheap early 404, running at the edge) and
+// other way: `proxy.ts` (the cheap early 404 — `middleware.ts` until the Next 16
+// rename, and no longer at the edge: a proxy always runs on Node.js) and
 // `app/dev-harness/layout.tsx` (the server-component gate that a request cannot
 // route around). Both layers are wanted — see the note in the layout about
 // CVE-2025-29927 — but the CONDITION must be single-sourced, or the day someone
 // relaxes one for local debugging the other silently keeps a harness reachable.
 // =============================================================
 
-/** The `/dev-harness` tree, as the middleware matcher sees it. */
+/** The `/dev-harness` tree, as the proxy matcher sees it. */
 export const DEV_HARNESS_PREFIX = '/dev-harness'
 
 /**

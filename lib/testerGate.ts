@@ -24,7 +24,7 @@
 //
 // Known limit: the gate governs what a signed-in account can REACH, not
 // whether an account can be created. Signup talks to Supabase directly and
-// never crosses this middleware, so a stranger can still register — they
+// never crosses the proxy, so a stranger can still register — they
 // just land on /not-a-tester and can do nothing. Closing that too would
 // need a database-level check.
 // =============================================================

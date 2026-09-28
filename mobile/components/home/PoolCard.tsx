@@ -1,10 +1,11 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { Image, Platform, Pressable, Text as RNText, View } from 'react-native';
 
+import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { CompetitionRail } from '@/components/CompetitionRail';
 import { ProgressRing, Text } from '@/components/ui';
+import { avatarBackgroundFor, avatarIndexFor, groundInkFor } from '@/lib/avatarGradient';
 import { getCompetitionColor } from '@/lib/design/competition';
-import type { PoolSummary } from '@/lib/useHomeData';
+import type { PoolCardMember, PoolSummary } from '@/lib/useHomeData';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type PoolCardProps = {
@@ -24,12 +25,6 @@ type PoolCardProps = {
 // Ryan, 2026-09-02 — on the grounds that the signal was already wrong for
 // league pools and the mode is named on the pool detail. Revisit when the rest
 // of the card is wired in.
-
-const AVATAR_GRADIENTS: Array<[string, string]> = [
-  ['#667EEA', '#764BA2'],
-  ['#F093FB', '#F5576C'],
-  ['#4FACFE', '#00F2FE'],
-];
 
 function brandHex(hex: string | null): string | null {
   if (!hex) return null;
@@ -183,7 +178,7 @@ export function PoolCard({ pool, onPress }: PoolCardProps) {
               justifyContent: 'space-between',
             }}
           >
-            <MemberAvatars initials={pool.memberInitials} totalMembers={pool.memberCount} />
+            <MemberAvatars members={pool.members} totalMembers={pool.memberCount} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <ProgressRing
                 completed={pool.predictionsCompleted}
@@ -202,45 +197,82 @@ export function PoolCard({ pool, onPress }: PoolCardProps) {
   );
 }
 
-function MemberAvatars({ initials, totalMembers }: { initials: string[]; totalMembers: number }) {
+const STACK_SIZE = 24;
+
+/**
+ * The overlapping run of members at the foot of the card.
+ *
+ * ⭐⭐ THE COLOUR NOW COMES FROM THE MEMBER, NOT THE SLOT. This used to read
+ * `AVATAR_GRADIENTS[i % 3]`, which coloured by POSITION — so a member's circle
+ * changed colour whenever somebody joined or left ahead of them in join order,
+ * and the same person wore different colours on two different cards. Both the
+ * avatar's ground and the initials fallback now derive from `avatarIndexFor`,
+ * which hashes the member's id, so a member has ONE colour everywhere.
+ *
+ * ⚠ That also makes this agree with the profile card and the web, which have
+ * always derived the ground from the id.
+ */
+function MemberAvatars({ members, totalMembers }: { members: PoolCardMember[]; totalMembers: number }) {
   const theme = useTheme();
-  const visible = initials.slice(0, 3);
+  // ⚠ DEFENSIVE, and the real fix is the CACHE_VERSION bump that discards any
+  // payload written before `members` existed. This is the second line: a cold
+  // start hydrates from disk inside a `useState` initialiser, so anything
+  // undefined here is a white screen on launch rather than a missing row.
+  const visible = (members ?? []).slice(0, 3);
   const overflow = Math.max(0, totalMembers - visible.length);
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      {visible.map((init, i) => (
-        <LinearGradient
-          key={`${init}-${i}`}
-          colors={AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1.5,
-            borderColor: theme.colors.surface,
-            marginLeft: i === 0 ? 0 : -6,
-          }}
-        >
-          <RNText
-            style={{
-              fontFamily: 'Nunito_700Bold',
-              fontSize: 9,
-              color: '#FFFFFF',
-            }}
-          >
-            {init}
-          </RNText>
-        </LinearGradient>
-      ))}
+      {visible.map((m, i) => {
+        const index = avatarIndexFor(m.userId, m.avatarColour);
+        const ground = avatarBackgroundFor(index);
+
+        /**
+         * ⚠ A LITERAL INK, NOT `theme.colors.ink`. The initials sit on the
+         * member's ground, which is the SAME value in light and dark — so a
+         * theme-aware colour is guaranteed to fail in one of them. Same reason
+         * the profile card pins its ink. White failed on all 22 grounds when
+         * this was measured; `groundInkFor` picks the one that passes.
+         */
+        const ink = groundInkFor(index);
+
+        const ring = {
+          borderWidth: 1.5,
+          borderColor: theme.colors.surface,
+          marginLeft: i === 0 ? 0 : -6,
+        } as const;
+
+        return (
+          <View key={m.userId} style={ring}>
+            <MemberAvatar
+              userId={m.userId}
+              avatarBuild={m.avatarBuild}
+              avatarColour={m.avatarColour}
+              size={STACK_SIZE}
+              fallback={
+                <View
+                  style={{
+                    width: STACK_SIZE,
+                    height: STACK_SIZE,
+                    borderRadius: STACK_SIZE / 2,
+                    backgroundColor: ground,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 9, color: ink }}>
+                    {m.initials}
+                  </RNText>
+                </View>
+              }
+            />
+          </View>
+        );
+      })}
       {overflow > 0 ? (
         <RNText
           style={{
-            fontFamily: 'Nunito_700Bold',
+            fontFamily: fontFamilies.bold,
             fontSize: 10,
             color: theme.colors.slate,
             marginLeft: 4,

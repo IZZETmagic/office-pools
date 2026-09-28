@@ -59,8 +59,12 @@ export async function updateSession(request: NextRequest) {
 
   // Tester gate — preview builds only, never production. See lib/testerGate.ts
   // for why this lives here instead of behind Vercel's deployment protection.
-  // Read each variable by static access: middleware is bundled for the Edge
-  // runtime, where a destructured `process.env` is not reliably populated.
+  // ⚠ Read each variable by STATIC access, `process.env.X` where it is used.
+  // THE REASON HAS CHANGED, the pattern has not: this used to be bundled for
+  // the Edge runtime, where a destructured `process.env` is not reliably
+  // populated. Since the Next 16 middleware→proxy rename it runs on Node.js
+  // (see the note in `proxy.ts`), where destructuring would in fact work. It
+  // stays because it is never wrong, not because it is still forced.
   if (
     user &&
     isTesterGateEnabled(process.env.VERCEL_ENV, process.env.TESTER_ALLOWLIST) &&

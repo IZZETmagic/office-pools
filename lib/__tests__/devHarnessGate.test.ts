@@ -69,7 +69,7 @@ describe('isBlockedHarnessPath', () => {
 
   it('leaves every other production route alone', () => {
     setEnv('production')
-    // ⚠⚠ THE BLAST-RADIUS CHECK. The gate sits in the middleware that every
+    // ⚠⚠ THE BLAST-RADIUS CHECK. The gate sits in the proxy that every
     // authenticated request passes through, so a prefix that over-matched would
     // 404 the live site. `/pools` is the one that matters most.
     for (const p of [

@@ -50,8 +50,8 @@ export async function createClient() {
             )
           } catch {
             // setAll can be called from a Server Component where cookies
-            // are read-only. This is safe to ignore since the middleware
-            // handles token refresh.
+            // are read-only. This is safe to ignore since `proxy.ts` handles
+            // token refresh (it was `middleware.ts` before Next 16).
           }
         },
       },

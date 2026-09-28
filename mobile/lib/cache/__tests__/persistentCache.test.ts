@@ -14,6 +14,7 @@ import {
   clearCache,
   readCache,
   writeCache,
+  CACHE_VERSION,
 } from '../persistentCache';
 
 type Row = { hello: string };
@@ -50,8 +51,10 @@ describe('persistentCache', () => {
   });
 
   it('misses on a version bump, so an old shape is never fed to new code', () => {
+    // ⚠ RELATIVE TO THE CURRENT VERSION, never a literal. Hardcoding the old
+    // number means this passes for free after the next bump.
     const stale = JSON.stringify({
-      v: 0,
+      v: CACHE_VERSION - 1,
       userId: USER,
       cachedAt: Date.now(),
       data: { hello: 'old shape' },
@@ -62,7 +65,10 @@ describe('persistentCache', () => {
 
   it('misses on an entry older than the max age', () => {
     const ancient = JSON.stringify({
-      v: 1,
+      // ⚠⚠ MUST BE THE CURRENT VERSION. With a stale `v` here this test passed
+      // because of the VERSION check and never exercised the age check at all —
+      // which is exactly what happened when CACHE_VERSION went 1 -> 2.
+      v: CACHE_VERSION,
       userId: USER,
       cachedAt: Date.now() - 8 * 24 * 60 * 60 * 1000, // 8 days, default cap is 7
       data: { hello: 'ancient' },
@@ -76,7 +82,7 @@ describe('persistentCache', () => {
     // different answers — this is the override doing its job.
     const cachedAt = Date.now() - 7 * 60 * 60 * 1000; // 7 hours
     const body = (key: string) =>
-      JSON.stringify({ v: 1, userId: USER, cachedAt, data: { hello: key } });
+      JSON.stringify({ v: CACHE_VERSION, userId: USER, cachedAt, data: { hello: key } });
     __setStoreForTests(
       fakeStore({
         [CACHE_KEYS.home]: body('home'),
