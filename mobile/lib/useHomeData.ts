@@ -168,6 +168,53 @@ export type HomeData = {
   daysUntilKickoff: number;
 };
 
+/** How many faces the pool card shows. The query's per-parent limit matches. */
+const CARD_FACE_COUNT = 3;
+
+/**
+ * Read a PostgREST embedded `count`.
+ *
+ * ⚠ THE SHAPE IS NOT CONSISTENT. A to-many count arrives as a single-element
+ * array (`[{ count: 4 }]`), and PostgREST hands back a bare object where it
+ * infers a to-one instead. Both are normalised here so that no call site has to
+ * remember which relationship it is reading, and so that a wrong guess degrades
+ * to 0 rather than to `undefined` leaking onto a card.
+ *
+ * ⚠ `count` is the ONLY aggregate available here — this project answers
+ * `PGRST123: Use of aggregate functions is not allowed` to `sum()` and to any
+ * top-level aggregate. Anything else has to be summed in JS.
+ */
+function countOf(value: unknown): number {
+  if (Array.isArray(value)) return (value[0] as { count?: number } | undefined)?.count ?? 0;
+  return (value as { count?: number } | null | undefined)?.count ?? 0;
+}
+
+type RollupMemberRow = {
+  user_id: string;
+  full_name: string | null;
+  avatar_build: unknown;
+  avatar_colour: string | null;
+};
+
+/** One row per pool, carrying what used to be three queries per pool. */
+type PoolRollupRow = {
+  pool_id: string;
+  member_count: unknown;
+  first_members:
+    | { joined_at: string | null; users: RollupMemberRow | RollupMemberRow[] }[]
+    | null;
+  /** One entry in this array per MEMBER; each carries that member's entry count. */
+  entry_rollup: { pool_entries: unknown }[] | null;
+};
+
+/** One row per tournament: the rail's league id, and how far through it is. */
+type TournamentRollupRow = {
+  tournament_id: string;
+  external_league_id: number | null;
+  total: unknown;
+  done: unknown;
+};
+
 const WORLD_CUP_KICKOFF = new Date('2026-06-11T00:00:00');
 
 function computeDaysUntilKickoff(now = new Date()): number {
@@ -337,102 +384,86 @@ export function useHomeDataInternal() {
         }
 
         await Promise.all([
-          // The competition behind each pool, for the card's rail. ONE query
-          // for every tournament on the page — the counts below fan out per
-          // tournament because they are `head: true` counts, but this returns
-          // rows and `.in()` is cheaper than N round trips.
+          // ⚠ ONE QUERY FOR EVERY PER-POOL ROLL-UP, where there were three
+          // PER POOL. The member count, the faces on the card and the entry
+          // denominator were each a `head: true` count fired once per pool — so
+          // a member of ten pools opened their phone and made thirty requests
+          // to answer three questions.
+          //
+          // They collapse because PostgREST will count an EMBEDDED resource,
+          // and will do it once per parent row. ⚠ Only `count` — general
+          // aggregates are disabled on this project (`PGRST123`), so there is
+          // no `sum()` to be had and the entry roll-up is summed here instead.
+          (async () => {
+            const { data, error } = await supabase
+              .from('pools')
+              .select(
+                `
+                pool_id,
+                member_count:pool_members(count),
+                first_members:pool_members(joined_at, users(user_id, full_name, avatar_build, avatar_colour)),
+                entry_rollup:pool_members(pool_entries(count))
+                `,
+              )
+              .in('pool_id', poolIds)
+              // Per-parent ordering and limit. ⚠ The slice below repeats the
+              // limit in JS on purpose: if the per-parent semantics were ever
+              // to differ from what is assumed here, the query would return
+              // MORE members rather than the wrong ones, and the card would
+              // still be right. Correctness does not rest on this line.
+              .order('joined_at', { referencedTable: 'first_members', ascending: true })
+              .limit(CARD_FACE_COUNT, { referencedTable: 'first_members' });
+            // ⚠ Surfaced, not discarded — the antipattern this file has been
+            // bitten by: `const { data } = await ...` renders empty defaults
+            // for ever and reports nothing.
+            if (error) throw error;
+
+            for (const row of (data ?? []) as PoolRollupRow[]) {
+              counts[row.pool_id] = countOf(row.member_count);
+              // pool_entries has no pool_id column — it hangs off pool_members
+              // (member_id FK) — so the denominator behind "Rank X of Y" is the
+              // sum of each member's entries.
+              entriesByPool[row.pool_id] = (row.entry_rollup ?? []).reduce(
+                (total, member) => total + countOf(member.pool_entries),
+                0,
+              );
+              membersByPool[row.pool_id] = [...(row.first_members ?? [])]
+                .sort((a, b) => (a.joined_at ?? '').localeCompare(b.joined_at ?? ''))
+                .slice(0, CARD_FACE_COUNT)
+                // ⚠ PostgREST returns an embedded one-to-one as either an
+                // object or a single-element array depending on how it infers
+                // the relationship. The old code already normalised this.
+                .map((m) => (Array.isArray(m.users) ? m.users[0] : m.users))
+                .filter((u): u is RollupMemberRow => !!u)
+                .map((u) => ({
+                  userId: u.user_id,
+                  initials: initialsOf(u.full_name),
+                  avatarBuild: u.avatar_build ?? null,
+                  avatarColour: u.avatar_colour,
+                }));
+            }
+          })(),
+          // The competition behind each pool, plus how far through it is. Was
+          // one query for the rail and then two counts PER TOURNAMENT; the two
+          // counts are now aliased embeds on the same row, and `done` carries
+          // its own filter — verified against PostgREST that an alias-scoped
+          // filter really does narrow only that alias.
           (async () => {
             const { data, error } = await supabase
               .from('tournaments')
-              .select('tournament_id, external_league_id')
-              .in('tournament_id', tournamentIds);
-            // ⚠ Surfaced, not discarded. `const { data } = await supabase...`
-            // hides a 400, and a selected column that does not exist comes back
-            // as null rather than an error — which is how the home screen's
-            // form, accuracy and streak were dead for weeks.
-            if (error) {
-              console.warn('[useHomeData] tournaments read failed:', error.message);
-              return;
-            }
-            for (const t of (data ?? []) as {
-              tournament_id: string;
-              external_league_id: number | null;
-            }[]) {
-              externalLeagueByTournament[t.tournament_id] = t.external_league_id ?? null;
+              .select(
+                'tournament_id, external_league_id, total:matches(count), done:matches(count)',
+              )
+              .in('tournament_id', tournamentIds)
+              .eq('done.is_completed', true);
+            if (error) throw error;
+
+            for (const row of (data ?? []) as TournamentRollupRow[]) {
+              externalLeagueByTournament[row.tournament_id] = row.external_league_id ?? null;
+              tournamentMatchCount[row.tournament_id] = countOf(row.total);
+              tournamentCompletedCount[row.tournament_id] = countOf(row.done);
             }
           })(),
-          ...poolIds.map(async (pid) => {
-            const { count } = await supabase
-              .from('pool_members')
-              .select('*', { count: 'exact', head: true })
-              .eq('pool_id', pid);
-            counts[pid] = count ?? 0;
-          }),
-          ...poolIds.map(async (pid) => {
-            // ⭐ THE STACK ON THE CARD, and since 2026-09-27 it draws real faces
-            // rather than initials on a gradient. That costs two more columns on
-            // a query that was already here and already `.limit(3)` — an avatar
-            // config is ~330 bytes, so this is ~660 bytes more per pool and no
-            // extra round trip.
-            //
-            // ⚠ `user_id` is NOT decoration. The ground a member's avatar sits on
-            // is derived from their id (`avatarIndexFor`), so without it the card
-            // cannot colour either the avatar or the initials that stand in for
-            // it. It was missing before because the old stack coloured by
-            // POSITION, which is the bug this replaces.
-            const { data: members } = await supabase
-              .from('pool_members')
-              .select('users!inner(user_id, full_name, avatar_build, avatar_colour)')
-              .eq('pool_id', pid)
-              .order('joined_at', { ascending: true })
-              .limit(3);
-            type MemberRow = {
-              user_id: string;
-              full_name: string | null;
-              avatar_build: unknown;
-              avatar_colour: string | null;
-            };
-            membersByPool[pid] = ((members ?? []) as Array<{ users: MemberRow | MemberRow[] }>)
-              // ⚠ PostgREST returns an embedded one-to-one as either an object or
-              // a single-element array depending on how it infers the
-              // relationship. The old code already normalised this; keep doing it.
-              .map((m) => (Array.isArray(m.users) ? m.users[0] : m.users))
-              .filter((u): u is MemberRow => !!u)
-              .map((u) => ({
-                userId: u.user_id,
-                initials: initialsOf(u.full_name),
-                avatarBuild: u.avatar_build ?? null,
-                avatarColour: u.avatar_colour,
-              }));
-          }),
-          ...poolIds.map(async (pid) => {
-            // pool_entries has no pool_id column — link via pool_members
-            // (member_id FK). Counts every entry in the pool, which is the
-            // denominator behind the "Rank X of Y" KPI on the dashboard.
-            const { count } = await supabase
-              .from('pool_entries')
-              .select('entry_id, pool_members!inner(pool_id)', { count: 'exact', head: true })
-              .eq('pool_members.pool_id', pid);
-            entriesByPool[pid] = count ?? 0;
-          }),
-          ...tournamentIds.map(async (tid) => {
-            const { count } = await supabase
-              .from('matches')
-              .select('*', { count: 'exact', head: true })
-              .eq('tournament_id', tid);
-            tournamentMatchCount[tid] = count ?? 0;
-          }),
-          ...tournamentIds.map(async (tid) => {
-            // Drives the dashboard's "show rank KPI?" gate. Scoring
-            // hasn't started until at least one match has flipped
-            // is_completed = true; before that, rank is noise.
-            const { count } = await supabase
-              .from('matches')
-              .select('*', { count: 'exact', head: true })
-              .eq('tournament_id', tid)
-              .eq('is_completed', true);
-            tournamentCompletedCount[tid] = count ?? 0;
-          }),
           ...poolIds.map(async (pid) => {
             const lastReadAt = lastReadByPool[pid];
             let query = supabase
