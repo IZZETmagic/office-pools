@@ -40,7 +40,12 @@ const appConfig = JSON.parse(
   readFileSync(resolve(process.cwd(), 'mobile/app.json'), 'utf8'),
 ) as { expo: { plugins: (string | [string, Record<string, unknown>])[] } };
 
-type NativeSplash = { backgroundColor?: string; dark?: { backgroundColor?: string }; image?: string };
+type NativeSplash = {
+  backgroundColor?: string;
+  dark?: { backgroundColor?: string };
+  image?: string;
+  drawable?: { icon?: string };
+};
 
 function nativeSplashConfig(): NativeSplash {
   const entry = appConfig.expo.plugins.find(
@@ -72,6 +77,19 @@ describe('the JS splash matches the native splash', () => {
     // different compositions, which is the hand-off this design removed. If an
     // image is genuinely wanted, the JS layer has to show the same thing.
     expect(nativeSplashConfig().image).toBeUndefined();
+  });
+
+  it('gives Android a drawable that paints nothing — the plugin demands one', () => {
+    // ⚠⚠ WITHOUT IT THE ANDROID RELEASE BUILD FAILS. The plugin's style always
+    // points at @drawable/splashscreen_logo but only writes it for an `image`,
+    // so an image-less splash dies at resource linking (2026-09-28). The file
+    // must stay fully transparent, or it becomes the native artwork the test
+    // above forbids by another name.
+    const icon = nativeSplashConfig().drawable?.icon;
+    expect(icon).toBeDefined();
+    const xml = readFileSync(resolve(__dirname, '..', '..', icon!), 'utf8');
+    expect(xml).toContain('@android:color/transparent');
+    expect(xml).not.toMatch(/<(bitmap|vector|path)\b/);
   });
 
   it('paints the same light ground the OS drew a moment earlier', () => {

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Android splash "logo" — deliberately NOTHING.
+
+  ⚠ IT EXISTS ONLY BECAUSE THE PLUGIN DEMANDS IT. expo-splash-screen's Android
+  style always sets `windowSplashScreenAnimatedIcon` to @drawable/splashscreen_logo,
+  but only writes that drawable when an `image` is configured. Our splash has no
+  image by design (the ground colour is the whole native screen — see
+  lib/__tests__/splashColour.guard.test.ts), so the release build failed at
+  resource linking: "drawable/splashscreen_logo not found" (2026-09-28).
+
+  A transparent shape satisfies the reference and paints nothing, so the native
+  screen stays the plain ground and the JS layer's wordmark is still the only
+  artwork. iOS never reads this file.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+    <size android:width="1dp" android:height="1dp" />
+</shape>

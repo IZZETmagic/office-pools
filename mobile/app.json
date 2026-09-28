@@ -47,6 +47,9 @@
           "backgroundColor": "#F7F8FC",
           "dark": {
             "backgroundColor": "#0B0F1A"
+          },
+          "drawable": {
+            "icon": "./assets/splash/android-no-logo.xml"
           }
         }
       ],
