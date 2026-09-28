@@ -389,7 +389,14 @@ function InnerLayout({ fontsReady }: { fontsReady: boolean }) {
 // <Stack> so the tabs mount and prefetch behind the splash from frame
 // zero. The floor gives the entrance animation (scale-in + bob) time to
 // play out so the brand identity registers.
-const SPLASH_MIN_MS = 1200;
+// ⚠ MEASURED FROM WHEN THE WORDMARK CAN BE DRAWN, NOT FROM MOUNT — see the
+// effect that starts it. It was 1.2s and it was buying an entrance animation
+// that no longer exists: a scale-in, a bob, and three bouncing dots. With the
+// cold start now resolving from disk, that floor was the ONLY thing left making
+// the app slow, and it was the app performing a wait rather than taking one.
+//
+// What remains is just long enough that the name registers instead of flashing.
+const SPLASH_MIN_MS = 400;
 
 /**
  * ⚠ THE CEILING, AND IT COVERS THE DATA GATE ONLY.
@@ -444,10 +451,16 @@ function useSplashGate(fontsReady: boolean): boolean {
   const [minElapsed, setMinElapsed] = useState(false);
   const [ceilingReached, setCeilingReached] = useState(false);
 
+  // ⚠ STARTS ON `fontsReady`, NOT ON MOUNT. Until the fonts land there is
+  // nothing on this screen — the wordmark is the whole design — and the native
+  // splash is still in front. Counting from mount would spend the floor behind
+  // a screen nobody can see, and the name would then flash for whatever was
+  // left of it.
   useEffect(() => {
+    if (!fontsReady) return;
     const t = setTimeout(() => setMinElapsed(true), SPLASH_MIN_MS);
     return () => clearTimeout(t);
-  }, []);
+  }, [fontsReady]);
 
   useEffect(() => {
     const t = setTimeout(() => setCeilingReached(true), SPLASH_MAX_MS);

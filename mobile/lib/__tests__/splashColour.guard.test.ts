@@ -5,12 +5,14 @@ import { resolve } from 'path';
 // =============================================================
 // The two splashes have to be the same colour
 // =============================================================
-// There are two of them. The NATIVE splash is drawn by the OS from
-// `app.json` before a line of JS runs, and the JS `Splash` component paints the
-// same mark on the same background a moment later and crossfades out. The
-// hand-off is invisible only because those two backgrounds are the same solid
-// colour — that is the whole trick, and it is why the trophy appears to sit
-// still while the layer underneath it dissolves.
+// There are two of them. The NATIVE splash is drawn by the OS from `app.json`
+// before a line of JS runs, and the JS `Splash` component paints the same
+// background a moment later, adds the wordmark, and crossfades out.
+//
+// ⚠ THE COLOUR IS NOW THE ONLY THING JOINING THEM. The native layer carries no
+// image at all — it is a solid ground, deliberately — so nothing else makes the
+// two read as one screen. If the colours drift, the launch stops being a screen
+// that gains a wordmark and becomes two screens handing over.
 //
 // ⚠ NOTHING KEEPS THEM IN SYNC. `SPLASH_BG` is a hex string hand-copied into
 // `components/Splash.tsx`, and its only tie to `app.json` is a comment saying
@@ -45,6 +47,14 @@ function nativeSplashConfig(): { backgroundColor?: string; dark?: { backgroundCo
 }
 
 describe('the JS splash matches the native splash', () => {
+  it('has no native image — the ground is the whole native screen', () => {
+    // ⚠ Re-adding one is a real regression, not a tidy-up. A native image means
+    // the OS draws artwork and the JS layer then draws a wordmark instead: two
+    // different compositions, which is the hand-off this design removed. If an
+    // image is genuinely wanted, the JS layer has to show the same thing.
+    expect(nativeSplashConfig().image).toBeUndefined();
+  });
+
   it('finds the colour the JS splash paints', () => {
     // Guards the guard: a rename of the constant must fail loudly here rather
     // than quietly stop checking anything.

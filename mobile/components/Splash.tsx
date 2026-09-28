@@ -1,47 +1,62 @@
-// Branded landing screen shown while the app prefetches Home + Pools +
-// Activity + Tournament Matches data on cold launch. Solid #0B0F1A
-// background matches the native splash's `backgroundColor` in app.json
-// so the native→JS hand-off has no color jump. Trophy is the Hugeicons
-// ChampionIcon (vector, naturally backgroundless) rendered in the gold
-// accent. Two-tone "SportPool" wordmark in Nunito. Timing: 0.5s entrance,
-// 1.5s bob, 0.4s dot cycle, 0.4s exit fade.
+// Launch screen. The two-tone wordmark on the brand's dark ground, and
+// nothing else.
+//
+// ⚠ IT IS THE SAME SCREEN AS THE NATIVE SPLASH, WHICH IS THE WHOLE POINT. The
+// OS paints `#0B0F1A` from `app.json` before a line of JS runs; this paints the
+// same colour and adds the wordmark. Because the ground never changes, the two
+// layers read as ONE screen that gains a wordmark and then dissolves — rather
+// than as two screens handing over, which is what a trophy on one and a trophy
+// plus a wordmark plus three dots on the other actually looked like.
+//
+// ⚠ NO LOADING DOTS. There were three of them, bouncing, and they were the
+// honest part of a slower app — they said "we are fetching" while the fetch was
+// happening. The fetch now resolves from disk on a warm start, so dots would be
+// the app PERFORMING a wait it no longer has. A progress indicator for progress
+// that isn't being made is just decoration that makes things feel slower.
+//
+// ⚠ THE DARK GROUND IS LOAD-BEARING, not a leftover. The wordmark is two-tone:
+// "Sport" in white, "Pool" in the brand blue. On a blue ground the second half
+// of the name disappears. Any change of ground has to answer for the wordmark
+// first.
 
 const SPLASH_BG = '#0B0F1A';
 
-import { ChampionIcon } from '@hugeicons/core-free-icons';
-import { HugeiconsIcon } from '@hugeicons/react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
-  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
-import { fontFamilies, useTheme } from '@/theme';
+import { Wordmark } from '@/components/ui/Wordmark';
 
 type Props = {
   /**
    * Whether the app's typefaces have loaded.
    *
-   * ⚠ The tree now mounts BEFORE they do, so that the session restore and the
-   * data prefetch can start instead of queueing behind seven font loads. This
-   * component can therefore be rendered with the system face, and must not show
-   * itself until it can draw its own wordmark.
+   * ⚠ The tree mounts BEFORE they do, so that the session restore and the data
+   * prefetch can start instead of queueing behind seven font loads. This screen
+   * is a wordmark and nothing else, so until the fonts land there is literally
+   * nothing for it to draw — it holds the native splash in front instead.
    */
   fontsReady: boolean;
   preloadComplete: boolean;
   onDismissed: () => void;
 };
 
-// Hand-off from the native splash to this custom one. Called once on mount
-// so there's no flash of empty screen between the two.
+/**
+ * Hand-off from the native splash to this one.
+ *
+ * ⚠ NOT ON MOUNT — on fonts. The native layer is a solid colour and needs no
+ * typeface, so it can sit in front until the wordmark is drawable. Handing over
+ * earlier would show the name in the system face and then swap it: a flash of
+ * the wrong brand, bought for nothing.
+ */
 function hideNativeSplash() {
   SplashScreen.hideAsync().catch(() => {
     /* may already be hidden */
@@ -49,86 +64,28 @@ function hideNativeSplash() {
 }
 
 export function Splash({ fontsReady, preloadComplete, onDismissed }: Props) {
-  const theme = useTheme();
-  const fadeIn = useSharedValue(0);
-  const scale = useSharedValue(0.8);
-  const bobY = useSharedValue(0);
   const rootOpacity = useSharedValue(1);
 
-  const [dotPhase, setDotPhase] = useState(0);
-
-  // Native-splash hand-off + entrance + bob.
   useEffect(() => {
-    // ⚠ HOLD THE NATIVE SPLASH UNTIL THE FONTS ARE IN. The native layer is a
-    // static image on a solid colour and needs no typeface, so it can sit in
-    // front while this one waits to be drawable. Handing over any earlier would
-    // show the wordmark in the system face and then swap it — a flash of the
-    // wrong brand, bought for nothing.
-    //
-    // The hand-off therefore looks exactly as it did. What changed is that the
-    // app has been restoring the session and prefetching behind it the whole
-    // time, instead of waiting for a font before it started.
     if (!fontsReady) return;
     hideNativeSplash();
+  }, [fontsReady]);
 
-    fadeIn.value = withTiming(1, {
-      duration: 500,
-      easing: Easing.out(Easing.ease),
-    });
-    scale.value = withTiming(1, {
-      duration: 500,
-      easing: Easing.out(Easing.ease),
-    });
-    bobY.value = withDelay(
-      500,
-      withRepeat(
-        withTiming(-8, {
-          duration: 1500,
-          easing: Easing.inOut(Easing.ease),
-        }),
-        -1,
-        true,
-      ),
-    );
-  }, [fontsReady, fadeIn, scale, bobY]);
-
-  // Dot cycle: phase bounces 0 → 1 → 2 → 1 → 0, matching the Swift timer.
-  useEffect(() => {
-    let direction = 1;
-    const id = setInterval(() => {
-      setDotPhase((prev) => {
-        if (prev === 2) direction = -1;
-        else if (prev === 0) direction = 1;
-        return prev + direction;
-      });
-    }, 400);
-    return () => clearInterval(id);
-  }, []);
-
-  // Fade-out + dismiss callback once preload completes.
+  // The only movement on this screen: a short crossfade into the app. That is
+  // not decoration — without it the splash CUTS to the first frame, which reads
+  // as a glitch rather than as an arrival.
   useEffect(() => {
     if (!preloadComplete) return;
     rootOpacity.value = withTiming(
       0,
-      { duration: 400, easing: Easing.inOut(Easing.ease) },
+      { duration: 250, easing: Easing.out(Easing.ease) },
       (finished) => {
         if (finished) runOnJS(onDismissed)();
       },
     );
   }, [preloadComplete, rootOpacity, onDismissed]);
 
-  const iconStyle = useAnimatedStyle(() => ({
-    opacity: fadeIn.value,
-    transform: [{ scale: scale.value }, { translateY: bobY.value }],
-  }));
-
-  const fadeInStyle = useAnimatedStyle(() => ({
-    opacity: fadeIn.value,
-  }));
-
-  const rootStyle = useAnimatedStyle(() => ({
-    opacity: rootOpacity.value,
-  }));
+  const rootStyle = useAnimatedStyle(() => ({ opacity: rootOpacity.value }));
 
   return (
     <Animated.View
@@ -137,34 +94,11 @@ export function Splash({ fontsReady, preloadComplete, onDismissed }: Props) {
     >
       <StatusBar style="light" />
       <View style={styles.center}>
-        <Animated.View style={iconStyle}>
-          <HugeiconsIcon
-            icon={ChampionIcon}
-            size={128}
-            color={theme.colors.accent}
-            strokeWidth={1.25}
-          />
-        </Animated.View>
-        <Animated.View style={[styles.wordmark, fadeInStyle]}>
-          <Text style={[styles.word, { color: '#FFFFFF' }]}>Sport</Text>
-          <Text style={[styles.word, { color: theme.colors.primary }]}>Pool</Text>
-        </Animated.View>
+        {/* ⚠ The shared `Wordmark`, not a copy of it. This file used to spell
+            the two-tone name out itself, which meant the launch screen could
+            drift from every other place the name appears. */}
+        {fontsReady ? <Wordmark size={44} onDark /> : null}
       </View>
-      <Animated.View style={[styles.dots, fadeInStyle]}>
-        {[0, 1, 2].map((i) => (
-          <View
-            key={i}
-            style={[
-              styles.dot,
-              {
-                backgroundColor: theme.colors.primary,
-                opacity: dotPhase === i ? 1 : 0.3,
-                transform: [{ scale: dotPhase === i ? 1.2 : 1 }],
-              },
-            ]}
-          />
-        ))}
-      </Animated.View>
     </Animated.View>
   );
 }
@@ -174,31 +108,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 24,
-  },
-  wordmark: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  word: {
-    fontFamily: fontFamilies.black,
-    fontSize: 44,
-    lineHeight: 50,
-    letterSpacing: -0.5,
-  },
-  dots: {
-    position: 'absolute',
-    bottom: 60,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
   },
 });
