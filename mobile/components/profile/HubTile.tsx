@@ -19,20 +19,16 @@ export function HubTile({
   title,
   teaser,
   tint,
-  highlight = false,
   onPress,
 }: {
   icon: string;
   title: string;
   teaser: string | null;
   tint: string;
-  /** The gold ground — the Trophy Room only. */
-  highlight?: boolean;
   onPress?: () => void;
 }) {
   const theme = useTheme();
   const soon = !onPress;
-  const ground = highlight ? theme.colors.accentLight : theme.colors.surface;
 
   return (
     <Pressable
@@ -43,7 +39,7 @@ export function HubTile({
       style={({ pressed }) => ({
         flex: 1,
         minHeight: 124,
-        backgroundColor: ground,
+        backgroundColor: theme.colors.surface,
         borderRadius: theme.radii.md,
         padding: theme.spacing.md,
         justifyContent: 'space-between',
@@ -56,7 +52,7 @@ export function HubTile({
             width: 36,
             height: 36,
             borderRadius: 11,
-            backgroundColor: highlight ? theme.colors.surface : withOpacity(tint, 0.12),
+            backgroundColor: withOpacity(tint, 0.12),
             alignItems: 'center',
             justifyContent: 'center',
           }}

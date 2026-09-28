@@ -213,7 +213,6 @@ export default function ProfileScreen() {
                 trophies.error ? 'Your badges' : trophyTeaser(trophies.total, podium?.first ?? null)
               }
               tint={theme.colors.amber}
-              highlight
               onPress={() => router.push('/profile/trophies')}
             />
           </View>
