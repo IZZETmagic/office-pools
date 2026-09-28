@@ -1,4 +1,4 @@
-// Archived pools (migration 040), shared by the settings hub (for the count on
+// Archived pools (migration 040), shared by the Profile hub (for the count on
 // the nav row) and the archived-pools page itself.
 //
 // Must stay in step with the web version (app/profile/ProfilePage.tsx →

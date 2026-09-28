@@ -1,22 +1,34 @@
-// Port of ios/OfficePools/Views/Profile/ProfileView.swift.
-// This tab is about *you*: profile card, quick stats, pool performance,
-// accuracy, trophy case. Everything that *configures* you — account,
-// notifications, archived pools, help, sign out, delete — lives behind the
-// single Settings row and under app/settings/.
+// The Profile tab — a hub.
+//
+// Header and avatar card on top (unchanged), then four doors, then the
+// settings rows in plain view. The tab fits on one screen; everything with
+// depth lives on the page its door opens.
+//
+// ⭐ Why a hub (2026-09-28): the old tab stacked Pool Performance, Prediction
+// Accuracy and an inline Trophy Case, and each was World-Cup-shaped — it
+// summed points across modes, folded Table / LMS / Showdown into an
+// exact-score vocabulary, and one of its three rings repeated another. The
+// replacement pages each speak one mode's language, or none.
+//
+// The doors:
+//   · Seasons          — not built yet ("Soon")
+//   · Trophy Room      — app/profile/trophies.tsx
+//   · Scouting Report  — not built yet ("Soon")
+//   · My Crews         — deliberately not built: no derived or suggested
+//                        crews for now (Ryan, 2026-09-28). Stays on the hub
+//                        as "Soon" so it is visibly part of the plan.
+//
+// Settings: Account, Notifications, Archived Pools, Help sit on the tab. Sign
+// Out and Delete Account live one level down, inside Account.
 
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  Text as RNText,
-  View,
-} from 'react-native';
+import * as Updates from 'expo-updates';
+import { useMemo, useRef } from 'react';
+import { RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AvatarCard } from '@/components/avatar/AvatarCard';
 import {
   JoinPoolSheet,
   type JoinPoolSheetHandle,
@@ -24,28 +36,39 @@ import {
   type PoolCreateJoinSheetHandle,
   PoolsHeader,
 } from '@/components/pools';
-import { SettingsCard, SettingsRow } from '@/components/settings';
-import { Icon, Text } from '@/components/ui';
-import { badgeIcon } from '@/components/pool-detail/badge-icons';
-import { AvatarCard } from '@/components/avatar/AvatarCard';
-import { useAuth } from '@/lib/auth';
+import { HubTile } from '@/components/profile/HubTile';
+import { DividedList, SectionWrapper, SettingsRow } from '@/components/settings';
 import { useHomeData } from '@/lib/HomeDataProvider';
-import type { PoolSummary } from '@/lib/useHomeData';
+import { trophyTeaser, versionLabel } from '@/lib/profileHub';
+import { useArchivedPools } from '@/lib/useArchivedPools';
 import { useManualRefresh } from '@/lib/useManualRefresh';
-import { supabase } from '@/lib/supabase';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { useTrophies } from '@/lib/useTrophies';
+import { fontFamilies, useTheme } from '@/theme';
+
+type Row = {
+  id: string;
+  icon: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+};
 
 export default function ProfileScreen() {
   const theme = useTheme();
   const { data, refresh } = useHomeData();
-  // Pull-to-refresh: spinner bound to real user gesture only.
-  const { refreshing, onRefresh } = useManualRefresh(refresh);
+  const trophies = useTrophies();
+  const { rows: archived, loading: archivedLoading } = useArchivedPools();
+
+  // Pull-to-refresh: spinner bound to real user gesture only. Refreshes the
+  // badge count alongside the pools, since the avatar card shows both.
+  const { refreshing, onRefresh } = useManualRefresh(() =>
+    Promise.all([refresh(), trophies.refresh()]),
+  );
   // Create / Join pool sheets — opened by the "+" button in the header.
   const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
   const joinPoolSheetRef = useRef<JoinPoolSheetHandle | null>(null);
 
-  const pools = data?.pools ?? [];
-  const totalPoints = useMemo(() => pools.reduce((s, p) => s + p.totalPoints, 0), [pools]);
+  const pools = useMemo(() => data?.pools ?? [], [data?.pools]);
   const totalPredictions = useMemo(
     () => pools.reduce((s, p) => s + (p.accuracyStats?.totalCompleted ?? p.predictionsCompleted), 0),
     [pools],
@@ -57,6 +80,67 @@ export default function ProfileScreen() {
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return (name.slice(0, 2) || '?').toUpperCase();
   }, [data?.fullName]);
+
+  const archivedSubtitle = archivedLoading
+    ? 'Checking…'
+    : archived && archived.length > 0
+      ? `${archived.length} archived`
+      : 'None archived';
+
+  const settingsRows: Row[] = [
+    {
+      id: 'account',
+      icon: 'person.crop.circle.fill',
+      title: 'Account',
+      subtitle: data?.username ? `@${data.username} · password, sign out` : 'Profile, password, sign out',
+      onPress: () => router.push('/settings/account'),
+    },
+    {
+      id: 'notifications',
+      icon: 'bell.fill',
+      title: 'Notifications',
+      subtitle: 'Push alerts and email preferences',
+      onPress: () => router.push('/settings/notifications'),
+    },
+    {
+      id: 'archived',
+      icon: 'archivebox.fill',
+      title: 'Archived Pools',
+      subtitle: archivedSubtitle,
+      onPress: () => router.push('/settings/archived-pools'),
+    },
+    {
+      id: 'help',
+      icon: 'questionmark.circle.fill',
+      title: 'Help & Legal',
+      subtitle: 'FAQs, privacy, terms and contact',
+      onPress: () => router.push('/settings/help'),
+    },
+  ];
+
+  /**
+   * Dev-only doors into the two Showdown review surfaces. They exist because
+   * deep links do not reach a physical device, and this machine has no
+   * simulator. ⚠⚠ `__DEV__` IS LOAD-BEARING — these carry fixture data (a duel
+   * against a "Priya" who is in nobody's pool), and Metro strips the branch
+   * from a production bundle only because the check is a literal `__DEV__`.
+   */
+  const devRows: Row[] = [
+    {
+      id: 'dev-phases',
+      icon: 'flame.fill',
+      title: 'Showdown phase harness',
+      subtitle: 'All six phases on demand, from fixtures',
+      onPress: () => router.push('/showdown-phase-harness'),
+    },
+    {
+      id: 'dev-reveal',
+      icon: 'sparkles',
+      title: 'Reveal playground',
+      subtitle: 'The 2026-06-27 motion-spec scrubber',
+      onPress: () => router.push('/showdown-reveal-playground'),
+    },
+  ];
 
   return (
     <SafeAreaView
@@ -83,10 +167,9 @@ export default function ProfileScreen() {
           />
         }
       >
-        {/* ⭐ The avatar card, directly under the header — Ryan: "right under the header section I
-            would like to put the avatar card like what we did on the web version". It replaces
-            BOTH `ProfileCard` and `QuickStatsRow`: the web card absorbed exactly those two, and at
-            phone width it carries the avatar with the name and the numbers underneath it. */}
+        {/* The avatar card, unchanged. Its third stat was "Total Points" — a sum
+            across modes (duel points + table points + World Cup points), which
+            means nothing — and is now Badges (Ryan, 2026-09-28). */}
         <AvatarCard
           fullName={data?.fullName ?? 'User'}
           username={data?.username ?? ''}
@@ -94,25 +177,80 @@ export default function ProfileScreen() {
           initials={initials}
           stats={[
             { label: 'Pools', value: String(pools.length) },
-            { label: 'Total Points', value: totalPoints.toLocaleString() },
             { label: 'Predictions', value: totalPredictions.toLocaleString() },
+            {
+              label: 'Badges',
+              value: trophies.total === null ? '–' : trophies.total.toLocaleString(),
+            },
           ]}
         />
 
-        {pools.length === 0 ? (
-          <EmptyStatsCard />
-        ) : (
-          <>
-            <PoolPerformanceSection pools={pools} />
-            <AccuracySection pools={pools} />
-          </>
-        )}
+        <View style={{ paddingHorizontal: theme.spacing.xl, gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            <HubTile
+              icon="calendar"
+              title="Seasons"
+              teaser="How you finished, competition by competition"
+              tint={theme.colors.primary}
+            />
+            <HubTile
+              icon="trophy.fill"
+              title="Trophy Room"
+              teaser={trophies.error ? 'Your badges' : trophyTeaser(trophies.total)}
+              tint={theme.colors.amber}
+              highlight
+              onPress={() => router.push('/profile/trophies')}
+            />
+          </View>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            <HubTile
+              icon="binoculars"
+              title="Scouting Report"
+              teaser="How you pick, across every league pool"
+              tint={theme.colors.green}
+            />
+            <HubTile
+              icon="person.3.fill"
+              title="My Crews"
+              teaser="The people you keep playing with"
+              tint={theme.colors.red}
+            />
+          </View>
+        </View>
 
-        <TrophyCaseSection />
+        <SectionWrapper title="Settings">
+          <DividedList
+            items={settingsRows}
+            keyOf={(i) => i.id}
+            render={({ id: _id, ...row }) => <SettingsRow {...row} />}
+          />
+        </SectionWrapper>
 
-        <SettingsSection />
+        {__DEV__ ? (
+          <SectionWrapper title="Developer">
+            <DividedList
+              items={devRows}
+              keyOf={(i) => i.id}
+              render={({ id: _id, ...row }) => <SettingsRow {...row} />}
+            />
+          </SectionWrapper>
+        ) : null}
 
-        <VersionFooter />
+        <RNText
+          style={{
+            textAlign: 'center',
+            fontFamily: fontFamilies.medium,
+            fontSize: 11,
+            color: theme.colors.slate,
+          }}
+        >
+          {versionLabel({
+            appVersion: Constants.expoConfig?.version,
+            runtimeVersion: Updates.runtimeVersion,
+            updateId: Updates.updateId,
+            isDev: __DEV__,
+          })}
+        </RNText>
       </ScrollView>
 
       <PoolCreateJoinSheet
@@ -123,584 +261,6 @@ export default function ProfileScreen() {
       />
       <JoinPoolSheet ref={joinPoolSheetRef} />
     </SafeAreaView>
-  );
-}
-
-function PoolPerformanceSection({ pools }: { pools: PoolSummary[] }) {
-  const theme = useTheme();
-  return (
-    <SectionWrapper title="Pool Performance">
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg }}>
-        {pools.map((pool, idx) => (
-          <View key={pool.poolId}>
-            <PoolStatRow pool={pool} />
-            {idx < pools.length - 1 ? <Divider /> : null}
-          </View>
-        ))}
-      </View>
-    </SectionWrapper>
-  );
-}
-
-function PoolStatRow({ pool }: { pool: PoolSummary }) {
-  const theme = useTheme();
-  const acc = pool.accuracyStats;
-  const accuracy =
-    acc && acc.totalCompleted > 0 ? Math.round((acc.correctCount / acc.totalCompleted) * 100) : null;
-  const rankEmoji = pool.currentRank === 1 ? '🥇' : pool.currentRank === 2 ? '🥈' : pool.currentRank === 3 ? '🥉' : null;
-  const memberCount = pool.totalEntries || pool.memberCount;
-  const rankBarColor = (() => {
-    if (!pool.currentRank || memberCount < 2) return theme.colors.mist;
-    const pct = (memberCount - pool.currentRank + 1) / memberCount;
-    if (pct >= 0.75) return theme.colors.green;
-    if (pct >= 0.5) return theme.colors.primary;
-    if (pct >= 0.25) return theme.colors.amber;
-    return theme.colors.red;
-  })();
-
-  return (
-    <View style={{ paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.md - 2, gap: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <RNText
-          numberOfLines={1}
-          style={{ flex: 1, fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}
-        >
-          {pool.poolName}
-        </RNText>
-        {pool.currentRank ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            {rankEmoji ? <RNText style={{ fontSize: 12 }}>{rankEmoji}</RNText> : null}
-            <RNText
-              style={{
-                fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-                fontSize: 12,
-                color: theme.colors.slate,
-              }}
-            >
-              #{pool.currentRank}/{memberCount}
-            </RNText>
-          </View>
-        ) : null}
-      </View>
-
-      {pool.currentRank && memberCount > 1 ? (
-        <View style={{ height: 4, borderRadius: 3, backgroundColor: theme.colors.mist, overflow: 'hidden' }}>
-          <View
-            style={{
-              height: 4,
-              borderRadius: 3,
-              backgroundColor: rankBarColor,
-              width: `${((memberCount - pool.currentRank + 1) / memberCount) * 100}%`,
-            }}
-          />
-        </View>
-      ) : null}
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md + 2 }}>
-        <MiniStat value={String(pool.totalPoints)} label="pts" color={theme.colors.primary} />
-        <MiniStat
-          value={String(acc?.totalCompleted ?? pool.predictionsCompleted)}
-          label="pred"
-          color={theme.colors.green}
-        />
-        {accuracy !== null ? (
-          <MiniStat
-            value={`${accuracy}%`}
-            label="acc"
-            color={accuracy >= 70 ? theme.colors.green : accuracy >= 40 ? theme.colors.amber : theme.colors.slate}
-          />
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-function MiniStat({ value, label, color }: { value: string; label: string; color: string }) {
-  const theme = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-      <RNText
-        style={{
-          fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 13,
-          color,
-        }}
-      >
-        {value}
-      </RNText>
-      <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 10, color: theme.colors.slate }}>
-        {label}
-      </RNText>
-    </View>
-  );
-}
-
-function AccuracySection({ pools }: { pools: PoolSummary[] }) {
-  const theme = useTheme();
-  // Aggregate across all pools.
-  const totals = useMemo(() => {
-    let exact = 0;
-    let correct = 0;
-    let completed = 0;
-    for (const p of pools) {
-      const a = p.accuracyStats;
-      if (!a) continue;
-      exact += a.exactCount;
-      correct += a.correctCount;
-      completed += a.totalCompleted;
-    }
-    return { exact, correct, completed };
-  }, [pools]);
-
-  const accuracyPct = totals.completed > 0 ? Math.round((totals.correct / totals.completed) * 100) : 0;
-  const exactPct = totals.completed > 0 ? Math.round((totals.exact / totals.completed) * 100) : 0;
-  const incorrect = Math.max(0, totals.completed - totals.correct);
-
-  return (
-    <SectionWrapper title="Prediction Accuracy">
-      <View
-        style={{
-          backgroundColor: theme.colors.surface,
-          borderRadius: theme.radii.lg,
-          paddingVertical: theme.spacing.md,
-          gap: theme.spacing.md - 2,
-        }}
-      >
-        <View style={{ flexDirection: 'row' }}>
-          <RingColumn value={accuracyPct} label="Accuracy" subtitle={`${totals.correct}/${totals.completed}`} color={theme.colors.green} />
-          <RingColumn value={exactPct} label="Exact" subtitle={`${totals.exact} scores`} color={theme.colors.accent} />
-          <RingColumn value={accuracyPct} label="Hit Rate" subtitle={`${totals.correct} wins`} color={theme.colors.primary} />
-        </View>
-
-        <Divider />
-
-        {totals.completed > 0 ? (
-          <AccuracyBar
-            exact={totals.exact}
-            correctNonExact={totals.correct - totals.exact}
-            miss={incorrect}
-          />
-        ) : null}
-
-        <View style={{ paddingHorizontal: theme.spacing.md, gap: 10 }}>
-          <BreakdownRow label="Exact Score" count={totals.exact} total={totals.completed} color={theme.colors.accent} />
-          <BreakdownRow label="Correct Result" count={Math.max(0, totals.correct - totals.exact)} total={totals.completed} color={theme.colors.green} />
-          <BreakdownRow label="Incorrect" count={incorrect} total={totals.completed} color={theme.colors.red} />
-        </View>
-      </View>
-    </SectionWrapper>
-  );
-}
-
-function RingColumn({
-  value,
-  label,
-  subtitle,
-  color,
-}: {
-  value: number;
-  label: string;
-  subtitle: string;
-  color: string;
-}) {
-  const theme = useTheme();
-  // Static SVG-free ring: outer track + a percentage fill ring using a
-  // rotated half-circle approach is heavy; for v1 we render an outer
-  // ring track + inner text. The numeric value already carries the signal.
-  return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-      <View
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          borderWidth: 5,
-          borderColor: withOpacity(color, 0.12),
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <View
-          style={{
-            position: 'absolute',
-            inset: -5,
-            borderRadius: 24,
-            borderWidth: 5,
-            borderColor: color,
-            borderRightColor: value >= 25 ? color : 'transparent',
-            borderBottomColor: value >= 50 ? color : 'transparent',
-            borderLeftColor: value >= 75 ? color : 'transparent',
-            borderTopColor: value >= 1 ? color : 'transparent',
-            transform: [{ rotate: '-45deg' }],
-          }}
-        />
-        <RNText
-          style={{
-            fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-            fontSize: 11,
-            color: theme.colors.ink,
-          }}
-        >
-          {value}%
-        </RNText>
-      </View>
-      <RNText
-        style={{ fontFamily: fontFamilies.semibold, fontSize: 11, color: theme.colors.ink }}
-      >
-        {label}
-      </RNText>
-      <RNText
-        style={{ fontFamily: fontFamilies.medium, fontSize: 9, color: theme.colors.slate }}
-      >
-        {subtitle}
-      </RNText>
-    </View>
-  );
-}
-
-function AccuracyBar({
-  exact,
-  correctNonExact,
-  miss,
-}: {
-  exact: number;
-  correctNonExact: number;
-  miss: number;
-}) {
-  const theme = useTheme();
-  const total = Math.max(1, exact + correctNonExact + miss);
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        gap: 2,
-        marginHorizontal: theme.spacing.md,
-        height: 8,
-      }}
-    >
-      {exact > 0 ? (
-        <View
-          style={{
-            backgroundColor: theme.colors.accent,
-            borderRadius: 4,
-            flex: exact / total,
-          }}
-        />
-      ) : null}
-      {correctNonExact > 0 ? (
-        <View
-          style={{
-            backgroundColor: theme.colors.green,
-            borderRadius: 4,
-            flex: correctNonExact / total,
-          }}
-        />
-      ) : null}
-      {miss > 0 ? (
-        <View
-          style={{
-            backgroundColor: withOpacity(theme.colors.red, 0.4),
-            borderRadius: 4,
-            flex: miss / total,
-          }}
-        />
-      ) : null}
-    </View>
-  );
-}
-
-function BreakdownRow({
-  label,
-  count,
-  total,
-  color,
-}: {
-  label: string;
-  count: number;
-  total: number;
-  color: string;
-}) {
-  const theme = useTheme();
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
-      <RNText
-        style={{ flex: 1, fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.ink }}
-      >
-        {label}
-      </RNText>
-      <RNText
-        style={{
-          fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
-          fontSize: 13,
-          color: theme.colors.ink,
-        }}
-      >
-        {count}
-      </RNText>
-      <RNText
-        style={{
-          width: 44,
-          textAlign: 'right',
-          fontFamily: fontFamilies.medium,
-          fontSize: 11,
-          color: theme.colors.slate,
-        }}
-      >
-        ({pct}%)
-      </RNText>
-    </View>
-  );
-}
-
-function SettingsSection() {
-  return (
-    <SectionWrapper title="Settings">
-      <SettingsCard>
-        <SettingsRow
-          icon="gearshape.fill"
-          title="Settings"
-          subtitle="Account, notifications, archived pools & help"
-          onPress={() => router.push('/settings')}
-        />
-      </SettingsCard>
-    </SectionWrapper>
-  );
-}
-
-function VersionFooter() {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: theme.spacing.xl + theme.spacing.md,
-      }}
-    >
-      <RNText
-        style={{ fontFamily: fontFamilies.semibold, fontSize: 12, color: theme.colors.slate }}
-      >
-        SportPool
-      </RNText>
-      <RNText
-        style={{
-          fontFamily: Platform.OS === 'ios' ? 'Menlo-Regular' : 'monospace',
-          fontSize: 11,
-          color: theme.colors.slate,
-        }}
-      >
-        v1.0.0
-      </RNText>
-    </View>
-  );
-}
-
-// Lifetime Trophy Case — cumulative badge counts from the append-only
-// badge_unlocks ledger (reads the user's own rows; RLS self-read policy allows
-// it across all pools, even ones they've left). Reuses the mobile medallion art.
-const TRANSIENT_BADGES = new Set(['top_dog']);
-
-function formatBadgeName(id: string): string {
-  return id
-    .replace(/^bp_/, '')
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
-
-function TrophyCaseSection() {
-  const theme = useTheme();
-  const { user } = useAuth();
-  const [badges, setBadges] = useState<{ id: string; count: number }[] | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    (async () => {
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('user_id')
-        .eq('auth_user_id', user.id)
-        .single();
-      const appUserId = (userRow as { user_id: string } | null)?.user_id;
-      if (!appUserId) {
-        if (!cancelled) setBadges([]);
-        return;
-      }
-      // Archived pools are excluded (migration 040): an archived pool stops
-      // counting toward trophies until it is restored. `!inner` makes the
-      // embedded pools row a join rather than a left-join, so `.is()` on it
-      // actually filters the outer rows. Must stay in step with the web
-      // Trophy Case (app/profile/ProfilePage.tsx) — two surfaces deriving the
-      // same number differently is how they came to disagree about levels.
-      const { data } = await supabase
-        .from('badge_unlocks')
-        .select('badge_id, pool:pools!inner(archived_at)')
-        .eq('user_id', appUserId)
-        .is('pool.archived_at', null);
-      if (cancelled) return;
-      const counts = new Map<string, number>();
-      for (const row of (data ?? []) as { badge_id: string }[]) {
-        if (TRANSIENT_BADGES.has(row.badge_id)) continue;
-        counts.set(row.badge_id, (counts.get(row.badge_id) ?? 0) + 1);
-      }
-      setBadges(
-        [...counts.entries()]
-          .map(([id, count]) => ({ id, count }))
-          .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id)),
-      );
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  if (badges === null) {
-    return (
-      <SectionWrapper title="Trophy Case">
-        <View style={{ padding: theme.spacing.xl, alignItems: 'center' }}>
-          <ActivityIndicator color={theme.colors.primary} />
-        </View>
-      </SectionWrapper>
-    );
-  }
-
-  if (badges.length === 0) {
-    return (
-      <SectionWrapper title="Trophy Case">
-        <View style={{ padding: theme.spacing.xl }}>
-          <Text style={{ color: theme.colors.slate, textAlign: 'center' }}>
-            No trophies yet — earn badges by making great predictions.
-          </Text>
-        </View>
-      </SectionWrapper>
-    );
-  }
-
-  return (
-    <SectionWrapper title="Trophy Case">
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-        {badges.map(({ id, count }) => {
-          const icon = badgeIcon(id);
-          return (
-            <View
-              key={id}
-              style={{
-                width: '31%',
-                alignItems: 'center',
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.radii.md,
-                paddingVertical: theme.spacing.md,
-                paddingHorizontal: theme.spacing.sm,
-              }}
-            >
-              {icon.png ? (
-                <Image source={icon.png} resizeMode="contain" style={{ width: 44, height: 44 }} />
-              ) : (
-                <Text style={{ fontSize: 30 }}>{icon.emoji}</Text>
-              )}
-              <Text
-                numberOfLines={1}
-                style={{ fontSize: 11, fontWeight: '600', color: theme.colors.ink, marginTop: 6, textAlign: 'center' }}
-              >
-                {formatBadgeName(id)}
-              </Text>
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 4,
-                  right: 4,
-                  backgroundColor: theme.colors.primary,
-                  borderRadius: theme.radii.pill,
-                  paddingHorizontal: 5,
-                  paddingVertical: 1,
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{count}×</Text>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </SectionWrapper>
-  );
-}
-
-function SectionWrapper({ title, children }: { title: string; children: React.ReactNode }) {
-  const theme = useTheme();
-  return (
-    <View style={{ gap: theme.spacing.sm + 4 }}>
-      <Text variant="sectionHeader" style={{ paddingHorizontal: theme.spacing.xl }}>
-        {title}
-      </Text>
-      <View style={{ paddingHorizontal: theme.spacing.xl }}>{children}</View>
-    </View>
-  );
-}
-
-function EmptyStatsCard() {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        marginHorizontal: theme.spacing.xl,
-        alignItems: 'center',
-        gap: theme.spacing.md,
-        paddingVertical: theme.spacing.xxl,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radii.lg,
-      }}
-    >
-      <View
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-          backgroundColor: withOpacity(theme.colors.primary, 0.08),
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Icon
-          name="chart.bar.fill"
-          tint={withOpacity(theme.colors.primary, 0.4)}
-          size={26}
-          weight="regular"
-        />
-      </View>
-      <RNText
-        style={{ fontFamily: fontFamilies.bold, fontSize: 16, color: theme.colors.ink }}
-      >
-        No stats yet
-      </RNText>
-      <RNText
-        style={{
-          fontFamily: fontFamilies.medium,
-          fontSize: 13,
-          color: theme.colors.slate,
-          textAlign: 'center',
-          paddingHorizontal: theme.spacing.xxl,
-        }}
-      >
-        Join a pool to start tracking{'\n'}your prediction performance
-      </RNText>
-    </View>
-  );
-}
-
-function Divider() {
-  const theme = useTheme();
-  return (
-    <View
-      style={{
-        height: 0.5,
-        marginHorizontal: theme.spacing.md - 2,
-        backgroundColor: withOpacity(theme.colors.mist, 0.5),
-      }}
-    />
   );
 }
 

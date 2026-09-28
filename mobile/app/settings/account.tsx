@@ -2,10 +2,16 @@
 // (app/profile/ProfilePage.tsx → AccountSettingsTab) can edit username, full
 // name and email; mobile deliberately still can't. Change Password moved here
 // from the profile tab's old Security section.
+//
+// Sign Out and Delete Account moved here from the old Settings screen when the
+// Profile tab became a hub (the settings rows now sit on the tab itself). One
+// level down is deliberate: the two irreversible-ish actions are the ones that
+// should take a tap to reach.
 
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -15,8 +21,16 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SectionWrapper, SettingsCard, SettingsHeader, SettingsRow } from '@/components/settings';
+import {
+  Divider as SettingsDivider,
+  SectionWrapper,
+  SettingsCard,
+  SettingsHeader,
+  SettingsRow,
+} from '@/components/settings';
 import { Icon } from '@/components/ui';
+import { deleteAccount } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -25,6 +39,7 @@ export default function AccountSettingsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { data } = useHomeData();
+  const { signOut } = useAuth();
   const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
@@ -67,10 +82,62 @@ export default function AccountSettingsScreen() {
             />
           </SettingsCard>
         </SectionWrapper>
+
+        <SectionWrapper title="Account Actions">
+          <SettingsCard>
+            <SettingsRow
+              icon="rectangle.portrait.and.arrow.right"
+              title="Sign Out"
+              subtitle="You can sign back in any time"
+              tone="danger"
+              accessory="none"
+              onPress={() => confirmSignOut(signOut)}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="trash.fill"
+              title="Delete Account"
+              subtitle="Permanently remove all data"
+              tone="danger"
+              accessory="none"
+              onPress={confirmDeleteAccount}
+            />
+          </SettingsCard>
+        </SectionWrapper>
       </ScrollView>
 
       <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </View>
+  );
+}
+
+function confirmSignOut(signOut: () => void | Promise<void>) {
+  Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Sign Out', style: 'destructive', onPress: () => void signOut() },
+  ]);
+}
+
+function confirmDeleteAccount() {
+  Alert.alert(
+    'Delete Account',
+    'This is permanent. All your predictions, scores, and pool memberships will be permanently deleted.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteAccount();
+            await supabase.auth.signOut();
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Failed to delete account';
+            Alert.alert('Delete failed', msg);
+          }
+        },
+      },
+    ],
   );
 }
 

@@ -368,10 +368,13 @@ function InnerLayout() {
             headerShown: false,
           }}
         />
-        {/* Settings hierarchy. No `presentation` on purpose — the default
+        {/* The Profile hub's doors. Same card push as settings — each draws its
+            own back header. */}
+        <Stack.Screen name="profile/trophies" options={{ headerShown: false }} />
+        {/* Settings hierarchy — its index is the Profile tab itself since the
+            hub rebuild. No `presentation` on purpose — the default
             card transition gives the push + edge-swipe-back that a settings
             hierarchy should have. Each screen draws its own SettingsHeader. */}
-        <Stack.Screen name="settings/index" options={{ headerShown: false }} />
         <Stack.Screen name="settings/account" options={{ headerShown: false }} />
         <Stack.Screen name="settings/notifications" options={{ headerShown: false }} />
         <Stack.Screen name="settings/archived-pools" options={{ headerShown: false }} />
