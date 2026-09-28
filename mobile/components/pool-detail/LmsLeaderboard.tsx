@@ -1,6 +1,7 @@
 import { Platform, Text as RNText, View } from 'react-native';
 
 import { ClubBar, Icon, Text } from '@/components/ui';
+import { LeaderboardAvatar } from './LeaderboardAvatar';
 import type { LeagueLeaderboardEntry, LeagueLeaderboardMeta } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -199,6 +200,22 @@ function SurvivorRow({
       }}
     >
       <StateDot lms={lms} />
+
+      {/* ⭐ Between the position marker and the name — the order Ryan asked for. In LMS the
+          marker is the state dot, not a number: the stored rank here is entry_id ORDER, so this
+          mode must never show one.
+
+          ⚠ `rank={1}` because there is no rank to pass. FACE_LIMIT is a guard for the tail of a
+          long board, and an LMS pool is capped far below it — passing a positional index here
+          would invent an ordering the mode deliberately refuses to state. */}
+      <LeaderboardAvatar
+        userId={entry.user_id ?? null}
+        name={name}
+        avatarBuild={entry.avatar_build ?? null}
+        avatarColour={entry.avatar_colour ?? null}
+        size={34}
+        rank={1}
+      />
 
       <View style={{ flex: 1, gap: 3 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

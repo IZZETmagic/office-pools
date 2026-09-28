@@ -1,5 +1,6 @@
 import { Platform, Pressable, Text as RNText, View } from 'react-native';
 
+import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { MovementPill, rankColor } from './leaderboard-shared';
 import { ClubBar, Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry, LeagueLeaderboardMeta } from '@/lib/api';
@@ -75,7 +76,6 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
             pedestalHeight={110}
             ringColor={theme.colors.silver}
             bgTint={withOpacity(theme.colors.silver, 0.15)}
-            medalIcon="medal.fill"
             isCurrentUser={entries[1].user_id === currentUserId}
             onPress={onEntryPress ? () => onEntryPress(entries[1]) : undefined}
           />
@@ -84,7 +84,6 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
             pedestalHeight={136}
             ringColor={theme.colors.accent}
             bgTint={withOpacity(theme.colors.accent, 0.1)}
-            medalIcon="trophy.fill"
             isCurrentUser={entries[0].user_id === currentUserId}
             onPress={onEntryPress ? () => onEntryPress(entries[0]) : undefined}
           />
@@ -93,7 +92,6 @@ export function LeagueTableLeaderboard({ entries, league, currentUserId, onEntry
             pedestalHeight={92}
             ringColor={theme.colors.bronze}
             bgTint={withOpacity(theme.colors.bronze, 0.1)}
-            medalIcon="medal.fill"
             isCurrentUser={entries[2].user_id === currentUserId}
             onPress={onEntryPress ? () => onEntryPress(entries[2]) : undefined}
           />
@@ -144,7 +142,6 @@ function PodiumColumn({
   pedestalHeight,
   ringColor,
   bgTint,
-  medalIcon,
   isCurrentUser,
   onPress,
 }: {
@@ -152,7 +149,6 @@ function PodiumColumn({
   pedestalHeight: number;
   ringColor: string;
   bgTint: string;
-  medalIcon: string;
   isCurrentUser: boolean;
   onPress?: () => void;
 }) {
@@ -182,7 +178,23 @@ function PodiumColumn({
             justifyContent: 'center',
           }}
         >
-          <Icon name={medalIcon as never} color="slate" size={22} />
+          {/*
+            ⭐ THE FACE STANDS WHERE THE MEDAL DID. The gold/silver/bronze `ringColor` is now the
+            only thing naming the place, so it must not be softened.
+
+            ⚠ 46, not 52 — the ring is 3pt each side of a 52pt circle, so the inside is 46. A 52
+            here sits under the border and clips.
+
+            ⚠ `rank={1}`: a podium is never the tail of a long list, so FACE_LIMIT must not gate it.
+          */}
+          <LeaderboardAvatar
+            userId={entry.user_id ?? null}
+            name={name}
+            avatarBuild={entry.avatar_build ?? null}
+            avatarColour={entry.avatar_colour ?? null}
+            size={46}
+            rank={1}
+          />
         </View>
         <MovementPill entry={entry} floating />
       </View>
@@ -278,6 +290,18 @@ function TableRow({
         </RNText>
         <MovementPill entry={entry} />
       </View>
+
+      {/* ⭐ Between the position and the name — the order Ryan asked for: position, avatar,
+          name, username. Its own fixed column rather than inside the `flex: 1` block, so a long
+          entry name cannot squeeze it. */}
+      <LeaderboardAvatar
+        userId={entry.user_id ?? null}
+        name={name}
+        avatarBuild={entry.avatar_build ?? null}
+        avatarColour={entry.avatar_colour ?? null}
+        size={34}
+        rank={rank}
+      />
 
       <View style={{ flex: 1, gap: 3 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
