@@ -383,6 +383,69 @@ export function useHomeDataInternal() {
           lastReadByPool[r.pools.pool_id] = r.last_read_at;
         }
 
+        // ---- Progressive pools: per-round "needs predictions" override ----
+        // The dashboard's "X pools need predictions" count was wrong for
+        // progressive pools because `has_submitted_predictions` on the entry
+        // flips true after the first submission and stays true even when a
+        // later round opens and hasn't been predicted yet. Mirror the iOS
+        // logic: for progressive pools, look at the BEST entry's
+        // entry_round_submissions vs the pool's open rounds.
+        const progressivePoolIds: string[] = [];
+        const bestEntryByProgressivePool: Record<string, string> = {};
+        for (const row of rows) {
+          if (row.pools.prediction_mode !== 'progressive') continue;
+          const entries = row.pool_entries ?? [];
+          if (entries.length === 0) continue;
+          // ⚠ STORED COLUMNS ONLY — and that is a known divergence, not a
+          // choice. The card below selects its entry with the home-scoring
+          // summary taking precedence, but that summary is fetched a wave later
+          // and does not exist yet here, so where it disagrees with the stored
+          // rank these two can land on DIFFERENT entries. See the long note in
+          // lib/bestEntry.ts; it is pinned by a test so the wave collapse makes
+          // the change visible.
+          const best = pickBestEntry(entries, storedRankOf, storedPointsOf);
+          if (!best) continue;
+          progressivePoolIds.push(row.pools.pool_id);
+          bestEntryByProgressivePool[row.pools.pool_id] = best.entry_id;
+        }
+
+        const allEntryIdsForPreds = rows.flatMap((r) =>
+          (r.pool_entries ?? []).map((e) => e.entry_id),
+        );
+        // Bracket-picker pools store picks in three separate tables, not in
+        // `predictions`. Count those rows separately for the progress circle.
+        const bracketPickerEntryIds = rows
+          .filter((r) => r.pools.prediction_mode === 'bracket_picker')
+          .flatMap((r) => (r.pool_entries ?? []).map((e) => e.entry_id));
+
+        // ⚠ EVERY REMAINING READ IS KEYED ON SOMETHING ALREADY IN HAND, so they
+        // all belong in ONE wave. The ids above come from the membership rows,
+        // which arrived in the first level — nothing below waits on anything
+        // beside it. They were three waves because they were WRITTEN in three
+        // paragraphs, and on a link to us-east-1 each paragraph cost a round
+        // trip.
+        //
+        // ⚠ ONE ANNOTATED CONTAINER, NOT SIX LOOSE `let`s. TypeScript's control
+        // flow cannot see an assignment made inside an async closure, so a
+        // `let x: T | null = null` filled in below reads as `null` at every use
+        // site — `if (x)` then narrows to `never` and the branch will not
+        // compile. Reading through an ANNOTATED const defeats that: property
+        // access uses the declared type rather than the initialiser's, so the
+        // nullable stays nullable and the check means what it says.
+        const fetched: {
+          openRounds: { pool_id: string; round_key: string }[];
+          submissions: { entry_id: string; round_key: string; has_submitted: boolean }[];
+          predRows: { entry_id: string }[];
+          brackets: { data: { entry_id: string }[] | null }[] | null;
+          scoring: HomeScoring;
+        } = {
+          openRounds: [],
+          submissions: [],
+          predRows: [],
+          brackets: null,
+          scoring: { entries: [], pools: null },
+        };
+
         await Promise.all([
           // ⚠ ONE QUERY FOR EVERY PER-POOL ROLL-UP, where there were three
           // PER POOL. The member count, the faces on the card and the entry
@@ -477,78 +540,93 @@ export function useHomeDataInternal() {
             const { count } = await query;
             unreadByPool[pid] = count ?? 0;
           }),
+          // Progressive pools' open rounds, and the submissions against them.
+          (async () => {
+            if (progressivePoolIds.length === 0) return;
+            const bestProgressiveEntryIds = Object.values(bestEntryByProgressivePool);
+            const [openRoundsRes, submissionsRes] = await Promise.all([
+              supabase
+                .from('pool_round_states')
+                .select('pool_id, round_key')
+                .in('pool_id', progressivePoolIds)
+                .eq('state', 'open'),
+              bestProgressiveEntryIds.length > 0
+                ? supabase
+                    .from('entry_round_submissions')
+                    .select('entry_id, round_key, has_submitted')
+                    .in('entry_id', bestProgressiveEntryIds)
+                : Promise.resolve({
+                    data: [] as {
+                      entry_id: string;
+                      round_key: string;
+                      has_submitted: boolean;
+                    }[],
+                  }),
+            ]);
+            fetched.openRounds = (openRoundsRes.data ?? []) as {
+              pool_id: string;
+              round_key: string;
+            }[];
+            fetched.submissions = (submissionsRes.data ?? []) as {
+              entry_id: string;
+              round_key: string;
+              has_submitted: boolean;
+            }[];
+          })(),
+          // Prediction counts, the scoring summary, and bracket-picker picks.
+          //
+          // Form / accuracy / streak come from the API, not PostgREST. Two
+          // reasons: the shadow tables this must follow are RLS deny-all, and
+          // the previous query selected is_exact_score / is_correct_difference
+          // / is_correct_result — columns that do not exist on either table, so
+          // it 400'd on every call and the discarded error left form and
+          // accuracy permanently empty. They are all just `score_type`.
+          (async () => {
+            if (allEntryIdsForPreds.length === 0) return;
+            const [predsRes, summaries, brackets] = await Promise.all([
+              supabase.from('predictions').select('entry_id').in('entry_id', allEntryIdsForPreds),
+              fetchHomeScoring(userData.user_id).catch(
+                () => ({ entries: [], pools: null }) as HomeScoring,
+              ),
+              bracketPickerEntryIds.length > 0
+                ? Promise.all([
+                    supabase
+                      .from('bracket_picker_group_rankings')
+                      .select('entry_id')
+                      .in('entry_id', bracketPickerEntryIds),
+                    supabase
+                      .from('bracket_picker_third_place_rankings')
+                      .select('entry_id')
+                      .in('entry_id', bracketPickerEntryIds),
+                    supabase
+                      .from('bracket_picker_knockout_picks')
+                      .select('entry_id')
+                      .in('entry_id', bracketPickerEntryIds),
+                  ])
+                : Promise.resolve(null),
+            ]);
+            fetched.predRows = (predsRes.data ?? []) as { entry_id: string }[];
+            fetched.scoring = summaries;
+            fetched.brackets = brackets as { data: { entry_id: string }[] | null }[] | null;
+          })(),
         ]);
 
-        // ---- Progressive pools: per-round "needs predictions" override ----
-        // The dashboard's "X pools need predictions" count was wrong for
-        // progressive pools because `has_submitted_predictions` on the entry
-        // flips true after the first submission and stays true even when a
-        // later round opens and hasn't been predicted yet. Mirror the iOS
-        // logic: for progressive pools, look at the BEST entry's
-        // entry_round_submissions vs the pool's open rounds.
-        const progressivePoolIds: string[] = [];
-        const bestEntryByProgressivePool: Record<string, string> = {};
-        for (const row of rows) {
-          if (row.pools.prediction_mode !== 'progressive') continue;
-          const entries = row.pool_entries ?? [];
-          if (entries.length === 0) continue;
-          // ⚠ STORED COLUMNS ONLY — and that is a known divergence, not a
-          // choice. The card below selects its entry with the home-scoring
-          // summary taking precedence, but that summary is fetched a wave later
-          // and does not exist yet here, so where it disagrees with the stored
-          // rank these two can land on DIFFERENT entries. See the long note in
-          // lib/bestEntry.ts; it is pinned by a test so the wave collapse makes
-          // the change visible.
-          const best = pickBestEntry(entries, storedRankOf, storedPointsOf);
-          if (!best) continue;
-          progressivePoolIds.push(row.pools.pool_id);
-          bestEntryByProgressivePool[row.pools.pool_id] = best.entry_id;
-        }
         const progressiveNeedsPredictions: Record<string, boolean> = {};
         if (progressivePoolIds.length > 0) {
-          const bestProgressiveEntryIds = Object.values(bestEntryByProgressivePool);
-          const [openRoundsRes, submissionsRes] = await Promise.all([
-            supabase
-              .from('pool_round_states')
-              .select('pool_id, round_key')
-              .in('pool_id', progressivePoolIds)
-              .eq('state', 'open'),
-            bestProgressiveEntryIds.length > 0
-              ? supabase
-                  .from('entry_round_submissions')
-                  .select('entry_id, round_key, has_submitted')
-                  .in('entry_id', bestProgressiveEntryIds)
-              : Promise.resolve({ data: [] as Array<{ entry_id: string; round_key: string; has_submitted: boolean }> }),
-          ]);
-          // Two Maps and three loops used to live here, where no test could
-          // reach them. The rule is in lib/needsPredictions.ts now; the row
-          // shapes it takes are exactly what the wave collapse will change.
+          // Pure, and reachable by a test — the rule lives in
+          // lib/needsPredictions.ts. The rows it reads were fetched in the wave
+          // above rather than in a wave of their own.
           Object.assign(
             progressiveNeedsPredictions,
             deriveProgressiveNeedsPredictions({
               progressivePoolIds,
               bestEntryByPool: bestEntryByProgressivePool,
-              openRounds: (openRoundsRes.data ?? []) as {
-                pool_id: string;
-                round_key: string;
-              }[],
-              submissions: (submissionsRes.data ?? []) as {
-                entry_id: string;
-                round_key: string;
-                has_submitted: boolean;
-              }[],
+              openRounds: fetched.openRounds,
+              submissions: fetched.submissions,
             }),
           );
         }
 
-        const allEntryIdsForPreds = rows.flatMap((r) =>
-          (r.pool_entries ?? []).map((e) => e.entry_id),
-        );
-        // Bracket-picker pools store picks in three separate tables, not in
-        // `predictions`. Count those rows separately for the progress circle.
-        const bracketPickerEntryIds = rows
-          .filter((r) => r.pools.prediction_mode === 'bracket_picker')
-          .flatMap((r) => (r.pool_entries ?? []).map((e) => e.entry_id));
         const predictionsByEntry: Record<string, number> = {};
         const formByEntry: Record<string, FormResult[]> = {};
         // Full accuracy aggregates per entry (every scored match, not just
@@ -566,46 +644,20 @@ export function useHomeDataInternal() {
         // so the home card cannot disagree with the pool it links to.
         const scoringByEntry: Record<string, EntryScoringSummary> = {};
         if (allEntryIdsForPreds.length > 0) {
-          // Form / accuracy / streak come from the API, not PostgREST. Two
-          // reasons: the shadow tables this must follow are RLS deny-all, and
-          // the previous query selected is_exact_score / is_correct_difference
-          // / is_correct_result — columns that do not exist on either table, so
-          // it 400'd on every call and the discarded error left form and
-          // accuracy permanently empty. They are all just `score_type`.
-          const [{ data: predRows }, scoringSummaries, bracketRes] = await Promise.all([
-            supabase.from('predictions').select('entry_id').in('entry_id', allEntryIdsForPreds),
-            fetchHomeScoring(userData.user_id).catch(
-              () => ({ entries: [], pools: null }) as HomeScoring,
-            ),
-            bracketPickerEntryIds.length > 0
-              ? Promise.all([
-                  supabase
-                    .from('bracket_picker_group_rankings')
-                    .select('entry_id')
-                    .in('entry_id', bracketPickerEntryIds),
-                  supabase
-                    .from('bracket_picker_third_place_rankings')
-                    .select('entry_id')
-                    .in('entry_id', bracketPickerEntryIds),
-                  supabase
-                    .from('bracket_picker_knockout_picks')
-                    .select('entry_id')
-                    .in('entry_id', bracketPickerEntryIds),
-                ])
-              : Promise.resolve(null),
-          ]);
-          for (const p of (predRows ?? []) as Array<{ entry_id: string }>) {
+          // All of this arrived in the single wave above; what is left here is
+          // the shaping of it.
+          for (const p of fetched.predRows) {
             predictionsByEntry[p.entry_id] = (predictionsByEntry[p.entry_id] ?? 0) + 1;
           }
-          if (bracketRes) {
-            for (const res of bracketRes) {
+          if (fetched.brackets) {
+            for (const res of fetched.brackets) {
               for (const r of (res.data ?? []) as Array<{ entry_id: string }>) {
                 predictionsByEntry[r.entry_id] = (predictionsByEntry[r.entry_id] ?? 0) + 1;
               }
             }
           }
-          poolFacts = scoringSummaries.pools;
-          for (const summary of scoringSummaries.entries) {
+          poolFacts = fetched.scoring.pools;
+          for (const summary of fetched.scoring.entries) {
             accuracyByEntry[summary.entry_id] = {
               totalCompleted: summary.total_completed,
               exactCount: summary.exact_count,
