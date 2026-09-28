@@ -101,9 +101,12 @@ function Section({ section }: { section: SeasonSection<PoolSummary> }) {
           </RNText>
         </View>
       </View>
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg, overflow: 'hidden' }}>
-        {groupByMode(section.pools).map((g, gi) => (
-          <ModeGroup key={g.key} group={g} first={gi === 0} />
+      {/* ⚠ ONE CARD PER MODE, not one card per competition with hairlines
+          between the modes — a hairline was too faint to tell the groups apart
+          (Ryan, 2026-09-28). */}
+      <View style={{ gap: theme.spacing.sm }}>
+        {groupByMode(section.pools).map((g) => (
+          <ModeGroup key={g.key} group={g} />
         ))}
       </View>
     </View>
@@ -115,7 +118,7 @@ const COL_A = 54;
 const COL_B = 74;
 const CHEVRON = 11;
 
-function ModeGroup({ group, first }: { group: SeasonModeGroup<PoolSummary>; first: boolean }) {
+function ModeGroup({ group }: { group: SeasonModeGroup<PoolSummary> }) {
   const theme = useTheme();
   const chip = getModeChip(group.predictionMode, group.leagueMode, theme.mode === 'dark');
   const headerText = {
@@ -127,17 +130,15 @@ function ModeGroup({ group, first }: { group: SeasonModeGroup<PoolSummary>; firs
   };
 
   return (
-    <View>
+    <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg, overflow: 'hidden' }}>
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           gap: theme.spacing.md,
           paddingHorizontal: theme.spacing.md,
-          paddingTop: first ? theme.spacing.md : theme.spacing.md + 4,
+          paddingTop: theme.spacing.md,
           paddingBottom: 6,
-          borderTopWidth: first ? 0 : 0.5,
-          borderTopColor: withOpacity(theme.colors.slate, 0.25),
         }}
       >
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
