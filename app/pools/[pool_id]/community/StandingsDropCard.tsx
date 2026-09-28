@@ -12,6 +12,7 @@ type StandingsDropCardProps = {
   onToggleReaction: (emoji: string) => void
   /** Passed straight to the message chassis. */
   onReply?: () => void
+  onDelete?: () => void
 }
 
 const RANK_MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
@@ -24,6 +25,7 @@ export function StandingsDropCard({
   reactions,
   onToggleReaction,
   onReply,
+  onDelete,
 }: StandingsDropCardProps) {
   const meta = message.metadata as unknown as StandingsDropMetadata
   if (!meta?.entries) return null
@@ -38,6 +40,7 @@ export function StandingsDropCard({
       onToggleReaction={onToggleReaction}
       currentUserId={currentUserId}
       onReply={onReply}
+      onDelete={onDelete}
     >
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3.5 pt-3 pb-2">

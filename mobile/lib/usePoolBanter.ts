@@ -33,6 +33,10 @@ export type BanterMessage = {
   // when the message isn't a reply (or the parent is outside the
   // currently-loaded page and couldn't be hydrated).
   replyTo: BanterReplyRef | null;
+  /** Set once the message is taken back (148). Content/metadata are already scrubbed. */
+  deletedAt: string | null;
+  /** Equal to userId = the sender took it back; anyone else = a pool admin removed it. */
+  deletedBy: string | null;
 };
 
 export type PoolMember = {
@@ -63,6 +67,8 @@ type DbMessageRow = {
   metadata: Record<string, unknown> | null;
   created_at: string;
   reply_to_message_id: string | null;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
 };
 
 type DbUserRow = {
@@ -231,7 +237,7 @@ export function usePoolBanter(poolId: string | undefined) {
       const { data: parents } = await supabase
         .from('pool_messages')
         .select(
-          'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id',
+          'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id, deleted_at, deleted_by',
         )
         .in('message_id', missingParents);
       const parentRows = (parents as DbMessageRow[] | null) ?? [];
@@ -258,6 +264,8 @@ export function usePoolBanter(poolId: string | undefined) {
         senderName: u?.full_name ?? u?.username ?? 'Member',
         senderUsername: u?.username ?? null,
         replyTo,
+        deletedAt: row.deleted_at ?? null,
+        deletedBy: row.deleted_by ?? null,
       };
     },
     [],
@@ -308,7 +316,7 @@ export function usePoolBanter(poolId: string | undefined) {
       const { data, error: fetchErr } = await supabase
         .from('pool_messages')
         .select(
-          'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id',
+          'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id, deleted_at, deleted_by',
         )
         .eq('pool_id', poolId)
         .order('created_at', { ascending: false })
@@ -361,7 +369,7 @@ export function usePoolBanter(poolId: string | undefined) {
       const { data, error: fetchErr } = await supabase
         .from('pool_messages')
         .select(
-          'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id',
+          'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id, deleted_at, deleted_by',
         )
         .eq('pool_id', poolId)
         .lt('created_at', oldest.createdAt)
@@ -416,7 +424,9 @@ export function usePoolBanter(poolId: string | undefined) {
         .from('pool_messages')
         .select('*', { count: 'exact', head: true })
         .eq('pool_id', poolId)
-        .neq('user_id', appUserId);
+        .neq('user_id', appUserId)
+        // A deleted message is not an unread one (148).
+        .is('deleted_at', null);
       if (lastReadAt) query = query.gt('created_at', lastReadAt);
       const { count } = await query;
       setUnreadCount(count ?? 0);
@@ -522,6 +532,45 @@ export function usePoolBanter(poolId: string | undefined) {
     [appUserId],
   );
 
+  // One path for our own delete and one arriving over realtime (148): the
+  // cached row is REWRITTEN to its tombstone — never overlaid — its reactions
+  // go, and any quote of it re-reads as deleted.
+  const applyDeletion = useCallback((row: DbMessageRow) => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.messageId === row.message_id) return decorate(row, m.replyTo);
+        if (m.replyTo?.messageId === row.message_id) {
+          return { ...m, replyTo: { ...m.replyTo, content: row.content } };
+        }
+        return m;
+      }),
+    );
+    setReactions((prev) => {
+      if (!prev.has(row.message_id)) return prev;
+      const next = new Map(prev);
+      next.delete(row.message_id);
+      return next;
+    });
+  }, [decorate]);
+
+  // Sender or pool admin — delete_pool_message enforces it; the UI only
+  // decides whether to offer it.
+  const deleteMessage = useCallback(
+    async (messageId: string): Promise<{ error?: string }> => {
+      if (messageId.startsWith('tmp-')) return { error: 'Still sending' };
+      const { data, error: rpcErr } = await supabase.rpc('delete_pool_message', {
+        p_message_id: messageId,
+      });
+      if (rpcErr || !data) {
+        console.warn('[usePoolBanter.deleteMessage]', rpcErr);
+        return { error: rpcErr?.message ?? 'Could not delete' };
+      }
+      applyDeletion(data as DbMessageRow);
+      return {};
+    },
+    [applyDeletion],
+  );
+
   const markAsRead = useCallback(async () => {
     if (!poolId || !appUserId) return;
     try {
@@ -592,6 +641,8 @@ export function usePoolBanter(poolId: string | undefined) {
         senderName: 'You',
         senderUsername: null,
         replyTo: optimisticReplyTo,
+        deletedAt: null,
+        deletedBy: null,
       };
       setMessages((prev) => [...prev, optimistic]);
       try {
@@ -607,7 +658,7 @@ export function usePoolBanter(poolId: string | undefined) {
           .from('pool_messages')
           .insert(insertPayload)
           .select(
-            'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id',
+            'message_id, pool_id, user_id, content, message_type, metadata, created_at, reply_to_message_id, deleted_at, deleted_by',
           )
           .single();
         if (insertErr) throw insertErr;
@@ -749,6 +800,11 @@ export function usePoolBanter(poolId: string | undefined) {
           return [...withoutOptimistic, decorate(row, replyTo)];
         });
       })
+      .on('broadcast', { event: 'message_delete' }, (msg) => {
+        const row = broadcastRecord<DbMessageRow>(msg);
+        if (!row?.message_id) return;
+        applyDeletion(row);
+      })
       .on('broadcast', { event: 'reaction_insert' }, (msg) => {
         const row = broadcastRecord<DbReactionRow>(msg);
         if (!row || !messageIdsRef.current.has(row.message_id)) return;
@@ -799,7 +855,7 @@ export function usePoolBanter(poolId: string | undefined) {
       active = false;
       void channel.unsubscribe();
     };
-  }, [poolId, hydrateSenders, decorate, replyRefFromMessage]);
+  }, [poolId, hydrateSenders, decorate, replyRefFromMessage, applyDeletion]);
 
   // Realtime sync of unread count across separate hook instances. The
   // BanterSheet and the pool detail screen each call usePoolBanter
@@ -846,6 +902,7 @@ export function usePoolBanter(poolId: string | undefined) {
     sendMessage,
     markAsRead,
     toggleReaction,
+    deleteMessage,
     refresh: load,
     loadOlder,
     loadingOlder,

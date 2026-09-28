@@ -273,6 +273,7 @@ export default async function DuelDecisionPage({
         .eq('pool_id', pool_id)
         .eq('user_id', themPerson.user_id)
         .eq('message_type', 'text')
+        .is('deleted_at', null)
         .lt('created_at', mwWindow.first_kickoff_at)
         .order('created_at', { ascending: false })
         .limit(1).maybeSingle()

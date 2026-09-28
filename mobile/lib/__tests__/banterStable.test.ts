@@ -66,6 +66,15 @@ describe('sameChatMessage', () => {
     expect(sameChatMessage(a, c)).toBe(false);
   });
 
+  it('sees a message being deleted, and who deleted it', () => {
+    // Even when the text alone would not change (someone wrote those words).
+    const before = msg({ text: 'Message deleted' });
+    expect(sameChatMessage(before, msg({ text: 'Message deleted', _deleted: 'self' }))).toBe(false);
+    expect(sameChatMessage(msg({ _deleted: 'self' }), msg({ _deleted: 'admin' }))).toBe(false);
+    // Absent and null both mean "not deleted".
+    expect(sameChatMessage(msg(), msg({ _deleted: null }))).toBe(true);
+  });
+
   it('sees a change inside the quoted reply', () => {
     const reply = { _id: 'p', text: 'hi', user: { _id: 'u2', name: 'sam' } };
     const a = msg({ replyMessage: reply });

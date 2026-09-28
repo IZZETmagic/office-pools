@@ -12,6 +12,7 @@ type BadgeFlexCardProps = {
   onToggleReaction: (emoji: string) => void
   /** Passed straight to the message chassis. */
   onReply?: () => void
+  onDelete?: () => void
   currentUserId?: string
 }
 
@@ -30,6 +31,7 @@ export function BadgeFlexCard({
   onToggleReaction,
   currentUserId,
   onReply,
+  onDelete,
 }: BadgeFlexCardProps) {
   const meta = message.metadata as unknown as BadgeFlexMetadata
   if (!meta?.badges) return null
@@ -48,6 +50,7 @@ export function BadgeFlexCard({
       onToggleReaction={onToggleReaction}
       currentUserId={currentUserId}
       onReply={onReply}
+      onDelete={onDelete}
     >
       {/* One badge, centred — RN's BadgeBody. The web showed a wrap-grid of
           every badge in 90px cards, which is the "share all your badges"

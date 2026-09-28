@@ -42,6 +42,7 @@ export function MessageRow({
   reactions = [],
   onToggleReaction,
   onReply,
+  onDelete,
   isFirstInCluster = true,
   isLastInCluster = true,
   wide = false,
@@ -55,6 +56,8 @@ export function MessageRow({
   reactions?: ReactionCount[]
   onToggleReaction?: (emoji: string) => void
   onReply?: () => void
+  /** Offered to the sender and to pool admins. The caller confirms and deletes. */
+  onDelete?: () => void
   isFirstInCluster?: boolean
   isLastInCluster?: boolean
   /**
@@ -112,6 +115,7 @@ export function MessageRow({
   const authorLevel = memberLevels.get(userId)
   const isOwn = userId === currentUserId
   const name = author?.users.full_name || author?.users.username || 'Unknown'
+  const hasMenu = !!(onReply || onToggleReaction || onDelete)
 
   return (
     <div ref={rowRef} className={`relative ${isFirstInCluster ? 'mt-5' : '-mt-2.5'}`}>
@@ -140,8 +144,8 @@ export function MessageRow({
           )}
 
           <div
-            onContextMenu={e => { if (onReply || onToggleReaction) { e.preventDefault(); setMenuOpen(true) } }}
-            onTouchStart={startPress}
+            onContextMenu={e => { if (hasMenu) { e.preventDefault(); setMenuOpen(true) } }}
+            onTouchStart={hasMenu ? startPress : undefined}
             onTouchEnd={cancelPress}
             onTouchMove={cancelPress}
             onTouchCancel={cancelPress}
@@ -153,7 +157,7 @@ export function MessageRow({
             {children}
           </div>
 
-          {menuOpen && (onReply || onToggleReaction) && (
+          {menuOpen && hasMenu && (
             <div
               role="menu"
               className={`absolute bottom-full mb-1 z-30 rounded-control bg-surface border border-border-default shadow-card-elevated overflow-hidden ${
@@ -194,6 +198,17 @@ export function MessageRow({
                 >
                   <Icon name="arrow.uturn.left" size={14} weight="semibold" />
                   Reply
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setMenuOpen(false); onDelete() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 t-body text-danger-600 hover:bg-snow transition-colors whitespace-nowrap"
+                >
+                  <Icon name="trash" size={14} weight="semibold" />
+                  Delete
                 </button>
               )}
             </div>

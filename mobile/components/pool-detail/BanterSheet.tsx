@@ -85,7 +85,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import {
   AVATAR_GRADIENTS,
   getInitials,
@@ -156,11 +156,16 @@ type BanterIMessage = IMessage & {
   // pre-date the rich-card pass.
   _messageType: string;
   _metadata: Record<string, unknown> | null;
+  // Who took it back (148). A deleted message renders as a tombstone
+  // and offers nothing — no long-press, no reactions, no reply.
+  _deleted: 'self' | 'admin' | null;
 };
 
 type Props = {
   poolId: string | undefined;
   poolName: string | undefined;
+  /** Pool admins may delete anyone's message; everyone may delete their own. */
+  isAdmin?: boolean;
 };
 
 // memo wrap — the pool detail screen's horizontal-pager onScroll fires
@@ -252,7 +257,7 @@ function formatMessageTime(createdAt: string | number | Date): string {
 }
 
 export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function BanterSheet(
-  { poolId, poolName },
+  { poolId, poolName, isAdmin = false },
   ref,
 ) {
   const theme = useTheme();
@@ -533,6 +538,30 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // turn would re-render every BanterBubble, defeating the
   // pull-out we just did for tab-switch jitter.
   const toggleReaction = banter.toggleReaction;
+
+  // Delete (148). The long-press overlay offers it to the sender and to
+  // pool admins; delete_pool_message makes the same check server-side.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const deleteMessage = banter.deleteMessage;
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDeleteId) return;
+    setDeleting(true);
+    const result = await deleteMessage(pendingDeleteId);
+    setDeleting(false);
+    setPendingDeleteId(null);
+    if (result.error) {
+      Alert.alert("Couldn't delete message", 'Please try again.');
+    }
+  }, [pendingDeleteId, deleteMessage]);
+
+  // A reply being composed against a message that just got deleted (by
+  // us or, over realtime, by an admin) has nothing left to quote.
+  useEffect(() => {
+    if (!replyTarget) return;
+    const target = banter.messages.find((m) => m.messageId === String(replyTarget._id));
+    if (target?.deletedAt) setReplyTarget(null);
+  }, [banter.messages, replyTarget]);
   const reactionsSheetRef = useRef<ReactionsSheetHandle | null>(null);
 
   // Tapping a reaction pill opens the "who reacted" sheet. We resolve the
@@ -767,6 +796,11 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         _isLastOfGroup: !next || next.userId !== m.userId,
         _messageType: m.messageType,
         _metadata: m.metadata,
+        _deleted: m.deletedAt
+          ? m.deletedBy && m.deletedBy !== m.userId
+            ? 'admin'
+            : 'self'
+          : null,
         // gifted-chat's Bubble renders a quoted-reply pill above the
         // bubble when `replyMessage` is set on currentMessage. The
         // shape is Pick<IMessage, '_id' | 'text' | 'user' | ...>;
@@ -958,6 +992,8 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
           // — they don't have a persisted message_id yet, so
           // an FK on reply_to_message_id would fail.
           if (String(msg._id).startsWith('tmp-')) return;
+          // Nothing to answer once it has been taken back.
+          if ((msg as BanterIMessage)._deleted) return;
           // gifted-chat fires this from onSwipeableWillOpen,
           // i.e. WHILE the swipe animation is still running.
           // Calling setReplyTarget synchronously triggers a
@@ -1754,10 +1790,60 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
               >
                 <Icon name="plus" size={16} tint={theme.colors.slate} weight="bold" />
               </Pressable>
+              {(() => {
+                const target = banter.messages.find((m) => m.messageId === reactionAnchor.id);
+                const canDelete =
+                  !!target &&
+                  !target.deletedAt &&
+                  !target.messageId.startsWith('tmp-') &&
+                  (target.userId === banter.appUserId || isAdmin);
+                if (!canDelete) return null;
+                return (
+                  <Pressable
+                    onPress={() => {
+                      setPendingDeleteId(reactionAnchor.id);
+                      dismissReactionPicker();
+                    }}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete message"
+                    style={({ pressed }) => ({
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: theme.colors.surface,
+                      borderWidth: 0.5,
+                      borderColor: withOpacity(theme.colors.silver, 0.6),
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.7 : 1,
+                      ...theme.shadows.card,
+                    })}
+                  >
+                    <Icon name="trash" size={16} tint={theme.colors.red} weight="bold" />
+                  </Pressable>
+                );
+              })()}
             </View>
           </View>
         </>
       ) : null}
+
+      <ConfirmDialog
+        visible={pendingDeleteId !== null}
+        title="Delete message?"
+        description={
+          banter.messages.find((m) => m.messageId === pendingDeleteId)?.userId === banter.appUserId
+            ? 'It will be removed for everyone in the pool.'
+            : 'It will be removed for everyone in the pool, and will show as removed by a pool admin.'
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        destructive
+        busy={deleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </View>
   );
 }));
@@ -1865,6 +1951,52 @@ const BanterBubble = memo(function BanterBubble({
     });
   };
   const handleShowReactors = () => onShowReactors(aggregates);
+
+  if (msg._deleted) {
+    return (
+      <View>
+        {showName ? (
+          <RNText
+            style={{
+              fontFamily: fontFamilies.semibold,
+              fontSize: 11,
+              color: theme.colors.slate,
+              letterSpacing: 0.3,
+              marginBottom: 2,
+            }}
+          >
+            {msg.user.name}
+          </RNText>
+        ) : null}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            alignSelf: isOwn ? 'flex-end' : 'flex-start',
+            paddingHorizontal: theme.spacing.xs + 6,
+            paddingVertical: theme.spacing.xxs + 4,
+            borderRadius: theme.radii.sm,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: withOpacity(theme.colors.silver, 0.8),
+          }}
+        >
+          <Icon name="trash" size={12} tint={theme.colors.slate} />
+          <RNText
+            style={{
+              fontFamily: fontFamilies.medium,
+              fontStyle: 'italic',
+              fontSize: 13,
+              color: theme.colors.slate,
+            }}
+          >
+            {msg._deleted === 'admin' ? 'Removed by a pool admin' : 'Message deleted'}
+          </RNText>
+        </View>
+      </View>
+    );
+  }
 
   const nameLabel = showName ? (
     <RNText

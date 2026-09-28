@@ -70,6 +70,7 @@ export function useDuelBanter({ poolId, userIds, from, to }: Args) {
         .select('message_id, user_id, content, message_type, created_at, users(full_name, username)')
         .eq('pool_id', poolId)
         .in('user_id', ids)
+        .is('deleted_at', null)
         .gte('created_at', from!)
         .lte('created_at', to!)
         .order('created_at', { ascending: true })

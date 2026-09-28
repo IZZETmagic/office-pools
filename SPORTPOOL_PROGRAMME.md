@@ -2528,11 +2528,22 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
 - **Done when:** a user can add friends and see a persistent list that carries across pools.
 
 ### Picture sharing in chat `Feature`
-- **Is:** Let players share images/screenshots in pool chat (brackets, results, banter, reactions). Chat is text-only today.
+- **Is:** Let players share images/screenshots — and GIFs — in pool chat (brackets, results, banter, reactions). Chat is text-only today.
 - **Touches:** chat composer + Supabase Storage upload + inline image rendering in the banter/chat list; ties to *Avatars v1* storage work.
 - **Audit 2026-07-12:** TODO — banter composer is text + rich cards only; no image picker/upload/Storage bucket.
-- **Effort:** ~2–3 days.
-- **Done when:** a user can attach and send an image in pool chat and others see it inline.
+- **Decided 2026-09-28 (Ryan):**
+  - **GIFs are FREE**, not a Pool Pro perk. This supersedes the "GIF" in `MONETIZATION.md`'s *Premium banter effects* row.
+  - **Provider = KLIPY.** The Tenor API shut down on 30 Jun 2026. GIPHY production keys are priced per negotiation. KLIPY's production tier is free with no request cap. **Ads OFF** in its Partner Panel (disclosure gate) and the strictest content filter.
+  - **Order:** (1) message deletion, (2) GIFs, (3) photos. GIFs ship by OTA because `expo-image` is already installed. Photos need `expo-image-picker`, i.e. a store build.
+- **Step 1 — message deletion ✅ 2026-09-28:**
+  - Migration `148_a_message_can_be_taken_back` (applied): the `delete_pool_message` RPC is callable by the sender, a pool admin or a super admin. It soft-deletes and scrubs the message, and broadcasts `message_delete`.
+  - Web and RN: Delete in the long-press menu, and tombstones reading "Message deleted" / "Removed by a pool admin".
+  - Before this, nobody could delete a message at all, even though the FAQ promised admin removal.
+- **Step 2 — GIFs:** planned. **Blocked on a KLIPY API key.**
+  - The GIF migration must add `gif` to the `message_type` CHECK, plus a trigger that only accepts KLIPY-hosted URLs. Today's INSERT policy checks membership only, so a member can put any URL in `metadata`.
+- **Step 3 — photos:** needs report/block before shipping (App Store guideline 1.2), a private bucket, and EXIF stripping.
+- **Effort:** ~2–3 days for photos; GIFs ~1.5–2 days.
+- **Done when:** a user can attach and send an image or GIF in pool chat and others see it inline.
 
 ### ✅ Completed (verified against code, 2026-07-12)
 | Item | What shipped — evidence | Note |

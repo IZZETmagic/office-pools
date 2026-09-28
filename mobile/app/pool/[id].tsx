@@ -1182,6 +1182,7 @@ export default function PoolDetailScreen() {
         ref={banterSheetRef}
         poolId={pool.poolId}
         poolName={pool.poolName}
+        isAdmin={pool.isAdmin}
       />
     </SafeAreaView>
   );

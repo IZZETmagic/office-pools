@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/Card'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
+import { useToast } from '@/components/ui/Toast'
 import { useStandaloneMode } from '@/hooks/useStandaloneMode'
 import type { MemberData } from '../types'
 import type {
@@ -15,7 +18,7 @@ import type {
   FeedItem,
   SystemEvent,
 } from './types'
-import { ChatMessage, DayHeader } from './ChatMessage'
+import { ChatMessage, DayHeader, DeletedMessage } from './ChatMessage'
 import { MessageInput } from './MessageInput'
 import { SystemEventCard } from './SystemEventCard'
 import { PinnedMessageCard } from './PinnedMessageCard'
@@ -81,6 +84,9 @@ export function CommunityTab({
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [replyingTo, setReplyingTo] = useState<MessageWithReactions | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<MessageWithReactions | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const { showToast } = useToast()
   const [replyPreviews, setReplyPreviews] = useState<Map<string, ReplyPreview>>(new Map())
   const [showPinModal, setShowPinModal] = useState(false)
   const [editingPin, setEditingPin] = useState<PinnedMessage | null>(null)
@@ -629,6 +635,25 @@ export function CommunityTab({
     if (ids.length > 0) loadReactionsForMessages(ids)
   }, [messages.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // One path for both our own delete and one arriving over realtime: swap the
+  // row for its tombstone, drop its reactions, re-word any quote of it, and
+  // close the reply banner if it was the thing being answered.
+  const applyDeletion = useCallback((record: Message) => {
+    setMessages(prev => prev.map(m =>
+      m.message_id === record.message_id
+        ? { ...m, ...record, metadata: record.metadata ?? {}, reactions: [] }
+        : m
+    ))
+    setReplyPreviews(prev => {
+      const existing = prev.get(record.message_id)
+      if (!existing) return prev
+      const next = new Map(prev)
+      next.set(record.message_id, { ...existing, content: record.content })
+      return next
+    })
+    setReplyingTo(prev => (prev?.message_id === record.message_id ? null : prev))
+  }, [])
+
   // Single Broadcast-from-database subscription for the whole banter feed —
   // new messages and reaction changes, over one private `pool:{id}` topic.
   // Supabase's recommended realtime approach for scalability + security: the
@@ -679,6 +704,11 @@ export function CommunityTab({
         // usually already on screen; falls back to a one-row fetch if not).
         if (newMsg.reply_to_message_id) void ensureReplyPreviews([newMsg])
       })
+      .on('broadcast', { event: 'message_delete' }, (msg) => {
+        const record = broadcastRecord<Message>(msg)
+        if (!record?.message_id) return
+        applyDeletion(record)
+      })
       .on('broadcast', { event: 'reaction_insert' }, refetchReactions)
       .on('broadcast', { event: 'reaction_delete' }, refetchReactions)
 
@@ -693,7 +723,25 @@ export function CommunityTab({
       active = false
       supabase.removeChannel(channel)
     }
-  }, [poolId, isNearBottom, currentUserId, loadReactionsForMessages, ensureReplyPreviews])
+  }, [poolId, isNearBottom, currentUserId, loadReactionsForMessages, ensureReplyPreviews, applyDeletion])
+
+  // =====================
+  // DELETE (148)
+  // =====================
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete) return
+    setDeleting(true)
+    const { data, error } = await supabaseRef.current
+      .rpc('delete_pool_message', { p_message_id: pendingDelete.message_id })
+    setDeleting(false)
+    if (error || !data) {
+      console.error('Failed to delete message:', error)
+      showToast('Could not delete that message. Try again.', 'error')
+      return
+    }
+    applyDeletion(data as Message)
+    setPendingDelete(null)
+  }, [pendingDelete, applyDeletion, showToast])
 
   const handleToggleReaction = useCallback(async (messageId: string, emoji: string) => {
     const msg = messages.find(m => m.message_id === messageId)
@@ -1141,6 +1189,7 @@ export function CommunityTab({
         const sameAuthorText = (other: FeedItem | undefined, userId: string) =>
           other?.type === 'message' &&
           other.data.message_type === 'text' &&
+          !other.data.deleted_at &&
           other.data.user_id === userId
 
         if (item.type === 'new_divider') {
@@ -1166,6 +1215,23 @@ export function CommunityTab({
         if (item.type === 'message') {
           const msg = item.data
 
+          if (msg.deleted_at) {
+            return (
+              <DeletedMessage
+                key={msg.message_id}
+                message={msg}
+                members={members}
+                memberLevels={memberLevels}
+                currentUserId={currentUserId}
+              />
+            )
+          }
+
+          // Sender or pool admin — the same test delete_pool_message makes.
+          const onDelete = msg.user_id === currentUserId || isAdmin
+            ? () => setPendingDelete(msg)
+            : undefined
+
           // Rich content cards — reactions only on these
           if (msg.message_type === 'prediction_share') {
             return (
@@ -1178,6 +1244,7 @@ export function CommunityTab({
                 reactions={msg.reactions}
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
                 onReply={() => setReplyingTo(msg)}
+                onDelete={onDelete}
               />
             )
           }
@@ -1193,6 +1260,7 @@ export function CommunityTab({
                 reactions={msg.reactions}
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
                 onReply={() => setReplyingTo(msg)}
+                onDelete={onDelete}
               />
             )
           }
@@ -1208,6 +1276,7 @@ export function CommunityTab({
                 reactions={msg.reactions}
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
                 onReply={() => setReplyingTo(msg)}
+                onDelete={onDelete}
               />
             )
           }
@@ -1230,6 +1299,7 @@ export function CommunityTab({
               reactions={msg.reactions}
               onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
               onReply={() => setReplyingTo(msg)}
+              onDelete={onDelete}
               isFirstInCluster={!sameAuthorText(feedItems[i - 1], msg.user_id)}
               isLastInCluster={!sameAuthorText(feedItems[i + 1], msg.user_id)}
             />
@@ -1392,6 +1462,29 @@ export function CommunityTab({
           }}
         />
       )}
+
+      <Modal
+        isOpen={!!pendingDelete}
+        onClose={() => { if (!deleting) setPendingDelete(null) }}
+        title="Delete message?"
+        size="sm"
+      >
+        <div className="px-4 sm:px-6 py-4 flex flex-col gap-4">
+          <p className="t-body text-muted">
+            {pendingDelete && pendingDelete.user_id !== currentUserId
+              ? 'It will be removed for everyone in the pool, and will show as removed by a pool admin.'
+              : 'It will be removed for everyone in the pool.'}
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button variant="gray" onClick={() => setPendingDelete(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleConfirmDelete} loading={deleting} loadingText="Deleting...">
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }

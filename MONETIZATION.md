@@ -821,7 +821,7 @@ For each Pool Pro feature at each pool tier:
 | Exclusive Pro badge variants | ✅ | ✅ | ✅ | ✅ |
 | Priority push category controls | ✅ | ✅ | ✅ | ✅ |
 | Advanced personal stats *(form, H2H, accuracy)* | ✅ | ✅ | ✅ | ✅ |
-| Premium banter effects *(animated reactions, GIF)* | ⚠️ *(no banter)* | ✅ | ✅ | ✅ |
+| Premium banter effects *(animated reactions — GIFs are FREE, decided 2026-09-28; see SPORTPOOL_PROGRAMME.md → Picture sharing in chat)* | ⚠️ *(no banter)* | ✅ | ✅ | ✅ |
 | Crowd analytics on How Others Predicted | ⚠️ *(no HOP)* | ✅ *(adds on top of basic HOP)* | ❌ *(Max already includes)* | ❌ *(same as Max)* |
 | Pool Pro Plus extras *(monthly cosmetic, Wrapped, designer)* | ✅ | ✅ | ✅ | ✅ |
 

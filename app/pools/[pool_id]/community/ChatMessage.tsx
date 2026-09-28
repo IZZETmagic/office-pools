@@ -1,6 +1,7 @@
 'use client'
 
 import { MessageRow } from './MessageRow'
+import { Icon } from '@/components/ui/Icon'
 import type { MemberData } from '../types'
 import type { MessageWithReactions, ReplyPreview, MemberWithLevel, ReactionCount } from './types'
 import { getInitials, formatClockTime, renderMessageContent, getLevelPillClasses, getRankTitle } from './helpers'
@@ -102,6 +103,7 @@ export function ChatMessage({
   reactions = [],
   onToggleReaction,
   onReply,
+  onDelete,
   isFirstInCluster = true,
   isLastInCluster = true,
 }: {
@@ -114,6 +116,7 @@ export function ChatMessage({
   onToggleReaction?: (emoji: string) => void
   /** Opens the composer's reply banner against this message. */
   onReply?: () => void
+  onDelete?: () => void
   isFirstInCluster?: boolean
   isLastInCluster?: boolean
 }) {
@@ -128,6 +131,7 @@ export function ChatMessage({
       reactions={reactions}
       onToggleReaction={onToggleReaction}
       onReply={onReply}
+      onDelete={onDelete}
       isFirstInCluster={isFirstInCluster}
       isLastInCluster={isLastInCluster}
     >
@@ -156,6 +160,46 @@ export function ChatMessage({
         >
           {formatClockTime(message.created_at)}
         </span>
+      </div>
+    </MessageRow>
+  )
+}
+
+// =====================
+// DELETED MESSAGE
+// =====================
+
+/**
+ * What is left of a message once it has been taken back (148).
+ *
+ * It keeps its place in the feed so a reply to it still reads in order, but it
+ * offers nothing — no reactions, no reply, no menu. The words say WHO removed
+ * it: a member taking back their own message is ordinary, an admin removing
+ * someone else's is not, and a silent removal would hide that.
+ */
+export function DeletedMessage({
+  message,
+  members,
+  memberLevels,
+  currentUserId,
+}: {
+  message: MessageWithReactions
+  members: MemberData[]
+  memberLevels: Map<string, MemberWithLevel>
+  currentUserId: string
+}) {
+  const byAdmin = !!message.deleted_by && message.deleted_by !== message.user_id
+
+  return (
+    <MessageRow
+      userId={message.user_id}
+      members={members}
+      memberLevels={memberLevels}
+      currentUserId={currentUserId}
+    >
+      <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-chip border border-dashed border-border-default t-detail italic text-muted">
+        <Icon name="trash" size={12} />
+        {byAdmin ? 'Removed by a pool admin' : 'Message deleted'}
       </div>
     </MessageRow>
   )

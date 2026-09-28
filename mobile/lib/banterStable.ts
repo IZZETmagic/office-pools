@@ -76,6 +76,8 @@ export type StableChatMessage = {
   _isLastOfGroup: boolean;
   _messageType: string;
   _metadata: Record<string, unknown> | null;
+  /** Who took it back (148): the sender ('self'), an admin ('admin'), or nobody. */
+  _deleted?: 'self' | 'admin' | null;
   replyMessage?: {
     _id: string | number;
     text: string;
@@ -108,7 +110,8 @@ export function sameChatMessage(a: StableChatMessage, b: StableChatMessage): boo
     a.user.name !== b.user.name ||
     a._showSenderName !== b._showSenderName ||
     a._isLastOfGroup !== b._isLastOfGroup ||
-    a._messageType !== b._messageType
+    a._messageType !== b._messageType ||
+    (a._deleted ?? null) !== (b._deleted ?? null)
   ) {
     return false;
   }

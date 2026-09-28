@@ -18,6 +18,11 @@ export type Message = {
   message_type: MessageType
   reply_to_message_id: string | null
   metadata: Record<string, any>
+  /** Set by the delete_pool_message RPC (148). The row stays so replies keep
+   *  their place; content, metadata and reactions are already scrubbed. */
+  deleted_at?: string | null
+  /** Equal to user_id = the sender took it back; anyone else = an admin removed it. */
+  deleted_by?: string | null
 }
 
 export type ReactionCount = {

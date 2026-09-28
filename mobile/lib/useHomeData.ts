@@ -533,7 +533,9 @@ export function useHomeDataInternal() {
               .from('pool_messages')
               .select('*', { count: 'exact', head: true })
               .eq('pool_id', pid)
-              .neq('user_id', userData.user_id);
+              .neq('user_id', userData.user_id)
+              // A deleted message is not an unread one (148).
+              .is('deleted_at', null);
             if (lastReadAt) {
               query = query.gt('created_at', lastReadAt);
             }

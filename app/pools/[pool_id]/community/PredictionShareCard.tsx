@@ -11,6 +11,7 @@ type PredictionShareCardProps = {
   onToggleReaction: (emoji: string) => void
   /** Passed straight to the message chassis. */
   onReply?: () => void
+  onDelete?: () => void
 }
 
 function OutcomeBadge({ outcome }: { outcome: 'exact' | 'correct' | 'miss' }) {
@@ -52,6 +53,7 @@ export function PredictionShareCard({
   reactions,
   onToggleReaction,
   onReply,
+  onDelete,
 }: PredictionShareCardProps) {
   const meta = message.metadata as unknown as PredictionShareMetadata
   if (!meta?.match_id) return null
@@ -69,6 +71,7 @@ export function PredictionShareCard({
       onToggleReaction={onToggleReaction}
       currentUserId={currentUserId}
       onReply={onReply}
+      onDelete={onDelete}
     >
       {/* Gold shimmer bar for exact scores */}
       {isExact && (
