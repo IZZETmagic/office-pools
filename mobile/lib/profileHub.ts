@@ -16,6 +16,8 @@ export type BadgeUnlockRow = {
   badgeId: string;
   poolId: string;
   poolName: string | null;
+  /** ISO timestamp. Null only in hand-built test rows. */
+  unlockedAt?: string | null;
 };
 
 export type BadgeTally = {
@@ -23,6 +25,8 @@ export type BadgeTally = {
   count: number;
   /** Distinct pools it was earned in, in first-seen order. */
   pools: { poolId: string; poolName: string | null }[];
+  /** Every unlock, newest first — the tap-a-badge list. */
+  unlocks: { poolId: string; poolName: string | null; unlockedAt: string | null }[];
 };
 
 /** One entry per badge, most-earned first, ties alphabetical. */
@@ -32,13 +36,21 @@ export function tallyBadges(rows: BadgeUnlockRow[]): BadgeTally[] {
     if (TRANSIENT_BADGES.has(row.badgeId)) continue;
     let tally = byBadge.get(row.badgeId);
     if (!tally) {
-      tally = { id: row.badgeId, count: 0, pools: [] };
+      tally = { id: row.badgeId, count: 0, pools: [], unlocks: [] };
       byBadge.set(row.badgeId, tally);
     }
     tally.count += 1;
+    tally.unlocks.push({
+      poolId: row.poolId,
+      poolName: row.poolName,
+      unlockedAt: row.unlockedAt ?? null,
+    });
     if (!tally.pools.some((p) => p.poolId === row.poolId)) {
       tally.pools.push({ poolId: row.poolId, poolName: row.poolName });
     }
+  }
+  for (const tally of byBadge.values()) {
+    tally.unlocks.sort((a, b) => (b.unlockedAt ?? '').localeCompare(a.unlockedAt ?? ''));
   }
   return [...byBadge.values()].sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
 }
@@ -57,11 +69,77 @@ export function badgeSource(tally: BadgeTally): string {
   return `${tally.pools.length} pools`;
 }
 
-/** The Trophy Room tile's teaser. Null while loading, so the tile shows nothing rather than "0". */
-export function trophyTeaser(total: number | null): string | null {
-  if (total === null) return null;
-  if (total === 0) return 'Your first badge is waiting';
-  return total === 1 ? '1 badge earned' : `${total.toLocaleString()} badges earned`;
+// -------------------------------------------------------------
+// Podium finishes
+// -------------------------------------------------------------
+
+/** The slice of a PoolSummary the podium needs — kept narrow so tests stay small. */
+export type PodiumPoolInput = {
+  poolId: string;
+  poolName: string;
+  status: string;
+  leagueMode: string | null;
+  currentRank: number | null;
+  totalEntries: number;
+  memberCount: number;
+};
+
+export type PodiumFinish = { poolId: string; poolName: string; rank: 1 | 2 | 3; field: number };
+
+export type Podium = {
+  first: number;
+  second: number;
+  third: number;
+  /** Best first, then by pool name. */
+  finishes: PodiumFinish[];
+};
+
+/**
+ * 1st, 2nd and 3rd place finishes across FINISHED pools.
+ *
+ * The rules, each one sayable in a tooltip:
+ *   · Only finished pools (`status = 'completed'`). A live rank is not a finish.
+ *   · Archived pools don't count — same rule as badges (migration 040).
+ *   · ⚠⚠ Last Man Standing never counts. Its stored rank is entry_id order
+ *     (every tie-break rung is zero), and the Home data falls back to the raw
+ *     `pool_entries.current_rank` when the scoring summary has no rank — so a
+ *     "2nd" here would be the order people joined. Excluded by mode, not by
+ *     trusting a null.
+ *   · You must have finished above at least one other entry. 1st of 1 is not a
+ *     title, and 3rd of 3 is last, not a podium.
+ */
+export function podiumFinishes(pools: PodiumPoolInput[], archivedIds: ReadonlySet<string>): Podium {
+  const finishes: PodiumFinish[] = [];
+  for (const p of pools) {
+    if (p.status !== 'completed') continue;
+    if (archivedIds.has(p.poolId)) continue;
+    if (p.leagueMode === 'last_man_standing') continue;
+    const rank = p.currentRank;
+    if (rank !== 1 && rank !== 2 && rank !== 3) continue;
+    const field = p.totalEntries || p.memberCount;
+    if (field <= rank) continue;
+    finishes.push({ poolId: p.poolId, poolName: p.poolName, rank, field });
+  }
+  finishes.sort((a, b) => a.rank - b.rank || a.poolName.localeCompare(b.poolName));
+  return {
+    first: finishes.filter((f) => f.rank === 1).length,
+    second: finishes.filter((f) => f.rank === 2).length,
+    third: finishes.filter((f) => f.rank === 3).length,
+    finishes,
+  };
+}
+
+/**
+ * The Trophy Room tile's teaser. Null while loading, so the tile shows nothing
+ * rather than a confident "0".
+ */
+export function trophyTeaser(badgeTotal: number | null, titles: number | null = 0): string | null {
+  if (badgeTotal === null || titles === null) return null;
+  const parts: string[] = [];
+  if (titles > 0) parts.push(titles === 1 ? '1 title' : `${titles} titles`);
+  if (badgeTotal > 0) parts.push(badgeTotal === 1 ? '1 badge' : `${badgeTotal.toLocaleString()} badges`);
+  if (parts.length === 0) return 'Your first badge is waiting';
+  return parts.join(' · ');
 }
 
 /**

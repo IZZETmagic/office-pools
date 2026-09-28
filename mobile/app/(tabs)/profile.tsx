@@ -42,6 +42,7 @@ import { useHomeData } from '@/lib/HomeDataProvider';
 import { trophyTeaser, versionLabel } from '@/lib/profileHub';
 import { useArchivedPools } from '@/lib/useArchivedPools';
 import { useManualRefresh } from '@/lib/useManualRefresh';
+import { usePodium } from '@/lib/usePodium';
 import { useTrophies } from '@/lib/useTrophies';
 import { fontFamilies, useTheme } from '@/theme';
 
@@ -57,6 +58,7 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const { data, refresh } = useHomeData();
   const trophies = useTrophies();
+  const podium = usePodium();
   const { rows: archived, loading: archivedLoading } = useArchivedPools();
 
   // Pull-to-refresh: spinner bound to real user gesture only. Refreshes the
@@ -196,7 +198,9 @@ export default function ProfileScreen() {
             <HubTile
               icon="trophy.fill"
               title="Trophy Room"
-              teaser={trophies.error ? 'Your badges' : trophyTeaser(trophies.total)}
+              teaser={
+                trophies.error ? 'Your badges' : trophyTeaser(trophies.total, podium?.first ?? null)
+              }
               tint={theme.colors.amber}
               highlight
               onPress={() => router.push('/profile/trophies')}

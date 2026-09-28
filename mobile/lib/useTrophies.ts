@@ -43,7 +43,7 @@ export function useTrophies() {
       }
       const { data, error: unlockErr } = await supabase
         .from('badge_unlocks')
-        .select('badge_id, pool_id, pool:pools!inner(pool_name, archived_at)')
+        .select('badge_id, pool_id, unlocked_at, pool:pools!inner(pool_name, archived_at)')
         .eq('user_id', appUserId)
         .is('pool.archived_at', null);
       if (unlockErr) throw unlockErr;
@@ -52,11 +52,13 @@ export function useTrophies() {
           ((data ?? []) as unknown as {
             badge_id: string;
             pool_id: string;
+            unlocked_at: string | null;
             pool: { pool_name: string } | null;
           }[]).map((r) => ({
             badgeId: r.badge_id,
             poolId: r.pool_id,
             poolName: r.pool?.pool_name ?? null,
+            unlockedAt: r.unlocked_at,
           })),
         ),
       );
