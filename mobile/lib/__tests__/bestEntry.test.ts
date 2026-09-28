@@ -73,16 +73,16 @@ describe('pickBestEntry', () => {
     expect(best?.entry_id).toBe('first')
   })
 
-  describe('⚠ the known divergence between the two callers', () => {
-    // PINNED, NOT ENDORSED. The card selects with the home-scoring summary
-    // taking precedence; the progressive "still owes a prediction" branch runs
-    // a wave earlier and can only see the stored columns. Where the two
-    // disagree they select DIFFERENT entries, and the card answers the same
-    // question twice.
+  describe('⚠ why there must be exactly one set of accessors', () => {
+    // The two accessor sets genuinely select different entries on the same
+    // data. That is not a quirk — it is the reason a second copy of this rule
+    // is a bug waiting to happen, and it did happen: the progressive branch
+    // once read the stored columns while the card read the summary, and a pool
+    // card lit an amber "predictions needed" for one entry beside a rank for
+    // another.
     //
-    // This test exists so that collapsing the waves — which makes the summary
-    // available to both — shows up as a deliberate behaviour change here,
-    // rather than as a card in the wild giving two answers.
+    // Both callers now pass the summary-aware accessors. This stays as the
+    // demonstration of what diverging would cost.
     const entries = [
       entry({ entry_id: 'stored-leader', current_rank: 1, scored_total_points: 10 }),
       entry({ entry_id: 'summary-leader', current_rank: 8, scored_total_points: 90 }),

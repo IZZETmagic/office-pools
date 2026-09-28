@@ -14,30 +14,27 @@
 // returned". Read `scored_total_points`. See schema notes: scored total is
 // canonical.
 //
-// ⚠⚠ THE TWO CALLERS FEED THIS DIFFERENT NUMBERS, AND TODAY THAT IS A KNOWN
-// DIVERGENCE, NOT A CHOICE.
+// ⚠⚠ THE ACCESSORS ARE THE ANSWER, SO THERE MUST ONLY EVER BE ONE SET OF THEM.
 //
-// The card display passes rank and points from the home-scoring API summary
-// where it has one, falling back to the stored columns — because selecting an
-// entry by production's rank and then printing shadow's points describes two
-// different entries on one card.
+// Both callers — the card, and the progressive "still owes a pick" branch —
+// pass rank and points from the home-scoring summary where there is one, and
+// fall back to the stored columns otherwise. Selecting an entry by production's
+// rank and then printing shadow's points would describe two different entries
+// on one card.
 //
-// The progressive "still owes a prediction" branch passes the STORED columns
-// only. Not because that is right, but because it runs a wave earlier than the
-// fetch that produces the summary, so the better numbers do not exist yet.
+// ⚠ It was not always so, and the failure is worth remembering. There used to
+// be two copies of the rule, and the progressive branch could see only the
+// stored columns because it ran a wave earlier than the fetch producing the
+// summary. Stored totals have drifted from the engine before — ranks out by
+// three — and where they disagreed the two copies selected DIFFERENT entries:
+// an amber "predictions needed" describing one entry beside a rank describing
+// another. One card, two answers, which is the signature of every pools-tab
+// bug so far.
 //
-// Where the summary and the stored columns disagree — and they do; stored
-// totals have drifted from the engine before, ranks out by three — those two
-// callers can select DIFFERENT entries. The card then answers the same question
-// twice: an amber "predictions needed" describing one entry beside a rank
-// describing another. That is the exact signature of the pools-tab bugs, and it
-// is one card giving two answers.
-//
-// The fix is not here. It is to make the summary available before this is asked
-// (the wave collapse), at which point both callers pass the same accessors and
-// the divergence ends. Until then it is pinned by a test so that the day
-// somebody reorders those waves, the behaviour change is visible rather than
-// discovered on a card.
+// Collapsing the fetch into a single wave put the summary in hand before either
+// question is asked, and the two copies became one definition in
+// `useHomeData`. Anyone adding a THIRD caller passes those same accessors; a
+// caller that reads the stored columns directly is re-opening the bug.
 //
 // ⚠ NO REACT NATIVE IMPORTS — this file is reachable by the root vitest, which
 // is the only reason the rule is asserted anywhere. See lib/needsPredictions.ts.
