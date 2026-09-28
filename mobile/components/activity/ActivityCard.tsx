@@ -429,7 +429,7 @@ function OutcomeChip({ outcome }: { outcome: string }) {
   );
 }
 
-function PoolChip({ name }: { name: string }) {
+export function PoolChip({ name }: { name: string }) {
   const theme = useTheme();
   return (
     <View
@@ -455,6 +455,9 @@ function PoolChip({ name }: { name: string }) {
 function resolveIcon(item: ActivityItem): string {
   const md = item.metadata ?? {};
   switch (item.activityType) {
+    // Drawn by MatchweekStoryCard; only reaches here if rendered generically.
+    case 'matchweek_story':
+      return 'calendar.badge.checkmark';
     case 'mention':
       return 'at.circle.fill';
     case 'rank_change': {
@@ -525,6 +528,8 @@ function isEmojiIcon(icon: string): boolean {
 function resolveColorKey(item: ActivityItem): ActivityColorKey {
   const md = item.metadata ?? {};
   switch (item.activityType) {
+    case 'matchweek_story':
+      return item.colorKey;
     case 'mention':
       return 'primary';
     case 'rank_change': {
@@ -637,7 +642,7 @@ function readPoolName(item: ActivityItem): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
-function relativeTime(iso: string): string {
+export function relativeTime(iso: string): string {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return '';
   const interval = (Date.now() - t) / 1000;

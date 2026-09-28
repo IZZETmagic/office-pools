@@ -4,7 +4,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { fetchEntryAnalytics, fetchUserActivity, type ActivityFeedItemRaw } from './api';
+import {
+  fetchEntryAnalytics,
+  fetchUserActivity,
+  markActivitySeen,
+  type ActivityFeedItemRaw,
+  type ActivityLink,
+  type NeedsYouItem,
+} from './api';
 import { useAuth } from './auth';
 import { CACHE_KEYS, readCache, writeCache } from './cache/persistentCache';
 import { supabase } from './supabase';
@@ -25,6 +32,7 @@ export type ActivityType =
   | 'points_adjusted'
   | 'xp_gain'
   | 'matchday_recap'
+  | 'matchweek_story'
   | 'welcome';
 
 export type ActivityColorKey = 'primary' | 'success' | 'warning' | 'error' | 'accent';
@@ -118,6 +126,41 @@ export type MentionMeta = {
   pool_name: string;
   sender_name: string;
   message_preview?: string;
+  message_id?: string;
+  sender_user_id?: string;
+};
+
+/** Mirrors `MatchweekStoryMeta` in lib/activity/matchweekStories.ts (web). */
+export type MatchweekStoryMeta = {
+  pool_name: string;
+  league_mode: 'pickem' | 'showdown' | 'last_man_standing' | 'table';
+  matchweek_number: number;
+  entry_id: string;
+  entry_name: string;
+  multi_entry: boolean;
+  points: number | null;
+  tiers: { exact: number; winner_gd: number; winner: number; miss: number } | null;
+  rank: number | null;
+  rank_before: number | null;
+  entrants: number | null;
+  lines: Array<{ label: string; points: number }>;
+  more_count: number;
+  more_points: number;
+  duel: {
+    outcome: 'won' | 'tied' | 'lost' | 'bye';
+    opponent_name: string | null;
+    my_accuracy: number | null;
+    their_accuracy: number | null;
+    duel_points: number;
+  } | null;
+  lms: {
+    result: 'survived' | 'eliminated';
+    club_name: string;
+    round_number: number;
+    survivors_left: number;
+    round_entrants: number;
+    won_round: boolean;
+  } | null;
 };
 
 export type ActivityMetadata =
@@ -145,7 +188,11 @@ export type ActivityItem = {
   metadata: Record<string, unknown> | null;
   isRead: boolean;
   createdAt: string;
+  /** The screen this row opens. */
+  link?: ActivityLink;
 };
+
+export type { NeedsYouItem };
 
 // --- Supabase row shapes -----------------------------------------------
 
@@ -240,10 +287,16 @@ function ensureUniqueActivityIds(items: ActivityItem[]): void {
  *
  * Mirrors ios/OfficePools/Services/ActivityService.swift in spirit.
  */
-async function fetchActivity(appUserId: string): Promise<ActivityItem[]> {
+type ActivityFetch = {
+  items: ActivityItem[];
+  needsYou: NeedsYouItem[];
+  seenAt: string | null;
+};
+
+async function fetchActivity(appUserId: string): Promise<ActivityFetch> {
   // Cheap synthesis (single server call).
-  const { items: rawItems } = await fetchUserActivity(appUserId);
-  const items: ActivityItem[] = rawItems.map(fromRaw);
+  const res = await fetchUserActivity(appUserId);
+  const items: ActivityItem[] = res.items.map(fromRaw);
 
   // XP gains still need membership data for entry context + timestamps.
   // Fetch the minimal slice required by appendXPEvents.
@@ -267,11 +320,18 @@ async function fetchActivity(appUserId: string): Promise<ActivityItem[]> {
 
   await appendXPEvents(memberships, items);
 
+  // XP rows are built here, not on the server, so they get their link here.
+  for (const it of items) {
+    if (!it.link && it.poolId && it.activityType === 'xp_gain') {
+      it.link = { pathname: '/pool/[id]', params: { id: it.poolId } };
+    }
+  }
+
   // Newest first
   items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
 
   ensureUniqueActivityIds(items);
-  return items;
+  return { items, needsYou: res.needs_you ?? [], seenAt: res.seen_at ?? null };
 }
 
 function fromRaw(r: ActivityFeedItemRaw): ActivityItem {
@@ -286,6 +346,7 @@ function fromRaw(r: ActivityFeedItemRaw): ActivityItem {
     metadata: r.metadata,
     isRead: r.is_read,
     createdAt: r.created_at,
+    link: r.link,
   };
 }
 
@@ -498,6 +559,12 @@ export function useActivity() {
   const [loading, setLoading] = useState(!cached);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // ⚠ Not cached to disk. A to-do list restored from yesterday would ask for a
+  // pick that has already been made; it arrives with the fetch instead.
+  const [needsYou, setNeedsYou] = useState<NeedsYouItem[]>([]);
+  /** When the member last opened the tab. Moves forward locally on `markSeen`. */
+  const [seenAt, setSeenAt] = useState<string | null>(null);
+  const appUserIdRef = useRef<string | null>(null);
   const hasDataRef = useRef<boolean>(!!cached);
 
   const load = useCallback(
@@ -519,11 +586,16 @@ export function useActivity() {
           throw userErr ?? new Error('User profile not found');
         }
         const appUserId = (userData as { user_id: string }).user_id;
+        appUserIdRef.current = appUserId;
         const next = await fetchActivity(appUserId);
-        setItems(next);
+        setItems(next.items);
+        setNeedsYou(next.needsYou);
+        // Never move the local stamp backwards: a fetch that started before
+        // `markSeen` landed would otherwise resurrect the tab dot.
+        setSeenAt((prev) => (prev && next.seenAt && prev > next.seenAt ? prev : next.seenAt));
         hasDataRef.current = true;
         // Stamped with the AUTH id, matching what the reader compares against.
-        writeCache(CACHE_KEYS.activity, user.id, next.slice(0, CACHED_ACTIVITY_LIMIT));
+        writeCache(CACHE_KEYS.activity, user.id, next.items.slice(0, CACHED_ACTIVITY_LIMIT));
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load activity';
         setError(msg);
@@ -555,11 +627,37 @@ export function useActivity() {
     if (user) load('initial');
   }, [user, load]);
 
+  /**
+   * The member is looking at the tab. Clears the tab dot's mention half now;
+   * the rows keep their unread dots until the next fetch, so what was new on
+   * this visit is still marked while they read it.
+   */
+  const markSeen = useCallback(async () => {
+    const id = appUserIdRef.current;
+    if (!id) return;
+    setSeenAt(new Date().toISOString());
+    try {
+      const res = await markActivitySeen(id);
+      setSeenAt(res.seen_at);
+    } catch (err) {
+      console.warn('[useActivity] markSeen', err);
+    }
+  }, []);
+
+  /** Mentions newer than the last visit — half of what lights the tab dot. */
+  const unreadMentions = seenAt
+    ? items.filter((i) => i.activityType === 'mention' && i.createdAt > seenAt).length
+    : 0;
+
   return {
     items,
+    needsYou,
+    seenAt,
+    unreadMentions,
     loading,
     refreshing,
     error,
     refresh: useCallback(() => load('refresh'), [load]),
+    markSeen,
   };
 }

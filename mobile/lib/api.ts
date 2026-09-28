@@ -749,14 +749,52 @@ export type ActivityFeedItemRaw = {
   metadata: Record<string, unknown> | null;
   is_read: boolean;
   created_at: string;
+  /** The screen this row opens. Absent for a pool the member has left. */
+  link?: ActivityLink;
+};
+
+/** An Expo Router destination, built server-side so web and mobile agree. */
+export type ActivityLink = {
+  pathname: string;
+  params: Record<string, string>;
+};
+
+/** A decision that is still open — the top of the Activity tab. */
+export type NeedsYouItem = {
+  id: string;
+  kind: 'pick' | 'lms' | 'table';
+  pool_id: string;
+  pool_name: string;
+  entry_id: string;
+  title: string;
+  subtitle: string;
+  deadline_at: string;
+  made: number;
+  total: number;
+  cta: string;
+  link: ActivityLink;
 };
 
 export type ActivityFeedResponse = {
   items: ActivityFeedItemRaw[];
+  /** v2 only. Missing when the API predates it — treat as empty. */
+  needs_you?: NeedsYouItem[];
+  /** v2 only. When this member last opened the tab; NULL if never. */
+  seen_at?: string | null;
 };
 
+/**
+ * ⚠ `v=2` asks for Needs You, league matchweek stories, links and real read
+ * state. The route answers v1 without it, which is what older OTAs get — so the
+ * API has to be deployed BEFORE an OTA carrying this.
+ */
 export function fetchUserActivity(userId: string) {
-  return apiFetch<ActivityFeedResponse>(`/api/users/${userId}/activity`);
+  return apiFetch<ActivityFeedResponse>(`/api/users/${userId}/activity?v=2`);
+}
+
+/** The member opened the Activity tab: everything before now is read. */
+export function markActivitySeen(userId: string) {
+  return apiFetch<{ seen_at: string }>(`/api/users/${userId}/activity/seen`, { method: 'POST' });
 }
 
 // --- Notification preferences -----------------------------------------

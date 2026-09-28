@@ -29,6 +29,7 @@ import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 
 import { NotificationDot } from '@/components/ui';
+import { useSharedActivity } from '@/lib/ActivityProvider';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { usePendingActionsOptional } from '@/lib/usePendingActions';
 import { fontFamilies, useTheme } from '@/theme';
@@ -60,6 +61,12 @@ export default function TabLayout() {
   const totalUnread = (data?.pools ?? []).reduce((sum, p) => sum + p.unreadBanterCount, 0);
   const poolsTabHasIndicator =
     totalUnread > 0 || (pending !== null && pending.totalIndicator > 0);
+  // Activity tab: a decision still open in Needs You, or a mention newer than
+  // the last visit. Nothing else lights it — the disclosure-gate version is
+  // "the dot means something needs you or someone @'d you". A dot, not a
+  // count, for the same reason as the Pools tab above.
+  const activity = useSharedActivity();
+  const activityTabHasIndicator = activity.needsYou.length > 0 || activity.unreadMentions > 0;
 
   // Picks the outline icon for inactive tabs and the solid icon for the
   // focused tab. strokeWidth only matters for the outline variant — solid
@@ -177,7 +184,7 @@ export default function TabLayout() {
         name="activity"
         options={{
           title: 'Activity',
-          tabBarIcon: renderTabIcon(ACTIVITY_ICONS),
+          tabBarIcon: renderTabIcon(ACTIVITY_ICONS, activityTabHasIndicator),
         }}
       />
       <Tabs.Screen
