@@ -250,29 +250,92 @@ export function groupSeasons<P extends SeasonPoolInput>(
   return out;
 }
 
-export type SeasonStat = { value: string; label: string; muted?: boolean };
+/** One cell of a Seasons row: a bold figure with an optional small line under it. */
+export type SeasonCell = { value: string; sub?: string; muted?: boolean };
 
 /**
- * The two figures a Seasons row shows, taken from the SAME per-mode blocks the
- * Pools tab card uses (`poolCardBlocks`) so the two surfaces cannot disagree.
+ * A Seasons row's two cells, plus the column headers they sit under.
  *
- * A rank reads "3rd · of 14"; a stat reads "112 · Points". Dots and the picks
- * ring are card furniture and are dropped. Last Man Standing has no rank block
- * at all — that decision lives in `poolCardBlocks`, and is inherited here.
+ * Built from `poolCardBlocks`, the same per-mode blocks the Pools tab card
+ * uses, so the two surfaces cannot disagree about a figure.
+ *
+ * ⚠ THE LABELS MOVE TO THE HEADER. Every row used to carry its own ("Points
+ * provisional", "Rounds in 2", "Matchweek of 38"), at its own width, so the
+ * bold numbers never lined up (Ryan, 2026-09-28). Rows in one mode group share
+ * headers, so each cell is just the figure.
+ *
+ * ⚠ THE RANK COLUMN IS ALWAYS THE RANK. Before scoring starts it reads "—"
+ * rather than letting Points slide into the rank column — which is what made
+ * one Pick'em row misalign with the rest.
+ *
+ * ⚠ LAST MAN STANDING HAS NO RANK BLOCK — `poolCardBlocks` decides that, and it
+ * is inherited here: its columns are Rounds and Clubs.
  */
-export function seasonRowStats(p: BlockInput): SeasonStat[] {
-  const out: SeasonStat[] = [];
-  for (const b of poolCardBlocks(p)) {
-    if (b.kind === 'rank') {
-      if (b.show && b.rank !== null) {
-        out.push({ value: ordinal(b.rank), label: `of ${b.totalEntries}` });
-      }
-    } else if (b.kind === 'stat') {
-      out.push({ value: b.value, label: b.sub ? `${b.label} ${b.sub}` : b.label, muted: b.muted });
-    }
-    if (out.length === 2) break;
+export function seasonRowCells(p: BlockInput): {
+  headers: [string, string];
+  cells: [SeasonCell, SeasonCell];
+} {
+  const blocks = poolCardBlocks(p);
+  const stats = blocks.filter(
+    (b): b is Extract<(typeof blocks)[number], { kind: 'stat' }> => b.kind === 'stat',
+  );
+  const statCell = (i: number): SeasonCell =>
+    stats[i]
+      ? { value: stats[i].value, sub: stats[i].sub, muted: stats[i].muted }
+      : { value: '—', muted: true };
+  const header = (i: number) => stats[i]?.label ?? '';
+
+  const rank = blocks.find(
+    (b): b is Extract<(typeof blocks)[number], { kind: 'rank' }> => b.kind === 'rank',
+  );
+  if (rank) {
+    const rankCell: SeasonCell =
+      rank.show && rank.rank !== null
+        ? { value: ordinal(rank.rank), sub: `of ${rank.totalEntries}` }
+        : { value: '—', muted: true };
+    return { headers: ['Rank', header(0)], cells: [rankCell, statCell(0)] };
   }
-  return out;
+  return { headers: [header(0), header(1)], cells: [statCell(0), statCell(1)] };
+}
+
+export type SeasonModeGroup<P extends SeasonPoolInput = SeasonPoolInput> = {
+  /** Mode + headers — two pools only share a group when their columns match. */
+  key: string;
+  predictionMode: string | null;
+  leagueMode: string | null;
+  headers: [string, string];
+  pools: P[];
+};
+
+/** Order a competition's modes read in: the weekly games first, the season-long ones after. */
+const MODE_ORDER = ['pickem', 'showdown', 'table', 'last_man_standing'];
+
+/**
+ * A competition's pools split by mode, so each group can carry its column
+ * headers once. Pool order inside a group is kept (open first, then name).
+ *
+ * ⚠ KEYED ON MODE *AND* HEADERS. A Showdown pool whose duel facts have not
+ * arrived falls back to Pick'em blocks; grouping on mode alone would put a
+ * "Points" figure under a "Duel pts" header.
+ */
+export function groupByMode<P extends SeasonPoolInput>(pools: P[]): SeasonModeGroup<P>[] {
+  const groups = new Map<string, SeasonModeGroup<P>>();
+  for (const p of pools) {
+    const { headers } = seasonRowCells(p);
+    const mode = p.league?.leagueMode ?? p.leagueMode ?? p.predictionMode ?? '';
+    const key = `${mode}|${headers.join('|')}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, predictionMode: p.predictionMode, leagueMode: p.leagueMode, headers, pools: [] };
+      groups.set(key, g);
+    }
+    g.pools.push(p);
+  }
+  const rankOf = (g: SeasonModeGroup<P>) => {
+    const i = MODE_ORDER.indexOf(g.key.split('|')[0]);
+    return i === -1 ? MODE_ORDER.length : i;
+  };
+  return [...groups.values()].sort((a, b) => rankOf(a) - rankOf(b) || a.key.localeCompare(b.key));
 }
 
 /** The medal a FINISHED pool's row wears, or null. Same podium rules as the Trophy Room. */

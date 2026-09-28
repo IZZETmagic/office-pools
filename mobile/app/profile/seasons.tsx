@@ -5,6 +5,12 @@
 // calls the Pools tab card makes, so the two can never disagree — including
 // Last Man Standing having no rank at all.
 //
+// ⚠ ALIGNED COLUMNS, LABELS IN THE HEADER (Ryan, 2026-09-28). Each row used to
+// carry its own labels at its own width, so the bold figures zig-zagged down
+// the page. Pools are now grouped by mode inside each competition; a group's
+// subheader names the two columns once, and every row puts its figures in the
+// same two fixed-width, right-aligned slots.
+//
 // Finished pools wear a medal when they were a podium finish, by the same
 // rules the Trophy Room counts (`podiumFinishes`). Archived pools are left out;
 // they have their own row in settings.
@@ -16,7 +22,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SettingsHeader } from '@/components/settings';
 import { Icon } from '@/components/ui';
 import { getModeChip, getModeName } from '@/lib/design/poolMode';
-import { finishMedal, seasonRowStats, type SeasonSection } from '@/lib/profileHub';
+import {
+  finishMedal,
+  groupByMode,
+  seasonRowCells,
+  type SeasonCell,
+  type SeasonModeGroup,
+  type SeasonSection,
+} from '@/lib/profileHub';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import type { PoolSummary } from '@/lib/useHomeData';
 import { useSeasons } from '@/lib/useSeasons';
@@ -88,16 +101,69 @@ function Section({ section }: { section: SeasonSection<PoolSummary> }) {
           </RNText>
         </View>
       </View>
-      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg }}>
-        {section.pools.map((p, i) => (
-          <View key={p.poolId}>
-            {i > 0 ? (
-              <View style={{ height: 0.5, marginHorizontal: theme.spacing.md, backgroundColor: withOpacity(theme.colors.slate, 0.25) }} />
-            ) : null}
-            <PoolRow pool={p} />
-          </View>
+      <View style={{ backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg, overflow: 'hidden' }}>
+        {groupByMode(section.pools).map((g, gi) => (
+          <ModeGroup key={g.key} group={g} first={gi === 0} />
         ))}
       </View>
+    </View>
+  );
+}
+
+/** Column widths — every row in every group uses the same two, so figures line up down the page. */
+const COL_A = 54;
+const COL_B = 74;
+const CHEVRON = 11;
+
+function ModeGroup({ group, first }: { group: SeasonModeGroup<PoolSummary>; first: boolean }) {
+  const theme = useTheme();
+  const chip = getModeChip(group.predictionMode, group.leagueMode, theme.mode === 'dark');
+  const headerText = {
+    fontFamily: fontFamilies.black,
+    fontSize: 9.5,
+    letterSpacing: 0.6,
+    color: theme.colors.slate,
+    textAlign: 'right' as const,
+  };
+
+  return (
+    <View>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.md,
+          paddingHorizontal: theme.spacing.md,
+          paddingTop: first ? theme.spacing.md : theme.spacing.md + 4,
+          paddingBottom: 6,
+          borderTopWidth: first ? 0 : 0.5,
+          borderTopColor: withOpacity(theme.colors.slate, 0.25),
+        }}
+      >
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: chip.ink }} />
+          <RNText style={{ ...headerText, textAlign: 'left', color: chip.ink }}>
+            {getModeName(group.predictionMode, group.leagueMode).toUpperCase()}
+          </RNText>
+        </View>
+        <RNText style={{ ...headerText, width: COL_A }}>{group.headers[0].toUpperCase()}</RNText>
+        <RNText style={{ ...headerText, width: COL_B }}>{group.headers[1].toUpperCase()}</RNText>
+        <View style={{ width: CHEVRON }} />
+      </View>
+      {group.pools.map((p, i) => (
+        <View key={p.poolId}>
+          {i > 0 ? (
+            <View
+              style={{
+                height: 0.5,
+                marginLeft: theme.spacing.md,
+                backgroundColor: withOpacity(theme.colors.slate, 0.15),
+              }}
+            />
+          ) : null}
+          <PoolRow pool={p} />
+        </View>
+      ))}
     </View>
   );
 }
@@ -108,8 +174,7 @@ function PoolRow({ pool }: { pool: PoolSummary }) {
   const theme = useTheme();
   const finished = pool.status === 'completed';
   const medal = finished ? finishMedal(pool) : null;
-  const stats = seasonRowStats(pool);
-  const chip = getModeChip(pool.predictionMode, pool.leagueMode, theme.mode === 'dark');
+  const { cells } = seasonRowCells(pool);
 
   return (
     <Pressable
@@ -118,69 +183,62 @@ function PoolRow({ pool }: { pool: PoolSummary }) {
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
-        gap: theme.spacing.sm + 2,
+        gap: theme.spacing.md,
         paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.md - 1,
+        paddingVertical: theme.spacing.md - 2,
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      {medal ? (
-        <View
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: 15,
-            backgroundColor: MEDAL[medal],
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <RNText style={{ fontFamily: fontFamilies.black, fontSize: 13, color: '#fff' }}>{medal}</RNText>
-        </View>
-      ) : (
-        <View
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: 9,
-            backgroundColor: withOpacity(chip.base, chip.tint),
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: chip.ink }} />
-        </View>
-      )}
-
-      <View style={{ flex: 1, gap: 1 }}>
-        <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>
-          {pool.poolName}
-        </RNText>
-        <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, color: theme.colors.slate }}>
-          {getModeName(pool.predictionMode, pool.leagueMode)} · {pool.memberCount}{' '}
-          {pool.memberCount === 1 ? 'member' : 'members'}
-        </RNText>
-      </View>
-
-      <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'center' }}>
-        {stats.map((st) => (
-          <View key={st.label} style={{ alignItems: 'flex-end' }}>
-            <RNText
-              style={{
-                fontFamily: fontFamilies.black,
-                fontSize: 14,
-                color: st.muted ? theme.colors.slate : theme.colors.ink,
-              }}
-            >
-              {st.value}
-            </RNText>
-            <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 10, color: theme.colors.slate }}>
-              {st.label}
-            </RNText>
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+        {medal ? (
+          <View
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              backgroundColor: MEDAL[medal],
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <RNText style={{ fontFamily: fontFamilies.black, fontSize: 11, color: '#fff' }}>{medal}</RNText>
           </View>
-        ))}
-        <Icon name="chevron.right" tint={theme.colors.slate} size={11} weight="semibold" />
+        ) : null}
+        <View style={{ flex: 1, gap: 1 }}>
+          <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>
+            {pool.poolName}
+          </RNText>
+          <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, color: theme.colors.slate }}>
+            {pool.memberCount} {pool.memberCount === 1 ? 'member' : 'members'}
+          </RNText>
+        </View>
       </View>
+      <Cell cell={cells[0]} width={COL_A} />
+      <Cell cell={cells[1]} width={COL_B} />
+      <Icon name="chevron.right" tint={theme.colors.slate} size={CHEVRON} weight="semibold" />
     </Pressable>
+  );
+}
+
+function Cell({ cell, width }: { cell: SeasonCell; width: number }) {
+  const theme = useTheme();
+  return (
+    <View style={{ width, alignItems: 'flex-end' }}>
+      <RNText
+        numberOfLines={1}
+        style={{
+          fontFamily: fontFamilies.black,
+          fontSize: 15,
+          fontVariant: ['tabular-nums'],
+          color: cell.muted ? theme.colors.slate : theme.colors.ink,
+        }}
+      >
+        {cell.value}
+      </RNText>
+      {/* Always drawn, so a row with no sub-line keeps the same height as its neighbours. */}
+      <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.medium, fontSize: 10.5, color: theme.colors.slate }}>
+        {cell.sub ?? ' '}
+      </RNText>
+    </View>
   );
 }

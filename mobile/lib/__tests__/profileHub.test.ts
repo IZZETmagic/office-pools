@@ -5,7 +5,8 @@ import {
   finishMedal,
   groupSeasons,
   podiumFinishes,
-  seasonRowStats,
+  groupByMode,
+  seasonRowCells,
   seasonsTeaser,
   tallyBadges,
   trophyTeaser,
@@ -224,44 +225,59 @@ describe('groupSeasons', () => {
   });
 });
 
-describe('seasonRowStats', () => {
-  it('reads rank then points for Pick\'em, from the same blocks as the pool card', () => {
-    const stats = seasonRowStats(
-      sp({
-        league: {
-          leagueMode: 'pickem',
-        } as never,
-      }),
-    );
-    expect(stats[0]).toEqual({ value: '3rd', label: 'of 14' });
-    expect(stats[1].label).toBe('Points');
+const lms = {
+  leagueMode: 'last_man_standing',
+  lms: {
+    roundsWon: 1,
+    roundNumber: 2,
+    clubsUsed: 5,
+    clubPool: 20,
+    survivorsLeft: 9,
+    roundEntrants: 23,
+    isEliminated: false,
+  },
+} as never;
+
+describe('seasonRowCells', () => {
+  it('puts rank then points under shared headers, labels out of the cells', () => {
+    const r = seasonRowCells(sp({ league: { leagueMode: 'pickem' } as never }));
+    expect(r.headers).toEqual(['Rank', 'Points']);
+    expect(r.cells[0]).toEqual({ value: '3rd', sub: 'of 14' });
+    expect(r.cells[1].value).toBe('112');
   });
 
-  it('shows no rank before scoring has started', () => {
-    const stats = seasonRowStats(sp({ hasScoringStarted: false, league: null, leagueMode: null }));
-    expect(stats[0].label).toBe('Points');
+  it('keeps the rank column the rank before scoring starts — "—", not Points sliding left', () => {
+    const r = seasonRowCells(sp({ hasScoringStarted: false, league: { leagueMode: 'pickem' } as never }));
+    expect(r.headers[0]).toBe('Rank');
+    expect(r.cells[0]).toEqual({ value: '—', muted: true });
+    expect(r.headers[1]).toBe('Points');
   });
 
-  it('never shows a rank in Last Man Standing', () => {
-    const stats = seasonRowStats(
-      sp({
-        leagueMode: 'last_man_standing',
-        currentRank: 2,
-        league: {
-          leagueMode: 'last_man_standing',
-          lms: {
-            roundsWon: 1,
-            roundNumber: 2,
-            clubsUsed: 5,
-            clubPool: 20,
-            survivorsLeft: 9,
-            roundEntrants: 23,
-            isEliminated: false,
-          },
-        } as never,
-      }),
-    );
-    expect(stats.map((x) => x.label)).toEqual(['Rounds in 2', 'Clubs of 20']);
+  it('never shows a rank in Last Man Standing — Rounds and Clubs instead', () => {
+    const r = seasonRowCells(sp({ leagueMode: 'last_man_standing', currentRank: 2, league: lms }));
+    expect(r.headers).toEqual(['Rounds', 'Clubs']);
+    expect(r.cells.map((c) => c.value)).toEqual(['1', '5']);
+  });
+});
+
+describe('groupByMode', () => {
+  it('splits a competition by mode, weekly games first', () => {
+    const g = groupByMode([
+      sp({ poolId: 'l', leagueMode: 'last_man_standing', league: lms }),
+      sp({ poolId: 'p1', league: { leagueMode: 'pickem' } as never }),
+      sp({ poolId: 'p2', league: { leagueMode: 'pickem' } as never }),
+    ]);
+    expect(g.map((x) => x.pools.map((p) => p.poolId))).toEqual([['p1', 'p2'], ['l']]);
+  });
+
+  it('never mixes columns in one group — same mode, different headers splits', () => {
+    const g = groupByMode([
+      sp({ poolId: 'a', leagueMode: 'showdown', league: null }),
+      sp({ poolId: 'b', leagueMode: 'showdown', league: null, hasScoringStarted: false }),
+    ]);
+    // both fall back to the same blocks, so they share a group
+    expect(g).toHaveLength(1);
+    expect(new Set(g.flatMap((x) => x.pools.map((p) => seasonRowCells(p).headers.join()))).size).toBe(1);
   });
 });
 
