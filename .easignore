@@ -2,67 +2,93 @@
 #
 # ⚠⚠ THIS FILE REPLACES EVERY .gitignore, IT DOES NOT ADD TO THEM. Expo's docs
 # are explicit: "if it is present, none of the existing .gitignore files will be
-# respected by EAS CLI." So anything missing here gets uploaded — including
+# respected by EAS CLI." Anything missing here gets uploaded — including
 # node_modules (2 GB) and, far worse, signing keys and env files. Read the whole
 # file before changing one line of it.
 #
 # Why it exists: the RN app lives in `mobile/`, but EAS archives from the GIT
-# ROOT, so every build was uploading the Next.js web app, the Swift app in
-# `ios/`, and ~230 MB of avatar source art in `assets/`. The archive came to
-# 610 MB and took 12m 24s to upload, for a build that reads none of it — EAS
-# itself flagged the size and pointed here.
+# ROOT, so every build uploaded the Next.js web app, the Swift app in `ios/`,
+# and ~230 MB of avatar source art in `assets/` — 610 MB and 12m 24s of upload
+# for a build that opens none of it. EAS flagged the size itself.
 #
-# ⚠ `mobile/` IS STANDALONE, which is what makes the whitelist below safe: it
-# has its own package.json, its own package-lock.json and its own .npmrc, and
-# the root package.json declares no workspaces. Nothing under `mobile/` imports
-# outside itself — `@/*` resolves to `./*`, and the few mentions of
-# `assets/showdown-storyboard` in that tree are comments, not imports.
+# ⚠ NO NEGATION PATTERNS. The first version of this file was a whitelist:
+# `/*` to drop the repo root, then `!/mobile/` to re-admit the app. Simulated
+# locally against the same `ignore` package EAS uses, that produced 449 files
+# and 51 MB — correct. EAS uploaded 80 BYTES and the build errored with an empty
+# archive, because it tests directory paths by a different convention and the
+# trailing slash on the negation never matched, so the whole tree was pruned.
+#
+# A blacklist cannot fail that way: every rule is an exclusion, nothing depends
+# on a later rule rescuing an earlier one. It is more lines and they are duller,
+# and that is the point.
 #
 # ⚠ NOT SUPPORTED WITH `"requireCommit": true` in eas.json, which switches EAS
 # to `git clone` and ignores this file entirely. It is not set today; if it ever
 # is, this file silently stops working and the 610 MB comes back.
 
 # ---------------------------------------------------------------------------
-# Exclude the entire repository root, then re-admit only the app.
+# Dependencies and build output, at any depth. The build server installs from
+# mobile/package-lock.json, so node_modules is ~2 GB of pure waste.
+# ---------------------------------------------------------------------------
+node_modules
+.git
+.next
+.turbo
+.expo
+web-build
+dist
+out
+coverage
+build
+.remotion
+.remotion-public
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# ---------------------------------------------------------------------------
+# ⚠ SECRETS. These were excluded only because the .gitignore files said so, and
+# those are no longer read. Losing a line here uploads a signing key.
 #
-# A whitelist rather than a list of exclusions, deliberately: the failure mode
-# of a forgotten exclusion is a secret being uploaded, and the failure mode of a
-# forgotten inclusion is a build error that says exactly what is missing. Only
-# one of those is quiet.
+# ⚠ `.npmrc` IS DELIBERATELY NOT HERE — mobile/.npmrc points at the Hugeicons
+# private registry and the build FAILS without it. It holds no secret: the token
+# is an ${ENV_VAR} reference, supplied by EAS at build time.
 # ---------------------------------------------------------------------------
-/*
-!/mobile/
+.env*
+*.pem
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.mcp.json
 
 # ---------------------------------------------------------------------------
-# Inside mobile/ — everything mobile/.gitignore excluded, carried over by hand
-# because it is no longer read.
+# The repo root — the web app, the Swift app, and the art. A LEADING SLASH on
+# every one of these, so `mobile/app`, `mobile/lib`, `mobile/components`,
+# `mobile/assets` and `mobile/scripts` are untouched. Dropping a slash here
+# deletes half the RN app from the archive.
 # ---------------------------------------------------------------------------
+/app
+/components
+/lib
+/hooks
+/public
+/assets
+/ios
+/drafts
+/remotion
+/memory
+/scripts
+/skills
+/.claude
+/.preview-emails
 
-# Dependencies and build output. The build server installs from
-# mobile/package-lock.json; uploading node_modules would add ~1.3 GB.
-mobile/node_modules/
-mobile/.expo/
-mobile/dist/
-mobile/web-build/
-mobile/.kotlin/
-mobile/expo-env.d.ts
-mobile/*.tsbuildinfo
-
-# ⚠ SECRETS. These were excluded before only because mobile/.gitignore said so,
-# and that file is now ignored. Losing a line here uploads a signing key.
-mobile/.env*
-mobile/*.jks
-mobile/*.p8
-mobile/*.p12
-mobile/*.key
-mobile/*.mobileprovision
-mobile/*.pem
-
+# ---------------------------------------------------------------------------
 # Local noise.
-mobile/.DS_Store
-mobile/**/.DS_Store
-mobile/*.orig.*
-mobile/.metro-health-check*
-mobile/npm-debug.*
-mobile/yarn-debug.*
-mobile/yarn-error.*
+# ---------------------------------------------------------------------------
+.DS_Store
+*.orig.*
+.metro-health-check*
+*-debug.log
+*.log
