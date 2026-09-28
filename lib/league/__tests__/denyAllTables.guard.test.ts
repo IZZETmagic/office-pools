@@ -47,11 +47,21 @@ import { readFileSync, readdirSync, statSync } from 'fs'
 import { resolve, join } from 'path'
 
 /** Named in migration 050 as deny-all. Adding one here is not a style choice. */
-const DENY_ALL = [
+const DENY_ALL_050 = [
   'league_match_scores',
   'league_entry_totals',
   'league_fixture_state',
   'league_score_events',
+] as const
+
+/**
+ * Deny-all tables added after 050. Same rule, but 050's header cannot name
+ * them, so the drift check at the bottom only covers `DENY_ALL_050`.
+ */
+const DENY_ALL = [
+  ...DENY_ALL_050,
+  // Migration 149 — the Activity feed's rank history.
+  'league_entry_rank_history',
 ] as const
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -170,6 +180,6 @@ describe('deny-all league tables are never read with a user-scoped client', () =
     const m050 = readFileSync(resolve(root, 'lib/migrations/050_l1_league_schema.sql'), 'utf8')
     const claim = m050.slice(m050.indexOf('deny-all (RLS on, zero policies) on exactly:'))
       .slice(0, 200)
-    for (const t of DENY_ALL) expect(claim, `050 no longer names ${t}`).toContain(t)
+    for (const t of DENY_ALL_050) expect(claim, `050 no longer names ${t}`).toContain(t)
   })
 })

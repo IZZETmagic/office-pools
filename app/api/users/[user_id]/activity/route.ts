@@ -8,6 +8,8 @@ import {
   type MatchScoreEvent,
 } from '@/lib/scoring/readSource'
 import { withPerfLogging } from '@/lib/api-perf'
+import { readLeagueActivity, type LeagueActivityPool } from '@/lib/activity/readLeagueActivity'
+import type { ActivityLink, NeedItem } from '@/lib/activity/needsYou'
 
 // =============================================================
 // GET /api/users/:user_id/activity
@@ -24,6 +26,17 @@ import { withPerfLogging } from '@/lib/api-perf'
 //
 // Auth: caller may only read their own activity. Super admins may
 // read any user's feed for support / debugging.
+//
+// ⭐ `?v=2` — the Activity tab redesign (Needs You → Matchweek Story → chips).
+// Adds, and ONLY adds, for a caller that asks for it:
+//   - `needs_you`   open decisions with a button (lib/activity/needsYou.ts)
+//   - `matchweek_story` items for league pools (lib/activity/matchweekStories.ts)
+//   - `link` on every item, so a row can open the screen it is about
+//   - `seen_at` + a real `is_read` (migration 149's user_activity_seen)
+//   - `message_id` on mention metadata
+// ⚠ Without `v=2` the response is byte-for-byte what it was, because phones on
+// an older OTA render every unknown type as a generic row. Deploy this BEFORE
+// the OTA that asks for v2.
 // =============================================================
 
 type ActivityType =
@@ -42,6 +55,7 @@ type ActivityType =
   | 'prediction_submitted'
   | 'points_adjusted'
   | 'xp_gain'
+  | 'matchweek_story'
   | 'welcome'
 
 type ColorKey = 'primary' | 'success' | 'warning' | 'error' | 'accent'
@@ -57,6 +71,8 @@ type ActivityItem = {
   metadata: Record<string, unknown> | null
   is_read: boolean
   created_at: string
+  /** v2 only. The screen this row opens. */
+  link?: ActivityLink
 }
 
 type MembershipRow = {
@@ -67,6 +83,10 @@ type MembershipRow = {
     pool_name: string
     prediction_deadline: string | null
     tournament_id: string | null
+    league_season_id: string | null
+    league_mode: string | null
+    league_table_lock_at: string | null
+    league_start_matchweek: number | null
   } | null
   pool_entries: Array<{
     entry_id: string
@@ -140,7 +160,7 @@ function synth(
 }
 
 async function handleGET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ user_id: string }> },
 ) {
   const { user_id } = await params
@@ -157,13 +177,17 @@ async function handleGET(
   // Single admin client for the read — caller authz is enforced above; the
   // synthesis crosses tables that have their own RLS, simpler to bypass.
   const adminClient = createAdminClient()
+  const v2 = new URL(request.url).searchParams.get('v') === '2'
 
   const { data: rows, error: pmErr } = await adminClient
     .from('pool_members')
     .select(
       `
       pool_id, joined_at,
-      pools(pool_id, pool_name, prediction_deadline, tournament_id),
+      pools(
+        pool_id, pool_name, prediction_deadline, tournament_id,
+        league_season_id, league_mode, league_table_lock_at, league_start_matchweek
+      ),
       pool_entries(
         entry_id, entry_name, entry_number,
         has_submitted_predictions, predictions_submitted_at,
@@ -341,7 +365,10 @@ async function handleGET(
     // user still has unsubmitted entries. The pre-deadline alert uses a
     // window-aligned timestamp so the same alert is stable across refreshes
     // within that window (no spam).
-    if (pool.prediction_deadline) {
+    // v2: a league pool's `prediction_deadline` is the season END (see
+    // LeagueCardFacts.deadlineAt), so this alert would fire in May. Needs You
+    // carries the real weekly deadline instead.
+    if (pool.prediction_deadline && !(v2 && pool.league_mode)) {
       const deadlineMs = Date.parse(pool.prediction_deadline)
       if (!Number.isNaN(deadlineMs)) {
         if (deadlineMs < now) {
@@ -600,7 +627,12 @@ async function handleGET(
                 pool_name: poolName,
                 sender_name: senderName,
                 message_preview: preview,
+                message_id: m.message_id,
+                sender_user_id: m.user_id,
               },
+              // Two mentions in one pool in the same second would otherwise
+              // share an id.
+              m.message_id,
             ),
           )
         }
@@ -842,12 +874,114 @@ async function handleGET(
     }
   }
 
-  // Newest first
+  if (!v2) {
+    // Newest first
+    items.sort((a, b) =>
+      a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
+    )
+    return NextResponse.json({ items })
+  }
+
+  // ---- v2: league stories, Needs You, links, read state ---------------------
+  const nameByEntry = new Map<string, string>()
+  for (const list of peersByPool.values()) {
+    for (const p of list) {
+      nameByEntry.set(p.entry_id, peerDisplayName.get(p.member_id) ?? p.entry_name)
+    }
+  }
+  const leaguePools: LeagueActivityPool[] = memberships
+    .filter((m) => m.pools?.league_mode)
+    .map((m) => {
+      const pool = m.pools!
+      return {
+        poolId: pool.pool_id,
+        poolName: pool.pool_name,
+        seasonId: pool.league_season_id,
+        mode: pool.league_mode,
+        tableLockAt: pool.league_table_lock_at,
+        startMatchweek: pool.league_start_matchweek,
+        entries: [...(m.pool_entries ?? [])]
+          .sort((a, b) => a.entry_number - b.entry_number)
+          .map((e) => ({ entryId: e.entry_id, entryName: e.entry_name })),
+        entrantCount: peersByPool.get(pool.pool_id)?.length ?? null,
+      }
+    })
+
+  const [league, seenRes] = await Promise.all([
+    readLeagueActivity(adminClient, leaguePools, nameByEntry, now).catch((err) => {
+      // Decoration around links: a league failure must not take the feed down.
+      console.error('[activity] league activity failed', err)
+      return { stories: [], needs: [] as NeedItem[] }
+    }),
+    adminClient.from('user_activity_seen').select('seen_at').eq('user_id', user_id).maybeSingle(),
+  ])
+  if (seenRes.error) console.error('[activity] seen_at read failed', seenRes.error.message)
+  const seenAt = (seenRes.data as { seen_at?: string } | null)?.seen_at ?? null
+
+  for (const st of league.stories) {
+    items.push({
+      activity_id: st.id,
+      pool_id: st.poolId,
+      activity_type: 'matchweek_story',
+      title: st.title,
+      body: st.body,
+      icon: 'calendar.badge.checkmark',
+      color_key: st.colorKey,
+      metadata: st.meta as unknown as Record<string, unknown>,
+      is_read: true,
+      created_at: st.createdAt,
+    })
+  }
+
+  const leagueModeByPool = new Map(leaguePools.map((p) => [p.poolId, p.mode]))
+  for (const it of items) {
+    it.link = linkFor(it, leagueModeByPool.get(it.pool_id ?? '') ?? null)
+    // No row yet means the tab has never been opened on a v2 build. Everything
+    // counts as read then, or the first open after the update would light up the
+    // member's whole history as new.
+    it.is_read = seenAt == null || it.created_at <= seenAt
+  }
+
   items.sort((a, b) =>
     a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
   )
 
-  return NextResponse.json({ items })
+  return NextResponse.json({ items, needs_you: league.needs, seen_at: seenAt })
+}
+
+/**
+ * Where a row goes when it is tapped. Pool-less rows (a pool that was left or
+ * deleted) go nowhere — the pool screen would only 404.
+ */
+function linkFor(item: ActivityItem, leagueMode: string | null): ActivityLink | undefined {
+  const poolId = item.pool_id
+  if (!poolId || item.activity_type === 'pool_left' || item.activity_type === 'pool_removed') {
+    return undefined
+  }
+  const meta = (item.metadata ?? {}) as Record<string, unknown>
+  switch (item.activity_type) {
+    case 'mention':
+      return { pathname: '/pool/[id]', params: { id: poolId, banter: 'open' } }
+    case 'matchweek_story': {
+      const entryId = String(meta.entry_id ?? '')
+      const mw = String(meta.matchweek_number ?? '')
+      if (leagueMode === 'showdown' && mw) {
+        return { pathname: '/pool/[id]/duel/[matchweek]', params: { id: poolId, matchweek: mw } }
+      }
+      if (leagueMode === 'last_man_standing' && entryId) {
+        return { pathname: '/pool/[id]/survivor/[entryId]', params: { id: poolId, entryId } }
+      }
+      if (leagueMode === 'table' && entryId) {
+        return { pathname: '/pool/[id]/table/[entryId]', params: { id: poolId, entryId } }
+      }
+      if (entryId && mw) {
+        return { pathname: '/pool/[id]/pickem/[entryId]', params: { id: poolId, entryId, mw } }
+      }
+      return { pathname: '/pool/[id]', params: { id: poolId } }
+    }
+    default:
+      return { pathname: '/pool/[id]', params: { id: poolId } }
+  }
 }
 
 export const GET = withPerfLogging('/api/users/[user_id]/activity', handleGET)
