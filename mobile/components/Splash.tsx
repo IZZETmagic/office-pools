@@ -27,6 +27,15 @@ import Animated, {
 import { fontFamilies, useTheme } from '@/theme';
 
 type Props = {
+  /**
+   * Whether the app's typefaces have loaded.
+   *
+   * ⚠ The tree now mounts BEFORE they do, so that the session restore and the
+   * data prefetch can start instead of queueing behind seven font loads. This
+   * component can therefore be rendered with the system face, and must not show
+   * itself until it can draw its own wordmark.
+   */
+  fontsReady: boolean;
   preloadComplete: boolean;
   onDismissed: () => void;
 };
@@ -39,7 +48,7 @@ function hideNativeSplash() {
   });
 }
 
-export function Splash({ preloadComplete, onDismissed }: Props) {
+export function Splash({ fontsReady, preloadComplete, onDismissed }: Props) {
   const theme = useTheme();
   const fadeIn = useSharedValue(0);
   const scale = useSharedValue(0.8);
@@ -50,6 +59,16 @@ export function Splash({ preloadComplete, onDismissed }: Props) {
 
   // Native-splash hand-off + entrance + bob.
   useEffect(() => {
+    // ⚠ HOLD THE NATIVE SPLASH UNTIL THE FONTS ARE IN. The native layer is a
+    // static image on a solid colour and needs no typeface, so it can sit in
+    // front while this one waits to be drawable. Handing over any earlier would
+    // show the wordmark in the system face and then swap it — a flash of the
+    // wrong brand, bought for nothing.
+    //
+    // The hand-off therefore looks exactly as it did. What changed is that the
+    // app has been restoring the session and prefetching behind it the whole
+    // time, instead of waiting for a font before it started.
+    if (!fontsReady) return;
     hideNativeSplash();
 
     fadeIn.value = withTiming(1, {
@@ -71,7 +90,7 @@ export function Splash({ preloadComplete, onDismissed }: Props) {
         true,
       ),
     );
-  }, [fadeIn, scale, bobY]);
+  }, [fontsReady, fadeIn, scale, bobY]);
 
   // Dot cycle: phase bounces 0 → 1 → 2 → 1 → 0, matching the Swift timer.
   useEffect(() => {

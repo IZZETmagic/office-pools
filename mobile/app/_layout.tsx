@@ -97,13 +97,21 @@ function RootLayout() {
     RobotoMono_700Bold,
   });
 
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
+  // ⚠ THIS USED TO `return null` UNTIL THE FONTS LANDED, and that put seven
+  // typeface loads in front of everything: no AuthProvider, so no session
+  // restore; no data providers, so no prefetch. The cold start did nothing at
+  // all while it waited for a font.
+  //
+  // Nothing needs to wait. The splash covers the whole screen either way, so
+  // the tree mounts now and starts working, and it is the SPLASH that holds
+  // until the fonts are ready — see `fontsReady` below. A font error counts as
+  // ready: the system face is a worse-looking app, not a broken one, and is
+  // certainly better than a splash that never lifts.
+  const fontsReady = fontsLoaded || !!fontError;
 
   return (
     <AuthProvider>
-      <InnerLayout />
+      <InnerLayout fontsReady={fontsReady} />
     </AuthProvider>
   );
 }
@@ -113,7 +121,7 @@ function RootLayout() {
 // configured (DSN missing), so safe to leave wrapped in all environments.
 export default Sentry.wrap(RootLayout);
 
-function InnerLayout() {
+function InnerLayout({ fontsReady }: { fontsReady: boolean }) {
   const colorScheme = useColorScheme();
   // ⚠ Created ONCE, via the lazy initialiser. `new QueryClient()` inline would
   // build a fresh cache on every render of this component and throw the old one
@@ -360,7 +368,7 @@ function InnerLayout() {
         <Stack.Screen name="settings/help" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
-        <SplashOverlay />
+        <SplashOverlay fontsReady={fontsReady} />
       </PendingActionsProvider>
       </ActivityProvider>
       </TournamentMatchesProvider>
@@ -405,20 +413,21 @@ const SPLASH_MIN_MS = 1200;
  */
 const SPLASH_MAX_MS = 2500;
 
-function SplashOverlay() {
-  const preloadComplete = useSplashGate();
+function SplashOverlay({ fontsReady }: { fontsReady: boolean }) {
+  const preloadComplete = useSplashGate(fontsReady);
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;
   return (
     <Splash
+      fontsReady={fontsReady}
       preloadComplete={preloadComplete}
       onDismissed={() => setDismissed(true)}
     />
   );
 }
 
-function useSplashGate(): boolean {
+function useSplashGate(fontsReady: boolean): boolean {
   const { session, loading: authLoading } = useAuth();
   const { loading: homeLoading } = useHomeData();
   const { loading: activityLoading } = useSharedActivity();
@@ -446,6 +455,9 @@ function useSplashGate(): boolean {
   }, []);
 
   if (!minElapsed) return false;
+  // ⚠ The tree now mounts before the fonts arrive, so the splash is the only
+  // thing standing between a half-loaded typeface and the user. It stays up.
+  if (!fontsReady) return false;
   if (authLoading || onboardingLoading || pushPermissionStatus === null) return false;
   // Unauthenticated launch: no data to prefetch — fade out so the user
   // lands on /(auth)/sign-in (or the pre-auth slides) immediately after
