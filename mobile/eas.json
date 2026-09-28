@@ -22,7 +22,7 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "APP_VARIANT": "preview"
+        "APP_VARIANT": "development"
       },
       "ios": {
         "simulator": false

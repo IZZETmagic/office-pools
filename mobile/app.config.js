@@ -10,10 +10,10 @@
 // (`Constants.expoConfig`), so it has to agree with the native build or push
 // tokens register under the wrong bundle ID.
 //
-// ⚠ PREVIEW WAS MISSING FROM HERE, and the gap is not obvious from the outside:
-// `development` and `preview` are BOTH `distribution: internal`, so they look
-// like the same kind of build, but only one of them had its own identity. A
-// preview build installed straight over TestFlight.
+// ⚠ PREVIEW USED TO FALL THROUGH HERE and build as `com.officepools.expo`,
+// which is the STORE identifier — so installing it asked to remove TestFlight.
+// It now sets APP_VARIANT=development in eas.json and lands in the same second
+// slot as the dev client.
 //
 // ⚠ PUSH IS PER BUNDLE ID. Each variant registers its own APNs token, so a
 // phone carrying two of them holds two registrations, not one.
@@ -22,16 +22,17 @@
 // one would need its own google-services.json entry and its own
 // developer-verification registration.
 
+// ⚠ ONE non-store identity, not one per profile. `development` and `preview`
+// BOTH build as SportPool Dev, deliberately: the point is a second app slot
+// beside TestFlight, and a second slot is all that is needed. Giving `preview`
+// an identity of its own means a bundle ID Apple has never seen, which needs a
+// new certificate and provisioning profile — an interactive Apple login, for no
+// benefit over the slot that already exists.
 const VARIANTS = {
   development: {
     name: 'SportPool Dev',
     scheme: 'officepools-dev',
     bundleIdentifier: 'com.officepools.expo.dev',
-  },
-  preview: {
-    name: 'SportPool Preview',
-    scheme: 'officepools-preview',
-    bundleIdentifier: 'com.officepools.expo.preview',
   },
 };
 
