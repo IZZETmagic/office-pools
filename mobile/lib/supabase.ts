@@ -9,8 +9,26 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  // ⚠ THIS THROW IS AT MODULE SCOPE, SO IT IS AN INSTANT CRASH ON LAUNCH — no
+  // screen, no Sentry breadcrumb, nothing to read. Failing fast is right (an
+  // app with no backend is not usable), but the message has to say where the
+  // values come from, because there are TWO sources and they are easy to
+  // confuse:
+  //
+  //   Metro          `mobile/.env.local` ON YOUR MACHINE. This is also why a
+  //                  dev client and an `eas update` bundle work — both are
+  //                  built locally, where that file exists.
+  //   an EAS build   the EAS ENVIRONMENT for the profile's channel. `.env.local`
+  //                  is gitignored and never uploaded, so the file is not there.
+  //
+  // A standalone `preview` build crashed on launch for exactly this reason: the
+  // `preview` environment had never been given the variables, and nothing else
+  // had ever needed them, because every previous preview bundle was built on a
+  // laptop.
   throw new Error(
-    'Missing Supabase env vars. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in mobile/.env.local.',
+    'Missing Supabase env vars (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY). ' +
+      'For Metro, set them in mobile/.env.local. For an EAS build, set them on the EAS ' +
+      'environment matching the build profile — `eas env:list --environment <name>`.',
   );
 }
 
