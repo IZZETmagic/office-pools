@@ -213,7 +213,7 @@ function SurvivorRow({
         name={name}
         avatarBuild={entry.avatar_build ?? null}
         avatarColour={entry.avatar_colour ?? null}
-        size={34}
+        size={40}
         rank={1}
       />
 

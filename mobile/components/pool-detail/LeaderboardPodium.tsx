@@ -97,7 +97,7 @@ function PodiumColumn({
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <View style={{ width: '100%', alignItems: 'center', height: 60, justifyContent: 'center' }}>
+      <View style={{ width: '100%', alignItems: 'center', height: 68, justifyContent: 'center' }}>
         {/*
           ⚠⚠ NO RING. It used to be a 3pt gold/silver/bronze border and it was the last
           thing on the podium naming the place, after the medal glyph was replaced by the
@@ -117,7 +117,7 @@ function PodiumColumn({
           name={name}
           avatarBuild={entry.avatar_build ?? null}
           avatarColour={entry.avatar_colour ?? null}
-          size={56}
+          size={64}
           rank={1}
         />
         {rankDelta !== 0 ? (

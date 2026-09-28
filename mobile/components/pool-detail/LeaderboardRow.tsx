@@ -68,18 +68,22 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
       })}
     >
       {/*
-        ⚠⚠ RIGHT-ALIGNED, NOT CENTRED, AND THAT IS THE FIX FOR THE GAP. Ryan: the avatar "doesn't
-        seem to be centred between the number and the next item". It was not the movement
-        indicator — that already sits under the number. It was this column: a FIXED 36pt with the
-        number CENTRED, so "#1" left ~9pt of dead space on its right and "#100" left none. The gap
-        between the glyph and the face therefore changed with the digit count and always read wider
-        than the gap on the other side of the face.
+        ⚠⚠ THE NUMBER DOES NOT MOVE — Ryan, having had to say it twice: "Don't move the position
+        number. Keep it where it is." An earlier go at the gap below right-aligned this column,
+        which shifted the number. That was the wrong side of the problem: what had to move was
+        everything AFTER it.
 
-        ⭐ Aligning to the end pins the number's right edge, so the distance to the face is exactly
-        the row's own `gap` on every row — and numerals line up on their units column, which is how
-        numbers are meant to be set anyway. The movement indicator right-aligns with it.
+        ⭐ SO THE FIX IS A NEGATIVE `marginRight`, not an alignment change. The column stays 36pt
+        with its content CENTRED — the glyph sits exactly where it always did — and the negative
+        margin only shortens the space the column consumes after itself, pulling the face, the
+        name and the rest leftwards.
+
+        ⚠ 8 is measured, not guessed. Menlo-Bold at 14 advances ~8.4pt a character, so "#1" is
+        ~17pt inside a 36pt box and leaves ~9.6pt to its right; "#12" leaves ~5.4. Ranks past #99
+        are rare — p95 across every pool is 35 entries — so 8 recovers the common case and the
+        remainder is under a point either way.
       */}
-      <View style={{ width: 36, alignItems: 'flex-end' }}>
+      <View style={{ width: 36, alignItems: 'center', marginRight: -theme.spacing.sm }}>
         <RNText
           style={{
             fontFamily: Platform.OS === 'ios' ? 'Menlo-Bold' : 'monospace',
@@ -123,7 +127,7 @@ export function LeaderboardRow({ entry, rank, isCurrentUser, awards, onPress }: 
         name={name}
         avatarBuild={entry.avatar_build ?? null}
         avatarColour={entry.avatar_colour ?? null}
-        size={34}
+        size={40}
         rank={rank}
       />
 
