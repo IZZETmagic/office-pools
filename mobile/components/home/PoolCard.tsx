@@ -198,6 +198,8 @@ export function PoolCard({ pool, onPress }: PoolCardProps) {
 }
 
 const STACK_SIZE = 24;
+/** The gap-making ring drawn between overlapping heads, in the card's own surface colour. */
+const RING_WIDTH = 1.5;
 
 /**
  * The overlapping run of members at the foot of the card.
@@ -236,9 +238,24 @@ function MemberAvatars({ members, totalMembers }: { members: PoolCardMember[]; t
          */
         const ink = groundInkFor(index);
 
+        /**
+         * The separating ring between overlapping heads.
+         *
+         * ⚠⚠ `borderRadius` IS LOAD-BEARING, NOT COSMETIC. Without it the border
+         * is a SQUARE drawn around a round avatar, and because the stack overlaps
+         * by 6px the neighbour's straight edge cuts a hard vertical line across
+         * the face beside it. The old initials stack never showed this because the
+         * border lived on the round gradient itself; moving it out to a wrapper is
+         * what exposed it.
+         *
+         * ⚠ The radius is the avatar's own radius PLUS the border width: a border
+         * on a wrap-content View sits OUTSIDE the 24px child, so the outer box is
+         * 27px and half of that is 13.5.
+         */
         const ring = {
-          borderWidth: 1.5,
+          borderWidth: RING_WIDTH,
           borderColor: theme.colors.surface,
+          borderRadius: STACK_SIZE / 2 + RING_WIDTH,
           marginLeft: i === 0 ? 0 : -6,
         } as const;
 

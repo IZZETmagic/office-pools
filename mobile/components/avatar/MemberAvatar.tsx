@@ -44,11 +44,38 @@ import { useAvatarAssets } from '@/lib/useAvatarAssets';
  * but the face shrinks and the shirt intrudes. 1700 keeps every style intact with the face still
  * dominant — so DO NOT tighten this without re-rendering the tall styles.
  */
-const CROP_BOX = 1700;
 const CANVAS = 2048;
-const SCALE = CANVAS / CROP_BOX;
-/** The face's centre on the canvas, as a fraction of its height. */
-const FACE_CY = 840 / CANVAS;
+const CROP_BOX = 1700;
+/** The face's centre on the canvas. Stable across every configuration. */
+const FACE_CX = 1024;
+const FACE_CY = 840;
+
+/**
+ * ⭐⭐ THE CROP IS DONE IN THE SVG, NOT IN THE LAYOUT, and that is the whole point.
+ *
+ * ⚠⚠ THE FIRST VERSION RENDERED THE SVG OVERSIZED INSIDE A ROUND `overflow: 'hidden'`
+ * VIEW AND IT DID NOT CLIP. On the device the avatar came out visibly WIDER than the
+ * initials circles beside it — the oversized child simply painted past its parent.
+ * Rewriting the viewBox makes the crop part of the image itself, so the child is
+ * exactly `size` square, there is nothing to overflow, and no RN clipping behaviour
+ * is being relied on.
+ *
+ * ⚠ The top clamps at 0. Centred on the face the box would start at y=-10, which is
+ * off-canvas and outside the background rect, leaving a transparent sliver. Clamping
+ * moves the face down by 10 of 2048 units — 0.12px at 24px, invisible.
+ */
+const CROP_X = Math.max(0, FACE_CX - CROP_BOX / 2);
+const CROP_Y = Math.max(0, FACE_CY - CROP_BOX / 2);
+const CROPPED_VIEWBOX = `viewBox="${CROP_X} ${CROP_Y} ${CROP_BOX} ${CROP_BOX}"`;
+
+/**
+ * ⚠ Replaces the FIRST viewBox only — the root element's. `composeAvatar` emits one
+ * root `<svg>` and paths beneath it, so there is no nested viewBox to catch, and a
+ * global replace would be wrong the day there is.
+ */
+function cropToFace(svg: string): string {
+  return svg.replace(/viewBox="0 0 2048 2048"/, CROPPED_VIEWBOX);
+}
 
 export function MemberAvatar({
   userId,
@@ -73,7 +100,7 @@ export function MemberAvatar({
     const build = readStoredAvatarBuild(avatarBuild, assets);
     if (!build) return null;
     const ground = avatarBackgroundFor(avatarIndexFor(userId, avatarColour));
-    return composeAvatar(toAvatarConfig(build, ground), assets);
+    return cropToFace(composeAvatar(toAvatarConfig(build, ground), assets));
     // ⚠ Keyed on the CONFIG, not on a parent object. `avatarBuild` arrives from the query as a
     // stable reference per fetch, so this recomposes when the member's face changes and not on
     // every scroll frame.
@@ -81,32 +108,19 @@ export function MemberAvatar({
 
   if (!svg) return <>{fallback}</>;
 
-  const rendered = size * SCALE;
-
   return (
     <View
       style={{
         width: size,
         height: size,
         borderRadius: size / 2,
-        // ⚠ Load-bearing. The SVG is drawn LARGER than this box and positioned outside it; without
-        // the clip the neighbouring avatars in the stack would be painted over.
+        // ⚠ The SVG is already cropped to a square of the face, so this rounds the
+        // square into a circle. It is NOT doing the crop — see `cropToFace`, and the
+        // note there about why relying on this to clip an oversized child failed.
         overflow: 'hidden',
       }}
     >
-      <SvgXml
-        xml={svg}
-        width={rendered}
-        height={rendered}
-        style={{
-          position: 'absolute',
-          left: size / 2 - rendered / 2,
-          // ⚠ Works out to +0.6% of size — very nearly centred, but not exactly, and the
-          // difference is a face sitting slightly low in the circle. Kept as the real expression
-          // rather than rounded to zero.
-          top: size / 2 - FACE_CY * rendered,
-        }}
-      />
+      <SvgXml xml={svg} width={size} height={size} />
     </View>
   );
 }
