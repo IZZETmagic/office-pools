@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text as RNText, View } from 'react-native';
 
-import { initialsOf } from './leaderboard-shared';
+import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { ActionMenu, Button, ConfirmDialog, Icon, PromptDialog, Text } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { useMemberRoster } from '@/lib/useMemberRoster';
@@ -173,11 +173,29 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, pred
   const roster = useMemberRoster(poolId);
   const myEntryIds = useMemo(() => new Set(entries.map((e) => e.entryId)), [entries]);
   const otherEntries = useMemo(() => {
-    const list: { entryId: string; entryName: string; ownerName: string; points: number }[] = [];
+    const list: {
+      entryId: string;
+      entryName: string;
+      ownerName: string;
+      points: number;
+      // ⚠ The row is labelled by its OWNER, so the face has to come from the member, not the
+      // entry — a member with three entries is one person three times over.
+      userId: string;
+      avatarColour: string | null;
+      avatarBuild: unknown;
+    }[] = [];
     for (const m of roster.members) {
       for (const e of m.entries) {
         if (myEntryIds.has(e.entryId)) continue;
-        list.push({ entryId: e.entryId, entryName: e.entryName, ownerName: m.fullName, points: e.scoredTotalPoints });
+        list.push({
+          entryId: e.entryId,
+          entryName: e.entryName,
+          ownerName: m.fullName,
+          points: e.scoredTotalPoints,
+          userId: m.userId,
+          avatarColour: m.avatarColour,
+          avatarBuild: m.avatarBuild,
+        });
       }
     }
     list.sort((a, b) => b.points - a.points || a.ownerName.localeCompare(b.ownerName));
@@ -383,6 +401,9 @@ export function PredictionsTab({ poolId, maxEntriesPerUser, predictionMode, pred
               ownerName={e.ownerName}
               entryName={e.entryName}
               points={e.points}
+              userId={e.userId}
+              avatarColour={e.avatarColour}
+              avatarBuild={e.avatarBuild}
               locked={!everyoneRevealed}
               onPress={
                 everyoneRevealed
@@ -602,12 +623,18 @@ function MemberEntryRow({
   ownerName,
   entryName,
   points,
+  userId,
+  avatarColour,
+  avatarBuild,
   locked,
   onPress,
 }: {
   ownerName: string;
   entryName: string;
   points: number;
+  userId: string;
+  avatarColour: string | null;
+  avatarBuild: unknown;
   locked: boolean;
   onPress?: () => void;
 }) {
@@ -627,20 +654,24 @@ function MemberEntryRow({
         ...theme.shadows.card,
       })}
     >
-      <View
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: theme.radii.pill,
-          backgroundColor: withOpacity(theme.colors.primary, 0.12),
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12, color: theme.colors.primary }}>
-          {initialsOf(ownerName)}
-        </RNText>
-      </View>
+      {/*
+        ⭐ THE OWNER'S FACE, where a flat primary-tinted monogram used to be. That circle was the
+        SAME colour for everybody — `primary` at 12% — so it identified the row as "a person"
+        and never as WHICH person. The face does both, and falls back to initials on the
+        member's own colour when they have not built one.
+
+        ⚠ `rank={1}`: this list is every other entry in the pool, not a ranked board, so
+        FACE_LIMIT has nothing to gate. Pools big enough to matter are World Cup, where this
+        list is already bounded by how many entries a member can open.
+      */}
+      <LeaderboardAvatar
+        userId={userId}
+        name={ownerName}
+        avatarBuild={avatarBuild}
+        avatarColour={avatarColour}
+        size={34}
+        rank={1}
+      />
       <View style={{ flex: 1, gap: 2 }}>
         <Text variant="cardTitle" numberOfLines={1}>
           {entryName}

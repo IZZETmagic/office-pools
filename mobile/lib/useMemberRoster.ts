@@ -22,6 +22,16 @@ export type RosterMember = {
   entryCount: number;
   bestPoints: number;
   entries: RosterEntry[];
+  /** The colour this member picked — null falls back to the hash of their id. */
+  avatarColour: string | null;
+  /**
+   * Their stored avatar, raw.
+   *
+   * ⚠ `unknown` until `readStoredAvatarBuild` has checked it against the asset bundle THIS
+   * build shipped with — a config written by a newer bundle is a real case, and the answer
+   * to it is initials, not a crash.
+   */
+  avatarBuild: unknown;
 };
 
 type DbRow = {
@@ -30,8 +40,8 @@ type DbRow = {
   role: string;
   joined_at: string;
   users:
-    | { full_name: string | null; username: string | null }
-    | Array<{ full_name: string | null; username: string | null }>
+    | { full_name: string | null; username: string | null; avatar_colour: string | null; avatar_build: unknown }
+    | { full_name: string | null; username: string | null; avatar_colour: string | null; avatar_build: unknown }[]
     | null;
   pool_entries: {
     entry_id: string;
@@ -55,7 +65,7 @@ export function useMemberRoster(poolId: string | undefined) {
       const { data, error: err } = await supabase
         .from('pool_members')
         .select(
-          'member_id, user_id, role, joined_at, users:user_id(full_name, username, avatar_colour), pool_entries(entry_id, entry_name, entry_number, scored_total_points, has_submitted_predictions)',
+          'member_id, user_id, role, joined_at, users:user_id(full_name, username, avatar_colour, avatar_build), pool_entries(entry_id, entry_name, entry_number, scored_total_points, has_submitted_predictions)',
         )
         .eq('pool_id', poolId);
       if (err) throw err;
@@ -87,6 +97,8 @@ export function useMemberRoster(poolId: string | undefined) {
           isAdmin: r.role === 'admin',
           joinedAt: r.joined_at,
           entryCount: entries.length,
+          avatarColour: user?.avatar_colour ?? null,
+          avatarBuild: user?.avatar_build ?? null,
           bestPoints,
           entries: entryList,
         };
