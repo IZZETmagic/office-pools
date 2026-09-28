@@ -90,7 +90,7 @@ export async function GET(
   // already states every one of these facts. Only the picks are sealed.
   const { data: memberRows, error: memberErr } = await admin
     .from('pool_members')
-    .select('member_id, user_id, users(username, full_name)')
+    .select('member_id, user_id, users(username, full_name, avatar_colour, avatar_build)')
     .eq('pool_id', pool_id)
   if (memberErr) return NextResponse.json({ error: `members: ${memberErr.message}` }, { status: 502 })
 
@@ -129,13 +129,17 @@ export async function GET(
   const members = (entryRows ?? []).map((e) => {
     const m = (memberRows ?? []).find((x) => x.member_id === e.member_id)
     const u = (m as { users?: unknown } | undefined)?.users
-    const user = (Array.isArray(u) ? u[0] : u) as { username?: string; full_name?: string } | undefined
+    const user = (Array.isArray(u) ? u[0] : u) as
+      | { username?: string; full_name?: string; avatar_colour?: string | null; avatar_build?: unknown }
+      | undefined
     const s = survivorByEntry.get(e.entry_id)
     return {
       entry_id: e.entry_id,
       user_id: m?.user_id ?? null,
       display_name: e.entry_name || user?.full_name || user?.username || 'Entry',
       username: user?.username ?? '',
+      avatar_colour: user?.avatar_colour ?? null,
+      avatar_build: user?.avatar_build ?? null,
       eliminated_matchweek: s?.eliminated_matchweek ?? null,
       // ⚠ No survivor row is NOT elimination — they joined after the round
       // opened and enter the next one. Everybody in it has spent clubs already.

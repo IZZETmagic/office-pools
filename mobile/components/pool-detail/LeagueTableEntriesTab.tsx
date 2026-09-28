@@ -2,8 +2,9 @@ import { router } from 'expo-router';
 import { Platform, Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
+import { LeaderboardAvatar } from './LeaderboardAvatar';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
-import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { useTheme } from '@/theme';
 
 // =============================================================
 // THE PREDICTIONS TAB FOR A TABLE POOL — entries, not a picker
@@ -161,18 +162,22 @@ function EntryCard({
         ...theme.shadows.card,
       })}
     >
-      <View
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: 19,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: withOpacity(theme.colors.primary, 0.12),
-        }}
-      >
-        <Icon name={disabled ? 'lock.fill' : 'list.number'} color="primary" size={16} />
-      </View>
+      {/*
+        ⭐ THE OWNER'S FACE, where a generic glyph used to sit. The circle held `list.number`
+        (or `lock.fill` when the row cannot be opened) on a primary tint identical for every
+        member — it described the ROW, not the person whose table this is.
+
+        ⚠ Dropping the lock glyph costs nothing: `Status` below states the lock in words and the
+        row already dims to 0.55 when disabled, so the state is said twice over without it.
+      */}
+      <LeaderboardAvatar
+        userId={entry.user_id ?? null}
+        name={entry.full_name}
+        avatarBuild={entry.avatar_build ?? null}
+        avatarColour={entry.avatar_colour ?? null}
+        size={38}
+        rank={1}
+      />
 
       <View style={{ flex: 1, gap: 2 }}>
         <Text variant="cardTitle" numberOfLines={1}>{name}</Text>

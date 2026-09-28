@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Button, Card, ClubBar, Icon, Text } from '@/components/ui';
 import { clubColorFromCrestUrl, fixturePalette } from '@/lib/design/clubColors';
+import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { Scoreline, TeamSheetRows } from './TeamSheet';
 import type { SheetRow, Verdict } from '@/lib/duelSheet';
@@ -746,6 +747,8 @@ function ElsewhereCard({
               <Fighter
                 name={d.aName}
                 userId={standings.get(d.a)?.userId ?? null}
+                avatarColour={standings.get(d.a)?.avatarColour ?? null}
+                avatarBuild={standings.get(d.a)?.avatarBuild ?? null}
                 leading={lead === 'a'}
                 dimmed={lead === 'b'}
               />
@@ -753,6 +756,8 @@ function ElsewhereCard({
               <Fighter
                 name={d.bName}
                 userId={standings.get(d.b)?.userId ?? null}
+                avatarColour={standings.get(d.b)?.avatarColour ?? null}
+                avatarBuild={standings.get(d.b)?.avatarBuild ?? null}
                 leading={lead === 'b'}
                 dimmed={lead === 'a'}
                 align="right"
@@ -776,20 +781,39 @@ function ElsewhereCard({
 function Fighter({
   name,
   userId,
+  avatarColour = null,
+  avatarBuild = null,
   leading,
   dimmed,
   align = 'left',
 }: {
   name: string;
   userId: string | null;
+  /** The colour they picked; null falls back to the hash of their id. */
+  avatarColour?: string | null;
+  /** Their stored avatar — Showdown pools carry it on the leaderboard payload. */
+  avatarBuild?: unknown;
   leading: boolean;
   dimmed: boolean;
   align?: 'left' | 'right';
 }) {
   const theme = useTheme();
-  const gradient = userId ? gradientForUser(userId) : null;
+  /**
+   * ⚠ `avatarColour` WAS MISSING. `gradientForUser(userId)` alone ignores the colour the member
+   * picked and falls back to the hash of their id — so this circle disagreed with the same
+   * person everywhere else, and would have disagreed with the face now drawn on top of it.
+   */
+  const gradient = userId ? gradientForUser(userId, avatarColour) : null;
 
-  const face = (
+  /**
+   * ⭐ THE REAL FACE, with the gradient monogram as its fallback. This component was already
+   * named `face` and already coloured by the person — it just had no picture of them.
+   *
+   * ⚠ The gradient stays as the fallback rather than being replaced by a flat ground: it is
+   * what a member without a built avatar keeps seeing, and it is the treatment the rest of the
+   * duel surfaces use.
+   */
+  const initials = (
     <View style={{ width: 26, height: 26, borderRadius: theme.radii.pill, overflow: 'hidden' }}>
       {gradient ? (
         <LinearGradient
@@ -806,6 +830,18 @@ function Fighter({
         <View style={{ flex: 1, backgroundColor: theme.colors.mist }} />
       )}
     </View>
+  );
+
+  const face = userId ? (
+    <MemberAvatar
+      userId={userId}
+      avatarBuild={avatarBuild}
+      avatarColour={avatarColour}
+      size={26}
+      fallback={initials}
+    />
+  ) : (
+    initials
   );
 
   const label = (

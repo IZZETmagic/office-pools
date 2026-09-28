@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native
 
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
-import { InitialsAvatar } from './leaderboard-shared';
+import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { lastLockedWeek, ownWeekState, type OwnWeekState } from '@/lib/pickemWeek';
 import { useLeaguePool } from '@/lib/useLeaguePool';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -274,7 +274,16 @@ function EntryCard({
       {/* ⚠ Initials, not a photo, and not for want of trying: the product
           stores no avatar on any table. This is the same mark the World Cup
           predictions list uses, from the same function. */}
-      <InitialsAvatar name={entry.full_name} />
+      {/* ⭐ The owner's face. `InitialsAvatar` was the World Cup's flat primary-tinted mark —
+          the same colour for every member — so it said "a person" and never which one. */}
+      <LeaderboardAvatar
+        userId={entry.user_id ?? null}
+        name={entry.full_name}
+        avatarBuild={entry.avatar_build ?? null}
+        avatarColour={entry.avatar_colour ?? null}
+        size={34}
+        rank={1}
+      />
 
       <View style={{ flex: 1, gap: 3 }}>
         <Text variant="cardTitle" numberOfLines={1}>

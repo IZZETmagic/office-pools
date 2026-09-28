@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text as RNText, View } from '
 
 import { Jersey } from '@/components/match/Jersey';
 import { ClubBar, Icon, Text } from '@/components/ui';
+import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { clubColorFromCrestUrl } from '@/lib/design/clubColors';
 import type { LmsMember, LmsPickCell, LmsState } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -366,7 +367,16 @@ function PicksWall({ state, currentUserId }: { state: LmsState; currentUserId: s
                   m.user_id === currentUserId ? withOpacity(theme.colors.primary, 0.06) : 'transparent',
               }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {/*
+                  ⚠ THE DOT STAYS AND THE FACE JOINS IT. The dot is not decoration — it is
+                  still-in / eliminated / joined-late, three states the face cannot say. This
+                  strip is the one place in LMS that answers "who is left", so it needs both.
+
+                  ⚠ 24pt inside a 52pt row, next to 11pt text: small, but this is a dense
+                  survivor list, not a leaderboard. FACE_LIMIT is irrelevant — `rank={1}` —
+                  because an LMS pool is bounded far below it and the list is never ranked.
+                */}
                 <View
                   style={{
                     width: 7,
@@ -378,6 +388,14 @@ function PicksWall({ state, currentUserId }: { state: LmsState; currentUserId: s
                         ? theme.colors.green
                         : theme.colors.red,
                   }}
+                />
+                <LeaderboardAvatar
+                  userId={m.user_id ?? null}
+                  name={m.display_name}
+                  avatarBuild={m.avatar_build ?? null}
+                  avatarColour={m.avatar_colour ?? null}
+                  size={24}
+                  rank={1}
                 />
                 <RNText
                   numberOfLines={1}

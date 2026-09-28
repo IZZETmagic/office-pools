@@ -1599,6 +1599,10 @@ export type LmsMember = {
   user_id: string | null;
   display_name: string;
   username: string;
+  /** The colour this member picked — null falls back to the hash of their id. */
+  avatar_colour?: string | null;
+  /** Their stored avatar. ⚠ Raw until `readStoredAvatarBuild` has vetted it against this build's bundle. */
+  avatar_build?: unknown;
   /** NULL means still standing. */
   eliminated_matchweek: number | null;
   /** ⚠ FALSE means they joined after the round opened — NOT that they are out. */
