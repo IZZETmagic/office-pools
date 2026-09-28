@@ -65,13 +65,17 @@ import {
 // onEmojiSelected callback fires with `{ emoji, name, slug, ... }`.
 import EmojiPicker from 'rn-emoji-keyboard';
 import {
+  type AvatarProps,
   Bubble,
   type BubbleProps,
+  type DayProps,
   GiftedChat,
   InputToolbar,
   MessageText,
   Send,
   type IMessage,
+  type MessageReplyProps,
+  type ReplyProps,
 } from 'react-native-gifted-chat';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Animated, {
@@ -94,6 +98,7 @@ import {
   buildFlexBadgePayload,
   loadFlexBadges,
 } from '@/lib/flexBadges';
+import { reuseIfUnchanged } from '@/lib/banterStable';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import {
@@ -670,10 +675,40 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // (force-close, or nav home + back), which is what users were
   // working around. One extra SELECT on open is a cheap safety net.
   const banterRefresh = banter.refresh;
+  const banterLoadOlder = banter.loadOlder;
+  // Older-history paging only runs while the sheet is OPEN. The sheet is
+  // mounted (hidden) with the pool screen, so the list can hit its
+  // "near the top" trigger in the background during pool load — and any page
+  // fetched then is thrown away by the refresh below on open anyway. A request
+  // made while closed is remembered and run once the open refresh lands, so a
+  // short chat can't get stuck with no way to page back.
+  const sheetOpenRef = useRef(false);
+  const pendingLoadOlderRef = useRef(false);
   useEffect(() => {
+    sheetOpenRef.current = sheetOpen;
     if (!sheetOpen) return;
-    void banterRefresh();
-  }, [sheetOpen, banterRefresh]);
+    void banterRefresh().then(() => {
+      if (!pendingLoadOlderRef.current || !sheetOpenRef.current) return;
+      pendingLoadOlderRef.current = false;
+      void banterLoadOlder();
+    });
+  }, [sheetOpen, banterRefresh, banterLoadOlder]);
+
+  const loadEarlierMessagesProps = useMemo(
+    () => ({
+      isAvailable: banter.hasMore,
+      isLoading: banter.loadingOlder,
+      isInfiniteScrollEnabled: true,
+      onPress: () => {
+        if (!sheetOpenRef.current) {
+          pendingLoadOlderRef.current = true;
+          return;
+        }
+        void banterLoadOlder();
+      },
+    }),
+    [banter.hasMore, banter.loadingOlder, banterLoadOlder],
+  );
 
   // Dismiss the keyboard whenever the sheet closes. If the user was
   // mid-composition (keyboard up), pan-down-to-close / backdrop tap /
@@ -698,14 +733,23 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // label in the renderBubble override below: name appears once
   // per block of messages from the same person, not repeated on
   // every bubble.
+  //
+  // ⭐ An unchanged message keeps the SAME object across rebuilds
+  // (`reuseIfUnchanged`). BanterBubble skips its redraw only when its
+  // message object is identical to last render — and the upstream list
+  // hands back brand-new objects on every refresh and page, so without
+  // the cache every update would redraw every bubble.
+  const giftedCacheRef = useRef<Map<string, BanterIMessage>>(new Map());
   const giftedMessages = useMemo<BanterIMessage[]>(() => {
     const out: BanterIMessage[] = [];
     const msgs = banter.messages;
+    const prevCache = giftedCacheRef.current;
+    const nextCache = new Map<string, BanterIMessage>();
     for (let i = 0; i < msgs.length; i++) {
       const m = msgs[i];
       const prev = i > 0 ? msgs[i - 1] : null;
       const next = i < msgs.length - 1 ? msgs[i + 1] : null;
-      out.push({
+      const fresh: BanterIMessage = {
         _id: m.messageId,
         text: m.content,
         createdAt: new Date(m.createdAt),
@@ -737,8 +781,12 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
               },
             }
           : undefined,
-      });
+      };
+      const item = reuseIfUnchanged(prevCache, fresh);
+      nextCache.set(m.messageId, item);
+      out.push(item);
     }
+    giftedCacheRef.current = nextCache;
     // Gifted-chat expects newest first. The source is already in
     // chronological order, so reverse a shallow copy.
     return out.reverse();
@@ -779,6 +827,223 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
     setComposerText('');
     setMentionQuery(null);
   }
+
+  // ⭐ Stable render callbacks. gifted-chat calls these for every row, and
+  // BanterBubble's memo compare checks `renderMessageReply` by identity — an
+  // inline arrow here would be a new function every render and defeat it.
+  const renderMessageReply = useCallback(
+    (replyProps: MessageReplyProps<BanterIMessage>) => {
+      const replyMsg = replyProps.currentMessage?.replyMessage;
+      if (!replyMsg) return null;
+      const isOwn = replyProps.position === 'right';
+      const accentColor = isOwn ? '#FFFFFF' : theme.colors.accent;
+      const usernameColor = accentColor;
+      // The quoted text sits one shade off the surrounding
+      // text color so it reads as secondary content. On the
+      // sent (primary blue) side, white @ 0.85; on the
+      // received side, ink @ 0.7.
+      const quotedTextColor = isOwn
+        ? withOpacity('#FFFFFF', 0.85)
+        : withOpacity(theme.colors.ink, 0.7);
+      const stripeBgColor = isOwn
+        ? withOpacity('#FFFFFF', 0.18)
+        : withOpacity(theme.colors.ink, 0.05);
+      return (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignSelf: 'stretch',
+            // minWidth forces the BUBBLE WRAPPER to grow to
+            // at least this many pt — without it the bubble
+            // sizes to the (short) message text, squeezing
+            // the reply pill into a narrow column where the
+            // username truncates to "IZ..." and the quoted
+            // text wraps to 2-3 lines of single words. 220
+            // gives the quote room for ~25 chars on one
+            // line, matching WhatsApp's natural width.
+            minWidth: 220,
+            backgroundColor: stripeBgColor,
+            // Smaller radius than the bubble (xs = 6 vs the
+            // bubble's sm = 12). The pill reads as a snappy
+            // inner element with light rounding nested
+            // inside the more rounded bubble — clean
+            // visual hierarchy.
+            borderRadius: theme.radii.xs,
+            // Positive marginTop pushes the pill DOWN inside
+            // the bubble, forcing the bubble wrapper to grow
+            // taller above it. The bubble's natural
+            // paddingVertical (xxs = 2pt) plus this 3pt
+            // gives ~5pt of breathing room between the
+            // bubble's top edge and the reply pill — a
+            // tighter, more snug feel than the original 8pt.
+            // marginBottom keeps the gap between the quote
+            // and the message body text below.
+            marginTop: 3,
+            marginBottom: 4,
+            marginHorizontal: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <View style={{ width: 3, backgroundColor: accentColor }} />
+          <View
+            style={{
+              flex: 1,
+              paddingVertical: 6,
+              paddingHorizontal: 10,
+            }}
+          >
+            <RNText
+              numberOfLines={1}
+              style={{
+                fontFamily: fontFamilies.bold,
+                fontSize: 13,
+                color: usernameColor,
+                marginBottom: 1,
+              }}
+            >
+              {replyMsg.user?.name || 'User'}
+            </RNText>
+            <RNText
+              numberOfLines={2}
+              style={{
+                fontFamily: fontFamilies.regular,
+                fontSize: 13,
+                lineHeight: 17,
+                color: quotedTextColor,
+              }}
+            >
+              {replyMsg.text}
+            </RNText>
+          </View>
+        </View>
+      );
+    },
+    [theme],
+  );
+
+  const reply = useMemo<ReplyProps<BanterIMessage>>(
+    () => ({
+      message: replyTarget
+        ? {
+            _id: replyTarget._id,
+            text: replyTarget.text,
+            user: replyTarget.user,
+          }
+        : null,
+      onClear: () => setReplyTarget(null),
+      // Custom preview component with a Reanimated mount
+      // animation. gifted-chat's default ReplyPreview has no
+      // animation, so its appearance was reading as a jittery
+      // snap. Our version animates height + opacity from 0 to
+      // natural over 180ms — the chat above sees a smooth
+      // progressive reflow rather than an instant push.
+      renderPreview: ({ replyMessage }) => (
+        <AnimatedReplyPreview
+          replyMessage={replyMessage}
+          onClear={() => setReplyTarget(null)}
+        />
+      ),
+      swipe: {
+        // Only register the per-message swipe gesture handlers
+        // while the banter sheet is open. When closed, the
+        // BanterSheet is still mounted (we kept it mounted to
+        // avoid first-open jitter), so the ~15 visible bubbles
+        // would otherwise have active gesture handlers stealing
+        // priority from the pool detail page's horizontal pager
+        // — that's the tab-switch jitter we saw return.
+        isEnabled: sheetOpen,
+        direction: 'left',
+        onSwipe: (msg) => {
+          // Don't allow replying to optimistic (tmp-) messages
+          // — they don't have a persisted message_id yet, so
+          // an FK on reply_to_message_id would fail.
+          if (String(msg._id).startsWith('tmp-')) return;
+          // gifted-chat fires this from onSwipeableWillOpen,
+          // i.e. WHILE the swipe animation is still running.
+          // Calling setReplyTarget synchronously triggers a
+          // React reconcile through the heavy bubble tree,
+          // which starves the UI thread and makes the swipe
+          // visibly jitter. Deferring one frame lets the
+          // animation finish first.
+          requestAnimationFrame(() => {
+            setReplyTarget(msg as BanterIMessage);
+          });
+        },
+      },
+      // Custom quote rendering — WhatsApp-style integrated
+      // header at the top of the bubble. Default gifted-chat
+      // MessageReply uses margins + its own borderRadius that
+      // make the quote look like a separate floating element.
+      // Our version is flush against the bubble's inner edge
+      // with a colored vertical accent bar, sender name in
+      // accent color, and quoted text muted. Lives inside the
+      // bubble's Pressable (gifted-chat puts renderMessageReply
+      // right before renderMessageText in the content tree).
+      renderMessageReply,
+    }),
+    [replyTarget, sheetOpen, renderMessageReply],
+  );
+
+  // Date separators — custom label (Today / Yesterday / "5 July"),
+  // rendered as a subtle on-theme light pill instead of gifted-chat's
+  // default heavy dark chip. gifted-chat's Day only maps "Today", so we
+  // compute the label ourselves (formatDayLabel).
+  const renderDay = useCallback(
+    (dayProps: DayProps) =>
+      dayProps.createdAt == null ? null : (
+        <View style={{ alignItems: 'center', marginTop: 24, marginBottom: 24 }}>
+          <View
+            style={{
+              backgroundColor: withOpacity(theme.colors.ink, 0.06),
+              borderRadius: 12,
+              paddingVertical: 5,
+              paddingHorizontal: 12,
+            }}
+          >
+            <RNText
+              style={{ color: theme.colors.ink, fontSize: 14, fontWeight: '700' }}
+            >
+              {formatDayLabel(dayProps.createdAt)}
+            </RNText>
+          </View>
+        </View>
+      ),
+    [theme],
+  );
+
+  const renderAvatar = useCallback(
+    (avatarProps: AvatarProps<BanterIMessage>) => {
+      // No avatar slot on the sent (right) side.
+      if (avatarProps.position === 'right') return null;
+      const msg = avatarProps.currentMessage as BanterIMessage | undefined;
+      return (
+        <AvatarSlot
+          userId={String(msg?.user._id ?? '')}
+          name={String(msg?.user.name ?? '?')}
+          visible={!!msg?._isLastOfGroup}
+          avatarColour={colourByUserId.get(String(msg?.user._id ?? '')) ?? null}
+        />
+      );
+    },
+    [colourByUserId],
+  );
+
+  const renderBubble = useCallback(
+    (bubbleProps: BubbleProps<BanterIMessage>) => (
+      <BanterBubble
+        bubbleProps={bubbleProps as BubbleProps<BanterIMessage>}
+        aggregates={
+          banter.reactions.get(
+            String((bubbleProps.currentMessage as BanterIMessage | undefined)?._id ?? ''),
+          ) ?? EMPTY_REACTIONS
+        }
+        currentUserId={banter.appUserId}
+        onLongPress={handleBubbleLongPress}
+        onShowReactors={handleShowReactors}
+      />
+    ),
+    [banter.reactions, banter.appUserId, handleBubbleLongPress, handleShowReactors],
+  );
 
   // Gifted-chat's `user` prop tells it which messages are "mine" so
   // they render in the primary color on the right. Matching is by
@@ -951,15 +1216,9 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
           // isInfiniteScrollEnabled it auto-calls onPress there, paging in
           // the previous 50 via the shared usePoolBanter.loadOlder().
           // isAvailable/isLoading come straight from the hook's
-          // hasMore/loadingOlder.
-          loadEarlierMessagesProps={{
-            isAvailable: banter.hasMore,
-            isLoading: banter.loadingOlder,
-            isInfiniteScrollEnabled: true,
-            onPress: () => {
-              void banter.loadOlder();
-            },
-          }}
+          // hasMore/loadingOlder. Deferred while closed — see
+          // loadEarlierMessagesProps above.
+          loadEarlierMessagesProps={loadEarlierMessagesProps}
           // Quiet auto-loading feel: only a small spinner while a page is
           // in flight — no default blue "Load earlier messages" pill.
           renderLoadEarlier={(earlierProps) =>
@@ -990,187 +1249,10 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
           // wire state. The quoted-bubble above each message
           // renders automatically because the message mapper sets
           // `replyMessage` on every IMessage that has a `replyTo`.
-          reply={{
-            message: replyTarget
-              ? {
-                  _id: replyTarget._id,
-                  text: replyTarget.text,
-                  user: replyTarget.user,
-                }
-              : null,
-            onClear: () => setReplyTarget(null),
-            // Custom preview component with a Reanimated mount
-            // animation. gifted-chat's default ReplyPreview has no
-            // animation, so its appearance was reading as a jittery
-            // snap. Our version animates height + opacity from 0 to
-            // natural over 180ms — the chat above sees a smooth
-            // progressive reflow rather than an instant push.
-            renderPreview: ({ replyMessage }) => (
-              <AnimatedReplyPreview
-                replyMessage={replyMessage}
-                onClear={() => setReplyTarget(null)}
-              />
-            ),
-            swipe: {
-              // Only register the per-message swipe gesture handlers
-              // while the banter sheet is open. When closed, the
-              // BanterSheet is still mounted (we kept it mounted to
-              // avoid first-open jitter), so the ~15 visible bubbles
-              // would otherwise have active gesture handlers stealing
-              // priority from the pool detail page's horizontal pager
-              // — that's the tab-switch jitter we saw return.
-              isEnabled: sheetOpen,
-              direction: 'left',
-              onSwipe: (msg) => {
-                // Don't allow replying to optimistic (tmp-) messages
-                // — they don't have a persisted message_id yet, so
-                // an FK on reply_to_message_id would fail.
-                if (String(msg._id).startsWith('tmp-')) return;
-                // gifted-chat fires this from onSwipeableWillOpen,
-                // i.e. WHILE the swipe animation is still running.
-                // Calling setReplyTarget synchronously triggers a
-                // React reconcile through the heavy bubble tree,
-                // which starves the UI thread and makes the swipe
-                // visibly jitter. Deferring one frame lets the
-                // animation finish first.
-                requestAnimationFrame(() => {
-                  setReplyTarget(msg as BanterIMessage);
-                });
-              },
-            },
-            // Custom quote rendering — WhatsApp-style integrated
-            // header at the top of the bubble. Default gifted-chat
-            // MessageReply uses margins + its own borderRadius that
-            // make the quote look like a separate floating element.
-            // Our version is flush against the bubble's inner edge
-            // with a colored vertical accent bar, sender name in
-            // accent color, and quoted text muted. Lives inside the
-            // bubble's Pressable (gifted-chat puts renderMessageReply
-            // right before renderMessageText in the content tree).
-            renderMessageReply: (replyProps) => {
-              const replyMsg = replyProps.currentMessage?.replyMessage;
-              if (!replyMsg) return null;
-              const isOwn = replyProps.position === 'right';
-              const accentColor = isOwn ? '#FFFFFF' : theme.colors.accent;
-              const usernameColor = accentColor;
-              // The quoted text sits one shade off the surrounding
-              // text color so it reads as secondary content. On the
-              // sent (primary blue) side, white @ 0.85; on the
-              // received side, ink @ 0.7.
-              const quotedTextColor = isOwn
-                ? withOpacity('#FFFFFF', 0.85)
-                : withOpacity(theme.colors.ink, 0.7);
-              const stripeBgColor = isOwn
-                ? withOpacity('#FFFFFF', 0.18)
-                : withOpacity(theme.colors.ink, 0.05);
-              return (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignSelf: 'stretch',
-                    // minWidth forces the BUBBLE WRAPPER to grow to
-                    // at least this many pt — without it the bubble
-                    // sizes to the (short) message text, squeezing
-                    // the reply pill into a narrow column where the
-                    // username truncates to "IZ..." and the quoted
-                    // text wraps to 2-3 lines of single words. 220
-                    // gives the quote room for ~25 chars on one
-                    // line, matching WhatsApp's natural width.
-                    minWidth: 220,
-                    backgroundColor: stripeBgColor,
-                    // Smaller radius than the bubble (xs = 6 vs the
-                    // bubble's sm = 12). The pill reads as a snappy
-                    // inner element with light rounding nested
-                    // inside the more rounded bubble — clean
-                    // visual hierarchy.
-                    borderRadius: theme.radii.xs,
-                    // Positive marginTop pushes the pill DOWN inside
-                    // the bubble, forcing the bubble wrapper to grow
-                    // taller above it. The bubble's natural
-                    // paddingVertical (xxs = 2pt) plus this 3pt
-                    // gives ~5pt of breathing room between the
-                    // bubble's top edge and the reply pill — a
-                    // tighter, more snug feel than the original 8pt.
-                    // marginBottom keeps the gap between the quote
-                    // and the message body text below.
-                    marginTop: 3,
-                    marginBottom: 4,
-                    marginHorizontal: 0,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <View style={{ width: 3, backgroundColor: accentColor }} />
-                  <View
-                    style={{
-                      flex: 1,
-                      paddingVertical: 6,
-                      paddingHorizontal: 10,
-                    }}
-                  >
-                    <RNText
-                      numberOfLines={1}
-                      style={{
-                        fontFamily: fontFamilies.bold,
-                        fontSize: 13,
-                        color: usernameColor,
-                        marginBottom: 1,
-                      }}
-                    >
-                      {replyMsg.user?.name || 'User'}
-                    </RNText>
-                    <RNText
-                      numberOfLines={2}
-                      style={{
-                        fontFamily: fontFamilies.regular,
-                        fontSize: 13,
-                        lineHeight: 17,
-                        color: quotedTextColor,
-                      }}
-                    >
-                      {replyMsg.text}
-                    </RNText>
-                  </View>
-                </View>
-              );
-            },
-          }}
-          // Date separators — custom label (Today / Yesterday / "5 July"),
-          // rendered as a subtle on-theme light pill instead of gifted-chat's
-          // default heavy dark chip. gifted-chat's Day only maps "Today", so we
-          // compute the label ourselves (formatDayLabel).
-          renderDay={(dayProps) =>
-            dayProps.createdAt == null ? null : (
-              <View style={{ alignItems: 'center', marginTop: 24, marginBottom: 24 }}>
-                <View
-                  style={{
-                    backgroundColor: withOpacity(theme.colors.ink, 0.06),
-                    borderRadius: 12,
-                    paddingVertical: 5,
-                    paddingHorizontal: 12,
-                  }}
-                >
-                  <RNText
-                    style={{ color: theme.colors.ink, fontSize: 14, fontWeight: '700' }}
-                  >
-                    {formatDayLabel(dayProps.createdAt)}
-                  </RNText>
-                </View>
-              </View>
-            )
-          }
-          renderAvatar={(avatarProps) => {
-            // No avatar slot on the sent (right) side.
-            if (avatarProps.position === 'right') return null;
-            const msg = avatarProps.currentMessage as BanterIMessage | undefined;
-            return (
-              <AvatarSlot
-                userId={String(msg?.user._id ?? '')}
-                name={String(msg?.user.name ?? '?')}
-                visible={!!msg?._isLastOfGroup}
-                avatarColour={colourByUserId.get(String(msg?.user._id ?? '')) ?? null}
-              />
-            );
-          }}
+          reply={reply}
+          // Date separators (see renderDay above).
+          renderDay={renderDay}
+          renderAvatar={renderAvatar}
           // Disable gifted-chat's internal KAV — keyboard avoidance is ours:
           // Android via <KeyboardLift> (keyboard-controller KeyboardAvoidingView),
           // iOS via the manual wrapper padding. GiftedChat's own KAV must stay
@@ -1187,19 +1269,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
           // BanterSheet export). Extracted so each bubble can hold its
           // own state — long-press handler, reaction pills below — and
           // so we don't accidentally call hooks inside a render-callback.
-          renderBubble={(bubbleProps) => (
-            <BanterBubble
-              bubbleProps={bubbleProps as BubbleProps<BanterIMessage>}
-              aggregates={
-                banter.reactions.get(
-                  String((bubbleProps.currentMessage as BanterIMessage | undefined)?._id ?? ''),
-                ) ?? EMPTY_REACTIONS
-              }
-              currentUserId={banter.appUserId}
-              onLongPress={handleBubbleLongPress}
-              onShowReactors={handleShowReactors}
-            />
-          )}
+          renderBubble={renderBubble}
           // -------------------------------------------------------
           // Input toolbar — iMessage / WhatsApp / Messenger style:
           //
@@ -1727,7 +1797,33 @@ type BanterBubbleProps = {
   onShowReactors: (aggregates: ReactionAggregate[]) => void;
 };
 
-function BanterBubble({
+// ⭐ Skip the redraw unless something this bubble DRAWS changed. gifted-chat
+// re-renders every row whenever the chat re-renders (a keystroke, a new
+// message, a reaction anywhere), and its Bubble re-parses the text for
+// links/@mentions each time. Every input below is either identity-stable
+// when unchanged (the message via `reuseIfUnchanged`, reactions via
+// `mergeReactionAggregates`, the callbacks via useCallback) or a primitive.
+// ⚠ If BanterBubble starts reading a new prop, add it here or the bubble
+// will keep showing the old value.
+function sameBubbleProps(a: BanterBubbleProps, b: BanterBubbleProps): boolean {
+  const pa = a.bubbleProps;
+  const pb = b.bubbleProps;
+  return (
+    pa.currentMessage === pb.currentMessage &&
+    pa.position === pb.position &&
+    // Neighbours drive gifted-chat's grouped-corner styling.
+    pa.previousMessage?._id === pb.previousMessage?._id &&
+    pa.nextMessage?._id === pb.nextMessage?._id &&
+    pa.user?._id === pb.user?._id &&
+    pa.messageReply?.renderMessageReply === pb.messageReply?.renderMessageReply &&
+    a.aggregates === b.aggregates &&
+    a.currentUserId === b.currentUserId &&
+    a.onLongPress === b.onLongPress &&
+    a.onShowReactors === b.onShowReactors
+  );
+}
+
+const BanterBubble = memo(function BanterBubble({
   bubbleProps,
   aggregates,
   currentUserId,
@@ -1935,7 +2031,7 @@ function BanterBubble({
       />
     </View>
   );
-}
+}, sameBubbleProps);
 
 // =============================================================
 // AnimatedReplyPreview — custom replacement for gifted-chat's
@@ -2476,7 +2572,7 @@ async function sendSharePrediction(pred: PredictionOption, sendMessage: SendMess
 // person always gets the same colors) with two-letter username
 // initials.
 // Invisible mode: same-sized transparent View (no children).
-function AvatarSlot({
+const AvatarSlot = memo(function AvatarSlot({
   userId,
   name,
   visible,
@@ -2542,7 +2638,7 @@ function AvatarSlot({
       ) : null}
     </View>
   );
-}
+});
 
 // Curated gradient palette for user avatars. Each pair is a
 // diagonal gradient (top-left → bottom-right). Tuned so the

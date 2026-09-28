@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { notifyMention, notifyMessage } from './api';
 import { useAuth } from './auth';
 import { refreshIconBadge } from './badgeSync';
+import { mergeReactionAggregates, type ReactionAggregate } from './banterStable';
 import { supabase } from './supabase';
 
 // Reference to the message a reply is targeting. Carries enough
@@ -42,11 +43,9 @@ export type PoolMember = {
   avatarColour: string | null;
 };
 
-export type ReactionAggregate = {
-  emoji: string;
-  count: number;
-  userIds: string[];
-};
+// Defined in `banterStable` (pure, testable) alongside the identity-preserving
+// merge that keeps unchanged reaction arrays the same objects.
+export type { ReactionAggregate };
 
 type DbReactionRow = {
   reaction_id: string;
@@ -163,11 +162,13 @@ export function usePoolBanter(poolId: string | undefined) {
   const [reactions, setReactions] = useState<Map<string, ReactionAggregate[]>>(new Map());
   const userCacheRef = useRef<Map<string, DbUserRow>>(new Map());
   const messageIdsRef = useRef<Set<string>>(new Set());
-  // Signature of the last set of (non-tmp) message ids we loaded reactions
-  // for. Lets the reactions effect skip a refetch when `messages` changes
-  // identity but the underlying id set hasn't (optimistic sends, reply-pill
-  // resolution, decorate updates) — those don't add reactions to fetch.
-  const reactionIdsSigRef = useRef<string>('');
+  // Message ids whose reactions have already been fetched. The reactions
+  // effect fetches only ids NOT in here, so paging in 50 older messages
+  // queries those 50 rather than every loaded message. Realtime keeps the
+  // fetched ones live after that. `load()` (the full refresh on every sheet
+  // open) clears it, so each open re-syncs reactions a dropped broadcast
+  // may have missed.
+  const reactionsFetchedRef = useRef<Set<string>>(new Set());
   // Scroll-up pagination. `hasMore` gates whether another older page can
   // be fetched; `loadingOlder` guards against overlapping fetches and
   // drives the top spinner. Refs mirror both so `loadOlder` can stay a
@@ -325,6 +326,8 @@ export function usePoolBanter(poolId: string | undefined) {
       // resolved replyTo. Rows whose `reply_to_message_id` is null
       // get `replyTo: null` and render without a quote pill.
       const parentLookup = await buildParentLookup(rows);
+      // Re-sync every reaction on a full reload (see reactionsFetchedRef).
+      reactionsFetchedRef.current = new Set();
       setMessages(
         rows.map((row) => {
           const parent = row.reply_to_message_id
@@ -452,19 +455,23 @@ export function usePoolBanter(poolId: string | undefined) {
     }
   }, [poolId]);
 
+  // Fetch reactions for `messageIds` and MERGE them in. Unchanged arrays keep
+  // their identity (so their bubbles don't redraw), and a fetch that changes
+  // nothing leaves the Map itself untouched.
   const loadReactions = useCallback(async (messageIds: string[]) => {
-    if (messageIds.length === 0) {
-      setReactions(new Map());
-      return;
-    }
+    if (messageIds.length === 0) return;
     try {
-      const { data } = await supabase
+      const { data, error: fetchErr } = await supabase
         .from('pool_message_reactions')
         .select('reaction_id, message_id, user_id, emoji')
         .in('message_id', messageIds);
+      if (fetchErr) throw fetchErr;
       const rows = ((data as DbReactionRow[] | null) ?? []);
-      setReactions(aggregateReactions(rows));
+      const fetched = aggregateReactions(rows);
+      setReactions((prev) => mergeReactionAggregates(prev, fetched, messageIds));
     } catch (err) {
+      // Let the next pass retry these ids rather than treating them as loaded.
+      for (const id of messageIds) reactionsFetchedRef.current.delete(id);
       console.warn('[usePoolBanter.loadReactions]', err);
     }
   }, []);
@@ -696,20 +703,17 @@ export function usePoolBanter(poolId: string | undefined) {
     messagesRef.current = messages;
     const ids = messages.map((m) => m.messageId).filter((id) => !id.startsWith('tmp-'));
     messageIdsRef.current = new Set(ids);
-    // Only (re)load reactions when the SET of loaded message ids actually
-    // changes. `messages` gets a new identity on every append, optimistic
-    // send, reply-pill resolution, and decorate — but reactions for
-    // already-loaded messages are kept live incrementally by the realtime
+    // Fetch reactions only for ids we haven't fetched yet. Reactions on
+    // already-loaded messages are kept live by the realtime
     // reaction_insert / reaction_delete handlers and optimistic
-    // toggleReaction. Refetching every reaction (and rebuilding the
-    // reactions Map) on each of those churns the Map identity and forces a
-    // full message-list re-render for no change. Guarding on the id
-    // signature preserves behaviour — reactions still (re)load whenever
-    // messages are added or paged in — while cutting the redundant work.
-    const idsSig = ids.join(',');
-    if (idsSig === reactionIdsSigRef.current) return;
-    reactionIdsSigRef.current = idsSig;
-    void loadReactions(ids);
+    // toggleReaction, so a new message or an older page costs one small
+    // query for the new ids — not a refetch (and full re-aggregation) of
+    // every reaction in the chat, which redrew every bubble.
+    const fetched = reactionsFetchedRef.current;
+    const missing = ids.filter((id) => !fetched.has(id));
+    if (missing.length === 0) return;
+    for (const id of missing) fetched.add(id);
+    void loadReactions(missing);
   }, [messages, loadReactions]);
 
   useEffect(() => {
