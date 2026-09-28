@@ -45,15 +45,6 @@ import Animated, {
 import { Wordmark } from '@/components/ui/Wordmark';
 
 type Props = {
-  /**
-   * Whether the app's typefaces have loaded.
-   *
-   * ⚠ The tree mounts BEFORE they do, so that the session restore and the data
-   * prefetch can start instead of queueing behind seven font loads. This screen
-   * is a wordmark and nothing else, so until the fonts land there is literally
-   * nothing for it to draw — it holds the native splash in front instead.
-   */
-  fontsReady: boolean;
   preloadComplete: boolean;
   onDismissed: () => void;
 };
@@ -61,10 +52,11 @@ type Props = {
 /**
  * Hand-off from the native splash to this one.
  *
- * ⚠ NOT ON MOUNT — on fonts. The native layer is a solid colour and needs no
- * typeface, so it can sit in front until the wordmark is drawable. Handing over
- * earlier would show the name in the system face and then swap it: a flash of
- * the wrong brand, bought for nothing.
+ * ⚠ Safe on mount because `RootLayout` holds the entire tree until the fonts
+ * have landed, so this component cannot exist before the wordmark is drawable.
+ * If that gate is ever removed, the hand-off has to wait for fonts again — or
+ * the name paints in the system face and then swaps, which is a flash of the
+ * wrong brand. See the long note in app/_layout.tsx.
  */
 function hideNativeSplash() {
   SplashScreen.hideAsync().catch(() => {
@@ -72,7 +64,7 @@ function hideNativeSplash() {
   });
 }
 
-export function Splash({ fontsReady, preloadComplete, onDismissed }: Props) {
+export function Splash({ preloadComplete, onDismissed }: Props) {
   // ⚠ READ HERE, NOT FROM `useTheme()`. This has to be the same signal the OS
   // used when it picked which `backgroundColor` to paint a moment ago, or the
   // two layers disagree and the launch gains the step this design removed.
@@ -81,9 +73,8 @@ export function Splash({ fontsReady, preloadComplete, onDismissed }: Props) {
   const rootOpacity = useSharedValue(1);
 
   useEffect(() => {
-    if (!fontsReady) return;
     hideNativeSplash();
-  }, [fontsReady]);
+  }, []);
 
   // The only movement on this screen: a short crossfade into the app. That is
   // not decoration — without it the splash CUTS to the first frame, which reads
@@ -112,7 +103,7 @@ export function Splash({ fontsReady, preloadComplete, onDismissed }: Props) {
         {/* ⚠ The shared `Wordmark`, not a copy of it. This file used to spell
             the two-tone name out itself, which meant the launch screen could
             drift from every other place the name appears. */}
-        {fontsReady ? <Wordmark size={44} onDark={isDark} /> : null}
+        <Wordmark size={44} onDark={isDark} />
       </View>
     </Animated.View>
   );

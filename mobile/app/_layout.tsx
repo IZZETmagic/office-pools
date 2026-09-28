@@ -97,21 +97,31 @@ function RootLayout() {
     RobotoMono_700Bold,
   });
 
-  // ⚠ THIS USED TO `return null` UNTIL THE FONTS LANDED, and that put seven
-  // typeface loads in front of everything: no AuthProvider, so no session
-  // restore; no data providers, so no prefetch. The cold start did nothing at
-  // all while it waited for a font.
+  // ⚠⚠ NOTHING THAT DRAWS TEXT MAY MOUNT BEFORE THE FONTS LAND, and this was
+  // learned the hard way. An earlier version rendered the whole tree
+  // immediately so the session restore and the prefetch could start sooner.
+  // React Native measured every string in the SYSTEM face, the real faces
+  // arrived a moment later, and the measurements were not redone — so each
+  // `<Text>` kept a width computed for a narrower font and clipped its last
+  // glyph. The wordmark in the home header read "SporPoo".
   //
-  // Nothing needs to wait. The splash covers the whole screen either way, so
-  // the tree mounts now and starts working, and it is the SPLASH that holds
-  // until the fonts are ready — see `fontsReady` below. A font error counts as
-  // ready: the system face is a worse-looking app, not a broken one, and is
-  // certainly better than a splash that never lifts.
+  // It is not a wordmark bug, it is every string in the app; the wordmark is
+  // merely where it is impossible to miss. The `return null` that used to be
+  // here is the standard Expo pattern precisely because of this.
+  //
+  // ⚠ AuthProvider STAYS OUTSIDE THE GATE, which keeps most of what the change
+  // was after. Session restore is the first thing on the critical path and it
+  // draws nothing, so it can start at frame zero. The data providers gain
+  // nothing from starting earlier anyway — every fetch they make is behind
+  // `if (!user) return`, so they cannot move until auth resolves regardless.
+  //
+  // A font ERROR counts as ready: a system typeface is a worse-looking app, not
+  // a broken one, and far better than a launch that never completes.
   const fontsReady = fontsLoaded || !!fontError;
 
   return (
     <AuthProvider>
-      <InnerLayout fontsReady={fontsReady} />
+      {fontsReady ? <InnerLayout /> : null}
     </AuthProvider>
   );
 }
@@ -121,7 +131,7 @@ function RootLayout() {
 // configured (DSN missing), so safe to leave wrapped in all environments.
 export default Sentry.wrap(RootLayout);
 
-function InnerLayout({ fontsReady }: { fontsReady: boolean }) {
+function InnerLayout() {
   const colorScheme = useColorScheme();
   // ⚠ Created ONCE, via the lazy initialiser. `new QueryClient()` inline would
   // build a fresh cache on every render of this component and throw the old one
@@ -368,7 +378,7 @@ function InnerLayout({ fontsReady }: { fontsReady: boolean }) {
         <Stack.Screen name="settings/help" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
-        <SplashOverlay fontsReady={fontsReady} />
+        <SplashOverlay />
       </PendingActionsProvider>
       </ActivityProvider>
       </TournamentMatchesProvider>
@@ -420,21 +430,20 @@ const SPLASH_MIN_MS = 400;
  */
 const SPLASH_MAX_MS = 2500;
 
-function SplashOverlay({ fontsReady }: { fontsReady: boolean }) {
-  const preloadComplete = useSplashGate(fontsReady);
+function SplashOverlay() {
+  const preloadComplete = useSplashGate();
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;
   return (
     <Splash
-      fontsReady={fontsReady}
       preloadComplete={preloadComplete}
       onDismissed={() => setDismissed(true)}
     />
   );
 }
 
-function useSplashGate(fontsReady: boolean): boolean {
+function useSplashGate(): boolean {
   const { session, loading: authLoading } = useAuth();
   const { loading: homeLoading } = useHomeData();
   const { loading: activityLoading } = useSharedActivity();
@@ -451,16 +460,13 @@ function useSplashGate(fontsReady: boolean): boolean {
   const [minElapsed, setMinElapsed] = useState(false);
   const [ceilingReached, setCeilingReached] = useState(false);
 
-  // ⚠ STARTS ON `fontsReady`, NOT ON MOUNT. Until the fonts land there is
-  // nothing on this screen — the wordmark is the whole design — and the native
-  // splash is still in front. Counting from mount would spend the floor behind
-  // a screen nobody can see, and the name would then flash for whatever was
-  // left of it.
+  // This component only exists once the fonts have landed — `RootLayout` holds
+  // the whole tree until then — so mount IS font-ready, and the floor starts
+  // counting from the moment the wordmark can actually be drawn.
   useEffect(() => {
-    if (!fontsReady) return;
     const t = setTimeout(() => setMinElapsed(true), SPLASH_MIN_MS);
     return () => clearTimeout(t);
-  }, [fontsReady]);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setCeilingReached(true), SPLASH_MAX_MS);
@@ -468,9 +474,6 @@ function useSplashGate(fontsReady: boolean): boolean {
   }, []);
 
   if (!minElapsed) return false;
-  // ⚠ The tree now mounts before the fonts arrive, so the splash is the only
-  // thing standing between a half-loaded typeface and the user. It stays up.
-  if (!fontsReady) return false;
   if (authLoading || onboardingLoading || pushPermissionStatus === null) return false;
   // Unauthenticated launch: no data to prefetch — fade out so the user
   // lands on /(auth)/sign-in (or the pre-auth slides) immediately after
