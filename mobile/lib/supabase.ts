@@ -3,6 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 import { AppState } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
+import { fetchWithTimeout } from './fetchWithTimeout';
+
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -19,6 +21,12 @@ const ExpoSecureStoreAdapter = {
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  // ⚠ REACHES AUTH TOO, WHICH IS THE POINT. `createClient` hands `global.fetch`
+  // to the auth client as well as to PostgREST, so a stalled token refresh
+  // during `getSession()` is bounded by the same clock as a query — and that
+  // one sits on the cold-start path ahead of everything else. Realtime is a
+  // WebSocket and is untouched, so the live leaderboard keeps its connection.
+  global: { fetch: fetchWithTimeout },
   auth: {
     storage: ExpoSecureStoreAdapter,
     autoRefreshToken: true,

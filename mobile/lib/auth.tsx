@@ -33,10 +33,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        setLoading(false);
+      })
+      // ⚠ WITHOUT THIS CATCH THE SPLASH NEVER LIFTS. `loading` is only cleared
+      // in the success path, and the splash gate holds on it ahead of every
+      // other check — so a rejection left the app on the branded splash for
+      // good, with an unhandled rejection as the only trace. It could not
+      // happen before because `getSession` had no timeout and simply hung; now
+      // that it is bounded, a stalled refresh REJECTS, and the hang would have
+      // become permanent. Treated as "not signed in", which routes to sign-in
+      // and is somewhere a person can act.
+      .catch((err: unknown) => {
+        console.warn('[auth] session restore failed — continuing signed out', err);
+        setSession(null);
+        setLoading(false);
+      });
 
     const {
       data: { subscription },

@@ -383,6 +383,28 @@ function InnerLayout() {
 // play out so the brand identity registers.
 const SPLASH_MIN_MS = 1200;
 
+/**
+ * ⚠ THE CEILING, AND IT COVERS THE DATA GATE ONLY.
+ *
+ * Before it, the gate below was an unbounded AND of three network fetches: if
+ * one never settled, the splash never lifted. Not a slow app — a branded screen
+ * with no way out, and no way for the person to know anything was wrong.
+ *
+ * Past this point we show the app regardless. That is safe because every tab
+ * renders its own loading state — Home puts a spinner under its header, and an
+ * error under that with a "Try Again" — so the worst case becomes a visible,
+ * recoverable screen with navigation instead of an indefinite hold.
+ *
+ * ⚠ IT DELIBERATELY DOES NOT BYPASS THE AUTH / ONBOARDING GATE. Those decide
+ * WHICH SCREEN the person lands on, and rushing them does not show the app
+ * sooner, it shows the wrong thing first and then snatches it away — sign-in
+ * flashing up at someone who is signed in. Those reads are local (SecureStore),
+ * and the one that can touch the network — the token refresh inside
+ * `getSession()` — is bounded by `fetchWithTimeout` and now fails closed rather
+ * than hanging.
+ */
+const SPLASH_MAX_MS = 2500;
+
 function SplashOverlay() {
   const preloadComplete = useSplashGate();
   const [dismissed, setDismissed] = useState(false);
@@ -411,9 +433,15 @@ function useSplashGate(): boolean {
   const { loading: onboardingLoading } = useOnboardingProgress();
   const { status: pushPermissionStatus } = usePushPermission();
   const [minElapsed, setMinElapsed] = useState(false);
+  const [ceilingReached, setCeilingReached] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setMinElapsed(true), SPLASH_MIN_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setCeilingReached(true), SPLASH_MAX_MS);
     return () => clearTimeout(t);
   }, []);
 
@@ -423,5 +451,9 @@ function useSplashGate(): boolean {
   // lands on /(auth)/sign-in (or the pre-auth slides) immediately after
   // the 1.2s floor.
   if (!session) return true;
+  // ⚠ BELOW THE AUTH GATE AND ABOVE THE DATA GATE, ON PURPOSE — see
+  // `SPLASH_MAX_MS`. Routing correctness is never rushed; a stalled fetch no
+  // longer strands anyone.
+  if (ceilingReached) return true;
   return !homeLoading && !activityLoading && !matchesLoading;
 }

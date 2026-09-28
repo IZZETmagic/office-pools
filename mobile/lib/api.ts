@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 
+import { fetchWithTimeout } from './fetchWithTimeout';
 import type { LeagueDepth, LeagueMode, PredictionMode } from './predictionMode';
 import { supabase } from './supabase';
 
@@ -66,7 +67,11 @@ export async function apiFetch<T>(path: string, opts: Options = {}): Promise<T> 
   const { data: sessionRes } = await supabase.auth.getSession();
   const accessToken = sessionRes.session?.access_token;
 
-  const res = await fetch(`${BASE_URL}${path}`, {
+  // Same bound as the Supabase client. This path is not covered by that
+  // client's `global.fetch` — it is a plain call to our own API, and it
+  // carries `fetchHomeScoring` and `fetchUserActivity`, both of which sit on
+  // the cold-start path.
+  const res = await fetchWithTimeout(`${BASE_URL}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
