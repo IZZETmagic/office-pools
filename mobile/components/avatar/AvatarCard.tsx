@@ -184,41 +184,84 @@ export function AvatarCard({
         </View>
       </View>
 
-      {/* The identity block and the numbers, on the PAGE rather than on the card — the same split
-          the web card makes at phone width, and for the same reason: stacked inside a coloured
-          card they were a block of text marooned in a field of colour. */}
-      <View style={{ gap: 2 }}>
-        <RNText
-          numberOfLines={1}
-          style={{ fontFamily: fontFamilies.bold, fontSize: 22, color: theme.colors.ink }}
-        >
-          {fullName}
-        </RNText>
-        <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 14, color: theme.colors.slate }}>
-          @{username}
-        </RNText>
-        {memberSince ? (
-          <RNText
-            style={{ fontFamily: fontFamilies.medium, fontSize: 12, color: theme.colors.slate }}
-          >
-            Member since {memberSince}
-          </RNText>
-        ) : null}
-      </View>
+      {/* The identity block and the numbers, OFF the avatar card — the same split the web card
+          makes at phone width: stacked inside a coloured card they were a block of text marooned
+          in a field of colour.
 
-      <View style={{ flexDirection: 'row', gap: theme.spacing.xl }}>
-        {stats.map((s) => (
-          <View key={s.label}>
-            <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 20, color: theme.colors.ink }}>
-              {s.value}
+          ⭐ A NAMEPLATE CARD, NOT LOOSE TEXT (Ryan, 2026-09-28, "option A"). Loose on the page it
+          was left-aligned under a centred avatar, and the stats sat at whatever width their
+          numbers took, so they drifted as the counts grew. It now sits on the same `surface` and
+          radius as the hub tiles below it, so the tab reads as one set of cards, and the stats
+          are three EQUAL columns that never move. */}
+      <View
+        style={{
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.radii.md,
+          paddingHorizontal: theme.spacing.md + 2,
+          paddingVertical: theme.spacing.md,
+          gap: theme.spacing.md - 2,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.sm }}>
+          <View style={{ flex: 1, gap: 1 }}>
+            <RNText
+              numberOfLines={1}
+              style={{ fontFamily: fontFamilies.bold, fontSize: 20, color: theme.colors.ink }}
+            >
+              {fullName}
             </RNText>
             <RNText
-              style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
+              numberOfLines={1}
+              style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}
             >
-              {s.label}
+              @{username}
             </RNText>
           </View>
-        ))}
+          {memberSince ? (
+            <View style={{ alignItems: 'flex-end' }}>
+              <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}>
+                Since
+              </RNText>
+              <RNText
+                style={{ fontFamily: fontFamilies.semibold, fontSize: 12, color: theme.colors.slate }}
+              >
+                {memberSince}
+              </RNText>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={{ height: 1, backgroundColor: theme.colors.mist }} />
+
+        <View style={{ flexDirection: 'row' }}>
+          {stats.map((s, i) => (
+            <View
+              key={s.label}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                borderLeftWidth: i === 0 ? 0 : 1,
+                borderLeftColor: theme.colors.mist,
+              }}
+            >
+              <RNText
+                style={{
+                  fontFamily: fontFamilies.bold,
+                  fontSize: 19,
+                  fontVariant: ['tabular-nums'],
+                  color: theme.colors.ink,
+                }}
+              >
+                {s.value}
+              </RNText>
+              <RNText
+                style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
+              >
+                {s.label}
+              </RNText>
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
