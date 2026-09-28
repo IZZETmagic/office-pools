@@ -71,6 +71,7 @@ export default function DuelDecisionScreen() {
       m.set(e.entry_id, {
         userId: e.user_id ?? null,
         avatarColour: e.avatar_colour ?? null,
+        avatarBuild: e.avatar_build ?? null,
         rank: e.current_rank ?? null,
         previousRank: e.previous_rank ?? null,
         points: e.total_points ?? 0,

@@ -73,8 +73,10 @@ const CROPPED_VIEWBOX = `viewBox="${CROP_X} ${CROP_Y} ${CROP_BOX} ${CROP_BOX}"`;
  * root `<svg>` and paths beneath it, so there is no nested viewBox to catch, and a
  * global replace would be wrong the day there is.
  */
+const FULL_VIEWBOX = new RegExp(`viewBox="0 0 ${CANVAS} ${CANVAS}"`)
+
 function cropToFace(svg: string): string {
-  return svg.replace(/viewBox="0 0 2048 2048"/, CROPPED_VIEWBOX);
+  return svg.replace(FULL_VIEWBOX, CROPPED_VIEWBOX);
 }
 
 export function MemberAvatar({
@@ -82,12 +84,27 @@ export function MemberAvatar({
   avatarBuild,
   avatarColour,
   size,
+  ground: groundOverride,
   fallback,
 }: {
   userId: string;
   avatarBuild: unknown;
   avatarColour: string | null;
   size: number;
+  /**
+   * A ground colour that OVERRIDES the one derived from the member.
+   *
+   * ⭐⭐ THIS EXISTS FOR DUELS. Two members can both be teal — one picked it, the other hashed
+   * into it — and `duelColourIndices` moves whichever side has the weaker claim so the two do
+   * not face each other in one colour. Once it has moved a side there is no user id left to
+   * ask: the answer is an INDEX, resolved from both entry ids together. So a duel passes
+   * `avatarBackgroundFor(index)` here rather than letting this component re-derive a colour
+   * that would undo the shift. It is the same reason `toAvatarConfig` takes a resolved colour.
+   *
+   * ⚠ Leave it unset everywhere else. The member's own colour is the right answer outside a
+   * duel, and hardcoding one here would make the same person two colours in two places.
+   */
+  ground?: string;
   /** Drawn while the art loads, and forever for a member who has not built a face. */
   fallback: React.ReactNode;
 }) {
@@ -99,12 +116,12 @@ export function MemberAvatar({
     if (!assets || avatarBuild == null) return null;
     const build = readStoredAvatarBuild(avatarBuild, assets);
     if (!build) return null;
-    const ground = avatarBackgroundFor(avatarIndexFor(userId, avatarColour));
+    const ground = groundOverride ?? avatarBackgroundFor(avatarIndexFor(userId, avatarColour));
     return cropToFace(composeAvatar(toAvatarConfig(build, ground), assets));
     // ⚠ Keyed on the CONFIG, not on a parent object. `avatarBuild` arrives from the query as a
     // stable reference per fetch, so this recomposes when the member's face changes and not on
     // every scroll frame.
-  }, [assets, avatarBuild, userId, avatarColour]);
+  }, [assets, avatarBuild, userId, avatarColour, groundOverride]);
 
   if (!svg) return <>{fallback}</>;
 

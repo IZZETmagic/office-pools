@@ -220,6 +220,20 @@ export type LeagueLeaderboardRow = {
    * have no other way to reach it. Without this the glow on a duel falls back to the hash.
    */
   avatar_colour: string | null
+  /**
+   * The member's avatar, as stored — `users.avatar_build`, migration 147.
+   *
+   * ⚠⚠ SHOWDOWN ONLY, AND null EVERYWHERE ELSE ON PURPOSE. A config is ~330 bytes a row and
+   * this payload is per ENTRY: the largest league pool has 192 of them, so sending it to every
+   * mode would add ~62 KB to a response already large enough to miss the 2 MB Runtime Cache
+   * cap — for modes whose leaderboards draw no avatars at all. Showdown pools are small by
+   * construction (biggest measured: 10 members), which is what makes it affordable there.
+   *
+   * ⚠ `unknown`, not a typed build. It is raw JSONB until `readStoredAvatarBuild` has checked
+   * it against the bundle the CLIENT shipped with — the server cannot vouch for a config a
+   * newer bundle wrote.
+   */
+  avatar_build: unknown
   total_points: number
   /**
    * ⚠ NULL IN LAST MAN STANDING, deliberately. The stored `final_rank` is
@@ -277,6 +291,8 @@ type MemberRow = {
     username: string | null
     full_name: string | null
     avatar_colour: string | null
+    /** ⚠ Present only on a Showdown pool — see the select below and the field's note. */
+    avatar_build?: unknown
   } | null
 }
 
@@ -296,6 +312,7 @@ export async function readLeagueLeaderboard(
 ): Promise<{ leaderboard: LeagueLeaderboard | null; error: string | null }> {
   const isTable = pool.league_mode === 'table'
   const isLms = pool.league_mode === 'last_man_standing'
+  const isShowdown = pool.league_mode === 'showdown'
   /**
    * Does this mode have a WEEKLY PICKING RECORD to report?
    *
@@ -329,9 +346,18 @@ export async function readLeagueLeaderboard(
         : 'scores'
       : null
 
+  /**
+   * ⚠ THE AVATAR CONFIG IS ASKED FOR ONLY WHERE IT IS DRAWN. See `avatar_build` on the entry
+   * type: ~330 bytes per ENTRY, and only Showdown renders faces — every other mode would pay
+   * ~62 KB on the largest league pool (192 entries) for something it never draws.
+   */
+  const memberColumns = isShowdown
+    ? 'member_id, user_id, users(user_id, username, full_name, avatar_colour, avatar_build)'
+    : 'member_id, user_id, users(user_id, username, full_name, avatar_colour)'
+
   const { data: memberRows, error: memberErr } = await admin
     .from('pool_members')
-    .select('member_id, user_id, users(user_id, username, full_name, avatar_colour)')
+    .select(memberColumns)
     .eq('pool_id', poolId)
   if (memberErr) return { leaderboard: null, error: `pool members: ${memberErr.message}` }
 
@@ -440,6 +466,10 @@ export async function readLeagueLeaderboard(
       full_name: member.users?.full_name ?? 'Unknown',
       username: member.users?.username ?? '',
       avatar_colour: member.users?.avatar_colour ?? null,
+      // ⚠ null outside Showdown because the column was never selected there — see the note on
+      // the field. A consumer that finds null must fall back to initials, never assume "no
+      // avatar built".
+      avatar_build: isShowdown ? member.users?.avatar_build ?? null : null,
       total_points: t?.total_points ?? 0,
       // ⚠ Withheld in LMS. See `LmsRowState` — the stored rank there is entry_id
       // order, and passing it on is passing on a wrong answer that looks right.

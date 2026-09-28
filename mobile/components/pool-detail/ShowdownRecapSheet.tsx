@@ -51,6 +51,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui';
+import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { duelResult } from '@/lib/duelPoints';
 import { fontFamilies, useTheme } from '@/theme';
@@ -58,6 +59,10 @@ import { fontFamilies, useTheme } from '@/theme';
 export type RecapSide = {
   name: string;
   userId: string | null;
+  /** The colour this member picked, or null to fall back to the hash of their id. */
+  avatarColour?: string | null;
+  /** Their stored avatar — Showdown pools only, see `avatar_build` in `lib/api.ts`. */
+  avatarBuild?: unknown;
   /** The weekly accuracy the duel was judged on. */
   score: number;
 };
@@ -295,7 +300,9 @@ function Face({ side }: { side: RecapSide }) {
     >
       {side.userId ? (
         <LinearGradient
-          colors={[...gradientForUser(side.userId)]}
+          // ⚠ `avatarColour` was missing — this hashed the id and ignored a picked colour,
+          // so the same member was one colour here and another on their own profile.
+          colors={[...gradientForUser(side.userId, side.avatarColour)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{
@@ -308,16 +315,36 @@ function Face({ side }: { side: RecapSide }) {
           }}
         />
       ) : null}
-      <Text
-        style={{
-          fontFamily: fontFamilies.black,
-          fontSize: 22,
-          lineHeight: 28,
-          color: side.userId ? '#FFFFFF' : theme.colors.slate,
-        }}
-      >
-        {getInitials(side.name)}
-      </Text>
+      {(() => {
+        /**
+         * ⭐ The face on the recap. Nothing is withheld by this point — the duel has been
+         * fought and settled, so both sides are long since revealed and there is no seal to
+         * respect here at all.
+         */
+        const initials = (
+          <Text
+            style={{
+              fontFamily: fontFamilies.black,
+              fontSize: 22,
+              lineHeight: 28,
+              color: side.userId ? '#FFFFFF' : theme.colors.slate,
+            }}
+          >
+            {getInitials(side.name)}
+          </Text>
+        );
+        return side.userId ? (
+          <MemberAvatar
+            userId={side.userId}
+            avatarBuild={side.avatarBuild ?? null}
+            avatarColour={side.avatarColour ?? null}
+            size={FACE}
+            fallback={initials}
+          />
+        ) : (
+          initials
+        );
+      })()}
     </View>
   );
 }

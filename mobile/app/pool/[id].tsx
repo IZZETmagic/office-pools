@@ -363,6 +363,12 @@ export default function PoolDetailScreen() {
         // The avatar gradient is keyed on the PERSON, not the entry — that is what
         // makes a member the same colour here as in Banter.
         userId: e.user_id ?? null,
+        // ⚠⚠ `avatarColour` WAS MISSING FROM THIS MAP. The duel screen's copy
+        // (`duel/[matchweek].tsx`) has always set it, so a member who PICKED a colour saw it
+        // honoured there and hashed here — the same header, two colours, depending on which
+        // screen you opened it from.
+        avatarColour: e.avatar_colour ?? null,
+        avatarBuild: e.avatar_build ?? null,
         rank: e.current_rank ?? null,
         previousRank: e.previous_rank ?? null,
         points: e.total_points ?? 0,
@@ -500,6 +506,8 @@ export default function PoolDetailScreen() {
       you: {
         name: duelOwnName ?? 'You',
         userId: duelStandings.get(b.you.entryId)?.userId ?? null,
+        avatarColour: duelStandings.get(b.you.entryId)?.avatarColour ?? null,
+        avatarBuild: duelStandings.get(b.you.entryId)?.avatarBuild ?? null,
         score: b.you.accuracy ?? 0,
       },
       // ⚠ NULL IS A BYE and must stay structural. A bye pays DUEL_BYE, which
@@ -509,6 +517,8 @@ export default function PoolDetailScreen() {
         ? {
             name: b.them.name,
             userId: duelStandings.get(b.them.entryId)?.userId ?? null,
+            avatarColour: duelStandings.get(b.them.entryId)?.avatarColour ?? null,
+            avatarBuild: duelStandings.get(b.them.entryId)?.avatarBuild ?? null,
             score: b.them.accuracy ?? 0,
           }
         : null,
@@ -1138,6 +1148,8 @@ export default function PoolDetailScreen() {
           opponent={{
             name: duel.current.them.name,
             userId: duelStandings.get(duel.current.them.entryId)?.userId ?? null,
+            avatarColour: duelStandings.get(duel.current.them.entryId)?.avatarColour ?? null,
+            avatarBuild: duelStandings.get(duel.current.them.entryId)?.avatarBuild ?? null,
             /*
               ⚠ THE OPPONENT'S RECORD, FROM THE SAME `duelTable` THE DUELS
               LEADERBOARD RENDERS. Clue 1 has to agree with the board a member

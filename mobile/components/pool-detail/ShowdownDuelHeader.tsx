@@ -10,11 +10,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { Icon, Text } from '@/components/ui';
 import {
   getInitials,
   gradientForUser,
   duelColourIndices,
+  avatarBackgroundFor,
   AVATAR_GRADIENTS,
 } from '@/lib/avatarGradient';
 import { formatDhms, formatHms, useCountdown } from '@/lib/useCountdown';
@@ -196,6 +198,14 @@ export type Standing = {
    * which is what everybody got before members could pick.
    */
   avatarColour?: string | null;
+  /**
+   * The member's stored avatar, if the server sent one.
+   *
+   * ⚠ SHOWDOWN POOLS ONLY — see `avatar_build` in `lib/api.ts`. Rides on the standing for the
+   * same reason `avatarColour` does: the standing is the only thing this header is handed that
+   * knows who a side IS. Null means initials, and that is a correct answer, not a failure.
+   */
+  avatarBuild?: unknown;
   rank: number | null;
   /**
    * Where they sat before the most recent settlement, for "what it moved".
@@ -622,6 +632,7 @@ export function ShowdownDuelHeader({
                 phase={phase}
                 opponentVisible={opponentVisible}
                 standings={standings}
+                colourPair={duelPair}
                 kickoffAt={kickoffAt}
                 liveScore={liveScore}
                 liveNow={liveNow}
@@ -756,6 +767,7 @@ function Matchup({
   phase,
   opponentVisible,
   standings,
+  colourPair,
   kickoffAt,
   liveScore,
   liveNow,
@@ -773,6 +785,15 @@ function Matchup({
   phase: DuelPhase | undefined;
   opponentVisible: boolean;
   standings: Map<string, Standing>;
+  /**
+   * Both sides' colours, already resolved against each other by `duelColourIndices`, or null
+   * when there is no opponent to resolve against.
+   *
+   * ⚠ RESOLVED IN THE PARENT, NOT HERE. The shift depends on BOTH entry ids, so it cannot be
+   * worked out one corner at a time — which is exactly why each `Corner` is handed an index
+   * instead of deriving a colour from its own `userId`.
+   */
+  colourPair: { a: number; b: number } | null;
   kickoffAt: string | null;
   liveScore: Props['liveScore'];
   liveNow: boolean;
@@ -873,6 +894,7 @@ function Matchup({
             name={bout.you.name}
             standing={standings.get(bout.you.entryId) ?? null}
             tone="primary"
+            colourIndex={colourPair?.a ?? null}
             moveStyle={leftMove}
             avatarShrink={avatarShrink}
             labelFade={labelFade}
@@ -938,6 +960,11 @@ function Matchup({
               opponentVisible && bout.them ? standings.get(bout.them.entryId) ?? null : null
             }
             tone={!opponentVisible || !bout.them ? 'muted' : 'red'}
+            colourIndex={
+              // ⚠ null while sealed — nothing to resolve against, and a resolved colour on a
+              // hidden corner is the leak the lock exists to prevent.
+              opponentVisible ? colourPair?.b ?? null : null
+            }
             sealed={!opponentVisible}
             subtitle={
               !opponentVisible ? 'Tap Reveal' : bout.them ? undefined : 'Bye week'
@@ -1347,6 +1374,7 @@ function Corner({
   standing,
   tone,
   subtitle,
+  colourIndex = null,
   sealed = false,
   moveStyle,
   avatarShrink,
@@ -1356,6 +1384,21 @@ function Corner({
   standing: Standing | null;
   tone: 'primary' | 'red' | 'muted';
   subtitle?: string;
+  /**
+   * This side's colour AFTER both sides were resolved together, or null when there is no
+   * opponent to resolve against.
+   *
+   * ⭐⭐ IT IS AN INDEX, NOT A COLOUR, AND NOT A USER ID. Two members can both be teal, and
+   * `duelColourIndices` moves whichever has the weaker claim so a duel is never one colour
+   * facing itself. Once it has moved a side, that side's colour no longer follows from its
+   * member — so anything that re-derives from `userId` here silently undoes the shift.
+   *
+   * ⚠⚠ THAT IS EXACTLY WHAT USED TO HAPPEN. The GLOW already used the resolved pair, but the
+   * circle and the ring both called `gradientForUser(userId)` — so when two same-coloured
+   * members met, the glows separated and the two avatars stayed identical. Adding faces made
+   * it obvious: both heads on the same ground.
+   */
+  colourIndex?: number | null;
   /**
    * Draw this corner as a locked silhouette rather than a person.
    *
@@ -1392,7 +1435,16 @@ function Corner({
    * makes it read as raised. Falls back to the corner colour when nobody is
    * there — a bye has no person and so no colour of their own.
    */
-  const ringColor = userId ? gradientForUser(userId)[0] : color;
+  /**
+   * ⚠ THE RESOLVED INDEX FIRST. `gradientForUser` is the fallback for a corner with no
+   * opponent to be resolved against — see `colourIndex`.
+   */
+  const ringColor =
+    colourIndex != null
+      ? AVATAR_GRADIENTS[colourIndex][0]
+      : userId
+        ? gradientForUser(userId, standing?.avatarColour)[0]
+        : color;
 
   return (
     <Animated.View
@@ -1451,7 +1503,11 @@ function Corner({
         >
           {userId ? (
             <LinearGradient
-              colors={[...gradientForUser(userId)]}
+              colors={[
+                ...(colourIndex != null
+                  ? AVATAR_GRADIENTS[colourIndex]
+                  : gradientForUser(userId, standing?.avatarColour)),
+              ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{
@@ -1479,6 +1535,45 @@ function Corner({
             // silently vanished the pool name and both usernames in light mode.
             // `RoundButton` below already does it this way.
             <Icon name="lock.fill" tint={BAND.slate} size={30} weight="semibold" />
+          ) : userId ? (
+            /**
+             * ⭐ THE FACE, once there is a person to show.
+             *
+             * ⚠⚠ REACHED ONLY PAST THE `sealed` BRANCH ABOVE, and that ordering is the whole
+             * safety argument. If one INITIAL is a clue somebody will read all week — which is
+             * why the lock exists — a face is the entire answer. Belt and braces: a sealed
+             * corner is also handed `standing={null}`, so there is no build here to draw even
+             * if this branch were ever reordered.
+             *
+             * ⚠ THE GROUND IS THE RESOLVED INDEX, NOT THE MEMBER'S OWN COLOUR. Passing
+             * `avatarColour` alone would let this re-derive a colour that `duelColourIndices`
+             * had just moved, putting both faces of a same-coloured duel on one ground —
+             * exactly what the shift exists to prevent.
+             *
+             * ⚠ It fills the circle, so a member WITH a face loses the light→dark gradient a
+             * member WITHOUT one still has. That is consistent with the profile and home cards,
+             * where an avatar always sits on its own flat ground — but it does mean the two
+             * corners of a half-built duel differ. Worth a look on device.
+             */
+            <MemberAvatar
+              userId={userId}
+              avatarBuild={standing?.avatarBuild ?? null}
+              avatarColour={standing?.avatarColour ?? null}
+              size={AVATAR}
+              ground={colourIndex != null ? avatarBackgroundFor(colourIndex) : undefined}
+              fallback={
+                <BandText
+                  style={{
+                    fontFamily: fontFamilies.black,
+                    fontSize: 26,
+                    lineHeight: 32,
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {getInitials(name)}
+                </BandText>
+              }
+            />
           ) : (
             <BandText
               style={{

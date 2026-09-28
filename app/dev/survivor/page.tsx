@@ -184,7 +184,7 @@ function boardRow(
 ): LeagueLeaderboard['rows'][number] {
   return {
     entry_id, entry_name, entry_number: 1, member_id: entry_id, user_id: entry_id,
-    full_name: entry_name, username, avatar_colour: null,
+    full_name: entry_name, username, avatar_colour: null, avatar_build: null,
     // ⚠ Zero and NULL on purpose. The mode has no points, and its stored rank is
     // entry_id order — which is exactly why this component ignores both.
     total_points: 0, current_rank: null, previous_rank: null,

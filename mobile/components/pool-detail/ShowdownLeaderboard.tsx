@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
 import type { LeagueLeaderboardEntry } from '@/lib/api';
+import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import { duelMovement } from '@/lib/duelRecord';
 import { ladderGap, ladderGapLabel, ladderNumberChars, type LadderGap } from '@/lib/ladderGap';
@@ -287,7 +288,12 @@ function Row({
           </View>
         </View>
 
-        <Avatar userId={entry.user_id} name={name} />
+        <Avatar
+          userId={entry.user_id}
+          name={name}
+          avatarBuild={entry.avatar_build ?? null}
+          avatarColour={entry.avatar_colour ?? null}
+        />
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="cardTitle" numberOfLines={1}>
@@ -374,7 +380,17 @@ function Row({
  * ⚠ The same gradient the duel band and Banter use, keyed on the PERSON — so a
  * member is one colour everywhere in the product. See `lib/avatarGradient`.
  */
-function Avatar({ userId, name }: { userId: string | null; name: string }) {
+function Avatar({
+  userId,
+  name,
+  avatarBuild,
+  avatarColour,
+}: {
+  userId: string | null;
+  name: string;
+  avatarBuild: unknown;
+  avatarColour: string | null;
+}) {
   const theme = useTheme();
   const size = theme.spacing.xxl;
   return (
@@ -391,7 +407,11 @@ function Avatar({ userId, name }: { userId: string | null; name: string }) {
     >
       {userId ? (
         <LinearGradient
-          colors={[...gradientForUser(userId)]}
+          // ⚠ `avatarColour` WAS MISSING HERE. `gradientForUser(userId)` alone ignores the
+          // colour the member actually picked and falls back to the hash of their id, so this
+          // circle disagreed with the same person's avatar everywhere else. It matters more now
+          // that a face sits on top: the ground and the ring would be two different colours.
+          colors={[...gradientForUser(userId, avatarColour)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{
@@ -406,20 +426,25 @@ function Avatar({ userId, name }: { userId: string | null; name: string }) {
           }}
         />
       ) : null}
-      {/* ⚠ The one size here that is NOT a token, deliberately. `caption` is
-          the right 11/14 step but carries 1.5 of tracking, which pushes two
-          initials apart inside a 32pt circle — the avatars elsewhere in the app
-          set this size directly for the same reason. */}
-      <Text
-        style={{
-          fontFamily: fontFamilies.black,
-          fontSize: 11,
-          lineHeight: 15,
-          color: userId ? '#FFFFFF' : theme.colors.slate,
-        }}
-      >
-        {getInitials(name)}
-      </Text>
+      {userId ? (
+        /**
+         * ⭐ The face, at 32pt. No seal to respect here — a leaderboard says where people
+         * stand, never who anybody is drawn against, so nothing is being given away.
+         *
+         * ⚠ The ground comes from the member's OWN colour, unlike the duel header: there is
+         * no opponent to be resolved against on a standings row, so there is no shift to
+         * honour. Passing a resolved index here would be wrong.
+         */
+        <MemberAvatar
+          userId={userId}
+          avatarBuild={avatarBuild}
+          avatarColour={avatarColour}
+          size={size}
+          fallback={<Initials name={name} userId={userId} />}
+        />
+      ) : (
+        <Initials name={name} userId={userId} />
+      )}
     </View>
   );
 }
@@ -571,5 +596,29 @@ function BoardPill({
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+/**
+ * Today's initials, kept exactly as they were — this is what a member without a face still
+ * sees, and what everybody sees until the art bundle arrives.
+ *
+ * ⚠ The one size here that is NOT a token, deliberately. `caption` is the right 11/14 step but
+ * carries 1.5 of tracking, which pushes two initials apart inside a 32pt circle — the avatars
+ * elsewhere in the app set this size directly for the same reason.
+ */
+function Initials({ name, userId }: { name: string; userId: string | null }) {
+  const theme = useTheme();
+  return (
+    <Text
+      style={{
+        fontFamily: fontFamilies.black,
+        fontSize: 11,
+        lineHeight: 15,
+        color: userId ? '#FFFFFF' : theme.colors.slate,
+      }}
+    >
+      {getInitials(name)}
+    </Text>
   );
 }

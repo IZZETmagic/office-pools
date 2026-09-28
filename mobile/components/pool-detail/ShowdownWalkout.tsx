@@ -72,6 +72,7 @@ import Svg, { Defs, Line, LinearGradient as SvgGradient, Rect, Stop } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui';
+import { MemberAvatar } from '@/components/avatar/MemberAvatar';
 import { getInitials, gradientForUser } from '@/lib/avatarGradient';
 import {
   BEATS,
@@ -161,6 +162,16 @@ export type WalkoutOpponent = {
   name: string;
   /** For the avatar gradient — `hash(userId)`, so they are the colour they are everywhere else. */
   userId: string | null;
+  /** The colour they picked, if they picked one. Null falls back to the hash above. */
+  avatarColour?: string | null;
+  /**
+   * Their stored avatar.
+   *
+   * ⚠⚠ IT IS A CLUE LIKE EVERY OTHER. It must arrive with the colour and the initial at beat
+   * 5, never before — a face answers the question the clues are still asking, and far more
+   * completely than the single letter the note below already worries about.
+   */
+  avatarBuild?: unknown;
   /** Clue 1. */
   record: { won: number; tied: number; lost: number };
   /** Clue 2. */
@@ -406,7 +417,14 @@ export function ShowdownWalkout({ matchweek, opponent, onClose }: Props) {
           ]}
         >
           <Figure t={t} label="You" userId={null} silhouetteOnly />
-          <Figure t={t} label={opponent.name} userId={opponent.userId} silhouetteOnly={false} />
+          <Figure
+            t={t}
+            label={opponent.name}
+            userId={opponent.userId}
+            avatarColour={opponent.avatarColour ?? null}
+            avatarBuild={opponent.avatarBuild ?? null}
+            silhouetteOnly={false}
+          />
         </Animated.View>
 
         {/* ---------- the clues ---------- */}
@@ -545,6 +563,8 @@ function Figure({
   t,
   label,
   userId,
+  avatarColour = null,
+  avatarBuild = null,
   silhouetteOnly,
 }: {
   /**
@@ -560,6 +580,8 @@ function Figure({
   t: ReturnType<typeof useSharedValue<number>>;
   label: string;
   userId: string | null;
+  avatarColour?: string | null;
+  avatarBuild?: unknown;
   /** The viewer's own side stays dark: this is not a reveal of you. */
   silhouetteOnly: boolean;
 }) {
@@ -584,7 +606,7 @@ function Figure({
       {userId && !silhouetteOnly ? (
         <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, colourStyle]}>
           <LinearGradient
-            colors={[...gradientForUser(userId)]}
+            colors={[...gradientForUser(userId, avatarColour)]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: SIZE / 2 }}
@@ -610,7 +632,24 @@ function Figure({
             colourStyle,
           ]}
         >
-          <Initial label={label} />
+          {/*
+            ⭐⭐ THE FACE RIDES THE SAME `colourStyle` AS THE INITIAL, so it inherits the
+            ceremony's timing exactly rather than getting a beat of its own — it appears at
+            beat 5, with the light and the colour. That is deliberate: the note above explains
+            that a single letter over a silhouette during clue 2 already answers the question
+            the clues are asking, and a face answers it completely.
+          */}
+          {userId ? (
+            <MemberAvatar
+              userId={userId}
+              avatarBuild={avatarBuild}
+              avatarColour={avatarColour}
+              size={SIZE}
+              fallback={<Initial label={label} />}
+            />
+          ) : (
+            <Initial label={label} />
+          )}
         </Animated.View>
       )}
       <View
