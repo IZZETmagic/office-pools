@@ -18,8 +18,9 @@
 //                        crews for now (Ryan, 2026-09-28). Stays on the hub
 //                        as "Soon" so it is visibly part of the plan.
 //
-// Settings: Account, Notifications, Archived Pools, Help sit on the tab. Sign
-// Out and Delete Account live one level down, inside Account.
+// Settings are tiles too — Account, Notifications, Archived Pools, Help — in
+// the same grid, after the four feature doors. Sign Out and Delete Account
+// live one level down, inside Account.
 
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
@@ -99,36 +100,92 @@ export default function ProfileScreen() {
       ? `${archived.length} archived`
       : 'None archived';
 
-  const settingsRows: Row[] = [
+  /**
+   * Every door on the hub, features first, then settings — two per row.
+   *
+   * ⭐ SETTINGS ARE TILES TOO (Ryan, 2026-09-28): a tile each for Account,
+   * Notifications, Archived Pools and Help, in place of the list that used to
+   * sit under the grid. Their icons take the neutral `slate` tint so they read
+   * as settings rather than as features, without a second visual system.
+   * A tile with no `onPress` is a page not built yet ("Soon").
+   */
+  const hubTiles: {
+    id: string;
+    icon: string;
+    title: string;
+    teaser: string | null;
+    tint: string;
+    onPress?: () => void;
+  }[] = [
+    {
+      id: 'seasons',
+      icon: 'calendar',
+      title: 'Seasons',
+      teaser: seasonsTeaser(seasonSections),
+      tint: theme.colors.primary,
+      onPress: () => router.push('/profile/seasons'),
+    },
+    {
+      id: 'trophies',
+      icon: 'trophy.fill',
+      title: 'Trophy Room',
+      teaser: trophies.error ? 'Your badges' : trophyTeaser(trophies.total, podium?.first ?? null),
+      tint: theme.colors.amber,
+      onPress: () => router.push('/profile/trophies'),
+    },
+    {
+      id: 'scouting',
+      icon: 'binoculars',
+      title: 'Scouting Report',
+      teaser: 'How you pick, across every league pool',
+      tint: theme.colors.green,
+      onPress: () => router.push('/profile/scouting'),
+    },
+    {
+      id: 'crews',
+      icon: 'person.3.fill',
+      title: 'My Crews',
+      teaser: 'The people you keep playing with',
+      tint: theme.colors.red,
+    },
     {
       id: 'account',
       icon: 'person.crop.circle.fill',
       title: 'Account',
-      subtitle: data?.username ? `@${data.username} · password, sign out` : 'Profile, password, sign out',
+      teaser: 'Password and sign out',
+      tint: theme.colors.slate,
       onPress: () => router.push('/settings/account'),
     },
     {
       id: 'notifications',
       icon: 'bell.fill',
       title: 'Notifications',
-      subtitle: 'Push alerts and email preferences',
+      teaser: 'Push alerts and email',
+      tint: theme.colors.slate,
       onPress: () => router.push('/settings/notifications'),
     },
     {
       id: 'archived',
       icon: 'archivebox.fill',
       title: 'Archived Pools',
-      subtitle: archivedSubtitle,
+      teaser: archivedSubtitle,
+      tint: theme.colors.slate,
       onPress: () => router.push('/settings/archived-pools'),
     },
     {
       id: 'help',
       icon: 'questionmark.circle.fill',
       title: 'Help & Legal',
-      subtitle: 'FAQs, privacy, terms and contact',
+      teaser: 'FAQs, privacy, terms and contact',
+      tint: theme.colors.slate,
       onPress: () => router.push('/settings/help'),
     },
   ];
+  const tileRows = hubTiles.reduce<(typeof hubTiles)[]>((rows, tile, i) => {
+    if (i % 2 === 0) rows.push([tile]);
+    else rows[rows.length - 1].push(tile);
+    return rows;
+  }, []);
 
   /**
    * Dev-only doors into the two Showdown review surfaces. They exist because
@@ -198,48 +255,14 @@ export default function ProfileScreen() {
         />
 
         <View style={{ paddingHorizontal: theme.spacing.xl, gap: theme.spacing.sm }}>
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-            <HubTile
-              icon="calendar"
-              title="Seasons"
-              teaser={seasonsTeaser(seasonSections)}
-              tint={theme.colors.primary}
-              onPress={() => router.push('/profile/seasons')}
-            />
-            <HubTile
-              icon="trophy.fill"
-              title="Trophy Room"
-              teaser={
-                trophies.error ? 'Your badges' : trophyTeaser(trophies.total, podium?.first ?? null)
-              }
-              tint={theme.colors.amber}
-              onPress={() => router.push('/profile/trophies')}
-            />
-          </View>
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-            <HubTile
-              icon="binoculars"
-              title="Scouting Report"
-              teaser="How you pick, across every league pool"
-              tint={theme.colors.green}
-              onPress={() => router.push('/profile/scouting')}
-            />
-            <HubTile
-              icon="person.3.fill"
-              title="My Crews"
-              teaser="The people you keep playing with"
-              tint={theme.colors.red}
-            />
-          </View>
+          {tileRows.map((row) => (
+            <View key={row[0].id} style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+              {row.map(({ id, ...tile }) => (
+                <HubTile key={id} {...tile} />
+              ))}
+            </View>
+          ))}
         </View>
-
-        <SectionWrapper title="Settings">
-          <DividedList
-            items={settingsRows}
-            keyOf={(i) => i.id}
-            render={({ id: _id, ...row }) => <SettingsRow {...row} />}
-          />
-        </SectionWrapper>
 
         {__DEV__ ? (
           <SectionWrapper title="Developer">
