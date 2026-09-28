@@ -123,7 +123,15 @@ export default function ActivityScreen() {
           }
         >
           {/* 0 — Needs you. Never filtered. */}
-          <View style={{ paddingHorizontal: theme.spacing.xl, gap: theme.spacing.sm + 2 }}>
+          {/* Bottom padding lives here, not on the chips: the chips are sticky, and
+              padding of their own would leave a gap above them while pinned. */}
+          <View
+            style={{
+              paddingHorizontal: theme.spacing.xl,
+              paddingBottom: needsYou.length > 0 ? theme.spacing.lg : 0,
+              gap: theme.spacing.sm + 2,
+            }}
+          >
             {needsYou.length > 0 ? (
               <>
                 <SectionLabel text={`Needs you · ${needsYou.length}`} />
