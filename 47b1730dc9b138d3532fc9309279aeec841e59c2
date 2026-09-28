@@ -1,0 +1,34 @@
+⚠ THIS COMMIT ALSO CONTAINS AN UNRELATED NEXT 16 FRAMEWORK MIGRATION.
+
+The message describes only the mobile avatar work. Eight further files in here are
+the `middleware.ts` -> `proxy.ts` migration, which landed by accident: they were
+staged in this shared checkout when another session ran `git commit`, and
+`git commit` commits the index.
+
+  middleware.ts                        (deleted)
+  proxy.ts                             (added — the renamed file)
+  lib/devHarnessGate.ts                (comment only)
+  lib/supabase/middleware.ts           (comment only)
+  lib/supabase/server.ts               (comment only)
+  lib/testerGate.ts                    (comment only)
+  lib/__tests__/devHarnessGate.test.ts (comment only)
+  app/dev-harness/layout.tsx           (comment only)
+
+Only the first two are behavioural. Done with `npx @next/codemod@latest
+middleware-to-proxy .`; the function was renamed `middleware` -> `proxy` (Next reads
+`mod.proxy || mod.default` for a proxy file), `config`/`matcher` are byte-identical,
+and the one real change is that a proxy ALWAYS runs on the Node.js runtime instead
+of the edge.
+
+⭐ IF YOU ARE BISECTING AN AUTH OR SESSION REGRESSION, THIS IS THE COMMIT THAT MOVED
+THE AUTH GATE — not the avatar work named in the subject. `proxy.ts` runs
+`updateSession` for every matched route.
+
+Verified before landing: `next build` clean in an isolated worktree matching what
+Vercel builds (deprecation warning gone, `f Proxy (Middleware)` in the output), 2340
+tests passing, `tsc` identical to the pre-change baseline, and the dev-harness gate
+re-checked against a live server per VERCEL_ENV — production 404s `/dev-harness/*`
+with a 0-byte body, preview and `next dev` serve it 200.
+
+A split was attempted and abandoned: by then this commit had been pushed, so
+splitting it would have meant force-pushing published history.
