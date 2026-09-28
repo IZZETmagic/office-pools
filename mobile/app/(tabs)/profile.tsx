@@ -13,7 +13,7 @@
 // The doors:
 //   · Seasons          — not built yet ("Soon")
 //   · Trophy Room      — app/profile/trophies.tsx
-//   · Scouting Report  — not built yet ("Soon")
+//   · Scouting Report  — app/profile/scouting.tsx (needs /api/me/scouting)
 //   · My Crews         — deliberately not built: no derived or suggested
 //                        crews for now (Ryan, 2026-09-28). Stays on the hub
 //                        as "Soon" so it is visibly part of the plan.
@@ -212,6 +212,7 @@ export default function ProfileScreen() {
               title="Scouting Report"
               teaser="How you pick, across every league pool"
               tint={theme.colors.green}
+              onPress={() => router.push('/profile/scouting')}
             />
             <HubTile
               icon="person.3.fill"

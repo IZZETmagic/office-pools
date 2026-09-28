@@ -371,6 +371,7 @@ function InnerLayout() {
         {/* The Profile hub's doors. Same card push as settings — each draws its
             own back header. */}
         <Stack.Screen name="profile/trophies" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/scouting" options={{ headerShown: false }} />
         {/* Settings hierarchy — its index is the Profile tab itself since the
             hub rebuild. No `presentation` on purpose — the default
             card transition gives the push + edge-swipe-back that a settings

@@ -2087,6 +2087,30 @@ export async function fetchDossier(
 }
 
 // =============================================================
+// /api/me/scouting — your own scouting report (the Profile hub's door)
+// =============================================================
+// The lifetime half of the dossier, pointed at the caller. ⚠ ONLY the fields
+// that describe HOW someone picks are sent — hit rate, form and missed picks
+// are pool facts and the route withholds them, so this type cannot reach them.
+// `lifetime` is always present here: the whole report IS the lifetime scope.
+
+export type SelfScoutDossier = Pick<
+  OpponentDossier,
+  'mostBacked' | 'mostOpposed' | 'blindSpot' | 'baseline' | 'fingerprint' | 'contrarian' | 'read'
+> & {
+  lifetime: NonNullable<OpponentDossier['lifetime']>;
+};
+
+export type SelfScoutResponse = {
+  user_id: string;
+  dossier: SelfScoutDossier;
+};
+
+export async function fetchSelfScout(): Promise<SelfScoutResponse> {
+  return apiFetch<SelfScoutResponse>('/api/me/scouting');
+}
+
+// =============================================================
 // /api/fixtures/:id/players — who is actually playing well
 // =============================================================
 // The people half of a scout report, from migration 141's player rows. It costs

@@ -2,7 +2,13 @@ import { Text as RNText, View } from 'react-native';
 
 import { MONO_BOLD } from '@/components/match/matchDisplay';
 import { Text } from '@/components/ui';
-import type { DossierResponse, OpponentDossier, ScoutClubLean, ScoutRate } from '@/lib/api';
+import type {
+  DossierResponse,
+  OpponentDossier,
+  ScoutClubLean,
+  ScoutRate,
+  SelfScoutDossier,
+} from '@/lib/api';
 import { useTheme, withOpacity } from '@/theme';
 
 import { StandingCard } from './StandingCard';
@@ -117,6 +123,61 @@ export function Dossier({
       )}
 
       <Footnote dossier={dossier} />
+    </View>
+  );
+}
+
+/**
+ * Your own report, from the Profile hub — the ALL TIME cards only.
+ *
+ * ⚠ THE SAME THREE CARDS the pool dossier renders, not copies. Each now takes
+ * just the fields it reads, which is what lets them render a `SelfScoutDossier`
+ * — a payload the server built WITHOUT the pool facts (standing, accuracy, form,
+ * missed picks), so nothing here can show one computed over a whole history.
+ *
+ * ⚠ NO VERDICT SENTENCE, same as the pool dossier (Ryan, 2026-09-10) — `read`
+ * travels for the Banter share card, not for this screen.
+ */
+export function SelfScoutReport({ dossier }: { dossier: SelfScoutDossier }) {
+  const empty =
+    dossier.mostBacked == null &&
+    dossier.mostOpposed == null &&
+    dossier.blindSpot == null &&
+    dossier.fingerprint.signature == null &&
+    dossier.contrarian == null;
+  const { lifetime } = dossier;
+
+  return (
+    <View style={{ gap: 16 }}>
+      {empty ? (
+        <ScoutCard title="No book on you yet">
+          <ScoutCardBody>
+            <Text variant="body" color="slate">
+              {lifetime.picks === 0
+                ? 'None of your league picks have been revealed yet. This fills in as each matchweek locks.'
+                : `${lifetime.picks} revealed pick${lifetime.picks === 1 ? '' : 's'} so far — not enough to call a habit. ` +
+                  'The report fills in as the season goes.'}
+            </Text>
+          </ScoutCardBody>
+        </ScoutCard>
+      ) : (
+        <>
+          <ClubBiasCard dossier={dossier} isSelf />
+          <FingerprintCard dossier={dossier} isSelf />
+          <TendenciesCard dossier={{ contrarian: dossier.contrarian, reliability: null }} />
+        </>
+      )}
+
+      <ScoutFootnote
+        lines={[
+          `${lifetime.picks} pick${lifetime.picks === 1 ? '' : 's'} across ${lifetime.pools} league pool${lifetime.pools === 1 ? '' : 's'}` +
+            (lifetime.droppedConflicts > 0
+              ? ` · ${lifetime.droppedConflicts} fixture${lifetime.droppedConflicts === 1 ? '' : 's'} picked two ways and not counted`
+              : ''),
+          'League picks only. World Cup pools are not counted.',
+          'Picks appear here once their matchweek locks. The open week is never shown.',
+        ]}
+      />
     </View>
   );
 }
@@ -299,7 +360,13 @@ function FormCard({ form }: { form: { matchweek: number; points: number }[] }) {
  * picks. Widening this one card to their whole history is what fixes the cold
  * start, and the caveat below says how thin the sample still is.
  */
-function ClubBiasCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: boolean }) {
+function ClubBiasCard({
+  dossier,
+  isSelf,
+}: {
+  dossier: Pick<OpponentDossier, 'mostBacked' | 'mostOpposed' | 'blindSpot' | 'lifetime'>;
+  isSelf: boolean;
+}) {
   const { mostBacked, blindSpot, mostOpposed } = dossier;
   if (!mostBacked && !blindSpot && !mostOpposed) return null;
 
@@ -312,8 +379,8 @@ function ClubBiasCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: b
             first figure should already know the sample is thin. */}
         {lifetime?.thin ? (
           <Caveat>
-            {lifetime.picks} pick{lifetime.picks === 1 ? '' : 's'} across all their pools — read
-            it lightly.
+            {lifetime.picks} pick{lifetime.picks === 1 ? '' : 's'} across all{' '}
+            {isSelf ? 'your' : 'their'} pools — read it lightly.
           </Caveat>
         ) : null}
 
@@ -383,7 +450,13 @@ const GOALS_SCALE = 5;
  * about arithmetic; "6%, and 25% of games end level" is a finding. Neither line
  * renders without both halves.
  */
-function FingerprintCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf: boolean }) {
+function FingerprintCard({
+  dossier,
+  isSelf,
+}: {
+  dossier: Pick<OpponentDossier, 'fingerprint' | 'baseline' | 'lifetime'>;
+  isSelf: boolean;
+}) {
   const { fingerprint: f, baseline: b } = dossier;
   const who = isSelf ? 'you predict' : 'they predict';
   const lifetime = dossier.lifetime;
@@ -462,7 +535,11 @@ function FingerprintCard({ dossier, isSelf }: { dossier: OpponentDossier; isSelf
 }
 
 /** The contrarian index and the missed picks — both only where they exist. */
-function TendenciesCard({ dossier }: { dossier: OpponentDossier }) {
+function TendenciesCard({
+  dossier,
+}: {
+  dossier: Pick<OpponentDossier, 'contrarian' | 'reliability'>;
+}) {
   const { contrarian, reliability } = dossier;
   if (!contrarian && !reliability) return null;
 
