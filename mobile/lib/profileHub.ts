@@ -338,11 +338,6 @@ export function groupByMode<P extends SeasonPoolInput>(pools: P[]): SeasonModeGr
   return [...groups.values()].sort((a, b) => rankOf(a) - rankOf(b) || a.key.localeCompare(b.key));
 }
 
-/** The medal a FINISHED pool's row wears, or null. Same podium rules as the Trophy Room. */
-export function finishMedal(p: PodiumPoolInput): 1 | 2 | 3 | null {
-  const finish = podiumFinishes([p], new Set()).finishes[0];
-  return finish ? finish.rank : null;
-}
 
 /** The Seasons tile's teaser — "2 live · 1 finished". Null while loading. */
 export function seasonsTeaser(sections: { live: boolean }[] | null): string | null {

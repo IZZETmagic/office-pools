@@ -11,8 +11,9 @@
 // subheader names the two columns once, and every row puts its figures in the
 // same two fixed-width, right-aligned slots.
 //
-// Finished pools wear a medal when they were a podium finish, by the same
-// rules the Trophy Room counts (`podiumFinishes`). Archived pools are left out;
+// ⚠ NO MEDALS ON FINISHED ROWS. They sat in front of the pool name and pushed
+// it out of line, and the rank column already says 2nd (Ryan, 2026-09-28).
+// Podium finishes are the Trophy Room's job. Archived pools are left out;
 // they have their own row in settings.
 
 import { router } from 'expo-router';
@@ -23,7 +24,6 @@ import { SettingsHeader } from '@/components/settings';
 import { Icon } from '@/components/ui';
 import { getModeChip, getModeName } from '@/lib/design/poolMode';
 import {
-  finishMedal,
   groupByMode,
   seasonRowCells,
   type SeasonCell,
@@ -169,12 +169,8 @@ function ModeGroup({ group }: { group: SeasonModeGroup<PoolSummary> }) {
   );
 }
 
-const MEDAL = { 1: '#F5C518', 2: '#A7B0C4', 3: '#CD7F32' } as const;
-
 function PoolRow({ pool }: { pool: PoolSummary }) {
   const theme = useTheme();
-  const finished = pool.status === 'completed';
-  const medal = finished ? finishMedal(pool) : null;
   const { cells } = seasonRowCells(pool);
 
   return (
@@ -190,29 +186,13 @@ function PoolRow({ pool }: { pool: PoolSummary }) {
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-        {medal ? (
-          <View
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: 11,
-              backgroundColor: MEDAL[medal],
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <RNText style={{ fontFamily: fontFamilies.black, fontSize: 11, color: '#fff' }}>{medal}</RNText>
-          </View>
-        ) : null}
-        <View style={{ flex: 1, gap: 1 }}>
-          <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>
-            {pool.poolName}
-          </RNText>
-          <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, color: theme.colors.slate }}>
-            {pool.memberCount} {pool.memberCount === 1 ? 'member' : 'members'}
-          </RNText>
-        </View>
+      <View style={{ flex: 1, gap: 1 }}>
+        <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>
+          {pool.poolName}
+        </RNText>
+        <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, color: theme.colors.slate }}>
+          {pool.memberCount} {pool.memberCount === 1 ? 'member' : 'members'}
+        </RNText>
       </View>
       <Cell cell={cells[0]} width={COL_A} />
       <Cell cell={cells[1]} width={COL_B} />

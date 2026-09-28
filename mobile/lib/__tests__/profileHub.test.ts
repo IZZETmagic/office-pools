@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   badgeSource,
-  finishMedal,
   groupSeasons,
   podiumFinishes,
   groupByMode,
@@ -278,14 +277,6 @@ describe('groupByMode', () => {
     // both fall back to the same blocks, so they share a group
     expect(g).toHaveLength(1);
     expect(new Set(g.flatMap((x) => x.pools.map((p) => seasonRowCells(p).headers.join()))).size).toBe(1);
-  });
-});
-
-describe('finishMedal', () => {
-  it('uses the Trophy Room rules — a medal only on a finished podium', () => {
-    expect(finishMedal(pool({ currentRank: 2 }))).toBe(2);
-    expect(finishMedal(pool({ status: 'open' }))).toBeNull();
-    expect(finishMedal(pool({ leagueMode: 'last_man_standing' }))).toBeNull();
   });
 });
 
