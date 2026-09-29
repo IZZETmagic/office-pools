@@ -8,17 +8,19 @@ import { Pressable, Text as RNText, View } from 'react-native';
 import type { NeedsYouItem } from '@/lib/useActivity';
 import { fontFamilies, useTheme } from '@/theme';
 
-/** "45m left", "5h left", else "Sat 11:30" in the device's time zone. */
+/** "45m left", "5h left", else "Sat 7:30 am" in the device's time zone. */
 export function deadlineLabel(iso: string, now = Date.now()): string {
   const ms = Date.parse(iso) - now;
   if (Number.isNaN(ms)) return '';
   if (ms < 3_600_000) return `${Math.max(1, Math.round(ms / 60_000))}m left`;
   if (ms < 86_400_000) return `${Math.round(ms / 3_600_000)}h left`;
-  return new Date(iso).toLocaleString('en-GB', {
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  // 12-hour with am/pm, built by hand so it reads the same on every device
+  // regardless of the phone's 24-hour setting: "Sat 7:30 am".
+  const d = new Date(iso);
+  const day = d.toLocaleDateString('en-GB', { weekday: 'short' });
+  const h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${day} ${h % 12 || 12}:${m} ${h < 12 ? 'am' : 'pm'}`;
 }
 
 export function NeedsYouCard({ item, onPress }: { item: NeedsYouItem; onPress: () => void }) {
