@@ -206,7 +206,7 @@ function SectionLabel({ text }: { text: string }) {
         marginLeft: theme.spacing.xs,
       }}
     >
-      <RNText style={{ fontFamily: fontFamilies.black, fontSize: 18, color: theme.colors.ink }}>
+      <RNText style={{ fontFamily: fontFamilies.black, fontSize: 20, color: theme.colors.ink }}>
         {head}
       </RNText>
       {tail ? (

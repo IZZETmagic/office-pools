@@ -98,7 +98,9 @@ export function MatchweekStoryCard({
         </RNText>
       </View>
 
-      <RNText style={{ fontFamily: fontFamilies.black, fontSize: 19, lineHeight: 23, color: accent }}>
+      {/* Bold, not black, and a step smaller than the group heading above it —
+          at black 19 every card competed with "Matchweek 5" for attention. */}
+      <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 16, lineHeight: 21, color: accent }}>
         {item.title}
       </RNText>
 
