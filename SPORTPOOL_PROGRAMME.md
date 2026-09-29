@@ -2545,7 +2545,7 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
   - **KLIPY's terms shaped it:** calls go direct from the client (no proxy), results are unfiltered and in KLIPY's order, and the search box reads "Search KLIPY".
   - **Still open:**
     - the app key in `mobile/.env.local` and EAS;
-    - `NEXT_PUBLIC_KLIPY_API_KEY` on Vercel;
+    - `NEXT_KLIPY_API_KEY` on Vercel for Preview + Development too (set for Production only on 2026-09-28). `next.config.ts` `env` maps it to the client as `KLIPY_WEB_KEY`, because Vercel refuses a NEXT_PUBLIC_ name containing "KEY";
     - request **production** access for both keys with screenshots (test keys = 100 req/hr).
 - **Step 3 — photos:** needs report/block before shipping (App Store guideline 1.2), a private bucket, and EXIF stripping.
 - **Effort:** ~2–3 days for photos; GIFs ~1.5–2 days.

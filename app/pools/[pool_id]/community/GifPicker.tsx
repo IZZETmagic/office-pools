@@ -12,8 +12,11 @@ import {
   type KlipyGif,
 } from '@/lib/banter/klipy'
 
-/** Public by design — KLIPY requires the browser, not our server, to call it. */
-export const KLIPY_WEB_KEY = process.env.NEXT_PUBLIC_KLIPY_API_KEY ?? ''
+/**
+ * Public by design — KLIPY requires the browser, not our server, to call it. Mapped in from
+ * NEXT_KLIPY_API_KEY by next.config.ts `env` (Vercel refuses a NEXT_PUBLIC_ name with "KEY").
+ */
+export const KLIPY_WEB_KEY = process.env.KLIPY_WEB_KEY ?? ''
 
 /**
  * Both platforms ask for every format a message needs, whoever renders it: the web plays the MP4,

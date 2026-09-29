@@ -16,6 +16,14 @@ const frameProtectionHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // ⚠ DELIBERATELY PUBLIC. KLIPY (Banter GIFs) requires its API to be called from the
+  // browser, never from our server, so its key ships in the client bundle — KLIPY treats it
+  // as public. Vercel refuses a NEXT_PUBLIC_ name containing "KEY", so the variable is
+  // NEXT_KLIPY_API_KEY and this maps it in. `env` is Next's legacy mechanism but documented
+  // and supported in 16; values are inlined at BUILD time, so changing the key needs a redeploy.
+  env: {
+    KLIPY_WEB_KEY: process.env.NEXT_KLIPY_API_KEY ?? "",
+  },
   async redirects() {
     return [
       {
