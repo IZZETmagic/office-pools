@@ -90,7 +90,8 @@ export function MatchweekStoryCard({
             color: theme.colors.slate,
           }}
         >
-          MW{m.matchweek_number} · {m.pool_name}
+          {/* No matchweek here: the history's group heading already says it. */}
+          {m.pool_name}
         </RNText>
         <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 10, color: theme.colors.slate }}>
           {MODE_LABEL[m.league_mode] ?? ''} · {relativeTime(item.createdAt)}
