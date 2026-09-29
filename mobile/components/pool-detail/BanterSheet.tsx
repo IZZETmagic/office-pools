@@ -80,9 +80,11 @@ import {
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Animated, {
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { Image as ExpoImage } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog, Icon, Text } from '@/components/ui';
@@ -116,6 +118,16 @@ import {
   type FlexBadgesSheetHandle,
 } from './FlexBadgesSheet';
 import { QuickActionsMenu, type QuickAction } from './QuickActionsMenu';
+import { GifPickerSheet, KLIPY_APP_KEY } from './GifPickerSheet';
+import {
+  GIF_MESSAGE_CONTENT,
+  fitGif,
+  klipyCustomerId,
+  klipyShareUrl,
+  readGifMetadata,
+  toGifMetadata,
+  type KlipyGif,
+} from '@/lib/klipy';
 import { ReactionPicker } from './ReactionPicker';
 import { ReactionPills } from './ReactionPills';
 import {
@@ -375,6 +387,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // option lists they consume live here.
   // -------------------------------------------------------------
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
   // Lazy-mount flags for the two inner gorhom BottomSheets. They
   // can't be permanently mounted (plain BottomSheet at index=-1
   // absorbs touches on Android, blocking interaction with the chat
@@ -624,7 +637,9 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
     async (key: string) => {
       setQuickActionsOpen(false);
       if (!poolId || !banter.appUserId) return;
-      if (key === 'standings') {
+      if (key === 'gif') {
+        setGifPickerOpen(true);
+      } else if (key === 'standings') {
         await sendStandings(poolId, banter.sendMessage);
       } else if (key === 'flex') {
         await openFlexBadges(poolId, banter.appUserId, predictionMode, (opts) => {
@@ -830,6 +845,37 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // supports batched sends, but we only ever ship one at a time).
   // The optimistic message it builds is discarded — our realtime
   // sub will pull the canonical row back from Supabase.
+  // A GIF is sent like a card — its own message_type, a fallback
+  // sentence as content (old builds, pushes and reply quotes show it),
+  // KLIPY's details in metadata (migration 150 checks every URL is
+  // KLIPY's). Unlike the cards it can answer a message.
+  async function handleSendGif(gif: KlipyGif, query: string) {
+    setGifPickerOpen(false);
+    const replyToId =
+      replyTarget && !String(replyTarget._id).startsWith('tmp-')
+        ? String(replyTarget._id)
+        : undefined;
+    const result = await banter.sendMessage(GIF_MESSAGE_CONTENT, {
+      messageType: 'gif',
+      metadata: toGifMetadata(gif),
+      replyToMessageId: replyToId,
+    });
+    if (result.error) {
+      Alert.alert("Couldn't send GIF", 'Please try again.');
+      return;
+    }
+    setReplyTarget(null);
+    // KLIPY's share trigger — their analytics, straight from the
+    // device as their terms ask. Never blocks or fails the send.
+    if (banter.appUserId) {
+      fetch(klipyShareUrl(KLIPY_APP_KEY, gif.slug), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: klipyCustomerId(banter.appUserId), q: query }),
+      }).catch((err) => console.warn('[BanterSheet] KLIPY share trigger failed', err));
+    }
+  }
+
   async function handleSend(newMessages: IMessage[]) {
     const m = newMessages[0];
     if (!m) return;
@@ -1544,7 +1590,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         >
           <QuickActionsMenu
             open={quickActionsOpen}
-            actions={QUICK_ACTIONS}
+            actions={VISIBLE_QUICK_ACTIONS}
             onPick={(key) => void handlePickQuickAction(key)}
             onDismiss={() => setQuickActionsOpen(false)}
           />
@@ -1672,6 +1718,8 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
             if (!ghostMsg) return null;
             const isOwn = reactionAnchor.position === 'right';
             const ghostIsRich = isRichMessageType(ghostMsg.messageType);
+            const ghostGif =
+              ghostMsg.messageType === 'gif' ? readGifMetadata(ghostMsg.metadata) : null;
             return (
               <Animated.View
                 pointerEvents="none"
@@ -1691,7 +1739,11 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
                     clone would span the full row width on Android
                     because gifted-chat's Bubble container uses
                     flex: 1. */}
-                {ghostIsRich ? (
+                {ghostGif ? (
+                  <View style={{ alignSelf: isOwn ? 'flex-end' : 'flex-start' }}>
+                    <BanterGif gif={ghostGif} createdAt={new Date(ghostMsg.createdAt)} />
+                  </View>
+                ) : ghostIsRich ? (
                   <View
                     style={{
                       alignSelf: isOwn ? 'flex-end' : 'flex-start',
@@ -1829,6 +1881,15 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         </>
       ) : null}
 
+      {KLIPY_APP_KEY ? (
+        <GifPickerSheet
+          visible={gifPickerOpen}
+          appUserId={banter.appUserId}
+          onClose={() => setGifPickerOpen(false)}
+          onSelect={(gif, query) => void handleSendGif(gif, query)}
+        />
+      ) : null}
+
       <ConfirmDialog
         visible={pendingDeleteId !== null}
         title="Delete message?"
@@ -1939,6 +2000,9 @@ const BanterBubble = memo(function BanterBubble({
   // Rich-card branch — non-'text' message types bypass the
   // gifted-chat Bubble entirely and render BanterRichCard.
   const isRich = isRichMessageType(msg._messageType);
+  // GIF branch — KLIPY media via expo-image. Unreadable metadata falls
+  // through to the text bubble, which shows "🎞️ sent a GIF".
+  const gif = msg._messageType === 'gif' ? readGifMetadata(msg._metadata) : null;
 
   // Measure the bubble's bounds in screen coords and hand them up.
   // measureInWindow gives (x, y, width, height) in window-space on
@@ -2031,7 +2095,30 @@ const BanterBubble = memo(function BanterBubble({
           branches call the same handleLongPress so the picker
           anchors identically. */}
       <View ref={bubbleAnchorRef} collapsable={false}>
-        {isRich ? (
+        {gif ? (
+          <Pressable
+            onLongPress={handleLongPress}
+            delayLongPress={350}
+            style={{ alignSelf: isOwn ? 'flex-end' : 'flex-start' }}
+            accessibilityLabel={gif.title || 'GIF'}
+          >
+            {msg.replyMessage ? (
+              <RNText
+                numberOfLines={2}
+                style={{
+                  fontFamily: fontFamilies.medium,
+                  fontSize: 12,
+                  color: theme.colors.slate,
+                  marginBottom: 4,
+                  maxWidth: 240,
+                }}
+              >
+                ↩ {msg.replyMessage.user.name}: {msg.replyMessage.text}
+              </RNText>
+            ) : null}
+            <BanterGif gif={gif} createdAt={msg.createdAt} />
+          </Pressable>
+        ) : isRich ? (
           <Pressable onLongPress={handleLongPress} delayLongPress={350}>
             <BanterRichCard
               messageType={msg._messageType}
@@ -2164,6 +2251,60 @@ const BanterBubble = memo(function BanterBubble({
     </View>
   );
 }, sameBubbleProps);
+
+// =============================================================
+// BanterGif — a KLIPY GIF in the chat
+// =============================================================
+// Loaded straight from KLIPY's CDN, exactly as returned (their terms).
+// With Reduce Motion on it shows the first frame; a tap plays it.
+function BanterGif({
+  gif,
+  createdAt,
+}: {
+  gif: NonNullable<ReturnType<typeof readGifMetadata>>;
+  createdAt: Date | number | undefined;
+}) {
+  const theme = useTheme();
+  const reducedMotion = useReducedMotion();
+  const [playing, setPlaying] = useState(false);
+  const size = fitGif(gif.width, gif.height, 240, 240);
+  const still = reducedMotion && !playing;
+  const uri = still && gif.still_url ? gif.still_url : (gif.gif_url ?? gif.still_url);
+  return (
+    <Pressable disabled={!still} onPress={() => setPlaying(true)}>
+      <ExpoImage
+        source={{ uri }}
+        placeholder={gif.still_url ? { uri: gif.still_url } : undefined}
+        autoplay={!still}
+        contentFit="cover"
+        style={{
+          width: size.width,
+          height: size.height,
+          borderRadius: theme.radii.sm,
+          backgroundColor: theme.colors.mist,
+        }}
+        accessibilityLabel={gif.title || 'GIF'}
+      />
+      {createdAt != null ? (
+        <View
+          style={{
+            position: 'absolute',
+            right: 6,
+            bottom: 6,
+            paddingHorizontal: 5,
+            paddingVertical: 2,
+            borderRadius: 6,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+          }}
+        >
+          <RNText style={{ fontSize: 11, fontFamily: fontFamilies.medium, color: '#FFFFFF' }}>
+            {formatMessageTime(createdAt)}
+          </RNText>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
 
 // =============================================================
 // AnimatedReplyPreview — custom replacement for gifted-chat's
@@ -2449,8 +2590,15 @@ type SendMessage = (
   opts?: { messageType?: string; metadata?: Record<string, unknown> | null },
 ) => Promise<{ error?: string }>;
 
-// The three actions surfaced by the `+` menu (in order).
+// The actions surfaced by the `+` menu (in order). Matches the web's
+// QuickActions verbatim.
 const QUICK_ACTIONS: QuickAction[] = [
+  {
+    key: 'gif',
+    emoji: '🎞️',
+    label: 'Send a GIF',
+    description: 'Search KLIPY for the reaction',
+  },
   {
     key: 'standings',
     emoji: '📊',
@@ -2470,6 +2618,11 @@ const QUICK_ACTIONS: QuickAction[] = [
     description: "Drop a score you've locked in",
   },
 ];
+
+// No KLIPY key in this build → no GIF row, rather than a picker that errors.
+const VISIBLE_QUICK_ACTIONS = KLIPY_APP_KEY
+  ? QUICK_ACTIONS
+  : QUICK_ACTIONS.filter((a) => a.key !== 'gif');
 
 // "Share standings" — fetch leaderboard, send a `standings_drop`
 // rich-card with top 5 entries as metadata. BanterRichCard's

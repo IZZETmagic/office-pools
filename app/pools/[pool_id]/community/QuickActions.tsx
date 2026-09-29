@@ -8,6 +8,8 @@ type QuickActionsProps = {
   onSharePrediction: () => void
   onFlexBadges: () => void
   onDropStandings: () => void
+  /** Absent when no KLIPY key is configured — the row is then not offered at all. */
+  onGif?: () => void
 }
 
 /**
@@ -21,6 +23,7 @@ type QuickActionsProps = {
  * Order, emoji, labels and descriptions are RN's QUICK_ACTIONS verbatim.
  */
 const QUICK_ACTIONS = [
+  { key: 'gif', emoji: '🎞️', label: 'Send a GIF', description: 'Search KLIPY for the reaction' },
   { key: 'standings', emoji: '📊', label: 'Share standings', description: "Drop the leaderboard's top 5" },
   { key: 'flex', emoji: '🏆', label: 'Flex badges', description: "Show off a badge you've earned" },
   { key: 'prediction', emoji: '🎯', label: 'Share prediction', description: "Drop a score you've locked in" },
@@ -30,7 +33,9 @@ export function QuickActions({
   onSharePrediction,
   onFlexBadges,
   onDropStandings,
+  onGif,
 }: QuickActionsProps) {
+  const actions = QUICK_ACTIONS.filter(a => a.key !== 'gif' || onGif)
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -50,7 +55,8 @@ export function QuickActions({
 
   const run = (key: string) => {
     setOpen(false)
-    if (key === 'standings') onDropStandings()
+    if (key === 'gif') onGif?.()
+    else if (key === 'standings') onDropStandings()
     else if (key === 'flex') onFlexBadges()
     else onSharePrediction()
   }
@@ -81,7 +87,7 @@ export function QuickActions({
              plus mb-1 is the same measurement expressed in the layout. */
           className="absolute bottom-full left-0 mb-1 z-30 min-w-[240px] rounded-control bg-surface border border-silver/60 shadow-card overflow-hidden animate-fade-up"
         >
-          {QUICK_ACTIONS.map((a, i) => (
+          {actions.map((a, i) => (
             <button
               key={a.key}
               type="button"

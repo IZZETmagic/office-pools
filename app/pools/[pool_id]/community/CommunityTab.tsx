@@ -24,6 +24,9 @@ import { SystemEventCard } from './SystemEventCard'
 import { PinnedMessageCard } from './PinnedMessageCard'
 import { PinMessageModal } from './PinMessageModal'
 import { QuickActions } from './QuickActions'
+import { GifPicker, KLIPY_WEB_KEY } from './GifPicker'
+import { GifMessage } from './GifMessage'
+import { GIF_MESSAGE_CONTENT, klipyCustomerId, klipyShareUrl, toGifMetadata, type KlipyGif } from '@/lib/banter/klipy'
 import { PredictionShareCard } from './PredictionShareCard'
 import { BadgeFlexCard } from './BadgeFlexCard'
 import { StandingsDropCard } from './StandingsDropCard'
@@ -85,6 +88,7 @@ export function CommunityTab({
   const [hasMore, setHasMore] = useState(false)
   const [replyingTo, setReplyingTo] = useState<MessageWithReactions | null>(null)
   const [pendingDelete, setPendingDelete] = useState<MessageWithReactions | null>(null)
+  const [showGifPicker, setShowGifPicker] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const { showToast } = useToast()
   const [replyPreviews, setReplyPreviews] = useState<Map<string, ReplyPreview>>(new Map())
@@ -1045,6 +1049,56 @@ export function CommunityTab({
     }
   }, [members, poolName, poolId, currentUserId, computedScoreMap])
 
+  // A GIF is sent like a card: its own message_type, a fallback sentence as
+  // content, and KLIPY's details in metadata (150 checks every URL is KLIPY's).
+  // Unlike the cards it can answer a message, since it is a reaction.
+  const handleSendGif = useCallback(async (gif: KlipyGif, query: string) => {
+    setShowGifPicker(false)
+    const replyToId = replyingTo?.message_id ?? null
+    const { data, error } = await supabaseRef.current.from('pool_messages').insert({
+      pool_id: poolId,
+      user_id: currentUserId,
+      content: GIF_MESSAGE_CONTENT,
+      mentions: [],
+      message_type: 'gif',
+      reply_to_message_id: replyToId,
+      metadata: toGifMetadata(gif),
+    }).select().single()
+
+    if (error || !data) {
+      console.error('Failed to send GIF:', error)
+      showToast('Could not send that GIF. Try again.', 'error')
+      return
+    }
+
+    setReplyingTo(null)
+    const newMsg: MessageWithReactions = {
+      ...data,
+      message_type: 'gif',
+      reply_to_message_id: data.reply_to_message_id ?? null,
+      metadata: data.metadata ?? {},
+      reactions: [],
+    }
+    wasNearBottomRef.current = true
+    setMessages(prev => prev.some(m => m.message_id === newMsg.message_id) ? prev : [...prev, newMsg])
+    if (newMsg.reply_to_message_id) void ensureReplyPreviews([newMsg])
+
+    fetch('/api/notifications/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pool_id: poolId, message_content: data.content }),
+      keepalive: true,
+    }).catch(err => console.error('[MessagePush] gif push failed:', err))
+
+    // KLIPY's share trigger — their analytics, straight from the browser as their terms ask.
+    fetch(klipyShareUrl(KLIPY_WEB_KEY, gif.slug), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: klipyCustomerId(currentUserId), q: query }),
+      keepalive: true,
+    }).catch(err => console.warn('[GIF] KLIPY share trigger failed:', err))
+  }, [poolId, currentUserId, replyingTo, showToast, ensureReplyPreviews])
+
   const sharedCallsCount = useMemo(() => {
     return messages.filter(m => m.message_type === 'prediction_share').length
   }, [messages])
@@ -1233,6 +1287,22 @@ export function CommunityTab({
             : undefined
 
           // Rich content cards — reactions only on these
+          if (msg.message_type === 'gif') {
+            return (
+              <GifMessage
+                key={msg.message_id}
+                message={msg}
+                members={members}
+                memberLevels={memberLevels}
+                currentUserId={currentUserId}
+                reactions={msg.reactions}
+                onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+                onReply={() => setReplyingTo(msg)}
+                onDelete={onDelete}
+              />
+            )
+          }
+
           if (msg.message_type === 'prediction_share') {
             return (
               <PredictionShareCard
@@ -1331,6 +1401,7 @@ export function CommunityTab({
             onSharePrediction={handleShareBoldCall}
             onFlexBadges={handleFlexBadges}
             onDropStandings={handleDropStandings}
+            onGif={KLIPY_WEB_KEY ? () => setShowGifPicker(true) : undefined}
           />
         }
         onSend={handleSendMessage}
@@ -1460,6 +1531,15 @@ export function CommunityTab({
               keepalive: true,
             }).catch(err => console.error('[MessagePush] prediction_share push failed:', err))
           }}
+        />
+      )}
+
+      {KLIPY_WEB_KEY && (
+        <GifPicker
+          isOpen={showGifPicker}
+          currentUserId={currentUserId}
+          onClose={() => setShowGifPicker(false)}
+          onSelect={(gif, query) => void handleSendGif(gif, query)}
         />
       )}
 

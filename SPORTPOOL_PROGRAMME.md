@@ -2539,8 +2539,14 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
   - Migration `148_a_message_can_be_taken_back` (applied): the `delete_pool_message` RPC is callable by the sender, a pool admin or a super admin. It soft-deletes and scrubs the message, and broadcasts `message_delete`.
   - Web and RN: Delete in the long-press menu, and tombstones reading "Message deleted" / "Removed by a pool admin".
   - Before this, nobody could delete a message at all, even though the FAQ promised admin removal.
-- **Step 2 — GIFs:** planned. **Blocked on a KLIPY API key.**
-  - The GIF migration must add `gif` to the `message_type` CHECK, plus a trigger that only accepts KLIPY-hosted URLs. Today's INSERT policy checks membership only, so a member can put any URL in `metadata`.
+- **Step 2 — GIFs: built 2026-09-28, on KLIPY test keys.**
+  - Migration `150_a_gif_comes_from_klipy` (applied): adds `gif` to the `message_type` CHECK. A trigger rejects any GIF whose media URL isn't https on `static`/`static1`/`static2.klipy.com`, and strips every other metadata key.
+  - Web picker + MP4 bubble; RN picker + expo-image GIF bubble (OTA-able). Shared pure `lib/banter/klipy.ts`, with a RN copy kept identical by `klipyParity.guard.test.ts`.
+  - **KLIPY's terms shaped it:** calls go direct from the client (no proxy), results are unfiltered and in KLIPY's order, and the search box reads "Search KLIPY".
+  - **Still open:**
+    - the app key in `mobile/.env.local` and EAS;
+    - `NEXT_PUBLIC_KLIPY_API_KEY` on Vercel;
+    - request **production** access for both keys with screenshots (test keys = 100 req/hr).
 - **Step 3 — photos:** needs report/block before shipping (App Store guideline 1.2), a private bucket, and EXIF stripping.
 - **Effort:** ~2–3 days for photos; GIFs ~1.5–2 days.
 - **Done when:** a user can attach and send an image or GIF in pool chat and others see it inline.

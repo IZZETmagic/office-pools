@@ -6,7 +6,7 @@ import type { MatchConductData } from '@/lib/tournament'
 // MESSAGE TYPES
 // =====================
 
-export type MessageType = 'text' | 'prediction_share' | 'badge_flex' | 'standings_drop' | 'system_event'
+export type MessageType = 'text' | 'prediction_share' | 'badge_flex' | 'standings_drop' | 'system_event' | 'gif'
 
 export type Message = {
   message_id: string
