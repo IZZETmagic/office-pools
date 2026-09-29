@@ -238,6 +238,14 @@ async function handler(
      *  person, so that a member is the same colour here as in Banter. */
     user_id: subjectUser?.user_id ?? null,
     full_name: subjectUser?.full_name ?? subjectUser?.username ?? null,
+    /**
+     * ⚠ The subject's face. One extra pair of columns on a read that already
+     * happens — no second round trip. Null is normal: an entry can outlive its
+     * user row, and a member may simply not have built an avatar. Either way the
+     * header falls back to initials, which is what it did before.
+     */
+    avatar_colour: subjectUser?.avatar_colour ?? null,
+    avatar_build: subjectUser?.avatar_build ?? null,
     ...context,
     /**
      * ⚠ THE SAME OBJECT EITHER WAY — the self-scout is not a second engine, it
@@ -310,12 +318,18 @@ async function readDuelRecord(
 async function readEntryUser(
   admin: ReturnType<typeof createAdminClient>,
   userId: string | null,
-): Promise<{ user_id: string; full_name: string | null; username: string | null } | null> {
+): Promise<{
+  user_id: string
+  full_name: string | null
+  username: string | null
+  avatar_colour: string | null
+  avatar_build: unknown
+} | null> {
   if (!userId) return null
   try {
     const { data, error } = await admin
       .from('users')
-      .select('user_id, full_name, username')
+      .select('user_id, full_name, username, avatar_colour, avatar_build')
       .eq('user_id', userId)
       .maybeSingle()
     if (error) throw new Error(error.message)

@@ -44,7 +44,14 @@ export default function SelfScoutScreen() {
         }
       >
         <ScoutHeader detail={detail}>
-          <MemberSubject name={home?.fullName ?? 'You'} userId={data?.user_id ?? home?.appUserId} />
+          {/* ⚠ The self-scout door. `data` is this member's own dossier, so the face comes
+              from the same payload as the opponent's — one source, one answer. */}
+          <MemberSubject
+            name={home?.fullName ?? 'You'}
+            userId={data?.user_id ?? home?.appUserId}
+            avatarColour={data?.avatar_colour ?? null}
+            avatarBuild={data?.avatar_build ?? null}
+          />
         </ScoutHeader>
 
         {loading && !data ? (

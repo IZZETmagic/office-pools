@@ -2096,6 +2096,10 @@ export type DossierResponse = {
    *  is the same colour here as in Banter. Null if the entry has no user. */
   user_id: string | null;
   full_name: string | null;
+  /** The colour they picked — null falls back to the hash of their id. */
+  avatar_colour?: string | null;
+  /** Their stored avatar. ⚠ Raw until `readStoredAvatarBuild` has vetted it against this build's bundle. */
+  avatar_build?: unknown;
   is_self: boolean;
   pool: { pool_id: string; name: string; league_mode: string | null } | null;
   competition: { name: string; season: string } | null;
@@ -2145,6 +2149,10 @@ export type SelfScoutDossier = Pick<
 
 export type SelfScoutResponse = {
   user_id: string;
+  /** The colour they picked — null falls back to the hash of their id. */
+  avatar_colour?: string | null;
+  /** Their stored avatar. ⚠ Raw until `readStoredAvatarBuild` has vetted it against this build's bundle. */
+  avatar_build?: unknown;
   dossier: SelfScoutDossier;
 };
 

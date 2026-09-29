@@ -80,7 +80,14 @@ export function DossierSheet({
   return (
     <ScoutSheet open={!!entryId} onClose={onClose} height="88%">
       <ScoutHeader detail={detail}>
-        {data ? <MemberSubject name={displayName} userId={data.user_id} /> : null}
+        {data ? (
+          <MemberSubject
+            name={displayName}
+            userId={data.user_id}
+            avatarColour={data.avatar_colour ?? null}
+            avatarBuild={data.avatar_build ?? null}
+          />
+        ) : null}
       </ScoutHeader>
 
       <ScoutSheetBody>

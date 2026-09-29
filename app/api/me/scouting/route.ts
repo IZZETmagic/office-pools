@@ -106,7 +106,25 @@ async function handler() {
 
   // ⚠ No name in the payload: the phone already holds it (Home data), and the
   // header is keyed on `user_id` for the avatar gradient.
-  return NextResponse.json({ user_id: userData.user_id, dossier })
+  /**
+   * ⚠ The viewer's own face, read here rather than taken from `/api/avatar/me`.
+   * That endpoint returns a COMPOSED SVG at a fixed size, which is right for a
+   * profile card and wrong for a header that sizes its own circle — the scout
+   * header composes from the config, like every other surface that draws a face
+   * at its own scale.
+   */
+  const { data: me } = await admin
+    .from('users')
+    .select('avatar_colour, avatar_build')
+    .eq('user_id', userData.user_id)
+    .maybeSingle()
+
+  return NextResponse.json({
+    user_id: userData.user_id,
+    avatar_colour: me?.avatar_colour ?? null,
+    avatar_build: me?.avatar_build ?? null,
+    dossier,
+  })
 }
 
 export const GET = withPerfLogging('/api/me/scouting', handler)
