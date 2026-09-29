@@ -45,6 +45,25 @@ describe('groupByDay', () => {
     expect(groups.map((g) => g.label.split(' ')[0])).toEqual(['Today', 'Yesterday', 'Saturday'])
     expect(groups[0].items).toHaveLength(2)
   })
+  it('groups matchweek stories by matchweek, even when they settled on different days', () => {
+    const story = (mw: number, at: Date) => ({
+      ...item('matchweek_story', at.toISOString()),
+      activityId: `s-${mw}-${at.getTime()}`,
+      metadata: { matchweek_number: mw },
+    })
+    const groups = groupByDay(
+      [
+        item('mention', new Date(2026, 8, 28, 9).toISOString()),
+        story(5, new Date(2026, 8, 20, 22)),
+        story(5, new Date(2026, 8, 20, 18)),
+        story(4, new Date(2026, 8, 15, 9)),
+        story(4, new Date(2026, 8, 14, 22)),
+      ],
+      now,
+    )
+    expect(groups.map((g) => g.label.split(' · ')[0])).toEqual(['Today', 'Matchweek 5', 'Matchweek 4'])
+    expect(groups[2].items).toHaveLength(2)
+  })
   it('drops an unparseable date rather than inventing a day', () => {
     expect(groupByDay([item('mention', 'not a date')], now)).toEqual([])
   })

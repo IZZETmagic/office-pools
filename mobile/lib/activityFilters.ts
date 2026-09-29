@@ -40,35 +40,53 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-/**
- * Split newest-first items into device-local days: "Today", "Yesterday", then
- * "Sunday 27 Sep". Items must already be sorted newest first.
- */
-export function groupByDay(items: ActivityItem[], now: Date = new Date()): DayGroup[] {
-  const today = dayKey(now);
+function dayLabel(d: Date, now: Date): string {
+  const k = dayKey(d);
+  if (k === dayKey(now)) return 'Today';
   const y = new Date(now);
   y.setDate(y.getDate() - 1);
-  const yesterday = dayKey(y);
+  if (k === dayKey(y)) return 'Yesterday';
+  return d.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  });
+}
 
+function matchweekOf(it: ActivityItem): number | null {
+  if (it.activityType !== 'matchweek_story') return null;
+  const n = (it.metadata as { matchweek_number?: unknown } | null)?.matchweek_number;
+  return typeof n === 'number' ? n : null;
+}
+
+/**
+ * Split newest-first items into groups for the history.
+ *
+ * Matchweek stories group by MATCHWEEK ("Matchweek 5 · Sun 20 Sep"), so every
+ * pool's result for a weekend sits together even when they settled hours
+ * apart. Everything else (mentions, badges, rank moves) groups by device-local
+ * day. A group is placed where its newest item falls.
+ *
+ * ⚠ Matchweek NUMBER, across competitions: Premier League MW4 and La Liga MW4
+ * share a group. That is the trial Ryan asked for (2026-09-29) — revisit if a
+ * member in two leagues finds it confusing.
+ *
+ * Items must already be sorted newest first.
+ */
+export function groupByDay(items: ActivityItem[], now: Date = new Date()): DayGroup[] {
   const out: DayGroup[] = [];
+  const byKey = new Map<string, DayGroup>();
   for (const it of items) {
     const d = new Date(it.createdAt);
     if (Number.isNaN(d.getTime())) continue;
-    const k = dayKey(d);
-    let g = out[out.length - 1];
-    if (!g || g.key !== k) {
-      const label =
-        k === today
-          ? 'Today'
-          : k === yesterday
-            ? 'Yesterday'
-            : d.toLocaleDateString('en-GB', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'short',
-                ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
-              });
-      g = { key: k, label, items: [] };
+    const mw = matchweekOf(it);
+    const key = mw != null ? `mw-${mw}` : `day-${dayKey(d)}`;
+    let g = byKey.get(key);
+    if (!g) {
+      const shortDate = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+      g = { key, label: mw != null ? `Matchweek ${mw} · ${shortDate}` : dayLabel(d, now), items: [] };
+      byKey.set(key, g);
       out.push(g);
     }
     g.items.push(it);
