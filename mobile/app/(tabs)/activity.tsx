@@ -186,22 +186,35 @@ function HistoryRow({ item }: { item: ActivityItem }) {
   );
 }
 
+/**
+ * A group heading. "Matchweek 5 · Sun 20 Sep" splits into a bold heading and a
+ * quieter date, so the matchweek reads first; a plain day ("Friday 25 Sep")
+ * is just the heading. Sized as a heading, not a caption: at 11px uppercase
+ * slate it disappeared against the cards (Ryan, 2026-09-29).
+ */
 function SectionLabel({ text }: { text: string }) {
   const theme = useTheme();
+  const [head, ...rest] = text.split(' · ');
+  const tail = rest.join(' · ');
   return (
-    <RNText
+    <View
       style={{
-        fontFamily: fontFamilies.bold,
-        fontSize: 11,
-        letterSpacing: 0.8,
-        textTransform: 'uppercase',
-        color: theme.colors.slate,
-        marginTop: theme.spacing.md,
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: theme.spacing.sm,
+        marginTop: theme.spacing.lg,
         marginLeft: theme.spacing.xs,
       }}
     >
-      {text}
-    </RNText>
+      <RNText style={{ fontFamily: fontFamilies.black, fontSize: 18, color: theme.colors.ink }}>
+        {head}
+      </RNText>
+      {tail ? (
+        <RNText style={{ fontFamily: fontFamilies.semibold, fontSize: 14, color: theme.colors.slate }}>
+          {tail}
+        </RNText>
+      ) : null}
+    </View>
   );
 }
 
