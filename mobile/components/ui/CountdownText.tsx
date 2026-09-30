@@ -42,11 +42,12 @@ const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
  * only ever gets SHORTER. No widest-case constant to keep in sync, and no
  * re-measure to schedule — the invariant does the work.
  *
- * ⚠ AND IT SURVIVES A RE-RENDER. The sizer is recomputed whenever the parent
- * renders, which only ever makes the box TIGHTER: it is read at a moment no later
- * than the digits it is sizing, and the digits shrink, so `sizer >= displayed`
- * holds however often this re-renders. That is the property to preserve — not
- * "it renders once".
+ * ⚠ THE PROPERTY TO PRESERVE IS `sizer >= displayed`, NOT A RENDER COUNT. The
+ * sizer is read at a moment no later than the digits it is sizing, and the digits
+ * only shrink — so it holds however often this re-renders, and equally if it never
+ * does. (In practice the React Compiler caches it on `clock.target`, so it is
+ * computed once per target; verified in the Metro bundle. Do not depend on that
+ * either way — depend on the invariant.)
  */
 export function CountdownText({
   clock,

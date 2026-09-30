@@ -38,9 +38,9 @@
 // =============================================================
 
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { useSharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui';
 import { ShowdownDuelHeader, type Standing } from '@/components/pool-detail/ShowdownDuelHeader';
@@ -255,6 +255,24 @@ export default function ShowdownPhaseHarness() {
   const [i, setI] = useState(0);
   const scrollY = useSharedValue(0);
   /**
+   * ⚠⚠ THE SCROLL IS WIRED UP, AND IT USED NOT TO BE. `scrollY` was created and
+   * handed to the band and then never written, so the band never COLLAPSED here —
+   * the harness could show you what every phase looks like and nothing about how
+   * any of them behaves.
+   *
+   * That mattered the moment the collapse became the thing under review: the
+   * countdown's whole reason for leaving React is that a commit mid-drag freezes
+   * this slide (see `lib/useCountdown.ts`), and a harness that cannot drag cannot
+   * show it. Same mechanism as the real screen — a UI-thread worklet writing the
+   * shared value, no re-render.
+   */
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      'worklet';
+      scrollY.value = e.contentOffset.y;
+    },
+  });
+  /**
    * ⚠ THE ONE PLACE A WALKOUT MAY BE REPLAYED.
    *
    * Ryan, 2026-09-02: *"once revealed there should be NO replay button."* That
@@ -345,7 +363,9 @@ export default function ShowdownPhaseHarness() {
         `scrollY`; a picker layered on top would be the one thing on screen that
         does not move with it, and would read as part of the design.
       */}
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.md, paddingTop: 320 }}
       >
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
@@ -436,7 +456,29 @@ export default function ShowdownPhaseHarness() {
           <Row k="opponentVisible" v={String(resolved.opponentVisible)} />
           <Row k="recapPending" v={String(resolved.recapPending)} />
         </View>
-      </ScrollView>
+
+        {/*
+          ⚠⚠ DELIBERATE DEAD SPACE, AND IT IS LOAD-BEARING FOR THE REVIEW.
+          The band collapses over roughly the first 150pt of scroll, and every
+          other child here put together does not fill a phone — so without
+          something taller than the viewport underneath, there is nothing to drag
+          and the collapse cannot be watched at all. That is the state this
+          harness was in until the scroll was wired up.
+
+          Do not "tidy" this away. A harness that cannot reproduce the behaviour
+          cannot catch a regression in it — the same lesson the phase-6 fixture
+          note records a few hundred lines up.
+        */}
+        <View style={{ height: 700, paddingTop: theme.spacing.xl, gap: theme.spacing.sm }}>
+          <Text variant="cardTitle" align="center">
+            Scroll down and back up
+          </Text>
+          <Text variant="body" color="slate" align="center">
+            The band should track your finger the whole way, with no freeze on the
+            second. Phase 3 and phase 6 are the ones with a running clock.
+          </Text>
+        </View>
+      </Animated.ScrollView>
 
       {/*
         ⚠ RENDERED LAST so it covers the band and the picker both. In the real
