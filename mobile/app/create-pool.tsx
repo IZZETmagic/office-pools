@@ -50,6 +50,7 @@ import {
 } from '@/lib/createPool';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
+import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 /**
@@ -341,10 +342,14 @@ export default function CreatePoolModal() {
       // is already there when the user navigates between tabs. Fire-and-
       // forget — the deep-link below doesn't wait for it.
       void refreshHomeData();
+      // ⭐ The end of a nine-step wizard. Fired before the redirect for the same
+      // reason as join-pool: the screen is about to be replaced.
+      hapticSuccess();
       // Land the admin on the new pool's Settings tab so they can tune
       // scoring rules, prizes, branding, etc. before sharing the pool.
       router.replace(`/pool/${created.pool_id}?tab=settings`);
     } catch (err) {
+      hapticFailure();
       setError(err instanceof Error ? err.message : 'Failed to create pool');
     } finally {
       setLoading(false);

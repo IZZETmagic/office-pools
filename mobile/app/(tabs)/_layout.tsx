@@ -28,6 +28,7 @@ import { BottomTabBar, type BottomTabBarProps } from '@react-navigation/bottom-t
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 
+import { HapticTab } from '@/components/haptic-tab';
 import { NotificationDot } from '@/components/ui';
 import { useSharedActivity } from '@/lib/ActivityProvider';
 import { useHomeData } from '@/lib/HomeDataProvider';
@@ -151,6 +152,10 @@ export default function TabLayout() {
           borderTopWidth: 0, // we render our own segmented border above
         },
         tabBarLabelStyle: { fontFamily: fontFamilies.semibold, fontSize: 11 },
+        // Every tab button taps out a haptic: selectionAsync on iOS,
+        // Context_Click on Android. See components/haptic-tab.tsx for why the
+        // two platforms take different calls.
+        tabBarButton: HapticTab,
         // Mount all five tab screens in JS upfront (behind the splash)
         // rather than lazily on first focus. Pairs with enableScreens(false)
         // in app/_layout.tsx so that by the time the splash dismisses,

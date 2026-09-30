@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Icon, Input, Text } from '@/components/ui';
 import { joinPool } from '@/lib/api';
+import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Tab = 'code' | 'qr';
@@ -24,8 +25,15 @@ export default function JoinPoolModal() {
     setLoading(true);
     try {
       await joinPool(trimmed);
+      // ⚠ Before `router.back()`, because after it this screen is gone and the
+      // member is looking at a list that has not refreshed yet. The buzz is the
+      // first thing that says the code worked.
+      hapticSuccess();
       router.back();
     } catch (err) {
+      // A mistyped code is the common case, and it is worth feeling: the field
+      // keeps what you typed, so nothing else about the screen changes.
+      hapticFailure();
       setError(err instanceof Error ? err.message : 'Failed to join pool');
     } finally {
       setLoading(false);

@@ -109,6 +109,7 @@ import {
   type PoolMember,
   usePoolBanter,
 } from '@/lib/usePoolBanter';
+import { hapticLongPress } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 import { BanterRichCard, isRichMessageType } from './BanterRichCard';
@@ -2010,6 +2011,14 @@ const BanterBubble = memo(function BanterBubble({
   // x/y/w/position to render the un-blurred clone overlaid on the
   // BlurView.
   const handleLongPress = () => {
+    // ⭐ PARITY WITH THE FULL SCREEN. `app/pool/[id]/banter.tsx` has always
+    // buzzed here and this branch never did — the same gesture on the same
+    // message, in the sheet instead of the screen, felt different. Both now go
+    // through `hapticLongPress`, so the weight cannot drift apart again.
+    //
+    // ⚠ Fires BEFORE the measure, not in its callback: `measureInWindow` is
+    // async and the buzz belongs to the press, not to the layout read.
+    hapticLongPress();
     bubbleAnchorRef.current?.measureInWindow((x, y, w, h) => {
       onLongPress(String(msg._id), { x, y, w, h }, bubbleProps.position);
     });

@@ -19,6 +19,7 @@ import {
   type LeagueMatch,
 } from '@/lib/useLeaguePool';
 import { useScreenStatusBar } from '@/lib/useScreenStatusBar';
+import { hapticFailure } from '@/lib/haptics';
 import { useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -202,7 +203,16 @@ export default function PickemPickScreen() {
     mutationFn: (predictions: LeaguePickBody[]) =>
       saveLeaguePicks(poolId, { entryId, predictions }),
     onSuccess: () => setError(null),
-    onError: (e) => setError(e instanceof Error ? e.message : 'Your picks could not be saved.'),
+    onError: (e) => {
+      // ⚠⚠ FAILURE ONLY, AND THE ASYMMETRY IS THE DESIGN. This screen autosaves
+      // per scoreline, so a success buzz would fire on every tap of every
+      // fixture — the rattle `hapticSelection` exists to avoid, on the one
+      // screen with the most taps in the app. But a FAILED save currently only
+      // sets a string, and a member who is still tapping the next fixture has
+      // no reason to look up. One buzz is what makes them.
+      hapticFailure();
+      setError(e instanceof Error ? e.message : 'Your picks could not be saved.');
+    },
   });
 
   const flush = useCallback(async () => {

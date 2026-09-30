@@ -37,6 +37,7 @@ import {
   isAvatarColourName,
 } from '@/lib/avatarGradient';
 import { useAuth } from '@/lib/auth';
+import { hapticFailure, hapticPress, hapticSelection, hapticSuccess } from '@/lib/haptics';
 import { supabase } from '@/lib/supabase';
 import { useAvatarAssets } from '@/lib/useAvatarAssets';
 import { invalidateMyAvatar } from '@/lib/useMyAvatar';
@@ -189,6 +190,7 @@ export default function AvatarEditorScreen() {
     // "follow the hair, lifted", and writing it as a copy renders every beard 12 per channel off.
     if (!isStoredAvatarBuild(payload)) {
       setSaving(false);
+      hapticFailure();
       console.warn('[avatar editor] refusing to save a malformed config');
       return;
     }
@@ -201,6 +203,7 @@ export default function AvatarEditorScreen() {
       .eq('user_id', userId);
     setSaving(false);
     if (error) {
+      hapticFailure();
       console.warn('[avatar editor] save failed:', error.message);
       return;
     }
@@ -208,6 +211,7 @@ export default function AvatarEditorScreen() {
     // without this it would keep drawing the face that was just replaced. It deliberately does not
     // fetch: this screen is about to unmount and the card may not be mounted yet, so a request
     // fired here would race the navigation. The card refetches on focus.
+    hapticSuccess();
     invalidateMyAvatar();
     router.back();
   }
@@ -329,7 +333,10 @@ export default function AvatarEditorScreen() {
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={s.label}
-              onPress={() => setStep(s.key)}
+              onPress={() => {
+                hapticPress();
+                setStep(s.key);
+              }}
               style={{
                 flex: 1,
                 alignItems: 'center',
@@ -664,7 +671,10 @@ function Swatches({
           key={c}
           accessibilityRole="button"
           accessibilityState={{ selected: value === c }}
-          onPress={() => onPick(c)}
+          onPress={() => {
+            hapticSelection();
+            onPick(c);
+          }}
           style={{
             width: 56,
             height: 56,
@@ -743,7 +753,10 @@ function MatchHairTile({
       accessibilityRole="button"
       accessibilityLabel="Match hair"
       accessibilityState={{ selected }}
-      onPress={onPress}
+      onPress={() => {
+        hapticSelection();
+        onPress();
+      }}
       style={{
         width: 56,
         height: 56,
@@ -887,7 +900,10 @@ function Heads({
           key={k ?? 'none'}
           accessibilityRole="button"
           accessibilityState={{ selected: value === k }}
-          onPress={() => onPick(k)}
+          onPress={() => {
+            hapticSelection();
+            onPick(k);
+          }}
           style={{
             width: tileSize,
             height: tileSize,

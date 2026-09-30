@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -33,6 +32,7 @@ import {
   type Match,
   type Team,
 } from '@/lib/bracket/tournament';
+import { hapticDragStart, hapticSelection } from '@/lib/haptics';
 import { useBracketPickerPredictions } from '@/lib/useBracketPickerPredictions';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -109,16 +109,17 @@ function stageKeyToDb(key: BPStageKey): string {
   return key;
 }
 
+// ⚠ Kept as named module-level functions rather than inlined, because both are
+// handed to `runOnJS` from a worklet below — see the note on `handleDragStart`.
+// The bodies moved to `lib/haptics.ts` so Android stops taking the raw Vibrator
+// path, and so `TablePicker` (the same library, the same two events) can share
+// the exact weights rather than re-derive them.
 function triggerPickupHaptic() {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {
-    /* haptics unavailable on simulator/emulator */
-  });
+  hapticDragStart();
 }
 
 function triggerSlotCrossHaptic() {
-  Haptics.selectionAsync().catch(() => {
-    /* haptics unavailable */
-  });
+  hapticSelection();
 }
 
 type Props = {

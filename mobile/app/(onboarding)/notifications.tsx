@@ -19,6 +19,7 @@ import {
 import { Button, Text } from '@/components/ui';
 import { markNotificationsPrompted } from '@/lib/useOnboardingProgress';
 import { usePushPermission } from '@/lib/usePushPermission';
+import { hapticSuccess, hapticWarning } from '@/lib/haptics';
 import { useTheme, withOpacity } from '@/theme';
 
 const EXAMPLES = [
@@ -53,7 +54,16 @@ export default function OnboardingNotifications() {
   const handleTurnOn = useCallback(async () => {
     setSubmitting(true);
     try {
-      await request();
+      // ⚠ The OUTCOME, not the press. `request()` resolves with the status, and
+      // a denial is not a failure — it is a legitimate answer that leads to the
+      // same next screen. So denial gets the warning rhythm rather than the
+      // error one, which is the distinction `hapticFailure` would blur.
+      //
+      // ⚠ Already the behaviour of the onboarding PROTOTYPE in
+      // `components/onboarding/concepts/shared.tsx`; production was behind it.
+      const granted = await request();
+      if (granted === 'granted') hapticSuccess();
+      else hapticWarning();
     } finally {
       setSubmitting(false);
       finish();

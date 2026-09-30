@@ -1,7 +1,7 @@
-import * as Haptics from 'expo-haptics';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, Pressable, Text as RNText, View } from 'react-native';
 
+import { hapticSelection, hapticWarning } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type Props = {
@@ -48,27 +48,26 @@ export function TapScoreField({ value, onChange, disabled, width = 48 }: Props) 
 
   function tap() {
     if (disabled) return;
-    // Light haptic on every tap — gives the score field the same "snappy"
-    // feel as a physical stepper. Fires before onChange so the tactile
-    // response lines up with the visual update (state batching defers the
-    // re-render by a frame anyway).
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {
-      /* haptics unavailable on simulator / older devices */
-    });
+    // Light tick on every tap — the score field should feel like a physical
+    // stepper. Fires before onChange so the tactile response lines up with the
+    // visual update (state batching defers the re-render by a frame anyway).
+    //
+    // ⚠⚠ WAS `impactAsync(Light)`, AND ANDROID WAS THE PROBLEM. That call writes
+    // a 50ms raw waveform, and this field cycles 0→15 — reaching 9 is nine taps,
+    // so nine overlapping waveforms, which on a rotating-mass motor is a rattle
+    // rather than nine ticks. `hapticSelection` is the OEM's own scrub tick.
+    hapticSelection();
     const next = ((value ?? -1) + 1) % 16;
     onChange(next);
   }
 
   function longPressReset() {
     if (disabled) return;
-    // Heavier double-pulse haptic on long-press reset. iOS Warning
-    // notification pattern is a built-in two-tap rhythm that feels
-    // distinctly different from the single Light impact used on tap —
-    // signals "you just did the bigger action" without needing to read
-    // the screen. On Android the same call maps to a pattern vibration.
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {
-      /* haptics unavailable */
-    });
+    // ⭐ STAYS A PATTERN, deliberately. The two-tap rhythm is what says "you did
+    // the bigger action" without looking, and it has to stay distinguishable
+    // from the single tick above — so this is the one call in this file that
+    // still wants the waveform on both platforms. See `hapticWarning`.
+    hapticWarning();
     onChange(0);
   }
 

@@ -24,7 +24,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BanterRichCard, isRichMessageType } from '@/components/pool-detail/BanterRichCard';
@@ -42,6 +41,7 @@ import {
   type SharePredictionSheetHandle,
 } from '@/components/pool-detail/SharePredictionSheet';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { hapticLongPress } from '@/lib/haptics';
 import { supabase } from '@/lib/supabase';
 import { Icon, Text } from '@/components/ui';
 import {
@@ -1045,9 +1045,10 @@ function MessageRow({
 
   const bubbleRef = useRef<View | null>(null);
   function handleLongPress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {
-      /* haptics unsupported on this device */
-    });
+    // ⚠ Was a raw `impactAsync(Medium)`. Routed through `lib/haptics` so the
+    // Android side stops writing a raw Vibrator waveform — and so `BanterSheet`,
+    // which runs the same gesture, can share the exact weight.
+    hapticLongPress();
     // Measure the bubble's screen-space position so the parent can render
     // the picker as a screen-level overlay anchored to it.
     bubbleRef.current?.measureInWindow((x, y, width, height) => {

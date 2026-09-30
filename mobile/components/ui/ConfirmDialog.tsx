@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 
+import { hapticWarning } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 type ConfirmDialogProps = {
@@ -131,7 +132,16 @@ export function ConfirmDialog({
               </Pressable>
             ) : null}
             <Pressable
-              onPress={onConfirm}
+              onPress={() => {
+                // ⚠⚠ DESTRUCTIVE ONLY, never on an ordinary confirm. This
+                // component fronts Delete Pool among others — the action that
+                // has already caused real data loss in this repo — and the
+                // two-pulse warning rhythm is the point: it is the one buzz in
+                // the app that should feel like a hand on your arm rather than
+                // a tick. Putting it on every confirm would spend that.
+                if (destructive) hapticWarning();
+                onConfirm();
+              }}
               disabled={busy}
               style={({ pressed }) => ({
                 flex: 1,

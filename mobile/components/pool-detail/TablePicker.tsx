@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, Text as RNText, View } from 'react-native';
+import { runOnJS } from 'react-native-reanimated';
 import {
   NestedReorderableList,
   ScrollViewContainer,
@@ -10,6 +11,7 @@ import {
 
 import { ClubBar, Icon, Text } from '@/components/ui';
 import { saveTablePrediction, type SeasonClub, type TableSettings } from '@/lib/api';
+import { hapticDragStart, hapticSelection } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -138,6 +140,30 @@ export function TablePicker({
     [flush],
   );
 
+  /**
+   * ⚠⚠ THESE RUN ON THE UI THREAD. `onDragStart` and `onIndexChange` are
+   * worklets, so the haptic has to be hopped back to JS with `runOnJS` — a bare
+   * call would try to serialise the native module onto the UI thread and kill
+   * the screen on mount. That is not hypothetical here: it is the exact crash
+   * `lib/__tests__/walkoutWorklets.guard.test.ts` exists to prevent, and this
+   * is the same shape `BracketPickerWizard` uses for the same two events.
+   */
+  const handleDragStart = useCallback(() => {
+    'worklet';
+    runOnJS(hapticDragStart)();
+  }, []);
+
+  /**
+   * ⭐ A tick PER SLOT CROSSED, not per drop. Twenty clubs is a long drag and
+   * the position numbers renumber underneath you as you go; the ticks are how
+   * you feel how far you have moved without reading them. The bracket's groups
+   * are four rows, where this matters far less.
+   */
+  const handleIndexChange = useCallback(() => {
+    'worklet';
+    runOnJS(hapticSelection)();
+  }, []);
+
   const rows = useMemo(
     () => order.map((id, i) => ({ club: byId.get(id)!, position: i + 1 })).filter((r) => r.club),
     [order, byId],
@@ -185,6 +211,8 @@ export function TablePicker({
         scrollable={false}
         keyExtractor={(r) => r.club.club_id}
         onReorder={handleReorder}
+        onDragStart={handleDragStart}
+        onIndexChange={handleIndexChange}
         // The library's own way to refuse a drag — not an absent handler.
         dragEnabled={!locked}
         // ⚠ See ROW_HEIGHT. This is what makes the content tall enough for the

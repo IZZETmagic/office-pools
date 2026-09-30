@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ClubBar, Icon, Text } from '@/components/ui';
 import { fetchLmsState, saveLmsPick, type LmsState } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -123,6 +124,9 @@ function Content({
       setMessage(null);
     },
     onSuccess: async () => {
+      // ⭐ Earned here more than almost anywhere: in Last Man Standing this one
+      // tap IS the matchweek, and a club spent is spent for the whole season.
+      hapticSuccess();
       setMessage({ kind: 'ok', text: 'Saved. You can change it until the matchweek locks.' });
       // ⚠ Refetch rather than patch the cache. The used-clubs rule and the wall
       // both derive from this response, and a local edit would have to reproduce
@@ -153,8 +157,10 @@ function Content({
       // RefreshControl to `useManualRefresh`, which only flips on a real pull.
       void Promise.resolve(refreshHome());
     },
-    onError: (e) =>
-      setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'That pick could not be saved.' }),
+    onError: (e) => {
+      hapticFailure();
+      setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'That pick could not be saved.' });
+    },
     onSettled: () => setPending(null),
   });
 
