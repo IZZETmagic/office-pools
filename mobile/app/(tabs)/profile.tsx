@@ -209,6 +209,13 @@ export default function ProfileScreen() {
       subtitle: 'The 2026-06-27 motion-spec scrubber',
       onPress: () => router.push('/showdown-reveal-playground'),
     },
+    {
+      id: 'dev-onboarding',
+      icon: 'person.crop.circle',
+      title: 'Onboarding concepts',
+      subtitle: 'Eight takes on push + avatar — nothing writes',
+      onPress: () => router.push('/onboarding-harness'),
+    },
   ];
 
   return (

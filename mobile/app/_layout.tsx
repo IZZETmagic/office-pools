@@ -382,6 +382,10 @@ function InnerLayout() {
         <Stack.Screen name="settings/archived-pools" options={{ headerShown: false }} />
         <Stack.Screen name="settings/help" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        {/* THROWAWAY — the onboarding redesign concept harness. Declared only so it renders
+            full-bleed instead of under the stack's default header, which would title itself
+            "onboarding-harness" from the file path. Delete with the harness. */}
+        <Stack.Screen name="onboarding-harness" options={{ headerShown: false }} />
         </Stack>
         <SplashOverlay />
       </PendingActionsProvider>
