@@ -1,4 +1,19 @@
-# Office Pools — Monetization Plan
+# Office Pools — Monetization Plan *(v1 — SUPERSEDED)*
+
+> 🔴 **SUPERSEDED 2026-09-29 by [`MONETIZATION_V2.md`](MONETIZATION_V2.md). Where the two documents
+> disagree, v2 wins — do not plan, price or build from this file.**
+>
+> **What v2 changed and why:** measured against production, 94.7% of users are in exactly one pool,
+> 1.4% are in three or more, and 99.8% touch one competition. The *Pool Pro* monthly subscription
+> below was designed for a player in "2–5 pools across sports" — sixty-one people — so **it is cut**,
+> along with the ~$82,000/year revenue line resting on it. v2 replaces the player ladder with a
+> per-competition season pass plus owned-forever cosmetics, adds the get-it-elsewhere test that
+> decides what may be sold to one member and not another, and re-derives the player-side revenue
+> honestly (~$26K, not ~$109K, at 50K users).
+>
+> **This file is retained as the archive for three things v2 deliberately does not restate:** the Pool
+> Ultra marketing-pack specification, the full 2026 World Cup regression working, and the Paddle
+> integration detail. The **admin ladder** is carried forward into v2 unchanged.
 
 **Status:** Design proposed (May 2026); payment provider set to **Paddle** (Aug 2026); customer journey added (Sep 2026); **generalised off the World Cup and repriced on size (Sep 2026)**. Validated against 2026 World Cup pool data. Pending final survey signal in Phase 2. ⚠️ **The "no payment infrastructure built yet" line this file used to carry is stale.** `lib/paddle/` *(tiers, api, verifySignature, transactionCompleted)*, `app/api/paddle/webhook/route.ts` and `app/pools/[pool_id]/upgrade/` all exist, and **migration 075 enforces the tier caps in the database**. What is *deployed* is narrower: `app/pricing/page.tsx` and `app/refund-policy/page.tsx` are live on sportpool.io; checkout, webhook and upgrade route are not.
 
@@ -764,7 +779,12 @@ backlog doc already identified being the opposite of that as the positioning.
   5% + 50¢ becomes punitive — **21.7% on a $2.99 kit**. Paddle's own pricing page says to contact them
   for custom pricing under $10. Negotiate before Vector 1 ships on web; mobile IAP is unaffected.
 
-### Vector 2 — Pool Pro *(subscription, competition-agnostic)*
+### Vector 2 — Pool Pro *(subscription, competition-agnostic)* — 🔴 **CUT. See `MONETIZATION_V2.md` §1.**
+
+> 🔴 **This product does not exist any more.** Its premise — a player in 2–5 pools with continuous
+> engagement — measures at **1.4% of users (61 people)**; 94.7% are in exactly one pool. v2 replaces it
+> with a **$9.99 per-competition season pass**, account-level, no recurrence. The table below is kept
+> only because its *contents* were mostly right; the billing shape was not.
 
 A continuous-engagement subscription for engaged players. Works across every pool the player is in, regardless of which sport, competition or pool tier. Competition-agnostic by construction — no "I don't care about NFL" tension because Pool Pro doesn't sell sports, it sells a better player experience.
 
