@@ -38,9 +38,16 @@
 // =============================================================
 
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { Stack } from 'expo-router';
-import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  type SharedValue,
+  useAnimatedProps,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useFrameCallback,
+  useSharedValue,
+} from 'react-native-reanimated';
 
 import { Text } from '@/components/ui';
 import { ShowdownDuelHeader, type Standing } from '@/components/pool-detail/ShowdownDuelHeader';
@@ -48,7 +55,9 @@ import { ShowdownRecapSheet } from '@/components/pool-detail/ShowdownRecapSheet'
 import { ShowdownWalkout } from '@/components/pool-detail/ShowdownWalkout';
 import { duelPhase, type DuelPhaseInput } from '@/lib/duelPhase';
 import type { Bout } from '@/lib/useDuel';
-import { useTheme } from '@/theme';
+import { fontFamilies, useTheme } from '@/theme';
+
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 // -------------------------------------------------------------- the cast
 
@@ -516,6 +525,13 @@ export default function ShowdownPhaseHarness() {
           onClose={() => setWatching(false)}
         />
       ) : null}
+
+      {/*
+        ⚠ LAST, AND OUTSIDE THE SCROLLVIEW. It is pinned to the screen and rides
+        the same `scrollY` the band does — inside the scroll content it would move
+        with the content and measure nothing.
+      */}
+      <ScrollProbe scrollY={scrollY} />
     </View>
   );
 }
@@ -534,3 +550,115 @@ function Row({ k, v }: { k: string; v: string }) {
   );
 }
 
+// ------------------------------------------------------ the scroll probe
+
+/**
+ * ⭐⭐ THE INSTRUMENT, BECAUSE TWO DIAGNOSES IN A ROW WERE WRONG.
+ *
+ * The Showdown band jitters on scroll. The first explanation was composed-SVG
+ * view count (killed by the fact that it predated the avatars); the second was
+ * the 1 Hz countdown committing mid-drag (the fix shipped and the jitter stayed).
+ * A third guess is not worth having. This measures instead, and it answers two
+ * different questions that call for opposite fixes.
+ *
+ * ⚠ 1. IS THE UI THREAD DROPPING FRAMES AT ALL? `useFrameCallback` runs on the UI
+ * thread, so the gap it reports is the real one — not what the JS thread thinks.
+ * If `worst` sits near the display interval while the band still looks wrong, the
+ * frames are arriving and it is WHERE the band is drawn that is late, which is
+ * the commit-pause family. If `worst` spikes, something is genuinely costing time
+ * on the UI thread and the pause theory is not the story.
+ *
+ * ⚠⚠ 2. THE DOT IS THE CONTROL, AND IT IS THE MORE USEFUL HALF. It rides the SAME
+ * `scrollY`, through the same kind of worklet, with nothing behind it — no
+ * gradients, no avatars, no text. So:
+ *
+ *     dot smooth + band jittery  →  the band's own CONTENT is the cost
+ *     dot jittery + band jittery →  the pipeline that applies both is the cost
+ *
+ * No number can separate those two; two things moving side by side can.
+ *
+ * ⚠ IT MUST NOT RE-RENDER, or it measures itself. Everything here is a shared
+ * value read through `useAnimatedProps` — the same reason `CountdownText` is a
+ * `TextInput`.
+ *
+ * ⚠ AND THIS IS A DEV BUNDLE, which drops frames a release build would not. The
+ * ABSOLUTE numbers are not the product's frame rate. The COMPARISON is what is
+ * being read here.
+ */
+function ScrollProbe({ scrollY }: { scrollY: SharedValue<number> }) {
+  const theme = useTheme();
+  const worst = useSharedValue(0);
+  const dropped = useSharedValue(0);
+  const frames = useSharedValue(0);
+
+  useFrameCallback((f) => {
+    'worklet';
+    const dt = f.timeSincePreviousFrame;
+    if (dt === null || dt <= 0) return;
+    frames.value += 1;
+    // ⚠ A WINDOW, NOT A LIFETIME TOTAL. A single spike while the screen mounts
+    // would otherwise sit in `worst` forever and make every later reading a lie.
+    // 240 frames is about two seconds at 120Hz — long enough to cover a flick.
+    if (frames.value > 240) {
+      frames.value = 0;
+      worst.value = 0;
+      dropped.value = 0;
+    }
+    if (dt > worst.value) worst.value = dt;
+    // Generous on purpose: 25ms is late at 60Hz and very late at 120Hz, so a
+    // count above zero means real dropped frames rather than jitter in the clock.
+    if (dt > 25) dropped.value += 1;
+  }, true);
+
+  const readout = useAnimatedProps(() => {
+    'worklet';
+    return {
+      text: `worst ${Math.round(worst.value)}ms   dropped ${dropped.value}`,
+    } as unknown as Record<string, unknown>;
+  });
+
+  /**
+   * ⚠ THE SAME ARITHMETIC THE BAND USES — clamped at 140, which is roughly its
+   * own slide distance. If it were driven differently the comparison would not
+   * mean anything.
+   */
+  const dotStyle = useAnimatedStyle(() => {
+    'worklet';
+    const p = Math.min(Math.max(scrollY.value, 0), 140);
+    return { transform: [{ translateY: -p }] };
+  });
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' }}
+    >
+      <Animated.View
+        style={[
+          {
+            width: 26,
+            height: 26,
+            borderRadius: 13,
+            marginBottom: theme.spacing.sm,
+            backgroundColor: theme.colors.primary,
+          },
+          dotStyle,
+        ]}
+      />
+      <AnimatedTextInput
+        editable={false}
+        defaultValue="worst —   dropped —"
+        animatedProps={readout}
+        style={{
+          padding: 0,
+          marginBottom: theme.spacing.xl,
+          textAlign: 'center',
+          fontFamily: fontFamilies.bold,
+          fontSize: 13,
+          color: theme.colors.slate,
+          fontVariant: ['tabular-nums'],
+        }}
+      />
+    </View>
+  );
+}
