@@ -145,6 +145,10 @@ function InnerLayout() {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  // ⚠ Whether the router has reached the screen this launch is meant to end on.
+  // Set by the routing effect below, read by the splash gate — it is the
+  // difference between "we have decided where to go" and "we are there".
+  const [routingSettled, setRoutingSettled] = useState(false);
   const {
     loading: onboardingLoading,
     seen: onboardingSeen,
@@ -168,8 +172,18 @@ function InnerLayout() {
 
   useEffect(() => {
     // Hold routing until every input the state machine reads has resolved.
-    // The splash overlay covers this; once everything's ready we route
-    // exactly once into the correct destination before splash fades.
+    //
+    // ⚠ EVERY BRANCH BELOW EITHER NAVIGATES OR DECLARES ITSELF SETTLED, and the
+    // splash waits for that declaration. `router.replace` is asynchronous: the
+    // frame after it is called still shows the OLD route. The splash used to
+    // cover that frame by accident, because its floor was 1.2s; at 400ms it
+    // stopped covering it and the onboarding slides flashed up on launch for
+    // people who had long since finished them.
+    //
+    // A branch that navigates returns WITHOUT settling. This effect re-runs on
+    // `segments`, so once the new route commits it comes back round, finds
+    // itself in the right place, and settles then — which is the only moment
+    // the splash may safely lift.
     if (loading || onboardingLoading || pushPermissionStatus === null) return;
 
     const group = segments[0];
@@ -181,14 +195,22 @@ function InnerLayout() {
     //    Once they sign in (or have an existing session from another
     //    install), the slides are skipped entirely — by design.
     if (!session && !onboardingSeen) {
-      const onSlides = group === '(onboarding)' && sub !== 'notifications';
-      if (!onSlides) router.replace('/(onboarding)');
+      const onSlides = group === '(onboarding)' && sub === 'welcome';
+      if (!onSlides) {
+        router.replace('/(onboarding)/welcome');
+        return;
+      }
+      setRoutingSettled(true);
       return;
     }
 
     // 2) Unauthed past the slides — standard sign-in.
     if (!session) {
-      if (group !== '(auth)') router.replace('/(auth)/sign-in');
+      if (group !== '(auth)') {
+        router.replace('/(auth)/sign-in');
+        return;
+      }
+      setRoutingSettled(true);
       return;
     }
 
@@ -202,7 +224,11 @@ function InnerLayout() {
         return;
       }
       const onNotifications = group === '(onboarding)' && sub === 'notifications';
-      if (!onNotifications) router.replace('/(onboarding)/notifications');
+      if (!onNotifications) {
+        router.replace('/(onboarding)/notifications');
+        return;
+      }
+      setRoutingSettled(true);
       return;
     }
 
@@ -210,7 +236,9 @@ function InnerLayout() {
     //    any reason, bounce into the app.
     if (group === '(auth)' || group === '(onboarding)') {
       router.replace('/(tabs)');
+      return;
     }
+    setRoutingSettled(true);
   }, [
     session,
     loading,
@@ -387,7 +415,7 @@ function InnerLayout() {
             "onboarding-harness" from the file path. Delete with the harness. */}
         <Stack.Screen name="onboarding-harness" options={{ headerShown: false }} />
         </Stack>
-        <SplashOverlay />
+        <SplashOverlay routingSettled={routingSettled} />
       </PendingActionsProvider>
       </ActivityProvider>
       </TournamentMatchesProvider>
@@ -439,8 +467,8 @@ const SPLASH_MIN_MS = 400;
  */
 const SPLASH_MAX_MS = 2500;
 
-function SplashOverlay() {
-  const preloadComplete = useSplashGate();
+function SplashOverlay({ routingSettled }: { routingSettled: boolean }) {
+  const preloadComplete = useSplashGate(routingSettled);
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;
@@ -452,7 +480,7 @@ function SplashOverlay() {
   );
 }
 
-function useSplashGate(): boolean {
+function useSplashGate(routingSettled: boolean): boolean {
   const { session, loading: authLoading } = useAuth();
   const { loading: homeLoading } = useHomeData();
   const { loading: activityLoading } = useSharedActivity();
@@ -484,13 +512,18 @@ function useSplashGate(): boolean {
 
   if (!minElapsed) return false;
   if (authLoading || onboardingLoading || pushPermissionStatus === null) return false;
-  // Unauthenticated launch: no data to prefetch — fade out so the user
-  // lands on /(auth)/sign-in (or the pre-auth slides) immediately after
-  // the 1.2s floor.
-  if (!session) return true;
-  // ⚠ BELOW THE AUTH GATE AND ABOVE THE DATA GATE, ON PURPOSE — see
-  // `SPLASH_MAX_MS`. Routing correctness is never rushed; a stalled fetch no
-  // longer strands anyone.
+  // ⚠ THE CEILING GOES FIRST NOW, above everything it is meant to rescue —
+  // including the routing check below. Nothing beneath this line can strand
+  // anyone. See `SPLASH_MAX_MS`.
   if (ceilingReached) return true;
+  // ⚠ NOT "we have decided", but "we are there". `router.replace` is async, so
+  // lifting the splash on the decision shows the frame BEFORE the redirect —
+  // which is how the onboarding slides flashed up at people who had finished
+  // them years ago. The routing effect sets this only once the router has
+  // actually arrived.
+  if (!routingSettled) return false;
+  // Unauthenticated launch: nothing to prefetch, and routing has settled, so
+  // the sign-in screen (or the slides) is already the thing underneath.
+  if (!session) return true;
   return !homeLoading && !activityLoading && !matchesLoading;
 }
