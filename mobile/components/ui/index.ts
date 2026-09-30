@@ -4,6 +4,7 @@ export { Card } from './Card';
 export { ClubBar } from './ClubBar';
 export { TeamMark } from './TeamMark';
 export { ConfirmDialog } from './ConfirmDialog';
+export { CountdownText } from './CountdownText';
 export { Icon } from './Icon';
 export { Input } from './Input';
 export { NotificationDot } from './NotificationDot';

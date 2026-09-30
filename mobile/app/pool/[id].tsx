@@ -98,7 +98,25 @@ const TAB_PARAM_VALUES: PoolTabKey[] = [
 // so the switch commit stays cheap and the highlight snaps immediately. This
 // doesn't block a panel's own data updates or internal state — only the
 // redundant parent-triggered re-render.
+//
+// ⚠⚠ AND ON A SHOWDOWN POOL THERE IS A SECOND, SHARPER REASON: A COMMIT COSTS
+// THE BAND FRAMES.
+//
+// On iOS every React commit pauses Reanimated until it has mounted, and the
+// animated values for those frames are never applied — the mechanism is written
+// out in `lib/useCountdown.ts`. The Showdown band's collapse follows the scroll
+// 1:1, so any commit landing mid-drag shows as the band and its tab strip
+// freezing and then jumping. The shorter the commit, the shorter the freeze.
+//
+// So on this screen a memo boundary is not only about wasted render time; it is
+// about how long the band stops moving. Anything that defeats one — an inline
+// closure, a freshly built element — is a scroll regression, which is why the
+// props below are all either primitives or memoised.
 const MemoPoolDetailHeader = memo(PoolDetailHeader);
+// ⚠ THE BAND, AND IT WAS THE ONE CHILD WITHOUT A BOUNDARY. It is also the most
+// expensive: two locally composed SVG avatars (~42 native views each) and six
+// animated styles, all rebuilt on every screen render.
+const MemoShowdownDuelHeader = memo(ShowdownDuelHeader);
 const MemoDuelTab = memo(DuelTab);
 const MemoShowdownLeaderboard = memo(ShowdownLeaderboard);
 const MemoShowdownRoom = memo(ShowdownRoom);
@@ -118,6 +136,17 @@ const MemoRoundsTab = memo(RoundsTab);
 const MemoMembersTab = memo(MembersTab);
 const MemoFeesTab = memo(FeesTab);
 const MemoSettingsTab = memo(SettingsTab);
+/**
+ * ⚠ `TabPage` IS DECLARED AT THE BOTTOM OF THIS FILE and this reference still
+ * works, because a function declaration hoists to the top of the module.
+ *
+ * ⚠ IT ONLY BITES WHEN ITS `children` ARE STABLE, which is the React Compiler's
+ * job (`app.json` → `experiments.reactCompiler`) since `renderTab(key)` builds a
+ * fresh element per call. Worth having either way: when it does bail out it saves
+ * re-rendering five to eight `Animated.ScrollView`s, and when it doesn't the
+ * panels inside are themselves memoised and bail out one level down.
+ */
+const MemoTabPage = memo(TabPage);
 
 export default function PoolDetailScreen() {
   const theme = useTheme();
@@ -484,6 +513,14 @@ export default function PoolDetailScreen() {
    * band names their opponent. Nobody may be trapped behind an animation that
    * will not play.
    */
+  /**
+   * ⚠ A NAMED CALLBACK RATHER THAN AN INLINE ARROW, and on this screen that is a
+   * performance fact and not a style preference: `onReveal` is a prop of the
+   * memoised band, so a fresh closure every render defeats the boundary and each
+   * commit costs the collapse another frame. See the note by the Memo block.
+   */
+  const openWalkout = useCallback(() => setWalkoutOpen(true), []);
+
   const closeWalkout = useCallback(() => {
     setWalkoutOpen(false);
     const duelId = duelCurrent?.duel.duel_id;
@@ -643,6 +680,84 @@ export default function PoolDetailScreen() {
    */
   useScreenStatusBar(accentColor || isShowdownPool ? 'light' : 'auto');
 
+  /**
+   * ⚠ STABLE, BECAUSE IT IS A PROP OF THE MEMOISED TAB STRIP — which is itself a
+   * prop of the memoised band. A plain function declaration in the render body
+   * (which this was) gets a new identity every render and breaks both boundaries.
+   */
+  const handleTabTap = useCallback((next: PoolTabKey) => setTab(next), []);
+
+  /**
+   * ⚠⚠ ONE `RefreshControl` ELEMENT FOR EVERY PAGE, BUILT ONCE.
+   *
+   * It used to be constructed inside the `visibleTabs.map`, so every render of
+   * this screen allocated five to eight of them and handed each page a prop it
+   * had to treat as changed. React instantiates the descriptor once per parent,
+   * so sharing it is not sharing STATE — each page still gets its own control.
+   */
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        tintColor={accentColor ?? theme.colors.primary}
+      />
+    ),
+    [refreshing, onRefresh, accentColor, theme.colors.primary],
+  );
+
+  /**
+   * The tab strip, hoisted above the early returns so it can be memoised.
+   *
+   * ⚠⚠ IT IS THE BAND'S `children`, AND THAT IS WHY IT HAD TO MOVE. A freshly
+   * built element every render means `children !== prevChildren`, which defeats
+   * `memo(ShowdownDuelHeader)` however stable everything else is — and on iOS a
+   * band that re-renders mid-drag is a band that stops moving. It sat below the
+   * early returns, where no hook may go.
+   *
+   * ⚠ IT READS `data?.pool`, like every other flag up here, rather than the `pool`
+   * destructured below — see the note on `leagueMode`. Null while the pool is
+   * loading, which the early returns mean nothing ever renders.
+   *
+   * ⚠ Still the SAME `PoolTabBar` for every mode and still passed as a child
+   * rather than duplicated: two copies of the pill list is how the pager and the
+   * pills start disagreeing about tab order.
+   */
+  const poolIdForTabs = data?.pool.poolId ?? null;
+  const tabBar = useMemo(() => {
+    if (!poolIdForTabs) return null;
+    return (
+      <PoolTabBar
+        active={tab}
+        onChange={handleTabTap}
+        isAdmin={isAdmin}
+        isProgressive={!!isProgressive}
+        feesEnabled={feesEnabled}
+        isLeague={isLeague}
+        pageOffset={pageOffset}
+        accentColor={accentColor}
+        poolId={poolIdForTabs}
+        leagueMode={leagueMode}
+        // The Showdown band is lit from both edges, stays dark in both app
+        // themes, and the strip sits inside it — so the strip goes transparent
+        // AND dark, from the one flag that says where it is.
+        onDarkBand={isShowdownPool}
+      />
+    );
+  }, [
+    tab,
+    handleTabTap,
+    isAdmin,
+    isProgressive,
+    feesEnabled,
+    isLeague,
+    pageOffset,
+    accentColor,
+    poolIdForTabs,
+    leagueMode,
+    isShowdownPool,
+  ]);
+
   const tabIndex = Math.max(0, visibleTabs.indexOf(tab));
 
   // A tab that is no longer offered leaves the screen in two minds: `tab` still
@@ -738,10 +853,6 @@ export default function PoolDetailScreen() {
   // is null, so a miss is a slower path, never a wrong one.
   const ownLeagueEntryId =
     leagueLeaderboard?.find((e) => e.user_id === pool.currentUserId)?.entry_id ?? null;
-
-  function handleTabTap(next: PoolTabKey) {
-    setTab(next);
-  }
 
   function handleMomentumScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const i = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -977,25 +1088,6 @@ export default function PoolDetailScreen() {
     }
   }
 
-  const tabBar = (
-    <PoolTabBar
-      active={tab}
-      onChange={handleTabTap}
-      isAdmin={pool.isAdmin}
-      isProgressive={!!isProgressive}
-      feesEnabled={feesEnabled}
-      isLeague={isLeague}
-      pageOffset={pageOffset}
-      accentColor={accentColor}
-      poolId={pool.poolId}
-      leagueMode={leagueMode}
-      // The Showdown band is lit from both edges, stays dark in both app
-      // themes, and the strip sits inside it — so the strip goes transparent
-      // AND dark, from the one flag that says where it is.
-      onDarkBand={isShowdownPool}
-    />
-  );
-
   return (
     <SafeAreaView
       edges={['left', 'right']}
@@ -1043,7 +1135,7 @@ export default function PoolDetailScreen() {
         style={{ flex: 1 }}
       >
         {visibleTabs.map((key, i) => (
-          <TabPage
+          <MemoTabPage
             key={key}
             index={i}
             width={width}
@@ -1051,16 +1143,10 @@ export default function PoolDetailScreen() {
             scrollY={scrollY}
             paddingTop={bandHeight}
             paddingBottom={theme.spacing.xxxl}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={accentColor ?? theme.colors.primary}
-              />
-            }
+            refreshControl={refreshControl}
           >
             {renderTab(key)}
-          </TabPage>
+          </MemoTabPage>
         ))}
       </Animated.ScrollView>
 
@@ -1074,13 +1160,13 @@ export default function PoolDetailScreen() {
         it. It reports its expanded height back so every page can pad by it.
       */}
       {isShowdownPool ? (
-        <ShowdownDuelHeader
+        <MemoShowdownDuelHeader
           poolName={pool.poolName}
           poolCode={pool.poolCode ?? null}
           bout={duel.current}
           sealed={duel.sealed}
           you={duelYou}
-          onReveal={duelPhaseState.phase === 'revealable' ? () => setWalkoutOpen(true) : null}
+          onReveal={duelPhaseState.phase === 'revealable' ? openWalkout : null}
           phase={duelPhaseState.phase}
           /* ⚠ THE SAME ANSWER THE DUEL TAB GETS. The band's right-hand glow is
              the opponent's own colour, so this gates light as well as text. */
@@ -1093,7 +1179,7 @@ export default function PoolDetailScreen() {
           onExpandedHeight={setBandHeight}
         >
           {tabBar}
-        </ShowdownDuelHeader>
+        </MemoShowdownDuelHeader>
       ) : null}
 
       <BanterFab
@@ -1247,11 +1333,25 @@ function TabPage({
     [index],
   );
 
+  // ⚠ MEMOISED, BOTH OF THEM. A fresh style object is a changed prop, and a
+  // changed prop on five to eight mounted ScrollViews is native work on the main
+  // thread — which is the thread the Showdown band's collapse is waiting on. See
+  // the note by the Memo block at the top of this file.
+  const outerStyle = useMemo(() => ({ width }), [width]);
+  const contentStyle = useMemo(
+    () => ({ paddingTop, paddingBottom, flexGrow: 1 }),
+    [paddingTop, paddingBottom],
+  );
+
   return (
     <Animated.ScrollView
-      style={{ width }}
-      contentContainerStyle={{ paddingTop, paddingBottom, flexGrow: 1 }}
+      style={outerStyle}
+      contentContainerStyle={contentStyle}
       onScroll={handler}
+      // ⚠ NOT A THROTTLE. Verified in RN 0.81: `RCTScrollViewComponentView.mm`
+      // maps anything ≤ 16.67ms to 0, and Android's `ReactScrollViewHelper.kt`
+      // only throttles at `>= 17` — so this reads as "every frame" on both.
+      // Left at 16 because that is the documented way to say so.
       scrollEventThrottle={16}
       refreshControl={refreshControl}
     >

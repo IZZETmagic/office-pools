@@ -11,7 +11,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MemberAvatar } from '@/components/avatar/MemberAvatar';
-import { Icon, Text } from '@/components/ui';
+import { CountdownText, Icon, Text } from '@/components/ui';
 import {
   getInitials,
   gradientForUser,
@@ -19,7 +19,7 @@ import {
   avatarBackgroundFor,
   AVATAR_GRADIENTS,
 } from '@/lib/avatarGradient';
-import { formatDhms, formatHms, useCountdown } from '@/lib/useCountdown';
+import { useCountdownClock } from '@/lib/useCountdown';
 import { duelResult } from '@/lib/duelPoints';
 import type { DuelPhase } from '@/lib/duelPhase';
 import type { Bout } from '@/lib/useDuel';
@@ -1088,9 +1088,10 @@ function RevealButton({ onPress }: { onPress: () => void }) {
 /**
  * The centre column while the draw is sealed: a clock to the walkout.
  *
- * ⚠ IT COUNTS DOWN TO A TARGET IT WAS GIVEN. `useCountdown` returns null once
- * the instant passes — see its own header on why a hook that renders a clock is
- * allowed and one that decides what the clock is FOR is not.
+ * ⚠ IT COUNTS DOWN TO A TARGET IT WAS GIVEN. `useCountdownClock` reports
+ * `running: false` once the instant passes — see its own header on why a hook
+ * that renders a clock is allowed and one that decides what the clock is FOR is
+ * not, and on why the digits never pass through React.
  *
  * ⚠ `formatDhms` RATHER THAN `formatHms`, AND THAT IS NOT COSMETIC. This wait
  * is a DAY at minimum (129) and can be nineteen: three matchweeks a season sit
@@ -1108,7 +1109,24 @@ function RevealButton({ onPress }: { onPress: () => void }) {
  */
 function SealedMiddle({ opensAt }: { opensAt: string | null }) {
   const theme = useTheme();
-  const until = useCountdown(opensAt);
+  const clock = useCountdownClock(opensAt);
+
+  /**
+   * ⚠ ONE STYLE, SHARED BY THE CLOCK AND THE WORDS THAT REPLACE IT. The clock is
+   * a `CountdownText` and the fallback is a `BandText`, which are two different
+   * primitives — so the style has to be named once rather than written twice, or
+   * they drift apart at the moment the wait expires and the swap happens.
+   */
+  const clockStyle: TextStyle = {
+    fontFamily: fontFamilies.black,
+    // ⚠ Smaller than the live scoreline's 32 on purpose. A clock to an
+    // event is not the event; sizing it like the score would make the
+    // wait shout louder than the football it is waiting for.
+    fontSize: 20,
+    lineHeight: 26,
+    color: BAND.ink,
+    fontVariant: ['tabular-nums'],
+  };
 
   return (
     <View style={{ alignItems: 'center', gap: theme.spacing.xs }}>
@@ -1121,29 +1139,26 @@ function SealedMiddle({ opensAt }: { opensAt: string | null }) {
           color: BAND.slate,
         }}
       >
-        {until === null ? 'Opens' : 'Opponent in'}
+        {clock.running ? 'Opponent in' : 'Opens'}
       </BandText>
-      <BandText
-        style={{
-          fontFamily: fontFamilies.black,
-          // ⚠ Smaller than the live scoreline's 32 on purpose. A clock to an
-          // event is not the event; sizing it like the score would make the
-          // wait shout louder than the football it is waiting for.
-          fontSize: 20,
-          lineHeight: 26,
-          color: BAND.ink,
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {/*
-          ⚠ THREE STATES, AND THE THIRD IS NOT AN ERROR. A live clock while the
-          hold is running; "Any moment" once it has expired but the payload has
-          not caught up — the reveal lands on a clock, and this component cannot
-          make rows appear; and "After this week" when there is no instant to
-          count to at all because the previous matchweek is still being played.
-        */}
-        {until !== null ? formatDhms(until) : opensAt !== null ? 'Any moment' : 'After this week'}
-      </BandText>
+      {/*
+        ⚠ THREE STATES, AND THE THIRD IS NOT AN ERROR. A live clock while the
+        hold is running; "Any moment" once it has expired but the payload has
+        not caught up — the reveal lands on a clock, and this component cannot
+        make rows appear; and "After this week" when there is no instant to
+        count to at all because the previous matchweek is still being played.
+
+        ⚠ `formatDhms` VIA `format="dhms"`, and that is not cosmetic: this wait is
+        a DAY at minimum (129) and can be nineteen, and `formatHms` accumulates
+        hours without rolling over, so it would print `499:00:00`.
+      */}
+      {clock.running ? (
+        <CountdownText clock={clock} format="dhms" style={clockStyle} />
+      ) : (
+        <BandText style={clockStyle}>
+          {opensAt !== null ? 'Any moment' : 'After this week'}
+        </BandText>
+      )}
     </View>
   );
 }
@@ -1169,8 +1184,12 @@ function Middle({
   const { you, them, settled } = bout;
   const result = settled && them ? duelResult(you.points) : null;
   // Nothing to count once the duel is decided — the week it belonged to is over.
-  const untilKickoff = useCountdown(settled ? null : kickoffAt);
-  const countdown = them ? untilKickoff : null;
+  const kickoffClock = useCountdownClock(settled ? null : kickoffAt);
+  // ⚠ A BYE HAS NOTHING TO COUNT TO EITHER. The clock is about a fight; with
+  // nobody drawn against you there is no fight to be counting down to, so this
+  // gate stays where it was rather than moving into the hook — the hook counts,
+  // it does not decide what a clock is for.
+  const counting = kickoffClock.running && them !== null;
 
   /**
    * ⚠ THE CLOCK GETS THE LOCK HOUR, THE SCORE GETS EVERYTHING AFTER IT.
@@ -1182,7 +1201,7 @@ function Middle({
    * counting to a real event, so it keeps the column until it expires and then
    * hands over on its own. No second condition, and no second clock read.
    */
-  const showLive = !settled && liveScore !== null && countdown === null;
+  const showLive = !settled && liveScore !== null && !counting;
 
   const score = settled && them
     ? { you: you.accuracy ?? 0, them: them.accuracy ?? 0 }
@@ -1329,9 +1348,17 @@ function Middle({
         lost — it is the team sheet's own heading, on the card that lists the
         games it is counting.
       */}
-      {showLive ? null : countdown ? (
-        <BandText
-          align="center"
+      {/*
+        ⚠⚠ A `CountdownText`, NOT A `BandText`, AND THAT IS THE FIX FOR THE BAND'S
+        SCROLL HITCH. This is the one number on the header that changes while you
+        watch it — and while it lived in React, changing it committed, and on iOS a
+        commit stalls the band's collapse mid-drag. See `lib/useCountdown.ts`.
+      */}
+      {showLive ? null : counting ? (
+        <CountdownText
+          clock={kickoffClock}
+          format="hms"
+          accessibilityLabel="Time until the first game"
           style={{
             fontFamily: fontFamilies.black,
             // Ryan: "this is the countdown to game time (fight time)". It is
@@ -1347,9 +1374,7 @@ function Middle({
             // proportional and the whole clock jitters sideways once a second.
             fontVariant: ['tabular-nums'],
           }}
-        >
-          {formatHms(countdown)}
-        </BandText>
+        />
       ) : (
         <BandText
           align="center"
