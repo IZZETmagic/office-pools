@@ -372,10 +372,32 @@ export function useTournamentMatchesInternal() {
   // went live on any screen. The subscription below is what makes the comment
   // true. Do not add an interval — fix the ear, not the clock.
   const leagueQueryKey = useMemo(() => ['league-fixtures', appUserId] as const, [appUserId]);
+  // ⚠ READ SYNCHRONOUSLY, ONCE, so react-query has something to serve on the
+  // very first render. The cold-start cache covered the World Cup `matches`
+  // table and stopped there, which left the LEAGUE half — an API route behind
+  // react-query, whose cache is memory-only — refetching on every cold launch.
+  // For a Premier League member that is the entire match list, and it is the
+  // "fixtures take a moment to appear" everyone was seeing.
+  const [cachedLeague] = useState(() => readCache<LeagueFixturesResponse>(CACHE_KEYS.leagueFixtures));
   const leagueQuery = useQuery({
     queryKey: leagueQueryKey,
     enabled: !!appUserId,
-    queryFn: () => apiFetch<LeagueFixturesResponse>(`/api/users/${appUserId}/fixtures`),
+    // ⚠ WRITTEN HERE RATHER THAN IN AN EFFECT ON `data`, and the difference
+    // matters: this runs only for a REAL fetch. An effect would also fire for
+    // the seeded value below and stamp it with a fresh `cachedAt`, renewing its
+    // own six-hour leash on every launch — data that could never expire while
+    // the app was opened daily, which is exactly when it is most wrong.
+    queryFn: async () => {
+      const data = await apiFetch<LeagueFixturesResponse>(`/api/users/${appUserId}/fixtures`);
+      if (userIdRef.current) writeCache(CACHE_KEYS.leagueFixtures, userIdRef.current, data);
+      return data;
+    },
+    initialData: cachedLeague?.data,
+    // ⚠ LOAD-BEARING. Without the real timestamp react-query treats the seeded
+    // value as fetched JUST NOW and will not revalidate it, so the fixtures
+    // would be instant and permanently stale. With it, the cache paints the
+    // first frame and a refetch starts immediately behind it.
+    initialDataUpdatedAt: cachedLeague?.cachedAt,
   });
 
   // =============================================================
@@ -392,6 +414,19 @@ export function useTournamentMatchesInternal() {
   // seasons needs five sockets, not twelve. The route picks the pool — see
   // `poolBySeason` there for why it has to, and why a stable choice matters.
   const queryClient = useQueryClient();
+  // ⚠ SAME ADOPT/REVOKE CONTRACT AS THE CACHES ABOVE. The fixtures were seeded
+  // from disk before auth resolved — that is what makes the first frame instant
+  // — so they are provisional until the restored session proves whose they are.
+  // A fixture list is a list of the competitions somebody follows, and on a
+  // shared phone that is not the next person's to see.
+  const leagueRevokedRef = useRef(false);
+  useEffect(() => {
+    if (!cachedLeague || leagueRevokedRef.current) return;
+    if (authLoading) return;
+    if (user && user.id === cachedLeague.userId) return;
+    leagueRevokedRef.current = true;
+    queryClient.removeQueries({ queryKey: leagueQueryKey });
+  }, [authLoading, user, cachedLeague, queryClient, leagueQueryKey]);
   // ⚠ A STRING FIRST, THEN THE LIST. `leagueQuery.data` is a NEW object on
   // every refetch and on every message this very subscription applies, so
   // depending on it directly would tear down and rebuild all five channels

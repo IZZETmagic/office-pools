@@ -77,9 +77,15 @@ describe('persistentCache', () => {
     expect(readCache<Row>(CACHE_KEYS.home)).toBeNull();
   });
 
-  it('holds matches to a SHORTER leash than home data', () => {
+  it('holds anything carrying a scoreline to a SHORTER leash than home data', () => {
     // A scoreline goes wrong in a way a pool name does not. Same age, two
     // different answers — this is the override doing its job.
+    //
+    // ⚠ BOTH match sources, not just one. The World Cup's `matches` table and
+    // the league fixtures API are separate caches that merge into a SINGLE list
+    // on screen, so an override on one and not the other means half the
+    // fixtures can be a day older than the other half with nothing on the
+    // screen to say which half.
     const cachedAt = Date.now() - 7 * 60 * 60 * 1000; // 7 hours
     const body = (key: string) =>
       JSON.stringify({ v: CACHE_VERSION, userId: USER, cachedAt, data: { hello: key } });
@@ -87,10 +93,12 @@ describe('persistentCache', () => {
       fakeStore({
         [CACHE_KEYS.home]: body('home'),
         [CACHE_KEYS.matches]: body('matches'),
+        [CACHE_KEYS.leagueFixtures]: body('league'),
       }),
     );
     expect(readCache<Row>(CACHE_KEYS.home)).not.toBeNull();
     expect(readCache<Row>(CACHE_KEYS.matches)).toBeNull();
+    expect(readCache<Row>(CACHE_KEYS.leagueFixtures)).toBeNull();
   });
 
   it('reports the owner so a caller can refuse another person\'s payload', () => {

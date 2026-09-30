@@ -95,6 +95,9 @@ const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
  */
 const MAX_AGE_OVERRIDES: Record<string, number> = {
   'tournament-matches': 6 * 60 * 60 * 1000, // 6 hours
+  // League fixtures carry scorelines too, so they get the same leash for the
+  // same reason.
+  'league-fixtures': 6 * 60 * 60 * 1000, // 6 hours
 };
 
 type Envelope<T> = {
@@ -230,4 +233,14 @@ export const CACHE_KEYS = {
   home: 'home-data',
   activity: 'activity-feed',
   matches: 'tournament-matches',
+  /**
+   * `/api/users/:id/fixtures` — the LEAGUE half of the match list.
+   *
+   * ⚠ A SEPARATE CACHE BECAUSE IT IS A SEPARATE SOURCE. `matches` above is the
+   * World Cup's Postgres table; this is an API route, fetched through
+   * react-query, and merged with the other into one list. Caching only the
+   * first left every Premier League member refetching their fixtures on every
+   * cold launch — which is the whole of the product right now.
+   */
+  leagueFixtures: 'league-fixtures',
 } as const;
