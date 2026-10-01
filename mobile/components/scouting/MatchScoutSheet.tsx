@@ -67,7 +67,7 @@ export function MatchScoutSheet({
   const { data, loading, error, refresh } = useMatchScout(fixtureId);
 
   return (
-    <ScoutSheet open={!!fixtureId} onClose={onClose} height="88%">
+    <ScoutSheet open={!!fixtureId} onClose={onClose} heightFraction={0.88}>
       {/* ⚠ THE SAME HEADER THE DOSSIER USES, with a fixture in the subject slot
           instead of a member. See `ScoutHeader`. */}
       <ScoutHeader detail={data?.fixture.venue}>

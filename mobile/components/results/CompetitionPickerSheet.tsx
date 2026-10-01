@@ -1,12 +1,12 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Easing,
   Modal,
   Pressable,
   ScrollView,
   Text as RNText,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -55,7 +55,10 @@ export const CompetitionPickerSheet = forwardRef<CompetitionPickerSheetHandle, P
     const insets = useSafeAreaInsets();
     const [visible, setVisible] = useState(false);
 
-    const screenHeight = Dimensions.get('window').height;
+    // ⚠ `useWindowDimensions`, NOT `Dimensions.get`. The hook re-renders on a
+    // rotation, a fold and an iPad split-view drag; the imperative read answers
+    // once and then quietly keeps answering for the screen it first saw.
+    const { height: screenHeight } = useWindowDimensions();
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(screenHeight)).current;
 

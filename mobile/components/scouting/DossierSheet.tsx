@@ -78,7 +78,7 @@ export function DossierSheet({
       .join(' · ') || null;
 
   return (
-    <ScoutSheet open={!!entryId} onClose={onClose} height="88%">
+    <ScoutSheet open={!!entryId} onClose={onClose} heightFraction={0.88}>
       <ScoutHeader detail={detail}>
         {data ? (
           <MemberSubject

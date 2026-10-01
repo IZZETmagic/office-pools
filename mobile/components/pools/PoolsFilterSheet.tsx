@@ -18,7 +18,7 @@ import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, useSheetChrome } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type FilterOption = {
@@ -43,6 +43,7 @@ export const PoolsFilterSheet = forwardRef<PoolsFilterSheetHandle>(function Pool
   ref,
 ) {
   const theme = useTheme();
+  const sheetChrome = useSheetChrome('surface');
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheet | null>(null);
   // Local config state — parent passes a fresh config each time it calls
@@ -89,15 +90,10 @@ export const PoolsFilterSheet = forwardRef<PoolsFilterSheetHandle>(function Pool
       snapPoints={snapPoints}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
-      handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-      // ⚠ THE TOP CORNERS ARE NAMED BECAUSE GORHOM'S DEFAULT IS 15, which is
-      // squarer than every other sheet in this app. `radii.xl` is the house
-      // sheet radius — the Modal-based sheets have always used it.
-      backgroundStyle={{
-        backgroundColor: theme.colors.surface,
-        borderTopLeftRadius: theme.radii.xl,
-        borderTopRightRadius: theme.radii.xl,
-      }}
+      // ⚠ CORNERS AND HANDLE COME FROM ONE PLACE — see `sheetChrome`. The
+      // handle also pins a WIDTH, because gorhom's default is a percentage
+      // of a screen width it read once at module scope.
+      {...sheetChrome}
     >
       <BottomSheetView
         style={{

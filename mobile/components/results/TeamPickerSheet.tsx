@@ -1,13 +1,13 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Easing,
   FlatList,
   Modal,
   Pressable,
   Text as RNText,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,7 +44,10 @@ export const TeamPickerSheet = forwardRef<TeamPickerSheetHandle, Props>(function
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
 
-  const screenHeight = Dimensions.get('window').height;
+  // ⚠ `useWindowDimensions`, NOT `Dimensions.get`. The hook re-renders on a
+  // rotation, a fold and an iPad split-view drag; the imperative read answers
+  // once and then quietly keeps answering for the screen it first saw.
+  const { height: screenHeight } = useWindowDimensions();
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(screenHeight)).current;
 

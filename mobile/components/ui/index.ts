@@ -12,5 +12,11 @@ export { Placeholder } from './Placeholder';
 export { ProgressRing } from './ProgressRing';
 export { PromptDialog } from './PromptDialog';
 export { Screen } from './Screen';
+export {
+  SHEET_HANDLE_WIDTH,
+  SHEET_RADIUS,
+  useSheetChrome,
+  useSheetHeight,
+} from './sheetChrome';
 export { Text } from './Text';
 export { Wordmark } from './Wordmark';

@@ -7,6 +7,7 @@ import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'r
 import { Image, Pressable, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useSheetChrome } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 import { badgeIcon } from './badge-icons';
@@ -33,6 +34,7 @@ export const FlexBadgesSheet = forwardRef<FlexBadgesSheetHandle, Props>(function
   ref,
 ) {
   const theme = useTheme();
+  const sheetChrome = useSheetChrome('surface');
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheet | null>(null);
 
@@ -68,15 +70,10 @@ export const FlexBadgesSheet = forwardRef<FlexBadgesSheetHandle, Props>(function
       snapPoints={snapPoints}
       enablePanDownToClose
       backdropComponent={renderBackdrop}
-      handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-      // ⚠ THE TOP CORNERS ARE NAMED BECAUSE GORHOM'S DEFAULT IS 15, which is
-      // squarer than every other sheet in this app. `radii.xl` is the house
-      // sheet radius — the Modal-based sheets have always used it.
-      backgroundStyle={{
-        backgroundColor: theme.colors.surface,
-        borderTopLeftRadius: theme.radii.xl,
-        borderTopRightRadius: theme.radii.xl,
-      }}
+      // ⚠ CORNERS AND HANDLE COME FROM ONE PLACE — see `sheetChrome`. The
+      // handle also pins a WIDTH, because gorhom's default is a percentage
+      // of a screen width it read once at module scope.
+      {...sheetChrome}
     >
       <BottomSheetView style={{ paddingHorizontal: theme.spacing.lg, paddingBottom: insets.bottom + theme.spacing.md }}>
         <View style={{ paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.md }}>

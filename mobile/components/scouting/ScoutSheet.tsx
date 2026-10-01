@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useTheme } from '@/theme';
+import { useSheetChrome, useSheetHeight } from '@/components/ui';
 
 // =============================================================
 // The shell every scout report slides up in
@@ -59,13 +59,28 @@ import { useTheme } from '@/theme';
 // off mid-slide.
 // =============================================================
 
+/**
+ * The shortest a scout report is allowed to be, in points.
+ *
+ * ⚠ IT EXISTS FOR SMALL SCREENS, AND IT IS A FLOOR, NOT A HEIGHT. 88% of a
+ * 932pt phone leaves 112pt of context behind the sheet, which is the intent. 88%
+ * of a 568pt SE leaves 68pt — not enough to read as "the screen you came from",
+ * and taken off a report that already scrolls. Above this floor the fraction
+ * rules; below it the sheet takes everything the window has, which is what a
+ * native sheet does on a small screen too.
+ *
+ * ⚠ `useSheetHeight` CLAMPS TO THE AVAILABLE HEIGHT AFTER THIS, so a number
+ * larger than the window cannot push the sheet under the status bar.
+ */
+const MIN_REPORT_HEIGHT = 560;
+
 export function ScoutSheet({
   open,
   onClose,
   /**
-   * How tall, as a share of the screen.
+   * How tall, as a share of the screen it has to work on.
    *
-   * ⚠ BOTH REPORTS ARE 88% NOW, AND THE PROP STAYS ANYWAY. It used to carry a
+   * ⚠ BOTH REPORTS ARE 0.88 NOW, AND THE PROP STAYS ANYWAY. It used to carry a
    * real split — the match scout was 72% so the picker stayed visible behind a
    * "peek", the dossier 88% because it is something you sit and read. Ryan,
    * 2026-10-01: bring the match scout up to the dossier's height. The report
@@ -73,20 +88,26 @@ export function ScoutSheet({
    *
    * The prop is not inlined because the two callers are the two things that get
    * to disagree about this, and a future third sheet may want to.
+   *
+   * ⚠⚠ A FRACTION, NOT A `'88%'` SNAP POINT, and that is the whole fix for small
+   * screens — `useSheetHeight` turns it into points against the LIVE window and
+   * floors it, so a short phone or a landscape window gets a usable sheet
+   * instead of 88% of not very much. See that hook for the argument.
    */
-  height = '88%',
+  heightFraction = 0.88,
   children,
 }: {
   open: boolean;
   onClose: () => void;
-  height?: string;
+  heightFraction?: number;
   children: React.ReactNode;
 }) {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const ref = useRef<BottomSheet | null>(null);
+  const sheetChrome = useSheetChrome('snow');
 
-  const snapPoints = useMemo(() => [height], [height]);
+  const sheetHeight = useSheetHeight(heightFraction, { min: MIN_REPORT_HEIGHT });
+  const snapPoints = useMemo(() => [sheetHeight], [sheetHeight]);
 
   // ⚠ THE PROP DRIVES THE IMPERATIVE API. Both are safe to call repeatedly —
   // gorhom no-ops on a sheet already at that snap point rather than re-animating.
@@ -132,26 +153,11 @@ export function ScoutSheet({
         onClose={onClose}
         backdropComponent={renderBackdrop}
         topInset={insets.top}
-        handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
         // ⚠ SNOW, NOT SURFACE. Cards in this app are `surface` on `snow`; make
-        // the sheet body a screen and the cards inside can just be cards.
-        //
-        // ⚠⚠ THE CORNERS ARE OVERRIDDEN BECAUSE GORHOM'S DEFAULT IS TOO SQUARE
-        // FOR THIS APP. Its background ships `borderRadius: 15`, which lands
-        // between `radii.sm` (12) and `radii.md` (18) — so the sheet was LESS
-        // round than the `radii.lg` cards sitting inside it, and a container
-        // sharper than its contents reads as a mistake rather than a choice.
-        // `xl` (32) is deliberately one step above the cards: the sheet is the
-        // outermost surface, so it should be the roundest thing on screen.
-        //
-        // ⚠ TOP CORNERS ONLY, NAMED EXPLICITLY. The bottom two are off-screen at
-        // every snap point, and the specific corner props win over the
-        // library's blanket `borderRadius` whatever order the styles merge in.
-        backgroundStyle={{
-          backgroundColor: theme.colors.snow,
-          borderTopLeftRadius: theme.radii.xl,
-          borderTopRightRadius: theme.radii.xl,
-        }}
+        // the sheet body a screen and the cards inside can just be cards. The
+        // corners and the handle are `sheetChrome`'s — every sheet in the app
+        // shares them, so they can only be got wrong in one place.
+        {...sheetChrome}
       >
         {children}
       </BottomSheet>

@@ -8,14 +8,13 @@ import {
   ScrollView,
   StyleSheet,
   Text as RNText,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, useSheetHeight } from '@/components/ui';
 import { withLightness } from '@/lib/design/oklch';
 import { useTheme, withOpacity } from '@/theme';
 import {
@@ -99,7 +98,7 @@ export function PlayerStatSheet({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
+  const sheetHeight = useSheetHeight(0.85, { min: 560 });
   // ⚠ `useState`, NOT `useRef`. The sibling sheets here hold their
   // `Animated.Value` in a ref, and for them that is fine — they only ever touch
   // it from an effect. This one INTERPOLATES it during render to build the
@@ -180,7 +179,10 @@ export function PlayerStatSheet({
               // is the trade ReactionsSheet's own comment accepts. This card is
               // ~690pt at its shortest against a 717pt box on a 844pt phone, so
               // the gap is small and the scrolling is not optional.
-              height: screenHeight * 0.85,
+              // ⚠ CLAMPED TO THE LIVE WINDOW. `useSheetHeight` floors this and caps
+              // it at the available height, so the definite box above survives a
+              // short screen, a landscape window and a split-view resize.
+              height: sheetHeight,
               // ⚠ SNOW, NOT SURFACE, AND THAT IS THE WHOLE RESTRUCTURE. Cards
               // in this app are `surface` on `snow` — that is the relationship
               // every screen uses and the one `shadows.card` is drawn for. The

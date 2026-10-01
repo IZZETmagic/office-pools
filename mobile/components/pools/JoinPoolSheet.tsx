@@ -21,7 +21,7 @@ import {
 import { Linking, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, Text } from '@/components/ui';
+import { Icon, Text, useSheetChrome } from '@/components/ui';
 import { joinPool } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -63,6 +63,7 @@ export type JoinPoolSheetHandle = {
 
 export const JoinPoolSheet = forwardRef<JoinPoolSheetHandle>(function JoinPoolSheet(_, ref) {
   const theme = useTheme();
+  const sheetChrome = useSheetChrome('surface');
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheet | null>(null);
   const [tab, setTab] = useState<Tab>('code');
@@ -167,15 +168,10 @@ export const JoinPoolSheet = forwardRef<JoinPoolSheetHandle>(function JoinPoolSh
       // Sheet shifts up as the keyboard appears so the input stays visible.
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
-      handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-      // ⚠ THE TOP CORNERS ARE NAMED BECAUSE GORHOM'S DEFAULT IS 15, which is
-      // squarer than every other sheet in this app. `radii.xl` is the house
-      // sheet radius — the Modal-based sheets have always used it.
-      backgroundStyle={{
-        backgroundColor: theme.colors.surface,
-        borderTopLeftRadius: theme.radii.xl,
-        borderTopRightRadius: theme.radii.xl,
-      }}
+      // ⚠ CORNERS AND HANDLE COME FROM ONE PLACE — see `sheetChrome`. The
+      // handle also pins a WIDTH, because gorhom's default is a percentage
+      // of a screen width it read once at module scope.
+      {...sheetChrome}
       // Track open/closed state so the QR tab can mount/unmount the
       // CameraView in lockstep with sheet visibility.
       onChange={(idx) => setSheetOpen(idx >= 0)}

@@ -7,6 +7,7 @@ import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'r
 import { Image, Pressable, Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useSheetChrome } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type PredictionOutcome = 'exact' | 'correct' | 'miss';
@@ -45,6 +46,7 @@ type Props = {
 export const SharePredictionSheet = forwardRef<SharePredictionSheetHandle, Props>(
   function SharePredictionSheet({ options, onPick }, ref) {
     const theme = useTheme();
+    const sheetChrome = useSheetChrome('surface');
     const insets = useSafeAreaInsets();
     const sheetRef = useRef<BottomSheet | null>(null);
 
@@ -79,15 +81,10 @@ export const SharePredictionSheet = forwardRef<SharePredictionSheetHandle, Props
         snapPoints={snapPoints}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
-        handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-        // ⚠ THE TOP CORNERS ARE NAMED BECAUSE GORHOM'S DEFAULT IS 15, which is
-        // squarer than every other sheet in this app. `radii.xl` is the house
-        // sheet radius — the Modal-based sheets have always used it.
-        backgroundStyle={{
-          backgroundColor: theme.colors.surface,
-          borderTopLeftRadius: theme.radii.xl,
-          borderTopRightRadius: theme.radii.xl,
-        }}
+        // ⚠ CORNERS AND HANDLE COME FROM ONE PLACE — see `sheetChrome`. The
+        // handle also pins a WIDTH, because gorhom's default is a percentage
+        // of a screen width it read once at module scope.
+        {...sheetChrome}
       >
         <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.md }}>
           <RNText

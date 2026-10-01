@@ -1,7 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Easing,
   Image,
   Modal,
@@ -9,6 +8,7 @@ import {
   Pressable,
   StyleSheet,
   Text as RNText,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,7 +53,10 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
     const [visible, setVisible] = useState(false);
     const [badge, setBadge] = useState<BadgeInfo | null>(null);
     const [earned, setEarned] = useState(false);
-    const screenHeight = Dimensions.get('window').height;
+    // ⚠ `useWindowDimensions`, NOT `Dimensions.get`. The hook re-renders on a
+    // rotation, a fold and an iPad split-view drag; the imperative read answers
+    // once and then quietly keeps answering for the screen it first saw.
+    const { height: screenHeight } = useWindowDimensions();
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(screenHeight)).current;
 

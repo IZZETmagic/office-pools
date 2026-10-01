@@ -3,13 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   Easing,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   Text as RNText,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,7 +68,10 @@ type Props = {
 export function TableEntrySheet({ poolId, target, isLocked, onClose }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const screenHeight = Dimensions.get('window').height;
+  // ⚠ `useWindowDimensions`, NOT `Dimensions.get`. The hook re-renders on a
+  // rotation, a fold and an iPad split-view drag; the imperative read answers
+  // once and then quietly keeps answering for the screen it first saw.
+  const { height: screenHeight } = useWindowDimensions();
 
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(screenHeight)).current;

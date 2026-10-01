@@ -87,7 +87,7 @@ import Animated, {
 import { Image as ExpoImage } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ConfirmDialog, Icon, Text } from '@/components/ui';
+import { ConfirmDialog, Icon, Text, useSheetChrome } from '@/components/ui';
 import {
   AVATAR_GRADIENTS,
   getInitials,
@@ -274,6 +274,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   ref,
 ) {
   const theme = useTheme();
+  const sheetChrome = useSheetChrome('snow');
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheet | null>(null);
   const banter = usePoolBanter(poolId);
@@ -1168,15 +1169,10 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         // the status bar. Sheet stays locked here — no
         // keyboardBehavior, no shifting when the keyboard opens.
         topInset={insets.top}
-        handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-        // ⚠ THE TOP CORNERS ARE NAMED BECAUSE GORHOM'S DEFAULT IS 15, which is
-        // squarer than every other sheet in this app. `radii.xl` is the house
-        // sheet radius — the Modal-based sheets have always used it.
-        backgroundStyle={{
-          backgroundColor: theme.colors.snow,
-          borderTopLeftRadius: theme.radii.xl,
-          borderTopRightRadius: theme.radii.xl,
-        }}
+        // ⚠ CORNERS AND HANDLE COME FROM ONE PLACE — see `sheetChrome`. The
+        // handle also pins a WIDTH, because gorhom's default is a percentage
+        // of a screen width it read once at module scope.
+        {...sheetChrome}
         onChange={(idx) => {
           setSheetOpen(idx >= 0);
           // Unfreeze padding AFTER the close animation completes

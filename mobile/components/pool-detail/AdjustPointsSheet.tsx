@@ -8,7 +8,6 @@ import {
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   Easing,
   KeyboardAvoidingView,
   Modal,
@@ -17,6 +16,7 @@ import {
   Text as RNText,
   TextInput,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,7 +56,10 @@ export const AdjustPointsSheet = forwardRef<AdjustPointsSheetHandle, Props>(
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const screenHeight = Dimensions.get('window').height;
+    // ⚠ `useWindowDimensions`, NOT `Dimensions.get`. The hook re-renders on a
+    // rotation, a fold and an iPad split-view drag; the imperative read answers
+    // once and then quietly keeps answering for the screen it first saw.
+    const { height: screenHeight } = useWindowDimensions();
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(screenHeight)).current;
 

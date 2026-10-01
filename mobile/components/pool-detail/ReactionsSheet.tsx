@@ -7,19 +7,19 @@ import {
 } from 'react';
 import {
   Animated,
-  Dimensions,
   Easing,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text as RNText,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui';
+import { Icon, useSheetHeight } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // One person who reacted, pre-resolved by the caller (BanterSheet owns the
@@ -57,7 +57,11 @@ export const ReactionsSheet = forwardRef<ReactionsSheetHandle>(
     const [visible, setVisible] = useState(false);
     const [groups, setGroups] = useState<ReactorGroup[]>([]);
     const [selectedTab, setSelectedTab] = useState<string>(ALL_TAB);
-    const screenHeight = Dimensions.get('window').height;
+    // ⚠ `useWindowDimensions`, NOT `Dimensions.get`. The hook re-renders on a
+    // rotation, a fold and an iPad split-view drag; the imperative read answers
+    // once and then quietly keeps answering for the screen it first saw.
+    const { height: screenHeight } = useWindowDimensions();
+    const sheetHeight = useSheetHeight(0.55, { min: 360 });
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(screenHeight)).current;
 
@@ -155,7 +159,11 @@ export const ReactionsSheet = forwardRef<ReactionsSheetHandle>(
               // Fixed height so the sheet doesn't resize when you switch tabs or
               // land on a reaction with only one person. Short lists leave white
               // space at the bottom; long lists scroll inside the list below.
-              height: screenHeight * 0.55,
+              //
+              // ⚠ DEFINITE, BUT NOT A BARE FRACTION. `useSheetHeight` clamps to
+              // the live window and floors it, so this cannot underlap the status
+              // bar on a short screen or collapse to ~200pt in landscape.
+              height: sheetHeight,
             }}
           >
             <View
