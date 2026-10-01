@@ -65,11 +65,16 @@ export function ScoutSheet({
   /**
    * How tall, as a share of the screen.
    *
-   * ⚠ A PEEK IS SHORTER THAN A REPORT. The match scout opens over the picker
-   * mid-decision and leaves it visible behind; the dossier is something you sit
-   * and read. Same shell, different height, and the caller owns the difference.
+   * ⚠ BOTH REPORTS ARE 88% NOW, AND THE PROP STAYS ANYWAY. It used to carry a
+   * real split — the match scout was 72% so the picker stayed visible behind a
+   * "peek", the dossier 88% because it is something you sit and read. Ryan,
+   * 2026-10-01: bring the match scout up to the dossier's height. The report
+   * outgrew the peek argument; see `MatchScoutSheet`.
+   *
+   * The prop is not inlined because the two callers are the two things that get
+   * to disagree about this, and a future third sheet may want to.
    */
-  height = '72%',
+  height = '88%',
   children,
 }: {
   open: boolean;
@@ -130,7 +135,23 @@ export function ScoutSheet({
         handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
         // ⚠ SNOW, NOT SURFACE. Cards in this app are `surface` on `snow`; make
         // the sheet body a screen and the cards inside can just be cards.
-        backgroundStyle={{ backgroundColor: theme.colors.snow }}
+        //
+        // ⚠⚠ THE CORNERS ARE OVERRIDDEN BECAUSE GORHOM'S DEFAULT IS TOO SQUARE
+        // FOR THIS APP. Its background ships `borderRadius: 15`, which lands
+        // between `radii.sm` (12) and `radii.md` (18) — so the sheet was LESS
+        // round than the `radii.lg` cards sitting inside it, and a container
+        // sharper than its contents reads as a mistake rather than a choice.
+        // `xl` (32) is deliberately one step above the cards: the sheet is the
+        // outermost surface, so it should be the roundest thing on screen.
+        //
+        // ⚠ TOP CORNERS ONLY, NAMED EXPLICITLY. The bottom two are off-screen at
+        // every snap point, and the specific corner props win over the
+        // library's blanket `borderRadius` whatever order the styles merge in.
+        backgroundStyle={{
+          backgroundColor: theme.colors.snow,
+          borderTopLeftRadius: theme.radii.xl,
+          borderTopRightRadius: theme.radii.xl,
+        }}
       >
         {children}
       </BottomSheet>
