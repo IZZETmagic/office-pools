@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, Text as RNText, View } from 'react-native';
 
 import { Icon, Text } from '@/components/ui';
+import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { useMemberRoster, type RosterMember } from '@/lib/useMemberRoster';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -170,33 +171,26 @@ function MemberRow({ member, onPress }: { member: RosterMember; onPress: () => v
   );
 }
 
+/**
+ * ⚠⚠ THIS CIRCLE USED TO ENCODE ROLE, NOT IDENTITY. It was one letter on
+ * `primary` at 12%, or `slate` at 15% for an admin — so every ordinary member in
+ * the pool was the same colour as every other, and the only thing it told you was
+ * whether somebody could remove you. The row already says "ADMIN" in words, so
+ * that signal was being made twice and identity not at all.
+ *
+ * ⚠ The fallback now shows TWO letters rather than one, because `initialsOf` is
+ * what every other surface in the app uses and "A" for Aisha Khan is a poorer
+ * stand-in for a person than "AK".
+ */
 function Avatar({ member }: { member: RosterMember }) {
-  const theme = useTheme();
-  const initial = (member.fullName || member.username || '?').slice(0, 1).toUpperCase();
-  const bg = member.isAdmin
-    ? withOpacity(theme.colors.slate, 0.15)
-    : withOpacity(theme.colors.primary, 0.12);
-  const fg = member.isAdmin ? theme.colors.slate : theme.colors.primary;
   return (
-    <View
-      style={{
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: bg,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <RNText
-        style={{
-          fontFamily: fontFamilies.bold,
-          fontSize: 14,
-          color: fg,
-        }}
-      >
-        {initial}
-      </RNText>
-    </View>
+    <LeaderboardAvatar
+      userId={member.userId ?? null}
+      name={member.fullName || member.username || '?'}
+      avatarBuild={member.avatarBuild}
+      avatarColour={member.avatarColour}
+      size={36}
+      rank={1}
+    />
   );
 }

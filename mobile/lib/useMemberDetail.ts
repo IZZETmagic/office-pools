@@ -10,6 +10,10 @@ export type MemberDetail = {
   role: string;
   isAdmin: boolean;
   joinedAt: string;
+  /** The colour they picked — null falls back to the hash of their id. */
+  avatarColour: string | null;
+  /** Their stored avatar. ⚠ Raw until `readStoredAvatarBuild` has vetted it against this build's bundle. */
+  avatarBuild: unknown;
   entries: MemberEntry[];
 };
 
@@ -29,8 +33,8 @@ type DbRow = {
   role: string;
   joined_at: string;
   users:
-    | { full_name: string | null; username: string | null }
-    | Array<{ full_name: string | null; username: string | null }>
+    | { full_name: string | null; username: string | null; avatar_colour: string | null; avatar_build: unknown }
+    | { full_name: string | null; username: string | null; avatar_colour: string | null; avatar_build: unknown }[]
     | null;
   pool_entries: Array<{
     entry_id: string;
@@ -57,7 +61,7 @@ export function useMemberDetail(memberId: string | undefined) {
       const { data, error: err } = await supabase
         .from('pool_members')
         .select(
-          'member_id, user_id, role, joined_at, users:user_id(full_name, username), pool_entries(entry_id, entry_name, entry_number, has_submitted_predictions, predictions_submitted_at, total_points, scored_total_points, point_adjustment)',
+          'member_id, user_id, role, joined_at, users:user_id(full_name, username, avatar_colour, avatar_build), pool_entries(entry_id, entry_name, entry_number, has_submitted_predictions, predictions_submitted_at, total_points, scored_total_points, point_adjustment)',
         )
         .eq('member_id', memberId)
         .maybeSingle();
@@ -96,6 +100,8 @@ export function useMemberDetail(memberId: string | undefined) {
         role: row.role,
         isAdmin: row.role === 'admin',
         joinedAt: row.joined_at,
+        avatarColour: user?.avatar_colour ?? null,
+        avatarBuild: user?.avatar_build ?? null,
         entries,
       });
     } catch (err) {

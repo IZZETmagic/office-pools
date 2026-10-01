@@ -18,6 +18,7 @@ import { ConfirmDialog, Icon, Text } from '@/components/ui';
 import { deleteEntry, notifyMemberRemoved } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useMemberDetail, type MemberDetail, type MemberEntry } from '@/lib/useMemberDetail';
+import { LeaderboardAvatar } from '@/components/pool-detail/LeaderboardAvatar';
 import { usePoolDetail } from '@/lib/usePoolDetail';
 import { useScreenStatusBar } from '@/lib/useScreenStatusBar';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -367,11 +368,6 @@ function Header({ insetTop, title }: { insetTop: number; title: string }) {
 
 function ProfileCard({ member }: { member: MemberDetail }) {
   const theme = useTheme();
-  const initial = (member.fullName || member.username || '?').slice(0, 1).toUpperCase();
-  const bg = member.isAdmin
-    ? withOpacity(theme.colors.slate, 0.15)
-    : withOpacity(theme.colors.primary, 0.12);
-  const fg = member.isAdmin ? theme.colors.slate : theme.colors.primary;
   return (
     <View
       style={{
@@ -384,26 +380,19 @@ function ProfileCard({ member }: { member: MemberDetail }) {
         ...theme.shadows.card,
       }}
     >
-      <View
-        style={{
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: bg,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <RNText
-          style={{
-            fontFamily: fontFamilies.bold,
-            fontSize: 22,
-            color: fg,
-          }}
-        >
-          {initial}
-        </RNText>
-      </View>
+      {/*
+        ⚠ Same change as the members list: the circle described the ROLE, not the
+        person. The ADMIN pill beside the name already says admin, so the tint was
+        a second telling of that and no telling at all of who this is.
+      */}
+      <LeaderboardAvatar
+        userId={member.userId ?? null}
+        name={member.fullName || member.username || '?'}
+        avatarBuild={member.avatarBuild}
+        avatarColour={member.avatarColour}
+        size={56}
+        rank={1}
+      />
       <View style={{ flex: 1, gap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text variant="sectionHeader" numberOfLines={1}>
