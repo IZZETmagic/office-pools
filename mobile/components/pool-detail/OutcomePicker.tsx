@@ -68,6 +68,7 @@
 import { Pressable, Text as RNText, View } from 'react-native'
 
 import { ClubBar } from '@/components/ui'
+import { hapticSelection } from '@/lib/haptics'
 import { fontFamilies, useTheme, withOpacity } from '@/theme'
 
 export type Outcome = 'home' | 'draw' | 'away'
@@ -112,7 +113,11 @@ export function OutcomePicker({ value, onChange, home, away, disabled }: Props) 
       />
 
       <Pressable
-        onPress={() => !disabled && onChange('draw')}
+        onPress={() => {
+          if (disabled) return
+          hapticSelection()
+          onChange('draw')
+        }}
         disabled={disabled}
         accessibilityRole="radio"
         accessibilityState={{ selected: value === 'draw', disabled: Boolean(disabled) }}
@@ -197,7 +202,22 @@ function ClubChoice({
 
   return (
     <Pressable
-      onPress={() => !disabled && onSelect()}
+      /*
+        ⭐⭐ THE MOST-TAPPED CONTROL IN THE PRODUCT, AND IT WAS SILENT. The header
+        above does the arithmetic: 10 fixtures × 38 matchweeks is 380 taps at
+        this depth. Meanwhile the OTHER depth on the SAME screen — `TapScoreField`
+        — has buzzed on every tap since the World Cup. One fixture card answered
+        a tap two different ways depending on the pool's depth.
+
+        ⚠ Guarded on `disabled` rather than leaning on Pressable's own prop: the
+        original wrote `!disabled && onSelect()` for the same reason, and a buzz
+        on a locked matchweek would say the pick landed when the week is closed.
+      */
+      onPress={() => {
+        if (disabled) return
+        hapticSelection()
+        onSelect()
+      }}
       disabled={disabled}
       accessibilityRole="radio"
       accessibilityState={{ selected, disabled: Boolean(disabled) }}

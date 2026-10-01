@@ -19,7 +19,7 @@ import {
   type LeagueMatch,
 } from '@/lib/useLeaguePool';
 import { useScreenStatusBar } from '@/lib/useScreenStatusBar';
-import { hapticFailure } from '@/lib/haptics';
+import { hapticFailure, hapticPress } from '@/lib/haptics';
 import { useTheme, withOpacity } from '@/theme';
 
 // =============================================================
@@ -490,7 +490,19 @@ function WeekArrow({ icon, onPress, enabled }: { icon: string; onPress: () => vo
   const theme = useTheme();
   return (
     <Pressable
-      onPress={onPress}
+      /*
+        ⚠ A PRESS, NOT A SELECTION. Stepping the matchweek reloads the whole
+        fixture list — it is the same class of move as a bottom-nav tab, not the
+        same class as choosing one club inside a card. Giving it the lighter
+        `hapticSelection` would make navigating feel like picking.
+
+        No `enabled` guard needed: `disabled` below already stops onPress, so
+        the arrow at the end of the season stays silent as well as dimmed.
+      */
+      onPress={() => {
+        hapticPress();
+        onPress();
+      }}
       disabled={!enabled}
       hitSlop={8}
       style={({ pressed }) => ({
