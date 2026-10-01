@@ -87,32 +87,6 @@ export function useSheetChrome(background: ColorToken = 'surface'): {
 }
 
 /**
- * The straight edge a sheet must leave between the DEVICE's corner and its own.
- *
- * ## ⚠⚠ THIS IS THE BUG THAT LOOKED LIKE A RADIUS BUG (Ryan, 2026-10-01)
- *
- * The Banter sheet's corners read as wrong while the scout sheet's read as
- * right, on the same 32pt radius. Measured off a screenshot, 1290×2796 @3x:
- *
- *   · Banter opened at `insets.top` = 59pt. An iPhone 15 Pro Max rounds its own
- *     SCREEN at ~55pt, so that curve finishes at y=55 and the sheet's curve
- *     starts at y=59 — **4pt of straight edge between two different radii**,
- *     each pinching inward. The eye reads one broken shape, not two corners.
- *   · The scout sheet opens at 164pt (88% of the available height), leaving
- *     109pt of straight edge. Nothing competes, so 32pt looks correct.
- *
- * The sheet's own corners were a perfect circle of R=96px=32pt in both cases,
- * left and right identical to the pixel. Changing the radius could never have
- * fixed this, and twice it did not.
- *
- * ⚠ ONE RADIUS OF CLEARANCE IS THE RULE, and it is portable in a way that
- * matching the device is not — screen corner radius is ~55pt on a 15 Pro Max,
- * 47.33pt on a 14, and **0 on an SE**, with no API to read it. Leaving a run of
- * straight edge works on all three without knowing which one you are on.
- */
-export const SHEET_TOP_GAP = 32;
-
-/**
  * How tall a sheet should be on THIS screen, in points.
  *
  * ## ⚠⚠ WHY NOT A PERCENTAGE SNAP POINT
@@ -142,11 +116,6 @@ export function useSheetHeight(fraction: number, opts?: { min?: number }): numbe
   const insets = useSafeAreaInsets();
   const min = opts?.min ?? 0;
 
-  // ⚠ THE CAP IS `available - SHEET_TOP_GAP`, NOT `available`. A sheet asking
-  // for everything would otherwise open flush against the status bar and
-  // collide with the device's own corner — see `SHEET_TOP_GAP`. Enforcing it
-  // here means no caller can reintroduce that by passing a fraction of 1.
   const available = Math.max(0, height - insets.top);
-  const ceiling = Math.max(0, available - SHEET_TOP_GAP);
-  return Math.round(Math.min(ceiling, Math.max(available * fraction, min)));
+  return Math.round(Math.min(available, Math.max(available * fraction, min)));
 }
