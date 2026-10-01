@@ -153,9 +153,6 @@ export type StoryInput = {
   nameByEntry: Map<string, string>
 }
 
-/** How many settled matchweeks per season the feed looks back over. */
-export const STORY_WEEKS = 6
-
 const LINES_SHOWN = 3
 
 export function ordinal(n: number): string {
@@ -207,16 +204,16 @@ function fixtureLabel(f: FixtureLabel | undefined): string {
 export function buildMatchweekStories(input: StoryInput): MatchweekStory[] {
   const out: MatchweekStory[] = []
 
-  // The last STORY_WEEKS settled weeks of each season, newest first.
+  // Every week it is handed — which weeks make a page is lib/activity/page.ts's
+  // decision, not this builder's.
   const weeksBySeason = new Map<string, SettledWeek[]>()
   for (const w of input.weeks) {
     const got = weeksBySeason.get(w.seasonId) ?? []
     got.push(w)
     weeksBySeason.set(w.seasonId, got)
   }
-  for (const [k, list] of weeksBySeason) {
+  for (const list of weeksBySeason.values()) {
     list.sort((a, b) => b.matchweekNumber - a.matchweekNumber)
-    weeksBySeason.set(k, list.slice(0, STORY_WEEKS))
   }
 
   const fixtureById = new Map(input.fixtures.map((f) => [f.fixture_id, f]))

@@ -22,7 +22,6 @@ import { fetchAllPages } from '@/lib/poolData'
 import { readLeagueCardFacts } from '@/lib/league/poolCards'
 import {
   buildMatchweekStories,
-  STORY_WEEKS,
   type DuelRow,
   type FixtureLabel,
   type LmsPickRow,
@@ -54,16 +53,18 @@ function logErr(label: string, error: { message: string } | null | undefined) {
   if (error) console.error(`[activity:league] ${label}:`, error.message)
 }
 
-export async function readLeagueActivity(
+function leaguePoolsOf(pools: LeagueActivityPool[]) {
+  return pools.filter((p) => p.seasonId && STORY_MODES.has(p.mode as StoryMode))
+}
+
+/** Open decisions — the top of the tab. First page only; it is about now. */
+export async function readLeagueNeeds(
   admin: SupabaseClient,
   pools: LeagueActivityPool[],
-  nameByEntry: Map<string, string>,
   now: number,
-): Promise<{ stories: MatchweekStory[]; needs: NeedItem[] }> {
-  const league = pools.filter((p) => p.seasonId && STORY_MODES.has(p.mode as StoryMode))
-  if (league.length === 0) return { stories: [], needs: [] }
-
-  // ---- Needs You: the same facts the pool cards use ------------------------
+): Promise<NeedItem[]> {
+  const league = leaguePoolsOf(pools)
+  if (league.length === 0) return []
   const facts = await readLeagueCardFacts(
     admin,
     league.map((p) => ({
@@ -75,7 +76,7 @@ export async function readLeagueActivity(
       entryId: p.entries[0]?.entryId ?? null,
     })),
   )
-  const needs = buildNeedsYou(
+  return buildNeedsYou(
     league.map((p) => ({
       poolId: p.poolId,
       poolName: p.poolName,
@@ -85,35 +86,35 @@ export async function readLeagueActivity(
     facts,
     now,
   )
+}
 
-  // ---- Settled weeks, per season -------------------------------------------
-  const seasonIds = Array.from(new Set(league.map((p) => p.seasonId as string)))
-  const { data: mwData, error: mwErr } = await admin
+/** Every settled matchweek in the member's league seasons — what pages are cut from. */
+export async function readSettledWeeks(
+  admin: SupabaseClient,
+  pools: LeagueActivityPool[],
+): Promise<SettledWeek[]> {
+  const seasonIds = Array.from(new Set(leaguePoolsOf(pools).map((p) => p.seasonId as string)))
+  if (seasonIds.length === 0) return []
+  const { data, error } = await admin
     .from('league_matchweeks')
     .select('season_id, matchweek_number, ranks_snapshot_at')
     .in('season_id', seasonIds)
     .not('ranks_snapshot_at', 'is', null)
-  logErr('matchweeks', mwErr)
-  const allWeeks: SettledWeek[] = ((mwData ?? []) as Array<{
-    season_id: string
-    matchweek_number: number
-    ranks_snapshot_at: string
-  }>).map((r) => ({
-    seasonId: r.season_id,
-    matchweekNumber: r.matchweek_number,
-    settledAt: r.ranks_snapshot_at,
-  }))
-  // Only the window the builder will use, so the reads below stay small.
-  const weeks: SettledWeek[] = []
-  for (const s of seasonIds) {
-    weeks.push(
-      ...allWeeks
-        .filter((w) => w.seasonId === s)
-        .sort((a, b) => b.matchweekNumber - a.matchweekNumber)
-        .slice(0, STORY_WEEKS),
-    )
-  }
-  if (weeks.length === 0) return { stories: [], needs }
+  logErr('matchweeks', error)
+  return ((data ?? []) as Array<{ season_id: string; matchweek_number: number; ranks_snapshot_at: string }>).map(
+    (r) => ({ seasonId: r.season_id, matchweekNumber: r.matchweek_number, settledAt: r.ranks_snapshot_at }),
+  )
+}
+
+/** The story cards for exactly the weeks given — one page's worth. */
+export async function readLeagueStories(
+  admin: SupabaseClient,
+  pools: LeagueActivityPool[],
+  weeks: SettledWeek[],
+  nameByEntry: Map<string, string>,
+): Promise<MatchweekStory[]> {
+  const league = leaguePoolsOf(pools)
+  if (league.length === 0 || weeks.length === 0) return []
   const weekNumbers = Array.from(new Set(weeks.map((w) => w.matchweekNumber)))
 
   const entryIdsOf = (modes: string[]) =>
@@ -258,7 +259,7 @@ export async function readLeagueActivity(
     entrantCount: p.entrantCount,
   }))
 
-  const stories = buildMatchweekStories({
+  return buildMatchweekStories({
     pools: storyPools,
     weeks,
     scores,
@@ -269,6 +270,4 @@ export async function readLeagueActivity(
     ranks,
     nameByEntry,
   })
-
-  return { stories, needs }
 }

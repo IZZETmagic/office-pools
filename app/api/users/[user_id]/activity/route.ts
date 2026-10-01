@@ -8,7 +8,13 @@ import {
   type MatchScoreEvent,
 } from '@/lib/scoring/readSource'
 import { withPerfLogging } from '@/lib/api-perf'
-import { readLeagueActivity, type LeagueActivityPool } from '@/lib/activity/readLeagueActivity'
+import {
+  readLeagueNeeds,
+  readLeagueStories,
+  readSettledWeeks,
+  type LeagueActivityPool,
+} from '@/lib/activity/readLeagueActivity'
+import { pageWeeks, slicePage } from '@/lib/activity/page'
 import type { ActivityLink, NeedItem } from '@/lib/activity/needsYou'
 
 // =============================================================
@@ -34,6 +40,10 @@ import type { ActivityLink, NeedItem } from '@/lib/activity/needsYou'
 //   - `link` on every item, so a row can open the screen it is about
 //   - `seen_at` + a real `is_read` (migration 149's user_activity_seen)
 //   - `message_id` on mention metadata
+//   - PAGING: `before=<iso>` returns the page older than that; the response's
+//     `next_before` is the cursor for the next one, NULL at the end of the
+//     history. A page is three matchweeks (lib/activity/page.ts). Needs You
+//     only comes on the first page.
 // ⚠ Without `v=2` the response is byte-for-byte what it was, because phones on
 // an older OTA render every unknown type as a generic row. Deploy this BEFORE
 // the OTA that asks for v2.
@@ -177,7 +187,14 @@ async function handleGET(
   // Single admin client for the read — caller authz is enforced above; the
   // synthesis crosses tables that have their own RLS, simpler to bypass.
   const adminClient = createAdminClient()
-  const v2 = new URL(request.url).searchParams.get('v') === '2'
+  const search = new URL(request.url).searchParams
+  const v2 = search.get('v') === '2'
+  // Only honoured with v2. A malformed cursor is treated as "first page" rather
+  // than an error, so a bad client value cannot strand the feed empty.
+  const rawBefore = v2 ? search.get('before') : null
+  // Kept as sent, not re-serialised: toISOString() would cut Postgres's
+  // microseconds and move the cursor (see the note in lib/activity/page.ts).
+  const before = rawBefore && !Number.isNaN(Date.parse(rawBefore)) ? rawBefore : null
 
   const { data: rows, error: pmErr } = await adminClient
     .from('pool_members')
@@ -583,6 +600,8 @@ async function handleGET(
         .select('message_id, pool_id, user_id, content, created_at')
         .in('pool_id', poolIds)
         .ilike('content', `%@${myUsername}%`)
+        // Paging: without this the 50-newest cap would hide older mentions forever.
+        .lt('created_at', before ?? '9999-12-31T00:00:00Z')
         .order('created_at', { ascending: false })
         .limit(50)
       const msgs = (msgData ?? []) as MsgRow[]
@@ -907,19 +926,38 @@ async function handleGET(
       }
     })
 
-  const [league, seenRes] = await Promise.all([
-    readLeagueActivity(adminClient, leaguePools, nameByEntry, now).catch((err) => {
-      // Decoration around links: a league failure must not take the feed down.
-      console.error('[activity] league activity failed', err)
-      return { stories: [], needs: [] as NeedItem[] }
+  // ---- the page -------------------------------------------------------------
+  // Everything above is computed in full (it is cheap, and the World Cup is
+  // over); the page is cut from it here. The league stories — the expensive
+  // part — are only ever read for this page's three matchweeks.
+  const allWeeks = await readSettledWeeks(adminClient, leaguePools)
+  const pw = pageWeeks(allWeeks, before)
+
+  items.sort((a, b) =>
+    a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
+  )
+  const { page, nextBefore } = slicePage(items, before, pw.floor, pw.olderWeeks)
+
+  const [needs, stories, seenRes] = await Promise.all([
+    // About now, so first page only.
+    before
+      ? Promise.resolve([] as NeedItem[])
+      : readLeagueNeeds(adminClient, leaguePools, now).catch((err) => {
+          // Decoration around links: a league failure must not take the feed down.
+          console.error('[activity] needs you failed', err)
+          return [] as NeedItem[]
+        }),
+    readLeagueStories(adminClient, leaguePools, pw.weeks, nameByEntry).catch((err) => {
+      console.error('[activity] league stories failed', err)
+      return []
     }),
     adminClient.from('user_activity_seen').select('seen_at').eq('user_id', user_id).maybeSingle(),
   ])
   if (seenRes.error) console.error('[activity] seen_at read failed', seenRes.error.message)
   const seenAt = (seenRes.data as { seen_at?: string } | null)?.seen_at ?? null
 
-  for (const st of league.stories) {
-    items.push({
+  for (const st of stories) {
+    page.push({
       activity_id: st.id,
       pool_id: st.poolId,
       activity_type: 'matchweek_story',
@@ -934,7 +972,7 @@ async function handleGET(
   }
 
   const leagueModeByPool = new Map(leaguePools.map((p) => [p.poolId, p.mode]))
-  for (const it of items) {
+  for (const it of page) {
     it.link = linkFor(it, leagueModeByPool.get(it.pool_id ?? '') ?? null)
     // No row yet means the tab has never been opened on a v2 build. Everything
     // counts as read then, or the first open after the update would light up the
@@ -942,11 +980,16 @@ async function handleGET(
     it.is_read = seenAt == null || it.created_at <= seenAt
   }
 
-  items.sort((a, b) =>
+  page.sort((a, b) =>
     a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
   )
 
-  return NextResponse.json({ items, needs_you: league.needs, seen_at: seenAt })
+  return NextResponse.json({
+    items: page,
+    needs_you: needs,
+    seen_at: seenAt,
+    next_before: nextBefore,
+  })
 }
 
 /**

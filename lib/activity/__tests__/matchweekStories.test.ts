@@ -3,7 +3,6 @@ import {
   buildMatchweekStories,
   ordinal,
   rankPhrase,
-  STORY_WEEKS,
   type StoryInput,
   type StoryPool,
 } from '../matchweekStories'
@@ -88,16 +87,14 @@ describe("Pick'em stories", () => {
     expect(buildMatchweekStories(base())).toEqual([])
   })
 
-  it('only looks back STORY_WEEKS settled weeks', () => {
-    const weeks = Array.from({ length: STORY_WEEKS + 3 }, (_, i) => ({
+  it('builds a card for every week it is handed — paging is not its job', () => {
+    const weeks = Array.from({ length: 9 }, (_, i) => ({
       seasonId: 's1',
       matchweekNumber: i + 1,
       settledAt: `2026-08-${String(i + 10).padStart(2, '0')}T09:00:00Z`,
     }))
     const scores = weeks.map((w) => score(`f${w.matchweekNumber}`, 'winner', 2, w.matchweekNumber))
-    const out = buildMatchweekStories(base({ weeks, scores }))
-    expect(out).toHaveLength(STORY_WEEKS)
-    expect(Math.min(...out.map((s) => s.meta.matchweek_number))).toBe(4)
+    expect(buildMatchweekStories(base({ weeks, scores }))).toHaveLength(9)
   })
 
   it('names the entry when the member has two', () => {
