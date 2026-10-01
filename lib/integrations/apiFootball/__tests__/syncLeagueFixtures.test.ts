@@ -597,6 +597,98 @@ describe('syncLeagueFixtures — the catch-up pass', () => {
     expect(formatLeagueNoteParts(r).join(' ')).not.toContain('stray_by_id=')
   })
 
+  it('V3.16 ⚠⚠ a stray OLDER THAN THE CATCH-UP HORIZON is still offered — the age floor is gone', async () => {
+    // The regression that stranded five La Liga matchweek-7 fixtures for eleven
+    // days (2026-10-01). `CATCHUP_MAX_AGE_MS` used to be a lower bound on
+    // eligibility here, so a stray stopped being offered seven days after the
+    // date WE hold — and nothing else in the system was ever going to look at
+    // it again. Every tick read `window=0 stale=0 errors=[] ok=true` while five
+    // finished matches sat at `scheduled` with no score.
+    getFixturesAllPages.mockResolvedValue({ fixtures: [], calls: 1 })
+    const ancient = dbRow({
+      fixture_id: 'f-ancient',
+      external_fixture_id: '1570397',
+      kickoff_at: '2026-07-05T15:00:00+00:00', // 48 days before NOW
+    })
+    const real = feedFixture(1570397, { home: 1, away: 3 })
+    real.fixture.date = '2026-07-03T19:00:00+00:00'
+    fullFixturesById.set(1570397, real)
+    const { client, calls } = fakeDb({
+      league_fixtures: [
+        { data: [], error: null },
+        { data: [ancient], error: null },
+        { data: [{ external_fixture_id: '1570397' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+      rpc: { data: { seen: 1, changed: [] }, error: null },
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+
+    // No lower bound on kickoff in the catch-up read. The window read above it
+    // has a `gte`, never a `gt`, so this is unambiguous.
+    const catchup = calls.filter((c) => c.table === 'league_fixtures')[1]
+    expect(catchup.filters.some((f) => f.startsWith('gt(kickoff_at'))).toBe(false)
+    expect(r.stale).toBe(1)
+    expect(r.strayAsked).toBe(1)
+    expect(r.strayFetched).toBe(1)
+  })
+
+  it('V3.17 ⚠ but the DAY FEED never widens past the horizon — that is where the bound belongs', async () => {
+    // `from` is the earliest kickoff in play, so an ancient stray would ask the
+    // provider for every fixture since then, hourly, paginated. Floored at the
+    // catch-up horizon instead: the stray is simply not in the day feed, which
+    // costs nothing, because 3b asks for it BY ID and by-id knows no date.
+    getFixturesAllPages.mockResolvedValue({ fixtures: [], calls: 1 })
+    const ancient = dbRow({
+      fixture_id: 'f-ancient',
+      external_fixture_id: '1570397',
+      kickoff_at: '2026-07-05T15:00:00+00:00',
+    })
+    omitFromBundle.add(1570397)
+    const { client } = fakeDb({
+      league_fixtures: [
+        { data: [], error: null },
+        { data: [ancient], error: null },
+        { data: [{ external_fixture_id: '1570397' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+    })
+    await syncLeagueFixtures(client, TARGET, OPTS)
+    const call = getFixturesAllPages.mock.calls[0][0] as { from: string; to: string }
+    expect(call.from).toBe('2026-08-15') // NOW − 7 days, not the stray's July date
+    expect(call.to).toBe('2026-08-22')
+  })
+
+  it('V3.18 ⚠ a stray we asked for and could not match is STAMPED, so the retry throttle applies', async () => {
+    // Load-bearing for V3.16. Without the stamp a row the provider cannot match
+    // keeps `last_synced_at IS NULL`, re-qualifies on every tick, and buys a
+    // by-id call a minute for the rest of the season. With it, the row rejoins
+    // the hourly throttle and the horizon retires it.
+    getFixturesAllPages.mockResolvedValue({ fixtures: [], calls: 1 })
+    const stray = dbRow({
+      fixture_id: 'f-old',
+      external_fixture_id: '1570381',
+      kickoff_at: '2026-08-17T15:00:00+00:00',
+    })
+    omitFromBundle.add(1570381) // asked by id, and the provider does not know it
+    const { client, rpcCalls } = fakeDb({
+      league_fixtures: [
+        { data: [], error: null },
+        { data: [stray], error: null },
+        { data: [{ external_fixture_id: '1570381' }], error: null },
+      ],
+      league_matchweeks: [{ data: MW, error: null }],
+      rpc: { data: { seen: 1, changed: [] }, error: null },
+    })
+    const r = await syncLeagueFixtures(client, TARGET, OPTS)
+    expect(r.strayAsked).toBe(1)
+    expect(r.strayFetched).toBe(0)
+    const apply = rpcCalls.find((c) => c.fn === 'league_apply_fixture_sync')
+    expect(apply?.args.p_seen).toEqual(['1570381'])
+    // Stamped, but nothing invented: no row was written for it.
+    expect(apply?.args.p_rows).toEqual([])
+  })
+
   it('V3.15 a refused ids call is an error and a 0/N note, never a silent unmatched', async () => {
     getFixturesAllPages.mockResolvedValue({ fixtures: [], calls: 1 })
     const stray = dbRow({

@@ -99,9 +99,29 @@ describe('what it looks at', () => {
     const db = fakeDb([ourRow()])
     getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture('900001', FAR)], calls: 1 })
     await reconcileLeagueSchedule(db.client, ARGS)
-    const gt = db.filters.find((f) => f.startsWith('gt(kickoff_at'))
-    expect(gt, 'the future-only filter is gone').toBeDefined()
-    expect(Date.parse(gt!.slice('gt(kickoff_at,'.length, -1))).toBeGreaterThan(NOW)
+    // The bound moved inside an `or()` when the past-postponement disjunct was
+    // added; it is still the same bound, and still the property this file
+    // exists to hold.
+    const or = db.filters.find((f) => f.startsWith('or(kickoff_at.gt.'))
+    expect(or, 'the future-only bound is gone').toBeDefined()
+    const ahead = or!.slice('or(kickoff_at.gt.'.length).split(',')[0]
+    expect(Date.parse(ahead)).toBeGreaterThan(NOW)
+  })
+
+  it('⚠ and a POSTPONEMENT already in the past, which no other arm looks at', async () => {
+    // A called-off match keeps the date it was called off on and the status
+    // `postponed`. The live sync's catch-up excludes terminal statuses, and the
+    // future-only bound above excluded this row for being in the past — so the
+    // rearranged date (api-football publishes it weeks later) reached nothing.
+    // La Liga 1570389: called off 16 September, moved to 21 October, still read
+    // 16 September here eleven days after the fact.
+    const db = fakeDb([ourRow()])
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture('900001', FAR)], calls: 1 })
+    await reconcileLeagueSchedule(db.client, ARGS)
+    const or = db.filters.find((f) => f.startsWith('or(kickoff_at.gt.'))
+    expect(or).toContain('and(status.eq.postponed,kickoff_at.lt.')
+    // Cancelled is permanent and must stay out.
+    expect(or).not.toContain('cancelled')
   })
 
   it('never considers a completed or manually-overridden fixture', async () => {
@@ -121,12 +141,59 @@ describe('what it looks at', () => {
     expect(r.checked).toBe(0)
   })
 
-  it('leaves a fixture the feed says is live or finished to the other arm', async () => {
+  it('leaves a fixture the feed says is live or finished AT OUR OWN INSTANT to the other arm', async () => {
+    // The genuine hand-off: we hold the right time, the game is under way, the
+    // live sync is holding the row this minute. Touching it here would be the
+    // two arms writing the same fixture.
     const db = fakeDb([ourRow()])
-    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture('900001', SOON, '1H')], calls: 1 })
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture('900001', FAR, '1H')], calls: 1 })
     const r = await reconcileLeagueSchedule(db.client, ARGS)
     expect(r.checked).toBe(0)
     expect(r.detected).toEqual([])
+    expect(r.playedAtAnotherTime).toBe(0)
+  })
+
+  it('⚠⚠ but NOT one being played at an instant we do not hold — nobody else can see that', async () => {
+    // This test used to assert the opposite, and in doing so encoded the bug:
+    // it handed a fixture to an arm that cannot reach it. The live sync builds
+    // its request from the date WE hold, so a game running at 12:20 today
+    // against our stored February date is invisible to it — for ever, once its
+    // catch-up horizon passes. Five La Liga matchweek-7 fixtures sat at
+    // `scheduled` with no score for eleven days on exactly this.
+    const db = fakeDb([ourRow()])
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture('900001', SOON, '1H')], calls: 1 })
+    const r = await reconcileLeagueSchedule(db.client, ARGS)
+    expect(r.checked).toBe(1)
+    expect(r.playedAtAnotherTime).toBe(1)
+    expect(r.detected).toHaveLength(1)
+    expect(r.detected[0]).toMatchObject({ oldKickoff: FAR, newKickoff: SOON })
+  })
+
+  it('⚠ and corrects only the SCHEDULE — the score stays the live arm’s to write', async () => {
+    // `fixtureToLeagueUpdate` fills in goals, status and is_completed from an
+    // FT feed. Writing those here would complete a fixture that nothing then
+    // scores: `league_score_fixture` is called by the live arm off its own
+    // write, and this pass never calls it. A completed fixture with no points
+    // is worse than a late one.
+    const ft = feedFixture('900001', SOON, 'FT')
+    ft.goals = { home: 2, away: 1 }
+    const db = fakeDb([ourRow()])
+    getFixturesAllPages.mockResolvedValue({ fixtures: [ft], calls: 1 })
+    const r = await reconcileLeagueSchedule(db.client, ARGS)
+    expect(r.playedAtAnotherTime).toBe(1)
+    const rows = db.rpcCalls[0].args.p_rows as Array<Record<string, unknown>>
+    expect(rows[0]).toMatchObject({ set_kickoff: true, kickoff_at: SOON })
+    expect(rows[0].set_goals).toBeUndefined()
+    expect(rows[0].set_status).toBeUndefined()
+    expect(rows[0].set_completed).toBeUndefined()
+    expect(rows[0].home_goals).toBeUndefined()
+  })
+
+  it('names it in the run note, because it is the provider telling us late', async () => {
+    const db = fakeDb([ourRow()])
+    getFixturesAllPages.mockResolvedValue({ fixtures: [feedFixture('900001', SOON, 'FT')], calls: 1 })
+    const r = await reconcileLeagueSchedule(db.client, ARGS)
+    expect(formatLeagueReconcileNote(r)).toContain('played_elsewhere=1')
   })
 })
 

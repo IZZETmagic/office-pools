@@ -84,6 +84,13 @@ export type LeagueReconcileResult = {
   applied: number
   /** Fixtures re-homed to a different matchweek as a result. */
   rehomed: number
+  /**
+   * Fixtures the feed had already started or finished at an instant other than
+   * the one we hold — the stranding case. Schedule corrected here, score left
+   * to the live arm. A non-zero figure is the provider moving a placeholder
+   * only after the game was played, not a fault of ours.
+   */
+  playedAtAnotherTime: number
   /** Ours with no counterpart in the season feed — a mapping problem, not a move. */
   unmatched: string[]
   /** false for a dry run: `detected` is what WOULD be written. */
@@ -110,6 +117,7 @@ export async function reconcileLeagueSchedule(
     detected: [],
     applied: 0,
     rehomed: 0,
+    playedAtAnotherTime: 0,
     unmatched: [],
     wrote: !args.dryRun,
     errors: [],
@@ -118,13 +126,32 @@ export async function reconcileLeagueSchedule(
 
   // Only what this pass may act on. The filters are here rather than in the
   // loop so the row cap applies to the rows that matter.
+  //
+  // ⚠ THE SECOND DISJUNCT IS A POSTPONEMENT IN THE PAST, and it is the one
+  // fixture in the database no arm looks at. A called-off match keeps the date
+  // it was called off on and the status `postponed`; the live sync's catch-up
+  // excludes terminal statuses by design, and the future-only filter here
+  // excluded the row for being in the past. api-football rearranges it weeks
+  // later — La Liga fixture 1570389 was called off on 16 September and now
+  // reads 21 October in the feed — and nothing in this system would ever have
+  // found out. It would have been played on a date we do not hold, with a
+  // status that keeps the live arm away, and never scored at all.
+  //
+  // Settlement is not at risk either way (migration 094 settles a matchweek on
+  // what was played), so the symptom is quiet: a fixture frozen on a date that
+  // has passed, and a member's prediction on it worth nothing for ever.
+  //
+  // Cancelled is deliberately NOT included. That one is permanent.
   const { data, error } = await admin
     .from('league_fixtures')
     .select(PROJECTION)
     .eq('season_id', args.seasonId)
     .eq('is_completed', false)
     .eq('manual_override', false)
-    .gt('kickoff_at', new Date(now + SYNC_WINDOW_MS).toISOString())
+    .or(
+      `kickoff_at.gt.${new Date(now + SYNC_WINDOW_MS).toISOString()},` +
+        `and(status.eq.postponed,kickoff_at.lt.${new Date(now).toISOString()})`,
+    )
     .order('kickoff_at', { ascending: true })
     .range(0, CAP - 1)
   // Checked, never destructured away: a 400 here reads as "no fixtures to
@@ -173,8 +200,31 @@ export async function reconcileLeagueSchedule(
 
     // A fixture the feed has started or finished is the live sync's business,
     // whatever our stored kickoff says. Belt and braces with the window filter.
+    //
+    // ⚠⚠ UNLESS THE LIVE SYNC CANNOT POSSIBLY BE HOLDING IT — which is the case
+    // this `continue` used to send into a hole. Every row here is one we store
+    // an hour or more in the FUTURE; if the feed says that match has already
+    // started or finished, then it is being played at an instant the live arm
+    // has never looked at, because that arm builds its request from the date we
+    // hold. Deferring to it is deferring to nobody.
+    //
+    // Not hypothetical, and found twice. La Liga publishes a TBD placeholder of
+    // Sunday 15:00Z and moves games to the Friday; on 2026-09-18/19 five
+    // matchweek-7 fixtures were played against a stored Sunday the 20th. This
+    // pass read all five the next morning, saw FT, and skipped them — the one
+    // mechanism that could have corrected the date, declining on the grounds
+    // that somebody else would. Consequence beyond the blank scores: `lock_at`
+    // derives from the matchweek's first stored kickoff, so picks stayed open
+    // about 41 hours into the real matchweek.
+    //
+    // So: when the instants disagree, correct the SCHEDULE and nothing else.
+    // The division of labour above is still intact — the score, the status and
+    // the completion stay the live arm's to write, and once the date is right
+    // its catch-up pass can finally see the fixture to write them.
     const short = f.fixture.status.short
-    if (isLiveStatus(short) || isFinalStatus(short)) continue
+    const started = isLiveStatus(short) || isFinalStatus(short)
+    const playedAtAnotherTime = started && Date.parse(f.fixture.date) !== Date.parse(row.kickoff_at)
+    if (started && !playedAtAnotherTime) continue
 
     result.checked++
 
@@ -189,6 +239,28 @@ export async function reconcileLeagueSchedule(
         shiftMinutes: Math.round((Date.parse(p.kickoff_at) - Date.parse(row.kickoff_at)) / 60_000),
       })
     }
+
+    if (playedAtAnotherTime) {
+      // Schedule only. `fixtureToLeagueUpdate` has also filled in the score,
+      // the status and `is_completed` from a feed that says FT, and writing
+      // those here would complete a fixture that nothing then scores —
+      // `league_score_fixture` is called by the live arm, off its own write,
+      // and this pass does not call it. A completed fixture with no points is
+      // worse than a late one, so the rest of the payload is dropped on
+      // purpose and the live arm picks the fixture up on its next tick.
+      if (!p.set_kickoff || !p.kickoff_at) continue
+      result.playedAtAnotherTime++
+      payload.push({
+        external_fixture_id: p.external_fixture_id,
+        set_kickoff: true,
+        kickoff_at: p.kickoff_at,
+        ...(p.set_original_kickoff
+          ? { set_original_kickoff: true, original_kickoff_at: p.original_kickoff_at }
+          : {}),
+      })
+      continue
+    }
+
     payload.push(p)
   }
 
@@ -249,6 +321,10 @@ export function formatLeagueReconcileNote(r: LeagueReconcileResult): string {
     `calls=${r.apiCalls}`,
     `moved=${r.detected.length}/${r.applied}`,
     r.rehomed > 0 ? `rehomed=${r.rehomed}` : null,
+    // Named rather than folded into `moved`: this one says the provider told
+    // us where a game was AFTER it was played, which is the signature of the
+    // stranding class and worth seeing in a run note on its own.
+    r.playedAtAnotherTime > 0 ? `played_elsewhere=${r.playedAtAnotherTime}` : null,
     r.unmatched.length > 0 ? `unmatched=${r.unmatched.length}` : null,
     r.wrote ? null : 'DRY',
     r.errors.length > 0 ? `errors=${r.errors.length}` : null,

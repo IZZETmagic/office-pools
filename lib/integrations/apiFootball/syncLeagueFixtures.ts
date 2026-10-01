@@ -383,6 +383,30 @@ export async function syncLeagueFixtures(
   // window: a fixture that kicked off during the gap leaves the window and can
   // never re-enter, so it is stranded at `scheduled / NULL goals` forever with
   // `window=0`, `errors: []`, `ok: true` — the codebase's signature failure.
+  //
+  // ⚠⚠ AND IT HAS NO AGE FLOOR, WHICH IT USED TO. `CATCHUP_MAX_AGE_MS` was a
+  // lower bound on eligibility here — seven days after its stored kickoff a
+  // stray stopped being offered at all, and nothing else in the system was ever
+  // going to look at it again. That stranded five La Liga matchweek-7 fixtures
+  // (found 2026-10-01, the SECOND time this class has bitten): they were played
+  // on the 18th and 19th against a stored placeholder of Sunday the 20th at
+  // 15:00Z, step 3b below exists to rescue exactly that by asking BY ID — and
+  // 3b never got the chance, because on 27 September this clause stopped
+  // handing them over. Every tick after that read `window=0 stale=0 errors=[]
+  // ok=true` while five finished matches sat at `scheduled` with no score.
+  //
+  // The floor was never really protecting eligibility. What it protects is the
+  // WIDTH OF THE DAY FEED at step 3, whose `from` is the earliest stored
+  // kickoff in play — a year-old stray would ask the provider for a year of
+  // fixtures, hourly. So the bound moved to where that cost actually is (see
+  // `catchupFloor` at step 3) and eligibility is now the honest rule: a past,
+  // open, non-terminal fixture is always a candidate.
+  //
+  // The spend stays bounded by the two gates that were always the real ones —
+  // `CATCHUP_LIMIT` rows a tick, and `CATCHUP_RETRY_MS` between looks at the
+  // same row — plus the stamp at 6c, which is what makes the retry throttle
+  // apply to a row the provider cannot match. Worst case for a season with a
+  // permanently unfinalised fixture is one by-id call an hour.
   const { data: strayRows, error: strayErr } = await admin
     .from('league_fixtures')
     .select(PROJECTION)
@@ -390,7 +414,6 @@ export async function syncLeagueFixtures(
     .eq('is_completed', false)
     .not('status', 'in', `(${TERMINAL_STATUSES.join(',')})`)
     .lt('kickoff_at', windowFrom)
-    .gt('kickoff_at', new Date(opts.now - CATCHUP_MAX_AGE_MS).toISOString())
     .or(
       `last_synced_at.is.null,last_synced_at.lt.${new Date(opts.now - CATCHUP_RETRY_MS).toISOString()}`,
     )
@@ -567,7 +590,15 @@ export async function syncLeagueFixtures(
   // -------------------------------------------------------- 3. one feed call
   // Day-granularity from/to covers the midnight straddle in ONE call, unlike
   // the World Cup arm's per-fixture getFixtureById fallback.
-  const earliest = Math.min(...rows.map((r) => Date.parse(r.kickoff_at)))
+  //
+  // ⚠ THE RANGE IS FLOORED AT `CATCHUP_MAX_AGE_MS`, and that floor is the one
+  // real cost of letting 1b offer a stray of any age. `from` is the earliest
+  // kickoff in play, so without this a fixture stranded since August would ask
+  // the provider for every fixture since August — every hour, for the rest of
+  // the season, paginated. An older stray simply will not be in the day feed,
+  // which is not a loss: 3b asks for it BY ID, and by-id knows no date.
+  const catchupFloor = opts.now - CATCHUP_MAX_AGE_MS
+  const earliest = Math.max(catchupFloor, Math.min(...rows.map((r) => Date.parse(r.kickoff_at))))
   const from = isoDateUTC(new Date(Math.min(earliest, opts.now - WINDOW_AFTER_MS)))
   const to = isoDateUTC(new Date(opts.now + WINDOW_BEFORE_MS))
 
@@ -621,11 +652,14 @@ export async function syncLeagueFixtures(
   //
   // Manual overrides are excluded here as well as at step 6: asking about a
   // row the diff will then refuse to write is a call spent for nothing.
+  /** Strays we spent a by-id call on, matched or not. Stamped at 6c. */
+  const strayAskedIds = new Set<string>()
   {
     const feedIds = new Set(feed.map((f) => String(f.fixture.id)))
     const missing = ((strayRows ?? []) as unknown as LeagueFixtureRow[]).filter(
       (r) => !r.manual_override && !feedIds.has(r.external_fixture_id),
     )
+    for (const r of missing) strayAskedIds.add(r.external_fixture_id)
     if (missing.length > 0) {
       const ids = missing
         .map((r) => Number(r.external_fixture_id))
@@ -733,6 +767,27 @@ export async function syncLeagueFixtures(
         `vocabulary changed; round checking is OFF this tick`,
       { season_id: target.seasonId },
     )
+  }
+
+  // ------------------------------------------- 6c. the stray we could not match
+  // A stray we asked for BY ID and still could not match is stamped as
+  // looked-at. The call was spent; `last_synced_at` means "the live arm looked
+  // at this row", and the RPC's own comment says a stamp with no write is how
+  // "the arm looked and found nothing to do" is told apart from "the arm never
+  // ran".
+  //
+  // ⚠ LOAD-BEARING FOR THE AGE-FLOOR EXEMPTION AT 1b. Without it a row the
+  // provider does not know stays `last_synced_at IS NULL` forever, re-qualifies
+  // on every tick, and buys a by-id call a minute for the rest of the season.
+  // With it, the row rejoins the hourly throttle immediately and the seven-day
+  // floor retires it.
+  //
+  // ⚠ AFTER the round-vocabulary check above, which compares `roundUnknown`
+  // against `seenIds.length`. A stray the feed never carried has no round to
+  // check, so counting it there would break the equality and silence a real
+  // vocabulary break.
+  for (const id of strayAskedIds) {
+    if (!byExt.has(id)) seenIds.push(id)
   }
 
   // -------------------------------------------------- 7. one set-based write
