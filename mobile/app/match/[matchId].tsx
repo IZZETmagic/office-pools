@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   type NativeScrollEvent,
@@ -37,6 +37,26 @@ import { LeaguePicksSection } from '@/components/match/LeaguePicksSection';
 import { LeagueTableSliceCard } from '@/components/match/LeagueTableSliceCard';
 import { LineupsTab } from '@/components/match/LineupsTab';
 import { PlayerStatSheet, type PlayerPick } from '@/components/match/PlayerStatSheet';
+
+/**
+ * ⚠⚠ MEMOISED, AND ON THIS SCREEN THAT IS ABOUT FRAMES RATHER THAN RENDER TIME.
+ *
+ * On iOS every React commit pauses Reanimated until it has mounted, and the
+ * animated values for those frames are never applied — the mechanism is written
+ * out in `lib/useCountdown.ts`. The sheet is a gorhom `BottomSheet`, so its open
+ * spring AND its inner scroll are Reanimated; a commit landing mid-gesture is a
+ * visible stall in both.
+ *
+ * This screen commits a lot. `useMatchDetail` holds thirteen state slices and a
+ * realtime subscription, and the header carries a clock that ticks every second
+ * while a match is live. Unmemoised, each of those re-rendered the whole sheet —
+ * photograph, gradient header and every stat row — and the sheet stopped moving
+ * for exactly as long as that took.
+ *
+ * ⚠ `onClose` HAS TO BE STABLE TOO, or this boundary never bites. It was an
+ * inline arrow, which is a new prop on every render by definition.
+ */
+const MemoPlayerStatSheet = memo(PlayerStatSheet);
 import { MatchTabBar } from '@/components/match/MatchTabBar';
 import { StatsTab } from '@/components/match/StatsTab';
 import { SubstitutionIcon } from '@/components/match/SubstitutionIcon';
@@ -132,6 +152,15 @@ export default function MatchDetailScreen() {
    * would blank the sheet and then slide an empty shell away.
    */
   const [playerPick, setPlayerPick] = useState<PlayerPick | null>(null);
+  /**
+   * Stable, so `MemoPlayerStatSheet` can actually bail out — see its note above.
+   *
+   * ⚠ BELOW THE STATE IT CLOSES OVER, not up with the other handlers. This file
+   * has the same temporal-dead-zone trap the pool screen records: a `const` read
+   * before its declaration is a ReferenceError, and the only reason it is subtle
+   * here is that a closure body defers the read.
+   */
+  const closePlayerPick = useCallback(() => setPlayerPick(null), []);
   /**
    * ⚠ THE TAB SET IS PER MATCH, NOT PER APP. Line-ups and Statistics exist only
    * where migration 139 has rows — never for a World Cup match, and not for a
@@ -439,7 +468,7 @@ export default function MatchDetailScreen() {
         animate — `PlayerStatSheet` takes `null` rather than being conditionally
         rendered.
       */}
-      <PlayerStatSheet pick={playerPick} onClose={() => setPlayerPick(null)} />
+      <MemoPlayerStatSheet pick={playerPick} onClose={closePlayerPick} />
     </View>
   );
 }

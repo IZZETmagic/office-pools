@@ -147,6 +147,13 @@ const MemoSettingsTab = memo(SettingsTab);
  * panels inside are themselves memoised and bail out one level down.
  */
 const MemoTabPage = memo(TabPage);
+/**
+ * ⚠ THE SCOUT SHEET, FOR THE SAME REASON AS THE BAND. It is a gorhom
+ * `BottomSheet`, so its open spring and its inner scroll both run on Reanimated,
+ * and a commit landing mid-gesture stalls them — see the note above. Unmemoised,
+ * every screen render rebuilt the whole report behind the sheet.
+ */
+const MemoDossierSheet = memo(DossierSheet);
 
 export default function PoolDetailScreen() {
   const theme = useTheme();
@@ -220,6 +227,8 @@ export default function PoolDetailScreen() {
    * Same reason `bandHeight` above is owned here rather than by `DuelTab`.
    */
   const [scoutingEntryId, setScoutingEntryId] = useState<string | null>(null);
+  /** Stable, so `MemoDossierSheet` can bail out. An inline arrow defeats the boundary. */
+  const closeScouting = useCallback(() => setScoutingEntryId(null), []);
   const { width } = useWindowDimensions();
   const pagerRef = useRef<Animated.ScrollView | null>(null);
   // When a tab change originates from a swipe, the pager has already
@@ -1202,10 +1211,10 @@ export default function PoolDetailScreen() {
         including over this. The rule down this whole block is that the further
         down you are, the more you cover.
       */}
-      <DossierSheet
+      <MemoDossierSheet
         poolId={pool.poolId}
         entryId={scoutingEntryId}
-        onClose={() => setScoutingEntryId(null)}
+        onClose={closeScouting}
       />
 
       {/*
