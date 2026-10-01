@@ -188,8 +188,11 @@ export function PlayerStatSheet({
               // had to invent borders and tinted fills to separate at all. Make
               // the body a screen and the cards can just be cards.
               backgroundColor: theme.colors.snow,
-              borderTopLeftRadius: theme.radii.lg,
-              borderTopRightRadius: theme.radii.lg,
+              // ⚠ `xl`, THE SAME AS EVERY OTHER SHEET. This was `lg` (24), which is
+              // the radius of the CARDS inside it — a container should not be as
+              // sharp as its contents.
+              borderTopLeftRadius: theme.radii.xl,
+              borderTopRightRadius: theme.radii.xl,
               // ⚠ SO THE BAND REACHES THE ROUNDED CORNERS. The header runs
               // edge to edge and right to the top of the sheet; without this it
               // would square them off.

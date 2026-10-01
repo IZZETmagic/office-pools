@@ -146,8 +146,10 @@ export const ReactionsSheet = forwardRef<ReactionsSheetHandle>(
             style={{
               transform: [{ translateY }],
               backgroundColor: theme.colors.surface,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
+              // ⚠ THE TOKEN, NOT A LITERAL. This was a hardcoded 20, which matched
+              // nothing in `radii` and so could never move with the rest.
+              borderTopLeftRadius: theme.radii.xl,
+              borderTopRightRadius: theme.radii.xl,
               paddingTop: theme.spacing.sm,
               paddingBottom: insets.bottom + theme.spacing.md,
               // Fixed height so the sheet doesn't resize when you switch tabs or

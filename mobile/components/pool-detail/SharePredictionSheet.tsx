@@ -80,7 +80,14 @@ export const SharePredictionSheet = forwardRef<SharePredictionSheetHandle, Props
         enablePanDownToClose
         backdropComponent={renderBackdrop}
         handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-        backgroundStyle={{ backgroundColor: theme.colors.surface }}
+        // ⚠ THE TOP CORNERS ARE NAMED BECAUSE GORHOM'S DEFAULT IS 15, which is
+        // squarer than every other sheet in this app. `radii.xl` is the house
+        // sheet radius — the Modal-based sheets have always used it.
+        backgroundStyle={{
+          backgroundColor: theme.colors.surface,
+          borderTopLeftRadius: theme.radii.xl,
+          borderTopRightRadius: theme.radii.xl,
+        }}
       >
         <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.md }}>
           <RNText

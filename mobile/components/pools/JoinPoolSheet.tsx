@@ -168,7 +168,14 @@ export const JoinPoolSheet = forwardRef<JoinPoolSheetHandle>(function JoinPoolSh
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-      backgroundStyle={{ backgroundColor: theme.colors.surface }}
+      // ⚠ THE TOP CORNERS ARE NAMED BECAUSE GORHOM'S DEFAULT IS 15, which is
+      // squarer than every other sheet in this app. `radii.xl` is the house
+      // sheet radius — the Modal-based sheets have always used it.
+      backgroundStyle={{
+        backgroundColor: theme.colors.surface,
+        borderTopLeftRadius: theme.radii.xl,
+        borderTopRightRadius: theme.radii.xl,
+      }}
       // Track open/closed state so the QR tab can mount/unmount the
       // CameraView in lockstep with sheet visibility.
       onChange={(idx) => setSheetOpen(idx >= 0)}

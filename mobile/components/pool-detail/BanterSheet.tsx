@@ -1169,7 +1169,14 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         // keyboardBehavior, no shifting when the keyboard opens.
         topInset={insets.top}
         handleIndicatorStyle={{ backgroundColor: theme.colors.silver }}
-        backgroundStyle={{ backgroundColor: theme.colors.snow }}
+        // ⚠ THE TOP CORNERS ARE NAMED BECAUSE GORHOM'S DEFAULT IS 15, which is
+        // squarer than every other sheet in this app. `radii.xl` is the house
+        // sheet radius — the Modal-based sheets have always used it.
+        backgroundStyle={{
+          backgroundColor: theme.colors.snow,
+          borderTopLeftRadius: theme.radii.xl,
+          borderTopRightRadius: theme.radii.xl,
+        }}
         onChange={(idx) => {
           setSheetOpen(idx >= 0);
           // Unfreeze padding AFTER the close animation completes
