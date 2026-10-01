@@ -262,6 +262,20 @@ const SITUATIONS: Situation[] = [
 export default function ShowdownPhaseHarness() {
   const theme = useTheme();
   const [i, setI] = useState(0);
+  /**
+   * ⭐⭐ THE A/B THAT SETTLES IT. With the band off, the only thing on screen
+   * driven by `scrollY` is the probe's own dot — one view, one `translateY`,
+   * nothing behind it.
+   *
+   *   dropped falls with the band off  →  the band's ~10 animated VIEWS are the
+   *     cost, and consolidating them is the fix
+   *   dropped stays the same           →  the cost is the per-frame commit
+   *     pipeline itself, and no amount of surgery on the band will help
+   *
+   * The second reading is the one that would send this to the Reanimated upgrade
+   * instead, so it is worth one toggle to know which.
+   */
+  const [bandOn, setBandOn] = useState(true);
   const scrollY = useSharedValue(0);
   /**
    * ⚠⚠ THE SCROLL IS WIRED UP, AND IT USED NOT TO BE. `scrollY` was created and
@@ -275,10 +289,40 @@ export default function ShowdownPhaseHarness() {
    * show it. Same mechanism as the real screen — a UI-thread worklet writing the
    * shared value, no re-render.
    */
+  /**
+   * ⚠⚠ `moving` EXISTS BECAUSE THE FIRST PROBE MEASURED THE WRONG THING.
+   *
+   * It counted every frame, including the ones where nobody was touching the
+   * screen — and on a ProMotion display the refresh rate drops as low as 24Hz
+   * when idle. A 41ms gap between frames is then the PANEL SAVING POWER, not a
+   * frame the app missed, and it read as `worst 37ms` with dozens "dropped" on a
+   * screen that was sitting perfectly still.
+   *
+   * So the stats only accumulate between `onBeginDrag` and the end of momentum,
+   * which is the only window in which a late frame means anything.
+   */
+  const moving = useSharedValue(false);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (e) => {
       'worklet';
       scrollY.value = e.contentOffset.y;
+    },
+    onBeginDrag: () => {
+      'worklet';
+      moving.value = true;
+    },
+    // ⚠ NOT `onEndDrag` — the finger leaving is the START of the fling, which is
+    // exactly when a dropped frame is most visible. Momentum ending is the honest
+    // close of the window.
+    onMomentumEnd: () => {
+      'worklet';
+      moving.value = false;
+    },
+    // A drag that ends without momentum (a slow release) fires no momentum event,
+    // so this closes the window for that case and is harmless when momentum follows.
+    onEndDrag: () => {
+      'worklet';
+      moving.value = false;
     },
   });
   /**
@@ -341,6 +385,7 @@ export default function ShowdownPhaseHarness() {
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
       <Stack.Screen options={{ headerShown: false }} />
 
+      {bandOn ? (
       <ShowdownDuelHeader
         poolName="Harness FC"
         poolCode="HARNESS"
@@ -366,6 +411,7 @@ export default function ShowdownPhaseHarness() {
       >
         <View style={{ height: 44 }} />
       </ShowdownDuelHeader>
+      ) : null}
 
       {/*
         ⚠ SITS BELOW THE BAND RATHER THAN OVER IT. The band floats and slides on
@@ -396,6 +442,27 @@ export default function ShowdownPhaseHarness() {
             </Pressable>
           ))}
         </View>
+
+        {/*
+          ⚠ THE CONTROL FOR THE EXPERIMENT, not a feature. Turning the band off
+          leaves the probe's dot as the only thing `scrollY` drives, which is what
+          separates "the band costs too much" from "applying ANY animated prop
+          costs too much on this version". See `bandOn` above.
+        */}
+        <Pressable
+          onPress={() => setBandOn((b) => !b)}
+          accessibilityRole="button"
+          style={{
+            paddingVertical: theme.spacing.sm,
+            borderRadius: theme.radii.pill,
+            alignItems: 'center',
+            backgroundColor: bandOn ? theme.colors.mist : theme.colors.primary,
+          }}
+        >
+          <Text variant="detail" style={{ color: bandOn ? theme.colors.slate : '#FFFFFF' }}>
+            {bandOn ? 'Band ON — tap to measure the dot alone' : 'Band OFF — dot only'}
+          </Text>
+        </Pressable>
 
         <View style={{ gap: theme.spacing.xs }}>
           <Text variant="cardTitle">
@@ -531,7 +598,7 @@ export default function ShowdownPhaseHarness() {
         the same `scrollY` the band does — inside the scroll content it would move
         with the content and measure nothing.
       */}
-      <ScrollProbe scrollY={scrollY} />
+      <ScrollProbe scrollY={scrollY} moving={moving} />
     </View>
   );
 }
@@ -585,43 +652,67 @@ function Row({ k, v }: { k: string; v: string }) {
  * ABSOLUTE numbers are not the product's frame rate. The COMPARISON is what is
  * being read here.
  */
-function ScrollProbe({ scrollY }: { scrollY: SharedValue<number> }) {
+function ScrollProbe({
+  scrollY,
+  moving,
+}: {
+  scrollY: SharedValue<number>;
+  moving: SharedValue<boolean>;
+}) {
   const theme = useTheme();
   const worst = useSharedValue(0);
   const dropped = useSharedValue(0);
-  const frames = useSharedValue(0);
+  const wasMoving = useSharedValue(false);
+  /**
+   * ⚠ A SEPARATE PAIR FOR THE READOUT, PUBLISHED A FEW TIMES A SECOND.
+   *
+   * The text is an animated prop, and an animated prop that changes every frame
+   * is another per-frame update on the very thread being measured. Publishing on
+   * a tick keeps the observer out of the experiment, and a number that changes
+   * 120 times a second is unreadable anyway.
+   */
+  const shownWorst = useSharedValue(0);
+  const shownDropped = useSharedValue(0);
+  const sincePublish = useSharedValue(0);
 
   useFrameCallback((f) => {
     'worklet';
     const dt = f.timeSincePreviousFrame;
     if (dt === null || dt <= 0) return;
-    frames.value += 1;
-    // ⚠ A WINDOW, NOT A LIFETIME TOTAL. A single spike while the screen mounts
-    // would otherwise sit in `worst` forever and make every later reading a lie.
-    // 240 frames is about two seconds at 120Hz — long enough to cover a flick.
-    if (frames.value > 240) {
-      frames.value = 0;
+
+    // ⚠ EACH DRAG IS ITS OWN READING. Resetting on the rising edge means the
+    // number on screen describes the gesture you just made, not the session.
+    if (moving.value && !wasMoving.value) {
       worst.value = 0;
       dropped.value = 0;
     }
+    wasMoving.value = moving.value;
+
+    // ⚠⚠ THE GATE. Outside a drag the display idles down to as low as 24Hz and
+    // every frame looks "late". See `moving` in the screen above.
+    if (!moving.value) return;
+
     if (dt > worst.value) worst.value = dt;
-    // Generous on purpose: 25ms is late at 60Hz and very late at 120Hz, so a
-    // count above zero means real dropped frames rather than jitter in the clock.
+    // 25ms is late at 60Hz and very late at 120Hz. Inside a drag the panel runs at
+    // its maximum rate, so anything over this is the app, not the screen.
     if (dt > 25) dropped.value += 1;
+
+    sincePublish.value += 1;
+    if (sincePublish.value >= 20) {
+      sincePublish.value = 0;
+      shownWorst.value = worst.value;
+      shownDropped.value = dropped.value;
+    }
   }, true);
 
   const readout = useAnimatedProps(() => {
     'worklet';
     return {
-      text: `worst ${Math.round(worst.value)}ms   dropped ${dropped.value}`,
+      text: `dragging:  worst ${Math.round(shownWorst.value)}ms   dropped ${shownDropped.value}`,
     } as unknown as Record<string, unknown>;
   });
 
-  /**
-   * ⚠ THE SAME ARITHMETIC THE BAND USES — clamped at 140, which is roughly its
-   * own slide distance. If it were driven differently the comparison would not
-   * mean anything.
-   */
+  /** The same arithmetic the band uses, so the comparison means something. */
   const dotStyle = useAnimatedStyle(() => {
     'worklet';
     const p = Math.min(Math.max(scrollY.value, 0), 140);
@@ -647,7 +738,7 @@ function ScrollProbe({ scrollY }: { scrollY: SharedValue<number> }) {
       />
       <AnimatedTextInput
         editable={false}
-        defaultValue="worst —   dropped —"
+        defaultValue="dragging:  worst —   dropped —"
         animatedProps={readout}
         style={{
           padding: 0,
