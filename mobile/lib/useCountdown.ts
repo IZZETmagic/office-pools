@@ -101,7 +101,20 @@ export function useCountdownClock(iso: string | null | undefined): CountdownCloc
    * holding the old answer.
    */
   const [seen, setSeen] = useState(() => ({ target, expired: msLeft(target) <= 0 }));
-  if (seen.target !== target) setSeen({ target, expired: msLeft(target) <= 0 });
+  /**
+   * ⚠⚠ `Object.is`, NOT `!==`, AND IT SHIPPED BROKEN ONCE FOR WANT OF IT.
+   *
+   * `target` is `NaN` whenever there is nothing to count to — a sealed week
+   * before the hold has a floor, a settled duel, a bye. And `NaN !== NaN` is
+   * ALWAYS TRUE, so the guard fired on every render, which set state, which
+   * rendered: "Too many re-renders" on the Showdown band in every phase that has
+   * no clock, which is most of them.
+   *
+   * `Object.is` treats `NaN` as equal to itself. It is also what React uses for
+   * its own state bail-out, so this comparison and React's now agree — which is
+   * the real reason to reach for it rather than special-casing `Number.isNaN`.
+   */
+  if (!Object.is(seen.target, target)) setSeen({ target, expired: msLeft(target) <= 0 });
 
   useEffect(() => {
     if (Number.isNaN(target)) return;
