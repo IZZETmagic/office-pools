@@ -153,6 +153,9 @@ export const BadgeDetailSheet = forwardRef<BadgeDetailSheetHandle>(
               borderTopRightRadius: SHEET_RADIUS,
               // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
               borderCurve: 'continuous' as const,
+              // ⚠ AND THE CLIP, so no opaque child can square off the bottom of the
+              // curve — the step `sheetChrome` describes.
+              overflow: 'hidden',
               paddingTop: theme.spacing.md,
               paddingHorizontal: theme.spacing.lg,
               paddingBottom: insets.bottom + theme.spacing.lg,

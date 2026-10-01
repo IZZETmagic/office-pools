@@ -50,27 +50,16 @@ export const SHEET_HANDLE_WIDTH = 40;
 /**
  * The corner radius of a sheet, in points.
  *
- * ## ⭐⭐ 30, BECAUSE THAT IS WHAT UIKIT DRAWS — MEASURED, NOT CHOSEN
+ * ⭐ 32 — THE SPORTPOOL RADIUS (`radii.xl`), AND RYAN'S CALL. For one commit
+ * this was 30, measured off the native page sheet UIKit draws for the GIF
+ * picker (its curve leaves the top edge 138px = 46pt in at @3x; a continuous
+ * corner spans 1.528 × R, so R = 30.1pt). The measurement stands and the two
+ * will differ by ~3pt of span — this is the house number, deliberately.
  *
- * The GIF picker is a NATIVE page sheet (`GifPickerSheet` renders a `<Modal
- * presentationStyle="pageSheet">`), so iOS draws its corners and Ryan approved
- * how it looks. Our sheets are gorhom, so we draw our own, and they have to
- * agree — the GIF picker opens ON TOP of Banter, both corners visible at once.
- *
- * Measured off that screenshot, 1290px wide @3x: the native curve leaves the
- * top edge **138px = 46pt** in from the corner. A continuous corner spans
- * 1.528 × R along each edge, so R = 46 / 1.528 = **30.1pt**.
- *
- * ⚠ IT IS NOT `radii.xl`. 32 was the house CARD radius borrowed for sheets, and
- * it spans 48.9pt — 3pt wider than the system's. That is invisible alone and
- * visible when the two cards are stacked, which is exactly when this is looked
- * at. Sheets follow the platform here; cards keep the token.
- *
- * ⚠ CHECKS THAT CONFIRMED THE SHAPE: a circle of R=138px would still be 37px
- * in at y=100 where the real curve measured 23px, and a circle of R=90px would
- * be 12.6px. Flatter than one, tighter than the other — a squircle.
+ * ⚠ IT IS A PLAIN NUMBER, NOT `theme.radii.xl`, because the CLIP below has to
+ * use the identical value and it is not inside a component.
  */
-export const SHEET_RADIUS = 30;
+export const SHEET_RADIUS = 32;
 
 /**
  * The top corners of every sheet.
@@ -112,12 +101,47 @@ export const SHEET_RADIUS = 30;
  * `detached` case, which this app does not use but might.
  */
 export function useSheetChrome(background: ColorToken = 'surface'): {
+  style: ViewStyle;
   backgroundStyle: ViewStyle;
   handleIndicatorStyle: ViewStyle;
 } {
   const theme = useTheme();
   return useMemo(
     () => ({
+      /**
+       * ## ⚠⚠ THE CLIP, AND IT IS THE WHOLE FIX FOR "A SHAPE SITTING ON TOP"
+       *
+       * gorhom draws the rounded background as a SIBLING BEHIND the handle and
+       * the content, and its container has no `overflow: hidden`. So nothing
+       * clips the children: any child with an opaque background paints its own
+       * SQUARE corners straight over the bottom of the curve.
+       *
+       * What that looks like, in Ryan's words (2026-10-01): "a semicircle
+       * sitting on top of a square, but the semicircle isn't as wide as the
+       * square" — the side comes up from the screen edge, jogs INWARD, and only
+       * then rounds. The jog is where the square child stops and the curve
+       * resumes.
+       *
+       * ⚠ IT IS WHY BANTER LOOKED WRONG AND THE SCOUT SHEET DID NOT. Banter's
+       * header sets `backgroundColor: snow` (load-bearing: with `zIndex`/
+       * `elevation` it occludes the chat as the Android keyboard lifts it).
+       * `ScoutHeader` sets no background at all. Same shell, same radius — one
+       * had an opaque square at the top and one did not.
+       *
+       * ⚠ THE HANDLE IS 24pt TALL, WHICH IS WHY THE STEP IS WHERE IT IS. The
+       * content starts below it, 24pt down a curve that needs ~49pt to finish,
+       * so the child lands squarely in the middle of the arc.
+       *
+       * ⚠ `PlayerStatSheet` ALREADY SOLVED THIS ONCE, for its edge-to-edge
+       * header band, and its note says exactly this. That fix never travelled
+       * because there was no shared shell to put it in. Now there is.
+       */
+      style: {
+        overflow: 'hidden' as const,
+        borderTopLeftRadius: SHEET_RADIUS,
+        borderTopRightRadius: SHEET_RADIUS,
+        borderCurve: 'continuous' as const,
+      },
       backgroundStyle: {
         backgroundColor: theme.colors[background],
         borderTopLeftRadius: SHEET_RADIUS,

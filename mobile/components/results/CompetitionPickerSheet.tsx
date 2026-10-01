@@ -137,6 +137,9 @@ export const CompetitionPickerSheet = forwardRef<CompetitionPickerSheetHandle, P
             borderTopRightRadius: SHEET_RADIUS,
             // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
             borderCurve: 'continuous' as const,
+            // ⚠ AND THE CLIP, so no opaque child can square off the bottom of the
+            // curve — the step `sheetChrome` describes.
+            overflow: 'hidden',
             transform: [{ translateY }],
             paddingBottom: insets.bottom + theme.spacing.sm,
             maxHeight: screenHeight - insets.top - 12,

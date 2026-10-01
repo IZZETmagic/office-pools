@@ -119,6 +119,9 @@ export const GroupPickerSheet = forwardRef<GroupPickerSheetHandle, Props>(functi
           borderTopRightRadius: SHEET_RADIUS,
           // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
           borderCurve: 'continuous' as const,
+          // ⚠ AND THE CLIP, so no opaque child can square off the bottom of the
+          // curve — the step `sheetChrome` describes.
+          overflow: 'hidden',
           transform: [{ translateY }],
           paddingBottom: insets.bottom + theme.spacing.sm,
           // Cap so a long group list scrolls instead of pushing under the

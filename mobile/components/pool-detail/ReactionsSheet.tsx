@@ -156,6 +156,9 @@ export const ReactionsSheet = forwardRef<ReactionsSheetHandle>(
               borderTopRightRadius: SHEET_RADIUS,
               // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
               borderCurve: 'continuous' as const,
+              // ⚠ AND THE CLIP, so no opaque child can square off the bottom of the
+              // curve — the step `sheetChrome` describes.
+              overflow: 'hidden',
               paddingTop: theme.spacing.sm,
               paddingBottom: insets.bottom + theme.spacing.md,
               // Fixed height so the sheet doesn't resize when you switch tabs or
