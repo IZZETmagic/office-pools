@@ -41,8 +41,10 @@ import { useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { Stack } from 'expo-router';
 import Animated, {
+  measure,
   type SharedValue,
   useAnimatedProps,
+  useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useFrameCallback,
@@ -675,6 +677,28 @@ function ScrollProbe({
   const shownDropped = useSharedValue(0);
   const sincePublish = useSharedValue(0);
 
+  /**
+   * ⭐⭐ THE OBJECTIVE ANSWER, BECAUSE AN EYE IS NOT ONE.
+   *
+   * Ryan on the two bars: "I THINK the right one is a bit jittery". A hedge is
+   * not evidence, and three wrong turns in is the wrong moment to build on one.
+   *
+   * `measure()` reads a view's real on-screen box from the UI thread with every
+   * transform already composed. So instead of asking whether the line LOOKS
+   * broken, this takes both bars' `pageY` every frame and keeps the largest gap.
+   * The two are laid out on the same row and travel the same 140, so at rest and
+   * in motion the honest answer is 0.00.
+   *
+   *   drift stays 0.00  →  nested composition is pixel-identical; the rounding
+   *     theory is dead and the jitter is somewhere else entirely
+   *   drift goes to ~1  →  the two transforms land on different device pixels,
+   *     which is the jitter, and it is a composition bug
+   */
+  const plainRef = useAnimatedRef<Animated.View>();
+  const nestedRef = useAnimatedRef<Animated.View>();
+  const drift = useSharedValue(0);
+  const shownDrift = useSharedValue(0);
+
   useFrameCallback((f) => {
     'worklet';
     const dt = f.timeSincePreviousFrame;
@@ -685,12 +709,22 @@ function ScrollProbe({
     if (moving.value && !wasMoving.value) {
       worst.value = 0;
       dropped.value = 0;
+      drift.value = 0;
     }
     wasMoving.value = moving.value;
 
     // ⚠⚠ THE GATE. Outside a drag the display idles down to as low as 24Hz and
     // every frame looks "late". See `moving` in the screen above.
     if (!moving.value) return;
+
+    // ⚠ MEASURED ON THE UI THREAD, which is the only place `measure` is allowed
+    // and also the only place the answer is current for THIS frame.
+    const a = measure(plainRef);
+    const b = measure(nestedRef);
+    if (a !== null && b !== null) {
+      const d = Math.abs(a.pageY - b.pageY);
+      if (d > drift.value) drift.value = d;
+    }
 
     if (dt > worst.value) worst.value = dt;
     // 25ms is late at 60Hz and very late at 120Hz. Inside a drag the panel runs at
@@ -702,13 +736,14 @@ function ScrollProbe({
       sincePublish.value = 0;
       shownWorst.value = worst.value;
       shownDropped.value = dropped.value;
+      shownDrift.value = drift.value;
     }
   }, true);
 
   const readout = useAnimatedProps(() => {
     'worklet';
     return {
-      text: `the line must not break   worst ${Math.round(shownWorst.value)}ms   dropped ${shownDropped.value}`,
+      text: `drift ${shownDrift.value.toFixed(2)}pt   worst ${Math.round(shownWorst.value)}ms   dropped ${shownDropped.value}`,
     } as unknown as Record<string, unknown>;
   });
 
@@ -770,6 +805,7 @@ function ScrollProbe({
       {/* ⚠ gap 2, sharp corners: the two halves must read as ONE line at rest. */}
       <View style={{ flexDirection: 'row', gap: 2, marginBottom: theme.spacing.sm }}>
         <Animated.View
+          ref={plainRef}
           style={[
             { width: 120, height: 8, backgroundColor: theme.colors.primary },
             plainStyle,
@@ -777,6 +813,7 @@ function ScrollProbe({
         />
         <Animated.View style={nestedParent}>
           <Animated.View
+            ref={nestedRef}
             style={[
               { width: 120, height: 8, backgroundColor: theme.colors.primary },
               nestedChild,
@@ -786,7 +823,7 @@ function ScrollProbe({
       </View>
       <AnimatedTextInput
         editable={false}
-        defaultValue="the line must not break   ·   worst —  dropped —"
+        defaultValue="drift —   worst —   dropped —"
         animatedProps={readout}
         style={{
           padding: 0,
