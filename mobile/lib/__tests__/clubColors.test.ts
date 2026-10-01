@@ -101,10 +101,19 @@ describe('CLUB_COLOR', () => {
     // the 96 clubs in play would have rendered nothing, so the other four
     // leagues were added. 20 PL + 20 La Liga + 20 Serie A + 18 Bundesliga +
     // 18 Ligue 1 = 96.
-    expect(Object.keys(CLUB_COLOR)).toHaveLength(96);
+    //
+    // ⚠ PLUS EIGHT, and they are not a sixth league. The onboarding practice matchweek runs a real
+    // Premier League matchweek from 2018/19 (`lib/onboarding/practiceMatchweek.ts`), and eight of
+    // its twenty clubs have been relegated since — without them `ClubMark` correctly draws nothing
+    // for eight sides and almost half the picker has no colour. 96 + 8 = 104.
+    expect(Object.keys(CLUB_COLOR)).toHaveLength(104);
     // The original twenty must survive any future edit to the map.
     for (const id of [42, 66, 35, 55, 51, 49, 1346, 52, 45, 36, 64, 57, 63, 40, 50, 33, 34, 65, 746, 47]) {
       expect(CLUB_COLOR[id], `Premier League club ${id} lost its colour`).toBeTruthy();
+    }
+    // And so must the eight the practice matchweek needs.
+    for (const id of [37, 38, 39, 41, 43, 44, 46, 48]) {
+      expect(CLUB_COLOR[id], `practice-matchweek club ${id} lost its colour`).toBeTruthy();
     }
   });
 

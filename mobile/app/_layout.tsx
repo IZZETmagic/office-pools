@@ -410,6 +410,9 @@ function InnerLayout() {
         <Stack.Screen name="settings/archived-pools" options={{ headerShown: false }} />
         <Stack.Screen name="settings/help" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        {/* DEV-ONLY — the onboarding journey, built on the real screens. Declared so it renders
+            full-bleed; undeclared it arrives with the stack's header titled from the file path. */}
+        <Stack.Screen name="onboarding-flow" options={{ headerShown: false }} />
         {/* THROWAWAY — the onboarding redesign concept harness. Declared only so it renders
             full-bleed instead of under the stack's default header, which would title itself
             "onboarding-harness" from the file path. Delete with the harness. */}

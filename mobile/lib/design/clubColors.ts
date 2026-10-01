@@ -55,6 +55,26 @@ export const CLUB_COLOR: Record<number, string> = {
   746: '#C81428',  // Sunderland
   47: '#132257',   // Tottenham
 
+  // ── Relegated since, and only reachable through a historical seed ────────
+  // ⚠ THESE EXIST FOR THE ONBOARDING PRACTICE MATCHWEEK and nothing else today. It runs a real
+  // Premier League matchweek from 2018/19, and eight of its twenty clubs are not in the current
+  // division — so without these rows `ClubMark` correctly renders NOTHING for eight sides and
+  // almost half the picker draws with no colour at all.
+  //
+  // ⚠ Additive and inert for every current surface: the ids are not otherwise reachable, so no
+  // live fixture resolves differently because they are here.
+  //
+  // ⚠ The ids are api-football's and were inferred from the twelve confirmed above. Confirm them
+  // against `importLeagueSeason(39, 2018)` at the same time as the seed's scorelines.
+  37: '#0E63AD',   // Huddersfield Town
+  38: '#FBEE23',   // Watford         ⚠ pale — takes the hairline
+  39: '#FDB913',   // Wolves          ⚠ pale — takes the hairline
+  41: '#D71920',   // Southampton
+  43: '#0070B5',   // Cardiff City
+  44: '#6C1D45',   // Burnley
+  46: '#003090',   // Leicester City
+  48: '#7A263A',   // West Ham United
+
   // ── Bundesliga ──────────────────────────────────────────────────────────
   157: '#DC052D',  // Bayern München
   165: '#FDE100',  // Borussia Dortmund  ⚠ ink foreground — the black half was a workaround

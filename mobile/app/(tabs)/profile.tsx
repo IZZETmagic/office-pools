@@ -216,6 +216,13 @@ export default function ProfileScreen() {
       subtitle: 'Eight takes on push + avatar — nothing writes',
       onPress: () => router.push('/onboarding-harness'),
     },
+    {
+      id: 'dev-onboarding-flow',
+      icon: 'sparkles',
+      title: 'Onboarding journey',
+      subtitle: '⚠ Builds a real avatar — the picker and board are the live ones',
+      onPress: () => router.push('/onboarding-flow'),
+    },
   ];
 
   return (
