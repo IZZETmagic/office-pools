@@ -2,7 +2,7 @@
 // The scout report, during the practice matchweek
 // =============================================================
 // ⭐ THE REAL SHELL AND THE REAL CARDS. `ScoutSheet` is the gorhom shell the live picker uses —
-// same 72% height, same drag-to-dismiss, same picker visible behind it — and every card is built
+// same height, same drag-to-dismiss, same picker visible behind it — and every card is built
 // from `components/scouting/kit`, which is the only place a scout card may be composed from. What
 // this file does NOT do is fetch: `MatchScoutSheet` reads `useMatchScout(fixtureId)`, and a 2018/19
 // practice fixture has no row to read. The data comes from the checked-in seed instead.

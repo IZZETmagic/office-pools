@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Pressable, Text as RNText, View } from 'react-native';
 
 import { Jersey } from '@/components/match/Jersey';
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
 import { PlayerBadges } from '@/components/match/PlayerBadges';
-import { PlayerStatSheet } from '@/components/match/PlayerStatSheet';
+import type { PlayerPick } from '@/components/match/PlayerStatSheet';
 import {
   PitchMarkings,
   pitchXToView,
@@ -56,9 +56,20 @@ import { fontFamilies, radii, useTheme, withOpacity } from '@/theme';
 // the band above the pitch names first, so the eye does not swap ends between
 // the scoreline and the shirts.
 //
-// ⚠ NO PLAYER IS TAPPABLE. There is no player screen to open — "Player detail
-// page" is an unstarted backlog item — and a press that does nothing is worse
-// than no affordance at all.
+// ## ⚠⚠ A TAP ON A PLAYER LEAVES THIS FILE, AND THAT IS NOT A STYLE CHOICE
+//
+// The sheet it opens is `PlayerStatSheet`, which now rides gorhom's
+// `ScoutSheet` — and a plain gorhom `BottomSheet` positions against its nearest
+// ancestor, so it has to be mounted at a SCREEN ROOT. This tab is inside a
+// `ScrollView` inside the match screen's horizontal pager; a `Modal` did not
+// care about that and this does. So the tap is reported up through
+// `onPickPlayer` and `app/match/[matchId]` holds the pick and mounts the sheet
+// beside the pager, the same hoist the pool screen does for `DossierSheet`.
+//
+// ⚠ THE TAB STILL OWNS WHAT A PICK MEANS. The clock, the substitution minutes
+// and the fixture palette are all derived here, so the whole `PlayerPick` is
+// assembled here too and the screen above only has to hold it. The screen does
+// not know what a substitution clock is and should not learn.
 // =============================================================
 
 /** The shirt. Big enough to read a number in, small enough for five across. */
@@ -104,6 +115,7 @@ export function LineupsTab({
   awayName,
   homeTeam,
   awayTeam,
+  onPickPlayer,
 }: {
   lineups: MatchLineup[];
   /** Migration 141. Empty before a match, and on any client older than it. */
@@ -120,6 +132,14 @@ export function LineupsTab({
   /** For the shirt colours — the crest URL is where the club's id hides. */
   homeTeam: ResultsTeam | null;
   awayTeam: ResultsTeam | null;
+  /**
+   * Somebody tapped a shirt or a bench row.
+   *
+   * ⚠ THE SCREEN OWNS THE SHEET, NOT THIS TAB — see the file header. Nothing
+   * here closes it either: `PlayerStatSheet` is dismissed by its own gesture or
+   * backdrop and tells the screen afterwards.
+   */
+  onPickPlayer: (pick: PlayerPick) => void;
 }) {
   const theme = useTheme();
   const home = lineups.find((l) => l.side === 'home') ?? null;
@@ -141,8 +161,12 @@ export function LineupsTab({
   // which is exactly what a live pitch showed while this was `live_minute`. See
   // `statsClock` in playerStats for the measurement.
   const clock = useMemo(() => statsClock(playerStats), [playerStats]);
-  const [open, setOpen] = useState<{ stat: MatchPlayerStat; team: string; tint: string } | null>(
-    null,
+  // ⚠ THE PITCH AND THE BENCHES STILL SPEAK IN `{ stat, team, tint }`, which is
+  // all either of them knows. The clock and the minutes are the tab's, so they
+  // are added here rather than threaded down through every row.
+  const handlePick = useCallback<Pick>(
+    ({ stat, team, tint }) => onPickPlayer({ stat, teamName: team, tint, substMinutes, clock }),
+    [onPickPlayer, substMinutes, clock],
   );
 
   // ⚠ THE SAME PALETTE THE STATS TAB USES, and for the same reason: two clubs
@@ -173,7 +197,7 @@ export function LineupsTab({
           awayName={awayName}
           palette={palette}
           statsById={statsById}
-          onPick={setOpen}
+          onPick={handlePick}
           substMinutes={substMinutes}
           clock={clock}
         />
@@ -191,7 +215,7 @@ export function LineupsTab({
           teamName={homeName}
           tint={palette.home}
           statsById={statsById}
-          onPick={setOpen}
+          onPick={handlePick}
         />
       ) : null}
       {away ? (
@@ -200,18 +224,9 @@ export function LineupsTab({
           teamName={awayName}
           tint={palette.away}
           statsById={statsById}
-          onPick={setOpen}
+          onPick={handlePick}
         />
       ) : null}
-
-      <PlayerStatSheet
-        stat={open?.stat ?? null}
-        teamName={open?.team ?? ''}
-        tint={open?.tint ?? palette.home}
-        substMinutes={substMinutes}
-        clock={clock}
-        onClose={() => setOpen(null)}
-      />
     </View>
   );
 }
@@ -225,7 +240,7 @@ export function LineupsTab({
  * band above the pitch puts them in, so a member's eye does not have to swap
  * sides between the scoreline and the shirts.
  */
-type Pick = (v: { stat: MatchPlayerStat; team: string; tint: string } | null) => void;
+type Pick = (v: { stat: MatchPlayerStat; team: string; tint: string }) => void;
 type StatsById = Map<number, MatchPlayerStat>;
 
 function Pitch({

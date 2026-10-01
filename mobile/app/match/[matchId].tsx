@@ -36,6 +36,7 @@ import { FormCard } from '@/components/match/FormCard';
 import { LeaguePicksSection } from '@/components/match/LeaguePicksSection';
 import { LeagueTableSliceCard } from '@/components/match/LeagueTableSliceCard';
 import { LineupsTab } from '@/components/match/LineupsTab';
+import { PlayerStatSheet, type PlayerPick } from '@/components/match/PlayerStatSheet';
 import { MatchTabBar } from '@/components/match/MatchTabBar';
 import { StatsTab } from '@/components/match/StatsTab';
 import { SubstitutionIcon } from '@/components/match/SubstitutionIcon';
@@ -115,6 +116,22 @@ export default function MatchDetailScreen() {
   const { refreshing, onRefresh } = useManualRefresh(refresh);
 
   const [tab, setTab] = useState<MatchTabKey>('facts');
+  /**
+   * The player whose afternoon is open, if any.
+   *
+   * ## ⚠⚠ IT LIVES HERE BECAUSE OF WHERE A gorhom SHEET CAN BE MOUNTED
+   *
+   * `PlayerStatSheet` runs on `ScoutSheet`, and a plain `BottomSheet` positions
+   * against its nearest ancestor rather than the screen — so it has to be a
+   * sibling of the pager, not a child of a tab inside it. The tap happens three
+   * levels down in `LineupsTab`; the state has to be up here for the sheet to
+   * be. Same hoist the pool screen does for `DossierSheet`.
+   *
+   * ⚠ ONLY `onClose` CLEARS IT. The sheet is dismissed by its own drag or
+   * backdrop and reports back AFTER the animation, so nulling this any earlier
+   * would blank the sheet and then slide an empty shell away.
+   */
+  const [playerPick, setPlayerPick] = useState<PlayerPick | null>(null);
   /**
    * ⚠ THE TAB SET IS PER MATCH, NOT PER APP. Line-ups and Statistics exist only
    * where migration 139 has rows — never for a World Cup match, and not for a
@@ -274,6 +291,11 @@ export default function MatchDetailScreen() {
             awayName={m.awayTeam?.shortName ?? awayDisplayName(m)}
             homeTeam={m.homeTeam}
             awayTeam={m.awayTeam}
+            // ⚠⚠ THE SHEET IS MOUNTED DOWN THERE, NOT IN THE TAB. A gorhom
+            // sheet positions against its nearest ancestor, and the tab is
+            // inside this pager's ScrollView — see `PlayerStatSheet`. The tab
+            // assembles the whole pick; this screen only holds it.
+            onPickPlayer={setPlayerPick}
           />
         );
       case 'stats':
@@ -407,6 +429,17 @@ export default function MatchDetailScreen() {
       >
         <MatchTabBar active={tab} tabs={tabs} onChange={setTab} pageOffset={pageOffset} />
       </MatchDetailHeader>
+
+      {/*
+        ⚠ LAST, SO IT COVERS THE BAND TOO. The header above floats over the
+        pager; a sheet rendered before it would slide up BEHIND the band and
+        have its own top corners hidden by it.
+
+        ⚠ AND IT STAYS MOUNTED WITH NOBODY PICKED, which is what lets the close
+        animate — `PlayerStatSheet` takes `null` rather than being conditionally
+        rendered.
+      */}
+      <PlayerStatSheet pick={playerPick} onClose={() => setPlayerPick(null)} />
     </View>
   );
 }

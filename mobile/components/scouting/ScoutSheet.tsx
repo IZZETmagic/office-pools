@@ -2,6 +2,7 @@ import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetScrollView,
   type BottomSheetBackdropProps,
+  type BottomSheetBackgroundProps,
 } from '@gorhom/bottom-sheet';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
@@ -13,9 +14,9 @@ import { useSheetChrome, useSheetHeight } from '@/components/ui';
 // The shell every scout report slides up in
 // =============================================================
 // ⚠ GORHOM, NOT A VANILLA `Modal`, AND THAT IS A REVERSAL. Both scout sheets
-// shipped on `PlayerStatSheet`'s shell, whose own comment says the library
+// shipped on `PlayerStatSheet`'s shell, whose own comment argued the library
 // "buys gesture dismissal and a snap-point stack, and this sheet wants
-// neither". That is true of a player card you open, read and close. It is not
+// neither". That was true of a player card you open, read and close. It is not
 // true here: Ryan asked for the Banter sheet's feel — grab it and throw it
 // down — and drag-to-dismiss is exactly what gorhom is for. 2026-09-10.
 //
@@ -23,6 +24,19 @@ import { useSheetChrome, useSheetHeight } from '@/components/ui';
 // carried three subtle decisions in each copy (sibling backdrop, definite
 // height, fixed-height header gradient). Two copies of a shell is two places to
 // get a gesture wrong.
+//
+// ## ⚠⚠ IT IS NOT A SCOUTING SHELL ANY MORE — `PlayerStatSheet` CAME BACK
+//
+// Ryan, 2026-10-01: make the player detail sheet like the scouting sheets. So
+// the Modal this shell was once copied FROM is now a caller of it, and the
+// quote above is a historical note rather than a description of that file. Four
+// sheets open on this shell: the two scout reports, the onboarding practice
+// report, and one player card that is not a report at all.
+//
+// ⚠ SO THE NAME IS NOW THE ODD THING, NOT THE LOCATION. A fifth non-scouting
+// caller is the trigger to move this to `components/ui` and call it what it is;
+// renaming it for one is churn. `PracticeScoutSheet` already imports it from
+// outside `components/scouting/`, so the import direction is established.
 //
 // ## ⚠⚠ `enableDynamicSizing={false}` IS LOAD-BEARING IN v5
 //
@@ -86,8 +100,11 @@ export function ScoutSheet({
    * 2026-10-01: bring the match scout up to the dossier's height. The report
    * outgrew the peek argument; see `MatchScoutSheet`.
    *
-   * The prop is not inlined because the two callers are the two things that get
-   * to disagree about this, and a future third sheet may want to.
+   * The prop is not inlined because the callers are the things that get to
+   * disagree about this. `PlayerStatSheet` states 0.88 as well — a player card
+   * is a thing you sit and read too — and only `PracticeScoutSheet` takes the
+   * default, because during onboarding it is showing off the live sheet and
+   * should get whatever the live sheet currently is.
    *
    * ⚠⚠ A FRACTION, NOT A `'88%'` SNAP POINT, and that is the whole fix for small
    * screens — `useSheetHeight` turns it into points against the LIVE window and
@@ -95,11 +112,38 @@ export function ScoutSheet({
    * instead of 88% of not very much. See that hook for the argument.
    */
   heightFraction = 0.88,
+  /**
+   * What the sheet is painted on — BEHIND the grab handle as well as the body.
+   *
+   * ## ⚠⚠ THE ONLY PLACE A COLOURED HEADER BAND CAN GO, AND THE REASON IS gorhom'S
+   * ## OWN TREE
+   *
+   * `PlayerStatSheet` opens on a 220pt club-coloured gradient that must reach
+   * the sheet's top edge and respect its corners. Put that gradient in
+   * `children` and it starts 24pt too low: gorhom lays the handle out ABOVE the
+   * children (`BottomSheetBody` is `column-reverse`, handle last), so a child at
+   * `top: 0` begins under it — leaving a snow strip with the sheet's rounded
+   * corners in it and a flat colour edge starting below. The background
+   * component is `StyleSheet.absoluteFill` behind BOTH, which is exactly where a
+   * surface treatment belongs.
+   *
+   * ⚠ IT RECEIVES `backgroundStyle` ALREADY APPLIED — snow plus the two top
+   * radii from `useSheetChrome`. A caller composing on top of it must spread the
+   * `style` it is handed and add `overflow: 'hidden'`, or its own band will
+   * square off the corners the style just rounded.
+   *
+   * ⚠ MEMOISE IT. gorhom memoises its background container on this component's
+   * IDENTITY, so an inline arrow remounts the background on every render of the
+   * caller.
+   */
+  background,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   heightFraction?: number;
+  /** ⚠ `FC`, NOT `ComponentType` — gorhom's own prop is narrower than that. */
+  background?: React.FC<BottomSheetBackgroundProps>;
   children: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -153,6 +197,11 @@ export function ScoutSheet({
         onClose={onClose}
         backdropComponent={renderBackdrop}
         topInset={insets.top}
+        // ⚠ `undefined` FALLS BACK TO THE LIBRARY'S OWN BACKGROUND, which is
+        // what three of the four callers want — gorhom reads
+        // `backgroundComponent ?? BottomSheetBackground`, and only an explicit
+        // `null` would remove the surface altogether.
+        backgroundComponent={background}
         // ⚠ SNOW, NOT SURFACE. Cards in this app are `surface` on `snow`; make
         // the sheet body a screen and the cards inside can just be cards. The
         // corners and the handle are `sheetChrome`'s — every sheet in the app
@@ -174,7 +223,23 @@ export function ScoutSheet({
  * stops responding to pan-down entirely — which is the one thing this shell was
  * changed to get.
  */
-export function ScoutSheetBody({ children }: { children: React.ReactNode }) {
+export function ScoutSheetBody({
+  /**
+   * Whether to draw the scrollbar.
+   *
+   * ⚠ OFF FOR A REPORT, ON FOR A LIST, AND THE DEFAULT IS THE REPORT. A scout
+   * report is four cards a reader scrolls through once; the indicator is chrome
+   * over content. `PlayerStatSheet` asks for it because Ryan could not tell that
+   * one scrolled at all — the real fault there was that it did not, but a long
+   * list of figures with no indicator gives a reader nothing to go on either
+   * way. That note is in `PlayerStatSheet`; this prop is what honours it.
+   */
+  scrollIndicator = false,
+  children,
+}: {
+  scrollIndicator?: boolean;
+  children: React.ReactNode;
+}) {
   const insets = useSafeAreaInsets();
   return (
     <BottomSheetScrollView
@@ -183,7 +248,7 @@ export function ScoutSheetBody({ children }: { children: React.ReactNode }) {
         paddingBottom: insets.bottom + 24,
         gap: 16,
       }}
-      showsVerticalScrollIndicator={false}
+      showsVerticalScrollIndicator={scrollIndicator}
     >
       {children}
     </BottomSheetScrollView>
