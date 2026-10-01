@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from './Icon';
 import { Text } from './Text';
+import { SHEET_RADIUS } from './sheetChrome';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type ActionSheetOption<T extends string> = {
@@ -89,8 +90,8 @@ export function ActionSheet<T extends string>({
         <View
           style={{
             backgroundColor: theme.colors.surface,
-            borderTopLeftRadius: theme.radii.xl,
-            borderTopRightRadius: theme.radii.xl,
+            borderTopLeftRadius: SHEET_RADIUS,
+            borderTopRightRadius: SHEET_RADIUS,
             // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
             borderCurve: 'continuous' as const,
             paddingTop: theme.spacing.md,

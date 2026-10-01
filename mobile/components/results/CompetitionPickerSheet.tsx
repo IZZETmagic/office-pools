@@ -12,7 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui';
+import { Icon, SHEET_RADIUS } from '@/components/ui';
 import { getCompetitionMonogram, getPoolStripe } from '@/lib/design/competition';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -133,8 +133,8 @@ export const CompetitionPickerSheet = forwardRef<CompetitionPickerSheetHandle, P
             right: 0,
             bottom: 0,
             backgroundColor: theme.colors.surface,
-            borderTopLeftRadius: theme.radii.xl,
-            borderTopRightRadius: theme.radii.xl,
+            borderTopLeftRadius: SHEET_RADIUS,
+            borderTopRightRadius: SHEET_RADIUS,
             // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
             borderCurve: 'continuous' as const,
             transform: [{ translateY }],

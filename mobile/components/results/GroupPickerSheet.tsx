@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui';
+import { Icon, SHEET_RADIUS } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type GroupOption = {
@@ -115,8 +115,8 @@ export const GroupPickerSheet = forwardRef<GroupPickerSheetHandle, Props>(functi
           right: 0,
           bottom: 0,
           backgroundColor: theme.colors.surface,
-          borderTopLeftRadius: theme.radii.xl,
-          borderTopRightRadius: theme.radii.xl,
+          borderTopLeftRadius: SHEET_RADIUS,
+          borderTopRightRadius: SHEET_RADIUS,
           // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
           borderCurve: 'continuous' as const,
           transform: [{ translateY }],

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { TeamMark, Icon } from '@/components/ui';
+import { Icon, SHEET_RADIUS, TeamMark } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type TeamOption = {
@@ -137,8 +137,8 @@ export const TeamPickerSheet = forwardRef<TeamPickerSheetHandle, Props>(function
           right: 0,
           bottom: 0,
           backgroundColor: theme.colors.surface,
-          borderTopLeftRadius: theme.radii.xl,
-          borderTopRightRadius: theme.radii.xl,
+          borderTopLeftRadius: SHEET_RADIUS,
+          borderTopRightRadius: SHEET_RADIUS,
           // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
           borderCurve: 'continuous' as const,
           transform: [{ translateY }],

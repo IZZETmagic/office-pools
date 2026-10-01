@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MONO, MONO_BOLD } from '@/components/match/matchDisplay';
-import { Icon, Text, useSheetHeight } from '@/components/ui';
+import { Icon, SHEET_RADIUS, Text, useSheetHeight } from '@/components/ui';
 import { withLightness } from '@/lib/design/oklch';
 import { useTheme, withOpacity } from '@/theme';
 import {
@@ -193,8 +193,8 @@ export function PlayerStatSheet({
               // ⚠ `xl`, THE SAME AS EVERY OTHER SHEET. This was `lg` (24), which is
               // the radius of the CARDS inside it — a container should not be as
               // sharp as its contents.
-              borderTopLeftRadius: theme.radii.xl,
-              borderTopRightRadius: theme.radii.xl,
+              borderTopLeftRadius: SHEET_RADIUS,
+              borderTopRightRadius: SHEET_RADIUS,
               // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
               borderCurve: 'continuous' as const,
               // ⚠ SO THE BAND REACHES THE ROUNDED CORNERS. The header runs

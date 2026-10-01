@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui';
+import { Icon, SHEET_RADIUS } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -226,8 +226,8 @@ export const AdjustPointsSheet = forwardRef<AdjustPointsSheetHandle, Props>(
           <Animated.View
             style={{
               backgroundColor: theme.colors.surface,
-              borderTopLeftRadius: theme.radii.xl,
-              borderTopRightRadius: theme.radii.xl,
+              borderTopLeftRadius: SHEET_RADIUS,
+              borderTopRightRadius: SHEET_RADIUS,
               // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
               borderCurve: 'continuous' as const,
               paddingTop: theme.spacing.md,

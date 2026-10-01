@@ -48,6 +48,31 @@ import { useTheme, type ColorToken } from '@/theme';
 export const SHEET_HANDLE_WIDTH = 40;
 
 /**
+ * The corner radius of a sheet, in points.
+ *
+ * ## ⭐⭐ 30, BECAUSE THAT IS WHAT UIKIT DRAWS — MEASURED, NOT CHOSEN
+ *
+ * The GIF picker is a NATIVE page sheet (`GifPickerSheet` renders a `<Modal
+ * presentationStyle="pageSheet">`), so iOS draws its corners and Ryan approved
+ * how it looks. Our sheets are gorhom, so we draw our own, and they have to
+ * agree — the GIF picker opens ON TOP of Banter, both corners visible at once.
+ *
+ * Measured off that screenshot, 1290px wide @3x: the native curve leaves the
+ * top edge **138px = 46pt** in from the corner. A continuous corner spans
+ * 1.528 × R along each edge, so R = 46 / 1.528 = **30.1pt**.
+ *
+ * ⚠ IT IS NOT `radii.xl`. 32 was the house CARD radius borrowed for sheets, and
+ * it spans 48.9pt — 3pt wider than the system's. That is invisible alone and
+ * visible when the two cards are stacked, which is exactly when this is looked
+ * at. Sheets follow the platform here; cards keep the token.
+ *
+ * ⚠ CHECKS THAT CONFIRMED THE SHAPE: a circle of R=138px would still be 37px
+ * in at y=100 where the real curve measured 23px, and a circle of R=90px would
+ * be 12.6px. Flatter than one, tighter than the other — a squircle.
+ */
+export const SHEET_RADIUS = 30;
+
+/**
  * The top corners of every sheet.
  *
  * ⚠ `xl` (32) IS THE HOUSE SHEET RADIUS, and it is one step rounder than the
@@ -78,8 +103,6 @@ export const SHEET_HANDLE_WIDTH = 40;
  * ⚠ iOS ONLY, AND SAFELY SO. Android ignores the property — no crash, no
  * warning. Android's own surfaces are circular, so there is nothing to match.
  */
-export const SHEET_RADIUS: keyof ReturnType<typeof useTheme>['radii'] = 'xl';
-
 /**
  * Background and handle for a gorhom `BottomSheet`, ready to spread.
  *
@@ -97,8 +120,8 @@ export function useSheetChrome(background: ColorToken = 'surface'): {
     () => ({
       backgroundStyle: {
         backgroundColor: theme.colors[background],
-        borderTopLeftRadius: theme.radii[SHEET_RADIUS],
-        borderTopRightRadius: theme.radii[SHEET_RADIUS],
+        borderTopLeftRadius: SHEET_RADIUS,
+        borderTopRightRadius: SHEET_RADIUS,
         // ⚠ THE SHAPE, NOT THE SIZE — see the header.
         borderCurve: 'continuous',
       },

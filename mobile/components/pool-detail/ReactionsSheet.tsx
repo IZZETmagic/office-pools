@@ -19,7 +19,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, useSheetHeight } from '@/components/ui';
+import { Icon, SHEET_RADIUS, useSheetHeight } from '@/components/ui';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 // One person who reacted, pre-resolved by the caller (BanterSheet owns the
@@ -152,8 +152,8 @@ export const ReactionsSheet = forwardRef<ReactionsSheetHandle>(
               backgroundColor: theme.colors.surface,
               // ⚠ THE TOKEN, NOT A LITERAL. This was a hardcoded 20, which matched
               // nothing in `radii` and so could never move with the rest.
-              borderTopLeftRadius: theme.radii.xl,
-              borderTopRightRadius: theme.radii.xl,
+              borderTopLeftRadius: SHEET_RADIUS,
+              borderTopRightRadius: SHEET_RADIUS,
               // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
               borderCurve: 'continuous' as const,
               paddingTop: theme.spacing.sm,

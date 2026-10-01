@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TableBreakdownList } from './TableBreakdownList';
-import { Icon, Text } from '@/components/ui';
+import { Icon, SHEET_RADIUS, Text } from '@/components/ui';
 import { fetchTablePrediction } from '@/lib/api';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -124,8 +124,8 @@ export function TableEntrySheet({ poolId, target, isLocked, onClose }: Props) {
           position: 'absolute',
           left: 0, right: 0, bottom: 0,
           backgroundColor: theme.colors.snow,
-          borderTopLeftRadius: theme.radii.xl,
-          borderTopRightRadius: theme.radii.xl,
+          borderTopLeftRadius: SHEET_RADIUS,
+          borderTopRightRadius: SHEET_RADIUS,
           // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
           borderCurve: 'continuous' as const,
           transform: [{ translateY }],
