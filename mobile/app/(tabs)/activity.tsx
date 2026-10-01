@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text as RNText, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -33,6 +33,23 @@ import { fontFamilies, useTheme } from '@/theme';
  */
 const FOCUS_REFRESH_MS = 30_000;
 
+/**
+ * How few rows a chip may show before the list fetches older pages on its own.
+ * Mentions are rare, so without this the Mentions chip could open on an empty
+ * screen while older mentions sat one page away.
+ */
+const FILTER_FILL_ROWS = 8;
+/** …and at most this many pages per chip change, so a member with no mentions
+ * at all does not page through their entire history every time they tap it. */
+const FILTER_FILL_PAGES = 4;
+
+type Row =
+  | { kind: 'needs'; key: 'needs' }
+  | { kind: 'chips'; key: 'chips' }
+  | { kind: 'heading'; key: string; label: string }
+  | { kind: 'item'; key: string; item: ActivityItem }
+  | { kind: 'empty'; key: 'empty' };
+
 function go(link: ActivityLink | undefined): (() => void) | null {
   if (!link) return null;
   return () => router.push(link as never);
@@ -47,7 +64,18 @@ function go(link: ActivityLink | undefined): (() => void) | null {
  */
 export default function ActivityScreen() {
   const theme = useTheme();
-  const { items, needsYou, loading, error, refresh, markSeen } = useSharedActivity();
+  const {
+    items,
+    needsYou,
+    loading,
+    error,
+    refresh,
+    markSeen,
+    nextBefore,
+    loadingMore,
+    loadMoreError,
+    loadMore,
+  } = useSharedActivity();
   // Pull-to-refresh: spinner bound to real user gesture only.
   const { refreshing, onRefresh } = useManualRefresh(refresh);
   const [filter, setFilter] = useState<ActivityFilter>('all');
@@ -81,9 +109,84 @@ export default function ActivityScreen() {
     () => items.filter((i) => i.activityType === 'mention' && !i.isRead).length,
     [items],
   );
-  const groups = useMemo(
-    () => groupByDay(items.filter((i) => matchesFilter(i, filter))),
-    [items, filter],
+  const filtered = useMemo(() => items.filter((i) => matchesFilter(i, filter)), [items, filter]);
+
+  /**
+   * One flat list, so FlatList only draws what is near the screen.
+   *   0 Needs you   1 chips (sticky)   2… headings and rows
+   */
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = [
+      { kind: 'needs', key: 'needs' },
+      { kind: 'chips', key: 'chips' },
+    ];
+    const groups = groupByDay(filtered);
+    if (groups.length === 0 && nextBefore === null) out.push({ kind: 'empty', key: 'empty' });
+    for (const g of groups) {
+      out.push({ kind: 'heading', key: `h-${g.key}`, label: g.label });
+      for (const item of g.items) out.push({ kind: 'item', key: item.activityId, item });
+    }
+    return out;
+  }, [filtered, nextBefore]);
+
+  // A chip with too little on screen pulls older pages until it has enough,
+  // the history ends, or it has tried FILTER_FILL_PAGES times.
+  const fillPagesRef = useRef(0);
+  useEffect(() => {
+    fillPagesRef.current = 0;
+  }, [filter]);
+  useEffect(() => {
+    if (filter === 'all' || !nextBefore || loadingMore || loadMoreError) return;
+    if (filtered.length >= FILTER_FILL_ROWS || fillPagesRef.current >= FILTER_FILL_PAGES) return;
+    fillPagesRef.current += 1;
+    loadMore();
+  }, [filter, filtered.length, nextBefore, loadingMore, loadMoreError, loadMore]);
+
+  const renderRow = useCallback(
+    ({ item: row }: { item: Row }) => {
+      switch (row.kind) {
+        case 'needs':
+          // Bottom padding lives here, not on the chips: the chips are sticky,
+          // and padding of their own would leave a gap above them while pinned.
+          return (
+            <View
+              style={{
+                paddingHorizontal: theme.spacing.xl,
+                paddingBottom: needsYou.length > 0 ? theme.spacing.lg : 0,
+                gap: theme.spacing.sm + 2,
+              }}
+            >
+              {needsYou.length > 0 ? (
+                <>
+                  <SectionLabel text={`Needs you · ${needsYou.length}`} />
+                  {needsYou.map((n) => (
+                    <NeedsYouCard key={n.id} item={n} onPress={() => router.push(n.link as never)} />
+                  ))}
+                </>
+              ) : null}
+            </View>
+          );
+        case 'chips':
+          return (
+            <ActivityFilterChips value={filter} onChange={setFilter} unreadMentions={unreadMentions} />
+          );
+        case 'heading':
+          return (
+            <View style={{ paddingHorizontal: theme.spacing.xl, paddingBottom: theme.spacing.sm + 2 }}>
+              <SectionLabel text={row.label} />
+            </View>
+          );
+        case 'item':
+          return (
+            <View style={{ paddingHorizontal: theme.spacing.xl, paddingBottom: theme.spacing.sm + 2 }}>
+              <HistoryRow item={row.item} />
+            </View>
+          );
+        case 'empty':
+          return <FilterEmpty filter={filter} />;
+      }
+    },
+    [theme, needsYou, filter, unreadMentions],
   );
 
   const hasAnything = items.length > 0 || needsYou.length > 0;
@@ -111,8 +214,24 @@ export default function ActivityScreen() {
       ) : !hasAnything ? (
         <EmptyState />
       ) : (
-        <ScrollView
+        <FlatList
+          data={rows}
+          keyExtractor={(r) => r.key}
+          renderItem={renderRow}
           stickyHeaderIndices={[1]}
+          initialNumToRender={14}
+          onEndReachedThreshold={0.6}
+          onEndReached={() => {
+            if (!loadMoreError) loadMore();
+          }}
+          ListFooterComponent={
+            <ListFooter
+              loadingMore={loadingMore}
+              error={loadMoreError}
+              atEnd={nextBefore === null && items.length > 0}
+              onRetry={loadMore}
+            />
+          }
           contentContainerStyle={{ paddingBottom: theme.spacing.xxxl }}
           refreshControl={
             <RefreshControl
@@ -121,46 +240,7 @@ export default function ActivityScreen() {
               tintColor={theme.colors.primary}
             />
           }
-        >
-          {/* 0 — Needs you. Never filtered. */}
-          {/* Bottom padding lives here, not on the chips: the chips are sticky, and
-              padding of their own would leave a gap above them while pinned. */}
-          <View
-            style={{
-              paddingHorizontal: theme.spacing.xl,
-              paddingBottom: needsYou.length > 0 ? theme.spacing.lg : 0,
-              gap: theme.spacing.sm + 2,
-            }}
-          >
-            {needsYou.length > 0 ? (
-              <>
-                <SectionLabel text={`Needs you · ${needsYou.length}`} />
-                {needsYou.map((n) => (
-                  <NeedsYouCard key={n.id} item={n} onPress={() => router.push(n.link as never)} />
-                ))}
-              </>
-            ) : null}
-          </View>
-
-          {/* 1 — the chips, sticky. */}
-          <ActivityFilterChips value={filter} onChange={setFilter} unreadMentions={unreadMentions} />
-
-          {/* 2 — the history. */}
-          <View style={{ paddingHorizontal: theme.spacing.xl, gap: theme.spacing.sm + 2 }}>
-            {groups.length === 0 ? (
-              <FilterEmpty filter={filter} />
-            ) : (
-              groups.map((g) => (
-                <View key={g.key} style={{ gap: theme.spacing.sm + 2 }}>
-                  <SectionLabel text={g.label} />
-                  {g.items.map((item) => (
-                    <HistoryRow key={item.activityId} item={item} />
-                  ))}
-                </View>
-              ))
-            )}
-          </View>
-        </ScrollView>
+        />
       )}
 
       <PoolCreateJoinSheet
@@ -184,6 +264,53 @@ function HistoryRow({ item }: { item: ActivityItem }) {
       <ActivityCard item={item} />
     </Pressable>
   );
+}
+
+/**
+ * The bottom of the list: a spinner while the next page loads, a retry if it
+ * failed, and an end marker once the whole history is in. The end marker is the
+ * point of the disclosure gate — the feed is a finite record, not a stream.
+ */
+function ListFooter({
+  loadingMore,
+  error,
+  atEnd,
+  onRetry,
+}: {
+  loadingMore: boolean;
+  error: string | null;
+  atEnd: boolean;
+  onRetry: () => void;
+}) {
+  const theme = useTheme();
+  const box = { paddingVertical: theme.spacing.xl, alignItems: 'center' as const };
+  if (loadingMore) {
+    return (
+      <View style={box}>
+        <ActivityIndicator color={theme.colors.primary} />
+      </View>
+    );
+  }
+  if (error) {
+    return (
+      <Pressable onPress={onRetry} accessibilityRole="button" style={box}>
+        <RNText style={{ fontFamily: fontFamilies.semibold, fontSize: 13, color: theme.colors.slate }}>
+          {"Couldn't load more · "}
+          <RNText style={{ fontFamily: fontFamilies.bold, color: theme.colors.primary }}>Try again</RNText>
+        </RNText>
+      </Pressable>
+    );
+  }
+  if (atEnd) {
+    return (
+      <View style={box}>
+        <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.slate }}>
+          {"That's everything since you joined"}
+        </RNText>
+      </View>
+    );
+  }
+  return null;
 }
 
 /**

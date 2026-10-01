@@ -781,6 +781,8 @@ export type ActivityFeedResponse = {
   needs_you?: NeedsYouItem[];
   /** v2 only. When this member last opened the tab; NULL if never. */
   seen_at?: string | null;
+  /** v2 only. Cursor for the next (older) page; NULL at the end of the history. */
+  next_before?: string | null;
 };
 
 /**
@@ -788,8 +790,9 @@ export type ActivityFeedResponse = {
  * state. The route answers v1 without it, which is what older OTAs get — so the
  * API has to be deployed BEFORE an OTA carrying this.
  */
-export function fetchUserActivity(userId: string) {
-  return apiFetch<ActivityFeedResponse>(`/api/users/${userId}/activity?v=2`);
+export function fetchUserActivity(userId: string, before?: string | null) {
+  const cursor = before ? `&before=${encodeURIComponent(before)}` : '';
+  return apiFetch<ActivityFeedResponse>(`/api/users/${userId}/activity?v=2${cursor}`);
 }
 
 /** The member opened the Activity tab: everything before now is read. */

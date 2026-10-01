@@ -2,7 +2,7 @@
 // Synthesizes the Activity feed from pool membership / entry / point-adjustment
 // data — no `user_activity` table is read; events are computed client-side.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   fetchEntryAnalytics,
@@ -288,13 +288,17 @@ function ensureUniqueActivityIds(items: ActivityItem[]): void {
  * Mirrors ios/OfficePools/Services/ActivityService.swift in spirit.
  */
 type ActivityFetch = {
+  /** Page one from the server. */
   items: ActivityItem[];
+  /** XP rows, built on the phone for ALL time — `mergeFeed` windows them. */
+  xpItems: ActivityItem[];
   needsYou: NeedsYouItem[];
   seenAt: string | null;
+  nextBefore: string | null;
 };
 
 async function fetchActivity(appUserId: string): Promise<ActivityFetch> {
-  // Cheap synthesis (single server call).
+  // First page (single server call).
   const res = await fetchUserActivity(appUserId);
   const items: ActivityItem[] = res.items.map(fromRaw);
 
@@ -318,20 +322,53 @@ async function fetchActivity(appUserId: string): Promise<ActivityFetch> {
   if (error) throw error;
   const memberships = (rows ?? []) as unknown as MembershipRow[];
 
-  await appendXPEvents(memberships, items);
+  const xpItems: ActivityItem[] = [];
+  await appendXPEvents(memberships, xpItems);
 
   // XP rows are built here, not on the server, so they get their link here.
-  for (const it of items) {
-    if (!it.link && it.poolId && it.activityType === 'xp_gain') {
+  for (const it of xpItems) {
+    if (!it.link && it.poolId) {
       it.link = { pathname: '/pool/[id]', params: { id: it.poolId } };
     }
   }
 
-  // Newest first
-  items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+  return {
+    items,
+    xpItems,
+    needsYou: res.needs_you ?? [],
+    seenAt: res.seen_at ?? null,
+    nextBefore: res.next_before ?? null,
+  };
+}
 
-  ensureUniqueActivityIds(items);
-  return { items, needsYou: res.needs_you ?? [], seenAt: res.seen_at ?? null };
+const ms = (iso: string) => Date.parse(iso);
+
+/**
+ * The feed as shown: every loaded server page, plus the XP rows that fall
+ * inside what has been loaded so far.
+ *
+ * ⚠ XP rows are synthesised on the phone for all time, so without the window a
+ * badge from July would sit at the bottom of page one with nothing around it,
+ * and then the page that should hold it would arrive above it. `nextBefore` is
+ * the oldest edge loaded; NULL means the whole history is in.
+ */
+export function mergeFeed(
+  server: ActivityItem[],
+  xp: ActivityItem[],
+  nextBefore: string | null | undefined,
+): ActivityItem[] {
+  const floor = nextBefore ? ms(nextBefore) : null;
+  const visibleXp = floor == null ? xp : xp.filter((i) => ms(i.createdAt) >= floor);
+  const out = [...server, ...visibleXp].map((i) => ({ ...i }));
+  out.sort((a, b) => ms(b.createdAt) - ms(a.createdAt));
+  ensureUniqueActivityIds(out);
+  return out;
+}
+
+/** Append a page, dropping any row already held (the same id twice is the same event). */
+function appendUnique(prev: ActivityItem[], add: ActivityItem[]): ActivityItem[] {
+  const seen = new Set(prev.map((i) => i.activityId));
+  return [...prev, ...add.filter((i) => !seen.has(i.activityId))];
 }
 
 function fromRaw(r: ActivityFeedItemRaw): ActivityItem {
@@ -552,7 +589,23 @@ export function useActivity() {
   // Synchronous hydrate — see the long note in `lib/cache/persistentCache.ts`.
   // Provisional until auth resolves; the adopt/revoke effect below settles it.
   const [cached] = useState(() => readCache<ActivityItem[]>(CACHE_KEYS.activity));
-  const [items, setItems] = useState<ActivityItem[]>(cached?.data ?? []);
+  // Server pages, appended as the member scrolls. The cache holds page one.
+  const [serverItems, setServerItems] = useState<ActivityItem[]>(cached?.data ?? []);
+  const [xpItems, setXpItems] = useState<ActivityItem[]>([]);
+  /**
+   * Cursor for the next older page. `undefined` = not fetched yet (a cache
+   * hydrate), so the list shows no end marker before it knows; `null` = the
+   * whole history is loaded.
+   */
+  const [nextBefore, setNextBefore] = useState<string | null | undefined>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const serverRef = useRef<ActivityItem[]>(serverItems);
+  serverRef.current = serverItems;
+  const nextBeforeRef = useRef<string | null | undefined>(undefined);
+  nextBeforeRef.current = nextBefore;
+  const loadingMoreRef = useRef(false);
+  const items = useMemo(() => mergeFeed(serverItems, xpItems, nextBefore), [serverItems, xpItems, nextBefore]);
   // ⚠ NOT `items.length === 0`. An empty feed is a legitimate answer for a new
   // member, and treating it as "no data" would hold the splash up for exactly
   // the people with the least to look at.
@@ -588,14 +641,27 @@ export function useActivity() {
         const appUserId = (userData as { user_id: string }).user_id;
         appUserIdRef.current = appUserId;
         const next = await fetchActivity(appUserId);
-        setItems(next.items);
+        // A refresh refetches page one but must not collapse pages the member
+        // has already scrolled into: keep everything older than page one's edge,
+        // and keep the deeper cursor if those older rows exist.
+        const prev = serverRef.current;
+        const edge = next.nextBefore ? ms(next.nextBefore) : null;
+        const older = edge == null ? [] : prev.filter((i) => ms(i.createdAt) < edge);
+        setServerItems(appendUnique(next.items, older));
+        setNextBefore(older.length > 0 ? nextBeforeRef.current : next.nextBefore);
+        setXpItems(next.xpItems);
+        setLoadMoreError(null);
         setNeedsYou(next.needsYou);
         // Never move the local stamp backwards: a fetch that started before
         // `markSeen` landed would otherwise resurrect the tab dot.
         setSeenAt((prev) => (prev && next.seenAt && prev > next.seenAt ? prev : next.seenAt));
         hasDataRef.current = true;
         // Stamped with the AUTH id, matching what the reader compares against.
-        writeCache(CACHE_KEYS.activity, user.id, next.items.slice(0, CACHED_ACTIVITY_LIMIT));
+        writeCache(
+          CACHE_KEYS.activity,
+          user.id,
+          mergeFeed(next.items, next.xpItems, next.nextBefore).slice(0, CACHED_ACTIVITY_LIMIT),
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load activity';
         setError(msg);
@@ -618,7 +684,9 @@ export function useActivity() {
     if (authLoading) return;
     if (user && user.id === cached.userId) return;
     revokedRef.current = true;
-    setItems([]);
+    setServerItems([]);
+    setXpItems([]);
+    setNextBefore(undefined);
     hasDataRef.current = false;
     setLoading(!!user);
   }, [authLoading, user, cached]);
@@ -644,6 +712,27 @@ export function useActivity() {
     }
   }, []);
 
+  /** The next older page, if there is one and nothing is already loading. */
+  const loadMore = useCallback(async () => {
+    const cursor = nextBeforeRef.current;
+    const id = appUserIdRef.current;
+    if (!cursor || !id || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    setLoadMoreError(null);
+    try {
+      const res = await fetchUserActivity(id, cursor);
+      setServerItems((prev) => appendUnique(prev, res.items.map(fromRaw)));
+      setNextBefore(res.next_before ?? null);
+    } catch (err) {
+      setLoadMoreError(err instanceof Error ? err.message : 'Could not load more');
+      console.warn('[useActivity] loadMore', err);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, []);
+
   /** Mentions newer than the last visit — half of what lights the tab dot. */
   const unreadMentions = seenAt
     ? items.filter((i) => i.activityType === 'mention' && i.createdAt > seenAt).length
@@ -659,5 +748,9 @@ export function useActivity() {
     error,
     refresh: useCallback(() => load('refresh'), [load]),
     markSeen,
+    nextBefore,
+    loadingMore,
+    loadMoreError,
+    loadMore,
   };
 }
