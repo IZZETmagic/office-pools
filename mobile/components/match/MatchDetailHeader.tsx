@@ -20,11 +20,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 
 import { MatchStatusBadge } from '@/components/MatchStatusBadge';
-import { Icon } from '@/components/ui';
+import { useAnimatedProps } from 'react-native-reanimated';
+
+import { AnimatedTextBox, Icon } from '@/components/ui';
 import { clubOnSurface, fixturePalette } from '@/lib/design/clubColors';
 import { getCompetitionBand, getCompetitionGlow, GLOW_HEIGHT } from '@/lib/design/competitionBand';
 import { hasScorers, matchScorers, type ScorerLine } from '@/lib/matchScorers';
-import { useMatchClock } from '@/lib/useMatchClock';
+import { pad2, useMatchClock } from '@/lib/useMatchClock';
 import type { TimelineEvent } from '@/lib/useMatchDetail';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { fontFamilies, useTheme } from '@/theme';
@@ -1078,19 +1080,56 @@ function CentreCaption({ match }: { match: ResultsMatch }) {
 // its own component so the once-a-second tick re-renders only this row, not the
 // whole header. Falls back to "LIVE" in the brief window before the first
 // minute is known.
+/**
+ * ⚠⚠ THE SECONDS DO NOT PASS THROUGH REACT, AND THAT IS NOT A MICRO-OPTIMISATION.
+ *
+ * This ticked once a second in `useState` for the whole ninety minutes. On iOS a
+ * React commit pauses Reanimated until it has mounted and the animated values for
+ * those frames are never applied, so the match header was stalling every
+ * animation on the screen once a second — including the player sheet's open
+ * spring and the scroll inside it. See `lib/useCountdown.ts` for the mechanism
+ * and `AnimatedTextBox` for why this is a `TextInput`.
+ *
+ * ⚠ ONLY THE SECONDS ARE ANIMATED. `HT`, `PENS` and the no-minute window do not
+ * tick at all, so they stay ordinary text — a `TextInput` for a static word would
+ * be the trick applied where it buys nothing and costs accessibility.
+ */
 function MatchClock({ match }: { match: ResultsMatch }) {
   const theme = useTheme();
-  const clock = useMatchClock(match);
+  const { seconds, staticLabel, prefix, suffix } = useMatchClock(match);
+
+  const animatedProps = useAnimatedProps(() => {
+    'worklet';
+    return { text: `${prefix ?? ''}${pad2(seconds.value)}${suffix}` } as unknown as Record<
+      string,
+      unknown
+    >;
+  });
+
+  const clockStyle = {
+    fontFamily: MONO_BOLD,
+    fontSize: 13,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  };
+
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
       <View
         style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.red }}
       />
-      <RNText
-        style={{ fontFamily: MONO_BOLD, fontSize: 13, color: '#FFFFFF', letterSpacing: 0.5 }}
-      >
-        {clock ?? 'LIVE'}
-      </RNText>
+      {prefix === null ? (
+        <RNText style={clockStyle}>{staticLabel ?? 'LIVE'}</RNText>
+      ) : (
+        /* ⚠ The sizer is `prefix + '00' + suffix`: the seconds are always two
+           characters, so the box cannot change width between renders, and when
+           the minute or stoppage DOES move it arrives as a prop and re-measures. */
+        <AnimatedTextBox
+          animatedProps={animatedProps}
+          sizerText={`${prefix}00${suffix}`}
+          style={clockStyle}
+        />
+      )}
     </View>
   );
 }

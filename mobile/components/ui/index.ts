@@ -1,4 +1,5 @@
 export { ActionMenu, type ActionMenuItem } from './ActionMenu';
+export { AnimatedTextBox } from './AnimatedTextBox';
 export { Button } from './Button';
 export { Card } from './Card';
 export { ClubBar } from './ClubBar';
