@@ -38,18 +38,9 @@
 // =============================================================
 
 import { useMemo, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Stack } from 'expo-router';
-import Animated, {
-  measure,
-  type SharedValue,
-  useAnimatedProps,
-  useAnimatedRef,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useFrameCallback,
-  useSharedValue,
-} from 'react-native-reanimated';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui';
 import { ShowdownDuelHeader, type Standing } from '@/components/pool-detail/ShowdownDuelHeader';
@@ -57,9 +48,7 @@ import { ShowdownRecapSheet } from '@/components/pool-detail/ShowdownRecapSheet'
 import { ShowdownWalkout } from '@/components/pool-detail/ShowdownWalkout';
 import { duelPhase, type DuelPhaseInput } from '@/lib/duelPhase';
 import type { Bout } from '@/lib/useDuel';
-import { fontFamilies, useTheme } from '@/theme';
-
-const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
+import { useTheme } from '@/theme';
 
 // -------------------------------------------------------------- the cast
 
@@ -264,20 +253,6 @@ const SITUATIONS: Situation[] = [
 export default function ShowdownPhaseHarness() {
   const theme = useTheme();
   const [i, setI] = useState(0);
-  /**
-   * ⭐⭐ THE A/B THAT SETTLES IT. With the band off, the only thing on screen
-   * driven by `scrollY` is the probe's own dot — one view, one `translateY`,
-   * nothing behind it.
-   *
-   *   dropped falls with the band off  →  the band's ~10 animated VIEWS are the
-   *     cost, and consolidating them is the fix
-   *   dropped stays the same           →  the cost is the per-frame commit
-   *     pipeline itself, and no amount of surgery on the band will help
-   *
-   * The second reading is the one that would send this to the Reanimated upgrade
-   * instead, so it is worth one toggle to know which.
-   */
-  const [bandOn, setBandOn] = useState(true);
   const scrollY = useSharedValue(0);
   /**
    * ⚠⚠ THE SCROLL IS WIRED UP, AND IT USED NOT TO BE. `scrollY` was created and
@@ -291,40 +266,10 @@ export default function ShowdownPhaseHarness() {
    * show it. Same mechanism as the real screen — a UI-thread worklet writing the
    * shared value, no re-render.
    */
-  /**
-   * ⚠⚠ `moving` EXISTS BECAUSE THE FIRST PROBE MEASURED THE WRONG THING.
-   *
-   * It counted every frame, including the ones where nobody was touching the
-   * screen — and on a ProMotion display the refresh rate drops as low as 24Hz
-   * when idle. A 41ms gap between frames is then the PANEL SAVING POWER, not a
-   * frame the app missed, and it read as `worst 37ms` with dozens "dropped" on a
-   * screen that was sitting perfectly still.
-   *
-   * So the stats only accumulate between `onBeginDrag` and the end of momentum,
-   * which is the only window in which a late frame means anything.
-   */
-  const moving = useSharedValue(false);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (e) => {
       'worklet';
       scrollY.value = e.contentOffset.y;
-    },
-    onBeginDrag: () => {
-      'worklet';
-      moving.value = true;
-    },
-    // ⚠ NOT `onEndDrag` — the finger leaving is the START of the fling, which is
-    // exactly when a dropped frame is most visible. Momentum ending is the honest
-    // close of the window.
-    onMomentumEnd: () => {
-      'worklet';
-      moving.value = false;
-    },
-    // A drag that ends without momentum (a slow release) fires no momentum event,
-    // so this closes the window for that case and is harmless when momentum follows.
-    onEndDrag: () => {
-      'worklet';
-      moving.value = false;
     },
   });
   /**
@@ -387,7 +332,6 @@ export default function ShowdownPhaseHarness() {
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {bandOn ? (
       <ShowdownDuelHeader
         poolName="Harness FC"
         poolCode="HARNESS"
@@ -413,7 +357,6 @@ export default function ShowdownPhaseHarness() {
       >
         <View style={{ height: 44 }} />
       </ShowdownDuelHeader>
-      ) : null}
 
       {/*
         ⚠ SITS BELOW THE BAND RATHER THAN OVER IT. The band floats and slides on
@@ -444,27 +387,6 @@ export default function ShowdownPhaseHarness() {
             </Pressable>
           ))}
         </View>
-
-        {/*
-          ⚠ THE CONTROL FOR THE EXPERIMENT, not a feature. Turning the band off
-          leaves the probe's dot as the only thing `scrollY` drives, which is what
-          separates "the band costs too much" from "applying ANY animated prop
-          costs too much on this version". See `bandOn` above.
-        */}
-        <Pressable
-          onPress={() => setBandOn((b) => !b)}
-          accessibilityRole="button"
-          style={{
-            paddingVertical: theme.spacing.sm,
-            borderRadius: theme.radii.pill,
-            alignItems: 'center',
-            backgroundColor: bandOn ? theme.colors.mist : theme.colors.primary,
-          }}
-        >
-          <Text variant="detail" style={{ color: bandOn ? theme.colors.slate : '#FFFFFF' }}>
-            {bandOn ? 'Band ON — tap to measure the dot alone' : 'Band OFF — dot only'}
-          </Text>
-        </Pressable>
 
         <View style={{ gap: theme.spacing.xs }}>
           <Text variant="cardTitle">
@@ -536,12 +458,13 @@ export default function ShowdownPhaseHarness() {
         </View>
 
         {/*
-          ⚠⚠ DELIBERATE DEAD SPACE, AND IT IS LOAD-BEARING FOR THE REVIEW.
-          The band collapses over roughly the first 150pt of scroll, and every
-          other child here put together does not fill a phone — so without
-          something taller than the viewport underneath, there is nothing to drag
-          and the collapse cannot be watched at all. That is the state this
-          harness was in until the scroll was wired up.
+          ⚠⚠ DELIBERATE DEAD SPACE, AND IT IS LOAD-BEARING. The band collapses
+          over roughly the first 150pt of scroll, and every other child here put
+          together does not fill a phone — so without something taller than the
+          viewport underneath there is nothing to drag, and the collapse cannot be
+          reviewed at all. That is the state this harness was in until the scroll
+          was wired up: `scrollY` was created, handed to the band, and never
+          written.
 
           Do not "tidy" this away. A harness that cannot reproduce the behaviour
           cannot catch a regression in it — the same lesson the phase-6 fixture
@@ -552,8 +475,8 @@ export default function ShowdownPhaseHarness() {
             Scroll down and back up
           </Text>
           <Text variant="body" color="slate" align="center">
-            The band should track your finger the whole way, with no freeze on the
-            second. Phase 3 and phase 6 are the ones with a running clock.
+            The band should collapse into the chrome row and come back cleanly.
+            Phase 3 and phase 6 are the ones with a running clock.
           </Text>
         </View>
       </Animated.ScrollView>
@@ -595,12 +518,6 @@ export default function ShowdownPhaseHarness() {
         />
       ) : null}
 
-      {/*
-        ⚠ LAST, AND OUTSIDE THE SCROLLVIEW. It is pinned to the screen and rides
-        the same `scrollY` the band does — inside the scroll content it would move
-        with the content and measure nothing.
-      */}
-      <ScrollProbe scrollY={scrollY} moving={moving} />
     </View>
   );
 }
@@ -615,226 +532,6 @@ function Row({ k, v }: { k: string; v: string }) {
       <Text variant="detail" style={{ fontVariant: ['tabular-nums'], color: theme.colors.ink }}>
         {v}
       </Text>
-    </View>
-  );
-}
-
-// ------------------------------------------------------ the scroll probe
-
-/**
- * ⭐⭐ THE INSTRUMENT, BECAUSE TWO DIAGNOSES IN A ROW WERE WRONG.
- *
- * The Showdown band jitters on scroll. The first explanation was composed-SVG
- * view count (killed by the fact that it predated the avatars); the second was
- * the 1 Hz countdown committing mid-drag (the fix shipped and the jitter stayed).
- * A third guess is not worth having. This measures instead, and it answers two
- * different questions that call for opposite fixes.
- *
- * ⚠ 1. IS THE UI THREAD DROPPING FRAMES AT ALL? `useFrameCallback` runs on the UI
- * thread, so the gap it reports is the real one — not what the JS thread thinks.
- * If `worst` sits near the display interval while the band still looks wrong, the
- * frames are arriving and it is WHERE the band is drawn that is late, which is
- * the commit-pause family. If `worst` spikes, something is genuinely costing time
- * on the UI thread and the pause theory is not the story.
- *
- * ⚠⚠ 2. THE DOT IS THE CONTROL, AND IT IS THE MORE USEFUL HALF. It rides the SAME
- * `scrollY`, through the same kind of worklet, with nothing behind it — no
- * gradients, no avatars, no text. So:
- *
- *     dot smooth + band jittery  →  the band's own CONTENT is the cost
- *     dot jittery + band jittery →  the pipeline that applies both is the cost
- *
- * No number can separate those two; two things moving side by side can.
- *
- * ⚠ IT MUST NOT RE-RENDER, or it measures itself. Everything here is a shared
- * value read through `useAnimatedProps` — the same reason `CountdownText` is a
- * `TextInput`.
- *
- * ⚠ AND THIS IS A DEV BUNDLE, which drops frames a release build would not. The
- * ABSOLUTE numbers are not the product's frame rate. The COMPARISON is what is
- * being read here.
- */
-function ScrollProbe({
-  scrollY,
-  moving,
-}: {
-  scrollY: SharedValue<number>;
-  moving: SharedValue<boolean>;
-}) {
-  const theme = useTheme();
-  const worst = useSharedValue(0);
-  const dropped = useSharedValue(0);
-  const wasMoving = useSharedValue(false);
-  /**
-   * ⚠ A SEPARATE PAIR FOR THE READOUT, PUBLISHED A FEW TIMES A SECOND.
-   *
-   * The text is an animated prop, and an animated prop that changes every frame
-   * is another per-frame update on the very thread being measured. Publishing on
-   * a tick keeps the observer out of the experiment, and a number that changes
-   * 120 times a second is unreadable anyway.
-   */
-  const shownWorst = useSharedValue(0);
-  const shownDropped = useSharedValue(0);
-  const sincePublish = useSharedValue(0);
-
-  /**
-   * ⭐⭐ THE OBJECTIVE ANSWER, BECAUSE AN EYE IS NOT ONE.
-   *
-   * Ryan on the two bars: "I THINK the right one is a bit jittery". A hedge is
-   * not evidence, and three wrong turns in is the wrong moment to build on one.
-   *
-   * `measure()` reads a view's real on-screen box from the UI thread with every
-   * transform already composed. So instead of asking whether the line LOOKS
-   * broken, this takes both bars' `pageY` every frame and keeps the largest gap.
-   * The two are laid out on the same row and travel the same 140, so at rest and
-   * in motion the honest answer is 0.00.
-   *
-   *   drift stays 0.00  →  nested composition is pixel-identical; the rounding
-   *     theory is dead and the jitter is somewhere else entirely
-   *   drift goes to ~1  →  the two transforms land on different device pixels,
-   *     which is the jitter, and it is a composition bug
-   */
-  const plainRef = useAnimatedRef<Animated.View>();
-  const nestedRef = useAnimatedRef<Animated.View>();
-  const drift = useSharedValue(0);
-  const shownDrift = useSharedValue(0);
-
-  useFrameCallback((f) => {
-    'worklet';
-    const dt = f.timeSincePreviousFrame;
-    if (dt === null || dt <= 0) return;
-
-    // ⚠ EACH DRAG IS ITS OWN READING. Resetting on the rising edge means the
-    // number on screen describes the gesture you just made, not the session.
-    if (moving.value && !wasMoving.value) {
-      worst.value = 0;
-      dropped.value = 0;
-      drift.value = 0;
-    }
-    wasMoving.value = moving.value;
-
-    // ⚠⚠ THE GATE. Outside a drag the display idles down to as low as 24Hz and
-    // every frame looks "late". See `moving` in the screen above.
-    if (!moving.value) return;
-
-    // ⚠ MEASURED ON THE UI THREAD, which is the only place `measure` is allowed
-    // and also the only place the answer is current for THIS frame.
-    const a = measure(plainRef);
-    const b = measure(nestedRef);
-    if (a !== null && b !== null) {
-      const d = Math.abs(a.pageY - b.pageY);
-      if (d > drift.value) drift.value = d;
-    }
-
-    if (dt > worst.value) worst.value = dt;
-    // 25ms is late at 60Hz and very late at 120Hz. Inside a drag the panel runs at
-    // its maximum rate, so anything over this is the app, not the screen.
-    if (dt > 25) dropped.value += 1;
-
-    sincePublish.value += 1;
-    if (sincePublish.value >= 20) {
-      sincePublish.value = 0;
-      shownWorst.value = worst.value;
-      shownDropped.value = dropped.value;
-      shownDrift.value = drift.value;
-    }
-  }, true);
-
-  const readout = useAnimatedProps(() => {
-    'worklet';
-    return {
-      text: `drift ${shownDrift.value.toFixed(2)}pt   worst ${Math.round(shownWorst.value)}ms   dropped ${shownDropped.value}`,
-    } as unknown as Record<string, unknown>;
-  });
-
-  /**
-   * ⭐⭐ TWO MARKS THAT MUST TRAVEL IDENTICALLY.
-   *
-   * ⚠ THE FIRST VERSION OF THIS WAS USELESS — Ryan: "the second dot does not
-   * travel the same distance as the left one". It did not: the nested one netted
-   * 36pt against the plain one's 140, so there was nothing to compare. An
-   * experiment whose two arms differ in TWO ways measures neither.
-   *
-   * Both now move exactly `NET` and differ only in HOW:
-   *
-   *     plain    translateY: -p * NET                         (one transform)
-   *     nested   parent -p * SLIDE, child +p * (SLIDE - NET)  (two, opposed)
-   *
-   * which is precisely what the band does to its corners, at the band's own
-   * roughly 3:1 overshoot. The nets are the same straight line, so in arithmetic
-   * they cannot differ by so much as a pixel.
-   *
-   * ⚠⚠ THEY ARE BARS, NOT DOTS, AND THEY TOUCH. A one-pixel vertical wobble is
-   * invisible on a circle and unmissable as a STEP in a straight edge. Butted
-   * together with a 2pt gap they read as one line; if the nested half rounds to a
-   * different pixel than the plain half, the line breaks while you drag.
-   *
-   * If it breaks, the jitter is counter-animation rounding — a composition bug,
-   * not a performance one.
-   */
-  const NET = 140;
-  const SLIDE = 420;
-  /**
-   * ⚠ THE ARITHMETIC IS INLINED IN ALL THREE, NOT SHARED VIA A HELPER. A plain
-   * arrow in the component body does NOT get workletized just because it carries
-   * the directive — checked in the Metro bundle, it was absent — and calling a
-   * non-worklet from the UI thread throws the moment you drag. Three repeated
-   * lines beat a helper that compiles and then explodes.
-   */
-  const plainStyle = useAnimatedStyle(() => {
-    'worklet';
-    const p = Math.min(Math.max(scrollY.value, 0), NET) / NET;
-    return { transform: [{ translateY: -p * NET }] };
-  });
-  const nestedParent = useAnimatedStyle(() => {
-    'worklet';
-    const p = Math.min(Math.max(scrollY.value, 0), NET) / NET;
-    return { transform: [{ translateY: -p * SLIDE }] };
-  });
-  const nestedChild = useAnimatedStyle(() => {
-    'worklet';
-    const p = Math.min(Math.max(scrollY.value, 0), NET) / NET;
-    return { transform: [{ translateY: p * (SLIDE - NET) }] };
-  });
-
-  return (
-    <View
-      pointerEvents="none"
-      style={{ position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' }}
-    >
-      {/* ⚠ gap 2, sharp corners: the two halves must read as ONE line at rest. */}
-      <View style={{ flexDirection: 'row', gap: 2, marginBottom: theme.spacing.sm }}>
-        <Animated.View
-          ref={plainRef}
-          style={[
-            { width: 120, height: 8, backgroundColor: theme.colors.primary },
-            plainStyle,
-          ]}
-        />
-        <Animated.View style={nestedParent}>
-          <Animated.View
-            ref={nestedRef}
-            style={[
-              { width: 120, height: 8, backgroundColor: theme.colors.primary },
-              nestedChild,
-            ]}
-          />
-        </Animated.View>
-      </View>
-      <AnimatedTextInput
-        editable={false}
-        defaultValue="drift —   worst —   dropped —"
-        animatedProps={readout}
-        style={{
-          padding: 0,
-          marginBottom: theme.spacing.xl,
-          textAlign: 'center',
-          fontFamily: fontFamilies.bold,
-          fontSize: 13,
-          color: theme.colors.slate,
-          fontVariant: ['tabular-nums'],
-        }}
-      />
     </View>
   );
 }
