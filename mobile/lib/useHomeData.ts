@@ -313,6 +313,23 @@ export function useHomeDataInternal() {
             // load-bearing: without it the join is a left join and the filter
             // would not restrict the membership rows at all.
             .eq('users.auth_user_id', user.id)
+            // ⚠ ARCHIVE IS A SEPARATE AXIS FROM `status` (migration 040).
+            // `status` is the competition lifecycle and is CHECK-constrained to
+            // (open, completed); archiving stamps `archived_at` and leaves
+            // status alone. So an archived pool is still `status = 'open'` and
+            // was arriving in `allPools` — rendering on the home dashboard and
+            // the Pools tab, and counting toward `totalPoints` / `bestRank`,
+            // the exact opposite of what archiving is for. The web has always
+            // filtered this (`app/dashboard/page.tsx`, `app/pools/page.tsx`);
+            // mobile never did, and three downstream hooks
+            // (useSeasons / usePodium / useTrophies) each subtracted the
+            // archived set by hand instead, which is why it looked handled.
+            //
+            // Filtered HERE rather than in each screen because this query is
+            // the single source of every pool list the app draws. Archived
+            // pools reach their own screen through `useArchivedPools`, which
+            // asks for `archived_at IS NOT NULL` and is unaffected.
+            .is('pools.archived_at', null)
             .order('joined_at', { ascending: false }),
         ]);
 

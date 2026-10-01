@@ -196,8 +196,23 @@ async function handleGET(
   const admin = createAdminClient()
   const { data: rows, error } = await admin
     .from('pool_members')
-    .select('pool_id, pool_entries(entry_id)')
+    .select('pool_id, pool_entries(entry_id), pools!inner(archived_at)')
     .eq('user_id', user_id)
+    // ⚠ ARCHIVED POOLS ARE NOT PART OF THIS ANSWER. Archiving stamps
+    // `pools.archived_at` and leaves `pools.status` alone, so an archived pool
+    // is still `status = 'open'` — and this route is where the phone's home
+    // screen gets `bestStreak` from, folded across every summary returned.
+    // Without this an archived pool kept setting the dashboard's best streak,
+    // which survived the fix to the pool list itself because the number does
+    // not come from the list.
+    //
+    // `!inner` is load-bearing: on a left join the filter would leave the
+    // membership row in place with a null child instead of dropping it.
+    //
+    // It is also the cheaper read — every pool here costs rank, points,
+    // accuracy and (for a league) a card-facts query, all of it discarded by
+    // the client for a pool it no longer draws.
+    .is('pools.archived_at', null)
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

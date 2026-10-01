@@ -59,6 +59,12 @@ export function useDiscoverPools() {
           )
           .eq('is_private', false)
           .eq('status', 'open')
+          // ⚠ `status = 'open'` DOES NOT EXCLUDE AN ARCHIVED POOL. Archiving
+          // stamps `archived_at` and deliberately leaves the lifecycle status
+          // alone, so without this an archived public pool was still being
+          // offered on the Pools tab's Discover segment — an invitation to
+          // join a read-only pool.
+          .is('archived_at', null)
           .order('created_at', { ascending: false })
           .limit(100);
 
