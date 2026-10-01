@@ -87,7 +87,7 @@ import Animated, {
 import { Image as ExpoImage } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ConfirmDialog, Icon, Text, useSheetChrome } from '@/components/ui';
+import { ConfirmDialog, Icon, Text, useSheetChrome, useSheetHeight } from '@/components/ui';
 import {
   AVATAR_GRADIENTS,
   getInitials,
@@ -695,12 +695,22 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
     [],
   );
 
-  // Snap point — 100% of the available area below the status bar.
-  // Combined with `topInset={insets.top}` on the BottomSheetModal,
-  // the sheet's top edge lands exactly at the bottom of the status
-  // bar / notch. Sheet stays locked there permanently; keyboard
-  // does not move it.
-  const snapPoints = useMemo<(string | number)[]>(() => ['100%'], []);
+  // Snap point — as much of the area below the status bar as a sheet is allowed
+  // to take. Combined with `topInset={insets.top}`, the sheet's top edge lands
+  // `SHEET_TOP_GAP` below the status bar. Sheet stays locked there permanently;
+  // the keyboard does not move it.
+  //
+  // ⚠⚠ IT WAS `['100%']`, AND THAT IS WHAT MADE THE CORNERS LOOK BROKEN. Flush
+  // against the status bar, the sheet's 32pt corner started 4pt after the
+  // PHONE's own ~55pt screen corner finished, and two different curves that
+  // close together read as one misaligned shape. The radius was never wrong —
+  // it is the same 32pt the scout sheet uses, and that one looks right because
+  // it opens 109pt down. `SHEET_TOP_GAP` carries the measurements.
+  //
+  // ⚠ THE COST IS 32pt OF CHAT, and it is the whole fix. Banter is still a
+  // sheet, not a screen — Ryan was explicit about that.
+  const sheetHeight = useSheetHeight(1, { min: 0 });
+  const snapPoints = useMemo<(string | number)[]>(() => [sheetHeight], [sheetHeight]);
 
   // Clear the unread badge the moment the sheet opens. Mirrors what
   // the old screen route did on mount.
