@@ -708,55 +708,58 @@ function ScrollProbe({
   const readout = useAnimatedProps(() => {
     'worklet';
     return {
-      text: `left plain · right nested   worst ${Math.round(shownWorst.value)}ms   dropped ${shownDropped.value}`,
+      text: `the line must not break   worst ${Math.round(shownWorst.value)}ms   dropped ${shownDropped.value}`,
     } as unknown as Record<string, unknown>;
   });
 
   /**
-   * ⭐ THE PLAIN DOT — ONE transform, no nesting. The smooth baseline.
+   * ⭐⭐ TWO MARKS THAT MUST TRAVEL IDENTICALLY.
+   *
+   * ⚠ THE FIRST VERSION OF THIS WAS USELESS — Ryan: "the second dot does not
+   * travel the same distance as the left one". It did not: the nested one netted
+   * 36pt against the plain one's 140, so there was nothing to compare. An
+   * experiment whose two arms differ in TWO ways measures neither.
+   *
+   * Both now move exactly `NET` and differ only in HOW:
+   *
+   *     plain    translateY: -p * NET                         (one transform)
+   *     nested   parent -p * SLIDE, child +p * (SLIDE - NET)  (two, opposed)
+   *
+   * which is precisely what the band does to its corners, at the band's own
+   * roughly 3:1 overshoot. The nets are the same straight line, so in arithmetic
+   * they cannot differ by so much as a pixel.
+   *
+   * ⚠⚠ THEY ARE BARS, NOT DOTS, AND THEY TOUCH. A one-pixel vertical wobble is
+   * invisible on a circle and unmissable as a STEP in a straight edge. Butted
+   * together with a 2pt gap they read as one line; if the nested half rounds to a
+   * different pixel than the plain half, the line breaks while you drag.
+   *
+   * If it breaks, the jitter is counter-animation rounding — a composition bug,
+   * not a performance one.
    */
-  const dotStyle = useAnimatedStyle(() => {
-    'worklet';
-    const p = Math.min(Math.max(scrollY.value, 0), 140);
-    return { transform: [{ translateY: -p }] };
-  });
-
+  const NET = 140;
+  const SLIDE = 420;
   /**
-   * ⭐⭐ THE NESTED DOT, AND IT IS THE REAL EXPERIMENT.
-   *
-   * It reproduces the band's STRUCTURE rather than its content: a parent that
-   * slides the whole way up, and a child that slides part of the way back down so
-   * its NET travel is small. That is exactly what `slide` and `leftMove` do to the
-   * corners —
-   *
-   *     parent:  -p * SLIDE
-   *     child:   +p * (SLIDE - WANTED)
-   *     net:     -p * WANTED
-   *
-   * — and the net is a straight line, so in arithmetic it cannot wobble. On screen
-   * it can: the two transforms are rounded to device pixels INDEPENDENTLY, and
-   * they cross their rounding boundaries at different values of `p`. The child's
-   * net position then gains and loses a pixel as you drag.
-   *
-   * ⚠ IF THIS DOT SHIMMERS AND THE PLAIN ONE DOES NOT, that is the jitter, and it
-   * is a composition bug rather than a performance one — no amount of making the
-   * band cheaper would have touched it. The fix is to stop counter-animating:
-   * give each piece ONE transform that expresses its own net travel.
-   *
-   * Nothing but geometry is different between the two dots. Same shared value,
-   * same worklet kind, same colour, side by side.
+   * ⚠ THE ARITHMETIC IS INLINED IN ALL THREE, NOT SHARED VIA A HELPER. A plain
+   * arrow in the component body does NOT get workletized just because it carries
+   * the directive — checked in the Metro bundle, it was absent — and calling a
+   * non-worklet from the UI thread throws the moment you drag. Three repeated
+   * lines beat a helper that compiles and then explodes.
    */
-  const NESTED_SLIDE = 140;
-  const NESTED_WANTED = 36;
+  const plainStyle = useAnimatedStyle(() => {
+    'worklet';
+    const p = Math.min(Math.max(scrollY.value, 0), NET) / NET;
+    return { transform: [{ translateY: -p * NET }] };
+  });
   const nestedParent = useAnimatedStyle(() => {
     'worklet';
-    const p = Math.min(Math.max(scrollY.value, 0), NESTED_SLIDE) / NESTED_SLIDE;
-    return { transform: [{ translateY: -p * NESTED_SLIDE }] };
+    const p = Math.min(Math.max(scrollY.value, 0), NET) / NET;
+    return { transform: [{ translateY: -p * SLIDE }] };
   });
   const nestedChild = useAnimatedStyle(() => {
     'worklet';
-    const p = Math.min(Math.max(scrollY.value, 0), NESTED_SLIDE) / NESTED_SLIDE;
-    return { transform: [{ translateY: p * (NESTED_SLIDE - NESTED_WANTED) }] };
+    const p = Math.min(Math.max(scrollY.value, 0), NET) / NET;
+    return { transform: [{ translateY: p * (SLIDE - NET) }] };
   });
 
   return (
@@ -764,19 +767,18 @@ function ScrollProbe({
       pointerEvents="none"
       style={{ position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' }}
     >
-      <View style={{ flexDirection: 'row', gap: 48, marginBottom: theme.spacing.sm }}>
-        {/* plain: one transform */}
+      {/* ⚠ gap 2, sharp corners: the two halves must read as ONE line at rest. */}
+      <View style={{ flexDirection: 'row', gap: 2, marginBottom: theme.spacing.sm }}>
         <Animated.View
           style={[
-            { width: 26, height: 26, borderRadius: 13, backgroundColor: theme.colors.primary },
-            dotStyle,
+            { width: 120, height: 8, backgroundColor: theme.colors.primary },
+            plainStyle,
           ]}
         />
-        {/* nested: parent slides up, child slides back — the band's structure */}
         <Animated.View style={nestedParent}>
           <Animated.View
             style={[
-              { width: 26, height: 26, borderRadius: 13, backgroundColor: theme.colors.primary },
+              { width: 120, height: 8, backgroundColor: theme.colors.primary },
               nestedChild,
             ]}
           />
@@ -784,7 +786,7 @@ function ScrollProbe({
       </View>
       <AnimatedTextInput
         editable={false}
-        defaultValue="left = plain · right = nested   ·   dragging: worst —  dropped —"
+        defaultValue="the line must not break   ·   worst —  dropped —"
         animatedProps={readout}
         style={{
           padding: 0,
