@@ -154,6 +154,8 @@ export const ReactionsSheet = forwardRef<ReactionsSheetHandle>(
               // nothing in `radii` and so could never move with the rest.
               borderTopLeftRadius: theme.radii.xl,
               borderTopRightRadius: theme.radii.xl,
+              // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
+              borderCurve: 'continuous' as const,
               paddingTop: theme.spacing.sm,
               paddingBottom: insets.bottom + theme.spacing.md,
               // Fixed height so the sheet doesn't resize when you switch tabs or

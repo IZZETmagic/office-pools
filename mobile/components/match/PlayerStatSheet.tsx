@@ -195,6 +195,8 @@ export function PlayerStatSheet({
               // sharp as its contents.
               borderTopLeftRadius: theme.radii.xl,
               borderTopRightRadius: theme.radii.xl,
+              // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
+              borderCurve: 'continuous' as const,
               // ⚠ SO THE BAND REACHES THE ROUNDED CORNERS. The header runs
               // edge to edge and right to the top of the sheet; without this it
               // would square them off.

@@ -126,6 +126,8 @@ export function TableEntrySheet({ poolId, target, isLocked, onClose }: Props) {
           backgroundColor: theme.colors.snow,
           borderTopLeftRadius: theme.radii.xl,
           borderTopRightRadius: theme.radii.xl,
+          // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
+          borderCurve: 'continuous' as const,
           transform: [{ translateY }],
           paddingBottom: insets.bottom + theme.spacing.sm,
           maxHeight: screenHeight - insets.top - 12,

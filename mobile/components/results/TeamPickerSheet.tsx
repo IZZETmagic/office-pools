@@ -139,6 +139,8 @@ export const TeamPickerSheet = forwardRef<TeamPickerSheetHandle, Props>(function
           backgroundColor: theme.colors.surface,
           borderTopLeftRadius: theme.radii.xl,
           borderTopRightRadius: theme.radii.xl,
+          // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
+          borderCurve: 'continuous' as const,
           transform: [{ translateY }],
           overflow: 'hidden',
         }}

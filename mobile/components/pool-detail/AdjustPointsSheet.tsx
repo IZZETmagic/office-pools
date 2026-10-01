@@ -228,6 +228,8 @@ export const AdjustPointsSheet = forwardRef<AdjustPointsSheetHandle, Props>(
               backgroundColor: theme.colors.surface,
               borderTopLeftRadius: theme.radii.xl,
               borderTopRightRadius: theme.radii.xl,
+              // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
+              borderCurve: 'continuous' as const,
               paddingTop: theme.spacing.md,
               paddingHorizontal: theme.spacing.lg,
               paddingBottom: insets.bottom + theme.spacing.lg,

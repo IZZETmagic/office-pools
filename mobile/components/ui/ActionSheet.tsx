@@ -91,6 +91,8 @@ export function ActionSheet<T extends string>({
             backgroundColor: theme.colors.surface,
             borderTopLeftRadius: theme.radii.xl,
             borderTopRightRadius: theme.radii.xl,
+            // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
+            borderCurve: 'continuous' as const,
             paddingTop: theme.spacing.md,
             paddingBottom: Math.max(insets.bottom, theme.spacing.md),
             // Subtle top shadow so the sheet feels lifted from the backdrop

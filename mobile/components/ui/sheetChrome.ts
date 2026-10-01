@@ -54,6 +54,29 @@ export const SHEET_HANDLE_WIDTH = 40;
  * `radii.lg` cards that sit inside these sheets. The outermost surface should be
  * the roundest thing on screen; a container as sharp as its contents reads as a
  * mistake.
+ *
+ * ## ⚠⚠ `borderCurve: 'continuous'` IS THE POINT, NOT THE RADIUS
+ *
+ * React Native's `borderRadius` draws a CIRCULAR arc: the curve begins abruptly,
+ * at full curvature, where it leaves the straight edge. iOS draws every system
+ * surface — sheets, alerts, app icons and THE PHONE'S OWN SCREEN CORNERS — as a
+ * continuous curve, which eases in. Side by side the circle looks pinched, and
+ * the eye reads it as two edges that do not line up rather than as a corner of
+ * the wrong size.
+ *
+ * ⚠ IT ONLY SHOWS WHERE THE TWO SHAPES CAN BE COMPARED, which is why this went
+ * unnoticed for so long. Measured off a screenshot, 1290×2796 @3x: the Banter
+ * sheet opens at `insets.top` = 59pt and a 15 Pro Max rounds its screen at
+ * ~55pt, so a circular corner sits 4pt from a continuous one and the mismatch
+ * is obvious. The scout sheet opens 164pt down, 109pt clear of anything, and
+ * the IDENTICAL 32pt circle looks perfectly fine there.
+ *
+ * ⚠ TWO FIXES FAILED BEFORE THIS ONE, and both failed for the same reason: a
+ * bigger circle is still a circle, and so is a lower one. The corner measured a
+ * flawless 96px circle, symmetric to the pixel, every time.
+ *
+ * ⚠ iOS ONLY, AND SAFELY SO. Android ignores the property — no crash, no
+ * warning. Android's own surfaces are circular, so there is nothing to match.
  */
 export const SHEET_RADIUS: keyof ReturnType<typeof useTheme>['radii'] = 'xl';
 
@@ -76,6 +99,8 @@ export function useSheetChrome(background: ColorToken = 'surface'): {
         backgroundColor: theme.colors[background],
         borderTopLeftRadius: theme.radii[SHEET_RADIUS],
         borderTopRightRadius: theme.radii[SHEET_RADIUS],
+        // ⚠ THE SHAPE, NOT THE SIZE — see the header.
+        borderCurve: 'continuous',
       },
       handleIndicatorStyle: {
         backgroundColor: theme.colors.silver,

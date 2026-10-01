@@ -117,6 +117,8 @@ export const GroupPickerSheet = forwardRef<GroupPickerSheetHandle, Props>(functi
           backgroundColor: theme.colors.surface,
           borderTopLeftRadius: theme.radii.xl,
           borderTopRightRadius: theme.radii.xl,
+          // ⚠ A SQUIRCLE, LIKE EVERY OTHER iOS SURFACE — see `sheetChrome`.
+          borderCurve: 'continuous' as const,
           transform: [{ translateY }],
           paddingBottom: insets.bottom + theme.spacing.sm,
           // Cap so a long group list scrolls instead of pushing under the
