@@ -708,15 +708,55 @@ function ScrollProbe({
   const readout = useAnimatedProps(() => {
     'worklet';
     return {
-      text: `dragging:  worst ${Math.round(shownWorst.value)}ms   dropped ${shownDropped.value}`,
+      text: `left plain · right nested   worst ${Math.round(shownWorst.value)}ms   dropped ${shownDropped.value}`,
     } as unknown as Record<string, unknown>;
   });
 
-  /** The same arithmetic the band uses, so the comparison means something. */
+  /**
+   * ⭐ THE PLAIN DOT — ONE transform, no nesting. The smooth baseline.
+   */
   const dotStyle = useAnimatedStyle(() => {
     'worklet';
     const p = Math.min(Math.max(scrollY.value, 0), 140);
     return { transform: [{ translateY: -p }] };
+  });
+
+  /**
+   * ⭐⭐ THE NESTED DOT, AND IT IS THE REAL EXPERIMENT.
+   *
+   * It reproduces the band's STRUCTURE rather than its content: a parent that
+   * slides the whole way up, and a child that slides part of the way back down so
+   * its NET travel is small. That is exactly what `slide` and `leftMove` do to the
+   * corners —
+   *
+   *     parent:  -p * SLIDE
+   *     child:   +p * (SLIDE - WANTED)
+   *     net:     -p * WANTED
+   *
+   * — and the net is a straight line, so in arithmetic it cannot wobble. On screen
+   * it can: the two transforms are rounded to device pixels INDEPENDENTLY, and
+   * they cross their rounding boundaries at different values of `p`. The child's
+   * net position then gains and loses a pixel as you drag.
+   *
+   * ⚠ IF THIS DOT SHIMMERS AND THE PLAIN ONE DOES NOT, that is the jitter, and it
+   * is a composition bug rather than a performance one — no amount of making the
+   * band cheaper would have touched it. The fix is to stop counter-animating:
+   * give each piece ONE transform that expresses its own net travel.
+   *
+   * Nothing but geometry is different between the two dots. Same shared value,
+   * same worklet kind, same colour, side by side.
+   */
+  const NESTED_SLIDE = 140;
+  const NESTED_WANTED = 36;
+  const nestedParent = useAnimatedStyle(() => {
+    'worklet';
+    const p = Math.min(Math.max(scrollY.value, 0), NESTED_SLIDE) / NESTED_SLIDE;
+    return { transform: [{ translateY: -p * NESTED_SLIDE }] };
+  });
+  const nestedChild = useAnimatedStyle(() => {
+    'worklet';
+    const p = Math.min(Math.max(scrollY.value, 0), NESTED_SLIDE) / NESTED_SLIDE;
+    return { transform: [{ translateY: p * (NESTED_SLIDE - NESTED_WANTED) }] };
   });
 
   return (
@@ -724,21 +764,27 @@ function ScrollProbe({
       pointerEvents="none"
       style={{ position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' }}
     >
-      <Animated.View
-        style={[
-          {
-            width: 26,
-            height: 26,
-            borderRadius: 13,
-            marginBottom: theme.spacing.sm,
-            backgroundColor: theme.colors.primary,
-          },
-          dotStyle,
-        ]}
-      />
+      <View style={{ flexDirection: 'row', gap: 48, marginBottom: theme.spacing.sm }}>
+        {/* plain: one transform */}
+        <Animated.View
+          style={[
+            { width: 26, height: 26, borderRadius: 13, backgroundColor: theme.colors.primary },
+            dotStyle,
+          ]}
+        />
+        {/* nested: parent slides up, child slides back — the band's structure */}
+        <Animated.View style={nestedParent}>
+          <Animated.View
+            style={[
+              { width: 26, height: 26, borderRadius: 13, backgroundColor: theme.colors.primary },
+              nestedChild,
+            ]}
+          />
+        </Animated.View>
+      </View>
       <AnimatedTextInput
         editable={false}
-        defaultValue="dragging:  worst —   dropped —"
+        defaultValue="left = plain · right = nested   ·   dragging: worst —  dropped —"
         animatedProps={readout}
         style={{
           padding: 0,
