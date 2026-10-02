@@ -5,7 +5,10 @@
 -- message, which reads "GUARD CHECK (rolled back) — S1 … ✓ | S2 … ✓ | …". Any ✗ is a failure.
 --
 -- It picks its own subjects: a finished, unarchived, non-branded pool with exactly one admin and
--- at least two players, one of those players, and a second pool that player is not in. It acts
+-- at least two players, one of those players, and a second pool that player is not in.
+-- ⚠⚠ NEITHER THE ADMIN NOR THE PLAYER MAY BE A SUPER ADMIN. A super admin passes the guard by
+-- design, so a super-admin "pool admin" proves nothing about the pool-admin rule. The first run on
+-- 2026-10-02 picked one, and its S4 passed for the wrong reason; this selection is why. It acts
 -- as each person exactly as PostgREST would — the JWT claims plus `set local role authenticated`.
 -- A finished pool is used on purpose: nothing about it is live, and nothing persists anyway.
 --
@@ -29,6 +32,8 @@ begin
    where p.status = 'completed' and p.archived_at is null and p.brand_slug is null
      and (select count(*) from public.pool_members pm where pm.pool_id = p.pool_id and pm.role = 'player') >= 2
      and (select count(*) from public.pool_members pm where pm.pool_id = p.pool_id and pm.role = 'admin') = 1
+     and not exists (select 1 from public.pool_members pm join public.users u on u.user_id = pm.user_id
+                      where pm.pool_id = p.pool_id and pm.role = 'admin' and u.is_super_admin)
    order by p.created_at limit 1;
 
   select pm.member_id, pm.user_id, u.auth_user_id::text into v_member, v_user, v_player
@@ -38,7 +43,7 @@ begin
 
   select u.auth_user_id::text into v_admin
     from public.pool_members pm join public.users u on u.user_id = pm.user_id
-   where pm.pool_id = v_pool and pm.role = 'admin' limit 1;
+   where pm.pool_id = v_pool and pm.role = 'admin' and not u.is_super_admin limit 1;
 
   select p.pool_id into v_other
     from public.pools p
@@ -46,6 +51,7 @@ begin
      and not exists (select 1 from public.pool_members pm where pm.pool_id = p.pool_id and pm.user_id = v_user)
    order by p.created_at limit 1;
 
+  r := format('pool %s · ', v_pool);
   if v_pool is null or v_member is null or v_admin is null or v_other is null then
     raise exception 'GUARD CHECK could not find subjects (pool %, member %, admin %, other %)', v_pool, v_member, v_admin, v_other;
   end if;
