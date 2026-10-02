@@ -82,6 +82,10 @@ in places; each one is stated here rather than built quietly.
 
 ## 3. Prerequisites — found this pass, and they come first
 
+**P1 · ✅ DONE 2026-10-02: migration `151_a_member_cannot_crown_themselves`**, applied to production.
+It's verified by `scripts/verify-pool-member-guard.sql` (8/8, rolled back), and the live function is
+byte-identical to the file. The Crews schema is therefore migration **152**.
+
 **P1 · 🔴 Pool-level privilege escalation (security, independent of crews, do first).**
 I confirmed the following from the live catalog; I did not attempt the exploit.
 - `pool_members` UPDATE policy *"Users can update own membership"* has **no `WITH CHECK`**.
@@ -135,7 +139,7 @@ numeric `>= 2` before any build sends 3.
 
 ---
 
-## 4. Data model — migration `151_a_crew_is_who_played`
+## 4. Data model — migration `152_a_crew_is_who_played`
 
 Four additions. **All crew tables are deny-all**: RLS on, zero policies, admin client only. They must
 be added to `lib/league/__tests__/denyAllTables.guard.test.ts`.
@@ -332,13 +336,13 @@ There is **no web Activity page**, so web gets these items on the dashboard. See
 
 Each step is a commit; nothing is pushed until Ryan says so.
 
-1. **P1 security trigger** (migration `151a` or its own number) + verification script.
+1. ✅ **P1 security trigger:** migration 151 + `scripts/verify-pool-member-guard.sql` (done 2026-10-02).
 2. **P2–P5:**
    - `pool_first_lock_at` / `pool_finished_at` (SQL + TypeScript mirror, tested against each other on
      real pools);
    - `lib/pools/join.ts` extraction (behaviour-identical; existing join tests pass);
    - numeric `v` gate.
-3. **Migration 151** (schema in §4).
+3. **Migration 152** (schema in §4).
    - Before applying: `scripts/verify-select-columns.ts`; hash `prosrc` on both sides.
    - Apply via MCP; add the tables to the deny-all guard test.
 4. **`lib/crews/` + routes** (§5), with vitest coverage of the pure parts:
