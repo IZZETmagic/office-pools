@@ -281,7 +281,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ SUMMARY ============================ -->
 <section id="summary">
-  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span></h2>
+  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span> <span class="chip ok">R32 FIXED 2026-10-02</span> <span class="chip lvl-crit">R34 OPENED 2026-10-02</span></h2>
 
   <div class="card crit" id="update-2026-10-02">
     <h3 style="margin:0 0 8px">2026-10-02 — Crews: nine decisions recorded, and a 🔴 found on the way</h3>
@@ -291,9 +291,22 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <p class="sec-sub" style="margin:0 0 10px"><strong>Updated later the same day:</strong> Ryan settled the four contradictions this
       block first surfaced (<code>drafts/2026-10-02_crews_plan.md</code> §11, committed <code>2d848086</code>). They are recorded below
       and in their sections. Nothing was re-opened.</p>
+    <p class="sec-sub" style="margin:0 0 10px"><strong>Updated again, the same evening:</strong> <strong><a href="#r32">R32</a> is
+      fixed</strong> (migration 151) and <strong><a href="#r34">R34</a> is opened</strong>. I read the migration, the verify script and the
+      commit in the tree. The production facts come from the fixing session and were <strong>not</strong> re-queried here.</p>
 
     <p style="margin:0 0 6px"><strong>Since last update</strong></p>
     <ul style="margin:0 0 10px 18px">
+      <li><strong>R32 fixed: migration <code>151_a_member_cannot_crown_themselves</code>, applied to production</strong>
+        (<code>schema_migrations</code> 20261002214554; commit <code>6c51140c</code>, local and not pushed). It was proven on production
+        before the fix, in a rolled-back transaction. <code>scripts/verify-pool-member-guard.sql</code> passes 8/8 on production, and the
+        live <code>prosrc</code> is byte-identical to the file. <strong>Whether anyone used the hole before today is unknown:</strong> 70
+        admin rows across 48 pools are not the pool's creator, and nothing records who promoted whom. <strong>Crews P1 is done</strong>,
+        so the Crews schema becomes <strong>migration 152</strong> (<code>drafts/2026-10-02_crews_plan.md</code>, updated in the same
+        commit).</li>
+      <li><strong>R34 opened 🔴: a member can rewrite their own <code>pool_entries</code> row</strong>, including score inputs, fee and
+        retirement. It is the same shape as R32, and nobody has probed or exploited it. See the drift item below: the reported impact
+        was partly wrong.</li>
       <li><strong>Decisions 1, 2 and 3 amended (Ryan).</strong> Each amendment sits beneath the original, which stays visible
         (<a href="#d1">D1</a> · <a href="#d2">D2</a> · <a href="#d3">D3</a>). <em>Crew-departure semantics</em> has moved out of
         <a href="#stillopen">Still open</a>.</li>
@@ -316,8 +329,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     </ul>
 
     <p style="margin:0 0 6px"><strong>Now</strong></p>
-    <p style="margin:0 0 10px"><strong><a href="#r32">R32</a> comes before the Crews build.</strong> It is security work, it is
-      open on every pool today, and it is Crews' own first prerequisite.</p>
+    <p style="margin:0 0 10px"><s><strong><a href="#r32">R32</a> comes before the Crews build.</strong> It is security work, it is
+      open on every pool today, and it is Crews' own first prerequisite.</s> ✅ Done the same day.
+      <strong><a href="#r34">R34</a> now comes before the Crews build</strong>, under the ranking rule that silent wrong data outranks
+      anything merely missing. It is open to every member and it reaches the score. It is <strong>not</strong> a Crews prerequisite,
+      so Crews P2–P5 are not blocked by it. They are next.</p>
 
     <p style="margin:0 0 6px"><strong>Risk moves</strong></p>
     <ul style="margin:0 0 10px 18px">
@@ -327,6 +343,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><strong>R32</strong> annotated later the same day, with no change of level. The join route's bare-<code>pool_id</code> door is
         a second way into a private pool, and R32's fix does not close it. Ryan has put that door into
         <a href="#i-privacy">Pool privacy: three levels</a>.</li>
+      <li><strong>R32</strong> 🔴 → ✅ <strong>closed</strong> that evening: 151 applied, 8/8 on production. The join route's door is
+        still open and still belongs to <a href="#i-privacy">Pool privacy: three levels</a>.</li>
+      <li><strong>R34</strong> opened 🔴: a member can edit their own <code>pool_entries</code> row. Its note also records a separate,
+        lower-severity defect: super-admin role and membership actions run on the session client and silently do nothing.</li>
     </ul>
 
     <p style="margin:0 0 6px"><strong>Drift</strong></p>
@@ -338,12 +358,24 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         post <code>pool_code</code>. So closing the gap by refusing <code>pool_id</code> for non-public pools would break every web
         invite link, unless that page moves to the code first. Verified this pass. Recorded under
         <a href="#i-privacy">Pool privacy: three levels</a>, not resolved.</li>
+      <li><strong>R34's impact, as reported, was partly wrong.</strong> The report said World Cup leaderboards read
+        <code>pool_entries.scored_total_points</code>, so a tampered total would stick. Since the read-path cutover, pools on
+        <code>shadow_read_enabled_pools</code> take their totals from <code>shadow_entry_totals</code>
+        (<code>lib/scoring/readSource.ts:286-301</code>). The leaderboard path for a self-written number runs through
+        <strong><code>point_adjustment</code></strong> instead. <code>shadow_finalize_totals</code> adds it to the total members see
+        (<code>lib/migrations/035_shadow_wire_bracket_picker.sql:66, :115</code>). A rewritten <code>scored_total_points</code> shows only
+        where <code>pool_entries</code> is read directly. Both are recorded on <a href="#r34">R34</a>. The level doesn't change.</li>
+      <li><strong>The <code>pool_entries</code> grant audit was promised a month ago and never recorded.</strong> Migration 122
+        (2026-08-31) and migration 136 (2026-09-06) each say the table-wide <code>authenticated</code> grant <em>"is wider than this feature
+        needs and a separate audit is open on it."</em> No item or risk in this document carried that audit, so the concern sat in two SQL
+        comments until R32's fix found it again. It is now <a href="#r34">R34</a>.</li>
     </ul>
     <p style="margin:0 0 10px">The full list is under <a href="#crews-cuts">Crews → Where this cuts across</a>.</p>
 
     <p style="margin:0 0 6px"><strong>Needs Ryan</strong></p>
     <ul style="margin:0 0 0 18px">
-      <li>take the R32 fix.</li>
+      <li><s>take the R32 fix.</s> ✅ Done 2026-10-02 (151).</li>
+      <li><strong>Take <a href="#r34">R34</a>'s writer audit plus the allow-list fix, and say when.</strong></li>
     </ul>
   </div>
 
@@ -511,12 +543,12 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <div class="stat high"><div class="n">13</div><div class="l">🟠 High risks</div></div>
     <div class="stat med"><div class="n">9</div><div class="l">🟡 Medium risks</div></div>
     <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
-    <div class="stat low"><div class="n">6</div><div class="l">✅ Closed (4 prod-verified)</div></div>
+    <div class="stat low"><div class="n">7</div><div class="l">✅ Closed (4 prod-verified by audit, + R32 by its fixing session)</div></div>
     <div class="stat pri"><div class="n">6</div><div class="l">Items in 🔥 Now</div></div>
     <div class="stat neu"><div class="n">9</div><div class="l">Projects</div></div>
     <div class="stat neu"><div class="n">15+5</div><div class="l">Settled decisions · product + infra (D1–D3 + D5 amended, D2 clarified 2026-10-02)</div></div>
-    <div class="stat neu"><div class="n">23+1</div><div class="l">Decisions needing Ryan (+3 on 2026-10-02, 2 settled the same day)</div></div>
-    <div class="stat neu"><div class="n">R33</div><div class="l">Highest risk id on the register</div></div>
+    <div class="stat neu"><div class="n">23+1</div><div class="l">Decisions needing Ryan (2026-10-02: +3, 2 settled; R32 fix taken, R34 fix added)</div></div>
+    <div class="stat neu"><div class="n">R34</div><div class="l">Highest risk id on the register</div></div>
   </div>
   <p class="strip-note"><strong>Moved 2026-10-02 (Crews decisions pass only).</strong> <strong>R32 is new</strong> 🔴: any pool member can
     make themselves that pool's admin with one PATCH, the same class as migration 145. The exploit was not attempted, and whether anyone has
@@ -531,18 +563,25 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     decision. <a href="#stillopen">Still open</a> goes from 8 to <strong>7</strong> (<em>Migration path</em> struck). One new backlog item,
     <a href="#i-privacy">Pool privacy: three levels</a>. <strong>No risk changed level.</strong> <a href="#r32">R32</a> is annotated
     with the join route's second door.</p>
+  <p class="strip-note"><strong>Moved that evening, 2026-10-02 (R32 fixed, R34 opened).</strong> 🔴 stays at <strong>3</strong>.
+    <a href="#r32">R32</a> closes (🔴 → ✅, migration 151, 8/8 on production per the fixing session), and <a href="#r34">R34</a> opens 🔴:
+    a member can edit their own <code>pool_entries</code> row. Closed goes from 6 to <strong>7</strong>. R32's closing evidence is a
+    production query run by the fixing session, not by this pass, so it is counted apart from the four audit-verified closures.
+    Needing Ryan stays at <strong>+1</strong>, because the R32 fix is done and R34's fix is the new call. A super-admin session-client
+    defect is recorded inside R34, deliberately not numbered and not rated 🔴.</p>
   <p class="strip-note"><strong>Moved 2026-09-19 (league ingestion pass only).</strong> <strong>R30 is new</strong> 🟠 — a fixture
     played before its placeholder date is unreachable by every sync arm; fix <code>fc23239</code> built, <strong>unpushed</strong>.
     <strong>R31 is new</strong> 🟡 — the outbox has no age guard and its first drain replayed 38 stale matchweek recaps.
     ⚠ <strong>R21 is counted 🔴 below as written, but is stale:</strong> <code>origin/master</code> moved to <code>a8dee7f</code> on 12 Sep and
     the league routes are live; the current gap is 109 unpushed commits. Re-levelling owed after a full pass.</p>
-  <p class="strip-note"><strong>Current levels, R1–R33, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R33 on 2026-10-02).</strong>
-    <strong>🔴</strong> R2 · R21 (stale, see above) · <strong>R32</strong>. &nbsp;
+  <p class="strip-note"><strong>Current levels, R1–R34, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R34 on 2026-10-02).</strong>
+    <strong>🔴</strong> R2 · R21 (stale, see above) · <strong>R34</strong>. &nbsp;
     <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27 · <strong>R30</strong>. &nbsp;
     <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong> · <strong>R33</strong>. &nbsp;
     <strong>🟢</strong> R11 · R15. &nbsp;
-    <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 — of which <strong>R4, R13, R17 and R26 are prod-verified</strong>;
-    R1 and R22 are closed <em>in code only</em>, and code is not production while <strong>R21</strong> stands.</p>
+    <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 · <strong>R32</strong>. Of these, <strong>R4, R13, R17 and R26 are
+    prod-verified</strong> by audit. <strong>R32</strong> is closed in the database, on the fixing session's production run, and needs no
+    deploy. R1 and R22 are closed <em>in code only</em>, and code is not production while <strong>R21</strong> stands.</p>
   <p class="strip-note"><strong>Moved 2026-09-02.</strong> <strong>R24</strong> 🟠 → 🟡 — the RN app could not read league data at
     all; the calendar and the pool card now reach the phone through server routes, and the three silent blanks on the match surfaces
     are fixed. <strong>R29 is new</strong> 🟡 — the root <code>tsconfig.json</code> compiles <code>mobile/**</code> into the web type
@@ -554,7 +593,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R33 · 6 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19 · R32–R33 added 2026-10-02</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R34 · 7 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19 · R32–R34 added 2026-10-02 (R32 closed the same day)</span></h2>
   <div class="note warn" style="margin-bottom:14px">
     <strong>⚠️ Mixed vintage — read the row dates.</strong> <strong>R1–R19</strong> below are <strong>2026-07-30 text</strong> and
     several have since closed or changed level; <strong>R20–R29</strong> were added on <strong>2026-09-02</strong> and are current.
@@ -1188,43 +1227,51 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
       <tr class="risk-crit" id="r32">
         <td class="id">R32</td>
-        <td><strong>Any pool member can make themselves that pool's admin with one PATCH. This is pool-level privilege escalation,
-          the same class as migration 145.</strong> ⚠️ New 2026-10-02. The Crews planning session confirmed it from the <strong>live
-          catalog</strong> and did <strong>not</strong> attempt the exploit.
-          <strong>(1)</strong> The <code>pool_members</code> UPDATE policy <em>"Users can update own membership"</em> has a
-          <code>USING</code> clause and <strong>no <code>WITH CHECK</code></strong>. It limits <em>which row</em>, not <em>which column</em>
-          (<code>lib/migrations/044_archived_pools_read_only.sql:136-143</code>, verified in the repo).
-          <strong>(2)</strong> <code>authenticated</code> holds an <strong>UPDATE grant on <code>role</code></strong> (live catalog; not
-          re-verified here).
-          <strong>(3)</strong> The only trigger is <code>trg_pool_member_tier_cap</code>, on INSERT (<code>075_free_tier_caps.sql:174</code>).
-          No migration file creates a role guard (verified).
-          <strong>(4)</strong> <code>is_pool_admin()</code> trusts the column (live catalog).
-          <strong>Separately</strong>, the INSERT policy <em>"Users can join pools"</em> (<code>044…sql:122-129</code>, verified) checks
-          only <em>"this row is me"</em> and <code>pool_writable</code> (= not archived). So a direct client insert can set its own
-          <code>role</code> and skip <code>accepting_members</code>, <code>status</code> and <code>is_private</code>: it can join a
-          private pool without its code, as admin. <em>RLS does rows, not columns.</em></td>
-        <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
-        <td class="blast"><strong>Every pool.</strong> Any member can take everything 044 gates on <code>is_pool_admin()</code>,
-          including deleting members and updating pool settings, and the INSERT path doesn't even need an invitation. The plan counts 643
-          pools. ⚠ <strong>Whether anyone has ever done this is unverified.</strong> No read-only check has been run</td>
-        <td>One authenticated PostgREST call, by any of ~4,841 accounts. No UI is needed</td>
-        <td><strong>None applied.</strong> The fix has 145's shape: a <strong>trigger</strong> that asks <em>who</em> is changing
-          <code>role</code>, plus a tightened INSERT path, <strong>not</strong> a column revoke. Pool admins promote and demote from the
-          browser (<code>app/pools/[pool_id]/admin/MembersTab.tsx:260-262</code>, verified), so a revoke would break that. ⚠ Any tightening
-          of joins must still let crew members join their crew's private pool.
-          ⚠ <strong>2026-10-02, later: a second door, which this fix does not close.</strong> <code>app/api/pools/join/route.ts:27-33</code>
-          accepts a bare <code>{pool_id}</code> and looks the pool up with the <strong>admin client</strong>. Neither the route nor
-          <code>poolJoinability</code> (<code>lib/poolStatus.ts:99-110</code>) checks <code>is_private</code> (verified). So anyone holding a
-          private pool's <code>pool_id</code> joins it without the code, as a <code>player</code>, not an admin. RLS never sees that path,
-          so R32's fix leaves it open; closing only the route leaves R32's INSERT door open. <strong>Both are needed.</strong> Ryan has put
-          the route door into <a href="#i-privacy">Pool privacy: three levels</a> (2026-10-02), which is planned, not started and has no
-          date</td>
-        <td>⏳ <strong>NEEDS RYAN.</strong> This is <strong>Crews prerequisite P1</strong>, and it has been <strong>offered as a separate
-          fix task</strong>. Not yet taken. <em>On the level:</em> by the register's wording this is "one user action away" (🟠). It is held
-          at 🔴 because the action needs no mistake and no date, it is open to every account against every pool now, and a self-promoted
-          admin looks like any other admin row. 145 was handled as 🔴, and R2 set the precedent of 🔴 one step from live. That judgement
-          can be overruled</td>
-        <td><a href="#crews">Crews → P1</a>; migration 145; <a href="#i-privacy">Pool privacy: three levels</a> (the join route's door)</td>
+        <td>✅ <strong>CLOSED 2026-10-02: migration 151 is applied to production, and the self-promotion is shut.</strong>
+          <code>lib/migrations/151_a_member_cannot_crown_themselves.sql</code>, commit <code>6c51140c</code>. The commit is <strong>local,
+          not pushed</strong>, and needs no deploy, because the whole fix lives in the database. It is applied as
+          <code>schema_migrations</code> version <strong>20261002214554</strong>.
+          <strong>The hole was proven on production before the fix</strong>, inside a rolled-back transaction. A real player in a finished
+          pool PATCHed their own row: <code>rows=1</code>, <code>role</code> became <code>'admin'</code> and <code>is_pool_admin()</code>
+          returned true. Nothing persisted (151 header <code>:13-14</code>).
+          <strong>The fix</strong> (<code>:63-121</code>, read this pass) is a BEFORE UPDATE trigger,
+          <code>guard_pool_member_privileges()</code>.
+          <strong>(a)</strong> The service role (<code>auth.uid()</code> null) and super admins pass.
+          <strong>(b)</strong> Nobody else may change <code>member_id</code>, <code>pool_id</code>, <code>user_id</code> or
+          <code>joined_at</code>.
+          <strong>(c)</strong> A pool admin keeps role and fee control over their own pool.
+          <strong>(d)</strong> Anyone else may change only <code>has_seen_how_to_play</code> and <code>last_read_at</code>. That is an
+          <strong>allow-list</strong>, so a column added later is protected by default.
+          The client INSERT policy <em>"Users can join pools"</em> is <strong>dropped</strong> (<code>:121</code>), because every real join
+          is <code>POST /api/pools/join</code> on the service role.
+          <span style="color:var(--slate)">Was: any member could make themselves their pool's admin with one PATCH. <em>"Users can update
+          own membership"</em> had no <code>WITH CHECK</code>, <code>authenticated</code> held UPDATE on <code>role</code>, and no trigger
+          guarded the column. A direct client insert could also join a private pool as admin.</span></td>
+        <td><span class="chip lvl-crit">🔴</span> → <span class="chip ok">✅ CLOSED</span></td>
+        <td class="blast">Was: <strong>every pool</strong>, open to any of ~4,841 accounts with one call. <strong>Now closed on the RLS
+          path.</strong> ⚠ <strong>Whether it was used before the fix is UNKNOWN, and cannot be recovered.</strong> 70 admin rows across 48
+          pools are not the pool's creator. Most are presumably real co-admin promotions, but nothing records who promoted whom, so a
+          self-promotion looks the same</td>
+        <td>—</td>
+        <td>✅ <strong>Verified.</strong> <code>scripts/verify-pool-member-guard.sql</code> runs 8 scenarios in a block that always rolls
+          back (read this pass). Four are <strong>blocked</strong>: self-promote, self fee-paid, an admin moving a member to another pool,
+          and a direct insert as admin. Three still <strong>work</strong>: a member's own read-state, an admin promoting, and the service
+          role. A player demoting the admin touches 0 rows. <strong>8/8 on production, and the live <code>prosrc</code> is byte-identical
+          to the file.</strong>
+          Checked in the tree this pass: both client-side <code>pool_members</code> self-writes are in the allow-list
+          (<code>app/pools/[pool_id]/PoolDetail.tsx:648</code> writes <code>has_seen_how_to_play</code>;
+          <code>mobile/lib/usePoolBanter.ts:579</code> writes <code>last_read_at</code>). Every <code>pool_members</code> insert in the tree
+          runs on the admin client (join, create, branded-pools). The two exceptions are the super-admin paths in
+          <a href="#r34">R34</a>'s note, which never worked.
+          ⚠ <strong>What this does NOT close:</strong> <strong>(1)</strong> The join route's bare-<code>pool_id</code> door
+          (<code>app/api/pools/join/route.ts:27-33</code>: admin client, no <code>is_private</code> check). It stays with
+          <a href="#i-privacy">Pool privacy: three levels</a>, as recorded earlier the same day. <strong>(2)</strong> The same hole, one
+          table over, on <code>pool_entries</code>. That is <a href="#r34">R34</a></td>
+        <td><strong>Discharged by the fix; no open call.</strong> ⚠ The production facts in this row (the pre-fix proof, the version,
+          8/8, <code>prosrc</code>, 70/48) come from the fixing session. This pass read the migration, the verify script and the commit,
+          and <strong>did not re-query production</strong></td>
+        <td><a href="#crews">Crews → P1 ✅</a>; migration 145; <a href="#r34">R34</a>; <a href="#i-privacy">Pool privacy: three
+          levels</a> (the join route's door)</td>
       </tr>
 
       <tr class="risk-med" id="r33">
@@ -1244,6 +1291,90 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td>No call needed; it's a defect. Levelled 🟡: no data loss, and the date is ~8 months out. It rises to 🟠 if anything else starts
           keying on <code>completed</code> first</td>
         <td><a href="#crews">Crews → P3</a>; R10</td>
+      </tr>
+
+      <tr class="risk-crit" id="r34">
+        <td class="id">R34</td>
+        <td><strong>A member can rewrite their own score, rank, fee and retirement on <code>pool_entries</code>. It is R32's hole, one
+          table over, and this time it reaches scoring.</strong> ⚠️ New 2026-10-02, found from the live catalog while fixing R32.
+          <strong>Not exploited and not probed:</strong> unlike R32, nobody has run a rolled-back proof.
+          <strong>(1)</strong> RLS policy <em>"Users can update own entries"</em> has a <code>USING</code> clause and <strong>no
+          <code>WITH CHECK</code></strong> (<code>lib/migrations/044_archived_pools_read_only.sql:175-181</code>, verified in the repo).
+          <strong>(2)</strong> <code>authenticated</code> holds UPDATE on <code>scored_total_points</code>, <code>current_rank</code>,
+          <code>point_adjustment</code>, <code>match_points</code>, <code>bonus_points</code>, <code>total_points</code>,
+          <code>retired_at</code> and <code>fee_paid</code> (live catalog, not re-verified here). The grant is probably wider than that
+          list: migrations 122 and 136 both record <code>pg_class.relacl</code> = <code>authenticated=arwdDxtm/postgres</code>, a
+          <strong>table-wide</strong> grant (<code>122…sql:38</code>, <code>136…sql:71</code>).
+          <strong>(3)</strong> The only triggers are INSERT triggers: <code>trg_fill_pool_entry_identity</code> (<code>056…sql:143</code>)
+          and <code>trg_pool_entry_tier_cap</code> (<code>075…sql:235</code>). No migration file creates an UPDATE guard (verified)</td>
+        <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
+        <td class="blast"><strong>Corrected by this pass, which traced the readers.</strong> The report was that World Cup leaderboards
+          read <code>pool_entries.scored_total_points</code>, so a tampered total would stick. <strong>That is half right.</strong> Since
+          the read-path cutover, a pool on <code>shadow_read_enabled_pools</code> takes its totals and ranks from
+          <code>shadow_entry_totals</code> (<code>lib/scoring/readSource.ts:286-301</code>). The programme records all ~623 World Cup pools
+          on that list (2026-07-30, not re-verified). So:
+          <strong>(a) The clean attack is <code>point_adjustment</code>, not the total.</strong> <code>shadow_finalize_totals</code> reads
+          <code>pe.point_adjustment</code> from <code>pool_entries</code> and adds it into the total members see
+          (<code>035…sql:66, :115</code>; last repo definition <code>046…sql:394</code>). It also reads
+          <code>predictions_submitted_at</code>, which is the last tiebreak rung (<code>lib/scoring/recalculate.ts:599-600</code>). A
+          self-written value in either column reaches the leaderboard the next time that pool finalizes. When a finished pool next
+          finalizes was not checked.
+          <strong>(b) A rewritten <code>scored_total_points</code> or <code>current_rank</code> shows wherever <code>pool_entries</code>
+          is read directly.</strong> That covers the mobile member roster (<code>mobile/lib/useMemberRoster.ts:68</code>), the Home fallback
+          (<code>mobile/lib/useHomeData.ts:697</code>) and the profile's best-entry pick (<code>app/profile/page.tsx:60</code>). It covers
+          the <code>.gt('scored_total_points', 0)</code> filters too (<code>app/dashboard/page.tsx:267</code>,
+          <code>app/pools/page.tsx:120</code>), and any pool read as <code>prod</code>.
+          <strong>(c) <code>fee_paid</code>:</strong> mark yourself paid.
+          <strong>(d) <code>retired_at</code>:</strong> un-retire yourself. 057's league engine and <code>lib/poolData.ts:202</code> both
+          key on it.
+          <strong>(e) <code>predictions_locked</code> (inferred from the policies, not probed).</strong> It gates every write to
+          <code>predictions</code> and <code>league_predictions</code> (<code>041…sql:77, :92</code>; <code>050…sql:413, :423</code>).
+          Clearing it re-opens editing after a submission or deadline lock. The per-fixture kickoff trigger still blocks post-kickoff
+          picks.
+          <strong>League totals are not exposed (verified).</strong> <code>league_entry_totals</code> has RLS on and zero policies
+          (<code>050_l1_league_schema.sql:378, :426</code>). No later migration adds a policy, and
+          <code>lib/league/__tests__/denyAllTables.guard.test.ts:52</code> guards it. The league leaderboard ranks from that table
+          (<code>lib/league/leaderboard.ts:476</code>). But (d) and (e) are still inputs to league scoring</td>
+        <td>One authenticated PostgREST PATCH on your own entry, by any member of any non-archived pool. No UI needed. ⚠ <strong>A pool
+          admin can do the same to every entry in their pool.</strong> <em>"Pool admins can update entries"</em>
+          (<code>044…sql:166-173</code>) has no <code>WITH CHECK</code> either, and until 151 any member could make themselves admin
+          first</td>
+        <td><strong>None applied.</strong> The fix has the shape of 145 and 151: a BEFORE UPDATE trigger with a per-role allow-list.
+          <strong>Why it was not fixed with R32: it needs a writer audit first</strong>, because many legitimate client writers touch this
+          table. Verified in the tree this pass: on web, <code>app/pools/[pool_id]/PoolDetail.tsx:610</code>
+          (<code>last_recap_seen_at</code>), <code>DuelsTab.tsx:672</code> (<code>last_reveal_seen_duel</code>),
+          <code>admin/MembersTab.tsx:404</code> (<code>point_adjustment</code>, <code>adjustment_reason</code>) and
+          <code>admin/FeesTab.tsx:109, :135</code> (<code>fee_paid</code>). On mobile, <code>mobile/lib/usePoolEntries.ts:177, :200</code>
+          (<code>entry_name</code> insert and update), <code>mobile/lib/usePredictions.ts:312</code> (submit),
+          <code>mobile/app/pool/[id]/member/[memberId].tsx:62</code> (admin unlock),
+          <code>mobile/components/pool-detail/AdjustPointsSheet.tsx:156</code> and <code>FeesTab.tsx:126, :154</code>. On the server, the
+          routes under <code>app/api/pools/[pool_id]/</code> (predictions, round, unlock, bracket-picks, entries).
+          ⚠ <strong>Some self-written columns matter for integrity in their own right.</strong>
+          <code>mobile/lib/usePredictions.ts:313-315</code> stamps <code>predictions_submitted_at</code> from the <strong>device
+          clock</strong>, so the audit has to decide whether that tiebreak rung stays client-written at all. ⚠ 122 and 136 both name
+          <code>last_recap_seen_at</code> and <code>last_reveal_seen_duel</code> as columns that <strong>must</strong> stay writable, or the
+          recap and the walkout replay on every visit.
+          <strong>Whether it has been used is unknown, and only half checkable.</strong> <strong>R17</strong>'s ledger recipe would catch
+          a rewritten <code>scored_total_points</code>. It <strong>cannot</strong> catch a rewritten <code>point_adjustment</code>,
+          because the adjustment is one of its terms.
+          <div class="note" style="margin-top:8px"><strong>A separate, lower-severity defect, recorded here and not rated 🔴.</strong>
+          Super-admin <em>transfer admin</em>, <em>change role</em> and <em>add member</em>
+          (<code>app/api/admin/pools/[id]/actions/route.ts:141, :410, :605</code>;
+          <code>app/api/admin/users/[id]/actions/route.ts:214, :506</code>) write <code>pool_members</code> through the
+          <strong>session</strong> client. No super-admin UPDATE or INSERT policy exists on <code>pool_members</code>, so they
+          <strong>already do nothing, silently</strong> (151 header <code>:57-61</code>; no such policy in <code>lib/migrations/</code>,
+          verified). 151 lets super admins through its trigger but adds no policy. ⚠ The same session-client pattern carries
+          <strong>seven super-admin <code>pool_entries</code> writes</strong>: fee, adjust points, unlock, and lock/unlock all
+          (<code>pools/[id]/actions/route.ts:522, :717, :764, :914, :946</code>; <code>users/[id]/actions/route.ts:286, :367</code>). No
+          migration file creates a super-admin policy on <code>pool_entries</code> either, and whether those writes land was not checked
+          live. It is 🟡-class: operator tooling that reports success and does nothing, and no member's data is harmed.</div></td>
+        <td>⏳ <strong>NEEDS RYAN: take the writer audit plus the allow-list fix, and say when.</strong> It is <strong>not</strong> a
+          Crews prerequisite, so it doesn't gate P2–P5. By the ranking rule, silent wrongness outranks missing, so it <strong>outranks
+          the Crews build</strong>. <em>On the level:</em> the reasoning that held R32 at 🔴 applies. The action needs no mistake and no
+          date, and it is open to every member now. Here the target is the score, which is the product. Nobody has probed it, so "not
+          seen" is not "not used". That judgement can be overruled</td>
+        <td>Migrations 145, 151; <a href="#r32">R32</a>; <strong>R17</strong> (the partial check); <strong>R12</strong>
+          (<code>retired_at</code>)</td>
       </tr>
 
       <tr class="risk-high">
@@ -1414,6 +1545,17 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         "the cascade leaves nothing behind", which is the same fact that makes the loss unrecoverable and the count unreconstructable. A
         real number needs event-typed history the product does not keep. The 21-table cascade itself is prod-schema-verified by Ryan's
         side, <strong>not</strong> re-verifiable from this repo — only the two route files are.</li>
+      <li><strong>R32's production facts (added 2026-10-02).</strong> These come from the fixing session: the pre-fix proof (a real
+        player became admin, rolled back), the <code>schema_migrations</code> version 20261002214554, the 8/8 verify run, the byte-identical
+        <code>prosrc</code>, and the <em>70 non-creator admin rows across 48 pools</em>. The migration, the verify script and the commit
+        were read in the tree. Production was not re-queried — <a href="#r32">R32</a>.</li>
+      <li><strong>R34's catalog facts (added 2026-10-02).</strong> The per-column UPDATE grant list on <code>pool_entries</code>, the
+        claim that only two INSERT triggers exist, and whether any super-admin policy exists on <code>pool_members</code> or
+        <code>pool_entries</code> all come from the live catalog. The repo agrees as far as it can see: the policy has no
+        <code>WITH CHECK</code> (044), 122 and 136 recorded a table-wide grant, and no migration file adds an UPDATE trigger or a
+        super-admin policy. Two things <strong>that change R34's real reach</strong> are also prod state: which pools are on
+        <code>shadow_read_enabled_pools</code> today, and when a finished pool's <code>shadow_finalize_totals</code> next runs —
+        <a href="#r34">R34</a>.</li>
     </ul>
     <p style="margin:10px 0 0"><strong>Anything not on this list, and not marked unverified inline, was read in the code on
       2026-07-26 or re-verified against prod/code on 2026-07-30.</strong></p>
@@ -2377,7 +2519,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       layer, email cadence, catalog, branding, monetisation) · <a href="#stillopen">still-open questions</a>.</p>
     <div class="note gold"><strong>2026-10-02:</strong> Decisions 1, 2, 3 and 5 amended, and Decision 2 clarified (Ryan).
       <a href="#crews">Crews</a> <strong>planned, not started</strong> (<code>drafts/2026-10-02_crews_plan.md</code>, ~15 days RN + ~1½
-      web in the same release + ~3½ web day two). Its prerequisite P1 is the new 🔴 <a href="#r32">R32</a>.
+      web in the same release + ~3½ web day two). Its prerequisite P1 (<a href="#r32">R32</a>) was ✅ <strong>fixed the same day</strong>
+      (migration 151), so the Crews schema is now migration <strong>152</strong>. The same-class 🔴 <a href="#r34">R34</a>
+      (<code>pool_entries</code>) is open, and it is not a Crews prerequisite.
       <a href="#i-privacy">Pool privacy: three levels</a> planned as its own item, not started.</div>
   </div>
 
@@ -2628,8 +2772,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
               <li>The database enforces it with <code>CHECK (crew_id IS NULL OR is_private)</code> on <code>pools</code>.</li>
               <li>"Who can join" is hidden once a crew is picked, and the Settings Visibility toggle is hidden for crew pools.</li>
               <li>Sharing the link still brings people into the crew.</li>
-              <li>⚠ The CHECK is <strong>planned</strong> (migration 151) and <strong>not built</strong>. The newest migration is
-                150.</li>
+              <li>⚠ The CHECK is <strong>planned</strong> (migration <s>151</s> <strong>152</strong>, renumbered 2026-10-02 because 151
+                went to R32's fix) and <strong>not built</strong>. The newest migration is 151, R32's fix, which is not crews work.</li>
               <li><strong>Refined 2026-10-02, later the same day (Ryan; plan §9 #6 and §11 #2):</strong> "always Private" meant
                 <strong>never listed</strong>. Today, with two levels, that is <code>is_private = true</code>. Once the strict level exists
                 (<a href="#d5">D5 → Amended 2026-10-02</a>), a crew pool may be <strong>Invite link</strong> (the default) or
@@ -4600,7 +4744,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
   <div class="card goldc" id="crews">
     <h4>👥 Crews: a crew is who played <span class="chip cat">Feature</span> <span class="chip cat">Multi-sport</span>
-      <span class="chip cat">Mobile</span> <span class="chip gold">📋 PLANNED, NOT STARTED</span> <span class="chip">2026-10-02</span></h4>
+      <span class="chip cat">Mobile</span> <span class="chip gold">📋 PLANNED, NOT STARTED</span> <span class="chip ok">P1 ✅ 2026-10-02</span> <span class="chip">2026-10-02</span></h4>
     <ul class="fields">
       <li><span class="f">Is:</span> Decision 1's durable group, built. You're in a crew because you played in one of its pools, or
         because you said yes when its captain added you. My Crews lists <strong>groups, never people</strong>, and there is no friends
@@ -4615,10 +4759,15 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><span class="f">Touches:</span>
         <ul style="margin:4px 0 0; padding-left:18px">
           <li><strong>Prerequisites P1–P5 first:</strong> <strong>P1</strong> is <a href="#r32">R32</a>, the pool-role self-promotion
-            (security, independent of crews). <strong>P2</strong> is <code>pool_first_lock_at</code>. <strong>P3</strong> is
+            (security, independent of crews). ✅ <strong>Done 2026-10-02:</strong> migration
+            <code>151_a_member_cannot_crown_themselves</code>, applied to production and verified by
+            <code>scripts/verify-pool-member-guard.sql</code> (8/8, rolled back). The plan records it as done (§3, commit
+            <code>6c51140c</code>). ⚠ It does not touch <code>pool_entries</code>, which has the same hole: <a href="#r34">R34</a>, not a
+            crews prerequisite. <strong>P2</strong> is <code>pool_first_lock_at</code>. <strong>P3</strong> is
             <code>pool_finished_at</code>; league pools never finish today (<a href="#r33">R33</a>). <strong>P4</strong> is a single
             join path, <code>lib/pools/join.ts</code>. <strong>P5</strong> is a numeric Activity <code>v</code> gate.</li>
-          <li><strong>Migration <code>151_a_crew_is_who_played</code>:</strong> four <strong>deny-all</strong> tables
+          <li><strong>Migration <code>152_a_crew_is_who_played</code></strong> (was 151; renumbered 2026-10-02 because 151 went to P1):
+            four <strong>deny-all</strong> tables
             (<code>crews</code>, <code>crew_members</code>, <code>crew_seats</code>, <code>crew_invites</code>), two new columns
             (<code>pools.crew_id</code>, <code>pools.crew_prompt_dismissed_at</code>), and the Private CHECK.</li>
           <li><strong>Server:</strong> <code>lib/crews/</code> and <code>app/api/crews/</code>, plus Activity API v3.</li>
@@ -4631,8 +4780,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <table style="min-width:620px">
         <thead><tr><th>Release</th><th>Scope</th><th>Size (plan's, order of magnitude)</th></tr></thead>
         <tbody>
-          <tr><td><strong>RN first</strong></td><td>P1–P5, migration 151, <code>lib/crews/</code> + routes, Activity v3, RN screens,
-            seat notice + one reminder</td><td><strong>~15 working days</strong></td></tr>
+          <tr><td><strong>RN first</strong></td><td>P1 ✅ (done 2026-10-02), P2–P5, migration 152, <code>lib/crews/</code> + routes,
+            Activity v3, RN screens, seat notice + one reminder</td><td><strong>~15 working days</strong> (P1's share is now spent)</td></tr>
           <tr><td><strong>Thin web slice, same release</strong></td><td>Dashboard <em>"Keep this group together?"</em> sheet (plus held
             seats and invites), basic crew page</td><td><strong>~1½ days</strong></td></tr>
           <tr><td><strong>Web, day two</strong></td><td>Create-modal Crew row + roster review, Profile → Crews tab, captain controls,
@@ -4643,9 +4792,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <ul class="fields">
       <li><span class="f">Why the web slice ships with RN:</span> the World Cup was played on the web (facts below). Decided by Ryan,
         2026-10-02 (plan §9 #8).</li>
-      <li><span class="f">Status:</span> 📋 <strong>Planned, not started.</strong> Verified in the tree 2026-10-02:
-        <code>lib/crews/</code>, <code>app/api/crews/</code> and <code>app/crews/</code> do not exist, and the newest migration is
-        <code>150_a_gif_comes_from_klipy.sql</code>. The only crew code is the device concept
+      <li><span class="f">Status:</span> 📋 <strong>Planned, not started; prerequisite P1 done.</strong> Verified in the tree 2026-10-02:
+        <code>lib/crews/</code>, <code>app/api/crews/</code> and <code>app/crews/</code> do not exist. <s>The newest migration is
+        <code>150_a_gif_comes_from_klipy.sql</code>.</s> Re-checked that evening: the newest is
+        <code>151_a_member_cannot_crown_themselves.sql</code>, which is P1 and not crews schema. Crews schema is still unwritten. The only crew code is the device concept
         <code>mobile/app/crews-concept.tsx</code>. It is <strong>untracked</strong>, and plan step 8 deletes it.</li>
       <li><span class="f">Done when:</span> a finished pool's admin can save its group as a crew, on web or in the app; a crew member
         who starts a pool gives every other ticked member a held seat, which is taken or quietly released at first lock; and
@@ -4737,7 +4887,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
                 checks <code>is_private</code> (verified). So anyone holding a private pool's <code>pool_id</code> joins without the
                 code.</li>
               <li>R32's fix (trigger plus INSERT policy) does not close this door, because the route bypasses RLS. This item does not close
-                R32's door either. <strong>Both are needed.</strong></li>
+                R32's door either. <strong>Both are needed.</strong> ✅ <strong>R32's half landed 2026-10-02</strong> (migration 151 drops
+                the client INSERT policy). <strong>This half is still open.</strong></li>
               <li>⚠ <strong>Found while recording this: the web invite link uses that same path.</strong>
                 <code>app/join/[pool_code]/JoinPoolClient.tsx:53</code> posts <code>{ pool_id: pool.pool_id }</code>, not the code. RN
                 (<code>mobile/lib/api.ts:105-108</code>) and the web Join modal (<code>components/pools/JoinPoolModal.tsx:44</code>) post
@@ -4745,7 +4896,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
                 link</strong> unless that page moves to the code first. Verified 2026-10-02. Not resolved here.</li>
               <li>Any tightening must still let crew members into their crew's pool from the crew page (plan §10).</li>
             </ul></li>
-          <li><strong>Crews interaction.</strong> Migration 151's planned <code>CHECK (crew_id IS NULL OR is_private)</code> (plan §4) is
+          <li><strong>Crews interaction.</strong> Migration 152's planned <code>CHECK (crew_id IS NULL OR is_private)</code> (plan §4;
+            renumbered from 151) is
             written against the boolean. Whichever of the two lands second has to restate <em>"a crew pool is never Public"</em> against the
             other's schema.</li>
           <li><strong>The relabel.</strong> Every surface that says "Private" today becomes "Invite link", on web and RN.</li>
@@ -4757,8 +4909,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><span class="f">Effort:</span> not sized by the plan or by Ryan. My order of magnitude, unvalidated: <strong>~3–5 days</strong>
         across schema, the join path, one Needs-you card and the relabel on both surfaces.</li>
       <li><span class="f">Status:</span> 📋 <strong>Planned, not started.</strong> Verified 2026-10-02: no visibility column exists in
-        <code>lib/migrations/</code>, the newest migration is <code>150_a_gif_comes_from_klipy.sql</code>, and the join route still has no
-        <code>is_private</code> check.</li>
+        <code>lib/migrations/</code>, and the join route still has no <code>is_private</code> check. Re-checked that evening: commit
+        <code>6c51140c</code> (151) touched only the migration, its verify script and the Crews plan, so the route is unchanged. The newest
+        migration is now 151, R32's fix.</li>
       <li><span class="f">Done when:</span> an admin can set a pool to Private; a link-holder who isn't in its crew gets <em>"Request
         sent"</em>, and joins only when the admin taps <em>Let in</em>; a crew member joins a Private crew pool straight through; a crew pool
         cannot be made Public, enforced in the database; and a bare <code>pool_id</code> no longer joins a non-public pool, while web invite
