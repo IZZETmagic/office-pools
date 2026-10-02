@@ -16,6 +16,7 @@ import {
 } from '@/lib/activity/readLeagueActivity'
 import { pageWeeks, slicePage } from '@/lib/activity/page'
 import type { ActivityLink, NeedItem } from '@/lib/activity/needsYou'
+import { activityApiVersion } from '@/lib/activity/version'
 
 // =============================================================
 // GET /api/users/:user_id/activity
@@ -188,7 +189,9 @@ async function handleGET(
   // synthesis crosses tables that have their own RLS, simpler to bypass.
   const adminClient = createAdminClient()
   const search = new URL(request.url).searchParams
-  const v2 = search.get('v') === '2'
+  // "At least 2", not "exactly 2" — versions only add fields, and a build asking for v3 must not
+  // fall back to the v1 response (lib/activity/version.ts).
+  const v2 = activityApiVersion(search.get('v')) >= 2
   // Only honoured with v2. A malformed cursor is treated as "first page" rather
   // than an error, so a bad client value cannot strand the feed empty.
   const rawBefore = v2 ? search.get('before') : null
