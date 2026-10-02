@@ -1,5 +1,7 @@
 # Crews — the plan (RN first, web day two)
 
+**Status: all nine decisions settled with Ryan on 2026-10-02 (§9). Ready to build, starting with P1.**
+
 **2026-10-02.** Asked by Ryan: *"write up the complete plan and steps to implement this in RN and day two
 web."* Follows the design agreed in this session and mocked on the device
 (`mobile/app/crews-concept.tsx`, Profile → Developer → My Crews concept).
@@ -10,20 +12,31 @@ record of work.**
 
 ---
 
-## 1. What we're building, in one rule
+## 1. What we're building, in two rules
 
-> **You're in a crew because you played in one of its pools.**
+> **You're in a crew because you played in one of its pools — or because you said yes when its captain
+> added you.**
 
-- No crew invites, no requests, no accept step, no people-picker, **no friends list.**
-- A crew is only ever **named from a group that already played** — after a pool finishes, or by picking
-  it on the create flow's name screen.
+- **No friends list.** Nothing to browse, no suggestions, no "people you may know". Adding someone is a
+  **lookup**: type one exact username or email, confirm the face, add them to *this* crew.
+- Two ways a crew starts:
+  - **named from a group that already played**, after a pool finishes or on the create flow's name
+    screen;
+  - **created directly**: My Crews → New crew → name it → add people. *(Ryan, 2026-10-02.)*
+- **Played in a crew pool:** in automatically. **Added directly:** one *Join / No thanks* card in Needs
+  you, once.
 - Each new season every member gets a **held seat**. Taking it is the yes. Ignoring it costs nothing: it
   goes quietly at first lock and nobody is told.
 - **My Crews lists groups, never people.**
 - Crew decisions live in **Activity → Needs you**, beside picks.
 
 Disclosure-gate tooltip, which is the whole mechanism: *"You're in this crew because you played in its
-pools. Each new season you get a saved spot — use it or don't. We'll remind you once. Leave anytime."*
+pools, or said yes when you were added. Each new season you get a saved spot — use it or don't. We'll
+remind you once. Leave anytime."*
+
+**Why the added path needs a yes and the played path doesn't:** playing together *is* the consent.
+Without it, anyone who knows your username could put you in their crew and trigger season notifications
+to you — and *"anyone who knows your username can sign you up and we'll notify you"* fails the gate.
 
 ### Why now: the number that frames it
 
@@ -35,8 +48,15 @@ pools. Each new season you get a saved spot — use it or don't. We'll remind yo
 | People in **any** league pool | **21**, of whom 8 also played the World Cup |
 
 The league product exists; the groups that would play it are sitting in 302 finished World Cup pools.
-**Crews are the bridge from those groups to the league season**, not a feature for the 21. The day this
-ships, every one of those 253 admins who opens the app sees *"Keep this group together?"* in Needs you.
+**Crews are the bridge from those groups to the league season**, not a feature for the 21.
+
+⚠ **The World Cup was played on the web.** Only **16** of 4,841 users have ever registered a push token,
+and **2** of the 253 admins. The app's installed base is somewhat larger than that, because not
+everyone allows notifications, but not by orders of magnitude. An RN-only release reaches almost none
+of these admins. **So a thin web slice ships with the RN release** (decision 8): the
+*"Keep this group together?"* sheet on the web dashboard, plus a basic crew page. There is **no email
+campaign** *(Ryan, 2026-10-02)*: the prompt reaches admins who come back on their own, on web or in the
+app.
 
 It also makes the **primary metric** (vision §8, *repeat commissioners*, risk **R7**, unmeasured)
 countable for the first time: *crews with two or more pools*.
@@ -50,9 +70,10 @@ in places; each one is stated here rather than built quietly.
 
 | Decision | Today it says | This plan | Why |
 |---|---|---|---|
-| **D1, creation route (2)** | "Directly, any time" | **Removed.** | A crew with no pool behind it needs a people-picker, and a people-picker is a friends list. Route (3), suggested crews, was already parked on 2026-09-28. Only route (1) remains. |
-| **D1, membership** | Not defined | **Defined by having played** in one of the crew's pools. | This is the one rule above. |
-| **D1, departure** | "Still open" (programme line ~3510) | **Settled.** Leave in one tap; your history stays; open seats are released. Removal = no more seats; not notified. A captain who leaves hands over to the co-captain, or else to the longest-standing member. | It fell out of the membership rule. |
+| **D1, creation route (2)** | "Directly, any time" | **Kept, and defined** *(Ryan, 2026-10-02)*: add people by **exact username or email** — a lookup, not a friends list. **Captain and co-captain** add. Added people **accept once**. An email with no account gets **one invite email** from SportPool. Route (3), suggested crews, stays parked (2026-09-28). | Ryan: crews must be creatable directly, without a friends list. |
+| **D1, membership** | Not defined | **Played** in one of the crew's pools, **or accepted** a direct add. | The two rules above. |
+| **D1, departure** | "Still open" (programme line ~3510) | **Settled.** Leave in one tap; your history stays; open seats are released. Removal = no more seats; not notified. A captain who leaves hands over to the co-captain, or else to the longest-standing member (tie → most crew pools played). | It fell out of the membership rule. |
+| **D1, co-captain "from day one"** | Required from the start | **Optional**, with a standing nudge on the crew page until one is set *(Ryan, 2026-10-02)* | A direct crew has nobody to pick at creation; requiring it on save adds friction at the most important moment |
 | **D2, roster review** | "A service to the captain" | Done by **whoever starts the pool**, because any member can. | D1 already lets any member start a pool. |
 | **D2, "guard against a crew already playing that competition"** | Guard | A **confirm**, not a block: *"Bermuda Office is already playing the Premier League (Pick'em). Start another?"* | A crew running Pick'em **and** LMS on the same season is the D3 range working as intended. |
 | **D3, name screen** | "Name · Crew · Who can join · Create" | Kept. ⚠ The mock's "Unlisted" wording was wrong: privacy today is one boolean, `is_private` (Public = listed in Discover, Private = code only). | There is no unlisted option to show. |
@@ -146,9 +167,26 @@ crew_seats              -- a held seat: NOT a pool_members row, NOT an entry
   resolution            text null check (taken | declined | released)
   notified_at, reminded_at  timestamptz null
 
+crew_invites            -- a direct add, waiting for one Join tap
+  invite_id             uuid pk
+  crew_id               uuid
+  invited_by            uuid → users           -- captain or co-captain at the time
+  invitee_user_id       uuid null → users      -- matched by username or email
+  invitee_email         citext null            -- no account yet; claimed at sign-up
+  created_at            timestamptz
+  resolved_at           timestamptz null
+  resolution            text null check (joined | declined | revoked)
+  -- exactly one of invitee_user_id / invitee_email
+
 pools.crew_id                    uuid null → crews   -- set once, from null; trigger-guarded
 pools.crew_prompt_dismissed_at   timestamptz null    -- "Not now" on Keep this group?
 ```
+
+**Database-enforced, because admins can write `pools` directly from the client** (mobile Settings does
+`supabase.from('pools').update`):
+- `CHECK (crew_id IS NULL OR is_private)`: a crew pool can never be listed (decision 6).
+- A trigger lets `crew_id` go from NULL to a value **once**, and only via the service role, so a client
+  can't attach a pool to someone else's crew.
 
 **What is derived, not stored** (the matchweek-rhythm rule):
 - **Whether a seat is open:** `resolved_at IS NULL AND now() < pool_first_lock_at(pool_id)`. Expiry
@@ -178,8 +216,14 @@ Pure decisions go in `lib/crews/*.ts`, with vitest coverage. Routes are thin.
 | `GET /api/crews` | me | My crews: name, people, seasons, status chip (live / seat saved / quiet), leader line, my line |
 | `GET /api/crews/:id` | active member | Playing now, all-time, past seasons, members (with roles) |
 | `POST /api/crews` `{pool_id, name, co_captain_user_id?}` | that pool's admin | **Save as a crew.** Creates the crew. Members = the pool's non-spectator members; the admin becomes captain. Sets `pools.crew_id`. |
+| `POST /api/crews` `{name}` (no `pool_id`) | me | **Create directly.** A crew of one; I'm captain |
+| `GET /api/users/lookup?username=` | signed in | Exact, **case-insensitive** match → display name + avatar to confirm. Never a prefix search |
+| `POST /api/crews/:id/invites` `{username}` or `{email}` | captain / co-captain | Creates the invite. Email always answers *"Invite sent"*, whether or not the address has an account |
+| `POST /api/crews/invites/:id/join` · `/decline` | the invitee | One tap. Join → `crew_members` row, role `member` |
+| `DELETE /api/crews/invites/:id` | captain / co-captain | Withdraw before they answer |
 | `POST /api/pools/:id/crew-prompt/dismiss` | pool admin | "Not now", for good |
 | `PATCH /api/crews/:id` | captain / co-captain | Rename; set co-captain |
+| `POST /api/crews/:id/rejoin` | someone whose own row is `left_reason='left'` | Clears `left_at`. Not available after `removed` |
 | `POST /api/crews/:id/leave` | me | `left_at`, `left_reason='left'`; release my open seats; captain succession |
 | `POST /api/crews/:id/members/:user_id/remove` | captain / co-captain | `left_reason='removed'`; release their open seats silently |
 | `POST /api/crews/seats/:pool_id/take` | the seat's holder | `lib/pools/join.ts`, then `resolution='taken'` |
@@ -212,12 +256,35 @@ Pure decisions go in `lib/crews/*.ts`, with vitest coverage. Routes are thin.
 Everyone is ticked by default; hard failures are unticked. **Unticked = no seat row**, so there's no
 extra state and nobody is notified.
 
+**Direct adds — the rules that keep a lookup from becoming a friends list or a spam channel:**
+- **Lookup is exact.** Username matching ignores case, because production has **36** username pairs
+  that differ only by case ("Dave" / "dave"). When more than one matches, show each face and let the
+  captain pick. No prefix search, no autocomplete over all users.
+- **Email never reveals whether an account exists.** It always answers *"Invite sent"*.
+  - An existing account gets the Needs-you card and one email.
+  - No account: **one** email from SportPool — *"Dave asked us to invite you to Bermuda Office"* —
+    linking to sign-up. Plural "we" voice. This is the captain's own act, sent once, so it is not the
+    *"reminders in the user's name"* that Decision 2 forbids.
+- **An email invite is claimed at sign-up only against a *verified* address.** Otherwise someone could
+  register the address first and land in the crew.
+- **"No thanks" sticks:** that crew can't re-invite you. They can still bring you in the played way, by
+  you joining one of its pools.
+- **Rate limit:** about 20 pending invites per crew and 50 per captain per day. That's generous for a
+  real group and useless for spam.
+- **Pending invitees are not members.** They get no seats, don't count toward the crew size, and
+  appear on the crew page only for the captain and co-captain, as *"Invited · waiting"*.
+
 **⚠ Size cap meets crew size.** New pools enforce `pool_tier_member_cap`: Free 10, Plus 30. A
 14-person crew starting a Free pool would let the 11th person to take a seat hit `pool_full`, in
 public, after being told their spot was saved. That's the worst version of the problem.
 
-The roster review is where it has to surface honestly: *"14 in this crew · a Free pool holds 10."*
-**Decision 7** below. Monetization v2 (*"priced on size; a new season is a new pool"*) is unchanged by
+**Decided (#7):** seats never exceed what the pool holds, so a saved spot is always a real promise.
+- Roster review shows it honestly: *"Bermuda Office · 14 people. A Free pool holds 10."* →
+  **Go Plus** (room for 30) or **choose who gets the 9 spots**.
+- Unticked people get no seat and aren't told, as with any roster review.
+- Upgrading before first lock re-opens the review for the rest.
+- `POST /api/pools/create` refuses more seats than `pool_tier_member_cap(tier) − 1`. The rule lives on
+  the server, not just in the UI. Monetization v2 (*"priced on size; a new season is a new pool"*) is unchanged by
 any of the options.
 
 ---
@@ -230,6 +297,7 @@ any of the options.
 | Kind | Shown to | Appears | Deadline | Gone when |
 |---|---|---|---|---|
 | `crew_seat` | the seat's holder | a crew pool is created | `pool_first_lock_at` | taken, declined, or first lock passes |
+| `crew_invite` | the invitee | a captain or co-captain adds them | **none** (sorts last) | joined, declined, or withdrawn |
 | `crew_save` | the pool's admin only | a crewless pool is finished (P3) with 2+ non-spectator members, not archived, not branded, not dismissed | **none** (sorts last) | saved, or "Not now" (for good) |
 
 **Type changes (both sides):**
@@ -247,7 +315,8 @@ needs P5 first.
 - `CrewNeedsCard` (already sketched in the concept) with two buttons. Each one calls its route, then
   refreshes Activity.
 - `NeedsYouCard` stays exactly as it is.
-- **Tab dot:** decision 2. My recommendation: `crew_seat` lights it and `crew_save` does not.
+- **Tab dot:** all three crew kinds light it *(Ryan, 2026-10-02)*. The rule
+`needsYou.length > 0 || unreadMentions > 0` in `mobile/app/(tabs)/_layout.tsx` needs no change.
 
 There is **no web Activity page**, so web gets these items on the dashboard. See §8.
 
@@ -277,16 +346,24 @@ Each step is a commit; nothing is pushed until Ryan says so.
 6. **RN screens.** Data via **react-query + API** (`useCrews`, `useCrew`), the pattern `useLeaguePool`
    uses, not hand-rolled PostgREST.
    - `mobile/app/profile/crews.tsx`: the list. Wire the Profile tile's `onPress`; drop "Soon".
-   - `mobile/app/profile/crews/[id].tsx`: the crew page. Captain controls (rename, co-captain, remove)
-     live in a member's sheet; **there is no add button.**
+   - `mobile/app/profile/crews.tsx` gains **New crew** (name → add people). This is the only
+     people-adding UI: a username/email field with a face to confirm, never a list to browse.
+   - `mobile/app/profile/crews/[id].tsx`: the crew page.
+     - Captain controls live in a member's sheet: rename, co-captain, remove.
+     - **Add people** (captain / co-captain only) opens the same lookup field.
+     - Pending invites are shown to them as *"Invited · waiting"*.
+   - Sign-up claims verified-email invites, so a new account lands with a *Join* card waiting.
    - The create wizard's `details` step gains the **Crew** row: your active crews + "No crew". The
      logic goes in `mobile/lib/createPool.ts`, which stays pure and tested.
      - The roster review opens from the row: *"13 get a saved spot · Review"*.
      - The same-competition confirm runs on Next.
      - `buildCreatePayload` gains `crew_id`. The private-by-default guard test must still pass.
    - Pool **Info tab:** *"Part of Bermuda Office"* → the crew page; before first lock,
-     *"9 in · 3 spots saved"*. This is a single line, not rows in the leaderboard (decision 5); the
+     *"9 in · 3 spots saved"* for everyone. This is a count, not rows in the leaderboard; the
      leaderboard read path is not touched.
+   - Pool **Members tab** (admin-only already): a *"Spots saved"* section before first lock, naming
+     who is still pending (decision 5). It comes from the server; the admin check is in the route.
+     Declined seats are not shown.
    - `CrewNeedsCard` in the Activity tab.
    - `usePushNotificationHandlers` gains `case 'crew_seat'` → Activity. Old builds ignore it
      harmlessly.
@@ -316,46 +393,75 @@ Each step is a commit; nothing is pushed until Ryan says so.
 | Steps | Days |
 |---|---|
 | 1–2 | ~2 |
-| 3–4 | ~3½ |
+| 3–4 | ~4½ (invites, lookup, email claim add ~1) |
 | 5 | ~1½ |
-| 6 | ~4 |
+| 6 | ~5 (direct create + lookup adds ~1) |
 | 7 | ~1½ |
 | 8–10 | ~½ |
-| **RN total** | **~13 working days** |
+| **RN total** | **~15 working days** |
 
 ---
 
-## 8. Web, day two
+## 8. Web
+
+### 8a. With the RN release (decision 8, ~1½ days)
+
+The World Cup groups are on the web, so the minimum for them to save a crew ships at the same time as
+the RN release:
+- a **dashboard "Needs you" strip** with the *"Keep this group together?"* sheet, plus held seats and
+  invites (`readCrewNeeds`, the same builder RN uses);
+- a **basic crew page** at `app/crews/[crew_id]/page.tsx`: playing now, past seasons, members, Leave.
+
+Seat links already work through `/join/<code>`.
+
+### 8b. Day two
 
 The server and the data are done by then, so web is rendering only. There's one quiet day-one win:
 **the seat emails already work on web**, because `/join/<code>` takes the seat.
 
 1. **Create modal** (`components/pools/CreatePoolModal.tsx`): the same Crew row, roster review and
    confirm on the Details step, posting the same `crew_id`.
-2. **Profile → Crews tab** (`app/profile/ProfilePage.tsx` `TAB_CONFIG`, `?tab=crews`) and a crew page at
-   `app/crews/[crew_id]/page.tsx`, reading the same `GET /api/crews*`.
-3. **Dashboard "Needs you" strip** above My Pools (`DashboardClient.tsx`), crew items only. It uses the
-   same `readCrewNeeds`, so web and RN cannot disagree. Web has no Activity page, and this is not the
-   moment to build one.
-4. **Pool page:** the same *"Part of…"* line and seat count on `PoolInfoTab`.
+2. **Profile → Crews tab** (`app/profile/ProfilePage.tsx` `TAB_CONFIG`, `?tab=crews`). The crew page
+   from 8a gains captain controls (rename, co-captain, remove).
+   New crew + Add people use the same lookup and invite routes. Sign-up on web claims email invites
+   too, so the invite email can link to the web sign-up page.
+3. **Pool page:** the same *"Part of…"* line and seat count on `PoolInfoTab`.
 
-About **4 days**.
+About **3½ days**. With 8a, web is about **5 days** in total.
 
 ---
 
-## 9. Decisions I need from you
+## 9. Decisions — all settled with Ryan, 2026-10-02
 
-| # | Question | My recommendation |
+| # | Question | Outcome |
 |---|---|---|
-| 1 | Record §2's amendments to D1/D2 in the programme? | Yes — the build follows them either way, so the record should too |
-| 2 | Does `crew_save` (no deadline) light the Activity tab dot? | **No** — the dot means "something has a clock on it" |
-| 3 | If someone left or was removed, does joining a crew pool by link put them back in the crew? | **No** — an explicit exit sticks; they can still play that pool |
-| 4 | Co-captain at save time: required, or optional with a nudge later? | **Optional**, nudge on the crew page |
-| 5 | Pending seats inside the pool: a count line, or rows like the mock? | **A count line** — leaderboard read paths stay untouched |
-| 6 | Crew pools forced Private (never listed in Discover)? | **Yes** — otherwise strangers from Discover become crew members by the one rule |
-| 7 | Crew bigger than the pool's tier cap (Free 10)? | Say it honestly in roster review — *"a Free pool holds 10"* — and let the starter choose Plus or who gets a spot. Never let the 11th person find out by hitting `pool_full` |
-| 8 | Email the 253 World Cup admins once at launch (*"Keep your World Cup group together"*)? | Yes, once, after the RN release is live — but it's outward-facing, so it's your call, and it gets its own copy review |
-| 9 | Captain leaves with no co-captain? | Longest-standing member becomes captain, and the crew page says so |
+| 1 | Record §2's amendments to D1/D2 in the programme? | ✅ **Decided** — all six, with route (2) kept and defined (see below) |
+| 2 | Which crew cards light the Activity tab dot? | ✅ **Decided — all three** (seat, invite, save). The existing rule `needsYou.length > 0` stays as is |
+| 3 | If someone left or was removed, does joining a crew pool by link put them back in the crew? | ✅ **Decided — no, exits stick.** They play the pool. Left → **Rejoin** themselves from the crew page. Removed → only captain/co-captain can add them back (one Join tap) |
+| 4 | Co-captain at save time: required, or optional with a nudge later? | ✅ **Decided — optional.** Skippable row on the save sheet; *"Pick a co-captain"* stays on the crew page until set (for a direct crew, once someone joins). Being made co-captain = one Activity history line, no card. Amends D1's "from day one" |
+| 5 | Pending seats inside the pool: a count line, or rows like the mock? | ✅ **Decided — count for everyone, names for the pool admin.** Members see *"9 in · 3 spots saved"*; the admin's Members tab lists who is still pending. Declined seats are not listed. Leaderboard untouched |
+| 6 | Crew pools forced Private (never listed in Discover)? | ✅ **Decided — yes, always Private.** The "Who can join" switch is hidden once a crew is picked, and the Settings Visibility toggle is hidden for crew pools. Sharing the link still brings people into the crew |
+| 7 | Crew bigger than the pool's tier cap (Free 10)? | ✅ **Decided — seats never exceed the cap.** Roster review: *"A Free pool holds 10"* → **Go Plus** or **choose who gets the 9 spots**. Upgrading before first lock re-opens the review. Link joins still hit the cap as today |
+| 8 | Email the 253 World Cup admins once at launch? | ✅ **Decided — no email.** But a **thin web slice ships with the RN release** (dashboard save sheet + basic crew page, ~1½ d), because the World Cup was played on web |
+| 9 | Captain leaves with no co-captain? | ✅ **Decided — the longest-standing member** (earliest `joined_at`; tie → most crew pools played). One Activity history line for them; the crew page shows *"Captain: Marcus (since Dave left)"*. When the last member leaves, the crew closes: history kept, never shown, no seats |
+
+**Decided so far (2026-10-02):**
+- **#1, part:** creating a crew directly stays. Add by exact username or email; added people tap
+  *Join* once; captain + co-captain add; non-account emails get one SportPool invite. No friends
+  list.
+- **#1, rest:** amendments 2–6 confirmed as written (membership widened to *played or accepted*).
+- **#2:** all three crew cards light the Activity dot.
+- **#4:** co-captain optional, with a standing nudge.
+- **#9:** a captainless crew passes to its longest-standing member; when the last member leaves, the
+  crew closes.
+- **#8:** no email to the World Cup admins. The web dashboard save sheet and a basic crew page ship
+  **with** the RN release.
+- **#7:** seats never exceed the pool's cap. Go Plus, or choose who gets the spots.
+- **#6:** crew pools are always Private, enforced by a CHECK constraint on `pools`, not only by hiding
+  the toggle.
+- **#5:** saved spots appear as a count to members; the pool admin sees names of who's still pending.
+- **#3:** exits stick. Joining by link doesn't re-add. Leavers can Rejoin themselves; the removed only
+  by being added back.
 
 ## 10. Not in this plan
 
