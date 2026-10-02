@@ -62,6 +62,12 @@ const DENY_ALL = [
   ...DENY_ALL_050,
   // Migration 149 — the Activity feed's rank history.
   'league_entry_rank_history',
+  // Migration 154 — Crews. Not league tables, but the same rule and the same silent failure: a
+  // user-scoped read returns [] with error: null, and My Crews would render an empty list.
+  'crews',
+  'crew_members',
+  'crew_seats',
+  'crew_invites',
 ] as const
 
 function walk(dir: string, out: string[] = []): string[] {

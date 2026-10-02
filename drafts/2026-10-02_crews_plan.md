@@ -355,7 +355,7 @@ Each step is a commit; nothing is pushed until Ryan says so.
      real pools);
    - `lib/pools/join.ts` extraction (behaviour-identical; existing join tests pass);
    - numeric `v` gate.
-3. **Migration 154** (schema in §4).
+3. ✅ **Migration 154** (schema in §4) — applied 2026-10-02 (`20261002233759`); 16/16 dry-run checks, live re-check, guard body byte-identical. Also covers client INSERTs of pools (the pools INSERT policy only checks admin_user_id), which §4 had not named.
    - Before applying: `scripts/verify-select-columns.ts`; hash `prosrc` on both sides.
    - Apply via MCP; add the tables to the deny-all guard test.
 4. **`lib/crews/` + routes** (§5), with vitest coverage of the pure parts:
