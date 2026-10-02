@@ -257,6 +257,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <a href="#engines">🧮 Scoring engines</a>
     <a href="#projects">Projects</a>
     <a href="#decisions">Settled decisions</a>
+    <a href="#crews">👥 Crews</a>
     <a href="#now">🔥 Now</a>
     <a href="#recurring">Recurring</a>
     <a href="#next-scale">Next · scale</a>
@@ -279,7 +280,52 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ SUMMARY ============================ -->
 <section id="summary">
-  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span></h2>
+  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span></h2>
+
+  <div class="card crit" id="update-2026-10-02">
+    <h3 style="margin:0 0 8px">2026-10-02 — Crews: nine decisions recorded, and a 🔴 found on the way</h3>
+    <p class="sec-sub" style="margin:0 0 10px">Scope: recording Ryan's 2026-10-02 Crews decisions, nothing else. Code claims were
+      checked in the tree. The production numbers come from the planning session and were <strong>not re-queried here</strong>.
+      Nothing else on this page was re-audited.</p>
+
+    <p style="margin:0 0 6px"><strong>Since last update</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>Decisions 1, 2 and 3 amended (Ryan).</strong> Each amendment sits beneath the original, which stays visible
+        (<a href="#d1">D1</a> · <a href="#d2">D2</a> · <a href="#d3">D3</a>). <em>Crew-departure semantics</em> has moved out of
+        <a href="#stillopen">Still open</a>.</li>
+      <li><strong>Crews planned, not started:</strong> <code>drafts/2026-10-02_crews_plan.md</code>. RN goes first, with a thin web
+        slice in the same release. See <a href="#crews">Crews</a>.</li>
+      <li><strong>The World Cup was played on the web.</strong> Only 16 of 4,841 users have ever registered a push token, and 2 of the
+        253 admins of finished World Cup groups. <strong>No email campaign to those admins</strong>, by Ryan's decision.</li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Now</strong></p>
+    <p style="margin:0 0 10px"><strong><a href="#r32">R32</a> comes before the Crews build.</strong> It is security work, it is
+      open on every pool today, and it is Crews' own first prerequisite.</p>
+
+    <p style="margin:0 0 6px"><strong>Risk moves</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>R32</strong> opened 🔴: any pool member can self-promote to admin.</li>
+      <li><strong>R33</strong> opened 🟡: league pools never finish.</li>
+      <li><strong>R7</strong> annotated: Crews would make it countable. Its baseline window closed unmeasured.</li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Drift, surfaced not resolved</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li>the <em>Friends list</em> item contradicts Decision 1;</li>
+      <li>Decision 5 names three privacy states and the schema has two;</li>
+      <li>the Crew + Season data-model item and the <em>Migration path</em> open question both assume a model the Crews plan doesn't
+        use.</li>
+    </ul>
+    <p style="margin:0 0 10px">The full list is under <a href="#crews-cuts">Crews → Where this cuts across</a>.</p>
+
+    <p style="margin:0 0 6px"><strong>Needs Ryan</strong></p>
+    <ul style="margin:0 0 0 18px">
+      <li>take the R32 fix;</li>
+      <li>retire or re-purpose <em>Friends list</em>;</li>
+      <li>say whether Decision 5's third privacy state is still wanted.</li>
+    </ul>
+  </div>
 
   <div class="card warnc" id="update-2026-09-19">
     <h3 style="margin:0 0 8px">2026-09-19 — League ingestion: the crons are finally scheduled, and the first drain found a strand and a replay</h3>
@@ -441,26 +487,32 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <em>current</em> level. Risk levels are defined in the register below. Closed risks stay on the register and are counted
     separately, not deleted.</p>
   <div class="strip">
-    <div class="stat crit"><div class="n">2</div><div class="l">🔴 Critical risks</div></div>
+    <div class="stat crit"><div class="n">3</div><div class="l">🔴 Critical risks</div></div>
     <div class="stat high"><div class="n">13</div><div class="l">🟠 High risks</div></div>
-    <div class="stat med"><div class="n">8</div><div class="l">🟡 Medium risks</div></div>
+    <div class="stat med"><div class="n">9</div><div class="l">🟡 Medium risks</div></div>
     <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
     <div class="stat low"><div class="n">6</div><div class="l">✅ Closed (4 prod-verified)</div></div>
     <div class="stat pri"><div class="n">6</div><div class="l">Items in 🔥 Now</div></div>
     <div class="stat neu"><div class="n">9</div><div class="l">Projects</div></div>
-    <div class="stat neu"><div class="n">14+5</div><div class="l">Settled decisions · product + infra</div></div>
-    <div class="stat neu"><div class="n">23</div><div class="l">Decisions needing Ryan</div></div>
-    <div class="stat neu"><div class="n">R31</div><div class="l">Highest risk id on the register</div></div>
+    <div class="stat neu"><div class="n">15+5</div><div class="l">Settled decisions · product + infra (D1–D3 amended 2026-10-02)</div></div>
+    <div class="stat neu"><div class="n">23+3</div><div class="l">Decisions needing Ryan (+3 on 2026-10-02)</div></div>
+    <div class="stat neu"><div class="n">R33</div><div class="l">Highest risk id on the register</div></div>
   </div>
+  <p class="strip-note"><strong>Moved 2026-10-02 (Crews decisions pass only).</strong> <strong>R32 is new</strong> 🔴: any pool member can
+    make themselves that pool's admin with one PATCH, the same class as migration 145. The exploit was not attempted, and whether anyone has
+    ever used it is unverified. <strong>R33 is new</strong> 🟡: league pools never reach <code>completed</code>. <strong>R7</strong> is
+    annotated, not re-levelled. The <strong>+3</strong> decisions needing Ryan are: take the R32 fix, the fate of <em>Friends list</em>,
+    and whether Decision 5's third privacy state is wanted. The 23 is carried as recorded and was not recounted. Settled decisions corrected
+    from 14 to <strong>15</strong> to match the markdown (Decision 15, 2026-09-28).</p>
   <p class="strip-note"><strong>Moved 2026-09-19 (league ingestion pass only).</strong> <strong>R30 is new</strong> 🟠 — a fixture
     played before its placeholder date is unreachable by every sync arm; fix <code>fc23239</code> built, <strong>unpushed</strong>.
     <strong>R31 is new</strong> 🟡 — the outbox has no age guard and its first drain replayed 38 stale matchweek recaps.
     ⚠ <strong>R21 is counted 🔴 below as written, but is stale:</strong> <code>origin/master</code> moved to <code>a8dee7f</code> on 12 Sep and
     the league routes are live; the current gap is 109 unpushed commits. Re-levelling owed after a full pass.</p>
-  <p class="strip-note"><strong>Current levels, R1–R31, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19).</strong>
-    <strong>🔴</strong> R2 · R21 (stale, see above). &nbsp;
+  <p class="strip-note"><strong>Current levels, R1–R33, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R33 on 2026-10-02).</strong>
+    <strong>🔴</strong> R2 · R21 (stale, see above) · <strong>R32</strong>. &nbsp;
     <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27 · <strong>R30</strong>. &nbsp;
-    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong>. &nbsp;
+    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong> · <strong>R33</strong>. &nbsp;
     <strong>🟢</strong> R11 · R15. &nbsp;
     <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 — of which <strong>R4, R13, R17 and R26 are prod-verified</strong>;
     R1 and R22 are closed <em>in code only</em>, and code is not production while <strong>R21</strong> stands.</p>
@@ -475,7 +527,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R31 · 6 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R33 · 6 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19 · R32–R33 added 2026-10-02</span></h2>
   <div class="note warn" style="margin-bottom:14px">
     <strong>⚠️ Mixed vintage — read the row dates.</strong> <strong>R1–R19</strong> below are <strong>2026-07-30 text</strong> and
     several have since closed or changed level; <strong>R20–R29</strong> were added on <strong>2026-09-02</strong> and are current.
@@ -635,7 +687,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           <strong>that condition is now due</strong></td>
         <td><a href="#i-empty-bracket">Empty-bracket bonus inflation</a></td>
       </tr>
-      <tr class="risk-high">
+      <tr class="risk-high" id="r7">
         <td class="id">R7</td>
         <td><strong>Admin churn is unmeasured.</strong> <code>/api/admin/stats</code> has counts (pool admins, avg pool size,
           deleted accounts) but <strong>no cohort or retention series</strong></td>
@@ -643,10 +695,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td class="blast">The best-identified growth lever: preventing 20% of admin churn ≈ <strong>+722 players</strong>
           (Decision 7's table). Not silent-wrongness class — ranks below R1–R3</td>
         <td>Dated, not action-driven: the clean baseline is the <strong>WC→EPL transition</strong>, which is happening now and
-          closes at EPL start</td>
-        <td>None built</td>
+          closes at EPL start. ⚠ <strong>2026-10-02:</strong> that window has <strong>closed unmeasured</strong>, because EPL started in
+          August</td>
+        <td>None built. ⚠ <strong>2026-10-02:</strong> Crews would make the primary metric (<em>repeat commissioners</em>)
+          <strong>countable for the first time</strong>, as <em>"crews with two or more pools"</em> (Crews plan §1). Crews are
+          <strong>planned, not started</strong>, so nothing is measured yet and this row stays open at its level</td>
         <td>Decision 7 says "instrument admin retention"; nothing exists</td>
-        <td><a href="#d7">Decision 7</a>; <a href="#i-superadmin-stats">Enhanced super-admin stats</a></td>
+        <td><a href="#d7">Decision 7</a>; <a href="#i-superadmin-stats">Enhanced super-admin stats</a>; <a href="#crews">Crews</a></td>
       </tr>
       <tr class="risk-med">
         <td class="id">R8</td>
@@ -1102,6 +1157,59 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td>⏳ <strong>NEEDS RYAN</strong> — set N, or say stale sends are acceptable. <em>"…in a batch, three weeks later"</em> fails the
           disclosure gate</td>
         <td>Pick'em season → The outbox is never drained; R30</td>
+      </tr>
+
+      <tr class="risk-crit" id="r32">
+        <td class="id">R32</td>
+        <td><strong>Any pool member can make themselves that pool's admin with one PATCH. This is pool-level privilege escalation,
+          the same class as migration 145.</strong> ⚠️ New 2026-10-02. The Crews planning session confirmed it from the <strong>live
+          catalog</strong> and did <strong>not</strong> attempt the exploit.
+          <strong>(1)</strong> The <code>pool_members</code> UPDATE policy <em>"Users can update own membership"</em> has a
+          <code>USING</code> clause and <strong>no <code>WITH CHECK</code></strong>. It limits <em>which row</em>, not <em>which column</em>
+          (<code>lib/migrations/044_archived_pools_read_only.sql:136-143</code>, verified in the repo).
+          <strong>(2)</strong> <code>authenticated</code> holds an <strong>UPDATE grant on <code>role</code></strong> (live catalog; not
+          re-verified here).
+          <strong>(3)</strong> The only trigger is <code>trg_pool_member_tier_cap</code>, on INSERT (<code>075_free_tier_caps.sql:174</code>).
+          No migration file creates a role guard (verified).
+          <strong>(4)</strong> <code>is_pool_admin()</code> trusts the column (live catalog).
+          <strong>Separately</strong>, the INSERT policy <em>"Users can join pools"</em> (<code>044…sql:122-129</code>, verified) checks
+          only <em>"this row is me"</em> and <code>pool_writable</code> (= not archived). So a direct client insert can set its own
+          <code>role</code> and skip <code>accepting_members</code>, <code>status</code> and <code>is_private</code>: it can join a
+          private pool without its code, as admin. <em>RLS does rows, not columns.</em></td>
+        <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
+        <td class="blast"><strong>Every pool.</strong> Any member can take everything 044 gates on <code>is_pool_admin()</code>,
+          including deleting members and updating pool settings, and the INSERT path doesn't even need an invitation. The plan counts 643
+          pools. ⚠ <strong>Whether anyone has ever done this is unverified.</strong> No read-only check has been run</td>
+        <td>One authenticated PostgREST call, by any of ~4,841 accounts. No UI is needed</td>
+        <td><strong>None applied.</strong> The fix has 145's shape: a <strong>trigger</strong> that asks <em>who</em> is changing
+          <code>role</code>, plus a tightened INSERT path, <strong>not</strong> a column revoke. Pool admins promote and demote from the
+          browser (<code>app/pools/[pool_id]/admin/MembersTab.tsx:260-262</code>, verified), so a revoke would break that. ⚠ Any tightening
+          of joins must still let crew members join their crew's private pool</td>
+        <td>⏳ <strong>NEEDS RYAN.</strong> This is <strong>Crews prerequisite P1</strong>, and it has been <strong>offered as a separate
+          fix task</strong>. Not yet taken. <em>On the level:</em> by the register's wording this is "one user action away" (🟠). It is held
+          at 🔴 because the action needs no mistake and no date, it is open to every account against every pool now, and a self-promoted
+          admin looks like any other admin row. 145 was handled as 🔴, and R2 set the precedent of 🔴 one step from live. That judgement
+          can be overruled</td>
+        <td><a href="#crews">Crews → P1</a>; migration 145</td>
+      </tr>
+
+      <tr class="risk-med" id="r33">
+        <td class="id">R33</td>
+        <td><strong>League pools never reach <code>status = 'completed'</code>.</strong> ⚠️ New 2026-10-02, found in Crews planning (P3),
+          verified in code. <code>lib/auto-archive.ts</code> completes a pool when every <code>matches</code> row for its tournament is
+          complete, and requires <code>totalCount &gt; 0</code> (<code>:37-55</code>). League fixtures live in
+          <code>league_fixtures</code>, so a league tournament has <strong>zero</strong> <code>matches</code> rows and never qualifies. The
+          real season-end signal already exists: a row in <code>league_standings_final</code></td>
+        <td><span class="chip lvl-med">🟡 MEDIUM</span></td>
+        <td class="blast">All league pools (the plan counts 20). <strong>Nothing is wrong today</strong>, because no league season has
+          ended. From the first season end (late May 2027), every league pool will claim to be running when it has finished. That
+          affects anything keyed on completion, including the Crews <em>"Keep this group together?"</em> prompt</td>
+        <td>The first league season ending</td>
+        <td><strong>Planned, not built:</strong> Crews P3 adds <code>pool_finished_at(pool_id)</code>. It returns
+          <code>status='completed'</code> for the World Cup, and the <code>league_standings_final</code> snapshot for leagues</td>
+        <td>No call needed; it's a defect. Levelled 🟡: no data loss, and the date is ~8 months out. It rises to 🟠 if anything else starts
+          keying on <code>completed</code> first</td>
+        <td><a href="#crews">Crews → P3</a>; R10</td>
       </tr>
 
       <tr class="risk-high">
@@ -2233,6 +2341,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <p style="margin:0 0 6px"><strong>Contains:</strong> <a href="#decisions">the 8 settled product decisions</a> ·
       <a href="#foundational">foundational work items</a> (league ingestion, sync cron, data model, templates, ingestion
       layer, email cadence, catalog, branding, monetisation) · <a href="#stillopen">still-open questions</a>.</p>
+    <div class="note gold"><strong>2026-10-02:</strong> Decisions 1–3 amended (Ryan) and <a href="#crews">Crews</a>
+      <strong>planned, not started</strong> (<code>drafts/2026-10-02_crews_plan.md</code>, ~15 days RN + ~1½ web in the same release +
+      ~3½ web day two). Its prerequisite P1 is the new 🔴 <a href="#r32">R32</a>.</div>
   </div>
 
   <div class="card pri" style="border-left:4px solid var(--primary)">
@@ -2314,7 +2425,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ DECISIONS ============================ -->
 <section id="decisions">
-  <h2 class="sec">Settled product decisions <span class="count">8 · Project: Multi-sport platform</span></h2>
+  <h2 class="sec">Settled product decisions <span class="count">8 · Project: Multi-sport platform</span> <span class="chip gold">D1–D3 AMENDED 2026-10-02</span></h2>
   <p class="sec-sub"><strong>Settled 2026-07-25 and not open for re-debate without a reason.</strong> The <em>why</em> is
     recorded alongside each so the argument doesn't have to be re-run. Research behind them: competitor UX across 14
     platforms, a pool-format taxonomy, and behavioural research on retention and organiser motivation. Collapsed by
@@ -2346,6 +2457,42 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           notified.</li>
         <li><strong>Banter stays per pool</strong>, not per crew.</li>
       </ul>
+      <div class="note gold" style="margin-top:12px">
+        <p style="margin:0 0 6px"><strong>Amended 2026-10-02 (Ryan).</strong> The 2026-07-25 text above stays as written. Where the
+          two differ, <strong>this amendment governs.</strong> Source: <code>drafts/2026-10-02_crews_plan.md</code> §2 and §9 (committed
+          <code>86736d88</code>).</p>
+        <ul style="margin:0; padding-left:18px">
+          <li><strong>Membership, now defined.</strong> You are in a crew because you <strong>played</strong> in one of its pools,
+            <strong>or</strong> you <strong>accepted</strong> a direct add. Played = in automatically. Added = one <em>Join / No
+            thanks</em> card, once.</li>
+          <li><strong>Route (2), "directly, any time": kept, and now defined.</strong> My Crews → New crew → name it → add people.
+            <ul style="margin:4px 0 0; padding-left:18px">
+              <li>Adding someone is a lookup by <strong>exact username or email</strong>, not a friends list. Nothing to browse, no
+                suggestions.</li>
+              <li>The <strong>captain and co-captain</strong> can add people.</li>
+              <li>Directly added people <strong>accept once</strong>.</li>
+              <li>An email with <strong>no account</strong> gets <strong>one invite email from SportPool</strong>.</li>
+            </ul></li>
+          <li><strong>Route (3), suggested crews: stays parked.</strong> It was parked on 2026-09-28. ⚠ That parking was never
+            recorded in this programme, and the only written record of it is the Crews plan §10.</li>
+          <li><strong>Co-captain "from the start" is now optional,</strong> with a standing <em>"Pick a co-captain"</em> nudge on the
+            crew page until one is set. For a direct crew, the nudge starts once someone joins. Being made co-captain adds one Activity
+            history line, with no card.</li>
+          <li><strong>Departure: settled</strong> (was in <a href="#stillopen">Still open</a>).
+            <ul style="margin:4px 0 0; padding-left:18px">
+              <li><strong>Leaving</strong> takes one tap. Your history stays, and your open seats are released.</li>
+              <li><strong>Removal</strong> means no more seats, and the removed person is not notified.</li>
+              <li><strong>Exits stick.</strong> Joining a crew pool by link does not put you back in the crew. Someone who
+                <strong>left</strong> can <strong>Rejoin</strong> from the crew page. Someone who was <strong>removed</strong> comes
+                back only if the captain or co-captain adds them again, which needs one Join tap.</li>
+              <li><strong>Captain succession:</strong> the co-captain takes over. If there isn't one, the longest-standing member does
+                (earliest <code>joined_at</code>; tie → most crew pools played). The crew page shows <em>"Captain: Marcus (since Dave
+                left)"</em>.</li>
+              <li><strong>The last member leaving closes the crew.</strong> Its history is kept but never shown, and it gets no
+                seats.</li>
+            </ul></li>
+        </ul>
+      </div>
     </div>
   </details>
 
@@ -2369,6 +2516,31 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           (competition, format, scoring), with <strong>the crew chosen separately</strong> — so "same setup, different group" is
           first-class. Guard against a crew already playing that competition.</li>
       </ul>
+      <div class="note gold" style="margin-top:12px">
+        <p style="margin:0 0 6px"><strong>Amended 2026-10-02 (Ryan).</strong> The text above stays as written. Where the two differ,
+          <strong>this amendment governs.</strong> Source: <code>drafts/2026-10-02_crews_plan.md</code> §2 and §9.</p>
+        <ul style="margin:0; padding-left:18px">
+          <li><strong>Roster review is done by whoever starts the pool,</strong> not "a service to the captain". Decision 1 already lets
+            any member start a pool.</li>
+          <li><strong>The same-competition guard is now a confirm, not a block.</strong> For example: <em>"Bermuda Office is already
+            playing the Premier League (Pick'em). Start another?"</em></li>
+          <li><strong>Seats never exceed the pool's tier member cap.</strong> The caps are Free 10, Plus 30
+            (<code>pool_tier_member_cap</code>, <code>075_free_tier_caps.sql:99</code>, verified).
+            <ul style="margin:4px 0 0; padding-left:18px">
+              <li>Roster review offers <strong>Go Plus</strong> or <strong>choose who gets the spots</strong>.</li>
+              <li>People who are unticked get no seat and aren't told.</li>
+              <li>Upgrading before first lock re-opens the review.</li>
+              <li>The server refuses more seats than the cap allows.</li>
+            </ul></li>
+          <li><strong>Pending seats inside a pool:</strong> members see a count (<em>"9 in · 3 spots saved"</em>). Only the pool admin's
+            Members tab lists names. Declined seats are not listed, and the leaderboard is untouched.</li>
+          <li><strong>Crew cards live in Activity → Needs you.</strong> There are three: saved spot, direct-add invite and keep this
+            group together. <strong>All three light the tab dot.</strong> The existing rule needs no change
+            (<code>mobile/app/(tabs)/_layout.tsx:70</code>, verified).</li>
+          <li><em>Plan scope, not a ruling:</em> the roster reason <em>"email bounced"</em> is not in v1, because bounces live in Resend
+            and it needs a webhook.</li>
+        </ul>
+      </div>
     </div>
   </details>
 
@@ -2376,15 +2548,42 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <summary><span class="dec-num">3</span> The format screen stays, as a one-tap confirmation</summary>
     <div class="body">
       <ul>
-        <li>Recommended format <strong>pre-selected</strong>; primary button names it (<em>"Continue with Score Predictor"</em>).
+        <li>Recommended format <strong>pre-selected</strong>; primary button names it (<em>"Continue with Pick'em"</em>).
           <strong>Skipped entirely</strong> when only one format exists, and by Run it back. Shows crew history.</li>
         <li><em>Why keep it:</em> <strong>the formats are the product.</strong> For a multi-sport app, the fact a league crew can
-          play Score Predictor, Last Man Standing or Final Table <em>is</em> the range. Hiding it makes SportPool look like a
-          one-trick pick'em app.</li>
+          play Pick'em, Showdown or Last Man Standing <em>is</em> the range. Hiding it makes SportPool look like a
+          one-trick pick'em app. ⚠ <strong>Names corrected 2026-07-30</strong>: this line previously read <em>"Score Predictor, Last
+          Man Standing or Final Table"</em>, which predates <strong>Decision 9</strong>. Final Table is an add-on rather than a mode,
+          Showdown is the third mode, and there is now a Results/Scores depth axis. <em>(This page carried the old wording until
+          2026-10-02.)</em></li>
         <li><strong>A format is a named preset that carries its own scoring.</strong> The admin chooses a game, never assembles one.</li>
         <li><strong>Crew selection lives on the name screen:</strong> <em>Name · Crew · Who can join · Create</em>. "No crew" is
           valid → share-link path, then <em>"save these people as a crew?"</em>.</li>
       </ul>
+      <div class="note gold" style="margin-top:12px">
+        <p style="margin:0 0 6px"><strong>Amended 2026-10-02 (Ryan).</strong> The text above stays as written. Where the two differ,
+          <strong>this amendment governs.</strong> Source: <code>drafts/2026-10-02_crews_plan.md</code> §2 and §9 #6.</p>
+        <ul style="margin:0; padding-left:18px">
+          <li><strong>Crew pools are always Private, and never listed in Discover.</strong>
+            <ul style="margin:4px 0 0; padding-left:18px">
+              <li>The database enforces it with <code>CHECK (crew_id IS NULL OR is_private)</code> on <code>pools</code>.</li>
+              <li>"Who can join" is hidden once a crew is picked, and the Settings Visibility toggle is hidden for crew pools.</li>
+              <li>Sharing the link still brings people into the crew.</li>
+              <li>⚠ The CHECK is <strong>planned</strong> (migration 151) and <strong>not built</strong>. The newest migration is
+                150.</li>
+            </ul></li>
+          <li><strong>The "Unlisted" wording in the concept mock was wrong</strong> (<code>mobile/app/crews-concept.tsx:457</code>,
+            verified). Privacy today is one boolean, <code>is_private</code>:
+            <ul style="margin:4px 0 0; padding-left:18px">
+              <li><strong>Public</strong> is listed in Discover (<code>app/api/pools/search/route.ts:26</code>).</li>
+              <li><strong>Private</strong> means joining by code or link only.</li>
+              <li>New pools default to Private (<code>app/api/pools/create/route.ts:348</code>).</li>
+            </ul></li>
+          <li>⚠ <strong>This cuts across <a href="#d5">Decision 5</a>. Surfaced, not resolved.</strong> D5 names three states
+            (<em>private · unlisted · listed</em>), and the schema has two. Today's "Private" behaves like D5's <em>unlisted</em>. D5's
+            stricter <em>private</em> does not exist. Whether it is still wanted is Ryan's call.</li>
+        </ul>
+      </div>
     </div>
   </details>
 
@@ -2415,7 +2614,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <li><strong>Honest state on every card</strong> — <em>"Opens 8 Aug · 12 joined"</em> / <em>"Live · matchweek 3"</em> /
           <em>"Closed"</em>.</li>
         <li><strong>Three-way privacy:</strong> private · <strong>unlisted</strong> <em>(stays the default)</em> ·
-          <strong>listed</strong> (opt-in).</li>
+          <strong>listed</strong> (opt-in). ⚠ <strong>2026-10-02:</strong> the schema has two states, not three
+          (<code>pools.is_private</code>). Today's "Private" behaves like <em>unlisted</em> here. Surfaced, not resolved: see
+          <a href="#d3">Decision 3 → Amended 2026-10-02</a>.</li>
         <li><strong>Report path + fast unlist</strong> — a listed pool is content published under our logo.</li>
         <li><strong>Official SportPool pools per major competition</strong> — always live, guaranteed-good first experience for a
           crewless user, and a controlled surface for testing formats. Branded-pool machinery exists.</li>
@@ -2505,20 +2706,32 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     </div>
   </details>
 
-  <h3 class="grp" id="stillopen">Still open <span style="font-weight:600;color:var(--slate);font-size:12px">— 6</span></h3>
+  <h3 class="grp" id="stillopen">Still open <span style="font-weight:600;color:var(--slate);font-size:12px">— 8 (1 settled 2026-10-02)</span></h3>
   <div class="card warnc">
     <ul>
       <li><strong>Presets for new pools with existing pools grandfathered</strong> — assumed yes, not explicitly ruled.</li>
-      <li><strong>Crew-departure semantics</strong> — history is immutable, but self-removal and exact removal behaviour aren't
-        settled.</li>
+      <li><s><strong>Crew-departure semantics</strong> — history is immutable, but self-removal and exact removal behaviour aren't
+        settled.</s> ✅ <strong>Settled 2026-10-02 (Ryan).</strong> Moved to <a href="#d1">Decision 1 → Amended 2026-10-02</a>.</li>
       <li><strong>Where the format recommendation comes from</strong> when crew history and global popularity disagree. (Settled
         for Run it back: the admin's own past setup.)</li>
       <li><strong>The breakthrough threshold</strong> for out-of-sport events — instinct is deliberately high; the moment it fires
         often it stops working.</li>
       <li><strong>Discover ranking weights</strong> — signals agreed, formula not.</li>
       <li><strong>Migration path</strong> from today's <code>pools</code> table to Crew + Season without disturbing 622 live pools.
-        Biggest unknown in the project.</li>
+        Biggest unknown in the project. ⚠ <strong>2026-10-02:</strong> the Crews plan (§10) builds crews <strong>beside</strong>
+        today's pools through <code>pools.crew_id</code>, and leaves existing pools alone until an admin saves one. If that is built,
+        crews no longer depend on this question. That design is the plan's, though, and it is <strong>not one of Ryan's nine
+        decisions</strong>, so this stays open.</li>
+      <li><strong>What <code>predictions_submitted_at</code> means in a 38-week season</strong> (Decision 9, rung 5). In the World
+        Cup, <em>"earliest"</em> meant <em>committed earliest</em>. Across 38 matchweeks it can only mean <em>joined and picked
+        first</em>. That is still deterministic and fair, but it is a different claim and should be named as one.</li>
+      <li><strong>The size of the Final Table slice</strong> — "small" is agreed, the number is not. Big enough that getting it right
+        matters, small enough that August cannot outrun a season played well.</li>
+      <li><strong>The season tiebreak when Final Table is toggled off</strong> — rung 4 (<code>bonus_points</code>) is then empty in a
+        league pool. Most correct results across the season is the obvious fallback, and it needs no new data.</li>
     </ul>
+    <p style="margin:8px 0 0;font-size:12.5px;color:var(--slate)">The last three were in the markdown but missing from this page. They
+      were added 2026-10-02 so the list matches its source.</p>
   </div>
 
   <h3 class="grp">Not yet discussed</h3>
@@ -3831,13 +4044,17 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     </ul>
   </div>
 
-  <div class="card neutral">
-    <h4>Friends list <span class="chip cat">Feature</span></h4>
+  <div class="card warnc" id="i-friends">
+    <h4>Friends list <span class="chip cat">Feature</span> <span class="chip warn">⚠ CONFLICTS WITH D1 · 2026-10-02</span></h4>
     <ul class="fields">
       <li><span class="f">Is:</span> Let users add each other as friends and keep a persistent cross-pool connections list. Today
         relationships only exist inside a shared pool.</li>
       <li><span class="f">Touches:</span> a new friends/relationship model + friend UI (add/list) + cross-pool surfacing.</li>
       <li><span class="f">Audit 2026-07-12:</span> TODO — no <code>friends</code> table; every <code>friend</code> hit is marketing copy.</li>
+      <li>⚠ <strong>2026-10-02: conflicts with <a href="#d1">Decision 1</a>, as originally written and as amended today.</strong>
+        Decision 1 says a flat "people you've played with" list is the wrong shape. Its amendment makes adding people <em>"a lookup, not a
+        friends list; nothing to browse, no suggestions"</em>. Surfaced, not resolved: this item stays until <strong>Ryan retires it or
+        says what it is for.</strong> See <a href="#crews">Crews</a>.</li>
       <li><span class="f">Effort:</span> ~1 week. <span class="f">Done when:</span> a user can add friends and see a persistent list that
         carries across pools.</li>
     </ul>
@@ -4245,7 +4462,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <h4>The rest of the foundations <span class="chip cat">Multi-sport</span></h4>
     <ul>
       <li><strong>Data-model abstraction</strong> — competition-instance model, now also carrying Crew + Season
-        (<a href="#d1">Decision 1</a>). Everything else depends on it.</li>
+        (<a href="#d1">Decision 1</a>). Everything else depends on it. ⚠ <strong>2026-10-02:</strong> the Crews plan does
+        <strong>not</strong> depend on this. It adds crews beside <code>pools</code> (<code>pools.crew_id</code>). Surfaced, not
+        resolved; see <a href="#crews">Crews</a>.</li>
       <li><strong>Pool template system</strong> — formats as named presets carrying their own scoring (<a href="#d3">Decision 3</a>).</li>
       <li><strong>Sports-data ingestion</strong> — pluggable fixtures/results/standings layer behind a provider interface.</li>
       <li><strong>Per-competition email cadence</strong> — schedules per competition instead of global crons.</li>
@@ -4254,7 +4473,102 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><strong>Per-competition branding</strong> — theme/copy per sport. (The existing <code>branded-pools</code> feature is
         per-<strong>pool</strong> white-label — a different axis.)</li>
       <li><strong>Monetization model</strong> — free vs freemium vs paid. Tracked under 💎.</li>
+      <li><strong>Crews</strong>: planned 2026-10-02, not started. See <a href="#crews">the card below</a>.</li>
     </ul>
+  </div>
+
+  <div class="card goldc" id="crews">
+    <h4>👥 Crews: a crew is who played <span class="chip cat">Feature</span> <span class="chip cat">Multi-sport</span>
+      <span class="chip cat">Mobile</span> <span class="chip gold">📋 PLANNED, NOT STARTED</span> <span class="chip">2026-10-02</span></h4>
+    <ul class="fields">
+      <li><span class="f">Is:</span> Decision 1's durable group, built. You're in a crew because you played in one of its pools, or
+        because you said yes when its captain added you. My Crews lists <strong>groups, never people</strong>, and there is no friends
+        list. Each new season, every member gets a <strong>held seat</strong> (Decision 2). Crew decisions live in <strong>Activity →
+        Needs you</strong>. <em>Tooltip, from the plan: "You're in this crew because you played in its pools, or said yes when you were
+        added. Each new season you get a saved spot — use it or don't. We'll remind you once. Leave anytime."</em></li>
+      <li><span class="f">Plan:</span> <code>drafts/2026-10-02_crews_plan.md</code> (committed <code>86736d88</code>). All nine
+        questions were settled with Ryan on 2026-10-02 (§9), and the amendments are recorded under <a href="#d1">D1</a>,
+        <a href="#d2">D2</a> and <a href="#d3">D3</a>.</li>
+      <li><span class="f">Touches:</span>
+        <ul style="margin:4px 0 0; padding-left:18px">
+          <li><strong>Prerequisites P1–P5 first:</strong> <strong>P1</strong> is <a href="#r32">R32</a>, the pool-role self-promotion
+            (security, independent of crews). <strong>P2</strong> is <code>pool_first_lock_at</code>. <strong>P3</strong> is
+            <code>pool_finished_at</code>; league pools never finish today (<a href="#r33">R33</a>). <strong>P4</strong> is a single
+            join path, <code>lib/pools/join.ts</code>. <strong>P5</strong> is a numeric Activity <code>v</code> gate.</li>
+          <li><strong>Migration <code>151_a_crew_is_who_played</code>:</strong> four <strong>deny-all</strong> tables
+            (<code>crews</code>, <code>crew_members</code>, <code>crew_seats</code>, <code>crew_invites</code>), two new columns
+            (<code>pools.crew_id</code>, <code>pools.crew_prompt_dismissed_at</code>), and the Private CHECK.</li>
+          <li><strong>Server:</strong> <code>lib/crews/</code> and <code>app/api/crews/</code>, plus Activity API v3.</li>
+          <li><strong>RN:</strong> <code>mobile/app/profile/crews*</code>, the create-wizard Crew row, and the pool Info and Members
+            tabs.</li>
+          <li><strong>Web:</strong> the dashboard and <code>app/crews/[crew_id]/page.tsx</code>.</li>
+        </ul></li>
+    </ul>
+    <div class="scroller" style="margin:10px 0">
+      <table style="min-width:620px">
+        <thead><tr><th>Release</th><th>Scope</th><th>Size (plan's, order of magnitude)</th></tr></thead>
+        <tbody>
+          <tr><td><strong>RN first</strong></td><td>P1–P5, migration 151, <code>lib/crews/</code> + routes, Activity v3, RN screens,
+            seat notice + one reminder</td><td><strong>~15 working days</strong></td></tr>
+          <tr><td><strong>Thin web slice, same release</strong></td><td>Dashboard <em>"Keep this group together?"</em> sheet (plus held
+            seats and invites), basic crew page</td><td><strong>~1½ days</strong></td></tr>
+          <tr><td><strong>Web, day two</strong></td><td>Create-modal Crew row + roster review, Profile → Crews tab, captain controls,
+            the pool page's <em>"Part of…"</em> line</td><td><strong>~3½ days</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="fields">
+      <li><span class="f">Why the web slice ships with RN:</span> the World Cup was played on the web (facts below). Decided by Ryan,
+        2026-10-02 (plan §9 #8).</li>
+      <li><span class="f">Status:</span> 📋 <strong>Planned, not started.</strong> Verified in the tree 2026-10-02:
+        <code>lib/crews/</code>, <code>app/api/crews/</code> and <code>app/crews/</code> do not exist, and the newest migration is
+        <code>150_a_gif_comes_from_klipy.sql</code>. The only crew code is the device concept
+        <code>mobile/app/crews-concept.tsx</code>. It is <strong>untracked</strong>, and plan step 8 deletes it.</li>
+      <li><span class="f">Done when:</span> a finished pool's admin can save its group as a crew, on web or in the app; a crew member
+        who starts a pool gives every other ticked member a held seat, which is taken or quietly released at first lock; and
+        <em>"crews with two or more pools"</em> can be counted (<a href="#r7">R7</a>).</li>
+    </ul>
+
+    <h4 style="margin-top:14px">What planning found: verified against production 2026-10-02</h4>
+    <p style="margin:0 0 8px;font-size:13px;color:var(--slate)">These were queried against production (<code>ujthamlehjyubbzxbnes</code>)
+      by the Crews planning session on 2026-10-02, and recorded from the plan (§1). ⚠ This pass did <strong>not</strong> re-query them,
+      because it had no production access.</p>
+    <div class="scroller" style="margin-bottom:10px">
+      <table style="min-width:560px">
+        <thead><tr><th>Fact</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Users who have <strong>ever</strong> registered a push token</td><td><strong>16 of 4,841</strong></td></tr>
+          <tr><td>Admins of finished multi-member World Cup pools with a push token</td><td><strong>2 of 253</strong></td></tr>
+          <tr><td>Finished, <strong>unarchived</strong> World Cup pools with 2+ members</td><td><strong>302</strong>. Sizes: 120 of 2–5 ·
+            88 of 6–15 · 74 of 16–40 · 16 of 41–100 · 4 over 100</td></tr>
+          <tr><td>Distinct admins of those 302 pools</td><td><strong>253</strong></td></tr>
+          <tr><td>People in <strong>any</strong> league pool</td><td><strong>21</strong>, of whom 8 also played the World Cup</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li><strong>The World Cup was played on the web.</strong> An RN-only release reaches almost none of those 253 admins.</li>
+      <li><strong>Decided (Ryan, 2026-10-02): no email campaign to the World Cup admins.</strong> The prompt reaches admins who come back
+        on their own, on web or in the app.</li>
+    </ul>
+
+    <h4 style="margin-top:14px" id="crews-cuts">Where this cuts across the rest of the programme: surfaced, not resolved</h4>
+    <ol style="margin:0; padding-left:20px">
+      <li><strong>The <a href="#i-friends">Friends list</a> backlog item</strong> contradicts Decision 1, both as originally written
+        (<em>"a single flat list is the wrong shape"</em>) and as amended (<em>"a lookup, not a friends list"</em>). The item has not been
+        removed. <strong>Ryan to retire it, or say what it is for.</strong></li>
+      <li><strong>Decision 5's three-way privacy vs the one <code>is_private</code> boolean.</strong> See
+        <a href="#d3">D3's amendment</a>.</li>
+      <li><strong><em>Data-model abstraction</em> and <em>Migration path</em></strong> both assume Crew + Season replaces
+        <code>pools</code>. The plan builds crews beside <code>pools</code>. That is not one of the nine decisions, so both stay as
+        written, with a pointer.</li>
+      <li><strong>Decision 2's <em>"never in the captain's name"</em> vs the invite email for someone with no account.</strong> Ryan
+        decided the email exists (from SportPool, once). The plan's draft copy names the captain (<em>"Dave asked us to invite you…"</em>).
+        That copy is the plan's, not an explicit ruling, and it is flagged so the call is made consciously. The disclosure gate is
+        satisfied either way.</li>
+      <li><strong>R7's dated window has passed.</strong> R7 named the WC→EPL transition as the baseline, and it closed unmeasured. Crews
+        would make the metric countable from here; they don't recover the baseline.</li>
+    </ol>
   </div>
 </section>
 
@@ -4399,7 +4713,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="wrap">
     <p><strong>SportPool Programme</strong> — hand-built view of <code>SPORTPOOL_PROGRAMME.md</code> at commit
       <code>6f3980d</code> + the uncommitted 2026-07-30 audit corrections. Rebuilt 2026-07-30; 2026-09-02 audit added;
-      <strong>2026-09-19 league ingestion update</strong> (R30, R31, the 2026-09-19 status block, R21 stale note). Self-contained: no network calls, no external
+      <strong>2026-09-19 league ingestion update</strong> (R30, R31, the 2026-09-19 status block, R21 stale note);
+      <strong>2026-10-02 Crews decisions</strong> (D1–D3 amendments, the Crews item, R32, R33, the R7 note, Still open brought in line with the
+      markdown). Self-contained: no network calls, no external
       fonts, no CDN. Colours are the SportPool tokens from
       <code>mobile/theme/colors.ts</code>, light/dark via <code>prefers-color-scheme</code>.</p>
     <p>The markdown is the source of truth. This file is a view of it and is updated in the same piece of work — if they
