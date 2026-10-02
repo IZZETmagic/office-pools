@@ -16,7 +16,7 @@ items roll up into.
 > standing was making the register point at the wrong things. What is written below is what the code
 > says today.
 
-### 2026-10-02 — Crews: nine decisions recorded, and a 🔴 found on the way
+### 2026-10-02 — Crews: nine decisions recorded, a 🔴 found on the way, and the build started
 
 > Scope: recording Ryan's 2026-10-02 Crews decisions, nothing else. Code claims were checked in the
 > tree. The production numbers come from the planning session and were not re-queried here. Nothing
@@ -34,8 +34,94 @@ items roll up into.
 > **R35** is opened from what 152 left out. I read the migration, both verify scripts and commit
 > `bd7a7bb5` in the tree, and checked every `pool_entries` writer against the allow-list. The
 > production facts come from the fixing session and were **not** re-queried here.
+>
+> **Updated at the end of the day: the Crews build has started.** Crews P2–P5 and plan step 3, the
+> schema, landed in four commits: `b31dcf10`, `859625ae`, `bc02a1b0` and `20d4740f`. All four are
+> local on `master` and **not pushed**. Both migrations are **live on production**. I read every file
+> the four commits touch. I re-ran their three test files (3 files, 26 tests, all pass) and the web
+> type-check in the tree. The production facts are **reported by the building session** and were
+> **not** re-queried here: both applies, the 643-pool checks, the dry runs and the `prosrc` match.
+>
+> Step 4 then began in two more commits while this pass ran (`163fd3af`, `dcc4f7ef`). For those I
+> read the `joinPool` change and the save path in `lib/crews/store.ts`, and I ran their tests. I did
+> **not** review them against the decisions. **The record is cut at `dcc4f7ef` (20:48).**
 
 **Since last update**
+
+- **Crews is in progress. P1–P5 and plan step 3 (the schema) are done, and step 4, `lib/crews/` plus
+  the API routes, is under way.** **No user can reach any of it.** No API route exists, and the one
+  live hook fires only for a pool with a crew, which no pool has. The plan marks P1–P5 and step 3
+  done (`drafts/2026-10-02_crews_plan.md` §3 and §7).
+  - ⚠ **Step 4 landed in two commits while this pass was running, which is outside the brief I was
+    given.** **This record is cut at `dcc4f7ef` (20:48).** Anything after that is not in it.
+  - ⚠ **Already past the cut when I finished:** `1c086ab6` (20:51, `lib/crews/read.ts`, every read)
+    and `bd85c53c` (20:54, **the API routes**: 12 under `app/api/crews/` and
+    `app/api/pools/[pool_id]/crew-prompt/dismiss`, plus a new **`app/api/users/lookup`**). So
+    *"no API route exists"* below is true **at the cut only**. None of it is recorded, reviewed or
+    pushed. The next pass should start there, and look at the user-lookup route first, because it
+    touches what one account can learn about another.
+  - `163fd3af` (20:43): `lib/crews/rules.ts` holds every Crews rule as a pure function, with 31
+    tests.
+  - `dcc4f7ef` (20:48): `lib/crews/store.ts` holds every crew write, on the admin client, with 32
+    tests against an in-memory fake. `joinPool` now makes a player of a crew's pool a crew member
+    (exits stick) and takes their held seat (`lib/pools/join.ts`, `if (pool.crew_id)`, loaded
+    lazily). 2 more join tests.
+  - I ran `lib/crews` and `lib/pools`: 135 tests pass. **I did not review the rules or the store
+    against the decisions.** Only `lib/pools/join.ts` imports the store (verified).
+    `app/api/crews/` and `app/crews/` do not exist.
+- **P5, `b31dcf10`:** `lib/activity/version.ts` adds `activityApiVersion()`. The Activity route's
+  gate is now `activityApiVersion(search.get('v')) >= 2`
+  (`app/api/users/[user_id]/activity/route.ts:194`, verified). It was `=== '2'`, which would have
+  sent a v3 build the v1 response, with no Needs you, links or paging. 4 tests.
+- **P4, `859625ae`:** `lib/pools/join.ts` holds `joinPool()`, the single join path. It covers the
+  lookup, join-ability, the SP010 tier cap, restoring a returning member's entries, the first entry
+  and the Showdown schedule. `POST /api/pools/join` is now a 41-line wrapper
+  (`app/api/pools/join/route.ts`, verified). The commit reports behaviour unchanged. One thing did
+  change: the username lookup moved from the session client to the admin client (same data, per the
+  commit). 10 tests.
+- **P2 + P3, `bc02a1b0`: migration `153_a_pool_knows_when_it_locks_and_ends`, applied 2026-10-02**
+  (building session). It adds `pool_first_lock_at(pool)` and `pool_finished_at(pool)`, derived and
+  never stored. They are **server-only**: execute is revoked from `anon` and `authenticated` and
+  granted to `service_role` (`153:112-115`, verified).
+  - *Checked against all 643 pools (building session):* every pool has a first lock, and World Cup
+    fixed-deadline pools match `prediction_deadline`. No league pool uses the season-end value. All
+    three LMS pools lock in their engine's round-1 matchweek, and chosen start weeks are honoured.
+    *Finished* is exactly "World Cup done, leagues running".
+  - **R33 is worked around for Crews, not fixed.** `pool_finished_at` reads `league_standings_final`
+    for a league (`153:99-101`), so Crews no longer need `status = 'completed'`. League pools still
+    never reach it.
+  - *Finding, historical only:* 28 finished progressive World Cup pools have a stale
+    `prediction_deadline`. Admins moved the round deadline that the round route actually enforces.
+  - **Deliberate change from the plan: no TypeScript mirror.** The SQL functions are the single
+    owner. No TypeScript file calls either function yet (verified).
+- **Step 3, `20d4740f`: migration `154_a_crew_is_who_played`, applied as `20261002233759`**
+  (building session).
+  - Four **deny-all** tables: `crews`, `crew_members`, `crew_seats` and `crew_invites`. RLS is on,
+    with zero policies, and grants are revoked from `anon` and `authenticated` (`154:177-182`,
+    verified).
+  - `pools` gains `crew_id` and `crew_prompt_dismissed_at`.
+  - CHECK `pools_crew_pool_is_private`: a crew pool must have `is_private IS TRUE`
+    (`154:132-133`). The check uses `IS TRUE` because the column is nullable.
+  - Trigger `guard_pool_crew_id`: only a trusted writer may set `crew_id`, only once, and only from
+    NULL, on INSERT or UPDATE (`154:141-174`). It covers INSERT because the `pools` INSERT policy
+    checks only `admin_user_id`.
+  - *Building session:* 16/16 dry-run checks, a live re-check, the guard body byte-identical, and
+    `verify-select-columns` OK. All 643 pools keep `crew_id` NULL.
+  - *This pass:* the four tables are in `lib/league/__tests__/denyAllTables.guard.test.ts`, and the
+    test passes.
+- **Process correction: a type-check that never ran was reported as clean.** Earlier today the
+  building session said P4 and P5 had **"zero web type errors"**. That came from a command wrapped in
+  `timeout`, which does not exist on this Mac. I confirmed this pass that neither `timeout` nor
+  `gtimeout` is installed. So the command failed before `tsc` started, and its silence read as a
+  pass. **Re-run properly:** `npx tsc --noEmit -p .` gives exactly 3 errors. All three are
+  `FormData.get` in `app/api/admin/branded-pools/upload-logo/route.ts:13-15`. That file is
+  pre-existing (last changed `37c84284`), the four commits don't touch it, and the errors are the
+  **R29** build failure. I re-ran it this pass and got the same 3 errors, and none in the changed
+  files. It is the same failure shape as the survey dry run that would have reported 146 recipients as
+  success: **a check that cannot fail looks like a check that passed.**
+- `master` is now **15** commits ahead of `origin/master` at the cut-off (verified).
+
+*Earlier on 2026-10-02:*
 
 - **R32 fixed: migration `151_a_member_cannot_crown_themselves`, applied to production**
   (`schema_migrations` 20261002214554; commit `6c51140c`, local and not pushed). It was proven on
@@ -44,7 +130,8 @@ items roll up into.
   used the hole before today is unknown:** 70 admin rows across 48 pools are not the pool's creator,
   and nothing records who promoted whom. **Crews P1 is done**, so the Crews schema becomes
   ~~**migration 152**~~ **migration 153**, because 152 went to R34's fix later that night
-  (`drafts/2026-10-02_crews_plan.md`, updated again in `bd7a7bb5`).
+  (`drafts/2026-10-02_crews_plan.md`, updated again in `bd7a7bb5`). *(It landed as **154**, because
+  153 went to P2 + P3. See above.)*
 - **R34 opened 🔴: a member can rewrite their own `pool_entries` row**, including score inputs, fee
   and retirement. It is the same shape as R32, and nobody has probed or exploited it. See the drift
   item below: the reported impact was partly wrong.
@@ -82,11 +169,21 @@ today, and it is Crews' own first prerequisite.~~ ✅ Done the same day.
 ~~**R34** now comes before the Crews build, under the ranking rule that silent wrong data outranks
 anything merely missing. It is open to every member and it reaches the score. It is **not** a Crews
 prerequisite, so Crews P2–P5 are not blocked by it. They are next.~~ ✅ Done that night (152).
-**Crews P2–P5 are next.** The new **R35** does not outrank them. Its deadline case is dormant until
-the next deadline-shaped competition. Its level also turns on one question nobody has traced: can a
-late entry save picks? If it can, that is silent wrong data, and R35 moves ahead of Crews.
+~~**Crews P2–P5 are next.**~~ ✅ Done, with step 3 (the schema), by the end of the day.
+**Crews step 4 is next, and has started: `lib/crews/` plus the API routes.** **R35** still does
+not outrank it, for the same reason as before. Its deadline case is dormant until the next deadline-shaped competition. If
+anyone traces that a late entry can save picks, that is silent wrong data, and R35 moves ahead of
+Crews. Step 4 is also where two schema notes below become live (*Drift*). Both should be settled in
+step 4, before any route can write a crew row. *Rule applied: silent wrong data first. Nothing open in
+this area is live silent wrongness yet, so the build order stands.*
 
 **Risk moves:**
+- **End of day:** no risk opened, closed or re-levelled. **R33** annotated: 153 gives Crews their own
+  season-end signal, but league pools still never reach `completed`, so R33 stays 🟡 and open.
+  **R7** annotated: the Crews schema and its writes exist, but no user can reach them, so *"crews with
+  two or more pools"* is still not countable.
+
+*Earlier on 2026-10-02:*
 - **R32** opened 🔴: any pool member can self-promote to admin.
 - **R33** opened 🟡: league pools never finish.
 - **R7** annotated: Crews would make it countable. Its baseline window closed unmeasured.
@@ -106,8 +203,62 @@ late entry save picks? If it can, that is silent wrong data, and R35 moves ahead
 - **R32** annotated: its first proof was invalid for the pool-admin path. It was re-run 8/8 with a
   non-super admin, and the level is unchanged (closed).
 
-**Drift:** the three drift items first listed here (*Friends list*, Decision 5's privacy levels,
-Crew + Season) were all settled the same day. One new finding came out of recording them:
+**Drift, end of day (newest first):**
+- **This document half-recorded Ryan's four settlements, and claimed it had recorded all of them.**
+  The update above says they were *"recorded below and in their sections"*. In the tracked markdown,
+  most of them were not:
+  - Decision 5 had no amendment, and Decision 3's amendment still said *"Surfaced, not resolved"*.
+  - *Migration path* still sat in *Still open* as open, and *Data-model abstraction* still said
+    *"Surfaced, not resolved"*.
+  - *Crews → Where this cuts across* still asked Ryan to rule on four things he had ruled on.
+
+  The commit that claimed to record them, `c4622ef7`, never contained those edits (checked against
+  its tree). The fuller text survives in two places. One is an untracked duplicate,
+  `SPORTPOOL_PROGRAMME 2.md` (17:05), which looks like an iCloud conflict copy. The other is the
+  HTML, which had all of them, so **the view and the source disagreed**. **Restored this pass** from
+  plan §11 (committed `2d848086`), re-verified line by line. Nothing was re-opened and nothing new
+  was decided. The duplicate file is untouched. See *Needs Ryan*.
+- **P4 moved the join route's bare-`pool_id` door. It did not close it.** The lookup now lives in
+  `lib/pools/join.ts:43-56`: the admin client, looked up by `pool_id` or `pool_code`. The route
+  reaches it at `app/api/pools/join/route.ts:22-26`. There is still no `is_private` check
+  (verified). **Its reach grew at 20:48:** since `dcc4f7ef`, a join into a crew pool also makes the
+  joiner a crew member. So once crew pools exist, a bare `pool_id` gets someone into the crew as well
+  as the pool, without the code. That is dormant until the first crew pool. The upside is that P4
+  made `joinPool` the single place to close the door. The `route.ts:27-33` references are stale.
+  They are updated on *Pool privacy: three levels*, the live item. R32 is closed, so its reference
+  stays as the record of what was true then.
+- **The Crews plan contradicts itself about the TypeScript mirror.** §3 says there is none. §7 step 2
+  still says *"SQL + TypeScript mirror, tested against each other on real pools"*
+  (`drafts/2026-10-02_crews_plan.md:354-355`). The code agrees with §3. The plan is not my file, so
+  this is flagged, not fixed.
+- **Two schema notes for step 4. Neither is live yet, because no user can reach a crew write.** This
+  is my reading of `154`. Neither was tested.
+  - **Account deletion skips captain succession.** `app/api/account/delete/route.ts:168-169` deletes
+    the `users` row, and `crew_members.user_id` is `ON DELETE CASCADE` (`154:48`). So a captain who
+    deletes their account simply vanishes. Decision 1's succession rule (*captaincy passes to the
+    longest-standing member*) now exists in `lib/crews/rules.ts` (`163fd3af`), and *leave* applies
+    it in `lib/crews/store.ts` (`dcc4f7ef`). But a cascade calls neither. The plan, the rules and the
+    store never mention account deletion (searched all three). The partial unique index allows a
+    crew with **zero** captains (`154:61-62`). This is the "exit erases" shape that Gate A2 / R12
+    already names, arriving at a new table.
+  - **A crew with a season cannot be hard-deleted.** `pools.crew_id` is `ON DELETE SET NULL`
+    (`154:126`). But Postgres runs referential actions as ordinary updates that fire the referencing
+    table's triggers, and `guard_pool_crew_id` refuses any change away from a non-NULL `crew_id`
+    (`154:160-161`). That fits the design (crews are *closed*, never deleted, `154:36-38`), but the
+    FK clause will never succeed. Whoever writes a support-side delete will hit an error.
+- **Saving a pool as a crew makes it Invite link.** `lib/crews/store.ts` sets `is_private: true` in
+  the same update that sets `crew_id` (`dcc4f7ef`). That is what Decision 3 (amended) and 154's CHECK
+  require, so it is **not** a contradiction. But the building session reports that **84 finished
+  World Cup groups are public**, and for their admins, saving delists the pool from Discover. The
+  save sheet (plan step 6 / web 8a) should say so in plain words. That is a note for the UI, not a
+  decision for Ryan.
+- **Migration 154 cites "Decision 6" and "decision 9"** (`154:16`, `:36`, `:129`). It means the
+  plan's §9 questions #6 and #9. In this document, Decision 6 is *Scoring*, and the never-Public rule
+  lives under *Decision 3 → Amended*. This is cosmetic, but it is a traceability trap.
+
+**Drift, earlier on 2026-10-02:** the three drift items first listed here (*Friends list*, Decision
+5's privacy levels, Crew + Season) were all settled the same day. One new finding came out of
+recording them:
 - **The web invite link itself uses the bare-`pool_id` path.**
   `app/join/[pool_code]/JoinPoolClient.tsx:53` posts `{ pool_id }`, not the code. RN and the web
   Join modal post `pool_code`. So closing the gap by refusing `pool_id` for non-public pools would
@@ -140,6 +291,12 @@ Crew + Season) were all settled the same day. One new finding came out of record
 The full list is under *Multi-sport → Crews → Where this cuts across*.
 
 **Needs Ryan:**
+- **`SPORTPOOL_PROGRAMME 2.md`: delete it or keep it.** It is an untracked, superseded copy of this
+  document. Its only unique content was the settlement text, now restored here. Left in place, it
+  will eventually be read as the programme. It is not mine to delete.
+- **Pushing.** `master` was 15 ahead at the cut, and 17 by 20:54: the Crews plan and its build
+  commits, R32, R34, and the programme updates. Both Crews migrations are already live, and they do not wait on a deploy. The
+  code halves of P4 and P5 reach users only when you push.
 - ~~take the R32 fix.~~ ✅ Done 2026-10-02 (151).
 - ~~**Take R34's writer audit plus the allow-list fix, and say when.**~~ ✅ Done 2026-10-02 (152).
 
@@ -709,7 +866,7 @@ unlanded.**
 | Project | What it is | Status |
 |---|---|---|
 | **Ship what is built** | 225 commits and ~30 migrations sit between `Development` and production, and the schema has moved past the deployed code. **The largest single item in the programme, and it is not a build.** | 🔴 **Blocking everything** (**R21**) |
-| **Multi-sport platform** | Generalise the single World Cup product into a reusable multi-competition platform. Product decisions settled 2026-07-25. **Migration 111 (a pool names one competition) is the first foundation applied**; La Liga is planned (`drafts/2026-08-28_la_liga_plan.md`) and unstarted. **2026-10-02:** Decisions 1, 2, 3 and 5 amended, and Decision 2 clarified (Ryan). **Crews planned, not started** (`drafts/2026-10-02_crews_plan.md`, ~15 days RN + ~1½ web in the same release + ~3½ web day two). Its prerequisite P1 (**R32**) was ✅ **fixed the same day** (migration 151). The same-class **R34** (`pool_entries`, not a Crews prerequisite) was ✅ **fixed that night** as migration 152, so the Crews schema is now migration ~~152~~ **153**. **Pool privacy: three levels** planned as its own item, not started. | 🔵 Designing |
+| **Multi-sport platform** | Generalise the single World Cup product into a reusable multi-competition platform. Product decisions settled 2026-07-25. **Migration 111 (a pool names one competition) is the first foundation applied**; La Liga is planned (`drafts/2026-08-28_la_liga_plan.md`) and unstarted. **2026-10-02:** Decisions 1, 2, 3 and 5 amended, and Decision 2 clarified (Ryan). ~~**Crews planned, not started**~~ **Crews in progress** (`drafts/2026-10-02_crews_plan.md`, ~15 days RN + ~1½ web in the same release + ~3½ web day two). Its prerequisite P1 (**R32**) was ✅ **fixed the same day** (migration 151). The same-class **R34** (`pool_entries`, not a Crews prerequisite) was ✅ **fixed that night** as migration 152. **By the end of the day, P2–P5 and the Crews schema were done:** migration 153 (first lock, finished) and migration ~~152~~ ~~153~~ **154** (the schema), both live on production per the building session. Step 4 (`lib/crews/` + routes) has started. Nothing is user-visible. **Pool privacy: three levels** planned as its own item, not started. | 🔵 Designing · Crews 🔨 building |
 | **Showdown / EPL launch** | H2H duels, persistent rivalries, and the first league season. ⚠️ **Status corrected 2026-09-02: this is BUILT, not designing** — four modes, sealed draw, walkout reveal, duel points on the season leaderboard, recap. It is undeployed, not unbuilt. | 🟡 **Built, ⛔ undeployed** |
 | **The RN league build** | Bring the Expo app to parity with the league product. ⚠️ **Status corrected 2026-09-02: started, and the read half is the part that moved.** The gate was always a read API rather than screens — mobile is direct-to-PostgREST and four league engine tables are deny-all (**R24**). Two server routes now carry the league to the phone: `/api/users/:id/fixtures` (all three match surfaces — Results, Home, match detail) and `/api/users/:id/home-scoring` (the pool card). **Picking is not built for any mode, by decision** (*Decision 14*), and no league *pool* screen exists. | 🟡 **Read half landed, ⛔ undeployed** — see *📱 The RN league build* |
 | **Scale & scoring integrity** | Shadow engine, leaderboard precompute, IO reduction, scoring correctness. | 🟢 In flight |
@@ -779,7 +936,7 @@ segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 | **R4** | ✅ **CLOSED 2026-07-30 — prod-verified. Shadow's podium now uses the derived view.** Was: prod *derives* the podium from completed matches (`lib/podium.ts`) while the shadow bonus SQL still `JOIN`ed `tournament_awards` — the same root cause prod paid ~324k points to fix. **Migrations 027 `tournament_podium_view` (20260727155217) and 028 `shadow_podium_use_view` (20260727160124) are both applied**, and podium bonuses are stored at full strength: `champion_correct` 837 entries / 729,270 pts · `second_place_correct` 738 / 42,740 · `third_place_correct` 167 / 7,470 | 🟠 → ✅ | Was **669 rows / ~324,375 pts** across ~73 pools; 50 changed rank, 13 changed their #1. Now zero | — | ⚠️ **The "latent, not live" reasoning recorded on 2026-07-26 was obsolete in the *opposite* direction and should be read as a warning, not a comfort.** By 2026-07-29 shadow was the read source for **all 623 pools**, so this divergence would have been **live for every member**, not latent. It isn't, only because it was fixed first — two days before the read widening, not because of it | No call recorded; none now needed | *Shadow scoring engine*; *Podium bonus remediation* (✅ Recently shipped). Clears **Node-retirement gate 2** |
 | **R5** | **EPL mid-August is not reachable on current foundations.** Missing: league scoring + bonuses (R2, **in two engines**), matchweek deadlines, **auto round-opening — zero code**, multi-tenant sync (`sync-fixtures/route.ts:67-70` still reads three env globals `API_FOOTBALL_TOURNAMENT_ID` / `_LEAGUE_ID` / `_SEASON`), and **applying migration 024** — the importer itself is already committed (corrected 2026-07-30) | 🟠 | The entire next-season target; Showdown sits behind it | The fixture list, mid-Aug — a fixed external date | None applied | Needs a **scope-or-date** call. Decision 7 already calls auto round-opening "a prerequisite, not polish" — 38 matchweeks × every pool, manually, is not viable | *Showdown / EPL launch* project; *Sync cron is single-tenant*; Decision 7 |
 | **R6** | **Empty-bracket bonus inflation.** An unpredicted group falls through to the FIFA-ranking tiebreaker, so seeded order ≈ reality and near-zero predictors collect the bonuses | 🟠 | **~243,000 pts across 155 entries**; a near-zero predictor earns ~77% of a full predictor's bonus with ~2% of their match points. Retro-fixing demotes ~155 real people (~87 pools move) | Any competition with group standings | None — no "did they predict it" gate in `calculateGroupStandingsBonuses` (re-verified 2026-07-26) | **Accepted / deferred 2026-07-21**, on the condition "fix before the next competition" — **that condition is now due** | *Empty-bracket bonus inflation* |
-| **R7** | **Admin churn is unmeasured.** `/api/admin/stats` has counts (pool admins, avg pool size, deleted accounts) but **no cohort or retention series** | 🟠 | The best-identified growth lever: preventing 20% of admin churn ≈ **+722 players** (Decision 7's table). Not silent-wrongness class — ranks below R1–R3 | Dated, not action-driven: the clean baseline is the **WC→EPL transition**, which is happening now and closes at EPL start. ⚠ **2026-10-02:** that window has **closed unmeasured**, because EPL started in August | None built. ⚠ **2026-10-02:** Crews would make the primary metric (*repeat commissioners*) **countable for the first time**, as *"crews with two or more pools"* (`drafts/2026-10-02_crews_plan.md` §1). Crews are **planned, not started**, so nothing is measured yet and this row stays open at its level | Decision 7 says "instrument admin retention"; nothing exists | Decision 7; *Enhanced super-admin stats*; *Crews* (Multi-sport) |
+| **R7** | **Admin churn is unmeasured.** `/api/admin/stats` has counts (pool admins, avg pool size, deleted accounts) but **no cohort or retention series** | 🟠 | The best-identified growth lever: preventing 20% of admin churn ≈ **+722 players** (Decision 7's table). Not silent-wrongness class — ranks below R1–R3 | Dated, not action-driven: the clean baseline is the **WC→EPL transition**, which is happening now and closes at EPL start. ⚠ **2026-10-02:** that window has **closed unmeasured**, because EPL started in August | None built. ⚠ **2026-10-02:** Crews would make the primary metric (*repeat commissioners*) **countable for the first time**, as *"crews with two or more pools"* (`drafts/2026-10-02_crews_plan.md` §1). ~~Crews are **planned, not started**~~ **Crews are in progress** (end of 2026-10-02): the tables exist (migration 154, live per the building session) and `lib/crews/store.ts` writes them, but no user can reach a write yet, so nothing is measured and this row stays open at its level | Decision 7 says "instrument admin retention"; nothing exists | Decision 7; *Enhanced super-admin stats*; *Crews* (Multi-sport) |
 | **R8** | **The feedback survey is past its own time box, and was held on a blocker that has cleared.** All four fixes are on `origin/master` as of 2026-07-25 | 🟡 | 477 admins + 3,652 players; response quality decays with distance from the final (16 Jul) | Already triggered — the stated window was "~1 week of the final", i.e. ~23 Jul | Code fixes verified in the repo; **deploy status is prod state, unverified** | Send-or-drop is Ryan's | *Post-tournament feedback surveys — send them* (🔥 Now) |
 | **R9** | **Repo lives in iCloud-synced `~/Documents`.** Now **18** duplicate artifacts on disk, including `.git/index 2` through `.git/index 7` | 🟡 | Local only — **but** it can flip a byte in tracked source, which can then be committed and pushed | Any build or git operation while iCloud syncs | Workaround only (clean `npm ci` in a throwaway worktree; scan `git diff` for null bytes) | Known; ~1 hour to move the repo — not done. ⚠ **Scope corrected 2026-09-02:** the `upload-logo` FormData build failure long attributed to this row is **not** iCloud — it is the root `tsconfig.json` pulling `mobile/**` into the web type program (**R29**). What *is* still this row: `.next/types/routes.d 3.ts` is in the program today and produces five duplicate-identifier errors | *iCloud corrupts the local checkout* (🧹 Housekeeping); **R29** |
 | **R10** | **The archive decision conflicts with the shipped schema.** Migration 025b constrains `pools.status` to `('open','completed')`, so an `archived` state is impossible without another migration; today's "Archive Pool" button just sets `completed` | 🟡 | Blocks "a reversible archive that keeps history" as specified — the replacement R1 depends on | Implementing the archive decision | None — needs either a migration or a ruling that archive *means* `completed` | Unrecognised conflict; needs a ruling before R1's proper fix is built | Decision 7 *"Archive, not delete"*; *"Delete Pool" destroys…* |
@@ -802,7 +959,7 @@ segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 | **R30** | **A fixture played before the placeholder date we hold for it is unreachable by every sync arm — fix built, NOT deployed.** ⚠️ **New 2026-09-19, verified in code and production.** Providers publish TBD placeholder kickoffs (La Liga: Sunday 15:00Z) and move the game later. The live sync and its hourly catch-up build the provider request from the **stored** kickoff (`lib/integrations/apiFootball/syncLeagueFixtures.ts`), and the daily reconcile reads only kickoffs **ahead** of the live window (`reconcileLeagueSchedule.ts:127`) — so once the placeholder date passes, a game played *before* it is asked for at the wrong date every tick, logged `stale=N unmatched=N` at `ok: true`, and never scored. With `league-reconcile` unscheduled until tonight, **202-ish placeholders across five leagues sat unreconciled; 111 fixtures in production now carry a kickoff earlier than their original**. Seven fixtures went unscored this way — five La Liga MW5, Lazio–AC Milan, Monaco–Lens — six of them for **7 days**. **Fix:** `fc23239` adds step 3b — a stray the day feed did not carry is fetched **by id** (`getFixturesByIds`, `client.ts:242`), which knows no date, and drops into the ordinary diff so the real kickoff lands with the score; note gains `stray_by_id=fetched/asked`; tests V3.13–V3.15, file 60/60 green | 🟠 | **Every league pool, every mode** — an unscored fixture is a silently wrong leaderboard, duel and LMS round for as long as it lasts. Tonight: 7 fixtures × every pool holding them, for a week. Now recovered (all seven `completed_at = 22:19:46Z`) | **One provider reschedule to an earlier day** after the daily reconcile has run for that day — or any provider whose placeholder date passes before the reconcile first sees it. La Liga does this every week | **Half.** The daily reconcile is now scheduled (135), which catches a move while the placeholder is still in the future. The by-id fallback that catches the rest is **committed locally and unpushed** — the scheduled sync is running the *old* arm. Manual recovery recipe exists: `scripts/run-league-sync.ts` from the local checkout (`6eb14e4` made it loadable again) | ⏳ **NEEDS RYAN — push + deploy `fc23239`.** Pushing `master` is a production deploy and is his call every time | *Decision 10 → L11 / league-reconcile*; *League ingestion*; **R21** |
 | **R31** | **The outbox has no age guard — a backlog, once drained, is delivered as if it were fresh.** ⚠️ **New 2026-09-19, incident already happened.** `app/api/cron/league-outbox/route.ts` claims every pending event and hands each notification kind to `sendLeagueNotice` with no check on `created_at`. The first scheduled drain at **21:52 UTC** processed **38 `matchweek_completed` events from MW2, MW3 and MW4** (created 31 Aug, 6 Sep, 14 Sep — oldest 19 days). `notify.ts:110`'s allowlist (pickem + showdown only) skipped the Table, LMS and null-mode pools, leaving **7 pools / 20 events**: *Showdown Duels* (10 members), *Matchweek Pick'em* (10), *Showdown: Exact Scores* (7), *Pick'em: Exact Scores* (4), *Premier League 2026/2027 Pool* (3), *Test La Liga* (1), *Ligue My Crack* (1) — three stale "Matchweek N is scored" emails each for the first five. ≤104 emails to **≤16 distinct users**, most of them the UX test accounts; only 1 of those users holds a push token. ⚠ **Delivery is unverified** — there is no send-log table and the Vercel runtime log was not readable from this session; the code path sends unconditionally | 🟡 | Trust, not data. Members of the one real-looking pool may have received three weeks of stale recaps in one minute. It recurs on any future backlog: an outage, a disabled `league_outbox_enabled`, a failed deploy | **Any gap in the `*/2` job longer than a matchweek**, followed by its resumption | **None.** The route's own comment prefers *"a missed notification over a repeated one"* — the same principle argues for dropping a stale one. Fix shape: skip-and-mark any notification event older than N hours (fixture/cache events are harmless to replay). Small; not started | ⏳ **NEEDS RYAN** — set N, or say stale sends are acceptable. Disclosure-gate note: *"we tell you how you did when a matchweek finishes"* passes; *"…in a batch, three weeks later"* does not | *Pick'em season → The outbox is never drained*; **R30** |
 | **R32** | ✅ **CLOSED 2026-10-02: migration 151 is applied to production, and the self-promotion is shut.** `lib/migrations/151_a_member_cannot_crown_themselves.sql`, commit `6c51140c`. The commit is **local, not pushed**, and needs no deploy, because the whole fix lives in the database. It is applied as `schema_migrations` version **20261002214554**. **The hole was proven on production before the fix**, inside a rolled-back transaction. A real player in a finished pool PATCHed their own row: `rows=1`, `role` became `'admin'` and `is_pool_admin()` returned true. Nothing persisted (151 header `:13-14`). **The fix** (`:63-121`, read this pass) is a BEFORE UPDATE trigger, `guard_pool_member_privileges()`. **(a)** The service role (`auth.uid()` null) and super admins pass. **(b)** Nobody else may change `member_id`, `pool_id`, `user_id` or `joined_at`. **(c)** A pool admin keeps role and fee control over their own pool. **(d)** Anyone else may change only `has_seen_how_to_play` and `last_read_at`. That is an **allow-list**, so a column added later is protected by default. The client INSERT policy *"Users can join pools"* is **dropped** (`:121`), because every real join is `POST /api/pools/join` on the service role. Was: any member could make themselves their pool's admin with one PATCH. *"Users can update own membership"* had no `WITH CHECK`, `authenticated` held UPDATE on `role`, and no trigger guarded the column. A direct client insert could also join a private pool as admin | 🔴 → ✅ | Was: **every pool**, open to any of ~4,841 accounts with one call. **Now closed on the RLS path.** ⚠ **Whether it was used before the fix is UNKNOWN, and cannot be recovered.** 70 admin rows across 48 pools are not the pool's creator. Most are presumably real co-admin promotions, but nothing records who promoted whom, so a self-promotion looks the same | — | ✅ **Verified.** `scripts/verify-pool-member-guard.sql` runs 8 scenarios in a block that always rolls back (read this pass). Four are **blocked**: self-promote, self fee-paid, an admin moving a member to another pool, and a direct insert as admin. Three still **work**: a member's own read-state, an admin promoting, and the service role. A player demoting the admin touches 0 rows. **8/8 on production, and the live `prosrc` is byte-identical to the file.** ⚠ **Corrected 2026-10-02, later that night: the first 8/8 proved less than it said.** Its pool admin was also a super admin, and super admins pass 151 by design (`:72`). So *"an admin promoting"* passed for the wrong reason, and the pool-admin rule was not actually exercised. The script now requires a **non-super** admin (`scripts/verify-pool-member-guard.sql:9-11, :35-36, :46`; the player was already non-super, `:41`; read in `bd7a7bb5`). It was **re-run 8/8 against 151 on 2026-10-02, on pool `cc9692e3…`** (fixing session). Checked in the tree this pass: both client-side `pool_members` self-writes are in the allow-list (`app/pools/[pool_id]/PoolDetail.tsx:648` writes `has_seen_how_to_play`; `mobile/lib/usePoolBanter.ts:579` writes `last_read_at`). Every `pool_members` insert in the tree runs on the admin client (join, create, branded-pools). The two exceptions are the super-admin paths in **R34**'s note, which never worked. ⚠ **What this does NOT close:** **(1)** The join route's bare-`pool_id` door (`app/api/pools/join/route.ts:27-33`: admin client, no `is_private` check). It stays with **Pool privacy: three levels**, as recorded earlier the same day. **(2)** The same hole, one table over, on `pool_entries`. That is **R34**, ✅ closed that night by 152 | **Discharged by the fix; no open call.** ⚠ The production facts in this row (the pre-fix proof, the version, both 8/8 runs, `prosrc`, 70/48) come from the fixing session. This pass read the migration, the verify script and the commit, and **did not re-query production** | **Crews → P1 ✅**; migration **145**; **R34**; **Pool privacy: three levels** (the join route's door) |
-| **R33** | **League pools never reach `status = 'completed'`.** ⚠️ **New 2026-10-02**, found in Crews planning (P3), verified in code this pass. `lib/auto-archive.ts` completes a pool when every `matches` row for its tournament is complete, and requires `totalCount > 0` (`:37-55`). League fixtures live in `league_fixtures`. A league tournament has **zero** `matches` rows, so it never qualifies, and every league pool stays `open` forever. The real season-end signal already exists: a row in `league_standings_final` | 🟡 | All league pools (the plan counts 20). **Nothing is wrong today**, because no league season has ended and `open` is the correct state. From the first season end (late May 2027), every league pool will claim to be running when it has finished. That affects anything keyed on completion, including the Crews *"Keep this group together?"* prompt and the crew page's *Playing now / Past seasons* split | The first league season ending | **Planned, not built:** Crews **P3** adds `pool_finished_at(pool_id)`. It returns `status='completed'` for the World Cup, and the `league_standings_final` snapshot for leagues. Nothing else reads it yet | **New — no call needed**; it's a defect. Levelled 🟡: no data loss, and the date is ~8 months out. It rises to 🟠 if anything else starts keying on `completed` before the fix | **Crews → P3**; **R10** (`pools.status` is CHECK-constrained to `open`/`completed`) |
+| **R33** | **League pools never reach `status = 'completed'`.** ⚠️ **New 2026-10-02**, found in Crews planning (P3), verified in code this pass. `lib/auto-archive.ts` completes a pool when every `matches` row for its tournament is complete, and requires `totalCount > 0` (`:37-55`). League fixtures live in `league_fixtures`. A league tournament has **zero** `matches` rows, so it never qualifies, and every league pool stays `open` forever. The real season-end signal already exists: a row in `league_standings_final` | 🟡 | All league pools (the plan counts 20). **Nothing is wrong today**, because no league season has ended and `open` is the correct state. From the first season end (late May 2027), every league pool will claim to be running when it has finished. That affects anything keyed on completion, including the Crews *"Keep this group together?"* prompt and the crew page's *Playing now / Past seasons* split | The first league season ending | ~~**Planned, not built:**~~ **A workaround for Crews, applied 2026-10-02. It is NOT a fix for R33.** Crews **P3** is migration `153_a_pool_knows_when_it_locks_and_ends` (`bc02a1b0`, applied per the building session). Its `pool_finished_at(pool_id)` uses `status='completed'` for the World Cup and the `league_standings_final` snapshot for leagues (`153:92-102`, verified), so **Crews do not depend on R33.** League pools **still never reach `completed`**: `lib/auto-archive.ts` is untouched. Anything else that keys on `completed` still sees every league pool as running. The function is service-role only, and **no TypeScript calls it yet** (verified) | **New — no call needed**; it's a defect. Levelled 🟡: no data loss, and the date is ~8 months out. It rises to 🟠 if anything else starts keying on `completed` before the fix | **Crews → P3**; **R10** (`pools.status` is CHECK-constrained to `open`/`completed`) |
 | **R34** | ✅ **CLOSED 2026-10-02: migration 152 is applied to production, and a member can no longer write their own score.** `lib/migrations/152_a_member_cannot_score_themselves.sql`, commit `bd7a7bb5`. The commit is **local, not pushed**, and needs no deploy, because the whole fix lives in the database. It is applied as `schema_migrations` version **20261002231437**. **The fix** (read this pass) is an allow-list trigger, `guard_pool_entry_writes()`, on **BEFORE INSERT OR UPDATE** (`:75-178`), built from an audit of every writer (`:28-43`). **(a) Trusted writers pass untouched** (`:95`). That means anything not running as `authenticated` or `anon`: the service role, migrations, and SECURITY DEFINER functions such as `lite_recalc_entry`. Super admins pass too. ⚠ "Trusted" is `current_user`, **not** `auth.uid()` as in 151. An admin's adjustment calls `lite_recalc_entry`, a DEFINER function, which must still re-derive totals and ranks. That is why the trigger itself is SECURITY INVOKER (`:45-54, :78`). It also means **any future SECURITY DEFINER writer is trusted**, so it must derive what it writes and never take a value from its caller (`:50-51`). **(b) A member, own entry:** `entry_name`, `last_recap_seen_at`, `last_reveal_seen_duel`, `predictions_last_saved_at`, `has_submitted_predictions` (false → true only, `:147-153`) and `predictions_submitted_at` (`:82-84`). **(c) A pool admin, any entry in their pool:** all of those, plus `fee_paid`, `fee_paid_at`, `point_adjustment`, `adjustment_reason`, and unlock (`:85-88`). **(d) Totals, ranks, retire, lock and identity** are for trusted writers only (`:117-126, :155-160`). It is an allow-list, so a column added later is protected by default. **(e) The tiebreak time belongs to the server.** `predictions_submitted_at` is stamped `now()` the first time it is set and never moves after; only an admin unlock clears it (`:132-144`). It is coerced rather than refused, so no released app breaks. **(f) A member's insert starts clean** (`:99-114`). Every scoring, fee, lock, retire and marker column is reset, and `pool_id`/`user_id` are re-derived from the membership. The trigger is named to sort before `trg_fill_pool_entry_identity` (`:174`). **(g)** The member DELETE policy *"Users can delete own entries"* is **dropped** (`:182`), so leaving goes only through 056's soft-delete doors. *Was:* one PATCH let any member set their own `point_adjustment`, which `shadow_finalize_totals` folds into the total members see, or their own total, rank, fee, retirement or lock. A member could also insert a loaded entry claiming any pool, or hard-delete their own. A pool admin could rewrite any total outside the logged adjustment trail. The full pre-fix analysis (which readers were reachable and why) is this row as of `f8c7ac62` | 🔴 → ✅ | Was: **every non-archived pool**, any member, one call, and it reached the score. **Now closed on the RLS path.** **No evidence of past use** (fixing session, production; 152 header `:24-26`). All **164** entries with a non-zero adjustment match the `point_adjustments` log, which only pool admins can write. Every stored `scored_total_points` equals match + bonus + adjustment. No `predictions_submitted_at` is in the future. ⚠ That is "no evidence", not proof. The log check cannot see an admin who logged a self-serving adjustment, and until 151 anyone could become admin. **12 positive self-adjustments (+887 pts) in 4 pools were made by admins who are not the pool's creator.** They are plausibly real co-admins. They were **not reviewed, by Ryan's decision** (2026-10-02), which is recorded as a decision, not an open action | — | ✅ **Verified.** `scripts/verify-pool-entry-guard.sql` runs **17** scenarios (M1–M11, A1–A5, S1) in a block that always rolls back (read this pass). **Blocked:** a member's own points, total and rank, retire, fee, lock and un-submit, and a pool admin rewriting a total directly. **Allowed:** a member's rename, read markers and save; a pool admin's adjustment, fee and unlock; `lite_recalc_entry` after an adjustment (total = parts); the service role. A member's backdated submission time is kept unchanged. A resubmit after unlock with a 2020 device time is stamped with server time. A loaded insert claiming another pool lands clean in the member's own pool. A hard delete, and a write to someone else's entry, touch 0 rows. The subjects are chosen so the pool admin is **not** a super admin (`:7-13, :42-44, :53-55`), which is the trap R32's first run fell into. **17/17 on production, and the live `prosrc` is byte-identical to the file** (fixing session). **Checked in the tree this pass: every session-client writer stays inside its role's allow-list.** That covers every writer listed when R34 opened, plus `mobile/lib/useCeremonyMarkers.ts:145` (read markers), which that list missed. The writers that need more run on the admin client: scoring (`lib/scoring/recalculate.ts:70`), auto-submit (`lib/auto-submit.ts:30`), join (`app/api/pools/join/route.ts:15`), create (`app/api/pools/create/route.ts:68`) and the unlock route (`app/api/pools/[pool_id]/predictions/unlock/route.ts:56`). ⚠ That `create_pool_entry` and `save_predictions_batch` are SECURITY INVOKER (`:52-53`) is the fixing session's catalog read. `save_predictions_batch` is defined in no repo migration. **✅ The device-clock tiebreak is closed, with no app release.** `mobile/lib/usePredictions.ts:313-315` still sends `new Date()`, and the trigger replaces it with server time. One consequence, verified in the tree and intended: the web full-submit routes (`predictions/route.ts:544`, `bracket-picks/route.ts:250`) used to re-stamp the time on every submit. Now the first stamp holds, which is the rule `predictions/round/route.ts:195-196` already stated. ⚠ **What this does NOT close:** **(1) R35.** The RN app adds entries directly, skipping `create_pool_entry`'s deadline and max-entries checks (`:65-68`). **(2)** `lite_recalc_entry` and `snapshot_pool_ranks` are executable by any signed-in user (`:69-70`). Neither takes a value from its caller, so neither can tamper; at worst they cause extra writes. 🟢-class, not numbered. It was already written into `lite_recalc_entry`'s own function comment (`047_lite_recalc_entry_revoke_public.sql:94`: *"any authenticated user can re-rank any pool by id"*), and no item here carried it. **(3) The super-admin session-client defect, corrected this pass.** The `pool_members` half stands. Super-admin *transfer admin*, *change role* and *add member* (`app/api/admin/pools/[id]/actions/route.ts:141, :410, :605`; `app/api/admin/users/[id]/actions/route.ts:214, :506`) write through the session client. No super-admin UPDATE or INSERT policy exists on `pool_members`, so they **do nothing, silently** (151 `:57-61`). 🟡-class: operator tooling only. ⚠ **The `pool_entries` half was probably recorded wrong.** `044_archived_pools_read_only.sql:147` (and `:21-27`) says a super-admin `FOR ALL` policy, *"Super admins can manage entries"*, exists and was left in place on purpose. No repo migration creates it, which is why the earlier search missed it. If it is live, the seven super-admin `pool_entries` writes (`pools/[id]/actions/route.ts:522, :717, :764, :914, :946`; `users/[id]/actions/route.ts:286, :367`) have always landed, and 152 still lets them through. Not checked live. **(4) Not traced.** 152 still lets a member set `has_submitted_predictions`, and a pool admin set `point_adjustment`, on a **league** entry by direct PATCH. Those are the two columns the league containment says must never be set on a league entry (*Premier League 2026/27 → What was deliberately deferred*). 152 narrowed that door and did not widen it. What a set value does to a league entry was not checked | **Discharged by the fix.** **Decided 2026-10-02 (Ryan): the 12 non-creator self-adjustments (+887, 4 pools) are not reviewed.** ⚠ These production facts come from the fixing session: the version, 17/17, `prosrc`, the 164-entry ledger check and 12/+887/4. This pass read the migration, both verify scripts and the commit, and **did not re-query production** | Migrations **145**, **151**; **R32**; **R17** (the ledger check); **R12** (`retired_at`); **R35** |
 | **R35** | **The RN app adds entries without the deadline and max-entries checks, and the deadline half needs no crafted call.** ⚠️ **New 2026-10-02**, from R34's fix (152 header `:65-68`), refined this pass. `mobile/lib/usePoolEntries.ts:176-178` inserts into `pool_entries` directly. That skips `create_pool_entry`, the RPC that refuses a passed deadline and a full allowance (`lib/migrations/005_create_pool_entry_rpc.sql:44-52`). The web goes through the RPC (`app/api/pools/[pool_id]/entries/route.ts:78`). **The RN screen gates the count but not the deadline** (`mobile/components/pool-detail/PredictionsTab.tsx:314`: `canAdd = entries.length < maxEntriesPerUser`, with no deadline term; verified). So *Add Entry* works after the deadline in the shipped app. Only the tier cap limits the count, and only in enforced pools (075). Since 152, a member-inserted entry starts with `predictions_locked = false` (152 `:105`). The `predictions` write policies check only `predictions_locked` and archive status (`041_pool_archive_policies.sql:70-95`) | 🟡 (provisional) | Any pool with a prediction deadline, any member, from the RN app. **Dormant now:** the World Cup closed on 16 Jul, and no deadline-shaped competition is known to be running (not checked in production). League pool settings force one entry per member (`mobile/components/pool-detail/SettingsTab.tsx:217`), so the count case there needs a direct insert. ⚠ **Not traced:** whether a post-deadline entry can then save picks for fixtures not yet kicked off. The RLS read suggests it can; the per-fixture kickoff trigger still blocks started ones. If it can, that is hindsight picking that reaches the leaderboard, which makes it silent wrong data: 🟠 at least | Tapping *Add Entry* in the RN app after the deadline, or a direct `pool_entries` insert beyond the allowance | **None applied, not scoped.** The fix could route RN's *Add Entry* through `create_pool_entry` as the web does, or enforce both checks in the database. Recorded, not chosen | **No call yet.** The fixing session called it *"product logic, not score integrity — separate item"*. It is levelled 🟡 rather than 🟢 here because the deadline half is reachable from the shipped UI. The level stays provisional until the trace above is done | **R34**; migrations **005**, **075**, **152**; *Mobile* |
 
@@ -3024,10 +3181,18 @@ Crew membership is consent to the **group**, not to every **competition**.
   - The "Who can join" switch is hidden once a crew is picked, and the Settings Visibility toggle is
     hidden for crew pools.
   - Sharing the link still brings people into the crew.
-  - ⚠ The constraint is **planned** (migration ~~`151_a_crew_is_who_played`~~
-    ~~**`152_a_crew_is_who_played`**~~ **`153_a_crew_is_who_played`**, renumbered twice on 2026-10-02:
-    151 went to R32's fix and 152 to R34's) and **not built**. The newest migration in
-    `lib/migrations/` is 152, R34's fix, which is not crews work.
+  - ~~⚠ The constraint is planned (migration 151, then 152, then 153 `_a_crew_is_who_played`,
+    renumbered as 151 went to R32's fix and 152 to R34's) and not built.~~ ✅ **Live since 2026-10-02 as
+    `pools_crew_pool_is_private`**, in migration **`154_a_crew_is_who_played`**
+    (`lib/migrations/154_a_crew_is_who_played.sql:132-133`, verified; applied `20261002233759` per
+    the building session; commit `20d4740f`). It was renumbered a third time because 153 went to
+    Crews P2 + P3. As built it reads `crew_id IS NULL OR is_private IS TRUE`. It uses `IS TRUE`
+    because `is_private` is nullable, and a NULL would pass a plain CHECK. No pool has a crew yet. The
+    two UI hidings above are **not built** (step 6 and later).
+  - **Refined 2026-10-02, later the same day (Ryan; plan §9 #6 and §11 #2):** "always Private" meant
+    **never listed**. Today, with two levels, that is `is_private = true`. Once the strict level exists
+    (*Decision 5 → Amended 2026-10-02*), a crew pool may be **Invite link** (the default) or
+    **Private** (request to join, and crew members skip the queue). It is **never Public**.
 - **The "Unlisted" wording in the concept mock was wrong.** It appears at
   `mobile/app/crews-concept.tsx:457` (*"Unlisted · anyone with the link"*, verified). Privacy today is
   one boolean, `is_private`:
@@ -3035,11 +3200,14 @@ Crew membership is consent to the **group**, not to every **competition**.
   - **Private** means joining by code or link only.
   - New pools default to Private (`app/api/pools/create/route.ts:348`, `is_private ?? true`).
   - Verified this pass.
-- ⚠ **This cuts across Decision 5. Surfaced here, not resolved.** Decision 5 names **three** states:
+- ~~⚠ **This cuts across Decision 5. Surfaced here, not resolved.**~~ Decision 5 names **three** states:
   *private · unlisted (the default) · listed*. The schema has **two**. What the product calls
   **Private** (join by code or link, never in Discover) behaves like what Decision 5 calls
   **unlisted**. Decision 5's stricter *private* does not exist. So "always Private" here means
-  `is_private = true`. Whether Decision 5's third state is still wanted is Ryan's call.
+  `is_private = true`. ~~Whether Decision 5's third state is still wanted is Ryan's call.~~
+  ✅ **Settled 2026-10-02 (Ryan): three levels are kept, and the strict one is to be built** as its own
+  item. See *Decision 5 → Amended 2026-10-02*. *(Restored to this file at the end of the day. It was
+  in the HTML but had dropped out of the markdown. See *Where this stands → Drift, end of day*.)*
 
 ### Decision 4 — Sport filters, tournament ranks
 
@@ -3062,10 +3230,43 @@ Crew membership is consent to the **group**, not to every **competition**.
 - **Honest state on every card** — *"Opens 8 Aug · 12 joined"* / *"Live · matchweek 3"* / *"Closed"*.
 - **Three-way privacy:** private · **unlisted** *(stays the default)* · **listed** (opt-in).
   ⚠ **2026-10-02:** the schema has two states, not three (`pools.is_private`). Today's "Private"
-  behaves like *unlisted* here. Surfaced, not resolved: see *Decision 3 → Amended 2026-10-02*.
+  behaves like *unlisted* here. ~~Surfaced, not resolved: see *Decision 3 → Amended 2026-10-02*.~~
+  ✅ Settled the same day: see *Amended 2026-10-02* below.
 - **Report path + fast unlist** — a listed pool is content published under our logo.
 - **Official SportPool pools per major competition** — always live, guaranteed-good first experience
   for a crewless user, and a controlled surface for testing formats. Branded-pool machinery exists.
+
+#### Amended 2026-10-02 (Ryan): three levels kept, and the strict one gets built
+
+> The text above stays as written. Where the two differ, **this amendment governs.** Source:
+> `drafts/2026-10-02_crews_plan.md` §11 #2 and §9 #6, committed `2d848086`.
+>
+> *Restored to this file at the end of 2026-10-02.* It was recorded that afternoon and shown in the
+> HTML, but it never reached the committed markdown (`c4622ef7`). Re-verified against plan §11 #2.
+> Nothing in it is new.
+
+- **Three levels, kept.** These are their names in the app:
+
+  | In the app | Decision 5's word | Who can join | In Discover | Exists today? |
+  |---|---|---|---|---|
+  | **Public** | listed | anyone | yes | yes: `is_private = false` |
+  | **Invite link** | unlisted *(the default)* | anyone with the code or link | no | yes: it is today's "Private", **relabelled, with behaviour unchanged** |
+  | **Private** | private | **request to join**; the pool admin lets them in | no | **no** |
+
+  New pools already default to Invite link: `app/api/pools/create/route.ts:348`, `is_private ?? true`
+  (re-verified at the end of 2026-10-02).
+- **How the strict Private works:**
+  - Someone holding the link sees *"Request sent"*.
+  - The pool admin gets *"Sam wants to join · Let in / No"* in **Activity → Needs you**.
+  - **Crew members skip the queue.** Their held seat lets them in.
+- **Crew pools may be Invite link (the default) or Private, never Public.** This refines Crews
+  decision 6 (*Decision 3 → Amended 2026-10-02*): "always Private" meant **never listed**. Today, with
+  two levels, that is `is_private = true`, and since migration 154 the database enforces it.
+- **The strict level is its own backlog item, not part of the Crews build:** *Pool privacy: three
+  levels* (*Foundational work items*, below). It is planned and not started. **The join route's
+  bare-`pool_id` gap is closed in the same work**, cross-referenced to **R32**.
+- **The schema today is one boolean, `is_private`**, so this needs a visibility column or enum. Its
+  design belongs to that item.
 
 ### Decision 6 — Scoring: one canonical scale, presets, locked at kickoff
 
@@ -3796,11 +3997,25 @@ The full rule, now written down once:
 - **The breakthrough threshold** for out-of-sport events — instinct is deliberately high; the moment
   it fires often it stops working.
 - **Discover ranking weights** — signals agreed, formula not.
-- **Migration path** from today's `pools` table to Crew + Season without disturbing 622 live pools.
+- ~~**Migration path** from today's `pools` table to Crew + Season without disturbing 622 live pools.
   Biggest unknown in the project. ⚠ **2026-10-02:** the Crews plan (§10) builds crews **beside**
   today's pools through `pools.crew_id`, and leaves existing pools (the plan counts 643) alone until an
   admin chooses to save one. If that is built, crews no longer depend on this question. That design is
-  the plan's, though, and it is **not one of Ryan's nine decisions**, so this stays open.
+  the plan's, though, and it is **not one of Ryan's nine decisions**, so this stays open.~~
+  ✅ **Settled 2026-10-02 (Ryan): there is no migration.** Ryan adopted the plan's design and closed
+  the question (plan §10 and §11 #3, committed `2d848086`):
+  - crews sit **alongside** pools, through `pools.crew_id`;
+  - **a pool is a season**;
+  - the 643 existing pools are **not migrated**, and are untouched until an admin chooses to save one;
+  - crewless pools stay **first-class**;
+  - anything that must one day belong to the crew rather than a pool becomes a **column on `crews`**:
+    an addition, not a restructure.
+
+  *Why it closed:* the question assumed a Crew + Season model would **replace** `pools`. Under this
+  design nothing is replaced, so there is nothing to migrate. **Built that way the same night:**
+  migration 154 adds `pools.crew_id` and leaves every existing pool's `crew_id` NULL (per the
+  building session). *(Restored to this file at the end of 2026-10-02. It was in the HTML but had
+  dropped out of the markdown.)*
 - **What `predictions_submitted_at` means in a 38-week season** (Decision 9, rung 5). In the World Cup
   one bracket was submitted once, so *"earliest"* meant *committed earliest*. Across 38 matchweeks it
   can only mean *joined and picked first*. Still deterministic and fair — but it is a different claim
@@ -3825,16 +4040,20 @@ The full rule, now written down once:
 - **League ingestion (Premier League)** `Multi-sport` 🔥 — ⚠️ **status corrected 2026-07-30.** Migration `024_multi_competition_league_support.sql`, `lib/integrations/apiFootball/importLeagueSeason.ts` and `scripts/import-league-season.ts` are ~~drafted~~ **committed and tracked on `origin/master`** (`b80395e`) — but **024 is not applied to production**. What keeps a league pool from existing at all is therefore **not** the repo: it is the prod CHECK constraints, `tournaments_tournament_type_check` = `('world_cup','euros','copa_america')` and `matches_stage_check` with no `regular_season`. ⚠️ **A league pool scores zero today, silently — two bugs, gate first, and in both engines.** **(1) The gate:** `checkKnockoutTeamsMatch` ([lib/scoring/core.ts:88](lib/scoring/core.ts)) returns `true` only for `'group'` or when teams aren't set; a `'regular_season'` fixture is neither — it has real teams from day one and there is no `shadow_entry_bracket`/`knockoutTeamMap` row to match them against — so it falls to `return false` and [core.ts:142](lib/scoring/core.ts) returns `miss`. The **live shadow SQL has the identical shape** (`WHEN stage <> 'group' AND NOT teams_match THEN 'miss'`), and shadow is what members read. **(2) Behind the gate, the prices:** `isGroupStage` selects the point values ([core.ts:153-155](lib/scoring/core.ts); shadow `CASE WHEN m.stage='group' THEN group_exact_score ELSE knockout_exact_score END`), so every league fixture is billed at **knockout** rates. Fixing the price without the gate changes nothing; fixing Node without shadow changes nothing a member sees. Importing fixtures is **not** the last step before a working league pool. ⚠ **2026-09-19:** this row is 2026-07-30 text; league ingestion has since shipped on its own `league_*` tables across five leagues. Tonight's changes in this area — the four league crons scheduled (135), the placeholder-kickoff strand found and half-fixed (**R30**, deploy owed), the stale-event replay (**R31**) — are recorded under *Decision 10 → league-reconcile* and in *Where this stands → 2026-09-19*.
 - **Team advancement is single-tournament** `Multi-sport` 🔒 **(added 2026-07-26 — R16)** — `app/api/admin/advance-teams/route.ts:56` reads `matches`, `teams` and `match_conduct` **tournament-wide with no scope**, because the advancement cascade was written for one competition. With a second competition present, unscoped `matches` would resolve knockout placeholders **across** competitions, and unscoped conduct is capped at 1,000 rows by PostgREST. Carries a blocker comment in-file. The fix is not a query change — it means deriving the tournament from `match_id` (or taking it as a parameter) and threading it through the cascade. **Must land before a second competition is ingested**, i.e. before 024 is applied.
 - **Sync cron is single-tenant** `Multi-sport` — competition comes from three env globals (`app/api/cron/sync-fixtures/route.ts:67`). Looping over active tournaments (reading `external_league_id`/`external_season` per row, which 024 backfills) is the unlock for N competitions. WC = api-football league 1; EPL = league 39.
-- **Data-model abstraction** `Multi-sport` — competition-instance model, now also carrying Crew + Season (Decision 1). Everything else depends on it. ⚠ **2026-10-02:** the Crews plan does **not** depend on this. It adds crews beside `pools` (`pools.crew_id`) rather than through a Crew + Season model. Surfaced, not resolved; see *Crews* below.
+- **Data-model abstraction** `Multi-sport` — competition-instance model~~, now also carrying Crew + Season (Decision 1)~~. Everything else depends on it. ~~⚠ **2026-10-02:** the Crews plan does **not** depend on this. It adds crews beside `pools` (`pools.crew_id`) rather than through a Crew + Season model. Surfaced, not resolved; see *Crews* below.~~ ✅ **2026-10-02 (Ryan): Crew + Season is no longer part of this item.** Ryan adopted the Crews plan's design. Crews sit **alongside** pools through `pools.crew_id`, and **a pool is a season**. The 643 existing pools are not migrated, and crewless pools stay first-class. Anything that must one day belong to the crew becomes a column on `crews`: an addition, not a restructure. So Crews do not depend on this item, and what remains is the competition-instance half. ⚠ *"Everything else depends on it"* is 2026-07-25 text. League pools have since shipped on their own `league_*` tables without it. That claim was not re-audited. *(Restored to this file at the end of 2026-10-02; it had dropped out of the markdown.)*
 - **Pool template system** `Multi-sport` — formats as named presets carrying their own scoring (Decision 3).
 - **Sports-data ingestion** `Multi-sport` — pluggable fixtures/results/standings layer behind a provider interface.
 - **Per-competition email cadence** `Multi-sport` — schedules per competition instead of global crons.
 - **Competition catalog & lifecycle** `Multi-sport` — catalog, season rollover, clone-from-last-year. Date-computed state chips, **never authored** (Decision 4).
 - **Per-competition branding** `Multi-sport` — theme/copy per sport. (The existing `branded-pools` feature is per-**pool** white-label — a different axis.)
 - **Monetization model** `Multi-sport` — free vs freemium vs paid. Tracked under 💎.
-- **Crews** `Multi-sport` `Feature` `Mobile`: planned 2026-10-02, not started. Full item below.
+- **Crews** `Multi-sport` `Feature` `Mobile`: planned 2026-10-02. ~~not started~~ **In progress since
+  the same day:** P1–P5 and the schema (154) are done, and step 4 has started. Full item below.
+- **Pool privacy: three levels** `Multi-sport` `Feature` `Mobile`: planned 2026-10-02, not started.
+  Decision 5's strict *Private* (request to join), built on its own and not inside Crews. Full item
+  below.
 
-### Crews: a crew is who played `Feature` `Multi-sport` `Mobile` — 📋 planned, not started
+### Crews: a crew is who played `Feature` `Multi-sport` `Mobile` — 🔨 in progress (P1–P5 + schema done; step 4 under way)
 
 - **Is:** Decision 1's durable group, built. You're in a crew because you played in one of its pools,
   or because you said yes when its captain added you.
@@ -3846,7 +4065,10 @@ The full rule, now written down once:
     remind you once. Leave anytime."*
 - **Plan:** `drafts/2026-10-02_crews_plan.md` (committed `86736d88`). All nine open questions were
   settled with Ryan on 2026-10-02 (§9), and the amendments they make are recorded under **Decisions 1, 2
-  and 3** above.
+  and 3** above. The four conflicts that pass surfaced were settled later the same day (§11, committed
+  `2d848086`), and are recorded under **Decisions 2, 3 and 5**, *Still open*, *Data-model abstraction*
+  and *Friends list*. *(That recording was incomplete in the markdown until the end of the day. See
+  Where this stands → Drift, end of day.)*
 - **Touches:**
   - **Prerequisites P1–P5 come first:**
     - **P1** is **R32**, the pool-role self-promotion. It is security work and independent of crews.
@@ -3854,15 +4076,17 @@ The full rule, now written down once:
       and verified by `scripts/verify-pool-member-guard.sql` (8/8, rolled back). The plan records it
       as done (§3, commit `6c51140c`). ⚠ It does not touch `pool_entries`, which had the same hole:
       **R34**, not a crews prerequisite, ✅ fixed that night as migration 152 (`bd7a7bb5`).
-    - **P2** is `pool_first_lock_at`.
-    - **P3** is `pool_finished_at`. League pools never finish today: **R33**.
-    - **P4** is a single join path, `lib/pools/join.ts`.
-    - **P5** is a numeric Activity `v` gate.
-  - **Migration `153_a_crew_is_who_played`** (was 151, then 152; renumbered twice on 2026-10-02,
-    because 151 went to P1 and 152 to R34's fix; plan §4 and step 3 updated in `bd7a7bb5`):
+    - **P2** is `pool_first_lock_at`. ✅ **Done 2026-10-02**, in migration 153 (`bc02a1b0`).
+    - **P3** is `pool_finished_at`. ✅ **Done 2026-10-02**, in migration 153. League pools never
+      finish today (**R33**). P3 works around that for Crews and **does not fix R33**.
+    - **P4** is a single join path, `lib/pools/join.ts`. ✅ **Done 2026-10-02** (`859625ae`).
+    - **P5** is a numeric Activity `v` gate. ✅ **Done 2026-10-02** (`b31dcf10`).
+  - **Migration ~~`153_a_crew_is_who_played`~~ `154_a_crew_is_who_played`** ✅ **applied 2026-10-02**
+    (renumbered three times: 151 went to P1, 152 to R34's fix, and 153 to P2 + P3):
     - four **deny-all** tables: `crews`, `crew_members`, `crew_seats`, `crew_invites`;
     - two new columns, `pools.crew_id` and `pools.crew_prompt_dismissed_at`;
-    - the Private CHECK.
+    - the Private CHECK (`pools_crew_pool_is_private`);
+    - and, not named in plan §4, a trigger that lets only a trusted writer set `pools.crew_id`.
   - **Server:** `lib/crews/` and `app/api/crews/`, plus Activity API v3.
   - **RN:** `mobile/app/profile/crews*`, the create-wizard Crew row, and the pool Info and Members tabs.
   - **Web:** the dashboard and `app/crews/[crew_id]/page.tsx`.
@@ -3870,20 +4094,60 @@ The full rule, now written down once:
 
   | Release | Scope | Size |
   |---|---|---|
-  | **RN first** | P1 ✅ (done 2026-10-02), P2–P5, migration 153, `lib/crews/` + routes, Activity v3, RN screens, seat notice + one reminder | **~15 working days** (P1's share is now spent) |
+  | **RN first** | P1–P5 ✅ and migration 154 ✅ (all done 2026-10-02), `lib/crews/` + routes (started), Activity v3, RN screens, seat notice + one reminder | **~15 working days** at plan time. The prerequisites and schema are now spent. Neither the plan nor Ryan has re-sized what remains, so I don't state a new figure |
   | **Thin web slice, in the same release** | Dashboard *"Keep this group together?"* sheet (plus held seats and invites), basic crew page | **~1½ days** |
   | **Web, day two** | Create-modal Crew row + roster review, Profile → Crews tab, captain controls, the pool page's *"Part of…"* line | **~3½ days** |
 
   The thin web slice is in the RN release **because the World Cup was played on the web** (see the
   facts below). It was decided by Ryan on 2026-10-02 (plan §9 #8).
-- **Status: 📋 planned, not started; prerequisite P1 done.** Verified in the tree 2026-10-02:
-  - `lib/crews/`, `app/api/crews/` and `app/crews/` do not exist.
-  - ~~The newest migration is `150_a_gif_comes_from_klipy.sql`.~~ Re-checked that evening: the
-    newest is `151_a_member_cannot_crown_themselves.sql`, which is P1 and not crews schema. Re-checked
-    later that night: the newest is now `152_a_member_cannot_score_themselves.sql`, R34's fix, also not
-    crews schema. Crews schema is still unwritten.
-  - The only crew code is the device concept `mobile/app/crews-concept.tsx`. It is **untracked**, and
-    plan step 8 deletes it.
+- **Status: 🔨 in progress. P1–P5 and plan step 3 (the schema) done 2026-10-02; step 4 under way.**
+  Nothing is user-visible. There is no route or screen, and the only live hook (`joinPool`) fires
+  only for a pool with a crew, which no pool has. Verified in the tree at the end of 2026-10-02,
+  cut at `dcc4f7ef` (20:48):
+  - ~~`lib/crews/`, `app/api/crews/` and `app/crews/` do not exist.~~ `lib/crews/rules.ts`
+    (`163fd3af`) and `lib/crews/store.ts` (`dcc4f7ef`) exist. `app/api/crews/` and `app/crews/` do
+    not. ⚠ *Past the cut:* `1c086ab6` (reads) and `bd85c53c` (the API routes, plus
+    `app/api/users/lookup`) landed by 20:54. They are not recorded or reviewed here.
+  - ~~The newest migration is `150_a_gif_comes_from_klipy.sql`.~~ ~~151~~ ~~152~~ The newest is
+    `154_a_crew_is_who_played.sql`, the Crews schema, preceded by `153_a_pool_knows_when_it_locks_and_ends.sql`
+    (P2 + P3).
+  - The only crew **UI** is the device concept `mobile/app/crews-concept.tsx`. It is still
+    **untracked**, and plan step 8 deletes it.
+  - ⚠ The plan contradicts itself on P2's TypeScript mirror: §3 says none, §7 step 2 still says
+    one (`drafts/2026-10-02_crews_plan.md:354-355`). The code follows §3.
+
+#### Build progress, 2026-10-02
+
+Every commit is local on `master` and **not pushed**. Both migrations are **live on production**.
+*Verified here* means I read it in the tree or ran it. *Building session* means it was reported by
+the session that did the work and **not re-queried** by me. I had no production access.
+
+| Step | Commit | What landed | Verified here | Building session (production) |
+|---|---|---|---|---|
+| **P5** | `b31dcf10` | `lib/activity/version.ts`. The Activity gate is `activityApiVersion(v) >= 2` (`app/api/users/[user_id]/activity/route.ts:194`). It was `=== '2'`, which would have sent a v3 build the v1 response | Code read; 4 tests pass | n/a, code only, and not deployed until pushed |
+| **P4** | `859625ae` | `lib/pools/join.ts`, `joinPool()`, the single join path: lookup, join-ability, SP010 cap, restore, first entry, Showdown schedule. The route is a thin wrapper | Code read; 10 tests pass. ⚠ The bare-`pool_id` door moved here unchanged (`lib/pools/join.ts:43-56`, no `is_private` check) | Behaviour unchanged (the commit's claim) |
+| **P2 + P3** | `bc02a1b0` | Migration 153: `pool_first_lock_at()`, `pool_finished_at()`. Derived, service-role only. **No TypeScript mirror**, a deliberate change from the plan | SQL read (`153:52-115`); grants confirmed in the file; no TS caller exists | Applied 2026-10-02. Checked against all 643 pools: every pool has a first lock; WC fixed-deadline pools match `prediction_deadline`; no league pool uses the season end; all 3 LMS pools lock in round 1's matchweek; start weeks honoured; finished = WC done, leagues running. 28 progressive WC pools have a stale `prediction_deadline` (historical) |
+| **Step 3** | `20d4740f` | Migration 154: 4 deny-all tables, `pools.crew_id` + `crew_prompt_dismissed_at`, CHECK `is_private IS TRUE`, the `crew_id` guard trigger (INSERT and UPDATE) | SQL read (`154:1-182`); deny-all guard test lists the 4 tables and passes | Applied `20261002233759`. 16/16 dry-run checks, live re-check (rolled back), guard body byte-identical, `verify-select-columns` OK, all 643 pools `crew_id` NULL |
+| **Step 4** (under way) | `163fd3af` | `lib/crews/rules.ts`: every Crews rule as a pure function | 31 tests pass. **Not reviewed** against the decisions | n/a |
+| **Step 4** (under way) | `dcc4f7ef` | `lib/crews/store.ts`: every crew write (save, create, leave with succession, rejoin, remove, invite, claim, seats). `joinPool` now makes a crew pool's player a crew member and takes their seat. Saving sets the pool `is_private: true` | 32 store + 2 join tests pass (135 across `lib/crews` + `lib/pools`). Only `joinPool` imports the store. **Not reviewed** against the decisions | 84 finished World Cup groups are public (from the commit message) |
+
+**Type-check, corrected.** An earlier report of *"zero web type errors"* for P4 and P5 came from a
+command that never ran (`timeout` is not installed here). `npx tsc --noEmit -p .` really gives **3
+errors**, all `FormData.get` in `app/api/admin/branded-pools/upload-logo/route.ts:13-15`. That is
+the pre-existing **R29** failure, and there are none in the changed files. I re-ran it this pass
+and got the same result.
+
+**For step 4, before any route can write a crew row.** The first and third are from reading `154`,
+and neither was tested:
+- **Account deletion bypasses captain succession.** `app/api/account/delete/route.ts:168-169`
+  deletes the `users` row, and `crew_members` cascades (`154:48`). The succession in
+  `lib/crews/rules.ts` and `store.ts` *leave* is never called on that path, and a crew can be left
+  with zero captains (`154:61-62`). The plan, the rules and the store never mention account deletion.
+- **Saving delists a public pool** (`is_private: true`, `dcc4f7ef`). That is consistent with
+  Decision 3 (amended). The save sheet should say so in plain words.
+- **`pools.crew_id ON DELETE SET NULL` (`154:126`) can never fire for a crew with a season.** The
+  guard (`154:160-161`) refuses the FK's own update. That is harmless while crews are closed rather
+  than deleted, which is the design. A future support-side delete will error.
 - **Done when:**
   - a finished pool's admin can save its group as a crew, **on web or in the app**;
   - a crew member who starts a pool gives every other ticked member a held seat, which is taken or
@@ -3910,24 +4174,33 @@ production access.
 - **Decided (Ryan, 2026-10-02): no email campaign to the World Cup admins.** The *"Keep this group
   together?"* prompt reaches admins who come back on their own, on web or in the app (plan §9 #8).
 
-#### Where this cuts across the rest of the programme: surfaced, not resolved
+#### Where this cuts across the rest of the programme: surfaced 2026-10-02, four of five settled the same day
 
-1. **The *Friends list* backlog item** (💬 Social & messaging) says *"let users add each other as
+*(The settlement marks below were restored to this file at the end of 2026-10-02. They were in the
+HTML but had dropped out of the markdown.)*
+
+1. ~~**The *Friends list* backlog item** (💬 Social & messaging) says *"let users add each other as
    friends and keep a persistent cross-pool connections list"*. That contradicts Decision 1 twice:
    the original (*"a single flat 'people you've played with' list is the wrong shape"*) and its
    2026-10-02 amendment (*"a lookup, not a friends list"*). The item has not been removed. **Ryan to
-   retire it, or say what it is for.**
-2. **Decision 5's three-way privacy vs the one `is_private` boolean.** See *Decision 3 → Amended
-   2026-10-02*.
-3. ***Data-model abstraction* (Foundational) and *Migration path* (Still open)** both assume a
+   retire it, or say what it is for.**~~ ✅ **Settled (Ryan): retired.** Struck through under 💬
+   Social & messaging. Crews do its job, and finding one person uses the exact lookup.
+2. ~~**Decision 5's three-way privacy vs the one `is_private` boolean.** See *Decision 3 → Amended
+   2026-10-02*.~~ ✅ **Settled (Ryan): three levels are kept** (Public · Invite link · Private), and the
+   strict one is built as its own item, *Pool privacy: three levels*. Crew pools are Invite link or
+   Private, never Public. See *Decision 5 → Amended 2026-10-02*.
+3. ~~***Data-model abstraction* (Foundational) and *Migration path* (Still open)** both assume a
    Crew + Season model replaces `pools`. The plan builds crews beside `pools`. That is not one of the
-   nine decisions, so both stay as written, with a pointer.
-4. **Decision 2: *"never in the captain's name"* vs the invite email for someone with no account.**
+   nine decisions, so both stay as written, with a pointer.~~ ✅ **Settled (Ryan): the plan's design is
+   adopted.** Crews sit alongside pools, and a pool is a season. *Migration path* is struck from *Still
+   open*, and *Data-model abstraction* is updated. Built that way in migration 154.
+4. ~~**Decision 2: *"never in the captain's name"* vs the invite email for someone with no account.**
    Ryan decided that email exists: from SportPool, sent once. The plan's draft copy names the captain
    (*"Dave asked us to invite you to Bermuda Office"*), and the plan argues this is the captain's own
    act, not a reminder sent in his name. That copy is the plan's, not an explicit ruling. It is flagged
-   so the call is made consciously. The disclosure gate is satisfied either way: *"we email your
-   invite once, from SportPool, and say who asked us to"* survives a tooltip.
+   so the call is made consciously.~~ ✅ **Settled (Ryan): the email names the captain**, once,
+   previewed, from SportPool. It is a clarification of Decision 2, not an exception: *invitations name
+   who asked; reminders never do.* See *Decision 2 → Clarified 2026-10-02*.
 5. **R7's dated window has passed.** R7 named the WC→EPL transition, closing at EPL start, as the
    clean baseline for admin retention. EPL started in August, so the window closed **unmeasured**.
    Crews would make the metric countable from here; they don't recover the baseline. Annotated on R7.
@@ -3953,13 +4226,21 @@ production access.
     2026-10-02). `is_private` is read or written in **17 files** across web, RN and one guard test (verified). They
     include mobile Settings, which writes `pools` directly, so the level has to be enforced in the
     database as well as hidden in the UI.
-  - **A request to join**, held somewhere, plus a new Needs-you card kind. Activity's `v` gate is a
+  - **A request to join**, held somewhere, plus a new Needs-you card kind. ~~Activity's `v` gate is a
     strict `=== '2'` today (`app/api/users/[user_id]/activity/route.ts:191`, verified), which is what
-    Crews **P5** changes.
+    Crews **P5** changes.~~ ✅ **P5 done 2026-10-02** (`b31dcf10`). The gate is now
+    `activityApiVersion(v) >= 2` (`app/api/users/[user_id]/activity/route.ts:194`, verified), so a
+    new card kind can go out to v3 builds only, without dropping v3 to the v1 response.
   - **The join route's bare-`pool_id` gap, closed in the same work** (Ryan). Cross-reference **R32**.
-    - `app/api/pools/join/route.ts:27-33` accepts `{pool_id}` and looks the pool up with the **admin
-      client**. Neither the route nor `poolJoinability` (`lib/poolStatus.ts:99-110`) checks
-      `is_private` (verified). So anyone holding a private pool's `pool_id` joins without the code.
+    - ~~`app/api/pools/join/route.ts:27-33`~~ The route accepts `{pool_id}`
+      (`app/api/pools/join/route.ts:22-26`). Since Crews P4 (`859625ae`), it hands that to `joinPool()`,
+      which looks the pool up with the **admin client** (`lib/pools/join.ts:43-56`). Neither
+      `joinPool`, the route nor `poolJoinability` (`lib/poolStatus.ts:99-110`) checks `is_private`
+      (re-verified at the end of 2026-10-02). So anyone holding a private pool's `pool_id` joins
+      without the code. **P4 moved the door; it did not close it.** Because every join now runs
+      through `joinPool`, **this is the one place to close it.** Since `dcc4f7ef`, a join through
+      it also makes the joiner a member of the pool's crew, if it has one. So a bare `pool_id` into a
+      crew pool would join the crew as well.
     - R32's fix (trigger plus INSERT policy) does not close this door, because the route bypasses RLS.
       This item does not close R32's door either. **Both are needed.** ✅ **R32's half landed
       2026-10-02** (migration 151 drops the client INSERT policy). **This half is still open.**
@@ -3970,10 +4251,12 @@ production access.
       link** unless that page moves to the code first. Verified 2026-10-02. Not resolved here.
     - Any tightening must still let crew members into their crew's pool from the crew page (plan
       §10).
-  - **Crews interaction.** Migration 153's planned `CHECK (crew_id IS NULL OR is_private)` (plan §4;
-    renumbered from 151, then 152)
-    is written against the boolean. Whichever of the two lands second has to restate *"a crew pool is
-    never Public"* against the other's schema.
+  - **Crews interaction.** ~~Migration 153's planned `CHECK (crew_id IS NULL OR is_private)`~~
+    Crews landed first. Migration **154**'s CHECK `pools_crew_pool_is_private`
+    (`crew_id IS NULL OR is_private IS TRUE`, `lib/migrations/154_a_crew_is_who_played.sql:132-133`,
+    live per the building session) is written against the boolean. **So this item, landing second,
+    has to restate *"a crew pool is never Public"* against its new visibility column**, and replace or
+    amend that CHECK in the same migration.
   - **The relabel.** Every surface that says "Private" today becomes "Invite link", on web and RN.
 - **Not decided, and for this item's design:** what the requester sees after *No*, and whether a
   request expires.
@@ -3986,7 +4269,11 @@ production access.
   commit `6c51140c` (151) touched only the migration, its verify script and the Crews plan, so the
   route is unchanged. ~~The newest migration is now 151, R32's fix.~~ Re-checked later that night:
   commit `bd7a7bb5` (152) touched only the migration, the two verify scripts and the Crews plan, so the
-  route is still unchanged. The newest migration is now 152, R34's fix.
+  route is still unchanged. ~~The newest migration is now 152, R34's fix.~~ Re-checked at the end of
+  2026-10-02: Crews P4 (`859625ae`) moved the join logic into `lib/pools/join.ts`, still with no
+  `is_private` check. `dcc4f7ef` added the crew hook there, and still no check. No visibility column
+  exists. The newest migration is now 154, the Crews schema. `is_private` now appears in **19**
+  files: the 17 above plus `lib/crews/store.ts` and its test.
 - **Done when:**
   - an admin can set a pool to Private;
   - a link-holder who isn't in its crew gets *"Request sent"*, and joins only when the admin taps

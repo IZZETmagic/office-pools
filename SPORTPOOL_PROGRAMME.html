@@ -281,10 +281,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ SUMMARY ============================ -->
 <section id="summary">
-  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span> <span class="chip ok">R32 FIXED 2026-10-02</span> <span class="chip ok">R34 FIXED 2026-10-02</span> <span class="chip lvl-med">R35 OPENED 2026-10-02</span></h2>
+  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span> <span class="chip ok">R32 FIXED 2026-10-02</span> <span class="chip ok">R34 FIXED 2026-10-02</span> <span class="chip lvl-med">R35 OPENED 2026-10-02</span> <span class="chip gold">CREWS BUILD STARTED 2026-10-02</span></h2>
 
   <div class="card crit" id="update-2026-10-02">
-    <h3 style="margin:0 0 8px">2026-10-02 — Crews: nine decisions recorded, and a 🔴 found on the way</h3>
+    <h3 style="margin:0 0 8px">2026-10-02 — Crews: nine decisions recorded, a 🔴 found on the way, and the build started</h3>
     <p class="sec-sub" style="margin:0 0 10px">Scope: recording Ryan's 2026-10-02 Crews decisions, nothing else. Code claims were
       checked in the tree. The production numbers come from the planning session and were <strong>not re-queried here</strong>.
       Nothing else on this page was re-audited.</p>
@@ -298,8 +298,91 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       (migration 152), R32's proof is corrected, and <strong><a href="#r35">R35</a></strong> is opened from what 152 left out. I read the
       migration, both verify scripts and commit <code>bd7a7bb5</code> in the tree, and checked every <code>pool_entries</code> writer
       against the allow-list. The production facts come from the fixing session and were <strong>not</strong> re-queried here.</p>
+    <p class="sec-sub" style="margin:0 0 10px"><strong>Updated at the end of the day: the Crews build has started.</strong> Crews P2–P5
+      and plan step 3, the schema, landed in four commits: <code>b31dcf10</code>, <code>859625ae</code>, <code>bc02a1b0</code> and
+      <code>20d4740f</code>. All four are local on <code>master</code> and <strong>not pushed</strong>. Both migrations are <strong>live on
+      production</strong>. I read every file the four commits touch, and I re-ran their three test files (3 files, 26 tests, all pass) and
+      the web type-check in the tree. The production facts are <strong>reported by the building session</strong> and were <strong>not</strong>
+      re-queried here: both applies, the 643-pool checks, the dry runs and the <code>prosrc</code> match. Step 4 then began in two more
+      commits while this pass ran (<code>163fd3af</code>, <code>dcc4f7ef</code>). For those I read the <code>joinPool</code> change and the
+      save path in <code>lib/crews/store.ts</code>, and ran their tests. I did <strong>not</strong> review them against the decisions.
+      <strong>The record is cut at <code>dcc4f7ef</code> (20:48).</strong></p>
 
     <p style="margin:0 0 6px"><strong>Since last update</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>Crews is in progress. P1–P5 and plan step 3 (the schema) are done, and step 4, <code>lib/crews/</code> plus the API
+        routes, is under way.</strong> <strong>No user can reach any of it.</strong> No API route exists, and the one live hook fires only
+        for a pool with a crew, which no pool has. The plan marks P1–P5 and step 3 done (<code>drafts/2026-10-02_crews_plan.md</code> §3
+        and §7). See <a href="#crews-build">Crews → Build progress</a>.
+        <ul style="margin:4px 0 0 18px">
+          <li>⚠ <strong>Step 4 landed in two commits while this pass was running, which is outside the brief I was given.</strong>
+            <code>163fd3af</code> (20:43): <code>lib/crews/rules.ts</code> holds every Crews rule as a pure function, with 31 tests.
+            <code>dcc4f7ef</code> (20:48): <code>lib/crews/store.ts</code> holds every crew write, on the admin client, with 32 tests
+            against an in-memory fake. <code>joinPool</code> now makes a player of a crew's pool a crew member (exits stick) and takes
+            their held seat. 2 more join tests.</li>
+          <li>I ran <code>lib/crews</code> and <code>lib/pools</code>: 135 tests pass. <strong>I did not review the rules or the store
+            against the decisions.</strong> Only <code>lib/pools/join.ts</code> imports the store (verified). <code>app/api/crews/</code>
+            and <code>app/crews/</code> do not exist.</li>
+          <li>⚠ <strong>Already past the cut when I finished:</strong> <code>1c086ab6</code> (20:51, <code>lib/crews/read.ts</code>, every
+            read) and <code>bd85c53c</code> (20:54, <strong>the API routes</strong>: 12 under <code>app/api/crews/</code> and
+            <code>app/api/pools/[pool_id]/crew-prompt/dismiss</code>, plus a new <strong><code>app/api/users/lookup</code></strong>). So
+            <em>"no API route exists"</em> is true <strong>at the cut only</strong>. None of it is recorded, reviewed or pushed. The next
+            pass should start there, and look at the user-lookup route first, because it touches what one account can learn about
+            another.</li>
+        </ul></li>
+      <li><strong>P5, <code>b31dcf10</code>:</strong> <code>lib/activity/version.ts</code> adds <code>activityApiVersion()</code>. The
+        Activity route's gate is now <code>activityApiVersion(search.get('v')) &gt;= 2</code>
+        (<code>app/api/users/[user_id]/activity/route.ts:194</code>, verified). It was <code>=== '2'</code>, which would have sent a v3
+        build the v1 response, with no Needs you, links or paging. 4 tests.</li>
+      <li><strong>P4, <code>859625ae</code>:</strong> <code>lib/pools/join.ts</code> holds <code>joinPool()</code>, the single join path. It
+        covers the lookup, join-ability, the SP010 tier cap, restoring a returning member's entries, the first entry and the Showdown
+        schedule. <code>POST /api/pools/join</code> is now a 41-line wrapper (verified). The commit reports behaviour unchanged. One thing
+        did change: the username lookup moved from the session client to the admin client (same data, per the commit). 10 tests.</li>
+      <li><strong>P2 + P3, <code>bc02a1b0</code>: migration <code>153_a_pool_knows_when_it_locks_and_ends</code>, applied 2026-10-02</strong>
+        (building session). It adds <code>pool_first_lock_at(pool)</code> and <code>pool_finished_at(pool)</code>, derived and never
+        stored. They are <strong>server-only</strong>: execute is revoked from <code>anon</code> and <code>authenticated</code> and granted to
+        <code>service_role</code> (<code>153:112-115</code>, verified).
+        <ul style="margin:4px 0 0 18px">
+          <li><em>Checked against all 643 pools (building session):</em> every pool has a first lock, and World Cup fixed-deadline pools
+            match <code>prediction_deadline</code>. No league pool uses the season-end value. All three LMS pools lock in their engine's
+            round-1 matchweek, and chosen start weeks are honoured. <em>Finished</em> is exactly "World Cup done, leagues running".</li>
+          <li><strong><a href="#r33">R33</a> is worked around for Crews, not fixed.</strong> <code>pool_finished_at</code> reads
+            <code>league_standings_final</code> for a league (<code>153:99-101</code>). League pools still never reach
+            <code>completed</code>.</li>
+          <li><em>Finding, historical only:</em> 28 finished progressive World Cup pools have a stale <code>prediction_deadline</code>.
+            Admins moved the round deadline that the round route actually enforces.</li>
+          <li><strong>Deliberate change from the plan: no TypeScript mirror.</strong> The SQL functions are the single owner. No
+            TypeScript file calls either function yet (verified).</li>
+        </ul></li>
+      <li><strong>Step 3, <code>20d4740f</code>: migration <code>154_a_crew_is_who_played</code>, applied as <code>20261002233759</code></strong>
+        (building session).
+        <ul style="margin:4px 0 0 18px">
+          <li>Four <strong>deny-all</strong> tables: <code>crews</code>, <code>crew_members</code>, <code>crew_seats</code> and
+            <code>crew_invites</code>. RLS is on, with zero policies, and grants are revoked from <code>anon</code> and
+            <code>authenticated</code> (<code>154:177-182</code>, verified).</li>
+          <li><code>pools</code> gains <code>crew_id</code> and <code>crew_prompt_dismissed_at</code>.</li>
+          <li>CHECK <code>pools_crew_pool_is_private</code>: a crew pool must have <code>is_private IS TRUE</code>
+            (<code>154:132-133</code>). The check uses <code>IS TRUE</code> because the column is nullable.</li>
+          <li>Trigger <code>guard_pool_crew_id</code>: only a trusted writer may set <code>crew_id</code>, only once, and only from NULL, on
+            INSERT or UPDATE (<code>154:141-174</code>). It covers INSERT because the <code>pools</code> INSERT policy checks only
+            <code>admin_user_id</code>.</li>
+          <li><em>Building session:</em> 16/16 dry-run checks, a live re-check, the guard body byte-identical, and
+            <code>verify-select-columns</code> OK. All 643 pools keep <code>crew_id</code> NULL.</li>
+          <li><em>This pass:</em> the four tables are in <code>lib/league/__tests__/denyAllTables.guard.test.ts</code>, and the test
+            passes.</li>
+        </ul></li>
+      <li><strong>Process correction: a type-check that never ran was reported as clean.</strong> Earlier today the building session said
+        P4 and P5 had <strong>"zero web type errors"</strong>. That came from a command wrapped in <code>timeout</code>, which does not
+        exist on this Mac. I confirmed this pass that neither <code>timeout</code> nor <code>gtimeout</code> is installed. So the command
+        failed before <code>tsc</code> started, and its silence read as a pass. <strong>Re-run properly:</strong>
+        <code>npx tsc --noEmit -p .</code> gives exactly 3 errors. All three are <code>FormData.get</code> in
+        <code>app/api/admin/branded-pools/upload-logo/route.ts:13-15</code>. That file is pre-existing (last changed <code>37c84284</code>),
+        the four commits don't touch it, and the errors are the <strong>R29</strong> build failure. I re-ran it this pass and got the same
+        3 errors, and none in the changed files. It is the same failure shape as the survey dry run that would have reported 146
+        recipients as success: <strong>a check that cannot fail looks like a check that passed.</strong></li>
+      <li><code>master</code> is now <strong>15</strong> commits ahead of <code>origin/master</code> at the cut-off (verified).</li>
+    </ul>
+    <p style="margin:0 0 6px"><em>Earlier on 2026-10-02:</em></p>
     <ul style="margin:0 0 10px 18px">
       <li><strong>R32 fixed: migration <code>151_a_member_cannot_crown_themselves</code>, applied to production</strong>
         (<code>schema_migrations</code> 20261002214554; commit <code>6c51140c</code>, local and not pushed). It was proven on production
@@ -307,7 +390,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         live <code>prosrc</code> is byte-identical to the file. <strong>Whether anyone used the hole before today is unknown:</strong> 70
         admin rows across 48 pools are not the pool's creator, and nothing records who promoted whom. <strong>Crews P1 is done</strong>,
         so the Crews schema becomes <s><strong>migration 152</strong></s> <strong>migration 153</strong>, because 152 went to R34's fix
-        later that night (<code>drafts/2026-10-02_crews_plan.md</code>, updated again in <code>bd7a7bb5</code>).</li>
+        later that night (<code>drafts/2026-10-02_crews_plan.md</code>, updated again in <code>bd7a7bb5</code>). <em>(It landed as
+        <strong>154</strong>, because 153 went to P2 + P3. See above.)</em></li>
       <li><strong>R34 opened 🔴: a member can rewrite their own <code>pool_entries</code> row</strong>, including score inputs, fee and
         retirement. It is the same shape as R32, and nobody has probed or exploited it. See the drift item below: the reported impact
         was partly wrong.</li>
@@ -348,11 +432,21 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <s><strong><a href="#r34">R34</a> now comes before the Crews build</strong>, under the ranking rule that silent wrong data outranks
       anything merely missing. It is open to every member and it reaches the score. It is <strong>not</strong> a Crews prerequisite,
       so Crews P2–P5 are not blocked by it. They are next.</s> ✅ Done that night (152).
-      <strong>Crews P2–P5 are next.</strong> The new <a href="#r35">R35</a> does not outrank them. Its deadline case is dormant until the
-      next deadline-shaped competition. Its level also turns on one question nobody has traced: can a late entry save picks? If it can,
-      that is silent wrong data, and R35 moves ahead of Crews.</p>
+      <s><strong>Crews P2–P5 are next.</strong></s> ✅ Done, with step 3 (the schema), by the end of the day.
+      <strong>Crews step 4 is next, and has started: <code>lib/crews/</code> plus the API routes.</strong> <a href="#r35">R35</a> still
+      does not outrank it, for the same reason as before. Its deadline case is dormant until the next deadline-shaped competition. If
+      anyone traces that a late entry can save picks, that is silent wrong data, and R35 moves ahead of Crews. Step 4 is also where two
+      schema notes below become live (<em>Drift</em>). Both should be settled in step 4, before any route can write a crew row.
+      <em>Rule applied: silent wrong data first. Nothing open in this area is live silent wrongness yet, so the build order stands.</em></p>
 
     <p style="margin:0 0 6px"><strong>Risk moves</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>End of day:</strong> no risk opened, closed or re-levelled. <strong><a href="#r33">R33</a></strong> annotated: 153 gives
+        Crews their own season-end signal, but league pools still never reach <code>completed</code>, so R33 stays 🟡 and open.
+        <strong><a href="#r7">R7</a></strong> annotated: the Crews schema and its writes exist, but no user can reach them, so
+        <em>"crews with two or more pools"</em> is still not countable.</li>
+    </ul>
+    <p style="margin:0 0 6px"><em>Earlier on 2026-10-02:</em></p>
     <ul style="margin:0 0 10px 18px">
       <li><strong>R32</strong> opened 🔴: any pool member can self-promote to admin.</li>
       <li><strong>R33</strong> opened 🟡: league pools never finish.</li>
@@ -372,7 +466,58 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         and the level is unchanged (closed).</li>
     </ul>
 
-    <p style="margin:0 0 6px"><strong>Drift</strong></p>
+    <p style="margin:0 0 6px"><strong>Drift, end of day (newest first)</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>The markdown half-recorded Ryan's four settlements, and claimed it had recorded all of them.</strong> This page had
+        them all, so <strong>the view and the source disagreed</strong>. In the tracked markdown:
+        <ul style="margin:4px 0 0 18px">
+          <li>Decision 5 had no amendment, and Decision 3's amendment still said <em>"Surfaced, not resolved"</em>.</li>
+          <li><em>Migration path</em> still sat in <em>Still open</em> as open, and <em>Data-model abstraction</em> still said
+            <em>"Surfaced, not resolved"</em>.</li>
+          <li><em>Crews → Where this cuts across</em> still asked Ryan to rule on four things he had ruled on.</li>
+        </ul>
+        The commit that claimed to record them, <code>c4622ef7</code>, never contained those edits (checked against its tree). The fuller
+        text survives in an untracked duplicate, <code>SPORTPOOL_PROGRAMME 2.md</code> (17:05), which looks like an iCloud conflict copy.
+        <strong>Restored to the markdown this pass</strong> from plan §11 (committed <code>2d848086</code>), re-verified line by line.
+        Nothing was re-opened and nothing new was decided. This page did not need those sections changed. The duplicate is untouched;
+        see <em>Needs Ryan</em>.</li>
+      <li><strong>P4 moved the join route's bare-<code>pool_id</code> door. It did not close it.</strong> The lookup now lives in
+        <code>lib/pools/join.ts:43-56</code>: the admin client, looked up by <code>pool_id</code> or <code>pool_code</code>. The route
+        reaches it at <code>app/api/pools/join/route.ts:22-26</code>. There is still no <code>is_private</code> check (verified).
+        <strong>Its reach grew at 20:48:</strong> since <code>dcc4f7ef</code>, a join into a crew pool also makes the joiner a crew member.
+        So once crew pools exist, a bare <code>pool_id</code> gets someone into the crew as well as the pool, without the code. That is
+        dormant until the first crew pool. The upside is that P4 made <code>joinPool</code> the single place to close the door. The
+        <code>route.ts:27-33</code> references are stale. They are updated on <a href="#i-privacy">Pool privacy</a>. R32 is closed, so its
+        reference stays as the record of what was true then.</li>
+      <li><strong>The Crews plan contradicts itself about the TypeScript mirror.</strong> §3 says there is none. §7 step 2 still says
+        <em>"SQL + TypeScript mirror, tested against each other on real pools"</em> (<code>drafts/2026-10-02_crews_plan.md:354-355</code>).
+        The code agrees with §3. The plan is not my file, so this is flagged, not fixed.</li>
+      <li><strong>Two schema notes for step 4. Neither is live yet, because no user can reach a crew write.</strong> This is my reading of
+        <code>154</code>. Neither was tested.
+        <ul style="margin:4px 0 0 18px">
+          <li><strong>Account deletion skips captain succession.</strong> <code>app/api/account/delete/route.ts:168-169</code> deletes the
+            <code>users</code> row, and <code>crew_members.user_id</code> is <code>ON DELETE CASCADE</code> (<code>154:48</code>). So a
+            captain who deletes their account simply vanishes. Decision 1's succession rule now exists in <code>lib/crews/rules.ts</code>
+            (<code>163fd3af</code>), and <em>leave</em> applies it in <code>lib/crews/store.ts</code> (<code>dcc4f7ef</code>). But a
+            cascade calls neither. The plan, the rules and the store never mention account deletion (searched all three). The partial
+            unique index allows a crew with <strong>zero</strong> captains (<code>154:61-62</code>). This is the "exit erases" shape that
+            Gate A2 / R12 already names, arriving at a new table.</li>
+          <li><strong>A crew with a season cannot be hard-deleted.</strong> <code>pools.crew_id</code> is <code>ON DELETE SET NULL</code>
+            (<code>154:126</code>). But Postgres runs referential actions as ordinary updates that fire the referencing table's triggers,
+            and <code>guard_pool_crew_id</code> refuses any change away from a non-NULL <code>crew_id</code> (<code>154:160-161</code>).
+            That fits the design (crews are <em>closed</em>, never deleted), but the FK clause will never succeed. Whoever writes a
+            support-side delete will hit an error.</li>
+        </ul></li>
+      <li><strong>Saving a pool as a crew makes it Invite link.</strong> <code>lib/crews/store.ts</code> sets <code>is_private: true</code> in
+        the same update that sets <code>crew_id</code> (<code>dcc4f7ef</code>). That is what <a href="#d3">Decision 3</a> (amended) and
+        154's CHECK require, so it is <strong>not</strong> a contradiction. But the building session reports that <strong>84 finished
+        World Cup groups are public</strong>, and for their admins, saving delists the pool from Discover. The save sheet should say so in
+        plain words. That is a note for the UI, not a decision for Ryan.</li>
+      <li><strong>Migration 154 cites "Decision 6" and "decision 9"</strong> (<code>154:16</code>, <code>:36</code>, <code>:129</code>).
+        It means the plan's §9 questions #6 and #9. In this programme, <a href="#d6">Decision 6</a> is <em>Scoring</em>, and the
+        never-Public rule lives under <a href="#d3">D3 → Amended</a>. This is cosmetic, but it is a traceability trap.</li>
+    </ul>
+    <p style="margin:0 0 6px"><strong>Drift, earlier on 2026-10-02</strong></p>
     <p style="margin:0 0 6px">The three drift items first listed here (<em>Friends list</em>, Decision 5's privacy levels, Crew + Season)
       were all settled the same day. One new finding came out of recording them:</p>
     <ul style="margin:0 0 10px 18px">
@@ -406,6 +551,12 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
     <p style="margin:0 0 6px"><strong>Needs Ryan</strong></p>
     <ul style="margin:0 0 0 18px">
+      <li><strong><code>SPORTPOOL_PROGRAMME 2.md</code>: delete it or keep it.</strong> It is an untracked, superseded copy of the
+        markdown. Its only unique content was the settlement text, now restored. Left in place, it will eventually be read as the
+        programme. It is not mine to delete.</li>
+      <li><strong>Pushing.</strong> <code>master</code> was 15 ahead at the cut, and 17 by 20:54: the Crews plan and its build commits, R32,
+        R34, and the programme updates. Both Crews migrations are already live, and they do not wait on a deploy. The code halves of P4 and P5 reach users only
+        when you push.</li>
       <li><s>take the R32 fix.</s> ✅ Done 2026-10-02 (151).</li>
       <li><s><strong>Take <a href="#r34">R34</a>'s writer audit plus the allow-list fix, and say when.</strong></s> ✅ Done 2026-10-02
         (152).</li>
@@ -608,6 +759,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     (provisional), so 🟡 goes from 9 to <strong>10</strong>. Needing Ryan goes from +1 to <strong>+0</strong>, because R34's fix is taken.
     Ryan's call not to review the 12 non-creator self-adjustments is recorded on R34 as a decision; it is a risk call, not a product
     decision, so settled decisions stay at 15. <a href="#r32">R32</a> stays closed; its proof is corrected.</p>
+  <p class="strip-note"><strong>Moved at the end of 2026-10-02 (Crews build started).</strong> <strong>No count changes.</strong> No risk
+    opened, closed or re-levelled. <a href="#r33">R33</a> and <a href="#r7">R7</a> are annotated: 153 works around R33 for Crews only, and
+    R7 is still not countable. <a href="#crews">Crews</a> moves from planned to <strong>🔨 in progress</strong>: P1–P5 and the schema
+    (migrations 153 and 154, live per the building session) are done, and step 4 is under way, cut at <code>dcc4f7ef</code>. Needs Ryan
+    gains two housekeeping items: the untracked <code>SPORTPOOL_PROGRAMME 2.md</code>, and the push. Neither is a product decision, so
+    neither is counted. The markdown had lost part of the four settlements recorded earlier that day. It is restored, and this page
+    and its source agree again.</p>
   <p class="strip-note"><strong>Moved 2026-09-19 (league ingestion pass only).</strong> <strong>R30 is new</strong> 🟠 — a fixture
     played before its placeholder date is unreachable by every sync arm; fix <code>fc23239</code> built, <strong>unpushed</strong>.
     <strong>R31 is new</strong> 🟡 — the outbox has no age guard and its first drain replayed 38 stale matchweek recaps.
@@ -803,8 +961,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           closes at EPL start. ⚠ <strong>2026-10-02:</strong> that window has <strong>closed unmeasured</strong>, because EPL started in
           August</td>
         <td>None built. ⚠ <strong>2026-10-02:</strong> Crews would make the primary metric (<em>repeat commissioners</em>)
-          <strong>countable for the first time</strong>, as <em>"crews with two or more pools"</em> (Crews plan §1). Crews are
-          <strong>planned, not started</strong>, so nothing is measured yet and this row stays open at its level</td>
+          <strong>countable for the first time</strong>, as <em>"crews with two or more pools"</em> (Crews plan §1). <s>Crews are
+          <strong>planned, not started</strong></s> <strong>Crews are in progress</strong> (end of 2026-10-02): the tables exist (migration
+          154, live per the building session) and <code>lib/crews/store.ts</code> writes them, but no user can reach a write yet, so nothing
+          is measured and this row stays open at its level</td>
         <td>Decision 7 says "instrument admin retention"; nothing exists</td>
         <td><a href="#d7">Decision 7</a>; <a href="#i-superadmin-stats">Enhanced super-admin stats</a>; <a href="#crews">Crews</a></td>
       </tr>
@@ -1331,8 +1491,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           ended. From the first season end (late May 2027), every league pool will claim to be running when it has finished. That
           affects anything keyed on completion, including the Crews <em>"Keep this group together?"</em> prompt</td>
         <td>The first league season ending</td>
-        <td><strong>Planned, not built:</strong> Crews P3 adds <code>pool_finished_at(pool_id)</code>. It returns
-          <code>status='completed'</code> for the World Cup, and the <code>league_standings_final</code> snapshot for leagues</td>
+        <td><s><strong>Planned, not built</strong></s> <strong>A workaround for Crews, applied 2026-10-02. It is NOT a fix for R33.</strong>
+          Crews P3 is migration <code>153_a_pool_knows_when_it_locks_and_ends</code> (<code>bc02a1b0</code>, applied per the building
+          session). Its <code>pool_finished_at(pool_id)</code> uses <code>status='completed'</code> for the World Cup and the
+          <code>league_standings_final</code> snapshot for leagues (<code>153:92-102</code>, verified), so <strong>Crews do not depend on
+          R33</strong>. League pools <strong>still never reach <code>completed</code></strong>: <code>lib/auto-archive.ts</code> is untouched.
+          Anything else that keys on <code>completed</code> still sees every league pool as running. The function is service-role only, and
+          <strong>no TypeScript calls it yet</strong> (verified)</td>
         <td>No call needed; it's a defect. Levelled 🟡: no data loss, and the date is ~8 months out. It rises to 🟠 if anything else starts
           keying on <code>completed</code> first</td>
         <td><a href="#crews">Crews → P3</a>; R10</td>
@@ -2615,10 +2780,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <a href="#foundational">foundational work items</a> (league ingestion, sync cron, data model, templates, ingestion
       layer, email cadence, catalog, branding, monetisation) · <a href="#stillopen">still-open questions</a>.</p>
     <div class="note gold"><strong>2026-10-02:</strong> Decisions 1, 2, 3 and 5 amended, and Decision 2 clarified (Ryan).
-      <a href="#crews">Crews</a> <strong>planned, not started</strong> (<code>drafts/2026-10-02_crews_plan.md</code>, ~15 days RN + ~1½
-      web in the same release + ~3½ web day two). Its prerequisite P1 (<a href="#r32">R32</a>) was ✅ <strong>fixed the same day</strong>
-      (migration 151). The same-class <a href="#r34">R34</a> (<code>pool_entries</code>, not a Crews prerequisite) was ✅ <strong>fixed
-      that night</strong> as migration 152, so the Crews schema is now migration <s>152</s> <strong>153</strong>.
+      <a href="#crews">Crews</a> <s><strong>planned, not started</strong></s> <strong>in progress</strong>
+      (<code>drafts/2026-10-02_crews_plan.md</code>, ~15 days RN + ~1½ web in the same release + ~3½ web day two). Its prerequisite P1
+      (<a href="#r32">R32</a>) was ✅ <strong>fixed the same day</strong> (migration 151). The same-class <a href="#r34">R34</a>
+      (<code>pool_entries</code>, not a Crews prerequisite) was ✅ <strong>fixed that night</strong> as migration 152. <strong>By the end of
+      the day, P2–P5 and the Crews schema were done:</strong> migration 153 (first lock, finished) and migration <s>152</s> <s>153</s>
+      <strong>154</strong> (the schema), both live on production per the building session. Step 4 (<code>lib/crews/</code> + routes) has
+      started. Nothing is user-visible.
       <a href="#i-privacy">Pool privacy: three levels</a> planned as its own item, not started.</div>
   </div>
 
@@ -2869,9 +3037,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
               <li>The database enforces it with <code>CHECK (crew_id IS NULL OR is_private)</code> on <code>pools</code>.</li>
               <li>"Who can join" is hidden once a crew is picked, and the Settings Visibility toggle is hidden for crew pools.</li>
               <li>Sharing the link still brings people into the crew.</li>
-              <li>⚠ The CHECK is <strong>planned</strong> (migration <s>151</s> <s>152</s> <strong>153</strong>, renumbered twice on
-                2026-10-02: 151 went to R32's fix and 152 to R34's) and <strong>not built</strong>. The newest migration is 152, R34's fix,
-                which is not crews work.</li>
+              <li><s>⚠ The CHECK is planned (migration 151, then 152, then 153, renumbered as 151 went to R32's fix and 152 to R34's)
+                and not built.</s> ✅ <strong>Live since 2026-10-02 as <code>pools_crew_pool_is_private</code></strong>, in migration
+                <strong><code>154_a_crew_is_who_played</code></strong> (<code>lib/migrations/154_a_crew_is_who_played.sql:132-133</code>,
+                verified; applied <code>20261002233759</code> per the building session; commit <code>20d4740f</code>). It was renumbered a
+                third time because 153 went to Crews P2 + P3. As built it reads <code>crew_id IS NULL OR is_private IS TRUE</code>. It uses
+                <code>IS TRUE</code> because <code>is_private</code> is nullable, and a NULL would pass a plain CHECK. No pool has a crew
+                yet. The two UI hidings above are <strong>not built</strong>.</li>
               <li><strong>Refined 2026-10-02, later the same day (Ryan; plan §9 #6 and §11 #2):</strong> "always Private" meant
                 <strong>never listed</strong>. Today, with two levels, that is <code>is_private = true</code>. Once the strict level exists
                 (<a href="#d5">D5 → Amended 2026-10-02</a>), a crew pool may be <strong>Invite link</strong> (the default) or
@@ -2946,13 +3118,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         </div>
         <ul style="margin:0; padding-left:18px">
           <li>New pools already default to Invite link: <code>app/api/pools/create/route.ts:348</code>, <code>is_private ?? true</code>
-            (verified 2026-10-02).</li>
+            (re-verified at the end of 2026-10-02).</li>
           <li><strong>How the strict Private works:</strong> someone holding the link sees <em>"Request sent"</em>. The pool admin gets
             <em>"Sam wants to join · Let in / No"</em> in <strong>Activity → Needs you</strong>. <strong>Crew members skip the queue</strong>,
             because their held seat lets them in.</li>
           <li><strong>Crew pools may be Invite link (the default) or Private, never Public.</strong> This refines Crews decision 6
             (<a href="#d3">D3 → Amended 2026-10-02</a>): "always Private" meant <strong>never listed</strong>. Today, with two levels, that
-            is <code>is_private = true</code>.</li>
+            is <code>is_private = true</code>, and since migration 154 the database enforces it.</li>
           <li><strong>The strict level is its own backlog item, not part of the Crews build:</strong>
             <a href="#i-privacy">Pool privacy: three levels</a>. It is planned and not started. <strong>The join route's
             bare-<code>pool_id</code> gap is closed in the same work</strong>, cross-referenced to <a href="#r32">R32</a>.</li>
@@ -3072,7 +3244,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             an addition, not a restructure.</li>
         </ul>
         <em>Why it closed:</em> the question assumed a Crew + Season model would <strong>replace</strong> <code>pools</code>. Under this
-        design nothing is replaced, so there is nothing to migrate.</li>
+        design nothing is replaced, so there is nothing to migrate. <strong>Built that way the same night:</strong> migration 154 adds
+        <code>pools.crew_id</code> and leaves every existing pool's <code>crew_id</code> NULL (per the building session).</li>
       <li><strong>What <code>predictions_submitted_at</code> means in a 38-week season</strong> (Decision 9, rung 5). In the World
         Cup, <em>"earliest"</em> meant <em>committed earliest</em>. Across 38 matchweeks it can only mean <em>joined and picked
         first</em>. That is still deterministic and fair, but it is a different claim and should be named as one.</li>
@@ -4834,7 +5007,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><strong>Per-competition branding</strong> — theme/copy per sport. (The existing <code>branded-pools</code> feature is
         per-<strong>pool</strong> white-label — a different axis.)</li>
       <li><strong>Monetization model</strong> — free vs freemium vs paid. Tracked under 💎.</li>
-      <li><strong>Crews</strong>: planned 2026-10-02, not started. See <a href="#crews">the card below</a>.</li>
+      <li><strong>Crews</strong>: planned 2026-10-02. <s>not started</s> <strong>In progress since the same day:</strong> P1–P5 and the
+        schema (154) are done, and step 4 has started. See <a href="#crews">the card below</a>.</li>
       <li><strong>Pool privacy: three levels</strong>: planned 2026-10-02, not started. Decision 5's strict <em>Private</em> (request
         to join), built on its own and not inside Crews. See <a href="#i-privacy">its card</a>.</li>
     </ul>
@@ -4842,7 +5016,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
   <div class="card goldc" id="crews">
     <h4>👥 Crews: a crew is who played <span class="chip cat">Feature</span> <span class="chip cat">Multi-sport</span>
-      <span class="chip cat">Mobile</span> <span class="chip gold">📋 PLANNED, NOT STARTED</span> <span class="chip ok">P1 ✅ 2026-10-02</span> <span class="chip">2026-10-02</span></h4>
+      <span class="chip cat">Mobile</span> <span class="chip warn">🔨 IN PROGRESS</span> <span class="chip ok">P1–P5 ✅ 2026-10-02</span>
+      <span class="chip ok">SCHEMA 154 ✅ LIVE</span> <span class="chip gold">STEP 4 UNDER WAY</span> <span class="chip">2026-10-02</span></h4>
     <ul class="fields">
       <li><span class="f">Is:</span> Decision 1's durable group, built. You're in a crew because you played in one of its pools, or
         because you said yes when its captain added you. My Crews lists <strong>groups, never people</strong>, and there is no friends
@@ -4861,14 +5036,18 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             <code>151_a_member_cannot_crown_themselves</code>, applied to production and verified by
             <code>scripts/verify-pool-member-guard.sql</code> (8/8, rolled back). The plan records it as done (§3, commit
             <code>6c51140c</code>). ⚠ It does not touch <code>pool_entries</code>, which had the same hole: <a href="#r34">R34</a>, not a
-            crews prerequisite, ✅ fixed that night as migration 152 (<code>bd7a7bb5</code>). <strong>P2</strong> is <code>pool_first_lock_at</code>. <strong>P3</strong> is
-            <code>pool_finished_at</code>; league pools never finish today (<a href="#r33">R33</a>). <strong>P4</strong> is a single
-            join path, <code>lib/pools/join.ts</code>. <strong>P5</strong> is a numeric Activity <code>v</code> gate.</li>
-          <li><strong>Migration <code>153_a_crew_is_who_played</code></strong> (was 151, then 152; renumbered twice on 2026-10-02,
-            because 151 went to P1 and 152 to R34's fix; plan §4 and step 3 updated in <code>bd7a7bb5</code>):
-            four <strong>deny-all</strong> tables
-            (<code>crews</code>, <code>crew_members</code>, <code>crew_seats</code>, <code>crew_invites</code>), two new columns
-            (<code>pools.crew_id</code>, <code>pools.crew_prompt_dismissed_at</code>), and the Private CHECK.</li>
+            crews prerequisite, ✅ fixed that night as migration 152 (<code>bd7a7bb5</code>). <strong>P2</strong> is
+            <code>pool_first_lock_at</code>: ✅ <strong>done 2026-10-02</strong>, in migration 153 (<code>bc02a1b0</code>). <strong>P3</strong>
+            is <code>pool_finished_at</code>: ✅ <strong>done 2026-10-02</strong>, in migration 153. League pools never finish today
+            (<a href="#r33">R33</a>), and P3 works around that for Crews but <strong>does not fix R33</strong>. <strong>P4</strong> is a
+            single join path, <code>lib/pools/join.ts</code>: ✅ <strong>done 2026-10-02</strong> (<code>859625ae</code>). <strong>P5</strong>
+            is a numeric Activity <code>v</code> gate: ✅ <strong>done 2026-10-02</strong> (<code>b31dcf10</code>).</li>
+          <li><strong>Migration <s><code>153_a_crew_is_who_played</code></s> <code>154_a_crew_is_who_played</code></strong> ✅ <strong>applied
+            2026-10-02</strong> (renumbered three times: 151 went to P1, 152 to R34's fix, and 153 to P2 + P3): four
+            <strong>deny-all</strong> tables (<code>crews</code>, <code>crew_members</code>, <code>crew_seats</code>,
+            <code>crew_invites</code>), two new columns (<code>pools.crew_id</code>, <code>pools.crew_prompt_dismissed_at</code>), the
+            Private CHECK (<code>pools_crew_pool_is_private</code>), and a trigger, not named in plan §4, that lets only a trusted writer
+            set <code>pools.crew_id</code>.</li>
           <li><strong>Server:</strong> <code>lib/crews/</code> and <code>app/api/crews/</code>, plus Activity API v3.</li>
           <li><strong>RN:</strong> <code>mobile/app/profile/crews*</code>, the create-wizard Crew row, and the pool Info and Members
             tabs.</li>
@@ -4879,8 +5058,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <table style="min-width:620px">
         <thead><tr><th>Release</th><th>Scope</th><th>Size (plan's, order of magnitude)</th></tr></thead>
         <tbody>
-          <tr><td><strong>RN first</strong></td><td>P1 ✅ (done 2026-10-02), P2–P5, migration 153, <code>lib/crews/</code> + routes,
-            Activity v3, RN screens, seat notice + one reminder</td><td><strong>~15 working days</strong> (P1's share is now spent)</td></tr>
+          <tr><td><strong>RN first</strong></td><td>P1–P5 ✅ and migration 154 ✅ (all done 2026-10-02), <code>lib/crews/</code> + routes
+            (started), Activity v3, RN screens, seat notice + one reminder</td><td><strong>~15 working days</strong> at plan time. The
+            prerequisites and schema are now spent. Neither the plan nor Ryan has re-sized what remains, so no new figure is stated</td></tr>
           <tr><td><strong>Thin web slice, same release</strong></td><td>Dashboard <em>"Keep this group together?"</em> sheet (plus held
             seats and invites), basic crew page</td><td><strong>~1½ days</strong></td></tr>
           <tr><td><strong>Web, day two</strong></td><td>Create-modal Crew row + roster review, Profile → Crews tab, captain controls,
@@ -4891,15 +5071,78 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <ul class="fields">
       <li><span class="f">Why the web slice ships with RN:</span> the World Cup was played on the web (facts below). Decided by Ryan,
         2026-10-02 (plan §9 #8).</li>
-      <li><span class="f">Status:</span> 📋 <strong>Planned, not started; prerequisite P1 done.</strong> Verified in the tree 2026-10-02:
-        <code>lib/crews/</code>, <code>app/api/crews/</code> and <code>app/crews/</code> do not exist. <s>The newest migration is
-        <code>150_a_gif_comes_from_klipy.sql</code>.</s> Re-checked that evening: the newest is
-        <code>151_a_member_cannot_crown_themselves.sql</code>, which is P1 and not crews schema. Re-checked later that night: the newest
-        is now <code>152_a_member_cannot_score_themselves.sql</code>, R34's fix, also not crews schema. Crews schema is still unwritten. The only crew code is the device concept
-        <code>mobile/app/crews-concept.tsx</code>. It is <strong>untracked</strong>, and plan step 8 deletes it.</li>
+      <li><span class="f">Status:</span> 🔨 <strong>In progress. P1–P5 and plan step 3 (the schema) done 2026-10-02; step 4 under
+        way.</strong> Nothing is user-visible. There is no route or screen, and the only live hook (<code>joinPool</code>) fires only for a
+        pool with a crew, which no pool has. Verified in the tree at the end of 2026-10-02, cut at <code>dcc4f7ef</code> (20:48):
+        <s><code>lib/crews/</code>, <code>app/api/crews/</code> and <code>app/crews/</code> do not exist.</s> <code>lib/crews/rules.ts</code>
+        (<code>163fd3af</code>) and <code>lib/crews/store.ts</code> (<code>dcc4f7ef</code>) exist. <code>app/api/crews/</code> and
+        <code>app/crews/</code> do not. ⚠ <em>Past the cut:</em> <code>1c086ab6</code> (reads) and <code>bd85c53c</code> (the API routes,
+        plus <code>app/api/users/lookup</code>) landed by 20:54. They are not recorded or reviewed here. The newest migration is <code>154_a_crew_is_who_played.sql</code>, the Crews schema, preceded by
+        <code>153_a_pool_knows_when_it_locks_and_ends.sql</code> (P2 + P3). The only crew <strong>UI</strong> is the device concept
+        <code>mobile/app/crews-concept.tsx</code>. It is still <strong>untracked</strong>, and plan step 8 deletes it. ⚠ The plan
+        contradicts itself on P2's TypeScript mirror: §3 says none, §7 step 2 still says one
+        (<code>drafts/2026-10-02_crews_plan.md:354-355</code>). The code follows §3.</li>
       <li><span class="f">Done when:</span> a finished pool's admin can save its group as a crew, on web or in the app; a crew member
         who starts a pool gives every other ticked member a held seat, which is taken or quietly released at first lock; and
         <em>"crews with two or more pools"</em> can be counted (<a href="#r7">R7</a>).</li>
+    </ul>
+
+    <h4 style="margin-top:14px" id="crews-build">Build progress, 2026-10-02</h4>
+    <p style="margin:0 0 8px;font-size:13px;color:var(--slate)">Every commit is local on <code>master</code> and <strong>not pushed</strong>.
+      Both migrations are <strong>live on production</strong>. <em>Verified here</em> means I read it in the tree or ran it. <em>Building
+      session</em> means it was reported by the session that did the work and <strong>not re-queried</strong> by me. I had no production
+      access.</p>
+    <div class="scroller" style="margin-bottom:10px">
+      <table style="min-width:980px">
+        <thead><tr><th>Step</th><th>Commit</th><th>What landed</th><th>Verified here</th><th>Building session (production)</th></tr></thead>
+        <tbody>
+          <tr><td><strong>P5</strong></td><td><code>b31dcf10</code></td><td><code>lib/activity/version.ts</code>. The Activity gate is
+            <code>activityApiVersion(v) &gt;= 2</code> (<code>app/api/users/[user_id]/activity/route.ts:194</code>). It was
+            <code>=== '2'</code>, which would have sent a v3 build the v1 response</td><td>Code read; 4 tests pass</td><td>n/a, code only,
+            and not deployed until pushed</td></tr>
+          <tr><td><strong>P4</strong></td><td><code>859625ae</code></td><td><code>lib/pools/join.ts</code>, <code>joinPool()</code>, the single
+            join path: lookup, join-ability, SP010 cap, restore, first entry, Showdown schedule. The route is a thin wrapper</td><td>Code
+            read; 10 tests pass. ⚠ The bare-<code>pool_id</code> door moved here unchanged (<code>lib/pools/join.ts:43-56</code>, no
+            <code>is_private</code> check)</td><td>Behaviour unchanged (the commit's claim)</td></tr>
+          <tr><td><strong>P2 + P3</strong></td><td><code>bc02a1b0</code></td><td>Migration 153: <code>pool_first_lock_at()</code>,
+            <code>pool_finished_at()</code>. Derived, service-role only. <strong>No TypeScript mirror</strong>, a deliberate change from the
+            plan</td><td>SQL read (<code>153:52-115</code>); grants confirmed in the file; no TS caller exists</td><td>Applied 2026-10-02.
+            Checked against all 643 pools: every pool has a first lock; WC fixed-deadline pools match <code>prediction_deadline</code>; no
+            league pool uses the season end; all 3 LMS pools lock in round 1's matchweek; start weeks honoured; finished = WC done, leagues
+            running. 28 progressive WC pools have a stale <code>prediction_deadline</code> (historical)</td></tr>
+          <tr><td><strong>Step 3</strong></td><td><code>20d4740f</code></td><td>Migration 154: 4 deny-all tables, <code>pools.crew_id</code> +
+            <code>crew_prompt_dismissed_at</code>, CHECK <code>is_private IS TRUE</code>, the <code>crew_id</code> guard trigger (INSERT and
+            UPDATE)</td><td>SQL read (<code>154:1-182</code>); the deny-all guard test lists the 4 tables and passes</td><td>Applied
+            <code>20261002233759</code>. 16/16 dry-run checks, live re-check (rolled back), guard body byte-identical,
+            <code>verify-select-columns</code> OK, all 643 pools <code>crew_id</code> NULL</td></tr>
+          <tr><td><strong>Step 4</strong> (under way)</td><td><code>163fd3af</code></td><td><code>lib/crews/rules.ts</code>: every Crews
+            rule as a pure function</td><td>31 tests pass. <strong>Not reviewed</strong> against the decisions</td><td>n/a</td></tr>
+          <tr><td><strong>Step 4</strong> (under way)</td><td><code>dcc4f7ef</code></td><td><code>lib/crews/store.ts</code>: every crew write
+            (save, create, leave with succession, rejoin, remove, invite, claim, seats). <code>joinPool</code> now makes a crew pool's
+            player a crew member and takes their seat. Saving sets the pool <code>is_private: true</code></td><td>32 store + 2 join tests
+            pass (135 across <code>lib/crews</code> + <code>lib/pools</code>). Only <code>joinPool</code> imports the store.
+            <strong>Not reviewed</strong> against the decisions</td><td>84 finished World Cup groups are public (from the commit
+            message)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn" style="margin-bottom:10px"><strong>Type-check, corrected.</strong> An earlier report of <em>"zero web type
+      errors"</em> for P4 and P5 came from a command that never ran (<code>timeout</code> is not installed here).
+      <code>npx tsc --noEmit -p .</code> really gives <strong>3 errors</strong>, all <code>FormData.get</code> in
+      <code>app/api/admin/branded-pools/upload-logo/route.ts:13-15</code>. That is the pre-existing <strong>R29</strong> failure, and there
+      are none in the changed files. I re-ran it this pass and got the same result.</div>
+    <p style="margin:0 0 6px"><strong>For step 4, before any route can write a crew row.</strong> The first and third are from reading
+      <code>154</code>, and neither was tested:</p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>Account deletion bypasses captain succession.</strong> <code>app/api/account/delete/route.ts:168-169</code> deletes the
+        <code>users</code> row, and <code>crew_members</code> cascades (<code>154:48</code>). The succession in
+        <code>lib/crews/rules.ts</code> and <code>store.ts</code> <em>leave</em> is never called on that path, and a crew can be left with
+        zero captains (<code>154:61-62</code>). The plan, the rules and the store never mention account deletion.</li>
+      <li><strong>Saving delists a public pool</strong> (<code>is_private: true</code>, <code>dcc4f7ef</code>). That is consistent with
+        <a href="#d3">Decision 3</a> (amended). The save sheet should say so in plain words.</li>
+      <li><strong><code>pools.crew_id ON DELETE SET NULL</code> (<code>154:126</code>) can never fire for a crew with a season.</strong> The
+        guard (<code>154:160-161</code>) refuses the FK's own update. That is harmless while crews are closed rather than deleted, which is
+        the design. A future support-side delete will error.</li>
     </ul>
 
     <h4 style="margin-top:14px">What planning found: verified against production 2026-10-02</h4>
@@ -4976,16 +5219,23 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             <code>is_private</code> is read or written in <strong>17 files</strong> across web, RN and one guard test (verified). They include mobile
             Settings, which writes <code>pools</code> directly, so the level has to be enforced in the database as well as hidden in the
             UI.</li>
-          <li><strong>A request to join</strong>, held somewhere, plus a new Needs-you card kind. Activity's <code>v</code> gate is a strict
-            <code>=== '2'</code> today (<code>app/api/users/[user_id]/activity/route.ts:191</code>, verified), which is what Crews
-            <strong>P5</strong> changes.</li>
+          <li><strong>A request to join</strong>, held somewhere, plus a new Needs-you card kind. <s>Activity's <code>v</code> gate is a
+            strict <code>=== '2'</code> today (<code>app/api/users/[user_id]/activity/route.ts:191</code>, verified), which is what Crews
+            <strong>P5</strong> changes.</s> ✅ <strong>P5 done 2026-10-02</strong> (<code>b31dcf10</code>). The gate is now
+            <code>activityApiVersion(v) &gt;= 2</code> (<code>app/api/users/[user_id]/activity/route.ts:194</code>, verified), so a new card
+            kind can go out to v3 builds only, without dropping v3 to the v1 response.</li>
           <li><strong>The join route's bare-<code>pool_id</code> gap, closed in the same work</strong> (Ryan). Cross-reference
             <a href="#r32">R32</a>.
             <ul style="margin:4px 0 0; padding-left:18px">
-              <li><code>app/api/pools/join/route.ts:27-33</code> accepts <code>{pool_id}</code> and looks the pool up with the
-                <strong>admin client</strong>. Neither the route nor <code>poolJoinability</code> (<code>lib/poolStatus.ts:99-110</code>)
-                checks <code>is_private</code> (verified). So anyone holding a private pool's <code>pool_id</code> joins without the
-                code.</li>
+              <li><s><code>app/api/pools/join/route.ts:27-33</code></s> The route accepts <code>{pool_id}</code>
+                (<code>app/api/pools/join/route.ts:22-26</code>). Since Crews P4 (<code>859625ae</code>), it hands that to
+                <code>joinPool()</code>, which looks the pool up with the <strong>admin client</strong> (<code>lib/pools/join.ts:43-56</code>).
+                Neither <code>joinPool</code>, the route nor <code>poolJoinability</code> (<code>lib/poolStatus.ts:99-110</code>) checks
+                <code>is_private</code> (re-verified at the end of 2026-10-02). So anyone holding a private pool's <code>pool_id</code> joins
+                without the code. <strong>P4 moved the door; it did not close it.</strong> Because every join now runs through
+                <code>joinPool</code>, <strong>this is the one place to close it.</strong> Since <code>dcc4f7ef</code>, a join through it
+                also makes the joiner a member of the pool's crew, if it has one. So a bare <code>pool_id</code> into a crew pool would
+                join the crew as well.</li>
               <li>R32's fix (trigger plus INSERT policy) does not close this door, because the route bypasses RLS. This item does not close
                 R32's door either. <strong>Both are needed.</strong> ✅ <strong>R32's half landed 2026-10-02</strong> (migration 151 drops
                 the client INSERT policy). <strong>This half is still open.</strong></li>
@@ -4996,10 +5246,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
                 link</strong> unless that page moves to the code first. Verified 2026-10-02. Not resolved here.</li>
               <li>Any tightening must still let crew members into their crew's pool from the crew page (plan §10).</li>
             </ul></li>
-          <li><strong>Crews interaction.</strong> Migration 153's planned <code>CHECK (crew_id IS NULL OR is_private)</code> (plan §4;
-            renumbered from 151, then 152) is
-            written against the boolean. Whichever of the two lands second has to restate <em>"a crew pool is never Public"</em> against the
-            other's schema.</li>
+          <li><strong>Crews interaction.</strong> <s>Migration 153's planned <code>CHECK (crew_id IS NULL OR is_private)</code></s> Crews
+            landed first. Migration <strong>154</strong>'s CHECK <code>pools_crew_pool_is_private</code> (<code>crew_id IS NULL OR is_private
+            IS TRUE</code>, <code>lib/migrations/154_a_crew_is_who_played.sql:132-133</code>, live per the building session) is written
+            against the boolean. <strong>So this item, landing second, has to restate <em>"a crew pool is never Public"</em> against its new
+            visibility column</strong>, and replace or amend that CHECK in the same migration.</li>
           <li><strong>The relabel.</strong> Every surface that says "Private" today becomes "Invite link", on web and RN.</li>
         </ul></li>
       <li><span class="f">Not decided, and for this item's design:</span> what the requester sees after <em>No</em>, and whether a request
@@ -5012,8 +5263,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <code>lib/migrations/</code>, and the join route still has no <code>is_private</code> check. Re-checked that evening: commit
         <code>6c51140c</code> (151) touched only the migration, its verify script and the Crews plan, so the route is unchanged. <s>The
         newest migration is now 151, R32's fix.</s> Re-checked later that night: commit <code>bd7a7bb5</code> (152) touched only the
-        migration, the two verify scripts and the Crews plan, so the route is still unchanged. The newest migration is now 152, R34's
-        fix.</li>
+        migration, the two verify scripts and the Crews plan, so the route is still unchanged. <s>The newest migration is now 152, R34's
+        fix.</s> Re-checked at the end of 2026-10-02: Crews P4 (<code>859625ae</code>) moved the join logic into
+        <code>lib/pools/join.ts</code>, still with no <code>is_private</code> check. <code>dcc4f7ef</code> added the crew hook there, and
+        still no check. No visibility column exists. The newest migration is now 154, the Crews schema. <code>is_private</code> now
+        appears in <strong>19</strong> files: the 17 above plus <code>lib/crews/store.ts</code> and its test.</li>
       <li><span class="f">Done when:</span> an admin can set a pool to Private; a link-holder who isn't in its crew gets <em>"Request
         sent"</em>, and joins only when the admin taps <em>Let in</em>; a crew member joins a Private crew pool straight through; a crew pool
         cannot be made Public, enforced in the database; and a bare <code>pool_id</code> no longer joins a non-public pool, while web invite
