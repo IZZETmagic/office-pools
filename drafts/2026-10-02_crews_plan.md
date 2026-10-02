@@ -263,8 +263,14 @@ extra state and nobody is notified.
 - **Email never reveals whether an account exists.** It always answers *"Invite sent"*.
   - An existing account gets the Needs-you card and one email.
   - No account: **one** email from SportPool — *"Dave asked us to invite you to Bermuda Office"* —
-    linking to sign-up. Plural "we" voice. This is the captain's own act, sent once, so it is not the
-    *"reminders in the user's name"* that Decision 2 forbids.
+    linking to sign-up. Plural "we" voice.
+  - **Settled with Ryan, 2026-10-02 (a clarification of Decision 2, not an exception to it):**
+    *invitations name who asked, once, previewed; reminders never do.*
+    - It's **from SportPool**, worded *"Dave asked us…"*, never written as if Dave wrote it.
+    - Before pressing Invite, the captain **sees the exact email**: *"We'll send mia@example.com one
+      email: …"*.
+    - It's **sent once**, with no follow-ups.
+    - Seat notices and the one reminder still never name the captain.
 - **An email invite is claimed at sign-up only against a *verified* address.** Otherwise someone could
   register the address first and land in the crew.
 - **"No thanks" sticks:** that crew can't re-invite you. They can still bring you in the played way, by
@@ -440,7 +446,7 @@ About **3½ days**. With 8a, web is about **5 days** in total.
 | 3 | If someone left or was removed, does joining a crew pool by link put them back in the crew? | ✅ **Decided — no, exits stick.** They play the pool. Left → **Rejoin** themselves from the crew page. Removed → only captain/co-captain can add them back (one Join tap) |
 | 4 | Co-captain at save time: required, or optional with a nudge later? | ✅ **Decided — optional.** Skippable row on the save sheet; *"Pick a co-captain"* stays on the crew page until set (for a direct crew, once someone joins). Being made co-captain = one Activity history line, no card. Amends D1's "from day one" |
 | 5 | Pending seats inside the pool: a count line, or rows like the mock? | ✅ **Decided — count for everyone, names for the pool admin.** Members see *"9 in · 3 spots saved"*; the admin's Members tab lists who is still pending. Declined seats are not listed. Leaderboard untouched |
-| 6 | Crew pools forced Private (never listed in Discover)? | ✅ **Decided — yes, always Private.** The "Who can join" switch is hidden once a crew is picked, and the Settings Visibility toggle is hidden for crew pools. Sharing the link still brings people into the crew |
+| 6 | Crew pools forced Private (never listed in Discover)? | ✅ **Decided — never Public.** Today that means `is_private = true`. Refined the same day: once the strict level exists (see §11), a crew pool can be **Invite link** (default) or **Private** (request to join; crew members skip the queue), never **Public** |
 | 7 | Crew bigger than the pool's tier cap (Free 10)? | ✅ **Decided — seats never exceed the cap.** Roster review: *"A Free pool holds 10"* → **Go Plus** or **choose who gets the 9 spots**. Upgrading before first lock re-opens the review. Link joins still hit the cap as today |
 | 8 | Email the 253 World Cup admins once at launch? | ✅ **Decided — no email.** But a **thin web slice ships with the RN release** (dashboard save sheet + basic crew page, ~1½ d), because the World Cup was played on web |
 | 9 | Captain leaves with no co-captain? | ✅ **Decided — the longest-standing member** (earliest `joined_at`; tie → most crew pools played). One Activity history line for them; the crew page shows *"Captain: Marcus (since Dave left)"*. When the last member leaves, the crew closes: history kept, never shown, no seats |
@@ -457,8 +463,8 @@ About **3½ days**. With 8a, web is about **5 days** in total.
 - **#8:** no email to the World Cup admins. The web dashboard save sheet and a basic crew page ship
   **with** the RN release.
 - **#7:** seats never exceed the pool's cap. Go Plus, or choose who gets the spots.
-- **#6:** crew pools are always Private, enforced by a CHECK constraint on `pools`, not only by hiding
-  the toggle.
+- **#6:** crew pools are never Public, enforced by a CHECK constraint on `pools`, not only by hiding
+  the toggle. Today that means `is_private = true`; once the strict level lands, Invite link or Private.
 - **#5:** saved spots appear as a count to members; the pool admin sees names of who's still pending.
 - **#3:** exits stick. Joining by link doesn't re-add. Leavers can Rejoin themselves; the removed only
   by being added back.
@@ -468,7 +474,19 @@ About **3½ days**. With 8a, web is about **5 days** in total.
 - **Run it back** (D2): the crew row makes it cheaper later, but it isn't needed for Crews to work.
 - **Suggested crews:** parked 2026-09-28.
 - **Crew banter:** banter stays per pool (D1).
-- **The `pools` → Crew + Season migration:** not needed. Crews sit **beside** today's pools via
-  `pools.crew_id`; the 643 existing pools are untouched until an admin chooses to save one.
+- **The `pools` → Crew + Season migration:** not needed, and the question is **closed** *(Ryan,
+  2026-10-02)*. Crews sit **beside** today's pools via `pools.crew_id`, and **a pool is a season**.
+  The 643 existing pools are untouched until an admin chooses to save one. Anything that must one day
+  belong to the crew rather than a pool becomes a column on `crews`: an addition, not a restructure.
 - **The join route accepting a bare `pool_id` for private pools:** part of the P1 conversation, but
   any tightening must keep **crew members** able to join their crew's pool from the crew page.
+
+## 11. Settled after the nine — the conflicts Gill surfaced (2026-10-02)
+
+| # | Conflict | Outcome |
+|---|---|---|
+| 1 | The *Friends list* backlog item contradicts Decision 1 | **Retired** (struck through, not deleted). Its job is done by Crews; finding one person uses the exact lookup, never a list |
+| 2 | Decision 5 names three privacy levels; the app has two | **Keep three; build the strict one as its own backlog item** (not in the Crews build). **Public** (Discover) · **Invite link** (today's "Private", relabelled, behaviour unchanged) · **Private** (request to join: the link shows *"Request sent"*, the admin gets *"Sam wants to join · Let in / No"* in Needs you; crew members skip the queue). Crew pools: Invite link (default) or Private, never Public. Close the join route's bare-`pool_id` gap at the same time |
+| 3 | Programme items assume a Crew + Season restructure | **Adopted the plan's design and closed the question:** crews sit alongside pools; a pool is a season |
+| 4 | The invite email names the captain; Decision 2 says "never in the captain's name" | **Name the captain, once, previewed, from SportPool.** Recorded as a clarification of Decision 2: *invitations name who asked; reminders never do* |
+
