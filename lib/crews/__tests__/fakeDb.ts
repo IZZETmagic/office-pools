@@ -1,7 +1,8 @@
 // An in-memory stand-in for the admin client, just wide enough for lib/crews/store.ts.
 //
-// Supports the PostgREST builder calls the store makes — select (incl. count/head), insert, update,
-// delete; eq / is / in / gte / ilike (exact, case-insensitive, wildcards escaped) / limit; single /
+// Supports the PostgREST builder calls the store and readers make — select (incl. count/head),
+// insert, update, delete; eq / is / in / gte / ilike (exact, case-insensitive, wildcards escaped) /
+// order / limit; single /
 // maybeSingle / await — plus rpc() answered from a table of canned values.
 //
 // It also enforces the one rule the store's write ORDER depends on: 154's partial unique index of
@@ -42,6 +43,7 @@ export function fakeDb(seed: Record<string, Row[]>, rpcAnswers: Record<string, u
     let payload: Row | Row[] | null = null
     let head = false
     let limit: number | null = null
+    let sort: { col: string; asc: boolean } | null = null
     const filters: Array<(r: Row) => boolean> = []
 
     const run = (): { data: unknown; error: { message: string } | null; count?: number } => {
@@ -73,7 +75,13 @@ export function fakeDb(seed: Record<string, Row[]>, rpcAnswers: Record<string, u
         }
         return { data: match, error: null }
       }
-      const out = (limit === null ? match : match.slice(0, limit)).map((r) => ({ ...r }))
+      const sorted = sort
+        ? [...match].sort((x, y) => {
+            const a = String(x[sort!.col] ?? ''), b = String(y[sort!.col] ?? '')
+            return sort!.asc ? a.localeCompare(b) : b.localeCompare(a)
+          })
+        : match
+      const out = (limit === null ? sorted : sorted.slice(0, limit)).map((r) => ({ ...r }))
       return head ? { data: null, error: null, count: match.length } : { data: out, error: null, count: match.length }
     }
 
@@ -106,6 +114,7 @@ export function fakeDb(seed: Record<string, Row[]>, rpcAnswers: Record<string, u
       return b
     }
     b.limit = (n: number) => ((limit = n), b)
+    b.order = (col: string, opts?: { ascending?: boolean }) => ((sort = { col, asc: opts?.ascending !== false }), b)
     b.single = () => {
       const r = run()
       if (r.error) return Promise.resolve({ data: null, error: r.error })
