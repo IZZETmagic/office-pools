@@ -43,7 +43,8 @@ export async function joinPool(
   const lookup = admin
     .from('pools')
     // league_season_id is needed only to re-score a restored league entry — see below.
-    .select('pool_id, pool_name, status, accepting_members, league_season_id')
+    // crew_id: a crew's pool makes its players crew members (Crews, 154) — see the end.
+    .select('pool_id, pool_name, status, accepting_members, league_season_id, crew_id')
   const { data: pool } = await ('poolId' in target
     ? lookup.eq('pool_id', target.poolId)
     : lookup.eq('pool_code', target.poolCode)
@@ -53,6 +54,7 @@ export async function joinPool(
     status: string
     accepting_members: boolean | null
     league_season_id: string | null
+    crew_id: string | null
   }>()
 
   if (!pool) {
@@ -159,6 +161,14 @@ export async function joinPool(
   // Best-effort, like the re-score above: a schedule that is one join stale is
   // recoverable, a join that failed is not.
   if (sched.error) console.error('Failed to regenerate duel schedule:', sched.error)
+
+  // A crew's pool: playing in it is how you join the crew (unless you left or were removed — exits
+  // stick), and it takes any saved spot you were holding. Best-effort, like the steps above: the
+  // join itself has already happened. Loaded lazily — lib/crews/store imports this module.
+  if (pool.crew_id) {
+    const { onCrewPoolJoined } = await import('@/lib/crews/store')
+    await onCrewPoolJoined(admin, { crewId: pool.crew_id, poolId: pool.pool_id, userId })
+  }
 
   return {
     ok: true,

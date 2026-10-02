@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const restore = vi.fn()
 const rescore = vi.fn()
 const regenerate = vi.fn()
+const crewJoined = vi.fn()
 
 vi.mock('@/lib/entries/retire', () => ({
   restoreEntriesForMember: (...a: unknown[]) => restore(...a),
@@ -17,6 +18,9 @@ vi.mock('@/lib/entries/retire', () => ({
 }))
 vi.mock('@/lib/league/duels', () => ({
   regenerateDuelSchedule: (...a: unknown[]) => regenerate(...a),
+}))
+vi.mock('@/lib/crews/store', () => ({
+  onCrewPoolJoined: (...a: unknown[]) => crewJoined(...a),
 }))
 
 import { joinPool } from '../join'
@@ -28,6 +32,7 @@ type Pool = {
   status: string
   accepting_members: boolean | null
   league_season_id: string | null
+  crew_id?: string | null
 }
 
 type Opts = {
@@ -92,6 +97,7 @@ beforeEach(() => {
   restore.mockReset().mockResolvedValue({ restored: 0, error: null })
   rescore.mockReset().mockResolvedValue({ error: null })
   regenerate.mockReset().mockResolvedValue({ error: null })
+  crewJoined.mockReset().mockResolvedValue(undefined)
 })
 
 describe('joinPool', () => {
@@ -182,6 +188,23 @@ describe('joinPool', () => {
     expect(inserts.map((i) => i.table)).toEqual(['pool_members'])
     expect(rescore).toHaveBeenCalledWith(client, { poolId: 'p1', leagueSeasonId: 'season-1' })
     expect(regenerate).toHaveBeenCalledWith(client, 'p1')
+  })
+
+  it('a crew’s pool tells the crew who joined; any other pool does not', async () => {
+    const crewPool = fakeClient({ pool: { ...OPEN, crew_id: 'crew-1' } })
+    await joinPool(crewPool.client, { poolId: 'p1' }, 'u1')
+    expect(crewJoined).toHaveBeenCalledWith(crewPool.client, { crewId: 'crew-1', poolId: 'p1', userId: 'u1' })
+
+    crewJoined.mockClear()
+    const plain = fakeClient({ pool: OPEN })
+    await joinPool(plain.client, { poolId: 'p1' }, 'u1')
+    expect(crewJoined).not.toHaveBeenCalled()
+  })
+
+  it('a refused join tells the crew nothing', async () => {
+    const { client } = fakeClient({ pool: { ...OPEN, crew_id: 'crew-1' }, existingMember: true })
+    await joinPool(client, { poolId: 'p1' }, 'u1')
+    expect(crewJoined).not.toHaveBeenCalled()
   })
 
   it('does not fail the join when the best-effort steps fail', async () => {
