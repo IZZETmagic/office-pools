@@ -85,7 +85,19 @@ in places; each one is stated here rather than built quietly.
 **P1 · ✅ DONE 2026-10-02: migration `151_a_member_cannot_crown_themselves`**, applied to production.
 It's verified by `scripts/verify-pool-member-guard.sql` (8/8, rolled back), and the live function is
 byte-identical to the file. **R34 followed the same day as migration `152_a_member_cannot_score_themselves`**
-(`scripts/verify-pool-entry-guard.sql`, 17/17 live). The Crews schema is therefore migration **153**.
+(`scripts/verify-pool-entry-guard.sql`, 17/17 live).
+
+**P2–P5 ✅ DONE 2026-10-02:**
+- **P5:** `lib/activity/version.ts`. The gate is now "at least 2".
+- **P4:** `lib/pools/join.ts`, with 10 tests. The route is a thin wrapper.
+- **P2 + P3:** migration `153_a_pool_knows_when_it_locks_and_ends` adds `pool_first_lock_at()` and
+  `pool_finished_at()`, applied and checked against all 643 pools.
+
+  ⚠ **Changed from the plan:** **no TypeScript mirror.** The SQL functions are the single owner, and
+  server code calls them through the admin client. A mirror would be a second owner, which is what
+  P2 set out to remove.
+
+**The Crews schema is therefore migration 154.**
 
 **P1 · 🔴 Pool-level privilege escalation (security, independent of crews, do first).**
 I confirmed the following from the live catalog; I did not attempt the exploit.
@@ -140,7 +152,7 @@ numeric `>= 2` before any build sends 3.
 
 ---
 
-## 4. Data model — migration `153_a_crew_is_who_played`
+## 4. Data model — migration `154_a_crew_is_who_played`
 
 Four additions. **All crew tables are deny-all**: RLS on, zero policies, admin client only. They must
 be added to `lib/league/__tests__/denyAllTables.guard.test.ts`.
@@ -338,12 +350,12 @@ There is **no web Activity page**, so web gets these items on the dashboard. See
 Each step is a commit; nothing is pushed until Ryan says so.
 
 1. ✅ **P1 security trigger:** migration 151 + `scripts/verify-pool-member-guard.sql` (done 2026-10-02).
-2. **P2–P5:**
+2. ✅ **P2–P5** (done 2026-10-02, see §3):
    - `pool_first_lock_at` / `pool_finished_at` (SQL + TypeScript mirror, tested against each other on
      real pools);
    - `lib/pools/join.ts` extraction (behaviour-identical; existing join tests pass);
    - numeric `v` gate.
-3. **Migration 153** (schema in §4).
+3. **Migration 154** (schema in §4).
    - Before applying: `scripts/verify-select-columns.ts`; hash `prosrc` on both sides.
    - Apply via MCP; add the tables to the deny-all guard test.
 4. **`lib/crews/` + routes** (§5), with vitest coverage of the pure parts:
