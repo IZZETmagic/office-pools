@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { seatSelectionError, spotsForCap } from '@/lib/crews/rules'
+import { holdSeats } from '@/lib/crews/store'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { seedPoolRoundStates } from '@/lib/poolRoundStates'
@@ -56,6 +58,9 @@ export async function POST(request: NextRequest) {
     is_private,
     max_participants,
     max_entries_per_user,
+    // Crews (154): the crew this pool is a season of, and who gets a saved spot in it.
+    crew_id,
+    seat_user_ids,
   } = body
 
   if (!pool_name?.trim()) {
@@ -66,6 +71,47 @@ export async function POST(request: NextRequest) {
   }
 
   const adminClient = createAdminClient()
+
+  // ── Crews ────────────────────────────────────────────────────────────────────
+  // A crew's pool: checked here, BEFORE anything is written, so a refusal never
+  // leaves a pool behind. The creator must be an active member (any member may
+  // start a pool — Decision 1); the pool is private (Decision 6, and 154's CHECK);
+  // and the saved spots never exceed what the pool can hold (decision 7 — a saved
+  // spot is a promise). New pools are Free, enforced from creation (075).
+  let crewSeats: string[] = []
+  if (crew_id != null) {
+    if (typeof crew_id !== 'string') {
+      return NextResponse.json({ error: 'crew_id must be a crew id.' }, { status: 400 })
+    }
+    if (is_private === false) {
+      return NextResponse.json({ error: 'Crew pools are always private.' }, { status: 400 })
+    }
+    const { data: crew } = await adminClient
+      .from('crews')
+      .select('crew_id, closed_at')
+      .eq('crew_id', crew_id)
+      .maybeSingle()
+    const { data: crewMembers } = await adminClient
+      .from('crew_members')
+      .select('user_id')
+      .eq('crew_id', crew_id)
+      .is('left_at', null)
+    const activeIds = new Set((crewMembers ?? []).map((m) => m.user_id as string))
+    if (!crew || crew.closed_at || !activeIds.has(userData.user_id)) {
+      return NextResponse.json({ error: 'Crew not found.' }, { status: 404 })
+    }
+    crewSeats = Array.isArray(seat_user_ids)
+      ? seat_user_ids.filter((x: unknown): x is string => typeof x === 'string')
+      : []
+    const { data: cap } = await adminClient.rpc('pool_tier_member_cap', { p_tier: 'free' })
+    const seatError = seatSelectionError({
+      chosen: crewSeats,
+      activeMemberIds: activeIds,
+      starterId: userData.user_id,
+      spots: spotsForCap((cap as number | null) ?? null),
+    })
+    if (seatError) return NextResponse.json({ error: seatError }, { status: 400 })
+  }
 
   // A league pool carries BOTH ids in the vertical slice — see
   // drafts/2026-08-22_league_vertical_slice.md §1. `tournament_id` stays
@@ -360,6 +406,9 @@ export async function POST(request: NextRequest) {
       max_entries_per_user: league_season_id
         ? 1
         : Math.max(1, Math.min(10, max_entries_per_user || 1)),
+      // Set once, here, by the server — 154's trigger refuses it from a client and
+      // refuses any later change.
+      crew_id: crew_id ?? null,
     })
     .select()
     .single()
@@ -404,6 +453,16 @@ export async function POST(request: NextRequest) {
 
   if (entryError) {
     console.error('Failed to create first entry:', entryError.message)
+  }
+
+  // 4b. Crews: hold a saved spot for each chosen member. The notice and the one
+  // reminder are sent separately (Crews step 7). A failure here is reported, not
+  // hidden: the pool exists, but nobody was promised a spot.
+  let seatsHeld = 0
+  if (crew_id) {
+    const held = await holdSeats(adminClient, { poolId: newPool.pool_id, crewId: crew_id, userIds: crewSeats })
+    if (held.error) console.error('Failed to hold crew seats:', held.error)
+    else seatsHeld = crewSeats.length
   }
 
   // 5. Update pool_settings with default scoring values (trigger auto-creates the row)
@@ -488,5 +547,6 @@ export async function POST(request: NextRequest) {
     pool_id: newPool.pool_id,
     pool_code: newPool.pool_code,
     pool_name: newPool.pool_name,
+    ...(crew_id ? { crew_id, seats_held: seatsHeld } : {}),
   })
 }

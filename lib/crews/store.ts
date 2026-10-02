@@ -305,6 +305,25 @@ export async function leaveCrew(
   return { ok: true, closed: false, newCaptainId: null }
 }
 
+/**
+ * Deleting an account. Its crew_members rows cascade away with the users row (154), which on its own
+ * would leave a crew with no captain. So, first, leave every crew the way a person leaving does —
+ * the captaincy passes on, open seats are released, a crew whose last member this was closes.
+ * Returns how many crews were left and any that failed, so the caller can refuse to go on.
+ */
+export async function leaveAllCrews(admin: Admin, userId: string): Promise<{ left: number; failed: string[] }> {
+  const { data, error } = await admin.from('crew_members').select('crew_id').eq('user_id', userId).is('left_at', null)
+  if (error) return { left: 0, failed: [`crew_members: ${error.message}`] }
+  let left = 0
+  const failed: string[] = []
+  for (const { crew_id } of data ?? []) {
+    const r = await leaveCrew(admin, { crewId: crew_id, userId })
+    if (r.ok) left++
+    else failed.push(`${crew_id}: ${r.error}`)
+  }
+  return { left, failed }
+}
+
 /** Someone who left on their own comes back. Never the removed — they need to be added back. */
 export async function rejoinCrew(admin: Admin, p: { crewId: string; userId: string }): Promise<CrewResult> {
   const crew = await loadCrew(admin, p.crewId)

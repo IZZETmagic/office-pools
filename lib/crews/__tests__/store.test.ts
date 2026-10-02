@@ -13,6 +13,7 @@ import {
   claimEmailInvites,
   createCrew,
   inviteToCrew,
+  leaveAllCrews,
   leaveCrew,
   lookupUsername,
   onCrewPoolJoined,
@@ -282,5 +283,23 @@ describe('the fake enforces what the store’s write order depends on', () => {
       .from('crew_members').update({ role: 'captain' }).eq('user_id', 'co')) as { error: unknown }
     expect(r.error).toBeTruthy()
     expect(db.tables.crew_members.find((m) => m.user_id === 'co')?.role).toBe('co_captain')
+  })
+})
+
+describe('deleting an account leaves every crew first', () => {
+  it('passes each captaincy on and closes a crew it was the last member of', async () => {
+    const db = fakeDb({
+      crews: [crew(), crew({ crew_id: 'c2', name: 'Solo' })],
+      crew_members: [
+        member('me', 'captain'),
+        member('co', 'co_captain'),
+        { ...member('me', 'captain'), crew_id: 'c2' },
+      ],
+      pools: [],
+    })
+    expect(await leaveAllCrews(db.client, 'me')).toEqual({ left: 2, failed: [] })
+    const c1 = db.tables.crew_members.filter((m) => m.crew_id === 'c1' && m.left_at === null)
+    expect(c1.map((m) => [m.user_id, m.role])).toEqual([['co', 'captain']])
+    expect(db.tables.crews.find((c) => c.crew_id === 'c2')?.closed_at).not.toBeNull()
   })
 })

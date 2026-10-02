@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { withPerfLogging } from '@/lib/api-perf'
+import { leaveAllCrews } from '@/lib/crews/store'
 
 async function handleDELETE() {
   const auth = await requireAuth()
@@ -60,6 +61,22 @@ async function handleDELETE() {
         ownedPools: ownedPools.map((p) => ({ poolId: p.pool_id, poolName: p.pool_name })),
       },
       { status: 400 },
+    )
+  }
+
+  // Crews (154): crew_members cascades with the users row, which on its own could
+  // leave a crew with no captain. Leave every crew first, exactly as a person
+  // leaving does — the captaincy passes on and a last member's crew closes. If
+  // that fails, stop here.
+  //
+  // ⚠ HERE, BEFORE ANY DELETE — for the reason the ownership check above gives.
+  // Everything below is irreversible, so a refusal after it would be a receipt.
+  const crews = await leaveAllCrews(adminSupabase, userData.user_id)
+  if (crews.failed.length > 0) {
+    console.error('[account/delete] leaving crews failed:', crews.failed)
+    return NextResponse.json(
+      { error: 'Could not hand over your crews. Your account was not deleted — please try again.' },
+      { status: 500 },
     )
   }
 

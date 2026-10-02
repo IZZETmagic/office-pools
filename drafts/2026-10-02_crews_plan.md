@@ -351,14 +351,28 @@ Each step is a commit; nothing is pushed until Ryan says so.
 
 1. ✅ **P1 security trigger:** migration 151 + `scripts/verify-pool-member-guard.sql` (done 2026-10-02).
 2. ✅ **P2–P5** (done 2026-10-02, see §3):
-   - `pool_first_lock_at` / `pool_finished_at` (SQL + TypeScript mirror, tested against each other on
-     real pools);
+   - `pool_first_lock_at` / `pool_finished_at` — SQL only, checked against all 643 pools. ⚠ The
+     TypeScript mirror first planned here was dropped (see §3): one owner, not two;
    - `lib/pools/join.ts` extraction (behaviour-identical; existing join tests pass);
    - numeric `v` gate.
 3. ✅ **Migration 154** (schema in §4) — applied 2026-10-02 (`20261002233759`); 16/16 dry-run checks, live re-check, guard body byte-identical. Also covers client INSERTs of pools (the pools INSERT policy only checks admin_user_id), which §4 had not named.
    - Before applying: `scripts/verify-select-columns.ts`; hash `prosrc` on both sides.
    - Apply via MCP; add the tables to the deny-all guard test.
-4. **`lib/crews/` + routes** (§5), with vitest coverage of the pure parts:
+4. ✅ **`lib/crews/` + routes** (§5) — done 2026-10-02 in five commits: rules (`163fd3af`), store +
+   the join hook (`dcc4f7ef`), reads (`1c086ab6`), routes (`bd85c53c`), and pool creation for a crew
+   plus account deletion (this step's last commit). 83 unit tests, plus
+   `scripts/verify-crews-store.ts`: **34/34 live** on production as the seeded test accounts, on a
+   crew with no pools, deleted afterwards. Found while building, not in §5:
+   - **saving a pool as a crew sets it Private** — 84 finished World Cup groups were Public, and a
+     crew pool is never listed. The save sheet must say so (RN step);
+   - **deleting an account now leaves every crew first** (`leaveAllCrews`), *before* any destructive
+     delete — otherwise crew_members cascades and a crew can lose its captain;
+   - a crew that has had a season can't be hard-deleted (`pools.crew_id`'s ON DELETE SET NULL is
+     refused by the once-only guard). That fits "crews close, never delete";
+   - the bare-`pool_id` join door (privacy item) now also joins the crew. Dormant until a crew pool
+     exists; `joinPool` is now the one place to close it.
+
+   Originally listed for this step, with vitest coverage of the pure parts:
    - membership-on-join;
    - seat open / closed;
    - captain succession;
