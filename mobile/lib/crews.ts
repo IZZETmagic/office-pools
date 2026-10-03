@@ -9,7 +9,15 @@
 
 export type CrewRole = 'captain' | 'co_captain' | 'member';
 
-export type Person = { userId: string; username: string | null; fullName: string | null; avatarUrl: string | null };
+export type Person = {
+  userId: string;
+  username: string | null;
+  fullName: string | null;
+  avatarUrl: string | null;
+  /** What MemberAvatar composes a face from; null for someone who hasn't built one. */
+  avatarBuild: unknown;
+  avatarColour: string | null;
+};
 
 export type CrewCard = {
   crewId: string;

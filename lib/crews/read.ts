@@ -32,7 +32,19 @@ import {
 
 type Admin = ReturnType<typeof createAdminClient>
 
-export type Person = { userId: string; username: string | null; fullName: string | null; avatarUrl: string | null }
+/**
+ * Someone, as the screens draw them. avatarBuild + avatarColour are what the app's MemberAvatar
+ * composes a face from (327 bytes, composed on the phone — see mobile/components/avatar/MemberAvatar);
+ * a member who hasn't built one gets initials on their colour.
+ */
+export type Person = {
+  userId: string
+  username: string | null
+  fullName: string | null
+  avatarUrl: string | null
+  avatarBuild: unknown
+  avatarColour: string | null
+}
 export type PoolMode = { predictionMode: string; leagueMode: string | null }
 
 type PoolRow = {
@@ -60,17 +72,24 @@ async function people(admin: Admin, ids: string[]): Promise<Map<string, Person>>
   if (unique.length === 0) return out
   const { data, error } = await admin
     .from('users')
-    .select('user_id, username, full_name, avatar_url')
+    .select('user_id, username, full_name, avatar_url, avatar_build, avatar_colour')
     .in('user_id', unique)
   if (error) throw new Error(`users: ${error.message}`)
   for (const u of data ?? []) {
-    out.set(u.user_id, { userId: u.user_id, username: u.username, fullName: u.full_name, avatarUrl: u.avatar_url })
+    out.set(u.user_id, {
+      userId: u.user_id,
+      username: u.username,
+      fullName: u.full_name,
+      avatarUrl: u.avatar_url,
+      avatarBuild: u.avatar_build ?? null,
+      avatarColour: u.avatar_colour ?? null,
+    })
   }
   return out
 }
 
 const personOf = (map: Map<string, Person>, id: string): Person =>
-  map.get(id) ?? { userId: id, username: null, fullName: null, avatarUrl: null }
+  map.get(id) ?? { userId: id, username: null, fullName: null, avatarUrl: null, avatarBuild: null, avatarColour: null }
 
 /** A crew's seasons, each with its competition name, first lock (153) and finish (153). */
 async function crewPools(admin: Admin, crewIds: string[]): Promise<CrewPool[]> {
@@ -409,8 +428,18 @@ export async function readRoster(
 
   const ids = others.map((m) => m.user_id)
   const { data: users } = ids.length
-    ? await admin.from('users').select('user_id, username, full_name, avatar_url, last_login').in('user_id', ids)
-    : { data: [] as { user_id: string; username: string; full_name: string | null; avatar_url: string | null; last_login: string | null }[] }
+    ? await admin.from('users').select('user_id, username, full_name, avatar_url, avatar_build, avatar_colour, last_login').in('user_id', ids)
+    : {
+        data: [] as {
+          user_id: string
+          username: string
+          full_name: string | null
+          avatar_url: string | null
+          avatar_build: unknown
+          avatar_colour: string | null
+          last_login: string | null
+        }[],
+      }
   const byId = new Map((users ?? []).map((u) => [u.user_id, u]))
 
   const signals: RosterSignal[] = others.map((m) => ({
@@ -430,6 +459,8 @@ export async function readRoster(
         username: u?.username ?? null,
         fullName: u?.full_name ?? null,
         avatarUrl: u?.avatar_url ?? null,
+        avatarBuild: u?.avatar_build ?? null,
+        avatarColour: u?.avatar_colour ?? null,
         reasons: r.reasons,
         ticked: r.ticked,
       }

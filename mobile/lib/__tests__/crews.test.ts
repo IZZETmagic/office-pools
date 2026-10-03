@@ -50,7 +50,7 @@ describe('the My Crews card', () => {
     expect(crewStatusText({ kind: 'quiet', poolId: null, competition: null })).toBe('No seasons yet');
   });
   it('leader and my place', () => {
-    const leader = { userId: 'd', username: 'dave', fullName: 'Dave Okafor', avatarUrl: null, titles: 1 };
+    const leader = { userId: 'd', username: 'dave', fullName: 'Dave Okafor', avatarUrl: null, avatarBuild: null, avatarColour: null, titles: 1 };
     expect(leaderText({ leader }, 'me')).toBe('Dave leads all-time');
     expect(leaderText({ leader }, 'd')).toBe('You lead all-time');
     expect(leaderText({ leader: null }, 'me')).toBeNull();
@@ -79,7 +79,7 @@ describe('seasons', () => {
 
 describe('what leaving does — said before the tap', () => {
   const member = (userId: string, role: 'captain' | 'co_captain' | 'member', joinedAt: string, fullName: string) => ({
-    userId, role, joinedAt, fullName, username: null, avatarUrl: null,
+    userId, role, joinedAt, fullName, username: null, avatarUrl: null, avatarBuild: null, avatarColour: null,
   });
   const detail = (role: 'captain' | 'member', members: ReturnType<typeof member>[]): Pick<CrewDetail, 'viewer' | 'members'> => ({
     viewer: { role, active: true, canManage: role === 'captain', canSetCoCaptain: role === 'captain', canRejoin: false },

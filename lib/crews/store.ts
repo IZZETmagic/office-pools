@@ -357,7 +357,14 @@ export async function removeMember(admin: Admin, p: { actorId: string; crewId: s
 
 // ── Adding people: a lookup, never a browse ─────────────────────────────────────────────────────
 
-export type UserMatch = { userId: string; username: string; fullName: string | null; avatarUrl: string | null }
+export type UserMatch = {
+  userId: string
+  username: string
+  fullName: string | null
+  avatarUrl: string | null
+  avatarBuild: unknown
+  avatarColour: string | null
+}
 
 /**
  * Exact username, case-insensitive. ⚠ An exact `ilike` with every wildcard escaped — never a prefix
@@ -368,7 +375,7 @@ export async function lookupUsername(admin: Admin, username: string): Promise<Us
   const exact = username.replace(/[\\%_]/g, (c) => `\\${c}`)
   const { data, error } = await admin
     .from('users')
-    .select('user_id, username, full_name, avatar_url')
+    .select('user_id, username, full_name, avatar_url, avatar_build, avatar_colour')
     .ilike('username', exact)
     .limit(5)
   if (error) throw new Error(`users lookup: ${error.message}`)
@@ -377,6 +384,8 @@ export async function lookupUsername(admin: Admin, username: string): Promise<Us
     username: u.username,
     fullName: u.full_name,
     avatarUrl: u.avatar_url,
+    avatarBuild: u.avatar_build ?? null,
+    avatarColour: u.avatar_colour ?? null,
   }))
 }
 
