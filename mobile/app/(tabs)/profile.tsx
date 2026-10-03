@@ -14,9 +14,9 @@
 //   · Seasons          — app/profile/seasons.tsx
 //   · Trophy Room      — app/profile/trophies.tsx
 //   · Scouting Report  — app/profile/scouting.tsx (needs /api/me/scouting)
-//   · My Crews         — deliberately not built: no derived or suggested
-//                        crews for now (Ryan, 2026-09-28). Stays on the hub
-//                        as "Soon" so it is visibly part of the plan.
+//   · My Crews         — app/profile/crews/ (Crews, 2026-10-02). Groups,
+//                        never people: there is no friends list. Still no
+//                        derived or suggested crews (Ryan, 2026-09-28).
 //
 // Settings are tiles too — Account, Notifications, Archived Pools, Help — in
 // the same grid, after the four feature doors. Sign Out and Delete Account
@@ -40,7 +40,9 @@ import {
 import { HubTile } from '@/components/profile/HubTile';
 import { DividedList, SectionWrapper, SettingsRow } from '@/components/settings';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { crewsTeaser } from '@/lib/crews';
 import { groupSeasons, seasonsTeaser, trophyTeaser, versionLabel } from '@/lib/profileHub';
+import { useMyCrews } from '@/lib/useCrews';
 import { useArchivedPools } from '@/lib/useArchivedPools';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { usePodium } from '@/lib/usePodium';
@@ -61,6 +63,7 @@ export default function ProfileScreen() {
   const trophies = useTrophies();
   const podium = usePodium();
   const { rows: archived, loading: archivedLoading } = useArchivedPools();
+  const { data: myCrews } = useMyCrews();
 
   // Pull-to-refresh: spinner bound to real user gesture only. Refreshes the
   // badge count alongside the pools, since the avatar card shows both.
@@ -145,8 +148,11 @@ export default function ProfileScreen() {
       id: 'crews',
       icon: 'person.3.fill',
       title: 'My Crews',
-      teaser: 'The people you keep playing with',
+      // ⚠ Falls back to the generic line while loading, on error, and with no crews — the API
+      // answers 404 until it deploys, and a tile must never say something false.
+      teaser: crewsTeaser(myCrews ?? null),
       tint: theme.colors.red,
+      onPress: () => router.push('/profile/crews'),
     },
     {
       id: 'account',
@@ -215,6 +221,13 @@ export default function ProfileScreen() {
       title: 'Onboarding concepts',
       subtitle: 'Eight takes on push + avatar — nothing writes',
       onPress: () => router.push('/onboarding-harness'),
+    },
+    {
+      id: 'dev-crews',
+      icon: 'person.3.fill',
+      title: 'My Crews concept',
+      subtitle: 'The nine decisions of 2 Oct — fixtures, nothing saves',
+      onPress: () => router.push('/crews-concept'),
     },
     {
       id: 'dev-onboarding-flow',

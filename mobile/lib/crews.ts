@@ -31,6 +31,8 @@ export type CrewCard = {
     | { kind: 'quiet'; poolId: string | null; competition: string | null };
   leader: (Person & { titles: number }) | null;
   me: { position: number | null; titles: number; seasons: number };
+  /** Up to three faces — captain first. */
+  faces: Person[];
 };
 
 export type PoolMode = { predictionMode: string; leagueMode: string | null };

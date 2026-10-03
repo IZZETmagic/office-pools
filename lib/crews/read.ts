@@ -184,6 +184,8 @@ export type CrewCard = {
   leader: (Person & { titles: number }) | null
   /** Where the viewer sits all-time; null position until they have a ranked finish. */
   me: { position: number | null; titles: number; seasons: number }
+  /** Up to three faces for the card — captain first, then by who joined first. */
+  faces: Person[]
 }
 
 export async function listMyCrews(admin: Admin, userId: string, now: number): Promise<CrewCard[]> {
@@ -198,14 +200,26 @@ export async function listMyCrews(admin: Admin, userId: string, now: number): Pr
 
   const [{ data: crews }, { data: members }, pools, { data: seats }] = await Promise.all([
     admin.from('crews').select('crew_id, name, created_at, closed_at').in('crew_id', crewIds),
-    admin.from('crew_members').select('crew_id, user_id').in('crew_id', crewIds).is('left_at', null),
+    admin.from('crew_members').select('crew_id, user_id, role, joined_at').in('crew_id', crewIds).is('left_at', null),
     crewPools(admin, crewIds),
     admin.from('crew_seats').select('pool_id, crew_id, resolution').eq('user_id', userId).in('crew_id', crewIds).is('resolved_at', null),
   ])
 
   const finished = pools.filter((p) => p.finishedAt)
   const finishes = await finishesFor(admin, finished)
-  const names = await people(admin, finishes.map((f) => f.user_id))
+  const roleRank = { captain: 0, co_captain: 1, member: 2 } as Record<string, number>
+  const facesByCrew = new Map<string, string[]>()
+  for (const id of crewIds) {
+    facesByCrew.set(
+      id,
+      (members ?? [])
+        .filter((m) => m.crew_id === id)
+        .sort((a, b) => (roleRank[a.role] ?? 3) - (roleRank[b.role] ?? 3) || String(a.joined_at).localeCompare(String(b.joined_at)))
+        .slice(0, 3)
+        .map((m) => m.user_id),
+    )
+  }
+  const names = await people(admin, [...finishes.map((f) => f.user_id), ...[...facesByCrew.values()].flat()])
 
   const cards: CrewCard[] = []
   for (const crew of crews ?? []) {
@@ -240,6 +254,7 @@ export async function listMyCrews(admin: Admin, userId: string, now: number): Pr
         titles: myRow?.titles ?? 0,
         seasons: myRow?.seasons ?? 0,
       },
+      faces: (facesByCrew.get(crew.crew_id) ?? []).map((id) => personOf(names, id)),
     })
   }
   // Something to act on first, then something happening, then the rest — newest crew first within each.

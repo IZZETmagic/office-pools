@@ -401,6 +401,9 @@ function InnerLayout() {
         <Stack.Screen name="profile/trophies" options={{ headerShown: false }} />
         <Stack.Screen name="profile/scouting" options={{ headerShown: false }} />
         <Stack.Screen name="profile/seasons" options={{ headerShown: false }} />
+        {/* Crews (154) — My Crews and one crew. Each draws its own SettingsHeader, like Seasons. */}
+        <Stack.Screen name="profile/crews/index" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/crews/[id]" options={{ headerShown: false }} />
         {/* Settings hierarchy — its index is the Profile tab itself since the
             hub rebuild. No `presentation` on purpose — the default
             card transition gives the push + edge-swipe-back that a settings
@@ -417,6 +420,8 @@ function InnerLayout() {
             full-bleed instead of under the stack's default header, which would title itself
             "onboarding-harness" from the file path. Delete with the harness. */}
         <Stack.Screen name="onboarding-harness" options={{ headerShown: false }} />
+        {/* THROWAWAY — the My Crews concept. Delete with the file. */}
+        <Stack.Screen name="crews-concept" options={{ headerShown: false }} />
         </Stack>
         <SplashOverlay routingSettled={routingSettled} />
       </PendingActionsProvider>
