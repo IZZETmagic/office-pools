@@ -452,8 +452,10 @@ Each step is a commit; nothing is pushed until Ryan says so.
    `/api/crews` 404→401, `/api/cron/crew-notices` 404→401, `/crew-invite` 200; cron `crew-notices`
    scheduled (`*/15`, pg_cron job 26) and a hand-fired request answered 200 "skipped" (switch off);
    OTA to `production` / runtime 1.2.0 from `406f644d` on BOTH platforms (iOS group `8f3a029f`,
-   Android `5337506d`). ⏸ **The switch is still OFF, waiting on Ryan:** the only message it would send
-   is his own invite to Kronosaur (made 02:37 UTC). The Xcode Cloud failure on the commit is the old
+   Android `5337506d`). ✅ **Switch ON 2026-10-03 15:06 UTC (Ryan: "turn them on")**, after a second
+   push + OTA of the clean-ups (`7004821c`; iOS `70c67a86`, Android `7b0cdec3`). A hand-fired run
+   answered `invites: 1` — Ryan's invite to Kronosaur, stamped sent 15:06:12 (account invite: push +
+   email, no link). **Crews is shipped.** The Xcode Cloud failure on the commit is the old
    Swift app in `ios/` — not part of this release.
 
    The order, as planned:
