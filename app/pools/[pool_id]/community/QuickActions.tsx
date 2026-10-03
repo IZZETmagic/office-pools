@@ -10,6 +10,8 @@ type QuickActionsProps = {
   onDropStandings: () => void
   /** Absent when no KLIPY key is configured — the row is then not offered at all. */
   onGif?: () => void
+  /** Opens the file chooser. Called synchronously from the click — browsers only open a file picker from a user gesture. */
+  onPhoto?: () => void
 }
 
 /**
@@ -23,6 +25,7 @@ type QuickActionsProps = {
  * Order, emoji, labels and descriptions are RN's QUICK_ACTIONS verbatim.
  */
 const QUICK_ACTIONS = [
+  { key: 'photo', emoji: '📷', label: 'Send a photo', description: 'Choose one from your device' },
   { key: 'gif', emoji: '🎞️', label: 'Send a GIF', description: 'Search KLIPY for the reaction' },
   { key: 'standings', emoji: '📊', label: 'Share standings', description: "Drop the leaderboard's top 5" },
   { key: 'flex', emoji: '🏆', label: 'Flex badges', description: "Show off a badge you've earned" },
@@ -34,8 +37,9 @@ export function QuickActions({
   onFlexBadges,
   onDropStandings,
   onGif,
+  onPhoto,
 }: QuickActionsProps) {
-  const actions = QUICK_ACTIONS.filter(a => a.key !== 'gif' || onGif)
+  const actions = QUICK_ACTIONS.filter(a => (a.key !== 'gif' || onGif) && (a.key !== 'photo' || onPhoto))
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -55,7 +59,8 @@ export function QuickActions({
 
   const run = (key: string) => {
     setOpen(false)
-    if (key === 'gif') onGif?.()
+    if (key === 'photo') onPhoto?.()
+    else if (key === 'gif') onGif?.()
     else if (key === 'standings') onDropStandings()
     else if (key === 'flex') onFlexBadges()
     else onSharePrediction()

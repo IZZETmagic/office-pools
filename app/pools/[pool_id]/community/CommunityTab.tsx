@@ -26,6 +26,9 @@ import { PinMessageModal } from './PinMessageModal'
 import { QuickActions } from './QuickActions'
 import { GifPicker, KLIPY_WEB_KEY } from './GifPicker'
 import { GifMessage } from './GifMessage'
+import { PhotoLightbox, PhotoMessage } from './PhotoMessage'
+import { preparePhotoFile, removePhoto, uploadPhoto, usePhotoUrls } from './photos'
+import { PHOTO_MESSAGE_CONTENT, readPhotoMetadata } from '@/lib/banter/photoMessage'
 import { GIF_MESSAGE_CONTENT, klipyCustomerId, klipyShareUrl, toGifMetadata, type KlipyGif } from '@/lib/banter/klipy'
 import { PredictionShareCard } from './PredictionShareCard'
 import { BadgeFlexCard } from './BadgeFlexCard'
@@ -98,6 +101,10 @@ export function CommunityTab({
   const [replyingTo, setReplyingTo] = useState<MessageWithReactions | null>(null)
   const [pendingDelete, setPendingDelete] = useState<MessageWithReactions | null>(null)
   const [showGifPicker, setShowGifPicker] = useState(false)
+  // Photos (159). A hidden file input the + menu clicks, the in-flight send, the lightbox.
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const [photoSending, setPhotoSending] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   // Report + block (158). `blockedIds` are members I've hidden, account-wide;
   // their messages stay in `messages` (so unblocking needs no refetch) but are
   // never put in the feed.
@@ -1175,6 +1182,67 @@ export function CommunityTab({
     }).catch(err => console.warn('[GIF] KLIPY share trigger failed:', err))
   }, [poolId, currentUserId, replyingTo, showToast, ensureReplyPreviews])
 
+  // A photo: shrink + re-encode in the browser (drops EXIF/GPS), upload into
+  // {pool}/{me}/{uuid}.jpg, then send the message pointing at it. The upload
+  // must land first — 159 refuses a photo whose file isn't there — and a
+  // failed send removes the orphaned upload.
+  const handlePhotoChosen = useCallback(async (file: File) => {
+    const supabase = supabaseRef.current
+    const replyToId = replyingTo?.message_id ?? null
+    setPhotoSending(true)
+    let uploadedPath: string | null = null
+    try {
+      const prepared = await preparePhotoFile(file)
+      const meta = await uploadPhoto(supabase, poolId, currentUserId, prepared)
+      uploadedPath = meta.path
+      const { data, error } = await supabase.from('pool_messages').insert({
+        pool_id: poolId,
+        user_id: currentUserId,
+        content: PHOTO_MESSAGE_CONTENT,
+        mentions: [],
+        message_type: 'photo',
+        reply_to_message_id: replyToId,
+        metadata: meta,
+      }).select().single()
+      if (error || !data) throw error ?? new Error('Message not saved')
+
+      setReplyingTo(null)
+      const newMsg: MessageWithReactions = {
+        ...data,
+        message_type: 'photo',
+        reply_to_message_id: data.reply_to_message_id ?? null,
+        metadata: data.metadata ?? {},
+        reactions: [],
+      }
+      wasNearBottomRef.current = true
+      setMessages(prev => prev.some(m => m.message_id === newMsg.message_id) ? prev : [...prev, newMsg])
+      if (newMsg.reply_to_message_id) void ensureReplyPreviews([newMsg])
+
+      fetch('/api/notifications/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pool_id: poolId, message_content: data.content }),
+        keepalive: true,
+      }).catch(err => console.error('[MessagePush] photo push failed:', err))
+    } catch (err) {
+      console.error('Failed to send photo:', err)
+      if (uploadedPath) void removePhoto(supabase, uploadedPath)
+      showToast(err instanceof Error && err.message.startsWith('This browser') ? err.message : 'Could not send that photo. Try again.', 'error')
+    } finally {
+      setPhotoSending(false)
+    }
+  }, [poolId, currentUserId, replyingTo, showToast, ensureReplyPreviews])
+
+  // Signed URLs for every photo loaded in the feed, signed in one batch.
+  const photoPaths = useMemo(
+    () => messages
+      .filter(m => m.message_type === 'photo' && !m.deleted_at)
+      .map(m => readPhotoMetadata(m.metadata)?.path)
+      .filter((p): p is string => !!p),
+    [messages],
+  )
+  const photoUrls = usePhotoUrls(supabaseRef.current, photoPaths)
+
   const sharedCallsCount = useMemo(() => {
     return messages.filter(m => m.message_type === 'prediction_share').length
   }, [messages])
@@ -1370,6 +1438,27 @@ export function CommunityTab({
             : undefined
 
           // Rich content cards — reactions only on these
+          if (msg.message_type === 'photo') {
+            const path = readPhotoMetadata(msg.metadata)?.path
+            return (
+              <PhotoMessage
+                key={msg.message_id}
+                message={msg}
+                url={path ? photoUrls.get(path) ?? null : null}
+                onOpen={setLightboxUrl}
+                members={members}
+                memberLevels={memberLevels}
+                currentUserId={currentUserId}
+                reactions={msg.reactions}
+                onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
+                onReply={() => setReplyingTo(msg)}
+                onDelete={onDelete}
+                onReport={onReport}
+                onBlock={onBlock}
+              />
+            )
+          }
+
           if (msg.message_type === 'gif') {
             return (
               <GifMessage
@@ -1501,6 +1590,7 @@ export function CommunityTab({
             onFlexBadges={handleFlexBadges}
             onDropStandings={handleDropStandings}
             onGif={KLIPY_WEB_KEY ? () => setShowGifPicker(true) : undefined}
+            onPhoto={photoSending ? undefined : () => photoInputRef.current?.click()}
           />
         }
         onSend={handleSendMessage}
@@ -1632,6 +1722,24 @@ export function CommunityTab({
           }}
         />
       )}
+
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          e.target.value = '' // the same file can be chosen again
+          if (file) void handlePhotoChosen(file)
+        }}
+      />
+      {photoSending && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-28 z-40 px-4 py-2 rounded-pill bg-surface border border-border-default shadow-card-elevated t-body font-semibold text-ink">
+          Sending photo…
+        </div>
+      )}
+      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
 
       {KLIPY_WEB_KEY && (
         <GifPicker

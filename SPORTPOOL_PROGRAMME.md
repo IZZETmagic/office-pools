@@ -3323,6 +3323,14 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
     - `POST /api/banter/media/sweep` (any member, or the cron with CRON_SECRET) removes the files through the Storage API. App, web and Reports call it right after a photo delete.
     - Verified end to end on prod: signed URL 200 → sweep → 400, queue cleared.
     - ⚠ Migration `161` (hourly cron) is written but NOT applied: apply it only after the route is deployed (expect 401, not 404).
+  - **Step 3.4 — viewer + web: BUILT 2026-10-03.**
+    - RN: pinch/pan/double-tap/swipe-down viewer (`ZoomablePhoto`), eased with no bounce.
+    - Web: "Send a photo" in + → file chooser → canvas resize to 1600 + JPEG re-encode → upload → message.
+      - Verified in the browser: a 4032×3024 JPEG with an injected GPS+Make EXIF block came out 1600×1200 with NO EXIF.
+    - Web photo bubble + lightbox (Esc/click closes).
+    - Reports tab shows the reported photo, or "Photo already removed".
+    - The pure module `lib/banter/photoMessage.ts` is kept identical to the RN copy by `photoMessageParity.guard.test.ts`.
+    - First real app upload (2026-10-03) checked CLEAN: encoder technical tags only, no GPS/make/dates.
   - **Open:** DMCA designated agent (legal review C3), Ryan's action.
 - **Effort:** ~2–3 days for photos; GIFs ~1.5–2 days.
 - **Done when:** a user can attach and send an image or GIF in pool chat and others see it inline.

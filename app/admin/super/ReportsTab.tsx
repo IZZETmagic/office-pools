@@ -77,6 +77,35 @@ async function fetchReports(view: 'open' | 'resolved'): Promise<ReportRow[] | nu
   return (data ?? []) as unknown as ReportRow[]
 }
 
+/**
+ * A reported photo, shown so it can be judged here. Super admins may sign banter-media URLs
+ * (159). Once the photo is removed its file is swept (160), so a resolved report says so
+ * instead of showing a broken image.
+ */
+function ReportedPhoto({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null | 'gone'>(null)
+  useEffect(() => {
+    let active = true
+    createClient().storage.from('banter-media').createSignedUrl(path, 300).then(({ data, error }) => {
+      if (active) setUrl(error || !data?.signedUrl ? 'gone' : data.signedUrl)
+    })
+    return () => { active = false }
+  }, [path])
+  if (url === 'gone') {
+    return <p className="text-sm text-muted italic mb-3">Photo already removed.</p>
+  }
+  return (
+    <div className="mb-3 rounded-control overflow-hidden bg-snow max-w-xs">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL
+        <img src={url} alt="Reported photo" className="w-full h-auto" />
+      ) : (
+        <div className="h-40 animate-pulse bg-silver/40" />
+      )}
+    </div>
+  )
+}
+
 export function ReportsTab({ currentUserId }: { currentUserId: string }) {
   const { showToast } = useToast()
   const [view, setView] = useState<'open' | 'resolved'>('open')
@@ -162,9 +191,13 @@ export function ReportsTab({ currentUserId }: { currentUserId: string }) {
                 <span className="text-xs text-muted ml-auto">{new Date(row.created_at).toLocaleString()}</span>
               </div>
 
-              <blockquote className="border-l-2 border-primary-500 bg-snow rounded-r-control px-4 py-3 text-sm text-ink whitespace-pre-wrap break-words mb-3">
-                {row.content_snapshot}
-              </blockquote>
+              {row.type_snapshot === 'photo' && typeof row.metadata_snapshot.path === 'string' ? (
+                <ReportedPhoto path={row.metadata_snapshot.path} />
+              ) : (
+                <blockquote className="border-l-2 border-primary-500 bg-snow rounded-r-control px-4 py-3 text-sm text-ink whitespace-pre-wrap break-words mb-3">
+                  {row.content_snapshot}
+                </blockquote>
+              )}
 
               <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1 text-xs mb-3">
                 <dt className="text-muted">Pool</dt><dd className="text-ink">{row.pools?.pool_name ?? '—'}</dd>

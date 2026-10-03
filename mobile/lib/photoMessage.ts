@@ -1,6 +1,9 @@
 // =============================================================
 // Photo messages — the pure half (no native modules, fully testable)
 // =============================================================
+// ⚠ The web carries a COPY at lib/banter/photoMessage.ts, kept identical
+// by lib/__tests__/photoMessageParity.guard.test.ts. Change both together.
+//
 // A photo is an ordinary `pool_messages` row (migration 159):
 //
 //   message_type = 'photo'
