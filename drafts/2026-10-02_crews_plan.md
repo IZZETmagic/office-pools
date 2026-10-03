@@ -551,8 +551,11 @@ a "check your email" step on every sign-up) or dropping no-account invites. **Bu
 - **Migration 155** (applied): `crew_invites.token_hash` (SHA-256 only), a CHECK that only an invite
   to an address can carry one, a unique index.
 - **Armed when the email goes out** (`notify.sendInviteNotice`); the button is
-  `/crew-invite#<token>`. ⚠ The token rides in the URL FRAGMENT: never sent to a server, so it stays
-  out of access logs and the page-view data Google Tag Manager collects.
+  `/crew-invite#<token>`. ⚠ The token rides in the URL FRAGMENT, and on arrival the page moves it
+  into localStorage and out of the address bar; Sign up / Log in return to the bare page
+  (`lib/crews/inviteLink.ts`). ⚠ Corrected (Gill): the first build passed `/crew-invite#<token>` as
+  `?redirectTo=`, so for a signed-out reader — the main path — the token DID reach the server and a
+  page running Google Tag Manager. Fixed before deploy; `__tests__/inviteLink.test.ts` pins it.
 - **`app/crew-invite`** (public): who asked and which crew; signed out → Sign up / Log in, both
   returning to the link; signed in → Join / No thanks (`POST /api/crews/invites/claim`). Opening the
   page answers nothing — only a button does (mail scanners pre-fetch links).
