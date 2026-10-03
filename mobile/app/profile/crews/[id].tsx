@@ -227,6 +227,115 @@ export default function CrewScreen() {
         </Pressable>
       ) : null}
 
+      {/* Section order — Ryan, 2026-10-03: All-time, the crew (and its invites), past seasons,
+          then the pools (playing now, and the ones that could be linked). */}
+      {crew.allTime.length ? (
+        <Section title="All-time">
+          <Card padded={false}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, paddingBottom: 4 }}>
+              <View style={{ width: 18 }} />
+              <View style={{ flex: 1 }} />
+              {['SEASONS', 'TITLES', 'BEST'].map((c) => (
+                <RNText key={c} style={{ width: 54, textAlign: 'right', fontFamily: fontFamilies.black, fontSize: 9.5, letterSpacing: 0.6, color: theme.colors.slate }}>
+                  {c}
+                </RNText>
+              ))}
+            </View>
+            {crew.allTime.map((r, i) => (
+              <Row key={r.userId} divider={i > 0}>
+                <RNText style={{ width: 18, fontFamily: fontFamilies.black, fontSize: 13, color: theme.colors.slate }}>{i + 1}</RNText>
+                <RNText numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>
+                  {shortName(r)}
+                </RNText>
+                <Num>{r.seasons}</Num>
+                <Num>{r.titles}</Num>
+                <Num>{r.best === null ? '—' : ordinal(r.best)}</Num>
+              </Row>
+            ))}
+          </Card>
+          <Hint text="Seasons, titles and best finish — never points added up across different games." />
+        </Section>
+      ) : null}
+
+      <Section title="The crew" action={v.canManage ? 'Add people' : undefined} onAction={() => addPeopleRef.current?.open()}>
+        <Card>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: theme.spacing.md }}>
+            {crew.members.map((m) => {
+              const tappable = memberOptions(m).length > 0;
+              const label = roleLabel(m.role);
+              return (
+                <Pressable
+                  key={m.userId}
+                  disabled={!tappable}
+                  onPress={() => setSelected(m)}
+                  accessibilityRole={tappable ? 'button' : undefined}
+                  accessibilityLabel={`${personName(m)}${label ? `, ${label}` : ''}`}
+                  style={{ width: '25%', alignItems: 'center', gap: 4 }}
+                >
+                  <CrewFace person={m} size={44} />
+                  <RNText numberOfLines={1} style={{ maxWidth: '92%', fontFamily: fontFamilies.bold, fontSize: 11.5, color: theme.colors.ink }}>
+                    {shortName(m)}
+                  </RNText>
+                  {label ? (
+                    <RNText style={{ fontFamily: fontFamilies.black, fontSize: 8.5, letterSpacing: 0.5, color: theme.colors.amber }}>
+                      {label.toUpperCase()}
+                    </RNText>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+        {v.canManage && crew.invites && crew.invites.length > 0 ? (
+          <Card padded={false}>
+            <View style={{ paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, paddingBottom: 2 }}>
+              <RNText style={{ fontFamily: fontFamilies.black, fontSize: 9.5, letterSpacing: 0.6, color: theme.colors.slate }}>INVITED · WAITING</RNText>
+            </View>
+            {crew.invites.map((inv, i) => (
+              <Row key={inv.inviteId} divider={i > 0}>
+                {inv.invitee ? <CrewFace person={inv.invitee} size={28} /> : <Icon name="envelope.fill" size={18} tint={theme.colors.slate} />}
+                <RNText numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>
+                  {inv.invitee ? personName(inv.invitee) : inv.email}
+                </RNText>
+                <Pressable
+                  onPress={() => void act(() => revokeCrewInvite(inv.inviteId))}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  hitSlop={8}
+                >
+                  <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12.5, color: theme.colors.red }}>Withdraw</RNText>
+                </Pressable>
+              </Row>
+            ))}
+          </Card>
+        ) : null}
+        <Hint
+          text={
+            v.canManage
+              ? 'Only you and your co-captain see who’s invited. Tap someone to make them co-captain or remove them — removed people aren’t told, and their history stays.'
+              : 'The captain and co-captain add people by username or email. Anyone who plays in one of the crew’s pools is in automatically.'
+          }
+        />
+      </Section>
+
+      {crew.pastSeasons.length ? (
+        <Section title="Past seasons">
+          <Card padded={false}>
+            {crew.pastSeasons.map((p, i) => (
+              <Row key={p.poolId} divider={i > 0} onPress={() => router.push({ pathname: '/pool/[id]', params: { id: p.poolId } })}>
+                <View style={{ flex: 1, gap: 1 }}>
+                  <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>{p.competition}</RNText>
+                  <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, color: theme.colors.slate }}>
+                    {[p.poolName, winnersText(p.winners)].filter(Boolean).join(' · ')}
+                  </RNText>
+                </View>
+                <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12.5, color: theme.colors.slate }}>{finishText(p.viewerRank, p.players)}</RNText>
+              </Row>
+            ))}
+          </Card>
+        </Section>
+      ) : null}
+
       {crew.playingNow.length ? (
         <Section title="Playing now">
           <Card padded={false}>
@@ -295,113 +404,6 @@ export default function CrewScreen() {
           <Hint text={LINK_HINT} />
         </Section>
       ) : null}
-
-      {crew.allTime.length ? (
-        <Section title="All-time">
-          <Card padded={false}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, paddingBottom: 4 }}>
-              <View style={{ width: 18 }} />
-              <View style={{ flex: 1 }} />
-              {['SEASONS', 'TITLES', 'BEST'].map((c) => (
-                <RNText key={c} style={{ width: 54, textAlign: 'right', fontFamily: fontFamilies.black, fontSize: 9.5, letterSpacing: 0.6, color: theme.colors.slate }}>
-                  {c}
-                </RNText>
-              ))}
-            </View>
-            {crew.allTime.map((r, i) => (
-              <Row key={r.userId} divider={i > 0}>
-                <RNText style={{ width: 18, fontFamily: fontFamilies.black, fontSize: 13, color: theme.colors.slate }}>{i + 1}</RNText>
-                <RNText numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>
-                  {shortName(r)}
-                </RNText>
-                <Num>{r.seasons}</Num>
-                <Num>{r.titles}</Num>
-                <Num>{r.best === null ? '—' : ordinal(r.best)}</Num>
-              </Row>
-            ))}
-          </Card>
-          <Hint text="Seasons, titles and best finish — never points added up across different games." />
-        </Section>
-      ) : null}
-
-      {crew.pastSeasons.length ? (
-        <Section title="Past seasons">
-          <Card padded={false}>
-            {crew.pastSeasons.map((p, i) => (
-              <Row key={p.poolId} divider={i > 0} onPress={() => router.push({ pathname: '/pool/[id]', params: { id: p.poolId } })}>
-                <View style={{ flex: 1, gap: 1 }}>
-                  <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>{p.competition}</RNText>
-                  <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, color: theme.colors.slate }}>
-                    {[p.poolName, winnersText(p.winners)].filter(Boolean).join(' · ')}
-                  </RNText>
-                </View>
-                <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12.5, color: theme.colors.slate }}>{finishText(p.viewerRank, p.players)}</RNText>
-              </Row>
-            ))}
-          </Card>
-        </Section>
-      ) : null}
-
-      <Section title="The crew" action={v.canManage ? 'Add people' : undefined} onAction={() => addPeopleRef.current?.open()}>
-        <Card>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: theme.spacing.md }}>
-            {crew.members.map((m) => {
-              const tappable = memberOptions(m).length > 0;
-              const label = roleLabel(m.role);
-              return (
-                <Pressable
-                  key={m.userId}
-                  disabled={!tappable}
-                  onPress={() => setSelected(m)}
-                  accessibilityRole={tappable ? 'button' : undefined}
-                  accessibilityLabel={`${personName(m)}${label ? `, ${label}` : ''}`}
-                  style={{ width: '25%', alignItems: 'center', gap: 4 }}
-                >
-                  <CrewFace person={m} size={44} />
-                  <RNText numberOfLines={1} style={{ maxWidth: '92%', fontFamily: fontFamilies.bold, fontSize: 11.5, color: theme.colors.ink }}>
-                    {shortName(m)}
-                  </RNText>
-                  {label ? (
-                    <RNText style={{ fontFamily: fontFamilies.black, fontSize: 8.5, letterSpacing: 0.5, color: theme.colors.amber }}>
-                      {label.toUpperCase()}
-                    </RNText>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        </Card>
-        {v.canManage && crew.invites && crew.invites.length > 0 ? (
-          <Card padded={false}>
-            <View style={{ paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, paddingBottom: 2 }}>
-              <RNText style={{ fontFamily: fontFamilies.black, fontSize: 9.5, letterSpacing: 0.6, color: theme.colors.slate }}>INVITED · WAITING</RNText>
-            </View>
-            {crew.invites.map((inv, i) => (
-              <Row key={inv.inviteId} divider={i > 0}>
-                {inv.invitee ? <CrewFace person={inv.invitee} size={28} /> : <Icon name="envelope.fill" size={18} tint={theme.colors.slate} />}
-                <RNText numberOfLines={1} style={{ flex: 1, fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>
-                  {inv.invitee ? personName(inv.invitee) : inv.email}
-                </RNText>
-                <Pressable
-                  onPress={() => void act(() => revokeCrewInvite(inv.inviteId))}
-                  disabled={busy}
-                  accessibilityRole="button"
-                  hitSlop={8}
-                >
-                  <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12.5, color: theme.colors.red }}>Withdraw</RNText>
-                </Pressable>
-              </Row>
-            ))}
-          </Card>
-        ) : null}
-        <Hint
-          text={
-            v.canManage
-              ? 'Only you and your co-captain see who’s invited. Tap someone to make them co-captain or remove them — removed people aren’t told, and their history stays.'
-              : 'The captain and co-captain add people by username or email. Anyone who plays in one of the crew’s pools is in automatically.'
-          }
-        />
-      </Section>
 
       {v.active ? (
         <View style={{ alignItems: 'center', gap: 4, paddingTop: theme.spacing.sm }}>

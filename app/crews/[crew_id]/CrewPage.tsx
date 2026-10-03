@@ -192,6 +192,130 @@ export function CrewPage({
           </button>
         ) : null}
 
+        {/* Section order — Ryan, 2026-10-03: All-time, the crew (and its invites), past seasons,
+            then the pools (playing now, and the ones that could be linked). Same as the app. */}
+        {crew.allTime.length ? (
+          <Section title="All-time" hint="Seasons, titles and best finish — never points added up across different games.">
+            <Card padding="none">
+              {/* Fixed-width number columns, as the app draws it: a table's auto layout let the
+                  name column squeeze the headings into one word. */}
+              <div className="flex items-center gap-3 px-4 pt-3 pb-1 text-[10px] font-black tracking-[0.6px] text-muted" aria-hidden>
+                <span className="w-5" />
+                <span className="flex-1" />
+                <span className="w-16 text-right">SEASONS</span>
+                <span className="w-16 text-right">TITLES</span>
+                <span className="w-16 text-right">BEST</span>
+              </div>
+              <ol>
+                {crew.allTime.map((r, i) => (
+                  <li
+                    key={r.userId}
+                    className={`flex items-center gap-3 px-4 py-2.5 text-sm ${i > 0 ? 'border-t border-border-subtle' : ''}`}
+                    aria-label={`${i + 1}. ${personName(r)}: ${plural(r.seasons, 'season')}, ${plural(r.titles, 'title')}, best ${r.best === null ? 'none' : ordinal(r.best)}`}
+                  >
+                    <span className="w-5 text-[13px] font-black text-muted">{i + 1}</span>
+                    <span className="flex-1 min-w-0 truncate font-bold text-ink">{r.userId === viewerId ? 'You' : shortName(r)}</span>
+                    <span className="w-16 text-right font-bold text-ink tabular-nums">{r.seasons}</span>
+                    <span className="w-16 text-right font-bold text-ink tabular-nums">{r.titles}</span>
+                    <span className="w-16 text-right font-bold text-ink tabular-nums">{r.best === null ? '—' : ordinal(r.best)}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          </Section>
+        ) : null}
+
+        <Section
+          title="The crew"
+          action={v.canManage ? { label: 'Add people', onClick: () => setAdding(true) } : undefined}
+          hint={
+            v.canManage
+              ? 'Only you and your co-captain see who’s invited. Click someone to make them co-captain or remove them — removed people aren’t told, and their history stays.'
+              : 'The captain and co-captain add people by username or email. Anyone who plays in one of the crew’s pools is in automatically.'
+          }
+        >
+          <Card>
+            <ul className="grid grid-cols-4 sm:grid-cols-5 gap-y-4">
+              {crew.members.map((m) => {
+                const label = roleLabel(m.role)
+                const tappable = memberOptions(m).length > 0
+                const inner = (
+                  <>
+                    <CrewFace person={m} size={44} />
+                    <span className="max-w-[92%] truncate text-[11.5px] font-bold text-ink">{m.userId === viewerId ? 'You' : shortName(m)}</span>
+                    {label ? <span className="text-[8.5px] font-black tracking-[0.5px] text-warning-700">{label.toUpperCase()}</span> : null}
+                  </>
+                )
+                const a11y = `${personName(m)}${label ? `, ${label}` : ''}`
+                return (
+                  <li key={m.userId} className="min-w-0">
+                    {tappable ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelected(m)}
+                        aria-label={a11y}
+                        className="w-full flex flex-col items-center gap-1 rounded-control py-1 hover:bg-mist/60 transition-colors"
+                      >
+                        {inner}
+                      </button>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 py-1" aria-label={a11y}>
+                        {inner}
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </Card>
+
+          {v.canManage && crew.invites && crew.invites.length > 0 ? (
+            <Card padding="none">
+              <p className="px-4 pt-3 pb-1 text-[10px] font-black tracking-[0.6px] text-muted">INVITED · WAITING</p>
+              <ul>
+                {crew.invites.map((inv, i) => (
+                  <li key={inv.inviteId} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-border-subtle' : ''}`}>
+                    {inv.invitee ? <CrewFace person={inv.invitee} size={28} /> : <Icon name="envelope.fill" size={18} className="text-muted" />}
+                    <span className="flex-1 min-w-0 truncate text-sm font-bold text-ink">
+                      {inv.invitee ? personName(inv.invitee) : inv.email}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void act(() => crewRequest(`/api/crews/invites/${encodeURIComponent(inv.inviteId)}`, { method: 'DELETE' }))
+                      }
+                      className="text-[12.5px] font-bold text-danger-600 hover:text-danger-700 disabled:opacity-50"
+                    >
+                      Withdraw
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+        </Section>
+
+        {crew.pastSeasons.length ? (
+          <Section title="Past seasons">
+            <Card padding="none">
+              {crew.pastSeasons.map((p, i) => (
+                <Link
+                  key={p.poolId}
+                  href={`/pools/${encodeURIComponent(p.poolId)}`}
+                  className={`flex items-center gap-3 px-4 py-3 hover:bg-mist/50 transition-colors ${i > 0 ? 'border-t border-border-subtle' : ''}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-ink">{p.competition}</p>
+                    <p className="text-[11.5px] font-medium text-muted truncate">{[p.poolName, winnersText(p.winners)].filter(Boolean).join(' · ')}</p>
+                  </div>
+                  <span className="text-[12.5px] font-bold text-muted">{finishText(p.viewerRank, p.players)}</span>
+                </Link>
+              ))}
+            </Card>
+          </Section>
+        ) : null}
+
         {crew.playingNow.length ? (
           <Section title="Playing now" hint="Any member can start a pool for the crew — whoever starts it runs that season.">
             <Card padding="none">
@@ -269,128 +393,6 @@ export function CrewPage({
             </Card>
           </Section>
         ) : null}
-
-        {crew.allTime.length ? (
-          <Section title="All-time" hint="Seasons, titles and best finish — never points added up across different games.">
-            <Card padding="none">
-              {/* Fixed-width number columns, as the app draws it: a table's auto layout let the
-                  name column squeeze the headings into one word. */}
-              <div className="flex items-center gap-3 px-4 pt-3 pb-1 text-[10px] font-black tracking-[0.6px] text-muted" aria-hidden>
-                <span className="w-5" />
-                <span className="flex-1" />
-                <span className="w-16 text-right">SEASONS</span>
-                <span className="w-16 text-right">TITLES</span>
-                <span className="w-16 text-right">BEST</span>
-              </div>
-              <ol>
-                {crew.allTime.map((r, i) => (
-                  <li
-                    key={r.userId}
-                    className={`flex items-center gap-3 px-4 py-2.5 text-sm ${i > 0 ? 'border-t border-border-subtle' : ''}`}
-                    aria-label={`${i + 1}. ${personName(r)}: ${plural(r.seasons, 'season')}, ${plural(r.titles, 'title')}, best ${r.best === null ? 'none' : ordinal(r.best)}`}
-                  >
-                    <span className="w-5 text-[13px] font-black text-muted">{i + 1}</span>
-                    <span className="flex-1 min-w-0 truncate font-bold text-ink">{r.userId === viewerId ? 'You' : shortName(r)}</span>
-                    <span className="w-16 text-right font-bold text-ink tabular-nums">{r.seasons}</span>
-                    <span className="w-16 text-right font-bold text-ink tabular-nums">{r.titles}</span>
-                    <span className="w-16 text-right font-bold text-ink tabular-nums">{r.best === null ? '—' : ordinal(r.best)}</span>
-                  </li>
-                ))}
-              </ol>
-            </Card>
-          </Section>
-        ) : null}
-
-        {crew.pastSeasons.length ? (
-          <Section title="Past seasons">
-            <Card padding="none">
-              {crew.pastSeasons.map((p, i) => (
-                <Link
-                  key={p.poolId}
-                  href={`/pools/${encodeURIComponent(p.poolId)}`}
-                  className={`flex items-center gap-3 px-4 py-3 hover:bg-mist/50 transition-colors ${i > 0 ? 'border-t border-border-subtle' : ''}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-ink">{p.competition}</p>
-                    <p className="text-[11.5px] font-medium text-muted truncate">{[p.poolName, winnersText(p.winners)].filter(Boolean).join(' · ')}</p>
-                  </div>
-                  <span className="text-[12.5px] font-bold text-muted">{finishText(p.viewerRank, p.players)}</span>
-                </Link>
-              ))}
-            </Card>
-          </Section>
-        ) : null}
-
-        <Section
-          title="The crew"
-          action={v.canManage ? { label: 'Add people', onClick: () => setAdding(true) } : undefined}
-          hint={
-            v.canManage
-              ? 'Only you and your co-captain see who’s invited. Click someone to make them co-captain or remove them — removed people aren’t told, and their history stays.'
-              : 'The captain and co-captain add people by username or email. Anyone who plays in one of the crew’s pools is in automatically.'
-          }
-        >
-          <Card>
-            <ul className="grid grid-cols-4 sm:grid-cols-5 gap-y-4">
-              {crew.members.map((m) => {
-                const label = roleLabel(m.role)
-                const tappable = memberOptions(m).length > 0
-                const inner = (
-                  <>
-                    <CrewFace person={m} size={44} />
-                    <span className="max-w-[92%] truncate text-[11.5px] font-bold text-ink">{m.userId === viewerId ? 'You' : shortName(m)}</span>
-                    {label ? <span className="text-[8.5px] font-black tracking-[0.5px] text-warning-700">{label.toUpperCase()}</span> : null}
-                  </>
-                )
-                const a11y = `${personName(m)}${label ? `, ${label}` : ''}`
-                return (
-                  <li key={m.userId} className="min-w-0">
-                    {tappable ? (
-                      <button
-                        type="button"
-                        onClick={() => setSelected(m)}
-                        aria-label={a11y}
-                        className="w-full flex flex-col items-center gap-1 rounded-control py-1 hover:bg-mist/60 transition-colors"
-                      >
-                        {inner}
-                      </button>
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 py-1" aria-label={a11y}>
-                        {inner}
-                      </div>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          </Card>
-
-          {v.canManage && crew.invites && crew.invites.length > 0 ? (
-            <Card padding="none">
-              <p className="px-4 pt-3 pb-1 text-[10px] font-black tracking-[0.6px] text-muted">INVITED · WAITING</p>
-              <ul>
-                {crew.invites.map((inv, i) => (
-                  <li key={inv.inviteId} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-border-subtle' : ''}`}>
-                    {inv.invitee ? <CrewFace person={inv.invitee} size={28} /> : <Icon name="envelope.fill" size={18} className="text-muted" />}
-                    <span className="flex-1 min-w-0 truncate text-sm font-bold text-ink">
-                      {inv.invitee ? personName(inv.invitee) : inv.email}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        void act(() => crewRequest(`/api/crews/invites/${encodeURIComponent(inv.inviteId)}`, { method: 'DELETE' }))
-                      }
-                      className="text-[12.5px] font-bold text-danger-600 hover:text-danger-700 disabled:opacity-50"
-                    >
-                      Withdraw
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : null}
-        </Section>
 
         {v.active ? (
           <div className="flex justify-center pt-1">
