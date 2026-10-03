@@ -131,6 +131,7 @@ import {
 } from './FlexBadgesSheet';
 import { QuickActionsMenu, type QuickAction } from './QuickActionsMenu';
 import { GifPickerSheet, KLIPY_APP_KEY } from './GifPickerSheet';
+import { ZoomablePhoto } from './ZoomablePhoto';
 import {
   GIF_MESSAGE_CONTENT,
   fitGif,
@@ -2127,12 +2128,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
       >
         <View style={{ flex: 1, backgroundColor: '#000000' }}>
           {viewerUri ? (
-            <ExpoImage
-              source={{ uri: viewerUri }}
-              contentFit="contain"
-              style={{ flex: 1 }}
-              accessibilityLabel="Photo"
-            />
+            <ZoomablePhoto uri={viewerUri} onClose={() => setViewerUri(null)} />
           ) : null}
           <Pressable
             onPress={() => setViewerUri(null)}
