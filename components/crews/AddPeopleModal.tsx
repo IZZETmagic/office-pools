@@ -102,7 +102,6 @@ export function AddPeopleModal({
           <h2 id="add-people-title" className="t-card-title text-ink">
             Add people
           </h2>
-          <p className="t-body text-muted">By their exact username or email. They’ll tap Join once to be in.</p>
         </div>
 
         <form
@@ -185,11 +184,6 @@ export function AddPeopleModal({
             })}
           </ul>
         ) : null}
-
-        <p className="text-[11.5px] leading-4 text-muted text-center">
-          Exact matches only — no browsing, no suggestions. An email never shows whether someone’s on SportPool; if
-          they’re not, we send them one invite.
-        </p>
 
         <Button variant="secondary" onClick={onClose}>
           Done

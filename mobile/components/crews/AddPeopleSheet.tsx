@@ -13,8 +13,8 @@
 
 import BottomSheet, {
   BottomSheetBackdrop,
-  BottomSheetScrollView,
   BottomSheetTextInput,
+  BottomSheetView,
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
@@ -117,9 +117,13 @@ export const AddPeopleSheet = forwardRef<
       keyboardBlurBehavior="restore"
       {...sheetChrome}
     >
-      <BottomSheetScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{
+      {/* ⚠ BottomSheetView, not BottomSheetScrollView (Ryan, 2026-10-02: "doesn't slide up far
+          enough to actually see all the words"). With dynamic sizing the scroll view measured the
+          sheet short, so the bottom of the content sat below what was visible. BottomSheetView is
+          what JoinPoolSheet and SaveCrewSheet use, with the same keyboard props. The content is
+          short — a field, a note, at most five exact matches — so nothing here needs to scroll. */}
+      <BottomSheetView
+        style={{
           paddingHorizontal: theme.spacing.xl,
           paddingTop: theme.spacing.sm,
           paddingBottom: insets.bottom + theme.spacing.md,
@@ -141,9 +145,6 @@ export const AddPeopleSheet = forwardRef<
           </View>
           <Text variant="cardTitle" align="center">
             Add people
-          </Text>
-          <Text variant="body" color="slate" align="center">
-            By their exact username or email. They’ll tap Join once to be in.
           </Text>
         </View>
 
@@ -278,11 +279,7 @@ export const AddPeopleSheet = forwardRef<
           </View>
         ) : null}
 
-        <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, lineHeight: 16, color: theme.colors.slate, textAlign: 'center' }}>
-          Exact matches only — no browsing, no suggestions. An email never shows whether someone’s on SportPool; if
-          they’re not, we send them one invite.
-        </RNText>
-      </BottomSheetScrollView>
+      </BottomSheetView>
     </BottomSheet>
   );
 });
