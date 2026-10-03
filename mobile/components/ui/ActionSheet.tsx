@@ -3,9 +3,19 @@
 // Why not ActionSheetIOS? It's iOS-only — on Android the call either
 // silently no-ops or has to be replaced with a hand-rolled cycle hack
 // (see the pre-fix PoolsFilterBar). This component renders identically
-// on both platforms using a slide-up Modal + theme tokens, with an
+// on both platforms using a transparent Modal + theme tokens, with an
 // optional active-value highlight, optional destructive styling, and
 // safe-area-aware bottom padding for Android gesture nav.
+//
+// ⚠ THE DIM FADES; ONLY THE SHEET SLIDES (Ryan, 2026-10-02: "the background
+// darkening is awkward"). It used the Modal's own slide animation, which moves the
+// Modal's WHOLE content — so the dark backdrop rose up the screen as a slab
+// behind the sheet instead of the screen dimming in place, unlike every gorhom
+// sheet in the app (`BottomSheetBackdrop` fades). Now the Modal itself doesn't
+// animate: the dim's opacity and the sheet's position are driven separately,
+// on the native driver (core Animated, not Reanimated — see
+// gotcha_reanimated_ios_commit_pause), and closing plays it backwards before
+// the Modal goes.
 //
 // Usage:
 //   <ActionSheet
@@ -21,7 +31,8 @@
 //     onSelect={(v) => { setOpen(false); setSort(v); }}
 //   />
 
-import { Modal, Platform, Pressable, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from './Icon';
@@ -66,11 +77,42 @@ export function ActionSheet<T extends string>({
 }: ActionSheetProps<T>) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+
+  // 0 = closed, 1 = open. Drives the dim (opacity) and the sheet (translateY) together.
+  const progress = useRef(new Animated.Value(0)).current;
+  // The Modal stays up while the close plays out, then goes.
+  const [shown, setShown] = useState(visible);
+  if (visible && !shown) setShown(true);
+
+  useEffect(() => {
+    if (visible) {
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(progress, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setShown(false);
+      });
+    }
+  }, [visible, progress]);
+
+  // From just below the screen's bottom edge — a fixed distance, so nothing depends on measuring
+  // the sheet first (a measured height arriving mid-animation would make it jump).
+  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [windowHeight, 0] });
 
   return (
     <Modal
-      visible={visible}
-      animationType="slide"
+      visible={shown}
+      animationType="none"
       transparent
       onRequestClose={onClose}
       statusBarTranslucent
@@ -83,12 +125,20 @@ export function ActionSheet<T extends string>({
           touches on Android inside transparent Modals — flex layout
           sidesteps the whole class of issues. */}
       <View style={{ flex: 1 }}>
-        <Pressable
-          onPress={onClose}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
+        {/* The dim: the whole screen, fading in place. Behind everything and
+            pointerEvents="none", so it never takes a touch — the transparent
+            Pressable below is still the tap-to-close target, and the flex
+            layout the note above depends on is unchanged. Full-screen rather
+            than only above the sheet, so no undimmed band shows beneath the
+            sheet while it is still sliding up. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)', opacity: progress }]}
         />
-        <View
+        <Pressable onPress={onClose} style={{ flex: 1 }} accessibilityLabel={cancelLabel} />
+        <Animated.View
           style={{
+            transform: [{ translateY }],
             backgroundColor: theme.colors.surface,
             borderTopLeftRadius: SHEET_RADIUS,
             borderTopRightRadius: SHEET_RADIUS,
@@ -233,7 +283,7 @@ export function ActionSheet<T extends string>({
               {cancelLabel}
             </Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
