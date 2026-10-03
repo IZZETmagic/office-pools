@@ -387,7 +387,24 @@ Each step is a commit; nothing is pushed until Ryan says so.
    deploys, because the app reads production.
    Originally: **Activity v3** (§6): server builder, route, and `mobile/lib/api.ts` types; `useActivity` sends
    `v=3`.
-6. **RN screens.** Data via **react-query + API** (`useCrews`, `useCrew`), the pattern `useLeaguePool`
+6. ✅ **RN screens** — done 2026-10-02 in five commits:
+   - `af488e40`: the data layer (types, words, API calls, query hooks; 13 tests);
+   - `35533da4`: every crew person carries their avatar;
+   - `576622d8`: My Crews, the crew page and Add people;
+   - `cdfc1307`: the create flow's Crew row, roster review with the Free cap, the
+     same-competition confirm, and Private locked;
+   - `c19f167c`: the pool screens' crew line (count for members, names for the admin, via a new
+     `GET /api/pools/:id/crew`).
+
+   Moved or not done:
+   - **push routing** for a saved-spot tap moves to step 7, with the notifications it routes;
+   - **"Go Plus" from inside the create flow** is not built — a pool's tier is bought after it
+     exists, so roster review states what Free holds and lets the starter choose. Follow-up;
+   - **the concept screen is kept** (dev-only) until the API deploys. The app reads production, so
+     the real screens show their error state on a Metro build until then, and the concept is the
+     only way to see the designs on a phone.
+
+   Originally listed — **RN screens.** Data via **react-query + API** (`useCrews`, `useCrew`), the pattern `useLeaguePool`
    uses, not hand-rolled PostgREST.
    - `mobile/app/profile/crews.tsx`: the list. Wire the Profile tile's `onPress`; drop "Soon".
    - `mobile/app/profile/crews.tsx` gains **New crew** (name → add people). This is the only
