@@ -152,7 +152,15 @@ export default function CrewScreen() {
   };
 
   return (
-    <Shell title="Crew" refreshing={refreshing} onRefresh={onRefresh} bottom={insets.bottom}>
+    <Shell
+      title="Crew"
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      bottom={insets.bottom}
+      overlay={
+        <AddPeopleSheet ref={addPeopleRef} crewId={crew.crew.crewId} crewName={crew.crew.name} onChanged={() => invalidateCrews(queryClient, id)} />
+      }
+    >
       {!v.active && v.canRejoin ? (
         <Card>
           <View style={{ gap: theme.spacing.md }}>
@@ -381,7 +389,6 @@ export default function CrewScreen() {
         </View>
       ) : null}
 
-      <AddPeopleSheet ref={addPeopleRef} crewId={crew.crew.crewId} crewName={crew.crew.name} onChanged={() => invalidateCrews(queryClient, id)} />
 
       <ActionSheet<MemberAction>
         visible={selected !== null}
@@ -480,12 +487,22 @@ function Shell({
   refreshing,
   onRefresh,
   bottom = 0,
+  overlay,
 }: {
   title: string;
   children: React.ReactNode;
   refreshing?: boolean;
   onRefresh?: () => void;
   bottom?: number;
+  /**
+   * ⚠ A GORHOM SHEET GOES HERE, NEVER IN `children` (Ryan, 2026-10-02: Add people "doesn't slide
+   * up far enough — it's cut off"). `children` render inside the ScrollView, and a BottomSheet
+   * there sizes and positions itself against the scrolling content instead of the screen. This
+   * slot is a sibling of the ScrollView at the screen's root, where every working sheet in the app
+   * sits (SaveCrewSheet on Activity, RosterReviewSheet on create-pool). RN Modals (the dialogs and
+   * the ActionSheet) don't care where they're rendered.
+   */
+  overlay?: React.ReactNode;
 }) {
   const theme = useTheme();
   return (
@@ -504,6 +521,7 @@ function Shell({
       >
         {children}
       </ScrollView>
+      {overlay}
     </View>
   );
 }
