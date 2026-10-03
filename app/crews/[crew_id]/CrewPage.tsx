@@ -26,7 +26,19 @@ import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import { crewRequest, errorText } from '@/lib/crews/client'
 import type { CrewDetail } from '@/lib/crews/read'
-import { finishText, leaveConsequence, ordinal, personName, plural, roleLabel, shortName, winnersText } from '@/lib/crews/words'
+import {
+  DISBAND_CONSEQUENCE,
+  DISBANDED_NOTICE,
+  finishText,
+  leaveConsequence,
+  monthYear,
+  ordinal,
+  personName,
+  plural,
+  roleLabel,
+  shortName,
+  winnersText,
+} from '@/lib/crews/words'
 
 type Member = CrewDetail['members'][number]
 
@@ -51,6 +63,7 @@ export function CrewPage({
   const [choosingCo, setChoosingCo] = useState(false)
   const [selected, setSelected] = useState<Member | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<Member | null>(null)
+  const [confirmDisband, setConfirmDisband] = useState(false)
 
   const v = crew.viewer
   const captain = crew.members.find((m) => m.role === 'captain') ?? null
@@ -82,6 +95,35 @@ export function CrewPage({
 
   const setCoCaptain = (userId: string) =>
     act(() => crewRequest(`${crewUrl}/co-captain`, { body: { user_id: userId } }))
+
+  // Disbanded (157): only its captain can open it, and the only thing left to do is bring it back.
+  if (crew.crew.disbandedAt) {
+    const when = monthYear(crew.crew.disbandedAt)
+    return (
+      <div className="min-h-screen bg-surface-secondary">
+        <AppHeader isSuperAdmin={isSuperAdmin} breadcrumbs={[{ label: 'Crews', href: '/profile?tab=crews' }, { label: crew.crew.name }]} />
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
+          <h1 className="text-[26px] font-black text-ink leading-tight break-words">{crew.crew.name}</h1>
+          <Card>
+            <div className="flex flex-col gap-3">
+              <p className="text-[15px] font-bold text-ink">You disbanded this crew{when ? ` · ${when}` : ''}</p>
+              <p className="text-[13px] leading-[18px] text-muted">{DISBANDED_NOTICE}</p>
+              {v.canRestore ? (
+                <Button
+                  onClick={() => void act(() => crewRequest(`${crewUrl}/restore`, { body: {} }))}
+                  loading={busy}
+                  loadingText="Restoring…"
+                  className="self-start"
+                >
+                  Restore crew
+                </Button>
+              ) : null}
+            </div>
+          </Card>
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-surface-secondary">
@@ -335,6 +377,18 @@ export function CrewPage({
             </button>
           </div>
         ) : null}
+        {/* The captain alone (157), always behind a confirmation that says what it does to everyone. */}
+        {v.canDisband ? (
+          <div className="flex justify-center -mt-4">
+            <button
+              type="button"
+              onClick={() => setConfirmDisband(true)}
+              className="text-sm font-bold text-danger-600 hover:text-danger-700 px-2 py-1 rounded-control"
+            >
+              Disband crew
+            </button>
+          </div>
+        ) : null}
       </main>
 
       {/* ── Dialogs ── */}
@@ -451,6 +505,27 @@ export function CrewPage({
             },
           )
         }}
+      />
+
+      <ConfirmModal
+        open={confirmDisband}
+        title={`Disband ${crew.crew.name}?`}
+        body={DISBAND_CONSEQUENCE}
+        confirmLabel="Disband"
+        cancelLabel="Keep it"
+        busyLabel="Disbanding…"
+        busy={busy}
+        onCancel={() => setConfirmDisband(false)}
+        onConfirm={() =>
+          // Stays on this page: the refresh answers with the disbanded view and its Restore.
+          void act(
+            () => crewRequest(`${crewUrl}/disband`, { body: {} }),
+            () => {
+              setConfirmDisband(false)
+              router.refresh()
+            },
+          )
+        }
       />
 
       <ConfirmModal

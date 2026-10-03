@@ -28,7 +28,9 @@ export type CrewCard = {
   status:
     | { kind: 'seat'; poolId: string; competition: string; firstLockAt: string }
     | { kind: 'live'; poolId: string; competition: string }
-    | { kind: 'quiet'; poolId: string | null; competition: string | null };
+    | { kind: 'quiet'; poolId: string | null; competition: string | null }
+    /** Its captain disbanded it (157) — only that captain sees the card, to restore it. */
+    | { kind: 'disbanded'; at: string };
   leader: (Person & { titles: number }) | null;
   me: { position: number | null; titles: number; seasons: number };
   /** Up to three faces — captain first. */
@@ -39,8 +41,19 @@ export type PoolMode = { predictionMode: string; leagueMode: string | null };
 export type SeatState = 'open' | 'taken' | 'declined' | 'released' | 'expired';
 
 export type CrewDetail = {
-  crew: { crewId: string; name: string; createdAt: string };
-  viewer: { role: CrewRole | null; active: boolean; canManage: boolean; canSetCoCaptain: boolean; canRejoin: boolean };
+  /** `disbandedAt` is set only on the captain's view of a crew they disbanded — read-only, Restore. */
+  crew: { crewId: string; name: string; createdAt: string; disbandedAt: string | null };
+  viewer: {
+    role: CrewRole | null;
+    active: boolean;
+    canManage: boolean;
+    canSetCoCaptain: boolean;
+    canRejoin: boolean;
+    /** The captain alone. */
+    canDisband: boolean;
+    /** The captain, on a crew they disbanded. */
+    canRestore: boolean;
+  };
   members: (Person & { role: CrewRole; joinedAt: string })[];
   playingNow: {
     poolId: string;
@@ -144,6 +157,7 @@ export function crewSummary(c: Pick<CrewCard, 'people' | 'seasons' | 'since'>): 
 export function crewStatusText(s: CrewCard['status']): string {
   if (s.kind === 'seat') return `Your spot’s saved · ${s.competition}`;
   if (s.kind === 'live') return `Playing now · ${s.competition}`;
+  if (s.kind === 'disbanded') return 'Disbanded · only you can see this';
   return s.competition ? `Last played ${s.competition}` : 'No seasons yet';
 }
 
@@ -189,6 +203,14 @@ export function leaveConsequence(d: Pick<CrewDetail, 'viewer' | 'members'>): str
   const next = co ?? [...others].sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))[0];
   return `${shortName(next)} will become captain${co ? '' : ' — the longest-standing member'}. Your history stays.`;
 }
+
+/** Disband's confirmation — said before the tap (157). Mirrored by lib/crews/words.ts on the web. */
+export const DISBAND_CONSEQUENCE =
+  'It disappears for everyone in it. Saved spots nobody has taken are released, and pools already running carry on as ordinary pools. You can restore it later from My Crews.';
+
+/** What the captain sees on a crew they disbanded (157). */
+export const DISBANDED_NOTICE =
+  'Nobody else can see it. Restore it and everyone’s back as they were — saved spots that were released stay released.';
 
 /**
  * What the captain sees before pressing Invite on an email — the email's own first line.

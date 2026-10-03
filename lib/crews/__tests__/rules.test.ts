@@ -5,8 +5,10 @@ import { describe, it, expect } from 'vitest'
 import {
   allTimeTable,
   buildRoster,
+  canDisband,
   canManage,
   canRejoin,
+  canRestore,
   canRemove,
   canSetCoCaptain,
   claimBlock,
@@ -251,5 +253,21 @@ describe('opening an invite’s one-time link (155)', () => {
   })
   it('⚠ a forwarded link never brings back someone a captain removed', () => {
     expect(claimBlock({ isInviter: false, member: m('u', 'member', '2026-06-01', 'removed') })).toBe('removed')
+  })
+})
+
+describe('disbanding and restoring (157)', () => {
+  it('disband is the captain’s alone', () => {
+    expect(canDisband(m('c', 'captain', '2026-06-01'))).toBe(true)
+    expect(canDisband(m('k', 'co_captain', '2026-06-01'))).toBe(false)
+    expect(canDisband(m('u', 'member', '2026-06-01'))).toBe(false)
+    expect(canDisband(m('c', 'captain', '2026-06-01', 'left'))).toBe(false)
+  })
+  it('restore: only a DISBANDED crew, only by its captain', () => {
+    const disbanded = { closed_at: '2026-10-02', closed_reason: 'disbanded' }
+    expect(canRestore(disbanded, m('c', 'captain', '2026-06-01'))).toBe(true)
+    expect(canRestore(disbanded, m('k', 'co_captain', '2026-06-01'))).toBe(false)
+    expect(canRestore({ closed_at: '2026-10-02', closed_reason: 'emptied' }, m('c', 'captain', '2026-06-01'))).toBe(false)
+    expect(canRestore({ closed_at: null, closed_reason: null }, m('c', 'captain', '2026-06-01'))).toBe(false)
   })
 })

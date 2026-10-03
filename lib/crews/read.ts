@@ -16,8 +16,10 @@ import { getScoringSource, readEntryScoring } from '@/lib/scoring/readSource'
 import {
   allTimeTable,
   buildRoster,
+  canDisband,
   canManage,
   canRejoin,
+  canRestore,
   canSetCoCaptain,
   isActive,
   seatState,
@@ -175,11 +177,13 @@ export type CrewCard = {
    * seat  — you hold an open saved spot in one of its pools (actionable, so it wins)
    * live  — one of its pools is running
    * quiet — nothing running; `poolId`/`competition` name the last season, if any
+   * disbanded — its captain disbanded it (157); only that captain sees the card, to restore it
    */
   status:
     | { kind: 'seat'; poolId: string; competition: string; firstLockAt: string }
     | { kind: 'live'; poolId: string; competition: string }
     | { kind: 'quiet'; poolId: string | null; competition: string | null }
+    | { kind: 'disbanded'; at: string }
   /** Most titles, then best finish. null until a season has finished with ranks. */
   leader: (Person & { titles: number }) | null
   /** Where the viewer sits all-time; null position until they have a ranked finish. */
@@ -199,7 +203,7 @@ export async function listMyCrews(admin: Admin, userId: string, now: number): Pr
   if (crewIds.length === 0) return []
 
   const [{ data: crews }, { data: members }, pools, { data: seats }] = await Promise.all([
-    admin.from('crews').select('crew_id, name, created_at, closed_at').in('crew_id', crewIds),
+    admin.from('crews').select('crew_id, name, created_at, closed_at, closed_reason').in('crew_id', crewIds),
     admin.from('crew_members').select('crew_id, user_id, role, joined_at').in('crew_id', crewIds).is('left_at', null),
     crewPools(admin, crewIds),
     admin.from('crew_seats').select('pool_id, crew_id, resolution').eq('user_id', userId).in('crew_id', crewIds).is('resolved_at', null),
@@ -223,7 +227,13 @@ export async function listMyCrews(admin: Admin, userId: string, now: number): Pr
 
   const cards: CrewCard[] = []
   for (const crew of crews ?? []) {
-    if (crew.closed_at) continue
+    // A closed crew is gone from everyone's list — except a DISBANDED one, for its captain, who can
+    // restore it (157). Everyone else sees nothing, as when a crew's last member leaves.
+    const disbandedForMe =
+      !!crew.closed_at &&
+      crew.closed_reason === 'disbanded' &&
+      (members ?? []).some((m) => m.crew_id === crew.crew_id && m.user_id === userId && m.role === 'captain')
+    if (crew.closed_at && !disbandedForMe) continue
     const own = pools.filter((p) => p.crew_id === crew.crew_id)
     const running = own.filter((p) => !p.finishedAt && !p.archived_at).sort((a, b) => a.created_at.localeCompare(b.created_at))
     const openSeat = (seats ?? [])
@@ -243,7 +253,9 @@ export async function listMyCrews(admin: Admin, userId: string, now: number): Pr
       people: (members ?? []).filter((m) => m.crew_id === crew.crew_id).length,
       seasons: own.length,
       since: crew.created_at,
-      status: openSeat?.pool
+      status: disbandedForMe
+        ? { kind: 'disbanded', at: crew.closed_at! }
+        : openSeat?.pool
         ? { kind: 'seat', poolId: openSeat.pool.pool_id, competition: openSeat.pool.competition, firstLockAt: openSeat.pool.firstLockAt! }
         : running[0]
           ? { kind: 'live', poolId: running[0].pool_id, competition: running[0].competition }
@@ -258,15 +270,26 @@ export async function listMyCrews(admin: Admin, userId: string, now: number): Pr
     })
   }
   // Something to act on first, then something happening, then the rest — newest crew first within each.
-  const order = { seat: 0, live: 1, quiet: 2 } as const
+  const order = { seat: 0, live: 1, quiet: 2, disbanded: 3 } as const
   return cards.sort((a, b) => order[a.status.kind] - order[b.status.kind] || b.since.localeCompare(a.since))
 }
 
 // ── One crew ────────────────────────────────────────────────────────────────────────────────────
 
 export type CrewDetail = {
-  crew: { crewId: string; name: string; createdAt: string }
-  viewer: { role: CrewRole | null; active: boolean; canManage: boolean; canSetCoCaptain: boolean; canRejoin: boolean }
+  /** `disbandedAt` is set only on the captain's view of a crew they disbanded (157) — read-only, Restore. */
+  crew: { crewId: string; name: string; createdAt: string; disbandedAt: string | null }
+  viewer: {
+    role: CrewRole | null
+    active: boolean
+    canManage: boolean
+    canSetCoCaptain: boolean
+    canRejoin: boolean
+    /** The captain alone (157). */
+    canDisband: boolean
+    /** The captain, on a crew they disbanded. */
+    canRestore: boolean
+  }
   members: Array<Person & { role: CrewRole; joinedAt: string }>
   playingNow: Array<{
     poolId: string
@@ -307,8 +330,12 @@ export type CrewDetail = {
  * Someone who LEFT on their own can still open it — that is where Rejoin lives.
  */
 export async function readCrew(admin: Admin, crewId: string, viewerId: string, now: number): Promise<CrewDetail | null> {
-  const { data: crew } = await admin.from('crews').select('crew_id, name, created_at, closed_at').eq('crew_id', crewId).maybeSingle()
-  if (!crew || crew.closed_at) return null
+  const { data: crew } = await admin
+    .from('crews')
+    .select('crew_id, name, created_at, closed_at, closed_reason')
+    .eq('crew_id', crewId)
+    .maybeSingle()
+  if (!crew) return null
   const { data: memberRows, error } = await admin
     .from('crew_members')
     .select('user_id, role, joined_at, left_at, left_reason')
@@ -317,6 +344,9 @@ export async function readCrew(admin: Admin, crewId: string, viewerId: string, n
   const all = (memberRows ?? []) as CrewMember[]
   const me = all.find((m) => m.user_id === viewerId) ?? null
   if (!me || (!isActive(me) && !canRejoin(me))) return null
+  // Closed: gone — except a DISBANDED crew, for its captain, who can restore it (157).
+  const disbanded = !!crew.closed_at && canRestore(crew, me)
+  if (crew.closed_at && !disbanded) return null
 
   const active = all.filter((m) => m.left_at === null)
   const pools = await crewPools(admin, [crewId])
@@ -334,7 +364,8 @@ export async function readCrew(admin: Admin, crewId: string, viewerId: string, n
   const inPool = new Set((myPoolRows ?? []).map((r) => r.pool_id))
   const seatByPool = new Map((mySeats ?? []).map((s) => [s.pool_id, s.resolution as 'taken' | 'declined' | 'released' | null]))
 
-  const manager = canManage(me)
+  // A disbanded crew is read-only: the only thing left to do with it is restore it.
+  const manager = !disbanded && canManage(me)
   const { data: inviteRows } = manager
     ? await admin.from('crew_invites').select('invite_id, invitee_user_id, invitee_email, created_at').eq('crew_id', crewId).is('resolved_at', null)
     : { data: null }
@@ -349,13 +380,15 @@ export async function readCrew(admin: Admin, crewId: string, viewerId: string, n
 
   const roleOrder = { captain: 0, co_captain: 1, member: 2 } as const
   return {
-    crew: { crewId: crew.crew_id, name: crew.name, createdAt: crew.created_at },
+    crew: { crewId: crew.crew_id, name: crew.name, createdAt: crew.created_at, disbandedAt: disbanded ? crew.closed_at : null },
     viewer: {
       role: isActive(me) ? me.role : null,
       active: isActive(me),
       canManage: manager,
-      canSetCoCaptain: canSetCoCaptain(me),
-      canRejoin: canRejoin(me),
+      canSetCoCaptain: !disbanded && canSetCoCaptain(me),
+      canRejoin: !disbanded && canRejoin(me),
+      canDisband: !disbanded && canDisband(me),
+      canRestore: disbanded,
     },
     members: active
       .sort((a, b) => roleOrder[a.role] - roleOrder[b.role] || a.joined_at.localeCompare(b.joined_at))

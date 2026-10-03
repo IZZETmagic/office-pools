@@ -51,12 +51,14 @@ import {
   answerSeat,
   claimInviteByToken,
   createCrew,
+  disbandCrew,
   inviteToCrew,
   leaveCrew,
   lookupUsername,
   readInviteLink,
   removeMember,
   rejoinCrew,
+  restoreCrew,
   renameCrew,
   setCoCaptain,
 } from '../lib/crews/store'
@@ -205,6 +207,24 @@ async function main() {
       check('…the address got its one-time link armed; the account did not', !!addr?.token_hash && acct?.token_hash === null, sentRows)
       check('the next run sends nothing', (await runCrewNotices(admin, Date.now())).invites === 0)
     }
+
+    console.log('\ndisband and restore (157)')
+    check('the co-captain cannot disband', !(await disbandCrew(admin, { actorId: TWO, crewId })).ok)
+    check('the captain disbands', (await disbandCrew(admin, { actorId: CAP, crewId })).ok)
+    const { data: closedRow } = await admin.from('crews').select('closed_at, closed_reason, closed_by').eq('crew_id', crewId).maybeSingle()
+    check('…closed as disbanded, by the captain', !!closedRow?.closed_at && closedRow.closed_reason === 'disbanded' && closedRow.closed_by === CAP, closedRow)
+    const { count: invitesLeft } = await admin.from('crew_invites').select('invite_id', { count: 'exact', head: true }).eq('crew_id', crewId).is('resolved_at', null)
+    check('…its open invites withdrawn', invitesLeft === 0, invitesLeft)
+    check('a member can no longer see it', (await readCrew(admin, crewId, TWO, Date.now())) === null)
+    check('…nor find it in My Crews', !(await listMyCrews(admin, TWO, Date.now())).some((c) => c.crewId === crewId))
+    const capCard = (await listMyCrews(admin, CAP, Date.now())).find((c) => c.crewId === crewId)
+    check('the captain still sees it, marked disbanded', capCard?.status.kind === 'disbanded', capCard?.status)
+    const capView = await readCrew(admin, crewId, CAP, Date.now())
+    check('…and its page offers only Restore', !!capView?.crew.disbandedAt && capView.viewer.canRestore && !capView.viewer.canManage, capView?.viewer)
+    check('the co-captain cannot restore it', !(await restoreCrew(admin, { actorId: TWO, crewId })).ok)
+    check('the captain restores it', (await restoreCrew(admin, { actorId: CAP, crewId })).ok)
+    const back = await readCrew(admin, crewId, TWO, Date.now())
+    check('…everyone back as they were', back?.viewer.role === 'co_captain' && back.members.length === 2, back?.members.map((m) => m.role))
     const roster = await readRoster(admin, { crewId, starterId: CAP, tier: 'free', now: Date.now() })
     check('readRoster: everyone but the starter, Free saves 9', roster?.rows.length === 1 && roster?.spots === 9 && roster?.memberCap === 10, roster)
 

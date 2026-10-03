@@ -67,6 +67,7 @@ export function crewSummary(c: Pick<CrewCard, 'people' | 'seasons' | 'since'>): 
 export function crewStatusText(s: CrewCard['status']): string {
   if (s.kind === 'seat') return `Your spot’s saved · ${s.competition}`
   if (s.kind === 'live') return `Playing now · ${s.competition}`
+  if (s.kind === 'disbanded') return 'Disbanded · only you can see this'
   return s.competition ? `Last played ${s.competition}` : 'No seasons yet'
 }
 
@@ -105,6 +106,14 @@ export function leaveConsequence(d: Pick<CrewDetail, 'viewer' | 'members'>): str
   const next = co ?? [...others].sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))[0]
   return `${shortName(next)} will become captain${co ? '' : ' — the longest-standing member'}. Your history stays.`
 }
+
+/** Disband's confirmation — said before the tap (157). */
+export const DISBAND_CONSEQUENCE =
+  'It disappears for everyone in it. Saved spots nobody has taken are released, and pools already running carry on as ordinary pools. You can restore it later from My Crews.'
+
+/** What the captain sees on a crew they disbanded (157). */
+export const DISBANDED_NOTICE =
+  'Nobody else can see it. Restore it and everyone’s back as they were — saved spots that were released stay released.'
 
 /**
  * The Needs you deadline pill: "40m left", "5h left", then "Sat 7:30 pm".

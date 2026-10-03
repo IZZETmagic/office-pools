@@ -13,6 +13,7 @@ import {
   answerSeat,
   claimInviteByToken,
   createCrew,
+  disbandCrew,
   inviteToCrew,
   leaveAllCrews,
   leaveCrew,
@@ -21,6 +22,7 @@ import {
   readInviteLink,
   rejoinCrew,
   removeMember,
+  restoreCrew,
   saveCrewFromPool,
   setCoCaptain,
 } from '../store'
@@ -304,6 +306,7 @@ describe('an email invite is claimed by its one-time link — never by a matchin
 
 describe('playing in a crew pool is how you join the crew — unless you left or were removed', () => {
   const seed = () => ({
+    crews: [crew()],
     crew_members: [member('cap', 'captain'), member('gone', 'member', '2026-06-01', 'left'), member('out', 'member', '2026-06-01', 'removed')],
     crew_seats: [{ pool_id: 'pl', user_id: 'new', crew_id: 'c1', resolved_at: null, resolution: null }],
   })
@@ -318,6 +321,68 @@ describe('playing in a crew pool is how you join the crew — unless you left or
     await onCrewPoolJoined(db.client, { crewId: 'c1', poolId: 'pl', userId: 'gone' })
     await onCrewPoolJoined(db.client, { crewId: 'c1', poolId: 'pl', userId: 'out' })
     expect(active(db).map((m) => m.user_id)).toEqual(['cap'])
+  })
+})
+
+describe('disbanding — the captain alone; it disappears; the captain can restore it (157)', () => {
+  const seed = () => ({
+    crews: [crew()],
+    crew_members: [member('cap', 'captain'), member('co', 'co_captain'), member('m1', 'member')],
+    crew_seats: [
+      { pool_id: 'pl', user_id: 'm1', crew_id: 'c1', resolved_at: null, resolution: null },
+      { pool_id: 'pl', user_id: 'co', crew_id: 'c1', resolved_at: '2026-10-01', resolution: 'taken' },
+    ],
+    crew_invites: [{ invite_id: 'i1', crew_id: 'c1', invitee_email: 'a@b.co', resolved_at: null, resolution: null }],
+    users: [],
+  })
+
+  it('only the captain — not the co-captain, not a member', async () => {
+    const db = fakeDb(seed())
+    expect(await disbandCrew(db.client, { actorId: 'co', crewId: 'c1' })).toMatchObject({ ok: false, status: 403 })
+    expect(await disbandCrew(db.client, { actorId: 'm1', crewId: 'c1' })).toMatchObject({ ok: false, status: 403 })
+    expect(db.tables.crews[0].closed_at).toBeNull()
+  })
+  it('closes it as DISBANDED by the captain; members untouched; untaken spots released; invites withdrawn', async () => {
+    const db = fakeDb(seed())
+    expect(await disbandCrew(db.client, { actorId: 'cap', crewId: 'c1' })).toEqual({ ok: true })
+    expect(db.tables.crews[0]).toMatchObject({ closed_reason: 'disbanded', closed_by: 'cap' })
+    expect(db.tables.crews[0].closed_at).not.toBeNull()
+    expect(active(db).map((m) => m.user_id).sort()).toEqual(['cap', 'co', 'm1'])
+    expect(db.tables.crew_seats.find((x) => x.user_id === 'm1')).toMatchObject({ resolution: 'released' })
+    expect(db.tables.crew_seats.find((x) => x.user_id === 'co')).toMatchObject({ resolution: 'taken' })
+    expect(db.tables.crew_invites[0]).toMatchObject({ resolution: 'revoked' })
+  })
+  it('a disbanded crew’s pool carries on as an ordinary pool — joining it adds nobody to the crew', async () => {
+    const db = fakeDb(seed())
+    await disbandCrew(db.client, { actorId: 'cap', crewId: 'c1' })
+    await onCrewPoolJoined(db.client, { crewId: 'c1', poolId: 'pl', userId: 'stranger' })
+    expect(db.tables.crew_members.find((m) => m.user_id === 'stranger')).toBeUndefined()
+  })
+  it('nobody can act on it while disbanded — not even the captain, except to restore', async () => {
+    const db = fakeDb(seed())
+    await disbandCrew(db.client, { actorId: 'cap', crewId: 'c1' })
+    expect(await leaveCrew(db.client, { crewId: 'c1', userId: 'm1' })).toMatchObject({ ok: false, status: 404 })
+    expect(await inviteToCrew(db.client, { actorId: 'cap', crewId: 'c1', userId: 'x' })).toMatchObject({ ok: false, status: 404 })
+  })
+  it('the captain restores it, everyone as they were — a released spot stays released', async () => {
+    const db = fakeDb(seed())
+    await disbandCrew(db.client, { actorId: 'cap', crewId: 'c1' })
+    expect(await restoreCrew(db.client, { actorId: 'co', crewId: 'c1' })).toMatchObject({ ok: false, status: 404 })
+    expect(await restoreCrew(db.client, { actorId: 'cap', crewId: 'c1' })).toEqual({ ok: true })
+    expect(db.tables.crews[0]).toMatchObject({ closed_at: null, closed_reason: null, closed_by: null })
+    expect(active(db).map((m) => m.user_id).sort()).toEqual(['cap', 'co', 'm1'])
+    expect(db.tables.crew_seats.find((x) => x.user_id === 'm1')).toMatchObject({ resolution: 'released' })
+  })
+  it('a crew whose last member left can’t be restored — and closes as EMPTIED', async () => {
+    const db = fakeDb({ crews: [crew()], crew_members: [member('cap', 'captain')], pools: [] })
+    await leaveCrew(db.client, { crewId: 'c1', userId: 'cap' })
+    expect(db.tables.crews[0]).toMatchObject({ closed_reason: 'emptied' })
+    expect(await restoreCrew(db.client, { actorId: 'cap', crewId: 'c1' })).toMatchObject({ ok: false, status: 404 })
+  })
+  it('a captain who disbanded a crew can still delete their account — the closed crew is skipped', async () => {
+    const db = fakeDb(seed())
+    await disbandCrew(db.client, { actorId: 'cap', crewId: 'c1' })
+    expect(await leaveAllCrews(db.client, 'cap')).toEqual({ left: 0, failed: [] })
   })
 })
 

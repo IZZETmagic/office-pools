@@ -15,9 +15,11 @@ import { joinPool } from '@/lib/pools/join'
 import { hashInviteToken, looksLikeInviteToken } from './inviteToken'
 import {
   CLAIM_BLOCK_TEXT,
+  canDisband,
   canManage,
   canRejoin,
   canRemove,
+  canRestore,
   canSetCoCaptain,
   claimBlock,
   cleanCrewName,
@@ -57,11 +59,20 @@ const MEMBER_COLS = 'user_id, role, joined_at, left_at, left_reason'
 async function loadCrew(admin: Admin, crewId: string) {
   const { data, error } = await admin
     .from('crews')
-    .select('crew_id, name, closed_at, created_by, created_at')
+    .select('crew_id, name, closed_at, closed_reason, closed_by, created_by, created_at')
     .eq('crew_id', crewId)
     .maybeSingle()
   if (error) throw new Error(`crews: ${error.message}`)
-  return data as { crew_id: string; name: string; closed_at: string | null; created_by: string | null; created_at: string } | null
+  return data as {
+    crew_id: string
+    name: string
+    closed_at: string | null
+    /** 157: 'emptied' (the last member left) or 'disbanded' (the captain disbanded it). */
+    closed_reason: 'emptied' | 'disbanded' | null
+    closed_by: string | null
+    created_by: string | null
+    created_at: string
+  } | null
 }
 
 async function loadMembers(admin: Admin, crewId: string): Promise<CrewMember[]> {
@@ -289,7 +300,7 @@ export async function leaveCrew(
   await releaseSeats(admin, p.crewId, p.userId)
 
   if (next.kind === 'close') {
-    await admin.from('crews').update({ closed_at: now }).eq('crew_id', p.crewId)
+    await admin.from('crews').update({ closed_at: now, closed_reason: 'emptied' }).eq('crew_id', p.crewId)
     await admin
       .from('crew_invites')
       .update({ resolved_at: now, resolution: 'revoked' })
@@ -309,6 +320,69 @@ export async function leaveCrew(
   return { ok: true, closed: false, newCaptainId: null }
 }
 
+// ── Disbanding, and restoring (157) ─────────────────────────────────────────────────────────────
+//
+// Ryan, 2026-10-02: the captain alone can disband; the crew disappears for everyone in it, like a
+// crew whose last member left; the captain can restore it. A crew pool still running carries on as an
+// ordinary private pool — saved spots nobody has taken are released (a released seat is not given
+// back by a restore: the people it was held for may have joined with the link, or moved on).
+//
+// Member rows are NOT touched, so a restore brings everyone back exactly as they were. Open invites
+// are withdrawn, as when a crew empties — a disbanded crew asks nobody to join it.
+
+/** The captain disbands the crew. */
+export async function disbandCrew(admin: Admin, p: { actorId: string; crewId: string }): Promise<CrewResult> {
+  const ctx = await crewForActor(admin, p.crewId, p.actorId)
+  if ('failure' in ctx) return ctx.failure!
+  if (!canDisband(ctx.actor)) return fail(403, 'Only the captain can disband the crew.')
+
+  const now = new Date().toISOString()
+  const { data: closed, error } = await admin
+    .from('crews')
+    .update({ closed_at: now, closed_reason: 'disbanded', closed_by: p.actorId })
+    .eq('crew_id', p.crewId)
+    .is('closed_at', null)
+    .select('crew_id')
+  if (error) return fail(500, error.message)
+  if (!closed || closed.length === 0) return fail(404, 'Crew not found.')
+
+  const [{ error: seatErr }, { error: inviteErr }] = await Promise.all([
+    admin
+      .from('crew_seats')
+      .update({ resolved_at: now, resolution: 'released' })
+      .eq('crew_id', p.crewId)
+      .is('resolved_at', null),
+    admin
+      .from('crew_invites')
+      .update({ resolved_at: now, resolution: 'revoked' })
+      .eq('crew_id', p.crewId)
+      .is('resolved_at', null),
+  ])
+  // The crew is closed either way — nothing can claim a seat or an invite of a closed crew — so a
+  // failed tidy-up is logged, not a reason to report failure.
+  if (seatErr) console.error('[crews] releasing seats on disband failed:', seatErr.message)
+  if (inviteErr) console.error('[crews] withdrawing invites on disband failed:', inviteErr.message)
+  return { ok: true }
+}
+
+/** The captain brings a disbanded crew back — members as they were. */
+export async function restoreCrew(admin: Admin, p: { actorId: string; crewId: string }): Promise<CrewResult> {
+  const crew = await loadCrew(admin, p.crewId)
+  if (!crew) return fail(404, 'Crew not found.')
+  const members = await loadMembers(admin, p.crewId)
+  const actor = members.find((m) => m.user_id === p.actorId) ?? null
+  if (!canRestore(crew, actor)) {
+    // Never says whether a crew exists to someone who couldn't restore it anyway.
+    return fail(404, 'Crew not found.')
+  }
+  const { error } = await admin
+    .from('crews')
+    .update({ closed_at: null, closed_reason: null, closed_by: null })
+    .eq('crew_id', p.crewId)
+    .eq('closed_reason', 'disbanded')
+  return error ? fail(500, error.message) : { ok: true }
+}
+
 /**
  * Deleting an account. Its crew_members rows cascade away with the users row (154), which on its own
  * would leave a crew with no captain. So, first, leave every crew the way a person leaving does —
@@ -321,6 +395,11 @@ export async function leaveAllCrews(admin: Admin, userId: string): Promise<{ lef
   let left = 0
   const failed: string[] = []
   for (const { crew_id } of data ?? []) {
+    // A closed crew has no captaincy to hand on (157: a captain who disbanded one still has an
+    // active row in it). Nothing to do — and leaveCrew would refuse it, which would block the
+    // account deletion.
+    const crew = await loadCrew(admin, crew_id)
+    if (!crew || crew.closed_at) continue
     const r = await leaveCrew(admin, { crewId: crew_id, userId })
     if (r.ok) left++
     else failed.push(`${crew_id}: ${r.error}`)
@@ -639,6 +718,10 @@ export async function answerInvite(
  * unless they left or were removed (exits stick), and any held seat of theirs is taken.
  */
 export async function onCrewPoolJoined(admin: Admin, p: { crewId: string; poolId: string; userId: string }) {
+  // A closed crew's pool is an ordinary pool now (157: "carries on as an ordinary private pool").
+  // Joining it adds nobody — or a restore would bring back people who never joined the crew.
+  const crew = await loadCrew(admin, p.crewId)
+  if (!crew || crew.closed_at) return
   const { data: row } = await admin
     .from('crew_members')
     .select('left_at')

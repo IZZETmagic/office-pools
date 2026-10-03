@@ -23,17 +23,22 @@ import { SettingsHeader } from '@/components/settings';
 import { ConfirmDialog, Icon, PromptDialog } from '@/components/ui';
 import { ActionSheet, type ActionSheetOption } from '@/components/ui/ActionSheet';
 import {
+  disbandCrew,
   joinPoolById,
   leaveCrew,
   rejoinCrew,
   removeCrewMember,
   renameCrew,
+  restoreCrew,
   revokeCrewInvite,
   setCrewCoCaptain,
 } from '@/lib/api';
 import {
+  DISBAND_CONSEQUENCE,
+  DISBANDED_NOTICE,
   finishText,
   leaveConsequence,
+  monthYear,
   ordinal,
   personName,
   plural,
@@ -67,6 +72,7 @@ export default function CrewScreen() {
   const [choosingCo, setChoosingCo] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmDisband, setConfirmDisband] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -102,6 +108,38 @@ export default function CrewScreen() {
   }
 
   const v = crew.viewer;
+
+  // Disbanded (157): only its captain can open it, and the only thing left to do is bring it back.
+  if (crew.crew.disbandedAt) {
+    return (
+      <Shell title="Crew" refreshing={refreshing} onRefresh={onRefresh} bottom={insets.bottom}>
+        <RNText style={{ fontFamily: fontFamilies.black, fontSize: 26, color: theme.colors.ink }}>{crew.crew.name}</RNText>
+        <Card>
+          <View style={{ gap: theme.spacing.md }}>
+            <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 15, color: theme.colors.ink }}>
+              You disbanded this crew{monthYear(crew.crew.disbandedAt) ? ` · ${monthYear(crew.crew.disbandedAt)}` : ''}
+            </RNText>
+            <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 13, lineHeight: 18, color: theme.colors.slate }}>
+              {DISBANDED_NOTICE}
+            </RNText>
+            {v.canRestore ? (
+              <PrimaryButton
+                label={busy ? 'Restoring…' : 'Restore crew'}
+                disabled={busy}
+                onPress={() => void act(() => restoreCrew(crew.crew.crewId))}
+              />
+            ) : null}
+          </View>
+        </Card>
+        {problem ? (
+          <View style={{ padding: theme.spacing.md, borderRadius: theme.radii.md, backgroundColor: theme.colors.redLight }}>
+            <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 13, color: theme.colors.red, textAlign: 'center' }}>{problem}</RNText>
+          </View>
+        ) : null}
+      </Shell>
+    );
+  }
+
   const captain = crew.members.find((m) => m.role === 'captain') ?? null;
   const co = crew.members.find((m) => m.role === 'co_captain') ?? null;
   const memberOptions = (m: Member): ActionSheetOption<MemberAction>[] => {
@@ -333,6 +371,13 @@ export default function CrewScreen() {
           <Pressable onPress={() => setConfirmLeave(true)} accessibilityRole="button" hitSlop={8}>
             <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.red }}>Leave crew</RNText>
           </Pressable>
+          {/* The captain alone (157). Below Leave, and only ever behind a confirmation that says
+              what it does to everyone else. */}
+          {v.canDisband ? (
+            <Pressable onPress={() => setConfirmDisband(true)} accessibilityRole="button" hitSlop={8} style={{ paddingTop: theme.spacing.md }}>
+              <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.red }}>Disband crew</RNText>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -378,6 +423,22 @@ export default function CrewScreen() {
           const m = confirmRemove;
           setConfirmRemove(null);
           if (m) void act(() => removeCrewMember(crew.crew.crewId, m.userId));
+        }}
+      />
+
+      <ConfirmDialog
+        visible={confirmDisband}
+        title={`Disband ${crew.crew.name}?`}
+        description={DISBAND_CONSEQUENCE}
+        confirmLabel="Disband"
+        cancelLabel="Keep it"
+        destructive
+        busy={busy}
+        onCancel={() => setConfirmDisband(false)}
+        onConfirm={() => {
+          setConfirmDisband(false);
+          // Stays on this screen: the refetch answers with the disbanded view and its Restore.
+          void act(() => disbandCrew(crew.crew.crewId));
         }}
       />
 

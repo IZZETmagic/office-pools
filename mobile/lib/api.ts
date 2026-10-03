@@ -873,6 +873,16 @@ export function rejoinCrew(crewId: string) {
   return apiFetch<Record<string, never>>(`/api/crews/${crewId}/rejoin`, { method: 'POST' });
 }
 
+/** The captain disbands the crew — it disappears for everyone; the captain can restore it (157). */
+export function disbandCrew(crewId: string) {
+  return apiFetch<Record<string, never>>(`/api/crews/${crewId}/disband`, { method: 'POST' });
+}
+
+/** The captain brings back a crew they disbanded, members as they were (157). */
+export function restoreCrew(crewId: string) {
+  return apiFetch<Record<string, never>>(`/api/crews/${crewId}/restore`, { method: 'POST' });
+}
+
 export function setCrewCoCaptain(crewId: string, userId: string) {
   return apiFetch<Record<string, never>>(`/api/crews/${crewId}/co-captain`, { method: 'POST', body: { user_id: userId } });
 }

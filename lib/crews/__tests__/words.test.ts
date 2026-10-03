@@ -92,6 +92,7 @@ describe('My Crews says what the app says', () => {
       { kind: 'live' as const, poolId: 'p', competition: 'Champions League 2026/27' },
       { kind: 'quiet' as const, poolId: 'p', competition: 'FIFA World Cup 2026' },
       { kind: 'quiet' as const, poolId: null, competition: null },
+      { kind: 'disbanded' as const, at: '2026-10-02T12:00:00Z' },
     ]
     for (const st of statuses) expect(web.crewStatusText(st)).toBe(app.crewStatusText(st))
   })
@@ -100,6 +101,10 @@ describe('My Crews says what the app says', () => {
       for (const viewer of ['d', 'someone-else', null]) expect(web.leaderText(c, viewer)).toBe(app.leaderText(c, viewer))
       expect(web.meText(c)).toBe(app.meText(c))
     }
+  })
+  it('disbanding — the confirmation and the captain’s notice', () => {
+    expect(web.DISBAND_CONSEQUENCE).toBe(app.DISBAND_CONSEQUENCE)
+    expect(web.DISBANDED_NOTICE).toBe(app.DISBANDED_NOTICE)
   })
   it('the invite preview line', () => {
     expect(web.invitePreviewText('Dave Okafor', 'Bermuda Office')).toBe(app.invitePreviewText('Dave Okafor', 'Bermuda Office'))

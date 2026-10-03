@@ -125,6 +125,40 @@ describe('My Crews', () => {
   })
 })
 
+describe('a disbanded crew (157) — gone for everyone but its captain, who can restore it', () => {
+  const disband = (db: ReturnType<typeof world>) => {
+    const five = db.tables.crews.find((c) => c.crew_id === 'five')!
+    Object.assign(five, { closed_at: '2026-10-02T10:00:00Z', closed_reason: 'disbanded', closed_by: 'me' })
+    return db
+  }
+  it('the captain still sees it in My Crews, last, marked disbanded', async () => {
+    const cards = await listMyCrews(disband(world()).client, 'me', NOW)
+    expect(cards.map((c) => c.crewId)).toEqual(['office', 'five'])
+    expect(cards[1].status).toEqual({ kind: 'disbanded', at: '2026-10-02T10:00:00Z' })
+  })
+  it('a member doesn’t — not in My Crews, not by its page', async () => {
+    const db = disband(world())
+    expect((await listMyCrews(db.client, 'sam', NOW)).map((c) => c.crewId)).toEqual([])
+    expect(await readCrew(db.client, 'five', 'sam', NOW)).toBeNull()
+  })
+  it('the captain’s page is read-only: restore is the only thing left to do', async () => {
+    const d = await readCrew(disband(world()).client, 'five', 'me', NOW)
+    expect(d?.crew.disbandedAt).toBe('2026-10-02T10:00:00Z')
+    expect(d?.viewer).toMatchObject({ canRestore: true, canDisband: false, canManage: false, canSetCoCaptain: false })
+    expect(d?.invites).toBeNull()
+  })
+  it('a crew whose last member left stays gone even for its old captain', async () => {
+    const db = world()
+    Object.assign(db.tables.crews.find((c) => c.crew_id === 'five')!, { closed_at: '2026-10-02T10:00:00Z', closed_reason: 'emptied' })
+    expect(await readCrew(db.client, 'five', 'me', NOW)).toBeNull()
+  })
+  it('an open crew’s captain can disband it; nobody else can', async () => {
+    const db = world()
+    expect((await readCrew(db.client, 'five', 'me', NOW))?.viewer).toMatchObject({ canDisband: true, canRestore: false })
+    expect((await readCrew(db.client, 'five', 'sam', NOW))?.viewer).toMatchObject({ canDisband: false })
+  })
+})
+
 describe('one crew', () => {
   it('the removed and strangers cannot see it; a closed crew is gone', async () => {
     const db = world()
@@ -134,7 +168,7 @@ describe('one crew', () => {
   })
   it('someone who left can still open it — that is where Rejoin lives', async () => {
     const d = await readCrew(world().client, 'gone', 'me', NOW)
-    expect(d?.viewer).toEqual({ role: null, active: false, canManage: false, canSetCoCaptain: false, canRejoin: true })
+    expect(d?.viewer).toEqual({ role: null, active: false, canManage: false, canSetCoCaptain: false, canRejoin: true, canDisband: false, canRestore: false })
   })
   it('members are listed captain first, active only', async () => {
     const d = await readCrew(world().client, 'office', 'me', NOW)

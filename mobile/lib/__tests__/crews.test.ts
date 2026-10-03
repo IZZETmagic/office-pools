@@ -82,7 +82,7 @@ describe('what leaving does — said before the tap', () => {
     userId, role, joinedAt, fullName, username: null, avatarUrl: null, avatarBuild: null, avatarColour: null,
   });
   const detail = (role: 'captain' | 'member', members: ReturnType<typeof member>[]): Pick<CrewDetail, 'viewer' | 'members'> => ({
-    viewer: { role, active: true, canManage: role === 'captain', canSetCoCaptain: role === 'captain', canRejoin: false },
+    viewer: { role, active: true, canManage: role === 'captain', canSetCoCaptain: role === 'captain', canRejoin: false, canDisband: role === 'captain', canRestore: false },
     members,
   });
   it('a member: history stays, rejoin any time', () => {

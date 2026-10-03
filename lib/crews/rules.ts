@@ -46,6 +46,25 @@ export function canManage(m: Pick<CrewMember, 'role' | 'left_at'> | null | undef
   return isActive(m) && (m!.role === 'captain' || m!.role === 'co_captain')
 }
 
+/**
+ * Disband is the captain's alone (Ryan, 2026-10-02). The crew disappears for everyone; the captain
+ * can restore it (`canRestore`).
+ */
+export function canDisband(m: Pick<CrewMember, 'role' | 'left_at'> | null | undefined): boolean {
+  return isActive(m) && m!.role === 'captain'
+}
+
+/**
+ * Restore a disbanded crew: only a crew the captain DISBANDED (not one whose last member left —
+ * nobody is left to bring back), and only by its captain, whose row a disband leaves untouched.
+ */
+export function canRestore(
+  crew: { closed_at: string | null; closed_reason: string | null },
+  m: Pick<CrewMember, 'role' | 'left_at'> | null | undefined,
+): boolean {
+  return !!crew.closed_at && crew.closed_reason === 'disbanded' && isActive(m) && m!.role === 'captain'
+}
+
 /** Naming the co-captain is the captain's alone. */
 export function canSetCoCaptain(m: Pick<CrewMember, 'role' | 'left_at'> | null | undefined): boolean {
   return isActive(m) && m!.role === 'captain'
