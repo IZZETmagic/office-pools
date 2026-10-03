@@ -490,8 +490,10 @@ Each step is a commit; nothing is pushed until Ryan says so.
   gap from step 5: someone who signed up in the app from an invite email didn't see it in Needs you
   until they opened My Crews. Activity claims only for the caller's own feed, never a super admin's
   view of someone else's.
-- **The invite-to-account email's button now goes to `/dashboard`**, not the site root (which is the
-  marketing page even when signed in). The words are unchanged.
+- **The invite-to-account email's button now goes to `/dashboard`**, not the site root. ⚠ Corrected
+  (Gill): a signed-in reader already got there from `/` — the proxy redirects it. The change matters
+  for a SIGNED-OUT reader, who `/` left on the marketing page and `/dashboard` sends through login
+  and back to the invite. The words are unchanged.
 - Verified on localhost: the strip on Ryan's real dashboard (two real *Keep this group together?*
   cards, dialog opened and cancelled — nothing pressed that writes); every card kind, the pill, the
   crew page, the Leave dialog and the left state on a fixture harness that was deleted afterwards.
@@ -504,7 +506,35 @@ same time as the RN release:
 
 Seat links already work through `/join/<code>`.
 
-### 8b. Day two
+### 8b. Day two — ✅ built 2026-10-02
+
+**As built:**
+- **Create modal** (`components/pools/CreatePoolModal.tsx` + `components/crews/CreatePoolCrew.tsx`):
+  the Crew row on Details (only for someone in a crew), roster review (`RosterReviewModal`, Done
+  disabled over the Free cap), the *Already playing this* confirm — on Next AND on the step header,
+  which could otherwise skip it — and a locked "Private — crew pools always are" card on Settings.
+  Posts `crew_id` + `seat_user_ids`. The crew dialogs are portaled: the wizard panel keeps its
+  slide-up transform, which pins a nested fixed overlay to the panel.
+- **Profile → Crews tab** (`?tab=crews`, `components/crews/MyCrewsTab.tsx`): crew cards and New crew.
+  The crew page's breadcrumb now leads back here.
+- **Crew page captain controls**: Rename, the co-captain nudge and chooser, a member menu (Make
+  co-captain / Remove, same rules as the app), Add people (`AddPeopleModal` — exact username or
+  email, the email's first line previewed), and INVITED · WAITING with Withdraw.
+- **Pool page**: "Part of …" + the saved-spot count on the Info tab, and SPOTS SAVED (names) on the
+  admin Members tab (`components/crews/PoolCrew.tsx`). Asks the server each time — the page's pool
+  row is cached for 45 s.
+- **One owner for the invite preview line**: `words.invitePreviewText`, which `notify.invitePreview`
+  now calls. Drift tests cover every mirrored word and both create helpers.
+- Verified on localhost: Profile → Crews, a crewless pool's Info tab and the create wizard on Ryan's
+  real account (nothing written); every crew-only state on a fixture harness, deleted afterwards.
+
+⚠ **Found while recording 8a (Gill, R36) and CONFIRMED from production:** email confirmation is
+OFF — 4,820 of 4,825 email accounts were "confirmed" within 5 s of creation, 0 unconfirmed, all 16
+sign-ups in the last 60 days instant. So `email_confirmed_at` proves nothing, and the email-invite
+claim ("lands in the crew when they sign up with that verified address") can be taken by whoever
+registers the invited address first. Dormant until the API deploys. **Needs Ryan's call before ship.**
+
+Originally:
 
 The server and the data are done by then, so web is rendering only. There's one quiet day-one win:
 **the seat emails already work on web**, because `/join/<code>` takes the seat.
