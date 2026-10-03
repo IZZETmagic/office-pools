@@ -9,6 +9,7 @@ import { fetchLmsState, saveLmsPick, type LmsState } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { hapticFailure, hapticSuccess } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { useSharedActivity } from '@/lib/ActivityProvider';
 
 // =============================================================
 // PICK ONE CLUB TO WIN — the Last Man Standing wizard
@@ -106,6 +107,7 @@ function Content({
   // `useHomeData`, a hand-rolled hook behind its own provider, so invalidating
   // a react-query key below does nothing to the card that sent you here.
   const { refresh: refreshHome } = useHomeData();
+  const { settleNeeds, refresh: refreshActivity } = useSharedActivity();
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [pending, setPending] = useState<string | null>(null);
 
@@ -156,6 +158,11 @@ function Content({
       // on the dashboard. ⚠ No spinner flashes: both tabs bind their
       // RefreshControl to `useManualRefresh`, which only flips on a real pull.
       void Promise.resolve(refreshHome());
+      // Activity → Needs you: "Choose your Matchweek N team" is done the moment this lands — one
+      // pick IS the decision in this mode — so the card leaves now (Ryan, 2026-10-02), and the
+      // refetch behind it reconciles the rest of the list with the server.
+      settleNeeds((n) => n.kind === 'lms' && n.entry_id === entryId);
+      void refreshActivity();
     },
     onError: (e) => {
       hapticFailure();

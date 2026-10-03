@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { LeagueCardFacts } from '@/lib/league/poolCards'
-import { buildNeedsYou, type NeedsYouPool } from '../needsYou'
+import { buildNeedsYou, sortNeeds, type NeedsYouPool } from '../needsYou'
 
 const NOW = Date.parse('2026-09-28T09:00:00Z')
 const LATER = '2026-10-03T10:30:00Z'
@@ -111,5 +111,15 @@ describe('buildNeedsYou', () => {
       NOW,
     )
     expect(out).toEqual([])
+  })
+})
+
+describe('the app orders Needs you exactly as the server does', () => {
+  it('mobile/lib/needsYouState.sortNeeds mirrors sortNeeds — it re-sorts a card put back after a failed action', async () => {
+    const { sortNeeds: appSort } = await import('../../../mobile/lib/needsYouState')
+    const mk = (id: string, deadline_at: string | null) => ({ id, deadline_at }) as never
+    const items = [mk('a', null), mk('b', '2026-10-05T12:00:00Z'), mk('c', '2026-10-03T12:00:00Z'), mk('d', null), mk('e', '2026-10-04T00:00:00Z')]
+    const ids = (xs: Array<{ id: string }>) => xs.map((x) => x.id)
+    expect(ids(appSort(items))).toEqual(ids(sortNeeds(items)))
   })
 })

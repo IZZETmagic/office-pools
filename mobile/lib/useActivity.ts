@@ -15,6 +15,7 @@ import {
 import { useAuth } from './auth';
 import { CACHE_KEYS, readCache, writeCache } from './cache/persistentCache';
 import { supabase } from './supabase';
+import { applyFetched, restore, settle, type Settled } from './needsYouState';
 
 export type ActivityType =
   | 'mention'
@@ -615,6 +616,11 @@ export function useActivity() {
   // ⚠ Not cached to disk. A to-do list restored from yesterday would ask for a
   // pick that has already been made; it arrives with the fetch instead.
   const [needsYou, setNeedsYou] = useState<NeedsYouItem[]>([]);
+  // A done card leaves at once (needsYouState.ts): the held list, and when each settled card left —
+  // so a fetch already in the air when it was settled can't bring it back.
+  const needsRef = useRef<NeedsYouItem[]>([]);
+  needsRef.current = needsYou;
+  const settledRef = useRef<Settled>(new Map());
   /** When the member last opened the tab. Moves forward locally on `markSeen`. */
   const [seenAt, setSeenAt] = useState<string | null>(null);
   const appUserIdRef = useRef<string | null>(null);
@@ -623,6 +629,7 @@ export function useActivity() {
   const load = useCallback(
     async (mode: 'initial' | 'refresh') => {
       if (!user) return;
+      const startedAt = Date.now();
       // Hydrated from cache? Then this is a refresh over real content, not a
       // load behind the splash.
       if (mode === 'refresh' || hasDataRef.current) setRefreshing(true);
@@ -651,7 +658,9 @@ export function useActivity() {
         setNextBefore(older.length > 0 ? nextBeforeRef.current : next.nextBefore);
         setXpItems(next.xpItems);
         setLoadMoreError(null);
-        setNeedsYou(next.needsYou);
+        const applied = applyFetched(next.needsYou, settledRef.current, startedAt);
+        settledRef.current = applied.settled;
+        setNeedsYou(applied.needs);
         // Never move the local stamp backwards: a fetch that started before
         // `markSeen` landed would otherwise resurrect the tab dot.
         setSeenAt((prev) => (prev && next.seenAt && prev > next.seenAt ? prev : next.seenAt));
@@ -712,6 +721,27 @@ export function useActivity() {
     }
   }, []);
 
+  /**
+   * A Needs-you card is done — take it out NOW, not when the next fetch lands (Ryan, 2026-10-02).
+   * Returns what left, for `restoreNeeds` if the action behind it then fails.
+   */
+  const settleNeeds = useCallback((match: (n: NeedsYouItem) => boolean): NeedsYouItem[] => {
+    const r = settle(needsRef.current, match, settledRef.current, Date.now());
+    if (r.removed.length === 0) return r.removed;
+    settledRef.current = r.settled;
+    needsRef.current = r.needs;
+    setNeedsYou(r.needs);
+    return r.removed;
+  }, []);
+
+  /** The action behind a settled card failed — put it back, in its place. */
+  const restoreNeeds = useCallback((items: NeedsYouItem[]) => {
+    const r = restore(needsRef.current, items, settledRef.current);
+    settledRef.current = r.settled;
+    needsRef.current = r.needs;
+    setNeedsYou(r.needs);
+  }, []);
+
   /** The next older page, if there is one and nothing is already loading. */
   const loadMore = useCallback(async () => {
     const cursor = nextBeforeRef.current;
@@ -747,6 +777,8 @@ export function useActivity() {
     refreshing,
     error,
     refresh: useCallback(() => load('refresh'), [load]),
+    settleNeeds,
+    restoreNeeds,
     markSeen,
     nextBefore,
     loadingMore,

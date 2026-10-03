@@ -81,6 +81,8 @@ export default function ActivityScreen() {
     loading,
     error,
     refresh,
+    settleNeeds,
+    restoreNeeds,
     markSeen,
     nextBefore,
     loadingMore,
@@ -100,20 +102,34 @@ export default function ActivityScreen() {
   const { refresh: refreshHomeData } = useHomeData();
 
   /**
-   * A crew card's buttons (lib/crews/needs.ts decides which a card has). Each calls its route,
-   * then refreshes, so the card leaves the list the way a made pick does. A failure keeps the card
-   * and says why — "This pool is full." comes straight from the server.
+   * A crew card's buttons (lib/crews/needs.ts decides which a card has). The card leaves the moment
+   * one is pressed (Ryan, 2026-10-02) — then the route is called, and the list reconciles with the
+   * server in the background. A failure puts the card back and says why: "This pool is full." comes
+   * straight from the server.
+   *
+   * "Save as crew" is the one that waits: it only opens the sheet, and the card leaves when the
+   * crew is actually saved (onSaved below), not when someone might still close the sheet.
    */
+  const savingNeedRef = useRef<NeedsYouItem | null>(null);
   const onCrewAction = useCallback(
     async (item: NeedsYouItem, action: NeedAction) => {
+      if (action.id === 'save') {
+        savingNeedRef.current = item;
+        saveCrewSheetRef.current?.open({
+          poolId: item.pool_id,
+          suggestedName: item.crew?.name ?? item.pool_name,
+          people: item.crew?.people ?? 0,
+        });
+        return;
+      }
+      const removed = settleNeeds((n) => n.id === item.id);
       try {
         switch (action.id) {
           case 'take':
             await answerCrewSeat(item.pool_id, 'take');
             void refreshHomeData();
-            await refresh();
             router.navigate(`/pool/${item.pool_id}`);
-            return;
+            break;
           case 'decline':
             if (item.kind === 'crew_invite' && item.crew?.invite_id) await answerCrewInvite(item.crew.invite_id, 'decline');
             else await answerCrewSeat(item.pool_id, 'decline');
@@ -124,20 +140,14 @@ export default function ActivityScreen() {
           case 'dismiss':
             await dismissCrewPrompt(item.pool_id);
             break;
-          case 'save':
-            saveCrewSheetRef.current?.open({
-              poolId: item.pool_id,
-              suggestedName: item.crew?.name ?? item.pool_name,
-              people: item.crew?.people ?? 0,
-            });
-            return;
         }
-        await refresh();
+        void refresh();
       } catch (e) {
+        restoreNeeds(removed);
         Alert.alert('That didn’t work', e instanceof Error ? e.message : 'Please try again.');
       }
     },
-    [refresh, refreshHomeData],
+    [refresh, refreshHomeData, settleNeeds, restoreNeeds],
   );
 
   // On focus: refresh if stale, THEN mark seen. In that order so the rows that
@@ -314,7 +324,15 @@ export default function ActivityScreen() {
         }}
       />
       <JoinPoolSheet ref={joinPoolSheetRef} />
-      <SaveCrewSheet ref={saveCrewSheetRef} onSaved={() => void refresh()} />
+      <SaveCrewSheet
+        ref={saveCrewSheetRef}
+        onSaved={() => {
+          const saved = savingNeedRef.current;
+          savingNeedRef.current = null;
+          if (saved) settleNeeds((n) => n.id === saved.id);
+          void refresh();
+        }}
+      />
     </SafeAreaView>
   );
 }

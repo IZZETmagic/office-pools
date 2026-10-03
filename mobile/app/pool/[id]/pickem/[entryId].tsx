@@ -21,6 +21,7 @@ import {
 import { useScreenStatusBar } from '@/lib/useScreenStatusBar';
 import { hapticFailure, hapticPress } from '@/lib/haptics';
 import { useTheme, withOpacity } from '@/theme';
+import { useSharedActivity } from '@/lib/ActivityProvider';
 
 // =============================================================
 // ONE MATCHWEEK'S PICKS — the picker, and the read-back
@@ -166,6 +167,9 @@ export default function PickemPickScreen() {
   useEffect(() => {
     if (seeded || !league.data) return;
     if (isOwn && ownEntry) {
+      // What the server already holds — a row per fixture, either depth (see `savedIds` below).
+      for (const p of ownEntry.predictions) savedIds.current.add(p.match_id);
+      for (const id of Object.keys(ownEntry.outcomes)) savedIds.current.add(id);
       const s: Record<string, { home: number | null; away: number | null }> = {};
       for (const p of ownEntry.predictions) {
         // ⚠ `match_id`. The contract renames the column — see `LeaguePrediction`.
@@ -199,10 +203,35 @@ export default function PickemPickScreen() {
   const pending = useRef<Map<string, LeaguePickBody>>(new Map());
   const inFlight = useRef(false);
 
+  // ---- Activity → Needs you -------------------------------------------------
+  // "Pick Matchweek N" leaves the moment the open matchweek is fully picked (Ryan, 2026-10-02).
+  // Counted the server's way (lib/league/poolCards.ts 2a): a fixture is picked once a row for it
+  // is SAVED, whichever depth — so this tracks saves, not what is on screen. If the count ever
+  // disagreed with the server, the refetch that follows puts the card back: the server stays the
+  // authority, this only means not waiting for it.
+  const { settleNeeds, refresh: refreshActivity } = useSharedActivity();
+  const savedIds = useRef<Set<string>>(new Set());
+  const savedThisVisit = useRef(false);
+  const fixturesRef = useRef(fixtures);
+  fixturesRef.current = fixtures;
+  const weekRef = useRef(week);
+  weekRef.current = week;
+  const openWeekRef = useRef<number | null>(season?.openMatchweekNumber ?? null);
+  openWeekRef.current = season?.openMatchweekNumber ?? null;
+
   const save = useMutation({
     mutationFn: (predictions: LeaguePickBody[]) =>
       saveLeaguePicks(poolId, { entryId, predictions }),
-    onSuccess: () => setError(null),
+    onSuccess: (_res, predictions) => {
+      setError(null);
+      savedThisVisit.current = true;
+      for (const p of predictions) savedIds.current.add(p.matchId);
+      const fx = fixturesRef.current;
+      const open = openWeekRef.current;
+      if (open !== null && weekRef.current === open && fx.length > 0 && fx.every((f) => savedIds.current.has(f.match_id))) {
+        if (settleNeeds((n) => n.kind === 'pick' && n.entry_id === entryId).length > 0) void refreshActivity();
+      }
+    },
     onError: (e) => {
       // ⚠⚠ FAILURE ONLY, AND THE ASYMMETRY IS THE DESIGN. This screen autosaves
       // per scoreline, so a success buzz would fire on every tap of every
@@ -236,8 +265,11 @@ export default function PickemPickScreen() {
   useEffect(() => {
     return () => {
       if (poolId) void qc.invalidateQueries({ queryKey: leaguePoolQueryKey(poolId) });
+      // Needs you shows progress ("4 of 10"); after picking, it is refreshed on the way out rather
+      // than when Activity is next opened — so it is already right by the time it is on screen.
+      if (savedThisVisit.current) void refreshActivity();
     };
-  }, [poolId, qc]);
+  }, [poolId, qc, refreshActivity]);
 
   const queue = useCallback(
     (body: LeaguePickBody) => {

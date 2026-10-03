@@ -11,6 +11,7 @@ import {
 
 import { ClubBar, Icon, Text } from '@/components/ui';
 import { saveTablePrediction, type SeasonClub, type TableSettings } from '@/lib/api';
+import { useSharedActivity } from '@/lib/ActivityProvider';
 import { hapticDragStart, hapticSelection } from '@/lib/haptics';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -81,6 +82,7 @@ export function TablePicker({
   initiallySaved,
 }: Props) {
   const theme = useTheme();
+  const { settleNeeds, refresh: refreshActivity } = useSharedActivity();
   const byId = useMemo(() => new Map(clubs.map((c) => [c.club_id, c])), [clubs]);
 
   // Seeded ONCE. Re-deriving from props on every render would fight a drag in
@@ -108,6 +110,10 @@ export function TablePicker({
     inFlight.current = true;
     try {
       const res = await saveTablePrediction(poolId, entryId, orderRef.current);
+      // Activity → Needs you: "Order your table" is done once a table is filed, so its card leaves
+      // now (Ryan, 2026-10-02). Before the `alive` check — the card is app-wide, not this screen's.
+      // This saves on every drag, so the feed is refetched only the once a card actually left.
+      if (settleNeeds((n) => n.kind === 'table' && n.entry_id === entryId).length > 0) void refreshActivity();
       if (!alive.current) return;
       setHasSaved(true);
       setLastSavedAt(res.savedAt);
@@ -126,7 +132,7 @@ export function TablePicker({
         void flush();
       }
     }
-  }, [poolId, entryId]);
+  }, [poolId, entryId, settleNeeds, refreshActivity]);
 
   const handleReorder = useCallback(
     ({ from, to }: ReorderableListReorderEvent) => {

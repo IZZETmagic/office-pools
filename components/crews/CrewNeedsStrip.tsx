@@ -31,7 +31,7 @@ export function CrewNeedsStrip({ items }: { items: NeedItem[] }) {
   const router = useRouter()
   const { showToast } = useToast()
   const [busy, setBusy] = useState<string | null>(null)
-  // Cards answered on this visit leave at once, before the server round-trip refreshes the page.
+  // Cards answered on this visit leave at once — before the request, let alone the page refresh.
   const [gone, setGone] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState<{ poolId: string; suggestedName: string; people: number } | null>(null)
 
@@ -43,10 +43,23 @@ export function CrewNeedsStrip({ items }: { items: NeedItem[] }) {
     const plan = crewActionPlan(item, action.id)
     if (plan.kind === 'none') return
     if (plan.kind === 'open-save') {
+      // The one that waits: the card leaves when the crew is saved (onSaved), not when the dialog
+      // opens — it can still be cancelled.
       setSaving({ poolId: item.pool_id, suggestedName: item.crew?.name ?? item.pool_name, people: item.crew?.people ?? 0 })
       return
     }
+    // The card leaves the moment the button is pressed (Ryan, 2026-10-02); a refusal brings it back
+    // with the server's reason ("This pool is full.").
     setBusy(`${item.id}:${action.id}`)
+    setGone((g) => new Set(g).add(item.id))
+    const putBack = (message: string) => {
+      setGone((g) => {
+        const next = new Set(g)
+        next.delete(item.id)
+        return next
+      })
+      showToast(message, 'error')
+    }
     try {
       const res = await fetch(plan.url, {
         method: 'POST',
@@ -55,15 +68,13 @@ export function CrewNeedsStrip({ items }: { items: NeedItem[] }) {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        // "This pool is full." and friends come straight from the server; the card stays.
-        showToast(typeof data.error === 'string' ? data.error : 'That didn’t work. Please try again.', 'error')
+        putBack(typeof data.error === 'string' ? data.error : 'That didn’t work. Please try again.')
         return
       }
-      setGone((g) => new Set(g).add(item.id))
       if (plan.then === 'refresh') router.refresh()
       else router.push(plan.then.goTo)
     } catch {
-      showToast('That didn’t work. Please try again.', 'error')
+      putBack('That didn’t work. Please try again.')
     } finally {
       setBusy(null)
     }
