@@ -297,7 +297,7 @@ export function CrewPage({
         </Section>
 
         {crew.playingNow.length ? (
-          <Section title="Playing now" hint="Any member can start a pool for the crew — whoever starts it runs that season.">
+          <Section title="Playing now">
             <Card padding="none">
               {crew.playingNow.map((p, i) => {
                 const body = (

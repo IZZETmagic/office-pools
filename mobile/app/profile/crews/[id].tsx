@@ -360,7 +360,6 @@ export default function CrewScreen() {
               </Row>
             ))}
           </Card>
-          <Hint text="Any member can start a pool for the crew — whoever starts it runs that season." />
         </Section>
       ) : null}
 
