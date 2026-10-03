@@ -64,8 +64,16 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to scan pool QR codes.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to scan pool QR codes and to take photos for your pool's chat.",
           "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to open your photos so you can share one in your pool's chat.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to scan pool QR codes and to take photos for your pool's chat.",
+          "microphonePermission": false
         }
       ],
       "expo-font"

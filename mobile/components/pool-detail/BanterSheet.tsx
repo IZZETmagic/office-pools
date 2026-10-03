@@ -53,6 +53,7 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -89,6 +90,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionMenu, ConfirmDialog, Icon, Text, useSheetChrome } from '@/components/ui';
 import { REPORT_REASONS, type ReportReason } from '@/lib/moderation';
+import { PHOTO_MESSAGE_CONTENT, fitPhoto, readPhotoMetadata } from '@/lib/photoMessage';
+import {
+  PHOTOS_AVAILABLE,
+  pickPhoto,
+  preparePhoto,
+  removeBanterPhoto,
+  uploadBanterPhoto,
+} from '@/lib/photos';
+import { useBanterPhotoUrls } from '@/lib/useBanterPhotoUrls';
 import {
   AVATAR_GRADIENTS,
   getInitials,
@@ -391,6 +401,10 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // -------------------------------------------------------------
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  // Photos (159). The source menu, the in-flight send, and the full-screen viewer.
+  const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
+  const [photoSending, setPhotoSending] = useState(false);
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
   // Lazy-mount flags for the two inner gorhom BottomSheets. They
   // can't be permanently mounted (plain BottomSheet at index=-1
   // absorbs touches on Android, blocking interaction with the chat
@@ -675,6 +689,8 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
       if (!poolId || !banter.appUserId) return;
       if (key === 'gif') {
         setGifPickerOpen(true);
+      } else if (key === 'photo') {
+        setPhotoSourceOpen(true);
       } else if (key === 'standings') {
         await sendStandings(poolId, banter.sendMessage);
       } else if (key === 'flex') {
@@ -883,6 +899,18 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
     return out.reverse();
   }, [banter.messages, banter.blockedIds]);
 
+  // Signed URLs for every photo loaded in the chat, signed in one batch.
+  const photoPaths = useMemo(
+    () =>
+      banter.messages
+        .filter((m) => m.messageType === 'photo' && !m.deletedAt)
+        .map((m) => readPhotoMetadata(m.metadata)?.path)
+        .filter((p): p is string => !!p),
+    [banter.messages],
+  );
+  const photoUrls = useBanterPhotoUrls(photoPaths);
+  const handleOpenPhoto = useCallback((uri: string) => setViewerUri(uri), []);
+
   // Gifted-chat fires onSend with an array of new messages (it
   // supports batched sends, but we only ever ship one at a time).
   // The optimistic message it builds is discarded — our realtime
@@ -891,6 +919,48 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // sentence as content (old builds, pushes and reply quotes show it),
   // KLIPY's details in metadata (migration 150 checks every URL is
   // KLIPY's). Unlike the cards it can answer a message.
+  // A photo: pick → resize + re-encode (drops EXIF/GPS) → upload into
+  // {pool}/{me}/{uuid}.jpg → send the message pointing at it. The upload
+  // must land first — 159 refuses a photo message whose file isn't there.
+  // If the message fails, the orphaned upload is removed.
+  async function handleSendPhoto(source: 'library' | 'camera') {
+    setPhotoSourceOpen(false);
+    if (!poolId || !banter.appUserId) return;
+    const picked = await pickPhoto(source);
+    if (picked === 'denied') {
+      Alert.alert(
+        'Camera access is off',
+        'Turn on camera access for SportPool in Settings to take a photo, or choose one from your library instead.',
+      );
+      return;
+    }
+    if (!picked) return;
+    const replyToId =
+      replyTarget && !String(replyTarget._id).startsWith('tmp-')
+        ? String(replyTarget._id)
+        : undefined;
+    setPhotoSending(true);
+    let uploadedPath: string | null = null;
+    try {
+      const prepared = await preparePhoto(picked);
+      const meta = await uploadBanterPhoto(poolId, banter.appUserId, prepared);
+      uploadedPath = meta.path;
+      const result = await banter.sendMessage(PHOTO_MESSAGE_CONTENT, {
+        messageType: 'photo',
+        metadata: meta,
+        replyToMessageId: replyToId,
+      });
+      if (result.error) throw new Error(result.error);
+      setReplyTarget(null);
+    } catch (err) {
+      console.warn('[BanterSheet] photo send failed', err);
+      if (uploadedPath) void removeBanterPhoto(uploadedPath);
+      Alert.alert("Couldn't send photo", 'Please try again.');
+    } finally {
+      setPhotoSending(false);
+    }
+  }
+
   async function handleSendGif(gif: KlipyGif, query: string) {
     setGifPickerOpen(false);
     const replyToId =
@@ -1164,9 +1234,16 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         currentUserId={banter.appUserId}
         onLongPress={handleBubbleLongPress}
         onShowReactors={handleShowReactors}
+        photoUrl={(() => {
+          const msg = bubbleProps.currentMessage as BanterIMessage | undefined;
+          if (msg?._messageType !== 'photo') return null;
+          const path = readPhotoMetadata(msg._metadata)?.path;
+          return path ? photoUrls.get(path) ?? null : null;
+        })()}
+        onOpenPhoto={handleOpenPhoto}
       />
     ),
-    [banter.reactions, banter.appUserId, handleBubbleLongPress, handleShowReactors],
+    [banter.reactions, banter.appUserId, handleBubbleLongPress, handleShowReactors, photoUrls, handleOpenPhoto],
   );
 
   // Gifted-chat's `user` prop tells it which messages are "mine" so
@@ -1764,6 +1841,8 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
             const ghostIsRich = isRichMessageType(ghostMsg.messageType);
             const ghostGif =
               ghostMsg.messageType === 'gif' ? readGifMetadata(ghostMsg.metadata) : null;
+            const ghostPhoto =
+              ghostMsg.messageType === 'photo' ? readPhotoMetadata(ghostMsg.metadata) : null;
             return (
               <Animated.View
                 pointerEvents="none"
@@ -1783,7 +1862,15 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
                     clone would span the full row width on Android
                     because gifted-chat's Bubble container uses
                     flex: 1. */}
-                {ghostGif ? (
+                {ghostPhoto ? (
+                  <View style={{ alignSelf: isOwn ? 'flex-end' : 'flex-start' }}>
+                    <BanterPhoto
+                      photo={ghostPhoto}
+                      uri={photoUrls.get(ghostPhoto.path) ?? null}
+                      createdAt={new Date(ghostMsg.createdAt)}
+                    />
+                  </View>
+                ) : ghostGif ? (
                   <View style={{ alignSelf: isOwn ? 'flex-end' : 'flex-start' }}>
                     <BanterGif gif={ghostGif} createdAt={new Date(ghostMsg.createdAt)} />
                   </View>
@@ -1963,6 +2050,77 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         </>
       ) : null}
 
+      <ActionMenu
+        visible={photoSourceOpen}
+        title="Send a photo"
+        items={[
+          { key: 'camera', label: 'Take photo', onPress: () => void handleSendPhoto('camera') },
+          { key: 'library', label: 'Choose from library', onPress: () => void handleSendPhoto('library') },
+        ]}
+        onCancel={() => setPhotoSourceOpen(false)}
+      />
+
+      {photoSending ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            alignSelf: 'center',
+            top: insets.top + 72,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 18,
+            backgroundColor: theme.colors.surface,
+            ...theme.shadows.card,
+          }}
+        >
+          <ActivityIndicator size="small" color={theme.colors.slate} />
+          <RNText style={{ fontFamily: fontFamilies.semibold, fontSize: 13, color: theme.colors.ink }}>
+            Sending photo…
+          </RNText>
+        </View>
+      ) : null}
+
+      <Modal
+        visible={viewerUri !== null}
+        animationType="fade"
+        transparent={false}
+        onRequestClose={() => setViewerUri(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000000' }}>
+          {viewerUri ? (
+            <ExpoImage
+              source={{ uri: viewerUri }}
+              contentFit="contain"
+              style={{ flex: 1 }}
+              accessibilityLabel="Photo"
+            />
+          ) : null}
+          <Pressable
+            onPress={() => setViewerUri(null)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close photo"
+            style={{
+              position: 'absolute',
+              top: insets.top + 12,
+              right: 16,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(255,255,255,0.18)',
+            }}
+          >
+            <Icon name="xmark" size={16} tint="#FFFFFF" weight="bold" />
+          </Pressable>
+        </View>
+      </Modal>
+
       {KLIPY_APP_KEY ? (
         <GifPickerSheet
           visible={gifPickerOpen}
@@ -2078,6 +2236,9 @@ type BanterBubbleProps = {
     position: 'left' | 'right',
   ) => void;
   onShowReactors: (aggregates: ReactionAggregate[]) => void;
+  /** Signed URL for a photo message; null while signing (or for any other type). */
+  photoUrl: string | null;
+  onOpenPhoto: (uri: string) => void;
 };
 
 // ⭐ Skip the redraw unless something this bubble DRAWS changed. gifted-chat
@@ -2102,7 +2263,9 @@ function sameBubbleProps(a: BanterBubbleProps, b: BanterBubbleProps): boolean {
     a.aggregates === b.aggregates &&
     a.currentUserId === b.currentUserId &&
     a.onLongPress === b.onLongPress &&
-    a.onShowReactors === b.onShowReactors
+    a.onShowReactors === b.onShowReactors &&
+    a.photoUrl === b.photoUrl &&
+    a.onOpenPhoto === b.onOpenPhoto
   );
 }
 
@@ -2112,6 +2275,8 @@ const BanterBubble = memo(function BanterBubble({
   currentUserId,
   onLongPress,
   onShowReactors,
+  photoUrl,
+  onOpenPhoto,
 }: BanterBubbleProps) {
   const theme = useTheme();
   const msg = bubbleProps.currentMessage as BanterIMessage | undefined;
@@ -2139,6 +2304,9 @@ const BanterBubble = memo(function BanterBubble({
   // GIF branch — KLIPY media via expo-image. Unreadable metadata falls
   // through to the text bubble, which shows "🎞️ sent a GIF".
   const gif = msg._messageType === 'gif' ? readGifMetadata(msg._metadata) : null;
+  // Photo branch (159) — a private file shown through a signed URL. Bad
+  // metadata falls through to the text bubble ("📷 sent a photo").
+  const photo = msg._messageType === 'photo' ? readPhotoMetadata(msg._metadata) : null;
 
   // Measure the bubble's bounds in screen coords and hand them up.
   // measureInWindow gives (x, y, width, height) in window-space on
@@ -2239,7 +2407,32 @@ const BanterBubble = memo(function BanterBubble({
           branches call the same handleLongPress so the picker
           anchors identically. */}
       <View ref={bubbleAnchorRef} collapsable={false}>
-        {gif ? (
+        {photo ? (
+          <Pressable
+            onPress={() => (photoUrl ? onOpenPhoto(photoUrl) : undefined)}
+            onLongPress={handleLongPress}
+            delayLongPress={350}
+            style={{ alignSelf: isOwn ? 'flex-end' : 'flex-start' }}
+            accessibilityRole="imagebutton"
+            accessibilityLabel="Photo. Tap to view full screen."
+          >
+            {msg.replyMessage ? (
+              <RNText
+                numberOfLines={2}
+                style={{
+                  fontFamily: fontFamilies.medium,
+                  fontSize: 12,
+                  color: theme.colors.slate,
+                  marginBottom: 4,
+                  maxWidth: 240,
+                }}
+              >
+                ↩ {msg.replyMessage.user.name}: {msg.replyMessage.text}
+              </RNText>
+            ) : null}
+            <BanterPhoto photo={photo} uri={photoUrl} createdAt={msg.createdAt} />
+          </Pressable>
+        ) : gif ? (
           <Pressable
             onLongPress={handleLongPress}
             delayLongPress={350}
@@ -2395,6 +2588,68 @@ const BanterBubble = memo(function BanterBubble({
     </View>
   );
 }, sameBubbleProps);
+
+// =============================================================
+// BanterPhoto — a member's photo in the chat (159)
+// =============================================================
+// The box takes the photo's own aspect ratio from metadata before the
+// signed URL arrives, so the chat doesn't jump when it loads.
+function BanterPhoto({
+  photo,
+  uri,
+  createdAt,
+}: {
+  photo: NonNullable<ReturnType<typeof readPhotoMetadata>>;
+  uri: string | null;
+  createdAt: Date | number | undefined;
+}) {
+  const theme = useTheme();
+  const size = fitPhoto(photo.width, photo.height, 240, 320);
+  return (
+    <View>
+      <View
+        style={{
+          width: size.width,
+          height: size.height,
+          borderRadius: theme.radii.sm,
+          overflow: 'hidden',
+          backgroundColor: theme.colors.mist,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {uri ? (
+          <ExpoImage
+            source={{ uri }}
+            contentFit="cover"
+            transition={150}
+            style={{ width: size.width, height: size.height }}
+            accessibilityLabel="Photo"
+          />
+        ) : (
+          <ActivityIndicator size="small" color={theme.colors.slate} />
+        )}
+      </View>
+      {createdAt != null ? (
+        <View
+          style={{
+            position: 'absolute',
+            right: 6,
+            bottom: 6,
+            paddingHorizontal: 5,
+            paddingVertical: 2,
+            borderRadius: 6,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+          }}
+        >
+          <RNText style={{ fontSize: 11, fontFamily: fontFamilies.medium, color: '#FFFFFF' }}>
+            {formatMessageTime(createdAt)}
+          </RNText>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 // =============================================================
 // BanterGif — a KLIPY GIF in the chat
@@ -2738,6 +2993,12 @@ type SendMessage = (
 // QuickActions verbatim.
 const QUICK_ACTIONS: QuickAction[] = [
   {
+    key: 'photo',
+    emoji: '📷',
+    label: 'Send a photo',
+    description: 'Take one or choose from your library',
+  },
+  {
     key: 'gif',
     emoji: '🎞️',
     label: 'Send a GIF',
@@ -2764,9 +3025,11 @@ const QUICK_ACTIONS: QuickAction[] = [
 ];
 
 // No KLIPY key in this build → no GIF row, rather than a picker that errors.
-const VISIBLE_QUICK_ACTIONS = KLIPY_APP_KEY
-  ? QUICK_ACTIONS
-  : QUICK_ACTIONS.filter((a) => a.key !== 'gif');
+// No picker in this binary (anything before 1.3.0) → no photo row, rather
+// than a row that crashes. See lib/photos.ts.
+const VISIBLE_QUICK_ACTIONS = QUICK_ACTIONS.filter(
+  (a) => (a.key !== 'gif' || KLIPY_APP_KEY) && (a.key !== 'photo' || PHOTOS_AVAILABLE),
+);
 
 // "Share standings" — fetch leaderboard, send a `standings_drop`
 // rich-card with top 5 entries as metadata. BanterRichCard's
