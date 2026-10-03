@@ -844,6 +844,68 @@ export function dismissCrewPrompt(poolId: string) {
   return apiFetch<Record<string, never>>(`/api/pools/${poolId}/crew-prompt/dismiss`, { method: 'POST' });
 }
 
+export function fetchMyCrews() {
+  return apiFetch<{ crews: import('./crews').CrewCard[] }>('/api/crews');
+}
+
+export function fetchCrew(crewId: string) {
+  return apiFetch<import('./crews').CrewDetail>(`/api/crews/${crewId}`);
+}
+
+export function fetchCrewRoster(crewId: string, tier = 'free') {
+  return apiFetch<import('./crews').RosterView>(`/api/crews/${crewId}/roster?tier=${encodeURIComponent(tier)}`);
+}
+
+/** My Crews → New crew. You're captain of a crew of one. */
+export function createCrew(name: string) {
+  return apiFetch<{ crewId: string }>('/api/crews', { method: 'POST', body: { name } });
+}
+
+export function renameCrew(crewId: string, name: string) {
+  return apiFetch<Record<string, never>>(`/api/crews/${crewId}`, { method: 'PATCH', body: { name } });
+}
+
+export function leaveCrew(crewId: string) {
+  return apiFetch<{ closed: boolean; newCaptainId: string | null }>(`/api/crews/${crewId}/leave`, { method: 'POST' });
+}
+
+export function rejoinCrew(crewId: string) {
+  return apiFetch<Record<string, never>>(`/api/crews/${crewId}/rejoin`, { method: 'POST' });
+}
+
+export function setCrewCoCaptain(crewId: string, userId: string) {
+  return apiFetch<Record<string, never>>(`/api/crews/${crewId}/co-captain`, { method: 'POST', body: { user_id: userId } });
+}
+
+export function removeCrewMember(crewId: string, userId: string) {
+  return apiFetch<Record<string, never>>(`/api/crews/${crewId}/members/${userId}/remove`, { method: 'POST' });
+}
+
+/**
+ * Add someone: by the user_id picked from a lookup (the captain saw their face), or by email.
+ * ⚠ An email always answers { sent: true } — it never reveals whether the address has an account.
+ */
+export function inviteToCrew(crewId: string, who: { userId: string } | { email: string }) {
+  return apiFetch<{ sent: true; inviteId: string | null }>(`/api/crews/${crewId}/invites`, {
+    method: 'POST',
+    body: 'userId' in who ? { user_id: who.userId } : { email: who.email },
+  });
+}
+
+export function revokeCrewInvite(inviteId: string) {
+  return apiFetch<Record<string, never>>(`/api/crews/invites/${inviteId}`, { method: 'DELETE' });
+}
+
+/** Exact username, case-insensitive — every match, so the captain can pick the right face. */
+export function lookupUsername(username: string) {
+  return apiFetch<{ matches: import('./crews').Person[] }>(`/api/users/lookup?username=${encodeURIComponent(username)}`);
+}
+
+/** Join a crew's running pool from the crew page — the ordinary join (lib/pools/join.ts). */
+export function joinPoolById(poolId: string) {
+  return apiFetch<JoinPoolResponse>('/api/pools/join', { method: 'POST', body: { pool_id: poolId } });
+}
+
 /** The member opened the Activity tab: everything before now is read. */
 export function markActivitySeen(userId: string) {
   return apiFetch<{ seen_at: string }>(`/api/users/${userId}/activity/seen`, { method: 'POST' });
