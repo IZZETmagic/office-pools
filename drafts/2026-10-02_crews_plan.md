@@ -592,6 +592,25 @@ About **3½ days**. With 8a, web is about **5 days** in total.
 
 ---
 
+### Disband (added 2026-10-02, after 8b) — ✅ built
+
+Ryan: *"we should have a disband crew option for the captain only."* His calls, asked before building:
+**it disappears for everyone** (like a crew whose last member left), **the captain can restore it**,
+and **a running crew pool carries on** as an ordinary private pool with untaken saved spots released.
+
+- **Migration 157** (applied): `crews.closed_reason` (`emptied` | `disbanded`) and `closed_by`, so the
+  two ways a crew closes are told apart — only a disband can be undone. Leaving as the last member now
+  records `emptied`.
+- `store.disbandCrew` / `restoreCrew`, captain only (`rules.canDisband` / `canRestore`); routes
+  `POST /api/crews/:id/disband` and `/restore`. Member rows are untouched, so restore brings everyone
+  back as they were; open invites are withdrawn; released seats stay released.
+- The captain alone still sees it: My Crews ("Disbanded · only you can see this") and a restore-only
+  crew page — app and web. Everyone else: gone (404).
+- Two holes closed with it: joining a CLOSED crew's pool no longer adds the player to the crew (or a
+  restore would bring in people who never joined it), and deleting an account skips closed crews
+  (a captain who disbanded one would otherwise have been blocked from deleting their account).
+- Verified: unit tests, and `scripts/verify-crews-store.ts` 64/64 on production as test accounts.
+
 ## 9. Decisions — all settled with Ryan, 2026-10-02
 
 | # | Question | Outcome |
