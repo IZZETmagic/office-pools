@@ -6,9 +6,10 @@ import { crewNoticesEnabled, runCrewNotices } from '@/lib/crews/notify'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-// Crew seat notices and the one reminder (lib/crews/notify.ts). Meant to run every ~15 minutes from
-// pg_cron, like the league outbox; NOT YET SCHEDULED — that is a deploy step, after Ryan approves
-// the wording and turns `crew_notices_enabled` on.
+// Crew seat notices, the one reminder, and any invite the moment of adding didn't send (156) —
+// lib/crews/notify.runCrewNotices. Meant to run every ~15 minutes from pg_cron, like the league
+// outbox; NOT YET SCHEDULED — that, and turning `crew_notices_enabled` on, are ship steps (wording
+// approved by Ryan 2026-10-02).
 //
 // Auth: Bearer <CRON_SECRET>, or a super admin so it can be run by hand.
 async function handle(request: NextRequest) {

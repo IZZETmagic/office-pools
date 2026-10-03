@@ -9,7 +9,8 @@
 // (everything crew-side cascades from crews).
 //
 // The one-time email link (155) is walked too: armed by hand (the send switch is off), claimed by
-// test_user_04, spent.
+// test_user_04, spent. So is the invite catch-up (156) — with the mailer's key removed, so nothing
+// can reach an inbox, and only when nothing else in production is waiting to be sent.
 //
 // ⚠ What it deliberately does NOT do: attach the crew to a pool (pools.crew_id is set once and can
 // never be cleared — 154), or TAKE a seat (that would add a test account to a real pool). A seat is
@@ -62,6 +63,7 @@ import {
 import { listMyCrews, readCrew, readRoster } from '../lib/crews/read'
 import { readCrewNeeds } from '../lib/crews/needs'
 import { newInviteToken } from '../lib/crews/inviteToken'
+import { runCrewNotices } from '../lib/crews/notify'
 
 const admin = createAdminClient()
 const U = (n: number) => `a0000000-0000-0000-0000-00000000000${n}` // test_user_01…
@@ -172,6 +174,37 @@ async function main() {
     check('…and now reads as not valid', (await readInviteLink(admin, { token, viewerId: null })).state === 'invalid')
     check('the joiner is in the crew', (await readCrew(admin, crewId, FOUR, Date.now()))?.viewer.active === true)
     check('…and leaves again, so the rest of this run is unchanged', (await leaveCrew(admin, { crewId, userId: FOUR })).ok)
+
+    console.log('\nthe invite catch-up (156)')
+    // ⚠ Nothing here may reach a real inbox or phone. The test accounts have no push tokens, and
+    // with the mailer's key removed every email send fails inside the sender (logged, swallowed).
+    // And the cron runs ONLY if nothing else in production is waiting to be sent — it must never
+    // claim, and so silently drop, a real message.
+    delete process.env.RESEND_API_KEY
+    const lateAddr = `late-${stamp}@verify.invalid`
+    const toFour = await inviteToCrew(admin, { actorId: CAP, crewId, userId: FOUR })
+    await inviteToCrew(admin, { actorId: CAP, crewId, email: lateAddr })
+    check('two invites made while the switch is off', toFour.ok)
+    const [{ count: othersUnsent }, { count: openSeats }] = await Promise.all([
+      admin.from('crew_invites').select('invite_id', { count: 'exact', head: true }).is('resolved_at', null).is('notified_at', null).neq('crew_id', crewId),
+      admin.from('crew_seats').select('user_id', { count: 'exact', head: true }).is('resolved_at', null).is('reminded_at', null),
+    ])
+    if (othersUnsent !== 0 || openSeats !== 0) {
+      console.log(`  – skipped: production has ${othersUnsent} other unsent invite(s) and ${openSeats} open seat(s)`)
+    } else {
+      const first = await runCrewNotices(admin, Date.now())
+      check('the cron sends every invite nobody sent', first.invites === 2 && first.notices === 0 && first.reminders === 0, first)
+      const { data: sentRows } = await admin
+        .from('crew_invites')
+        .select('invitee_user_id, invitee_email, notified_at, token_hash')
+        .eq('crew_id', crewId)
+        .is('resolved_at', null)
+      const acct = sentRows?.find((r) => r.invitee_user_id === FOUR)
+      const addr = sentRows?.find((r) => r.invitee_email === lateAddr)
+      check('…each is stamped as sent', !!acct?.notified_at && !!addr?.notified_at, sentRows)
+      check('…the address got its one-time link armed; the account did not', !!addr?.token_hash && acct?.token_hash === null, sentRows)
+      check('the next run sends nothing', (await runCrewNotices(admin, Date.now())).invites === 0)
+    }
     const roster = await readRoster(admin, { crewId, starterId: CAP, tier: 'free', now: Date.now() })
     check('readRoster: everyone but the starter, Free saves 9', roster?.rows.length === 1 && roster?.spots === 9 && roster?.memberCap === 10, roster)
 
