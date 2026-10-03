@@ -420,8 +420,6 @@ function InnerLayout() {
             full-bleed instead of under the stack's default header, which would title itself
             "onboarding-harness" from the file path. Delete with the harness. */}
         <Stack.Screen name="onboarding-harness" options={{ headerShown: false }} />
-        {/* THROWAWAY — the My Crews concept. Delete with the file. */}
-        <Stack.Screen name="crews-concept" options={{ headerShown: false }} />
         </Stack>
         <SplashOverlay routingSettled={routingSettled} />
       </PendingActionsProvider>

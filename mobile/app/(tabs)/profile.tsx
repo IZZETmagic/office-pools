@@ -223,13 +223,6 @@ export default function ProfileScreen() {
       onPress: () => router.push('/onboarding-harness'),
     },
     {
-      id: 'dev-crews',
-      icon: 'person.3.fill',
-      title: 'My Crews concept',
-      subtitle: 'The nine decisions of 2 Oct — fixtures, nothing saves',
-      onPress: () => router.push('/crews-concept'),
-    },
-    {
       id: 'dev-onboarding-flow',
       icon: 'sparkles',
       title: 'Onboarding journey',
