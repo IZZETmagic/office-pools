@@ -403,6 +403,9 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
   // Photos (159). The source menu, the in-flight send, and the full-screen viewer.
   const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
+  // The source picked in the menu, held until the menu has fully closed —
+  // see handlePickPhotoSource.
+  const pendingPhotoSourceRef = useRef<'library' | 'camera' | null>(null);
   const [photoSending, setPhotoSending] = useState(false);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   // Lazy-mount flags for the two inner gorhom BottomSheets. They
@@ -923,10 +926,38 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // {pool}/{me}/{uuid}.jpg → send the message pointing at it. The upload
   // must land first — 159 refuses a photo message whose file isn't there.
   // If the message fails, the orphaned upload is removed.
+  // ⚠ iOS presents the system picker on top of whatever screen is frontmost
+  // AT THAT INSTANT. Launching it straight from the menu's tap lands it on the
+  // menu while the menu is still animating closed, and iOS silently drops the
+  // presentation — "Choose from library" did nothing (2026-10-03). So on iOS
+  // the choice is held until the menu's onDismiss; Android has no such race
+  // (its picker is a separate activity) and launches at once.
+  function handlePickPhotoSource(source: 'library' | 'camera') {
+    if (Platform.OS === 'ios') {
+      pendingPhotoSourceRef.current = source;
+      setPhotoSourceOpen(false);
+    } else {
+      setPhotoSourceOpen(false);
+      void handleSendPhoto(source);
+    }
+  }
+
+  function handlePhotoMenuDismissed() {
+    const source = pendingPhotoSourceRef.current;
+    pendingPhotoSourceRef.current = null;
+    if (source) void handleSendPhoto(source);
+  }
+
   async function handleSendPhoto(source: 'library' | 'camera') {
-    setPhotoSourceOpen(false);
     if (!poolId || !banter.appUserId) return;
-    const picked = await pickPhoto(source);
+    let picked: Awaited<ReturnType<typeof pickPhoto>>;
+    try {
+      picked = await pickPhoto(source);
+    } catch (err) {
+      console.warn('[BanterSheet] photo picker failed', err);
+      Alert.alert("Couldn't open your photos", 'Please try again.');
+      return;
+    }
     if (picked === 'denied') {
       Alert.alert(
         'Camera access is off',
@@ -2054,10 +2085,14 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         visible={photoSourceOpen}
         title="Send a photo"
         items={[
-          { key: 'camera', label: 'Take photo', onPress: () => void handleSendPhoto('camera') },
-          { key: 'library', label: 'Choose from library', onPress: () => void handleSendPhoto('library') },
+          { key: 'camera', label: 'Take photo', onPress: () => handlePickPhotoSource('camera') },
+          { key: 'library', label: 'Choose from library', onPress: () => handlePickPhotoSource('library') },
         ]}
-        onCancel={() => setPhotoSourceOpen(false)}
+        onCancel={() => {
+          pendingPhotoSourceRef.current = null;
+          setPhotoSourceOpen(false);
+        }}
+        onDismiss={handlePhotoMenuDismissed}
       />
 
       {photoSending ? (

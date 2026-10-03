@@ -38,6 +38,13 @@ type ActionMenuProps = {
   items: ActionMenuItem[];
   cancelLabel?: string;
   onCancel: () => void;
+  /**
+   * iOS only: fires once the menu has finished animating away. Anything that
+   * presents its OWN native screen next (the photo picker, a share sheet) must
+   * wait for this — iOS silently refuses to present on top of a screen that is
+   * still being dismissed, so the next screen just never appears.
+   */
+  onDismiss?: () => void;
 };
 
 export function ActionMenu({
@@ -47,11 +54,12 @@ export function ActionMenu({
   items,
   cancelLabel = 'Cancel',
   onCancel,
+  onDismiss,
 }: ActionMenuProps) {
   const theme = useTheme();
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel} onDismiss={onDismiss}>
       <View
         style={{
           flex: 1,
