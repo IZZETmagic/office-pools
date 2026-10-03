@@ -430,7 +430,7 @@ Each step is a commit; nothing is pushed until Ryan says so.
      harmlessly.
 7. ✅ **Notifications** — built 2026-10-02 (`6cec6f1c`), ⚠ **switched OFF**: nothing sends until
    `sync_settings.crew_notices_enabled = true`, and `/api/cron/crew-notices` is not scheduled. Both
-   are deploy steps, after Ryan approves the wording (preview sent 2026-10-02). Changed from below:
+   are deploy steps. **Wording approved by Ryan 2026-10-02** ("Copy approved"). Changed from below:
    lock times are relative ("in 3 days"); the CTA reads "Take your spot" (the plural-voice test
    caught "my"); invites send inline at the moment of adding, not from the cron.
 
@@ -471,10 +471,33 @@ Each step is a commit; nothing is pushed until Ryan says so.
 
 ## 8. Web
 
-### 8a. With the RN release (decision 8, ~1½ days)
+### 8a. With the RN release (decision 8, ~1½ days) — ✅ built 2026-10-02
 
-The World Cup groups are on the web, so the minimum for them to save a crew ships at the same time as
-the RN release:
+**As built:**
+- **Dashboard "Needs you"** (`components/crews/CrewNeedsStrip.tsx`, above My Pools): the same cards
+  as the app, from `readCrewNeeds`, crews only (the dashboard's pool cards already carry the pick
+  reminders). Buttons map to routes in `lib/crews/needActions.ts` (pure, tested from the real cards).
+  *Keep this group together?* opens `components/crews/SaveCrewModal.tsx`, word for word the app's
+  sheet, including the private/Discover line; saving lands on the new crew's page. The deadline pill
+  reads a subscribed clock, so the server never prints a UTC time.
+- **Crew page** `app/crews/[crew_id]/page.tsx` + `CrewPage.tsx`: playing now (Join / I'm in), all-time,
+  past seasons, members, Leave (names the next captain first) and Rejoin. Never-members, the removed,
+  closed crews and bad ids all 404. `/crews` is a protected route. Captains get a line saying the
+  controls are in the app for now (8b).
+- **Words** `lib/crews/words.ts` — the web copy of `mobile/lib/crews.ts`; `__tests__/words.test.ts`
+  runs both on the same inputs and fails on drift.
+- **Email invites are claimed on the dashboard AND in the app's Activity read** — the second was a
+  gap from step 5: someone who signed up in the app from an invite email didn't see it in Needs you
+  until they opened My Crews. Activity claims only for the caller's own feed, never a super admin's
+  view of someone else's.
+- **The invite-to-account email's button now goes to `/dashboard`**, not the site root (which is the
+  marketing page even when signed in). The words are unchanged.
+- Verified on localhost: the strip on Ryan's real dashboard (two real *Keep this group together?*
+  cards, dialog opened and cancelled — nothing pressed that writes); every card kind, the pill, the
+  crew page, the Leave dialog and the left state on a fixture harness that was deleted afterwards.
+
+Originally — the World Cup groups are on the web, so the minimum for them to save a crew ships at the
+same time as the RN release:
 - a **dashboard "Needs you" strip** with the *"Keep this group together?"* sheet, plus held seats and
   invites (`readCrewNeeds`, the same builder RN uses);
 - a **basic crew page** at `app/crews/[crew_id]/page.tsx`: playing now, past seasons, members, Leave.
@@ -490,8 +513,8 @@ The server and the data are done by then, so web is rendering only. There's one 
    confirm on the Details step, posting the same `crew_id`.
 2. **Profile → Crews tab** (`app/profile/ProfilePage.tsx` `TAB_CONFIG`, `?tab=crews`). The crew page
    from 8a gains captain controls (rename, co-captain, remove).
-   New crew + Add people use the same lookup and invite routes. Sign-up on web claims email invites
-   too, so the invite email can link to the web sign-up page.
+   New crew + Add people use the same lookup and invite routes. (Web claiming of email invites
+   already shipped in 8a — the dashboard claims them before it reads Needs you.)
 3. **Pool page:** the same *"Part of…"* line and seat count on `PoolInfoTab`.
 
 About **3½ days**. With 8a, web is about **5 days** in total.
