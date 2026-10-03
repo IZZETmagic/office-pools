@@ -428,7 +428,13 @@ Each step is a commit; nothing is pushed until Ryan says so.
    - `CrewNeedsCard` in the Activity tab.
    - `usePushNotificationHandlers` gains `case 'crew_seat'` → Activity. Old builds ignore it
      harmlessly.
-7. **Notifications** (Decision 2's *one reminder*, always SportPool-branded, **never in the captain's
+7. ✅ **Notifications** — built 2026-10-02 (`6cec6f1c`), ⚠ **switched OFF**: nothing sends until
+   `sync_settings.crew_notices_enabled = true`, and `/api/cron/crew-notices` is not scheduled. Both
+   are deploy steps, after Ryan approves the wording (preview sent 2026-10-02). Changed from below:
+   lock times are relative ("in 3 days"); the CTA reads "Take your spot" (the plural-voice test
+   caught "my"); invites send inline at the moment of adding, not from the cron.
+
+   Originally: **Notifications** (Decision 2's *one reminder*, always SportPool-branded, **never in the captain's
    name**):
    - **Seat held:** one push (category `POOL_ACTIVITY`, so no new preference column or OTA) and one
      email (topic `POOL_ACTIVITY`), sent when the pool is created.
