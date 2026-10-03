@@ -19,20 +19,50 @@ export type ActivityLink = {
   params: Record<string, string>
 }
 
+/**
+ * ⚠ The crew kinds (lib/crews/needs.ts) are sent ONLY to a client that asks for them with
+ * `crews=1` — a build without CrewNeedsCard would render them as a generic card with one tap,
+ * an empty deadline pill and no way to answer. See the activity route.
+ */
+export type NeedKind = 'pick' | 'lms' | 'table' | 'crew_seat' | 'crew_invite' | 'crew_save'
+
+/** A crew card's buttons. The client knows which route each one calls. */
+export type NeedAction = {
+  id: 'take' | 'decline' | 'join' | 'save' | 'dismiss'
+  label: string
+  style: 'primary' | 'secondary'
+}
+
 export type NeedItem = {
   id: string
-  kind: 'pick' | 'lms' | 'table'
+  kind: NeedKind
   pool_id: string
   pool_name: string
   entry_id: string
   title: string
   subtitle: string
-  deadline_at: string
+  /** NULL for a crew card with no clock (an invite, Keep this group together?). Sorts last. */
+  deadline_at: string | null
   /** Progress, for the bar. Single-decision modes are 0 of 1. */
   made: number
   total: number
   cta: string
-  link: ActivityLink
+  /** NULL when tapping the card itself goes nowhere — its buttons are the actions. */
+  link: ActivityLink | null
+  /** Crew cards only: two buttons, because every crew decision can be a no. */
+  actions?: NeedAction[]
+  /** Crew cards only. */
+  crew?: { crew_id: string | null; name: string; invite_id?: string; people?: number }
+}
+
+/** Soonest deadline first; cards with no deadline after every card with one. */
+export function sortNeeds(items: NeedItem[]): NeedItem[] {
+  return [...items].sort((a, b) => {
+    if (a.deadline_at === b.deadline_at) return 0
+    if (a.deadline_at === null) return 1
+    if (b.deadline_at === null) return -1
+    return a.deadline_at < b.deadline_at ? -1 : 1
+  })
 }
 
 export type NeedsYouPool = {
@@ -42,7 +72,7 @@ export type NeedsYouPool = {
   entryId: string | null
 }
 
-const MODE_LABEL: Record<string, string> = {
+export const MODE_LABEL: Record<string, string> = {
   pickem: "Pick'em",
   showdown: 'Showdown',
   last_man_standing: 'Last One Standing',
@@ -129,6 +159,5 @@ export function buildNeedsYou(
   }
 
   // Soonest deadline first — the order a member would do them in.
-  out.sort((a, b) => (a.deadline_at < b.deadline_at ? -1 : a.deadline_at > b.deadline_at ? 1 : 0))
-  return out
+  return sortNeeds(out)
 }

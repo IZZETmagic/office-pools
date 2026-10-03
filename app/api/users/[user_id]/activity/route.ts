@@ -15,7 +15,8 @@ import {
   type LeagueActivityPool,
 } from '@/lib/activity/readLeagueActivity'
 import { pageWeeks, slicePage } from '@/lib/activity/page'
-import type { ActivityLink, NeedItem } from '@/lib/activity/needsYou'
+import { sortNeeds, type ActivityLink, type NeedItem } from '@/lib/activity/needsYou'
+import { readCrewNeeds } from '@/lib/crews/needs'
 import { activityApiVersion } from '@/lib/activity/version'
 
 // =============================================================
@@ -192,6 +193,14 @@ async function handleGET(
   // "At least 2", not "exactly 2" — versions only add fields, and a build asking for v3 must not
   // fall back to the v1 response (lib/activity/version.ts).
   const v2 = activityApiVersion(search.get('v')) >= 2
+  // Crew cards in Needs you (lib/crews/needs.ts) — only for a build that can answer them.
+  //
+  // ⚠ A CAPABILITY FLAG, NOT A VERSION BUMP. The app talks to production, and until this deploys
+  // production answers anything but v=2 with the v1 response — so an app asking for v=3 would lose
+  // Needs You entirely the moment it shipped (or the moment Metro reloaded). `v=2&crews=1` is safe
+  // in both orders: the old server ignores `crews`, the new one adds the cards. A build that
+  // doesn't send it never sees a card it can't act on.
+  const withCrews = v2 && search.get('crews') === '1'
   // Only honoured with v2. A malformed cursor is treated as "first page" rather
   // than an error, so a bad client value cannot strand the feed empty.
   const rawBefore = v2 ? search.get('before') : null
@@ -956,6 +965,14 @@ async function handleGET(
     }),
     adminClient.from('user_activity_seen').select('seen_at').eq('user_id', user_id).maybeSingle(),
   ])
+  const crewNeeds =
+    withCrews && !before
+      ? await readCrewNeeds(adminClient, user_id, now).catch((err) => {
+          // Same rule as the league cards: a crew failure must not take the feed down.
+          console.error('[activity] crew needs failed', err)
+          return [] as NeedItem[]
+        })
+      : []
   if (seenRes.error) console.error('[activity] seen_at read failed', seenRes.error.message)
   const seenAt = (seenRes.data as { seen_at?: string } | null)?.seen_at ?? null
 
@@ -989,7 +1006,7 @@ async function handleGET(
 
   return NextResponse.json({
     items: page,
-    needs_you: needs,
+    needs_you: crewNeeds.length ? sortNeeds([...needs, ...crewNeeds]) : needs,
     seen_at: seenAt,
     next_before: nextBefore,
   })

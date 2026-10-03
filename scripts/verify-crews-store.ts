@@ -55,6 +55,7 @@ import {
   setCoCaptain,
 } from '../lib/crews/store'
 import { listMyCrews, readCrew, readRoster } from '../lib/crews/read'
+import { readCrewNeeds } from '../lib/crews/needs'
 
 const admin = createAdminClient()
 const U = (n: number) => `a0000000-0000-0000-0000-00000000000${n}` // test_user_01…
@@ -110,6 +111,11 @@ async function main() {
     check('a repeat email answers "sent" and writes nothing', again.ok && copies === 1, { again, copies })
     check('a member cannot add people', !(await inviteToCrew(admin, { actorId: TWO, crewId, userId: FOUR })).ok)
 
+    console.log('\nActivity → Needs you')
+    const twoNeeds = await readCrewNeeds(admin, TWO, Date.now())
+    const inviteCard = twoNeeds.find((n) => n.kind === 'crew_invite' && n.crew?.crew_id === crewId)
+    check('the invitee gets an invite card, no deadline, Join / No thanks', !!inviteCard && inviteCard.deadline_at === null && inviteCard.actions?.map((a) => a.id).join() === 'decline,join', inviteCard)
+
     console.log('\nanswers')
     if (toTwo.ok && toTwo.inviteId) check('Join', (await answerInvite(admin, { userId: TWO, inviteId: toTwo.inviteId, answer: 'join' })).ok)
     const { data: inv3 } = await admin.from('crew_invites').select('invite_id').eq('crew_id', crewId).eq('invitee_user_id', THREE).is('resolved_at', null).maybeSingle()
@@ -133,6 +139,9 @@ async function main() {
     console.log('\nseats (crew_seats only)')
     if (runningPool) {
       await admin.from('crew_seats').insert({ pool_id: runningPool, crew_id: crewId, user_id: TWO })
+      const { data: lock } = await admin.rpc('pool_first_lock_at', { p_pool_id: runningPool })
+      const seatCard = (await readCrewNeeds(admin, TWO, Date.now())).find((n) => n.kind === 'crew_seat' && n.pool_id === runningPool)
+      check('a held seat shows as a card whose deadline is the first lock', !!seatCard && seatCard.deadline_at === lock, { seatCard, lock })
       check('Not this one, while open', (await answerSeat(admin, { userId: TWO, poolId: runningPool, answer: 'decline' })).ok)
       const { data: s } = await admin.from('crew_seats').select('resolution').eq('pool_id', runningPool).eq('user_id', TWO).maybeSingle()
       check('…the seat is declined', s?.resolution === 'declined', s)
@@ -143,6 +152,28 @@ async function main() {
       const { data: s } = await admin.from('crew_seats').select('resolution').eq('pool_id', finished.pool_id).eq('user_id', CAP).maybeSingle()
       check('after the first lock there is nothing to decline', s?.resolution === null, s)
     }
+
+    // Keep this group together? — READ-ONLY, so a real admin of a finished pool is fine to ask.
+    const { data: finishedPools } = await admin
+      .from('pools')
+      .select('pool_id, admin_user_id')
+      .eq('status', 'completed')
+      .is('crew_id', null)
+      .is('archived_at', null)
+      .is('brand_slug', null)
+      .is('crew_prompt_dismissed_at', null)
+      .limit(20)
+    let saveChecked = false
+    for (const fp of finishedPools ?? []) {
+      const { count } = await admin.from('pool_members').select('member_id', { count: 'exact', head: true }).eq('pool_id', fp.pool_id).neq('role', 'spectator')
+      if ((count ?? 0) < 2) continue
+      const cards = await readCrewNeeds(admin, fp.admin_user_id, Date.now())
+      const card = cards.find((n) => n.kind === 'crew_save' && n.pool_id === fp.pool_id)
+      check(`a finished pool's admin is offered "Keep this group together?" (${count} players)`, !!card && card.subtitle === `Save these ${count} as a crew for next time`, card && { kind: card.kind, subtitle: card.subtitle })
+      saveChecked = true
+      break
+    }
+    if (!saveChecked) console.log('  · no finished multi-member pool to check — skipped')
 
     console.log('\nleaving, removal, succession')
     check('the co-captain cannot remove the captain', !(await removeMember(admin, { actorId: TWO, crewId, targetId: CAP })).ok)
