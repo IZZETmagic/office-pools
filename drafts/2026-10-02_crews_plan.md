@@ -446,7 +446,8 @@ Each step is a commit; nothing is pushed until Ryan says so.
      league-outbox "only once" pattern via `crew_seats.reminded_at`, run from an existing cron (verify
      by `net._http_response`).
    - **No notification ever names who hasn't taken a spot.**
-8. **Delete the concept:** `crews-concept.tsx`, its `Stack.Screen` and its dev row.
+8. ✅ **Delete the concept:** `crews-concept.tsx`, its `Stack.Screen` and its dev row — done
+   2026-10-02. Nothing else imported from it.
 9. **Ship, in the order that has bitten before:**
    1. Deploy the API.
    2. Verify a **new route 404→401** on prod.
