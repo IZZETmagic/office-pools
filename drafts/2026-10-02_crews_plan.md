@@ -448,7 +448,15 @@ Each step is a commit; nothing is pushed until Ryan says so.
    - **No notification ever names who hasn't taken a spot.**
 8. ✅ **Delete the concept:** `crews-concept.tsx`, its `Stack.Screen` and its dev row — done
    2026-10-02. Nothing else imported from it.
-9. **Ship, in the order that has bitten before:**
+9. **Ship** — 🔨 2026-10-03 (UTC): pushed `53bef13e..406f644d` (on Ryan's word); Vercel production ✅;
+   `/api/crews` 404→401, `/api/cron/crew-notices` 404→401, `/crew-invite` 200; cron `crew-notices`
+   scheduled (`*/15`, pg_cron job 26) and a hand-fired request answered 200 "skipped" (switch off);
+   OTA to `production` / runtime 1.2.0 from `406f644d` on BOTH platforms (iOS group `8f3a029f`,
+   Android `5337506d`). ⏸ **The switch is still OFF, waiting on Ryan:** the only message it would send
+   is his own invite to Kronosaur (made 02:37 UTC). The Xcode Cloud failure on the commit is the old
+   Swift app in `ios/` — not part of this release.
+
+   The order, as planned:
    1. Deploy the API.
    2. Verify a **new route 404→401** on prod.
    3. **Schedule `/api/cron/crew-notices`** (pg_cron; verify by `net._http_response`).
