@@ -7,8 +7,10 @@
 // do not promise this, so it is checked on a REAL upload, not assumed.
 //
 // Downloads the newest file(s) in banter-media with the service role and
-// walks the JPEG segments: any APP1 "Exif" segment fails, and a GPS IFD
-// (tag 0x8825) inside it is called out separately. Read-only.
+// walks the JPEG segments: an APP1 "Exif" block FAILS only if it carries a
+// sensitive tag (GPS, make/model, dates, maker note…). The encoder's own
+// technical tags (orientation, resolution, colour space, size) are expected.
+// Read-only.
 //
 //   npx tsx scripts/verify-banter-photo-exif.ts        # newest 3 uploads
 // =============================================================
@@ -48,16 +50,36 @@ function jpegSegments(buf: Buffer): Segment[] {
   return out
 }
 
-function hasGpsIfd(exif: Buffer): boolean {
-  // exif = "Exif\0\0" + TIFF header; look for tag 0x8825 in IFD0 either byte order.
-  const tiff = exif.subarray(6)
+// Tags that identify a person, a device, a time or a place. The iOS/Android
+// encoders ALWAYS write a minimal technical block on a fresh JPEG (Orientation,
+// X/YResolution, ResolutionUnit, ColorSpace, PixelX/YDimension) — that is not
+// the camera's metadata and is fine. Anything below is not.
+const SENSITIVE: Record<number, string> = {
+  0x8825: 'GPS', 0x010f: 'Make', 0x0110: 'Model', 0x0131: 'Software', 0x0132: 'DateTime',
+  0x013b: 'Artist', 0x8298: 'Copyright', 0x9003: 'DateTimeOriginal', 0x9004: 'DateTimeDigitized',
+  0x9010: 'OffsetTime', 0x9011: 'OffsetTimeOriginal', 0x927c: 'MakerNote', 0x9286: 'UserComment',
+  0xa420: 'ImageUniqueID', 0xa430: 'CameraOwnerName', 0xa431: 'BodySerialNumber', 0xa433: 'LensMake',
+  0xa434: 'LensModel', 0xa435: 'LensSerialNumber',
+}
+
+/** Sensitive tag names found in IFD0 and the Exif sub-IFD. */
+function sensitiveTags(exif: Buffer): string[] {
+  const tiff = exif.subarray(6) // after "Exif\0\0"
   const le = tiff[0] === 0x49
   const read16 = (o: number) => (le ? tiff.readUInt16LE(o) : tiff.readUInt16BE(o))
   const read32 = (o: number) => (le ? tiff.readUInt32LE(o) : tiff.readUInt32BE(o))
-  const ifd0 = read32(4)
-  const count = read16(ifd0)
-  for (let n = 0; n < count; n++) if (read16(ifd0 + 2 + n * 12) === 0x8825) return true
-  return false
+  const found: string[] = []
+  const walk = (ifd: number) => {
+    const count = read16(ifd)
+    for (let n = 0; n < count; n++) {
+      const entry = ifd + 2 + n * 12
+      const tag = read16(entry)
+      if (SENSITIVE[tag]) found.push(SENSITIVE[tag])
+      if (tag === 0x8769) walk(read32(entry + 8)) // Exif sub-IFD
+    }
+  }
+  walk(read32(4))
+  return found
 }
 
 async function main() {
@@ -88,8 +110,13 @@ async function main() {
     if (dlErr || !data) throw dlErr
     const buf = Buffer.from(await data.arrayBuffer())
     const exif = jpegSegments(buf).find(s => s.marker === 0xe1 && s.data.subarray(0, 4).toString('latin1') === 'Exif')
-    const verdict = !exif ? 'CLEAN — no EXIF block' : hasGpsIfd(exif.data) ? 'EXIF WITH GPS ⚠⚠' : 'EXIF present (no GPS) ⚠'
-    if (exif) bad++
+    const found = exif ? sensitiveTags(exif.data) : []
+    const verdict = !exif
+      ? 'CLEAN — no EXIF block'
+      : found.length === 0
+        ? 'CLEAN — encoder technical tags only'
+        : `LEAKS ${found.join(', ')} ⚠⚠`
+    if (found.length) bad++
     console.log(`${row.created_at}  ${(buf.length / 1024).toFixed(0)} KB  ${verdict}  ${row.name}`)
   }
   process.exit(bad ? 1 : 0)
