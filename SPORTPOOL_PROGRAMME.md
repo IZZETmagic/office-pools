@@ -16,6 +16,155 @@ items roll up into.
 > standing was making the register point at the wrong things. What is written below is what the code
 > says today.
 
+### 2026-10-02, late night — Crews web day two (8b) built, and R36 is confirmed; nothing pushed
+
+> Scope: Crews only, from my last cut (`5a1b6ec4`, 21:46) to `16e9637c` (22:03), two commits:
+> `050c0b57` (8b) and `16e9637c` (the plan). I read `050c0b57` in full and checked each claim in
+> the brief against the tree. The tracked tree was clean when I started, so tests, the type-check and
+> lint ran in place on the committed code. Production facts come from the building session and were
+> **not** re-queried. I had no production access.
+>
+> ⚠ **R36 work began in the working tree during this pass, uncommitted.** By 22:19 it touched 17
+> tracked files, including the Crews plan. It also added `lib/crews/inviteToken.ts` and its test,
+> `app/api/crews/invites/claim/`, `app/api/crews/invites/link/`, `app/crew-invite/` and
+> `lib/migrations/155_an_invite_is_claimed_by_its_link.sql` (22:08). **None of it is in this record**,
+> except two lines that claim Ryan's call: one in 155's header and one in the uncommitted plan §5.
+> Both are under *Drift* and *Needs Ryan*. Every citation below is to `HEAD` (`16e9637c`), not the
+> working tree.
+
+**Since last update**
+
+- **8b, web day two, is built (`050c0b57`). None of it is pushed.** `master` is 36 ahead of
+  `origin/master` (`53bef13e`) before this commit (verified). What remains for Crews: **R36's fix**,
+  **step 8** (delete the concept screen) and **step 9** (ship). Verified in the tree:
+  - **Create wizard** (`components/pools/CreatePoolModal.tsx` + `components/crews/CreatePoolCrew.tsx`):
+    - The Crew row shows only to someone in a crew (`CreatePoolCrew.tsx:70`).
+    - In roster review, Done is disabled while too many are ticked (`RosterReviewModal.tsx:120`).
+    - The *Already playing this* confirm runs on Next (`CreatePoolModal.tsx:568`) and on the step
+      header (`:835`). Those are the only two ways onto Settings.
+    - Settings shows a locked *Private* card for a crew pool (`:1357`).
+    - The request sends `is_private: isPrivate || !!crew.crewId` with `crew_id` and `seat_user_ids`
+      (`:677-679`).
+    - The server refuses a public crew pool and an over-cap seat list before it writes anything
+      (`app/api/pools/create/route.ts:82-113`, from step 4).
+  - **Profile → Crews** (`components/crews/MyCrewsTab.tsx`). `?tab=crews` works as a link, because
+    the valid tabs are derived from `TAB_CONFIG` (`app/profile/ProfilePage.tsx:229-230`).
+  - **Crew page captain controls** (`app/crews/[crew_id]/CrewPage.tsx`):
+    - Rename (`:120`, PATCH at `:361`).
+    - A *Pick a co-captain* nudge (`:143`), shown to the captain while there is no co-captain and
+      more than one member.
+    - A member menu with *Make co-captain* and *Remove*.
+    - *Add people* (`components/crews/AddPeopleModal.tsx`).
+    - *INVITED · WAITING* with *Withdraw* (`:302`, DELETE at `:314`).
+    - Every route the page calls exists with that method.
+    - The *"controls are in the app for now"* line is gone. The breadcrumb, and the last member's
+      Leave, now go to `/profile?tab=crews` (`:90`, `:471`).
+  - **Pool page:** *"Part of …"* and the saved-spot count on Info, and *SPOTS SAVED* names on the
+    admin Members tab (`components/crews/PoolCrew.tsx`). The server returns 404 to a non-member of the
+    pool (`lib/crews/read.ts:517`). It sends names only to a viewer whose role is `admin`
+    (`:530-531`). That is plan §9 #5.
+  - **The invite preview:** `notify.invitePreview` now calls `words.invitePreviewText`
+    (`lib/crews/notify.ts:171-172`). The captain's preview names them the way the sender does: full
+    name, else username (`app/crews/[crew_id]/page.tsx:44`; `notify.ts:327`).
+  - **The `/dashboard` button's reason is corrected** in the comment (`notify.ts:114-119`) and in
+    plan §8a. Last pass's drift note closes.
+  - **Tests, run this pass on `HEAD`:**
+    - `lib/crews`, `lib/activity` and `lib/pools`: 14 files, **239** tests, all pass. That is 233 plus
+      6 new in `words.test.ts`.
+    - `lib/__tests__/privateByDefault.guard.test.ts`: 6/6.
+    - `npx tsc --noEmit -p .`: the 3 **R29** `FormData.get` errors only.
+    - `eslint` on the 18 changed files: 10 errors, and `git blame` puts every one on a line from an
+      older commit. None is from `050c0b57`.
+  - *Building session, not re-checked:* checked on localhost on Ryan's account with nothing written,
+    and every crew-only state on a fixture harness that was then deleted.
+- **R36 is confirmed. *Confirm email* is off in production.** *Building session's read-only query on
+  `auth.users`, provider `email`; not re-queried by me:* 4,825 accounts, 0 with `email_confirmed_at`
+  null. 4,820 were confirmed within 5 seconds of `created_at`, and 5 later. All 16 sign-ups in the
+  last 60 days were confirmed within 5 seconds. So `email_confirmed_at` proves nothing about who owns
+  an address. The fix is Ryan's call, and **no call is recorded** (see *Drift*).
+
+**Now:**
+1. **R36's fix: Ryan's call, before the ship.** This is the only open Crews item that is a decision,
+   and code for one direction is already being written without a recorded call.
+2. **Step 9, the ship, on Ryan's say-so.** The notices switch and the cron have to be in it, in the
+   right place (*Drift*: an invite made while the switch is off is never emailed).
+3. **Step 8**, deleting the concept screen. It takes minutes and goes with the ship.
+
+*Rule applied: silent wrong data first. Nothing here is live, because nothing is deployed. R36 comes
+first because it gates the ship and only Ryan can make the call.* **R35** still doesn't outrank
+these, and its trace is still owed.
+
+**Risk moves:**
+- **R36: provisional → confirmed. The level stays 🟡.** What changed is certainty, not reach or
+  likelihood: the claimant still has to know the address and that an invite is waiting.
+  - **New: the notices switch does not contain R36.** A claim reads only the account's address and
+    `email_confirmed_at` (`lib/crews/store.ts:484-488`, `lib/crews/http.ts:45`). It never checks
+    whether an email went out.
+  - So shipping the API with `crew_notices_enabled` off still ships R36. In that state, the address's
+    owner gets no email, and someone else can still claim the invite.
+- No other risk moved.
+
+**Drift:**
+- **A decision is claimed in a code comment and is not recorded.** The uncommitted
+  `lib/migrations/155_an_invite_is_claimed_by_its_link.sql` (22:08) opens with *"Ryan's call,
+  2026-10-02 (R36)"*. It builds direction **(b)**: an email invite is claimed by a one-time link in
+  the email, not by a matching address.
+  - The uncommitted edit to plan §5 says the same: *"Ryan chose this over turning on
+    confirmation."*
+  - The brief for this pass says the fix is still awaiting Ryan's decision. So R36 is recorded as
+    **open, with no call**.
+  - Whether 155 has been applied to production is **unverified**.
+- **An invite made while the switch is off is never emailed, and it cannot be resent.**
+  - `sendInviteNotice` returns at once when the switch is off (`notify.ts:312`). It is best-effort
+    and never retried (`:306-310`), and the cron sends seat notices only.
+  - A second invite to the same address is blocked as *already invited* and still answers *"Invite
+    sent"*, with no row and no email (`store.ts:436-442`).
+  - Meanwhile the web tells the captain *"We'll send them one email"*, then *"Invite sent to …"*
+    (`AddPeopleModal.tsx:139-142, :64`).
+  - Seat notices recover once the switch flips, because the cron picks up any open seat that hasn't
+    had its notice. Invites don't. **So the switch has to be on by the time the API goes live.**
+  - Plan §7 step 7 calls the switch and the cron *"deploy steps"*
+    (`drafts/2026-10-02_crews_plan.md:431-433`). Step 9's ordered list (`:448-455`) includes neither.
+    The brief for this pass does.
+- **`seats_held` is returned, and nothing reads it.** If holding the seats fails, the create route
+  logs it and reports it only in its response (`app/api/pools/create/route.ts:461-466, :550`).
+  Neither the web wizard nor the app reads that field (grep, whole tree). The pool would then exist
+  as a crew pool with no saved spots, and the starter would see *"Pool created!"*. It is one insert,
+  so all or nothing, and unlikely. Not raised as a risk.
+- **"Private — crew pools always are"** is in both clients (`CreatePoolModal.tsx:1357`,
+  `mobile/app/create-pool.tsx:1192`). It is right for today's single boolean and today's labels. Under
+  amended Decision 5, a crew pool defaults to *Invite link* and may also be strict *Private*. So the
+  sentence becomes **false**, not just mislabelled, when *Pool privacy: three levels* lands. Added to
+  that item.
+- **"Only you see these names, as the pool's admin"** (`PoolCrew.tsx:71`,
+  `mobile/components/crews/PoolCrewLine.tsx:88`). The server sends the names to every pool member
+  whose role is `admin` (`read.ts:530`), and a pool can have several. This is a wording problem, not a
+  leak.
+- **"Single owner of the invite's first line" is narrower than it sounds.** `words.invitePreviewText`
+  owns the *preview*. The email's own first line is still written inline in `inviteToEmailCopy`
+  (`notify.ts:155`). What holds the two together is a test with fixed strings
+  (`lib/crews/__tests__/notify.test.ts:85-88`), not shared code. It holds today.
+- **Decision 7's *Go Plus* is missing on both surfaces now.** Plan §9 #7 says *"Go Plus or choose who
+  gets the spots"*. The web's roster review offers only the second, like the app's
+  (`mobile/components/crews/RosterReviewSheet.tsx:11`). This is missing, not wrong, so it ranks below
+  everything above.
+- **The plan's 8b estimate was overtaken.** About 3½ days at plan time; it was committed at 22:03, the
+  same evening. *Built* means committed, unit-tested and seen on localhost. It does not mean seen
+  working against a deployed API.
+
+**Needs Ryan:**
+- **R36: which fix?**
+  - **(a)** Turn on *Confirm email*. That is product-wide, and both sign-up flows would need a
+    *check your email* state they don't have.
+  - **(b)** Claim only through the invite email's own link. That is what the uncommitted 155 builds.
+    155's header and the uncommitted plan both say it is your call. **If you made that call, say so
+    and it gets recorded as decided. The record has none.**
+  - Either way, leaving the switch off does not contain it.
+- **The ship's order: the notices switch on by the time the API is live.** Otherwise email invites
+  made in the gap are dead. Pushing is a deploy, and it is your say-so. `master` is 37 ahead after
+  this commit.
+- **`SPORTPOOL_PROGRAMME 2.md`** is still there. Untouched.
+
 ### 2026-10-02, night — Crews built through the web slice; nothing pushed, nothing deployed
 
 > Scope: Crews only, from my last cut (`dcc4f7ef`, 20:48) to `5a1b6ec4` (21:46), 17 commits. I read
@@ -95,14 +244,15 @@ items roll up into.
     (`mobile/app/(tabs)/profile.tsx:294`).
 
 **Now:**
-1. **The R36 check, before shipping.** One look at the production auth setting decides whether the
+1. ~~**The R36 check, before shipping.** One look at the production auth setting decides whether the
    ship carries a guard that checks nothing. It takes a minute, and it has to come first, because the
-   ship is what makes R36 reachable.
+   ship is what makes R36 reachable.~~ ✅ Checked the same night: off. R36 is confirmed, and its fix
+   is now the open call (*2026-10-02, late night*).
 2. **Step 9, the ship, on Ryan's say-so.** 8a must go with the RN release (Decision 8), and it is
    built. Step 8 goes with it.
-3. **8b, day two:** about 3½ days by the plan, and already under way, uncommitted (see the cut note).
+3. ~~**8b, day two:** about 3½ days by the plan, and already under way, uncommitted (see the cut note).
    Until it lands, the only way a web user reaches their crew page is a Needs-you card. There is no
-   list and no pool-page link.
+   list and no pool-page link.~~ ✅ Committed at 22:03 (`050c0b57`).
 
 **R35** still doesn't outrank these, and its trace is still owed. *Rule applied: silent wrong data
 first. Nothing here is live silent wrongness. R36 goes first because it is the cheapest and must
@@ -120,7 +270,7 @@ precede the ship, not because it is severe.*
   (`lib/supabase/middleware.ts:13, :86-90`, called from `proxy.ts`). So signed-in recipients already
   landed on the dashboard. The change still helps a **signed-out** recipient, who now goes through
   login and back to `/dashboard` instead of the marketing page. The change is right; its reason is
-  wrong.
+  wrong. ✅ *Corrected in `050c0b57`: the comment and plan §8a now give the signed-out reason.*
 - **Three of last pass's drift notes are closed by the code:**
   - Account deletion now leaves every crew first, with captain succession, and refuses to delete if
     that fails (`app/api/account/delete/route.ts:67-78`, `dd12ce9a`). Verified in code, not run.
@@ -140,10 +290,11 @@ precede the ship, not because it is severe.*
   (8b ~3½ days, steps 8–10 ~½ day) are not re-sized here.
 
 **Needs Ryan:**
-- **Is *Confirm email* on for production Supabase Auth?** (Dashboard → Authentication → Sign In /
+- ~~**Is *Confirm email* on for production Supabase Auth?** (Dashboard → Authentication → Sign In /
   Providers → Email.) If it is off, **R36** is real and should be settled before the ship. If it is
   on, R36 closes. The code points to off: neither sign-up flow handles a sign-up that returns no
-  session. A fact to check, not a product decision.
+  session. A fact to check, not a product decision.~~ ✅ **Answered: off** (building session's
+  production query). The fix is now the open call (*2026-10-02, late night → Needs Ryan*).
 - **Pushing.** `master` is 34 ahead after this commit. A push is a deploy, and step 9's order is in
   the plan.
 - **`SPORTPOOL_PROGRAMME 2.md`** is still there. Untouched.
@@ -1002,7 +1153,7 @@ unlanded.**
 | Project | What it is | Status |
 |---|---|---|
 | **Ship what is built** | 225 commits and ~30 migrations sit between `Development` and production, and the schema has moved past the deployed code. **The largest single item in the programme, and it is not a build.** | 🔴 **Blocking everything** (**R21**) |
-| **Multi-sport platform** | Generalise the single World Cup product into a reusable multi-competition platform. Product decisions settled 2026-07-25. **Migration 111 (a pool names one competition) is the first foundation applied**; La Liga is planned (`drafts/2026-08-28_la_liga_plan.md`) and unstarted. **2026-10-02:** Decisions 1, 2, 3 and 5 amended, and Decision 2 clarified (Ryan). ~~**Crews planned, not started**~~ **Crews in progress** (`drafts/2026-10-02_crews_plan.md`, ~15 days RN + ~1½ web in the same release + ~3½ web day two). Its prerequisite P1 (**R32**) was ✅ **fixed the same day** (migration 151). The same-class **R34** (`pool_entries`, not a Crews prerequisite) was ✅ **fixed that night** as migration 152. **By the end of the day, P2–P5 and the Crews schema were done:** migration 153 (first lock, finished) and migration ~~152~~ ~~153~~ **154** (the schema), both live on production per the building session. ~~Step 4 (`lib/crews/` + routes) has started.~~ **Late that night, steps 4–7 and the web slice (8a) were built, up to `5a1b6ec4`. All of it is local and unpushed**, so nothing is user-visible. 8b, step 8 and the ship remain, and **R36** should be checked before the ship. **Pool privacy: three levels** planned as its own item, not started. | 🔵 Designing · Crews 🔨 built to the ship step, unpushed |
+| **Multi-sport platform** | Generalise the single World Cup product into a reusable multi-competition platform. Product decisions settled 2026-07-25. **Migration 111 (a pool names one competition) is the first foundation applied**; La Liga is planned (`drafts/2026-08-28_la_liga_plan.md`) and unstarted. **2026-10-02:** Decisions 1, 2, 3 and 5 amended, and Decision 2 clarified (Ryan). ~~**Crews planned, not started**~~ **Crews in progress** (`drafts/2026-10-02_crews_plan.md`, ~15 days RN + ~1½ web in the same release + ~3½ web day two). Its prerequisite P1 (**R32**) was ✅ **fixed the same day** (migration 151). The same-class **R34** (`pool_entries`, not a Crews prerequisite) was ✅ **fixed that night** as migration 152. **By the end of the day, P2–P5 and the Crews schema were done:** migration 153 (first lock, finished) and migration ~~152~~ ~~153~~ **154** (the schema), both live on production per the building session. ~~Step 4 (`lib/crews/` + routes) has started.~~ **Late that night, steps 4–7 and the web slice (8a) were built, up to `5a1b6ec4`. All of it is local and unpushed**, so nothing is user-visible. ~~8b, step 8 and the ship remain, and **R36** should be checked before the ship.~~ **8b (web, day two) followed at 22:03 (`050c0b57`), also unpushed.** What remains: **R36's fix** (confirmed: *Confirm email* is off in production; Ryan's call, none recorded), step 8 and the ship. **Pool privacy: three levels** planned as its own item, not started. | 🔵 Designing · Crews 🔨 built to the ship step (web 8b too), unpushed; R36 fix awaiting Ryan |
 | **Showdown / EPL launch** | H2H duels, persistent rivalries, and the first league season. ⚠️ **Status corrected 2026-09-02: this is BUILT, not designing** — four modes, sealed draw, walkout reveal, duel points on the season leaderboard, recap. It is undeployed, not unbuilt. | 🟡 **Built, ⛔ undeployed** |
 | **The RN league build** | Bring the Expo app to parity with the league product. ⚠️ **Status corrected 2026-09-02: started, and the read half is the part that moved.** The gate was always a read API rather than screens — mobile is direct-to-PostgREST and four league engine tables are deny-all (**R24**). Two server routes now carry the league to the phone: `/api/users/:id/fixtures` (all three match surfaces — Results, Home, match detail) and `/api/users/:id/home-scoring` (the pool card). **Picking is not built for any mode, by decision** (*Decision 14*), and no league *pool* screen exists. | 🟡 **Read half landed, ⛔ undeployed** — see *📱 The RN league build* |
 | **Scale & scoring integrity** | Shadow engine, leaderboard precompute, IO reduction, scoring correctness. | 🟢 In flight |
@@ -1098,7 +1249,7 @@ segment, a 20× rescale, phantom bonuses, predictions destroyed by a delete.
 | **R33** | **League pools never reach `status = 'completed'`.** ⚠️ **New 2026-10-02**, found in Crews planning (P3), verified in code this pass. `lib/auto-archive.ts` completes a pool when every `matches` row for its tournament is complete, and requires `totalCount > 0` (`:37-55`). League fixtures live in `league_fixtures`. A league tournament has **zero** `matches` rows, so it never qualifies, and every league pool stays `open` forever. The real season-end signal already exists: a row in `league_standings_final` | 🟡 | All league pools (the plan counts 20). **Nothing is wrong today**, because no league season has ended and `open` is the correct state. From the first season end (late May 2027), every league pool will claim to be running when it has finished. That affects anything keyed on completion, including the Crews *"Keep this group together?"* prompt and the crew page's *Playing now / Past seasons* split | The first league season ending | ~~**Planned, not built:**~~ **A workaround for Crews, applied 2026-10-02. It is NOT a fix for R33.** Crews **P3** is migration `153_a_pool_knows_when_it_locks_and_ends` (`bc02a1b0`, applied per the building session). Its `pool_finished_at(pool_id)` uses `status='completed'` for the World Cup and the `league_standings_final` snapshot for leagues (`153:92-102`, verified), so **Crews do not depend on R33.** League pools **still never reach `completed`**: `lib/auto-archive.ts` is untouched. Anything else that keys on `completed` still sees every league pool as running. The function is service-role only, and **no TypeScript calls it yet** (verified) | **New — no call needed**; it's a defect. Levelled 🟡: no data loss, and the date is ~8 months out. It rises to 🟠 if anything else starts keying on `completed` before the fix | **Crews → P3**; **R10** (`pools.status` is CHECK-constrained to `open`/`completed`) |
 | **R34** | ✅ **CLOSED 2026-10-02: migration 152 is applied to production, and a member can no longer write their own score.** `lib/migrations/152_a_member_cannot_score_themselves.sql`, commit `bd7a7bb5`. The commit is **local, not pushed**, and needs no deploy, because the whole fix lives in the database. It is applied as `schema_migrations` version **20261002231437**. **The fix** (read this pass) is an allow-list trigger, `guard_pool_entry_writes()`, on **BEFORE INSERT OR UPDATE** (`:75-178`), built from an audit of every writer (`:28-43`). **(a) Trusted writers pass untouched** (`:95`). That means anything not running as `authenticated` or `anon`: the service role, migrations, and SECURITY DEFINER functions such as `lite_recalc_entry`. Super admins pass too. ⚠ "Trusted" is `current_user`, **not** `auth.uid()` as in 151. An admin's adjustment calls `lite_recalc_entry`, a DEFINER function, which must still re-derive totals and ranks. That is why the trigger itself is SECURITY INVOKER (`:45-54, :78`). It also means **any future SECURITY DEFINER writer is trusted**, so it must derive what it writes and never take a value from its caller (`:50-51`). **(b) A member, own entry:** `entry_name`, `last_recap_seen_at`, `last_reveal_seen_duel`, `predictions_last_saved_at`, `has_submitted_predictions` (false → true only, `:147-153`) and `predictions_submitted_at` (`:82-84`). **(c) A pool admin, any entry in their pool:** all of those, plus `fee_paid`, `fee_paid_at`, `point_adjustment`, `adjustment_reason`, and unlock (`:85-88`). **(d) Totals, ranks, retire, lock and identity** are for trusted writers only (`:117-126, :155-160`). It is an allow-list, so a column added later is protected by default. **(e) The tiebreak time belongs to the server.** `predictions_submitted_at` is stamped `now()` the first time it is set and never moves after; only an admin unlock clears it (`:132-144`). It is coerced rather than refused, so no released app breaks. **(f) A member's insert starts clean** (`:99-114`). Every scoring, fee, lock, retire and marker column is reset, and `pool_id`/`user_id` are re-derived from the membership. The trigger is named to sort before `trg_fill_pool_entry_identity` (`:174`). **(g)** The member DELETE policy *"Users can delete own entries"* is **dropped** (`:182`), so leaving goes only through 056's soft-delete doors. *Was:* one PATCH let any member set their own `point_adjustment`, which `shadow_finalize_totals` folds into the total members see, or their own total, rank, fee, retirement or lock. A member could also insert a loaded entry claiming any pool, or hard-delete their own. A pool admin could rewrite any total outside the logged adjustment trail. The full pre-fix analysis (which readers were reachable and why) is this row as of `f8c7ac62` | 🔴 → ✅ | Was: **every non-archived pool**, any member, one call, and it reached the score. **Now closed on the RLS path.** **No evidence of past use** (fixing session, production; 152 header `:24-26`). All **164** entries with a non-zero adjustment match the `point_adjustments` log, which only pool admins can write. Every stored `scored_total_points` equals match + bonus + adjustment. No `predictions_submitted_at` is in the future. ⚠ That is "no evidence", not proof. The log check cannot see an admin who logged a self-serving adjustment, and until 151 anyone could become admin. **12 positive self-adjustments (+887 pts) in 4 pools were made by admins who are not the pool's creator.** They are plausibly real co-admins. They were **not reviewed, by Ryan's decision** (2026-10-02), which is recorded as a decision, not an open action | — | ✅ **Verified.** `scripts/verify-pool-entry-guard.sql` runs **17** scenarios (M1–M11, A1–A5, S1) in a block that always rolls back (read this pass). **Blocked:** a member's own points, total and rank, retire, fee, lock and un-submit, and a pool admin rewriting a total directly. **Allowed:** a member's rename, read markers and save; a pool admin's adjustment, fee and unlock; `lite_recalc_entry` after an adjustment (total = parts); the service role. A member's backdated submission time is kept unchanged. A resubmit after unlock with a 2020 device time is stamped with server time. A loaded insert claiming another pool lands clean in the member's own pool. A hard delete, and a write to someone else's entry, touch 0 rows. The subjects are chosen so the pool admin is **not** a super admin (`:7-13, :42-44, :53-55`), which is the trap R32's first run fell into. **17/17 on production, and the live `prosrc` is byte-identical to the file** (fixing session). **Checked in the tree this pass: every session-client writer stays inside its role's allow-list.** That covers every writer listed when R34 opened, plus `mobile/lib/useCeremonyMarkers.ts:145` (read markers), which that list missed. The writers that need more run on the admin client: scoring (`lib/scoring/recalculate.ts:70`), auto-submit (`lib/auto-submit.ts:30`), join (`app/api/pools/join/route.ts:15`), create (`app/api/pools/create/route.ts:68`) and the unlock route (`app/api/pools/[pool_id]/predictions/unlock/route.ts:56`). ⚠ That `create_pool_entry` and `save_predictions_batch` are SECURITY INVOKER (`:52-53`) is the fixing session's catalog read. `save_predictions_batch` is defined in no repo migration. **✅ The device-clock tiebreak is closed, with no app release.** `mobile/lib/usePredictions.ts:313-315` still sends `new Date()`, and the trigger replaces it with server time. One consequence, verified in the tree and intended: the web full-submit routes (`predictions/route.ts:544`, `bracket-picks/route.ts:250`) used to re-stamp the time on every submit. Now the first stamp holds, which is the rule `predictions/round/route.ts:195-196` already stated. ⚠ **What this does NOT close:** **(1) R35.** The RN app adds entries directly, skipping `create_pool_entry`'s deadline and max-entries checks (`:65-68`). **(2)** `lite_recalc_entry` and `snapshot_pool_ranks` are executable by any signed-in user (`:69-70`). Neither takes a value from its caller, so neither can tamper; at worst they cause extra writes. 🟢-class, not numbered. It was already written into `lite_recalc_entry`'s own function comment (`047_lite_recalc_entry_revoke_public.sql:94`: *"any authenticated user can re-rank any pool by id"*), and no item here carried it. **(3) The super-admin session-client defect, corrected this pass.** The `pool_members` half stands. Super-admin *transfer admin*, *change role* and *add member* (`app/api/admin/pools/[id]/actions/route.ts:141, :410, :605`; `app/api/admin/users/[id]/actions/route.ts:214, :506`) write through the session client. No super-admin UPDATE or INSERT policy exists on `pool_members`, so they **do nothing, silently** (151 `:57-61`). 🟡-class: operator tooling only. ⚠ **The `pool_entries` half was probably recorded wrong.** `044_archived_pools_read_only.sql:147` (and `:21-27`) says a super-admin `FOR ALL` policy, *"Super admins can manage entries"*, exists and was left in place on purpose. No repo migration creates it, which is why the earlier search missed it. If it is live, the seven super-admin `pool_entries` writes (`pools/[id]/actions/route.ts:522, :717, :764, :914, :946`; `users/[id]/actions/route.ts:286, :367`) have always landed, and 152 still lets them through. Not checked live. **(4) Not traced.** 152 still lets a member set `has_submitted_predictions`, and a pool admin set `point_adjustment`, on a **league** entry by direct PATCH. Those are the two columns the league containment says must never be set on a league entry (*Premier League 2026/27 → What was deliberately deferred*). 152 narrowed that door and did not widen it. What a set value does to a league entry was not checked | **Discharged by the fix.** **Decided 2026-10-02 (Ryan): the 12 non-creator self-adjustments (+887, 4 pools) are not reviewed.** ⚠ These production facts come from the fixing session: the version, 17/17, `prosrc`, the 164-entry ledger check and 12/+887/4. This pass read the migration, both verify scripts and the commit, and **did not re-query production** | Migrations **145**, **151**; **R32**; **R17** (the ledger check); **R12** (`retired_at`); **R35** |
 | **R35** | **The RN app adds entries without the deadline and max-entries checks, and the deadline half needs no crafted call.** ⚠️ **New 2026-10-02**, from R34's fix (152 header `:65-68`), refined this pass. `mobile/lib/usePoolEntries.ts:176-178` inserts into `pool_entries` directly. That skips `create_pool_entry`, the RPC that refuses a passed deadline and a full allowance (`lib/migrations/005_create_pool_entry_rpc.sql:44-52`). The web goes through the RPC (`app/api/pools/[pool_id]/entries/route.ts:78`). **The RN screen gates the count but not the deadline** (`mobile/components/pool-detail/PredictionsTab.tsx:314`: `canAdd = entries.length < maxEntriesPerUser`, with no deadline term; verified). So *Add Entry* works after the deadline in the shipped app. Only the tier cap limits the count, and only in enforced pools (075). Since 152, a member-inserted entry starts with `predictions_locked = false` (152 `:105`). The `predictions` write policies check only `predictions_locked` and archive status (`041_pool_archive_policies.sql:70-95`) | 🟡 (provisional) | Any pool with a prediction deadline, any member, from the RN app. **Dormant now:** the World Cup closed on 16 Jul, and no deadline-shaped competition is known to be running (not checked in production). League pool settings force one entry per member (`mobile/components/pool-detail/SettingsTab.tsx:217`), so the count case there needs a direct insert. ⚠ **Not traced:** whether a post-deadline entry can then save picks for fixtures not yet kicked off. The RLS read suggests it can; the per-fixture kickoff trigger still blocks started ones. If it can, that is hindsight picking that reaches the leaderboard, which makes it silent wrong data: 🟠 at least | Tapping *Add Entry* in the RN app after the deadline, or a direct `pool_entries` insert beyond the allowance | **None applied, not scoped.** The fix could route RN's *Add Entry* through `create_pool_entry` as the web does, or enforce both checks in the database. Recorded, not chosen | **No call yet.** The fixing session called it *"product logic, not score integrity — separate item"*. It is levelled 🟡 rather than 🟢 here because the deadline half is reachable from the shipped UI. The level stays provisional until the trace above is done | **R34**; migrations **005**, **075**, **152**; *Mobile* |
-| **R36** | **An email invite to a crew may go to whoever registers the address first.** ⚠️ **New 2026-10-02**, found while recording Crews 8a. An invite to an address with no account waits in `crew_invites.invitee_email`. The first account that signs in with that address and a confirmed email claims it (`lib/crews/store.ts:484-512`, where `emailVerified` is `!!email_confirmed_at`, `lib/crews/http.ts:45`). The plan's guard is to claim *"only against a verified address. Otherwise someone could register the address first and land in the crew"* (`drafts/2026-10-02_crews_plan.md:291-292`). **That guard is only as good as `email_confirmed_at`.** Supabase's docs: with *Confirm email* disabled, sign-up *"implicitly confirms the user's email in the database"*. Both sign-up flows go straight into the signed-in app, with no *check your email* step (`app/signup/SignupForm.tsx:127`; `mobile/lib/auth.tsx:109-122`). That points to confirmation being **off** in production. **Not verified:** the auth setting can't be read from here. The unit test proves the flag is respected (`lib/crews/__tests__/store.test.ts:228-230`). Nothing proves the flag means what the guard assumes, and `scripts/verify-crews-store.ts` does not exercise claiming at all | 🟡 (provisional) | Any email invite to an address with no account. The claimant joins the crew with one tap on *Join*. They then see its members, all-time table and past seasons, and get a saved spot in its future pools. The real owner later finds the address taken. **Likelihood is low:** the claimant must know both the address and that an invite is waiting. **Dormant now:** no invite can be created until the API deploys | The API deploys, a captain invites an address with no account, and someone else signs up with that address first | **None.** If confirmation is off, two directions, recorded and not chosen. **(a)** Turn on *Confirm email*. That is product-wide, and both sign-up flows would need a *check your email* state they don't have. **(b)** Stop treating `email_confirmed_at` as proof for crew claims, for example by claiming only through the invite email's own link | **No call yet.** Ryan to check the setting (*Where this stands → Needs Ryan*). The level stays provisional until then. If confirmation is on, this closes | *Crews* (Multi-sport); plan §5 *Direct adds* |
+| **R36** | **An email invite to a crew may go to whoever registers the address first.** ⚠️ **New 2026-10-02**, found while recording Crews 8a. An invite to an address with no account waits in `crew_invites.invitee_email`. The first account that signs in with that address and a confirmed email claims it (`lib/crews/store.ts:484-512`, where `emailVerified` is `!!email_confirmed_at`, `lib/crews/http.ts:45`). The plan's guard is to claim *"only against a verified address. Otherwise someone could register the address first and land in the crew"* (`drafts/2026-10-02_crews_plan.md:291-292`). **That guard is only as good as `email_confirmed_at`.** Supabase's docs: with *Confirm email* disabled, sign-up *"implicitly confirms the user's email in the database"*. Both sign-up flows go straight into the signed-in app, with no *check your email* step (`app/signup/SignupForm.tsx:127`; `mobile/lib/auth.tsx:109-122`). That points to confirmation being **off** in production. ~~**Not verified:** the auth setting can't be read from here.~~ ✅ **Confirmed 2026-10-02, late night: *Confirm email* is off.** *From the building session's read-only query on production `auth.users` (provider `email`), not re-queried by me:* 4,825 accounts, 0 with `email_confirmed_at` null, 4,820 confirmed within 5 seconds of `created_at` and 5 later. All 16 sign-ups in the last 60 days were confirmed within 5 seconds. Plan §8b records the same (`16e9637c`). The unit test proves the flag is respected (`lib/crews/__tests__/store.test.ts:228-230`). The flag does not mean what the guard assumes, and `scripts/verify-crews-store.ts` does not exercise claiming at all. **The notices switch does not contain this.** A claim reads only the account's address and `email_confirmed_at` (`lib/crews/store.ts:484-488`). It never checks whether an invite email went out. So with the API live and `crew_notices_enabled` off, the address's owner gets no email, and someone else can still claim the invite | 🟡 (confirmed; was provisional) | Any email invite to an address with no account. The claimant joins the crew with one tap on *Join*. They then see its members, all-time table and past seasons, and get a saved spot in its future pools. The real owner later finds the address taken. **Likelihood is low:** the claimant must know both the address and that an invite is waiting. **Dormant now:** no invite can be created until the API deploys. *Level unchanged on confirmation: what changed is certainty, not reach or likelihood* | The API deploys, a captain invites an address with no account, and someone else signs up with that address first | **None applied.** Two directions, recorded and not chosen. **(a)** Turn on *Confirm email*. That is product-wide, and both sign-up flows would need a *check your email* state they don't have. **(b)** Stop treating `email_confirmed_at` as proof for crew claims, for example by claiming only through the invite email's own link. ⚠ **Uncommitted at 22:08, and outside this record:** `lib/migrations/155_an_invite_is_claimed_by_its_link.sql` and new claim and link routes build **(b)**. 155's header says *"Ryan's call, 2026-10-02 (R36)"*, and an uncommitted edit to plan §5 says *"Ryan chose this over turning on confirmation"*. Whether 155 is applied to production is **unverified** | **No call recorded.** The brief for the late-night pass says the fix awaits Ryan's decision, and two uncommitted files say he has made it. These conflict, and only Ryan can settle it (*Where this stands → 2026-10-02, late night → Needs Ryan*). The plan (§8b) and this programme treat it as gating the ship; Ryan has not ruled on that either | *Crews* (Multi-sport); plan §5 *Direct adds* |
 
 **Why R13 is 🟠 and not 🔴.** It meets the 🔴 wording — it is live and it is misleading users right
 now. It is held at 🟠 because the wrongness is confined to a **displayed gamification level**: no
@@ -4190,7 +4341,7 @@ The full rule, now written down once:
   Decision 5's strict *Private* (request to join), built on its own and not inside Crews. Full item
   below.
 
-### Crews: a crew is who played `Feature` `Multi-sport` `Mobile` — 🔨 in progress (steps 1–7 and web 8a built 2026-10-02, unpushed; 8b, step 8 and the ship remain)
+### Crews: a crew is who played `Feature` `Multi-sport` `Mobile` — 🔨 in progress (steps 1–7, web 8a and web 8b built 2026-10-02, unpushed; R36's fix, step 8 and the ship remain)
 
 - **Is:** Decision 1's durable group, built. You're in a crew because you played in one of its pools,
   or because you said yes when its captain added you.
@@ -4226,23 +4377,38 @@ The full rule, now written down once:
     - and, not named in plan §4, a trigger that lets only a trusted writer set `pools.crew_id`.
   - **Server:** `lib/crews/` and `app/api/crews/`, plus Activity API v3.
   - **RN:** `mobile/app/profile/crews*`, the create-wizard Crew row, and the pool Info and Members tabs.
-  - **Web:** the dashboard and `app/crews/[crew_id]/page.tsx`.
+  - **Web:** the dashboard and `app/crews/[crew_id]/page.tsx` (8a), then the create modal, Profile →
+    Crews, and the pool Info and admin Members tabs (8b).
 - **Effort:** order of magnitude. These are the plan's own sizings, not a commitment:
 
   | Release | Scope | Size |
   |---|---|---|
   | **RN first** | P1–P5 ✅ and migration 154 ✅, `lib/crews/` + routes ✅, Needs-you crew cards ✅ (a capability flag, not v3), RN screens ✅, seat notice + one reminder ✅ (switched off). All built 2026-10-02 and unpushed. Left: step 8 (delete the concept screen) and step 9 (ship) | **~15 working days** at plan time. **Overtaken:** steps 4–7 were committed in one evening. *Built* means committed and unit-tested. The RN screens have not run against their API, which isn't deployed. The plan sizes steps 8–10 at ~½ day |
   | **Thin web slice, in the same release** | Dashboard *"Keep this group together?"* sheet (plus held seats and invites), basic crew page. ✅ **Built 2026-10-02** (`fc536f65`), unpushed | **~1½ days** at plan time; committed the same evening |
-  | **Web, day two** | Create-modal Crew row + roster review, Profile → Crews tab, captain controls, the pool page's *"Part of…"* line. Web claiming of email invites is already done by 8a. **Under way in the working tree at 21:53, uncommitted, and not recorded** | **~3½ days** |
+  | **Web, day two** | Create-modal Crew row + roster review, Profile → Crews tab, captain controls, the pool page's *"Part of…"* line. Web claiming of email invites is already done by 8a. ~~**Under way in the working tree at 21:53, uncommitted, and not recorded**~~ ✅ **Built 2026-10-02** (`050c0b57`, 22:03), unpushed. *Go Plus* in roster review is not built, as on the app | **~3½ days** at plan time; committed the same evening |
 
   The thin web slice is in the RN release **because the World Cup was played on the web** (see the
   facts below). It was decided by Ryan on 2026-10-02 (plan §9 #8).
-- **Status: 🔨 in progress. Plan steps 1–7 and web 8a built 2026-10-02, cut at `5a1b6ec4`
+- **Status: 🔨 in progress. Plan steps 1–7, web 8a and web 8b built 2026-10-02, cut at
+  `16e9637c` (22:03). Nothing is pushed, so nothing is user-visible.** What remains:
+  1. **R36's fix.** *Confirm email* is confirmed off in production. The fix is Ryan's call, and
+     **none is recorded**. Uncommitted work building direction (b) appeared during the late-night pass
+     (*R36*).
+  2. **Step 8:** delete the concept screen.
+  3. **Step 9, the ship.** As the brief for the late-night pass lists it: push only on Ryan's
+     explicit say-so, deploy the API, verify a new route goes 404→401, schedule the cron, flip
+     `crew_notices_enabled`, then OTA per platform with a clean `git status`.
+     - ⚠ The switch has to be on by the time the API is live. An email invite made while it is off
+       is never emailed and can't be resent (*Where this stands → 2026-10-02, late night → Drift*).
+     - Plan §7 step 9's own list includes neither the cron nor the switch.
+
+  The routes exist in the tree and not on production, and the app reads production. So the RN
+  screens show their error state on a Metro build until the API deploys (plan §7 step 6). See *Build
+  progress* below and *Where this stands → 2026-10-02, late night*.
+- ~~**Status: 🔨 in progress. Plan steps 1–7 and web 8a built 2026-10-02, cut at `5a1b6ec4`
   (21:46). Nothing is pushed, so nothing is user-visible.** Left: 8b (web, day two; under way
-  uncommitted), step 8 and step 9 (ship). Check **R36** before the ship. The routes exist in the
-  tree and not on production, and the app reads production, so the RN screens show their error
-  state on a Metro build until the API deploys (plan §7 step 6). See *Build progress* below and
-  *Where this stands → 2026-10-02, night*.
+  uncommitted), step 8 and step 9 (ship). Check **R36** before the ship.~~ *As it stood at the
+  21:46 cut.*
 - ~~**Status: 🔨 in progress. P1–P5 and plan step 3 (the schema) done 2026-10-02; step 4 under way.**
   Nothing is user-visible. There is no route or screen, and the only live hook (`joinPool`) fires
   only for a pool with a crew, which no pool has.~~ *As it stood at the earlier cut,* `dcc4f7ef` (20:48):
@@ -4277,7 +4443,8 @@ the session that did the work and **not re-queried** by me. I had no production 
 | **Step 5** ✅ | `93eb3ead`, `b3220834` | Crew cards in Activity → Needs you, and the app's *Save as crew* sheet. **Changed from the plan:** a capability flag (`v=2&crews=1`, `app/api/users/[user_id]/activity/route.ts:204`), not v3, so that either deploy order is safe | The flag is in the route. The save sheet states that the pool goes private (`mobile/components/crews/SaveCrewSheet.tsx:167`) | 9 builder tests; live verify 37/37 for all three card kinds |
 | **Step 6** ✅ | `af488e40`, `35533da4`, `576622d8`, `cdfc1307`, `c19f167c` | RN data layer, My Crews, the crew page, Add people, the create flow's Crew row with roster review and the Free cap, and the pool screens' crew line (`GET /api/pools/[pool_id]/crew`) | Screens exist (`mobile/app/profile/crews/index.tsx`, `[id].tsx`). **Never run against their API:** it isn't deployed, and native builds can't run here. *Go Plus* inside the create flow was not built | n/a |
 | **Step 7** ✅ (off) | `6cec6f1c`, `3fb53035`, `5a1b6ec4` | The seat notice, the one reminder and the invite. **Wording approved by Ryan** (*"Copy approved"*, recorded in plan §7, `5a1b6ec4`) | The switch fails closed: no row means no send (`lib/crews/notify.ts:208-212`). No migration writes the row. `/api/cron/crew-notices` skips while off. It is not in `vercel.json` or any repo migration | **Not checked:** production `sync_settings` and `pg_cron` |
-| **8a** ✅ | `fc536f65`, `5a1b6ec4` | Web: the dashboard *Needs you* strip and save dialog, `/crews/[crew_id]`, `lib/crews/words.ts` with a drift test, `/crews` protected, email invites claimed on the dashboard **and** in the Activity route, and the invite email's button to `/dashboard` | Every claim checked in the committed tree (see *Where this stands → 2026-10-02, night*). 233 tests pass on an export of `5a1b6ec4`, and `tsc` gives the R29 baseline only. ⚠ The button change's stated reason is wrong (*Drift*). ⚠ The claim's verified-address guard is **R36** | Seen on localhost on Ryan's real dashboard (dialog opened and cancelled) and a fixture harness |
+| **8a** ✅ | `fc536f65`, `5a1b6ec4` | Web: the dashboard *Needs you* strip and save dialog, `/crews/[crew_id]`, `lib/crews/words.ts` with a drift test, `/crews` protected, email invites claimed on the dashboard **and** in the Activity route, and the invite email's button to `/dashboard` | Every claim checked in the committed tree (see *Where this stands → 2026-10-02, night*). 233 tests pass on an export of `5a1b6ec4`, and `tsc` gives the R29 baseline only. ~~⚠ The button change's stated reason is wrong (*Drift*).~~ ✅ Corrected in `050c0b57` (`lib/crews/notify.ts:114-119`, plan §8a). ⚠ The claim's verified-address guard is **R36** | Seen on localhost on Ryan's real dashboard (dialog opened and cancelled) and a fixture harness |
+| **8b** ✅ | `050c0b57`, `16e9637c` | Web, day two. **Create wizard:** the Crew row (only for someone in a crew), roster review with Done disabled over the Free cap, the *Already playing this* confirm on Next **and** on the step header, a locked *Private* card on Settings, and `crew_id` + `seat_user_ids` posted. **Profile → Crews** (`?tab=crews`). **Crew page captain controls:** rename, the co-captain nudge and chooser, the member menu, *Add people*, *INVITED · WAITING* with *Withdraw*. **Pool page:** *"Part of …"* and the count on Info, names on the admin Members tab. `words.invitePreviewText` owns the preview line | Every claim checked in the tree at `HEAD` (see *Where this stands → 2026-10-02, late night*). Every route the crew page calls exists with that method. 239 tests pass, the private-by-default guard passes 6/6, `tsc` gives the R29 baseline only, and `eslint` shows no error from this commit. ⚠ Not read by any client: `seats_held` from the create route. ⚠ *"Private — crew pools always are"* becomes false when *Pool privacy: three levels* lands. ⚠ *Go Plus* not built | Localhost on Ryan's account with nothing written, and a fixture harness, deleted afterwards. *R36 confirmed* from production `auth.users` (see **R36**) |
 
 **Type-check, corrected.** An earlier report of *"zero web type errors"* for P4 and P5 came from a
 command that never ran (`timeout` is not installed here). `npx tsc --noEmit -p .` really gives **3
@@ -4401,7 +4568,9 @@ HTML but had dropped out of the markdown.)*
       post `pool_code`. So refusing `pool_id` for non-public pools would break **every web invite
       link** unless that page moves to the code first. Verified 2026-10-02. Not resolved here.
     - Any tightening must still let crew members into their crew's pool from the crew page (plan
-      §10).
+      §10). ⚠ *Added 2026-10-02, late night:* the web crew page's *Join* / *I'm in* posts
+      `{ pool_id }` too (`app/crews/[crew_id]/CrewPage.tsx:180`, since 8a). It is a second caller of
+      the bare-`pool_id` path, alongside the invite link.
   - **Crews interaction.** ~~Migration 153's planned `CHECK (crew_id IS NULL OR is_private)`~~
     Crews landed first. Migration **154**'s CHECK `pools_crew_pool_is_private`
     (`crew_id IS NULL OR is_private IS TRUE`, `lib/migrations/154_a_crew_is_who_played.sql:132-133`,
@@ -4409,6 +4578,10 @@ HTML but had dropped out of the markdown.)*
     has to restate *"a crew pool is never Public"* against its new visibility column**, and replace or
     amend that CHECK in the same migration.
   - **The relabel.** Every surface that says "Private" today becomes "Invite link", on web and RN.
+    ⚠ *Added 2026-10-02, late night:* two surfaces do more than use the label. They state a rule:
+    *"Private — crew pools always are"* (`components/pools/CreatePoolModal.tsx:1357`, Crews 8b;
+    `mobile/app/create-pool.tsx:1192`, Crews step 6). Under amended Decision 5, a crew pool defaults
+    to Invite link and may be Private. So that sentence has to be rewritten, not just relabelled.
 - **Not decided, and for this item's design:** what the requester sees after *No*, and whether a
   request expires.
 - **When:** not set. Crews do not wait for it, because a crew pool works today as
