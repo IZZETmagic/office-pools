@@ -46,6 +46,8 @@ export type CrewDetail = {
     poolId: string;
     poolName: string;
     competition: string;
+    leagueSeasonId: string | null;
+    tournamentId: string;
     mode: PoolMode;
     players: number;
     runBy: Person;

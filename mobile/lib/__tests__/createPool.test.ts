@@ -24,6 +24,7 @@ import {
   asksStartMatchweek,
   buildCreatePayload,
   closesInLabel,
+  crewAlreadyPlaying,
   deadlineTitle,
   defaultDeadline,
   defaultStartMatchweek,
@@ -34,6 +35,7 @@ import {
   pairSeasons,
   parseLocalDate,
   quickPicks,
+  seatSelectionProblem,
   selectableCompetitions,
   startMatchweekOptions,
   validateDeadline,
@@ -630,3 +632,50 @@ describe('buildCreatePayload — the start matchweek', () => {
     expect(p.league_start_matchweek).toBeNull()
   })
 })
+
+describe('crews in the create flow', () => {
+  const base = {
+    poolName: 'Five-a-side CL',
+    description: '',
+    leagueMode: 'pickem' as const,
+    leagueDepth: 'results' as const,
+    predictionMode: 'full_tournament' as const,
+    deadline: new Date('2026-10-01T13:00:00Z'),
+    isPrivate: false,
+    maxEntriesPerUser: 1,
+    startMatchweek: null as number | null,
+  }
+
+  it('a crew pool sends the crew and the chosen spots — and is always private', () => {
+    const p = buildCreatePayload({ ...base, competition: pl(), crewId: 'crew-1', seatUserIds: ['a', 'b'] })
+    expect(p).toMatchObject({ crew_id: 'crew-1', seat_user_ids: ['a', 'b'], is_private: true })
+  })
+  it('a pool with no crew sends neither, and keeps the privacy the admin chose', () => {
+    const p = buildCreatePayload({ ...base, competition: pl(), crewId: null })
+    expect(p).not.toHaveProperty('crew_id')
+    expect(p).not.toHaveProperty('seat_user_ids')
+    expect(p.is_private).toBe(false)
+  })
+
+  const playing = [
+    { poolName: 'Office PL', competition: 'Premier League 2026/27', leagueSeasonId: PL_SEASON.season_id, tournamentId: 'placeholder' },
+    { poolName: 'Office WC', competition: 'FIFA World Cup 2026', leagueSeasonId: null, tournamentId: WORLD_CUP.tournament_id },
+  ]
+  it('spots a crew already playing the same league season', () => {
+    expect(crewAlreadyPlaying(playing, pl())?.poolName).toBe('Office PL')
+  })
+  it('spots a crew already playing the same tournament', () => {
+    expect(crewAlreadyPlaying(playing, wc())?.poolName).toBe('Office WC')
+  })
+  it('a different competition is no clash', () => {
+    expect(crewAlreadyPlaying([playing[0]], wc())).toBeNull()
+    expect(crewAlreadyPlaying([], pl())).toBeNull()
+  })
+
+  it('saved spots never exceed what the pool holds', () => {
+    expect(seatSelectionProblem(9, 9)).toBeNull()
+    expect(seatSelectionProblem(40, null)).toBeNull()
+    expect(seatSelectionProblem(13, 9)).toBe('A Free pool holds 10, so 9 can have a saved spot — untick 4 more.')
+  })
+})
+

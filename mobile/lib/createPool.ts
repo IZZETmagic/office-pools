@@ -553,6 +553,10 @@ export type WizardState = {
    * for table mode, and until the options have loaded.
    */
   startMatchweek: number | null
+  /** Crews (154): the crew this pool is a season of, or NULL for no crew. */
+  crewId?: string | null
+  /** Crews: who gets a saved spot. Ignored without a crew. */
+  seatUserIds?: string[]
 }
 
 export type CreatePoolPayload = {
@@ -569,6 +573,9 @@ export type CreatePoolPayload = {
   is_private: boolean
   max_participants: number
   max_entries_per_user: number
+  /** Crews (154). Sent only for a crew pool. */
+  crew_id?: string
+  seat_user_ids?: string[]
 }
 
 /**
@@ -615,12 +622,44 @@ export function buildCreatePayload(state: WizardState): CreatePoolPayload {
     league_start_matchweek: asksStartMatchweek(state.competition, state.leagueMode)
       ? state.startMatchweek
       : null,
-    is_private: state.isPrivate,
+    // ⚠ A crew pool is never listed (Decision 6; 154's CHECK refuses it). The settings step hides
+    // the choice for a crew pool, and this makes sure no stale state sends Public anyway.
+    is_private: state.crewId ? true : state.isPrivate,
     max_participants: 0,
     max_entries_per_user: league
       ? 1
       : Math.max(1, Math.min(10, state.maxEntriesPerUser || 1)),
+    ...(state.crewId ? { crew_id: state.crewId, seat_user_ids: state.seatUserIds ?? [] } : {}),
   }
+}
+
+// ============================================================= crews
+
+/**
+ * Is the crew already playing the competition this pool is for? Decision 2's guard, kept as a
+ * CONFIRM rather than a block (2026-10-02): Pick'em and Last Man Standing on the same season is the
+ * range of formats working, not a mistake — but the starter should know before making a second.
+ */
+export function crewAlreadyPlaying<
+  P extends { poolName: string; competition: string; leagueSeasonId: string | null; tournamentId: string },
+>(playingNow: P[], competition: Pick<Competition, 'tournament_id' | 'league_season_id'>): P | null {
+  return (
+    playingNow.find((p) =>
+      competition.league_season_id
+        ? p.leagueSeasonId === competition.league_season_id
+        : !p.leagueSeasonId && p.tournamentId === competition.tournament_id,
+    ) ?? null
+  )
+}
+
+/**
+ * Saved spots never exceed what the pool holds (decision 7). null when the choice fits; otherwise
+ * the sentence to show — the server refuses the same thing (lib/crews/rules.seatSelectionError).
+ */
+export function seatSelectionProblem(chosen: number, spots: number | null): string | null {
+  if (spots === null || chosen <= spots) return null
+  const over = chosen - spots
+  return `A Free pool holds ${spots + 1}, so ${spots} can have a saved spot — untick ${over} more.`
 }
 
 // ============================================================= start matchweek

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Icon, Input, Text } from '@/components/ui';
+import { RosterReviewSheet, type RosterReviewSheetHandle } from '@/components/crews/RosterReviewSheet';
+import { Button, ConfirmDialog, Icon, Input, Text } from '@/components/ui';
 import { createPool } from '@/lib/api';
 import {
   LEAGUE_DEPTHS,
@@ -47,7 +48,11 @@ import {
   type StartMatchweekOption,
   type TournamentRow,
   type UpcomingLock,
+  crewAlreadyPlaying,
+  seatSelectionProblem,
 } from '@/lib/createPool';
+import { plural, type CrewCard } from '@/lib/crews';
+import { useCrew, useCrewRoster, useMyCrews } from '@/lib/useCrews';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { supabase } from '@/lib/supabase';
 import { hapticFailure, hapticSuccess } from '@/lib/haptics';
@@ -104,6 +109,20 @@ export default function CreatePoolModal() {
   // Step 3
   const [poolName, setPoolName] = useState('');
   const [description, setDescription] = useState('');
+  // Crews (154) — "Name · Crew · Who can join · Create" (Decision 3). No crew is a real answer:
+  // today's share-link pool, and when it ends its admin is offered to keep the group together.
+  const [crewId, setCrewId] = useState<string | null>(null);
+  /** Who gets a saved spot. NULL until the starter changes it — then the roster's defaults apply. */
+  const [seatUserIds, setSeatUserIds] = useState<string[] | null>(null);
+  const [clashConfirmed, setClashConfirmed] = useState(false);
+  const [clashPrompt, setClashPrompt] = useState<string | null>(null);
+  const rosterSheetRef = useRef<RosterReviewSheetHandle | null>(null);
+  const { data: myCrews } = useMyCrews();
+  const { data: crewDetail } = useCrew(crewId);
+  const { data: roster, isLoading: rosterLoading } = useCrewRoster(crewId, 'free');
+  const effectiveSeats = seatUserIds ?? roster?.rows.filter((r) => r.ticked).map((r) => r.userId) ?? [];
+  const seatProblem = crewId ? seatSelectionProblem(effectiveSeats.length, roster?.spots ?? null) : null;
+  const pickedCrew = (myCrews ?? []).find((c) => c.crewId === crewId) ?? null;
 
   // Step 4
   const [deadline, setDeadline] = useState<Date | null>(null);
@@ -289,7 +308,8 @@ export default function CreatePoolModal() {
       case 'pool_type':
         return true; // always has a default selection
       case 'details':
-        return poolName.trim().length > 0;
+        // A crew pool also needs its roster loaded and a choice of saved spots the pool can hold.
+        return poolName.trim().length > 0 && (!crewId || (!!roster && !seatProblem));
       case 'settings':
         // ⬅ 143. A league pool that asks for a start matchweek needs THAT
         // answered, not a date it never shows. `deadline` is still prefilled
@@ -301,7 +321,22 @@ export default function CreatePoolModal() {
 
   function goNext() {
     setError(null);
+    // Decision 2's guard, as a CONFIRM: a crew already playing this competition can start another
+    // game on it (Pick'em and Last Man Standing side by side) — but should know it's doing so.
+    if (step === 'details' && crewId && selected && !clashConfirmed) {
+      const clash = crewAlreadyPlaying(crewDetail?.playingNow ?? [], selected);
+      if (clash) {
+        setClashPrompt(`${pickedCrew?.name ?? 'This crew'} is already playing ${clash.competition} (${clash.poolName}). Start another pool on it?`);
+        return;
+      }
+    }
     if (stepIndex < STEP_ORDER.length - 1) setStep(STEP_ORDER[stepIndex + 1]);
+  }
+
+  function pickCrew(id: string | null) {
+    setCrewId(id);
+    setSeatUserIds(null);
+    setClashConfirmed(false);
   }
 
   function goBack() {
@@ -336,6 +371,8 @@ export default function CreatePoolModal() {
           isPrivate,
           maxEntriesPerUser,
           startMatchweek,
+          crewId,
+          seatUserIds: crewId ? effectiveSeats : [],
         }),
       );
       // Refresh the home dashboard / Pools tab list so the new pool card
@@ -449,6 +486,20 @@ export default function CreatePoolModal() {
               description={description}
               onNameChange={setPoolName}
               onDescriptionChange={setDescription}
+              crews={myCrews ?? []}
+              crewId={crewId}
+              onPickCrew={pickCrew}
+              seatLine={
+                crewId
+                  ? roster
+                    ? `${plural(effectiveSeats.length, 'person gets', 'people get')} a saved spot`
+                    : rosterLoading
+                      ? 'Loading the crew…'
+                      : 'Couldn’t load the crew'
+                  : null
+              }
+              seatProblem={seatProblem}
+              onReviewSeats={() => rosterSheetRef.current?.open(effectiveSeats)}
             />
           ) : null}
 
@@ -478,6 +529,7 @@ export default function CreatePoolModal() {
               onDismissPicker={() => setShowPicker(false)}
               isPrivate={isPrivate}
               onPrivacyChange={setIsPrivate}
+              crewName={pickedCrew?.name ?? null}
               maxEntriesPerUser={maxEntriesPerUser}
               onMaxEntriesChange={setMaxEntriesPerUser}
             />
@@ -494,6 +546,27 @@ export default function CreatePoolModal() {
           onSubmit={handleSubmit}
         />
       </KeyboardAvoidingView>
+
+      <RosterReviewSheet
+        ref={rosterSheetRef}
+        crewName={pickedCrew?.name ?? ''}
+        roster={roster}
+        loading={rosterLoading}
+        onDone={(chosen) => setSeatUserIds(chosen)}
+      />
+      <ConfirmDialog
+        visible={clashPrompt !== null}
+        title="Already playing this"
+        description={clashPrompt ?? ''}
+        confirmLabel="Start another"
+        cancelLabel="Go back"
+        onCancel={() => setClashPrompt(null)}
+        onConfirm={() => {
+          setClashPrompt(null);
+          setClashConfirmed(true);
+          if (stepIndex < STEP_ORDER.length - 1) setStep(STEP_ORDER[stepIndex + 1]);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -875,12 +948,24 @@ function DetailsStep({
   description,
   onNameChange,
   onDescriptionChange,
+  crews,
+  crewId,
+  onPickCrew,
+  seatLine,
+  seatProblem,
+  onReviewSeats,
 }: {
   competition: Competition | null;
   poolName: string;
   description: string;
   onNameChange: (s: string) => void;
   onDescriptionChange: (s: string) => void;
+  crews: CrewCard[];
+  crewId: string | null;
+  onPickCrew: (id: string | null) => void;
+  seatLine: string | null;
+  seatProblem: string | null;
+  onReviewSeats: () => void;
 }) {
   const theme = useTheme();
   const placeholder = competition
@@ -909,6 +994,62 @@ function DetailsStep({
           style={{ minHeight: 96, textAlignVertical: 'top' }}
         />
       </View>
+
+      {/* Crews (154). Only shown to someone in a crew — "No crew" alone is no choice at all. */}
+      {crews.length > 0 ? (
+        <View style={{ gap: theme.spacing.sm }}>
+          <Text variant="cardTitle">Crew</Text>
+          <Text variant="body" color="slate">
+            Pick a crew and they each get a saved spot. No crew is fine — share the link, and when the pool ends you can
+            keep the group together.
+          </Text>
+          {[...crews.map((c) => ({ id: c.crewId as string | null, title: c.name, sub: plural(c.people, 'person', 'people') })), { id: null, title: 'No crew', sub: 'Share a link instead' }].map(
+            (o) => {
+              const on = crewId === o.id;
+              return (
+                <Pressable
+                  key={o.id ?? 'none'}
+                  onPress={() => onPickCrew(o.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.md,
+                    padding: theme.spacing.md,
+                    borderRadius: theme.radii.sm,
+                    borderWidth: 1.5,
+                    borderColor: on ? theme.colors.primary : theme.colors.mist,
+                    backgroundColor: on ? theme.colors.primaryLight : 'transparent',
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>{o.title}</Text>
+                    <Text style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, color: theme.colors.slate }}>{o.sub}</Text>
+                  </View>
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: on ? 6 : 1.5,
+                      borderColor: on ? theme.colors.primary : theme.colors.silver,
+                    }}
+                  />
+                </Pressable>
+              );
+            },
+          )}
+          {crewId && seatLine ? (
+            <Pressable onPress={onReviewSeats} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 }}>
+              <Text style={{ flex: 1, fontFamily: fontFamilies.semibold, fontSize: 13, color: seatProblem ? theme.colors.red : theme.colors.ink }}>
+                {seatProblem ?? seatLine}
+              </Text>
+              <Text style={{ fontFamily: fontFamilies.bold, fontSize: 13, color: theme.colors.primary }}>Review</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -931,6 +1072,7 @@ function SettingsStep({
   onDismissPicker,
   isPrivate,
   onPrivacyChange,
+  crewName,
   maxEntriesPerUser,
   onMaxEntriesChange,
 }: {
@@ -950,6 +1092,8 @@ function SettingsStep({
   onDismissPicker: () => void;
   isPrivate: boolean;
   onPrivacyChange: (b: boolean) => void;
+  /** Set when the pool is a crew's — then it is always private, and the choice is not offered. */
+  crewName: string | null;
   maxEntriesPerUser: number;
   onMaxEntriesChange: (n: number) => void;
 }) {
@@ -1041,6 +1185,20 @@ function SettingsStep({
       </Card>
       )}
 
+      {crewName ? (
+        // ⚠ A crew pool is never listed in Discover (Decision 6; 154's CHECK). Stated, not offered.
+        <Card
+          title="Who can join"
+          description={`Private — crew pools always are. ${crewName} gets saved spots, and anyone you share the link with can join.`}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Icon name="lock.fill" size={14} tint={theme.colors.slate} />
+            <Text variant="body" color="slate">
+              Not listed in Discover
+            </Text>
+          </View>
+        </Card>
+      ) : (
       <Card
         title="Who can join"
         description="Everyone needs the pool code either way. Private also keeps it out of Discover."
@@ -1060,6 +1218,7 @@ function SettingsStep({
           />
         </View>
       </Card>
+      )}
 
       {/* ⚠ NO "MAXIMUM MEMBERS" CARD, and its absence is deliberate.
           Migration 075 records that `pools.max_participants` is "stored,

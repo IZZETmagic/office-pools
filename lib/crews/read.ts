@@ -272,6 +272,9 @@ export type CrewDetail = {
     poolId: string
     poolName: string
     competition: string
+    /** The competition's ids — the create flow's "already playing this?" check compares these. */
+    leagueSeasonId: string | null
+    tournamentId: string
     mode: PoolMode
     players: number
     runBy: Person
@@ -365,6 +368,8 @@ export async function readCrew(admin: Admin, crewId: string, viewerId: string, n
           poolId: p.pool_id,
           poolName: p.pool_name,
           competition: p.competition,
+          leagueSeasonId: p.league_season_id,
+          tournamentId: p.tournament_id,
           mode: { predictionMode: p.prediction_mode, leagueMode: p.league_mode },
           players: playersIn(liveFinishes, p.pool_id),
           runBy: personOf(names, p.admin_user_id),
