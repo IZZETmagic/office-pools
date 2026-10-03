@@ -10,7 +10,6 @@ import { resolveEntryLevel } from '@/lib/entryLevel'
 import { pickBestEntry } from '@/lib/bestEntry'
 import { DashboardClient } from './DashboardClient'
 import { readCrewNeeds } from '@/lib/crews/needs'
-import { claimInvitesFor } from '@/lib/crews/http'
 import type { NeedItem } from '@/lib/activity/needsYou'
 import type { MatchWithResult } from '@/lib/bonusCalculation'
 import type { Team, MatchConductData } from '@/lib/tournament'
@@ -63,13 +62,11 @@ export default async function DashboardPage() {
   if (!userData) redirect('/login')
 
   // Crews → "Needs you" (decision 8: the World Cup groups are on the web). Started here and awaited
-  // at the end so it runs alongside everything below. Email invites are claimed first — someone who
-  // signed up from an invite email lands here, and this is where "Dave added you" has to be waiting.
-  // A crew failure must never take the dashboard down.
+  // at the end so it runs alongside everything below. A crew failure must never take the dashboard
+  // down. (An invite to an address with no account arrives by its emailed link — /crew-invite —
+  // never by matching the address here: email confirmation is off; see migration 155.)
   const crewNeedsPromise: Promise<NeedItem[]> = (async () => {
-    const crewAdmin = createAdminClient()
-    await claimInvitesFor(crewAdmin, userData.user_id, user)
-    return readCrewNeeds(crewAdmin, userData.user_id, Date.now())
+    return readCrewNeeds(createAdminClient(), userData.user_id, Date.now())
   })().catch((err) => {
     console.error('[dashboard] crew needs failed', err)
     return [] as NeedItem[]

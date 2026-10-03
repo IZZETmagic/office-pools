@@ -10,6 +10,7 @@ vi.mock('@/lib/email/topics', () => ({ TOPICS: { POOL_ACTIVITY: 'topic-pool-acti
 import {
   dueNotice,
   dueReminder,
+  inviteLinkUrl,
   invitePreview,
   inviteToAccountCopy,
   inviteToEmailCopy,
@@ -75,16 +76,28 @@ describe('the invite names who asked — once', () => {
   it('to an account: the button lands where the invite can be answered, not the marketing page', () => {
     expect(inviteToAccountCopy(input).email.html).toMatch(/href="[^"]*\/dashboard"/)
   })
-  it('to an address with no account: a sign-up link that carries no email address', () => {
-    const m = inviteToEmailCopy(input)
+  const TOKEN = 'A'.repeat(43)
+  const emailInput = { ...input, inviteUrl: inviteLinkUrl(TOKEN) }
+  it('to an address with no account: the button is the one-time link, and the link is ONLY a token', () => {
+    const m = inviteToEmailCopy(emailInput)
     expect(m.subject).toBe('Dave Okafor asked us to invite you to Bermuda Office')
-    expect(m.html).toMatch(/href="[^"]*\/signup"/)
-    expect(m.html).not.toMatch(/signup\?/)
+    expect(m.html).toContain(`href="${inviteLinkUrl(TOKEN)}"`)
     expect(m.html).toContain('we won’t email you about it again')
+  })
+  it('⚠ the token rides in the fragment — never the path or query, which servers and analytics record', () => {
+    const url = new URL(inviteLinkUrl(TOKEN))
+    expect(url.pathname).toBe('/crew-invite')
+    expect(url.search).toBe('')
+    expect(url.hash).toBe(`#${TOKEN}`)
+  })
+  it('⚠ says to use the BUTTON — not “sign up with this email address”, which proves nothing (R36)', () => {
+    const html = inviteToEmailCopy(emailInput).html
+    expect(html).toContain('Use the button below to sign up')
+    expect(html).not.toContain('with this email address')
   })
   it('the captain is shown the email’s own first line before pressing Invite', () => {
     expect(invitePreview(input)).toBe('Dave Okafor asked us to invite you to Bermuda Office on SportPool…')
-    expect(inviteToEmailCopy(input).html).toContain('Dave Okafor asked us to invite you to <strong>Bermuda Office</strong> on SportPool')
+    expect(inviteToEmailCopy({ ...input, inviteUrl: 'https://x/crew-invite#t' }).html).toContain('Dave Okafor asked us to invite you to <strong>Bermuda Office</strong> on SportPool')
   })
 })
 
@@ -95,7 +108,7 @@ describe('our voice is plural — never “I”', () => {
       allText(seatNoticeCopy(seatInput, NOW)),
       allText(seatReminderCopy(seatInput, NOW)),
       allText(inviteToAccountCopy(input)),
-      inviteToEmailCopy(input).subject + inviteToEmailCopy(input).html,
+      inviteToEmailCopy({ ...input, inviteUrl: 'https://x/crew-invite#t' }).subject + inviteToEmailCopy({ ...input, inviteUrl: 'https://x/crew-invite#t' }).html,
     ]
     for (const t of texts) {
       const prose = t.replace(/<[^>]+>/g, ' ')

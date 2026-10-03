@@ -8,8 +8,9 @@
 //     right one — production has 36 username pairs that differ only by case ("Dave" / "dave").
 //     No prefix search, no suggestions, no list of people you might know.
 //   · An email always answers "Invite sent" — whether or not it has an account. It never reveals who
-//     is on SportPool. Someone without an account gets one invite email and lands in the crew when
-//     they sign up with that (verified) address.
+//     is on SportPool. Someone without an account gets one invite email carrying a one-time link;
+//     whoever opens it can join (migration 155 — never by signing up with the address, which proves
+//     nothing while email confirmation is off).
 // Either way the person taps Join once before they're in.
 
 import { useState } from 'react'

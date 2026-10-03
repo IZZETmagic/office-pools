@@ -1,7 +1,6 @@
 // crewResponse — a store result as an HTTP response.
 
-import { describe, it, expect, vi } from 'vitest'
-vi.mock('../store', () => ({ claimEmailInvites: vi.fn() }))
+import { describe, it, expect } from 'vitest'
 import { crewResponse, readBody } from '../http'
 
 describe('crewResponse', () => {

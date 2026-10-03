@@ -68,7 +68,7 @@ export function PoolSpotsSaved({ poolId }: { poolId: string }) {
         ))}
       </ul>
       <p className="text-[11.5px] leading-4 text-muted">
-        Only you see these names, as the pool’s admin. We send the one reminder — nobody has to chase.
+        Only the pool’s admins see these names. We send the one reminder — nobody has to chase.
       </p>
     </div>
   )

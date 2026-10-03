@@ -12,11 +12,14 @@
 
 import type { createAdminClient } from '@/lib/supabase/server'
 import { joinPool } from '@/lib/pools/join'
+import { hashInviteToken, looksLikeInviteToken } from './inviteToken'
 import {
+  CLAIM_BLOCK_TEXT,
   canManage,
   canRejoin,
   canRemove,
   canSetCoCaptain,
+  claimBlock,
   cleanCrewName,
   inviteBlock,
   inviteRateLimit,
@@ -25,6 +28,7 @@ import {
   offersCrewSave,
   seatState,
   successionAfter,
+  type ClaimBlock,
   type CrewMember,
   type CrewRole,
 } from './rules'
@@ -476,39 +480,127 @@ export async function revokeInvite(admin: Admin, p: { actorId: string; inviteId:
   return error ? fail(500, error.message) : { ok: true }
 }
 
-/**
- * Email invites wait for an account. When someone signs in with a VERIFIED address, any open invite
- * to that address becomes theirs. ⚠ Verified only — otherwise someone could register the address
- * first and land in a crew. Called lazily from the crew readers, so there is no sign-up hook to miss.
- */
-export async function claimEmailInvites(
-  admin: Admin,
-  p: { userId: string; email: string | null | undefined; emailVerified: boolean },
-): Promise<number> {
-  if (!p.emailVerified || !p.email) return 0
-  const email = p.email.trim().toLowerCase()
-  const { data: open } = await admin
-    .from('crew_invites')
-    .select('invite_id, crew_id')
-    .eq('invitee_email', email)
-    .is('resolved_at', null)
-  let claimed = 0
-  for (const inv of open ?? []) {
-    const { error } = await admin
-      .from('crew_invites')
-      .update({ invitee_user_id: p.userId, invitee_email: null })
-      .eq('invite_id', inv.invite_id)
-    if (!error) {
-      claimed++
-    } else {
-      // Already holds an open invite to this crew by user_id — the email copy is redundant.
-      await admin
-        .from('crew_invites')
-        .update({ resolved_at: new Date().toISOString(), resolution: 'revoked' })
-        .eq('invite_id', inv.invite_id)
+// ── The one-time link (migration 155) ───────────────────────────────────────────────────────────
+//
+// ⚠ An invite to an address with no account is NOT claimed by signing up with that address. 154
+// did that "against a verified address", but production has email confirmation off — every address
+// is "verified" at sign-up — so whoever registered an invited address first would have taken the
+// invite (R36). The email carries a one-time link instead, and the invite goes to whoever opens it.
+
+export type InviteLinkView =
+  | { state: 'invalid' }
+  | { state: 'used' }
+  | { state: 'closed' }
+  | {
+      state: 'open'
+      crewName: string
+      inviter: string
+      people: number
+      /** Why the signed-in viewer can't take it; null when they can (or nobody is signed in). */
+      block: ClaimBlock | null
     }
+
+async function inviteByToken(admin: Admin, token: unknown) {
+  if (!looksLikeInviteToken(token)) return null
+  const { data } = await admin
+    .from('crew_invites')
+    .select('invite_id, crew_id, invited_by, invitee_email, resolved_at')
+    .eq('token_hash', hashInviteToken(token))
+    .maybeSingle()
+  return data as { invite_id: string; crew_id: string; invited_by: string | null; invitee_email: string | null; resolved_at: string | null } | null
+}
+
+/** What the link's page shows. Says nothing the email didn't: who asked, which crew, how many. */
+export async function readInviteLink(admin: Admin, p: { token: unknown; viewerId: string | null }): Promise<InviteLinkView> {
+  const inv = await inviteByToken(admin, p.token)
+  if (!inv) return { state: 'invalid' }
+  if (inv.resolved_at) return { state: 'used' }
+  const crew = await loadCrew(admin, inv.crew_id)
+  if (!crew || crew.closed_at) return { state: 'closed' }
+  const members = await loadMembers(admin, inv.crew_id)
+  const { data: inviter } = inv.invited_by
+    ? await admin.from('users').select('full_name, username').eq('user_id', inv.invited_by).maybeSingle()
+    : { data: null as { full_name: string | null; username: string } | null }
+  return {
+    state: 'open',
+    crewName: crew.name,
+    inviter: inviter?.full_name?.trim() || inviter?.username || 'Someone',
+    people: members.filter((m) => m.left_at === null).length,
+    block: p.viewerId
+      ? claimBlock({ isInviter: inv.invited_by === p.viewerId, member: members.find((m) => m.user_id === p.viewerId) ?? null })
+      : null,
   }
-  return claimed
+}
+
+/**
+ * Join / No thanks from the link's page. The invite becomes the signed-in person's and is answered
+ * in ONE conditional update — the claim is the lock: of two people opening the same link at once,
+ * exactly one gets it. The token is cleared in the same write, so the link works once.
+ */
+export async function claimInviteByToken(
+  admin: Admin,
+  p: { userId: string; token: unknown; answer: 'join' | 'decline' },
+): Promise<CrewResult<{ crewId: string }>> {
+  const inv = await inviteByToken(admin, p.token)
+  if (!inv) return fail(404, 'This invite link isn’t valid.')
+  if (inv.resolved_at) return fail(409, 'This invite has already been used or withdrawn.')
+  const crew = await loadCrew(admin, inv.crew_id)
+  if (!crew || crew.closed_at) return fail(409, 'This crew has closed.')
+  const members = await loadMembers(admin, inv.crew_id)
+  const existing = members.find((m) => m.user_id === p.userId) ?? null
+  const block = claimBlock({ isInviter: inv.invited_by === p.userId, member: existing })
+  if (block) return fail(block === 'already_member' ? 409 : 403, CLAIM_BLOCK_TEXT[block], block)
+
+  const now = new Date().toISOString()
+  const { data: claimed, error } = await admin
+    .from('crew_invites')
+    .update({
+      invitee_user_id: p.userId,
+      invitee_email: null,
+      token_hash: null,
+      resolved_at: now,
+      resolution: p.answer === 'join' ? 'joined' : 'declined',
+    })
+    .eq('invite_id', inv.invite_id)
+    .is('resolved_at', null)
+    .select('invite_id')
+  if (error) return fail(500, error.message)
+  if (!claimed || claimed.length === 0) return fail(409, 'This invite has already been used or withdrawn.')
+  if (p.answer === 'decline') return { ok: true, crewId: inv.crew_id }
+
+  const joined = await joinByInvite(admin, { crewId: inv.crew_id, userId: p.userId, existing, now })
+  if (!joined.ok) {
+    // Hand the invite back exactly as it was, so the link still works for a second try.
+    await admin
+      .from('crew_invites')
+      .update({ invitee_user_id: null, invitee_email: inv.invitee_email, token_hash: hashInviteToken(p.token as string), resolved_at: null, resolution: null })
+      .eq('invite_id', inv.invite_id)
+    return joined
+  }
+  // Any other open invite they had to this crew (say, by username) is answered by this one.
+  await admin
+    .from('crew_invites')
+    .update({ resolved_at: now, resolution: 'joined' })
+    .eq('crew_id', inv.crew_id)
+    .eq('invitee_user_id', p.userId)
+    .is('resolved_at', null)
+  return { ok: true, crewId: inv.crew_id }
+}
+
+/** Into the crew by an invite: a new member row, or an old one (left or removed) made active. */
+async function joinByInvite(
+  admin: Admin,
+  p: { crewId: string; userId: string; existing: CrewMember | null; now: string },
+): Promise<CrewResult> {
+  if (isActive(p.existing)) return { ok: true }
+  const { error } = p.existing
+    ? await admin
+        .from('crew_members')
+        .update({ left_at: null, left_reason: null, role: 'member', joined_via: 'invite', joined_at: p.now })
+        .eq('crew_id', p.crewId)
+        .eq('user_id', p.userId)
+    : await admin.from('crew_members').insert({ crew_id: p.crewId, user_id: p.userId, role: 'member', joined_via: 'invite' })
+  return error ? fail(500, error.message) : { ok: true }
 }
 
 /** "Dave added you to Bermuda Office" → Join / No thanks. One tap, once. */
@@ -534,16 +626,8 @@ export async function answerInvite(
   if (!crew || crew.closed_at) return fail(409, 'This crew has closed.')
   const members = await loadMembers(admin, inv.crew_id)
   const existing = members.find((m) => m.user_id === p.userId) ?? null
-  if (!isActive(existing)) {
-    const { error } = existing
-      ? await admin
-          .from('crew_members')
-          .update({ left_at: null, left_reason: null, role: 'member', joined_via: 'invite', joined_at: now })
-          .eq('crew_id', inv.crew_id)
-          .eq('user_id', p.userId)
-      : await admin.from('crew_members').insert({ crew_id: inv.crew_id, user_id: p.userId, role: 'member', joined_via: 'invite' })
-    if (error) return fail(500, error.message)
-  }
+  const joined = await joinByInvite(admin, { crewId: inv.crew_id, userId: p.userId, existing, now })
+  if (!joined.ok) return joined
   await admin.from('crew_invites').update({ resolved_at: now, resolution: 'joined' }).eq('invite_id', p.inviteId)
   return { ok: true, crewId: inv.crew_id }
 }

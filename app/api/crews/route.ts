@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { listMyCrews } from '@/lib/crews/read'
 import { createCrew, saveCrewFromPool } from '@/lib/crews/store'
-import { claimInvitesFor, crewResponse, readBody } from '@/lib/crews/http'
+import { crewResponse, readBody } from '@/lib/crews/http'
 
 // GET  — My Crews: the groups you're in. Never a list of people.
 // POST — { name }            create a crew directly (you're captain)
@@ -12,7 +12,6 @@ export async function GET() {
   const auth = await requireAuth()
   if (auth.error) return auth.error
   const admin = createAdminClient()
-  await claimInvitesFor(admin, auth.data.userData.user_id, auth.data.user)
   const crews = await listMyCrews(admin, auth.data.userData.user_id, Date.now())
   return NextResponse.json({ crews })
 }

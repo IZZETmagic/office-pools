@@ -14,7 +14,8 @@
 //   · ONE reminder, and the email says so. Nothing ever tells anyone who HASN'T taken a spot.
 //   · Lock times are RELATIVE ("in 3 days"): an email can't know the reader's timezone, and an
 //     absolute time in the wrong zone is a promise we'd break.
-//   · No personal data in any URL — the sign-up link carries no email address.
+//   · No personal data in any URL — the invite link carries an opaque one-time token (155), never
+//     the address and never the invite id.
 //
 // Disclosure gate, as one tooltip: "When your crew starts a pool we save you a spot and tell you
 // once; if it's still open about a day before picks lock we remind you once. That's all."
@@ -29,11 +30,19 @@ import { brandedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { sendPushToUser } from '@/lib/push/apns'
 import { modeLabel } from './needs'
+import { newInviteToken } from './inviteToken'
 import { invitePreviewText } from './words'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
+
+/**
+ * The page a one-time invite link opens (app/crew-invite). ⚠ The token rides in the FRAGMENT: a
+ * browser never sends it to a server, so it stays out of access logs and out of the page-view data
+ * Google Tag Manager collects — which a token in the path or query would not.
+ */
+export const inviteLinkUrl = (token: string) => `${APP_URL}/crew-invite#${token}`
 
 /** The reminder goes out when picks lock within this window — "about a day". */
 export const REMINDER_WINDOW_MS = 24 * 3_600_000
@@ -142,10 +151,12 @@ export function inviteToAccountCopy(i: InviteCopyInput): Message {
 }
 
 /**
- * To an address with no account: ONE email. They land in the crew when they sign up with this
- * address and verify it, then tap Join once. ⚠ No email address in the link.
+ * To an address with no account: ONE email, carrying the invite's one-time link (migration 155).
+ * The link IS the invite: whoever opens it — signing up on the way if they need to — can Join. Not
+ * the address they sign up with: email confirmation is off, so an address proves nothing (R36).
+ * ⚠ Only the opaque token is in the link — no email address, no invite id.
  */
-export function inviteToEmailCopy(i: InviteCopyInput): { subject: string; html: string } {
+export function inviteToEmailCopy(i: InviteCopyInput & { inviteUrl: string }): { subject: string; html: string } {
   return {
     subject: `${i.inviter} asked us to invite you to ${i.crewName}`,
     html: brandedTemplate({
@@ -153,11 +164,11 @@ export function inviteToEmailCopy(i: InviteCopyInput): { subject: string; html: 
       heading: `You’re invited to ${esc(i.crewName)}`,
       body: `
         ${paragraph(`${esc(i.inviter)} asked us to invite you to <strong>${esc(i.crewName)}</strong> on SportPool, where groups of friends predict the football together, season after season.`)}
-        ${paragraph(`Sign up with this email address and you’ll find the invite waiting — tap Join once and you’re in.`)}
+        ${paragraph(`Use the button below to sign up and you’ll find the invite waiting — tap Join once and you’re in.`)}
         ${paragraph(`<span style="color:#7B87A8;font-size:13px">If you weren’t expecting this, you can ignore it — we won’t email you about it again.</span>`)}
       `,
       ctaText: 'Sign up',
-      ctaUrl: `${APP_URL}/signup`,
+      ctaUrl: i.inviteUrl,
       // Not a subscriber, so no notification-settings footer to point at.
       footer: 'none',
     }),
@@ -332,7 +343,19 @@ export async function sendInviteNotice(admin: Admin, inviteId: string): Promise<
     if (inv.invitee_user_id) {
       await deliver(admin, inv.invitee_user_id, inviteToAccountCopy(input), { type: 'crew_invite', crewId: inv.crew_id })
     } else if (inv.invitee_email) {
-      const m = inviteToEmailCopy(input)
+      // Arm the one-time link (155). Only its hash is stored; the token itself goes out in this one
+      // email and nowhere else. Conditional on the invite still being open and still to an address,
+      // so a withdrawal that raced the send can't be re-armed.
+      const { token, hash } = newInviteToken()
+      const { data: armed } = await admin
+        .from('crew_invites')
+        .update({ token_hash: hash })
+        .eq('invite_id', inviteId)
+        .is('resolved_at', null)
+        .is('invitee_user_id', null)
+        .select('invite_id')
+      if (!armed || armed.length === 0) return
+      const m = inviteToEmailCopy({ ...input, inviteUrl: inviteLinkUrl(token) })
       await sendEmail({ to: inv.invitee_email, subject: m.subject, html: m.html })
     }
   } catch (e) {

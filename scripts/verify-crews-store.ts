@@ -8,6 +8,9 @@
 // (test_user_01…04 — never a real person), on a crew with NO pools, and deletes it afterwards
 // (everything crew-side cascades from crews).
 //
+// The one-time email link (155) is walked too: armed by hand (the send switch is off), claimed by
+// test_user_04, spent.
+//
 // ⚠ What it deliberately does NOT do: attach the crew to a pool (pools.crew_id is set once and can
 // never be cleared — 154), or TAKE a seat (that would add a test account to a real pool). A seat is
 // declined against a real running pool's first lock, which writes only crew_seats.
@@ -45,10 +48,12 @@ import { createAdminClient } from '../lib/supabase/server'
 import {
   answerInvite,
   answerSeat,
+  claimInviteByToken,
   createCrew,
   inviteToCrew,
   leaveCrew,
   lookupUsername,
+  readInviteLink,
   removeMember,
   rejoinCrew,
   renameCrew,
@@ -56,6 +61,7 @@ import {
 } from '../lib/crews/store'
 import { listMyCrews, readCrew, readRoster } from '../lib/crews/read'
 import { readCrewNeeds } from '../lib/crews/needs'
+import { newInviteToken } from '../lib/crews/inviteToken'
 
 const admin = createAdminClient()
 const U = (n: number) => `a0000000-0000-0000-0000-00000000000${n}` // test_user_01…
@@ -133,6 +139,39 @@ async function main() {
     check('readCrew: the co-captain sees invites too', Array.isArray(asTwo?.invites))
     const cards = await listMyCrews(admin, TWO, Date.now())
     check('listMyCrews: quiet, two people, no seasons', cards.some((c) => c.crewId === crewId && c.people === 2 && c.seasons === 0 && c.status.kind === 'quiet'), cards.find((c) => c.crewId === crewId))
+
+    console.log('\nthe one-time link (155)')
+    // What notify.sendInviteNotice does as it sends. The send switch is off, so armed by hand — the
+    // same conditional update, on the open invite to the unknown address.
+    const { token, hash } = newInviteToken()
+    const { data: armed } = await admin
+      .from('crew_invites')
+      .update({ token_hash: hash })
+      .eq('crew_id', crewId)
+      .eq('invitee_email', unknown)
+      .is('resolved_at', null)
+      .is('invitee_user_id', null)
+      .select('invite_id')
+    check('the email invite is armed with a hash', armed?.length === 1, armed)
+    const { error: accountArm } = await admin.from('crew_invites').update({ token_hash: newInviteToken().hash }).eq('crew_id', crewId).eq('invitee_user_id', THREE)
+    check('an invite to an ACCOUNT can never carry a link (155 CHECK)', !!accountArm, accountArm?.message)
+    const link = await readInviteLink(admin, { token, viewerId: null })
+    check('the link shows who asked, which crew, how many', link.state === 'open' && link.crewName.startsWith('Verify crew') && link.people === 2, link)
+    const asSender = await readInviteLink(admin, { token, viewerId: CAP })
+    check('…and tells the sender it isn’t theirs', asSender.state === 'open' && asSender.block === 'own_invite', asSender)
+    check('the sender can’t claim it', !(await claimInviteByToken(admin, { userId: CAP, token, answer: 'join' })).ok)
+    const claimed = await claimInviteByToken(admin, { userId: FOUR, token, answer: 'join' })
+    check('whoever opens it, signed in, joins', claimed.ok, claimed)
+    const { data: row } = await admin
+      .from('crew_invites')
+      .select('invitee_user_id, invitee_email, token_hash, resolution')
+      .eq('invite_id', armed?.[0]?.invite_id ?? '')
+      .maybeSingle()
+    check('…the invite is theirs, answered, the link spent', row?.invitee_user_id === FOUR && row.invitee_email === null && row.token_hash === null && row.resolution === 'joined', row)
+    check('the link works once', !(await claimInviteByToken(admin, { userId: THREE, token, answer: 'join' })).ok)
+    check('…and now reads as not valid', (await readInviteLink(admin, { token, viewerId: null })).state === 'invalid')
+    check('the joiner is in the crew', (await readCrew(admin, crewId, FOUR, Date.now()))?.viewer.active === true)
+    check('…and leaves again, so the rest of this run is unchanged', (await leaveCrew(admin, { crewId, userId: FOUR })).ok)
     const roster = await readRoster(admin, { crewId, starterId: CAP, tier: 'free', now: Date.now() })
     check('readRoster: everyone but the starter, Free saves 9', roster?.rows.length === 1 && roster?.spots === 9 && roster?.memberCap === 10, roster)
 

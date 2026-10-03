@@ -9,6 +9,7 @@ import {
   canRejoin,
   canRemove,
   canSetCoCaptain,
+  claimBlock,
   cleanCrewName,
   inviteBlock,
   inviteRateLimit,
@@ -232,5 +233,23 @@ describe('"Keep this group together?" is offered only when it makes sense', () =
     expect(offersCrewSave({ ...base, brandSlug: 'acme' })).toBe(false)
     expect(offersCrewSave({ ...base, dismissedAt: '2026-08-01' })).toBe(false)
     expect(offersCrewSave({ ...base, players: 1 })).toBe(false)
+  })
+})
+
+describe('opening an invite’s one-time link (155)', () => {
+  it('anyone holding the link can take it — including someone who once said No thanks', () => {
+    expect(claimBlock({ isInviter: false, member: null })).toBeNull()
+  })
+  it('someone who left can come back through it', () => {
+    expect(claimBlock({ isInviter: false, member: m('u', 'member', '2026-06-01', 'left') })).toBeNull()
+  })
+  it('the sender can’t take their own invite', () => {
+    expect(claimBlock({ isInviter: true, member: m('u', 'captain', '2026-06-01') })).toBe('own_invite')
+  })
+  it('a member already in is told so (and the link stays good for whoever it was meant for)', () => {
+    expect(claimBlock({ isInviter: false, member: m('u', 'member', '2026-06-01') })).toBe('already_member')
+  })
+  it('⚠ a forwarded link never brings back someone a captain removed', () => {
+    expect(claimBlock({ isInviter: false, member: m('u', 'member', '2026-06-01', 'removed') })).toBe('removed')
   })
 })

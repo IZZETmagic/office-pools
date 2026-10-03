@@ -167,6 +167,36 @@ export function inviteBlock(p: {
   return null
 }
 
+export type ClaimBlock =
+  | 'own_invite' // the person who sent it
+  | 'already_member' // already in the crew — the invite stays open for whoever it was meant for
+  | 'removed' // a captain took them out; a forwarded link must not undo that
+
+/**
+ * Can this signed-in person take the invite behind a one-time link (migration 155)?
+ *
+ * The link is the proof — whoever can read the inbox it went to — so a link can be forwarded, and
+ * that is the invitee's call. Two things it must never do: let the sender claim their own invite,
+ * or bring back someone a captain removed (exits stick; the removed come back only when a captain
+ * adds THEM). A "No thanks" to this crew in the past is NOT a block: opening the link and pressing
+ * Join is a fresh yes. Neither block consumes the invite.
+ */
+export function claimBlock(p: {
+  isInviter: boolean
+  member: Pick<CrewMember, 'left_at' | 'left_reason'> | null
+}): ClaimBlock | null {
+  if (p.isInviter) return 'own_invite'
+  if (isActive(p.member)) return 'already_member'
+  if (p.member?.left_reason === 'removed') return 'removed'
+  return null
+}
+
+export const CLAIM_BLOCK_TEXT: Record<ClaimBlock, string> = {
+  own_invite: 'This invite is for the person you asked us to invite.',
+  already_member: 'You’re already in this crew.',
+  removed: 'You can’t join this crew with this invite.',
+}
+
 /** Generous for a real group, useless for spam (plan §5). */
 export const INVITE_LIMITS = { openPerCrew: 20, perActorPerDay: 50 } as const
 

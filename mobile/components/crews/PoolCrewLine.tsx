@@ -85,7 +85,7 @@ export function PoolSpotsSaved({ poolId }: { poolId: string }) {
         </View>
       ))}
       <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, lineHeight: 16, color: theme.colors.slate }}>
-        Only you see these names, as the pool’s admin. We send the one reminder — nobody has to chase.
+        Only the pool’s admins see these names. We send the one reminder — nobody has to chase.
       </RNText>
     </View>
   );

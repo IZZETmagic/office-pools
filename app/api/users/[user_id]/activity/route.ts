@@ -17,7 +17,6 @@ import {
 import { pageWeeks, slicePage } from '@/lib/activity/page'
 import { sortNeeds, type ActivityLink, type NeedItem } from '@/lib/activity/needsYou'
 import { readCrewNeeds } from '@/lib/crews/needs'
-import { claimInvitesFor } from '@/lib/crews/http'
 import { activityApiVersion } from '@/lib/activity/version'
 
 // =============================================================
@@ -966,13 +965,6 @@ async function handleGET(
     }),
     adminClient.from('user_activity_seen').select('seen_at').eq('user_id', user_id).maybeSingle(),
   ])
-  // Email invites wait for an account and are claimed lazily, on a read (lib/crews/http.ts). This is
-  // the read a person who just signed up in the app makes first, so "Dave added you" is waiting in
-  // Needs you rather than only once they find My Crews. Only for the caller's OWN feed — the claim
-  // matches the signed-in address, never a super admin's when they inspect someone else's.
-  if (withCrews && !before && userData.user_id === user_id) {
-    await claimInvitesFor(adminClient, user_id, auth.data.user)
-  }
   const crewNeeds =
     withCrews && !before
       ? await readCrewNeeds(adminClient, user_id, now).catch((err) => {

@@ -7,16 +7,18 @@ const joinPool = vi.fn()
 vi.mock('@/lib/pools/join', () => ({ joinPool: (...a: unknown[]) => joinPool(...a) }))
 
 import { fakeDb } from './fakeDb'
+import { hashInviteToken, newInviteToken } from '../inviteToken'
 import {
   answerInvite,
   answerSeat,
-  claimEmailInvites,
+  claimInviteByToken,
   createCrew,
   inviteToCrew,
   leaveAllCrews,
   leaveCrew,
   lookupUsername,
   onCrewPoolJoined,
+  readInviteLink,
   rejoinCrew,
   removeMember,
   saveCrewFromPool,
@@ -222,13 +224,81 @@ describe('adding people — a lookup, and an email never reveals an account', ()
     const sent = await inviteToCrew(db.client, { actorId: 'cap', crewId: 'c1', userId: 'mia' })
     expect(await answerInvite(db.client, { userId: 'm1', inviteId: (sent as { inviteId: string }).inviteId, answer: 'join' })).toMatchObject({ status: 404 })
   })
+})
 
-  it('an email invite is claimed only against a verified address', async () => {
-    const db = fakeDb({ crew_invites: [{ invite_id: 'i1', crew_id: 'c1', invitee_user_id: null, invitee_email: 'new@person.org', resolved_at: null, resolution: null }] })
-    expect(await claimEmailInvites(db.client, { userId: 'newbie', email: 'New@Person.org', emailVerified: false })).toBe(0)
-    expect(db.tables.crew_invites[0].invitee_user_id).toBeNull()
-    expect(await claimEmailInvites(db.client, { userId: 'newbie', email: 'New@Person.org', emailVerified: true })).toBe(1)
-    expect(db.tables.crew_invites[0]).toMatchObject({ invitee_user_id: 'newbie', invitee_email: null })
+describe('an email invite is claimed by its one-time link — never by a matching address (155, R36)', () => {
+  const { token, hash } = newInviteToken()
+  const seed = (invite: Record<string, unknown> = {}) => ({
+    crews: [crew()],
+    crew_members: [member('cap', 'captain'), member('m1', 'member'), member('out', 'member', '2026-06-01', 'removed'), member('gone', 'member', '2026-06-01', 'left')],
+    crew_invites: [
+      { invite_id: 'i1', crew_id: 'c1', invited_by: 'cap', invitee_user_id: null, invitee_email: 'new@person.org', token_hash: hash, resolved_at: null, resolution: null, ...invite },
+    ],
+    users: [{ user_id: 'cap', username: 'cap', full_name: 'Dave Okafor' }],
+  })
+
+  it('whoever opens the link and presses Join is in — and the link is spent', async () => {
+    const db = fakeDb(seed())
+    expect(await claimInviteByToken(db.client, { userId: 'newbie', token, answer: 'join' })).toEqual({ ok: true, crewId: 'c1' })
+    expect(db.tables.crew_members.find((m) => m.user_id === 'newbie')).toMatchObject({ role: 'member', joined_via: 'invite', left_at: null })
+    expect(db.tables.crew_invites[0]).toMatchObject({ invitee_user_id: 'newbie', invitee_email: null, token_hash: null, resolution: 'joined' })
+    expect(await claimInviteByToken(db.client, { userId: 'someone-else', token, answer: 'join' })).toMatchObject({ ok: false, status: 404 })
+  })
+  it('No thanks spends it too, and adds nobody', async () => {
+    const db = fakeDb(seed())
+    expect(await claimInviteByToken(db.client, { userId: 'newbie', token, answer: 'decline' })).toMatchObject({ ok: true })
+    expect(db.tables.crew_invites[0]).toMatchObject({ invitee_user_id: 'newbie', token_hash: null, resolution: 'declined' })
+    expect(db.tables.crew_members.find((m) => m.user_id === 'newbie')).toBeUndefined()
+  })
+  it('a wrong, malformed or missing token finds nothing — and the store only ever looks up a HASH', async () => {
+    const db = fakeDb(seed())
+    for (const t of [newInviteToken().token, 'short', hash, undefined, 42]) {
+      expect(await claimInviteByToken(db.client, { userId: 'newbie', token: t, answer: 'join' })).toMatchObject({ ok: false, status: 404 })
+    }
+    expect(db.tables.crew_invites[0].resolved_at).toBeNull()
+  })
+  it('a withdrawn invite’s link does nothing', async () => {
+    const db = fakeDb(seed({ resolved_at: '2026-10-01', resolution: 'revoked' }))
+    expect(await claimInviteByToken(db.client, { userId: 'newbie', token, answer: 'join' })).toMatchObject({ ok: false, status: 409 })
+  })
+  it('the sender can’t take their own invite; a member is told they’re in; neither spends the link', async () => {
+    const db = fakeDb(seed())
+    expect(await claimInviteByToken(db.client, { userId: 'cap', token, answer: 'join' })).toMatchObject({ status: 403, reason: 'own_invite' })
+    expect(await claimInviteByToken(db.client, { userId: 'm1', token, answer: 'join' })).toMatchObject({ status: 409, reason: 'already_member' })
+    expect(db.tables.crew_invites[0]).toMatchObject({ token_hash: hash, resolved_at: null })
+  })
+  it('⚠ a forwarded link can’t bring back someone a captain removed — but someone who left can come back', async () => {
+    const db = fakeDb(seed())
+    expect(await claimInviteByToken(db.client, { userId: 'out', token, answer: 'join' })).toMatchObject({ status: 403, reason: 'removed' })
+    expect(await claimInviteByToken(db.client, { userId: 'gone', token, answer: 'join' })).toMatchObject({ ok: true })
+    expect(db.tables.crew_members.find((m) => m.user_id === 'gone')).toMatchObject({ left_at: null, joined_via: 'invite' })
+  })
+  it('joining by link also answers any other open invite they had to the crew', async () => {
+    const db = fakeDb(seed())
+    db.tables.crew_invites.push({ invite_id: 'i2', crew_id: 'c1', invited_by: 'cap', invitee_user_id: 'newbie', invitee_email: null, resolved_at: null, resolution: null })
+    await claimInviteByToken(db.client, { userId: 'newbie', token, answer: 'join' })
+    expect(db.tables.crew_invites.find((i) => i.invite_id === 'i2')).toMatchObject({ resolution: 'joined' })
+  })
+  it('a closed crew can’t be joined by its link', async () => {
+    const db = fakeDb(seed())
+    db.tables.crews[0].closed_at = '2026-10-01'
+    expect(await claimInviteByToken(db.client, { userId: 'newbie', token, answer: 'join' })).toMatchObject({ status: 409 })
+  })
+
+  it('the link’s page says only what the email said — and why a signed-in viewer can’t take it', async () => {
+    const db = fakeDb(seed())
+    expect(await readInviteLink(db.client, { token, viewerId: null })).toEqual({
+      state: 'open', crewName: 'Bermuda Office', inviter: 'Dave Okafor', people: 2, block: null,
+    })
+    expect(await readInviteLink(db.client, { token, viewerId: 'out' })).toMatchObject({ block: 'removed' })
+    expect(await readInviteLink(db.client, { token: 'nope', viewerId: null })).toEqual({ state: 'invalid' })
+    await claimInviteByToken(db.client, { userId: 'newbie', token, answer: 'join' })
+    expect(await readInviteLink(db.client, { token, viewerId: null })).toEqual({ state: 'invalid' })
+  })
+  it('a used link reads as used while its row still holds the hash', async () => {
+    const db = fakeDb(seed({ resolved_at: '2026-10-01', resolution: 'revoked' }))
+    expect(await readInviteLink(db.client, { token, viewerId: null })).toEqual({ state: 'used' })
+    expect(hashInviteToken(token)).toBe(hash)
   })
 })
 
