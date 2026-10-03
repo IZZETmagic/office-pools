@@ -7,7 +7,7 @@ import {
 } from '@/lib/testerGate'
 
 // Routes that require authentication
-const protectedRoutes = ['/dashboard', '/pools', '/profile', '/join']
+const protectedRoutes = ['/dashboard', '/pools', '/profile', '/join', '/crews']
 
 // Routes that authenticated users should be redirected away from
 const authRoutes = ['/', '/login', '/signup', '/forgot-password']

@@ -72,6 +72,9 @@ describe('the invite names who asked — once', () => {
     expect(m.email.html).toContain('No thanks')
     expect(m.email.html).toContain('the only email about this invite')
   })
+  it('to an account: the button lands where the invite can be answered, not the marketing page', () => {
+    expect(inviteToAccountCopy(input).email.html).toMatch(/href="[^"]*\/dashboard"/)
+  })
   it('to an address with no account: a sign-up link that carries no email address', () => {
     const m = inviteToEmailCopy(input)
     expect(m.subject).toBe('Dave Okafor asked us to invite you to Bermuda Office')

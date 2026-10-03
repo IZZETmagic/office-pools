@@ -20,6 +20,8 @@ import { shortClubName } from '@/lib/league/clubName'
 import { PoolCard, PoolStripCard } from '@/components/pools/PoolCard'
 import { byAttention } from '@/lib/pools/card'
 import type { PoolCardMember } from '@/lib/pools/card'
+import { CrewNeedsStrip } from '@/components/crews/CrewNeedsStrip'
+import type { NeedItem } from '@/lib/activity/needsYou'
 
 // =====================
 // TYPES
@@ -146,6 +148,8 @@ type LiveMatch = UpcomingMatch & {
 
 type DashboardClientProps = {
   user: { user_id: string; username: string; full_name: string; is_super_admin?: boolean }
+  /** Crew decisions waiting on this person (lib/crews/needs.ts). Empty → no strip. */
+  crewNeeds: NeedItem[]
   pools: PoolCardData[]
   liveMatches: LiveMatch[]
   upcomingMatches: UpcomingMatch[]
@@ -467,6 +471,7 @@ function ActivityList({
 // =====================
 export function DashboardClient({
   user,
+  crewNeeds,
   pools,
   liveMatches,
   upcomingMatches,
@@ -580,6 +585,9 @@ export function DashboardClient({
       </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+
+        {/* Crew decisions first: each one is a single tap, and a saved spot has a clock. */}
+        <CrewNeedsStrip items={crewNeeds} />
 
         {/* My Pools section */}
         <div className="mb-8">

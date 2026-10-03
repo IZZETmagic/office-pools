@@ -111,7 +111,11 @@ export function seatReminderCopy(i: SeatCopyInput, now: number): Message {
 
 export type InviteCopyInput = { inviter: string; crewName: string; people: number }
 
-/** To someone with an account: push + email. The answer (Join / No thanks) is in the app. */
+/**
+ * To someone with an account: push + email. The answer (Join / No thanks) is in the app's Needs you
+ * and on the web dashboard's — so the button goes to /dashboard, not the site root, which is the
+ * marketing page even when you're signed in. Signed out, /dashboard sends you through login and back.
+ */
 export function inviteToAccountCopy(i: InviteCopyInput): Message {
   return {
     push: {
@@ -129,7 +133,7 @@ export function inviteToAccountCopy(i: InviteCopyInput): Message {
           ${paragraph(`<span style="color:#7B87A8;font-size:13px">We sent this because ${esc(i.inviter)} asked us to. It’s the only email about this invite.</span>`)}
         `,
         ctaText: 'Open SportPool',
-        ctaUrl: APP_URL,
+        ctaUrl: `${APP_URL}/dashboard`,
       }),
     },
   }
