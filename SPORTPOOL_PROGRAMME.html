@@ -281,7 +281,145 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ SUMMARY ============================ -->
 <section id="summary">
-  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span> <span class="chip ok">R32 FIXED 2026-10-02</span> <span class="chip ok">R34 FIXED 2026-10-02</span> <span class="chip lvl-med">R35 OPENED 2026-10-02</span> <span class="chip gold">CREWS BUILD STARTED 2026-10-02</span></h2>
+  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span> <span class="chip ok">R32 FIXED 2026-10-02</span> <span class="chip ok">R34 FIXED 2026-10-02</span> <span class="chip lvl-med">R35 OPENED 2026-10-02</span> <span class="chip gold">CREWS BUILD STARTED 2026-10-02</span> <span class="chip gold">CREWS BUILT TO SHIP STEP · UNPUSHED</span> <span class="chip lvl-med">R36 OPENED 2026-10-02</span></h2>
+
+  <div class="card goldc" id="update-2026-10-02-night">
+    <h3 style="margin:0 0 8px">2026-10-02, night — Crews built through the web slice; nothing pushed, nothing deployed</h3>
+    <p class="sec-sub" style="margin:0 0 10px">Scope: Crews only, from my last cut (<code>dcc4f7ef</code>, 20:48) to <code>5a1b6ec4</code>
+      (21:46), 17 commits. I read the 8a commit in full and checked every claim in the brief against the tree. For steps 4–7 I checked
+      that the files and gates exist and ran the tests. I did <strong>not</strong> review them line by line against the decisions.
+      Production facts come from the building session and were <strong>not</strong> re-queried. I had no production access.</p>
+    <div class="note warn" style="margin:0 0 10px">⚠ <strong>8b started in the working tree while this pass ran, uncommitted.</strong> It
+      includes a Profile → Crews tab, Add people, captain controls on the crew page and the pool-page crew line, in 8 modified and 8 new
+      files at 21:53. <strong>This record is cut at <code>5a1b6ec4</code>. None of that is in it.</strong> Every citation below is to the
+      committed tree, and the tests and type-check were re-run on an export of <code>5a1b6ec4</code>, not on the working tree.</div>
+
+    <p style="margin:0 0 6px"><strong>Since last update</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>Crews steps 4–7 and the web slice (8a) are built. None of it is pushed, so none of it is deployed.</strong>
+        <code>origin/master</code> is still <code>53bef13e</code> (1 Oct), and <code>master</code> was 33 ahead before this commit
+        (verified). What remains: <strong>8b</strong> (web, day two), <strong>step 8</strong> (delete the concept screen) and
+        <strong>step 9</strong> (ship). See <a href="#crews-build">Crews → Build progress</a>.</li>
+      <li><strong>8a, the web slice (<code>fc536f65</code>), verified in the tree:</strong>
+        <ul style="margin:4px 0 0 18px">
+          <li><strong>Dashboard <em>Needs you</em> strip:</strong> <code>components/crews/CrewNeedsStrip.tsx</code>, wired at
+            <code>app/dashboard/page.tsx:65-77, :831</code> and <code>app/dashboard/DashboardClient.tsx:589-590</code>. A crew failure
+            returns <code>[]</code>, so it cannot take the dashboard down. Buttons map to routes in <code>lib/crews/needActions.ts</code>,
+            which is pure and has 8 tests.</li>
+          <li><strong>Save dialog:</strong> <code>components/crews/SaveCrewModal.tsx:103</code> says, before Save, that the pool goes private
+            and leaves Discover. The app's sheet says the same (<code>mobile/components/crews/SaveCrewSheet.tsx:167</code>). That closes last
+            pass's note.</li>
+          <li><strong>Crew page:</strong> <code>app/crews/[crew_id]/page.tsx</code> + <code>CrewPage.tsx</code>. <code>readCrew</code> returns
+            null, which gives a 404, for a never-member, a removed member, a closed crew and a bad id (<code>lib/crews/read.ts:311, :319</code>).
+            ⚠ That is not quite <em>"anyone not in the crew"</em>: a member who <strong>left</strong> still sees the page, so they can Rejoin.
+            This is the plan's design (§8a), not a defect. Captains and co-captains get a line saying their controls are in the app for now
+            (<code>CrewPage.tsx:201-202</code>).</li>
+          <li><strong><code>/crews</code> is a protected route</strong> (<code>lib/supabase/middleware.ts:10</code>).</li>
+          <li><strong>Words:</strong> <code>lib/crews/words.ts</code> mirrors <code>mobile/lib/crews.ts</code>.
+            <code>lib/crews/__tests__/words.test.ts</code> imports both and runs them on the same inputs.</li>
+          <li><strong>Email invites are claimed before Needs you is read:</strong> on the dashboard (<code>app/dashboard/page.tsx:71-72</code>)
+            and in the Activity route (<code>app/api/users/[user_id]/activity/route.ts:973-975</code>). The Activity claim runs only for the
+            caller's own feed and only with <code>crews=1</code>. A claim needs <code>email_confirmed_at</code>
+            (<code>lib/crews/http.ts:45</code>, <code>lib/crews/store.ts:488</code>). See <a href="#r36">R36</a>.</li>
+          <li><strong>The invite-to-account email's button goes to <code>/dashboard</code></strong> (<code>lib/crews/notify.ts:136</code>),
+            with a test. The wording is unchanged. See <em>Drift</em> for its stated reason.</li>
+          <li><strong>Tests, run this pass on an export of <code>5a1b6ec4</code>:</strong> <code>lib/crews</code>, <code>lib/activity</code>
+            and <code>lib/pools</code>: 14 files, 233 tests, all pass. <code>npx tsc --noEmit -p .</code>, run without <code>timeout</code>,
+            gives the same 3 <code>FormData.get</code> errors (<strong>R29</strong>) and none in Crews files. A fourth error came from my export
+            leaving out <code>public/</code>, not from the code.</li>
+          <li><em>Building session, not re-checked:</em> verified on localhost against Ryan's real dashboard (two real <em>Keep this group
+            together?</em> cards; the dialog was opened and cancelled) and on a fixture harness, deleted afterwards.</li>
+        </ul></li>
+      <li><strong>Step 7's wording is approved by Ryan</strong> (<em>"Copy approved"</em>, 2026-10-02). This is recorded from plan §7 step 7
+        (committed <code>5a1b6ec4</code>). I did not see the approval myself.
+        <ul style="margin:4px 0 0 18px">
+          <li><strong>The switch fails closed.</strong> With no <code>crew_notices_enabled</code> row, nothing sends
+            (<code>lib/crews/notify.ts:208-212</code>), and no migration writes that row. <code>/api/cron/crew-notices</code> skips while the
+            switch is off (<code>app/api/cron/crew-notices/route.ts:23</code>). The cron is in neither <code>vercel.json</code> nor any repo
+            migration. <strong>Production <code>sync_settings</code> and <code>pg_cron</code> were not checked</strong> (R19's rule: name
+            both mechanisms).</li>
+        </ul></li>
+      <li><strong>8b's <em>"web sign-up claims email invites"</em> is done by 8a in practice.</strong> Web sign-up lands on
+        <code>/dashboard</code> (<code>app/signup/SignupForm.tsx:25, :127</code>), the auth callback defaults there
+        (<code>app/auth/callback/route.ts:7</code>), and the dashboard claims. Plan §8b item 2 already says so. It inherits
+        <a href="#r36">R36</a>.</li>
+      <li><strong>Steps 4–7, between my cut and 8a (12 commits).</strong> Recorded from the plan and the commits, and spot-checked:
+        <ul style="margin:4px 0 0 18px">
+          <li><strong>Step 4 finished:</strong> reads <code>1c086ab6</code>, routes <code>bd85c53c</code>, and pool creation for a crew plus
+            account deletion <code>dd12ce9a</code>. There are 11 route files under <code>app/api/crews/</code>, plus
+            <code>crew-prompt/dismiss</code> and <code>GET /api/pools/[pool_id]/crew</code> (step 6). <em>Building session:</em>
+            <code>scripts/verify-crews-store.ts</code> passed 34/34 live on production.</li>
+          <li><strong>Step 5:</strong> crew cards in Needs you, <code>93eb3ead</code> + <code>b3220834</code>. <strong>Changed from the
+            plan:</strong> it uses a capability flag (<code>v=2&amp;crews=1</code>, <code>route.ts:204</code>), not v3. <em>Building
+            session:</em> 37/37 live.</li>
+          <li><strong>Step 6:</strong> the RN screens, in five commits (<code>af488e40</code>, <code>35533da4</code>, <code>576622d8</code>,
+            <code>cdfc1307</code>, <code>c19f167c</code>). <code>mobile/app/profile/crews/index.tsx</code> and <code>[id].tsx</code> exist.
+            <strong>Nobody has seen them work on a phone:</strong> the app reads the production API, which doesn't have these routes yet
+            (plan §7 step 6). <em>Go Plus</em> inside the create flow was not built.</li>
+          <li><strong>Step 7:</strong> the notices, <code>6cec6f1c</code>, switched off (above).</li>
+          <li>The concept screen is now tracked (<code>99c193ba</code>), and it stays behind <code>__DEV__</code>
+            (<code>mobile/app/(tabs)/profile.tsx:294</code>).</li>
+        </ul></li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Now</strong></p>
+    <ol style="margin:0 0 6px 18px">
+      <li><strong>The <a href="#r36">R36</a> check, before shipping.</strong> One look at the production auth setting decides whether the
+        ship carries a guard that checks nothing. It takes a minute, and it has to come first, because the ship is what makes R36
+        reachable.</li>
+      <li><strong>Step 9, the ship, on Ryan's say-so.</strong> 8a must go with the RN release (<a href="#d8">Decision 8</a>), and it is
+        built. Step 8 goes with it.</li>
+      <li><strong>8b, day two:</strong> about 3½ days by the plan, and already under way, uncommitted (see the cut note). Until it lands,
+        the only way a web user reaches their crew page is a Needs-you card. There is no list and no pool-page link.</li>
+    </ol>
+    <p style="margin:0 0 10px"><a href="#r35">R35</a> still doesn't outrank these, and its trace is still owed. <em>Rule applied: silent
+      wrong data first. Nothing here is live silent wrongness. R36 goes first because it is the cheapest and must precede the ship, not
+      because it is severe.</em></p>
+
+    <p style="margin:0 0 6px"><strong>Risk moves</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong><a href="#r36">R36</a> opened 🟡 (provisional):</strong> an email invite may be claimable by whoever registers the address
+        first. It is provisional because the deciding fact is a production setting I can't read.</li>
+      <li><strong><a href="#r7">R7</a></strong> is unchanged. Nothing is deployed, so no user can make a crew yet.</li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Drift</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>The stated reason for 8a's email-button change is contradicted by the code.</strong> The commit, the comment
+        (<code>lib/crews/notify.ts:115-117</code>) and plan §8a all say the site root <em>"is the marketing page even when signed in"</em>.
+        But the proxy redirects any signed-in visitor at <code>/</code> to <code>/dashboard</code>
+        (<code>lib/supabase/middleware.ts:13, :86-90</code>, called from <code>proxy.ts</code>). So signed-in recipients already landed on
+        the dashboard. The change still helps a <strong>signed-out</strong> recipient, who now goes through login and back to
+        <code>/dashboard</code> instead of the marketing page. The change is right; its reason is wrong.</li>
+      <li><strong>Three of last pass's drift notes are closed by the code:</strong>
+        <ul style="margin:4px 0 0 18px">
+          <li>Account deletion now leaves every crew first, with captain succession, and refuses to delete if that fails
+            (<code>app/api/account/delete/route.ts:67-78</code>, <code>dd12ce9a</code>). Verified in code, not run.</li>
+          <li>Both save sheets say the pool goes private (above).</li>
+          <li>The plan no longer contradicts itself on the TypeScript mirror (<code>drafts/2026-10-02_crews_plan.md:354-355</code> now says
+            it was dropped).</li>
+        </ul></li>
+      <li><strong>The user-lookup route, which last pass said to review first.</strong> <code>app/api/users/lookup/route.ts</code> matches
+        exactly, ignoring case: an <code>ilike</code> with <code>%</code>, <code>_</code> and <code>\</code> escaped
+        (<code>lib/crews/store.ts:374-381</code>). It returns at most 5 rows, excludes the caller and never looks up an email. It returns
+        username, full name and avatar fields, and it has no rate limit. Whether that is more than a signed-in client can already read
+        depends on the <code>users</code> SELECT policies, and no repo migration defines those. Not checked. Nothing raised.</li>
+      <li><strong>The plan's effort estimate was overtaken.</strong> RN steps 4–7 (about 12½ of the plan's ~15 days) and the ~1½-day web
+        slice were committed in one evening (20:43–21:46). <em>Built</em> here means committed, with unit tests passing, and for the web,
+        seen on localhost. It does not mean seen working end to end, because the RN screens cannot reach their API until it deploys. The
+        plan's remaining sizes (8b ~3½ days, steps 8–10 ~½ day) are not re-sized here.</li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Needs Ryan</strong></p>
+    <ul style="margin:0 0 0 18px">
+      <li><strong>Is <em>Confirm email</em> on for production Supabase Auth?</strong> (Dashboard → Authentication → Sign In / Providers →
+        Email.) If it is off, <a href="#r36">R36</a> is real and should be settled before the ship. If it is on, R36 closes. The code points
+        to off: neither sign-up flow handles a sign-up that returns no session. A fact to check, not a product decision.</li>
+      <li><strong>Pushing.</strong> <code>master</code> is 34 ahead after this commit. A push is a deploy, and step 9's order is in the
+        plan.</li>
+      <li><strong><code>SPORTPOOL_PROGRAMME 2.md</code></strong> is still there. Untouched.</li>
+    </ul>
+  </div>
 
   <div class="card crit" id="update-2026-10-02">
     <h3 style="margin:0 0 8px">2026-10-02 — Crews: nine decisions recorded, a 🔴 found on the way, and the build started</h3>
@@ -437,7 +575,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       does not outrank it, for the same reason as before. Its deadline case is dormant until the next deadline-shaped competition. If
       anyone traces that a late entry can save picks, that is silent wrong data, and R35 moves ahead of Crews. Step 4 is also where two
       schema notes below become live (<em>Drift</em>). Both should be settled in step 4, before any route can write a crew row.
-      <em>Rule applied: silent wrong data first. Nothing open in this area is live silent wrongness yet, so the build order stands.</em></p>
+      <em>Rule applied: silent wrong data first. Nothing open in this area is live silent wrongness yet, so the build order stands.</em>
+      ✅ <em>Superseded the same night: steps 4–7 and 8a were built. See <a href="#update-2026-10-02-night">the card above</a>.</em></p>
 
     <p style="margin:0 0 6px"><strong>Risk moves</strong></p>
     <ul style="margin:0 0 10px 18px">
@@ -491,7 +630,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         reference stays as the record of what was true then.</li>
       <li><strong>The Crews plan contradicts itself about the TypeScript mirror.</strong> §3 says there is none. §7 step 2 still says
         <em>"SQL + TypeScript mirror, tested against each other on real pools"</em> (<code>drafts/2026-10-02_crews_plan.md:354-355</code>).
-        The code agrees with §3. The plan is not my file, so this is flagged, not fixed.</li>
+        The code agrees with §3. The plan is not my file, so this is flagged, not fixed. ✅ <em>Later that night: the plan now says the
+        mirror was dropped.</em></li>
       <li><strong>Two schema notes for step 4. Neither is live yet, because no user can reach a crew write.</strong> This is my reading of
         <code>154</code>. Neither was tested.
         <ul style="margin:4px 0 0 18px">
@@ -501,7 +641,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             (<code>163fd3af</code>), and <em>leave</em> applies it in <code>lib/crews/store.ts</code> (<code>dcc4f7ef</code>). But a
             cascade calls neither. The plan, the rules and the store never mention account deletion (searched all three). The partial
             unique index allows a crew with <strong>zero</strong> captains (<code>154:61-62</code>). This is the "exit erases" shape that
-            Gate A2 / R12 already names, arriving at a new table.</li>
+            Gate A2 / R12 already names, arriving at a new table. ✅ <em>Closed in code later that night (<code>dd12ce9a</code>): deletion
+            leaves every crew first, and refuses if that fails (<code>app/api/account/delete/route.ts:67-78</code>). Not run.</em></li>
           <li><strong>A crew with a season cannot be hard-deleted.</strong> <code>pools.crew_id</code> is <code>ON DELETE SET NULL</code>
             (<code>154:126</code>). But Postgres runs referential actions as ordinary updates that fire the referencing table's triggers,
             and <code>guard_pool_crew_id</code> refuses any change away from a non-NULL <code>crew_id</code> (<code>154:160-161</code>).
@@ -512,7 +653,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         the same update that sets <code>crew_id</code> (<code>dcc4f7ef</code>). That is what <a href="#d3">Decision 3</a> (amended) and
         154's CHECK require, so it is <strong>not</strong> a contradiction. But the building session reports that <strong>84 finished
         World Cup groups are public</strong>, and for their admins, saving delists the pool from Discover. The save sheet should say so in
-        plain words. That is a note for the UI, not a decision for Ryan.</li>
+        plain words. That is a note for the UI, not a decision for Ryan. ✅ <em>Both sheets now say so
+        (<code>components/crews/SaveCrewModal.tsx:103</code>, <code>mobile/components/crews/SaveCrewSheet.tsx:167</code>).</em></li>
       <li><strong>Migration 154 cites "Decision 6" and "decision 9"</strong> (<code>154:16</code>, <code>:36</code>, <code>:129</code>).
         It means the plan's §9 questions #6 and #9. In this programme, <a href="#d6">Decision 6</a> is <em>Scoring</em>, and the
         never-Public rule lives under <a href="#d3">D3 → Amended</a>. This is cosmetic, but it is a traceability trap.</li>
@@ -725,15 +867,21 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="strip">
     <div class="stat crit"><div class="n">2</div><div class="l">🔴 Critical risks</div></div>
     <div class="stat high"><div class="n">13</div><div class="l">🟠 High risks</div></div>
-    <div class="stat med"><div class="n">10</div><div class="l">🟡 Medium risks</div></div>
+    <div class="stat med"><div class="n">11</div><div class="l">🟡 Medium risks</div></div>
     <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
     <div class="stat low"><div class="n">8</div><div class="l">✅ Closed (4 prod-verified by audit, + R32 and R34 by their fixing sessions)</div></div>
     <div class="stat pri"><div class="n">6</div><div class="l">Items in 🔥 Now</div></div>
     <div class="stat neu"><div class="n">9</div><div class="l">Projects</div></div>
     <div class="stat neu"><div class="n">15+5</div><div class="l">Settled decisions · product + infra (D1–D3 + D5 amended, D2 clarified 2026-10-02)</div></div>
     <div class="stat neu"><div class="n">23</div><div class="l">Decisions needing Ryan (2026-10-02: +3 raised, all settled or taken; R32 and R34 fixes taken)</div></div>
-    <div class="stat neu"><div class="n">R35</div><div class="l">Highest risk id on the register</div></div>
+    <div class="stat neu"><div class="n">R36</div><div class="l">Highest risk id on the register</div></div>
   </div>
+  <p class="strip-note"><strong>Moved late on 2026-10-02 (Crews built to the ship step).</strong> <a href="#r36">R36</a> opens 🟡
+    (provisional): an email invite may be claimable by whoever registers the address first, if <em>Confirm email</em> is off in
+    production. So 🟡 goes from 10 to <strong>11</strong>, and the highest id is <strong>R36</strong>. No other risk changed level.
+    <a href="#r7">R7</a> is unchanged, because nothing is deployed. <a href="#crews">Crews</a> is built through steps 1–7 and web 8a,
+    all unpushed. Needs Ryan gains one fact to check (the auth setting) and carries the push and the duplicate file. None of these is a
+    product decision, so none is counted.</p>
   <p class="strip-note"><strong>Moved 2026-10-02 (Crews decisions pass only).</strong> <strong>R32 is new</strong> 🔴: any pool member can
     make themselves that pool's admin with one PATCH, the same class as migration 145. The exploit was not attempted, and whether anyone has
     ever used it is unverified. <strong>R33 is new</strong> 🟡: league pools never reach <code>completed</code>. <strong>R7</strong> is
@@ -771,10 +919,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <strong>R31 is new</strong> 🟡 — the outbox has no age guard and its first drain replayed 38 stale matchweek recaps.
     ⚠ <strong>R21 is counted 🔴 below as written, but is stale:</strong> <code>origin/master</code> moved to <code>a8dee7f</code> on 12 Sep and
     the league routes are live; the current gap is 109 unpushed commits. Re-levelling owed after a full pass.</p>
-  <p class="strip-note"><strong>Current levels, R1–R35, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R35 on 2026-10-02).</strong>
+  <p class="strip-note"><strong>Current levels, R1–R36, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R36 on 2026-10-02).</strong>
     <strong>🔴</strong> R2 · R21 (stale, see above). &nbsp;
     <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27 · <strong>R30</strong>. &nbsp;
-    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong> · <strong>R33</strong> · <strong>R35</strong> (provisional). &nbsp;
+    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong> · <strong>R33</strong> · <strong>R35</strong> (provisional) · <strong>R36</strong> (provisional). &nbsp;
     <strong>🟢</strong> R11 · R15. &nbsp;
     <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 · <strong>R32</strong> · <strong>R34</strong>. Of these, <strong>R4, R13, R17
     and R26 are prod-verified</strong> by audit. <strong>R32</strong> and <strong>R34</strong> are closed in the database, on their fixing
@@ -790,7 +938,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R35 · 8 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19 · R32–R35 added 2026-10-02 (R32 and R34 closed the same day)</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R36 · 8 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19 · R32–R36 added 2026-10-02 (R32 and R34 closed the same day)</span></h2>
   <div class="note warn" style="margin-bottom:14px">
     <strong>⚠️ Mixed vintage — read the row dates.</strong> <strong>R1–R19</strong> below are <strong>2026-07-30 text</strong> and
     several have since closed or changed level; <strong>R20–R29</strong> were added on <strong>2026-09-02</strong> and are current.
@@ -1629,6 +1777,35 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           is levelled 🟡 rather than 🟢 here because the deadline half is reachable from the shipped UI. The level stays provisional until
           the trace above is done</td>
         <td><a href="#r34">R34</a>; migrations 005, 075, 152; Mobile</td>
+      </tr>
+
+      <tr class="risk-med" id="r36">
+        <td class="id">R36</td>
+        <td><strong>An email invite to a crew may go to whoever registers the address first.</strong> ⚠️ New 2026-10-02, found while
+          recording Crews 8a. An invite to an address with no account waits in <code>crew_invites.invitee_email</code>. The first account
+          that signs in with that address and a confirmed email claims it (<code>lib/crews/store.ts:484-512</code>, where
+          <code>emailVerified</code> is <code>!!email_confirmed_at</code>, <code>lib/crews/http.ts:45</code>). The plan's guard is to claim
+          <em>"only against a verified address. Otherwise someone could register the address first and land in the crew"</em>
+          (<code>drafts/2026-10-02_crews_plan.md:291-292</code>). <strong>That guard is only as good as
+          <code>email_confirmed_at</code>.</strong> Supabase's docs: with <em>Confirm email</em> disabled, sign-up <em>"implicitly confirms
+          the user's email in the database"</em>. Both sign-up flows go straight into the signed-in app, with no <em>check your email</em>
+          step (<code>app/signup/SignupForm.tsx:127</code>; <code>mobile/lib/auth.tsx:109-122</code>). That points to confirmation being
+          <strong>off</strong> in production. <strong>Not verified:</strong> the auth setting can't be read from here. The unit test proves
+          the flag is respected (<code>lib/crews/__tests__/store.test.ts:228-230</code>). Nothing proves the flag means what the guard
+          assumes, and <code>scripts/verify-crews-store.ts</code> does not exercise claiming at all</td>
+        <td><span class="chip lvl-med">🟡 MEDIUM</span> (provisional)</td>
+        <td class="blast">Any email invite to an address with no account. The claimant joins the crew with one tap on <em>Join</em>. They
+          then see its members, all-time table and past seasons, and get a saved spot in its future pools. The real owner later finds the
+          address taken. <strong>Likelihood is low:</strong> the claimant must know both the address and that an invite is waiting.
+          <strong>Dormant now:</strong> no invite can be created until the API deploys</td>
+        <td>The API deploys, a captain invites an address with no account, and someone else signs up with that address first</td>
+        <td><strong>None.</strong> If confirmation is off, two directions, recorded and not chosen. <strong>(a)</strong> Turn on <em>Confirm
+          email</em>. That is product-wide, and both sign-up flows would need a <em>check your email</em> state they don't have.
+          <strong>(b)</strong> Stop treating <code>email_confirmed_at</code> as proof for crew claims, for example by claiming only through
+          the invite email's own link</td>
+        <td><strong>No call yet.</strong> Ryan to check the setting (<a href="#update-2026-10-02-night">Where this stands → Needs Ryan</a>).
+          The level stays provisional until then. If confirmation is on, this closes</td>
+        <td><a href="#crews">Crews</a> (Multi-sport); plan §5 <em>Direct adds</em></td>
       </tr>
 
       <tr class="risk-high">
@@ -2785,8 +2962,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       (<a href="#r32">R32</a>) was ✅ <strong>fixed the same day</strong> (migration 151). The same-class <a href="#r34">R34</a>
       (<code>pool_entries</code>, not a Crews prerequisite) was ✅ <strong>fixed that night</strong> as migration 152. <strong>By the end of
       the day, P2–P5 and the Crews schema were done:</strong> migration 153 (first lock, finished) and migration <s>152</s> <s>153</s>
-      <strong>154</strong> (the schema), both live on production per the building session. Step 4 (<code>lib/crews/</code> + routes) has
-      started. Nothing is user-visible.
+      <strong>154</strong> (the schema), both live on production per the building session. <s>Step 4 (<code>lib/crews/</code> + routes) has
+      started.</s> <strong>Late that night, steps 4–7 and the web slice (8a) were built, up to <code>5a1b6ec4</code>. All of it is local and
+      unpushed</strong>, so nothing is user-visible. 8b, step 8 and the ship remain, and <a href="#r36">R36</a> should be checked before the
+      ship.
       <a href="#i-privacy">Pool privacy: three levels</a> planned as its own item, not started.</div>
   </div>
 
@@ -5017,7 +5196,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="card goldc" id="crews">
     <h4>👥 Crews: a crew is who played <span class="chip cat">Feature</span> <span class="chip cat">Multi-sport</span>
       <span class="chip cat">Mobile</span> <span class="chip warn">🔨 IN PROGRESS</span> <span class="chip ok">P1–P5 ✅ 2026-10-02</span>
-      <span class="chip ok">SCHEMA 154 ✅ LIVE</span> <span class="chip gold">STEP 4 UNDER WAY</span> <span class="chip">2026-10-02</span></h4>
+      <span class="chip ok">SCHEMA 154 ✅ LIVE</span> <span class="chip ok">STEPS 4–7 + WEB 8a BUILT</span> <span class="chip warn">UNPUSHED</span>
+      <span class="chip lvl-med">R36 BEFORE SHIP</span> <span class="chip">2026-10-02</span></h4>
     <ul class="fields">
       <li><span class="f">Is:</span> Decision 1's durable group, built. You're in a crew because you played in one of its pools, or
         because you said yes when its captain added you. My Crews lists <strong>groups, never people</strong>, and there is no friends
@@ -5058,30 +5238,41 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <table style="min-width:620px">
         <thead><tr><th>Release</th><th>Scope</th><th>Size (plan's, order of magnitude)</th></tr></thead>
         <tbody>
-          <tr><td><strong>RN first</strong></td><td>P1–P5 ✅ and migration 154 ✅ (all done 2026-10-02), <code>lib/crews/</code> + routes
-            (started), Activity v3, RN screens, seat notice + one reminder</td><td><strong>~15 working days</strong> at plan time. The
-            prerequisites and schema are now spent. Neither the plan nor Ryan has re-sized what remains, so no new figure is stated</td></tr>
+          <tr><td><strong>RN first</strong></td><td>P1–P5 ✅ and migration 154 ✅, <code>lib/crews/</code> + routes ✅, Needs-you crew
+            cards ✅ (a capability flag, not v3), RN screens ✅, seat notice + one reminder ✅ (switched off). All built 2026-10-02 and
+            unpushed. Left: step 8 (delete the concept screen) and step 9 (ship)</td><td><strong>~15 working days</strong> at plan time.
+            <strong>Overtaken:</strong> steps 4–7 were committed in one evening. <em>Built</em> means committed and unit-tested. The RN screens
+            have not run against their API, which isn't deployed. The plan sizes steps 8–10 at ~½ day</td></tr>
           <tr><td><strong>Thin web slice, same release</strong></td><td>Dashboard <em>"Keep this group together?"</em> sheet (plus held
-            seats and invites), basic crew page</td><td><strong>~1½ days</strong></td></tr>
+            seats and invites), basic crew page. ✅ <strong>Built 2026-10-02</strong> (<code>fc536f65</code>), unpushed</td><td><strong>~1½
+            days</strong> at plan time; committed the same evening</td></tr>
           <tr><td><strong>Web, day two</strong></td><td>Create-modal Crew row + roster review, Profile → Crews tab, captain controls,
-            the pool page's <em>"Part of…"</em> line</td><td><strong>~3½ days</strong></td></tr>
+            the pool page's <em>"Part of…"</em> line. Web claiming of email invites is already done by 8a. <strong>Under way in the working
+            tree at 21:53, uncommitted, and not recorded</strong></td><td><strong>~3½ days</strong></td></tr>
         </tbody>
       </table>
     </div>
     <ul class="fields">
       <li><span class="f">Why the web slice ships with RN:</span> the World Cup was played on the web (facts below). Decided by Ryan,
         2026-10-02 (plan §9 #8).</li>
-      <li><span class="f">Status:</span> 🔨 <strong>In progress. P1–P5 and plan step 3 (the schema) done 2026-10-02; step 4 under
+      <li><span class="f">Status:</span> 🔨 <strong>In progress. Plan steps 1–7 and web 8a built 2026-10-02, cut at
+        <code>5a1b6ec4</code> (21:46). Nothing is pushed, so nothing is user-visible.</strong> Left: 8b (web, day two; under way
+        uncommitted), step 8 and step 9 (ship). Check <a href="#r36">R36</a> before the ship. The routes exist in the tree and not on
+        production, and the app reads production, so the RN screens show their error state on a Metro build until the API deploys (plan §7
+        step 6). See <a href="#crews-build">Build progress</a> and <a href="#update-2026-10-02-night">Where this stands → 2026-10-02,
+        night</a>.</li>
+      <li><span class="f">Earlier cut:</span> <s>🔨 <strong>In progress. P1–P5 and plan step 3 (the schema) done 2026-10-02; step 4 under
         way.</strong> Nothing is user-visible. There is no route or screen, and the only live hook (<code>joinPool</code>) fires only for a
-        pool with a crew, which no pool has. Verified in the tree at the end of 2026-10-02, cut at <code>dcc4f7ef</code> (20:48):
+        pool with a crew, which no pool has.</s> <em>As it stood at</em> <code>dcc4f7ef</code> (20:48):
         <s><code>lib/crews/</code>, <code>app/api/crews/</code> and <code>app/crews/</code> do not exist.</s> <code>lib/crews/rules.ts</code>
         (<code>163fd3af</code>) and <code>lib/crews/store.ts</code> (<code>dcc4f7ef</code>) exist. <code>app/api/crews/</code> and
         <code>app/crews/</code> do not. ⚠ <em>Past the cut:</em> <code>1c086ab6</code> (reads) and <code>bd85c53c</code> (the API routes,
         plus <code>app/api/users/lookup</code>) landed by 20:54. They are not recorded or reviewed here. The newest migration is <code>154_a_crew_is_who_played.sql</code>, the Crews schema, preceded by
-        <code>153_a_pool_knows_when_it_locks_and_ends.sql</code> (P2 + P3). The only crew <strong>UI</strong> is the device concept
-        <code>mobile/app/crews-concept.tsx</code>. It is still <strong>untracked</strong>, and plan step 8 deletes it. ⚠ The plan
-        contradicts itself on P2's TypeScript mirror: §3 says none, §7 step 2 still says one
-        (<code>drafts/2026-10-02_crews_plan.md:354-355</code>). The code follows §3.</li>
+        <code>153_a_pool_knows_when_it_locks_and_ends.sql</code> (P2 + P3). <s>The only crew <strong>UI</strong> is the device concept
+        <code>mobile/app/crews-concept.tsx</code>. It is still <strong>untracked</strong>, and plan step 8 deletes it.</s> The real RN screens
+        and the web slice now exist. The concept is tracked (<code>99c193ba</code>), stays behind <code>__DEV__</code>, and step 8 still
+        deletes it. <s>⚠ The plan contradicts itself on P2's TypeScript mirror: §3 says none, §7 step 2 still says one
+        (<code>drafts/2026-10-02_crews_plan.md:354-355</code>).</s> ✅ The plan now agrees with the code: no mirror.</li>
       <li><span class="f">Done when:</span> a finished pool's admin can save its group as a crew, on web or in the app; a crew member
         who starts a pool gives every other ticked member a held seat, which is taken or quietly released at first lock; and
         <em>"crews with two or more pools"</em> can be counted (<a href="#r7">R7</a>).</li>
@@ -5123,6 +5314,36 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             pass (135 across <code>lib/crews</code> + <code>lib/pools</code>). Only <code>joinPool</code> imports the store.
             <strong>Not reviewed</strong> against the decisions</td><td>84 finished World Cup groups are public (from the commit
             message)</td></tr>
+          <tr><td><strong>Step 4</strong> ✅</td><td><code>1c086ab6</code>, <code>bd85c53c</code>, <code>dd12ce9a</code></td><td>Every read
+            (<code>lib/crews/read.ts</code>). The routes: 11 files under <code>app/api/crews/</code>, <code>crew-prompt/dismiss</code>, and
+            <code>GET /api/users/lookup</code>. Pool creation for a crew. Account deletion leaves every crew first
+            (<code>app/api/account/delete/route.ts:67-78</code>)</td><td>Files exist. The lookup route was read: exact, case-insensitive, ≤5,
+            never an email (<code>lib/crews/store.ts:374-381</code>). <code>readCrew</code> 404s never-members, the removed and closed crews
+            (<code>read.ts:311, :319</code>). <strong>Not reviewed</strong> against the decisions line by line</td><td><code>scripts/verify-crews-store.ts</code>
+            34/34 live on production, on a crew with no pools, deleted afterwards</td></tr>
+          <tr><td><strong>Step 5</strong> ✅</td><td><code>93eb3ead</code>, <code>b3220834</code></td><td>Crew cards in Activity → Needs you, and
+            the app's <em>Save as crew</em> sheet. <strong>Changed from the plan:</strong> a capability flag (<code>v=2&amp;crews=1</code>,
+            <code>app/api/users/[user_id]/activity/route.ts:204</code>), not v3, so that either deploy order is safe</td><td>The flag is in the
+            route. The save sheet states that the pool goes private (<code>mobile/components/crews/SaveCrewSheet.tsx:167</code>)</td><td>9
+            builder tests; live verify 37/37 for all three card kinds</td></tr>
+          <tr><td><strong>Step 6</strong> ✅</td><td><code>af488e40</code>, <code>35533da4</code>, <code>576622d8</code>, <code>cdfc1307</code>,
+            <code>c19f167c</code></td><td>RN data layer, My Crews, the crew page, Add people, the create flow's Crew row with roster review and
+            the Free cap, and the pool screens' crew line (<code>GET /api/pools/[pool_id]/crew</code>)</td><td>Screens exist
+            (<code>mobile/app/profile/crews/index.tsx</code>, <code>[id].tsx</code>). <strong>Never run against their API:</strong> it isn't
+            deployed, and native builds can't run here. <em>Go Plus</em> inside the create flow was not built</td><td>n/a</td></tr>
+          <tr><td><strong>Step 7</strong> ✅ (off)</td><td><code>6cec6f1c</code>, <code>3fb53035</code>, <code>5a1b6ec4</code></td><td>The seat
+            notice, the one reminder and the invite. <strong>Wording approved by Ryan</strong> (<em>"Copy approved"</em>, recorded in plan §7,
+            <code>5a1b6ec4</code>)</td><td>The switch fails closed: no row means no send (<code>lib/crews/notify.ts:208-212</code>). No migration
+            writes the row. <code>/api/cron/crew-notices</code> skips while off. It is not in <code>vercel.json</code> or any repo
+            migration</td><td><strong>Not checked:</strong> production <code>sync_settings</code> and <code>pg_cron</code></td></tr>
+          <tr><td><strong>8a</strong> ✅</td><td><code>fc536f65</code>, <code>5a1b6ec4</code></td><td>Web: the dashboard <em>Needs you</em>
+            strip and save dialog, <code>/crews/[crew_id]</code>, <code>lib/crews/words.ts</code> with a drift test, <code>/crews</code>
+            protected, email invites claimed on the dashboard <strong>and</strong> in the Activity route, and the invite email's button to
+            <code>/dashboard</code></td><td>Every claim checked in the committed tree (see <a href="#update-2026-10-02-night">Where this
+            stands → 2026-10-02, night</a>). 233 tests pass on an export of <code>5a1b6ec4</code>, and <code>tsc</code> gives the R29 baseline
+            only. ⚠ The button change's stated reason is wrong (<em>Drift</em>). ⚠ The claim's verified-address guard is
+            <a href="#r36">R36</a></td><td>Seen on localhost on Ryan's real dashboard (dialog opened and cancelled) and a fixture
+            harness</td></tr>
         </tbody>
       </table>
     </div>
@@ -5134,12 +5355,15 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <p style="margin:0 0 6px"><strong>For step 4, before any route can write a crew row.</strong> The first and third are from reading
       <code>154</code>, and neither was tested:</p>
     <ul style="margin:0 0 10px 18px">
-      <li><strong>Account deletion bypasses captain succession.</strong> <code>app/api/account/delete/route.ts:168-169</code> deletes the
+      <li><s><strong>Account deletion bypasses captain succession.</strong> <code>app/api/account/delete/route.ts:168-169</code> deletes the
         <code>users</code> row, and <code>crew_members</code> cascades (<code>154:48</code>). The succession in
         <code>lib/crews/rules.ts</code> and <code>store.ts</code> <em>leave</em> is never called on that path, and a crew can be left with
-        zero captains (<code>154:61-62</code>). The plan, the rules and the store never mention account deletion.</li>
+        zero captains (<code>154:61-62</code>). The plan, the rules and the store never mention account deletion.</s> ✅ <strong>Closed in
+        code, <code>dd12ce9a</code>:</strong> deletion calls <code>leaveAllCrews</code> first and refuses to delete if that fails
+        (<code>app/api/account/delete/route.ts:67-78</code>). Read, not run.</li>
       <li><strong>Saving delists a public pool</strong> (<code>is_private: true</code>, <code>dcc4f7ef</code>). That is consistent with
-        <a href="#d3">Decision 3</a> (amended). The save sheet should say so in plain words.</li>
+        <a href="#d3">Decision 3</a> (amended). <s>The save sheet should say so in plain words.</s> ✅ Both sheets say so
+        (<code>components/crews/SaveCrewModal.tsx:103</code>, <code>mobile/components/crews/SaveCrewSheet.tsx:167</code>).</li>
       <li><strong><code>pools.crew_id ON DELETE SET NULL</code> (<code>154:126</code>) can never fire for a crew with a season.</strong> The
         guard (<code>154:160-161</code>) refuses the FK's own update. That is harmless while crews are closed rather than deleted, which is
         the design. A future support-side delete will error.</li>
