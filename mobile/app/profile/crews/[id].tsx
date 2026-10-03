@@ -227,8 +227,8 @@ export default function CrewScreen() {
         </Pressable>
       ) : null}
 
-      {/* Section order — Ryan, 2026-10-03: All-time, the crew (and its invites), past seasons,
-          then the pools (playing now, and the ones that could be linked). */}
+      {/* Section order — Ryan, 2026-10-03: All-time, the crew (and its invites), playing now,
+          past seasons, then the pools that could be linked. */}
       {crew.allTime.length ? (
         <Section title="All-time">
           <Card padded={false}>
@@ -318,24 +318,6 @@ export default function CrewScreen() {
         />
       </Section>
 
-      {crew.pastSeasons.length ? (
-        <Section title="Past seasons">
-          <Card padded={false}>
-            {crew.pastSeasons.map((p, i) => (
-              <Row key={p.poolId} divider={i > 0} onPress={() => router.push({ pathname: '/pool/[id]', params: { id: p.poolId } })}>
-                <View style={{ flex: 1, gap: 1 }}>
-                  <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>{p.competition}</RNText>
-                  <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, color: theme.colors.slate }}>
-                    {[p.poolName, winnersText(p.winners)].filter(Boolean).join(' · ')}
-                  </RNText>
-                </View>
-                <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12.5, color: theme.colors.slate }}>{finishText(p.viewerRank, p.players)}</RNText>
-              </Row>
-            ))}
-          </Card>
-        </Section>
-      ) : null}
-
       {crew.playingNow.length ? (
         <Section title="Playing now">
           <Card padded={false}>
@@ -379,6 +361,24 @@ export default function CrewScreen() {
             ))}
           </Card>
           <Hint text="Any member can start a pool for the crew — whoever starts it runs that season." />
+        </Section>
+      ) : null}
+
+      {crew.pastSeasons.length ? (
+        <Section title="Past seasons">
+          <Card padded={false}>
+            {crew.pastSeasons.map((p, i) => (
+              <Row key={p.poolId} divider={i > 0} onPress={() => router.push({ pathname: '/pool/[id]', params: { id: p.poolId } })}>
+                <View style={{ flex: 1, gap: 1 }}>
+                  <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 14, color: theme.colors.ink }}>{p.competition}</RNText>
+                  <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, color: theme.colors.slate }}>
+                    {[p.poolName, winnersText(p.winners)].filter(Boolean).join(' · ')}
+                  </RNText>
+                </View>
+                <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12.5, color: theme.colors.slate }}>{finishText(p.viewerRank, p.players)}</RNText>
+              </Row>
+            ))}
+          </Card>
         </Section>
       ) : null}
 

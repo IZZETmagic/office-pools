@@ -192,8 +192,8 @@ export function CrewPage({
           </button>
         ) : null}
 
-        {/* Section order — Ryan, 2026-10-03: All-time, the crew (and its invites), past seasons,
-            then the pools (playing now, and the ones that could be linked). Same as the app. */}
+        {/* Section order — Ryan, 2026-10-03: All-time, the crew (and its invites), playing now,
+            past seasons, then the pools that could be linked. Same as the app. */}
         {crew.allTime.length ? (
           <Section title="All-time" hint="Seasons, titles and best finish — never points added up across different games.">
             <Card padding="none">
@@ -296,26 +296,6 @@ export function CrewPage({
           ) : null}
         </Section>
 
-        {crew.pastSeasons.length ? (
-          <Section title="Past seasons">
-            <Card padding="none">
-              {crew.pastSeasons.map((p, i) => (
-                <Link
-                  key={p.poolId}
-                  href={`/pools/${encodeURIComponent(p.poolId)}`}
-                  className={`flex items-center gap-3 px-4 py-3 hover:bg-mist/50 transition-colors ${i > 0 ? 'border-t border-border-subtle' : ''}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-ink">{p.competition}</p>
-                    <p className="text-[11.5px] font-medium text-muted truncate">{[p.poolName, winnersText(p.winners)].filter(Boolean).join(' · ')}</p>
-                  </div>
-                  <span className="text-[12.5px] font-bold text-muted">{finishText(p.viewerRank, p.players)}</span>
-                </Link>
-              ))}
-            </Card>
-          </Section>
-        ) : null}
-
         {crew.playingNow.length ? (
           <Section title="Playing now" hint="Any member can start a pool for the crew — whoever starts it runs that season.">
             <Card padding="none">
@@ -368,6 +348,26 @@ export function CrewPage({
                   </div>
                 )
               })}
+            </Card>
+          </Section>
+        ) : null}
+
+        {crew.pastSeasons.length ? (
+          <Section title="Past seasons">
+            <Card padding="none">
+              {crew.pastSeasons.map((p, i) => (
+                <Link
+                  key={p.poolId}
+                  href={`/pools/${encodeURIComponent(p.poolId)}`}
+                  className={`flex items-center gap-3 px-4 py-3 hover:bg-mist/50 transition-colors ${i > 0 ? 'border-t border-border-subtle' : ''}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-ink">{p.competition}</p>
+                    <p className="text-[11.5px] font-medium text-muted truncate">{[p.poolName, winnersText(p.winners)].filter(Boolean).join(' · ')}</p>
+                  </div>
+                  <span className="text-[12.5px] font-bold text-muted">{finishText(p.viewerRank, p.players)}</span>
+                </Link>
+              ))}
             </Card>
           </Section>
         ) : null}
