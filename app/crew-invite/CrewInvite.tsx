@@ -6,8 +6,11 @@
 //   signed out → who asked and which crew, then Sign up / Log in, both returning here
 //   signed in  → Join / No thanks, which claim and answer the invite in one request
 //
-// Opening the page answers nothing: only a button press does. (Mail scanners pre-fetch links, and a
-// fragment never reaches a server anyway.)
+// Opening the page answers nothing: only a button press does (mail scanners pre-fetch links).
+//
+// ⚠ The token arrives after the '#', and on arrival it moves into localStorage and out of the address
+// bar. Sign up / Log in return to the bare page, which reads it back — it is never put in a
+// `?redirectTo=` or any other URL a server or analytics would see. See lib/crews/inviteLink.ts.
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -18,23 +21,63 @@ import { Icon } from '@/components/ui/Icon'
 import { crewRequest, errorText } from '@/lib/crews/client'
 import { CLAIM_BLOCK_TEXT } from '@/lib/crews/rules'
 import type { InviteLinkView } from '@/lib/crews/store'
+import { INVITE_PAGE, INVITE_TOKEN_KEY, LOG_IN_HREF, SIGN_UP_HREF } from '@/lib/crews/inviteLink'
 import { plural } from '@/lib/crews/words'
 
 type View = InviteLinkView & { signedIn: boolean }
 
-const subscribeHash = (notify: () => void) => {
-  window.addEventListener('hashchange', notify)
-  return () => window.removeEventListener('hashchange', notify)
+function storedToken(): string {
+  try {
+    return window.localStorage.getItem(INVITE_TOKEN_KEY) ?? ''
+  } catch {
+    return ''
+  }
 }
+function forgetToken() {
+  try {
+    window.localStorage.removeItem(INVITE_TOKEN_KEY)
+  } catch {
+    /* storage blocked — nothing was kept */
+  }
+}
+const subscribeToken = (notify: () => void) => {
+  window.addEventListener('hashchange', notify)
+  window.addEventListener('storage', notify)
+  return () => {
+    window.removeEventListener('hashchange', notify)
+    window.removeEventListener('storage', notify)
+  }
+}
+/** The link's token: still in the address bar on the first pass, from storage after that. */
+const currentToken = () => window.location.hash.slice(1) || storedToken()
 
 export function CrewInvite() {
   const router = useRouter()
-  // null on the server and the first client pass; then whatever follows the '#'.
-  const token = useSyncExternalStore(subscribeHash, () => window.location.hash.slice(1), () => null)
+  // null on the server and the first client pass; then the token, or '' when there is none.
+  const token = useSyncExternalStore(subscribeToken, currentToken, () => null)
   const [loaded, setLoaded] = useState<{ token: string; view: View | null } | null>(null)
   const [busy, setBusy] = useState<'join' | 'decline' | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
-  const [declined, setDeclined] = useState(false)
+  const [declined, setDeclined] = useState<{ crewName: string; signedIn: boolean } | null>(null)
+
+  // Move the token out of the address bar and into storage, so nothing that reads the URL from here
+  // on — the sign-up round trip, a copied address, a screenshot — carries it. If storage is blocked
+  // it stays in the hash: this visit still works, and signing up means opening the email again.
+  useEffect(() => {
+    function take() {
+      const fromHash = window.location.hash.slice(1)
+      if (!fromHash) return
+      try {
+        window.localStorage.setItem(INVITE_TOKEN_KEY, fromHash)
+      } catch {
+        return
+      }
+      window.history.replaceState(window.history.state, '', INVITE_PAGE)
+    }
+    take()
+    window.addEventListener('hashchange', take)
+    return () => window.removeEventListener('hashchange', take)
+  }, [])
 
   useEffect(() => {
     if (!token) return
@@ -55,17 +98,37 @@ export function CrewInvite() {
     if (!token || busy) return
     setBusy(a)
     setProblem(null)
+    let crewId: string
     try {
-      const { crewId } = await crewRequest<{ crewId: string }>('/api/crews/invites/claim', { body: { token, answer: a } })
-      if (a === 'join') router.push(`/crews/${encodeURIComponent(crewId)}`)
-      else setDeclined(true)
+      crewId = (await crewRequest<{ crewId: string }>('/api/crews/invites/claim', { body: { token, answer: a } })).crewId
     } catch (e) {
       setProblem(errorText(e))
-    } finally {
       setBusy(null)
+      return
     }
+    // Answered — the link is spent, so it has no business staying in this browser.
+    forgetToken()
+    if (a === 'join') {
+      // Busy stays on while the crew page loads: re-rendering here would read the now-empty token
+      // and flash "isn't complete" on the way out.
+      router.push(`/crews/${encodeURIComponent(crewId)}`)
+      return
+    }
+    const view = loaded?.view
+    setDeclined({ crewName: view?.state === 'open' ? view.crewName : 'this crew', signedIn: !!view?.signedIn })
+    setBusy(null)
   }
 
+
+  if (declined) {
+    return (
+      <Message
+        title="No problem"
+        body={`You won’t be added to ${declined.crewName}, and we won’t email you about it again.`}
+        action={declined.signedIn ? { label: 'Go to your dashboard', href: '/dashboard' } : undefined}
+      />
+    )
+  }
   if (token === '') return <Message title="This invite link isn’t complete" body="Open it again from the email we sent — the whole link, please." />
   const view = loaded && loaded.token === token ? loaded.view : undefined
   if (token === null || view === undefined) return <p className="t-body text-muted text-center">Opening your invite…</p>
@@ -73,18 +136,6 @@ export function CrewInvite() {
   if (view.state === 'invalid') return <Message title="This invite link isn’t valid" body="Open it again from the email we sent — the whole link, please." />
   if (view.state === 'used') return <Message title="This invite has already been used" body="Each invite link works once. If it was meant for you, ask whoever invited you to add you again." />
   if (view.state === 'closed') return <Message title="This crew has closed" body="Everyone left, so there’s nothing to join any more." />
-  if (declined) {
-    return (
-      <Message
-        title="No problem"
-        body={`You won’t be added to ${view.crewName}, and we won’t email you about it again.`}
-        action={view.signedIn ? { label: 'Go to your dashboard', href: '/dashboard' } : undefined}
-      />
-    )
-  }
-
-  // Back here after signing up or logging in, fragment and all.
-  const here = `/crew-invite#${token}`
   return (
     <div className="flex flex-col gap-5 text-center">
       <div className="flex flex-col items-center gap-2">
@@ -100,12 +151,12 @@ export function CrewInvite() {
 
       {!view.signedIn ? (
         <div className="flex flex-col gap-2">
-          <Button href={`/signup?redirectTo=${encodeURIComponent(here)}`} fullWidth>
+          <Button href={SIGN_UP_HREF} fullWidth>
             Sign up
           </Button>
           <p className="text-sm text-muted">
             Already on SportPool?{' '}
-            <Link href={`/login?redirectTo=${encodeURIComponent(here)}`} className="font-semibold text-primary-600 hover:underline">
+            <Link href={LOG_IN_HREF} className="font-semibold text-primary-600 hover:underline">
               Log in
             </Link>
           </p>

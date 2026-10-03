@@ -30,6 +30,7 @@ import { brandedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { sendPushToUser } from '@/lib/push/apns'
 import { modeLabel } from './needs'
+import { inviteLinkFor } from './inviteLink'
 import { newInviteToken } from './inviteToken'
 import { invitePreviewText } from './words'
 
@@ -38,11 +39,11 @@ type Admin = ReturnType<typeof createAdminClient>
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
 
 /**
- * The page a one-time invite link opens (app/crew-invite). ⚠ The token rides in the FRAGMENT: a
- * browser never sends it to a server, so it stays out of access logs and out of the page-view data
- * Google Tag Manager collects — which a token in the path or query would not.
+ * The page a one-time invite link opens (app/crew-invite). ⚠ The token rides in the FRAGMENT, and
+ * the page moves it into localStorage straight away — so it never reaches a server, a log, or Google
+ * Tag Manager's page views. See ./inviteLink for how a signed-out reader gets back to it.
  */
-export const inviteLinkUrl = (token: string) => `${APP_URL}/crew-invite#${token}`
+export const inviteLinkUrl = (token: string) => inviteLinkFor(APP_URL, token)
 
 /** The reminder goes out when picks lock within this window — "about a day". */
 export const REMINDER_WINDOW_MS = 24 * 3_600_000
