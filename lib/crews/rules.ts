@@ -66,24 +66,25 @@ export function canRestore(
 }
 
 /**
- * Can this pool be linked to the crew (Ryan, 2026-10-03)? Only if every PLAYER in it is already an
- * active member — so linking adds a season to the crew's history and never adds a person. (Our rule
- * is "you're in a crew because you played in its pools"; a pool with an outsider would make them a
- * member without their choosing, so such a pool is never offered and never linked.) And it must be
- * the crew playing together — at least two players, more than half the crew. Spectators
- * aren't players and don't count. Who may link is `canManage` AND the pool's admin — checked where
- * the pool is known (store.linkPoolToCrew).
+ * Can this pool be linked to the crew (Ryan, 2026-10-03)? When every PLAYER in it is already an
+ * active member — the whole crew, or any part of it — and there are at least two of them.
+ *
+ *   · All in the crew, so linking adds a season to the crew's history and never adds a person (our
+ *     rule is "you're in a crew because you played in its pools"; a pool with an outsider would
+ *     make them a member unasked).
+ *   · Any part of the crew (Ryan: "there'll be times when people just can't join — life events —
+ *     but they still want to be part of the crew"). A season someone sat out costs them nothing:
+ *     the all-time table is seasons · titles · best finish, never summed points, so they simply
+ *     have one season fewer, and the finish reads against the field ("1st of 3").
+ *   · At least two, his call: a one-player season is a free title (1st of 1 beats nobody) that
+ *     would sit in the all-time table beside real ones — and production offered five solo test
+ *     pools beside the two real ones before this rule existed.
+ *
+ * Spectators aren't players. Who may link is `canManage` AND the pool's admin — checked where the
+ * pool is known (store.linkPoolToCrew); the same rule gates both the list and the write.
  */
 export function linkablePool(playerIds: readonly string[], activeMemberIds: ReadonlySet<string>): boolean {
-  // ⚠ "The same people, or fewer" — but not ANY fewer. Run against production, the bare rule offered
-  // every pool its captain plays alone (five solo test pools beside the two real ones): one player is
-  // trivially "all in the crew". So it must be the crew playing together: at least two players, and
-  // more than half of the crew.
-  return (
-    playerIds.length >= 2 &&
-    playerIds.length * 2 > activeMemberIds.size &&
-    playerIds.every((id) => activeMemberIds.has(id))
-  )
+  return playerIds.length >= 2 && playerIds.every((id) => activeMemberIds.has(id))
 }
 
 /** Naming the co-captain is the captain's alone. */

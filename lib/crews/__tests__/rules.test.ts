@@ -285,12 +285,13 @@ describe('linking a pool you already run (2026-10-03)', () => {
   it('an empty pool is nothing to link', () => {
     expect(linkablePool([], crew)).toBe(false)
   })
-  it('⚠ a pool you play alone isn’t the crew playing together — production offered five of those', () => {
+  it('⚠ two or more: a one-player season is a free title (and production offered five solo pools)', () => {
     expect(linkablePool(['a'], crew)).toBe(false)
   })
-  it('more than half the crew: 2 of 3 yes, 2 of 5 no', () => {
-    expect(linkablePool(['a', 'b'], crew)).toBe(true)
-    expect(linkablePool(['a', 'b'], new Set(['a', 'b', 'c', 'd', 'e']))).toBe(false)
-    expect(linkablePool(['a', 'b', 'c'], new Set(['a', 'b', 'c', 'd', 'e']))).toBe(true)
+  it('any part of the crew — someone sitting a season out (life happens) doesn’t stop it', () => {
+    const big = new Set(['a', 'b', 'c', 'd', 'e'])
+    expect(linkablePool(['a', 'b'], big)).toBe(true)
+    expect(linkablePool(['a', 'b', 'c'], big)).toBe(true)
+    expect(linkablePool(['a', 'b', 'c', 'd', 'e'], big)).toBe(true)
   })
 })

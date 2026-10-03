@@ -221,7 +221,7 @@ export const LINK_CONSEQUENCE =
   'Its seasons count in the crew’s history, and anyone in the crew can join it from here. A pool stays with its crew for good, and crew pools are private.';
 
 /** Under "Also playing together". */
-export const LINK_HINT = 'Pools you run where everyone’s already in the crew. Linking adds the season to its history — nobody new joins.';
+export const LINK_HINT = 'Pools you run where everyone playing is in the crew — all of it, or just some of you. Linking adds the season to its history; nobody new joins.';
 
 /** "Same 3 people as the crew" / "2 of the crew’s 3". */
 export function linkablePeopleText(players: number, crewSize: number): string {
