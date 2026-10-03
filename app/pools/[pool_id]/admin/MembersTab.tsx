@@ -24,6 +24,7 @@ import {
 } from '@/lib/tournament'
 import { resolvePredictedBracket } from '@/lib/bracketResolver'
 import { resolveFullBracketFromPicks } from '@/lib/bracketPickerResolver'
+import { PoolSpotsSaved } from '@/components/crews/PoolCrew'
 
 type MemberBadgeStatus = 'submitted' | 'partial' | 'pending' | 'awaiting'
 
@@ -480,6 +481,9 @@ export function MembersTab({
 
   return (
     <div>
+
+      {/* Crews (154): who still has a saved spot — this tab is the pool admin's, and so are the names. */}
+      <PoolSpotsSaved poolId={pool.pool_id} />
 
       {error && (
         <Alert variant="error" className="mb-4">

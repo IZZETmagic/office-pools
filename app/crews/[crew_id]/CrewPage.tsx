@@ -1,9 +1,11 @@
 'use client'
 
-// The web crew page — the basic one (plan §8a). Mirrors mobile/app/profile/crews/[id].tsx section
-// for section, minus the captain's controls, which come with 8b.
+// The web crew page. Mirrors mobile/app/profile/crews/[id].tsx section for section: the basic page
+// shipped in plan §8a, and the captain's controls joined it in §8b.
 //
 // The rules it shows (Ryan, 2026-10-02):
+//   · Captain + co-captain add people (by exact username or email — AddPeopleModal), remove people,
+//     and rename; the captain alone names the co-captain. Removal is silent and keeps history.
 //   · Anyone in the crew can join a running season they're not in, from here.
 //   · Leaving is one tap; history stays; the captaincy passes on (said before the tap). Someone who
 //     left can open this page and Rejoin; the removed can't see it at all (the page 404s).
@@ -13,52 +15,80 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+import { AddPeopleModal } from '@/components/crews/AddPeopleModal'
+import { CrewFace } from '@/components/crews/CrewFace'
+import { NameCrewModal } from '@/components/crews/NameCrewModal'
 import { AppHeader } from '@/components/ui/AppHeader'
-import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Icon } from '@/components/ui/Icon'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
-import type { CrewDetail, Person } from '@/lib/crews/read'
+import { crewRequest, errorText } from '@/lib/crews/client'
+import type { CrewDetail } from '@/lib/crews/read'
 import { finishText, leaveConsequence, ordinal, personName, plural, roleLabel, shortName, winnersText } from '@/lib/crews/words'
 
-/** The shared web Avatar takes the database's snake_case. */
-const face = (p: Person) => ({ user_id: p.userId, full_name: p.fullName, username: p.username, avatar_colour: p.avatarColour })
+type Member = CrewDetail['members'][number]
 
-export function CrewPage({ crew, viewerId, isSuperAdmin }: { crew: CrewDetail; viewerId: string; isSuperAdmin: boolean }) {
+export function CrewPage({
+  crew,
+  viewerId,
+  viewerName,
+  isSuperAdmin,
+}: {
+  crew: CrewDetail
+  viewerId: string
+  /** Who an email invite will say asked — the viewer. */
+  viewerName: string
+  isSuperAdmin: boolean
+}) {
   const router = useRouter()
   const { showToast } = useToast()
   const [busy, setBusy] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [choosingCo, setChoosingCo] = useState(false)
+  const [selected, setSelected] = useState<Member | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState<Member | null>(null)
 
   const v = crew.viewer
   const captain = crew.members.find((m) => m.role === 'captain') ?? null
   const co = crew.members.find((m) => m.role === 'co_captain') ?? null
   const crewUrl = `/api/crews/${encodeURIComponent(crew.crew.crewId)}`
 
-  /** POST, then either go somewhere or re-read the page. A failure keeps everything and says why. */
-  async function act(url: string, body: Record<string, unknown>, after: (data: Record<string, unknown>) => void) {
+  /** Run one request, then go somewhere or re-read the page. A failure keeps everything and says why. */
+  async function act<T>(request: () => Promise<T>, after: (data: T) => void = () => router.refresh()) {
     if (busy) return
     setBusy(true)
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
-      if (!res.ok) {
-        showToast(typeof data.error === 'string' ? data.error : 'That didn’t work. Please try again.', 'error')
-        return
-      }
-      after(data)
-    } catch {
-      showToast('That didn’t work. Please try again.', 'error')
+      after(await request())
+    } catch (e) {
+      showToast(errorText(e), 'error')
     } finally {
       setBusy(false)
     }
   }
 
+  /** What tapping a member offers — the same rules as the app (and the API, which enforces them). */
+  function memberOptions(m: Member): Array<{ id: 'co_captain' | 'remove'; label: string }> {
+    const out: Array<{ id: 'co_captain' | 'remove'; label: string }> = []
+    if (v.canSetCoCaptain && m.role === 'member') out.push({ id: 'co_captain', label: 'Make co-captain' })
+    if (v.canManage && m.role !== 'captain' && (m.role === 'member' || v.role === 'captain')) {
+      out.push({ id: 'remove', label: 'Remove from crew' })
+    }
+    return out
+  }
+
+  const setCoCaptain = (userId: string) =>
+    act(() => crewRequest(`${crewUrl}/co-captain`, { body: { user_id: userId } }))
+
   return (
     <div className="min-h-screen bg-surface-secondary">
-      <AppHeader isSuperAdmin={isSuperAdmin} breadcrumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: crew.crew.name }]} />
+      <AppHeader
+        isSuperAdmin={isSuperAdmin}
+        breadcrumbs={[{ label: 'Crews', href: '/profile?tab=crews' }, { label: crew.crew.name }]}
+      />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
         {!v.active && v.canRejoin ? (
@@ -67,7 +97,7 @@ export function CrewPage({ crew, viewerId, isSuperAdmin }: { crew: CrewDetail; v
               <p className="text-[15px] font-bold text-ink">You left this crew</p>
               <p className="text-[13px] text-muted">Rejoin to get a saved spot next season again. Your history is still here.</p>
               <Button
-                onClick={() => void act(`${crewUrl}/rejoin`, {}, () => router.refresh())}
+                onClick={() => void act(() => crewRequest(`${crewUrl}/rejoin`, { body: {} }))}
                 loading={busy}
                 loadingText="Rejoining…"
                 className="self-start"
@@ -79,7 +109,18 @@ export function CrewPage({ crew, viewerId, isSuperAdmin }: { crew: CrewDetail; v
         ) : null}
 
         <header className="flex flex-col gap-1">
-          <h1 className="text-[26px] font-black text-ink leading-tight break-words">{crew.crew.name}</h1>
+          <div className="flex items-start gap-3">
+            <h1 className="flex-1 min-w-0 text-[26px] font-black text-ink leading-tight break-words">{crew.crew.name}</h1>
+            {v.canManage ? (
+              <button
+                type="button"
+                onClick={() => setRenaming(true)}
+                className="mt-2 text-[13px] font-bold text-primary-600 hover:text-primary-700"
+              >
+                Rename
+              </button>
+            ) : null}
+          </div>
           <p className="text-[13px] font-medium text-muted">
             {[
               plural(crew.members.length, 'person', 'people'),
@@ -90,6 +131,20 @@ export function CrewPage({ crew, viewerId, isSuperAdmin }: { crew: CrewDetail; v
               .join(' · ')}
           </p>
         </header>
+
+        {v.role === 'captain' && !co && crew.members.length > 1 ? (
+          <button
+            type="button"
+            onClick={() => setChoosingCo(true)}
+            className="flex items-center gap-2 rounded-control bg-warning-100 dark:bg-warning-500/15 p-4 text-left hover:opacity-80 transition-opacity"
+          >
+            <Icon name="star.fill" size={15} className="text-warning-600 shrink-0" />
+            <span className="flex-1 text-[13px] leading-[18px] text-ink">
+              <strong className="font-bold">Pick a co-captain</strong>, so the crew isn’t stuck if you’re away.
+            </span>
+            <Icon name="chevron.right" size={12} weight="semibold" className="text-muted" />
+          </button>
+        ) : null}
 
         {crew.playingNow.length ? (
           <Section title="Playing now" hint="Any member can start a pool for the crew — whoever starts it runs that season.">
@@ -121,7 +176,10 @@ export function CrewPage({ crew, viewerId, isSuperAdmin }: { crew: CrewDetail; v
                         disabled={busy}
                         onClick={() =>
                           // Joining a crew pool with an open seat takes the seat (lib/pools/join.ts).
-                          void act('/api/pools/join', { pool_id: p.poolId }, () => router.push(`/pools/${encodeURIComponent(p.poolId)}`))
+                          void act(
+                            () => crewRequest('/api/pools/join', { body: { pool_id: p.poolId } }),
+                            () => router.push(`/pools/${encodeURIComponent(p.poolId)}`),
+                          )
                         }
                       >
                         {p.seat === 'open' ? 'I’m in' : 'Join'}
@@ -197,9 +255,10 @@ export function CrewPage({ crew, viewerId, isSuperAdmin }: { crew: CrewDetail; v
 
         <Section
           title="The crew"
+          action={v.canManage ? { label: 'Add people', onClick: () => setAdding(true) } : undefined}
           hint={
             v.canManage
-              ? 'Adding people, renaming the crew and picking a co-captain are in the SportPool app for now.'
+              ? 'Only you and your co-captain see who’s invited. Click someone to make them co-captain or remove them — removed people aren’t told, and their history stays.'
               : 'The captain and co-captain add people by username or email. Anyone who plays in one of the crew’s pools is in automatically.'
           }
         >
@@ -207,16 +266,62 @@ export function CrewPage({ crew, viewerId, isSuperAdmin }: { crew: CrewDetail; v
             <ul className="grid grid-cols-4 sm:grid-cols-5 gap-y-4">
               {crew.members.map((m) => {
                 const label = roleLabel(m.role)
-                return (
-                  <li key={m.userId} className="flex flex-col items-center gap-1 min-w-0" aria-label={`${personName(m)}${label ? `, ${label}` : ''}`}>
-                    <Avatar person={face(m)} size={44} />
+                const tappable = memberOptions(m).length > 0
+                const inner = (
+                  <>
+                    <CrewFace person={m} size={44} />
                     <span className="max-w-[92%] truncate text-[11.5px] font-bold text-ink">{m.userId === viewerId ? 'You' : shortName(m)}</span>
                     {label ? <span className="text-[8.5px] font-black tracking-[0.5px] text-warning-700">{label.toUpperCase()}</span> : null}
+                  </>
+                )
+                const a11y = `${personName(m)}${label ? `, ${label}` : ''}`
+                return (
+                  <li key={m.userId} className="min-w-0">
+                    {tappable ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelected(m)}
+                        aria-label={a11y}
+                        className="w-full flex flex-col items-center gap-1 rounded-control py-1 hover:bg-mist/60 transition-colors"
+                      >
+                        {inner}
+                      </button>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 py-1" aria-label={a11y}>
+                        {inner}
+                      </div>
+                    )}
                   </li>
                 )
               })}
             </ul>
           </Card>
+
+          {v.canManage && crew.invites && crew.invites.length > 0 ? (
+            <Card padding="none">
+              <p className="px-4 pt-3 pb-1 text-[10px] font-black tracking-[0.6px] text-muted">INVITED · WAITING</p>
+              <ul>
+                {crew.invites.map((inv, i) => (
+                  <li key={inv.inviteId} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-border-subtle' : ''}`}>
+                    {inv.invitee ? <CrewFace person={inv.invitee} size={28} /> : <Icon name="envelope.fill" size={18} className="text-muted" />}
+                    <span className="flex-1 min-w-0 truncate text-sm font-bold text-ink">
+                      {inv.invitee ? personName(inv.invitee) : inv.email}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void act(() => crewRequest(`/api/crews/invites/${encodeURIComponent(inv.inviteId)}`, { method: 'DELETE' }))
+                      }
+                      className="text-[12.5px] font-bold text-danger-600 hover:text-danger-700 disabled:opacity-50"
+                    >
+                      Withdraw
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
         </Section>
 
         {v.active ? (
@@ -232,46 +337,213 @@ export function CrewPage({ crew, viewerId, isSuperAdmin }: { crew: CrewDetail; v
         ) : null}
       </main>
 
-      <Modal isOpen={confirmLeave} onClose={() => setConfirmLeave(false)} size="sm" titleId="leave-crew-title">
+      {/* ── Dialogs ── */}
+
+      {adding ? (
+        <AddPeopleModal
+          isOpen
+          crewId={crew.crew.crewId}
+          crewName={crew.crew.name}
+          inviterName={viewerName}
+          onClose={() => setAdding(false)}
+          onChanged={() => router.refresh()}
+        />
+      ) : null}
+
+      {renaming ? (
+        <NameCrewModal
+          title="Rename the crew"
+          description="Everyone in the crew sees the new name."
+          initialName={crew.crew.name}
+          confirmLabel="Save"
+          onClose={() => setRenaming(false)}
+          onSubmit={async (name) => {
+            if (name !== crew.crew.name) await crewRequest(crewUrl, { method: 'PATCH', body: { name } })
+            setRenaming(false)
+            router.refresh()
+          }}
+        />
+      ) : null}
+
+      <Modal isOpen={selected !== null} onClose={() => setSelected(null)} size="sm" titleId="member-title">
+        {selected ? (
+          <div className="px-5 sm:px-6 pt-4 pb-6 flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <CrewFace person={selected} size={40} />
+              <h2 id="member-title" className="t-card-title text-ink truncate">
+                {personName(selected)}
+              </h2>
+            </div>
+            <div className="flex flex-col gap-2">
+              {memberOptions(selected).map((o) => (
+                <Button
+                  key={o.id}
+                  variant={o.id === 'remove' ? 'secondary' : 'primary'}
+                  className={o.id === 'remove' ? 'text-danger-600' : ''}
+                  onClick={() => {
+                    const m = selected
+                    setSelected(null)
+                    if (o.id === 'co_captain') void setCoCaptain(m.userId)
+                    else setConfirmRemove(m)
+                  }}
+                >
+                  {o.label}
+                </Button>
+              ))}
+              <Button variant="ghost" onClick={() => setSelected(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal isOpen={choosingCo} onClose={() => setChoosingCo(false)} size="sm" titleId="co-title">
         <div className="px-5 sm:px-6 pt-4 pb-6 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <h2 id="leave-crew-title" className="t-card-title text-ink">
-              Leave {crew.crew.name}?
+            <h2 id="co-title" className="t-card-title text-ink">
+              Pick a co-captain
             </h2>
-            <p className="t-body text-muted">{leaveConsequence(crew)}</p>
+            <p className="t-body text-muted">They can add and remove people and rename the crew, and take over if you leave.</p>
           </div>
-          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-            <Button variant="secondary" onClick={() => setConfirmLeave(false)} disabled={busy}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              loading={busy}
-              loadingText="Leaving…"
-              onClick={() =>
-                void act(`${crewUrl}/leave`, {}, (data) => {
-                  setConfirmLeave(false)
-                  // The last one out closes the crew, and a closed crew has no page.
-                  if (data.closed === true) router.push('/dashboard')
-                  else router.refresh()
-                })
-              }
-            >
-              Leave
-            </Button>
-          </div>
+          <ul className="rounded-control border border-border-default divide-y divide-border-subtle overflow-hidden max-h-[50vh] overflow-y-auto">
+            {crew.members
+              .filter((m) => m.role === 'member')
+              .map((m) => (
+                <li key={m.userId}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setChoosingCo(false)
+                      void setCoCaptain(m.userId)
+                    }}
+                    className="w-full flex items-center gap-3 p-3 text-left hover:bg-mist/60 transition-colors"
+                  >
+                    <CrewFace person={m} size={32} />
+                    <span className="flex-1 min-w-0 truncate text-sm font-bold text-ink">{personName(m)}</span>
+                  </button>
+                </li>
+              ))}
+          </ul>
+          <Button variant="secondary" onClick={() => setChoosingCo(false)}>
+            Cancel
+          </Button>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={confirmRemove !== null}
+        title={confirmRemove ? `Remove ${shortName(confirmRemove)}?` : ''}
+        body="They’ll stop getting a saved spot. They won’t be told, and their history stays."
+        confirmLabel="Remove"
+        busyLabel="Removing…"
+        busy={busy}
+        onCancel={() => setConfirmRemove(null)}
+        onConfirm={() => {
+          const m = confirmRemove
+          if (!m) return
+          void act(
+            () => crewRequest(`${crewUrl}/members/${encodeURIComponent(m.userId)}/remove`, { body: {} }),
+            () => {
+              setConfirmRemove(null)
+              router.refresh()
+            },
+          )
+        }}
+      />
+
+      <ConfirmModal
+        open={confirmLeave}
+        title={`Leave ${crew.crew.name}?`}
+        body={leaveConsequence(crew)}
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        busyLabel="Leaving…"
+        busy={busy}
+        onCancel={() => setConfirmLeave(false)}
+        onConfirm={() =>
+          void act(
+            () => crewRequest<{ closed?: boolean }>(`${crewUrl}/leave`, { body: {} }),
+            (data) => {
+              setConfirmLeave(false)
+              // The last one out closes the crew, and a closed crew has no page.
+              if (data.closed === true) router.push('/profile?tab=crews')
+              else router.refresh()
+            },
+          )
+        }
+      />
     </div>
   )
 }
 
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Section({
+  title,
+  hint,
+  action,
+  children,
+}: {
+  title: string
+  hint?: string
+  action?: { label: string; onClick: () => void }
+  children: React.ReactNode
+}) {
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-[11px] font-black tracking-[0.6px] text-muted uppercase px-1">{title}</h2>
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-[11px] font-black tracking-[0.6px] text-muted uppercase">{title}</h2>
+        {action ? (
+          <button type="button" onClick={action.onClick} className="text-[13px] font-bold text-primary-600 hover:text-primary-700">
+            {action.label}
+          </button>
+        ) : null}
+      </div>
       {children}
       {hint ? <p className="text-xs text-muted px-1">{hint}</p> : null}
     </section>
+  )
+}
+
+function ConfirmModal({
+  open,
+  title,
+  body,
+  confirmLabel,
+  cancelLabel = 'Cancel',
+  busyLabel,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean
+  title: string
+  body: string
+  confirmLabel: string
+  cancelLabel?: string
+  busyLabel: string
+  busy: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <Modal isOpen={open} onClose={onCancel} size="sm" titleId="confirm-title">
+      <div className="px-5 sm:px-6 pt-4 pb-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <h2 id="confirm-title" className="t-card-title text-ink">
+            {title}
+          </h2>
+          <p className="t-body text-muted">{body}</p>
+        </div>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+          <Button variant="secondary" onClick={onCancel} disabled={busy}>
+            {cancelLabel}
+          </Button>
+          <Button variant="danger" loading={busy} loadingText={busyLabel} onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   )
 }

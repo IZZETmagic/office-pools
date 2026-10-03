@@ -21,6 +21,7 @@ import { AppHeader } from '@/components/ui/AppHeader'
 import { useTheme } from '@/components/ThemeProvider'
 import { getFormDotClass } from '@/lib/design/formDots'
 import { formatNumber } from '@/lib/format'
+import { MyCrewsTab } from '@/components/crews/MyCrewsTab'
 
 // =====================
 // TYPES
@@ -78,7 +79,7 @@ type Prediction = {
   }
 }
 
-type Tab = 'statistics' | 'achievements' | 'predictions' | 'archived' | 'account'
+type Tab = 'statistics' | 'achievements' | 'crews' | 'predictions' | 'archived' | 'account'
 
 type PlayerScoreEntry = {
   match_points: number
@@ -165,6 +166,16 @@ const TAB_CONFIG: { key: Tab; label: string; mobileLabel: string; icon: React.Re
     mobileLabel: 'Trophies',
     icon: (
       <Icon name="trophy.fill" size={16} weight="semibold" className="shrink-0" />
+    ),
+  },
+  {
+    // Crews (154): the groups you play with — never a list of people. The app's My Crews, on the
+    // web. Linked as ?tab=crews from the crew page's breadcrumb.
+    key: 'crews',
+    label: 'Crews',
+    mobileLabel: 'Crews',
+    icon: (
+      <Icon name="person.3.fill" size={16} weight="semibold" className="shrink-0" />
     ),
   },
   {
@@ -324,6 +335,9 @@ export default function ProfilePage({
             )}
             {activeTab === 'achievements' && (
               <AchievementsSection userId={profile.user_id} />
+            )}
+            {activeTab === 'crews' && (
+              <MyCrewsTab viewerId={profile.user_id} />
             )}
             {activeTab === 'archived' && (
               <ArchivedPoolsTab userId={profile.user_id} />

@@ -9,7 +9,7 @@
 //
 // PURE — no React, no Supabase.
 
-import type { CrewDetail, Person } from './read'
+import type { CrewCard, CrewDetail, Person } from './read'
 import type { CrewRole } from './rules'
 
 /** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st, 22nd. */
@@ -55,6 +55,34 @@ export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
+/** The card's second line: "14 people · 3 seasons since Jun 2026". */
+export function crewSummary(c: Pick<CrewCard, 'people' | 'seasons' | 'since'>): string {
+  const since = monthYear(c.since)
+  return [plural(c.people, 'person', 'people'), c.seasons ? plural(c.seasons, 'season') : 'no seasons yet']
+    .join(' · ')
+    .concat(since ? ` since ${since}` : '')
+}
+
+/** The status chip. Something to act on, then something happening, then the last season. */
+export function crewStatusText(s: CrewCard['status']): string {
+  if (s.kind === 'seat') return `Your spot’s saved · ${s.competition}`
+  if (s.kind === 'live') return `Playing now · ${s.competition}`
+  return s.competition ? `Last played ${s.competition}` : 'No seasons yet'
+}
+
+/** "Dave leads all-time" / "You lead all-time" — null until a season has finished with ranks. */
+export function leaderText(c: Pick<CrewCard, 'leader'>, viewerId: string | null): string | null {
+  if (!c.leader) return null
+  if (c.leader.userId === viewerId) return 'You lead all-time'
+  return `${shortName(c.leader)} leads all-time`
+}
+
+/** "You're 4th all-time" — null until the viewer has a ranked finish. */
+export function meText(c: Pick<CrewCard, 'me'>): string | null {
+  if (c.me.position === null) return null
+  return c.me.position === 1 ? 'You’re top all-time' : `You’re ${ordinal(c.me.position)} all-time`
+}
+
 /** "3rd of 12", or "Played" when the mode has no rank (Last Man Standing). */
 export function finishText(rank: number | null, players: number): string {
   if (rank === null) return 'Played'
@@ -94,4 +122,45 @@ export function deadlineLabel(iso: string, now = Date.now()): string {
   const h = d.getHours()
   const m = String(d.getMinutes()).padStart(2, '0')
   return `${day} ${h % 12 || 12}:${m} ${h < 12 ? 'am' : 'pm'}`
+}
+
+/**
+ * What the captain sees before pressing Invite on an email — the email's own first line.
+ *
+ * ⭐ THE OWNER on the web: lib/crews/notify.invitePreview calls this, so the line shown and the line
+ * sent cannot differ. Lives here rather than in notify.ts because notify imports the mailer and the
+ * push sender, which a browser bundle can't. Mirrored by mobile/lib/crews.invitePreviewText.
+ */
+export function invitePreviewText(inviter: string, crewName: string): string {
+  return `${inviter} asked us to invite you to ${crewName} on SportPool…`
+}
+
+// ── Starting a pool for a crew ──────────────────────────────────────────────────────────────────
+// Mirrors of mobile/lib/createPool.ts (crewAlreadyPlaying, seatSelectionProblem).
+
+/**
+ * Is this crew already playing the competition? Decision 2's guard — a CONFIRM rather than a block
+ * (2026-10-02): Pick'em and Last Man Standing on the same season is the range of formats working,
+ * not a mistake, but the starter should know before making a second.
+ */
+export function crewAlreadyPlaying<
+  P extends { poolName: string; competition: string; leagueSeasonId: string | null; tournamentId: string },
+>(playingNow: P[], competition: { tournament_id: string; league_season_id: string | null }): P | null {
+  return (
+    playingNow.find((p) =>
+      competition.league_season_id
+        ? p.leagueSeasonId === competition.league_season_id
+        : !p.leagueSeasonId && p.tournamentId === competition.tournament_id,
+    ) ?? null
+  )
+}
+
+/**
+ * Saved spots never exceed what the pool holds (decision 7). null when the choice fits; otherwise
+ * the sentence to show — the server refuses the same thing (rules.seatSelectionError).
+ */
+export function seatSelectionProblem(chosen: number, spots: number | null): string | null {
+  if (spots === null || chosen <= spots) return null
+  const over = chosen - spots
+  return `A Free pool holds ${spots + 1}, so ${spots} can have a saved spot — untick ${over} more.`
 }

@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 
 import * as app from '../../../mobile/lib/crews'
+import * as appCreate from '../../../mobile/lib/createPool'
 import * as web from '../words'
 
 const P = (o: Partial<{ userId: string; fullName: string | null; username: string | null; role: 'captain' | 'co_captain' | 'member'; joinedAt: string }>) => ({
@@ -68,6 +69,64 @@ describe('the web says what the app says', () => {
     expect(web.leaveConsequence({ ...cases[1], viewer: { role: 'captain', active: true, canManage: true, canSetCoCaptain: true, canRejoin: false } })).toBe(
       'Kofi will become captain. Your history stays.',
     )
+  })
+})
+
+describe('My Crews says what the app says', () => {
+  const card = (o: Partial<Parameters<typeof web.crewSummary>[0] & Parameters<typeof web.leaderText>[0] & Parameters<typeof web.meText>[0]> = {}) => ({
+    people: 14,
+    seasons: 3,
+    since: '2026-06-15T12:00:00Z',
+    leader: { ...P({ userId: 'd' }), titles: 2 },
+    me: { position: 4, titles: 0, seasons: 3 },
+    ...o,
+  })
+  it('the summary line — including one person, no seasons, and a bad date', () => {
+    for (const c of [card(), card({ people: 1, seasons: 0 }), card({ seasons: 1, since: 'nope' })]) {
+      expect(web.crewSummary(c)).toBe(app.crewSummary(c))
+    }
+  })
+  it('the status chip, all three kinds', () => {
+    const statuses = [
+      { kind: 'seat' as const, poolId: 'p', competition: 'Premier League 2026/27', firstLockAt: '2026-10-09T12:00:00Z' },
+      { kind: 'live' as const, poolId: 'p', competition: 'Champions League 2026/27' },
+      { kind: 'quiet' as const, poolId: 'p', competition: 'FIFA World Cup 2026' },
+      { kind: 'quiet' as const, poolId: null, competition: null },
+    ]
+    for (const st of statuses) expect(web.crewStatusText(st)).toBe(app.crewStatusText(st))
+  })
+  it('who leads, and where you stand', () => {
+    for (const c of [card(), card({ leader: null }), card({ me: { position: 1, titles: 2, seasons: 3 } }), card({ me: { position: null, titles: 0, seasons: 0 } })]) {
+      for (const viewer of ['d', 'someone-else', null]) expect(web.leaderText(c, viewer)).toBe(app.leaderText(c, viewer))
+      expect(web.meText(c)).toBe(app.meText(c))
+    }
+  })
+  it('the invite preview line', () => {
+    expect(web.invitePreviewText('Dave Okafor', 'Bermuda Office')).toBe(app.invitePreviewText('Dave Okafor', 'Bermuda Office'))
+  })
+})
+
+describe('starting a pool for a crew works as it does in the app', () => {
+  const running = [
+    { poolName: 'Office League', competition: 'Premier League 2026/27', leagueSeasonId: 's-pl', tournamentId: 't-pl' },
+    { poolName: 'WC Sweep', competition: 'FIFA World Cup 2026', leagueSeasonId: null, tournamentId: 't-wc' },
+  ]
+  it('already playing this? — by season for a league, by tournament otherwise', () => {
+    const asks = [
+      { tournament_id: 't-pl', league_season_id: 's-pl' },
+      { tournament_id: 't-pl', league_season_id: 's-other' },
+      { tournament_id: 't-wc', league_season_id: null },
+      { tournament_id: 't-new', league_season_id: null },
+    ]
+    for (const a of asks) expect(web.crewAlreadyPlaying(running, a)).toEqual(appCreate.crewAlreadyPlaying(running, a))
+    expect(web.crewAlreadyPlaying(running, asks[0])?.poolName).toBe('Office League')
+    expect(web.crewAlreadyPlaying(running, asks[3])).toBeNull()
+  })
+  it('saved spots never exceed what the pool holds', () => {
+    for (const [chosen, spots] of [[9, 9], [10, 9], [12, 9], [3, null]] as const) {
+      expect(web.seatSelectionProblem(chosen, spots)).toBe(appCreate.seatSelectionProblem(chosen, spots))
+    }
+    expect(web.seatSelectionProblem(10, 9)).toContain('untick 1 more')
   })
 })
 

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from '@/components/ui/Icon'
 import { createClient } from '@/lib/supabase/client'
 import { hasCompetitionEnded } from '@/lib/competitionFormat'
@@ -17,6 +18,10 @@ import { Input } from '@/components/ui/Input'
 import { FormField } from '@/components/ui/FormField'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { TimePicker } from '@/components/ui/TimePicker'
+import { Modal } from '@/components/ui/Modal'
+import { CreatePoolCrewSection, useCreatePoolCrew } from '@/components/crews/CreatePoolCrew'
+import { RosterReviewModal } from '@/components/crews/RosterReviewModal'
+import { crewAlreadyPlaying } from '@/lib/crews/words'
 
 type CreatePoolModalProps = {
   onClose: () => void
@@ -365,6 +370,14 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Crews (154) — the Crew row on Details, and what it changes downstream: a crew pool is always
+  // private, and the people ticked get saved spots. See components/crews/CreatePoolCrew.tsx.
+  const crew = useCreatePoolCrew()
+  const [reviewingSeats, setReviewingSeats] = useState(false)
+  const [clashPrompt, setClashPrompt] = useState<string | null>(null)
+  /** The crew + competition the starter already said "start another" for. */
+  const [clashConfirmedFor, setClashConfirmedFor] = useState<string | null>(null)
+
   // Fetch tournaments on mount
   useEffect(() => {
     async function fetchTournaments() {
@@ -528,7 +541,31 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
 
   const currentStepIndex = STEPS.findIndex((s) => s.key === currentStep)
 
+  /**
+   * Decision 2's guard, as a CONFIRM: a crew already playing this competition can start another
+   * game on it (Pick'em and Last Man Standing side by side) — but should know it's doing so.
+   * True when it has stopped to ask. ⚠ Both ways onto Settings call this: Next, and the step header.
+   */
+  function crewClashStops(): boolean {
+    if (!crew.crewId || !selectedTournament) return false
+    const key = `${crew.crewId}:${selectedTournament.tournament_id}:${selectedTournament.league_season_id ?? ''}`
+    if (clashConfirmedFor === key) return false
+    const clash = crewAlreadyPlaying(crew.playingNow, selectedTournament)
+    if (!clash) return false
+    setClashPrompt(
+      `${crew.picked?.name ?? 'This crew'} is already playing ${clash.competition} (${clash.poolName}). Start another pool on it?`,
+    )
+    return true
+  }
+
+  function goToSettings() {
+    setSlideDirection('forward')
+    setSlideKey((k) => k + 1)
+    setCurrentStep('settings')
+  }
+
   function goNext() {
+    if (currentStep === 'details' && crewClashStops()) return
     if (currentStepIndex < STEPS.length - 1) {
       setSlideDirection('forward')
       setSlideKey((k) => k + 1)
@@ -634,7 +671,12 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
           // on anyway — sent from one expression rather than behind a second
           // branch that could drift out of step with `asksStartMatchweek`.
           league_start_matchweek: asksStartMatchweek ? startMatchweek : null,
-          is_private: isPrivate,
+          // The admin's choice, sent explicitly (lib/__tests__/privateByDefault.guard.test.ts) —
+          // and ⚠ forced on for a crew pool, which is never listed in Discover (Decision 6; 154's
+          // CHECK refuses the pair, and the route answers 400 before it gets that far).
+          is_private: isPrivate || !!crew.crewId,
+          crew_id: crew.crewId,
+          seat_user_ids: crew.crewId ? crew.seats : [],
           // 0 means "no admin-set limit", which the create route turns into
           // NULL. The real ceiling is the tier one, enforced by a trigger.
           max_participants: 0,
@@ -668,7 +710,8 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
   }
 
   const canProceedFromTournament = !!selectedTournamentId
-  const canProceedFromDetails = poolName.trim().length > 0
+  // A crew pool also needs its roster loaded and a choice of saved spots the pool can hold.
+  const canProceedFromDetails = poolName.trim().length > 0 && crew.ready
 
   function canProceed() {
     if (currentStep === 'tournament') return canProceedFromTournament
@@ -789,6 +832,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                     else if (idx === 1 && canProceedFromTournament) canGo = true
                     else if (idx === 2 && canProceedFromTournament) canGo = true
                     else if (idx === 3 && canProceedFromTournament && canProceedFromDetails) canGo = true
+                    if (canGo && idx === 3 && currentStepIndex < 3 && crewClashStops()) return
                     if (canGo && idx !== currentStepIndex) {
                       setSlideDirection(idx > currentStepIndex ? 'forward' : 'back')
                       setSlideKey((k) => k + 1)
@@ -1165,6 +1209,8 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       className="w-full px-4 py-3 rounded-control bg-mist text-ink border border-transparent focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 transition-colors"
                     />
                   </FormField>
+
+                  <CreatePoolCrewSection crew={crew} onReview={() => setReviewingSeats(true)} />
                 </div>
               )}
 
@@ -1304,6 +1350,18 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                   </Section>
                   )}
 
+                  {crew.picked ? (
+                    // ⚠ A crew pool is never listed in Discover (Decision 6; 154's CHECK). Stated, not offered.
+                    <Section
+                      title="Who can join"
+                      description={`Private — crew pools always are. ${crew.picked.name} gets saved spots, and anyone you share the link with can join.`}
+                    >
+                      <p className="flex items-center gap-2 text-sm text-neutral-500">
+                        <Icon name="lock.fill" size={14} />
+                        Not listed in Discover
+                      </p>
+                    </Section>
+                  ) : (
                   <Section
                     title="Who can join"
                     description="Everyone needs the pool code either way. Private also keeps it out of Discover."
@@ -1330,6 +1388,7 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
                       ))}
                     </div>
                   </Section>
+                  )}
 
                   {/* The heading names the control, so the FormField label that
                       used to sit above the 1–10 strip has gone — it was the third
@@ -1427,6 +1486,55 @@ export function CreatePoolModal({ onClose, onSuccess }: CreatePoolModalProps) {
               )}
         </div>
       </div>
+
+      {/* ⚠ Portaled: the panel above keeps its slide-up transform, and a fixed overlay inside a
+          transformed box is pinned to the box rather than the screen. */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            {reviewingSeats && crew.roster ? (
+              <RosterReviewModal
+                crewName={crew.picked?.name ?? ''}
+                roster={crew.roster}
+                initial={crew.seats}
+                onClose={() => setReviewingSeats(false)}
+                onDone={(chosen) => {
+                  crew.setSeats(chosen)
+                  setReviewingSeats(false)
+                }}
+              />
+            ) : null}
+            <Modal isOpen={clashPrompt !== null} onClose={() => setClashPrompt(null)} size="sm" titleId="crew-clash-title">
+              <div className="px-5 sm:px-6 pt-4 pb-6 flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <h2 id="crew-clash-title" className="t-card-title text-ink">
+                    Already playing this
+                  </h2>
+                  <p className="t-body text-muted">{clashPrompt}</p>
+                </div>
+                <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+                  <Button variant="secondary" onClick={() => setClashPrompt(null)}>
+                    Go back
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (crew.crewId && selectedTournament) {
+                        setClashConfirmedFor(
+                          `${crew.crewId}:${selectedTournament.tournament_id}:${selectedTournament.league_season_id ?? ''}`,
+                        )
+                      }
+                      setClashPrompt(null)
+                      goToSettings()
+                    }}
+                  >
+                    Start another
+                  </Button>
+                </div>
+              </div>
+            </Modal>
+          </>,
+          document.body,
+        )}
     </div>
   )
 }

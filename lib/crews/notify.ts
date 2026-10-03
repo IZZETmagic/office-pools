@@ -29,6 +29,7 @@ import { brandedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { sendPushToUser } from '@/lib/push/apns'
 import { modeLabel } from './needs'
+import { invitePreviewText } from './words'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -113,8 +114,9 @@ export type InviteCopyInput = { inviter: string; crewName: string; people: numbe
 
 /**
  * To someone with an account: push + email. The answer (Join / No thanks) is in the app's Needs you
- * and on the web dashboard's — so the button goes to /dashboard, not the site root, which is the
- * marketing page even when you're signed in. Signed out, /dashboard sends you through login and back.
+ * and on the web dashboard's — so the button goes to /dashboard. Signed in, the site root would get
+ * there too (the proxy redirects `/`); the difference is a SIGNED-OUT reader, whom `/` leaves on the
+ * marketing page and /dashboard sends through login and back to the invite.
  */
 export function inviteToAccountCopy(i: InviteCopyInput): Message {
   return {
@@ -162,9 +164,12 @@ export function inviteToEmailCopy(i: InviteCopyInput): { subject: string; html: 
   }
 }
 
-/** What the captain is shown before pressing Invite — the email's own first line, verbatim. */
+/**
+ * What the captain is shown before pressing Invite — the email's own first line, verbatim. The
+ * sentence lives in ./words (browser-safe), so the add-people dialog shows exactly this.
+ */
 export function invitePreview(i: Pick<InviteCopyInput, 'inviter' | 'crewName'>): string {
-  return `${i.inviter} asked us to invite you to ${i.crewName} on SportPool…`
+  return invitePreviewText(i.inviter, i.crewName)
 }
 
 // ── Who is due what (pure) ──────────────────────────────────────────────────────────────────────

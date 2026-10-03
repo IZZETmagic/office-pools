@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/Icon'
 import { LocalTime } from '@/components/LocalTime'
 import { POOL_MODE_INFO, type PredictionMode } from '@/lib/poolModeInfo'
 import { leagueModeInfo, type LeagueMode, type LeagueDepth } from '@/lib/leagueModeInfo'
+import { PoolCrewCard } from '@/components/crews/PoolCrew'
 import type { PoolData, MemberData, EntryData, PoolRoundState } from './types'
 
 type PoolInfoTabProps = {
@@ -147,6 +148,9 @@ export function PoolInfoTab({
 
   return (
     <div className="space-y-6">
+
+      {/* Crews (154): "Part of Bermuda Office · 9 in · 3 spots saved". Nothing for a crewless pool. */}
+      <PoolCrewCard poolId={pool.pool_id} />
 
       {/* Pool Details first: what kind of pool this is frames everything
           below it, so it should not be the last thing read. */}
