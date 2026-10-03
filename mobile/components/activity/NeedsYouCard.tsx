@@ -25,7 +25,9 @@ export function deadlineLabel(iso: string, now = Date.now()): string {
 
 export function NeedsYouCard({ item, onPress }: { item: NeedsYouItem; onPress: () => void }) {
   const theme = useTheme();
-  const urgent = Date.parse(item.deadline_at) - Date.now() < 86_400_000;
+  // Crew cards (no clock) are drawn by CrewNeedsCard; this guard only keeps a NULL from drawing an
+  // empty pill if one ever arrives here.
+  const urgent = item.deadline_at !== null && Date.parse(item.deadline_at) - Date.now() < 86_400_000;
   const progress = item.total > 1 ? item.made / item.total : null;
 
   return (
@@ -55,24 +57,26 @@ export function NeedsYouCard({ item, onPress }: { item: NeedsYouItem; onPress: (
             {item.subtitle}
           </RNText>
         </View>
-        <View
-          style={{
-            paddingHorizontal: theme.spacing.sm,
-            paddingVertical: 3,
-            borderRadius: theme.radii.pill,
-            backgroundColor: urgent ? theme.colors.redLight : theme.colors.amberLight,
-          }}
-        >
-          <RNText
+        {item.deadline_at !== null ? (
+          <View
             style={{
-              fontFamily: fontFamilies.bold,
-              fontSize: 11,
-              color: urgent ? theme.colors.red : theme.colors.amber,
+              paddingHorizontal: theme.spacing.sm,
+              paddingVertical: 3,
+              borderRadius: theme.radii.pill,
+              backgroundColor: urgent ? theme.colors.redLight : theme.colors.amberLight,
             }}
           >
-            {deadlineLabel(item.deadline_at)}
-          </RNText>
-        </View>
+            <RNText
+              style={{
+                fontFamily: fontFamilies.bold,
+                fontSize: 11,
+                color: urgent ? theme.colors.red : theme.colors.amber,
+              }}
+            >
+              {deadlineLabel(item.deadline_at)}
+            </RNText>
+          </View>
+        ) : null}
       </View>
 
       {progress !== null ? (

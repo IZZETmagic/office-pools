@@ -759,21 +759,42 @@ export type ActivityLink = {
   params: Record<string, string>;
 };
 
-/** A decision that is still open — the top of the Activity tab. */
+/** A crew card's button. Which route each one calls lives in the Activity screen. */
+export type NeedAction = {
+  id: 'take' | 'decline' | 'join' | 'save' | 'dismiss';
+  label: string;
+  style: 'primary' | 'secondary';
+};
+
+/**
+ * A decision that is still open — the top of the Activity tab.
+ *
+ * The three crew kinds arrive only because fetchUserActivity sends `crews=1`; a build without
+ * CrewNeedsCard never asks for them (server: lib/crews/needs.ts).
+ */
 export type NeedsYouItem = {
   id: string;
-  kind: 'pick' | 'lms' | 'table';
+  kind: 'pick' | 'lms' | 'table' | 'crew_seat' | 'crew_invite' | 'crew_save';
   pool_id: string;
   pool_name: string;
   entry_id: string;
   title: string;
   subtitle: string;
-  deadline_at: string;
+  /** NULL for a crew card with no clock (an invite, Keep this group together?). */
+  deadline_at: string | null;
   made: number;
   total: number;
   cta: string;
-  link: ActivityLink;
+  /** NULL when the card itself goes nowhere — its buttons are the actions. */
+  link: ActivityLink | null;
+  /** Crew cards only. */
+  actions?: NeedAction[];
+  /** Crew cards only. */
+  crew?: { crew_id: string | null; name: string; invite_id?: string; people?: number };
 };
+
+export const isCrewNeed = (n: NeedsYouItem): boolean =>
+  n.kind === 'crew_seat' || n.kind === 'crew_invite' || n.kind === 'crew_save';
 
 export type ActivityFeedResponse = {
   items: ActivityFeedItemRaw[];
@@ -792,7 +813,35 @@ export type ActivityFeedResponse = {
  */
 export function fetchUserActivity(userId: string, before?: string | null) {
   const cursor = before ? `&before=${encodeURIComponent(before)}` : '';
-  return apiFetch<ActivityFeedResponse>(`/api/users/${userId}/activity?v=2${cursor}`);
+  // ⚠ `crews=1` is a CAPABILITY FLAG, not a version: it asks for the crew cards this build can
+  // answer (CrewNeedsCard). A server that predates Crews ignores it and answers v2 as before —
+  // which is why this is not `v=3`, which an old server would answer with v1 and no Needs You.
+  return apiFetch<ActivityFeedResponse>(`/api/users/${userId}/activity?v=2&crews=1${cursor}`);
+}
+
+// ── Crews ────────────────────────────────────────────────────────────────────
+
+/** "Your spot's saved" → I'm in (the ordinary join) / Not this one. */
+export function answerCrewSeat(poolId: string, answer: 'take' | 'decline') {
+  return apiFetch<{ poolId: string }>(`/api/crews/seats/${poolId}`, { method: 'POST', body: { answer } });
+}
+
+/** "Dave added you to …" → Join / No thanks. */
+export function answerCrewInvite(inviteId: string, answer: 'join' | 'decline') {
+  return apiFetch<{ crewId: string }>(`/api/crews/invites/${inviteId}/answer`, { method: 'POST', body: { answer } });
+}
+
+/** "Keep this group together?" → Save as crew. The pool's admin only. */
+export function saveCrewFromPool(poolId: string, name: string) {
+  return apiFetch<{ crewId: string; members: number }>('/api/crews', {
+    method: 'POST',
+    body: { pool_id: poolId, name },
+  });
+}
+
+/** "Keep this group together?" → Not now. For good. */
+export function dismissCrewPrompt(poolId: string) {
+  return apiFetch<Record<string, never>>(`/api/pools/${poolId}/crew-prompt/dismiss`, { method: 'POST' });
 }
 
 /** The member opened the Activity tab: everything before now is read. */

@@ -1,16 +1,18 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text as RNText, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   ActivityCard,
   ActivityFilterChips,
+  CrewNeedsCard,
   MatchweekStoryCard,
   MentionCard,
   NeedsYouCard,
 } from '@/components/activity';
+import { SaveCrewSheet, type SaveCrewSheetHandle } from '@/components/crews/SaveCrewSheet';
 import {
   JoinPoolSheet,
   type JoinPoolSheetHandle,
@@ -21,7 +23,16 @@ import {
 import { Button, Icon, Text } from '@/components/ui';
 import { useSharedActivity } from '@/lib/ActivityProvider';
 import { groupByDay, matchesFilter, type ActivityFilter } from '@/lib/activityFilters';
-import type { ActivityLink } from '@/lib/api';
+import {
+  answerCrewInvite,
+  answerCrewSeat,
+  dismissCrewPrompt,
+  isCrewNeed,
+  type ActivityLink,
+  type NeedAction,
+  type NeedsYouItem,
+} from '@/lib/api';
+import { useHomeData } from '@/lib/HomeDataProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import type { ActivityItem } from '@/lib/useActivity';
 import { fontFamilies, useTheme } from '@/theme';
@@ -84,7 +95,50 @@ export default function ActivityScreen() {
   // join a pool from any primary tab.
   const createJoinSheetRef = useRef<PoolCreateJoinSheetHandle | null>(null);
   const joinPoolSheetRef = useRef<JoinPoolSheetHandle | null>(null);
+  const saveCrewSheetRef = useRef<SaveCrewSheetHandle | null>(null);
   const lastFocusFetchRef = useRef(0);
+  const { refresh: refreshHomeData } = useHomeData();
+
+  /**
+   * A crew card's buttons (lib/crews/needs.ts decides which a card has). Each calls its route,
+   * then refreshes, so the card leaves the list the way a made pick does. A failure keeps the card
+   * and says why — "This pool is full." comes straight from the server.
+   */
+  const onCrewAction = useCallback(
+    async (item: NeedsYouItem, action: NeedAction) => {
+      try {
+        switch (action.id) {
+          case 'take':
+            await answerCrewSeat(item.pool_id, 'take');
+            void refreshHomeData();
+            await refresh();
+            router.navigate(`/pool/${item.pool_id}`);
+            return;
+          case 'decline':
+            if (item.kind === 'crew_invite' && item.crew?.invite_id) await answerCrewInvite(item.crew.invite_id, 'decline');
+            else await answerCrewSeat(item.pool_id, 'decline');
+            break;
+          case 'join':
+            if (item.crew?.invite_id) await answerCrewInvite(item.crew.invite_id, 'join');
+            break;
+          case 'dismiss':
+            await dismissCrewPrompt(item.pool_id);
+            break;
+          case 'save':
+            saveCrewSheetRef.current?.open({
+              poolId: item.pool_id,
+              suggestedName: item.crew?.name ?? item.pool_name,
+              people: item.crew?.people ?? 0,
+            });
+            return;
+        }
+        await refresh();
+      } catch (e) {
+        Alert.alert('That didn’t work', e instanceof Error ? e.message : 'Please try again.');
+      }
+    },
+    [refresh, refreshHomeData],
+  );
 
   // On focus: refresh if stale, THEN mark seen. In that order so the rows that
   // are new on this visit keep their dots while being read — the fetch carries
@@ -159,9 +213,19 @@ export default function ActivityScreen() {
               {needsYou.length > 0 ? (
                 <>
                   <SectionLabel text={`Needs you · ${needsYou.length}`} />
-                  {needsYou.map((n) => (
-                    <NeedsYouCard key={n.id} item={n} onPress={() => router.push(n.link as never)} />
-                  ))}
+                  {needsYou.map((n) =>
+                    isCrewNeed(n) ? (
+                      <CrewNeedsCard key={n.id} item={n} onAction={onCrewAction} />
+                    ) : (
+                      <NeedsYouCard
+                        key={n.id}
+                        item={n}
+                        onPress={() => {
+                          if (n.link) router.push(n.link as never);
+                        }}
+                      />
+                    ),
+                  )}
                 </>
               ) : null}
             </View>
@@ -186,7 +250,7 @@ export default function ActivityScreen() {
           return <FilterEmpty filter={filter} />;
       }
     },
-    [theme, needsYou, filter, unreadMentions],
+    [theme, needsYou, filter, unreadMentions, onCrewAction],
   );
 
   const hasAnything = items.length > 0 || needsYou.length > 0;
@@ -250,6 +314,7 @@ export default function ActivityScreen() {
         }}
       />
       <JoinPoolSheet ref={joinPoolSheetRef} />
+      <SaveCrewSheet ref={saveCrewSheetRef} onSaved={() => void refresh()} />
     </SafeAreaView>
   );
 }
