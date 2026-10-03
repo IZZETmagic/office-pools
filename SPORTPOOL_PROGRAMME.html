@@ -281,7 +281,143 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ SUMMARY ============================ -->
 <section id="summary">
-  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span> <span class="chip ok">R32 FIXED 2026-10-02</span> <span class="chip ok">R34 FIXED 2026-10-02</span> <span class="chip lvl-med">R35 OPENED 2026-10-02</span> <span class="chip gold">CREWS BUILD STARTED 2026-10-02</span> <span class="chip gold">CREWS BUILT TO SHIP STEP · UNPUSHED</span> <span class="chip lvl-med">R36 OPENED 2026-10-02</span> <span class="chip gold">CREWS WEB 8b BUILT · UNPUSHED</span> <span class="chip lvl-med">R36 CONFIRMED · FIX AWAITS RYAN</span></h2>
+  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span> <span class="chip ok">R32 FIXED 2026-10-02</span> <span class="chip ok">R34 FIXED 2026-10-02</span> <span class="chip lvl-med">R35 OPENED 2026-10-02</span> <span class="chip gold">CREWS BUILD STARTED 2026-10-02</span> <span class="chip gold">CREWS BUILT TO SHIP STEP · UNPUSHED</span> <span class="chip lvl-med">R36 OPENED 2026-10-02</span> <span class="chip gold">CREWS WEB 8b BUILT · UNPUSHED</span> <span class="chip lvl-med">R36 CONFIRMED · FIX AWAITS RYAN</span> <span class="chip ok">R36 DECIDED · FIXED IN CODE · INVITES CATCH UP · STEP 8 DONE</span></h2>
+
+  <div class="card okc" id="update-2026-10-02-2231">
+    <h3 style="margin:0 0 8px">2026-10-02, 22:31 — R36 decided and fixed in code, unsent invites catch up, step 8 done; only the ship is left</h3>
+    <p class="sec-sub" style="margin:0 0 10px">Scope: from <code>1bd9c6a8</code> to <code>81323706</code>, six commits. <code>42579aca</code>
+      is the one-time-link fix (25 files), <code>f105488b</code> is the invite catch-up, <code>cbced41a</code> is step 8, and
+      <code>d89a3181</code>, <code>be58ed1e</code> and <code>81323706</code> are the plan. I read the token, send, catch-up, link page, routes and claim in full, and ran the full suite and the type-check on
+      <code>HEAD</code>. <strong>Ryan's two calls reached me through the building session's briefs. I did not see either myself.</strong>
+      Production facts are the building session's and were not re-queried. The uncommitted work the late-night pass saw is the 155 fix, now
+      committed.</p>
+
+    <p style="margin:0 0 6px"><strong>Since last update</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong><a href="#r36">R36</a> is decided (Ryan, 2026-10-02): an email invite is claimed by a one-time link, never by its
+        address.</strong> He chose this over turning on <em>Confirm email</em> product-wide, and over dropping no-account email invites for
+        now. <em>Relayed by the building session and recorded in plan §5 and §8b (<code>d89a3181</code>).</em> Recorded under
+        <a href="#d1">Decision 1 → Amended 2026-10-02</a>.</li>
+      <li><strong>Built in <code>42579aca</code>, local and unpushed. Verified in the tree:</strong>
+        <ul style="margin:4px 0 0 18px">
+          <li><strong>The token</strong> is 32 random bytes, and only its SHA-256 is stored (<code>lib/crews/inviteToken.ts:13-20</code>). It
+            is armed in the same conditional update that marks the invite as sent, and only while the invite is still to an address
+            (<code>lib/crews/notify.ts:367-377</code>). The link is <code>/crew-invite#&lt;token&gt;</code> (<code>:45</code>).</li>
+          <li><strong>The page:</strong> <code>/crew-invite</code> is public, because it doesn't match <code>/crews</code>
+            (<code>lib/supabase/middleware.ts:10</code>). Opening it answers nothing. Reading the invite and answering it are both POSTs
+            (<code>app/api/crews/invites/link/route.ts</code>, <code>app/api/crews/invites/claim/route.ts</code>).</li>
+          <li><strong>The claim</strong> is one conditional update that hands the invite over, answers it and clears the token
+            (<code>lib/crews/store.ts:555-568</code>), so a link works once. The inviter can't take their own invite, and a forwarded link
+            can't bring back someone a captain removed (<code>lib/crews/rules.ts:184</code>, <code>store.ts:551-552</code>).</li>
+          <li><strong>Address matching is gone.</strong> <code>claimEmailInvites</code>, <code>claimInvitesFor</code> and
+            <code>email_confirmed_at</code> appear nowhere in <code>app</code>, <code>lib</code>, <code>components</code>,
+            <code>mobile</code> or <code>scripts</code>. The only mention is 155's header (grep).</li>
+          <li><strong>"Only the pool's admins see these names"</strong>, on web and in the app (<code>components/crews/PoolCrew.tsx:71</code>,
+            <code>mobile/components/crews/PoolCrewLine.tsx:88</code>). The late-night drift note closes.</li>
+        </ul></li>
+      <li><strong>Unsent invites now catch up (<code>f105488b</code>, migration 156). My late-night finding is resolved.</strong> Verified in
+        the tree:
+        <ul style="margin:4px 0 0 18px">
+          <li>Every invite send is claimed first, through <code>crew_invites.notified_at</code>, the same way seat notices are
+            (<code>notify.ts:357-377</code>). So the moment of adding and the cron can both try, and exactly one sends.</li>
+          <li><code>runCrewNotices</code> now sends every open invite that nobody has sent, oldest first, up to 200 a tick
+            (<code>notify.ts:321-333</code>).</li>
+          <li>An invite made while the switch is off therefore goes out on the first cron run after the switch is on, and so does its link.
+            Closing a crew revokes its open invites (<code>store.ts:291-297</code>), so the catch-up can't send one for a dead crew.</li>
+          <li><strong>Still by design:</strong> a claimed send that then fails is logged and not retried (<code>notify.ts:392-400</code>), the
+            same rule as seats (<em>"one missed beats two"</em>). An address invite in that state can't be claimed until a captain withdraws
+            it and adds the address again.</li>
+          <li><em>Building session, not re-checked:</em> 156 is applied to production (the column and the partial index
+            <code>crew_invites_unsent</code>, confirmed by query).</li>
+        </ul></li>
+      <li><strong>Ryan approved the changed email sentence (2026-10-02).</strong> It reads <em>"Use the button below to sign up and you'll
+        find the invite waiting — tap Join once and you're in."</em> (<code>notify.ts:167</code>). It replaced <em>"Sign up with this email
+        address…"</em>, which would have been false. <em>Relayed by the building session; recorded in plan §8b
+        (<code>be58ed1e</code>).</em></li>
+      <li><strong>Plan §7 step 9 now includes the cron and the switch</strong> (<code>drafts/2026-10-02_crews_plan.md:450-464</code>). Since
+        156, turning the switch on no longer has to race the deploy. The programme's ship list now matches the plan
+        (<a href="#crews">Crews → Status</a>).</li>
+      <li><strong>Step 8 is done (<code>cbced41a</code>, 22:31).</strong> <code>mobile/app/crews-concept.tsx</code> is deleted, along with its
+        <code>Stack.Screen</code> in <code>mobile/app/_layout.tsx</code> and its dev row in <code>mobile/app/(tabs)/profile.tsx</code>. Nothing
+        under <code>mobile/app</code>, <code>mobile/components</code> or <code>mobile/lib</code> still refers to it (grep). Plan §7 marks it
+        done (<code>81323706</code>).</li>
+      <li><strong>Tests, run this pass:</strong> the full web suite, 175 files, 2,696 pass and 7 skipped, including 8 new in
+        <code>lib/crews/__tests__/notifySend.test.ts</code>. <code>tsc</code> gives the <strong>R29</strong> baseline only. The mobile tests
+        pass 654, with 1 skipped (<code>npx vitest run mobile</code>). The mobile <code>tsc</code> gives 12 errors, none in a crew file. The
+        building session calls 12 the baseline; I did not trace it.</li>
+      <li><em>Building session, not re-checked:</em>
+        <ul style="margin:4px 0 0 18px">
+          <li>Migration <strong>155</strong> is applied to production. The column, the CHECK <code>crew_invites_token_only_for_email</code>
+            and the unique index <code>crew_invites_token</code> were confirmed by query.</li>
+          <li><code>scripts/verify-crews-store.ts</code> passed 53/53 live on production as test accounts. That includes the link checks and
+            the catch-up. It ran with the mailer's key removed, so nothing could reach an inbox. The cron part runs only when nothing else in
+            production is waiting to be sent.</li>
+          <li>Production <code>crews</code>, <code>crew_invites</code> and <code>crew_members</code> are back to 0 rows.</li>
+        </ul></li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Now</strong></p>
+    <ol style="margin:0 0 6px 18px">
+      <li><strong>Step 9, the ship, on Ryan's say-so.</strong> It is the only Crews step left, and nothing on the Crews side waits on a
+        decision any more.</li>
+      <li><strong>Keep the token in the fragment on the sign-up path</strong> (<em>Risk moves</em>). It is small, and it is the fix's own
+        stated property.</li>
+      <li><strong>Read <code>seats_held</code> in both create flows.</strong> It is silent, and unlikely.</li>
+    </ol>
+    <p style="margin:0 0 10px"><em>Rule applied: silent wrong data first, then blast radius × likelihood ÷ effort. Items 2 and 3 are close,
+      and both are low-likelihood.</em> <a href="#r35">R35</a> still doesn't outrank the ship, and its trace is still owed.</p>
+
+    <p style="margin:0 0 6px"><strong>Risk moves</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong><a href="#r36">R36</a>: 🟡 → ✅ fixed in code, not deployed.</strong> It was never live. No crew route is on production, and
+        the fix goes out in the same push as the feature. Like R1 and R22, it is closed in code only. It becomes closed on production when the
+        API deploys, with 155 and 156 already applied. Two residuals are recorded on the row and not numbered:
+        <ul style="margin:4px 0 0 18px">
+          <li><strong>The token leaves the fragment on the sign-up path.</strong> When the reader is signed out, the page's <em>Sign up</em>
+            and <em>Log in</em> links put <code>/crew-invite#&lt;token&gt;</code>, URL-encoded, into a <code>redirectTo</code> query
+            parameter (<code>app/crew-invite/CrewInvite.tsx:87, :103, :108</code>).
+            <ul style="margin:4px 0 0 18px">
+              <li>So for the reader this page mostly serves, someone with no account yet, the token does reach the server in the
+                <code>/signup</code> or <code>/login</code> request. It is also in the address of a page that loads Google Tag Manager
+                (<code>app/layout.tsx:117-118</code>).</li>
+              <li>That contradicts the design note in plan §8b and the brief: <em>"never sent to a server … out of access logs and the
+                page-view data Google Tag Manager collects."</em></li>
+              <li>The exposure ends at the claim, which clears the token, and using it needs log or analytics access. Whether the GTM
+                container records the query string is <strong>unverified</strong>.</li>
+            </ul></li>
+          <li><strong>An invite to an address that already has an account still goes to that account</strong>
+            (<code>lib/crews/store.ts:428</code>). With confirmation off, whoever registered the address first gets the invite card. Plan
+            §8b calls this platform-wide rather than a Crews hole, since a password reset still goes to the real inbox. That is the building
+            session's reasoning. <strong>No call from Ryan is recorded on it.</strong></li>
+        </ul></li>
+      <li>Counts: 🟡 from 11 to <strong>10</strong>, and closed from 8 to <strong>9</strong>.</li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Drift</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li>✅ <strong>Resolved: unsent invites now catch up</strong> (156, above). The late-night note that the switch had to be on at deploy
+        no longer holds.</li>
+      <li><strong>Carried from the late-night pass, still true at <code>HEAD</code>:</strong>
+        <ul style="margin:4px 0 0 18px">
+          <li>The create route's <code>seats_held</code> is read by no client.</li>
+          <li><em>Go Plus</em> is missing on both surfaces.</li>
+          <li><em>"Private — crew pools always are"</em> becomes false once three privacy levels exist.</li>
+          <li>The preview line and the email's first line are tied together by a test
+            (<code>lib/crews/__tests__/notify.test.ts:98-101</code>), not by shared code (<code>notify.ts:166</code>,
+            <code>:182</code>).</li>
+        </ul></li>
+      <li><strong>Two of Ryan's calls are recorded second-hand:</strong> the one-time link and the sentence. Both came through the building
+        session, and both are also in the plan. That matches how the step 7 <em>"Copy approved"</em> was recorded.</li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Needs Ryan</strong></p>
+    <ul style="margin:0 0 0 18px">
+      <li><strong>Pushing.</strong> A push is a deploy, and it is your say-so. <code>master</code> is 44 ahead after this commit.</li>
+      <li><strong><a href="#r36">R36</a>, residual 2, only if you want to rule on it:</strong> an invite to an address that already has an
+        account goes to that account, whoever registered it. Plan §8b treats this as platform-wide.</li>
+      <li><strong><code>SPORTPOOL_PROGRAMME 2.md</code></strong> is still there. Untouched.</li>
+    </ul>
+  </div>
 
   <div class="card goldc" id="update-2026-10-02-late">
     <h3 style="margin:0 0 8px">2026-10-02, late night — Crews web day two (8b) built, and R36 is confirmed; nothing pushed</h3>
@@ -359,11 +495,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
     <p style="margin:0 0 6px"><strong>Now</strong></p>
     <ol style="margin:0 0 6px 18px">
-      <li><strong><a href="#r36">R36</a>'s fix: Ryan's call, before the ship.</strong> This is the only open Crews item that is a decision,
-        and code for one direction is already being written without a recorded call.</li>
+      <li><s><strong><a href="#r36">R36</a>'s fix: Ryan's call, before the ship.</strong> This is the only open Crews item that is a decision,
+        and code for one direction is already being written without a recorded call.</s> ✅ Decided (the one-time link) and built at 22:22
+        (<a href="#update-2026-10-02-2231">2026-10-02, 22:31</a>).</li>
       <li><strong>Step 9, the ship, on Ryan's say-so.</strong> The notices switch and the cron have to be in it, in the right place
         (<em>Drift</em>: an invite made while the switch is off is never emailed).</li>
-      <li><strong>Step 8</strong>, deleting the concept screen. It takes minutes and goes with the ship.</li>
+      <li><strong>Step 8</strong>, deleting the concept screen. It takes minutes and goes with the ship. ✅ <em>Done at 22:31
+        (<code>cbced41a</code>).</em></li>
     </ol>
     <p style="margin:0 0 10px"><em>Rule applied: silent wrong data first. Nothing here is live, because nothing is deployed. R36 comes first
       because it gates the ship and only Ryan can make the call.</em> <a href="#r35">R35</a> still doesn't outrank these, and its trace is
@@ -385,7 +523,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
     <p style="margin:0 0 6px"><strong>Drift</strong></p>
     <ul style="margin:0 0 10px 18px">
-      <li><strong>A decision is claimed in a code comment and is not recorded.</strong> The uncommitted
+      <li>✅ <em>Resolved at 22:22: the building session relayed Ryan's call, and it is recorded.</em> <s><strong>A decision is claimed in a
+        code comment and is not recorded.</strong></s> The uncommitted
         <code>lib/migrations/155_an_invite_is_claimed_by_its_link.sql</code> (22:08) opens with <em>"Ryan's call, 2026-10-02 (R36)"</em>. It
         builds direction <strong>(b)</strong>: an email invite is claimed by a one-time link in the email, not by a matching address.
         <ul style="margin:4px 0 0 18px">
@@ -394,7 +533,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             call</strong>.</li>
           <li>Whether 155 has been applied to production is <strong>unverified</strong>.</li>
         </ul></li>
-      <li><strong>An invite made while the switch is off is never emailed, and it cannot be resent.</strong>
+      <li><strong>An invite made while the switch is off is never emailed, and it cannot be resent.</strong> ✅ <em>Resolved at 22:28 by migration 156
+        (<code>f105488b</code>): unsent invites now catch up on the cron. See <a href="#update-2026-10-02-2231">22:31</a>.</em>
         <ul style="margin:4px 0 0 18px">
           <li><code>sendInviteNotice</code> returns at once when the switch is off (<code>notify.ts:312</code>). It is best-effort and never
             retried (<code>:306-310</code>), and the cron sends seat notices only.</li>
@@ -416,7 +556,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <a href="#d5">Decision 5</a>, a crew pool defaults to <em>Invite link</em> and may also be strict <em>Private</em>. So the sentence
         becomes <strong>false</strong>, not just mislabelled, when <a href="#i-privacy">Pool privacy: three levels</a> lands. Added to that
         item.</li>
-      <li><strong>"Only you see these names, as the pool's admin"</strong> (<code>PoolCrew.tsx:71</code>,
+      <li>✅ <em>Fixed in <code>42579aca</code>: "Only the pool's admins see these names".</em> <s><strong>"Only you see these names, as the
+        pool's admin"</strong></s> (<code>PoolCrew.tsx:71</code>,
         <code>mobile/components/crews/PoolCrewLine.tsx:88</code>). The server sends the names to every pool member whose role is
         <code>admin</code> (<code>read.ts:530</code>), and a pool can have several. This is a wording problem, not a leak.</li>
       <li><strong>"Single owner of the invite's first line" is narrower than it sounds.</strong> <code>words.invitePreviewText</code> owns the
@@ -432,7 +573,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
     <p style="margin:0 0 6px"><strong>Needs Ryan</strong></p>
     <ul style="margin:0 0 0 18px">
-      <li><strong><a href="#r36">R36</a>: which fix?</strong>
+      <li>✅ <em>Answered at 22:22: (b), the one-time link (Ryan, relayed).</em> <s><strong><a href="#r36">R36</a>: which fix?</strong></s>
         <ul style="margin:4px 0 0 18px">
           <li><strong>(a)</strong> Turn on <em>Confirm email</em>. That is product-wide, and both sign-up flows would need a <em>check your
             email</em> state they don't have.</li>
@@ -1036,15 +1177,22 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="strip">
     <div class="stat crit"><div class="n">2</div><div class="l">🔴 Critical risks</div></div>
     <div class="stat high"><div class="n">13</div><div class="l">🟠 High risks</div></div>
-    <div class="stat med"><div class="n">11</div><div class="l">🟡 Medium risks</div></div>
+    <div class="stat med"><div class="n">10</div><div class="l">🟡 Medium risks</div></div>
     <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
-    <div class="stat low"><div class="n">8</div><div class="l">✅ Closed (4 prod-verified by audit, + R32 and R34 by their fixing sessions)</div></div>
+    <div class="stat low"><div class="n">9</div><div class="l">✅ Closed (4 prod-verified by audit, + R32 and R34 by their fixing sessions, + R36 in code only)</div></div>
     <div class="stat pri"><div class="n">6</div><div class="l">Items in 🔥 Now</div></div>
     <div class="stat neu"><div class="n">9</div><div class="l">Projects</div></div>
     <div class="stat neu"><div class="n">15+5</div><div class="l">Settled decisions · product + infra (D1–D3 + D5 amended, D2 clarified 2026-10-02)</div></div>
-    <div class="stat neu"><div class="n">24</div><div class="l">Decisions needing Ryan (2026-10-02: +3 raised, all settled or taken; R32 and R34 fixes taken; R36's fix raised late night, open)</div></div>
+    <div class="stat neu"><div class="n">23</div><div class="l">Decisions needing Ryan (2026-10-02: +3 raised, all settled or taken; R32, R34 and R36 fixes taken)</div></div>
     <div class="stat neu"><div class="n">R36</div><div class="l">Highest risk id on the register</div></div>
   </div>
+  <p class="strip-note"><strong>Moved at 22:22–22:31, 2026-10-02 (R36 decided and fixed in code; invites catch up; step 8 done).</strong>
+    <a href="#r36">R36</a> goes 🟡 → ✅, fixed in code and not deployed. It was never live, and it ships in the same push as the feature. So
+    🟡 goes from 11 to <strong>10</strong>, and closed from 8 to <strong>9</strong>. Like R1 and R22, it is closed in code only. Needing Ryan
+    goes back from +1 to <strong>+0</strong>, so 24 becomes <strong>23</strong>: Ryan chose the one-time link, relayed by the building session.
+    Two residuals stay on the row, unnumbered: the token reaches a query string on the signed-out path, and an invite to a pre-registered
+    address still goes to that account. The late-night finding that unsent invites never catch up is resolved by migration 156. Ryan
+    approved the changed invite-email sentence. Step 8 is done, so only the ship is left for Crews.</p>
   <p class="strip-note"><strong>Moved later still, 2026-10-02, late night (Crews 8b built, R36 confirmed).</strong> <strong>No risk changed
     level.</strong> <a href="#r36">R36</a> drops <em>provisional</em>: <em>Confirm email</em> is off in production (the building session's
     query), so it stays 🟡 and is now confirmed. Needing Ryan goes from +0 to <strong>+1</strong>, because R36's fix is a product decision
@@ -1097,9 +1245,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <p class="strip-note"><strong>Current levels, R1–R36, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R36 on 2026-10-02).</strong>
     <strong>🔴</strong> R2 · R21 (stale, see above). &nbsp;
     <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27 · <strong>R30</strong>. &nbsp;
-    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong> · <strong>R33</strong> · <strong>R35</strong> (provisional) · <strong>R36</strong> (confirmed late on 2026-10-02). &nbsp;
+    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong> · <strong>R33</strong> · <strong>R35</strong> (provisional). &nbsp;
     <strong>🟢</strong> R11 · R15. &nbsp;
-    <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 · <strong>R32</strong> · <strong>R34</strong>. Of these, <strong>R4, R13, R17
+    <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 · <strong>R32</strong> · <strong>R34</strong> · <strong>R36</strong> (in code only, 2026-10-02 22:22). Of these, <strong>R4, R13, R17
     and R26 are prod-verified</strong> by audit. <strong>R32</strong> and <strong>R34</strong> are closed in the database, on their fixing
     sessions' production runs, and need no deploy. R1 and R22 are closed <em>in code only</em>, and code is not production while <strong>R21</strong> stands.</p>
   <p class="strip-note"><strong>Moved 2026-09-02.</strong> <strong>R24</strong> 🟠 → 🟡 — the RN app could not read league data at
@@ -1956,7 +2104,22 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
       <tr class="risk-med" id="r36">
         <td class="id">R36</td>
-        <td><strong>An email invite to a crew may go to whoever registers the address first.</strong> ⚠️ New 2026-10-02, found while
+        <td>✅ <strong>FIXED IN CODE 2026-10-02 (<code>42579aca</code>, 22:22), not deployed: an email invite is claimed by its one-time link,
+          never by its address.</strong> <strong>Decided by Ryan, 2026-10-02</strong> (relayed by the building session; I did not see the
+          call): the link, over turning on <em>Confirm email</em> product-wide or dropping no-account email invites for now. <em>The fix,
+          verified in the tree:</em> a 32-byte token, stored only as a SHA-256 (<code>lib/crews/inviteToken.ts:13-20</code>), armed in the same
+          conditional update that marks the invite as sent (<code>lib/crews/notify.ts:367-377</code>). The link is
+          <code>/crew-invite#&lt;token&gt;</code>, a public page that answers nothing until a button is pressed. The claim is one conditional
+          update that hands over, answers and clears the token (<code>lib/crews/store.ts:555-568</code>). It refuses the inviter and a removed
+          member (<code>lib/crews/rules.ts:184</code>). Address matching is removed with every caller (grep). <em>Building session, not
+          re-checked:</em> migration <strong>155</strong> is applied to production (column, CHECK and unique index confirmed by query).
+          ⚠ <strong>Residual 1, the token leaves the fragment on the sign-up path.</strong> Signed out, the page's <em>Sign up</em> and <em>Log
+          in</em> links carry the token URL-encoded in a <code>redirectTo</code> query (<code>app/crew-invite/CrewInvite.tsx:87, :103,
+          :108</code>). So it does reach the server and a page that loads Google Tag Manager (<code>app/layout.tsx:117-118</code>), contrary to
+          the design note. The exposure ends at the claim. Whether GTM records the query is unverified. ⚠ <strong>Residual 2:</strong> an invite
+          to an address that already has an account still goes to that account (<code>store.ts:428</code>), so whoever registered the address
+          first gets the card. Plan §8b calls that platform-wide; no call from Ryan is recorded on it. <em>As found:</em> An email invite to a
+          crew could go to whoever registered the address first. ⚠️ New 2026-10-02, found while
           recording Crews 8a. An invite to an address with no account waits in <code>crew_invites.invitee_email</code>. The first account
           that signs in with that address and a confirmed email claims it (<code>lib/crews/store.ts:484-512</code>, where
           <code>emailVerified</code> is <code>!!email_confirmed_at</code>, <code>lib/crews/http.ts:45</code>). The plan's guard is to claim
@@ -1975,23 +2138,26 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           A claim reads only the account's address and <code>email_confirmed_at</code> (<code>lib/crews/store.ts:484-488</code>). It never
           checks whether an invite email went out. So with the API live and <code>crew_notices_enabled</code> off, the address's owner gets no
           email, and someone else can still claim the invite</td>
-        <td><span class="chip lvl-med">🟡 MEDIUM</span> (confirmed; was provisional)</td>
+        <td><span class="chip lvl-med">🟡</span> → <span class="chip ok">✅ FIXED IN CODE</span> (was 🟡, provisional, then confirmed)</td>
         <td class="blast">Any email invite to an address with no account. The claimant joins the crew with one tap on <em>Join</em>. They
           then see its members, all-time table and past seasons, and get a saved spot in its future pools. The real owner later finds the
           address taken. <strong>Likelihood is low:</strong> the claimant must know both the address and that an invite is waiting.
           <strong>Dormant now:</strong> no invite can be created until the API deploys. <em>Level unchanged on confirmation: what changed is
           certainty, not reach or likelihood</em></td>
         <td>The API deploys, a captain invites an address with no account, and someone else signs up with that address first</td>
-        <td><strong>None applied.</strong> Two directions, recorded and not chosen. <strong>(a)</strong> Turn on <em>Confirm email</em>. That
+        <td>✅ <strong>Applied in code, direction (b), <code>42579aca</code>.</strong> It ships with the API, and the hole was never live.
+          ✅ <strong>The unsent-invite catch-up is built too</strong> (<code>f105488b</code>, migration 156 applied per the building session).
+          An invite made while the switch is off is now sent, and its link armed, on the next cron run. <em>As recorded before the
+          decision:</em> Two directions, recorded and not chosen. <strong>(a)</strong> Turn on <em>Confirm email</em>. That
           is product-wide, and both sign-up flows would need a <em>check your email</em> state they don't have. <strong>(b)</strong> Stop
           treating <code>email_confirmed_at</code> as proof for crew claims, for example by claiming only through the invite email's own link.
           ⚠ <strong>Uncommitted at 22:08, and outside this record:</strong>
           <code>lib/migrations/155_an_invite_is_claimed_by_its_link.sql</code> and new claim and link routes build <strong>(b)</strong>. 155's
           header says <em>"Ryan's call, 2026-10-02 (R36)"</em>, and an uncommitted edit to plan §5 says <em>"Ryan chose this over turning on
           confirmation"</em>. Whether 155 is applied to production is <strong>unverified</strong></td>
-        <td><strong>No call recorded.</strong> The brief for the late-night pass says the fix awaits Ryan's decision, and two uncommitted files
-          say he has made it. These conflict, and only Ryan can settle it (<a href="#update-2026-10-02-late">Where this stands → 2026-10-02, late
-          night → Needs Ryan</a>). The plan (§8b) and this programme treat it as gating the ship; Ryan has not ruled on that either</td>
+        <td>✅ <strong>Decided by Ryan, 2026-10-02: the one-time link</strong> (relayed by the building session at 22:22, and recorded in plan
+          §5 and §8b, <code>d89a3181</code>). That settles the late-night conflict. Residual 2 has no call of its own. <strong>The changed
+          invite-email sentence was approved by Ryan, 2026-10-02</strong> (relayed; plan §8b, <code>be58ed1e</code>)</td>
         <td><a href="#crews">Crews</a> (Multi-sport); plan §5 <em>Direct adds</em></td>
       </tr>
 
@@ -3152,9 +3318,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <strong>154</strong> (the schema), both live on production per the building session. <s>Step 4 (<code>lib/crews/</code> + routes) has
       started.</s> <strong>Late that night, steps 4–7 and the web slice (8a) were built, up to <code>5a1b6ec4</code>. All of it is local and
       unpushed</strong>, so nothing is user-visible. <s>8b, step 8 and the ship remain, and <a href="#r36">R36</a> should be checked before the
-      ship.</s> <strong>8b (web, day two) followed at 22:03 (<code>050c0b57</code>), also unpushed.</strong> What remains:
-      <strong><a href="#r36">R36</a>'s fix</strong> (confirmed: <em>Confirm email</em> is off in production; Ryan's call, none recorded),
-      step 8 and the ship.
+      ship.</s> <strong>8b (web, day two) followed at 22:03 (<code>050c0b57</code>), also unpushed.</strong> <s>What remains:
+      <strong>R36's fix</strong> (confirmed: <em>Confirm email</em> is off in production; Ryan's call, none recorded),
+      step 8 and the ship.</s> <strong>At 22:22, R36 was decided by Ryan (the one-time link) and fixed in code (<code>42579aca</code>, migration 155
+      applied per the building session). At 22:28, unsent invites were made to catch up (<code>f105488b</code>, migration 156). At 22:31, step
+      8 deleted the concept screen (<code>cbced41a</code>). All unpushed.</strong> What remains: the ship (step 9).
       <a href="#i-privacy">Pool privacy: three levels</a> planned as its own item, not started.</div>
   </div>
 
@@ -3284,7 +3452,14 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
               <li>The <strong>captain and co-captain</strong> can add people.</li>
               <li>Directly added people <strong>accept once</strong>.</li>
               <li>An email with <strong>no account</strong> gets <strong>one invite email from SportPool</strong>. It names the
-                captain, once and previewed (<a href="#d2">Decision 2 → Clarified 2026-10-02</a>).</li>
+                captain, once and previewed (<a href="#d2">Decision 2 → Clarified 2026-10-02</a>).
+                <ul>
+                  <li><strong>Decided 2026-10-02 (Ryan), <a href="#r36">R36</a>: that invite is claimed by a one-time link in the email,
+                    never by signing up with the address.</strong> He chose it over turning on <em>Confirm email</em> product-wide, and over
+                    dropping no-account email invites for now. Whoever opens the link, signed in, can take the invite, and the link works
+                    once. <em>Relayed by the building session; recorded in plan §5 and §8b (<code>d89a3181</code>). Built in
+                    <code>42579aca</code>, unpushed.</em></li>
+                </ul></li>
             </ul></li>
           <li><strong>Route (3), suggested crews: stays parked.</strong> It was parked on 2026-09-28. ⚠ That parking was never
             recorded in this programme, and the only written record of it is the Crews plan §10.</li>
@@ -5385,8 +5560,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="card goldc" id="crews">
     <h4>👥 Crews: a crew is who played <span class="chip cat">Feature</span> <span class="chip cat">Multi-sport</span>
       <span class="chip cat">Mobile</span> <span class="chip warn">🔨 IN PROGRESS</span> <span class="chip ok">P1–P5 ✅ 2026-10-02</span>
-      <span class="chip ok">SCHEMA 154 ✅ LIVE</span> <span class="chip ok">STEPS 4–7 + WEB 8a + 8b BUILT</span> <span class="chip warn">UNPUSHED</span>
-      <span class="chip lvl-med">R36 CONFIRMED · FIX AWAITS RYAN</span> <span class="chip">2026-10-02</span></h4>
+      <span class="chip ok">SCHEMA 154 ✅ LIVE</span> <span class="chip ok">STEPS 4–8 + WEB 8a + 8b BUILT</span> <span class="chip ok">R36 FIXED IN CODE</span>
+      <span class="chip warn">UNPUSHED · ONLY THE SHIP LEFT</span> <span class="chip">2026-10-02</span></h4>
     <ul class="fields">
       <li><span class="f">Is:</span> Decision 1's durable group, built. You're in a crew because you played in one of its pools, or
         because you said yes when its captain added you. My Crews lists <strong>groups, never people</strong>, and there is no friends
@@ -5430,7 +5605,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <tbody>
           <tr><td><strong>RN first</strong></td><td>P1–P5 ✅ and migration 154 ✅, <code>lib/crews/</code> + routes ✅, Needs-you crew
             cards ✅ (a capability flag, not v3), RN screens ✅, seat notice + one reminder ✅ (switched off). All built 2026-10-02 and
-            unpushed. Left: step 8 (delete the concept screen) and step 9 (ship)</td><td><strong>~15 working days</strong> at plan time.
+            unpushed. <s>Left: step 8 (delete the concept screen) and step 9 (ship)</s> Step 8 ✅ (<code>cbced41a</code>). Left: step 9 (ship)</td><td><strong>~15 working days</strong> at plan time.
             <strong>Overtaken:</strong> steps 4–7 were committed in one evening. <em>Built</em> means committed and unit-tested. The RN screens
             have not run against their API, which isn't deployed. The plan sizes steps 8–10 at ~½ day</td></tr>
           <tr><td><strong>Thin web slice, same release</strong></td><td>Dashboard <em>"Keep this group together?"</em> sheet (plus held
@@ -5447,24 +5622,39 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <ul class="fields">
       <li><span class="f">Why the web slice ships with RN:</span> the World Cup was played on the web (facts below). Decided by Ryan,
         2026-10-02 (plan §9 #8).</li>
-      <li><span class="f">Status:</span> 🔨 <strong>In progress. Plan steps 1–7, web 8a and web 8b built 2026-10-02, cut at
-        <code>16e9637c</code> (22:03). Nothing is pushed, so nothing is user-visible.</strong> What remains:
+      <li><span class="f">Status:</span> 🔨 <strong>In progress. Plan steps 1–8, web 8a, web 8b, the R36 fix and the invite catch-up done
+        2026-10-02, cut at <code>81323706</code> (22:31). Nothing is pushed, so nothing is user-visible.</strong> No Crews decision is waiting
+        on Ryan. What remains:
         <ol style="margin:4px 0 0 18px">
-          <li><strong><a href="#r36">R36</a>'s fix.</strong> <em>Confirm email</em> is confirmed off in production. The fix is Ryan's call, and
-            <strong>none is recorded</strong>. Uncommitted work building direction (b) appeared during the late-night pass.</li>
-          <li><strong>Step 8:</strong> delete the concept screen.</li>
-          <li><strong>Step 9, the ship.</strong> As the brief for the late-night pass lists it: push only on Ryan's explicit say-so, deploy the
-            API, verify a new route goes 404→401, schedule the cron, flip <code>crew_notices_enabled</code>, then OTA per platform with a clean
-            <code>git status</code>.
-            <ul style="margin:4px 0 0 18px">
-              <li>⚠ The switch has to be on by the time the API is live. An email invite made while it is off is never emailed and can't be
-                resent (<a href="#update-2026-10-02-late">late night → Drift</a>).</li>
-              <li>Plan §7 step 9's own list includes neither the cron nor the switch.</li>
-            </ul></li>
+          <li><s><strong>Step 8:</strong> delete the concept screen.</s> ✅ Done (<code>cbced41a</code>).</li>
+          <li><strong>Step 9, the ship. Push only on Ryan's explicit say-so</strong> (plan §7: <em>"nothing is pushed until Ryan says
+            so"</em>). Then, as plan §7 step 9 lists it (<code>drafts/2026-10-02_crews_plan.md:450-464</code>):
+            <ol style="margin:4px 0 0 18px">
+              <li>Deploy the API.</li>
+              <li>Verify a <strong>new route goes 404→401</strong> on production.</li>
+              <li><strong>Schedule <code>/api/cron/crew-notices</code></strong> with <code>pg_cron</code>, and verify it by
+                <code>net._http_response</code>.</li>
+              <li><strong>Turn on <code>sync_settings.crew_notices_enabled</code>.</strong> Since 156 it no longer has to race the deploy:
+                invites made while it is off go out on the first cron run after it is on. The cron still has to be scheduled, or nothing
+                catches up.</li>
+              <li><code>git status</code> clean.</li>
+              <li><code>eas channel:view</code>.</li>
+              <li><code>eas update</code> <strong>per platform</strong>, and check both Commit lines. ⚠ The Android OTA still reaches
+                nobody.</li>
+            </ol></li>
         </ol>
         The routes exist in the tree and not on production, and the app reads production. So the RN screens show their error state on a
         Metro build until the API deploys (plan §7 step 6). See <a href="#crews-build">Build progress</a> and
-        <a href="#update-2026-10-02-late">Where this stands → 2026-10-02, late night</a>.</li>
+        <a href="#update-2026-10-02-2231">Where this stands → 2026-10-02, 22:31</a>.</li>
+      <li><span class="f">Open follow-ups, not built:</span>
+        <ul style="margin:4px 0 0 18px">
+          <li><strong>Keep the token in the fragment on the sign-up path</strong> (<a href="#r36">R36</a>, residual 1).</li>
+          <li><strong>Read <code>seats_held</code> in both create flows</strong>, or drop the claim that a failed hold is reported.</li>
+          <li><strong><em>Go Plus</em> in roster review</strong>, on both surfaces (plan §9 #7).</li>
+          <li><s><strong>Unsent-invite catch-up.</strong></s> ✅ <strong>Built 2026-10-02</strong> (<code>f105488b</code>, migration 156,
+            applied per the building session). A claimed send that then fails is still not retried, by design, the same as seats.</li>
+        </ul></li>
+      <li><span class="f">At the late-night cut:</span> <s><code>16e9637c</code>. Left: R36's fix, step 8 and step 9 (ship).</s></li>
       <li><span class="f">At the 21:46 cut:</span> <s>🔨 <strong>In progress. Plan steps 1–7 and web 8a built 2026-10-02, cut at
         <code>5a1b6ec4</code> (21:46). Nothing is pushed, so nothing is user-visible.</strong> Left: 8b (web, day two; under way
         uncommitted), step 8 and step 9 (ship). Check R36 before the ship.</s></li>
@@ -5478,7 +5668,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <code>153_a_pool_knows_when_it_locks_and_ends.sql</code> (P2 + P3). <s>The only crew <strong>UI</strong> is the device concept
         <code>mobile/app/crews-concept.tsx</code>. It is still <strong>untracked</strong>, and plan step 8 deletes it.</s> The real RN screens
         and the web slice now exist. The concept is tracked (<code>99c193ba</code>), stays behind <code>__DEV__</code>, and step 8 still
-        deletes it. <s>⚠ The plan contradicts itself on P2's TypeScript mirror: §3 says none, §7 step 2 still says one
+        deletes it. ✅ <em>Deleted 2026-10-02 in <code>cbced41a</code> (step 8).</em> <s>⚠ The plan contradicts itself on P2's TypeScript mirror: §3 says none, §7 step 2 still says one
         (<code>drafts/2026-10-02_crews_plan.md:354-355</code>).</s> ✅ The plan now agrees with the code: no mirror.</li>
       <li><span class="f">Done when:</span> a finished pool's admin can save its group as a crew, on web or in the app; a crew member
         who starts a pool gives every other ticked member a held seat, which is taken or quietly released at first lock; and
@@ -5565,6 +5755,27 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             ⚠ <em>"Private — crew pools always are"</em> becomes false when <a href="#i-privacy">Pool privacy: three levels</a> lands.
             ⚠ <em>Go Plus</em> not built</td><td>Localhost on Ryan's account with nothing written, and a fixture harness, deleted afterwards.
             <em>R36 confirmed</em> from production <code>auth.users</code> (see <a href="#r36">R36</a>)</td></tr>
+          <tr><td><strong>R36 fix</strong> ✅</td><td><code>42579aca</code>, <code>d89a3181</code></td><td>Ryan's call (relayed): an email invite
+            is claimed by its one-time link. Migration 155 (<code>crew_invites.token_hash</code>, a CHECK and a unique index), the public
+            <code>/crew-invite</code> page, <code>POST /api/crews/invites/link</code> and <code>/claim</code>, <code>claimInviteByToken</code> and
+            <code>claimBlock</code>. Address matching is removed. One approved email sentence changed, then re-approved by Ryan. <em>"Only the
+            pool's admins see these names"</em></td><td>Read in full at <code>HEAD</code>. Address matching is gone (grep). The claim is one
+            conditional update that clears the token (<code>store.ts:555-568</code>). ⚠ The token leaves the fragment on the signed-out path
+            (<a href="#r36">R36</a>, residual 1)</td><td>155 applied, with column, CHECK and index confirmed by query. Production crew tables
+            hold 0 rows</td></tr>
+          <tr><td><strong>Invite catch-up</strong> ✅</td><td><code>f105488b</code>, <code>be58ed1e</code></td><td>Migration 156:
+            <code>crew_invites.notified_at</code> and the partial index <code>crew_invites_unsent</code>. Every invite send is claimed first, and
+            for an address the same update arms the link. <code>runCrewNotices</code> sends every open, unsent invite, oldest first, 200 a
+            tick</td><td>Read at <code>HEAD</code> (<code>notify.ts:319-333, :357-402</code>). Closing a crew revokes its open invites
+            (<code>store.ts:291-297</code>). <code>notifySend.test.ts</code> has 8 tests, and the full suite passes 2,696. A claimed send that
+            fails is not retried, by design</td><td>156 applied, with the column and index confirmed by query. <code>verify-crews-store</code>
+            53/53 live, run with the mailer's key removed</td></tr>
+          <tr><td><strong>Step 8</strong> ✅</td><td><code>cbced41a</code>, <code>81323706</code></td><td>Deletes
+            <code>mobile/app/crews-concept.tsx</code> (1,262 lines), its <code>Stack.Screen</code> in <code>mobile/app/_layout.tsx</code> and its
+            dev row in <code>mobile/app/(tabs)/profile.tsx</code></td><td>The file is gone, and nothing in <code>mobile/app</code>,
+            <code>mobile/components</code> or <code>mobile/lib</code> refers to it (grep). Mobile tests pass 654 (1 skipped). Mobile
+            <code>tsc</code> gives 12 errors, none in a crew file</td><td>Mobile <code>tsc</code> at its baseline of 12 and 654 tests (the
+            building session's numbers, matched here)</td></tr>
         </tbody>
       </table>
     </div>
