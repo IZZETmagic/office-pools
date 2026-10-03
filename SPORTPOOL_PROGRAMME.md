@@ -3307,6 +3307,13 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
     - Activity mentions and dashboard mentions hide blocked senders.
     - **Web:** Report and Block in the message menu; Blocked members in Profile → Account; Super Admin → Reports (`?tab=reports`).
     - **RN:** a ⋯ beside the reaction picker leads to Report (reasons) or Block, with Settings → Account → Blocked Members.
+  - **Step 3.2 — photo storage: DONE 2026-10-03.**
+    - The private `banter-media` bucket (5 MB, jpeg/webp) is created via the Storage API by `scripts/create-banter-media-bucket.ts`, which can be re-run safely. Storage rows are read-only from SQL, and `storage.protect_delete` blocks SQL deletes outright.
+    - Migration `159_a_photo_stays_in_its_pool` (applied):
+      - path `{pool}/{sender}/{uuid}.jpg`;
+      - members upload only to their own folder, pool members and super admins read, and only the uploader deletes via the client;
+      - `photo` message type plus a trigger: the path must be its own pool/sender, the file must exist, and only path/width/height are kept.
+    - Verified through the real API: signed URL 200; the public URL, anon access and PNG are refused; **a signed URL dies (400) once the file is deleted**.
   - **Open:** DMCA designated agent (legal review C3), Ryan's action.
 - **Effort:** ~2–3 days for photos; GIFs ~1.5–2 days.
 - **Done when:** a user can attach and send an image or GIF in pool chat and others see it inline.
