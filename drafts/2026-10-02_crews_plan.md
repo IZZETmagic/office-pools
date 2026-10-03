@@ -288,8 +288,10 @@ extra state and nobody is notified.
       email: …"*.
     - It's **sent once**, with no follow-ups.
     - Seat notices and the one reminder still never name the captain.
-- **An email invite is claimed at sign-up only against a *verified* address.** Otherwise someone could
-  register the address first and land in the crew.
+- ~~**An email invite is claimed at sign-up only against a *verified* address.**~~ ⚠ Superseded
+  2026-10-02 (R36, migration 155): production has email confirmation off, so no address is ever
+  unverified. **An email invite is claimed by its one-time link** — the email's button — and the
+  invite goes to whoever opens it, signed in. Ryan chose this over turning on confirmation.
 - **"No thanks" sticks:** that crew can't re-invite you. They can still bring you in the played way, by
   you joining one of its pools.
 - **Rate limit:** about 20 pending invites per crew and 50 per captain per day. That's generous for a
@@ -448,9 +450,16 @@ Each step is a commit; nothing is pushed until Ryan says so.
 9. **Ship, in the order that has bitten before:**
    1. Deploy the API.
    2. Verify a **new route 404→401** on prod.
-   3. `git status` clean.
-   4. `eas channel:view`.
-   5. `eas update` **per platform**, and check both Commit lines.
+   3. **Schedule `/api/cron/crew-notices`** (pg_cron; verify by `net._http_response`).
+   4. **Turn on `sync_settings.crew_notices_enabled` straight after the deploy** — ⚠ (Gill, 2026-10-02)
+      an invite made while it's off is never emailed and never retried (`sendInviteNotice` returns at
+      once; the cron only catches up seats), and since 155 an email invite's link is armed only when
+      the email goes out — so an invite made in that window can never be claimed. Seats catch up;
+      invites don't. A cron catch-up for unsent invites is the durable fix (needs a `notified_at` on
+      `crew_invites`) — not built.
+   5. `git status` clean.
+   6. `eas channel:view`.
+   7. `eas update` **per platform**, and check both Commit lines.
 
    ⚠ The Android OTA still reaches nobody (avatar store release notes).
 10. **Gill** records what changed in the programme + HTML.
@@ -532,7 +541,32 @@ Seat links already work through `/join/<code>`.
 OFF — 4,820 of 4,825 email accounts were "confirmed" within 5 s of creation, 0 unconfirmed, all 16
 sign-ups in the last 60 days instant. So `email_confirmed_at` proves nothing, and the email-invite
 claim ("lands in the crew when they sign up with that verified address") can be taken by whoever
-registers the invited address first. Dormant until the API deploys. **Needs Ryan's call before ship.**
+registers the invited address first. Dormant until the API deploys.
+
+✅ **Ryan's call (2026-10-02): the one-time link** — over turning on email confirmation (product-wide,
+a "check your email" step on every sign-up) or dropping no-account invites. **Built:**
+- **Migration 155** (applied): `crew_invites.token_hash` (SHA-256 only), a CHECK that only an invite
+  to an address can carry one, a unique index.
+- **Armed when the email goes out** (`notify.sendInviteNotice`); the button is
+  `/crew-invite#<token>`. ⚠ The token rides in the URL FRAGMENT: never sent to a server, so it stays
+  out of access logs and the page-view data Google Tag Manager collects.
+- **`app/crew-invite`** (public): who asked and which crew; signed out → Sign up / Log in, both
+  returning to the link; signed in → Join / No thanks (`POST /api/crews/invites/claim`). Opening the
+  page answers nothing — only a button does (mail scanners pre-fetch links).
+- **The claim is the lock**: one conditional update hands the invite over, answers it and clears
+  the token, so a link works once. The sender can't take their own invite, a member is told they're
+  in, and a forwarded link can never bring back someone a captain removed (`rules.claimBlock`).
+- **The match-by-address claim is gone** (`claimEmailInvites`, `claimInvitesFor`, and its calls on
+  the dashboard, the Activity read and three crew routes).
+- **One approved sentence changed**, as it would otherwise be false: "Sign up with this email
+  address and you'll find the invite waiting" → "Use the button below to sign up and you'll find
+  the invite waiting". Everything else in the email is as approved.
+- Verified live on production as test accounts: `scripts/verify-crews-store.ts` 48/48 (10 new
+  link checks, including the CHECK refusing a link on an account invite); the page on localhost
+  signed in, and signed out by its API; everything deleted afterwards.
+- Still trusted: an email invite to an address that ALREADY has an account goes to that account.
+  That's the platform's general state (any account's address is unverified), and a password reset
+  goes to the real inbox — not a crews-specific hole.
 
 Originally:
 
