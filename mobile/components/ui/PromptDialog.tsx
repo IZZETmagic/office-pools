@@ -14,9 +14,27 @@
 //     onCancel={() => setOpen(false)}
 //     onSubmit={(value) => { setOpen(false); void addEntry(value); }}
 //   />
+//
+// ⚠ MOVING OUT OF THE KEYBOARD'S WAY (Ryan, 2026-10-02: "it pushes it up, and
+// it's very sudden and abrupt … and when you dismiss it, something similar").
+// This used to sit in a KeyboardAvoidingView, which moves its content with
+// LayoutAnimation — and on the New Architecture (`newArchEnabled`) that does
+// not animate reliably, so the card SNAPPED up when the keyboard came and
+// snapped down as it left. On iOS the card now moves itself:
+//   · up, by half the keyboard's height (so it stays centred in what's left
+//     of the screen), over the keyboard's own duration, on the native driver;
+//   · NOT back down when the dialog closes — it holds still while it fades,
+//     and the keyboard slides away beneath it;
+//   · and because it keeps that offset, every later opening starts already
+//     in place: the keyboard rises into the space below and nothing moves.
+// Android keeps the KeyboardAvoidingView: a Modal's window there resizes for
+// the keyboard itself, so moving the card as well would move it twice.
 
 import { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +45,10 @@ import {
 } from 'react-native';
 
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
+
+const IOS = Platform.OS === 'ios';
+/** Close to the iOS keyboard's own curve, so the card and the keyboard move as one. */
+const KEYBOARD_EASING = Easing.bezier(0.17, 0.59, 0.4, 0.77);
 
 type PromptDialogProps = {
   visible: boolean;
@@ -67,6 +89,34 @@ export function PromptDialog({
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<TextInput | null>(null);
 
+  // iOS: how far the card sits above centre. Kept between openings on purpose (see the header).
+  const lift = useRef(new Animated.Value(0)).current;
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+
+  useEffect(() => {
+    if (!IOS) return;
+    const move = (toValue: number, duration: number) =>
+      Animated.timing(lift, { toValue, duration: duration || 250, easing: KEYBOARD_EASING, useNativeDriver: true }).start();
+    const show = Keyboard.addListener('keyboardWillShow', (e) => {
+      if (visibleRef.current) move(-e.endCoordinates.height / 2, e.duration);
+    });
+    const hide = Keyboard.addListener('keyboardWillHide', (e) => {
+      // Closing: hold still while the dialog fades. Only a keyboard dismissed with the dialog
+      // still up brings the card back to the middle.
+      if (visibleRef.current) move(0, e.duration);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [lift]);
+
+  // Closing takes the keyboard down WITH the fade, rather than after it.
+  useEffect(() => {
+    if (!visible) Keyboard.dismiss();
+  }, [visible]);
+
   // Reset input + focus whenever the dialog opens, so every show
   // starts from the supplied default. The autoFocus prop alone
   // doesn't refire across re-opens of the same Modal instance.
@@ -86,10 +136,7 @@ export function PromptDialog({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
+      <KeyboardAvoidingView behavior="height" enabled={!IOS} style={{ flex: 1 }}>
         {/* Backdrop. Tap-to-dismiss matches iOS Alert.prompt's
             "tap outside" behavior (which doesn't dismiss, actually
             — iOS alerts are modal). We mirror that: backdrop taps
@@ -103,12 +150,13 @@ export function PromptDialog({
             padding: theme.spacing.xl,
           }}
         >
-          <View
+          <Animated.View
             style={{
               backgroundColor: theme.colors.surface,
               borderRadius: theme.radii.lg,
               padding: theme.spacing.lg,
               gap: theme.spacing.md,
+              transform: [{ translateY: lift }],
             }}
           >
             <RNText
@@ -210,7 +258,7 @@ export function PromptDialog({
                 </RNText>
               </Pressable>
             </View>
-          </View>
+          </Animated.View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
