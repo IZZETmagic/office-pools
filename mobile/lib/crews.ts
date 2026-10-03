@@ -71,6 +71,15 @@ export type CrewDetail = {
   invites: { inviteId: string; invitee: Person | null; email: string | null; createdAt: string }[] | null;
 };
 
+export type PoolCrewView = {
+  crew: { crewId: string; name: string } | null;
+  inPool: number;
+  saved: number;
+  firstLockAt: string | null;
+  /** Names of who's still pending — present for the pool's admin only. */
+  pending: Person[] | null;
+};
+
 export type RosterView = {
   rows: (Person & { reasons: string[]; ticked: boolean })[];
   spots: number | null;

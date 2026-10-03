@@ -29,6 +29,7 @@ import { useLeaguePool } from '@/lib/useLeaguePool';
 import { usePoolRounds, roundLabel } from '@/lib/usePoolRounds';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 import { poolStatusDisplay } from '@/lib/poolStatus';
+import { PoolCrewCard } from '@/components/crews/PoolCrewLine';
 
 const MODE_LABEL: Record<string, string> = {
   full_tournament: 'Full Tournament',
@@ -188,6 +189,9 @@ export function PoolInfoTab({ pool, matchweekDeadline = null }: Props) {
         gap: theme.spacing.lg,
       }}
     >
+      {/* Crews (154): "Part of Bermuda Office · 9 in · 3 spots saved". Nothing for a crewless pool. */}
+      <PoolCrewCard poolId={pool.poolId} />
+
       {/*
         HOW IT PLAYS — the mode, in the product's own words.
 

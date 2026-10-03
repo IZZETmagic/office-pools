@@ -5,6 +5,7 @@ import { Icon, Text } from '@/components/ui';
 import { LeaderboardAvatar } from './LeaderboardAvatar';
 import { useMemberRoster, type RosterMember } from '@/lib/useMemberRoster';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
+import { PoolSpotsSaved } from '@/components/crews/PoolCrewLine';
 
 type Props = {
   poolId: string;
@@ -52,6 +53,8 @@ export function MembersTab({ poolId }: Props) {
         gap: theme.spacing.lg,
       }}
     >
+      {/* Crews (154): who still has a saved spot — this tab is the pool admin's, and so are the names. */}
+      <PoolSpotsSaved poolId={poolId} />
       <View
         style={{
           backgroundColor: theme.colors.surface,

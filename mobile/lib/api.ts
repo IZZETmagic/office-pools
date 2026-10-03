@@ -901,6 +901,11 @@ export function lookupUsername(username: string) {
   return apiFetch<{ matches: import('./crews').Person[] }>(`/api/users/lookup?username=${encodeURIComponent(username)}`);
 }
 
+/** A pool's crew line — members only; the pending names come back for the pool's admin only. */
+export function fetchPoolCrew(poolId: string) {
+  return apiFetch<import('./crews').PoolCrewView>(`/api/pools/${poolId}/crew`);
+}
+
 /** Join a crew's running pool from the crew page — the ordinary join (lib/pools/join.ts). */
 export function joinPoolById(poolId: string) {
   return apiFetch<JoinPoolResponse>('/api/pools/join', { method: 'POST', body: { pool_id: poolId } });

@@ -6,12 +6,13 @@
 
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 
-import { fetchCrew, fetchCrewRoster, fetchMyCrews } from './api';
+import { fetchCrew, fetchCrewRoster, fetchMyCrews, fetchPoolCrew } from './api';
 
 export const crewKeys = {
   mine: ['crews'] as const,
   one: (crewId: string) => ['crew', crewId] as const,
   roster: (crewId: string, tier: string) => ['crew-roster', crewId, tier] as const,
+  pool: (poolId: string) => ['pool-crew', poolId] as const,
 };
 
 export function useMyCrews() {
@@ -39,4 +40,14 @@ export function useCrewRoster(crewId: string | null | undefined, tier = 'free') 
 export function invalidateCrews(client: QueryClient, crewId?: string) {
   void client.invalidateQueries({ queryKey: crewKeys.mine });
   if (crewId) void client.invalidateQueries({ queryKey: crewKeys.one(crewId) });
+}
+
+/** A pool's crew line. Renders nothing for a pool with no crew, and nothing if the API can't answer. */
+export function usePoolCrew(poolId: string | null | undefined) {
+  return useQuery({
+    queryKey: crewKeys.pool(poolId ?? ''),
+    queryFn: () => fetchPoolCrew(poolId!),
+    enabled: Boolean(poolId),
+    retry: false,
+  });
 }

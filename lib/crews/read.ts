@@ -490,3 +490,50 @@ export async function readRoster(
     memberCap,
   }
 }
+
+// ── A pool's crew ───────────────────────────────────────────────────────────────────────────────
+
+export type PoolCrewView = {
+  /** null when the pool is not a crew's. */
+  crew: { crewId: string; name: string } | null
+  /** Members already in the pool. */
+  inPool: number
+  /** Open saved spots — unanswered and before the first lock. 0 after it: a seat lapses at the lock. */
+  saved: number
+  firstLockAt: string | null
+  /**
+   * WHO is still pending — the pool's ADMIN only (decision 5: a count for members, names for the
+   * admin). null for everyone else, so a member's payload can never carry the names.
+   */
+  pending: Person[] | null
+}
+
+/**
+ * The pool screens' crew line. null when the viewer is not in the pool (the crew tables are deny-all,
+ * so this route is the only way a client learns a pool's crew, and it answers members only).
+ */
+export async function readPoolCrew(admin: Admin, poolId: string, viewerId: string, now: number): Promise<PoolCrewView | null> {
+  const { data: me } = await admin.from('pool_members').select('role').eq('pool_id', poolId).eq('user_id', viewerId).maybeSingle()
+  if (!me) return null
+  const { data: pool } = await admin.from('pools').select('crew_id').eq('pool_id', poolId).maybeSingle()
+  if (!pool) return null
+  if (!pool.crew_id) return { crew: null, inPool: 0, saved: 0, firstLockAt: null, pending: null }
+
+  const [{ data: crew }, { count: inPool }, { data: lock }, { data: seats }] = await Promise.all([
+    admin.from('crews').select('crew_id, name').eq('crew_id', pool.crew_id).maybeSingle(),
+    admin.from('pool_members').select('member_id', { count: 'exact', head: true }).eq('pool_id', poolId),
+    admin.rpc('pool_first_lock_at', { p_pool_id: poolId }),
+    admin.from('crew_seats').select('user_id, resolution').eq('pool_id', poolId).is('resolved_at', null),
+  ])
+  const firstLockAt = (lock as string | null) ?? null
+  const open = (seats ?? []).filter((s) => seatState({ resolution: s.resolution }, firstLockAt, now) === 'open')
+  const isAdmin = me.role === 'admin'
+  const names = isAdmin ? await people(admin, open.map((s) => s.user_id)) : null
+  return {
+    crew: crew ? { crewId: crew.crew_id, name: crew.name } : null,
+    inPool: inPool ?? 0,
+    saved: open.length,
+    firstLockAt,
+    pending: names ? open.map((s) => personOf(names, s.user_id)) : null,
+  }
+}

@@ -10,7 +10,7 @@ vi.mock('@/lib/scoring/readSource', () => ({
 }))
 
 import { fakeDb } from './fakeDb'
-import { listMyCrews, readCrew, readRoster } from '../read'
+import { listMyCrews, readCrew, readPoolCrew, readRoster } from '../read'
 
 const NOW = Date.parse('2026-10-02T12:00:00Z')
 const SOON = '2026-10-05T18:00:00Z'
@@ -199,5 +199,47 @@ describe('roster review', () => {
     const db = world()
     expect(await readRoster(db.client, { crewId: 'office', starterId: 'dave', tier: 'max', now: NOW })).toMatchObject({ spots: null, memberCap: null })
     expect(await readRoster(db.client, { crewId: 'office', starterId: 'stranger', tier: 'free', now: NOW })).toBeNull()
+  })
+})
+
+describe('a pool’s crew line — a count for members, names for the admin', () => {
+  function poolWorld() {
+    return fakeDb(
+      {
+        pools: [{ pool_id: 'cl', crew_id: 'five' }, { pool_id: 'plain', crew_id: null }],
+        crews: [{ crew_id: 'five', name: 'Friday Five' }],
+        pool_members: [
+          { pool_id: 'cl', user_id: 'me', role: 'admin', member_id: 'm1' },
+          { pool_id: 'cl', user_id: 'sam', role: 'player', member_id: 'm2' },
+          { pool_id: 'plain', user_id: 'me', role: 'player', member_id: 'm3' },
+        ],
+        crew_seats: [
+          { pool_id: 'cl', user_id: 'tom', resolved_at: null, resolution: null },
+          { pool_id: 'cl', user_id: 'ella', resolved_at: null, resolution: null },
+        ],
+        users: [
+          { user_id: 'tom', username: 'tom', full_name: 'Tom', avatar_url: null },
+          { user_id: 'ella', username: 'ella', full_name: 'Ella', avatar_url: null },
+        ],
+      },
+      { pool_first_lock_at: '2026-10-05T18:00:00Z' },
+    )
+  }
+  it('the admin sees who is still pending', async () => {
+    const v = await readPoolCrew(poolWorld().client, 'cl', 'me', NOW)
+    expect(v).toMatchObject({ crew: { crewId: 'five', name: 'Friday Five' }, inPool: 2, saved: 2 })
+    expect(v!.pending!.map((p) => p.userId).sort()).toEqual(['ella', 'tom'])
+  })
+  it('a member sees only the count — the names never leave the server', async () => {
+    const v = await readPoolCrew(poolWorld().client, 'cl', 'sam', NOW)
+    expect(v).toMatchObject({ saved: 2, pending: null })
+  })
+  it('after the first lock no spot is saved any more', async () => {
+    const v = await readPoolCrew(poolWorld().client, 'cl', 'me', Date.parse('2026-10-06T00:00:00Z'))
+    expect(v).toMatchObject({ saved: 0, pending: [] })
+  })
+  it('not a crew pool → no crew; not a member → nothing at all', async () => {
+    expect(await readPoolCrew(poolWorld().client, 'plain', 'me', NOW)).toMatchObject({ crew: null })
+    expect(await readPoolCrew(poolWorld().client, 'cl', 'stranger', NOW)).toBeNull()
   })
 })
