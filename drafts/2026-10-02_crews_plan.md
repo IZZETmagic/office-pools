@@ -600,6 +600,22 @@ About **3½ days**. With 8a, web is about **5 days** in total.
 
 ---
 
+### Link a pool you already run (added 2026-10-03) — ✅ built
+
+Ryan: *"there are actually two other pools that I have right now with the exact same users … how can
+we connect them? … not auto-do it … something that would allow the user to trigger it."* His calls:
+- **Offered only when everyone playing is already in the crew** — so linking never adds a person.
+  Refined after a production read showed five solo test pools offered beside the two real ones: at
+  least two players, and more than half the crew (`rules.linkablePool`; the same rule gates Link).
+- **Only by someone who runs the pool AND is the crew's captain or co-captain.**
+- **For good** — a pool's crew never changes once set (154).
+
+The crew page lists them under *Also playing together* with a **Link** button and a confirmation
+(`LINK_CONSEQUENCE`); app and web. `store.linkPoolToCrew` sets `crew_id` + private in one conditional
+write; `POST /api/crews/:id/link-pool`. No Needs-you card, no notification — it is there when you open
+the crew. Production read for Ryan's crew offers exactly *Football Daddies (Prem)* and *Football Daddies
+Standing*; *Connor Wants A Baby Bracket* (a fourth player) is not offered.
+
 ### Disband (added 2026-10-02, after 8b) — ✅ built
 
 Ryan: *"we should have a disband crew option for the captain only."* His calls, asked before building:
