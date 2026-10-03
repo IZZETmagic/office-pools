@@ -605,16 +605,21 @@ About **3½ days**. With 8a, web is about **5 days** in total.
 Ryan: *"there are actually two other pools that I have right now with the exact same users … how can
 we connect them? … not auto-do it … something that would allow the user to trigger it."* His calls:
 - **Offered only when everyone playing is already in the crew** — so linking never adds a person.
-  Refined after a production read showed five solo test pools offered beside the two real ones: at
-  least two players, and more than half the crew (`rules.linkablePool`; the same rule gates Link).
+  ~~At least two players, and more than half the crew~~ → **revised by Ryan the same day: any part
+  of the crew, at least two players.** "There'll be times when people just can't join — life
+  events — but they still want to be part of the crew." A sat-out season costs nothing (the
+  all-time table is seasons · titles · best finish; the finish reads "1st of 3"). Two or more, his
+  call over "any size": a one-player season is a free title, and production had offered five solo
+  test pools (`rules.linkablePool`; the same rule gates Link).
 - **Only by someone who runs the pool AND is the crew's captain or co-captain.**
 - **For good** — a pool's crew never changes once set (154).
 
 The crew page lists them under *Also playing together* with a **Link** button and a confirmation
 (`LINK_CONSEQUENCE`); app and web. `store.linkPoolToCrew` sets `crew_id` + private in one conditional
 write; `POST /api/crews/:id/link-pool`. No Needs-you card, no notification — it is there when you open
-the crew. Production read for Ryan's crew offers exactly *Football Daddies (Prem)* and *Football Daddies
-Standing*; *Connor Wants A Baby Bracket* (a fourth player) is not offered.
+the crew. Production read for Ryan's crew offered exactly *Football Daddies (Prem)* and *Football Daddies
+Standing*; *Connor Wants A Baby Bracket* (a fourth player) is not offered. Ryan then LINKED *Football
+Daddies (Prem)* from the app (crew set, private) — the write proven on production.
 
 ### Disband (added 2026-10-02, after 8b) — ✅ built
 
