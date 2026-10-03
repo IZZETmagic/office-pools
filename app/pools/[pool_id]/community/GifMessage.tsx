@@ -27,6 +27,8 @@ export function GifMessage({
   onToggleReaction,
   onReply,
   onDelete,
+  onReport,
+  onBlock,
 }: {
   message: MessageWithReactions
   members: MemberData[]
@@ -36,6 +38,8 @@ export function GifMessage({
   onToggleReaction?: (emoji: string) => void
   onReply?: () => void
   onDelete?: () => void
+  onReport?: () => void
+  onBlock?: () => void
 }) {
   const gif = readGifMetadata(message.metadata)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -63,6 +67,8 @@ export function GifMessage({
       onToggleReaction={onToggleReaction}
       onReply={onReply}
       onDelete={onDelete}
+      onReport={onReport}
+      onBlock={onBlock}
     >
       {gif && size ? (
         <div

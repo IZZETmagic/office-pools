@@ -43,6 +43,8 @@ export function MessageRow({
   onToggleReaction,
   onReply,
   onDelete,
+  onReport,
+  onBlock,
   isFirstInCluster = true,
   isLastInCluster = true,
   wide = false,
@@ -58,6 +60,10 @@ export function MessageRow({
   onReply?: () => void
   /** Offered to the sender and to pool admins. The caller confirms and deletes. */
   onDelete?: () => void
+  /** Offered on other members' messages (158). The caller runs the reason picker. */
+  onReport?: () => void
+  /** Offered on other members' messages (158). The caller confirms. */
+  onBlock?: () => void
   isFirstInCluster?: boolean
   isLastInCluster?: boolean
   /**
@@ -115,7 +121,7 @@ export function MessageRow({
   const authorLevel = memberLevels.get(userId)
   const isOwn = userId === currentUserId
   const name = author?.users.full_name || author?.users.username || 'Unknown'
-  const hasMenu = !!(onReply || onToggleReaction || onDelete)
+  const hasMenu = !!(onReply || onToggleReaction || onDelete || onReport || onBlock)
 
   return (
     <div ref={rowRef} className={`relative ${isFirstInCluster ? 'mt-5' : '-mt-2.5'}`}>
@@ -198,6 +204,28 @@ export function MessageRow({
                 >
                   <Icon name="arrow.uturn.left" size={14} weight="semibold" />
                   Reply
+                </button>
+              )}
+              {onReport && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setMenuOpen(false); onReport() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 t-body text-ink hover:bg-snow transition-colors whitespace-nowrap"
+                >
+                  <Icon name="exclamationmark.triangle" size={14} weight="semibold" />
+                  Report
+                </button>
+              )}
+              {onBlock && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setMenuOpen(false); onBlock() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 t-body text-danger-600 hover:bg-snow transition-colors whitespace-nowrap"
+                >
+                  <Icon name="person.crop.circle.badge.xmark" size={14} weight="semibold" />
+                  Block {name}
                 </button>
               )}
               {onDelete && (

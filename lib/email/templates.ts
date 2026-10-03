@@ -1396,6 +1396,57 @@ export function mentionNotificationTemplate(params: {
   }
 }
 
+/** Member-written text goes into HTML, so it is escaped — a message is not markup. */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * Internal alert: a member reported a banter message (158). Goes to the support inbox, not to
+ * members, and carries what we need to act without opening anything — who, where, why, and the
+ * snapshot taken when it was reported (the message itself may already be gone).
+ */
+export function messageReportAlertTemplate(params: {
+  poolName: string
+  reporterName: string
+  reportedName: string
+  reason: string
+  details: string | null
+  contentSnapshot: string
+  typeSnapshot: string
+  openReportCount: number
+  reportsUrl: string
+}): { subject: string; html: string } {
+  const e = escapeHtml
+  const media = params.typeSnapshot === 'gif' ? ' (a GIF)' : params.typeSnapshot === 'photo' ? ' (a photo)' : ''
+  return {
+    subject: `Banter report: ${params.reason} in ${params.poolName}`,
+    html: brandedTemplate({
+      preheader: `${params.reporterName} reported a message from ${params.reportedName}`,
+      heading: 'A message was reported',
+      body: `
+        ${dataRows([
+          { label: 'Pool', value: e(params.poolName) },
+          { label: 'Reported by', value: e(params.reporterName) },
+          { label: 'Sent by', value: e(params.reportedName) },
+          { label: 'Reason', value: e(params.reason), valueVariant: 'danger' },
+          { label: 'Open reports', value: String(params.openReportCount) },
+        ])}
+        ${paragraph(`What was said${media}:`, { marginBottom: 8 })}
+        ${quoteBlock(e(params.contentSnapshot.slice(0, 500)))}
+        ${params.details ? paragraph(`Their note: ${e(params.details)}`) : ''}
+      `,
+      ctaText: 'Open Reports',
+      ctaUrl: params.reportsUrl,
+    }),
+  }
+}
+
 /**
  * "You haven't put your table in order yet, and it closes on Friday."
  *

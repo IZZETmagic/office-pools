@@ -87,7 +87,8 @@ import Animated, {
 import { Image as ExpoImage } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ConfirmDialog, Icon, Text, useSheetChrome } from '@/components/ui';
+import { ActionMenu, ConfirmDialog, Icon, Text, useSheetChrome } from '@/components/ui';
+import { REPORT_REASONS, type ReportReason } from '@/lib/moderation';
 import {
   AVATAR_GRADIENTS,
   getInitials,
@@ -557,6 +558,39 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // Delete (148). The long-press overlay offers it to the sender and to
   // pool admins; delete_pool_message makes the same check server-side.
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  // Report + block (158) — App Store guideline 1.2. The long-press
+  // overlay's ⋯ opens `moreFor`; Report goes to the reason picker; a
+  // filed report offers to block as well. Blocking always confirms.
+  const [moreFor, setMoreFor] = useState<{ messageId: string; userId: string; name: string } | null>(null);
+  const [reportFor, setReportFor] = useState<{ messageId: string; userId: string; name: string } | null>(null);
+  const [blockOffer, setBlockOffer] = useState<{ userId: string; name: string; afterReport: boolean } | null>(null);
+  const [moderating, setModerating] = useState(false);
+  const reportMessage = banter.reportMessage;
+  const blockUser = banter.blockUser;
+  const handleReport = useCallback(
+    async (reason: ReportReason) => {
+      const target = reportFor;
+      if (!target) return;
+      setReportFor(null);
+      const result = await reportMessage(target.messageId, reason);
+      if (result.error) {
+        Alert.alert("Couldn't send report", 'Please try again.');
+        return;
+      }
+      setBlockOffer({ userId: target.userId, name: target.name, afterReport: true });
+    },
+    [reportFor, reportMessage],
+  );
+  const handleBlock = useCallback(async () => {
+    const target = blockOffer;
+    if (!target) return;
+    setModerating(true);
+    const result = await blockUser(target.userId);
+    setModerating(false);
+    setBlockOffer(null);
+    if (result.error) Alert.alert("Couldn't block", 'Please try again.');
+  }, [blockOffer, blockUser]);
   const [deleting, setDeleting] = useState(false);
   const deleteMessage = banter.deleteMessage;
   const handleConfirmDelete = useCallback(async () => {
@@ -788,7 +822,11 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   const giftedCacheRef = useRef<Map<string, BanterIMessage>>(new Map());
   const giftedMessages = useMemo<BanterIMessage[]>(() => {
     const out: BanterIMessage[] = [];
-    const msgs = banter.messages;
+    // Members I blocked (158) are not shown at all. Their messages are
+    // still in the hook (so unblocking needs no refetch), just not drawn.
+    const blocked = banter.blockedIds;
+    const msgs =
+      blocked.size === 0 ? banter.messages : banter.messages.filter((m) => !blocked.has(m.userId));
     const prevCache = giftedCacheRef.current;
     const nextCache = new Map<string, BanterIMessage>();
     for (let i = 0; i < msgs.length; i++) {
@@ -825,7 +863,9 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         replyMessage: m.replyTo
           ? {
               _id: m.replyTo.messageId,
-              text: m.replyTo.content,
+              text: blocked.has(m.replyTo.userId)
+                ? 'Message from a blocked member'
+                : m.replyTo.content,
               user: {
                 _id: m.replyTo.userId,
                 name: m.replyTo.senderUsername ?? m.replyTo.senderName,
@@ -841,7 +881,7 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
     // Gifted-chat expects newest first. The source is already in
     // chronological order, so reverse a shallow copy.
     return out.reverse();
-  }, [banter.messages]);
+  }, [banter.messages, banter.blockedIds]);
 
   // Gifted-chat fires onSend with an array of new messages (it
   // supports batched sends, but we only ever ship one at a time).
@@ -1848,6 +1888,44 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
               </Pressable>
               {(() => {
                 const target = banter.messages.find((m) => m.messageId === reactionAnchor.id);
+                const canModerate =
+                  !!target &&
+                  !target.deletedAt &&
+                  !target.messageId.startsWith('tmp-') &&
+                  target.userId !== banter.appUserId;
+                if (!canModerate) return null;
+                return (
+                  <Pressable
+                    onPress={() => {
+                      setMoreFor({
+                        messageId: target.messageId,
+                        userId: target.userId,
+                        name: target.senderUsername ? `@${target.senderUsername}` : target.senderName,
+                      });
+                      dismissReactionPicker();
+                    }}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel="Report or block"
+                    style={({ pressed }) => ({
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: theme.colors.surface,
+                      borderWidth: 0.5,
+                      borderColor: withOpacity(theme.colors.silver, 0.6),
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.7 : 1,
+                      ...theme.shadows.card,
+                    })}
+                  >
+                    <Icon name="ellipsis" size={16} tint={theme.colors.slate} weight="bold" />
+                  </Pressable>
+                );
+              })()}
+              {(() => {
+                const target = banter.messages.find((m) => m.messageId === reactionAnchor.id);
                 const canDelete =
                   !!target &&
                   !target.deletedAt &&
@@ -1893,6 +1971,60 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
           onSelect={(gif, query) => void handleSendGif(gif, query)}
         />
       ) : null}
+
+      <ActionMenu
+        visible={moreFor !== null}
+        title={moreFor?.name}
+        items={[
+          {
+            key: 'report',
+            label: 'Report message',
+            description: 'Our team reviews every report',
+            onPress: () => {
+              setReportFor(moreFor);
+              setMoreFor(null);
+            },
+          },
+          {
+            key: 'block',
+            label: `Block ${moreFor?.name ?? ''}`.trim(),
+            description: 'Hide their messages and notifications',
+            destructive: true,
+            onPress: () => {
+              if (moreFor) setBlockOffer({ userId: moreFor.userId, name: moreFor.name, afterReport: false });
+              setMoreFor(null);
+            },
+          },
+        ]}
+        onCancel={() => setMoreFor(null)}
+      />
+
+      <ActionMenu
+        visible={reportFor !== null}
+        title="Why are you reporting this?"
+        items={REPORT_REASONS.map((r) => ({
+          key: r.key,
+          label: r.label,
+          onPress: () => void handleReport(r.key),
+        }))}
+        onCancel={() => setReportFor(null)}
+      />
+
+      <ConfirmDialog
+        visible={blockOffer !== null}
+        title={blockOffer?.afterReport ? 'Thanks — we’ll take a look' : `Block ${blockOffer?.name ?? ''}?`}
+        description={
+          blockOffer?.afterReport
+            ? `Do you also want to block ${blockOffer.name}? You won’t see their messages or get their notifications. They won’t be told.`
+            : 'You won’t see their messages or get their notifications, in any pool. They won’t be told. You can unblock them in Settings.'
+        }
+        confirmLabel="Block"
+        cancelLabel={blockOffer?.afterReport ? 'Not now' : 'Cancel'}
+        destructive
+        busy={moderating}
+        onConfirm={() => void handleBlock()}
+        onCancel={() => setBlockOffer(null)}
+      />
 
       <ConfirmDialog
         visible={pendingDeleteId !== null}

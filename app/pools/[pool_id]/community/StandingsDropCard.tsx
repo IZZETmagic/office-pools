@@ -13,6 +13,8 @@ type StandingsDropCardProps = {
   /** Passed straight to the message chassis. */
   onReply?: () => void
   onDelete?: () => void
+  onReport?: () => void
+  onBlock?: () => void
 }
 
 const RANK_MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
@@ -26,6 +28,8 @@ export function StandingsDropCard({
   onToggleReaction,
   onReply,
   onDelete,
+  onReport,
+  onBlock,
 }: StandingsDropCardProps) {
   const meta = message.metadata as unknown as StandingsDropMetadata
   if (!meta?.entries) return null
@@ -41,6 +45,8 @@ export function StandingsDropCard({
       currentUserId={currentUserId}
       onReply={onReply}
       onDelete={onDelete}
+      onReport={onReport}
+      onBlock={onBlock}
     >
       {/* Header */}
       <div className="flex items-center gap-1.5 px-3.5 pt-3 pb-2">

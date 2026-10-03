@@ -15,6 +15,8 @@ type SharedCardWrapperProps = {
   /** Opens the composer's reply banner against this card. */
   onReply?: () => void
   onDelete?: () => void
+  onReport?: () => void
+  onBlock?: () => void
   children: React.ReactNode
 }
 
@@ -43,6 +45,8 @@ export function SharedCardWrapper({
   currentUserId,
   onReply,
   onDelete,
+  onReport,
+  onBlock,
   children,
 }: SharedCardWrapperProps) {
   return (
@@ -56,6 +60,8 @@ export function SharedCardWrapper({
       onToggleReaction={onToggleReaction}
       onReply={onReply}
       onDelete={onDelete}
+      onReport={onReport}
+      onBlock={onBlock}
       wide
     >
       {/* The card keeps its own surface and border — it is a card inside a

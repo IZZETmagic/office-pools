@@ -104,6 +104,8 @@ export function ChatMessage({
   onToggleReaction,
   onReply,
   onDelete,
+  onReport,
+  onBlock,
   isFirstInCluster = true,
   isLastInCluster = true,
 }: {
@@ -117,6 +119,8 @@ export function ChatMessage({
   /** Opens the composer's reply banner against this message. */
   onReply?: () => void
   onDelete?: () => void
+  onReport?: () => void
+  onBlock?: () => void
   isFirstInCluster?: boolean
   isLastInCluster?: boolean
 }) {
@@ -132,6 +136,8 @@ export function ChatMessage({
       onToggleReaction={onToggleReaction}
       onReply={onReply}
       onDelete={onDelete}
+      onReport={onReport}
+      onBlock={onBlock}
       isFirstInCluster={isFirstInCluster}
       isLastInCluster={isLastInCluster}
     >

@@ -9,6 +9,7 @@
 // should take a tap to reach.
 
 import { useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -79,6 +80,17 @@ export default function AccountSettingsScreen() {
               title="Change Password"
               subtitle="Update your account password"
               onPress={() => setPasswordOpen(true)}
+            />
+          </SettingsCard>
+        </SectionWrapper>
+
+        <SectionWrapper title="Privacy">
+          <SettingsCard>
+            <SettingsRow
+              icon="person.crop.circle.badge.xmark"
+              title="Blocked Members"
+              subtitle="People whose messages you've hidden"
+              onPress={() => router.push('/settings/blocked-members')}
             />
           </SettingsCard>
         </SectionWrapper>

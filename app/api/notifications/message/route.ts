@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { sendPushToUsers } from '@/lib/push/apns'
+import { createAdminClient } from '@/lib/supabase/server'
+import { withoutBlockersOf } from '@/lib/banter/blocks'
 
 /**
  * POST /api/notifications/message
@@ -55,7 +57,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ sent: true, count: 0 })
   }
 
-  const recipientIds = members.map((m) => m.user_id)
+  // Nobody is pushed a message from someone they blocked (158).
+  const recipientIds = await withoutBlockersOf(
+    createAdminClient(),
+    userData.user_id,
+    members.map((m) => m.user_id),
+  )
+  if (recipientIds.length === 0) {
+    return NextResponse.json({ sent: true, count: 0 })
+  }
   const senderData = senderResult.data
   const displayName = sender_name || senderData?.full_name || senderData?.username || 'Someone'
 

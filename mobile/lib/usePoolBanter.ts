@@ -4,6 +4,13 @@ import { notifyMention, notifyMessage } from './api';
 import { useAuth } from './auth';
 import { refreshIconBadge } from './badgeSync';
 import { mergeReactionAggregates, type ReactionAggregate } from './banterStable';
+import {
+  blockMember,
+  fetchBlockedIds,
+  reportBanterMessage,
+  unblockMember,
+  type ReportReason,
+} from './moderation';
 import { supabase } from './supabase';
 
 // Reference to the message a reply is targeting. Carries enough
@@ -162,6 +169,12 @@ export function usePoolBanter(poolId: string | undefined) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  // Members I have blocked (158). Their messages are hidden by the sheet and
+  // left out of my unread count; a ref so fetchUnread reads the latest set
+  // without re-subscribing on every change.
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(() => new Set());
+  const blockedRef = useRef(blockedIds);
+  blockedRef.current = blockedIds;
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<PoolMember[]>([]);
   const membersRef = useRef<PoolMember[]>([]);
@@ -427,6 +440,10 @@ export function usePoolBanter(poolId: string | undefined) {
         .neq('user_id', appUserId)
         // A deleted message is not an unread one (148).
         .is('deleted_at', null);
+      // Nor is one from somebody I blocked (158) — I can't see it.
+      if (blockedRef.current.size > 0) {
+        query = query.not('user_id', 'in', `(${Array.from(blockedRef.current).join(',')})`);
+      }
       if (lastReadAt) query = query.gt('created_at', lastReadAt);
       const { count } = await query;
       setUnreadCount(count ?? 0);
@@ -569,6 +586,61 @@ export function usePoolBanter(poolId: string | undefined) {
       return {};
     },
     [applyDeletion],
+  );
+
+  // Report and block (158). Reporting files through the web API, which
+  // also emails the support inbox; blocking writes my own user_blocks row.
+  const reportMessage = useCallback(
+    async (messageId: string, reason: ReportReason, details?: string): Promise<{ error?: string }> => {
+      try {
+        await reportBanterMessage(messageId, reason, details);
+        return {};
+      } catch (err) {
+        console.warn('[usePoolBanter.reportMessage]', err);
+        return { error: err instanceof Error ? err.message : 'Could not report' };
+      }
+    },
+    [],
+  );
+
+  const blockUser = useCallback(
+    async (userId: string): Promise<{ error?: string }> => {
+      if (!appUserId || userId === appUserId) return { error: 'Not allowed' };
+      setBlockedIds((prev) => new Set(prev).add(userId));
+      try {
+        await blockMember(appUserId, userId);
+        void fetchUnread();
+        return {};
+      } catch (err) {
+        console.warn('[usePoolBanter.blockUser]', err);
+        setBlockedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+        return { error: 'Could not block' };
+      }
+    },
+    [appUserId, fetchUnread],
+  );
+
+  const unblockUser = useCallback(
+    async (userId: string): Promise<{ error?: string }> => {
+      if (!appUserId) return { error: 'Not ready' };
+      try {
+        await unblockMember(userId);
+        setBlockedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+        return {};
+      } catch (err) {
+        console.warn('[usePoolBanter.unblockUser]', err);
+        return { error: 'Could not unblock' };
+      }
+    },
+    [appUserId],
   );
 
   const markAsRead = useCallback(async () => {
@@ -738,6 +810,15 @@ export function usePoolBanter(poolId: string | undefined) {
     void load();
   }, [load]);
 
+  // My blocks, re-read whenever the pool reloads so an unblock made in
+  // Settings is picked up the next time the chat opens.
+  useEffect(() => {
+    if (!appUserId) return;
+    fetchBlockedIds()
+      .then((ids) => setBlockedIds(ids))
+      .catch((err) => console.warn('[usePoolBanter.fetchBlockedIds]', err));
+  }, [appUserId, load]);
+
   useEffect(() => {
     void loadMembers();
   }, [loadMembers]);
@@ -903,6 +984,10 @@ export function usePoolBanter(poolId: string | undefined) {
     markAsRead,
     toggleReaction,
     deleteMessage,
+    blockedIds,
+    blockUser,
+    unblockUser,
+    reportMessage,
     refresh: load,
     loadOlder,
     loadingOlder,

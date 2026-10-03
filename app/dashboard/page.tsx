@@ -760,7 +760,7 @@ export default async function DashboardPage() {
   // 6. MENTIONED events — messages where current user is @mentioned
   const poolIds = (userPools ?? []).map((m: any) => m.pools.pool_id)
   if (poolIds.length > 0) {
-    const { data: mentionMessages } = await supabase
+    const { data: mentionRows } = await supabase
       .from('pool_messages')
       .select('message_id, pool_id, user_id, created_at')
       .contains('mentions', [userData.user_id])
@@ -768,7 +768,12 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(20)
 
-    if (mentionMessages && mentionMessages.length > 0) {
+    // Mentions from people this member blocked (158) are not shown.
+    const { data: blockRows } = await supabase.from('user_blocks').select('blocked_id')
+    const blockedIds = new Set((blockRows ?? []).map((b: { blocked_id: string }) => b.blocked_id))
+    const mentionMessages = (mentionRows ?? []).filter((m: { user_id: string }) => !blockedIds.has(m.user_id))
+
+    if (mentionMessages.length > 0) {
       const mentionerIds = [...new Set(mentionMessages.map((m: any) => m.user_id))]
       const { data: mentioners } = await supabase
         .from('users')

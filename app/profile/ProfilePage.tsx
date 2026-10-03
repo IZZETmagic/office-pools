@@ -1523,6 +1523,77 @@ function PredictionHistoryTab({
 // TAB 3: ACCOUNT
 // =====================
 
+/**
+ * Blocked members (158) — where a block is undone. Blocking happens from a message's menu in
+ * Banter. RLS returns only the viewer's own rows; the people listed are never told.
+ */
+function BlockedMembersCard({ supabase }: { supabase: ReturnType<typeof createClient> }) {
+  const { showToast } = useToast()
+  const [rows, setRows] = useState<{ userId: string; name: string; username: string | null }[] | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    supabase
+      .from('user_blocks')
+      .select('blocked_id, created_at, users!user_blocks_blocked_id_fkey(full_name, username)')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error) { console.error('Failed to load blocked members:', error); setRows([]); return }
+        type Row = { blocked_id: string; users: { full_name: string | null; username: string | null } | null }
+        setRows(((data ?? []) as unknown as Row[]).map(r => ({
+          userId: r.blocked_id,
+          name: r.users?.full_name || r.users?.username || 'Member',
+          username: r.users?.username ?? null,
+        })))
+      })
+    return () => { active = false }
+  }, [supabase])
+
+  async function unblock(userId: string) {
+    setBusyId(userId)
+    const { error } = await supabase.from('user_blocks').delete().eq('blocked_id', userId)
+    setBusyId(null)
+    if (error) { showToast('Could not unblock. Try again.', 'error'); return }
+    setRows(prev => (prev ?? []).filter(r => r.userId !== userId))
+  }
+
+  return (
+    <Card>
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-8 h-8 rounded-control bg-primary-50 flex items-center justify-center">
+          <Icon name="person.crop.circle.badge.xmark" size={16} weight="semibold" className="text-primary-600" />
+        </div>
+        <h4 className="text-base font-semibold text-ink">Blocked members</h4>
+      </div>
+      <p className="text-xs text-muted mb-4">
+        You don’t see messages or get notifications from people you’ve blocked, in any pool. They aren’t told,
+        and they aren’t told if you unblock them.
+      </p>
+      {rows === null ? (
+        <p className="text-sm text-muted">Loading…</p>
+      ) : rows.length === 0 ? (
+        <div className="bg-snow rounded-control p-4 text-sm text-muted">You haven’t blocked anyone.</div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {rows.map(r => (
+            <div key={r.userId} className="flex items-center justify-between bg-snow rounded-control p-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-ink truncate">{r.name}</p>
+                {r.username && <p className="text-xs text-muted mt-0.5">@{r.username}</p>}
+              </div>
+              <Button variant="outline" size="sm" onClick={() => void unblock(r.userId)} loading={busyId === r.userId} loadingText="Unblocking...">
+                Unblock
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function AccountSettingsTab({
   profile,
   poolMemberships,
@@ -1864,6 +1935,8 @@ function AccountSettingsTab({
           </Button>
         </div>
       </Card>
+
+      <BlockedMembersCard supabase={supabase} />
 
       {/* Appearance */}
       <Card>

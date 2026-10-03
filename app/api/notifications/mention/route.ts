@@ -5,6 +5,8 @@ import { mentionNotificationTemplate } from '@/lib/email/templates'
 import { syncContactToResend } from '@/lib/email/contacts'
 import { TOPICS } from '@/lib/email/topics'
 import { sendPushToUsers } from '@/lib/push/apns'
+import { createAdminClient } from '@/lib/supabase/server'
+import { withoutBlockersOf } from '@/lib/banter/blocks'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
@@ -52,8 +54,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
   }
 
-  // Get mentioned users' emails (excluding the sender)
-  const mentionedIds = (mentioned_user_ids as string[]).filter(id => id !== userData.user_id)
+  // Get mentioned users' emails (excluding the sender, and anyone who blocked them — 158)
+  const mentionedIds = await withoutBlockersOf(
+    createAdminClient(),
+    userData.user_id,
+    (mentioned_user_ids as string[]).filter(id => id !== userData.user_id),
+  )
 
   if (mentionedIds.length === 0) {
     console.log('[Mention] Sender mentioned themselves only, skipping')

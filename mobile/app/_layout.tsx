@@ -411,6 +411,7 @@ function InnerLayout() {
         <Stack.Screen name="settings/account" options={{ headerShown: false }} />
         <Stack.Screen name="settings/notifications" options={{ headerShown: false }} />
         <Stack.Screen name="settings/archived-pools" options={{ headerShown: false }} />
+        <Stack.Screen name="settings/blocked-members" options={{ headerShown: false }} />
         <Stack.Screen name="settings/help" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         {/* DEV-ONLY — the onboarding journey, built on the real screens. Declared so it renders

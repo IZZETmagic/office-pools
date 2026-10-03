@@ -46,6 +46,15 @@ import type { GroupStanding, Team } from '@/lib/tournament'
 import type { MatchWithResult } from '@/lib/bracketPickerScoring'
 import type { PinnedMessage, BadgeFlexMetadata, StandingsDropMetadata, ReactionCount } from './types'
 
+// Same reasons, same order, as the phone's lib/moderation.ts — and the only values 158 accepts.
+const REPORT_REASONS = [
+  { key: 'spam', label: 'Spam' },
+  { key: 'offensive', label: 'Offensive' },
+  { key: 'harassment', label: 'Harassment or bullying' },
+  { key: 'inappropriate_image', label: 'Inappropriate image' },
+  { key: 'other', label: 'Something else' },
+] as const
+
 // Broadcast-from-database payload envelope. Migration 022's triggers call
 // `realtime.send({ record: <row> }, ...)`; the client `.on('broadcast')`
 // callback receives it under `.payload`. We also accept a top-level `record`
@@ -89,6 +98,13 @@ export function CommunityTab({
   const [replyingTo, setReplyingTo] = useState<MessageWithReactions | null>(null)
   const [pendingDelete, setPendingDelete] = useState<MessageWithReactions | null>(null)
   const [showGifPicker, setShowGifPicker] = useState(false)
+  // Report + block (158). `blockedIds` are members I've hidden, account-wide;
+  // their messages stay in `messages` (so unblocking needs no refetch) but are
+  // never put in the feed.
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(() => new Set())
+  const [reportFor, setReportFor] = useState<MessageWithReactions | null>(null)
+  const [blockFor, setBlockFor] = useState<{ userId: string; name: string; afterReport: boolean } | null>(null)
+  const [moderating, setModerating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const { showToast } = useToast()
   const [replyPreviews, setReplyPreviews] = useState<Map<string, ReplyPreview>>(new Map())
@@ -747,6 +763,60 @@ export function CommunityTab({
     setPendingDelete(null)
   }, [pendingDelete, applyDeletion, showToast])
 
+  // =====================
+  // REPORT + BLOCK (158)
+  // =====================
+  useEffect(() => {
+    let active = true
+    supabaseRef.current.from('user_blocks').select('blocked_id').then(({ data, error }) => {
+      if (error) { console.error('Failed to load blocks:', error); return }
+      if (active) setBlockedIds(new Set((data ?? []).map(r => r.blocked_id as string)))
+    })
+    return () => { active = false }
+  }, [])
+
+  const nameOf = useCallback((userId: string) => {
+    const m = members.find(mm => mm.user_id === userId)
+    return m?.users.username ? `@${m.users.username}` : (m?.users.full_name || 'this member')
+  }, [members])
+
+  const handleReport = useCallback(async (reason: string) => {
+    const target = reportFor
+    if (!target) return
+    setModerating(true)
+    const res = await fetch('/api/banter/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: target.message_id, reason }),
+    }).catch(() => null)
+    setModerating(false)
+    setReportFor(null)
+    if (!res?.ok) {
+      showToast('Could not send that report. Try again.', 'error')
+      return
+    }
+    setBlockFor({ userId: target.user_id, name: nameOf(target.user_id), afterReport: true })
+  }, [reportFor, nameOf, showToast])
+
+  const handleBlock = useCallback(async () => {
+    const target = blockFor
+    if (!target) return
+    setModerating(true)
+    const { error } = await supabaseRef.current
+      .from('user_blocks')
+      .upsert({ blocker_id: currentUserId, blocked_id: target.userId }, { onConflict: 'blocker_id,blocked_id', ignoreDuplicates: true })
+    setModerating(false)
+    setBlockFor(null)
+    if (error) {
+      console.error('Failed to block:', error)
+      showToast('Could not block. Try again.', 'error')
+      return
+    }
+    setBlockedIds(prev => new Set(prev).add(target.userId))
+    setReplyingTo(prev => (prev?.user_id === target.userId ? null : prev))
+    showToast(`${target.name} is blocked. You can unblock them in Settings.`, 'success')
+  }, [blockFor, currentUserId, showToast])
+
   const handleToggleReaction = useCallback(async (messageId: string, emoji: string) => {
     const msg = messages.find(m => m.message_id === messageId)
     if (!msg) return
@@ -1110,6 +1180,7 @@ export function CommunityTab({
     const items: FeedItem[] = []
 
     for (const msg of messages) {
+      if (blockedIds.has(msg.user_id)) continue
       items.push({ type: 'message', data: msg })
     }
 
@@ -1158,7 +1229,7 @@ export function CommunityTab({
     }
 
     return withHeaders
-  }, [messages, systemEvents, currentUserId, initialLastReadAt])
+  }, [messages, systemEvents, currentUserId, initialLastReadAt, blockedIds])
 
   // =====================
   // RENDER
@@ -1285,6 +1356,12 @@ export function CommunityTab({
           const onDelete = msg.user_id === currentUserId || isAdmin
             ? () => setPendingDelete(msg)
             : undefined
+          // Anyone else's message can be reported, and its sender blocked (158).
+          const isOthers = msg.user_id !== currentUserId
+          const onReport = isOthers ? () => setReportFor(msg) : undefined
+          const onBlock = isOthers
+            ? () => setBlockFor({ userId: msg.user_id, name: nameOf(msg.user_id), afterReport: false })
+            : undefined
 
           // Rich content cards — reactions only on these
           if (msg.message_type === 'gif') {
@@ -1299,6 +1376,8 @@ export function CommunityTab({
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
                 onReply={() => setReplyingTo(msg)}
                 onDelete={onDelete}
+                onReport={onReport}
+                onBlock={onBlock}
               />
             )
           }
@@ -1315,6 +1394,8 @@ export function CommunityTab({
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
                 onReply={() => setReplyingTo(msg)}
                 onDelete={onDelete}
+                onReport={onReport}
+                onBlock={onBlock}
               />
             )
           }
@@ -1331,6 +1412,8 @@ export function CommunityTab({
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
                 onReply={() => setReplyingTo(msg)}
                 onDelete={onDelete}
+                onReport={onReport}
+                onBlock={onBlock}
               />
             )
           }
@@ -1347,6 +1430,8 @@ export function CommunityTab({
                 onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
                 onReply={() => setReplyingTo(msg)}
                 onDelete={onDelete}
+                onReport={onReport}
+                onBlock={onBlock}
               />
             )
           }
@@ -1355,7 +1440,13 @@ export function CommunityTab({
           // banter-engagement item asked for the opposite: reacting is the
           // cheapest way in for the ~93% of members who never type.
           const reply = msg.reply_to_message_id
-            ? replyPreviews.get(msg.reply_to_message_id) ?? null
+            ? (() => {
+                const preview = replyPreviews.get(msg.reply_to_message_id!) ?? null
+                const parent = messages.find(m => m.message_id === msg.reply_to_message_id)
+                return preview && parent && blockedIds.has(parent.user_id)
+                  ? { ...preview, content: 'Message from a blocked member' }
+                  : preview
+              })()
             : null
 
           return (
@@ -1370,6 +1461,8 @@ export function CommunityTab({
               onToggleReaction={(emoji) => handleToggleReaction(msg.message_id, emoji)}
               onReply={() => setReplyingTo(msg)}
               onDelete={onDelete}
+              onReport={onReport}
+              onBlock={onBlock}
               isFirstInCluster={!sameAuthorText(feedItems[i - 1], msg.user_id)}
               isLastInCluster={!sameAuthorText(feedItems[i + 1], msg.user_id)}
             />
@@ -1542,6 +1635,51 @@ export function CommunityTab({
           onSelect={(gif, query) => void handleSendGif(gif, query)}
         />
       )}
+
+      <Modal
+        isOpen={!!reportFor}
+        onClose={() => { if (!moderating) setReportFor(null) }}
+        title="Why are you reporting this?"
+        size="sm"
+      >
+        <div className="px-4 sm:px-6 py-4 flex flex-col gap-2">
+          <p className="t-detail text-muted mb-1">Our team reviews every report. {reportFor ? nameOf(reportFor.user_id) : ''} won’t be told who reported it.</p>
+          {REPORT_REASONS.map(r => (
+            <button
+              key={r.key}
+              type="button"
+              disabled={moderating}
+              onClick={() => void handleReport(r.key)}
+              className="w-full text-left px-4 py-3 rounded-control bg-mist t-body font-semibold text-ink hover:bg-ink/10 transition-colors disabled:opacity-50"
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!blockFor}
+        onClose={() => { if (!moderating) setBlockFor(null) }}
+        title={blockFor?.afterReport ? 'Thanks — we’ll take a look' : `Block ${blockFor?.name ?? ''}?`}
+        size="sm"
+      >
+        <div className="px-4 sm:px-6 py-4 flex flex-col gap-4">
+          <p className="t-body text-muted">
+            {blockFor?.afterReport
+              ? `Do you also want to block ${blockFor.name}? You won’t see their messages or get their notifications. They won’t be told.`
+              : 'You won’t see their messages or get their notifications, in any pool. They won’t be told. You can unblock them in Settings.'}
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button variant="gray" onClick={() => setBlockFor(null)} disabled={moderating}>
+              {blockFor?.afterReport ? 'Not now' : 'Cancel'}
+            </Button>
+            <Button variant="danger" onClick={() => void handleBlock()} loading={moderating} loadingText="Blocking...">
+              Block
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={!!pendingDelete}

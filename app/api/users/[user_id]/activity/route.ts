@@ -617,10 +617,16 @@ async function handleGET(
         .order('created_at', { ascending: false })
         .limit(50)
       const msgs = (msgData ?? []) as MsgRow[]
-      // Drop self-mentions and substring false-positives.
+      // People this member blocked (158) never surface here either.
+      const { data: blockRows } = await adminClient
+        .from('user_blocks')
+        .select('blocked_id')
+        .eq('blocker_id', user_id)
+      const blocked = new Set(((blockRows ?? []) as Array<{ blocked_id: string }>).map((b) => b.blocked_id))
+      // Drop self-mentions, blocked senders and substring false-positives.
       const mentionMatcher = new RegExp(`@${escapeRegex(myUsername)}(?!\\w)`)
       const matched = msgs.filter(
-        (m) => m.user_id !== user_id && mentionMatcher.test(m.content),
+        (m) => m.user_id !== user_id && !blocked.has(m.user_id) && mentionMatcher.test(m.content),
       )
 
       if (matched.length > 0) {

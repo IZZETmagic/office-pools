@@ -13,6 +13,8 @@ type BadgeFlexCardProps = {
   /** Passed straight to the message chassis. */
   onReply?: () => void
   onDelete?: () => void
+  onReport?: () => void
+  onBlock?: () => void
   currentUserId?: string
 }
 
@@ -32,6 +34,8 @@ export function BadgeFlexCard({
   currentUserId,
   onReply,
   onDelete,
+  onReport,
+  onBlock,
 }: BadgeFlexCardProps) {
   const meta = message.metadata as unknown as BadgeFlexMetadata
   if (!meta?.badges) return null
@@ -51,6 +55,8 @@ export function BadgeFlexCard({
       currentUserId={currentUserId}
       onReply={onReply}
       onDelete={onDelete}
+      onReport={onReport}
+      onBlock={onBlock}
     >
       {/* One badge, centred — RN's BadgeBody. The web showed a wrap-grid of
           every badge in 90px cards, which is the "share all your badges"

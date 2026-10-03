@@ -3297,6 +3297,16 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
     3. send: resize to ~1600px + re-encode, which strips EXIF/GPS;
     4. display: batched signed URLs + full-screen viewer;
     5. delete removes the file. Signed URLs can't be revoked, so deleting the file is what removes the photo.
+  - **Step 3.1 — report + block: BUILT 2026-10-03** (not yet pushed or OTA'd).
+    - Migration `158_a_member_can_report_and_block` (applied) adds two tables:
+      - `pool_message_reports`: filed only via `report_pool_message`, which snapshots server-side; super admins read and resolve.
+      - `user_blocks`: own rows only, so the blocked person can never see them.
+    - The unread counts skip blocked senders.
+    - `POST /api/banter/report` files the report and emails `REPORT_ALERT_EMAIL` (default support@sportpool.io).
+    - Message and mention pushes skip anyone who blocked the sender (admin client; it fails open).
+    - Activity mentions and dashboard mentions hide blocked senders.
+    - **Web:** Report and Block in the message menu; Blocked members in Profile → Account; Super Admin → Reports (`?tab=reports`).
+    - **RN:** a ⋯ beside the reaction picker leads to Report (reasons) or Block, with Settings → Account → Blocked Members.
   - **Open:** DMCA designated agent (legal review C3), Ryan's action.
 - **Effort:** ~2–3 days for photos; GIFs ~1.5–2 days.
 - **Done when:** a user can attach and send an image or GIF in pool chat and others see it inline.

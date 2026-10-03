@@ -3,6 +3,7 @@
 import './sp-admin.css'
 import { Icon } from '@/components/ui/Icon'
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { AppHeader } from '@/components/ui/AppHeader'
 import type {
   SuperMatchData,
@@ -24,8 +25,9 @@ import { BrandedPoolsTab } from './BrandedPoolsTab'
 import { SubscriptionsTab } from './SubscriptionsTab'
 import { SP } from './SpTable'
 import { AvatarsTab } from './AvatarsTab'
+import { ReportsTab } from './ReportsTab'
 
-type Tab = 'matches' | 'users' | 'pools' | 'branded' | 'audit' | 'stats' | 'templates' | 'broadcast' | 'email_history' | 'automated_emails' | 'subscriptions' | 'avatars'
+type Tab = 'matches' | 'users' | 'pools' | 'branded' | 'audit' | 'stats' | 'templates' | 'broadcast' | 'email_history' | 'automated_emails' | 'subscriptions' | 'avatars' | 'reports'
 
 type TabItem = { key: Tab; label: string; icon: React.ReactNode }
 type TabSection = { heading: string; items: TabItem[] }
@@ -127,6 +129,14 @@ const TAB_SECTIONS: TabSection[] = [
     heading: 'Operations',
     items: [
       {
+        // Banter reports (158). The report email links here with ?tab=reports.
+        key: 'reports',
+        label: 'Reports',
+        icon: (
+          <Icon name="exclamationmark.triangle" className="w-[18px] h-[18px]" />
+        ),
+      },
+      {
         key: 'subscriptions',
         label: 'Subscriptions',
         icon: (
@@ -156,7 +166,13 @@ export function SuperAdminDashboard({
   subscriptionPeriods: initialSubscriptionPeriods,
   currentUserId,
 }: SuperAdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('stats')
+  // Deep link from the report alert email: /admin/super?tab=reports. useSearchParams reads the
+  // same value on the server and the client, so the first render already shows the right tab.
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const requested = searchParams.get('tab')
+    return requested && ALL_TABS.some(t => t.key === requested) ? (requested as Tab) : 'stats'
+  })
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [matches, setMatches] = useState(initialMatches)
   const [users, setUsers] = useState(initialUsers)
@@ -283,6 +299,7 @@ export function SuperAdminDashboard({
             />
           )}
           {activeTab === 'avatars' && <AvatarsTab />}
+          {activeTab === 'reports' && <ReportsTab currentUserId={currentUserId} />}
           {activeTab === 'users' && (
             <UsersTab
               users={users}
