@@ -189,3 +189,13 @@ export function leaveConsequence(d: Pick<CrewDetail, 'viewer' | 'members'>): str
   const next = co ?? [...others].sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))[0];
   return `${shortName(next)} will become captain${co ? '' : ' — the longest-standing member'}. Your history stays.`;
 }
+
+/**
+ * What the captain sees before pressing Invite on an email — the email's own first line.
+ * ⚠ MIRRORS the server's `invitePreview` (lib/crews/notify.ts), which owns the wording; mobile is a
+ * separate project and cannot import it. Change both together.
+ */
+export function invitePreviewText(inviter: string, crewName: string): string {
+  return `${inviter} asked us to invite you to ${crewName} on SportPool…`;
+}
+

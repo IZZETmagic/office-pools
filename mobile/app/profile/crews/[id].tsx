@@ -336,7 +336,7 @@ export default function CrewScreen() {
         </View>
       ) : null}
 
-      <AddPeopleSheet ref={addPeopleRef} crewId={crew.crew.crewId} onChanged={() => invalidateCrews(queryClient, id)} />
+      <AddPeopleSheet ref={addPeopleRef} crewId={crew.crew.crewId} crewName={crew.crew.name} onChanged={() => invalidateCrews(queryClient, id)} />
 
       <ActionSheet<MemberAction>
         visible={selected !== null}

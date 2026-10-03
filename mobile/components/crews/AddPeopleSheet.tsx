@@ -22,7 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, Text, useSheetChrome } from '@/components/ui';
 import { inviteToCrew, lookupUsername } from '@/lib/api';
-import { personName, type Person } from '@/lib/crews';
+import { invitePreviewText, personName, type Person } from '@/lib/crews';
+import { useHomeData } from '@/lib/HomeDataProvider';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 import { CrewFace } from './CrewFace';
@@ -33,10 +34,10 @@ type RowState = { kind: 'idle' } | { kind: 'busy' } | { kind: 'added' } | { kind
 
 const looksLikeEmail = (s: string) => s.includes('@') && !s.startsWith('@');
 
-export const AddPeopleSheet = forwardRef<AddPeopleSheetHandle, { crewId: string; onChanged: () => void }>(function AddPeopleSheet(
-  { crewId, onChanged },
-  ref,
-) {
+export const AddPeopleSheet = forwardRef<
+  AddPeopleSheetHandle,
+  { crewId: string; crewName: string; onChanged: () => void }
+>(function AddPeopleSheet({ crewId, crewName, onChanged }, ref) {
   const theme = useTheme();
   const sheetChrome = useSheetChrome('surface');
   const insets = useSafeAreaInsets();
@@ -46,6 +47,9 @@ export const AddPeopleSheet = forwardRef<AddPeopleSheetHandle, { crewId: string;
   const [matches, setMatches] = useState<Person[] | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [note, setNote] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
+  const { data: home } = useHomeData();
+  const inviterName = home?.fullName?.trim() || home?.username || 'You';
+  const emailTyped = looksLikeEmail(query.trim());
 
   useImperativeHandle(ref, () => ({
     open: () => {
@@ -189,6 +193,23 @@ export const AddPeopleSheet = forwardRef<AddPeopleSheetHandle, { crewId: string;
             )}
           </Pressable>
         </View>
+
+        {/* The 2026-10-02 rule: invitations name who asked — once, and the captain sees the email's
+            own first line before pressing Invite. Worded so it never says whether the address has
+            an account. */}
+        {emailTyped && !note ? (
+          <View style={{ padding: theme.spacing.md, borderRadius: theme.radii.md, backgroundColor: theme.colors.mist, gap: 4 }}>
+            <RNText style={{ fontFamily: fontFamilies.bold, fontSize: 12, color: theme.colors.slate }}>
+              We’ll send them one email:
+            </RNText>
+            <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 13, lineHeight: 18, color: theme.colors.ink }}>
+              “{invitePreviewText(inviterName, crewName)}”
+            </RNText>
+            <RNText style={{ fontFamily: fontFamilies.medium, fontSize: 11.5, lineHeight: 16, color: theme.colors.slate }}>
+              From SportPool, never followed up. If they already use SportPool, it’ll be waiting in their app too.
+            </RNText>
+          </View>
+        ) : null}
 
         {note ? (
           <RNText

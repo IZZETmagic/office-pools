@@ -55,6 +55,12 @@ function routeFor(
       // /pool/[id]/banter route.
       return { pathname: '/pool/[id]', params: { id: poolId, banter: 'open' } };
     }
+    // Crews (lib/crews/notify.ts on the server): a saved spot, its one reminder, or an invite. All
+    // land on Activity, where the card with its two buttons is — the decision is made there, not in
+    // a notification. Older builds have no case for these and simply open the app.
+    case 'crew_seat':
+    case 'crew_invite':
+      return { pathname: '/(tabs)/activity' };
     default:
       return null;
   }
