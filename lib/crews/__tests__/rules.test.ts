@@ -16,6 +16,7 @@ import {
   inviteBlock,
   inviteRateLimit,
   joinOutcome,
+  linkablePool,
   offersCrewSave,
   parseInviteTarget,
   rosterReasons,
@@ -269,5 +270,27 @@ describe('disbanding and restoring (157)', () => {
     expect(canRestore(disbanded, m('k', 'co_captain', '2026-06-01'))).toBe(false)
     expect(canRestore({ closed_at: '2026-10-02', closed_reason: 'emptied' }, m('c', 'captain', '2026-06-01'))).toBe(false)
     expect(canRestore({ closed_at: null, closed_reason: null }, m('c', 'captain', '2026-06-01'))).toBe(false)
+  })
+})
+
+describe('linking a pool you already run (2026-10-03)', () => {
+  const crew = new Set(['a', 'b', 'c'])
+  it('the same people, or fewer, can be linked — linking never adds anyone', () => {
+    expect(linkablePool(['a', 'b', 'c'], crew)).toBe(true)
+    expect(linkablePool(['a', 'b'], crew)).toBe(true)
+  })
+  it('one outsider and it can’t — playing in a crew pool would make them a member unasked', () => {
+    expect(linkablePool(['a', 'b', 'c', 'x'], crew)).toBe(false)
+  })
+  it('an empty pool is nothing to link', () => {
+    expect(linkablePool([], crew)).toBe(false)
+  })
+  it('⚠ a pool you play alone isn’t the crew playing together — production offered five of those', () => {
+    expect(linkablePool(['a'], crew)).toBe(false)
+  })
+  it('more than half the crew: 2 of 3 yes, 2 of 5 no', () => {
+    expect(linkablePool(['a', 'b'], crew)).toBe(true)
+    expect(linkablePool(['a', 'b'], new Set(['a', 'b', 'c', 'd', 'e']))).toBe(false)
+    expect(linkablePool(['a', 'b', 'c'], new Set(['a', 'b', 'c', 'd', 'e']))).toBe(true)
   })
 })

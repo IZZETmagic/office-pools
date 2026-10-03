@@ -25,6 +25,7 @@ import { ActionSheet, type ActionSheetOption } from '@/components/ui/ActionSheet
 import {
   disbandCrew,
   joinPoolById,
+  linkPoolToCrew,
   leaveCrew,
   rejoinCrew,
   removeCrewMember,
@@ -36,6 +37,9 @@ import {
 import {
   DISBAND_CONSEQUENCE,
   DISBANDED_NOTICE,
+  LINK_CONSEQUENCE,
+  LINK_HINT,
+  linkablePeopleText,
   finishText,
   leaveConsequence,
   monthYear,
@@ -46,6 +50,7 @@ import {
   shortName,
   winnersText,
   type CrewDetail,
+  type LinkablePool,
 } from '@/lib/crews';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { useManualRefresh } from '@/lib/useManualRefresh';
@@ -73,6 +78,7 @@ export default function CrewScreen() {
   const [renaming, setRenaming] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmDisband, setConfirmDisband] = useState(false);
+  const [linking, setLinking] = useState<LinkablePool | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -267,6 +273,29 @@ export default function CrewScreen() {
         </Section>
       ) : null}
 
+      {/* Pools the captain/co-captain runs with nobody outside the crew in them (2026-10-03). Offered,
+          never linked unasked; the server re-checks every condition on Link. */}
+      {crew.linkable && crew.linkable.length ? (
+        <Section title="Also playing together">
+          <Card padded={false}>
+            {crew.linkable.map((p, i) => (
+              <Row key={p.poolId} divider={i > 0}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.bold, fontSize: 15, color: theme.colors.ink }}>
+                    {p.poolName}
+                  </RNText>
+                  <RNText numberOfLines={1} style={{ fontFamily: fontFamilies.medium, fontSize: 12, color: theme.colors.slate }}>
+                    {p.competition} · {linkablePeopleText(p.players, crew.members.length)}
+                  </RNText>
+                </View>
+                <SmallButton label="Link" disabled={busy} onPress={() => setLinking(p)} />
+              </Row>
+            ))}
+          </Card>
+          <Hint text={LINK_HINT} />
+        </Section>
+      ) : null}
+
       {crew.allTime.length ? (
         <Section title="All-time">
           <Card padded={false}>
@@ -430,6 +459,21 @@ export default function CrewScreen() {
           const m = confirmRemove;
           setConfirmRemove(null);
           if (m) void act(() => removeCrewMember(crew.crew.crewId, m.userId));
+        }}
+      />
+
+      <ConfirmDialog
+        visible={linking !== null}
+        title={linking ? `Link ${linking.poolName}?` : ''}
+        description={LINK_CONSEQUENCE}
+        confirmLabel="Link"
+        cancelLabel="Not now"
+        busy={busy}
+        onCancel={() => setLinking(null)}
+        onConfirm={() => {
+          const p = linking;
+          setLinking(null);
+          if (p) void act(() => linkPoolToCrew(crew.crew.crewId, p.poolId));
         }}
       />
 

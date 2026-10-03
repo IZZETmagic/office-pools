@@ -873,6 +873,11 @@ export function rejoinCrew(crewId: string) {
   return apiFetch<Record<string, never>>(`/api/crews/${crewId}/rejoin`, { method: 'POST' });
 }
 
+/** Link a pool you run to the crew — every player already in it; for good (2026-10-03). */
+export function linkPoolToCrew(crewId: string, poolId: string) {
+  return apiFetch<{ poolId: string }>(`/api/crews/${crewId}/link-pool`, { method: 'POST', body: { pool_id: poolId } });
+}
+
 /** The captain disbands the crew — it disappears for everyone; the captain can restore it (157). */
 export function disbandCrew(crewId: string) {
   return apiFetch<Record<string, never>>(`/api/crews/${crewId}/disband`, { method: 'POST' });

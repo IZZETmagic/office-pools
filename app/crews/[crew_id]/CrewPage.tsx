@@ -25,10 +25,13 @@ import { Icon } from '@/components/ui/Icon'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import { crewRequest, errorText } from '@/lib/crews/client'
-import type { CrewDetail } from '@/lib/crews/read'
+import type { CrewDetail, LinkablePool } from '@/lib/crews/read'
 import {
   DISBAND_CONSEQUENCE,
   DISBANDED_NOTICE,
+  LINK_CONSEQUENCE,
+  LINK_HINT,
+  linkablePeopleText,
   finishText,
   leaveConsequence,
   monthYear,
@@ -64,6 +67,7 @@ export function CrewPage({
   const [selected, setSelected] = useState<Member | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<Member | null>(null)
   const [confirmDisband, setConfirmDisband] = useState(false)
+  const [linking, setLinking] = useState<LinkablePool | null>(null)
 
   const v = crew.viewer
   const captain = crew.members.find((m) => m.role === 'captain') ?? null
@@ -240,6 +244,28 @@ export function CrewPage({
                   </div>
                 )
               })}
+            </Card>
+          </Section>
+        ) : null}
+
+        {/* Pools the captain/co-captain runs with nobody outside the crew in them (2026-10-03).
+            Offered, never linked unasked; the server re-checks every condition on Link. */}
+        {crew.linkable && crew.linkable.length ? (
+          <Section title="Also playing together" hint={LINK_HINT}>
+            <Card padding="none">
+              {crew.linkable.map((p, i) => (
+                <div key={p.poolId} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-border-subtle' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-bold text-ink truncate">{p.poolName}</p>
+                    <p className="text-xs font-medium text-muted truncate">
+                      {p.competition} · {linkablePeopleText(p.players, crew.members.length)}
+                    </p>
+                  </div>
+                  <Button size="xs" className="rounded-pill" disabled={busy} onClick={() => setLinking(p)}>
+                    Link
+                  </Button>
+                </div>
+              ))}
             </Card>
           </Section>
         ) : null}
@@ -506,6 +532,39 @@ export function CrewPage({
           )
         }}
       />
+
+      <Modal isOpen={linking !== null} onClose={() => setLinking(null)} size="sm" titleId="link-title">
+        <div className="px-5 sm:px-6 pt-4 pb-6 flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <h2 id="link-title" className="t-card-title text-ink">
+              {linking ? `Link ${linking.poolName}?` : ''}
+            </h2>
+            <p className="t-body text-muted">{LINK_CONSEQUENCE}</p>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Button variant="secondary" onClick={() => setLinking(null)} disabled={busy}>
+              Not now
+            </Button>
+            <Button
+              loading={busy}
+              loadingText="Linking…"
+              onClick={() => {
+                const p = linking
+                if (!p) return
+                void act(
+                  () => crewRequest(`${crewUrl}/link-pool`, { body: { pool_id: p.poolId } }),
+                  () => {
+                    setLinking(null)
+                    router.refresh()
+                  },
+                )
+              }}
+            >
+              Link
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <ConfirmModal
         open={confirmDisband}

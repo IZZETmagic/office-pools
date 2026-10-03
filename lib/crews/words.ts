@@ -107,6 +107,18 @@ export function leaveConsequence(d: Pick<CrewDetail, 'viewer' | 'members'>): str
   return `${shortName(next)} will become captain${co ? '' : ' — the longest-standing member'}. Your history stays.`
 }
 
+/** Linking a pool you run (2026-10-03) — the confirmation, said before the tap. */
+export const LINK_CONSEQUENCE =
+  'Its seasons count in the crew’s history, and anyone in the crew can join it from here. A pool stays with its crew for good, and crew pools are private.'
+
+/** Under "Also playing together". */
+export const LINK_HINT = 'Pools you run where everyone’s already in the crew. Linking adds the season to its history — nobody new joins.'
+
+/** "Same 3 people as the crew" / "2 of the crew’s 3". */
+export function linkablePeopleText(players: number, crewSize: number): string {
+  return players >= crewSize ? `Same ${plural(players, 'person', 'people')} as the crew` : `${players} of the crew’s ${crewSize}`
+}
+
 /** Disband's confirmation — said before the tap (157). */
 export const DISBAND_CONSEQUENCE =
   'It disappears for everyone in it. Saved spots nobody has taken are released, and pools already running carry on as ordinary pools. You can restore it later from My Crews.'

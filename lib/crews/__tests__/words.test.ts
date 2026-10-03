@@ -106,6 +106,14 @@ describe('My Crews says what the app says', () => {
     expect(web.DISBAND_CONSEQUENCE).toBe(app.DISBAND_CONSEQUENCE)
     expect(web.DISBANDED_NOTICE).toBe(app.DISBANDED_NOTICE)
   })
+  it('linking a pool — the confirmation, the hint, and who it’s with', () => {
+    expect(web.LINK_CONSEQUENCE).toBe(app.LINK_CONSEQUENCE)
+    expect(web.LINK_HINT).toBe(app.LINK_HINT)
+    for (const [players, size] of [[3, 3], [2, 3], [1, 1]] as const) {
+      expect(web.linkablePeopleText(players, size)).toBe(app.linkablePeopleText(players, size))
+    }
+    expect(web.linkablePeopleText(3, 3)).toBe('Same 3 people as the crew')
+  })
   it('the invite preview line', () => {
     expect(web.invitePreviewText('Dave Okafor', 'Bermuda Office')).toBe(app.invitePreviewText('Dave Okafor', 'Bermuda Office'))
   })

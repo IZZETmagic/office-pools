@@ -159,6 +159,30 @@ describe('a disbanded crew (157) — gone for everyone but its captain, who can 
   })
 })
 
+describe('pools a captain could link (2026-10-03)', () => {
+  const withMine = (db: ReturnType<typeof world>) => {
+    // 'me' captains Friday Five (me, sam). Three pools 'me' runs that aren't in a crew:
+    db.tables.pools.push(
+      pool('same', null as unknown as string, { pool_name: 'Same People', admin_user_id: 'me', prediction_mode: 'league_pickem', league_mode: 'table', league_season_id: 's-pl', brand_slug: null }),
+      pool('extra', null as unknown as string, { pool_name: 'With An Outsider', admin_user_id: 'me', brand_slug: null }),
+      pool('gone', null as unknown as string, { pool_name: 'Archived', admin_user_id: 'me', archived_at: '2026-09-01', brand_slug: null }),
+    )
+    db.tables.pool_members.push(
+      { pool_id: 'same', user_id: 'me', role: 'admin' }, { pool_id: 'same', user_id: 'sam', role: 'player' },
+      { pool_id: 'extra', user_id: 'me', role: 'admin' }, { pool_id: 'extra', user_id: 'sam', role: 'player' }, { pool_id: 'extra', user_id: 'stranger', role: 'player' },
+      { pool_id: 'gone', user_id: 'me', role: 'admin' },
+    )
+    return db
+  }
+  it('the captain sees the pools they run whose players are all in the crew — nothing else', async () => {
+    const d = await readCrew(withMine(world()).client, 'five', 'me', NOW)
+    expect(d?.linkable?.map((p) => [p.poolId, p.players, p.competition])).toEqual([['same', 2, 'Premier League 2026/27']])
+  })
+  it('a member sees none', async () => {
+    expect((await readCrew(withMine(world()).client, 'five', 'sam', NOW))?.linkable).toBeNull()
+  })
+})
+
 describe('one crew', () => {
   it('the removed and strangers cannot see it; a closed crew is gone', async () => {
     const db = world()

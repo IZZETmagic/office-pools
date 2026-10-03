@@ -65,6 +65,27 @@ export function canRestore(
   return !!crew.closed_at && crew.closed_reason === 'disbanded' && isActive(m) && m!.role === 'captain'
 }
 
+/**
+ * Can this pool be linked to the crew (Ryan, 2026-10-03)? Only if every PLAYER in it is already an
+ * active member — so linking adds a season to the crew's history and never adds a person. (Our rule
+ * is "you're in a crew because you played in its pools"; a pool with an outsider would make them a
+ * member without their choosing, so such a pool is never offered and never linked.) And it must be
+ * the crew playing together — at least two players, more than half the crew. Spectators
+ * aren't players and don't count. Who may link is `canManage` AND the pool's admin — checked where
+ * the pool is known (store.linkPoolToCrew).
+ */
+export function linkablePool(playerIds: readonly string[], activeMemberIds: ReadonlySet<string>): boolean {
+  // ⚠ "The same people, or fewer" — but not ANY fewer. Run against production, the bare rule offered
+  // every pool its captain plays alone (five solo test pools beside the two real ones): one player is
+  // trivially "all in the crew". So it must be the crew playing together: at least two players, and
+  // more than half of the crew.
+  return (
+    playerIds.length >= 2 &&
+    playerIds.length * 2 > activeMemberIds.size &&
+    playerIds.every((id) => activeMemberIds.has(id))
+  )
+}
+
 /** Naming the co-captain is the captain's alone. */
 export function canSetCoCaptain(m: Pick<CrewMember, 'role' | 'left_at'> | null | undefined): boolean {
   return isActive(m) && m!.role === 'captain'

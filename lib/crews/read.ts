@@ -21,6 +21,7 @@ import {
   canRejoin,
   canRestore,
   canSetCoCaptain,
+  linkablePool,
   isActive,
   seatState,
   spotsForCap,
@@ -94,17 +95,11 @@ const personOf = (map: Map<string, Person>, id: string): Person =>
   map.get(id) ?? { userId: id, username: null, fullName: null, avatarUrl: null, avatarBuild: null, avatarColour: null }
 
 /** A crew's seasons, each with its competition name, first lock (153) and finish (153). */
-async function crewPools(admin: Admin, crewIds: string[]): Promise<CrewPool[]> {
-  if (crewIds.length === 0) return []
-  const { data, error } = await admin
-    .from('pools')
-    .select(
-      'pool_id, pool_name, crew_id, created_at, archived_at, status, accepting_members, prediction_mode, league_mode, league_season_id, tournament_id, admin_user_id',
-    )
-    .in('crew_id', crewIds)
-  if (error) throw new Error(`pools: ${error.message}`)
-  const rows = (data ?? []) as PoolRow[]
-
+/** "Premier League 2026/27" / "FIFA World Cup 2026" for each pool — one read per kind, shared. */
+async function competitionNamer(
+  admin: Admin,
+  rows: { league_season_id: string | null; tournament_id: string; pool_name: string }[],
+): Promise<(r: { league_season_id: string | null; tournament_id: string; pool_name: string }) => string> {
   const seasonIds = [...new Set(rows.map((r) => r.league_season_id).filter((x): x is string => !!x))]
   const tournamentIds = [...new Set(rows.filter((r) => !r.league_season_id).map((r) => r.tournament_id))]
   const [seasons, tournaments] = await Promise.all([
@@ -117,6 +112,20 @@ async function crewPools(admin: Admin, crewIds: string[]): Promise<CrewPool[]> {
   ])
   const seasonName = new Map((seasons.data ?? []).map((s) => [s.season_id, `${s.competition_name} ${s.season_label}`.trim()]))
   const tournamentName = new Map((tournaments.data ?? []).map((t) => [t.tournament_id, t.name]))
+  return (r) => (r.league_season_id ? seasonName.get(r.league_season_id) : tournamentName.get(r.tournament_id)) ?? r.pool_name
+}
+
+async function crewPools(admin: Admin, crewIds: string[]): Promise<CrewPool[]> {
+  if (crewIds.length === 0) return []
+  const { data, error } = await admin
+    .from('pools')
+    .select(
+      'pool_id, pool_name, crew_id, created_at, archived_at, status, accepting_members, prediction_mode, league_mode, league_season_id, tournament_id, admin_user_id',
+    )
+    .in('crew_id', crewIds)
+  if (error) throw new Error(`pools: ${error.message}`)
+  const rows = (data ?? []) as PoolRow[]
+  const competitionOf = await competitionNamer(admin, rows)
 
   return Promise.all(
     rows.map(async (r) => {
@@ -128,7 +137,7 @@ async function crewPools(admin: Admin, crewIds: string[]): Promise<CrewPool[]> {
         ...r,
         finishedAt: (fin.data as string | null) ?? null,
         firstLockAt: (lock.data as string | null) ?? null,
-        competition: (r.league_season_id ? seasonName.get(r.league_season_id) : tournamentName.get(r.tournament_id)) ?? r.pool_name,
+        competition: competitionOf(r),
       }
     }),
   )
@@ -276,6 +285,53 @@ export async function listMyCrews(admin: Admin, userId: string, now: number): Pr
 
 // ── One crew ────────────────────────────────────────────────────────────────────────────────────
 
+export type LinkablePool = {
+  poolId: string
+  poolName: string
+  competition: string
+  mode: PoolMode
+  /** Players in the pool — every one of them already in the crew. */
+  players: number
+  finished: boolean
+}
+
+/** The pools this person runs that could be linked to the crew — see CrewDetail.linkable. */
+async function linkablePools(admin: Admin, viewerId: string, activeIds: ReadonlySet<string>): Promise<LinkablePool[]> {
+  const { data: mine } = await admin.from('pool_members').select('pool_id').eq('user_id', viewerId).eq('role', 'admin')
+  const ids = (mine ?? []).map((r) => r.pool_id)
+  if (ids.length === 0) return []
+  const { data: rows } = await admin
+    .from('pools')
+    .select('pool_id, pool_name, crew_id, archived_at, brand_slug, prediction_mode, league_mode, league_season_id, tournament_id')
+    .in('pool_id', ids)
+    .is('crew_id', null)
+    .is('archived_at', null)
+    .is('brand_slug', null)
+  const pools = rows ?? []
+  if (pools.length === 0) return []
+  const { data: memberRows } = await admin.from('pool_members').select('pool_id, user_id, role').in('pool_id', pools.map((p) => p.pool_id))
+  const playersOf = (poolId: string) =>
+    (memberRows ?? []).filter((m) => m.pool_id === poolId && m.role !== 'spectator').map((m) => m.user_id as string)
+  const candidates = pools
+    .filter((p) => linkablePool(playersOf(p.pool_id), activeIds))
+    .sort((a, b) => playersOf(b.pool_id).length - playersOf(a.pool_id).length || a.pool_name.localeCompare(b.pool_name))
+  if (candidates.length === 0) return []
+  const competitionOf = await competitionNamer(admin, candidates)
+  return Promise.all(
+    candidates.map(async (p) => {
+      const { data: fin } = await admin.rpc('pool_finished_at', { p_pool_id: p.pool_id })
+      return {
+        poolId: p.pool_id,
+        poolName: p.pool_name,
+        competition: competitionOf(p),
+        mode: { predictionMode: p.prediction_mode, leagueMode: p.league_mode },
+        players: playersOf(p.pool_id).length,
+        finished: !!fin,
+      }
+    }),
+  )
+}
+
 export type CrewDetail = {
   /** `disbandedAt` is set only on the captain's view of a crew they disbanded (157) — read-only, Restore. */
   crew: { crewId: string; name: string; createdAt: string; disbandedAt: string | null }
@@ -321,6 +377,12 @@ export type CrewDetail = {
     viewerRank: number | null
   }>
   allTime: Array<Person & { seasons: number; titles: number; best: number | null }>
+  /**
+   * Pools the viewer runs that could join this crew's history (Ryan, 2026-10-03): not in a crew,
+   * not archived or branded, and every player already in the crew (rules.linkablePool). The
+   * captain and co-captain only; null for everyone else.
+   */
+  linkable: LinkablePool[] | null
   /** Open invites — the captain and co-captain only; null for everyone else. */
   invites: Array<{ inviteId: string; invitee: Person | null; email: string | null; createdAt: string }> | null
 }
@@ -426,6 +488,7 @@ export async function readCrew(admin: Admin, crewId: string, viewerId: string, n
         viewerRank: bestRankIn(finishes, p.pool_id, viewerId),
       })),
     allTime: table.map((r) => ({ ...personOf(names, r.user_id), seasons: r.seasons, titles: r.titles, best: r.best })),
+    linkable: manager ? await linkablePools(admin, viewerId, new Set(active.map((m) => m.user_id))) : null,
     invites: manager
       ? (inviteRows ?? []).map((i) => ({
           inviteId: i.invite_id,

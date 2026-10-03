@@ -81,7 +81,19 @@ export type CrewDetail = {
     viewerRank: number | null;
   }[];
   allTime: (Person & { seasons: number; titles: number; best: number | null })[];
+  /** Pools the viewer runs that could join this crew's history — captain/co-captain only, else null. */
+  linkable: LinkablePool[] | null;
   invites: { inviteId: string; invitee: Person | null; email: string | null; createdAt: string }[] | null;
+};
+
+export type LinkablePool = {
+  poolId: string;
+  poolName: string;
+  competition: string;
+  mode: PoolMode;
+  /** Players in the pool — every one already in the crew. */
+  players: number;
+  finished: boolean;
 };
 
 export type PoolCrewView = {
@@ -202,6 +214,18 @@ export function leaveConsequence(d: Pick<CrewDetail, 'viewer' | 'members'>): str
   const co = others.find((m) => m.role === 'co_captain');
   const next = co ?? [...others].sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))[0];
   return `${shortName(next)} will become captain${co ? '' : ' — the longest-standing member'}. Your history stays.`;
+}
+
+/** Linking a pool you run (2026-10-03) — the confirmation. Mirrored by lib/crews/words.ts. */
+export const LINK_CONSEQUENCE =
+  'Its seasons count in the crew’s history, and anyone in the crew can join it from here. A pool stays with its crew for good, and crew pools are private.';
+
+/** Under "Also playing together". */
+export const LINK_HINT = 'Pools you run where everyone’s already in the crew. Linking adds the season to its history — nobody new joins.';
+
+/** "Same 3 people as the crew" / "2 of the crew’s 3". */
+export function linkablePeopleText(players: number, crewSize: number): string {
+  return players >= crewSize ? `Same ${plural(players, 'person', 'people')} as the crew` : `${players} of the crew’s ${crewSize}`;
 }
 
 /** Disband's confirmation — said before the tap (157). Mirrored by lib/crews/words.ts on the web. */

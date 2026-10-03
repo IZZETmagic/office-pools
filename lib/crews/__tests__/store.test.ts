@@ -17,6 +17,7 @@ import {
   inviteToCrew,
   leaveAllCrews,
   leaveCrew,
+  linkPoolToCrew,
   lookupUsername,
   onCrewPoolJoined,
   readInviteLink,
@@ -321,6 +322,53 @@ describe('playing in a crew pool is how you join the crew — unless you left or
     await onCrewPoolJoined(db.client, { crewId: 'c1', poolId: 'pl', userId: 'gone' })
     await onCrewPoolJoined(db.client, { crewId: 'c1', poolId: 'pl', userId: 'out' })
     expect(active(db).map((m) => m.user_id)).toEqual(['cap'])
+  })
+})
+
+describe('linking a pool you run to the crew (2026-10-03)', () => {
+  const seed = (poolExtra: Record<string, unknown> = {}, extraMembers: Record<string, unknown>[] = []) => ({
+    crews: [crew()],
+    crew_members: [member('cap', 'captain'), member('co', 'co_captain'), member('m1', 'member')],
+    pools: [{ pool_id: 'pl', crew_id: null, archived_at: null, brand_slug: null, is_private: false, ...poolExtra }],
+    pool_members: [
+      { pool_id: 'pl', user_id: 'cap', role: 'admin' },
+      { pool_id: 'pl', user_id: 'm1', role: 'player' },
+      { pool_id: 'pl', user_id: 'watcher', role: 'spectator' },
+      ...extraMembers,
+    ],
+  })
+  it('the captain who runs the pool links it: it joins the crew, and goes private', async () => {
+    const db = fakeDb(seed())
+    expect(await linkPoolToCrew(db.client, { actorId: 'cap', crewId: 'c1', poolId: 'pl' })).toEqual({ ok: true, poolId: 'pl' })
+    expect(db.tables.pools[0]).toMatchObject({ crew_id: 'c1', is_private: true })
+  })
+  it('a spectator isn’t a player, so doesn’t stop it', async () => {
+    const db = fakeDb(seed())
+    expect((await linkPoolToCrew(db.client, { actorId: 'cap', crewId: 'c1', poolId: 'pl' })).ok).toBe(true)
+  })
+  it('⚠ never if anyone playing isn’t already in the crew — linking adds nobody', async () => {
+    const db = fakeDb(seed({}, [{ pool_id: 'pl', user_id: 'outsider', role: 'player' }]))
+    expect(await linkPoolToCrew(db.client, { actorId: 'cap', crewId: 'c1', poolId: 'pl' })).toMatchObject({ ok: false, status: 409 })
+    expect(db.tables.pools[0].crew_id).toBeNull()
+  })
+  it('you must run the pool — captaining the crew isn’t enough', async () => {
+    const db = fakeDb(seed())
+    db.tables.pool_members.push({ pool_id: 'pl', user_id: 'co', role: 'player' })
+    expect(await linkPoolToCrew(db.client, { actorId: 'co', crewId: 'c1', poolId: 'pl' })).toMatchObject({ ok: false, status: 403 })
+  })
+  it('and you must captain the crew — running the pool isn’t enough', async () => {
+    const db = fakeDb(seed())
+    db.tables.pool_members.find((m) => m.user_id === 'm1')!.role = 'admin'
+    expect(await linkPoolToCrew(db.client, { actorId: 'm1', crewId: 'c1', poolId: 'pl' })).toMatchObject({ ok: false, status: 403 })
+  })
+  it('a pool already in a crew stays where it is — for good', async () => {
+    const db = fakeDb(seed({ crew_id: 'other' }))
+    expect(await linkPoolToCrew(db.client, { actorId: 'cap', crewId: 'c1', poolId: 'pl' })).toMatchObject({ ok: false, status: 409 })
+    expect(db.tables.pools[0].crew_id).toBe('other')
+  })
+  it('not an archived or a branded pool', async () => {
+    expect(await linkPoolToCrew(fakeDb(seed({ archived_at: '2026-09-01' })).client, { actorId: 'cap', crewId: 'c1', poolId: 'pl' })).toMatchObject({ status: 409 })
+    expect(await linkPoolToCrew(fakeDb(seed({ brand_slug: 'acme' })).client, { actorId: 'cap', crewId: 'c1', poolId: 'pl' })).toMatchObject({ status: 409 })
   })
 })
 

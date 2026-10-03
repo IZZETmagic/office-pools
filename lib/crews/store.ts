@@ -23,6 +23,7 @@ import {
   canSetCoCaptain,
   claimBlock,
   cleanCrewName,
+  linkablePool,
   inviteBlock,
   inviteRateLimit,
   isActive,
@@ -318,6 +319,56 @@ export async function leaveCrew(
     return { ok: true, closed: false, newCaptainId: next.userId }
   }
   return { ok: true, closed: false, newCaptainId: null }
+}
+
+// ── Linking a pool you already run (Ryan, 2026-10-03) ──────────────────────────────────────────
+//
+// "There are two other pools I have right now with the exact same users — how can we connect them?"
+// His calls: offered and linked only when EVERY player is already in the crew (so linking never adds
+// a person — rules.linkablePool), only by someone who runs the pool AND captains the crew (captain or
+// co-captain), and for good — a pool's crew never changes once set (154). Nothing is linked unasked:
+// the crew page lists the candidates and a person presses Link.
+
+/** Link a pool the actor runs to the crew. Its seasons join the crew's history; it becomes private. */
+export async function linkPoolToCrew(
+  admin: Admin,
+  p: { actorId: string; crewId: string; poolId: string },
+): Promise<CrewResult<{ poolId: string }>> {
+  const ctx = await crewForActor(admin, p.crewId, p.actorId)
+  if ('failure' in ctx) return ctx.failure!
+  if (!canManage(ctx.actor)) return fail(403, 'Only the captain or co-captain can link a pool.')
+
+  const { data: pool, error: poolErr } = await admin
+    .from('pools')
+    .select('pool_id, crew_id, archived_at, brand_slug')
+    .eq('pool_id', p.poolId)
+    .maybeSingle()
+  if (poolErr) return fail(500, poolErr.message)
+  if (!pool) return fail(404, 'Pool not found.')
+  const { data: poolMembers, error: pmErr } = await admin.from('pool_members').select('user_id, role').eq('pool_id', p.poolId)
+  if (pmErr) return fail(500, pmErr.message)
+  const mine = (poolMembers ?? []).find((m) => m.user_id === p.actorId)
+  if (!mine || mine.role !== 'admin') return fail(403, 'Only the pool’s admin can link it.')
+  if (pool.crew_id) {
+    return fail(409, pool.crew_id === p.crewId ? 'This pool is already part of the crew.' : 'This pool already belongs to another crew.')
+  }
+  if (pool.archived_at || pool.brand_slug) return fail(409, 'This pool can’t be linked to a crew.')
+
+  const active = new Set(ctx.members.filter((m) => isActive(m)).map((m) => m.user_id))
+  const players = (poolMembers ?? []).filter((m) => m.role !== 'spectator').map((m) => m.user_id as string)
+  if (!linkablePool(players, active)) return fail(409, 'Everyone in the pool has to be in the crew already.')
+
+  // Private with it — a crew pool is never listed in Discover (154's CHECK takes both in one write).
+  // Conditional on still having no crew, so two links racing can't both land.
+  const { data: linked, error } = await admin
+    .from('pools')
+    .update({ crew_id: p.crewId, is_private: true })
+    .eq('pool_id', p.poolId)
+    .is('crew_id', null)
+    .select('pool_id')
+  if (error) return fail(500, error.message)
+  if (!linked || linked.length === 0) return fail(409, 'This pool already belongs to a crew.')
+  return { ok: true, poolId: p.poolId }
 }
 
 // ── Disbanding, and restoring (157) ─────────────────────────────────────────────────────────────
