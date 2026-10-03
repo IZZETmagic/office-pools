@@ -15,10 +15,10 @@ import { Image as ExpoImage } from 'expo-image';
 import { StyleSheet, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -26,7 +26,9 @@ const MIN = 1;
 const MAX = 4;
 const DOUBLE_TAP = 2.5;
 const DISMISS_DISTANCE = 120;
-const SPRING = { damping: 20, stiffness: 220 };
+// Ease out and stop — no overshoot. A spring here read as a bounce on every
+// double tap (Ryan, 2026-10-03); Photos zooms in and settles, it doesn't wobble.
+const SETTLE = { duration: 260, easing: Easing.out(Easing.cubic) };
 
 export function ZoomablePhoto({ uri, onClose }: { uri: string; onClose: () => void }) {
   const { width, height } = useWindowDimensions();
@@ -71,9 +73,9 @@ export function ZoomablePhoto({ uri, onClose }: { uri: string; onClose: () => vo
     })
     .onEnd(() => {
       const s = Math.min(MAX, Math.max(MIN, scale.value));
-      scale.value = withSpring(s, SPRING);
-      x.value = withSpring(s === 1 ? 0 : clampX(x.value, s), SPRING);
-      y.value = withSpring(s === 1 ? 0 : clampY(y.value, s), SPRING);
+      scale.value = withTiming(s, SETTLE);
+      x.value = withTiming(s === 1 ? 0 : clampX(x.value, s), SETTLE);
+      y.value = withTiming(s === 1 ? 0 : clampY(y.value, s), SETTLE);
     });
 
   const pan = Gesture.Pan()
@@ -102,15 +104,15 @@ export function ZoomablePhoto({ uri, onClose }: { uri: string; onClose: () => vo
     .numberOfTaps(2)
     .onEnd((e) => {
       if (scale.value > 1.01) {
-        scale.value = withSpring(1, SPRING);
-        x.value = withSpring(0, SPRING);
-        y.value = withSpring(0, SPRING);
+        scale.value = withTiming(1, SETTLE);
+        x.value = withTiming(0, SETTLE);
+        y.value = withTiming(0, SETTLE);
       } else {
         const fx = e.x - width / 2;
         const fy = e.y - height / 2;
-        scale.value = withSpring(DOUBLE_TAP, SPRING);
-        x.value = withSpring(clampX(-fx * (DOUBLE_TAP - 1), DOUBLE_TAP), SPRING);
-        y.value = withSpring(clampY(-fy * (DOUBLE_TAP - 1), DOUBLE_TAP), SPRING);
+        scale.value = withTiming(DOUBLE_TAP, SETTLE);
+        x.value = withTiming(clampX(-fx * (DOUBLE_TAP - 1), DOUBLE_TAP), SETTLE);
+        y.value = withTiming(clampY(-fy * (DOUBLE_TAP - 1), DOUBLE_TAP), SETTLE);
       }
     });
 
