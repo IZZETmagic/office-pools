@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { notifyMention, notifyMessage } from './api';
+import { apiFetch, notifyMention, notifyMessage } from './api';
 import { useAuth } from './auth';
 import { refreshIconBadge } from './badgeSync';
 import { mergeReactionAggregates, type ReactionAggregate } from './banterStable';
@@ -583,6 +583,14 @@ export function usePoolBanter(poolId: string | undefined) {
         return { error: rpcErr?.message ?? 'Could not delete' };
       }
       applyDeletion(data as DbMessageRow);
+      // A photo's FILE outlives its scrubbed row until the server removes it
+      // (160) — and only removing the file kills signed URLs already handed
+      // out. Ask for that now rather than waiting for the cron.
+      if (messagesRef.current.find((m) => m.messageId === messageId)?.messageType === 'photo') {
+        apiFetch('/api/banter/media/sweep', { method: 'POST' }).catch((err) =>
+          console.warn('[usePoolBanter.deleteMessage] media sweep failed', err),
+        );
+      }
       return {};
     },
     [applyDeletion],

@@ -3314,6 +3314,15 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
       - members upload only to their own folder, pool members and super admins read, and only the uploader deletes via the client;
       - `photo` message type plus a trigger: the path must be its own pool/sender, the file must exist, and only path/width/height are kept.
     - Verified through the real API: signed URL 200; the public URL, anon access and PNG are refused; **a signed URL dies (400) once the file is deleted**.
+  - **Step 3.3 — sending (app): BUILT 2026-10-03**, dev client build `a68522b0`.
+    - expo-image-picker + expo-image-manipulator are native, so they need build 1.3.0. They are lazy-required behind `PHOTOS_AVAILABLE`, so 1.2.0 OTAs can't crash; a guard test enforces it.
+    - Resize to 1600 + JPEG 0.8 re-encode. EXIF stripping is still to be confirmed on a real camera upload with `scripts/verify-banter-photo-exif.ts`.
+    - iOS picker fix: wait for the menu's onDismiss before presenting.
+  - **Step 3.5 — deletion removes the file: BUILT 2026-10-03.**
+    - Migration `160` (applied): a `banter_media_deletions` queue, filled by triggers on soft delete and on hard delete/cascade; `enqueue_banter_media_orphans()` covers uploads older than 1 day with no message.
+    - `POST /api/banter/media/sweep` (any member, or the cron with CRON_SECRET) removes the files through the Storage API. App, web and Reports call it right after a photo delete.
+    - Verified end to end on prod: signed URL 200 → sweep → 400, queue cleared.
+    - ⚠ Migration `161` (hourly cron) is written but NOT applied: apply it only after the route is deployed (expect 401, not 404).
   - **Open:** DMCA designated agent (legal review C3), Ryan's action.
 - **Effort:** ~2–3 days for photos; GIFs ~1.5–2 days.
 - **Done when:** a user can attach and send an image or GIF in pool chat and others see it inline.

@@ -104,6 +104,11 @@ export function ReportsTab({ currentUserId }: { currentUserId: string }) {
         showToast('Could not remove the message.', 'error')
         return
       }
+      // A removed photo's file goes now, not at the next cron run (160).
+      if (row.type_snapshot === 'photo') {
+        fetch('/api/banter/media/sweep', { method: 'POST' })
+          .catch(err => console.warn('[ReportsTab] media sweep failed:', err))
+      }
     }
     const { error } = await supabase
       .from('pool_message_reports')

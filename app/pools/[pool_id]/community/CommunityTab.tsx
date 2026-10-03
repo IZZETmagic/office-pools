@@ -760,6 +760,12 @@ export function CommunityTab({
       return
     }
     applyDeletion(data as Message)
+    // A photo's file outlives the scrubbed row until the server removes it (160),
+    // and only that kills signed URLs already handed out — ask for it now.
+    if (pendingDelete.message_type === 'photo') {
+      fetch('/api/banter/media/sweep', { method: 'POST', keepalive: true })
+        .catch(err => console.warn('[CommunityTab] media sweep failed:', err))
+    }
     setPendingDelete(null)
   }, [pendingDelete, applyDeletion, showToast])
 
