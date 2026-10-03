@@ -378,7 +378,14 @@ Each step is a commit; nothing is pushed until Ryan says so.
    - captain succession;
    - roster reasons;
    - all-time aggregation per mode.
-5. **Activity v3** (§6): server builder, route, and `mobile/lib/api.ts` types; `useActivity` sends
+5. ✅ **Activity — crew cards in Needs you** — done 2026-10-02: server `93eb3ead`, app `b3220834`.
+   ⚠ **Changed from the plan: a capability flag, not v3.** The app talks to production, which until
+   it deploys answers anything but `v=2` with the v1 response, so a build asking for `v=3` would lose
+   Needs You outright (on Ryan's phone the moment Metro reloaded). The app sends `v=2&crews=1`; the
+   server adds crew cards only then. Safe in either deploy order. 9 builder tests; the live verify
+   script checks all three card kinds (37/37). Crew cards cannot appear on a phone until the API
+   deploys, because the app reads production.
+   Originally: **Activity v3** (§6): server builder, route, and `mobile/lib/api.ts` types; `useActivity` sends
    `v=3`.
 6. **RN screens.** Data via **react-query + API** (`useCrews`, `useCrew`), the pattern `useLeaguePool`
    uses, not hand-rolled PostgREST.
