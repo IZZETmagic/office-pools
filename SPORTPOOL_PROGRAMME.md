@@ -3322,7 +3322,7 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
     - Migration `160` (applied): a `banter_media_deletions` queue, filled by triggers on soft delete and on hard delete/cascade; `enqueue_banter_media_orphans()` covers uploads older than 1 day with no message.
     - `POST /api/banter/media/sweep` (any member, or the cron with CRON_SECRET) removes the files through the Storage API. App, web and Reports call it right after a photo delete.
     - Verified end to end on prod: signed URL 200 → sweep → 400, queue cleared.
-    - ⚠ Migration `161` (hourly cron) is written but NOT applied: apply it only after the route is deployed (expect 401, not 404).
+    - ✅ Migration `161` (hourly cron `banter-media-sweep`, :07) APPLIED 2026-10-03 after the route answered 401 on prod. A manual fire of the job's exact request returned **200** `{removed:0,cleared:0,failed:0,orphans_queued:0}` (net._http_response), which proves the vault secret matches CRON_SECRET.
   - **Step 3.4 — viewer + web: BUILT 2026-10-03.**
     - RN: pinch/pan/double-tap/swipe-down viewer (`ZoomablePhoto`), eased with no bounce.
     - Web: "Send a photo" in + → file chooser → canvas resize to 1600 + JPEG re-encode → upload → message.
