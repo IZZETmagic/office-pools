@@ -3287,7 +3287,17 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
     - the app key in `mobile/.env.local` and EAS;
     - `NEXT_KLIPY_API_KEY` on Vercel for Preview + Development too (set for Production only on 2026-09-28). `next.config.ts` `env` maps it to the client as `KLIPY_WEB_KEY`, because Vercel refuses a NEXT_PUBLIC_ name containing "KEY";
     - request **production** access for both keys with screenshots (test keys = 100 req/hr).
-- **Step 3 — photos:** needs report/block before shipping (App Store guideline 1.2), a private bucket, and EXIF stripping.
+- **Step 3 — photos: decided 2026-10-03 (Ryan).**
+  - **Scope:** free for every pool; camera + photo library in the app.
+  - **Reports** go to a super-admin Reports tab plus an email alert.
+  - **⭐ App FIRST, web quickly after.** The app needs build 1.3.0 (expo-image-picker is native; runtimeVersion follows appVersion).
+  - **Order:**
+    1. report + block (all Banter, App Store guideline 1.2);
+    2. private `banter-media` bucket with per-pool RLS;
+    3. send: resize to ~1600px + re-encode, which strips EXIF/GPS;
+    4. display: batched signed URLs + full-screen viewer;
+    5. delete removes the file. Signed URLs can't be revoked, so deleting the file is what removes the photo.
+  - **Open:** DMCA designated agent (legal review C3), Ryan's action.
 - **Effort:** ~2–3 days for photos; GIFs ~1.5–2 days.
 - **Done when:** a user can attach and send an image or GIF in pool chat and others see it inline.
 
