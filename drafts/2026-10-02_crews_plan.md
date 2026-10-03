@@ -451,12 +451,14 @@ Each step is a commit; nothing is pushed until Ryan says so.
    1. Deploy the API.
    2. Verify a **new route 404→401** on prod.
    3. **Schedule `/api/cron/crew-notices`** (pg_cron; verify by `net._http_response`).
-   4. **Turn on `sync_settings.crew_notices_enabled` straight after the deploy** — ⚠ (Gill, 2026-10-02)
-      an invite made while it's off is never emailed and never retried (`sendInviteNotice` returns at
-      once; the cron only catches up seats), and since 155 an email invite's link is armed only when
-      the email goes out — so an invite made in that window can never be claimed. Seats catch up;
-      invites don't. A cron catch-up for unsent invites is the durable fix (needs a `notified_at` on
-      `crew_invites`) — not built.
+   4. **Turn on `sync_settings.crew_notices_enabled`.** ✅ No longer has to race the deploy: Gill
+      found (2026-10-02) that an invite made while the switch was off was never sent or retried —
+      and since 155 its link is armed only as the email goes out, so it could never be claimed.
+      **Fixed by migration 156** (applied): `crew_invites.notified_at`, the same claim-before-send
+      the seat notices use, and `runCrewNotices` now sends every open invite nobody sent, oldest
+      first. A claimed invite whose send fails is still not retried (one missed beats two). Verified
+      on production by `scripts/verify-crews-store.ts` (53/53) with the mailer's key removed, so
+      nothing could reach an inbox.
    5. `git status` clean.
    6. `eas channel:view`.
    7. `eas update` **per platform**, and check both Commit lines.
@@ -560,7 +562,8 @@ a "check your email" step on every sign-up) or dropping no-account invites. **Bu
   the dashboard, the Activity read and three crew routes).
 - **One approved sentence changed**, as it would otherwise be false: "Sign up with this email
   address and you'll find the invite waiting" → "Use the button below to sign up and you'll find
-  the invite waiting". Everything else in the email is as approved.
+  the invite waiting". ✅ **Ryan approved the new sentence (2026-10-02).** Everything else in the
+  email is as approved.
 - Verified live on production as test accounts: `scripts/verify-crews-store.ts` 48/48 (10 new
   link checks, including the CHECK refusing a link on an account invite); the page on localhost
   signed in, and signed out by its API; everything deleted afterwards.
