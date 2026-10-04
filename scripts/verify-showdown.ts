@@ -17,9 +17,14 @@
 //   · over multiple cycles no opponent count differs by more than one
 //   · in an odd pool everybody gets the same number of byes
 //
-// Then the scoring: 3 / 1 / 0, the leading rank key, and — the one that would
-// silently break another mode — that a Pick'em pool's cascade is UNCHANGED by
-// the new key.
+// Then the scoring: 500 / 250 / 0 added to accuracy (121), and — the one that
+// would silently break another mode — that a Pick'em pool's cascade is
+// UNCHANGED by it.
+//
+// And 164/165, the draw itself: a pool's first duel week is drawn 24 hours
+// before that week's first KICKOFF, everyone who joins before a draw is in it,
+// a drawn week never changes (the stamp), and a roster change starts a new pass
+// with the pairs who have met played last.
 //
 //   npx tsx scripts/verify-showdown.ts
 //
@@ -45,6 +50,7 @@ import { resolve } from 'path'
 
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '../lib/supabase/server'
+import { DUEL_WIN, DUEL_TIE, DUEL_LOSS } from '../lib/league/duelPoints'
 
 const admin = createAdminClient()
 
@@ -60,6 +66,7 @@ const POOL_EVEN = `${S}000000000002` // 6 entries
 const POOL_ODD  = `${S}000000000003` // 5 entries -> byes
 const POOL_PICK = `${S}000000000004` // control: pickem, cascade must not move
 const POOL_LATE = `${S}000000000005` // created after matchweeks 1-4 have locked
+const POOL_GROW = `${S}000000000006` // 164: two members, then three, then four
 // ⚠ The scratch season needs its OWN tournament. Migration 111 raises unless a
 // pool's tournament and league season resolve to the same (external_provider,
 // external_league_id, external_season) triple — and this script used to borrow
@@ -72,8 +79,25 @@ const MW = (n: number) => `${S}0000000000${(20 + n).toString().padStart(2, '0')}
 const CLUB = (n: number) => `${S}00000000004${n}`
 const FIX = (n: number) => `${S}0000000000${(50 + n).toString().padStart(2, '0')}`
 const E = (n: number) => `${S}0000000000${(70 + n).toString().padStart(2, '0')}`
+const G = (n: number) => `${S}0000000001${n.toString().padStart(2, '0')}` // POOL_GROW's entries
 
 const WEEKS = 12
+const HOUR = 3600e3
+const at = (msFromNow: number) => new Date(Date.now() + msFromNow).toISOString()
+/**
+ * Matchweek n kicks off (n + 1) days from setup, so even matchweek 1's draw —
+ * 24 hours before its first kickoff (164) — is still ahead when the pools are
+ * created. The lock is an hour before the kickoff, as production's is (101).
+ */
+const kickoffOf = (n: number) => (n + 1) * 24 * HOUR
+/** Move a matchweek's clock: its first kickoff, with the lock an hour before. */
+async function setKickoff(n: number, msFromNow: number) {
+  await must(`kickoff mw${n}`, admin.from('league_matchweeks')
+    .update({ first_kickoff_at: at(msFromNow), lock_at: at(msFromNow - HOUR) })
+    .eq('matchweek_id', MW(n)).select('matchweek_id'))
+}
+/** A matchweek that has been played: kicked off and locked in the past. */
+const play = (n: number) => setKickoff(n, -2 * HOUR)
 let failures = 0
 const ok = (m: string, x = '') => console.log(`    ✓ ${m}${x ? `  — ${x}` : ''}`)
 const bad = (m: string, x = '') => { failures++; console.log(`    ✗ ${m}${x ? `  — ${x}` : ''}`) }
@@ -95,6 +119,16 @@ type Duel = {
   accuracy_a: number | null; accuracy_b: number | null
   settled_at: string | null
 }
+/** A pairing's identity regardless of side; a bye is `entry|BYE`. UUIDs contain '-', so not that. */
+const pairKey = (d: { entry_a: string; entry_b: string | null }) =>
+  d.entry_b ? [d.entry_a, d.entry_b].sort().join('|') : `${d.entry_a}|BYE`
+const revealsAt = async (poolId: string, n: number) => await must(`reveals_at mw${n}`,
+  admin.rpc('league_duel_reveals_at', { p_pool_id: poolId, p_matchweek_number: n })) as unknown as string | null
+const isRevealed = async (poolId: string, n: number) => await must(`revealed mw${n}`,
+  admin.rpc('league_duel_is_revealed', { p_pool_id: poolId, p_matchweek_number: n })) as unknown as boolean
+const sameInstant = (a: string | null, b: string | null) =>
+  a !== null && b !== null && new Date(a).getTime() === new Date(b).getTime()
+
 const duelsOf = (poolId: string) =>
   must('duels', admin.from('league_duels')
     .select('duel_id, matchweek_number, entry_a, entry_b, points_a, points_b, accuracy_a, accuracy_b, settled_at')
@@ -144,11 +178,11 @@ async function setup() {
     await must(`mw${n}`, admin.from('league_matchweeks').insert({
       matchweek_id: MW(n), season_id: SEASON, matchweek_number: n, label: `MW${n}`,
       provider_round: `r${n}`, fixture_count: 1, completed_fixture_count: 0,
-      first_kickoff_at: future(24 * n), lock_at: future(24 * n),
+      first_kickoff_at: at(kickoffOf(n)), lock_at: at(kickoffOf(n) - HOUR),
     }).select('matchweek_id'))
     await must(`fx${n}`, admin.from('league_fixtures').insert({
       fixture_id: FIX(n), season_id: SEASON, matchweek_id: MW(n), fixture_number: n,
-      home_club_id: CLUB(1), away_club_id: CLUB(2), kickoff_at: future(24 * n),
+      home_club_id: CLUB(1), away_club_id: CLUB(2), kickoff_at: at(kickoffOf(n)),
       status: 'scheduled', is_completed: false, external_fixture_id: `scratch-100-${n}`,
     }).select('fixture_id'))
   }
@@ -165,6 +199,13 @@ async function setup() {
       prediction_deadline: future(24 * WEEKS), status: 'open',
       prediction_mode: 'league_pickem', league_season_id: SEASON,
       league_mode: mode, league_depth: 'results', max_entries_per_user: 20,
+      // ⚠ 075's tier cap allows ONE entry per member on any pool with a
+      // `tier_enforced_from`, and the column defaults to now(). These scratch
+      // pools hang every entry off one member, so they are grandfathered —
+      // exactly as every pool from before 075 is.
+      tier_enforced_from: null,
+      // The create route stores a start for every Showdown pool (164/165).
+      league_start_matchweek: mode === 'showdown' ? 1 : null,
     }).select('pool_id'))
     await must(`membership ${memN}`, admin.from('pool_members').insert({
       member_id: MEM(memN), pool_id: pid, user_id: adminUser, role: 'admin',
@@ -253,7 +294,7 @@ async function byes() {
 // ---------------------------------------------------------------- the duel
 
 async function scoring() {
-  head('3. Three for a win, one for a draw, none for a loss')
+  head(`3. ${DUEL_WIN} for a win, ${DUEL_TIE} for a draw, ${DUEL_LOSS} for a loss — added to accuracy (121)`)
 
   const mw1 = (await duelsOf(POOL_EVEN)).filter((d) => d.matchweek_number === 1)
   eq('three duels to settle', mw1.length, 3)
@@ -283,15 +324,21 @@ async function scoring() {
   const byId = new Map(after.map((d) => [d.duel_id, d]))
   const d1 = byId.get(mw1[0].duel_id)!, d2 = byId.get(mw1[1].duel_id)!, d3 = byId.get(mw1[2].duel_id)!
 
-  eq('a one-point win is still three points', d1.points_a, 3)
-  eq('…and the loser gets nothing', d1.points_b, 0)
-  eq('a hundred-point win is also three', d2.points_a, 3)
+  eq('a one-point win pays the full win', d1.points_a, DUEL_WIN)
+  eq('…and the loser gets nothing', d1.points_b, DUEL_LOSS)
+  eq('a hundred-point win pays exactly the same', d2.points_a, DUEL_WIN)
   note('the margin does not carry — that is what makes it a league table and not a totals race')
-  eq('equal accuracy is a draw', d3.points_a, 1)
-  eq('…for both', d3.points_b, 1)
+  eq('equal accuracy is a draw', d3.points_a, DUEL_TIE)
+  eq('…for both', d3.points_b, DUEL_TIE)
   eq('the accuracy that decided it is recorded', d1.accuracy_a, 10)
 
-  head('4. Duel points lead the table, pick points do not')
+  // Matchweek 1 is now a played week — kicked off and locked, as it would be in
+  // production before anything could settle it. Every later section reads it
+  // that way, and a settled week that is still "open" is a state the product
+  // cannot reach.
+  await play(1)
+
+  head('4. Duel points are added to the table — one total, not a cascade (121)')
 
   const totals = await must('totals', admin.from('league_entry_totals')
     .select('entry_id, duel_points, total_points, final_rank').eq('pool_id', POOL_EVEN))
@@ -299,16 +346,16 @@ async function scoring() {
     .map((r) => [r.entry_id, r]))
 
   eq('a row for every entry, including any who never picked', (totals ?? []).length, 6)
-  eq('narrow winner has three', t.get(d1.entry_a)?.duel_points, 3)
-  eq('landslide loser has none', t.get(d2.entry_b!)?.duel_points, 0)
-  eq('both drawers have one', t.get(d3.entry_a)?.duel_points, 1)
+  eq('narrow winner holds a win', t.get(d1.entry_a)?.duel_points, DUEL_WIN)
+  eq('landslide loser holds nothing', t.get(d2.entry_b!)?.duel_points, DUEL_LOSS)
+  eq('both drawers hold a draw', t.get(d3.entry_a)?.duel_points, DUEL_TIE)
 
-  // The point of the mode: 3 duel points on ten pick points beats 0 duel points
-  // on a hundred.
+  // The point of the mode: a won duel on ten pick points beats a lost one on a
+  // hundred, because the duel is worth half a perfect week.
   const winnerRank = t.get(d1.entry_a)?.final_rank ?? 999
   const loserRank = t.get(d2.entry_b!)?.final_rank ?? 999
   eq('winning a small duel outranks losing a big one', winnerRank < loserRank, true)
-  note(`rank ${winnerRank} (3 duel pts / 10 pick pts) above rank ${loserRank} (0 duel pts / 100 pick pts)`)
+  note(`rank ${winnerRank} (${DUEL_WIN} duel + 10 pick) above rank ${loserRank} (${DUEL_LOSS} duel + 100 pick)`)
 }
 
 async function controlPool() {
@@ -366,53 +413,65 @@ async function regeneration() {
   eq('the new entry is in the forward schedule',
     mw2.some((d) => d.entry_a === E(14) || d.entry_b === E(14)), true)
   eq('seven entries means a bye somewhere in the week', mw2.some((d) => d.entry_b === null), true)
+
+  // ⭐ 164: the join starts a NEW PASS, and it is a full round-robin of the new
+  // roster. Seven entries pad to eight seats — seven rounds, matchweeks 2–8.
+  // The old generator restarted the circle from the calendar and forgot who
+  // had met; this asserts it remembers.
+  const all = await duelsOf(POOL_EVEN)
+  const pass = all.filter((d) => d.matchweek_number >= 2 && d.matchweek_number <= 8)
+  const counts = new Map<string, number>()
+  for (const d of pass) counts.set(pairKey(d), (counts.get(pairKey(d)) ?? 0) + 1)
+  const meetings = [...counts.entries()].filter(([k]) => !k.endsWith('|BYE'))
+  const byeRows = [...counts.entries()].filter(([k]) => k.endsWith('|BYE'))
+  eq('the pass after the join covers all 21 pairs of the seven', meetings.length, 21)
+  eq('…each exactly once', meetings.every(([, c]) => c === 1), true)
+  eq('…and seven byes, one each', byeRows.length === 7 && byeRows.every(([, c]) => c === 1), true)
+
+  const mw1Pairs = new Set(after.map(pairKey))
+  eq('nobody meets their matchweek-1 opponent again in matchweek 2',
+    mw2.some((d) => mw1Pairs.has(pairKey(d))), false)
+  note('pairs that already met are played LAST in the new pass, never first')
 }
 
 async function neverInThePast() {
-  head('7. A pool created mid-season gets no duels for weeks it missed')
+  head('7. The redraw line — and a pool never duels in weeks it missed (095/164)')
 
-  // Found on live data 2026-08-24: the seed pools carried five duels in
-  // matchweek 1, a week played four days before those pools existed. Nobody
-  // could have picked in them, so every one would have settled 0-0 — a draw —
-  // and paid every member a point for a week they were not in.
-  await must('lock mw1-4', admin.from('league_matchweeks')
-    .update({ lock_at: new Date(Date.now() - 3600e3).toISOString() })
-    .in('matchweek_id', [MW(1), MW(2), MW(3), MW(4)]).select('matchweek_id'))
+  // Matchweeks 1–4 are played. POOL_ODD's whole season was drawn back in
+  // section 2, and matchweek 5 is now the open week — but nobody has seen it.
+  for (const n of [1, 2, 3, 4]) await play(n)
 
-  // ⚠ THIS EXPECTED VALUE WAS STALE — it encoded 095, not 100.
-  //
-  // 095 rebuilt from the first matchweek not yet LOCKED, which is 5 here. 100
-  // then added the guard this file's own header describes — *"never the LIVE
-  // matchweek if it already has a draw… redrawing it swaps the opponent of
-  // somebody who has already picked"* — and POOL_ODD was given a full schedule
-  // back in section 2, so matchweek 5 already has one. The generator must skip
-  // it and start at 6. The assertion was never updated when 100 landed.
-  //
-  // The proof that this is the guard and not an off-by-one is four lines below:
-  // POOL_LATE, brand new and holding no duels at all, still starts at 5.
-  const openHasDraw = (await duelsOf(POOL_ODD)).some((d) => d.matchweek_number === 5)
-  eq('POOL_ODD already holds a draw for the open matchweek', openHasDraw, true)
-
+  // ⭐ 164 REVERSES 100's GUARD. 100 froze the open matchweek the moment it held
+  // a draw, which shut out everyone who joined after the second member. Under
+  // the seal (116) an unrevealed week can be redrawn invisibly, so it is.
+  eq('matchweek 5 has a draw nobody has seen', await isRevealed(POOL_ODD, 5), false)
   const gen = await generate(POOL_ODD)
-  eq('a drawn open matchweek is left alone, so the rebuild starts after it',
-     gen.from_matchweek ?? 0, 6)
+  eq('…so the rebuild starts AT it, not after it', gen.from_matchweek ?? 0, 5)
 
-  // Duels ALREADY written for matchweeks 1-4 stay: they were created while
-  // those weeks were open, and repairing a locked week's fixture list would
-  // change who somebody was playing after they had picked. What must not happen
-  // is a pool created NOW receiving duels for weeks that are already over.
   const kept = (await duelsOf(POOL_ODD)).filter((d) => d.matchweek_number < 5)
-  eq('duels made while those weeks were open are left alone', kept.length > 0, true)
+  eq('the played weeks are left alone', kept.length, 4 * 3)
   note('a locked week keeps its fixture list — its picks are already in')
 
+  // And the moment it IS drawn, it is fixed.
+  const shape5 = (await duelsOf(POOL_ODD)).filter((d) => d.matchweek_number === 5).map(pairKey).sort().join(',')
+  await must('stamp mw5', admin.from('league_duels').update({ drawn_at: new Date().toISOString() })
+    .eq('pool_id', POOL_ODD).eq('matchweek_number', 5).select('duel_id'))
+  const genAfter = await generate(POOL_ODD)
+  eq('a DRAWN open week is left alone, so the rebuild starts after it', genAfter.from_matchweek ?? 0, 6)
+  eq('…and its pairings are exactly what was drawn',
+     (await duelsOf(POOL_ODD)).filter((d) => d.matchweek_number === 5).map(pairKey).sort().join(','), shape5)
+
+  // A pool created now, starting at matchweek 7 — the create route stores the
+  // start (164/165), and the pool owns its first draw.
   const late = await must('late pool', admin.from('pools').insert({
     pool_id: POOL_LATE, tournament_id: TOURNAMENT,
     admin_user_id: (await must('u', admin.from('pool_members')
       .select('user_id').eq('member_id', MEM(1))) as Array<{ user_id: string }>)[0].user_id,
     pool_name: '__scratch 100 late joiner (auto-deleted)',
-    prediction_deadline: new Date(Date.now() + 90 * 864e5).toISOString(),
+    prediction_deadline: at(90 * 24 * HOUR),
     status: 'open', prediction_mode: 'league_pickem', league_season_id: SEASON,
     league_mode: 'showdown', league_depth: 'results', max_entries_per_user: 20,
+    tier_enforced_from: null, league_start_matchweek: 7,
   }).select('pool_id, admin_user_id'))
   await must('late mem', admin.from('pool_members').insert({
     member_id: MEM(4), pool_id: POOL_LATE,
@@ -424,37 +483,45 @@ async function neverInThePast() {
     }).select('entry_id'))
   }
   const lateGen = await generate(POOL_LATE)
-  // The same open matchweek, the opposite answer — because this pool has no
-  // draw to protect. One guard, both branches.
-  eq('…but a pool with NO draw yet does get the open matchweek', lateGen.from_matchweek ?? 0, 5)
+  eq('a pool starting at matchweek 7 is first drawn for matchweek 7', lateGen.from_matchweek ?? 0, 7)
   const lateDuels = await duelsOf(POOL_LATE)
-  eq('…and holds NOTHING in the weeks it missed',
-     lateDuels.filter((d) => d.matchweek_number < 5).length, 0)
-  note('LMS and Table both got this right; only the duel generator counted from one')
+  eq('…and holds NOTHING before it', lateDuels.filter((d) => d.matchweek_number < 7).length, 0)
+  eq('…and has no reveal at all for a week it does not play', await revealsAt(POOL_LATE, 6), null)
 
-  // And a season with nothing open left schedules nothing rather than falling
-  // back to matchweek 1.
+  // ⭐ "Remember pools can be started at different matchweeks." Same season,
+  // same week, two answers: POOL_LATE's FIRST draw is a day before matchweek 7's
+  // kickoff; POOL_ODD is mid-season there and follows the season rule (with
+  // matchweek 6 unsettled, the floor: a day before the LOCK, an hour earlier).
+  const mw7 = await must('mw7', admin.from('league_matchweeks')
+    .select('first_kickoff_at, lock_at').eq('matchweek_id', MW(7)).single()) as { first_kickoff_at: string; lock_at: string }
+  const dayBefore = (iso: string) => new Date(new Date(iso).getTime() - 24 * HOUR).toISOString()
+  eq('the late pool draws matchweek 7 a day before its first kickoff',
+     sameInstant(await revealsAt(POOL_LATE, 7), dayBefore(mw7.first_kickoff_at)), true)
+  eq('…while the older pool opens it on the season\'s clock',
+     sameInstant(await revealsAt(POOL_ODD, 7), dayBefore(mw7.lock_at)), true)
+
+  // A season with nothing open left schedules nothing rather than falling back
+  // to matchweek 1.
   await must('lock all', admin.from('league_matchweeks')
-    .update({ lock_at: new Date(Date.now() - 3600e3).toISOString() })
+    .update({ lock_at: at(-HOUR) })
     .eq('season_id', SEASON).select('matchweek_id'))
   const none = await generate(POOL_ODD)
   eq('a finished season schedules nothing', none.skipped, 'no open matchweek left')
 }
 
 async function theSeal() {
-  head('8. ONE DUEL AT A TIME — the draw opens as duels are decided (116/119/120)')
+  head('8. The seal — open once drawn, and drawn means for good (116/119/120/164)')
 
   // ⚠ WHY THIS SECTION EXISTS AT ALL.
   //
   // Every other check in this file runs as `admin` — the service-role client,
-  // which carries `bypassrls`. Migration 116's policy is invisible to it. A
-  // service-role-only test of a row-level policy PASSES WITH THE SEAL WIDE
-  // OPEN, which is worse than no test: it reports a guarantee nobody is
-  // providing. So this one check needs a real member's JWT.
+  // which carries `bypassrls`. The policy is invisible to it. A service-role-only
+  // test of a row-level policy PASSES WITH THE SEAL WIDE OPEN, which is worse
+  // than no test: it reports a guarantee nobody is providing. So this one check
+  // needs a real member's JWT.
   //
-  // State when this runs: every matchweek locks in the future (`setup`), so
-  // matchweek 1 is the open one and matchweeks 2..WEEKS are sealed. Run it
-  // BEFORE `neverInThePast`, which pushes locks into the past.
+  // State when this runs: matchweek 1 has been played (section 3) and its draw
+  // stamped (section 10); matchweek 2 onwards is in the future and unsettled.
 
   const created = await admin.auth.admin.createUser({
     email: SEAL_EMAIL, password: SEAL_PASSWORD, email_confirm: true,
@@ -500,76 +567,164 @@ async function theSeal() {
     return
   }
 
+  const memberWeeks = async () => {
+    const { data, error } = await member
+      .from('league_duels').select('matchweek_number').eq('pool_id', POOL_EVEN)
+    // An RLS refusal is empty rows, never an error. An error means the policy
+    // raised — most likely a helper revoked from the caller, which is the
+    // hazard `league_duel_is_revealed` is SECURITY DEFINER to avoid.
+    if (error) throw new Error(`member read: ${error.message}`)
+    return new Set((data ?? []).map((d) => d.matchweek_number as number))
+  }
+
   const asAdmin = await must('duels as service_role',
     admin.from('league_duels').select('matchweek_number').eq('pool_id', POOL_EVEN))
   const adminWeeks = new Set((asAdmin as Array<{ matchweek_number: number }>)
     .map((d) => d.matchweek_number))
-
-  const { data: asMemberRows, error: memberErr } = await member
-    .from('league_duels').select('matchweek_number').eq('pool_id', POOL_EVEN)
-  if (memberErr) {
-    // An RLS refusal is empty rows, never an error. An error here means the
-    // policy raised — most likely `league_open_matchweek` being revoked from
-    // the caller, which is the hazard `league_duel_is_revealed` is SECURITY
-    // DEFINER to avoid.
-    bad('the member read returns rows, not an error', memberErr.message)
-    return
-  }
-  const memberWeeks = new Set((asMemberRows ?? []).map((d) => d.matchweek_number as number))
+  const seen = await memberWeeks()
 
   eq('service_role still sees the whole season', adminWeeks.size, WEEKS)
-  // ONE DUEL AT A TIME (119). Only matchweek 1 is open, because it is the only
-  // one with no predecessor.
-  //
-  // ⚠ Section 3 does NOT settle matchweek 1 for this purpose. It calls
-  // `league_score_duels` directly, which settles the DUELS; the matchweek's own
-  // `ranks_snapshot_at` is stamped by `league_snapshot_matchweek_ranks`, and in
-  // production the duel settle trigger fires FROM that stamp rather than the
-  // other way round. So nothing here is stamped, and matchweek 2 stays sealed —
-  // which is the predicate behaving correctly, not a gap in the fixture.
-  eq('the member sees only the duels that have opened', [...memberWeeks].sort((a, b) => a - b).join(','), '1')
+  eq('the member sees only the duel that has been drawn', [...seen].sort((a, b) => a - b).join(','), '1')
   eq('…and every later matchweek is withheld',
-     [...adminWeeks].filter((w) => w > 1).every((w) => !memberWeeks.has(w)), true)
+     [...adminWeeks].filter((w) => w > 1).every((w) => !seen.has(w)), true)
   note('a service-role-only test of this policy would pass with the seal wide open')
 
-  const revealed = async (n: number) => await must(`predicate mw${n}`,
-    admin.rpc('league_duel_is_revealed', { p_pool_id: POOL_EVEN, p_matchweek_number: n })) as unknown
+  eq('matchweek 2 is sealed while matchweek 1 is unsettled', await isRevealed(POOL_EVEN, 2), false)
 
-  eq('the first matchweek has no predecessor, so it is open', await revealed(1), true)
-  eq('…and the one after an unsettled matchweek is not', await revealed(2), false)
-
-  // ⚠ THE REVEAL FOLLOWS THE RESULT. Settling matchweek 2 must open matchweek 3
-  // and nothing further — this is the whole mechanic, and a rule that opened
-  // two at once would look identical on the counts above.
-  await must('settle mw1', admin.from('league_matchweeks')
-    .update({ ranks_snapshot_at: new Date().toISOString() })
+  // ⚠ THE REVEAL FOLLOWS THE RESULT — by 24 HOURS (129; 164 restored it after
+  // 138 was found never applied). Settled 25 hours ago opens the next week and
+  // nothing further.
+  await must('settle mw1 25h ago', admin.from('league_matchweeks')
+    .update({ ranks_snapshot_at: at(-25 * HOUR) })
     .eq('matchweek_id', MW(1)).select('matchweek_id'))
-  eq('settling a duel opens the next one', await revealed(2), true)
-  eq('…and only the next one', await revealed(3), false)
+  eq('a day after the result, the next duel opens', await isRevealed(POOL_EVEN, 2), true)
+  eq('…and only the next one', await isRevealed(POOL_EVEN, 3), false)
+  await must('settle mw1 an hour ago', admin.from('league_matchweeks')
+    .update({ ranks_snapshot_at: at(-HOUR) })
+    .eq('matchweek_id', MW(1)).select('matchweek_id'))
+  eq('…but not within the day — the recap gets its own breath', await isRevealed(POOL_EVEN, 2), false)
   await must('unsettle mw1', admin.from('league_matchweeks')
     .update({ ranks_snapshot_at: null }).eq('matchweek_id', MW(1)).select('matchweek_id'))
 
-  // The 24-hour floor (120). A postponed matchweek settles only when the NEXT
-  // one locks (094), which without this reveals the opponent as picks close.
-  await must('mw2 locks within the hour', admin.from('league_matchweeks')
-    .update({ lock_at: new Date(Date.now() + 3600e3).toISOString() })
-    .eq('matchweek_id', MW(2)).select('matchweek_id'))
+  // The 24-hour floor (120). A postponed matchweek settles only when its window
+  // closes (094), which without this reveals the opponent as picks close.
+  await setKickoff(2, 2 * HOUR)
   eq('a matchweek about to lock opens even with its predecessor unsettled',
-     await revealed(2), true)
+     await isRevealed(POOL_EVEN, 2), true)
   note('unreachable in a normal week — settlement leads the next lock by 66h at the tightest')
-  await must('restore mw2 lock', admin.from('league_matchweeks')
-    .update({ lock_at: new Date(Date.now() + 24 * 2 * 3600e3).toISOString() })
-    .eq('matchweek_id', MW(2)).select('matchweek_id'))
+  await setKickoff(2, kickoffOf(2))
+
+  // ⭐ THE STAMP (164). A drawn duel stays drawn whatever the fixture list does
+  // next. Push matchweek 1's kickoff a month out — the clock now says sealed —
+  // and the member must still see it. This is 138's re-seal hazard, closed.
+  const stamped = await must('mw1 stamps', admin.from('league_duels')
+    .select('drawn_at').eq('pool_id', POOL_EVEN).eq('matchweek_number', 1))
+  eq('matchweek 1 was stamped when it was drawn',
+     (stamped as Array<{ drawn_at: string | null }>).every((d) => d.drawn_at !== null), true)
+  await setKickoff(1, 30 * 24 * HOUR)
+  eq('…so moving its kickoff later cannot re-seal it', (await memberWeeks()).has(1), true)
+  eq('…and the predicate agrees', await isRevealed(POOL_EVEN, 1), true)
+  await play(1)
 
   // A non-member sees nothing at all — the membership half of the policy is
   // still doing its job, not just the reveal half.
   await must('drop scratch membership',
     admin.from('pool_members').delete().eq('member_id', MEM(9)).select('member_id'))
-  const { data: asStranger } = await member
-    .from('league_duels').select('matchweek_number').eq('pool_id', POOL_EVEN)
-  eq('a non-member sees no duels at all', (asStranger ?? []).length, 0)
+  eq('a non-member sees no duels at all', (await memberWeeks()).size, 0)
 
   await member.auth.signOut()
+}
+
+async function theDrawWaits() {
+  head('10. THE DRAW WAITS FOR THE POOL — two members, then three, then four (164)')
+
+  // Ryan, 2026-10-04: "the match ups should not just be picked once there are
+  // two people in the pool." His own pool drew and revealed its first duel the
+  // second mhcaldwell11 joined, and KevC — six days early — was left out.
+
+  const adminUser = (await must('u', admin.from('pool_members')
+    .select('user_id').eq('member_id', MEM(1))) as Array<{ user_id: string }>)[0].user_id
+  await must('grow pool', admin.from('pools').insert({
+    pool_id: POOL_GROW, tournament_id: TOURNAMENT, admin_user_id: adminUser,
+    pool_name: '__scratch 164 growing (auto-deleted)',
+    prediction_deadline: at(90 * 24 * HOUR), status: 'open',
+    prediction_mode: 'league_pickem', league_season_id: SEASON,
+    league_mode: 'showdown', league_depth: 'results', max_entries_per_user: 20,
+    tier_enforced_from: null, league_start_matchweek: 1,
+  }).select('pool_id'))
+  await must('grow member', admin.from('pool_members').insert({
+    member_id: MEM(5), pool_id: POOL_GROW, user_id: adminUser, role: 'admin',
+  }).select('member_id'))
+  const join = async (n: number) => {
+    await must(`grow entry ${n}`, admin.from('pool_entries').insert({
+      entry_id: G(n), member_id: MEM(5), entry_name: `G${n}`, entry_number: n,
+    }).select('entry_id'))
+    return generate(POOL_GROW)
+  }
+
+  await join(1)
+  const two = await join(2)
+  eq('the first duel week is the pool\'s own start', (two as { first_duel_matchweek?: number }).first_duel_matchweek, 1)
+
+  const mw1 = await must('mw1', admin.from('league_matchweeks')
+    .select('first_kickoff_at, lock_at').eq('matchweek_id', MW(1)).single()) as { first_kickoff_at: string; lock_at: string }
+  const expected = new Date(new Date(mw1.first_kickoff_at).getTime() - 24 * HOUR).toISOString()
+  eq('its draw is 24 hours before the first KICKOFF — not the lock',
+     sameInstant(await revealsAt(POOL_GROW, 1), expected), true)
+  eq('…and with two members it is still sealed', await isRevealed(POOL_GROW, 1), false)
+  note('before 164 this was -infinity: drawn and revealed the second the second member joined')
+
+  await join(3)
+  const withThree = (await duelsOf(POOL_GROW)).filter((d) => d.matchweek_number === 1)
+  eq('a third member who joins before the draw is IN the first week',
+     withThree.some((d) => d.entry_a === G(3) || d.entry_b === G(3)), true)
+  eq('…with a bye somewhere, as three must have', withThree.some((d) => d.entry_b === null), true)
+
+  // The draw. Pull matchweek 1 to 23 hours out — its draw instant passes — and
+  // run the stamp the cron runs every minute.
+  await setKickoff(1, 23 * HOUR)
+  eq('once the draw instant passes, the week is revealed', await isRevealed(POOL_GROW, 1), true)
+  // ⚠ The production cron runs this every minute and may get there first, so
+  // assert the STATE, never the count this call returned.
+  await must('stamp', admin.rpc('league_stamp_drawn_duels'))
+  const drawn = (await must('drawn', admin.from('league_duels')
+    .select('duel_id, drawn_at, entry_a, entry_b').eq('pool_id', POOL_GROW).eq('matchweek_number', 1))) as
+    Array<{ duel_id: string; drawn_at: string | null; entry_a: string; entry_b: string | null }>
+  eq('the stamp makes the draw permanent', drawn.length > 0 && drawn.every((d) => d.drawn_at !== null), true)
+  eq('…stamped with the instant it opened, not the instant the cron noticed',
+     drawn.every((d) => Math.abs(new Date(d.drawn_at!).getTime() - (Date.now() - HOUR)) < 60e3), true)
+
+  const before = drawn.map((d) => d.duel_id).sort().join(',')
+  await join(4)
+  const afterJoin = (await duelsOf(POOL_GROW))
+  const mw1After = afterJoin.filter((d) => d.matchweek_number === 1)
+  eq('a member who joins AFTER the draw does not change it — same duels, same ids',
+     mw1After.map((d) => d.duel_id).sort().join(','), before)
+  eq('…and is not in it', mw1After.some((d) => d.entry_a === G(4) || d.entry_b === G(4)), false)
+  const mw2 = afterJoin.filter((d) => d.matchweek_number === 2)
+  eq('…but is in the next week\'s', mw2.some((d) => d.entry_a === G(4) || d.entry_b === G(4)), true)
+
+  // Four entries: three rounds, matchweeks 2–4, a full round-robin of the new
+  // roster — and matchweek 1's pair does not meet again straight away.
+  const pass = afterJoin.filter((d) => d.matchweek_number >= 2 && d.matchweek_number <= 4)
+  const counts = new Map<string, number>()
+  for (const d of pass) counts.set(pairKey(d), (counts.get(pairKey(d)) ?? 0) + 1)
+  eq('the first pass after the join is all six pairs of the four, once each',
+     counts.size === 6 && [...counts.values()].every((c) => c === 1), true)
+  const mw1Pair = mw1After.find((d) => d.entry_b !== null)!
+  eq('matchweek 1\'s pair does not meet again in matchweek 2',
+     mw2.some((d) => pairKey(d) === pairKey(mw1Pair)), false)
+
+  // Two pools, one season, different start weeks: different first draws.
+  // POOL_GROW's matchweek 3 follows the season rule (the floor: the lock minus a
+  // day = kickoff minus 25 hours); a pool STARTING at 3 is drawn at kickoff
+  // minus 24. The create route stores the start with this same function.
+  eq('the create route\'s resolver: a start whose draw has passed rolls to the next week',
+     await must('resolver', admin.rpc('league_showdown_first_matchweek_for',
+       { p_season_id: SEASON, p_floor: 1, p_at: new Date().toISOString() })) as unknown as number, 2)
+  note('Ryan\'s call: one stored start, never a picks-only first week')
+
+  await setKickoff(1, kickoffOf(1))
 }
 
 async function theShuffle() {
@@ -634,7 +789,7 @@ async function teardown() {
     if (authId) await admin.auth.admin.deleteUser(authId)
   }
 
-  for (const pid of [POOL_EVEN, POOL_ODD, POOL_PICK, POOL_LATE]) {
+  for (const pid of [POOL_EVEN, POOL_ODD, POOL_PICK, POOL_LATE, POOL_GROW]) {
     await admin.from('pool_entries').delete().eq('pool_id', pid)
     await admin.from('pools').delete().eq('pool_id', pid)
   }
@@ -645,6 +800,7 @@ async function teardown() {
   for (const [t, col, val] of [
     ['pools', 'pool_id', POOL_EVEN], ['pools', 'pool_id', POOL_ODD],
     ['pools', 'pool_id', POOL_PICK], ['pools', 'pool_id', POOL_LATE],
+    ['pools', 'pool_id', POOL_GROW], ['league_duels', 'pool_id', POOL_GROW],
     ['league_seasons', 'season_id', SEASON], ['league_duels', 'pool_id', POOL_EVEN],
     ['league_fixtures', 'season_id', SEASON], ['users', 'email', SEAL_EMAIL],
     ['tournaments', 'tournament_id', TOURNAMENT],
@@ -657,12 +813,13 @@ async function teardown() {
 }
 
 ;(async () => {
-  console.log('\n  SHOWDOWN — migrations 083-085, 116-118')
+  console.log('\n  SHOWDOWN — migrations 083-085, 116-121, 164-165')
   console.log('  ' + '='.repeat(68))
   try {
     await setup()
     await roundRobin()
     await byes()
+    await theDrawWaits()
     await scoring()
     await controlPool()
     await regeneration()

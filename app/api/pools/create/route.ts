@@ -298,6 +298,43 @@ export async function POST(request: NextRequest) {
         // eliminated in Last Man Standing without ever seeing one.
         resolvedStartMatchweek = Math.max(chosen, firstOpenMatchweek)
       }
+
+      // ⬅ 164. SHOWDOWN'S FLOOR IS ITS FIRST DRAW, NOT THE LOCK. A pool's
+      // first duel week is drawn 24 hours before that week's first kickoff
+      // (Ryan, 2026-10-04), so the week that is "still open" by 143's rule can
+      // already be past its draw — created on a Friday night, it would be drawn
+      // the moment a second member joined, which is the bug 164 exists to end.
+      // Such a pool starts the following week instead (Ryan's call: one stored
+      // start, no picks-only first week).
+      //
+      // ⚠ RESOLVED IN SQL, NEVER HERE. `league_showdown_first_matchweek_for` is
+      // the same function the reveal clock and the generator read, so the week
+      // this stores and the week the pool is first drawn in cannot disagree.
+      // Stored even when the admin chose nothing, so every Showdown pool states
+      // its own first draw rather than implying it.
+      if (resolvedLeagueMode === 'showdown') {
+        const { data: firstDuelMw, error: firstDuelErr } = await adminClient.rpc(
+          'league_showdown_first_matchweek_for',
+          {
+            p_season_id: league_season_id,
+            p_floor: resolvedStartMatchweek ?? firstOpenMatchweek,
+            p_at: new Date().toISOString(),
+          },
+        )
+        if (firstDuelErr) {
+          return NextResponse.json(
+            { error: 'Could not work out which matchweek this pool starts in.' },
+            { status: 500 },
+          )
+        }
+        if (typeof firstDuelMw !== 'number') {
+          return NextResponse.json(
+            { error: 'This season has no matchweek left that a Showdown pool can be drawn for.' },
+            { status: 409 },
+          )
+        }
+        resolvedStartMatchweek = firstDuelMw
+      }
     }
 
     if (resolvedLeagueMode === 'table') {

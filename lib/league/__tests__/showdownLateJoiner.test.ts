@@ -37,14 +37,16 @@ const migration = read('lib/migrations/100_showdown_survives_a_late_joiner.sql')
  * is still read above for the parts of the late-joiner behaviour it owns.
  */
 const duelValues = read('lib/migrations/121_a_duel_is_worth_half_a_perfect_week.sql')
-// ⚠ 117 REPLACED 100's generator. The bye scoring below is still 100's; every
-// rule about WHICH matchweeks get drawn now lives in 117, and asserting those
-// against 100 would be a test that passes while the live function does
-// something else — the exact drift migration 055 is a warning about.
-// 118 REPLACED 117's function in turn. Always the newest definition — the whole
-// point of these assertions is that they describe what actually runs.
-const generator = read('lib/migrations/118_the_draw_does_not_run_out_of_surprises.sql')
+// ⚠ The generator has been replaced four times (100 → 117 → 118 → 143 → 164).
+// Every rule about WHICH matchweeks get drawn, and in what order, is asserted
+// against the NEWEST definition — the whole point of these assertions is that
+// they describe what actually runs, and a test pinned to a superseded file
+// passes while the live function does something else (055's warning).
+const generator = read('lib/migrations/164_the_draw_waits_for_the_pool.sql')
+/** 116 still owns the GRANT on `league_duel_is_revealed` (CREATE OR REPLACE keeps it). */
 const seal = read('lib/migrations/116_the_draw_opens_one_week_at_a_time.sql')
+/** 164 owns the policy, the predicate's body and the reveal clock. */
+const draw = generator
 /**
  * Just the executable body of a `$fn$ ... $fn$` function, with `--` comment
  * lines stripped.
@@ -62,6 +64,20 @@ const body = (sql: string) => {
     .filter((l) => !l.trim().startsWith('--'))
     .join('\n')
 }
+/** One function's executable body out of a migration that defines several. */
+const fnBody = (sql: string, name: string) => {
+  const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}(`)
+  if (start === -1) throw new Error(`${name} is not defined in this migration`)
+  const rest = sql.slice(start)
+  return body(rest.slice(0, rest.indexOf('$fn$;') + 5))
+}
+const generatorBody = fnBody(generator, 'league_generate_duel_schedule')
+const revealsAt = fnBody(draw, 'league_duel_reveals_at')
+const isRevealed = fnBody(draw, 'league_duel_is_revealed')
+/** 165 replaced 164's membership pair: the stored start is the answer. */
+const keepsStart = read('lib/migrations/165_a_pool_keeps_the_start_it_was_given.sql')
+const playsMatchweek = fnBody(keepsStart, 'league_showdown_plays_matchweek')
+const firstMatchweek = fnBody(keepsStart, 'league_showdown_first_matchweek')
 const modeInfo = read('lib/leagueModeInfo.ts')
 const rulesTab = read('app/pools/[pool_id]/LeagueScoringRulesTab.tsx')
 
@@ -114,73 +130,132 @@ describe('a bye is worth a tie, never nothing', () => {
   })
 })
 
-describe('a join never redraws the matchweek people are picking in', () => {
-  it('the live matchweek is skipped when it already has a draw', () => {
-    expect(generator).toMatch(/v_open_has_duels/)
-    expect(generator).toMatch(/NOT \(v_open_has_duels AND m\.matchweek_id = v_open_id\)/)
+describe('a join redraws everything not yet drawn, and nothing that has been', () => {
+  it('the redraw line is league_duel_is_revealed — for the DELETE and the loop alike', () => {
+    // 117's title promised one line and 100's `v_open_has_duels` kept two: a week
+    // froze when it became the OPEN week, days before anybody could see it, and
+    // everyone who joined in between was shut out (KevC, 2026-10-04).
+    expect(generatorBody).toMatch(/AND NOT league_duel_is_revealed\(p_pool_id, d\.matchweek_number\)/)
+    expect(generatorBody).toMatch(/AND NOT league_duel_is_revealed\(p_pool_id, m\.matchweek_number\)/)
+    expect(generatorBody).not.toMatch(/v_open_has_duels/)
   })
 
-  it('⚠ but a FIRST generation still gets the live matchweek', () => {
-    // The two cases are separated by whether duels already exist. Without that,
-    // a pool created mid-season would skip the very matchweek its members can
-    // pick in, and sit out a week for no reason.
-    const guard = generator.slice(generator.indexOf('SELECT EXISTS ('))
-    expect(guard).toMatch(/FROM league_duels d/)
-    expect(guard).toMatch(/m\.matchweek_id = v_open_id/)
+  it('a stamped duel is never deleted', () => {
+    expect(generatorBody).toMatch(/AND d\.drawn_at IS NULL/)
   })
 
-  it('still never rewrites a settled duel', () => {
-    // The rule 095 established and neither 100 nor 117 may lose: a result is a
-    // result. 117 gets it twice over — a settled matchweek is fully played, so
-    // its lock is in the past and the predicate excludes it anyway.
-    expect(generator).toMatch(/d\.settled_at IS NULL/)
-    expect(generator).toMatch(/m\.lock_at IS NULL OR m\.lock_at > now\(\)/)
+  it('still never rewrites a settled duel, or a locked week', () => {
+    expect(generatorBody).toMatch(/d\.settled_at IS NULL/)
+    expect(generatorBody).toMatch(/m\.lock_at IS NULL OR m\.lock_at > now\(\)/)
   })
 
-  it('still orders the roster by created_at, so existing pairs do not reshuffle', () => {
-    expect(generator).toMatch(/ORDER BY pe\.created_at, pe\.entry_id/)
+  it('⚠ there is ONE delete, and it runs before the fewer-than-two return', () => {
+    // 143's short-roster branch deleted EVERY unsettled duel, revealed or not, so
+    // the second-to-last member leaving erased a duel the other was mid-way
+    // through. A drawn duel with a departed opponent stays; 134 settles it.
+    expect(generatorBody.match(/DELETE FROM league_duels/g)?.length).toBe(1)
+    expect(generatorBody.indexOf('DELETE FROM league_duels'))
+      .toBeLessThan(generatorBody.indexOf("'fewer than two entries'"))
+  })
+
+  it('still orders the roster by created_at, so the circle is stable', () => {
+    expect(generatorBody).toMatch(/ORDER BY pe\.created_at, pe\.entry_id/)
+  })
+
+  it('only schedules weeks this pool duels in', () => {
+    expect(generatorBody).toMatch(/league_showdown_plays_matchweek\(p_pool_id, m\.matchweek_number\)/)
   })
 })
 
 describe('the reveal line and the redraw line are the same line', () => {
-  it('the generator calls league_open_matchweek instead of counting by number', () => {
+  it('the generator never counts by matchweek number', () => {
     // Migration 103's lesson: the rule existed four times and the copies drifted
-    // the moment 101 changed one. 100 was the copy 103 missed.
-    expect(generator).toMatch(/v_open_id\s*:=\s*league_open_matchweek\(v_season\)/)
-    expect(body(generator)).not.toMatch(/MIN\(matchweek_number\)/)
+    // the moment 101 changed one.
+    expect(generatorBody).not.toMatch(/MIN\(matchweek_number\)/)
+    expect(generatorBody).toMatch(/ORDER BY m\.lock_at NULLS LAST/)
   })
 
-  it('both sides measure in lock time, never matchweek number', () => {
+  it('the reveal clock finds the previous matchweek in lock time, never number', () => {
     // Rounds are played out of numerical order — minimum gap −121 days across
-    // three real seasons (101). A number comparison seals a matchweek being
-    // played and reveals one that is weeks away.
-    expect(seal).toMatch(/m\.lock_at <= COALESCE/)
-    expect(body(seal)).not.toMatch(/matchweek_number <=/)
-    expect(generator).toMatch(/ORDER BY m\.lock_at NULLS LAST/)
+    // three real seasons (101).
+    expect(revealsAt).toMatch(/\(prev\.lock_at, prev\.matchweek_number\) < \(m\.lock_at, m\.matchweek_number\)/)
   })
 })
 
-describe('the draw is sealed until its matchweek opens', () => {
-  it('the policy gates on league_duel_is_revealed, not just membership', () => {
-    expect(seal).toMatch(/CREATE POLICY "Members see duels up to the open matchweek"/)
-    expect(seal).toMatch(/AND league_duel_is_revealed\(league_duels\.pool_id, league_duels\.matchweek_number\)/)
-    expect(seal).toMatch(/DROP POLICY IF EXISTS "Members can view their pool's duels"/)
+describe('a pool\'s first draw is its own (164)', () => {
+  it('the first duel week opens 24 hours before its FIRST KICKOFF', () => {
+    // Ryan, 2026-10-04: "24 hours before the first matchweek kickoff for that
+    // pool. Remember pools can be started at different matchweeks." Kickoff,
+    // not lock_at — the lock is an hour earlier (101).
+    expect(revealsAt).toMatch(/WHEN m\.matchweek_number = public\.league_showdown_first_matchweek\(p_pool_id\)\s+THEN m\.first_kickoff_at - interval '24 hours'/)
   })
 
-  it('a finished season still shows its own results', () => {
-    // COALESCE(..., now()) is load-bearing: league_open_matchweek returns NULL
-    // once every matchweek is done, and `lock_at <= NULL` is NULL — which would
-    // hide every duel of a finished season, settled results included.
-    expect(seal).toMatch(/COALESCE\(\s*\n?\s*\(SELECT o\.lock_at/)
-    expect(seal).toMatch(/now\(\)\)/)
+  it('⚠ no -infinity base case — that opened every new pool at the second join', () => {
+    expect(revealsAt).not.toMatch(/infinity/)
+  })
+
+  it('a week the pool does not duel in has no reveal at all', () => {
+    expect(revealsAt).toMatch(/WHEN NOT public\.league_showdown_plays_matchweek\(p_pool_id, p_matchweek_number\)\s+THEN NULL/)
+  })
+
+  it('later weeks hold 24 hours — 129\'s decision, never 137\'s throwaway', () => {
+    // 138 was never applied: production ran 6h46m58s from 2026-09-07 until 164.
+    expect(revealsAt).toMatch(/prev\.ranks_snapshot_at \+ interval '24 hours'/)
+    expect(revealsAt).not.toMatch(/46 minutes/)
+  })
+
+  it('⚠ membership is the STORED start — never re-derived from a fixture list that moves', () => {
+    // 165: 164 compared created_at with the CURRENT first kickoff, so a kickoff
+    // corrected earlier made a pool's first week vanish while its provisional
+    // rows stayed scoreable. The stored start wins; created_at is only the
+    // fallback for a pool that has none.
+    expect(playsMatchweek).toMatch(/COALESCE\(\s*p\.league_start_matchweek,/)
+    expect(playsMatchweek).not.toMatch(/first_kickoff_at/)
+    expect(playsMatchweek).not.toMatch(/now\(\)/)
+    expect(firstMatchweek).toMatch(/WHEN p\.league_start_matchweek IS NOT NULL THEN/)
+    expect(firstMatchweek).toMatch(/'-infinity'::timestamptz/)
+  })
+
+  it('⚠ the backfill stamps under the OLD rule, before the clock is replaced', () => {
+    // 24h is later than 6h47m. Switching first would re-seal duels people had
+    // already watched — 138's warning, in the direction it warned about.
+    expect(draw.indexOf('UPDATE public.league_duels d'))
+      .toBeLessThan(draw.indexOf('CREATE OR REPLACE FUNCTION public.league_duel_reveals_at('))
+  })
+
+  it('the create route resolves a Showdown start in SQL, never with its own 24h', () => {
+    const route = read('app/api/pools/create/route.ts')
+    expect(route).toMatch(/rpc\(\s*'league_showdown_first_matchweek_for'/)
+    expect(prose(route)).not.toMatch(/24\s*\*\s*(60|3600)/)
+  })
+
+  it('the stamp is scheduled every minute', () => {
+    expect(draw).toMatch(/'league-duel-draw-stamp',\s*'\* \* \* \* \*'/)
+  })
+})
+
+describe('the draw is sealed until it is drawn, and stays open once it is', () => {
+  it('the policy reads the row\'s stamp, then the predicate — membership first', () => {
+    expect(draw).toMatch(/CREATE POLICY "Members see duels once they are drawn"/)
+    expect(draw).toMatch(/league_duels\.drawn_at IS NOT NULL\s+OR league_duel_is_revealed\(league_duels\.pool_id, league_duels\.matchweek_number\)/)
+    expect(draw).toMatch(/DROP POLICY IF EXISTS "Members see duels up to the open matchweek"/)
+  })
+
+  it('a stamped duel is revealed whatever the clock later says', () => {
+    // A kickoff moved later by the sync (105) used to re-seal a duel people had
+    // watched. The stamp half of the predicate is what makes a reveal permanent.
+    expect(isRevealed).toMatch(/d\.drawn_at IS NOT NULL/)
+    expect(isRevealed).toMatch(/league_duel_reveals_at\(p_pool_id, p_matchweek_number\) <= now\(\)/)
   })
 
   it('the helper is SECURITY DEFINER, because league_open_matchweek is not public', () => {
     // 102 revoked it from anon. A policy calling it directly would raise
     // permission denied rather than returning zero rows, and Postgres does not
-    // promise to evaluate the membership EXISTS first.
+    // promise to evaluate the membership EXISTS first. 116 granted it; 164's
+    // CREATE OR REPLACE keeps that grant.
+    const fn164 = draw.slice(draw.indexOf('CREATE OR REPLACE FUNCTION public.league_duel_is_revealed('))
+    expect(fn164.slice(0, fn164.indexOf('$fn$'))).toMatch(/SECURITY DEFINER/)
     const fn = seal.slice(seal.indexOf('CREATE OR REPLACE FUNCTION public.league_duel_is_revealed'))
-    expect(fn).toMatch(/SECURITY DEFINER/)
     expect(fn.slice(0, fn.indexOf('CREATE POLICY'))).toMatch(/GRANT\s+EXECUTE[\s\S]*?TO anon, authenticated, service_role/)
   })
 
@@ -271,31 +346,28 @@ describe('the copy matches the engine', () => {
   })
 })
 
-describe('the round order is permuted per cycle, deterministically', () => {
+describe('the round order: fewest meetings first, then a per-pass hash', () => {
   it('never random() — a regeneration must not redraw a future nobody has seen', () => {
     // Under a sealed draw a member cannot audit this from the outside, which
-    // makes it more dangerous rather than less: random() would reshuffle the
-    // whole remaining season every time somebody joined and nothing would show.
-    expect(body(generator)).not.toMatch(/random\(\)/)
-    expect(generator).toMatch(/md5\(p_pool_id::text \|\| ':' \|\| v_cycle::text/)
+    // makes it more dangerous rather than less.
+    expect(generatorBody).not.toMatch(/random\(\)/)
   })
 
-  it('the seed is the pool and the cycle, so two pools differ and one pool does not', () => {
-    expect(generator).toMatch(/array_agg\(r ORDER BY md5\(/)
-    expect(generator).toMatch(/generate_series\(0, v_rounds - 1\)/)
+  it('meetings decide first, then "not last week again", then the hash', () => {
+    expect(generatorBody).toMatch(/ORDER BY l\.s,\s+l\.repeats_last_week,\s+md5\(p_pool_id::text \|\| ':' \|\| l\.lvl::text \|\| ':' \|\| l\.r::text\)/)
   })
 
-  it('the round is keyed on the matchweek\'s place in the SEASON, not the loop', () => {
-    // 083 and 117 derived it from a counter starting at 0 on whichever matchweek
-    // the regeneration happened to touch first, so a pool regenerated in
-    // November replayed August's rotation.
-    expect(generator).toMatch(/ROW_NUMBER\(\) OVER \(ORDER BY m\.lock_at NULLS LAST/)
-    expect(generator).toMatch(/v_cycle := v_pos \/ v_rounds/)
-    expect(generator).toMatch(/v_slot\s+:= v_pos % v_rounds/)
-    expect(body(generator)).not.toMatch(/v_k/)
+  it('history is re-read inside the loop, so this call\'s own weeks count', () => {
+    expect(generatorBody.indexOf('WITH met AS')).toBeGreaterThan(generatorBody.indexOf('LOOP'))
   })
 
-  it('the permutation is applied, not merely computed', () => {
-    expect(generator).toMatch(/v_r := v_perm\[v_slot \+ 1\]/)
+  it('⚠ the tie-break is NOT "longest since last met" — that replays pass one forever', () => {
+    // 118's whole point: a pass that repeats the previous pass's order is
+    // derivable by anyone who watched the first one.
+    expect(generatorBody).not.toMatch(/ORDER BY[^;]*last_met/i)
+  })
+
+  it('no calendar arithmetic is left — a cycle starts where the roster does', () => {
+    expect(generatorBody).not.toMatch(/v_pos|v_cycle|v_slot/)
   })
 })
