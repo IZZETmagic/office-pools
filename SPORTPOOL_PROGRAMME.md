@@ -3331,6 +3331,13 @@ That asymmetry *is* the design: a removal is **never** a loss, because the remov
     - Reports tab shows the reported photo, or "Photo already removed".
     - The pure module `lib/banter/photoMessage.ts` is kept identical to the RN copy by `photoMessageParity.guard.test.ts`.
     - First real app upload (2026-10-03) checked CLEAN: encoder technical tags only, no GPS/make/dates.
+  - **Step 3.6 — the database asks for the sweep: DONE 2026-10-04.**
+    - An app delete (00:31:28 UTC) reached the DB, but its client sweep call never removed the file, so it waited for the cron.
+    - Migration `162_a_deleted_photo_goes_at_once` (applied): statement-level triggers on pool_messages (soft and hard delete) fire ONE pg_net POST to the sweep route after commit, when the queue is non-empty. A pool delete with 100 photos sends one request.
+    - Verified in prod with no client call: file gone in 1.6s (signed URL 400), and the stuck 00:31 file was swept by the same run. Bucket = live photos exactly.
+    - Client sweep calls kept, now redundant.
+    - The app's own camera upload (00:27) checked CLEAN, with no GPS.
+    - Ryan's device test 2026-10-04: library, camera, viewer, report/block and delete all confirmed working.
   - **Open:** DMCA designated agent (legal review C3), Ryan's action.
 - **Effort:** ~2–3 days for photos; GIFs ~1.5–2 days.
 - **Done when:** a user can attach and send an image or GIF in pool chat and others see it inline.
