@@ -48,14 +48,12 @@ export async function POST(
         return NextResponse.json({ error: 'User has no auth account' }, { status: 400 })
       }
       const adminSupabase = createAdminClient()
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
-      const { error } = await adminSupabase.auth.admin.generateLink({
-        type: 'recovery',
-        email: targetUser.email,
-        options: {
-          redirectTo: `${appUrl}/auth/callback?next=/reset-password`,
-        },
-      })
+      // ⚠ NOT `auth.admin.generateLink` — that BUILDS a link without sending it,
+      // and this used to call it and log "Sent password reset" while the member
+      // received nothing. `resetPasswordForEmail` sends the Reset password
+      // template, the same email the member gets from /forgot-password or the
+      // app. No `redirectTo`: the template links to /auth/confirm itself.
+      const { error } = await adminSupabase.auth.resetPasswordForEmail(targetUser.email)
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
