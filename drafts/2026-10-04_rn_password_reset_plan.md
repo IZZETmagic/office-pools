@@ -1,6 +1,18 @@
 # Password reset in the app — plan
 
-**Status:** ✅ approved 2026-10-04, being built · approach **(b)** chosen in chat
+**Status:** 🟡 web DEPLOYED + verified 2026-10-04 · ⏸ template swap (Ryan) · ⏸ phone test · ⏸ OTA
+
+## Where it stands (2026-10-04, afternoon)
+
+- ✅ Pushed `2e144f67..9054323f` (with 6 earlier commits from other sessions). Vercel succeeded, and
+  `/auth/confirm` went **404 → 307** to `/forgot-password?error=link_invalid`.
+- ✅ `scripts/verify-password-reset.ts` passes all 10 checks on production.
+- ⏸ **Template swap: Ryan does this.** The permission check refused my opening the Reset password
+  template in the dashboard. The edit is below ("Ryan's two edits").
+- ⏸ Ryan tests on his own inbox (web), then on his phone over Metro (app).
+- ⏸ OTA, on a separate go.
+- ⚠ The dashboard shows an org banner: *"Grace period is over · Your projects will not be able to
+  serve requests when you use up your quota."*
 
 ## Decisions (Ryan, 2026-10-04)
 
@@ -101,7 +113,25 @@ unless you say otherwise.**
 
 ### 2 · Email template *(dashboard, after step 1 is live)*
 
-Restyle to match whatever step 0 shows; the content is:
+#### Ryan's two edits (Authentication → Emails → Reset password → Source)
+
+The existing templates are branded HTML, so keep the template and change two things. Copy the
+current Source somewhere first: undoing these two edits is the whole rollback.
+
+1. In the button's `href`, replace `{{ .ConfirmationURL }}` with
+   `https://sportpool.io/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`
+   (spelled out, since the Site URL has no scheme).
+2. Just below the button, add:
+
+```html
+<p style="margin:24px 0 8px;color:#4b5563;font-size:14px;text-align:center;">Resetting in the SportPool app? Enter this code instead:</p>
+<p style="margin:0;color:#111827;font-size:28px;font-weight:700;letter-spacing:6px;text-align:center;font-family:Menlo,Consolas,monospace;">{{ .Token }}</p>
+```
+
+Then check the Preview tab and Save. If any line says the link "expires in" a time, compare it with
+Auth → Providers → Email → Email OTP Expiration.
+
+#### Reference content (if starting from scratch)
 
 ```html
 <h2>Reset your password</h2>
