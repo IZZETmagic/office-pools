@@ -8,6 +8,7 @@
  */
 
 import { dataRows, greeting, panel, paragraph, sectionLabel } from '../lib/email/components'
+import { resetPasswordAuthTemplate } from '../lib/email/supabaseAuthTemplates'
 import * as T from '../lib/email/templates'
 
 const POOL_URL = 'https://sportpool.io/pools/demo-pool'
@@ -252,6 +253,17 @@ add('Community', 'mentionNotification', T.mentionNotificationTemplate({
   messageContent: "Ryan you absolute menace, how did you have Morocco going through? I had them bottom of the group and now I'm eating it in front of the whole office. Respect. Genuinely.",
   poolUrl: POOL_URL,
 }))
+
+// --- Supabase auth (pasted into the dashboard; see lib/email/supabaseAuthTemplates.ts) -----
+
+// The placeholders are Supabase's, filled at send time; sample values stand in for them here.
+{
+  const reset = resetPasswordAuthTemplate()
+  add('Supabase auth', 'Reset password', {
+    subject: reset.subject,
+    html: reset.html.replaceAll('{{ .Token }}', '48203917').replaceAll('{{ .TokenHash }}', 'sample'),
+  })
+}
 
 // --- Shells themselves -------------------------------------------------------------------
 
