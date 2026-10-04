@@ -403,10 +403,6 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
   // Photos (159). The source menu, the in-flight send, and the full-screen viewer.
-  const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
-  // The source picked in the menu, held until the menu has fully closed —
-  // see handlePickPhotoSource.
-  const pendingPhotoSourceRef = useRef<'library' | 'camera' | null>(null);
   const [photoSending, setPhotoSending] = useState(false);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   // Lazy-mount flags for the two inner gorhom BottomSheets. They
@@ -693,8 +689,11 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
       if (!poolId || !banter.appUserId) return;
       if (key === 'gif') {
         setGifPickerOpen(true);
-      } else if (key === 'photo') {
-        setPhotoSourceOpen(true);
+      } else if (key === 'camera' || key === 'library') {
+        // The + menu is an in-sheet overlay, not a native <Modal>, so there
+        // is no dismissing screen for iOS to refuse to present over — the
+        // picker can open straight from the tap.
+        void handleSendPhoto(key);
       } else if (key === 'standings') {
         await sendStandings(poolId, banter.sendMessage);
       } else if (key === 'flex') {
@@ -716,7 +715,8 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         });
       }
     },
-    [poolId, banter.appUserId, banter.sendMessage, predictionMode],
+    // handleSendPhoto is rebuilt each render (it reads the reply target), so it is a dep.
+    [poolId, banter.appUserId, banter.sendMessage, predictionMode, handleSendPhoto],
   );
 
   // Fired from inside FlexBadgesSheet when a badge is picked. We need
@@ -927,28 +927,6 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
   // {pool}/{me}/{uuid}.jpg → send the message pointing at it. The upload
   // must land first — 159 refuses a photo message whose file isn't there.
   // If the message fails, the orphaned upload is removed.
-  // ⚠ iOS presents the system picker on top of whatever screen is frontmost
-  // AT THAT INSTANT. Launching it straight from the menu's tap lands it on the
-  // menu while the menu is still animating closed, and iOS silently drops the
-  // presentation — "Choose from library" did nothing (2026-10-03). So on iOS
-  // the choice is held until the menu's onDismiss; Android has no such race
-  // (its picker is a separate activity) and launches at once.
-  function handlePickPhotoSource(source: 'library' | 'camera') {
-    if (Platform.OS === 'ios') {
-      pendingPhotoSourceRef.current = source;
-      setPhotoSourceOpen(false);
-    } else {
-      setPhotoSourceOpen(false);
-      void handleSendPhoto(source);
-    }
-  }
-
-  function handlePhotoMenuDismissed() {
-    const source = pendingPhotoSourceRef.current;
-    pendingPhotoSourceRef.current = null;
-    if (source) void handleSendPhoto(source);
-  }
-
   async function handleSendPhoto(source: 'library' | 'camera') {
     if (!poolId || !banter.appUserId) return;
     let picked: Awaited<ReturnType<typeof pickPhoto>>;
@@ -2082,20 +2060,6 @@ export const BanterSheet = memo(forwardRef<BanterSheetHandle, Props>(function Ba
         </>
       ) : null}
 
-      <ActionMenu
-        visible={photoSourceOpen}
-        title="Send a photo"
-        items={[
-          { key: 'camera', label: 'Take photo', onPress: () => handlePickPhotoSource('camera') },
-          { key: 'library', label: 'Choose from library', onPress: () => handlePickPhotoSource('library') },
-        ]}
-        onCancel={() => {
-          pendingPhotoSourceRef.current = null;
-          setPhotoSourceOpen(false);
-        }}
-        onDismiss={handlePhotoMenuDismissed}
-      />
-
       {photoSending ? (
         <View
           pointerEvents="none"
@@ -3023,11 +2987,20 @@ type SendMessage = (
 // The actions surfaced by the `+` menu (in order). Matches the web's
 // QuickActions verbatim.
 const QUICK_ACTIONS: QuickAction[] = [
+  // Two rows, not one row and a second menu: the tap goes straight to the
+  // camera or the library, like the messaging apps people already use
+  // (Ryan, 2026-10-04).
   {
-    key: 'photo',
+    key: 'camera',
     icon: 'camera.fill',
-    label: 'Send a photo',
-    description: 'Take one or choose from your library',
+    label: 'Take a photo',
+    description: 'Open the camera',
+  },
+  {
+    key: 'library',
+    icon: 'photo.on.rectangle',
+    label: 'Choose a photo',
+    description: 'From your photo library',
   },
   {
     key: 'gif',
@@ -3059,7 +3032,9 @@ const QUICK_ACTIONS: QuickAction[] = [
 // No picker in this binary (anything before 1.3.0) → no photo row, rather
 // than a row that crashes. See lib/photos.ts.
 const VISIBLE_QUICK_ACTIONS = QUICK_ACTIONS.filter(
-  (a) => (a.key !== 'gif' || KLIPY_APP_KEY) && (a.key !== 'photo' || PHOTOS_AVAILABLE),
+  (a) =>
+    (a.key !== 'gif' || KLIPY_APP_KEY) &&
+    ((a.key !== 'camera' && a.key !== 'library') || PHOTOS_AVAILABLE),
 );
 
 // "Share standings" — fetch leaderboard, send a `standings_drop`

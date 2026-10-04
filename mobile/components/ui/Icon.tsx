@@ -135,6 +135,7 @@ import {
   ViewOffIcon,
   WaveIcon,
   Video01Icon,
+  Image01Icon,
 } from '@hugeicons/core-free-icons';
 
 // Pro solid-rounded variants — opt-in via the `solid` prop. Each entry
@@ -360,6 +361,7 @@ const ICON_MAP: Record<string, IconConstant> = {
   'person.crop.circle.badge.xmark': UserBlock01Icon,
   'person.crop.circle.fill': UserCircleIcon,
   'person.fill': UserIcon,
+  'photo.on.rectangle': Image01Icon,
   'plus': PlusSignIcon,
   'plus.circle.fill': PlusSignCircleIcon,
   'plus.forwardslash.minus': PlusMinus01Icon,
