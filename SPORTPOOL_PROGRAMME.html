@@ -1196,7 +1196,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <strong>12</strong>. Closed stays at <strong>9</strong>. Needing Ryan stays at <strong>23</strong>: the push was a deploy call and
     is taken, and the OTA is a deploy call, neither counted by precedent. ⚠ <strong>Don't publish that OTA from this checkout as it
     stands.</strong> <code>eas update</code> bundles the working tree, and another session has uncommitted edits under
-    <code>mobile/</code>.</p>
+    <code>mobile/</code>. Ryan also dropped owed item (c), the new Duel-tab states, because the sealed phase already covers both
+    cases (relayed). The wizard, item (b), is the only Showdown build item left.</p>
   <p class="strip-note"><strong>Moved 2026-10-04 (Showdown: the draw waits for the pool).</strong> <a href="#r37">R37</a> opens 🟠.
     Until <code>fdc1ba73</code> is pushed, a Showdown pool created in the 23 hours before its start week's first kickoff gets no duel that
     week. The next window opens Fri 9 Oct 11:30 UTC. <a href="#r38">R38</a> opens 🟡: the member-facing Showdown copy describes the old
@@ -3433,10 +3434,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <code>dpl_GNdVmRRjNuWLiwKJUrBMfPc3aB7R</code> is READY at that sha and aliased to sportpool.io. So the create route
       (<code>fdc1ba73</code>) now matches 164/165, and <a href="#r37">R37</a>'s no-duel case is closed. The copy fix
       (<code>11ae5f9a</code>, Ryan's disclosure sentence) is live on the web, and in Pool Info on both surfaces
-      (<a href="#r38">R38</a>). Still owed: an OTA for the app's four bundled copy surfaces (<a href="#r38">R38</a>); the wizard showing
+      (<a href="#r38">R38</a>). Still owed: an OTA for the app's four bundled copy surfaces (<a href="#r38">R38</a>), and the wizard showing
       each start week's draw time, without which a late creation is moved a week and not told so at creation (<a href="#r37">R37</a>,
-      now 🟡, blocked); and the Duel-tab states for a pool still filling up and for a late joiner.
-      See <a href="#showdown-2026-10-04">Showdown → 2026-10-04</a>.</div>
+      now 🟡, blocked). That wizard item is the only Showdown build item left: Ryan dropped the new Duel-tab states (2026-10-04,
+      relayed). See <a href="#showdown-2026-10-04">Showdown → 2026-10-04</a>.</div>
     <p style="margin:0"><strong>Contains:</strong> <a href="#epl">Showdown mode, Showdown notifications, Avatars v1,
       Match-day recap emails</a>. Gated by <a href="#i-league-ingestion">League ingestion</a> and the
       <a href="#i-sync-cron">single-tenant sync cron</a> — see <strong>R2</strong> and <strong>R5</strong>.</p>
@@ -4060,12 +4061,22 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             <td>⛔ <strong>Still blocked</strong> (<code>git status</code>, 2026-10-04). Another session's uncommitted edits to both files
               are still in the tree. Since the deploy, what this item prevents is <strong>live</strong>: a late creation is moved to the next
               week, and nothing says so at creation. Pool Info states the true start afterwards (<a href="#r37">R37</a>, now 🟡)</td></tr>
-          <tr><td class="id">(c)</td><td>Duel-tab copy for a pool still filling up, and for a member who joined after a draw</td>
-            <td>⛔ <strong>Dropped — Ryan's call, 2026-10-04.</strong> No new Duel-tab states, and no "you joined after this week's draw"
-              line. The existing <strong>sealed</strong> phase already covers both: a pool still filling up counts down to its own first draw
-              (164 made <code>league_first_sealed_matchweek</code> pool-scoped), and a late joiner counts down to the week they actually
-              play. The empty state's <em>"Everyone in the pool by then gets an opponent"</em> was wrong for an odd-sized pool and now
-              reads <em>"everyone in the pool by then is in it"</em>. Not to be re-proposed without a new reason</td></tr>
+          <tr><td class="id">(c)</td><td><s>Duel-tab copy for a pool still filling up, and for a member who joined after a draw</s></td>
+            <td>🚫 <strong>Dropped by Ryan, 2026-10-04 (relayed by the coordinator; I did not see the call). Not owed.</strong> No new
+              Duel-tab states, and no <em>"you joined after this week's draw"</em> line. <em>His reason: the existing sealed phase already
+              covers both.</em> I checked it against the code. The phase function sends a member with no live duel and a sealed week ahead
+              to <code>sealed</code>, with that week's countdown (<code>lib/league/duelPhase.ts:249-256</code>). After a draw, a late joiner
+              therefore counts down to the first week they are actually in. 164 gives the sealed card the pool's own clock:
+              <code>league_first_sealed_matchweek</code> asks <code>league_duel_is_revealed</code>, and for the pool's first duel week it has
+              no predecessor to wait on (<code>lib/migrations/164_the_draw_waits_for_the_pool.sql:381-420</code>). So a forming pool counts
+              down to its own first draw. The web band says as much: <em>"a pool mid-season and a pool that has never played land on the
+              same screen"</em> (<code>app/pools/[pool_id]/DuelsTab.tsx:1262-1264</code>). A pool with no visible duel rows gets the empty
+              state (<code>DuelsTab.tsx:1019-1032</code>), whose copy <code>11ae5f9a</code> changed. <em>Read in code, not exercised.</em>
+              ⚠ The empty-state line the drop leans on was slightly wrong. <em>"Everyone in the pool by then gets an opponent"</em> is
+              false in an odd-sized pool, where one member sits out each week, as Pool Info itself says
+              (<code>lib/leagueModeInfo.ts:152-153</code>). It is <strong>fixed in <code>1975b699</code></strong> (<em>"everyone in the
+              pool by then is in it"</em>), which is committed and <strong>not pushed</strong>, so production still shows the old line. The
+              guard does not cover it</td></tr>
           <tr><td class="id">(d)</td><td>Replace Pool Info's <em>"the whole season is drawn when the pool is created"</em>, which is false for
             any pool that grew</td>
             <td>✅ <strong>Done in <code>11ae5f9a</code></strong>, across every surface that carried it, with the guard rewritten. Live on
