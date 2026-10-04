@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, Text as RNText, View } from 'react-native';
 
+import { Icon } from '@/components/ui/Icon';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
 export type QuickAction = {
   key: string;
-  emoji: string;
+  /** SF-Symbol-style name for `Icon` (Hugeicons), e.g. "camera.fill". */
+  icon: string;
   label: string;
   description: string;
 };
@@ -84,7 +86,22 @@ export function QuickActionsMenu({ open, actions, onPick, onDismiss }: Props) {
                 borderTopColor: withOpacity(theme.colors.silver, 0.4),
               })}
             >
-              <RNText style={{ fontSize: 20 }}>{a.emoji}</RNText>
+              {/* Circular tinted icon swatch — PoolCreateJoinSheet's row
+                  affordance at this menu's tighter scale (36 rather than 40).
+                  The rows used to carry an emoji, which read as a bullet next
+                  to the label rather than as the action's icon. */}
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: theme.radii.pill,
+                  backgroundColor: withOpacity(theme.colors.primary, 0.12),
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name={a.icon} color="primary" size={18} weight="semibold" />
+              </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <RNText
                   numberOfLines={1}

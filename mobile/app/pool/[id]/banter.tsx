@@ -353,19 +353,19 @@ export default function BanterScreen() {
   const quickActions: QuickAction[] = [
     {
       key: 'standings',
-      emoji: '📊',
+      icon: 'chart.bar.fill',
       label: 'Share standings',
       description: "Drop the current leaderboard's top 5",
     },
     {
       key: 'flex',
-      emoji: '🏆',
+      icon: 'trophy.fill',
       label: 'Flex badges',
       description: 'Show off the badges you’ve earned',
     },
     {
       key: 'prediction',
-      emoji: '🎯',
+      icon: 'target',
       label: 'Share prediction',
       description: 'Show a score you’ve locked in',
     },

@@ -3025,31 +3025,31 @@ type SendMessage = (
 const QUICK_ACTIONS: QuickAction[] = [
   {
     key: 'photo',
-    emoji: '📷',
+    icon: 'camera.fill',
     label: 'Send a photo',
     description: 'Take one or choose from your library',
   },
   {
     key: 'gif',
-    emoji: '🎞️',
+    icon: 'gif',
     label: 'Send a GIF',
     description: 'Search KLIPY for the reaction',
   },
   {
     key: 'standings',
-    emoji: '📊',
+    icon: 'chart.bar.fill',
     label: 'Share standings',
     description: "Drop the leaderboard's top 5",
   },
   {
     key: 'flex',
-    emoji: '🏆',
+    icon: 'trophy.fill',
     label: 'Flex badges',
     description: "Show off a badge you've earned",
   },
   {
     key: 'prediction',
-    emoji: '🎯',
+    icon: 'target',
     label: 'Share prediction',
     description: "Drop a score you've locked in",
   },

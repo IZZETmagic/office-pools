@@ -36,6 +36,7 @@ import {
   Calendar02Icon,
   Calendar03Icon,
   CalendarCheckIn01Icon,
+  Camera01Icon,
   Cancel01Icon,
   CancelCircleIcon,
   ChampionIcon,
@@ -65,6 +66,7 @@ import {
   FlashIcon,
   CheckListIcon,
   FootballIcon,
+  Gif01Icon,
   GitBranchIcon,
   Grid02Icon,
   HandHelpingIcon,
@@ -263,6 +265,7 @@ const ICON_MAP: Record<string, IconConstant> = {
   'calendar': Calendar03Icon,
   'calendar.badge.checkmark': CalendarCheckIn01Icon,
   'calendar.badge.clock': Calendar02Icon,
+  'camera.fill': Camera01Icon,
   'chart.bar': BarChartIcon,
   'chart.bar.fill': ChartBarLineIcon,
   'chart.bar.xaxis': ChartBarLineIcon,
@@ -311,6 +314,9 @@ const ICON_MAP: Record<string, IconConstant> = {
   'flame.fill': Fire03Icon,
   'gear': Settings02Icon,
   'gearshape.fill': Settings02Icon,
+  /* Not an SF Symbol — SF has no GIF glyph — so it takes the format's own
+     name, as 'grip.vertical' below takes a descriptive one. */
+  'gif': Gif01Icon,
   /* The 2x3 drag grip. Not an SF Symbol — SF has no grip glyph — so it takes a
      descriptive name, as 'line.3.horizontal' does below. */
   'grip.vertical': GripVerticalIcon,

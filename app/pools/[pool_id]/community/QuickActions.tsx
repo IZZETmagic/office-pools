@@ -22,14 +22,14 @@ type QuickActionsProps = {
  * under its label — "Share standings / Drop the leaderboard's top 5" — which the
  * pills had no room for, so the web only ever showed half the copy.
  *
- * Order, emoji, labels and descriptions are RN's QUICK_ACTIONS verbatim.
+ * Order, icons, labels and descriptions are RN's QUICK_ACTIONS verbatim.
  */
 const QUICK_ACTIONS = [
-  { key: 'photo', emoji: '📷', label: 'Send a photo', description: 'Choose one from your device' },
-  { key: 'gif', emoji: '🎞️', label: 'Send a GIF', description: 'Search KLIPY for the reaction' },
-  { key: 'standings', emoji: '📊', label: 'Share standings', description: "Drop the leaderboard's top 5" },
-  { key: 'flex', emoji: '🏆', label: 'Flex badges', description: "Show off a badge you've earned" },
-  { key: 'prediction', emoji: '🎯', label: 'Share prediction', description: "Drop a score you've locked in" },
+  { key: 'photo', icon: 'camera.fill', label: 'Send a photo', description: 'Choose one from your device' },
+  { key: 'gif', icon: 'gif', label: 'Send a GIF', description: 'Search KLIPY for the reaction' },
+  { key: 'standings', icon: 'chart.bar.fill', label: 'Share standings', description: "Drop the leaderboard's top 5" },
+  { key: 'flex', icon: 'trophy.fill', label: 'Flex badges', description: "Show off a badge you've earned" },
+  { key: 'prediction', icon: 'target', label: 'Share prediction', description: "Drop a score you've locked in" },
 ] as const
 
 export function QuickActions({
@@ -102,7 +102,12 @@ export function QuickActions({
                 i === 0 ? '' : 'border-t border-silver/40'
               }`}
             >
-              <span className="text-xl leading-none shrink-0">{a.emoji}</span>
+              {/* Circular tinted icon swatch, as the RN menu draws it. These rows
+                  used to carry an emoji, which read as a bullet beside the label
+                  rather than as the action's own icon. */}
+              <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-pill bg-primary-600/10">
+                <Icon name={a.icon} size={18} weight="semibold" className="text-primary-600" />
+              </span>
               <span className="min-w-0 flex flex-col gap-0.5">
                 <span className="t-body font-bold text-ink truncate">{a.label}</span>
                 <span className="text-[11px] text-muted truncate">{a.description}</span>
