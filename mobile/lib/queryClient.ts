@@ -62,6 +62,48 @@ export function createQueryClient(): QueryClient {
 }
 
 /**
+ * The client this process is actually using.
+ *
+ * ⚠ A REGISTRY RATHER THAN A MODULE SINGLETON, on purpose. The client is created in
+ * `app/_layout.tsx` through a `useState` lazy initialiser so a re-render cannot replace it, and
+ * making it a module-level `const` instead would construct a cache at import time in every test
+ * that touches this file. Teardown still needs to reach it, so the owner hands it over.
+ */
+let registered: QueryClient | null = null
+
+/** Called once by the root layout, so {@link clearQueryCache} has something to empty. */
+export function registerQueryClient(client: QueryClient): void {
+  registered = client
+}
+
+/**
+ * Drop every cached query. Called when the signed-in member changes — see `lib/sessionReset.ts`.
+ *
+ * ⚠⚠ `clear()`, NOT `invalidateQueries()`. Invalidating marks data stale but KEEPS it, so the
+ * incoming member renders the outgoing member's pools, standings and names for as long as the
+ * refetch takes. These keys are not all scoped by user id, so that data is not merely old — it is
+ * someone else's.
+ *
+ * ⚠ A no-op before the root layout has mounted, which is the correct outcome: there is nothing
+ * cached yet.
+ */
+export function clearQueryCache(): void {
+  const client = registered
+  if (!client) return
+  // ⚠ CANCELLED BEFORE IT IS EMPTIED. Requests belonging to the outgoing
+  // session are still in the air at this point — the same hole the avatar cache
+  // had, where a response that left before the sign-out lands after it. It also
+  // keeps a screen that is mid-unmount from firing a fresh 401 as the cache
+  // empties under it.
+  //
+  // ⚠ Not awaited, and its rejection is swallowed: this is called from an
+  // auth-state callback where a floating rejection has nowhere to go, and the
+  // `clear()` below is what the correctness depends on.
+  void client.cancelQueries().catch(() => {})
+  client.clear()
+}
+
+/**
  * React Query's focus tracking is written for a browser's `window.focus`. In
  * React Native the equivalent is `AppState`, and without this wiring
  * `refetchOnWindowFocus` simply never fires — so a phone that has been in a

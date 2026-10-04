@@ -45,7 +45,7 @@ import {
   useTournamentMatches,
 } from '@/lib/TournamentMatchesProvider';
 import { PendingActionsProvider } from '@/lib/usePendingActions';
-import { createQueryClient, wireAppStateFocus } from '@/lib/queryClient';
+import { createQueryClient, registerQueryClient, wireAppStateFocus } from '@/lib/queryClient';
 import { initSentry, Sentry } from '@/lib/sentry';
 import {
   markNotificationsPrompted,
@@ -142,6 +142,13 @@ function InnerLayout() {
   // signal is AppState, and without this `refetchOnWindowFocus` never fires at
   // all — a phone that has been in a pocket for an hour shows hour-old data.
   useEffect(() => wireAppStateFocus(), []);
+  // ⚠ HANDED TO THE REGISTRY so sign-out can empty it. The cache outlives the
+  // session otherwise — nothing else can reach this client, because it is held
+  // in component state — and the next member to sign in on the device renders
+  // the last one's pools until every key happens to refetch. In an effect
+  // rather than in the initialiser above: StrictMode may run that twice, and
+  // registering the copy React threw away would clear the wrong cache.
+  useEffect(() => registerQueryClient(queryClient), [queryClient]);
   const { session, loading, recovering } = useAuth();
   const segments = useSegments();
   const router = useRouter();

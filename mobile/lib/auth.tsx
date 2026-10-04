@@ -1,8 +1,8 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { clearCache } from './cache/persistentCache';
 import { resetErrorMessage } from './passwordReset';
+import { resetSessionState } from './sessionReset';
 import { supabase } from './supabase';
 
 type AuthState = {
@@ -74,6 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       });
 
+    // ⚠ The member we last saw, so an IDENTITY CHANGE can be told apart from a
+    // token refresh (which fires this listener constantly with the same user).
+    // `undefined` means "not observed yet": the first event of a launch is
+    // INITIAL_SESSION, and treating that as a change would wipe the cold-start
+    // cache we had just read, on every single launch.
+    let seenUserId: string | null | undefined;
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
@@ -81,6 +88,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // A reset can't outlive its session. Left set across a sign-out or a
       // failed refresh, the NEXT sign-in would land on "choose a new password".
       if (!nextSession) setRecovering(false);
+
+      const nextUserId = nextSession?.user.id ?? null;
+      // ⚠⚠ THE TEARDOWN IS NOT ONLY IN `signOut()`. A refresh token that fails
+      // ends the session without anyone pressing Sign Out — the catch above
+      // treats that as signed out and the gate routes to sign-in — so a
+      // teardown wired to the button alone leaves the whole of the outgoing
+      // member's state in memory for whoever signs in next.
+      //
+      // ⚠ Only when we were signed in as SOMEONE. A null → member transition
+      // is a sign-in, where there is nothing of a previous session left to
+      // forget (we cleared on the way out) and clearing would cost the
+      // returning member their warm cold-start cache for nothing.
+      if (seenUserId != null && seenUserId !== nextUserId) resetSessionState();
+      seenUserId = nextUserId;
     });
 
     return () => subscription.unsubscribe();
@@ -149,12 +170,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       async signOut() {
         await supabase.auth.signOut();
-        // ⚠ THE COLD-START CACHE IS PER-DEVICE, NOT PER-SESSION. The envelope's
-        // `userId` stops the next person being *shown* this person's pools, but
-        // it does not stop the payload — pool names, member initials, standings
-        // — sitting in the app sandbox after they have signed out. On a shared
-        // phone that is someone else's data left behind, so it goes here.
-        clearCache();
+        // ⚠ NOTHING OF THIS SESSION SURVIVES THE BUTTON. Signing out does not
+        // restart the bundle, so the disk cache, the query cache and the
+        // composed avatar all have to be dropped by hand —
+        // `lib/sessionReset.ts` holds the list and says why each is on it.
+        //
+        // The listener above sees this same transition and calls it again; it
+        // is idempotent. Doing it here too means the state is gone by the time
+        // `signOut()` resolves, rather than one callback later.
+        resetSessionState();
       },
 
       async checkUsernameAvailable(username) {
