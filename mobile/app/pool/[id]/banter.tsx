@@ -357,18 +357,6 @@ export default function BanterScreen() {
       label: 'Share standings',
       description: "Drop the current leaderboard's top 5",
     },
-    {
-      key: 'flex',
-      icon: 'trophy.fill',
-      label: 'Flex badges',
-      description: 'Show off the badges you’ve earned',
-    },
-    {
-      key: 'prediction',
-      icon: 'target',
-      label: 'Share prediction',
-      description: 'Show a score you’ve locked in',
-    },
   ];
 
   function toggleQuickActions() {

@@ -3014,18 +3014,6 @@ const QUICK_ACTIONS: QuickAction[] = [
     label: 'Share standings',
     description: "Drop the leaderboard's top 5",
   },
-  {
-    key: 'flex',
-    icon: 'trophy.fill',
-    label: 'Flex badges',
-    description: "Show off a badge you've earned",
-  },
-  {
-    key: 'prediction',
-    icon: 'target',
-    label: 'Share prediction',
-    description: "Drop a score you've locked in",
-  },
 ];
 
 // No KLIPY key in this build → no GIF row, rather than a picker that errors.

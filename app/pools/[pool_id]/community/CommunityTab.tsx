@@ -1586,8 +1586,6 @@ export function CommunityTab({
            so the + is a peer of the send button on the other end. */
         leftAction={
           <QuickActions
-            onSharePrediction={handleShareBoldCall}
-            onFlexBadges={handleFlexBadges}
             onDropStandings={handleDropStandings}
             onGif={KLIPY_WEB_KEY ? () => setShowGifPicker(true) : undefined}
             onPhoto={photoSending ? undefined : () => photoInputRef.current?.click()}

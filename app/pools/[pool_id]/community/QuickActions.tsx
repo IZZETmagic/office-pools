@@ -5,8 +5,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 
 type QuickActionsProps = {
-  onSharePrediction: () => void
-  onFlexBadges: () => void
   onDropStandings: () => void
   /** Absent when no KLIPY key is configured — the row is then not offered at all. */
   onGif?: () => void
@@ -28,13 +26,9 @@ const QUICK_ACTIONS = [
   { key: 'photo', icon: 'camera.fill', label: 'Send a photo', description: 'Choose one from your device' },
   { key: 'gif', icon: 'gif', label: 'Send a GIF', description: 'Search KLIPY for the reaction' },
   { key: 'standings', icon: 'chart.bar.fill', label: 'Share standings', description: "Drop the leaderboard's top 5" },
-  { key: 'flex', icon: 'trophy.fill', label: 'Flex badges', description: "Show off a badge you've earned" },
-  { key: 'prediction', icon: 'target', label: 'Share prediction', description: "Drop a score you've locked in" },
 ] as const
 
 export function QuickActions({
-  onSharePrediction,
-  onFlexBadges,
   onDropStandings,
   onGif,
   onPhoto,
@@ -62,8 +56,6 @@ export function QuickActions({
     if (key === 'photo') onPhoto?.()
     else if (key === 'gif') onGif?.()
     else if (key === 'standings') onDropStandings()
-    else if (key === 'flex') onFlexBadges()
-    else onSharePrediction()
   }
 
   return (
