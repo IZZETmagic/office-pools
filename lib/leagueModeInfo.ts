@@ -29,17 +29,25 @@
  * times, so nobody gets an easier run than anybody else". True of a fixed
  * roster, and false the moment somebody joins in October — Decision 10 settles
  * that a straggler joins the draw from the next matchweek, which necessarily
- * gives them fewer duels than the members who were there in August. The promise
- * is now about the draw being made up front and rotated, which stays true.
+ * gives them fewer duels than the members who were there in August.
+ *
+ * ⚠ 2026-10-04 — AND "DRAWN WHEN THE POOL IS CREATED" WAS NEVER TRUE EITHER, the
+ * moment anybody joined late: every join redrew the remaining weeks. Migration
+ * 164 made the honest version the rule — a round-robin of everyone in the pool,
+ * rebuilt on join or leave until each week is revealed, and fixed once it is.
+ * The copy now carries Ryan's sentence for it verbatim, including the pool's
+ * own first draw (24 hours before the first kickoff).
  *  2. The engines. Every number quoted in `points` below is a default the SQL
  *     COALESCEs against, not a number this file decides.
  *
- * ⚠ 2026-08-31 — THE REVEAL WAITS TWO DAYS. Migration 123 holds the next
- * opponent for 48 hours after the previous matchweek settles, because 119
- * opened it in the same instant the duel settled — the recap and the next
- * pairing arrived in one breath and there was no gap for anticipation to live
- * in. The copy MUST carry the wait: a member who is not told will read it as
- * the reveal being broken.
+ * ⚠ THE REVEAL WAITS A DAY. Migration 123 held the next opponent for 48 hours
+ * after the previous matchweek settles, because 119 opened it in the same
+ * instant the duel settled — the recap and the next pairing arrived in one
+ * breath and there was no gap for anticipation to live in. 129 made it 24 hours
+ * (Ryan, 2026-09-01). ⚠ This copy said "two days" until 2026-10-04 while
+ * production actually ran 137's 6h47m throwaway — 138 was never applied; 164
+ * lands the 24 hours. The copy MUST carry the wait: a member who is not told
+ * will read it as the reveal being broken.
  *
  * ⚠ 2026-08-31 — A DUEL IS NOW WORTH 500, AND THERE IS ONLY ONE TABLE.
  * Migration 121 raised a win from 3 to 500 (half a perfect matchweek, since
@@ -134,12 +142,13 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
           'and are drawn against one other member for that week. Whoever scores more wins the ' +
           'duel — 500 points for a win and 250 for a tie, added to whatever your picks scored ' +
           'that week. A win is worth about half a perfect matchweek, so the duel moves the ' +
-          'table further than any single result can. The whole season is drawn when the ' +
-          'pool is created, but each opponent is revealed two days after the previous duel is ' +
-          'decided, or a day before you pick if a postponement holds that up — so you play one ' +
-          'duel at a time, and the wait is on purpose: for two days you know how you did and ' +
-          'not yet who is next. The draw ' +
-          'rotates, so everybody meets everybody rather than ' +
+          'table further than any single result can. Opponents come from a round-robin of ' +
+          'everyone in the pool. It updates when people join or leave, and each week’s ' +
+          'pairings are locked when they’re revealed. The first draw is 24 hours before the ' +
+          'first kickoff. After that, each opponent is revealed a day after the previous duel ' +
+          'is decided, or a day before you pick if a postponement holds that up — so you play ' +
+          'one duel at a time, and the wait is on purpose: for a day you know how you did and ' +
+          'not yet who is next. The round-robin means everybody meets everybody rather than ' +
           'the same pairs coming round again. With an odd number of members somebody sits out ' +
           'each week and takes 250 — there was no opponent, so there was no defeat. There is ' +
           'one table: your duel points and your weekly scores are the same total. Joining ' +
@@ -148,10 +157,13 @@ export function leagueModeInfo(mode: LeagueMode, depth: LeagueDepth): LeagueMode
         points: [
           // ⚠ THE DISCLOSURE GATE LIVES IN THIS SENTENCE. Migration 116 seals the
           // draw and reveals it a matchweek at a time; that passes gate 1 only
-          // while the copy says what actually happens. The draw is made ONCE, at
-          // pool creation — never "you have been randomly paired this week",
-          // which would be a claim about a thing we did not do.
-          'Drawn up front; your next opponent opens two days after the current duel is decided.',
+          // while the copy says what actually happens. It is a ROUND-ROBIN of
+          // whoever is in the pool, rebuilt on every join or leave until each
+          // week is revealed and fixed after (164) — never "you have been
+          // randomly paired this week", which would be a claim about a thing we
+          // did not do, and no longer "drawn up front", which stopped being true
+          // the first time anybody joined late.
+          'A round-robin of the pool; your next opponent opens a day after the current duel is decided.',
           // The floor clause lives in `description` rather than here — three
           // bullets is the shape, and the headline rule is the settle arm.
           '500 for a win, 250 for a tie — about half a perfect matchweek.',

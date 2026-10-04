@@ -194,10 +194,13 @@ function DuelCard() {
       </div>
       <p className="t-body text-muted mt-3">
         Every matchweek you are drawn against one other member. Whoever scored more that week
-        wins the duel. The whole season is drawn when the pool is created, but each opponent is
-        revealed two days after the previous duel is decided, or a day before you pick if a
-        postponement holds that up — one duel at a time. The wait is on purpose: for two days
-        you know how you did and not yet who is next. The draw rotates, so everybody meets everybody. With an odd number of
+        wins the duel. Opponents come from a round-robin of everyone in the pool. It updates
+        when people join or leave, and each week’s pairings are locked when they’re revealed.
+        The first draw is 24 hours before the first kickoff. After that, each opponent is
+        revealed a day after the previous duel is decided, or a day before you pick if a
+        postponement holds that up — one duel at a time. The wait is on purpose: for a day you
+        know how you did and not yet who is next. The round-robin means everybody meets
+        everybody. With an odd number of
         entries somebody sits out each week and takes {DUEL_BYE} —
         there was no opponent, so there was no defeat.
       </p>

@@ -1036,7 +1036,7 @@ function Matchup({
         <BandText align="center" variant="body" style={{ paddingHorizontal: 24, color: BAND.slate }}>
           {sealed
             ? 'Your opponent opens one week at a time.'
-            : 'The draw is made once there are two members.'}
+            : 'The first draw is 24 hours before the first kickoff.'}
         </BandText>
       )}
     </View>

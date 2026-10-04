@@ -1023,8 +1023,8 @@ export default function DuelsTab({
           <Icon name="arrow.triangle.merge" size={40} className="mx-auto text-neutral-300 mb-3" />
           <p className="text-sm text-neutral-600 font-medium">No duels yet</p>
           <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
-            The draw is made once there are two members, and your first opponent opens with the
-            matchweek. Invite someone and it appears.
+            The first draw is 24 hours before the first kickoff. Everyone in the pool by then
+            gets an opponent — invite someone and they’re in it.
           </p>
         </div>
       </Card>

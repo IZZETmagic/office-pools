@@ -1465,8 +1465,8 @@ function ShowdownRulesCard() {
   const theme = useTheme();
   const lines: Array<[string, string]> = [
     [
-      'The draw is already made',
-      'The whole season was drawn when the pool was created, and it rotates so everybody meets everybody. Members see one opponent at a time — you cannot change it, and you cannot open it early.',
+      'The draw is made week by week',
+      'Opponents come from a round-robin of everyone in the pool, so everybody meets everybody. The first draw is 24 hours before the first kickoff, and each week’s pairings are locked when they’re revealed. Members see one opponent at a time — you cannot change it, and you cannot open it early.',
     ],
     [
       'Picks lock per matchweek',
@@ -1478,7 +1478,7 @@ function ShowdownRulesCard() {
     ],
     [
       'Joining and leaving redraw it',
-      'The remaining fixtures are redrawn when somebody joins or leaves. A duel already played is never rewritten, and the week in progress is left alone.',
+      'Any week not yet revealed is redrawn when somebody joins or leaves, so a late joiner is in the next draw. A revealed week never changes, and a duel already played is never rewritten.',
     ],
   ];
 

@@ -169,16 +169,20 @@ export function LeaguePickemScoring({ poolId, showDuel = false }: Props) {
             perfect matchweek, moves you further than any single result can.
           </Note>
           {/*
-            ⚠ THE COPY MUST NEVER SAY A PAIRING HAPPENS EACH WEEK. The whole
-            season is drawn at pool creation; only the SHOWING is weekly. That
-            is the one sentence here that would fail the disclosure gate,
-            because it is a claim about something we did not do.
+            ⚠ THE COPY MUST NEVER SAY A PAIRING HAPPENS AT RANDOM EACH WEEK. It
+            is a round-robin of the pool, rebuilt on join or leave until each
+            week is revealed and fixed after (migration 164) — Ryan's sentence,
+            verbatim, and the same one `lib/leagueModeInfo.ts` serves the Pool
+            Info tab. "Drawn when the pool is created" was never true once
+            anybody joined late.
           */}
           <Note>
-            The whole season is drawn when the pool is created, and each opponent is revealed two
-            days after the previous duel is decided — one duel at a time. The draw rotates, so
-            everybody meets everybody. With an odd number of entries somebody sits out each week
-            and takes {fmt(DUEL_BYE)}: there was no opponent, so there was no defeat.
+            Opponents come from a round-robin of everyone in the pool. It updates when people join or
+            leave, and each week’s pairings are locked when they’re revealed. The first draw is 24
+            hours before the first kickoff; after that each opponent is revealed a day after the
+            previous duel is decided — one duel at a time. With an odd number of entries somebody
+            sits out each week and takes {fmt(DUEL_BYE)}: there was no opponent, so there was no
+            defeat.
           </Note>
           <Note>
             Joining after the season has started means fewer duels than the members who were here

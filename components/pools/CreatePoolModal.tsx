@@ -53,7 +53,7 @@ const LEAGUE_MODES = [
   {
     value: 'showdown' as const,
     label: 'Showdown',
-    desc: () => 'The same weekly picks, plus a head-to-head duel against one other member. Three points for beating them, one for a tie. The fixture list is drawn up front, so you can see your rival coming.',
+    desc: () => 'The same weekly picks, plus a head-to-head duel against one other member. 500 points for beating them, 250 for a tie, added to your picks. Opponents come from a round-robin of everyone in the pool, revealed one week at a time.',
     icon: 'arrow.triangle.merge' as const,
   },
   {

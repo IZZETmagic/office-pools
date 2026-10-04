@@ -132,15 +132,27 @@ describe('the sealed draw is described honestly', () => {
     for (const depth of ['results', 'scores'] as const) {
       const info = leagueModeInfo('showdown', depth)
       const all = [info.description, ...info.points].join(' ')
-      expect(all, depth).toMatch(/drawn when the pool is created/i)
+      // ⭐ Ryan's disclosure sentence (2026-10-04, migration 164), verbatim.
+      // "Drawn when the pool is created" was this guard's REQUIRED phrase until
+      // then — and it was false the first time anybody joined late, because
+      // every join redrew the remaining weeks. A guard that pins a false
+      // sentence is worse than none: it makes fixing the copy fail CI.
+      expect(all, depth).toMatch(/Opponents come from a round-robin of everyone in the pool\./)
+      expect(all, depth).toMatch(/It updates when people join or leave, and each week’s pairings are locked when they’re revealed\./)
+      expect(all, depth).toMatch(/The first draw is 24 hours before the first kickoff\./)
+      expect(all, depth).not.toMatch(/drawn when the pool is created/i)
+      expect(all, depth).not.toMatch(/drawn up front/i)
       // Migration 119: one duel at a time. The copy has to carry BOTH halves —
-      // when the draw was made, and when each opponent opens — because the
+      // when the draw is made, and when each opponent opens — because the
       // second is the part a member would otherwise assume is a weekly draw.
       expect(all, depth).toMatch(/after the previous duel is decided/i)
-      // ⚠ Migration 123's 48-hour hold. Withholding the next opponent on
-      // purpose passes the disclosure gate ONLY while the copy says so — an
-      // undisclosed wait is indistinguishable from the reveal being broken.
-      expect(all, depth).toMatch(/two days after the previous duel is decided/i)
+      // ⚠ The hold. Withholding the next opponent on purpose passes the
+      // disclosure gate ONLY while the copy says so — an undisclosed wait is
+      // indistinguishable from the reveal being broken. 123 made it 48 hours,
+      // 129 made it 24; the copy said "two days" until 164 actually landed 24
+      // (138 was never applied — production ran 6h47m in between).
+      expect(all, depth).toMatch(/a day after the previous duel is decided/i)
+      expect(all, depth).not.toMatch(/two days/i)
       expect(all, depth).toMatch(/one duel at a time/i)
       // Migration 120's floor. A member who only ever hears the settle arm will
       // read a postponement week as the rule breaking, so both clauses ship.
