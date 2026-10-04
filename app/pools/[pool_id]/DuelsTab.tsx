@@ -1023,8 +1023,8 @@ export default function DuelsTab({
           <Icon name="arrow.triangle.merge" size={40} className="mx-auto text-neutral-300 mb-3" />
           <p className="text-sm text-neutral-600 font-medium">No duels yet</p>
           <p className="text-xs text-neutral-400 mt-1 max-w-sm mx-auto">
-            The first draw is 24 hours before the first kickoff. Everyone in the pool by then
-            gets an opponent — invite someone and they’re in it.
+            The first draw is 24 hours before the first kickoff, and everyone in the pool by
+            then is in it — invite someone and they will be too.
           </p>
         </div>
       </Card>
