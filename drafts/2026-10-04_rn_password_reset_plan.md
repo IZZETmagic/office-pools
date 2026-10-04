@@ -1,6 +1,6 @@
 # Password reset in the app — plan
 
-**Status:** 🟡 switching to ONE code flow (see below) · ⏸ OTP length → 6 (Ryan) · ⏸ push · ⏸ template · ⏸ phone · ⏸ OTA
+**Status:** ✅ ONE code flow LIVE on the web (2026-10-04) · OTP length 6 · code-only template saved, dash renders · app tested over Metro · ⏸ OTA (needs Ryan's go) · ⏸ delete /auth/confirm
 
 ## ⭐ Direction change (Ryan, 2026-10-04 afternoon): ONE code flow, 6 digits as 123-456
 
