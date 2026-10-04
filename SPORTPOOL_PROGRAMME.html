@@ -1176,16 +1176,26 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     separately, not deleted.</p>
   <div class="strip">
     <div class="stat crit"><div class="n">2</div><div class="l">🔴 Critical risks</div></div>
-    <div class="stat high"><div class="n">13</div><div class="l">🟠 High risks</div></div>
-    <div class="stat med"><div class="n">10</div><div class="l">🟡 Medium risks</div></div>
+    <div class="stat high"><div class="n">14</div><div class="l">🟠 High risks</div></div>
+    <div class="stat med"><div class="n">11</div><div class="l">🟡 Medium risks</div></div>
     <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
     <div class="stat low"><div class="n">9</div><div class="l">✅ Closed (4 prod-verified by audit, + R32 and R34 by their fixing sessions, + R36 in code only)</div></div>
     <div class="stat pri"><div class="n">6</div><div class="l">Items in 🔥 Now</div></div>
     <div class="stat neu"><div class="n">9</div><div class="l">Projects</div></div>
-    <div class="stat neu"><div class="n">15+5</div><div class="l">Settled decisions · product + infra (D1–D3 + D5 amended, D2 clarified 2026-10-02)</div></div>
+    <div class="stat neu"><div class="n">15+5</div><div class="l">Settled decisions · product + infra (D1–D3 + D5 amended, D2 clarified 2026-10-02; D15 amended 2026-10-04)</div></div>
     <div class="stat neu"><div class="n">23</div><div class="l">Decisions needing Ryan (2026-10-02: +3 raised, all settled or taken; R32, R34 and R36 fixes taken)</div></div>
-    <div class="stat neu"><div class="n">R36</div><div class="l">Highest risk id on the register</div></div>
+    <div class="stat neu"><div class="n">R38</div><div class="l">Highest risk id on the register</div></div>
   </div>
+  <p class="strip-note"><strong>Moved 2026-10-04 (Showdown: the draw waits for the pool).</strong> <a href="#r37">R37</a> opens 🟠.
+    Until <code>fdc1ba73</code> is pushed, a Showdown pool created in the 23 hours before its start week's first kickoff gets no duel that
+    week. The next window opens Fri 9 Oct 11:30 UTC. <a href="#r38">R38</a> opens 🟡: the member-facing Showdown copy describes the old
+    draw and a two-day hold, and a guard test pins it. So 🟠 goes from 13 to <strong>14</strong>, 🟡 from 10 to <strong>11</strong>,
+    and the highest id is <strong>R38</strong>. No other risk changed level. Settled decisions stay at <strong>15</strong>, because
+    Ryan's rule amends <a href="#d15">Decision 15</a> rather than adding one. Needing Ryan stays at <strong>23</strong>. The push is not
+    counted, by this page's precedent. R38's fix is the copy work Ryan has already named in part. Found on the way: migration 138 was never
+    applied, so production ran a 6h47m hold from 2026-09-07 until 164. D15 had been gate-checked against 24h. ⚠ <strong>This page had no
+    Decision 15 and no <em>Showdown, end to end</em> section.</strong> Both are added here so the amendment has something to amend. D9–D14
+    are still missing from this page.</p>
   <p class="strip-note"><strong>Moved at 22:22–22:31, 2026-10-02 (R36 decided and fixed in code; invites catch up; step 8 done).</strong>
     <a href="#r36">R36</a> goes 🟡 → ✅, fixed in code and not deployed. It was never live, and it ships in the same push as the feature. So
     🟡 goes from 11 to <strong>10</strong>, and closed from 8 to <strong>9</strong>. Like R1 and R22, it is closed in code only. Needing Ryan
@@ -1242,10 +1252,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <strong>R31 is new</strong> 🟡 — the outbox has no age guard and its first drain replayed 38 stale matchweek recaps.
     ⚠ <strong>R21 is counted 🔴 below as written, but is stale:</strong> <code>origin/master</code> moved to <code>a8dee7f</code> on 12 Sep and
     the league routes are live; the current gap is 109 unpushed commits. Re-levelling owed after a full pass.</p>
-  <p class="strip-note"><strong>Current levels, R1–R36, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R36 on 2026-10-02).</strong>
+  <p class="strip-note"><strong>Current levels, R1–R38, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R36 on 2026-10-02, R37–R38 on 2026-10-04).</strong>
     <strong>🔴</strong> R2 · R21 (stale, see above). &nbsp;
-    <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27 · <strong>R30</strong>. &nbsp;
-    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong> · <strong>R33</strong> · <strong>R35</strong> (provisional). &nbsp;
+    <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27 · <strong>R30</strong> · <strong>R37</strong>. &nbsp;
+    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong> · <strong>R33</strong> · <strong>R35</strong> (provisional) · <strong>R38</strong>. &nbsp;
     <strong>🟢</strong> R11 · R15. &nbsp;
     <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 · <strong>R32</strong> · <strong>R34</strong> · <strong>R36</strong> (in code only, 2026-10-02 22:22). Of these, <strong>R4, R13, R17
     and R26 are prod-verified</strong> by audit. <strong>R32</strong> and <strong>R34</strong> are closed in the database, on their fixing
@@ -1261,7 +1271,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R36 · 8 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19 · R32–R36 added 2026-10-02 (R32 and R34 closed the same day)</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R38 · 8 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19 · R32–R36 added 2026-10-02 (R32 and R34 closed the same day) · R37–R38 added 2026-10-04 (Showdown draw)</span></h2>
   <div class="note warn" style="margin-bottom:14px">
     <strong>⚠️ Mixed vintage — read the row dates.</strong> <strong>R1–R19</strong> below are <strong>2026-07-30 text</strong> and
     several have since closed or changed level; <strong>R20–R29</strong> were added on <strong>2026-09-02</strong> and are current.
@@ -2159,6 +2169,59 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           §5 and §8b, <code>d89a3181</code>). That settles the late-night conflict. Residual 2 has no call of its own. <strong>The changed
           invite-email sentence was approved by Ryan, 2026-10-02</strong> (relayed; plan §8b, <code>be58ed1e</code>)</td>
         <td><a href="#crews">Crews</a> (Multi-sport); plan §5 <em>Direct adds</em></td>
+      </tr>
+
+      <tr class="risk-high" id="r37">
+        <td class="id">R37</td>
+        <td><strong>Until <code>fdc1ba73</code> is pushed, a Showdown pool created in the 23 hours before its start week's first kickoff
+          gets no duel in that week at all.</strong> ⚠️ New 2026-10-04. Migrations 164 and 165 are live, but the create route that
+          matches them is not. The deployed route stores the admin's chosen week (<code>origin/master:app/api/pools/create/route.ts:299</code>,
+          <code>:384</code>), and both wizards default to the open week (<code>lib/league/startMatchweek.ts:122-124</code>). Under 165, a
+          stored start is the pool's first duel week whatever its clock says. That week's draw (first kickoff − 24h) has already passed, so
+          <code>league_duel_is_revealed</code> is true at once. The generator only writes weeks that are <strong>not</strong> revealed
+          (<code>lib/migrations/164_the_draw_waits_for_the_pool.sql</code>, generator loop), so it never writes a duel for the start week.
+          The pool gets a picks-only first week, which is exactly what Ryan ruled out on 2026-10-04. Nothing errors. What the Duel tab and
+          pool card show for a week that is "revealed" with no rows is <strong>unverified</strong></td>
+        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td class="blast">Every Showdown pool created in that window with that week chosen, which is the wizard default. Today that is 3 pools
+          in six weeks, 1 of them real, so it is rare. It is also the Friday-night creation case that 143 and 164 were written for</td>
+        <td>Creating a Showdown pool between first kickoff − 24h and the lock of the open week. <strong>Next window: Fri 9 Oct 11:30 UTC →
+          Sat 10 Oct 10:30 UTC</strong> (matchweek 6, checked against production <code>league_matchweeks</code>)</td>
+        <td><strong>Built, not deployed:</strong> the route resolves the start via <code>league_showdown_first_matchweek_for</code>
+          (<code>app/api/pools/create/route.ts:302-337</code>), which rolls a passed week to the next one. ⚠ <strong>There is a residual
+          after the push.</strong> The wizard still offers, and defaults to, a week whose draw has passed, and the route moves the pool on
+          silently. The admin picks matchweek 6 and the pool starts in matchweek 7, and I found nothing that tells them. That is item (b)
+          under <a href="#showdown-2026-10-04">Showdown → 2026-10-04</a>, blocked on another session's uncommitted edits to both wizards</td>
+        <td>⏳ <strong>NEEDS RYAN: the push</strong>, ideally before Fri 9 Oct 11:30 UTC. The residual needs no new call: it is the wizard
+          work already owed</td>
+        <td><a href="#showdown-2026-10-04">Showdown → 2026-10-04</a>; <a href="#d15">Decision 15 → Amended 2026-10-04</a></td>
+      </tr>
+
+      <tr class="risk-med" id="r38">
+        <td class="id">R38</td>
+        <td><strong>The copy Showdown members read describes a draw and a hold that no longer exist, and a guard test pins the wrong
+          sentence in place.</strong> ⚠️ New 2026-10-04. <code>lib/leagueModeInfo.ts:137-140</code> and <code>:154</code> say <em>"the
+          whole season is drawn when the pool is created"</em> and that each opponent is revealed <em>"two days after the previous duel is
+          decided"</em>. That text feeds Pool Info on web and RN (<code>app/pools/[pool_id]/PoolInfoTab.tsx:123</code>, and RN through the
+          league API). The same two claims appear in <code>app/pools/[pool_id]/LeagueScoringRulesTab.tsx:197-199</code> and
+          <code>mobile/components/pool-detail/LeaguePickemScoring.tsx:178-179</code>. <em>"Drawn when the pool was created"</em> is also in
+          RN admin settings (<code>mobile/components/pool-detail/SettingsTab.tsx:1469</code>).
+          <code>app/pools/[pool_id]/DuelsTab.tsx:1026</code> says <em>"the draw is made once there are two members"</em>. <strong>All of it
+          is on <code>origin/master</code>.</strong> Since 164, none of these claims is true. The draw is rebuilt on every join or leave
+          until it is revealed. The hold is 24h, not two days. And from 2026-09-07 to 2026-10-04 production actually ran
+          <strong>6h47m</strong>. ⚠ <code>lib/__tests__/leagueModeCopy.guard.test.ts:135</code> <strong>requires</strong> <em>"drawn when
+          the pool is created"</em>, so the guard fails on any correct fix and has to change with it</td>
+        <td><span class="chip lvl-med">🟡 MEDIUM</span></td>
+        <td class="blast">Every member of every Showdown pool: 1 real pool of 3 members, plus 2 seeded test pools. It grows with every
+          Showdown pool created. <strong>No score, rank or duel result is affected</strong></td>
+        <td>Live now. Anyone who opens Pool Info, Scoring rules or an empty Duel tab in a Showdown pool sees it</td>
+        <td><strong>None applied.</strong> Ryan's disclosure sentence (<a href="#d15">Decision 15 → Amended 2026-10-04</a>) is the
+          obvious replacement. Whether it <em>is</em> the member-facing copy is his call. It is not yet in any surface</td>
+        <td>⏳ <strong>Partly called.</strong> Ryan named (c) the Duel-tab copy and (d) the Pool Info sentence as owed (2026-10-04). Scoring
+          rules (web and RN), RN admin settings, the "two days" claim and the guard test are found here and not yet called. <em>On the
+          level:</em> this meets the 🔴 wording, because it is live and it misleads members. It is held at 🟡 for R13's reason. It misstates
+          <em>when</em> a pairing opens, never a number, and it reaches three real members. That judgement can be overruled</td>
+        <td><a href="#showdown-2026-10-04">Showdown → 2026-10-04</a>; <a href="#d15">Decision 15</a></td>
       </tr>
 
       <tr class="risk-high">
@@ -3327,8 +3390,19 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   </div>
 
   <div class="card pri" style="border-left:4px solid var(--primary)">
-    <h4>🚀 Showdown / EPL launch <span class="chip">🔵 Designing</span></h4>
+    <h4>🚀 Showdown / EPL launch <span class="chip lvl-med">🟡 Live · the draw fix is half-deployed (R37, R38)</span></h4>
     <p style="margin:0 0 8px">H2H duels, persistent rivalries, and the first league season. Target Aug 2026.</p>
+    <div class="note warn" style="margin:0 0 8px"><strong>This card read "🔵 Designing" until 2026-10-04</strong>, though the markdown
+      had said <em>built</em> since 2026-09-02. <strong>Status corrected 2026-10-04: it is live.</strong> The Showdown wizard is on
+      <code>origin/master</code>, and a real pool, <em>Prem 2026/27 Showdown</em> (3 members), has been in production since 2026-09-25.
+      The build covers four modes, a sealed draw, the walkout reveal, duel points on the season leaderboard, and the recap.
+      <strong>2026-10-04: the draw now waits for the pool</strong> (Ryan; <a href="#d15">Decision 15 → Amended 2026-10-04</a>). Migrations
+      <strong>164</strong> and <strong>165</strong> are applied to production; I checked read-only that <code>league_duels.drawn_at</code>
+      exists, 45 duels are stamped, and 165's backfill holds. The create-route half (<code>fdc1ba73</code>) is committed and <strong>not
+      pushed</strong>. Until it is, a pool created in the 23 hours before its start week's first kickoff gets <strong>no duel that
+      week</strong> (<a href="#r37">R37</a>). The copy members read still describes the old draw and a 48h hold
+      (<a href="#r38">R38</a>). Still owed: the push, the wizard showing each start week's draw time, Duel-tab copy, and the copy fix.
+      See <a href="#showdown-2026-10-04">Showdown → 2026-10-04</a>.</div>
     <p style="margin:0"><strong>Contains:</strong> <a href="#epl">Showdown mode, Showdown notifications, Avatars v1,
       Match-day recap emails</a>. Gated by <a href="#i-league-ingestion">League ingestion</a> and the
       <a href="#i-sync-cron">single-tenant sync cron</a> — see <strong>R2</strong> and <strong>R5</strong>.</p>
@@ -3405,7 +3479,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ DECISIONS ============================ -->
 <section id="decisions">
-  <h2 class="sec">Settled product decisions <span class="count">8 · Project: Multi-sport platform</span> <span class="chip gold">D1–D3 + D5 AMENDED · D2 CLARIFIED 2026-10-02</span></h2>
+  <h2 class="sec">Settled product decisions <span class="count">D1–D8 + D15 shown · Project: Multi-sport platform</span> <span class="chip gold">D1–D3 + D5 AMENDED · D2 CLARIFIED 2026-10-02</span> <span class="chip gold">D15 AMENDED 2026-10-04</span></h2>
   <p class="sec-sub"><strong>Settled 2026-07-25 and not open for re-debate without a reason.</strong> The <em>why</em> is
     recorded alongside each so the argument doesn't have to be re-run. Research behind them: competitor UX across 14
     platforms, a pool-format taxonomy, and behavioural research on retention and organiser motivation. Collapsed by
@@ -3760,6 +3834,81 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     </div>
   </details>
 
+  <details class="dec" id="d15">
+    <summary><span class="dec-num">15</span> The reveal hold is a schedule, not a slot machine <span class="chip gold">AMENDED 2026-10-04</span></summary>
+    <div class="body">
+      <p style="margin:0 0 8px;font-size:12.5px;color:var(--slate)">Added to this page 2026-10-04, so its amendment has a home. Decisions
+        9–14 are in the markdown and are still missing here.</p>
+      <p style="margin:0 0 8px">Settled 2026-09-28 with Ryan, closing open call Q1 of <em>The Notification Spine</em>: <strong>the
+        24-hour Showdown reveal hold passes Decision 8's fifth gate.</strong> A fixed, announced delay adds no variance. It moves
+        <em>when</em> an already-determined pairing is shown, and it does not generate, weight or vary it. The clock is started by a
+        football result (<code>ranks_snapshot_at</code>), floored at <code>lock_at − 24h</code> (129, <code>LEAST</code> of the two), and
+        the same for everyone.</p>
+      <p style="margin:0 0 8px"><strong>Tooltip it survives:</strong> <em>"Your next opponent is revealed 24 hours after the last game of
+        the previous matchweek — or 24 hours before you pick, whichever comes first."</em></p>
+      <ul>
+        <li><strong>Not licensed:</strong> a variable hold, a hold started by anything but a sporting event, or holding a member's own score
+          or rank (073).</li>
+        <li><strong>Consequence:</strong> <code>duel_reveal_ready</code> is unblocked (N7). <code>lib/league/duelPhase.ts</code> stays the
+          sole decider of a duel's phase.</li>
+        <li>The hold is 24h (129), not the 48h of 123. Anything still quoting 48h is stale.</li>
+      </ul>
+      <div class="note danger" style="margin-top:12px">
+        <p style="margin:0"><strong>Correction, 2026-10-04: this decision was gate-checked against a hold production was not
+          running.</strong> Migration 138, which set the 24h, was never applied. From 2026-09-07 until migration 164 (applied 2026-10-04),
+          every reveal opened <strong>6h46m58s</strong> after the previous matchweek settled. That was 137's throwaway value. 164 restores
+          24h. Throughout, the members' copy said <strong>two days</strong> (<a href="#r38">R38</a>). The gate-5 reasoning is unaffected,
+          because a fixed, announced delay adds no variance whatever its length. What did fail for four weeks was the
+          <em>announced</em> half: the delay members were told about was not the one they got. The pairing is no longer <em>"hashed from
+          <code>(pool_id, cycle)</code>"</em>, and the first week's clock no longer <em>"starts at <code>ranks_snapshot_at</code>"</em>.
+          See below.</p>
+      </div>
+      <div class="note gold" style="margin-top:12px">
+        <p style="margin:0 0 6px"><strong>Amended 2026-10-04 (Ryan): each pool's first draw is its own.</strong> A Showdown pool's
+          <strong>first</strong> draw is made <strong>24 hours before the first kickoff of that pool's own start matchweek</strong>. Pools
+          start at different matchweeks, so each pool has its own first draw. <strong>Later weeks keep the rule above:</strong> 24 hours
+          after the previous matchweek's last game, or 24 hours before the deadline, whichever is first. <strong>Until a week is drawn,
+          its pairings are rebuilt on every join or leave. Once drawn, they never change.</strong> A pool created after its start week's
+          draw has passed <strong>starts the following week</strong>, with one stored start and <strong>no picks-only first week</strong>.</p>
+        <p style="margin:0 0 6px"><strong>Why.</strong> Matchups were drawn the moment a second member joined, which shut later joiners
+          out of the first week. In Ryan's own pool, KevC joined six days before matchweek 6 locked and had no duel in it. Ryan (164's
+          header): <em>"the match ups should not just be picked once there are two people in the pool because there may end up being many
+          more people"</em> and <em>"Make it 24 hours before the first matchweek kickoff for that pool. Remember pools can be started at
+          different matchweeks."</em></p>
+        <p style="margin:0 0 6px"><strong>Disclosure-gate sentence (Ryan's):</strong> <em>"Opponents come from a round-robin of everyone in
+          the pool. It updates when people join or leave, and each week's pairings are locked when they're revealed. The first draw is 24
+          hours before the first kickoff."</em></p>
+        <p style="margin:0 0 6px"><strong>Gate 5 still passes. My check, against 164's code:</strong></p>
+        <ul style="margin:0 0 6px; padding-left:18px">
+          <li>The new clock is anchored to a sporting event (a scheduled kickoff), fixed at 24h, and the same for every member of a
+            pool.</li>
+          <li>The pairing order is deterministic. In order, it takes the fewest prior meetings, then avoids last week's pairs, then uses an
+            <code>md5</code> of pool, level and round. It never uses <code>random()</code>.</li>
+          <li>A rebuild is triggered by membership, never by us, and it only touches weeks nobody can yet see.</li>
+          <li>Two pools on the same season get different first-draw instants. That is a fact about each pool's chosen start, not a
+            variable hold.</li>
+        </ul>
+        <p style="margin:0 0 6px"><strong>Where it lives, and what is verified.</strong></p>
+        <ul style="margin:0; padding-left:18px">
+          <li><strong>Migrations.</strong> <code>lib/migrations/164_the_draw_waits_for_the_pool.sql</code> and
+            <code>165_a_pool_keeps_the_start_it_was_given.sql</code> are both applied to production on 2026-10-04. Each appears in
+            <code>supabase_migrations.schema_migrations</code> per the building session. I confirmed the effects read-only (see
+            <a href="#showdown-2026-10-04">Showdown → 2026-10-04</a>).</li>
+          <li><strong>Create route.</strong> The "starts the following week" half is in
+            <code>app/api/pools/create/route.ts:302-337</code>. It is <strong>committed and not deployed</strong>
+            (<a href="#r37">R37</a>).</li>
+          <li><strong>"Join or leave".</strong> Joining reaches the generator (<code>lib/pools/join.ts:160</code>), and so does retiring an
+            entry (<code>lib/entries/retire.ts:99</code>). Whether <em>every</em> way of leaving a pool reaches it is
+            <strong>unverified</strong>.</li>
+          <li>⚠ <strong>"Never the same pair or bye two weeks running" is a tie-break, not a guarantee.</strong> It holds in Ryan's pool for
+            matchweeks 6–15, as checked. A 2-member pool has only one possible pairing, so it repeats every week by construction.</li>
+          <li>⚠ <strong>The sentence is not yet what members read.</strong> The live copy still says the season is drawn at creation and
+            that the hold is two days (<a href="#r38">R38</a>).</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+
   <h3 class="grp" id="stillopen">Still open <span style="font-weight:600;color:var(--slate);font-size:12px">— 7 (2 settled 2026-10-02)</span></h3>
   <div class="card warnc">
     <ul>
@@ -3805,7 +3954,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="card neutral">
     <ul>
       <li>The competition-shape × pool-format grid, and which format engines to build in what order.</li>
-      <li>Showdown mechanics beyond "no playoff cut, matched pairing".</li>
+      <li>Showdown mechanics beyond "no playoff cut, matched pairing". ⚠ <em>Stale, noted 2026-10-04.</em> Several Showdown mechanics
+        have since been settled: the round-robin (2026-08-24), the sealed draw (2026-08-30), the 24h hold (<a href="#d15">Decision
+        15</a>), and each pool's own first draw (D15, amended 2026-10-04).</li>
       <li>Monetisation (tracked separately under 💎).</li>
     </ul>
   </div>
@@ -3815,6 +3966,71 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 <section id="shipped">
   <h2 class="sec">✅ Recently shipped</h2>
   <p class="sec-sub">Completed and deployed to production. Kept here for visibility, then pruned once it's old news.</p>
+
+  <div class="card warnc" id="showdown-2026-10-04">
+    <h4>Showdown — 2026-10-04: the draw waits for the pool <span class="chip cat">Feature</span> <span class="chip ok">164 + 165 APPLIED</span>
+      <span class="chip lvl-high">ROUTE UNPUSHED (fdc1ba73)</span></h4>
+    <div class="note warn">This page had no entry for <em>Showdown, end to end</em> (built 2026-08-30 → 2026-09-02). The markdown's
+      section still says <em>not deployed</em>, and that heading is stale: Showdown is live, with a real 3-member pool in production since
+      2026-09-25. This card mirrors the markdown's 2026-10-04 subsection only.</div>
+    <ul class="fields">
+      <li><span class="f">What was wrong:</span> Ryan's own pool, <em>Prem 2026/27 Showdown</em>, chose matchweek 6 as its start. It was
+        drawn and revealed the moment the second member joined (2026-09-25). KevC joined on 2026-10-04, six days before matchweek 6 locks,
+        and got no matchweek-6 duel. Until 164, every later joiner was shut out of the week the pool was created for. The rule that
+        replaces this is <a href="#d15">Decision 15 → Amended 2026-10-04</a>.</li>
+      <li><span class="f">Draws are stored:</span> <code>league_duels.drawn_at</code> is stamped once, by a one-minute cron, when a week's
+        reveal passes. A stamped duel stays visible even if the reveal clock later moves. <em>I checked read-only in production
+        2026-10-04:</em> the column exists and 45 duels carry a stamp. <em>Not verified by me:</em> that the cron job exists, because the
+        <code>cron</code> schema is not reachable read-only from here. No reveal has passed since 164, so the stamp is
+        <strong>unexercised</strong>. Its first live run is Ryan's matchweek 6, at Fri 9 Oct 11:30 UTC. Check that those rows have
+        <code>drawn_at</code> after that time.</li>
+      <li><span class="f">The round-robin remembers who has met:</span> each undrawn week takes the circle round whose pairs have met
+        least. A round repeating last week's pair, or last week's bye, loses the tie-break. Then comes a per-pool hash, never
+        <code>random()</code>. <em>I read Ryan's pool's provisional matchweeks 6–15 from production:</em> no pair and no bye repeats in
+        consecutive weeks, and each 3-week pass is a full round-robin.</li>
+      <li><span class="f">The first draw is per pool:</span> (<code>league_showdown_first_matchweek_for</code>,
+        <code>league_duel_reveals_at</code>, 164). <em>I checked in production:</em> the function answers 6 for Ryan's pool, and its
+        matchweek-6 reveal is <code>2026-10-09 11:30 UTC</code>.</li>
+      <li><span class="f">165:</span> the stored start week is the answer, not an input. 164 re-derived it from the fixture list, so a
+        kickoff moved earlier could drop a week whose provisional rows would still be scored. <em>I checked in production:</em> both seeded
+        pools are backfilled to matchweek 2, and Ryan's is 6.</li>
+      <li><span class="f">Create route:</span> <code>app/api/pools/create/route.ts:302-337</code> stores every Showdown pool's start
+        through the same SQL function, so a week whose draw has passed rolls to the next one. <strong>Committed, not pushed</strong>
+        (<code>origin/master</code> lacks it). See <a href="#r37">R37</a>.</li>
+      <li><span class="f">Per the building session, not re-run by me:</span> both migrations were hash-checked against these files, and
+        <code>scripts/verify-showdown.ts</code> passed after its rewrite for 164/165, 500/250/0 and the 075 entry cap.</li>
+      <li><span class="f">Found, 138 was never applied:</span> from 2026-09-07 until 164, production ran 137's throwaway hold of
+        <strong>6h46m58s</strong>, not the 24h Ryan chose (129). 164 restores 24h. <em>I confirmed it independently.</em> 164's backfill
+        stamped <em>Showdown Duels</em> matchweek 6 at <code>2026-09-21 00:07:59 UTC</code>. That is 6h46m59s after matchweek 5's
+        <code>ranks_snapshot_at</code> (<code>2026-09-20 17:21:00</code>). The member copy said <strong>two days</strong> throughout
+        (<a href="#r38">R38</a>).</li>
+      <li><span class="f">Ryan's pool, by his choice:</span> matchweek 6 was redrawn. It reveals <strong>Fri 9 Oct 11:30 UTC</strong> with
+        <strong>IZZETmagic v KevC and mhcaldwell11 on a bye</strong> (<em>checked in production:</em> the rows are unstamped, and the
+        entries resolve to those usernames). The redraw mints new duel ids, so the walkout plays again.</li>
+    </ul>
+    <div class="scroller" style="margin-top:10px">
+      <table class="risk">
+        <thead><tr><th></th><th>Still owed</th><th>State</th></tr></thead>
+        <tbody>
+          <tr><td class="id">(a)</td><td>Push <code>fdc1ba73</code>, so the create route matches 164/165</td>
+            <td>⏳ <strong>Ryan's call.</strong> Until then <a href="#r37">R37</a> is open. Next window: Fri 9 Oct 11:30 UTC</td></tr>
+          <tr><td class="id">(b)</td><td>The create wizard shows each start week's draw time (web <code>components/pools/CreatePoolModal.tsx</code>,
+            RN <code>mobile/app/create-pool.tsx</code>)</td>
+            <td>⛔ <strong>Blocked.</strong> Another session has uncommitted edits to both files. Without this, after the push the wizard still
+              offers a week whose draw has passed, and the route silently moves the pool to the next one (<a href="#r37">R37</a>
+              residual)</td></tr>
+          <tr><td class="id">(c)</td><td>Duel-tab copy for a pool still filling up, and for a member who joined after a draw</td>
+            <td>⬜ Not started. The current empty state, <em>"the draw is made once there are two members"</em>
+              (<code>app/pools/[pool_id]/DuelsTab.tsx:1026</code>), is false since 164</td></tr>
+          <tr><td class="id">(d)</td><td>Replace Pool Info's <em>"the whole season is drawn when the pool is created"</em>, which is false for
+            any pool that grew</td>
+            <td>⬜ Not started, and <strong>wider than stated.</strong> The sentence lives in <code>lib/leagueModeInfo.ts:137-140</code> and
+              <code>:154</code>. It is repeated in web Scoring rules, RN scoring and RN admin settings, alongside a stale "two days" hold,
+              and a guard test pins it (<a href="#r38">R38</a>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   <div class="card okc" id="i-cutover">
     <h4>Shadow read-path cutover — all 623 pools <span class="chip cat">Infra</span> <span class="chip cat">Scoring</span>
