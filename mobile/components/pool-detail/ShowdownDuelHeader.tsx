@@ -1093,12 +1093,11 @@ function RevealButton({ onPress }: { onPress: () => void }) {
  * that renders a clock is allowed and one that decides what the clock is FOR is
  * not, and on why the digits never pass through React.
  *
- * ⚠ `formatDhms` RATHER THAN `formatHms`, AND THAT IS NOT COSMETIC. This wait
- * is a DAY at minimum (129) and can be nineteen: three matchweeks a season sit
- * behind an international break — mw 6 is 19.7 days, mw 31 is 20.8 — and
- * `formatHms` accumulates hours without rolling over, so it would print
- * `499:00:00` and mean nothing to anybody. Days are the unit this wait is
- * actually measured in.
+ * ⚠ DAYS ARE THE UNIT THIS WAIT IS MEASURED IN. It is a DAY at minimum (129)
+ * and can be nineteen: three matchweeks a season sit behind an international
+ * break — mw 6 is 19.7 days, mw 31 is 20.8. `CountdownText`'s face starts in
+ * days (`19d 16h 48m`) and steps down to hours and then hundredths on its own,
+ * so this clock and the kickoff clock beside it can never disagree about form.
  *
  * ⚠ AND IT SAYS SO WHEN IT CANNOT SAY WHEN. `opensAt` is null while the
  * previous matchweek is unsettled and the floor has not bitten yet, which is a
@@ -1148,12 +1147,11 @@ function SealedMiddle({ opensAt }: { opensAt: string | null }) {
         make rows appear; and "After this week" when there is no instant to
         count to at all because the previous matchweek is still being played.
 
-        ⚠ `formatDhms` VIA `format="dhms"`, and that is not cosmetic: this wait is
-        a DAY at minimum (129) and can be nineteen, and `formatHms` accumulates
-        hours without rolling over, so it would print `499:00:00`.
+        The face is `CountdownText`'s, not this column's: `19d 16h 48m`, then
+        `4h 11m 09s`, then `11m 09s 83` — see `lib/countdownFormat.ts`.
       */}
       {clock.running ? (
-        <CountdownText clock={clock} format="dhms" style={clockStyle} />
+        <CountdownText clock={clock} style={clockStyle} />
       ) : (
         <BandText style={clockStyle}>
           {opensAt !== null ? 'Any moment' : 'After this week'}
@@ -1265,9 +1263,11 @@ function Middle({
     // saying the same thing as two avatars either side of a scoreline already
     // say, and it was competing with the one number here that moves.
     //
-    // `MIDDLE_COL` still has to clear `HH:MM:SS`, which is about 103pt of
-    // tabular digits at 24pt Nunito Black. Too narrow and the clock wraps
-    // mid-time; the corners are `flex: 1` and simply take what is left.
+    // `MIDDLE_COL` still has to clear the clock's widest face, `19d 23h 59m`:
+    // 151pt of tabular digits at 24pt Nunito Black, measured from the font's
+    // advance widths with `tnum` applied (`HH:MM:SS` was 99.5). Too narrow and
+    // the clock wraps mid-time; the corners are `flex: 1` and simply take what
+    // is left.
     <View
       style={{
         minWidth: MIDDLE_COL,
@@ -1357,7 +1357,6 @@ function Middle({
       {showLive ? null : counting ? (
         <CountdownText
           clock={kickoffClock}
-          format="hms"
           accessibilityLabel="Time until the first game"
           style={{
             fontFamily: fontFamilies.black,

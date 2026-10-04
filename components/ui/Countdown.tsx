@@ -14,9 +14,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { countdownBand, formatCountdown } from '@/lib/countdownFormat'
+
 
 /**
- * `clock` is the duel page's — hours, minutes and seconds, always.
+ * `clock` is the duel page's — `2d 04h 11m`, `4h 11m 09s`, then `11m 09s 83`.
  * `compact` is the pool card's. See `countdownText` for why they differ.
  */
 export type CountdownFormat = 'clock' | 'compact'
@@ -24,10 +26,11 @@ export type CountdownFormat = 'clock' | 'compact'
 /**
  * How long is left, as text.
  *
- * ⚠ HOURS, NOT DAYS, in both formats. `1d 21:21:54` made the reader do
- * arithmetic to answer the only question they had — how long — and the two
- * halves were in different units, so the number stopped being scannable at a
- * glance. Hours carry all of it and keep one clock.
+ * ⚠ `clock` HAS DAYS AGAIN — Ryan, 2026-10-04, reversing 2026-08-31's "hours,
+ * no days" (c3b06cc4). That objection was to `1d 21:21:54`, a day count glued
+ * to a clock in another unit; every field of the new face carries its own
+ * letter. The face lives in `lib/countdownFormat.ts` because the phone mirrors
+ * it, and a test holds the two copies together.
  *
  * ⚠ `compact` SWITCHES AT ONE HOUR, not at twelve. The pool card's tile is 54px
  * wide and its value is Geist Mono at 18px, which is 10.8px a character —
@@ -43,6 +46,7 @@ export type CountdownFormat = 'clock' | 'compact'
 export function countdownText(msLeft: number | null, format: CountdownFormat = 'clock'): string {
   if (msLeft === null) return ''
   if (msLeft <= 0) return 'any moment'
+  if (format === 'clock') return formatCountdown(msLeft)
   const s = Math.floor(msLeft / 1000)
   const pad = (n: number) => String(n).padStart(2, '0')
   // It cannot run away: the hold is 48h, floored at 24h before lock (123), so
@@ -50,10 +54,7 @@ export function countdownText(msLeft: number | null, format: CountdownFormat = '
   // settlement (094) can push it further, and `padStart(2)` widens rather than
   // truncating — three digits is ugly and correct, which beats tidy and wrong.
   const hours = Math.floor(s / 3600)
-  if (format === 'compact') {
-    return s >= 3600 ? `${pad(hours)}:${pad(Math.floor((s % 3600) / 60))}` : `${pad(Math.floor(s / 60))}:${pad(s % 60)}`
-  }
-  return `${pad(hours)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`
+  return s >= 3600 ? `${pad(hours)}:${pad(Math.floor((s % 3600) / 60))}` : `${pad(Math.floor(s / 60))}:${pad(s % 60)}`
 }
 
 /** True while `compact` is showing hours rather than minutes — the caption's cue. */
@@ -65,12 +66,17 @@ export function countdownIsHours(msLeft: number | null): boolean {
  * The tick, for callers that need more than the text — a tile captioning its
  * own clock in hours or minutes, say.
  *
+ * `everyFrame` is for a face that shows hundredths: inside the hour it ticks on
+ * `requestAnimationFrame` rather than once a second. Off by default, because a
+ * pool card re-rendering sixty times a second to print `mm:ss` would be pure
+ * waste. The browser pauses animation frames in a background tab on its own.
+ *
  * ⚠ `msLeft` IS NULL UNTIL MOUNTED, and that is not the same as zero. See the
  * note on `Countdown`: anything derived from `Date.now()` differs between the
  * server render and the first client one, so the caller must render nothing
  * rather than render a guess.
  */
-export function useCountdown(to: string, onExpire?: () => void): number | null {
+export function useCountdown(to: string, onExpire?: () => void, everyFrame = false): number | null {
   const [msLeft, setMsLeft] = useState<number | null>(null)
   // ⚠ THE CALLBACK LIVES IN A REF, not the dependency array. Callers pass an
   // inline arrow, which is a new function every render — in the deps it tears
@@ -87,18 +93,30 @@ export function useCountdown(to: string, onExpire?: () => void): number | null {
     // few enough that a wrong `to` cannot turn a page into a polling loop.
     let fires = 0
     let lastFire = 0
+    let frame = 0
     const tick = () => {
       const ms = target - Date.now()
       setMsLeft(ms)
       if (ms <= 0) {
         const now = Date.now()
         if (fires < 3 && now - lastFire >= 30_000) { fires++; lastFire = now; expire.current?.() }
+      } else if (everyFrame && !frame && countdownBand(ms) === 'minutes') {
+        frame = requestAnimationFrame(paint)
       }
+    }
+    // ⚠ THE FRAME LOOP ONLY PAINTS. Expiry stays with `tick`, so the bounded
+    // retries above are the one place `onExpire` can fire from; the frame that
+    // reaches zero hands over to it rather than re-implementing it.
+    const paint = () => {
+      const ms = target - Date.now()
+      if (ms <= 0) { frame = 0; tick(); return }
+      setMsLeft(ms)
+      frame = requestAnimationFrame(paint)
     }
     tick()
     const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [to])
+    return () => { clearInterval(id); cancelAnimationFrame(frame) }
+  }, [to, everyFrame])
   return msLeft
 }
 
@@ -119,5 +137,5 @@ export function Countdown({
   onExpire?: () => void
   format?: CountdownFormat
 }) {
-  return <>{countdownText(useCountdown(to, onExpire), format)}</>
+  return <>{countdownText(useCountdown(to, onExpire, format === 'clock'), format)}</>
 }

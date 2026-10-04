@@ -1493,8 +1493,14 @@ export default function DuelsTab({
               </div>
 
               <div className="order-1 col-span-3 sm:col-span-1 sm:order-none text-center min-w-0">
+                {/* ⚠ 5xl AT `sm`, 6xl FROM `md` — because of the face, 2026-10-04.
+                    `19d 23h 59m` is 389px at 6xl (measured in this font), where
+                    `45:21:54` was 283. At 640px the middle column is 360
+                    (640 − main's 48 − the card's 40 − two 64px faces − two 32px
+                    gaps), so 6xl ran into the "?" circle up to ~670px. 5xl is
+                    311. At `md` the column is 448 and 6xl fits. */}
                 {sealedOpensAtLatest && (
-                  <p className="t-num t-num-black text-3xl sm:text-6xl text-accent-400
+                  <p className="t-num t-num-black text-3xl sm:text-5xl md:text-6xl text-accent-400
                                 whitespace-nowrap">
                     <Countdown to={sealedOpensAtLatest} />
                   </p>

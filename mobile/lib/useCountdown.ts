@@ -1,5 +1,8 @@
+import { useIsFocused } from '@react-navigation/native';
 import { useEffect, useState } from 'react';
-import { useSharedValue, type SharedValue } from 'react-native-reanimated';
+import { useFrameCallback, useSharedValue, type SharedValue } from 'react-native-reanimated';
+
+import { countdownBand } from './countdownFormat';
 
 // =============================================================
 // ONE TICKING CLOCK, AND IT DOES NOT RE-RENDER
@@ -49,7 +52,30 @@ import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 // that flips at most once per target, for callers that need to choose between a
 // clock and a sentence. The digits belong to `CountdownText`, which reads the
 // shared value on the UI thread.
+//
+// ## ⭐ THE FINAL HOUR TICKS EVERY FRAME — Ryan, 2026-10-04
+//
+// Inside the hour the face is `11m 09s 83`, and hundredths on a once-a-second
+// tick would sit still for a second and then jump. So below the hour a
+// `useFrameCallback` takes over the shared value and the JS interval stops
+// writing it. Still no React commit; the UI thread does all of it.
+//
+// ⚠ IT READS THE WALL CLOCK EVERY FRAME rather than running a `withTiming` to
+// zero. An animation measures from frame timestamps, which stop while the phone
+// is asleep — lock the screen for ten minutes and a timing would wake ten
+// minutes behind. `Date.now()` per frame cannot fall behind.
+//
+// ⚠ AND IT STOPS WHEN THE SCREEN IS NOT FOCUSED. The pool screen stays mounted
+// under a pushed duel screen, and both carry the header — a clock nobody can
+// see would otherwise redraw sixty times a second for an hour.
+//
+// ⚠ TWO MORE COMMITS PER TARGET, AT MOST, and that is what the width needs. The
+// three faces are different widths, and `CountdownText` sizes its box from a
+// render — so crossing into the next band has to commit once to re-measure. The
+// crossings are at known instants (a day out, an hour out), not once a second.
 // =============================================================
+
+const HOUR = 3_600_000;
 
 /**
  * Milliseconds left on `target`, floored at zero. `NaN` target reads as expired.
@@ -58,9 +84,15 @@ function msLeft(target: number): number {
   return Number.isNaN(target) ? 0 : Math.max(0, target - Date.now());
 }
 
+/** What the last render was told: which instant, whether it has passed, and which face it wears. */
+function reading(target: number) {
+  const ms = msLeft(target);
+  return { target, expired: ms <= 0, band: countdownBand(ms) };
+}
+
 export type CountdownClock = {
   /**
-   * Milliseconds remaining, advanced once a second.
+   * Milliseconds remaining — once a second above the hour, every frame below it.
    *
    * ⚠ READ IT FROM A WORKLET, not from render — that is the entire point. See
    * `CountdownText`.
@@ -89,6 +121,10 @@ export function useCountdownClock(iso: string | null | undefined): CountdownCloc
   // ⚠ SEEDED AT MOUNT so the first paint has real digits. A shared value's
   // initialiser runs once; the effect below owns every value after it.
   const remaining = useSharedValue(msLeft(target));
+  // ⚠ THE FRAME CALLBACK READS THE TARGET FROM HERE, not from its closure. Its
+  // closure is re-registered whenever this component renders, which is rarely
+  // and never on the target's schedule; a shared value is always current.
+  const targetAt = useSharedValue(target);
 
   /**
    * ⚠ KEYED ON THE TARGET AND ADJUSTED DURING RENDER — React's documented
@@ -99,8 +135,11 @@ export function useCountdownClock(iso: string | null | undefined): CountdownCloc
    * change is a visible flash of "9 to play" where a clock belongs. React
    * discards this render and re-runs immediately, so nothing is ever painted
    * holding the old answer.
+   *
+   * `band` is in here only so that crossing one re-renders `CountdownText` and
+   * re-measures its box — see the header. Nothing reads it.
    */
-  const [seen, setSeen] = useState(() => ({ target, expired: msLeft(target) <= 0 }));
+  const [seen, setSeen] = useState(() => reading(target));
   /**
    * ⚠⚠ `Object.is`, NOT `!==`, AND IT SHIPPED BROKEN ONCE FOR WANT OF IT.
    *
@@ -114,76 +153,86 @@ export function useCountdownClock(iso: string | null | undefined): CountdownCloc
    * its own state bail-out, so this comparison and React's now agree — which is
    * the real reason to reach for it rather than special-casing `Number.isNaN`.
    */
-  if (!Object.is(seen.target, target)) setSeen({ target, expired: msLeft(target) <= 0 });
+  if (!Object.is(seen.target, target)) setSeen(reading(target));
+
+  const focused = useIsFocused();
+
+  /** The final hour's tick. Off until the effect below turns it on. */
+  const frames = useFrameCallback(() => {
+    'worklet';
+    remaining.set(Math.max(0, targetAt.get() - Date.now()));
+  }, false);
 
   useEffect(() => {
-    if (Number.isNaN(target)) return;
+    if (Number.isNaN(target) || !focused) return;
+    targetAt.set(target);
+
+    /**
+     * Tell React what it needs to know, and nothing else. The updater returns
+     * the same object when the band and the expiry are unchanged, so React
+     * bails out; it only ever commits on a crossing.
+     */
+    const land = (ms: number) => {
+      const next = { target, expired: ms <= 0, band: countdownBand(ms) };
+      setSeen((s) => (s.expired === next.expired && s.band === next.band ? s : next));
+    };
+
     let ms = msLeft(target);
+    // ⚠ Straight away, not on the first tick: on a refocus the shared value
+    // still holds whatever it read when the screen was left.
     remaining.set(ms);
+    land(ms);
     if (ms <= 0) return;
+
+    let band = countdownBand(ms);
+    let expiry: ReturnType<typeof setTimeout> | undefined;
+    const startFrames = (left: number) => {
+      frames.setActive(true);
+      // ⚠ To the millisecond, so the sentence replaces the clock as it reaches
+      // zero rather than up to a second after. The interval stays on as the
+      // backstop in case a sleeping phone holds this timer back.
+      expiry = setTimeout(finish, left);
+    };
+    const finish = () => {
+      clearInterval(id);
+      clearTimeout(expiry);
+      frames.setActive(false);
+      remaining.set(0);
+      // The commit this hook was always allowed: at zero the caller swaps the
+      // digits for a sentence.
+      land(0);
+    };
 
     // ⚠ Cleared on unmount. These live inside a tab pager where several screens
     // stay mounted off-view; a timer per mounted copy is how a list of pools
     // ends up ticking a dozen times a second in the background.
     const id = setInterval(() => {
       ms = msLeft(target);
+      if (ms <= 0) return finish();
+      // Inside the hour the frame callback owns the digits.
+      if (band === 'minutes') return;
       // ⚠⚠ A SHARED-VALUE WRITE, NOT A `setState`. See the header — this line is
       // the whole fix, and turning it back into state re-breaks the band.
       remaining.set(ms);
-      if (ms <= 0) {
-        clearInterval(id);
-        // The one commit this hook is allowed: the moment the clock runs out,
-        // its caller has to swap the digits for a sentence.
-        setSeen({ target, expired: true });
+      const now = countdownBand(ms);
+      if (now !== band) {
+        band = now;
+        land(ms);
+        if (band === 'minutes') startFrames(ms);
       }
     }, 1000);
-    return () => clearInterval(id);
-    // ⚠ `remaining` is a stable ref; `target` is the real dependency. Re-reading
-    // `Date.now()` on every tick is what makes this self-correcting after the app
-    // has been backgrounded, so no AppState listener is needed.
-  }, [target, remaining]);
+    if (band === 'minutes') startFrames(ms);
+
+    return () => {
+      clearInterval(id);
+      clearTimeout(expiry);
+      frames.setActive(false);
+    };
+    // ⚠ `remaining`, `targetAt` and `frames` are stable refs; `target` and
+    // `focused` are the real dependencies. Re-reading `Date.now()` on every tick
+    // and every frame is what makes this self-correcting after the app has been
+    // backgrounded, so no AppState listener is needed.
+  }, [target, focused, remaining, targetAt, frames]);
 
   return { remaining, target, running: !Number.isNaN(target) && !seen.expired };
-}
-
-/**
- * ⚠ WORKLET-MARKED, ALL THREE, because `CountdownText` formats on the UI thread.
- * They stay callable from JS as well — a workletised function is not confined to
- * the UI runtime. `lib/showdownBeats.ts` does the same thing for the walkout.
- */
-function pad(n: number): string {
-  'worklet';
-  return String(n).padStart(2, '0');
-}
-
-/**
- * `HH:MM:SS`, with hours ACCUMULATING past 24 — three days out reads `72:00:00`
- * rather than rolling over to `00:00:00` and looking like it has expired.
- */
-export function formatHms(ms: number): string {
-  'worklet';
-  const s = Math.floor(ms / 1000);
-  return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
-}
-
-/**
- * `2d 04:11:09` — for waits long enough that a raw hour count stops meaning much.
- *
- * ⚠ IT HAS A CALLER AGAIN — `SealedMiddle` in `ShowdownDuelHeader`, 2026-09-06.
- * It sat unused from 2026-09-03, when the Duel tab's sealed card came out and
- * the header replaced it with a single line of text and no clock at all. The
- * note kept here then said it was retained "because the sealed card is on the
- * list to come back"; it came back into the band instead.
- *
- * ⚠ AND THE SEALED CLOCK MUST USE THIS ONE, NOT `formatHms`. The wait is a day
- * at minimum (129) and up to twenty across an international break, and
- * `formatHms` accumulates hours rather than rolling over — so it would render
- * `499:00:00`, which is technically correct and unreadable.
- */
-export function formatDhms(ms: number): string {
-  'worklet';
-  const s = Math.floor(ms / 1000);
-  const d = Math.floor(s / 86400);
-  const rest = `${pad(Math.floor((s % 86400) / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
-  return d > 0 ? `${d}d ${rest}` : rest;
 }
