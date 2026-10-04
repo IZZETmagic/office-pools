@@ -281,7 +281,110 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ SUMMARY ============================ -->
 <section id="summary">
-  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span> <span class="chip ok">R32 FIXED 2026-10-02</span> <span class="chip ok">R34 FIXED 2026-10-02</span> <span class="chip lvl-med">R35 OPENED 2026-10-02</span> <span class="chip gold">CREWS BUILD STARTED 2026-10-02</span> <span class="chip gold">CREWS BUILT TO SHIP STEP · UNPUSHED</span> <span class="chip lvl-med">R36 OPENED 2026-10-02</span> <span class="chip gold">CREWS WEB 8b BUILT · UNPUSHED</span> <span class="chip lvl-med">R36 CONFIRMED · FIX AWAITS RYAN</span> <span class="chip ok">R36 DECIDED · FIXED IN CODE · INVITES CATCH UP · STEP 8 DONE</span></h2>
+  <h2 class="sec">Where this stands <span class="chip ok">REFRESHED 2026-09-02</span> <span class="chip lvl-high">LEAGUE INGESTION UPDATE 2026-09-19</span> <span class="chip lvl-crit">CREWS DECISIONS 2026-10-02</span> <span class="chip ok">4 CONFLICTS SETTLED 2026-10-02</span> <span class="chip ok">R32 FIXED 2026-10-02</span> <span class="chip ok">R34 FIXED 2026-10-02</span> <span class="chip lvl-med">R35 OPENED 2026-10-02</span> <span class="chip gold">CREWS BUILD STARTED 2026-10-02</span> <span class="chip gold">CREWS BUILT TO SHIP STEP · UNPUSHED</span> <span class="chip lvl-med">R36 OPENED 2026-10-02</span> <span class="chip gold">CREWS WEB 8b BUILT · UNPUSHED</span> <span class="chip lvl-med">R36 CONFIRMED · FIX AWAITS RYAN</span> <span class="chip ok">R36 DECIDED · FIXED IN CODE · INVITES CATCH UP · STEP 8 DONE</span> <span class="chip ok">DEPLOY NOTES CORRECTED 2026-10-04 · R21 + R15 CLOSED · R30 → 🟡</span></h2>
+
+  <div class="card okc" id="update-2026-10-04-deploy-notes">
+    <h3 style="margin:0 0 8px">2026-10-04, late — the "unpushed" notes, checked against production</h3>
+    <p class="sec-sub" style="margin:0 0 10px">Scope: every note on this page that said something was unpushed, not deployed or "in code
+      only". Checked against git (local <code>master</code> = <code>origin/master</code> = <code>2265c5d9</code>, and
+      <code>origin/Development</code> has nothing <code>master</code> lacks), the Vercel production deployment list, the EAS
+      <code>production</code> branch (<code>eas update:list</code> and <code>update:view</code>), and read-only production reads:
+      <code>sync_settings</code>, the <code>crew_invites</code> columns, three unauthenticated route probes, and
+      <code>scripts/verify-league-stranded-fixtures.ts</code>. <strong>I could not read <code>supabase_migrations</code> or
+      <code>cron</code></strong>, so migration applies and cron jobs stay as their building sessions reported them. Each stale note is
+      corrected in place, with this date.</p>
+
+    <p style="margin:0 0 6px"><strong>Since last update</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>Nothing on this page waits on a push any more.</strong> Vercel production
+        <code>dpl_B3ZDxGLYtvAWR1B1WzF7XqMhoTMG</code> is READY at <code>2265c5d9</code> and aliased to sportpool.io, with no alias error.
+        <strong>The app is a separate channel.</strong> The newest production OTA is from <code>8dc59ea3</code> (2026-10-04, 19:44Z iOS
+        and 19:46Z Android, runtime 1.3.0). Anything committed after that reaches phones only with the next OTA.</li>
+      <li><strong>When each "unpushed" item actually reached production.</strong> The date is the first production deployment whose commit
+        contains it.</li>
+    </ul>
+    <div class="scroller">
+    <table>
+      <thead><tr><th>Item</th><th>Commit</th><th>Web live since</th><th>The other halves</th></tr></thead>
+      <tbody>
+        <tr><td>R22's guard, R1's archive, and everything on 2026-09-02's <code>Development</code> (the RN league reads, Showdown, LMS)</td>
+          <td><code>6aa2831</code>, <code>8c42d1d</code>, <code>c98a037</code></td><td>2026-09-11 13:54Z (<code>dpl_BJoPWXP6…</code>,
+          <code>14ce29e7</code>)</td><td>App: in every runtime-1.2.0 OTA, from 2026-09-28 02:27Z (<code>ee168d1c</code>)</td></tr>
+        <tr><td><a href="#r30">R30</a>'s stray-by-id</td><td><code>fc23239</code></td><td>2026-09-27 20:33Z (<code>dpl_9bCps3qT…</code>,
+          <code>1db25140</code>)</td><td>Server only: <code>/api/cron/sync-fixtures</code>, <code>league-reconcile</code>,
+          <code>league-standings</code></td></tr>
+        <tr><td><a href="#r30">R30</a>'s second fix, <strong>not recorded here until now</strong></td><td><code>2c06229c</code></td>
+          <td>2026-10-01 10:36Z (<code>dpl_HMxXCPMq…</code>, <code>31588dc0</code>)</td><td>Server only</td></tr>
+        <tr><td><a href="#r32">R32</a> (151) and <a href="#r34">R34</a> (152)</td><td><code>6c51140c</code>, <code>bd7a7bb5</code></td>
+          <td>2026-10-03 02:35Z (<code>dpl_6uSca5oE…</code>, <code>406f644d</code>)</td><td>The fix is the database, applied 2026-10-02 per
+          the fixing sessions. The push changed nothing for either</td></tr>
+        <tr><td><a href="#crews">Crews</a>: P4, P5, steps 4–8, 8a, 8b, the R36 fix, the invite catch-up</td><td><code>b31dcf10</code> …
+          <code>cbced41a</code>, <code>42579aca</code>, <code>f105488b</code></td><td>2026-10-03 02:35Z (<code>dpl_6uSca5oE…</code>)</td>
+          <td>App: OTA from <code>406f644d</code> on both platforms, 02:41Z and 02:43Z (runtime 1.2.0). Notice switch on since 15:06Z</td></tr>
+        <tr><td>Banter report + block (photos step 3.1)</td><td><code>b03e294e</code></td><td>2026-10-03 23:16Z (<code>dpl_BnCy3JJB…</code>,
+          <code>2e144f67</code>)</td><td>App: only the runtime-1.3.0 OTAs of 2026-10-04. The last 1.2.0 OTA (<code>7004821c</code>) predates
+          it</td></tr>
+        <tr><td>Showdown's draw fix and copy</td><td><code>fdc1ba73</code>, <code>11ae5f9a</code></td><td>2026-10-04 22:52Z
+          (<code>dpl_GNdVmRRj…</code>)</td><td>App copy: <strong>not OTA'd</strong> (<a href="#r38">R38</a>)</td></tr>
+        <tr><td>Showdown's odd-pool empty state</td><td><code>1975b699</code></td><td>2026-10-04 23:11Z (<code>dpl_B3ZDxGLY…</code>)</td>
+          <td>Web only. The app has no copy of that line</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <ul style="margin:10px 0 10px 18px">
+      <li><strong>Checked in production this pass.</strong> <code>/api/crews</code> and <code>/api/cron/crew-notices</code> answer 401, and
+        <code>/crew-invite</code> answers 200. <code>crew_invites.token_hash</code> and <code>crew_invites.notified_at</code> exist (155 and
+        156). <code>sync_settings.crew_notices_enabled</code> is <code>true</code>, set 2026-10-03 15:06:04Z. The stranded-fixtures verifier
+        passes in all five leagues, with 0 stranded and 0 unreconciled moves.</li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Now</strong> — not re-ranked this pass. The first two items of the 2026-10-02 list are done: the Crews
+      ship (2026-10-03), and keeping the token in the fragment (<code>c79df712</code>, deployed with the ship). What is still
+      deploy-shaped:</p>
+    <ol style="margin:0 0 10px 18px">
+      <li><strong>The <a href="#r38">R38</a> OTA.</strong> The app's four Showdown copy surfaces still describe a draw that no longer exists.
+        That is misleading copy, live, so it leads. ⚠ Publish only from a clean tree. <code>git status</code> shows another session's
+        uncommitted edits under <code>mobile/</code>, and <code>eas update</code> bundles the working tree.</li>
+      <li><strong><a href="#r37">R37</a>'s wizard item.</strong> It is still blocked by the same uncommitted edits.</li>
+    </ol>
+
+    <p style="margin:0 0 6px"><strong>Risk moves</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong><a href="#r21">R21</a>: 🔴 → ✅ closed.</strong> The risk was the gap between the code and production, and the gap is
+        zero. It closed on 2026-09-11, reopened to 109 commits by 2026-09-19, closed again on 2026-09-27, and is zero today. Two things it
+        does <strong>not</strong> close. Migrations 119, 120, 123–126, 128 and 129 are still individually unattested, and I can't query
+        <code>schema_migrations</code> from here. And a migration that was written but never applied is a different failure from R21's: 138
+        was one (found 2026-10-04), and no deploy catches it.</li>
+      <li><strong><a href="#r30">R30</a>: 🟠 → 🟡.</strong> Both fixes are live: stray-by-id since 2026-09-27, and since 2026-10-01 a
+        catch-up with no age floor and a reconcile that corrects a fixture the feed says was played elsewhere. Production shows 0 stranded
+        fixtures today. <strong>It is not closed, for two reasons.</strong> The first deployed fix did not stop the second strand: five La
+        Liga matchweek-7 fixtures sat unscored for 11 days, found on 2026-10-01 from a screenshot. And nothing alarms on this class. The
+        verifier is run by hand.</li>
+      <li><strong><a href="#r15">R15</a>: 🟢 → ✅ closed.</strong> Its own row said it stays until deployed. The hoist is in the 2026-07-31
+        production deployment (<code>4877aae1</code>, the oldest I listed), and it is still at <code>HEAD</code>.</li>
+      <li><strong>R1, <a href="#r22">R22</a> and <a href="#r36">R36</a> stay ✅,</strong> but they are now closed on production, not in code
+        only: R1 and R22 since 2026-09-11, and R36 since 2026-10-03. <strong>R32 and R34</strong> are unchanged. Only their "not pushed"
+        note was stale.</li>
+      <li><strong>Counts:</strong> 🔴 2 → <strong>1</strong>, 🟠 13 → <strong>12</strong>, 🟡 12 → <strong>13</strong>, 🟢 2 →
+        <strong>1</strong>, closed 9 → <strong>11</strong>.</li>
+    </ul>
+
+    <p style="margin:0 0 6px"><strong>Drift</strong></p>
+    <ul style="margin:0 0 10px 18px">
+      <li><strong>R30's second strand (2026-10-01) was never recorded here.</strong> It is now on the row.</li>
+      <li><strong>The Crews ship (2026-10-03) was never recorded here.</strong> Plan §7 records it (<code>6f604248</code>). Nor was the work
+        around it: migration 157 (disband and restore, <code>0abb9088</code>, in the ship), link-a-pool (<code>12c4da4a</code>,
+        <code>0ab51672</code>) and migration 163 (an answered invite forgets its address, <code>0f8a7fd1</code>, 2026-10-04). The ship's
+        facts are recorded above. The rest is <strong>not reviewed</strong> here.</li>
+      <li><strong><a href="#r8">R8</a> may be stale the other way.</strong> This page says the feedback survey is unsent. A session note
+        dated 2026-09-07 records it as sent, with 104 responses from 22–30 Jul. <strong>Unverified:</strong> I have no Tally access here, so
+        R8 and its 🔥 Now item are unchanged.</li>
+      <li><code>SPORTPOOL_PROGRAMME 2.md</code> is still untracked in the repo root.</li>
+    </ul>
+
+    <p style="margin:0"><strong>Needs Ryan</strong> — nothing new, and the count stays at 23. R21's <em>"timing call"</em> was a deploy call,
+      and by this page's precedent deploy calls are not counted. The R38 OTA is also a deploy call.</p>
+  </div>
 
   <div class="card okc" id="update-2026-10-02-2231">
     <h3 style="margin:0 0 8px">2026-10-02, 22:31 — R36 decided and fixed in code, unsent invites catch up, step 8 done; only the ship is left</h3>
@@ -298,7 +401,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         address.</strong> He chose this over turning on <em>Confirm email</em> product-wide, and over dropping no-account email invites for
         now. <em>Relayed by the building session and recorded in plan §5 and §8b (<code>d89a3181</code>).</em> Recorded under
         <a href="#d1">Decision 1 → Amended 2026-10-02</a>.</li>
-      <li><strong>Built in <code>42579aca</code>, local and unpushed. Verified in the tree:</strong>
+      <li><strong>Built in <code>42579aca</code>, local and unpushed at the time.</strong> <em>(2026-10-04: on production since 2026-10-03
+        02:35Z, <code>dpl_6uSca5oE…</code>.)</em> <strong>Verified in the tree:</strong>
         <ul style="margin:4px 0 0 18px">
           <li><strong>The token</strong> is 32 random bytes, and only its SHA-256 is stored (<code>lib/crews/inviteToken.ts:13-20</code>). It
             is armed in the same conditional update that marks the invite as sent, and only while the invite is still to an address
@@ -371,7 +475,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <ul style="margin:0 0 10px 18px">
       <li><strong><a href="#r36">R36</a>: 🟡 → ✅ fixed in code, not deployed.</strong> It was never live. No crew route is on production, and
         the fix goes out in the same push as the feature. Like R1 and R22, it is closed in code only. It becomes closed on production when the
-        API deploys, with 155 and 156 already applied. Two residuals are recorded on the row and not numbered:
+        API deploys, with 155 and 156 already applied. <em>(2026-10-04: it did, on 2026-10-03 02:35Z, so R36 is closed on production.
+        Residual 1 below was fixed before that deploy, in <code>c79df712</code>.)</em> Two residuals are recorded on the row and not
+        numbered:
         <ul style="margin:4px 0 0 18px">
           <li><strong>The token leaves the fragment on the sign-up path.</strong> When the reader is signed out, the page's <em>Sign up</em>
             and <em>Log in</em> links put <code>/crew-invite#&lt;token&gt;</code>, URL-encoded, into a <code>redirectTo</code> query
@@ -412,7 +518,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
     <p style="margin:0 0 6px"><strong>Needs Ryan</strong></p>
     <ul style="margin:0 0 0 18px">
-      <li><strong>Pushing.</strong> A push is a deploy, and it is your say-so. <code>master</code> is 44 ahead after this commit.</li>
+      <li><s><strong>Pushing.</strong> A push is a deploy, and it is your say-so. <code>master</code> is 44 ahead after this commit.</s>
+        ✅ <em>Pushed; on production since 2026-10-03 02:35Z (noted 2026-10-04).</em></li>
       <li><strong><a href="#r36">R36</a>, residual 2, only if you want to rule on it:</strong> an invite to an address that already has an
         account goes to that account, whoever registered it. Plan §8b treats this as platform-wide.</li>
       <li><strong><code>SPORTPOOL_PROGRAMME 2.md</code></strong> is still there. Untouched.</li>
@@ -714,7 +821,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         depends on the <code>users</code> SELECT policies, and no repo migration defines those. Not checked. Nothing raised.</li>
       <li><strong>The plan's effort estimate was overtaken.</strong> RN steps 4–7 (about 12½ of the plan's ~15 days) and the ~1½-day web
         slice were committed in one evening (20:43–21:46). <em>Built</em> here means committed, with unit tests passing, and for the web,
-        seen on localhost. It does not mean seen working end to end, because the RN screens cannot reach their API until it deploys. The
+        seen on localhost. It does not mean seen working end to end, because the RN screens cannot reach their API until it deploys
+        <em>(it deployed 2026-10-03)</em>. The
         plan's remaining sizes (8b ~3½ days, steps 8–10 ~½ day) are not re-sized here.</li>
     </ul>
 
@@ -725,8 +833,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         to off: neither sign-up flow handles a sign-up that returns no session. A fact to check, not a product decision.</s> ✅
         <strong>Answered: off</strong> (building session's production query). The fix is now the open call
         (<a href="#update-2026-10-02-late">2026-10-02, late night → Needs Ryan</a>).</li>
-      <li><strong>Pushing.</strong> <code>master</code> is 34 ahead after this commit. A push is a deploy, and step 9's order is in the
-        plan.</li>
+      <li><s><strong>Pushing.</strong> <code>master</code> is 34 ahead after this commit. A push is a deploy, and step 9's order is in the
+        plan.</s> ✅ <em>Pushed; on production since 2026-10-03 02:35Z (noted 2026-10-04).</em></li>
       <li><strong><code>SPORTPOOL_PROGRAMME 2.md</code></strong> is still there. Untouched.</li>
     </ul>
   </div>
@@ -748,7 +856,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       against the allow-list. The production facts come from the fixing session and were <strong>not</strong> re-queried here.</p>
     <p class="sec-sub" style="margin:0 0 10px"><strong>Updated at the end of the day: the Crews build has started.</strong> Crews P2–P5
       and plan step 3, the schema, landed in four commits: <code>b31dcf10</code>, <code>859625ae</code>, <code>bc02a1b0</code> and
-      <code>20d4740f</code>. All four are local on <code>master</code> and <strong>not pushed</strong>. Both migrations are <strong>live on
+      <code>20d4740f</code>. All four are local on <code>master</code> and <strong>not pushed</strong> <em>(2026-10-04: all four on
+      production since 2026-10-03 02:35Z)</em>. Both migrations are <strong>live on
       production</strong>. I read every file the four commits touch, and I re-ran their three test files (3 files, 26 tests, all pass) and
       the web type-check in the tree. The production facts are <strong>reported by the building session</strong> and were <strong>not</strong>
       re-queried here: both applies, the 643-pool checks, the dry runs and the <code>prosrc</code> match. Step 4 then began in two more
@@ -833,7 +942,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <p style="margin:0 0 6px"><em>Earlier on 2026-10-02:</em></p>
     <ul style="margin:0 0 10px 18px">
       <li><strong>R32 fixed: migration <code>151_a_member_cannot_crown_themselves</code>, applied to production</strong>
-        (<code>schema_migrations</code> 20261002214554; commit <code>6c51140c</code>, local and not pushed). It was proven on production
+        (<code>schema_migrations</code> 20261002214554; commit <code>6c51140c</code>, local and not pushed at the time, on production since
+        2026-10-03 02:35Z). It was proven on production
         before the fix, in a rolled-back transaction. <code>scripts/verify-pool-member-guard.sql</code> passes 8/8 on production, and the
         live <code>prosrc</code> is byte-identical to the file. <strong>Whether anyone used the hole before today is unknown:</strong> 70
         admin rows across 48 pools are not the pool's creator, and nothing records who promoted whom. <strong>Crews P1 is done</strong>,
@@ -845,7 +955,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         was partly wrong.</li>
       <li><strong>R34 fixed later that night: migration <code>152_a_member_cannot_score_themselves</code>, applied to production</strong>
         (<code>schema_migrations</code> 20261002231437; commit <code>bd7a7bb5</code>, local and not pushed; <code>master</code> is 8 commits
-        ahead of <code>origin/master</code>). It is an allow-list trigger on INSERT and UPDATE, built from an audit of every writer.
+        ahead of <code>origin/master</code>. <em>2026-10-04: on production since 2026-10-03 02:35Z, and the gap is zero</em>). It is an allow-list trigger on INSERT and UPDATE, built from an audit of every writer.
         <code>scripts/verify-pool-entry-guard.sql</code> passes 17/17 on production, rolled back, with a non-super pool admin. The live
         <code>prosrc</code> is byte-identical to the file. <strong>No evidence it was used:</strong> every non-zero adjustment (164) matches
         the <code>point_adjustments</code> log, and every stored total equals its parts. <strong>The device-clock tiebreak is closed
@@ -1006,9 +1116,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><strong><code>SPORTPOOL_PROGRAMME 2.md</code>: delete it or keep it.</strong> It is an untracked, superseded copy of the
         markdown. Its only unique content was the settlement text, now restored. Left in place, it will eventually be read as the
         programme. It is not mine to delete.</li>
-      <li><strong>Pushing.</strong> <code>master</code> was 15 ahead at the cut, and 17 by 20:54: the Crews plan and its build commits, R32,
+      <li><s><strong>Pushing.</strong> <code>master</code> was 15 ahead at the cut, and 17 by 20:54: the Crews plan and its build commits, R32,
         R34, and the programme updates. Both Crews migrations are already live, and they do not wait on a deploy. The code halves of P4 and P5 reach users only
-        when you push.</li>
+        when you push.</s> ✅ <em>2026-10-04: pushed. All of it is on production since 2026-10-03 02:35Z.</em></li>
       <li><s>take the R32 fix.</s> ✅ Done 2026-10-02 (151).</li>
       <li><s><strong>Take <a href="#r34">R34</a>'s writer audit plus the allow-list fix, and say when.</strong></s> ✅ Done 2026-10-02
         (152).</li>
@@ -1042,7 +1152,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li>✅ <strong>Seven stranded fixtures recovered</strong> — all <code>completed_at = 2026-09-19 22:19:46Z</code>: Osasuna–Espanyol,
         Racing–Alavés, Real Madrid–Rayo, Sevilla–Valencia, Athletic–Elche, Lazio–AC Milan, Monaco–Lens. Six sat <strong>7 days</strong>,
         Monaco–Lens <strong>1</strong>. Standings for La Liga / Serie A / Ligue 1 refreshed at 22:19:5x.</li>
-      <li>✅ <strong><code>fc23239</code></strong> (local, <strong>unpushed</strong>) — step 3b fetches strays <strong>by fixture id</strong>
+      <li>✅ <strong><code>fc23239</code></strong> (local, <strong>unpushed</strong>; <em>2026-10-04: on production since 2026-09-27
+        20:33Z</em>) — step 3b fetches strays <strong>by fixture id</strong>
         (<code>getFixturesByIds</code>, <code>client.ts:242</code>; <code>syncLeagueFixtures.ts:600-643</code>); note gains
         <code>stray_by_id=fetched/asked</code>; tests V3.13–V3.15, file <strong>60/60</strong>. <strong><code>6eb14e4</code></strong> —
         <code>scripts/run-league-sync.ts</code> was dead at import since <code>a3c3e19</code> (2 Sep); shim
@@ -1051,8 +1162,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
     <p style="margin:0 0 6px"><strong>Now</strong></p>
     <ol style="margin:0 0 10px 18px">
-      <li><strong>Push + deploy <code>fc23239</code></strong> — the scheduled sync runs the old arm until then; the next
-        placeholder-before-kickoff game strands again, silently. <strong>R30.</strong></li>
+      <li><s><strong>Push + deploy <code>fc23239</code></strong> — the scheduled sync runs the old arm until then; the next
+        placeholder-before-kickoff game strands again, silently. <strong>R30.</strong></s> ✅ <em>Deployed 2026-09-27. It stranded once
+        more anyway, and a second fix followed on 2026-10-01 (<a href="#r30">R30</a>).</em></li>
       <li><strong>Decide what the outbox does with a stale event</strong> — the first drain <strong>replayed 38
         <code>matchweek_completed</code> events from MW2–MW4</strong> (oldest 19 days); no age guard in
         <code>league-outbox/route.ts</code>. Allowlist limited it to 7 pickem/showdown pools, ≤104 emails, ≤16 distinct users, mostly UX
@@ -1068,12 +1180,13 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <div class="note warn"><strong>Drift.</strong> <strong>R21 is stale in the load-bearing way:</strong> the register still says production is
       <code>6dc5710</code> (24 Aug), 225 commits behind. <code>origin/master</code> is <strong><code>a8dee7f</code> (12 Sep)</strong> and the four
       league routes answer 401 — the deploy the register calls "not attempted" happened. The current gap is <strong>109 commits unpushed</strong>
-      (incl. <code>fc23239</code>). A full re-audit of R21 and <em>Ship what is built</em> is owed; not done in this pass. The sentences
+      (incl. <code>fc23239</code>). A full re-audit of R21 and <em>Ship what is built</em> is owed; not done in this pass. <em>(Done
+      2026-10-04: the gap closed on 2026-09-27 and is zero today, and <a href="#r21">R21</a> is closed.)</em> The sentences
       <em>"league-notices is undeployed and therefore unschedulable"</em> and <em>"cron.job holds no league job of any kind"</em> were true on
       2026-09-02 and are false tonight; annotated in the markdown.</div>
 
-    <p style="margin:8px 0 0"><strong>Needs Ryan</strong> — push <code>fc23239</code> + <code>6eb14e4</code> (pushing <code>master</code> is a
-      production deploy; only he does it). <strong>R31:</strong> drop or mark-without-sending any notification event older than N hours? Today it
+    <p style="margin:8px 0 0"><strong>Needs Ryan</strong> — <s>push <code>fc23239</code> + <code>6eb14e4</code> (pushing <code>master</code> is a
+      production deploy; only he does it).</s> ✅ <em>Pushed; on production since 2026-09-27 20:33Z.</em> <strong>R31:</strong> drop or mark-without-sending any notification event older than N hours? Today it
       sends. <em>"We tell you how you did when a matchweek finishes"</em> passes the disclosure gate; <em>"…three weeks later, in a batch"</em>
       does not.</p>
   </div>
@@ -1084,11 +1197,12 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       a sealed draw and a walkout reveal, duel points feeding the season leaderboard, Last Man Standing, Table mode, avatars, banter
       as its own surface, and a live engine that scores while a game is being played. <strong>1,244 tests pass across 92 files</strong>
       (re-run 2026-09-02), up from 625 on 2026-08-28 — and those 92 include <code>mobile/</code> <strong>for the first time</strong>.</p>
-    <p style="margin:0 0 10px"><strong>None of it is in production, and that is the single largest risk in this document.</strong>
+    <p style="margin:0 0 10px"><em>(2026-10-04: this paragraph is the 2026-09-02 record. It has been in production since 2026-09-11, and
+      <a href="#r21">R21</a> is closed.)</em> <s><strong>None of it is in production, and that is the single largest risk in this document.</strong>
       <code>origin/master</code> is still <code>6dc5710</code>, <strong>24 August</strong>. <code>Development</code> is
       <strong>225 commits ahead</strong>, and roughly <strong>thirty migrations have been applied to the shared production
       database</strong> past the code that is serving members. Two live Premier League pools are being run by real people against the
-      24 August app. This is not a backlog item; it is a state the product is in every minute it stays there — <strong>R21</strong>.</p>
+      24 August app. This is not a backlog item; it is a state the product is in every minute it stays there — <strong>R21</strong>.</s></p>
   </div>
 
   <div class="card okc">
@@ -1100,7 +1214,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       device in the Expo dev app.</p>
     <p style="margin:0"><strong>⚠ It is a read-only surface by decision</strong> — picking on a phone is still not built for any of
       the four league modes (<em>Decision 14</em>), league pushes still dead-end, there has been no formal device QA beyond Ryan's
-      look, and <strong>none of it is deployed</strong>. Detail: <a href="#rn-league">📱 The RN league build</a>.</p>
+      look, and <strong>none of it is deployed</strong> <em>(2026-10-04: deployed 2026-09-11)</em>. Detail: <a href="#rn-league">📱 The RN
+      league build</a>.</p>
   </div>
 
   <details class="card neutral">
@@ -1171,21 +1286,33 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 <!-- ============================ STATUS ============================ -->
 <section id="status">
   <h2 class="sec">Status at a glance <span class="chip ok">REFRESHED 2026-09-02</span></h2>
-  <p class="sec-sub">Counts are of what the <strong>markdown</strong> records, on <strong>2026-09-02</strong>, at each risk's
-    <em>current</em> level. Risk levels are defined in the register below. Closed risks stay on the register and are counted
+  <p class="sec-sub">Counts are of what the <strong>markdown</strong> records, on <strong>2026-09-02</strong> and moved by the notes
+    below (latest: <strong>2026-10-04, late</strong>), at each risk's <em>current</em> level. Risk levels are defined in the register below. Closed risks stay on the register and are counted
     separately, not deleted.</p>
   <div class="strip">
-    <div class="stat crit"><div class="n">2</div><div class="l">🔴 Critical risks</div></div>
-    <div class="stat high"><div class="n">13</div><div class="l">🟠 High risks</div></div>
-    <div class="stat med"><div class="n">12</div><div class="l">🟡 Medium risks</div></div>
-    <div class="stat low"><div class="n">2</div><div class="l">🟢 Low risks</div></div>
-    <div class="stat low"><div class="n">9</div><div class="l">✅ Closed (4 prod-verified by audit, + R32 and R34 by their fixing sessions, + R36 in code only)</div></div>
+    <div class="stat crit"><div class="n">1</div><div class="l">🔴 Critical risks</div></div>
+    <div class="stat high"><div class="n">12</div><div class="l">🟠 High risks</div></div>
+    <div class="stat med"><div class="n">13</div><div class="l">🟡 Medium risks</div></div>
+    <div class="stat low"><div class="n">1</div><div class="l">🟢 Low risks</div></div>
+    <div class="stat low"><div class="n">11</div><div class="l">✅ Closed (4 prod-verified by audit, + R32 and R34 by their fixing sessions, + R1, R15, R21, R22 and R36 by deploy evidence, 2026-10-04)</div></div>
     <div class="stat pri"><div class="n">6</div><div class="l">Items in 🔥 Now</div></div>
     <div class="stat neu"><div class="n">9</div><div class="l">Projects</div></div>
     <div class="stat neu"><div class="n">15+5</div><div class="l">Settled decisions · product + infra (D1–D3 + D5 amended, D2 clarified 2026-10-02; D15 amended 2026-10-04)</div></div>
     <div class="stat neu"><div class="n">23</div><div class="l">Decisions needing Ryan (2026-10-02: +3 raised, all settled or taken; R32, R34 and R36 fixes taken)</div></div>
     <div class="stat neu"><div class="n">R38</div><div class="l">Highest risk id on the register</div></div>
   </div>
+  <p class="strip-note"><strong>Moved latest on 2026-10-04 (the "unpushed" notes, checked against production).</strong> Nothing on this
+    page waits on a push: local <code>master</code> = <code>origin/master</code> = production <code>2265c5d9</code>
+    (<code>dpl_B3ZDxGLYtvAWR1B1WzF7XqMhoTMG</code>, READY, aliased to sportpool.io). <a href="#r21">R21</a> closes, <strong>🔴 → ✅</strong>:
+    the deploy gap closed on 2026-09-11, reopened, closed again on 2026-09-27, and is zero today. Migrations 119–129 stay individually
+    unattested, and a written-but-unapplied migration (138) is a different failure that no deploy catches. <a href="#r30">R30</a> goes
+    <strong>🟠 → 🟡</strong>: both fixes are live (2026-09-27 and 2026-10-01) and production has 0 stranded fixtures, but the class beat one
+    deployed fix already and nothing alarms on it. <a href="#r15">R15</a> closes, <strong>🟢 → ✅</strong>: its own row said it stays until
+    deployed, and it was deployed by 2026-07-31. R1, <a href="#r22">R22</a> and <a href="#r36">R36</a> stay closed, now on production
+    rather than in code only. So 🔴 goes from 2 to <strong>1</strong>, 🟠 from 13 to <strong>12</strong>, 🟡 from 12 to <strong>13</strong>,
+    🟢 from 2 to <strong>1</strong>, and closed from 9 to <strong>11</strong>. Needing Ryan stays at <strong>23</strong>: R21's timing call
+    was a deploy call, not counted by precedent. Two unrecorded events surfaced: R30's second strand (2026-10-01) and the Crews ship
+    (2026-10-03). See <a href="#update-2026-10-04-deploy-notes">the 2026-10-04 update</a>.</p>
   <p class="strip-note"><strong>Moved later on 2026-10-04 (Showdown pushed and deployed).</strong> Ryan approved the push.
     <code>origin/master</code> is <code>11ae5f9a</code>, and Vercel production <code>dpl_GNdVmRRjNuWLiwKJUrBMfPc3aB7R</code> is READY at
     that sha and aliased to sportpool.io (checked by me, Vercel API). <a href="#r37">R37</a>'s main case is closed: the create route now
@@ -1264,14 +1391,16 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <strong>R31 is new</strong> 🟡 — the outbox has no age guard and its first drain replayed 38 stale matchweek recaps.
     ⚠ <strong>R21 is counted 🔴 below as written, but is stale:</strong> <code>origin/master</code> moved to <code>a8dee7f</code> on 12 Sep and
     the league routes are live; the current gap is 109 unpushed commits. Re-levelling owed after a full pass.</p>
-  <p class="strip-note"><strong>Current levels, R1–R38, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R36 on 2026-10-02, R37–R38 on 2026-10-04, R37 re-levelled later that day).</strong>
-    <strong>🔴</strong> R2 · R21 (stale, see above). &nbsp;
-    <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27 · <strong>R30</strong>. &nbsp;
-    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R31</strong> · <strong>R33</strong> · <strong>R35</strong> (provisional) · <strong>R37</strong> (residual only) · <strong>R38</strong> (app copy only, until an OTA). &nbsp;
-    <strong>🟢</strong> R11 · R15. &nbsp;
-    <strong>✅ closed</strong> R1 · R4 · R13 · R17 · R22 · R26 · <strong>R32</strong> · <strong>R34</strong> · <strong>R36</strong> (in code only, 2026-10-02 22:22). Of these, <strong>R4, R13, R17
+  <p class="strip-note"><strong>Current levels, R1–R38, as the markdown has them (R1–R29 on 2026-09-02, R30–R31 on 2026-09-19, R32–R36 on 2026-10-02, R37–R38 on 2026-10-04, R37 re-levelled later that day; R15, R21 and R30 re-levelled late on 2026-10-04).</strong>
+    <strong>🔴</strong> R2. &nbsp;
+    <strong>🟠</strong> R3 · R5 · R6 · R7 · R12 · R14 · R16 · R18 · R19 · R20 (prod half) · R23 · R27. &nbsp;
+    <strong>🟡</strong> R8 · R9 · R10 · R24 · R25 · R28 · R29 · <strong>R30</strong> (both fixes live; no alarm) · <strong>R31</strong> · <strong>R33</strong> · <strong>R35</strong> (provisional) · <strong>R37</strong> (residual only) · <strong>R38</strong> (app copy only, until an OTA). &nbsp;
+    <strong>🟢</strong> R11. &nbsp;
+    <strong>✅ closed</strong> R1 · R4 · R13 · R15 · R17 · R21 · R22 · R26 · <strong>R32</strong> · <strong>R34</strong> · <strong>R36</strong>. Of these, <strong>R4, R13, R17
     and R26 are prod-verified</strong> by audit. <strong>R32</strong> and <strong>R34</strong> are closed in the database, on their fixing
-    sessions' production runs, and need no deploy. R1 and R22 are closed <em>in code only</em>, and code is not production while <strong>R21</strong> stands.</p>
+    sessions' production runs, and need no deploy. <strong>R1, R15, R21, R22 and R36</strong> are closed on deploy evidence (2026-10-04:
+    the commit is in a READY production deployment; R1 and R22 since 2026-09-11, R15 by 2026-07-31, R36 since 2026-10-03). <s>R1 and R22
+    are closed <em>in code only</em>, and code is not production while <strong>R21</strong> stands.</s></p>
   <p class="strip-note"><strong>Moved 2026-09-02.</strong> <strong>R24</strong> 🟠 → 🟡 — the RN app could not read league data at
     all; the calendar and the pool card now reach the phone through server routes, and the three silent blanks on the match surfaces
     are fixed. <strong>R29 is new</strong> 🟡 — the root <code>tsconfig.json</code> compiles <code>mobile/**</code> into the web type
@@ -1283,7 +1412,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
 <!-- ============================ RISKS ============================ -->
 <section id="risks">
-  <h2 class="sec">🚨 Risk register <span class="count">R1–R38 · 9 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19 · R32–R36 added 2026-10-02 (R32 and R34 closed the same day) · R37–R38 added 2026-10-04 (Showdown draw; R37 🟠 → 🟡 the same day)</span></h2>
+  <h2 class="sec">🚨 Risk register <span class="count">R1–R38 · 11 closed · R20–R29 added 2026-09-02 · R30–R31 added 2026-09-19 · R32–R36 added 2026-10-02 (R32 and R34 closed the same day) · R37–R38 added 2026-10-04 (Showdown draw; R37 🟠 → 🟡 the same day) · R15 and R21 closed, R30 🟠 → 🟡, 2026-10-04 late</span></h2>
   <div class="note warn" style="margin-bottom:14px">
     <strong>⚠️ Mixed vintage — read the row dates.</strong> <strong>R1–R19</strong> below are <strong>2026-07-30 text</strong> and
     several have since closed or changed level; <strong>R20–R29</strong> were added on <strong>2026-09-02</strong> and are current.
@@ -1291,7 +1420,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <code>SPORTPOOL_PROGRAMME.md</code>. Notably: <strong>R1</strong> and <strong>R12</strong> are no longer what they say here — the
     <em>Delete Pool</em> button is gone from both surfaces (archive, migrations 040/041/044) and soft delete now exists
     (<code>pool_entries.retired_at</code>, 056/057), so the note below about "no soft-delete anywhere" is <strong>false as of
-    2026-09-02</strong> and is kept only as the record of why the two rows were split.
+    2026-09-02</strong> and is kept only as the record of why the two rows were split. <strong>2026-10-04:</strong> R1's archive has been
+    on production since 2026-09-11 (and in the app by OTA, runtime 1.0.0), so R1 is closed on production. <a href="#r15">R15</a> is closed:
+    its hoist was deployed by 2026-07-31.
   </div>
   <p class="quote">Standing reference, not an appendix. Opened 2026-07-26 from a full audit of this document against the
     code, migrations and git history. Every risk carries: <strong>what · blast radius · trigger · mitigation status ·
@@ -1461,7 +1592,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td>Decision 7 says "instrument admin retention"; nothing exists</td>
         <td><a href="#d7">Decision 7</a>; <a href="#i-superadmin-stats">Enhanced super-admin stats</a>; <a href="#crews">Crews</a></td>
       </tr>
-      <tr class="risk-med">
+      <tr class="risk-med" id="r8">
         <td class="id">R8</td>
         <td><strong>The feedback survey is past its own time box, and was held on a blocker that has cleared.</strong> All four
           fixes are on <code>origin/master</code> as of 2026-07-25</td>
@@ -1609,19 +1740,22 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td><strong>Open — Ryan's timing call.</strong> Needs a window where the deploy and the reseed run back to back</td>
         <td><a href="#i-xp-writers">XP has two writers</a> (🔥 Now)</td>
       </tr>
-      <tr class="risk-high">
+      <tr class="risk-high" id="r15">
         <td class="id">R15</td>
-        <td>✅ <strong>FIXED IN CODE 2026-07-26; the hoist is now on <code>origin/master</code></strong>
+        <td>✅ <strong>CLOSED 2026-10-04 — deployed.</strong> The hoist is in the production deployment of 2026-07-31
+          (<code>dpl_2RUcX568…</code>, <code>4877aae1</code>, the oldest one I listed; <code>lib/analytics/entryAnalytics.ts:201, :223</code> at
+          that sha), and it is still at <code>HEAD</code> (<code>:208</code>, <code>:230</code>). This row said it stays until deployed.
+          <s><strong>FIXED IN CODE 2026-07-26; the hoist is now on <code>origin/master</code></strong>
           (<code>computeCrowdConsensus</code> at <code>lib/analytics/entryAnalytics.ts:201</code>, <code>applyCrowdOverlay</code> at
           <code>:223</code>, checked 2026-07-30 — <em>whether that commit is deployed on Vercel is still prod state and
-          unverified</em>). <strong>The performance work had put full-pool analytics on the scoring path.</strong>
+          unverified</em>).</s> <strong>The performance work had put full-pool analytics on the scoring path.</strong>
           <code>lib/push/badges.ts:156</code> calls <code>computePoolEntryAnalytics</code> for the whole pool on every
           badge run, and badge runs fire from <code>lib/scoring/recalculate.ts:93</code> and <code>:322</code> on every recalc. That
           helper called <code>computeCrowdPredictions</code> <strong>once per entry</strong> — the exact O(entries × predictions) loop
           this same session hoisted out of three other call sites, left un-hoisted in the fourth. <strong>Now hoisted</strong>
           (<code>lib/analytics/entryAnalytics.ts:201</code> consensus once, <code>:223</code> overlay per entry), matching the other
           three</td>
-        <td><span class="chip lvl-high">🟠 HIGH</span> → <span class="chip lvl-low">🟢 on deploy</span></td>
+        <td><span class="chip lvl-high">🟠 HIGH</span> → <span class="chip lvl-low">🟢</span> → <span class="chip ok">✅ CLOSED (deployed)</span></td>
         <td class="blast">Was: 192 entries × 13,385 predictions ≈ <strong>2.6M iterations per recalc</strong> on the largest pool,
           net-new, on the path with a documented kickoff CPU spike behind it. Now O(n + m); the full-pool prediction pull remains and is
           inherent to the design</td>
@@ -1630,7 +1764,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td><strong>Fixed and verified in code.</strong> The file header, which <em>claimed</em> the hoist while the code below did the
           opposite, is corrected; its STATUS now reads <em>"LIVE, ON THE SCORING PATH — treat added work here as scoring-path cost"</em>
           instead of <em>"DRAFT, not imported by any live code path"</em> — the more durable half of the fix</td>
-        <td><strong>New — fixed, no decision needed.</strong> Stays on the register until deployed</td>
+        <td><strong>New — fixed, no decision needed.</strong> Stays on the register until deployed. ✅ <em>Deployed by 2026-07-31; closed
+          2026-10-04</em></td>
         <td><a href="#perf">⚡ Performance &amp; caching</a>; <a href="#next-scale">Kickoff write spike</a></td>
       </tr>
       <tr class="risk-high">
@@ -1702,42 +1837,55 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         2026-07-30 and several have since moved</strong> — the current levels are listed in the status strip.
       </td></tr>
 
-      <tr class="risk-crit">
+      <tr class="risk-crit" id="r21">
         <td class="id">R21</td>
-        <td><div class="note warn" style="margin:0 0 8px">⚠ <strong>STALE AS WRITTEN — noted 2026-09-19, not re-levelled.</strong>
+        <td><div class="note ok" style="margin:0 0 8px">✅ <strong>CLOSED 2026-10-04 — the gap is zero.</strong> Local <code>master</code> =
+          <code>origin/master</code> = <code>2265c5d9</code>, <code>origin/Development</code> has nothing <code>master</code> lacks, and
+          Vercel production <code>dpl_B3ZDxGLYtvAWR1B1WzF7XqMhoTMG</code> is READY at that sha and aliased to sportpool.io. The 2026-09-02
+          <code>Development</code> tip (<code>c98a037</code>) reached production on <strong>2026-09-11 13:54Z</strong>
+          (<code>dpl_BJoPWXP6…</code>), so the 225-commit gap below closed then. A new gap of 109 commits was open by 2026-09-19, and closed on
+          <strong>2026-09-27 20:33Z</strong> (<code>dpl_9bCps3qT…</code>). <strong>What this does not close:</strong> 119, 120, 123–126, 128
+          and 129 are still individually unattested, and a migration written but never applied (138, found 2026-10-04) is a different
+          failure that no deploy catches. The app is a separate channel, gated by OTA (<a href="#r38">R38</a>).</div>
+          <s>⚠ <strong>STALE AS WRITTEN — noted 2026-09-19, not re-levelled.</strong>
           <code>origin/master</code> is <strong><code>a8dee7f</code> (12 Sep)</strong>; all four <code>/api/cron/league-*</code> routes answer
           <strong>401</strong> in production. Current gap: <strong>109 commits unpushed</strong> on local <code>master</code>, including the
-          R30 fix. Everything below describes 2026-09-02; full re-audit owed.</div>
+          R30 fix. Everything below describes 2026-09-02; full re-audit owed.</s>
           <strong>Production is 225 commits and ~30 migrations behind the code.</strong> <code>origin/master</code> =
           <code>6dc5710</code> (24 Aug), unmoved; <code>Development</code> = <code>c98a037</code> (2 Sep). Migrations have been
           applied to the <strong>shared</strong> production database past the deployed code — <strong>121 makes a duel worth 500
           while the deployed <code>DuelsTab</code> treats anything that is not 3 or 1 as a LOSS</strong>, and <strong>110
           DROPPED</strong> <code>pools.league_table_revealed_at</code> plus two functions. The exact shape of the 2026-08-22
-          outage: schema and code disagreeing at HTTP 200</td>
-        <td><span class="chip lvl-crit">🔴 CRITICAL</span></td>
-        <td class="blast"><strong>Everything.</strong> Two real Premier League pools with real members are running the 24 Aug app.
+          outage: schema and code disagreeing at HTTP 200 <em>(the 2026-09-02 record, kept)</em></td>
+        <td><span class="chip lvl-crit">🔴 CRITICAL</span> → <span class="chip ok">✅ CLOSED</span></td>
+        <td class="blast"><em>Was:</em> <strong>Everything.</strong> Two real Premier League pools with real members are running the 24 Aug app.
           Every ✅ in this document below the Premier League heading describes code no member can reach</td>
-        <td><strong>Already triggered</strong>, and compounding daily. It resolves only by deploying</td>
-        <td><strong>None.</strong> No deploy attempted. The migrations <em>have</em> run — five probes confirmed 099, 105, 110,
+        <td><strong>Already triggered</strong>, and compounding daily. It resolves only by deploying. ✅ <em>Resolved by deploying,
+          2026-09-11 and again 2026-09-27</em></td>
+        <td>✅ <strong>Deployed.</strong> <s><strong>None.</strong> No deploy attempted.</s> The migrations <em>have</em> run — five probes confirmed 099, 105, 110,
           115, 127; but 119, 120, 123–126, 128 and 129 are individually unattested, and absence of a record is not evidence of
           non-application</td>
-        <td>⏳ <strong>NEEDS RYAN — a timing call, not an engineering one.</strong> Wants a written order, and
-          <code>scripts/verify-select-columns.ts</code> run first</td>
+        <td>✅ <strong>Taken</strong> — <code>master</code> was pushed and deployed on 2026-09-11, and repeatedly since. <s>⏳ <strong>NEEDS
+          RYAN — a timing call, not an engineering one.</strong> Wants a written order, and <code>scripts/verify-select-columns.ts</code> run
+          first</s></td>
         <td>Ship what is built</td>
       </tr>
 
-      <tr class="risk-crit">
+      <tr class="risk-crit" id="r22">
         <td class="id">R22</td>
-        <td>✅ <strong>FIXED IN CODE 2026-09-02, ⛔ undeployed.</strong> Was: <code>app/api/account/delete/route.ts</code> destroyed
+        <td>✅ <strong>FIXED 2026-09-02, ON PRODUCTION SINCE 2026-09-11</strong> (<code>6aa2831</code> is in <code>dpl_BJoPWXP6…</code>; the
+          guard is still first at <code>HEAD</code>, <code>app/api/account/delete/route.ts:42-63</code>). <s>⛔ undeployed</s> <em>(corrected
+          2026-10-04)</em>. Was: <code>app/api/account/delete/route.ts</code> destroyed
           scores, predictions, entries and memberships and <em>only then</em> asked "do you still administer a pool?", returning
           400 — <strong>after</strong> the destruction. The guard is now first and its error is captured;
           <code>deleteOrder.guard.test.ts</code> was negative-tested. ⚠ Not transactional, and this door still
           <strong>hard-deletes rather than retiring</strong> (Gate A2, unanswered)</td>
-        <td><span class="chip lvl-crit">🔴 → ✅ code</span></td>
+        <td><span class="chip lvl-crit">🔴</span> → <span class="chip ok">✅ on production since 2026-09-11</span></td>
         <td class="blast">Any user who administers ≥1 pool and taps Delete Account — <strong>535 accounts</strong> by the R1 count.
           Irreversible, silent to everyone else in those pools, and it bypasses <code>retired_at</code> entirely</td>
         <td>One tap in account settings</td>
-        <td><strong>Fixed</strong> — <code>6aa2831</code>. <strong>Closes on deploy (R21), not on the commit</strong></td>
+        <td><strong>Fixed</strong> — <code>6aa2831</code>. <strong>Closes on deploy (R21), not on the commit.</strong> ✅ <em>Deployed
+          2026-09-11</em></td>
         <td>New — no call made</td>
         <td>Account deletion destroys everything before it checks (🔥 Now)</td>
       </tr>
@@ -1792,9 +1940,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <td class="blast"><strong>Every Table pool.</strong> Both frozen pools unfroze in the rolled-back test —
           <em>Premier League Test</em> moved <strong>760 → 940</strong></td>
         <td>Already triggered. Every completed fixture since 30 Aug widened it</td>
-        <td>⛔ <strong>The other half is still the deploy</strong> — standings are stale since 30 Aug because the sync that
-          refreshes them is undeployed and <code>league-standings</code> is unscheduled, so the trigger has nothing to react to.
-          Not observable live until 11 Sep (international break)</td>
+        <td><s>⛔ <strong>The other half is still the deploy</strong> — standings are stale since 30 Aug because the sync that
+          refreshes them is undeployed and <code>league-standings</code> is unscheduled, so the trigger has nothing to react to.</s>
+          ✅ <em>Landed (recorded in the markdown 2026-09-19): the sync deployed 2026-09-11 and <code>league-standings</code> was scheduled
+          weekly by migration 135; standings were refreshing on completion that night.</em> Not observable live until 11 Sep (international
+          break). Closing the row wants a Table-pool score observed moving on a real fixture, which no pass has checked</td>
         <td>New — no call made. ⚠ NOT fixed by the deploy alone</td>
         <td>Table mode — one decision, all season</td>
       </tr>
@@ -1872,10 +2022,23 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         ➕ R30–R31 — added 2026-09-19 from the league ingestion pass. Condensed; full cells in the markdown.
       </td></tr>
 
-      <tr class="risk-high">
+      <tr class="risk-med" id="r30">
         <td class="id">R30</td>
-        <td><strong>A fixture played before the placeholder date we hold for it is unreachable by every sync arm — fix built, NOT
-          deployed.</strong> ⚠️ New 2026-09-19, verified in code and production. Providers publish TBD placeholder kickoffs (La Liga: Sunday
+        <td><div class="note warn" style="margin:0 0 8px">🟡 <strong>BOTH FIXES DEPLOYED; it bit once more in between. Re-levelled 🟠 → 🟡
+          on 2026-10-04.</strong> <em>Verified this pass:</em> <code>fc23239</code> (stray-by-id) is on production since <strong>2026-09-27
+          20:33Z</strong> (<code>dpl_9bCps3qT…</code>). It did not prevent a <strong>second strand</strong>: five La Liga matchweek-7
+          fixtures, played 18–19 Sep against a stored 20 Sep 15:00Z, sat at <code>scheduled</code> with no score for <strong>11 days</strong>,
+          found on 2026-10-01 from a screenshot. Three gates closed in sequence: the day feed was built from the stored date,
+          <code>league-reconcile</code> deferred FT fixtures to the live arm, and the catch-up stopped offering a stray seven days on, so step
+          3b never got a candidate. <strong>Fix 2, <code>2c06229c</code>, on production since 2026-10-01 10:36Z</strong>
+          (<code>dpl_HMxXCPMq…</code>): no age floor on the catch-up, a spent by-id call is stamped (one call an hour), the reconcile corrects
+          the <em>schedule</em> of a fixture the feed says was played elsewhere (<code>played_elsewhere=N</code>), and it reads a postponed
+          fixture whose date has passed. The five were recovered by hand the same day (per the commit). ⚠ Matchweek 7's <code>lock_at</code>
+          stays at 20 Sep 11:00 (migration 101), so picks stayed open ~41h into the real matchweek; that cannot be undone. <strong>Production
+          today:</strong> <code>scripts/verify-league-stranded-fixtures.ts</code> passes in all five leagues, 0 stranded and 0 unreconciled
+          moves (run 2026-10-04).</div>
+          <em>Original, 2026-09-19:</em> <strong>A fixture played before the placeholder date we hold for it is unreachable by every sync
+          arm — fix built, NOT deployed.</strong> ⚠️ New 2026-09-19, verified in code and production. Providers publish TBD placeholder kickoffs (La Liga: Sunday
           15:00Z) and move the game later. The live sync and hourly catch-up build the request from the <strong>stored</strong> kickoff
           (<code>lib/integrations/apiFootball/syncLeagueFixtures.ts</code>); the daily reconcile reads only kickoffs <strong>ahead</strong> of
           the live window (<code>reconcileLeagueSchedule.ts:127</code>). Once the placeholder date passes, the game is asked for at the wrong
@@ -1883,15 +2046,21 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           production now carry a kickoff earlier than their original. <strong>Fix:</strong> <code>fc23239</code>, step 3b — strays fetched
           <strong>by id</strong> (<code>getFixturesByIds</code>, <code>client.ts:242</code>); note <code>stray_by_id=fetched/asked</code>; tests
           V3.13–V3.15, file 60/60</td>
-        <td><span class="chip lvl-high">🟠 HIGH</span></td>
+        <td><span class="chip lvl-high">🟠 HIGH</span> → <span class="chip lvl-med">🟡 MEDIUM</span></td>
         <td class="blast"><strong>Every league pool, every mode</strong> — an unscored fixture is a silently wrong leaderboard, duel and LMS
           round for as long as it lasts. Tonight: 7 fixtures (5 La Liga MW5, Lazio–AC Milan, Monaco–Lens), six of them for
           <strong>7 days</strong>. All recovered, <code>completed_at = 22:19:46Z</code></td>
-        <td><strong>One provider reschedule to an earlier day</strong> after the daily reconcile has passed it. La Liga does this weekly</td>
-        <td><strong>Half.</strong> Reconcile now scheduled (135) — catches a move while the placeholder is still ahead. The by-id fallback
-          is <strong>committed locally, unpushed</strong>; the scheduled sync runs the old arm. Manual recovery:
-          <code>scripts/run-league-sync.ts</code> from the local checkout (<code>6eb14e4</code>)</td>
-        <td>⏳ <strong>NEEDS RYAN — push + deploy <code>fc23239</code>.</strong> Pushing <code>master</code> is a production deploy</td>
+        <td><strong>One provider reschedule to an earlier day</strong> after the daily reconcile has passed it. La Liga does this weekly.
+          <em>2026-10-04: both cases are covered by the two deployed fixes. What remains is a third way to strand that nobody has seen yet,
+          and nothing would alarm on it</em></td>
+        <td>✅ <strong>Applied, both halves</strong> <em>(2026-10-04)</em>: reconcile scheduled (135), stray-by-id live (2026-09-27), catch-up
+          and reconcile changes live (2026-10-01). <s>The by-id fallback is <strong>committed locally, unpushed</strong>; the scheduled sync
+          runs the old arm.</s> ⚠ <strong>No alarm.</strong> Detection is <code>scripts/verify-league-stranded-fixtures.ts</code>, run by hand
+          (it exits 1 on a strand, so it could gate a deploy or a cron); both strands so far were found from a screenshot. <strong>Why 🟡 and
+          not ✅:</strong> this class has beaten one deployed fix already, and a recurrence is silent wrong data. Manual recovery:
+          <code>scripts/run-league-sync.ts</code> and <code>scripts/run-league-reconcile.ts --apply</code> (<code>6eb14e4</code>)</td>
+        <td>✅ <s>⏳ <strong>NEEDS RYAN — push + deploy <code>fc23239</code>.</strong></s> <strong>Taken:</strong> pushed and deployed
+          2026-09-27, and fix 2 on 2026-10-01. No call recorded on an alarm for this class</td>
         <td>Decision 10 → league-reconcile; League ingestion; R21</td>
       </tr>
 
@@ -1920,8 +2089,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <tr class="risk-crit" id="r32">
         <td class="id">R32</td>
         <td>✅ <strong>CLOSED 2026-10-02: migration 151 is applied to production, and the self-promotion is shut.</strong>
-          <code>lib/migrations/151_a_member_cannot_crown_themselves.sql</code>, commit <code>6c51140c</code>. The commit is <strong>local,
-          not pushed</strong>, and needs no deploy, because the whole fix lives in the database. It is applied as
+          <code>lib/migrations/151_a_member_cannot_crown_themselves.sql</code>, commit <code>6c51140c</code>. The commit <s>is <strong>local,
+          not pushed</strong></s> has been on production since 2026-10-03 02:35Z <em>(corrected 2026-10-04)</em>, and needs no deploy, because the whole fix lives in the database. It is applied as
           <code>schema_migrations</code> version <strong>20261002214554</strong>.
           <strong>The hole was proven on production before the fix</strong>, inside a rolled-back transaction. A real player in a finished
           pool PATCHed their own row: <code>rows=1</code>, <code>role</code> became <code>'admin'</code> and <code>is_pool_admin()</code>
@@ -1999,8 +2168,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <tr class="risk-crit" id="r34">
         <td class="id">R34</td>
         <td>✅ <strong>CLOSED 2026-10-02: migration 152 is applied to production, and a member can no longer write their own
-          score.</strong> <code>lib/migrations/152_a_member_cannot_score_themselves.sql</code>, commit <code>bd7a7bb5</code>. The commit is
-          <strong>local, not pushed</strong>, and needs no deploy, because the whole fix lives in the database. It is applied as
+          score.</strong> <code>lib/migrations/152_a_member_cannot_score_themselves.sql</code>, commit <code>bd7a7bb5</code>. The commit
+          <s>is <strong>local, not pushed</strong></s> has been on production since 2026-10-03 02:35Z <em>(corrected 2026-10-04)</em>, and needs
+          no deploy, because the whole fix lives in the database. It is applied as
           <code>schema_migrations</code> version <strong>20261002231437</strong>.
           <strong>The fix</strong> (read this pass) is an allow-list trigger, <code>guard_pool_entry_writes()</code>, on <strong>BEFORE
           INSERT OR UPDATE</strong> (<code>:75-178</code>), built from an audit of every writer (<code>:28-43</code>).
@@ -2126,8 +2296,14 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
       <tr class="risk-med" id="r36">
         <td class="id">R36</td>
-        <td>✅ <strong>FIXED IN CODE 2026-10-02 (<code>42579aca</code>, 22:22), not deployed: an email invite is claimed by its one-time link,
-          never by its address.</strong> <strong>Decided by Ryan, 2026-10-02</strong> (relayed by the building session; I did not see the
+        <td>✅ <strong>CLOSED ON PRODUCTION 2026-10-03: an email invite is claimed by its one-time link, never by its address.</strong>
+          <em>(Corrected 2026-10-04. Was "fixed in code 2026-10-02, <code>42579aca</code>, 22:22, not deployed".)</em> <em>Verified this
+          pass:</em> the web half is on production since 2026-10-03 02:35Z (<code>dpl_6uSca5oE…</code>); <code>/api/crews</code> answers 401
+          and <code>/crew-invite</code> 200; <code>crew_invites.token_hash</code> and <code>notified_at</code> exist (155 and 156); the app's
+          half (<code>AddPeopleSheet</code>, <code>PoolCrewLine</code>) is in the OTA from <code>406f644d</code> on both platforms.
+          <strong>Residual 1 is fixed</strong>, before that deploy: <code>c79df712</code> keeps the token out of every URL, and the sign-up
+          and log-in links carry only the page path (<code>lib/crews/inviteLink.ts:19-20</code>; the token moves to <code>localStorage</code>,
+          <code>app/crew-invite/CrewInvite.tsx:71</code>). Residual 2 stands. <strong>Decided by Ryan, 2026-10-02</strong> (relayed by the building session; I did not see the
           call): the link, over turning on <em>Confirm email</em> product-wide or dropping no-account email invites for now. <em>The fix,
           verified in the tree:</em> a 32-byte token, stored only as a SHA-256 (<code>lib/crews/inviteToken.ts:13-20</code>), armed in the same
           conditional update that marks the invite as sent (<code>lib/crews/notify.ts:367-377</code>). The link is
@@ -2135,10 +2311,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           update that hands over, answers and clears the token (<code>lib/crews/store.ts:555-568</code>). It refuses the inviter and a removed
           member (<code>lib/crews/rules.ts:184</code>). Address matching is removed with every caller (grep). <em>Building session, not
           re-checked:</em> migration <strong>155</strong> is applied to production (column, CHECK and unique index confirmed by query).
-          ⚠ <strong>Residual 1, the token leaves the fragment on the sign-up path.</strong> Signed out, the page's <em>Sign up</em> and <em>Log
+          <s>⚠ <strong>Residual 1, the token leaves the fragment on the sign-up path.</strong> Signed out, the page's <em>Sign up</em> and <em>Log
           in</em> links carry the token URL-encoded in a <code>redirectTo</code> query (<code>app/crew-invite/CrewInvite.tsx:87, :103,
           :108</code>). So it does reach the server and a page that loads Google Tag Manager (<code>app/layout.tsx:117-118</code>), contrary to
-          the design note. The exposure ends at the claim. Whether GTM records the query is unverified. ⚠ <strong>Residual 2:</strong> an invite
+          the design note. The exposure ends at the claim. Whether GTM records the query is unverified.</s> ✅ <em>Fixed in
+          <code>c79df712</code>, before deploy (see above).</em> ⚠ <strong>Residual 2:</strong> an invite
           to an address that already has an account still goes to that account (<code>store.ts:428</code>), so whoever registered the address
           first gets the card. Plan §8b calls that platform-wide; no call from Ryan is recorded on it. <em>As found:</em> An email invite to a
           crew could go to whoever registered the address first. ⚠️ New 2026-10-02, found while
@@ -2160,14 +2337,17 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           A claim reads only the account's address and <code>email_confirmed_at</code> (<code>lib/crews/store.ts:484-488</code>). It never
           checks whether an invite email went out. So with the API live and <code>crew_notices_enabled</code> off, the address's owner gets no
           email, and someone else can still claim the invite</td>
-        <td><span class="chip lvl-med">🟡</span> → <span class="chip ok">✅ FIXED IN CODE</span> (was 🟡, provisional, then confirmed)</td>
+        <td><span class="chip lvl-med">🟡</span> → <span class="chip ok">✅ ON PRODUCTION SINCE 2026-10-03</span> (was 🟡, provisional, then
+          confirmed, then fixed in code)</td>
         <td class="blast">Any email invite to an address with no account. The claimant joins the crew with one tap on <em>Join</em>. They
           then see its members, all-time table and past seasons, and get a saved spot in its future pools. The real owner later finds the
           address taken. <strong>Likelihood is low:</strong> the claimant must know both the address and that an invite is waiting.
-          <strong>Dormant now:</strong> no invite can be created until the API deploys. <em>Level unchanged on confirmation: what changed is
+          <s><strong>Dormant now:</strong> no invite can be created until the API deploys.</s> <em>(The API deployed 2026-10-03 with the
+          fix in it, so the hole was never live.)</em> <em>Level unchanged on confirmation: what changed is
           certainty, not reach or likelihood</em></td>
         <td>The API deploys, a captain invites an address with no account, and someone else signs up with that address first</td>
-        <td>✅ <strong>Applied in code, direction (b), <code>42579aca</code>.</strong> It ships with the API, and the hole was never live.
+        <td>✅ <strong>Applied, direction (b), <code>42579aca</code>, on production since 2026-10-03 02:35Z.</strong> It shipped with the API,
+          and the hole was never live.
           ✅ <strong>The unsent-invite catch-up is built too</strong> (<code>f105488b</code>, migration 156 applied per the building session).
           An invite made while the switch is off is now sent, and its link armed, on the next cron run. <em>As recorded before the
           decision:</em> Two directions, recorded and not chosen. <strong>(a)</strong> Turn on <em>Confirm email</em>. That
@@ -2176,7 +2356,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           ⚠ <strong>Uncommitted at 22:08, and outside this record:</strong>
           <code>lib/migrations/155_an_invite_is_claimed_by_its_link.sql</code> and new claim and link routes build <strong>(b)</strong>. 155's
           header says <em>"Ryan's call, 2026-10-02 (R36)"</em>, and an uncommitted edit to plan §5 says <em>"Ryan chose this over turning on
-          confirmation"</em>. Whether 155 is applied to production is <strong>unverified</strong></td>
+          confirmation"</em>. Whether 155 is applied to production is <strong>unverified</strong> <em>(2026-10-04: its column
+          <code>token_hash</code> exists in production, read via PostgREST; the CHECK and index were not re-read)</em></td>
         <td>✅ <strong>Decided by Ryan, 2026-10-02: the one-time link</strong> (relayed by the building session at 22:22, and recorded in plan
           §5 and §8b, <code>d89a3181</code>). That settles the late-night conflict. Residual 2 has no call of its own. <strong>The changed
           invite-email sentence was approved by Ryan, 2026-10-02</strong> (relayed; plan §8b, <code>be58ed1e</code>)</td>
@@ -2287,7 +2468,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="note" style="margin-top:12px">
     <strong>R14 and R15, on being fixed rather than closed.</strong> Both were raised here on 2026-07-26, verified against the code by Ryan
     rather than taken on trust, and fixed the same day. They <strong>stay on the register</strong>, because nothing is deployed: a defect
-    fixed in an uncommitted working copy is not a defect production no longer has. R15 is annotated 🟠 → 🟢 and closes on deploy; R14 changes
+    fixed in an uncommitted working copy is not a defect production no longer has. R15 is annotated 🟠 → 🟢 and closes on deploy <em>(✅ closed
+    2026-10-04: deployed by 2026-07-31)</em>; R14 changes
     <em>kind</em> rather than closing — the code now fails safe, so what remains is a <strong>release-ordering constraint</strong>, and
     constraints are not fixed by commits.
     <br><br>⚠️ <strong>R14's ordering has probably been discharged by the R13 release</strong> (026 applied → deploy → reseed → parity
@@ -2615,7 +2797,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         mismatches. Both files were last touched <strong>2026-07-06</strong>, so they are genuinely pre-existing and untouched by
         this work — but the claimed "pre-existing <code>_layout.tsx:158</code> tuple error" <strong>does not reproduce</strong>.</li>
       <li>⬜ <strong>No formal device QA.</strong> Ryan saw it render. That is one device, one build, one look.</li>
-      <li>⛔ <strong>Not deployed, and it is on a third branch.</strong> All of it is local on
+      <li><s>⛔ <strong>Not deployed, and it is on a third branch.</strong></s> ✅ <em>Corrected 2026-10-04: merged at <code>8c42d1d</code>,
+        on production since 2026-09-11 (<code>dpl_BJoPWXP6…</code>), and in every runtime-1.2.0 OTA from 2026-09-28.
+        <code>origin/tester-gate/allowlist-in-the-app</code> now exists too. What follows is the 2026-09-02 record.</em> All of it is local on
         <code>tester-gate/allowlist-in-the-app</code>, <strong>unpushed</strong> — no remote ref contains it. That branch is
         <strong>259 commits ahead of <code>origin/master</code></strong>, against <code>Development</code>'s 225, so it is
         <em>further</em> from production than the gap <strong>R21</strong> describes (<strong>Gate M0</strong>).</li>
@@ -2652,8 +2836,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <table class="risk">
         <thead><tr><th>Gate</th><th>Status</th><th>What it is</th></tr></thead>
         <tbody>
-          <tr><td class="id">M0</td><td><span class="chip lvl-crit">⛔ BLOCKING</span></td>
-            <td><strong>Deploy what exists.</strong> <code>origin/master</code> is 225 commits and ~30 migrations behind
+          <tr><td class="id">M0</td><td><span class="chip ok">✅ DONE 2026-09-11</span></td>
+            <td><strong>Deploy what exists.</strong> <em>✅ Done 2026-09-11; the gap is zero today (2026-10-04).</em> <code>origin/master</code> is 225 commits and ~30 migrations behind
               (<strong>R21</strong>). Building RN against web behaviour no member has ever seen means verifying against a moving
               target and shipping an OTA into a mismatch. <strong>Nothing else on this list should start first.</strong></td></tr>
           <tr><td class="id">M1</td><td><span class="chip lvl-med">🟡 STARTED</span></td>
@@ -2725,7 +2909,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <span class="chip lvl-med">R8</span></h4>
     <p><strong>Independent of everything below.</strong> Not a dependency of anything; it sits first only because its value decays and
       it is already past its own time box. The written blocker has cleared (all four commits are on <code>origin/master</code>); what
-      remains is confirming the deploy is live, which is prod state this document cannot verify.</p>
+      remains is confirming the deploy is live, which is prod state this document cannot verify. <em>(2026-10-04: it is. The paging fix is
+      in every production deployment from 2026-07-31 on. A session note says the survey was sent, with 104 responses, which this page has
+      not verified; see <a href="#update-2026-10-04-deploy-notes">2026-10-04 → Drift</a>.)</em></p>
   </div>
 
   <div class="step crit-step">
@@ -3370,7 +3556,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     statuses have moved</strong> — see the markdown.</p>
 
   <div class="card crit">
-    <h4>🚢 Ship what is built <span class="chip lvl-crit">🔴 Blocking everything</span></h4>
+    <h4>🚢 Ship what is built <span class="chip ok">✅ Done — R21 closed 2026-10-04</span></h4>
+    <div class="note ok" style="margin:0 0 8px">✅ <strong>Corrected 2026-10-04: shipped.</strong> The 2026-09-02 <code>Development</code> tip
+      went to production on 2026-09-11; a second gap of 109 commits closed on 2026-09-27; local <code>master</code> =
+      <code>origin/master</code> = production (<code>2265c5d9</code>) today. Still open beside it: migrations 119, 120, 123–126, 128 and 129
+      are individually unattested, and the app ships separately, by OTA. The text below is the 2026-09-02 record.</div>
     <p style="margin:0 0 8px">225 commits and ~30 migrations sit between <code>Development</code> and production, and the schema
       has moved past the deployed code. <strong>The largest single item in the programme, and it is not a build.</strong></p>
     <p style="margin:0">Carries <strong>R21</strong>. Every ✅ below the Premier League heading in the markdown describes code no
@@ -3381,7 +3571,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   </div>
 
   <div class="card warnc">
-    <h4>📱 The RN league build <span class="chip lvl-med">🟡 Read half landed, ⛔ undeployed</span></h4>
+    <h4>📱 The RN league build <span class="chip lvl-med">🟡 Read half live — routes on production since 2026-09-11, in every runtime-1.2.0 OTA from 2026-09-28</span></h4>
     <p style="margin:0 0 8px">Bring the Expo app to parity with the league product. ⚠️ <strong>Status corrected 2026-09-02:
       started, and the read half is the part that moved.</strong> The gate was always a read API rather than screens — mobile is
       direct-to-PostgREST and four league engine tables are deny-all (<strong>R24</strong>).</p>
@@ -3393,7 +3583,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   </div>
 
   <div class="card pri" style="border-left:4px solid var(--primary)">
-    <h4>🌍 Multi-sport platform <span class="chip">🔵 Designing</span></h4>
+    <h4>🌍 Multi-sport platform <span class="chip">🔵 Designing</span> <span class="chip ok">Crews ✅ shipped 2026-10-03</span></h4>
     <p style="margin:0 0 8px">Generalise the single World Cup product into a reusable multi-competition platform. Product
       decisions settled 2026-07-25; foundations still TODO.</p>
     <div class="note"><strong>Audit 2026-07-12:</strong> the foundations are genuinely <strong>TODO</strong> — the schema is
@@ -3416,7 +3606,10 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <strong>R36's fix</strong> (confirmed: <em>Confirm email</em> is off in production; Ryan's call, none recorded),
       step 8 and the ship.</s> <strong>At 22:22, R36 was decided by Ryan (the one-time link) and fixed in code (<code>42579aca</code>, migration 155
       applied per the building session). At 22:28, unsent invites were made to catch up (<code>f105488b</code>, migration 156). At 22:31, step
-      8 deleted the concept screen (<code>cbced41a</code>). All unpushed.</strong> What remains: the ship (step 9).
+      8 deleted the concept screen (<code>cbced41a</code>). All unpushed.</strong> <s>What remains: the ship (step 9).</s> ✅ <strong>Shipped
+      2026-10-03</strong> <em>(corrected 2026-10-04)</em>: web on production 02:35Z, OTA on both platforms 02:41Z and 02:43Z (runtime 1.2.0),
+      and the notice switch on at 15:06Z. Later 2026-10-03 work (disband, migration 157; link-a-pool) is recorded in the plan and not
+      reviewed here.
       <a href="#i-privacy">Pool privacy: three levels</a> planned as its own item, not started.</div>
   </div>
 
@@ -3431,7 +3624,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <strong>164</strong> and <strong>165</strong> are applied to production; I checked read-only that <code>league_duels.drawn_at</code>
       exists, 45 duels are stamped, and 165's backfill holds. <strong>Pushed and deployed later on 2026-10-04, on Ryan's
       approval.</strong> <code>origin/master</code> is <code>11ae5f9a</code>, and Vercel production
-      <code>dpl_GNdVmRRjNuWLiwKJUrBMfPc3aB7R</code> is READY at that sha and aliased to sportpool.io. So the create route
+      <code>dpl_GNdVmRRjNuWLiwKJUrBMfPc3aB7R</code> is READY at that sha and aliased to sportpool.io. <em>(Since then, 23:11Z: production
+      is <code>2265c5d9</code>, <code>dpl_B3ZDxGLY…</code>, which also carries the odd-pool empty-state fix <code>1975b699</code>.)</em> So
+      the create route
       (<code>fdc1ba73</code>) now matches 164/165, and <a href="#r37">R37</a>'s no-duel case is closed. The copy fix
       (<code>11ae5f9a</code>, Ryan's disclosure sentence) is live on the web, and in Pool Info on both surfaces
       (<a href="#r38">R38</a>). Still owed: an OTA for the app's four bundled copy surfaces (<a href="#r38">R38</a>), and the wizard showing
@@ -3567,7 +3762,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
                     never by signing up with the address.</strong> He chose it over turning on <em>Confirm email</em> product-wide, and over
                     dropping no-account email invites for now. Whoever opens the link, signed in, can take the invite, and the link works
                     once. <em>Relayed by the building session; recorded in plan §5 and §8b (<code>d89a3181</code>). Built in
-                    <code>42579aca</code>, unpushed.</em></li>
+                    <code>42579aca</code>, <s>unpushed</s> on production since 2026-10-03 (corrected 2026-10-04).</em></li>
                 </ul></li>
             </ul></li>
           <li><strong>Route (3), suggested crews: stays parked.</strong> It was parked on 2026-09-28. ⚠ That parking was never
@@ -4005,10 +4200,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
   <div class="card warnc" id="showdown-2026-10-04">
     <h4>Showdown — 2026-10-04: the draw waits for the pool <span class="chip cat">Feature</span> <span class="chip ok">164 + 165 APPLIED</span>
-      <span class="chip ok">DEPLOYED 2026-10-04 (11ae5f9a)</span> <span class="chip lvl-med">APP COPY WAITS ON AN OTA</span></h4>
-    <div class="note warn">This page had no entry for <em>Showdown, end to end</em> (built 2026-08-30 → 2026-09-02). The markdown's
-      section still says <em>not deployed</em>, and that heading is stale: Showdown is live, with a real 3-member pool in production since
-      2026-09-25. This card mirrors the markdown's 2026-10-04 subsection only.</div>
+      <span class="chip ok">DEPLOYED 2026-10-04 (11ae5f9a, then 2265c5d9)</span> <span class="chip lvl-med">APP COPY WAITS ON AN OTA</span></h4>
+    <div class="note warn">This page had no entry for <em>Showdown, end to end</em> (built 2026-08-30 → 2026-09-02). <s>The markdown's
+      section still says <em>not deployed</em>, and that heading is stale</s> <em>(the markdown's heading is corrected 2026-10-04: deployed
+      2026-09-11)</em>. Showdown is live, with a real 3-member pool in production since 2026-09-25. This card mirrors the markdown's
+      2026-10-04 subsection only.</div>
     <ul class="fields">
       <li><span class="f">What was wrong:</span> Ryan's own pool, <em>Prem 2026/27 Showdown</em>, chose matchweek 6 as its start. It was
         drawn and revealed the moment the second member joined (2026-09-25). KevC joined on 2026-10-04, six days before matchweek 6 locks,
@@ -4033,7 +4229,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
       <li><span class="f">Create route:</span> <code>app/api/pools/create/route.ts:302-337</code> stores every Showdown pool's start
         through the same SQL function, so a week whose draw has passed rolls to the next one. <s>Committed, not pushed.</s>
         <strong>Deployed 2026-10-04:</strong> <code>origin/master</code> is <code>11ae5f9a</code>, and Vercel production
-        <code>dpl_GNdVmRRjNuWLiwKJUrBMfPc3aB7R</code> is READY at that sha (Vercel API, checked by me). It is unexercised until a Showdown
+        <code>dpl_GNdVmRRjNuWLiwKJUrBMfPc3aB7R</code> is READY at that sha (Vercel API, checked by me). <em>(Production moved on to
+        <code>2265c5d9</code> at 23:11Z, which still carries it.)</em> It is unexercised until a Showdown
         pool is created inside a draw window. See <a href="#r37">R37</a>.</li>
       <li><span class="f">Per the building session, not re-run by me:</span> both migrations were hash-checked against these files, and
         <code>scripts/verify-showdown.ts</code> passed after its rewrite for 164/165, 500/250/0 and the 075 entry cap.</li>
@@ -4075,8 +4272,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
               ⚠ The empty-state line the drop leans on was slightly wrong. <em>"Everyone in the pool by then gets an opponent"</em> is
               false in an odd-sized pool, where one member sits out each week, as Pool Info itself says
               (<code>lib/leagueModeInfo.ts:152-153</code>). It is <strong>fixed in <code>1975b699</code></strong> (<em>"everyone in the
-              pool by then is in it"</em>), which is committed and <strong>not pushed</strong>, so production still shows the old line. The
-              guard does not cover it</td></tr>
+              pool by then is in it"</em>), <s>which is committed and <strong>not pushed</strong>, so production still shows the old
+              line</s> <strong>on production since 2026-10-04 23:11Z</strong> (<code>dpl_B3ZDxGLYtvAWR1B1WzF7XqMhoTMG</code>, READY at
+              <code>2265c5d9</code>, aliased to sportpool.io; corrected the same day). It is web only: the line is in
+              <code>app/pools/[pool_id]/DuelsTab.tsx:1027</code>, and the app has no copy of it, so no OTA is owed for it. The guard does
+              not cover it</td></tr>
           <tr><td class="id">(d)</td><td>Replace Pool Info's <em>"the whole season is drawn when the pool is created"</em>, which is false for
             any pool that grew</td>
             <td>✅ <strong>Done in <code>11ae5f9a</code></strong>, across every surface that carried it, with the guard rewritten. Live on
@@ -4161,6 +4361,11 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
   <div class="card crit" id="i-delete-pool">
     <h4>"Delete Pool" destroys every member's predictions <span class="chip cat">Bug</span>
       <span class="chip danger">Data-loss</span> <span class="chip danger">🔥 R1</span></h4>
+    <div class="note ok" style="margin:0 0 8px">✅ <strong>2026-10-04: this card is the July text, and it is out of date.</strong> The
+      markdown retitled the item <em>Account deletion destroys everything before it checks</em> on 2026-09-02. The Delete Pool button is gone
+      from both surfaces (R1 closed), and the account-delete fix (<code>6aa2831</code>, <a href="#r22">R22</a>) has been on production since
+      2026-09-11. What remains is R22's two stated gaps: the check-then-act is not transactional, and this door still hard-deletes (Gate
+      A2).</div>
     <ul class="fields">
       <li><span class="f">Is:</span> <code>app/pools/[pool_id]/admin/SettingsTab.tsx:232-302</code> runs five un-transactional
         PostgREST deletes from the <strong>browser</strong>, predictions first. An RLS asymmetry makes it catastrophic:
@@ -4220,7 +4425,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <code>scripts/preflight-feedback-survey.ts</code>, super-admin <strong>Templates</strong> tab.</li>
       <li>⚠️ <span class="f">Blocker corrected 2026-07-26 — "the fix is local" is no longer true.</span> All four commits are on
         <code>origin/master</code> (<code>a5cdf0e</code> paging, <code>68a48ec</code> branding, <code>bb50f5d</code> runbook,
-        <code>71e0a44</code> sender), pushed 2026-07-25; the only unpushed commit on <code>master</code> is <code>a1e1ef4</code>.
+        <code>71e0a44</code> sender), pushed 2026-07-25; the only unpushed commit on <code>master</code> is <code>a1e1ef4</code>
+        <em>(2026-10-04: on <code>origin/master</code> too, and the paging fix is in every production deployment from 2026-07-31 on)</em>.
         The original hazard still stands in principle — the Templates tab runs against prod, so sending <em>before</em> the deploy is
         live resolves the old truncated audience <strong>and</strong> burns the idempotency key — but the remaining question is now
         <strong>"is the deploy live?"</strong>, which is prod state and unverified here, not "has the code been written?". Check the
@@ -4524,7 +4730,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         actual standings match an independent points/GD/GF ranking on all 48 group positions. Shadow bracket is
         <strong>ground-truth-correct through the QF</strong>, not merely live-parity.</li>
       <li>✅ <span class="f">Cutover-hardening shipped 2026-07-13</span> (DB objects live; <code>recalculate.ts</code> +
-        <code>shadow-materialize</code> route changes pending a deploy): <strong>(#4)</strong> <code>v_shadow_worker_runs</code>
+        <code>shadow-materialize</code> route changes pending a deploy — <em>2026-10-04: nothing on <code>master</code> is unpushed, so any
+        committed form of those changes is on production; which deploy carried them was not traced</em>): <strong>(#4)</strong> <code>v_shadow_worker_runs</code>
         repointed off the retired <code>shadow-drain-queue</code> to the live jobs; <strong>(#3)</strong> automated parity alarm
         <code>shadow_detect_diffs()</code> + <code>shadow-parity-alarm</code> pg_cron (jobid 21, <code>*/15</code>) writes
         <code>entry_total_mismatch</code> rows + reports coverage-by-mode; <strong>(#2)</strong> <code>shadow_dirty_pools</code> marker
@@ -5778,7 +5985,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <div class="note warn" style="margin-top:8px">⚠ <strong>2026-09-19:</strong> the text above is 2026-07-30; league ingestion has since shipped
       on its own <code>league_*</code> tables across five leagues. Tonight in this area: the four league crons scheduled (migration
       <strong>135</strong>, applied — outbox and notices corroborated from data, standings and reconcile awaiting first firing); the
-      <strong>placeholder-kickoff strand</strong> found and half-fixed — <code>fc23239</code> unpushed (<strong>R30</strong>); the first outbox drain
+      <strong>placeholder-kickoff strand</strong> found and half-fixed — <code>fc23239</code> unpushed (<strong>R30</strong>; <em>2026-10-04:
+      deployed 2026-09-27, bit again 2026-10-01, second fix deployed that day, R30 now 🟡</em>); the first outbox drain
       replayed 38 stale recaps (<strong>R31</strong>). See <a href="#update-2026-09-19">the 2026-09-19 block</a>.</div>
   </div>
 
@@ -5830,9 +6038,9 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
   <div class="card goldc" id="crews">
     <h4>👥 Crews: a crew is who played <span class="chip cat">Feature</span> <span class="chip cat">Multi-sport</span>
-      <span class="chip cat">Mobile</span> <span class="chip warn">🔨 IN PROGRESS</span> <span class="chip ok">P1–P5 ✅ 2026-10-02</span>
-      <span class="chip ok">SCHEMA 154 ✅ LIVE</span> <span class="chip ok">STEPS 4–8 + WEB 8a + 8b BUILT</span> <span class="chip ok">R36 FIXED IN CODE</span>
-      <span class="chip warn">UNPUSHED · ONLY THE SHIP LEFT</span> <span class="chip">2026-10-02</span></h4>
+      <span class="chip cat">Mobile</span> <span class="chip ok">✅ SHIPPED 2026-10-03</span> <span class="chip ok">P1–P5 ✅ 2026-10-02</span>
+      <span class="chip ok">SCHEMA 154 ✅ LIVE</span> <span class="chip ok">STEPS 4–9 + WEB 8a + 8b</span> <span class="chip ok">R36 CLOSED ON PRODUCTION</span>
+      <span class="chip ok">WEB + APP OTA + NOTICES ON</span> <span class="chip">corrected 2026-10-04</span></h4>
     <ul class="fields">
       <li><span class="f">Is:</span> Decision 1's durable group, built. You're in a crew because you played in one of its pools, or
         because you said yes when its captain added you. My Crews lists <strong>groups, never people</strong>, and there is no friends
@@ -5875,17 +6083,20 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
         <thead><tr><th>Release</th><th>Scope</th><th>Size (plan's, order of magnitude)</th></tr></thead>
         <tbody>
           <tr><td><strong>RN first</strong></td><td>P1–P5 ✅ and migration 154 ✅, <code>lib/crews/</code> + routes ✅, Needs-you crew
-            cards ✅ (a capability flag, not v3), RN screens ✅, seat notice + one reminder ✅ (switched off). All built 2026-10-02 and
-            unpushed. <s>Left: step 8 (delete the concept screen) and step 9 (ship)</s> Step 8 ✅ (<code>cbced41a</code>). Left: step 9 (ship)</td><td><strong>~15 working days</strong> at plan time.
-            <strong>Overtaken:</strong> steps 4–7 were committed in one evening. <em>Built</em> means committed and unit-tested. The RN screens
-            have not run against their API, which isn't deployed. The plan sizes steps 8–10 at ~½ day</td></tr>
+            cards ✅ (a capability flag, not v3), RN screens ✅, seat notice + one reminder ✅ (<s>switched off</s> on since 2026-10-03 15:06Z).
+            All built 2026-10-02 <s>and unpushed</s>. <s>Left: step 8 (delete the concept screen) and step 9 (ship)</s> Step 8 ✅
+            (<code>cbced41a</code>). <s>Left: step 9 (ship)</s> Step 9 ✅ 2026-10-03</td><td><strong>~15 working days</strong> at plan time.
+            <strong>Overtaken:</strong> steps 4–7 were committed in one evening. <em>Built</em> means committed and unit-tested. <s>The RN screens
+            have not run against their API, which isn't deployed.</s> The API is on production since 2026-10-03, and the screens reach phones by
+            OTA. The plan sizes steps 8–10 at ~½ day</td></tr>
           <tr><td><strong>Thin web slice, same release</strong></td><td>Dashboard <em>"Keep this group together?"</em> sheet (plus held
-            seats and invites), basic crew page. ✅ <strong>Built 2026-10-02</strong> (<code>fc536f65</code>), unpushed</td><td><strong>~1½
+            seats and invites), basic crew page. ✅ <strong>Built 2026-10-02</strong> (<code>fc536f65</code>), <s>unpushed</s> on production
+            since 2026-10-03</td><td><strong>~1½
             days</strong> at plan time; committed the same evening</td></tr>
           <tr><td><strong>Web, day two</strong></td><td>Create-modal Crew row + roster review, Profile → Crews tab, captain controls,
             the pool page's <em>"Part of…"</em> line. Web claiming of email invites is already done by 8a. <s><strong>Under way in the working
             tree at 21:53, uncommitted, and not recorded</strong></s> ✅ <strong>Built 2026-10-02</strong> (<code>050c0b57</code>, 22:03),
-            unpushed. <em>Go Plus</em> in roster review is not built, as on the app</td><td><strong>~3½ days</strong> at plan time; committed
+            <s>unpushed</s> on production since 2026-10-03. <em>Go Plus</em> in roster review is not built, as on the app</td><td><strong>~3½ days</strong> at plan time; committed
             the same evening</td></tr>
         </tbody>
       </table>
@@ -5893,12 +6104,30 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
     <ul class="fields">
       <li><span class="f">Why the web slice ships with RN:</span> the World Cup was played on the web (facts below). Decided by Ryan,
         2026-10-02 (plan §9 #8).</li>
-      <li><span class="f">Status:</span> 🔨 <strong>In progress. Plan steps 1–8, web 8a, web 8b, the R36 fix and the invite catch-up done
+      <li><span class="f">Status:</span> ✅ <strong>Shipped 2026-10-03</strong> <em>(recorded 2026-10-04; plan §7 recorded it the same
+        night, <code>6f604248</code>)</em>. Step 9, checked against its own list:
+        <ol style="margin:4px 0 0 18px">
+          <li>✅ <strong>API deployed:</strong> production <code>dpl_6uSca5oE…</code> at <code>406f644d</code>, 2026-10-03 02:35Z.</li>
+          <li>✅ <strong>404→401:</strong> <code>/api/crews</code> and <code>/api/cron/crew-notices</code> answer 401 today, and
+            <code>/crew-invite</code> answers 200 (probed 2026-10-04; the 404 before is the building session's).</li>
+          <li>⚠ <strong>Cron <code>crew-notices</code>:</strong> <code>*/15</code>, pg_cron job 26, per the building session (plan §7).
+            <strong>Not verified by me:</strong> the <code>cron</code> schema is not readable from here.</li>
+          <li>✅ <strong>Switch on:</strong> <code>sync_settings.crew_notices_enabled = true</code>, set 2026-10-03 15:06:04Z (read
+            2026-10-04).</li>
+          <li>✅ <strong>OTA on both platforms</strong> (steps 5–7): <code>production</code> branch, runtime 1.2.0, from <code>406f644d</code>
+            (iOS 02:41Z, Android 02:43Z), then again from <code>7004821c</code> at 03:24Z and 03:25Z. <em>Whether <code>git status</code> was
+            clean at publish is not recorded in EAS.</em></li>
+        </ol>
+        ⚠ <strong>Not reviewed here:</strong> the Crews work after the 22:31 cut. That is disband and restore (migration 157,
+        <code>0abb9088</code>, which went out with the ship), link-a-pool (<code>12c4da4a</code>, <code>0ab51672</code>, 2026-10-03), and
+        migration 163 (<em>an answered invite forgets its address</em>, <code>0f8a7fd1</code>, 2026-10-04). The plan records the first
+        two.</li>
+      <li><span class="f">At the 22:31 cut:</span> <s>🔨 <strong>In progress. Plan steps 1–8, web 8a, web 8b, the R36 fix and the invite catch-up done
         2026-10-02, cut at <code>81323706</code> (22:31). Nothing is pushed, so nothing is user-visible.</strong> No Crews decision is waiting
-        on Ryan. What remains:
+        on Ryan. What remains:</s>
         <ol style="margin:4px 0 0 18px">
           <li><s><strong>Step 8:</strong> delete the concept screen.</s> ✅ Done (<code>cbced41a</code>).</li>
-          <li><strong>Step 9, the ship. Push only on Ryan's explicit say-so</strong> (plan §7: <em>"nothing is pushed until Ryan says
+          <li><s><strong>Step 9, the ship. Push only on Ryan's explicit say-so</strong></s> ✅ <em>Done 2026-10-03, above.</em> (plan §7: <em>"nothing is pushed until Ryan says
             so"</em>). Then, as plan §7 step 9 lists it (<code>drafts/2026-10-02_crews_plan.md:450-464</code>):
             <ol style="margin:4px 0 0 18px">
               <li>Deploy the API.</li>
@@ -5914,12 +6143,14 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
                 nobody.</li>
             </ol></li>
         </ol>
-        The routes exist in the tree and not on production, and the app reads production. So the RN screens show their error state on a
-        Metro build until the API deploys (plan §7 step 6). See <a href="#crews-build">Build progress</a> and
-        <a href="#update-2026-10-02-2231">Where this stands → 2026-10-02, 22:31</a>.</li>
+        <s>The routes exist in the tree and not on production, and the app reads production. So the RN screens show their error state on a
+        Metro build until the API deploys (plan §7 step 6).</s> <em>The API deployed 2026-10-03, so this no longer applies.</em> See
+        <a href="#crews-build">Build progress</a>, <a href="#update-2026-10-02-2231">Where this stands → 2026-10-02, 22:31</a> and
+        <a href="#update-2026-10-04-deploy-notes">2026-10-04, late</a>.</li>
       <li><span class="f">Open follow-ups, not built:</span>
         <ul style="margin:4px 0 0 18px">
-          <li><strong>Keep the token in the fragment on the sign-up path</strong> (<a href="#r36">R36</a>, residual 1).</li>
+          <li><s><strong>Keep the token in the fragment on the sign-up path</strong> (<a href="#r36">R36</a>, residual 1).</s> ✅ <em>Done in
+            <code>c79df712</code>, before the ship (found 2026-10-04).</em></li>
           <li><strong>Read <code>seats_held</code> in both create flows</strong>, or drop the claim that a failed hold is reported.</li>
           <li><strong><em>Go Plus</em> in roster review</strong>, on both surfaces (plan §9 #7).</li>
           <li><s><strong>Unsent-invite catch-up.</strong></s> ✅ <strong>Built 2026-10-02</strong> (<code>f105488b</code>, migration 156,
@@ -5948,7 +6179,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
 
     <h4 style="margin-top:14px" id="crews-build">Build progress, 2026-10-02</h4>
     <p style="margin:0 0 8px;font-size:13px;color:var(--slate)">Every commit is local on <code>master</code> and <strong>not pushed</strong>.
-      Both migrations are <strong>live on production</strong>. <em>Verified here</em> means I read it in the tree or ran it. <em>Building
+      <em>(2026-10-04: every commit in this table is on production since 2026-10-03 02:35Z, and the app's share is in the OTA from
+      <code>406f644d</code>.)</em> Both migrations are <strong>live on production</strong>. <em>Verified here</em> means I read it in the tree or ran it. <em>Building
       session</em> means it was reported by the session that did the work and <strong>not re-queried</strong> by me. I had no production
       access.</p>
     <div class="scroller" style="margin-bottom:10px">
@@ -5958,7 +6190,7 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
           <tr><td><strong>P5</strong></td><td><code>b31dcf10</code></td><td><code>lib/activity/version.ts</code>. The Activity gate is
             <code>activityApiVersion(v) &gt;= 2</code> (<code>app/api/users/[user_id]/activity/route.ts:194</code>). It was
             <code>=== '2'</code>, which would have sent a v3 build the v1 response</td><td>Code read; 4 tests pass</td><td>n/a, code only,
-            and not deployed until pushed</td></tr>
+            <s>and not deployed until pushed</s> deployed 2026-10-03</td></tr>
           <tr><td><strong>P4</strong></td><td><code>859625ae</code></td><td><code>lib/pools/join.ts</code>, <code>joinPool()</code>, the single
             join path: lookup, join-ability, SP010 cap, restore, first entry, Showdown schedule. The route is a thin wrapper</td><td>Code
             read; 10 tests pass. ⚠ The bare-<code>pool_id</code> door moved here unchanged (<code>lib/pools/join.ts:43-56</code>, no
@@ -5998,7 +6230,8 @@ footer{border-top:1px solid var(--silver); padding:20px 0 40px; color:var(--slat
             <code>c19f167c</code></td><td>RN data layer, My Crews, the crew page, Add people, the create flow's Crew row with roster review and
             the Free cap, and the pool screens' crew line (<code>GET /api/pools/[pool_id]/crew</code>)</td><td>Screens exist
             (<code>mobile/app/profile/crews/index.tsx</code>, <code>[id].tsx</code>). <strong>Never run against their API:</strong> it isn't
-            deployed, and native builds can't run here. <em>Go Plus</em> inside the create flow was not built</td><td>n/a</td></tr>
+            deployed, and native builds can't run here. <em>(2026-10-04: the API deployed 2026-10-03, and the screens shipped by OTA the
+            same night. I have not run them.)</em> <em>Go Plus</em> inside the create flow was not built</td><td>n/a</td></tr>
           <tr><td><strong>Step 7</strong> ✅ (off)</td><td><code>6cec6f1c</code>, <code>3fb53035</code>, <code>5a1b6ec4</code></td><td>The seat
             notice, the one reminder and the invite. <strong>Wording approved by Ryan</strong> (<em>"Copy approved"</em>, recorded in plan §7,
             <code>5a1b6ec4</code>)</td><td>The switch fails closed: no row means no send (<code>lib/crews/notify.ts:208-212</code>). No migration
