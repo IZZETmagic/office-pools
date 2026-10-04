@@ -31,7 +31,7 @@ export default function PrivacyPage() {
       {/* Content */}
       <section className="py-16 sm:py-24">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-sm text-neutral-500 mb-12">Last updated: September 7, 2026</p>
+          <p className="text-sm text-neutral-500 mb-12">Last updated: October 4, 2026</p>
 
           <div className="space-y-10">
             {/* 1. Overview */}
@@ -135,22 +135,67 @@ export default function PrivacyPage() {
                 <div>
                   <h3 className="font-semibold text-neutral-900 mb-2">Banter (Pool Chat)</h3>
                   <p>
-                    Every pool has a group chat called Banter. When you take part, we store the text of your messages, who sent them and when, which pool they belong to, any members you @mention, the message you were replying to, emoji reactions and who added them, messages an admin has pinned, and how far through the conversation you have read.
+                    Every pool has a group chat called Banter. When you take part, we store the text of your messages, any photos and GIFs you send, who sent them and when, which pool they belong to, any members you @mention, the message you were replying to, emoji reactions and who added them, messages an admin has pinned, and how far through the conversation you have read.
                   </p>
                   <p className="mt-2">
                     <strong>Most Banter messages are not typed.</strong> The app posts share cards to the chat on your behalf when something happens worth sharing &mdash; a badge or level you have earned, a leaderboard update, or a prediction you chose to share. These are stored like any other message, and alongside the visible card we keep the structured detail behind it: for a badge card, your level, total experience points and the badges themselves; for a prediction card, what you predicted and what actually happened; for a leaderboard card, the standings at that moment, which can include the name of whoever was leading.
                   </p>
                   <p className="mt-2">
-                    <strong>Banter messages cannot be edited or deleted &mdash; by you, by your pool admin, or by us through the app.</strong> Once a message is posted it stays in that pool&apos;s history. Please treat anything you send as permanent. You can remove an emoji reaction you added, and deleting your account removes your messages everywhere (see Section 8), but there is no way to take back a single message.
+                    <strong>You can delete any message you sent, and a pool admin can delete any message in their pool.</strong> We can also remove any message. Deleting a message removes everything in it &mdash; its text, any photo or GIF, its @mentions and its reactions &mdash; and leaves the words &quot;Message deleted&quot; in its place, so replies to it still make sense. We record who deleted it and when. Messages cannot be edited. A deleted message disappears from every member&apos;s chat straight away, but anyone who saw it before then may have read it or saved a copy, so please still think before you post.
                   </p>
                   <p className="mt-2">
                     Banter history is visible to whoever is a member of the pool <em>now</em>. Someone who joins the pool later can read everything posted before they arrived. If you leave a pool, you lose access to its chat but <strong>the messages you already posted stay there</strong> and remain visible to the members who remain.
                   </p>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-neutral-900 mb-2">Camera Access (Mobile App Only)</h3>
+                  <h3 className="font-semibold text-neutral-900 mb-2">Photos in Banter</h3>
                   <p>
-                    The mobile app can join a pool by scanning an invite QR code. If you choose that option, the app asks for camera permission and opens a live camera view solely to read the code in frame. <strong>No photo or video is captured, saved, or transmitted anywhere</strong> &mdash; the camera is read in memory, only the invite code is extracted, and the camera session is shut down as soon as you leave the scanner. You can join by typing a code instead and never grant camera access at all, and you can revoke the permission at any time in your device settings.
+                    You can send a photo to a pool&apos;s chat, either by taking one with your camera or by choosing one you already have. Before a photo is uploaded, your device shrinks it to at most 1,600 pixels on its longest side and saves it as a new image. <strong>This removes the details your camera embeds in the original, including the location where it was taken, the device that took it, and the date.</strong>
+                  </p>
+                  <p className="mt-2">
+                    Photos are kept in private storage, not at a public address. Only members of that pool and SportPool staff can open them. Staff open them to review reports. Each time a photo is shown, the app gets a link to it that stops working after one hour.
+                  </p>
+                  <p className="mt-2">
+                    When a photo message is deleted (by you, by a pool admin, by us, or because the account or pool it belongs to is deleted), the photo file itself is removed from storage, normally within seconds and at most within an hour. If a photo was uploaded but never posted, for example because sending failed, it is removed within about a day.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-neutral-900 mb-2">GIFs in Banter</h3>
+                  <p>
+                    GIFs in Banter are provided by <strong>KLIPY</strong>. When you open the GIF picker or search for a GIF, your device sends KLIPY your search words and an identifier we derive from your account. That identifier is not your name, email address, username or SportPool account ID, and KLIPY cannot use it to work out who you are. When you send a GIF, we tell KLIPY which one was sent and the search that found it. GIFs load directly from KLIPY&apos;s servers, so KLIPY also receives your device&apos;s IP address when you search and when a GIF appears in a chat you have open. We ask KLIPY for its strictest content filter. With your message we store the GIF&apos;s KLIPY address, title and dimensions.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-neutral-900 mb-2">Reporting and Blocking</h3>
+                  <p>
+                    <strong>Reporting.</strong> You can report any message in a pool you belong to. A report stores who filed it, the reason and any detail you add, and a copy of the message as it was when you reported it. The copy is kept even if the message is later deleted, so the report can still be reviewed. Reports are emailed to our support team and can be read only by SportPool staff. Pool admins cannot see them, and <strong>the member you report is never told who reported them.</strong>
+                  </p>
+                  <p className="mt-2">
+                    <strong>Blocking.</strong> You can block another member. Blocking applies to every pool you share: their Banter messages are hidden from you, they stop counting towards your unread messages, and you stop getting push notifications for them. A block is private. <strong>The person you block is not told and cannot find out.</strong> You can unblock them at any time in the mobile app, under Settings &rarr; Blocked members.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-neutral-900 mb-2">Camera and Photos (Mobile App)</h3>
+                  <p>
+                    The mobile app uses your camera for two things, each only when you choose it.
+                  </p>
+                  <p className="mt-2">
+                    <strong>Scanning an invite QR code.</strong> The camera image is read in memory and only the invite code is taken from it. No photo or video is saved or sent anywhere, and the camera is switched off as soon as you leave the scanner.
+                  </p>
+                  <p className="mt-2">
+                    <strong>Taking a photo for Banter.</strong> The photo is uploaded only if you send it, and is then handled as described under <em>Photos in Banter</em>.
+                  </p>
+                  <p className="mt-2">
+                    To send a photo you already have, the app opens your device&apos;s own photo picker, <strong>which gives the app only the photo you pick.</strong> The app cannot browse the rest of your photo library. You can join pools by typing a code and use Banter without photos, so you never have to grant camera access, and you can turn it off at any time in your device settings.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-neutral-900 mb-2">Crews</h3>
+                  <p>
+                    A crew is a group that plays pools together, season after season. You are in a crew because you played in one of its pools, or because its captain or co-captain added you and you accepted. Other members of a crew can see who is in it.
+                  </p>
+                  <p className="mt-2">
+                    A captain or co-captain can add someone by their exact username or email address. If the address doesn&apos;t belong to a SportPool account, we store it with the invite and send that address one email containing a link that works only once. We use the address only to send that invite, and <strong>we keep it only while the invite is waiting for an answer.</strong> As soon as the invite is accepted, declined or withdrawn, or the crew closes, the address is deleted.
                   </p>
                 </div>
                 <div>
@@ -199,7 +244,9 @@ export default function PrivacyPage() {
                   <li>Calculate scores, update leaderboards, settle duels and rounds, and process predictions</li>
                   <li>Run the games a pool has chosen &mdash; including drawing Showdown opponents, tracking Last Man Standing survival, and scoring predicted league tables</li>
                   <li>Show you and your fellow members how you are playing, including form, streaks, levels, and badges</li>
-                  <li>Deliver community features such as Banter chat, reactions, @mentions, and online presence</li>
+                  <li>Deliver community features such as Banter chat, photos, GIFs, reactions, @mentions, crews, and online presence</li>
+                  <li>Review reports of objectionable content and act on them, and apply the blocks you set</li>
+                  <li>Send a crew invite to an email address a crew captain or co-captain has added</li>
                   <li>Complete pool upgrade purchases, unlock the tier you bought, handle refund requests, and keep accurate financial and tax records</li>
                   <li>Generate the shareable video cards you ask for</li>
                   <li>Send you email notifications about pool activity, prediction deadlines, match results, leaderboard updates, and administrative events, subject to your notification preferences</li>
@@ -278,7 +325,7 @@ export default function PrivacyPage() {
                 <p>We use the following third-party services to operate SportPool:</p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>
-                    <strong>Supabase</strong> &mdash; Provides our database and authentication infrastructure. Your account information and activity data are stored securely on Supabase servers.
+                    <strong>Supabase</strong> &mdash; Provides our database and authentication infrastructure. Your account information and activity data are stored securely on Supabase servers. Photos sent in Banter are stored in Supabase&apos;s private file storage.
                   </li>
                   <li>
                     <strong>Vercel</strong> &mdash; Hosts the Service. Vercel may collect standard server logs including IP addresses and request data. We also use Vercel Blob to store rendered video cards (see Section 2) and Vercel&apos;s ephemeral compute sandboxes to render them.
@@ -287,7 +334,10 @@ export default function PrivacyPage() {
                     <strong>Paddle</strong> &mdash; Merchant of record for pool upgrade purchases. Paddle collects and processes your payment and billing information directly, handles any sales tax or VAT due in your country, and returns to us only the transaction record described in Section 2.
                   </li>
                   <li>
-                    <strong>Resend</strong> &mdash; Handles email delivery for notifications, deadline reminders, and contact form messages. We also sync your email address to a Resend audience so that pool admins and SportPool can send you broadcast emails to which you are subscribed. Every broadcast email includes a one-click unsubscribe link.
+                    <strong>Resend</strong> &mdash; Handles email delivery for notifications, deadline reminders, crew invites, and contact form messages. We also sync your email address to a Resend audience so that pool admins and SportPool can send you broadcast emails to which you are subscribed. Every broadcast email includes a one-click unsubscribe link.
+                  </li>
+                  <li>
+                    <strong>KLIPY</strong> &mdash; Provides GIFs in Banter. Your device sends KLIPY your GIF searches and an identifier derived from your account (never your name, email address, username or account ID), we tell KLIPY when a GIF is sent, and GIFs load directly from KLIPY&apos;s servers, which therefore receive your device&apos;s IP address. See Section 2.
                   </li>
                   <li>
                     <strong>Google Analytics / Google Tag Manager</strong> &mdash; Collects aggregated usage analytics to help us understand how the Service is used. Subject to your cookie preferences and local law.
@@ -336,14 +386,14 @@ export default function PrivacyPage() {
                   <strong>Your predictions become visible to other members only once they can no longer be changed.</strong> Picks are sealed until the relevant deadline &mdash; a match kickoff, a matchweek lock, or a table deadline &mdash; and are then shown to the pool. In Showdown pools, the opponent you have been drawn against is likewise hidden from you until the reveal for that matchweek.
                 </p>
                 <p>
-                  Messages, reactions, pins, and @mentions you post in a pool&apos;s Banter chat are visible to every member of that pool, including members who join after you posted. They are delivered live to members who have the chat open at the time, and can trigger an email or push notification to the people you mention.
+                  Messages, photos, GIFs, reactions, pins, and @mentions you post in a pool&apos;s Banter chat are visible to every member of that pool, including members who join after you posted. They are delivered live to members who have the chat open at the time, and can trigger an email or push notification to the people you mention.
                 </p>
                 <p>
-                  Pool admins and SportPool super admins can read chat content. To be clear about what that does and does not mean: an admin can pin a message, but <strong>no one using the app can edit or remove a message once it is sent</strong>. If something in a pool&apos;s chat needs to come down, please{' '}
+                  Pool admins and SportPool super admins can read chat content. A pool admin can pin or delete any message in their pool, and SportPool can delete any message. If something in a chat needs to come down, report it from the message itself or{' '}
                   <Link href="/contact" className="text-primary-600 hover:text-primary-700 font-medium transition">
                     contact us
-                  </Link>{' '}
-                  and we will deal with it directly.
+                  </Link>
+                  . Reports are seen only by SportPool staff. They are never shared with the member you reported or with pool admins.
                 </p>
                 <p>
                   Video cards you generate are stored at public URLs and can be viewed by anyone holding the link, including people who are not SportPool members (see Section 2).
@@ -376,13 +426,20 @@ export default function PrivacyPage() {
                   We retain your personal information for as long as your account is active or as needed to provide the Service.
                 </p>
                 <p>
-                  When you delete your account, we delete your account record, your pool memberships and entries, all of your predictions and scores across every game mode, your experience points, levels and badges, your Banter messages and reactions, your presence record, your push tokens and notification preferences, your terms-acceptance record, and your sign-in credentials. Deletion is immediate and cannot be undone.
+                  When you delete your account, we delete your account record, your pool memberships and entries, all of your predictions and scores across every game mode, your experience points, levels and badges, your Banter messages, photos and reactions, the blocks you have set, the reports you have filed, your presence record, your push tokens and notification preferences, your terms-acceptance record, and your sign-in credentials. Deletion is immediate and cannot be undone.
                 </p>
                 <p>
-                  Deleting your account is the only way to remove Banter messages you have posted, and it removes them from every pool at once &mdash; they will disappear from the chat history other members see. Leaving a single pool does not remove them.
+                  Deleting your account removes your Banter messages and photos from every pool at once &mdash; they will disappear from the chat history other members see, and photo files are removed from storage within an hour. You can also delete individual messages at any time (see Section 2). Leaving a single pool does not remove the messages you posted there.
                 </p>
                 <p>
-                  Two things are kept after deletion. Records of email we have already sent you are retained but stripped of your account identifier. Records of purchases made through Paddle are retained, unlinked from your account, because we are required to keep accurate financial and tax records; Paddle retains its own copy under its own policy.
+                  Three things are kept after deletion. Records of email we have already sent you are retained but stripped of your account identifier. Records of purchases made through Paddle are retained, unlinked from your account, because we are required to keep accurate financial and tax records; Paddle retains its own copy under its own policy. And if another member reported one of your messages, the report, including its copy of that message, is kept so our moderation record stays complete, but it is no longer linked to your account.
+                </p>
+                <p>
+                  If a crew captain invited you by email and you never created an account, your address is kept only while that invite is open, and is deleted as soon as it is accepted, declined or withdrawn, or the crew closes. To have it removed sooner, please{' '}
+                  <Link href="/contact" className="text-primary-600 hover:text-primary-700 font-medium transition">
+                    contact us
+                  </Link>
+                  .
                 </p>
                 <p>
                   Video cards already generated and shared remain at their public URLs until we remove them. If you want a card taken down, please contact us.
@@ -405,7 +462,9 @@ export default function PrivacyPage() {
                   <li><strong>Correct</strong> any inaccurate or incomplete information</li>
                   <li><strong>Delete</strong> your account and associated data from your profile settings</li>
                   <li><strong>Manage</strong> which categories of email and push notifications you receive from your profile settings, and revoke push notification permission at any time in your device&apos;s system settings</li>
-                  <li><strong>Revoke</strong> camera permission for QR scanning at any time in your device&apos;s system settings</li>
+                  <li><strong>Revoke</strong> camera permission, used for QR scanning and Banter photos, at any time in your device&apos;s system settings</li>
+                  <li><strong>Delete</strong> any Banter message you have sent</li>
+                  <li><strong>Report</strong> messages and <strong>block</strong> members in Banter</li>
                   <li><strong>Unsubscribe</strong> from broadcast emails using the unsubscribe link in any such email</li>
                 </ul>
                 <p>
