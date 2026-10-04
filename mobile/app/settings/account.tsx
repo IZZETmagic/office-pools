@@ -33,6 +33,7 @@ import { Icon } from '@/components/ui';
 import { deleteAccount } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { validateNewPassword } from '@/lib/passwordReset';
 import { supabase } from '@/lib/supabase';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
@@ -216,15 +217,10 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
   }, [open]);
 
   async function handleSubmit() {
-    setError(null);
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
+    // The same rule the reset flow's new-password screen applies.
+    const invalid = validateNewPassword(newPassword, confirmPassword);
+    setError(invalid);
+    if (invalid) return;
     setLoading(true);
     const { error: updErr } = await supabase.auth.updateUser({ password: newPassword });
     setLoading(false);

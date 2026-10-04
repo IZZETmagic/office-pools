@@ -1,6 +1,6 @@
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Icon, Input, Text, Wordmark } from '@/components/ui';
@@ -25,10 +25,8 @@ export default function SignInScreen() {
   }
 
   function handleForgotPassword() {
-    Alert.alert(
-      'Reset on web',
-      'Password reset is available on the web app. Visit officepools.app, reset your password, then sign in here.',
-    );
+    const typed = email.trim();
+    router.push({ pathname: '/(auth)/forgot-password', params: typed ? { email: typed } : {} });
   }
 
   return (

@@ -142,7 +142,7 @@ function InnerLayout() {
   // signal is AppState, and without this `refetchOnWindowFocus` never fires at
   // all — a phone that has been in a pocket for an hour shows hour-old data.
   useEffect(() => wireAppStateFocus(), []);
-  const { session, loading } = useAuth();
+  const { session, loading, recovering } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   // ⚠ Whether the router has reached the screen this launch is meant to end on.
@@ -214,6 +214,21 @@ function InnerLayout() {
       return;
     }
 
+    // 2b) Signed in by a password-reset code, new password not saved yet.
+    //     ⚠ MUST SIT ABOVE 3 AND 4. Both route any session onward, so without
+    //     this the code would carry them into the app — or, on a new phone,
+    //     the notifications screen — with a password they still don't know.
+    //     The code screen never navigates itself; this does.
+    if (recovering) {
+      const onNewPassword = group === '(auth)' && sub === 'new-password';
+      if (!onNewPassword) {
+        router.replace('/(auth)/new-password');
+        return;
+      }
+      setRoutingSettled(true);
+      return;
+    }
+
     // 3) Authed but haven't been shown the post-auth notifications screen.
     //    Fires for fresh sign-ups AND for existing users on their first
     //    launch after this feature ships. If push perm is already granted,
@@ -241,6 +256,7 @@ function InnerLayout() {
     setRoutingSettled(true);
   }, [
     session,
+    recovering,
     loading,
     onboardingLoading,
     onboardingSeen,

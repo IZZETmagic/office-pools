@@ -2,12 +2,20 @@ import type { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { clearCache } from './cache/persistentCache';
+import { resetErrorMessage } from './passwordReset';
 import { supabase } from './supabase';
 
 type AuthState = {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  /**
+   * Signed in by a reset code, new password not saved yet. The root gate holds
+   * a recovering person on `(auth)/new-password` — without it, the session the
+   * code creates would carry them straight into the app (or, on a new phone,
+   * the notifications screen) with a password they still don't know.
+   */
+  recovering: boolean;
 };
 
 type AuthActions = {
@@ -20,6 +28,18 @@ type AuthActions = {
   }) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   checkUsernameAvailable: (username: string) => Promise<boolean>;
+  /** Emails a reset code. Succeeds whether or not the address has an account. */
+  requestPasswordReset: (email: string) => Promise<{ error?: string }>;
+  /** Signs in with the emailed code and starts `recovering`. */
+  verifyResetCode: (email: string, code: string) => Promise<{ error?: string }>;
+  /** Saves the new password and ends `recovering`. */
+  completePasswordReset: (password: string) => Promise<{ error?: string }>;
+  /**
+   * Ends `recovering` without a new password. ⚠ STAYS SIGNED IN (Ryan,
+   * 2026-10-04): the code already proved the inbox, so "not now" lets them in
+   * rather than throwing them back to a sign-in they can't complete.
+   */
+  skipPasswordReset: () => void;
 };
 
 type AuthContextValue = AuthState & AuthActions;
@@ -31,6 +51,7 @@ const USERNAME_PATTERN = /^[a-zA-Z0-9_]+$/;
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     supabase.auth
@@ -57,6 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
+      // A reset can't outlive its session. Left set across a sign-out or a
+      // failed refresh, the NEXT sign-in would land on "choose a new password".
+      if (!nextSession) setRecovering(false);
     });
 
     return () => subscription.unsubscribe();
@@ -67,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       user: session?.user ?? null,
       loading,
+      recovering,
 
       async signIn(email, password) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -141,8 +166,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .maybeSingle();
         return !data;
       },
+
+      async requestPasswordReset(email) {
+        // No `redirectTo`: the email's link is built by the template and goes
+        // to /auth/confirm on the web; the app only ever uses the code.
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+        return error ? { error: resetErrorMessage(error) } : {};
+      },
+
+      async verifyResetCode(email, code) {
+        // ⚠ SET BEFORE THE CALL, NOT AFTER IT. verifyOtp stores the session and
+        // fires onAuthStateChange before it resolves, so a flag raised on the
+        // way out would leave a render where the gate sees a session without
+        // it — and routes onward from there.
+        setRecovering(true);
+        const { data, error } = await supabase.auth.verifyOtp({
+          email: email.trim(),
+          token: code,
+          type: 'recovery',
+        });
+        if (error || !data.session) {
+          setRecovering(false);
+          return { error: resetErrorMessage(error ?? { code: 'otp_expired' }) };
+        }
+        if (data.user) {
+          await supabase
+            .from('users')
+            .update({ last_login: new Date().toISOString() })
+            .eq('auth_user_id', data.user.id);
+        }
+        return {};
+      },
+
+      async completePasswordReset(password) {
+        const { error } = await supabase.auth.updateUser({ password });
+        // `same_password` means they knew it after all — nothing left to do.
+        if (error && error.code !== 'same_password') {
+          return { error: resetErrorMessage(error) };
+        }
+        setRecovering(false);
+        return {};
+      },
+
+      skipPasswordReset() {
+        setRecovering(false);
+      },
     }),
-    [session, loading],
+    [session, loading, recovering],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
