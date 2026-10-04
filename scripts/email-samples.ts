@@ -8,7 +8,7 @@
  */
 
 import { dataRows, greeting, panel, paragraph, sectionLabel } from '../lib/email/components'
-import { resetPasswordAuthTemplate } from '../lib/email/supabaseAuthTemplates'
+import { RESET_CODE_DISPLAY, resetPasswordAuthTemplate } from '../lib/email/supabaseAuthTemplates'
 import * as T from '../lib/email/templates'
 
 const POOL_URL = 'https://sportpool.io/pools/demo-pool'
@@ -261,7 +261,7 @@ add('Community', 'mentionNotification', T.mentionNotificationTemplate({
   const reset = resetPasswordAuthTemplate()
   add('Supabase auth', 'Reset password', {
     subject: reset.subject,
-    html: reset.html.replaceAll('{{ .Token }}', '48203917').replaceAll('{{ .TokenHash }}', 'sample'),
+    html: reset.html.replace(RESET_CODE_DISPLAY, '482-039'),
   })
 }
 

@@ -50,11 +50,6 @@ export function brandedTemplate(params: {
   body: string
   ctaText?: string
   ctaUrl?: string
-  /**
-   * Body copy that belongs BELOW the button — a fallback to it, or the small print
-   * after it. Everything in `body` renders above the CTA.
-   */
-  afterCta?: string
   unsubscribeUrl?: string
   /** Right-aligned label in the header band, e.g. "Support". */
   headerLabel?: string
@@ -67,7 +62,7 @@ export function brandedTemplate(params: {
    */
   footer?: 'subscription' | 'support' | 'none'
 }): string {
-  const { preheader, heading, body, ctaText, ctaUrl, afterCta, headerLabel } = params
+  const { preheader, heading, body, ctaText, ctaUrl, headerLabel } = params
   const footer = params.footer ?? 'subscription'
   const unsubscribeUrl = params.unsubscribeUrl || `${APP_URL}/profile?tab=settings`
 
@@ -120,7 +115,6 @@ export function brandedTemplate(params: {
           </table>`
               : ''
           }
-          ${afterCta ?? ''}
         </td></tr>
         <tr><td class="sp-pad ${cls.hairline}" style="padding:20px 32px 26px;border-top:1px solid ${color('hairline')};text-align:center;">
           <p style="margin:0 0 8px;">${wordmark(14, color('heading'), color('primary'), cls.heading)}</p>

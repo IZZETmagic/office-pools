@@ -1,34 +1,42 @@
 import { describe, expect, it } from 'vitest'
 
-import { resetPasswordAuthTemplate } from '../supabaseAuthTemplates'
+import { RESET_CODE_LENGTH, formatResetCode } from '../../passwordReset'
+import { RESET_CODE_DISPLAY, resetPasswordAuthTemplate } from '../supabaseAuthTemplates'
 
 // =============================================================
 // The reset email survives being pasted into Supabase
 // =============================================================
-// Supabase fills `{{ .X }}` actions at send time. A placeholder lost here is a
-// reset email with no link or no code; a stray `{{` from anywhere else in the
-// shell would be read as an action and break the whole template.
+// Supabase runs the `{{ … }}` actions at send time. A lost one is a reset email
+// with no code; a stray `{{` from anywhere else in the shell would be read as
+// an action and break the whole template.
 // =============================================================
 
 const { subject, html } = resetPasswordAuthTemplate()
 
+/** What Go's `slice` makes of a code — the same cut the template asks for. */
+function renderLikeSupabase(template: string, token: string): string {
+  return template.replace(/\{\{ slice \.Token (\d+)(?: (\d+))? \}\}/g, (_, from, to) =>
+    token.slice(Number(from), to === undefined ? undefined : Number(to))
+  )
+}
+
 describe('reset password template', () => {
-  it('links to /auth/confirm with the token hash, never the old PKCE ConfirmationURL', () => {
-    expect(html).toContain(
-      'href="https://sportpool.io/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery"'
-    )
+  it('prints the code exactly as the website and the app format it', () => {
+    const token = '482039'
+    expect(token).toHaveLength(RESET_CODE_LENGTH)
+    expect(renderLikeSupabase(RESET_CODE_DISPLAY, token)).toBe(formatResetCode(token))
+    expect(renderLikeSupabase(html, token)).toContain('482-039')
+  })
+
+  it('carries no link — the code is the whole flow', () => {
     expect(html).not.toContain('ConfirmationURL')
-    // The Site URL is saved without a scheme, so it must never build the link.
-    expect(html).not.toContain('{{ .SiteURL }}')
+    expect(html).not.toContain('TokenHash')
+    expect(html).not.toContain('/auth/confirm')
   })
 
-  it('carries the code for the app', () => {
-    expect(html).toContain('{{ .Token }}')
-  })
-
-  it('contains no Go template action except the two it means to', () => {
+  it('contains no Go template action except the two halves of the code', () => {
     const actions = html.match(/\{\{[^}]*\}\}/g) ?? []
-    expect(new Set(actions)).toEqual(new Set(['{{ .TokenHash }}', '{{ .Token }}']))
+    expect(actions).toEqual([`{{ slice .Token 0 ${RESET_CODE_LENGTH / 2} }}`, `{{ slice .Token ${RESET_CODE_LENGTH / 2} }}`])
     expect(html.split('{{').length - 1).toBe(actions.length)
   })
 

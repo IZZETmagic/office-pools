@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MIN_PASSWORD_LENGTH,
   RESET_CODE_LENGTH,
+  formatResetCode,
   looksLikeEmail,
   normalizeResetCode,
   resetErrorMessage,
@@ -18,6 +19,20 @@ describe('normalizeResetCode', () => {
 
   it('never grows past the code length', () => {
     expect(normalizeResetCode('1234567890123')).toHaveLength(RESET_CODE_LENGTH);
+  });
+});
+
+describe('formatResetCode', () => {
+  it('prints the code the way the email does', () => {
+    expect(RESET_CODE_LENGTH).toBe(6);
+    expect(formatResetCode('123456')).toBe('123-456');
+    expect(formatResetCode('123-456')).toBe('123-456');
+  });
+
+  it('adds the dash with the fourth digit, so backspacing never strands it', () => {
+    expect(formatResetCode('123')).toBe('123');
+    expect(formatResetCode('123-')).toBe('123');
+    expect(formatResetCode('1234')).toBe('123-4');
   });
 });
 

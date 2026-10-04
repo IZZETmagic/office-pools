@@ -4,8 +4,9 @@
 //   npx tsx scripts/verify-password-reset.ts --base=https://dev.sportpool.io
 //   npx tsx scripts/verify-password-reset.ts --app-only            # the code half; needs no deploy
 //
-// The reset email carries a LINK for the web (/auth/confirm?token_hash=…&type=recovery) and a CODE
-// for the app (verifyOtp type 'recovery'). Both are walked here as test10@test.com — a dev account
+// The reset email carries a CODE that the website and the app both type in (verifyOtp type
+// 'recovery'). /auth/confirm (the LINK older emails carried) is walked too while it exists.
+// Both are walked here as test10@test.com — a dev account
 // with no pools, never a real person — using `auth.admin.generateLink`, which builds the token WITHOUT SENDING ANY EMAIL. That is
 // the point: nothing reaches an inbox, so this can run as often as needed.
 //
@@ -44,7 +45,7 @@ import { dirname, resolve } from 'path'
 })()
 
 import { createClient } from '@supabase/supabase-js'
-import { RESET_CODE_LENGTH } from '../mobile/lib/passwordReset'
+import { RESET_CODE_LENGTH } from '../lib/passwordReset'
 
 const BASE = (process.argv.find((a) => a.startsWith('--base='))?.slice('--base='.length) ?? 'https://sportpool.io').replace(/\/$/, '')
 const APP_ONLY = process.argv.includes('--app-only')
@@ -140,7 +141,7 @@ async function appCode(email: string) {
   console.log('\nApp code (verifyOtp)')
   const second = await recoveryToken(email)
   check(
-    `the code is ${RESET_CODE_LENGTH} digits, as the app's code box expects (Auth → Email OTP Length)`,
+    `the code is ${RESET_CODE_LENGTH} digits, as the code boxes and the email template expect (Auth → Email OTP Length)`,
     new RegExp(`^\\d{${RESET_CODE_LENGTH}}$`).test(second.code),
     second.code.length,
   )

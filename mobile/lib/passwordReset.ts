@@ -1,24 +1,28 @@
 // =============================================================
 // Password reset — the rules and the words, without the screens
 // =============================================================
-// The app resets a password with the code in the reset email, not with
-// the email's link. A link back into the app needs universal links (none are
-// set up) or the `officepools://` scheme, which most mail apps will not make
-// tappable and which does nothing on a laptop. The code works wherever the
-// email is read. The same email's link serves the web (/auth/confirm).
+// A reset is a 6-digit code from the reset email, typed into the app or the
+// website — one flow for both (Ryan, 2026-10-04). The email has no link: a link
+// can't open the app (no universal links), and a mail scanner that "clicks"
+// links can spend one before the person does, which it can't do to a code.
+//
+// ⚠ MIRRORED, NOT SHARED, AT lib/passwordReset.ts. The website can't import from
+// `mobile/` (it is in .vercelignore), so the web keeps a copy and
+// lib/__tests__/passwordResetParity.test.ts fails if the two ever disagree.
+// Change both.
 //
 // ⚠ PURE ON PURPOSE — no `react-native`, no supabase client. vitest runs this
 // from the repo root, where nothing under `mobile/node_modules` resolves.
 // =============================================================
 
 /**
- * Digits in the reset code. ⚠ MIRRORS A DASHBOARD SETTING — Auth → Providers →
- * Email → "Email OTP Length". It is 8 on this project, NOT Supabase's default
- * of 6 (read off a generated token, 2026-10-04). The code box fills and submits
- * at this length, so a box built for 6 would submit a truncated code every time.
- * `scripts/verify-password-reset.ts` fails if the two drift apart.
+ * Digits in the reset code. ⚠ MIRRORS A DASHBOARD SETTING — Authentication →
+ * Sign In / Providers → Email → "Email OTP Length", set to 6 on 2026-10-04 (it
+ * had been 8). The code box fills and submits at this length, and the email
+ * template splits the code at its half, so all three must agree.
+ * `scripts/verify-password-reset.ts` fails if the setting drifts from this.
  */
-export const RESET_CODE_LENGTH = 8;
+export const RESET_CODE_LENGTH = 6;
 
 /**
  * Seconds before "Send a new code" comes back. Supabase refuses a second
@@ -41,6 +45,16 @@ export type ResetError = {
 /** Keep digits only, so a pasted `123 456` or `123-456` still works. */
 export function normalizeResetCode(input: string): string {
   return input.replace(/\D/g, '').slice(0, RESET_CODE_LENGTH);
+}
+
+/**
+ * Show a code the way the email prints it: `123-456`. The dash appears with the
+ * fourth digit, so backspacing never strands one on its own.
+ */
+export function formatResetCode(input: string): string {
+  const digits = normalizeResetCode(input);
+  const half = RESET_CODE_LENGTH / 2;
+  return digits.length > half ? `${digits.slice(0, half)}-${digits.slice(half)}` : digits;
 }
 
 /** Enough of an email address to be worth sending to. Supabase has the final say. */

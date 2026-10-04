@@ -1,5 +1,6 @@
 import { paragraph, statBlock } from './components'
 import { brandedTemplate } from './templates'
+import { RESET_CODE_LENGTH } from '../passwordReset'
 
 // =============================================================
 // Supabase auth emails — designed HERE, sent by Supabase
@@ -10,50 +11,49 @@ import { brandedTemplate } from './templates'
 // through Resend, instead of a hand-kept copy of the green design retired in
 // July. To change one: edit it here, then
 //
-//   npx tsx scripts/render-auth-email.ts reset-password
+//   npx tsx scripts/render-auth-email.ts reset-password --copy
 //
 // and paste the output over the dashboard's Source.
 //
-// ⚠ THE `{{ .X }}` PLACEHOLDERS ARE GO TEMPLATE ACTIONS, filled by Supabase at
-// send time. They pass through `brandedTemplate` untouched (it is a plain string
-// template), and the test pins that no other `{{` reaches the output, since any
-// would be read as an action and break the template.
+// ⚠ THE `{{ … }}` ARE GO TEMPLATE ACTIONS, run by Supabase at send time. They
+// pass through `brandedTemplate` untouched (it is a plain string template), and
+// the test pins that no other `{{` reaches the output, since any would be read
+// as an action and break the template.
 // =============================================================
 
+const HALF = RESET_CODE_LENGTH / 2
+
 /**
- * The reset link. It goes to /auth/confirm, which verifies the hash on the
- * server, so it works whichever browser opens it (see lib/authConfirm.ts).
- *
- * ⚠ SPELLED OUT, NOT `{{ .SiteURL }}`: the project's Site URL is saved as bare
- * `sportpool.io`, with no scheme, which would print a link no mail app opens.
+ * The code as the person reads it, `123-456`, cut at its half by Go's built-in
+ * `slice`. ⚠ ONLY SAFE WHILE THE CODE IS RESET_CODE_LENGTH LONG: Supabase's
+ * "Email OTP Length" must match, or a longer code loses its tail here and a
+ * shorter one fails to render, which stops the email being sent at all.
  */
-export const RESET_PASSWORD_URL =
-  'https://sportpool.io/auth/confirm?token_hash={{ .TokenHash }}&amp;type=recovery'
+export const RESET_CODE_DISPLAY = `{{ slice .Token 0 ${HALF} }}-{{ slice .Token ${HALF} }}`
 
 /** Authentication → Emails → Reset password. */
 export function resetPasswordAuthTemplate(): { subject: string; html: string } {
   return {
     subject: 'Reset your SportPool password',
     html: brandedTemplate({
-      preheader: 'Choose a new password for your SportPool account.',
+      preheader: 'Your SportPool password reset code.',
       heading: 'Reset your password',
-      body: paragraph(
-        'We got a request to reset the password on your SportPool account. Tap the button to choose a new one.'
-      ),
-      ctaText: 'Reset password',
-      ctaUrl: RESET_PASSWORD_URL,
-      // The app can't open the link (no universal links), so the same email
-      // carries the code it asks for. Supabase's {{ .Token }} is 8 digits here.
-      afterCta:
-        '<div style="height:12px;line-height:12px;font-size:12px;">&nbsp;</div>' +
+      // No link, by design (Ryan, 2026-10-04): the website and the app both ask
+      // for this code. A link can't open the app, and a mail scanner that
+      // "clicks" links can spend one before the person does.
+      body:
+        paragraph(
+          'We got a request to reset the password on your SportPool account. Enter this code in SportPool to choose a new one.',
+          { marginBottom: 20 }
+        ) +
         statBlock({
-          label: 'Using the SportPool app?',
-          value: '{{ .Token }}',
-          sub: 'Enter this code instead',
+          label: 'Your code',
+          value: RESET_CODE_DISPLAY,
+          sub: 'Works once, for an hour',
           variant: 'info',
         }) +
         paragraph(
-          'The button and the code each work once and expire after an hour. If you didn’t ask to reset your password, you can ignore this email and nothing will change.',
+          'If you didn’t ask to reset your password, you can ignore this email and nothing will change.',
           { marginBottom: 0 }
         ),
       footer: 'none',

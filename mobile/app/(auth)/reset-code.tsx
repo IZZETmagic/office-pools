@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import {
   RESEND_COOLDOWN_SECONDS,
   RESET_CODE_LENGTH,
+  formatResetCode,
   normalizeResetCode,
 } from '@/lib/passwordReset';
 import { useTheme } from '@/theme';
@@ -77,9 +78,10 @@ export default function ResetCodeScreen() {
       onBack={() => router.back()}
     >
       <Input
-        value={code}
+        // Held as digits, shown as the email prints it: 123-456.
+        value={formatResetCode(code)}
         onChangeText={handleChange}
-        placeholder={'0'.repeat(RESET_CODE_LENGTH)}
+        placeholder={formatResetCode('0'.repeat(RESET_CODE_LENGTH))}
         keyboardType="number-pad"
         textContentType="oneTimeCode"
         autoComplete="one-time-code"
@@ -87,7 +89,7 @@ export default function ResetCodeScreen() {
         autoFocus
         editable={!verifying}
         accessibilityLabel={`${RESET_CODE_LENGTH}-digit code`}
-        style={{ textAlign: 'center', fontSize: 24, letterSpacing: 8 }}
+        style={{ textAlign: 'center', fontSize: 24, letterSpacing: 4 }}
       />
       <Button
         title="Continue"

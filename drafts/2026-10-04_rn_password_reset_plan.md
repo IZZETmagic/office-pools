@@ -1,6 +1,26 @@
 # Password reset in the app — plan
 
-**Status:** 🟡 web DEPLOYED + verified 2026-10-04 · ⏸ template swap (Ryan) · ⏸ phone test · ⏸ OTA
+**Status:** 🟡 switching to ONE code flow (see below) · ⏸ OTP length → 6 (Ryan) · ⏸ push · ⏸ template · ⏸ phone · ⏸ OTA
+
+## ⭐ Direction change (Ryan, 2026-10-04 afternoon): ONE code flow, 6 digits as 123-456
+
+After the link version shipped, Ryan asked why the email carried both a link and a code. Now **the
+code is the only flow, on the website and in the app**, and it's 6 digits shown as `123-456`. The
+link sections below are history.
+
+- Email: no button, just the code, printed `{{ slice .Token 0 3 }}-{{ slice .Token 3 }}` (Go's
+  built-in `slice`). Built in `lib/email/supabaseAuthTemplates.ts` on the shared shell; paste it from
+  `npx tsx scripts/render-auth-email.ts reset-password --copy`.
+- Website: `/forgot-password` has two steps on one page (email, then code), then `/reset-password`.
+  The request goes through a plain (non-PKCE) client, as the app's does.
+- `lib/passwordReset.ts` mirrors `mobile/lib/passwordReset.ts` (the web can't import `mobile/`), and
+  `lib/__tests__/passwordResetParity.test.ts` holds them together.
+- A bonus: mail scanners that "click" links can't spend a code.
+
+**Order (no broken window):** build → **Ryan sets Email OTP Length 8 → 6** → push → re-run the
+check → **Ryan pastes the code-only template** → test web → phone → OTA → later, delete
+`/auth/confirm` once the last link emails expire (1h). The length change must land BEFORE the push,
+or the site would ask for 6 digits while the email still sends 8.
 
 ## Where it stands (2026-10-04, afternoon)
 
