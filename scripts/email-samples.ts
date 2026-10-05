@@ -193,30 +193,6 @@ add('Rounds', 'bracketFix', T.bracketFixTemplate({
   poolUrl: POOL_URL,
 }))
 
-// --- Announcements & countdowns ------------------------------------------------------
-
-const GROUP_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
-add('Announcements', 'allTeamsAnnouncement', T.allTeamsAnnouncementTemplate({
-  userName: 'Ryan',
-  groups: GROUP_LETTERS.map((letter, i) => ({
-    letter,
-    teams: ['BRA', 'ARG', 'FRA', 'ENG'].map((code) => ({
-      name: code,
-      code,
-      flagUrl: `https://flagcdn.com/w20/${['br', 'ar', 'fr', 'gb-eng'][i % 4]}.png`,
-    })),
-  })),
-  daysUntilKickoff: 63,
-  dashboardUrl: DASH_URL,
-}))
-
-for (const milestone of ['60days', '30days', '14days', '7days', '1day'] as const) {
-  const days = { '60days': 60, '30days': 30, '14days': 14, '7days': 7, '1day': 1 }[milestone]
-  add('Announcements', `countdownReminder — ${milestone}`, T.countdownReminderTemplate({
-    milestone, daysUntilKickoff: days, dashboardUrl: DASH_URL,
-  }))
-}
-
 // --- Growth & re-engagement -----------------------------------------------------------
 
 add('Growth', 'emptyPoolNudge', T.emptyPoolNudgeTemplate({
