@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
 import { getResendClient } from '@/lib/email/resend'
 import { querySegment, SEGMENTS, type SegmentKey } from '@/lib/email/segments'
+import { resolveSendMode } from '@/lib/email/sendMode'
 
 // =============================================================
 // GET /api/admin/broadcast
@@ -14,7 +15,21 @@ import { querySegment, SEGMENTS, type SegmentKey } from '@/lib/email/segments'
 // For other segments → clears the "Broadcast Target" audience,
 // populates it with the segment's users, then sends the broadcast.
 //
-// Body: { subject, html, segment: SegmentKey }
+// Body: { subject, html, segment: SegmentKey, dry_run?, idempotency_key? }
+//
+// ⚠ SAFE BY DEFAULT (2026-10-05) — see lib/email/sendMode.ts. Until then
+// every POST sent: no preview mode and no one-time key, so a retry or a
+// double-click broadcast twice. Now a body PREVIEWS unless it says
+// `dry_run: false`, and a real send must carry an idempotency_key, which is
+// recorded BEFORE the shared audience is touched — so a duplicate is refused
+// while it can still do no harm.
+//
+// ⚠ STILL OPEN — the shared "Broadcast Target" audience. Every non-"all"
+// broadcast clears and refills ONE Resend audience. The one-time key removes
+// the likeliest overlap (one admin's double-click), but two DIFFERENT
+// broadcasts in flight at once can still overwrite each other's recipients —
+// and whether Resend snapshots an audience at send time or reads it as it
+// delivers is unverified, so even back-to-back sends may not be safe.
 // =============================================================
 
 export async function GET() {
@@ -58,7 +73,8 @@ export async function POST(request: NextRequest) {
   const { supabase } = auth.data
 
   try {
-    const { subject, html, segment } = await request.json()
+    const body = await request.json()
+    const { subject, html, segment } = body
 
     if (!subject || !html) {
       return NextResponse.json({ error: 'subject and html are required' }, { status: 400 })
@@ -86,6 +102,37 @@ export async function POST(request: NextRequest) {
 
     if (recipientEmails.length === 0) {
       return NextResponse.json({ message: 'No users in this segment', sent: 0 })
+    }
+
+    // Preview unless the caller said `dry_run: false`. There is no test send
+    // here; a `test_send` body resolves to 'test', which is not 'send'.
+    if (resolveSendMode(body) !== 'send') {
+      return NextResponse.json({
+        dry_run: true,
+        segment: segmentKey,
+        recipientCount: recipientEmails.length,
+        preview: recipientEmails.slice(0, 5),
+      })
+    }
+
+    // A real send spends a one-time key FIRST — before the shared audience is
+    // cleared — so a retried or double-clicked request is refused, not re-sent.
+    const idempotencyKey = typeof body.idempotency_key === 'string' ? body.idempotency_key.trim() : ''
+    if (!idempotencyKey) {
+      return NextResponse.json({ error: 'A real send needs an idempotency_key' }, { status: 400 })
+    }
+    const { error: keyError } = await supabase
+      .from('sent_announcements')
+      .insert({ idempotency_key: idempotencyKey, sent_by: auth.data.userData.user_id })
+    if (keyError) {
+      if (keyError.code === '23505') {
+        return NextResponse.json(
+          { error: 'This broadcast has already been sent. Start a new one to send again.' },
+          { status: 409 },
+        )
+      }
+      console.error('[Broadcast] Could not record the send key:', keyError.message)
+      return NextResponse.json({ error: 'Could not record the send, so nothing was sent' }, { status: 500 })
     }
 
     if (segmentKey === 'all') {

@@ -111,6 +111,10 @@ export function BroadcastTab() {
   const [segment, setSegment] = useState<SegmentKey>('all')
   const [previewHtml, setPreviewHtml] = useState('')
   const [confirmSend, setConfirmSend] = useState(false)
+  // One key per broadcast, made when Send opens the confirm step. Confirming
+  // twice, or retrying after an error, reuses it — so the server refuses the
+  // repeat instead of broadcasting again. Cancel and Send again → a new key.
+  const [sendKey, setSendKey] = useState<string | null>(null)
 
   // This builds the HTML that is both previewed and POSTed to /api/admin/broadcast —
   // the route sends what it is given. It used to hold its own hand-copied shell, which
@@ -161,6 +165,11 @@ export function BroadcastTab() {
       showToast('Subject and body are required', 'error')
       return
     }
+    if (!sendKey) {
+      showToast('Press Send again to confirm this broadcast', 'error')
+      setConfirmSend(false)
+      return
+    }
 
     setSending(true)
     try {
@@ -168,7 +177,8 @@ export function BroadcastTab() {
       const res = await fetch('/api/admin/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, html, segment }),
+        // ⚠ `dry_run: false` must be explicit — the route previews without it.
+        body: JSON.stringify({ subject, html, segment, dry_run: false, idempotency_key: sendKey }),
       })
 
       const data = await res.json()
@@ -197,6 +207,7 @@ export function BroadcastTab() {
     setSegment('all')
     setPreviewHtml('')
     setConfirmSend(false)
+    setSendKey(null)
   }
 
   // Group presets by category for display
@@ -412,7 +423,7 @@ export function BroadcastTab() {
             {!confirmSend ? (
               <Button
                 size="sm"
-                onClick={() => setConfirmSend(true)}
+                onClick={() => { setSendKey(`broadcast-${crypto.randomUUID()}`); setConfirmSend(true) }}
                 disabled={!subject || !body}
               >
                 Send to {SEGMENTS[segment].label}
