@@ -16,9 +16,11 @@
 -- switch. The tournament ended 2026-07-16; they have nothing left to do.
 --
 -- DELIBERATELY NOT TOUCHED
---   * countdown-emails (jobid 5) — ACTIVE, the same shape, outside this
---     instruction. It sends nothing today only because no `matches` row is in
---     the future; the next tournament loaded into `matches` wakes it.
+--   * countdown-emails (jobid 5) — ACTIVE, outside this instruction, and
+--     permanently inert: its function returns early once kickoff has passed,
+--     and kickoff is hard-coded as 2026-06-11. (Corrected 2026-10-05 — this
+--     line first claimed a new tournament in `matches` would wake it. It reads
+--     no `matches` row; nothing can.)
 --   * The edge functions themselves. Only the triggers go. All seven deployed
 --     functions run with verify_jwt = true, which the PUBLIC anon key satisfies,
 --     so removing a cron does not stop a function being called directly.
