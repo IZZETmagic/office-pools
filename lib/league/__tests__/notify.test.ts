@@ -14,7 +14,7 @@
 // that spams somebody every time it runs.
 // =============================================================
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 type EmailArg = Array<{ to: string; subject: string; html: string }>
 // Typed explicitly: `vi.fn(async () => …)` infers an EMPTY argument tuple, so
@@ -36,7 +36,7 @@ vi.mock('@/lib/push/apns', () => ({
 }))
 vi.mock('@/lib/email/topics', () => ({ TOPICS: { PREDICTIONS: 't1', MATCH_RESULTS: 't2' } }))
 
-import { notifyLockReminder } from '@/lib/league/notify'
+import { notifyLockReminder, notifyMatchweekOpened, notifyMatchweekCompleted } from '@/lib/league/notify'
 
 type Member = {
   user_id: string
@@ -51,7 +51,10 @@ type Member = {
  */
 function fakeAdmin(seed: {
   pool?: { pool_name: string; archived_at: string | null; league_mode?: string | null }
-  matchweek?: { matchweek_number: number; label: string | null; lock_at: string | null; fixture_count: number }
+  matchweek?: {
+    matchweek_number: number; label: string | null; lock_at: string | null; fixture_count: number
+    ranks_snapshot_at?: string | null
+  }
   members?: Member[]
   fixtures?: Array<{ fixture_id: string }>
   predictions?: Array<{ entry_id: string; fixture_id: string }>
@@ -62,6 +65,8 @@ function fakeAdmin(seed: {
     pool_members: seed.members ?? [],
     league_fixtures: seed.fixtures ?? [],
     league_predictions: seed.predictions ?? [],
+    league_match_scores: [],
+    league_entry_totals: [],
   }
   return {
     from(table: string) {
@@ -98,9 +103,22 @@ const BASE = {
 const recipients = () => sendBatchEmails.mock.calls[0]?.[0] ?? []
 const pushedTo = () => sendPushToUsers.mock.calls[0]?.[0] ?? []
 
+// ⚠ THE CLOCK IS PINNED. Decision 16 compares notices against the real time, so
+// a fixture with a hard-coded lock date would turn every test that expects a send
+// into a failure the day that date passes — BASE locks on 1 Nov 2026. Faking
+// only `Date` keeps real timers, so nothing async is disturbed.
+const NOW = new Date('2026-10-05T12:00:00Z')
+const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString()
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(NOW)
   sendBatchEmails.mockClear()
   sendPushToUsers.mockClear()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('the lock reminder goes ONLY to people who have not picked', () => {
@@ -269,5 +287,87 @@ describe('the lock reminder goes ONLY to people who have not picked', () => {
       'mw1',
     )
     expect(sendPushToUsers.mock.calls[0]?.[2]).toBe('PREDICTIONS')
+  })
+})
+
+
+// =============================================================
+// Decision 16 — nothing is sent once it has stopped being true or timely
+// =============================================================
+// Every test here has a twin that proves the gate does NOT over-block: a guard
+// that silently drops legitimate notices is the same failure as one that lets a
+// stale one through, just quieter.
+
+describe('Decision 16 — no backfills', () => {
+  const LOCKED = { ...BASE.matchweek, lock_at: hoursAgo(1) }
+
+  it('does not remind anyone to pick once the matchweek has LOCKED', async () => {
+    const r = await notifyLockReminder(
+      fakeAdmin({ ...BASE, matchweek: LOCKED, members: [MEMBER(1, ['e1'])] }),
+      'p1', 'mw1',
+    )
+    expect(r.skipped).toBe('expired: the matchweek has already locked')
+    expect(sendBatchEmails).not.toHaveBeenCalled()
+    expect(sendPushToUsers).not.toHaveBeenCalled()
+  })
+
+  it('does not announce a matchweek as OPEN once it has locked', async () => {
+    const r = await notifyMatchweekOpened(
+      fakeAdmin({ ...BASE, matchweek: LOCKED, members: [MEMBER(1, ['e1'])] }),
+      'p1', 'mw1',
+    )
+    expect(r.skipped).toBe('expired: the matchweek has already locked')
+    expect(sendBatchEmails).not.toHaveBeenCalled()
+  })
+
+  it('still announces a matchweek that is open', async () => {
+    const r = await notifyMatchweekOpened(fakeAdmin({ ...BASE, members: [MEMBER(1, ['e1'])] }), 'p1', 'mw1')
+    expect(r.skipped).toBeUndefined()
+    expect(recipients().map((e) => e.to)).toEqual(['u1@example.com'])
+  })
+
+  it('sends a recap for a matchweek scored an hour ago', async () => {
+    const r = await notifyMatchweekCompleted(
+      fakeAdmin({ ...BASE, matchweek: { ...BASE.matchweek, ranks_snapshot_at: hoursAgo(1) }, members: [MEMBER(1, ['e1'])] }),
+      'p1', 'mw1',
+    )
+    expect(r.skipped).toBeUndefined()
+    expect(recipients().map((e) => e.to)).toEqual(['u1@example.com'])
+  })
+
+  it('still sends at 47 hours — inside the window', async () => {
+    const r = await notifyMatchweekCompleted(
+      fakeAdmin({ ...BASE, matchweek: { ...BASE.matchweek, ranks_snapshot_at: hoursAgo(47) }, members: [MEMBER(1, ['e1'])] }),
+      'p1', 'mw1',
+    )
+    expect(r.skipped).toBeUndefined()
+  })
+
+  it('does NOT send a recap at 49 hours — it is no longer news', async () => {
+    const r = await notifyMatchweekCompleted(
+      fakeAdmin({ ...BASE, matchweek: { ...BASE.matchweek, ranks_snapshot_at: hoursAgo(49) }, members: [MEMBER(1, ['e1'])] }),
+      'p1', 'mw1',
+    )
+    expect(r.skipped).toBe('expired: the matchweek was scored more than 48 hours ago')
+    expect(sendBatchEmails).not.toHaveBeenCalled()
+    expect(sendPushToUsers).not.toHaveBeenCalled()
+  })
+
+  it('would have stopped the 2026-09-19 backlog — a recap 19 days late', async () => {
+    const r = await notifyMatchweekCompleted(
+      fakeAdmin({ ...BASE, matchweek: { ...BASE.matchweek, ranks_snapshot_at: hoursAgo(19 * 24) }, members: [MEMBER(1, ['e1'])] }),
+      'p1', 'mw1',
+    )
+    expect(r.skipped).toMatch(/^expired:/)
+    expect(sendBatchEmails).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the matchweek has no scored time', async () => {
+    const r = await notifyMatchweekCompleted(
+      fakeAdmin({ ...BASE, matchweek: { ...BASE.matchweek, ranks_snapshot_at: null }, members: [MEMBER(1, ['e1'])] }),
+      'p1', 'mw1',
+    )
+    expect(r.skipped).toBe('expired: no scored time, so freshness cannot be established')
+    expect(sendBatchEmails).not.toHaveBeenCalled()
   })
 })

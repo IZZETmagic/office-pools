@@ -65,13 +65,45 @@ type MemberRow = {
   pool_entries: Array<{ entry_id: string; entry_name: string }> | null
 }
 
+// =============================================================
+// NO BACKFILLS — Decision 16
+// =============================================================
+// A notice is sent only while it is still TRUE and still TIMELY. The outbox
+// already guarantees nothing is sent twice; that is a different promise. A row
+// that sat unsent — a paused consumer, an unscheduled cron, the kill switch —
+// is not a duplicate, so de-duplication waves it straight through.
+//
+// That is not hypothetical. On 2026-09-19 at 21:52 the newly scheduled consumer
+// drained a backlog in seven seconds and sent 17 matchweek recaps to seven
+// pools, between 5 and 19 days late, several to the same people at once.
+//
+// So each notice is checked against the WORLD at send time, never against the
+// queue: "it is open" and "it locks soon" are false once the matchweek has
+// locked, and a result stays true forever but stops being news. A notice that
+// fails is skipped with an `expired:` reason — still marked done, still logged,
+// countable — rather than sent late.
+// =============================================================
+
+const hasLocked = (lockAt: string | null) =>
+  lockAt !== null && new Date(lockAt).getTime() <= Date.now()
+
+/**
+ * How long a matchweek result is still news.
+ *
+ * Measured 2026-10-05 against all 68 recaps ever queued: every one that went out
+ * on time did so inside 24 hours of the matchweek being scored, and every late
+ * one was at least 5 days late — nothing fell between. 48 hours blocks the whole
+ * late group and none of the on-time one, with a day of margin on each side.
+ */
+const RECAP_FRESH_FOR_MS = 48 * 60 * 60 * 1000
+
 /** Everything all three notices need, fetched once. */
 async function context(admin: SupabaseClient, poolId: string, matchweekId: string) {
   const [{ data: pool }, { data: mw }] = await Promise.all([
     admin.from('pools').select('pool_name, archived_at, league_mode').eq('pool_id', poolId).single(),
     admin
       .from('league_matchweeks')
-      .select('matchweek_number, label, lock_at, fixture_count')
+      .select('matchweek_number, label, lock_at, fixture_count, ranks_snapshot_at')
       .eq('matchweek_id', matchweekId)
       .single(),
   ])
@@ -114,6 +146,8 @@ async function context(admin: SupabaseClient, poolId: string, matchweekId: strin
       || `Matchweek ${(mw as { matchweek_number: number }).matchweek_number}`,
     matchweekNumber: (mw as { matchweek_number: number }).matchweek_number,
     lockAt: (mw as { lock_at: string | null }).lock_at,
+    /** When the matchweek became fully played AND fully scored — the moment its result became news. */
+    snapshotAt: (mw as { ranks_snapshot_at: string | null }).ranks_snapshot_at,
     fixtureCount: (mw as { fixture_count: number }).fixture_count,
     members: ((members ?? []) as unknown as MemberRow[]).filter((m) => m.users?.email),
     poolUrl: `${appUrl()}/pools/${poolId}?tab=predictions`,
@@ -157,6 +191,10 @@ export async function notifyMatchweekOpened(
   if (ctx.archived) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
   if (!ctx.hasFixturePicks) {
     return { emails: 0, pushes: 0, skipped: 'mode has no weekly fixture picks' }
+  }
+  // "A new matchweek is open" is false once it has locked.
+  if (hasLocked(ctx.lockAt)) {
+    return { emails: 0, pushes: 0, skipped: 'expired: the matchweek has already locked' }
   }
 
   const emails = ctx.members.map((m) => {
@@ -205,6 +243,10 @@ export async function notifyLockReminder(
   if (ctx.archived) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
   if (!ctx.hasFixturePicks) {
     return { emails: 0, pushes: 0, skipped: 'mode has no weekly fixture picks' }
+  }
+  // "Picks lock soon" is false once they have locked.
+  if (hasLocked(ctx.lockAt)) {
+    return { emails: 0, pushes: 0, skipped: 'expired: the matchweek has already locked' }
   }
 
   const { data: fixtures } = await admin
@@ -282,6 +324,17 @@ export async function notifyMatchweekCompleted(
   if (ctx.archived) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
   if (!ctx.hasFixturePicks) {
     return { emails: 0, pushes: 0, skipped: 'mode has no weekly fixture picks' }
+  }
+  // A result stays true forever but stops being news. Aged from when the
+  // matchweek was SCORED, not from when the row was queued, so a stale event
+  // that gets re-queued is still caught. A missing stamp fails closed: the
+  // snapshot is what produces this event, so its absence means something is
+  // wrong, and a late recap is the outcome Decision 16 exists to prevent.
+  if (!ctx.snapshotAt) {
+    return { emails: 0, pushes: 0, skipped: 'expired: no scored time, so freshness cannot be established' }
+  }
+  if (Date.now() - new Date(ctx.snapshotAt).getTime() > RECAP_FRESH_FOR_MS) {
+    return { emails: 0, pushes: 0, skipped: 'expired: the matchweek was scored more than 48 hours ago' }
   }
 
   const entryIds = ctx.members.flatMap((m) => (m.pool_entries ?? []).map((e) => e.entry_id))
