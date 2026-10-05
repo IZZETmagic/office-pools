@@ -1751,11 +1751,14 @@ function AccountSettingsTab({
     setNotifPrefs((prev) => ({ ...prev, [key]: newValue }))
 
     try {
-      await fetch('/api/notifications/preferences', {
+      const res = await fetch('/api/notifications/preferences', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topicKey: key, enabled: newValue }),
       })
+      // A refusal is a failure too. Until 2026-10-05 only a network error
+      // reverted, so a change the server turned down stayed on screen as saved.
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
     } catch {
       // Revert on failure
       setNotifPrefs((prev) => ({ ...prev, [key]: !newValue }))
