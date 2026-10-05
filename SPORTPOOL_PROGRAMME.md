@@ -5179,6 +5179,70 @@ first draw is 24 hours before the first kickoff."*
   create-mode card carry it in code only, until an OTA ships (**R38**).
 
 
+### Decision 16 — No backfills: a notice is sent while it is true and timely, or never
+
+Settled 2026-10-05 with Ryan:
+
+> **"I do not want users to get a backfill of push notifications or emails."**
+
+**It had already happened once.** On 2026-09-19 at 21:52 the first tick of the newly scheduled
+`league-outbox` (135) drained a backlog in seven seconds: **17 matchweek recaps to seven pools — eleven
+to Pick'em, six to Showdown — between 5 and 19 days late**, several to the same members at once. N0 of
+the notification plan had specified the opposite order — mark the stale rows done *without sending*,
+then schedule — and the mark was never run. Found 2026-10-05 from the rows themselves: `attempts = 1`
+and one seven-second `processed_at` burst mean the consumer *claimed* them, where a mark-without-send
+leaves `attempts = 0` (as the nine marked on 2026-08-25 do). ⚠ Inference, not a delivery receipt —
+nothing records a send, because `notification_log` has never held a row — but every condition for
+sending held, and none of the rows threw.
+
+**Why de-duplication did not catch it.** The outbox and the five `push_*_sent` tables guarantee nothing
+is sent *twice*. A row that sat unsent — a paused consumer, an unscheduled cron, the
+`league_outbox_enabled` kill switch, a manual re-queue — is not a duplicate, so de-duplication waves it
+straight through. Preventing a duplicate and preventing a backfill are different promises, and only the
+first was being kept.
+
+**The rule.** A notice is checked against the **world** at send time, never against the queue, and is
+sent only while it is still **true** and still **timely**. Otherwise it is skipped with an `expired:`
+reason — still marked done, still logged, countable — and never sent late.
+
+| Notice | Expires when | Why |
+|---|---|---|
+| `matchweek_opened` | the matchweek locks | "it is open" is **false** after the lock |
+| `lock_reminder` | the matchweek locks | "picks lock soon" is **false** after the lock |
+| `matchweek_completed` | 48 h after `ranks_snapshot_at` | stays true forever, but stops being **news** |
+| `table_deadline` | the deadline passes | already enforced in `notifyTableDeadline` — unchanged |
+| `fixture_scored` | **never** | cache invalidation, not a notice — it must run however late, or the leaderboard goes stale |
+
+**Aged from the matchweek, not from the row.** The recap's clock is `league_matchweeks.ranks_snapshot_at`
+— when the matchweek became fully played and fully scored — never the event's `created_at`. A stale
+event that gets re-queued carries a fresh `created_at`, so a queue clock would wave it through; the
+matchweek's clock cannot be reset. **48 hours is measured, not chosen:** across all 68 recaps ever
+queued, every one sent on time went out inside 24 h of scoring and every late one was at least five days
+late, with nothing in between — so 48 h blocks the whole late group and none of the on-time one. A
+missing snapshot **fails closed**: the snapshot is what produces the event, so its absence means
+something is wrong, and a late recap is the outcome this decision exists to prevent.
+
+An `activated_at` floor on each producer was considered and is **subsumed**: it only covers a producer
+being switched on, where a send-time check covers that and every other way a row goes stale.
+
+**Built 2026-10-05** — `lib/league/notify.ts`, three gates beside the existing skip checks. No migration
+and no change to what the consumer writes, deliberately: an `outcome` column written in the same
+`update()` as `processed_at` would, if the code deployed before the column, fail the whole mark — and
+an unmarked row is re-claimed and **re-sent**. Pinned by eight tests in
+`lib/league/__tests__/notify.test.ts`, each blocking case paired with one proving the gate does not
+over-block, and mutation-checked: with the gate disabled, exactly the four blocking tests fail. ⚠ The
+tests pin the clock — the shared fixture locks on 2026-11-01, and without the pin every lock-reminder
+test would have begun failing that day.
+
+⚠ **What this does not yet cover.**
+- **Every future notice type.** The rule is enforced per notifier, so a new one is unprotected until it
+  says when it stops being worth sending. In N2 that becomes a column beside `disclosure_sentence`:
+  **a type cannot exist without declaring its expiry.**
+- **The three disabled World Cup email crons** — `deadline-reminders`, `round-deadline-reminders`,
+  `weekly-recap` — are Supabase edge functions with no such gate, each one `active = true` from running.
+- **Counting.** `expired:` is a log reason today; it becomes a number in the delivery ledger (N4).
+
+
 ## 💎 Later — monetization & cosmetics
 
 ### Sponsored pools `Feature` `Monetization`
