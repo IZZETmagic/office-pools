@@ -7,32 +7,40 @@
 //
 // SAFE BY DEFAULT — without --apply it writes nothing to the database.
 //
-//   npx tsx scripts/import-email-preferences.ts --snapshot <file>       # fetch, report, save
-//   npx tsx scripts/import-email-preferences.ts --from <file> --apply   # apply a saved fetch
-//   npx tsx scripts/import-email-preferences.ts --apply                 # fetch and apply
+//   npx tsx scripts/import-email-preferences.ts --limit 1000           # fetch the next 1,000
+//   npx tsx scripts/import-email-preferences.ts --limit 0 --apply      # apply, once all are in
+//   npx tsx scripts/import-email-preferences.ts --fresh --limit 1000   # start a NEW pass
+//
+// ⭐ RESUMABLE. Each contact is saved to a progress file the moment it is
+// fetched, and a run skips every contact already saved — so a run that is
+// stopped loses nothing, and the next one carries on. --limit caps a run so it
+// finishes cleanly. (The first version saved only at the very end, and lost
+// 3,400 fetched contacts when its run hit a time limit.) --apply refuses while
+// any contact is still unfetched, unless --allow-partial.
 //
 // ONLY OPT-OUTS ARE STORED. All six topics default to opt_in in Resend
 // (verified 2026-10-05), so a missing row means subscribed.
 //
-// RE-RUN IT AFTER EVERY DEPLOY THAT TOUCHES THIS. Resend is always the newest
-// truth for email: the preferences route writes Resend before Postgres, and a
-// footer unsubscribe lands in Resend first. So --apply MIRRORS Resend — it
-// writes every opt-out and removes any opt-out row for a topic the contact
-// has since rejoined. A contact whose fetch failed is left untouched: an error
-// is never read as "subscribed to everything".
+// RE-RUN AFTER EVERY DEPLOY THAT TOUCHES THIS — with --fresh, so every
+// contact is read again rather than resumed from an old pass. Resend is always
+// the newest truth for email: the preferences route writes Resend before
+// Postgres, and a footer unsubscribe lands in Resend first. So --apply MIRRORS
+// Resend: it writes every opt-out and removes any opt-out row for a topic the
+// contact has since rejoined. A contact whose fetch failed is never saved, so
+// an error is never read as "subscribed to everything".
 //
-// ⚠ NEWER WINS. A full fetch takes ~45 minutes, and once the webhook is live a
+// ⚠ NEWER WINS. A full pass takes ~40 minutes, and once the webhook is live a
 // member can change a topic in that window — after their contact was read.
 // Each contact's fetch time is kept, and a row that changed after it is left
 // alone, so the import can never overwrite a newer choice with a stale one.
 //
-// ⚠ The snapshot holds member email addresses. Keep it out of the repo — the
-// default path is the OS temp directory — and delete it when you are done.
-// ⚠ About 40 minutes for ~4,900 contacts: Resend allows 2 requests a second
-// and has no bulk call for topic subscriptions.
+// ⚠ The progress file holds member email addresses. Keep it out of the repo —
+// the default path is the OS temp directory — and delete it when you are done.
+// ⚠ ~40 minutes for ~4,900 contacts: Resend allows 2 requests a second and
+// has no bulk call for topic subscriptions.
 // =============================================================
 
-import { readFileSync, writeFileSync } from 'fs'
+import { appendFileSync, existsSync, readFileSync, unlinkSync } from 'fs'
 import { dirname, join, resolve } from 'path'
 import { tmpdir } from 'os'
 import { createClient } from '@supabase/supabase-js'
@@ -75,20 +83,17 @@ const NAME_TO_KEY: Record<string, Key> = {
   'Community Topic': 'COMMUNITY',
 }
 
-type Snapshot = {
-  generatedAt: string
-  contactsTotal: number
-  failed: string[]
-  /** Every contact fetched successfully, with the keys it has opted OUT of. */
-  states: Array<{ email: string; optedOut: Key[]; fetchedAt?: string }>
-}
+/** One fetched contact — one line of the progress file. */
+type State = { id: string; email: string; optedOut: Key[]; fetchedAt: string }
 
 const args = process.argv.slice(2)
 const flag = (f: string) => args.includes(f)
 const value = (f: string) => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined)
 const APPLY = flag('--apply')
-const FROM = value('--from')
-const SNAPSHOT = value('--snapshot') ?? join(tmpdir(), `email-prefs-snapshot-${Date.now()}.json`)
+const ALLOW_PARTIAL = flag('--allow-partial')
+const FRESH = flag('--fresh')
+const LIMIT = value('--limit') !== undefined ? Number(value('--limit')) : Infinity
+const PROGRESS = value('--progress') ?? join(tmpdir(), 'sportpool-email-prefs-progress.ndjson')
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -106,7 +111,23 @@ async function resend<T>(path: string): Promise<T> {
   }
 }
 
-async function fetchSnapshot(): Promise<Snapshot> {
+/** Every saved contact. A line torn by a stopped run is skipped, not fatal. */
+function loadProgress(): Map<string, State> {
+  const done = new Map<string, State>()
+  if (!existsSync(PROGRESS)) return done
+  for (const line of readFileSync(PROGRESS, 'utf8').split('\n')) {
+    if (!line.trim()) continue
+    try {
+      const s = JSON.parse(line) as State
+      if (s.id && s.email && Array.isArray(s.optedOut) && s.fetchedAt) done.set(s.id, s)
+    } catch {
+      // the last line of a run that was stopped mid-write — that contact is refetched
+    }
+  }
+  return done
+}
+
+async function topicMap(): Promise<Map<string, Key>> {
   const topics = await resend<{ data: Array<{ id: string; name: string; default_subscription: string }> }>('/topics')
   const idToKey = new Map<string, Key>()
   for (const t of topics.data) {
@@ -120,7 +141,10 @@ async function fetchSnapshot(): Promise<Snapshot> {
     idToKey.set(t.id, key)
   }
   if (idToKey.size !== KEYS.length) throw new Error(`expected ${KEYS.length} topics, Resend has ${idToKey.size}`)
+  return idToKey
+}
 
+async function allContacts(): Promise<Array<{ id: string; email: string }>> {
   const contacts: Array<{ id: string; email: string }> = []
   let after: string | undefined
   for (;;) {
@@ -131,15 +155,23 @@ async function fetchSnapshot(): Promise<Snapshot> {
     if (!page.has_more || page.data.length === 0) break
     after = page.data[page.data.length - 1].id
   }
-  console.log(`[import] ${contacts.length} contacts, ${idToKey.size} topics`)
+  return contacts
+}
 
-  const states: Snapshot['states'] = []
-  const failed: string[] = []
+/** Fetch up to LIMIT contacts not yet saved, appending each the moment it lands. */
+async function fetchMore(contacts: Array<{ id: string; email: string }>, done: Map<string, State>) {
+  const todo = contacts.filter((c) => !done.has(c.id))
+  const batch = todo.slice(0, Number.isFinite(LIMIT) ? LIMIT : todo.length)
+  if (batch.length === 0) return 0
+  const idToKey = await topicMap()
+  console.log(`[import] fetching ${batch.length} of the ${todo.length} not yet saved`)
+
+  let failed = 0
   // Pace by when each request STARTS, not by a pause after each reply — a pause
   // stacks on Resend's own latency and roughly doubles the run.
   let nextAt = Date.now()
-  for (let i = 0; i < contacts.length; i++) {
-    const c = contacts[i]
+  for (let i = 0; i < batch.length; i++) {
+    const c = batch[i]
     const wait = nextAt - Date.now()
     if (wait > 0) await sleep(wait)
     nextAt = Date.now() + 510 // Resend: 2 requests a second
@@ -148,24 +180,26 @@ async function fetchSnapshot(): Promise<Snapshot> {
       const optedOut = r.data
         .filter((t) => t.subscription === 'opt_out' && idToKey.has(t.id))
         .map((t) => idToKey.get(t.id) as Key)
-      states.push({ email: c.email, optedOut, fetchedAt: new Date().toISOString() })
+      const s: State = { id: c.id, email: c.email, optedOut, fetchedAt: new Date().toISOString() }
+      appendFileSync(PROGRESS, JSON.stringify(s) + '\n')
+      done.set(c.id, s)
     } catch (e) {
-      failed.push(c.id)
-      console.error(`[import] contact ${i + 1} failed: ${e instanceof Error ? e.message : String(e)}`)
+      failed++
+      console.error(`[import] a contact failed (will retry next run): ${e instanceof Error ? e.message : String(e)}`)
     }
-    if ((i + 1) % 200 === 0) console.log(`[import] ${i + 1}/${contacts.length} fetched, ${failed.length} failed`)
+    if ((i + 1) % 200 === 0) console.log(`[import] ${i + 1}/${batch.length} this run, ${failed} failed`)
   }
-  return { generatedAt: new Date().toISOString(), contactsTotal: contacts.length, failed, states }
+  return failed
 }
 
-function report(s: Snapshot) {
-  const withOptOut = s.states.filter((x) => x.optedOut.length > 0)
-  console.log(`\n[import] fetched ${s.states.length} of ${s.contactsTotal}; ${s.failed.length} failed`)
-  console.log(`[import] contacts with at least one opt-out: ${withOptOut.length}`)
-  for (const k of KEYS) console.log(`  ${k.padEnd(14)} ${s.states.filter((x) => x.optedOut.includes(k)).length} opted out`)
+function report(contactsTotal: number, done: Map<string, State>) {
+  const states = [...done.values()]
+  console.log(`\n[import] saved ${states.length} of ${contactsTotal} contacts — ${contactsTotal - states.length} still to fetch`)
+  console.log(`[import] contacts with at least one opt-out: ${states.filter((x) => x.optedOut.length > 0).length}`)
+  for (const k of KEYS) console.log(`  ${k.padEnd(14)} ${states.filter((x) => x.optedOut.includes(k)).length} opted out`)
 }
 
-async function apply(s: Snapshot) {
+async function apply(states: State[]) {
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false },
   })
@@ -196,15 +230,14 @@ async function apply(s: Snapshot) {
   const rejoined: Array<{ user_id: string; category: Key }> = []
   let unmatched = 0
   let newerKept = 0
-  for (const st of s.states) {
+  for (const st of states) {
     const userId = byEmail.get(st.email.toLowerCase())
     if (!userId) { unmatched++; continue }
-    const at = st.fetchedAt ?? s.generatedAt
     for (const k of KEYS) {
       const cur = existing.get(`${userId}|${k}`)
       // Changed after this contact was read — that change is newer. Leave it.
-      if (cur && Date.parse(cur.updated_at) > Date.parse(at)) { newerKept++; continue }
-      if (st.optedOut.includes(k)) upserts.push({ user_id: userId, category: k, channel: 'email', enabled: false, updated_at: at })
+      if (cur && Date.parse(cur.updated_at) > Date.parse(st.fetchedAt)) { newerKept++; continue }
+      if (st.optedOut.includes(k)) upserts.push({ user_id: userId, category: k, channel: 'email', enabled: false, updated_at: st.fetchedAt })
       else if (cur && cur.enabled === false) rejoined.push({ user_id: userId, category: k })
     }
   }
@@ -212,10 +245,6 @@ async function apply(s: Snapshot) {
   console.log(`[import] ${newerKept} rows changed after their contact was read — kept, not overwritten`)
   console.log(`[import] ${upserts.length} opt-out rows to write, ${rejoined.length} to clear (rejoined since)`)
 
-  if (!APPLY) {
-    console.log('[import] DRY RUN — nothing written. Re-run with --apply to write.')
-    return
-  }
   for (let i = 0; i < upserts.length; i += 500) {
     const { error } = await db
       .from('notification_preferences')
@@ -233,14 +262,27 @@ async function apply(s: Snapshot) {
 }
 
 async function main() {
-  const snap: Snapshot = FROM ? JSON.parse(readFileSync(FROM, 'utf8')) : await fetchSnapshot()
-  if (!FROM) {
-    writeFileSync(SNAPSHOT, JSON.stringify(snap))
-    console.log(`[import] snapshot saved to ${SNAPSHOT} — it holds member addresses; delete it when done`)
+  if (FRESH && existsSync(PROGRESS)) {
+    unlinkSync(PROGRESS)
+    console.log('[import] --fresh: previous progress discarded, starting a new pass')
   }
-  report(snap)
-  // Applying (or dry-running the apply) needs the table; a bare fetch does not.
-  if (APPLY || FROM) await apply(snap)
+  console.log(`[import] progress file: ${PROGRESS} — it holds member addresses; delete it when done`)
+  const done = loadProgress()
+  const contacts = await allContacts()
+  const failed = await fetchMore(contacts, done)
+  report(contacts.length, done)
+
+  if (!APPLY) {
+    console.log('[import] nothing written to the database. Re-run to fetch more, then --apply.')
+    return
+  }
+  const remaining = contacts.filter((c) => !done.has(c.id)).length
+  if ((remaining > 0 || failed > 0) && !ALLOW_PARTIAL) {
+    throw new Error(`${remaining} contacts not yet fetched — finish the pass first, or pass --allow-partial`)
+  }
+  // Only contacts still in the audience: one removed since an earlier run is dropped.
+  const live = new Set(contacts.map((c) => c.id))
+  await apply([...done.values()].filter((s) => live.has(s.id)))
 }
 
 main().catch((e) => {
