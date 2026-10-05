@@ -5238,8 +5238,14 @@ test would have begun failing that day.
 - **Every future notice type.** The rule is enforced per notifier, so a new one is unprotected until it
   says when it stops being worth sending. In N2 that becomes a column beside `disclosure_sentence`:
   **a type cannot exist without declaring its expiry.**
-- **The three disabled World Cup email crons** — `deadline-reminders`, `round-deadline-reminders`,
-  `weekly-recap` — are Supabase edge functions with no such gate, each one `active = true` from running.
+- ~~**The three disabled World Cup email crons**~~ — ✅ **closed 2026-10-05.** Unscheduled (166), and then
+  all **seven** edge functions retired to do-nothing stubs (167 + `supabase/functions-retired/`): each ran
+  with the service-role key, never checked its caller, and sat behind `verify_jwt` — which the **public
+  anon key satisfies** — so anyone could fire them. `send-countdown-retry` broke this rule by design,
+  emailing *"N days until the World Cup"* with N negative. No cron calls an edge function any more.
+- ⚠ **Nothing auto-submits a draft now.** `auto-submit` was one of the seven; no league pool used it. The
+  next deadline-based competition needs it **rebuilt as a web cron route** — with this decision's
+  send-time check, the `retired_at` filter, and `CRON_SECRET` auth.
 - **Counting.** `expired:` is a log reason today; it becomes a number in the delivery ledger (N4).
 
 

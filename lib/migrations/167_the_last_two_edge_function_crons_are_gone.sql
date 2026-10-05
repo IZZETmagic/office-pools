@@ -1,0 +1,45 @@
+-- =============================================================
+-- 167 — THE LAST TWO EDGE-FUNCTION CRONS ARE GONE
+-- =============================================================
+-- Ryan, 2026-10-05: retire both. The rule they were judged against, in his
+-- words: "we are not mass sending out notifications to users for past events."
+--
+--   auto-submit-and-archive  jobid 3   0 0 * * *    → auto-submit
+--   countdown-emails         jobid 5   0 14 * * *   → send-countdown-emails
+--
+-- auto-submit emailed "your draft was auto-submitted — the deadline has
+-- passed" for EVERY pool deadline in the past, with no upper age limit, to
+-- retired entries as well as live ones — and ran with the service-role key
+-- behind verify_jwt, which the public anon key satisfies. On the day it was
+-- retired it had nothing to act on (0 draft entries, 0 open rounds) and it is
+-- a no-op for every league pool — but it was one paused-and-resumed night from
+-- a mass send about months-old deadlines. Decision 16's shape exactly.
+--
+-- countdown-emails could NOT break the rule — its function returns early once
+-- kickoff (hard-coded 2026-06-11) has passed. Retired as dead weight: a daily
+-- call that has sent nothing since June.
+--
+-- Each cron was its function's only caller (cron.job, pg_proc and the web and
+-- mobile code all searched). Both functions are redeployed as 410 stubs
+-- alongside this; their sources are archived in supabase/functions-retired/.
+--
+-- ⚠ NOTHING AUTO-SUBMITS A DRAFT NOW. No league pool used it. The next
+-- deadline-based competition needs it rebuilt as a web cron route with
+-- Decision 16's send-time check, the retired_at filter, and CRON_SECRET auth.
+--
+-- TO RESTORE A CRON (not advised — the functions it called are now stubs).
+-- Both were ACTIVE, so cron.schedule alone puts one back as it was. The bearer
+-- is the public anon key, redacted rather than committed:
+--
+--   select cron.schedule('auto-submit-and-archive', '0 0 * * *', $$
+--     SELECT net.http_post(
+--       url := 'https://ujthamlehjyubbzxbnes.supabase.co/functions/v1/auto-submit',
+--       headers := '{"Content-Type": "application/json", "Authorization": "Bearer <anon key>"}'::jsonb,
+--       body := '{}'::jsonb
+--     ) $$);
+--
+-- and countdown-emails likewise, at '0 14 * * *', calling send-countdown-emails.
+-- =============================================================
+
+select cron.unschedule('auto-submit-and-archive');
+select cron.unschedule('countdown-emails');

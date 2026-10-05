@@ -1,6 +1,6 @@
 # Retired edge functions — do not redeploy
 
-Retired **2026-10-05**. Each of the five functions below is still deployed, but its live source is now a
+Retired **2026-10-05** — all seven edge functions in the project. Each is still deployed, but its live source is now a
 stub that answers `410` and does nothing — no reads, no writes, no sends. These files are the code that
 ran before, kept as a **record**, not for restoring. The `.ts.retired` extension keeps every tool —
 `tsc`, eslint, vitest, `supabase functions deploy` — from picking them up.
@@ -19,6 +19,8 @@ copy was the only one.
 | `send-deadline-reminders` | v4, 2026-02-27 | Email every un-submitted member of any pool whose deadline is 24–25 h away |
 | `send-round-deadline-reminders` | v3, 2026-03-09 | The same, for progressive-round deadlines |
 | `send-countdown-retry` | v1, 2026-04-11 | Email 23 hard-coded members *"N days until the World Cup"* — after kickoff, a **negative** N, for a tournament already over |
+| `auto-submit` | v3, 2026-03-09 | Auto-submit drafts and archive pools — and email *"your draft was auto-submitted"* for **any** past deadline, with no age limit, retired entries included |
+| `send-countdown-emails` | v3, 2026-04-11 | Nothing, in practice — it returned early once kickoff (hard-coded 2026-06-11) had passed. Retired as dead weight |
 
 ## The rule they broke
 
@@ -32,10 +34,11 @@ trigger been re-enabled — see below.
 - **`on_match_completed`** on `public.matches` still points at `send-match-results`. It is **disabled**
   (`tgenabled = 'D'`). If anyone re-enables it, it now reaches the stub rather than mass-sending results
   for past matches.
-- **Two functions with the same exposure are still live**, because live crons call them: `auto-submit`
-  (`auto-submit-and-archive`, daily) and `send-countdown-emails` (`countdown-emails`, daily). Not part of
-  this retirement — they need either a vault-sourced secret check or removal.
+- **Nothing auto-submits a draft now.** `auto-submit` was the only thing that did, and no league pool used
+  it. The next deadline-based competition needs it rebuilt as a web cron route — with Decision 16's
+  send-time check, the `retired_at` filter, and `CRON_SECRET` auth — not as an edge function.
+- **No cron calls an edge function any more** (migrations 166 and 167). Verified 2026-10-05.
 - **`send-countdown-retry`'s 23 hard-coded member addresses are not in this archive.** They are personal
   data and were left out when the source was transcribed; everything else is as it ran.
-- To finish the job, **delete all five from the Supabase dashboard** (Edge Functions). There is no
+- To finish the job, **delete all seven from the Supabase dashboard** (Edge Functions). There is no
   delete through the MCP tooling used here, and the CLI is not installed on this machine.

@@ -1,0 +1,360 @@
+// ⛔ RETIRED 2026-10-05 — DO NOT REDEPLOY. Archived as a record, not for restoring.
+// Last deployed: version 3, 2026-04-11. The deployed copy now answers 410 and does nothing.
+// It ran with the SERVICE-ROLE key, never checked its caller, and sat behind verify_jwt —
+// which the public anon key satisfies — so anyone could trigger it. See README.md.
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const RESEND_TOPIC_POOL_ACTIVITY = Deno.env.get("RESEND_TOPIC_POOL_ACTIVITY") || "";
+const FROM_EMAIL = "Sport Pool <notifications@sportpool.io>";
+const APP_URL = Deno.env.get("APP_URL") || "https://sportpool.io";
+
+const KICKOFF = new Date("2026-06-11T00:00:00Z");
+
+// Use a super admin user_id for the sent_by FK
+const SYSTEM_USER_ID = "30000000-0000-0000-0000-000000000001";
+
+type Milestone = "60days" | "30days" | "14days" | "7days" | "1day";
+
+// maxDays uses ceiling to account for time-of-day variance
+const MILESTONES: { key: Milestone; maxDays: number }[] = [
+  { key: "60days", maxDays: 61 },
+  { key: "30days", maxDays: 31 },
+  { key: "14days", maxDays: 15 },
+  { key: "7days", maxDays: 8 },
+  { key: "1day", maxDays: 2 },
+];
+
+const MILESTONE_CONFIG: Record<Milestone, {
+  subject: (d: number) => string;
+  preheader: (d: number) => string;
+  heading: string;
+  emoji: string;
+  accentBg: string;
+  accentBorder: string;
+  accentText: string;
+}> = {
+  "60days": {
+    subject: (d) => `${d} days until the World Cup \u2014 time to get your pool ready!`,
+    preheader: (d) => `FIFA World Cup 2026 kicks off in ${d} days. Create or join a pool now!`,
+    heading: "Two Months to Go!",
+    emoji: "&#x1F3C6;",
+    accentBg: "#f0fdf4",
+    accentBorder: "#bbf7d0",
+    accentText: "#166534",
+  },
+  "30days": {
+    subject: () => `One month to go \u2014 World Cup 2026 is almost here!`,
+    preheader: (d) => `Just ${d} days until kickoff. Make sure your pool is ready!`,
+    heading: "One Month to Go!",
+    emoji: "&#x26BD;",
+    accentBg: "#f0fdf4",
+    accentBorder: "#bbf7d0",
+    accentText: "#166534",
+  },
+  "14days": {
+    subject: () => `Two weeks until kickoff \u2014 is your pool ready?`,
+    preheader: (d) => `${d} days to go. Invite your friends before it's too late!`,
+    heading: "Two Weeks to Go!",
+    emoji: "&#x1F525;",
+    accentBg: "#fffbeb",
+    accentBorder: "#fde68a",
+    accentText: "#92400e",
+  },
+  "7days": {
+    subject: () => `One week until the World Cup \u2014 predictions open soon!`,
+    preheader: (d) => `Just ${d} days left. Get your pool and predictions ready!`,
+    heading: "One Week to Go!",
+    emoji: "&#x1F6A8;",
+    accentBg: "#fffbeb",
+    accentBorder: "#fde68a",
+    accentText: "#92400e",
+  },
+  "1day": {
+    subject: () => `TOMORROW \u2014 FIFA World Cup 2026 kicks off!`,
+    preheader: () => `It's almost here! Make sure your predictions are locked in.`,
+    heading: "It's Tomorrow!",
+    emoji: "&#x1F389;",
+    accentBg: "#fef2f2",
+    accentBorder: "#fecaca",
+    accentText: "#991b1b",
+  },
+};
+
+function baseTemplate(preheader: string, heading: string, body: string, ctaText?: string, ctaUrl?: string): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">Sport Pool</h1>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
+          ${body}
+          ${ctaText && ctaUrl ? `<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a></div>` : ""}
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
+          <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
+            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
+            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Notification Settings</a> &middot;
+            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Unsubscribe</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+function buildBody(milestone: Milestone, userName: string, daysUntilKickoff: number, poolCount: number): string {
+  const plural = poolCount > 1 ? "s" : "";
+
+  switch (milestone) {
+    case "60days":
+      return `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The FIFA World Cup 2026 is just <strong>${daysUntilKickoff} days away</strong> and the excitement is building! All 48 teams have been confirmed and the group stage draw is set.</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Now's the time to rally your friends, family, and coworkers:</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li><strong>Create a pool</strong> and share the code with your group</li>
+          <li><strong>Join a pool</strong> if someone's already sent you a code</li>
+          <li><strong>Spread the word</strong> \u2014 the more people, the better the competition</li>
+        </ul>
+        ${poolCount > 0 ? `<p style="color:#525252;line-height:1.6;margin:0;">You're in <strong>${poolCount} pool${plural}</strong> so far. Keep inviting!</p>` : `<p style="color:#525252;line-height:1.6;margin:0;">You haven't joined a pool yet \u2014 get started now!</p>`}`;
+
+    case "30days":
+      return `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Can you believe it? The World Cup is just <strong>${daysUntilKickoff} days away</strong>. We're counting down and we hope you are too!</p>
+        ${poolCount > 0 ? `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're in <strong>${poolCount} pool${plural}</strong>. Here's what to do:</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li><strong>Share your pool code</strong> with anyone who hasn't joined yet</li>
+          <li><strong>Check the groups</strong> \u2014 start thinking about your predictions</li>
+          <li><strong>Create another pool</strong> for a different friend group or office</li>
+        </ul>
+        ` : `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">There's still time to get in on the action:</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li><strong>Create a pool</strong> and become the organizer</li>
+          <li><strong>Join a pool</strong> using a friend's code</li>
+        </ul>
+        `}
+        <p style="color:#525252;line-height:1.6;margin:0;">Don't wait \u2014 the best pools are the ones that start early!</p>`;
+
+    case "14days":
+      return `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">We're just <strong>${daysUntilKickoff} days</strong> from the biggest World Cup in history. 48 teams. 3 host nations. This is going to be special.</p>
+        ${poolCount > 0 ? `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're in <strong>${poolCount} pool${plural}</strong> \u2014 nice! Here's your checklist:</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li>Last call to <strong>invite friends</strong> to your pools</li>
+          <li>Group Stage predictions will <strong>open soon</strong></li>
+          <li>Start doing your <strong>homework on the groups</strong></li>
+        </ul>
+        ` : `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">It's not too late! Create or join a pool and be part of the action.</p>
+        `}`;
+
+    case "7days":
+      return `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 16px;"><strong>${daysUntilKickoff} days.</strong> That's it. The World Cup is almost here.</p>
+        ${poolCount > 0 ? `
+        <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:0 0 16px;">
+          <p style="color:#171717;margin:0 0 8px;font-weight:600;">Your pre-kickoff checklist:</p>
+          <p style="color:#525252;margin:0;font-size:14px;line-height:1.8;">&#9745; Joined ${poolCount} pool${plural}<br/>&#9744; Invite any last friends<br/>&#9744; Make your Group Stage predictions when they open<br/>&#9744; Clear your schedule for June 11!</p>
+        </div>
+        ` : `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're not in a pool yet! There's still time \u2014 create one or ask a friend for their pool code.</p>
+        `}`;
+
+    case "1day":
+      return `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userName},</p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;font-size:16px;"><strong>IT'S ALMOST HERE.</strong></p>
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The FIFA World Cup 2026 kicks off <strong>tomorrow, June 11th</strong>. 48 teams. 104 matches. One champion.</p>
+        ${poolCount > 0 ? `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">You're in <strong>${poolCount} pool${plural}</strong>. Make sure your predictions are in!</p>
+        <ul style="color:#525252;font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">
+          <li>Double-check your <strong>Group Stage predictions</strong></li>
+          <li>Share your pool code one last time \u2014 the more the merrier</li>
+          <li>Get ready for the beautiful game</li>
+        </ul>
+        ` : `
+        <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Last chance to join a pool before kickoff! Ask a friend for their code or create your own.</p>
+        `}
+        <p style="color:#525252;line-height:1.6;margin:0;">See you on the pitch. &#x26BD;</p>`;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+Deno.serve(async (_req: Request) => {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Calculate days until kickoff
+    const now = new Date();
+    const daysUntilKickoff = Math.ceil((KICKOFF.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysUntilKickoff <= 0) {
+      return new Response(JSON.stringify({ message: "Tournament has started, no countdown emails needed" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Find the most urgent milestone that applies
+    const milestone = [...MILESTONES].reverse().find((m) => daysUntilKickoff <= m.maxDays);
+
+    if (!milestone) {
+      return new Response(JSON.stringify({ message: `No milestone reached yet (${daysUntilKickoff} days to go)` }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Idempotency check
+    const idempotencyKey = `countdown-${milestone.key}-2026`;
+    const { data: existing } = await supabase
+      .from("sent_announcements")
+      .select("id")
+      .eq("idempotency_key", idempotencyKey)
+      .single();
+
+    if (existing) {
+      return new Response(JSON.stringify({ message: `Milestone ${milestone.key} already sent` }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Record that we're sending
+    const { error: insertError } = await supabase
+      .from("sent_announcements")
+      .insert({ idempotency_key: idempotencyKey, sent_by: SYSTEM_USER_ID });
+
+    if (insertError) {
+      if (insertError.code === "23505") {
+        return new Response(JSON.stringify({ message: `Milestone ${milestone.key} already sent (race)` }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ error: "Failed to record announcement", details: insertError.message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Fetch all users
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("user_id, full_name, username, email")
+      .not("email", "is", null);
+
+    if (usersError || !users) {
+      return new Response(JSON.stringify({ error: "Failed to fetch users" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Fetch pool membership counts
+    const { data: memberships } = await supabase
+      .from("pool_members")
+      .select("user_id");
+
+    const poolCountMap = new Map<string, number>();
+    if (memberships) {
+      for (const m of memberships) {
+        poolCountMap.set(m.user_id, (poolCountMap.get(m.user_id) || 0) + 1);
+      }
+    }
+
+    const dashboardUrl = `${APP_URL}/dashboard`;
+
+    // Send emails with rate limiting (4 per second to stay under Resend's 5/sec limit)
+    let totalSent = 0;
+    const errors: string[] = [];
+    const usersWithEmail = users.filter((u) => u.email);
+
+    for (let i = 0; i < usersWithEmail.length; i++) {
+      const u = usersWithEmail[i];
+      const userName = u.full_name || u.username || "there";
+      const poolCount = poolCountMap.get(u.user_id) || 0;
+      const config = MILESTONE_CONFIG[milestone.key];
+
+      const body = buildBody(milestone.key, userName, daysUntilKickoff, poolCount);
+      const countdownBox = `
+        <div style="background:${config.accentBg};border:1px solid ${config.accentBorder};border-radius:8px;padding:16px;text-align:center;margin:16px 0;">
+          <p style="margin:0;font-size:14px;color:${config.accentText};">Kickoff: <strong>June 11, 2026</strong></p>
+          <p style="margin:4px 0 0;font-size:28px;font-weight:700;color:${config.accentText};">${daysUntilKickoff} days</p>
+        </div>`;
+
+      const html = baseTemplate(
+        config.preheader(daysUntilKickoff),
+        `${config.emoji} ${config.heading}`,
+        body + countdownBox,
+        poolCount > 0 ? "Go to Dashboard" : "Create or Join a Pool",
+        dashboardUrl
+      );
+
+      try {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: [u.email],
+            subject: config.subject(daysUntilKickoff),
+            html,
+            ...(RESEND_TOPIC_POOL_ACTIVITY ? { topicId: RESEND_TOPIC_POOL_ACTIVITY } : {}),
+            tags: [{ name: "type", value: `countdown-${milestone.key}` }],
+          }),
+        });
+
+        if (res.ok) {
+          totalSent++;
+        } else {
+          const errText = await res.text();
+          errors.push(`${u.email}: ${errText}`);
+        }
+      } catch (err) {
+        errors.push(`${u.email}: ${String(err)}`);
+      }
+
+      // Rate limit: wait 250ms between sends (4/sec, under Resend's 5/sec limit)
+      if (i < usersWithEmail.length - 1) {
+        await sleep(250);
+      }
+    }
+
+    return new Response(JSON.stringify({
+      message: `Countdown ${milestone.key} sent`,
+      milestone: milestone.key,
+      daysUntilKickoff,
+      totalSent,
+      totalUsers: usersWithEmail.length,
+      ...(errors.length > 0 ? { errors } : {}),
+    }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+});

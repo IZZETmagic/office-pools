@@ -1,0 +1,496 @@
+// ⛔ RETIRED 2026-10-05 — DO NOT REDEPLOY. Archived as a record, not for restoring.
+// Last deployed: version 3, 2026-03-09. The deployed copy now answers 410 and does nothing.
+// It ran with the SERVICE-ROLE key, never checked its caller, and sat behind verify_jwt —
+// which the public anon key satisfies — so anyone could trigger it. See README.md.
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const RESEND_TOPIC_PREDICTIONS = Deno.env.get("RESEND_TOPIC_PREDICTIONS") || "";
+const FROM_EMAIL = "Sport Pool <notifications@sportpool.io>";
+const APP_URL = Deno.env.get("APP_URL") || "https://sportpool.io";
+
+// Progressive round constants
+const ROUND_MATCH_STAGES: Record<string, string[]> = {
+  group: ["group"],
+  round_32: ["round_32"],
+  round_16: ["round_16"],
+  quarter_final: ["quarter_final"],
+  semi_final: ["semi_final"],
+  third_place: ["third_place"],
+  final: ["final"],
+};
+
+const ROUND_LABELS: Record<string, string> = {
+  group: "Group Stage",
+  round_32: "Round of 32",
+  round_16: "Round of 16",
+  quarter_final: "Quarter Finals",
+  semi_final: "Semi Finals",
+  third_place: "Third Place",
+  final: "Final",
+};
+
+const ARCHIVE_DELAY_DAYS = 15;
+
+function baseTemplate(preheader: string, heading: string, body: string, ctaText?: string, ctaUrl?: string): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.025em;">Sport Pool</h1>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
+          ${body}
+          ${ctaText && ctaUrl ? `<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a></div>` : ""}
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
+          <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
+            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
+            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Notification Settings</a> &middot;
+            <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:#a3a3a3;text-decoration:none;">Unsubscribe</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+async function sendEmail(to: string, subject: string, html: string, topicId?: string) {
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: [to],
+        subject,
+        html,
+        ...(topicId ? { topicId } : {}),
+        tags: [{ name: "category", value: "predictions" }],
+      }),
+    });
+  } catch (err) {
+    console.error(`Failed to send email to ${to}:`, err);
+  }
+}
+
+async function sendBatchEmails(emails: { to: string; subject: string; html: string }[]) {
+  // Resend batch limit is 100
+  for (let i = 0; i < emails.length; i += 100) {
+    const chunk = emails.slice(i, i + 100);
+    try {
+      await fetch("https://api.resend.com/emails/batch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify(
+          chunk.map((e) => ({
+            from: FROM_EMAIL,
+            to: [e.to],
+            subject: e.subject,
+            html: e.html,
+            ...(RESEND_TOPIC_PREDICTIONS ? { topicId: RESEND_TOPIC_PREDICTIONS } : {}),
+            tags: [{ name: "category", value: "predictions" }],
+          }))
+        ),
+      });
+    } catch (err) {
+      console.error("Batch email error:", err);
+    }
+  }
+}
+
+// =============================================
+// AUTO-SUBMIT DRAFT ENTRIES
+// =============================================
+
+async function autoSubmitDraftEntries(supabase: ReturnType<typeof createClient>) {
+  const result = { poolsChecked: 0, submitted: 0, errors: [] as string[] };
+
+  // Find pools with past deadlines
+  const { data: pools, error: poolsError } = await supabase
+    .from("pools")
+    .select("pool_id, pool_name, tournament_id, prediction_deadline")
+    .lt("prediction_deadline", new Date().toISOString())
+    .not("prediction_deadline", "is", null);
+
+  if (poolsError || !pools || pools.length === 0) {
+    if (poolsError) result.errors.push(poolsError.message);
+    return result;
+  }
+
+  result.poolsChecked = pools.length;
+
+  for (const pool of pools) {
+    // Find unsubmitted entries
+    const { data: entries, error: entriesError } = await supabase
+      .from("pool_entries")
+      .select(`
+        entry_id, entry_name, member_id,
+        pool_members!inner(
+          user_id, pool_id,
+          users!inner(email, username, full_name)
+        )
+      `)
+      .eq("pool_members.pool_id", pool.pool_id)
+      .eq("has_submitted_predictions", false)
+      .eq("auto_submitted", false)
+      .eq("predictions_locked", false);
+
+    if (entriesError || !entries || entries.length === 0) {
+      if (entriesError) result.errors.push(`Pool ${pool.pool_id}: ${entriesError.message}`);
+      continue;
+    }
+
+    // Get total match count
+    const { count: totalMatches } = await supabase
+      .from("matches")
+      .select("*", { count: "exact", head: true })
+      .eq("tournament_id", pool.tournament_id);
+
+    // Filter to entries with at least 1 prediction
+    const eligibleEntries: { entry_id: string; entry_name: string; predictionCount: number; email: string; userName: string }[] = [];
+
+    for (const entry of entries) {
+      const { count } = await supabase
+        .from("predictions")
+        .select("*", { count: "exact", head: true })
+        .eq("entry_id", entry.entry_id);
+
+      if (count && count > 0) {
+        const member = (entry as any).pool_members;
+        const user = member.users;
+        eligibleEntries.push({
+          entry_id: entry.entry_id,
+          entry_name: entry.entry_name,
+          predictionCount: count,
+          email: user.email,
+          userName: user.full_name || user.username,
+        });
+      }
+    }
+
+    if (eligibleEntries.length === 0) continue;
+
+    // Batch update
+    const entryIds = eligibleEntries.map((e) => e.entry_id);
+    const now = new Date().toISOString();
+
+    const { error: updateError } = await supabase
+      .from("pool_entries")
+      .update({
+        has_submitted_predictions: true,
+        predictions_submitted_at: now,
+        predictions_last_saved_at: now,
+        auto_submitted: true,
+      })
+      .in("entry_id", entryIds);
+
+    if (updateError) {
+      result.errors.push(`Pool ${pool.pool_id}: update failed: ${updateError.message}`);
+      continue;
+    }
+
+    result.submitted += eligibleEntries.length;
+
+    // Send notification emails
+    const poolUrl = `${APP_URL}/pools/${pool.pool_id}`;
+    const emailBatch = eligibleEntries.map((entry) => {
+      const isPartial = (totalMatches ?? 0) > 0 && entry.predictionCount < (totalMatches ?? 0);
+      return {
+        to: entry.email,
+        subject: `Your draft predictions were auto-submitted for ${pool.pool_name}`,
+        html: baseTemplate(
+          `The deadline passed and your draft for ${entry.entry_name} was automatically submitted`,
+          "Draft Auto-Submitted",
+          `<p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${entry.userName},</p>
+           <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The prediction deadline for <strong>${pool.pool_name}</strong> has passed. Your draft predictions for <strong>${entry.entry_name}</strong> were automatically submitted.</p>
+           <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
+             <p style="color:#92400e;margin:0;font-size:14px;"><strong>${entry.predictionCount}</strong> of <strong>${totalMatches ?? 0}</strong> match predictions submitted${isPartial ? " (partial)" : ""}</p>
+           </div>
+           ${isPartial ? '<p style="color:#525252;line-height:1.6;margin:0 0 12px;">Matches without predictions will not earn any points.</p>' : ""}
+           <p style="color:#525252;line-height:1.6;margin:0;">Good luck!</p>`,
+          "View Pool",
+          poolUrl
+        ),
+      };
+    });
+
+    await sendBatchEmails(emailBatch);
+  }
+
+  return result;
+}
+
+// =============================================
+// AUTO-SUBMIT PROGRESSIVE ROUNDS
+// =============================================
+
+async function autoSubmitProgressiveRounds(supabase: ReturnType<typeof createClient>) {
+  const result = { poolsChecked: 0, submitted: 0, errors: [] as string[] };
+
+  // Find open rounds with past deadlines
+  const { data: openRounds, error: roundsError } = await supabase
+    .from("pool_round_states")
+    .select("id, pool_id, round_key, deadline")
+    .eq("state", "open")
+    .lt("deadline", new Date().toISOString())
+    .not("deadline", "is", null);
+
+  if (roundsError || !openRounds || openRounds.length === 0) {
+    if (roundsError) result.errors.push(roundsError.message);
+    return result;
+  }
+
+  // Group by pool
+  const poolRounds = new Map<string, typeof openRounds>();
+  for (const round of openRounds) {
+    const existing = poolRounds.get(round.pool_id) ?? [];
+    existing.push(round);
+    poolRounds.set(round.pool_id, existing);
+  }
+
+  result.poolsChecked = poolRounds.size;
+
+  for (const [poolId, rounds] of poolRounds) {
+    const { data: pool } = await supabase
+      .from("pools")
+      .select("pool_id, pool_name, tournament_id")
+      .eq("pool_id", poolId)
+      .single();
+
+    if (!pool) continue;
+
+    const { data: members } = await supabase
+      .from("pool_members")
+      .select("member_id, users(email, full_name, username)")
+      .eq("pool_id", poolId);
+
+    const { data: entries } = await supabase
+      .from("pool_entries")
+      .select("entry_id, entry_name, member_id")
+      .in("member_id", (members ?? []).map((m: any) => m.member_id));
+
+    if (!entries || entries.length === 0) continue;
+
+    const memberMap = new Map((members ?? []).map((m: any) => [m.member_id, m]));
+
+    for (const round of rounds) {
+      const roundKey = round.round_key;
+      const roundName = ROUND_LABELS[roundKey] ?? roundKey;
+      const stages = ROUND_MATCH_STAGES[roundKey] ?? [];
+
+      const { count: roundMatchCount } = await supabase
+        .from("matches")
+        .select("*", { count: "exact", head: true })
+        .eq("tournament_id", pool.tournament_id)
+        .in("stage", stages);
+
+      for (const entry of entries) {
+        // Check if already submitted
+        const { data: existingSub } = await supabase
+          .from("entry_round_submissions")
+          .select("id, has_submitted")
+          .eq("entry_id", entry.entry_id)
+          .eq("round_key", roundKey)
+          .maybeSingle();
+
+        if (existingSub?.has_submitted) continue;
+
+        // Get match IDs for this round
+        const { data: matchIds } = await supabase
+          .from("matches")
+          .select("match_id")
+          .eq("tournament_id", pool.tournament_id)
+          .in("stage", stages);
+
+        if (!matchIds || matchIds.length === 0) continue;
+
+        const { count: predCount } = await supabase
+          .from("predictions")
+          .select("*", { count: "exact", head: true })
+          .eq("entry_id", entry.entry_id)
+          .in("match_id", matchIds.map((m: any) => m.match_id));
+
+        if (!predCount || predCount === 0) continue;
+
+        // Auto-submit
+        const now = new Date().toISOString();
+        await supabase
+          .from("entry_round_submissions")
+          .upsert(
+            {
+              ...(existingSub?.id ? { id: existingSub.id } : {}),
+              entry_id: entry.entry_id,
+              round_key: roundKey,
+              has_submitted: true,
+              submitted_at: now,
+              auto_submitted: true,
+              prediction_count: predCount,
+              updated_at: now,
+            },
+            { onConflict: "entry_id,round_key" }
+          );
+
+        result.submitted++;
+
+        // Send email
+        const member = memberMap.get(entry.member_id) as any;
+        if (member?.users?.email) {
+          const u = member.users;
+          const matchCount = predCount;
+          const totalRoundMatches = roundMatchCount ?? 0;
+          await sendEmail(
+            u.email,
+            `${roundName} predictions auto-submitted - ${pool.pool_name}`,
+            baseTemplate(
+              `Your draft ${roundName} predictions for ${entry.entry_name} were auto-submitted.`,
+              `${roundName} Auto-Submitted`,
+              `<p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${u.full_name || u.username},</p>
+               <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The deadline for <strong>${roundName}</strong> in <strong>${pool.pool_name}</strong> has passed. Your draft predictions for <strong>${entry.entry_name}</strong> were automatically submitted.</p>
+               <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
+                 <p style="color:#92400e;margin:0;font-size:14px;"><strong>${matchCount}</strong> of <strong>${totalRoundMatches}</strong> matches had predictions saved</p>
+                 ${matchCount < totalRoundMatches ? '<p style="color:#92400e;margin:4px 0 0;font-size:13px;">Matches without predictions will score 0 points.</p>' : ""}
+               </div>`,
+              "View Pool",
+              `${APP_URL}/pools/${poolId}?tab=predictions`
+            ),
+            RESEND_TOPIC_PREDICTIONS
+          );
+        }
+      }
+
+      // Transition round to in_progress
+      await supabase
+        .from("pool_round_states")
+        .update({ state: "in_progress", updated_at: new Date().toISOString() })
+        .eq("id", round.id);
+    }
+  }
+
+  return result;
+}
+
+// =============================================
+// AUTO-ARCHIVE COMPLETED POOLS
+// =============================================
+
+async function autoArchivePools(supabase: ReturnType<typeof createClient>) {
+  const result = { poolsChecked: 0, archived: 0, errors: [] as string[] };
+
+  const { data: pools, error: poolsError } = await supabase
+    .from("pools")
+    .select("pool_id, pool_name, tournament_id, status")
+    .in("status", ["open", "active"]);
+
+  if (poolsError || !pools || pools.length === 0) {
+    if (poolsError) result.errors.push(poolsError.message);
+    return result;
+  }
+
+  const tournamentIds = [...new Set(pools.map((p: any) => p.tournament_id))];
+  const tournamentStatus = new Map<string, { allCompleted: boolean; lastMatchDate: Date | null }>();
+
+  for (const tid of tournamentIds) {
+    const { count: totalCount } = await supabase
+      .from("matches")
+      .select("*", { count: "exact", head: true })
+      .eq("tournament_id", tid);
+
+    const { count: completedCount } = await supabase
+      .from("matches")
+      .select("*", { count: "exact", head: true })
+      .eq("tournament_id", tid)
+      .eq("is_completed", true);
+
+    const allCompleted =
+      totalCount !== null && completedCount !== null && totalCount > 0 && totalCount === completedCount;
+
+    let lastMatchDate: Date | null = null;
+    if (allCompleted) {
+      const { data: lastMatch } = await supabase
+        .from("matches")
+        .select("match_date")
+        .eq("tournament_id", tid)
+        .order("match_date", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (lastMatch?.match_date) {
+        lastMatchDate = new Date(lastMatch.match_date);
+      }
+    }
+
+    tournamentStatus.set(tid, { allCompleted, lastMatchDate });
+  }
+
+  const now = new Date();
+  for (const pool of pools) {
+    result.poolsChecked++;
+    const status = tournamentStatus.get(pool.tournament_id);
+    if (!status || !status.allCompleted || !status.lastMatchDate) continue;
+
+    const daysSinceLastMatch = (now.getTime() - status.lastMatchDate.getTime()) / (1000 * 60 * 60 * 24);
+
+    if (daysSinceLastMatch >= ARCHIVE_DELAY_DAYS) {
+      const { error: updateError } = await supabase
+        .from("pools")
+        .update({ status: "completed", updated_at: new Date().toISOString() })
+        .eq("pool_id", pool.pool_id);
+
+      if (updateError) {
+        result.errors.push(`Failed to archive "${pool.pool_name}": ${updateError.message}`);
+      } else {
+        result.archived++;
+      }
+    }
+  }
+
+  return result;
+}
+
+// =============================================
+// MAIN HANDLER
+// =============================================
+
+Deno.serve(async (_req: Request) => {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    const [submitResult, progressiveResult, archiveResult] = await Promise.all([
+      autoSubmitDraftEntries(supabase),
+      autoSubmitProgressiveRounds(supabase),
+      autoArchivePools(supabase),
+    ]);
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        autoSubmit: submitResult,
+        progressiveAutoSubmit: progressiveResult,
+        autoArchive: archiveResult,
+      }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+});
