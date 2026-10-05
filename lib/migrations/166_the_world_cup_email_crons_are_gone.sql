@@ -1,0 +1,44 @@
+-- =============================================================
+-- 166 — THE WORLD CUP EMAIL CRONS ARE GONE
+-- =============================================================
+-- Ryan, 2026-10-05: delete them.
+--
+-- Three pg_cron jobs, all INACTIVE, each one `active = true` away from running:
+--
+--   deadline-reminders        jobid 1   0 * * * *    → send-deadline-reminders
+--   weekly-recap              jobid 2   0 20 * * 0   → send-weekly-recap
+--   round-deadline-reminders  jobid 4   0 * * * *    → send-round-deadline-reminders
+--
+-- WHY — Decision 16, no backfills. Every league notice now checks at send time
+-- that it is still true and still timely. These three call edge functions that
+-- do not, and whose source is not in this repository, so nothing reviewable
+-- stops them sending World Cup reminders and recaps the day somebody flips the
+-- switch. The tournament ended 2026-07-16; they have nothing left to do.
+--
+-- DELIBERATELY NOT TOUCHED
+--   * countdown-emails (jobid 5) — ACTIVE, the same shape, outside this
+--     instruction. It sends nothing today only because no `matches` row is in
+--     the future; the next tournament loaded into `matches` wakes it.
+--   * The edge functions themselves. Only the triggers go. All seven deployed
+--     functions run with verify_jwt = true, which the PUBLIC anon key satisfies,
+--     so removing a cron does not stop a function being called directly.
+--
+-- TO RESTORE ONE — they were INACTIVE, so restore in two steps or it comes back
+-- live. The bearer below is the public anon key, redacted rather than committed:
+--
+--   select cron.schedule('weekly-recap', '0 20 * * 0', $$
+--     SELECT net.http_post(
+--       url := 'https://ujthamlehjyubbzxbnes.supabase.co/functions/v1/send-weekly-recap',
+--       headers := '{"Content-Type": "application/json", "Authorization": "Bearer <anon key>"}'::jsonb,
+--       body := '{}'::jsonb
+--     ) $$);
+--   select cron.alter_job(job_id := (select jobid from cron.job where jobname = 'weekly-recap'),
+--                         active := false);
+--
+-- Run history survives: cron.unschedule removes the job from cron.job and leaves
+-- cron.job_run_details untouched (Supabase docs, Cron → Unschedule a job).
+-- =============================================================
+
+select cron.unschedule('deadline-reminders');
+select cron.unschedule('weekly-recap');
+select cron.unschedule('round-deadline-reminders');
