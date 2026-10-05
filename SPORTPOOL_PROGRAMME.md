@@ -5213,6 +5213,12 @@ templates `we_miss_you`, `ready_to_join` and `past_predictor_hype`, and the Broa
 three plus `pool_admin_invite_push` and `inactive_reminder`. Each announced the World Cup as *coming*. What
 remains sendable names no event at all: the four pool-size nudges, `start_a_pool`, and the two legal notices.
 
+**Where the rule stops — open invitations.** Ryan, 2026-10-05, on adding an age limit to Crews invites:
+*"no cut off."* An open invitation is a **standing fact, not a past event** — it stays true and
+answerable until it is accepted or withdrawn — so announcing one late is not a backfill, even a backlog
+released by turning `crew_notices_enabled` back on. **Do not add a cutoff.** Crews' seat notice and its
+one reminder need none either: both already stop at the lock (`dueNotice`, `dueReminder`).
+
 **The rule.** A notice is checked against the **world** at send time, never against the queue, and is
 sent only while it is still **true** and still **timely**. Otherwise it is skipped with an `expired:`
 reason — still marked done, still logged, countable — and never sent late.

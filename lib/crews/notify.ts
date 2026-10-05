@@ -319,6 +319,9 @@ export async function runCrewNotices(
 
   // Invites the moment of adding didn't send — oldest first, so a backlog goes out in the order
   // the captains asked.
+  // ⚠ NO AGE CUTOFF, by decision (Ryan, 2026-10-05: "no cut off"). An open invitation is a standing
+  // fact, not a past event, so announcing one late is not a backfill under Decision 16 — even a
+  // backlog released by turning crew_notices_enabled back on. Do not add one.
   const { data: unsent, error: unsentErr } = await admin
     .from('crew_invites')
     .select('invite_id')
