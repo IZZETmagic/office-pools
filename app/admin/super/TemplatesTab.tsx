@@ -227,6 +227,8 @@ export function TemplatesTab() {
   const [dryRunResult, setDryRunResult] = useState<{ totalEmails: number; preview: { to: string; subject: string }[] } | null>(null)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewSubject, setPreviewSubject] = useState<string | null>(null)
+  // Its own flag, so Preview and the test send never spin together.
+  const [testSending, setTestSending] = useState(false)
 
   // Load pools, rounds, users on mount
   useEffect(() => {
@@ -378,6 +380,32 @@ export function TemplatesTab() {
       showToast('Dry run failed', 'error')
     } finally {
       setSending(false)
+    }
+  }
+
+  // One copy of the first rendered email, to the signed-in admin only.
+  async function handleTestSend() {
+    setTestSending(true)
+    try {
+      const res = await fetch('/api/admin/send-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...buildRequestBody(true), test_send: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || 'Test send failed', 'error')
+        return
+      }
+      if (data.totalEmails === 0) {
+        showToast('No recipients matched, so there was nothing to test', 'info')
+        return
+      }
+      showToast(`Test sent to ${data.sentTo}, rendered as ${data.renderedFor} will see it`, 'success')
+    } catch {
+      showToast('Test send failed', 'error')
+    } finally {
+      setTestSending(false)
     }
   }
 
@@ -1011,6 +1039,16 @@ export function TemplatesTab() {
               loading={sending && !confirmSend}
             >
               Preview
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleTestSend}
+              disabled={!isFormValid() || sending || testSending}
+              loading={testSending}
+            >
+              Send test to me
             </Button>
 
             {!confirmSend ? (

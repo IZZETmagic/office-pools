@@ -3,6 +3,7 @@ import { requireSuperAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/paginate'
 import { sendBatchEmails } from '@/lib/email/send'
+import { resolveSendMode, testEmailFor } from '@/lib/email/sendMode'
 import { greeting, paragraph } from '@/lib/email/components'
 import {
   brandedTemplate,
@@ -115,6 +116,8 @@ export async function POST(request: NextRequest) {
     template: TemplateType
     idempotency_key?: string
     dry_run?: boolean
+    /** One copy of the first rendered email, to the admin who asked. See lib/email/sendMode.ts. */
+    test_send?: boolean
     // Recipient targeting (for custom & pool templates)
     recipient_mode?: 'segment' | 'users'
     segment?: SegmentKey
@@ -223,8 +226,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'No recipients matched', totalEmails: 0 })
   }
 
-  // Dry run mode
-  if (body.dry_run) {
+  // ⚠ SAFE BY DEFAULT — see lib/email/sendMode.ts. Only `dry_run: false`, the
+  // boolean, reaches members; a body that leaves the flag out previews.
+  const mode = resolveSendMode(body)
+
+  // A test send: one copy, to the admin who asked. Nothing is recorded, so the
+  // real send's idempotency key is still unspent afterwards.
+  if (mode === 'test') {
+    const { data: me, error: meErr } = await supabase
+      .from('users')
+      .select('email')
+      .eq('user_id', auth.data.userData.user_id)
+      .single()
+    if (meErr || !me?.email) {
+      return NextResponse.json(
+        { error: 'Could not find your email address, so no test was sent' },
+        { status: 500 },
+      )
+    }
+    const first = result.emails[0]
+    const sent = await sendBatchEmails([testEmailFor(first, me.email)])
+    if (!sent.success) {
+      return NextResponse.json({ error: 'The test email failed to send', details: sent.error }, { status: 502 })
+    }
+    return NextResponse.json({
+      test_send: true,
+      sentTo: me.email,
+      renderedFor: first.to,
+      totalEmails: result.emails.length,
+      message: `Test sent to ${me.email}`,
+    })
+  }
+
+  // Preview — the default.
+  if (mode === 'preview') {
     return NextResponse.json({
       dry_run: true,
       totalEmails: result.emails.length,

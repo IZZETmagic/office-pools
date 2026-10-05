@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
+import { resolveSendMode } from '@/lib/email/sendMode'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendBatchEmails } from '@/lib/email/send'
 import { pendingPredictionsReminderTemplate } from '@/lib/email/templates'
@@ -265,8 +266,11 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // 3b. Dry run mode — return preview without sending
-  if (body.dry_run) {
+  // 3b. Preview unless the caller said `dry_run: false` — SAFE BY DEFAULT, see
+  // lib/email/sendMode.ts. Before 2026-10-05 a body without the flag sent.
+  // There is no test send here (no screen calls this route); a `test_send`
+  // body resolves to 'test', which is not 'send', so it previews.
+  if (resolveSendMode(body) !== 'send') {
     return NextResponse.json({
       dry_run: true,
       totalEmails: emails.length,
