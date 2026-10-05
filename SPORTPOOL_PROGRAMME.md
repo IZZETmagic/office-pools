@@ -5267,6 +5267,32 @@ test would have begun failing that day.
 - **Counting.** `expired:` is a log reason today; it becomes a number in the delivery ledger (N4).
 
 
+### Decision 17 — No quiet hours of our own: the phone's Do Not Disturb decides
+
+Settled 2026-10-05 with Ryan, closing question 6 of the notification plan:
+
+> **"We run no quiet hours of our own. The phone's Do Not Disturb decides, and nothing we send overrides
+> it."**
+
+The plan had proposed server-side quiet hours — 22:00–08:00 in each member's local time. Two questions
+from Ryan took it apart.
+
+- ***"Why do we need to capture timezones into the database?"*** — server-side quiet hours was the only
+  reason, and every phone already has them: iOS Focus and Do Not Disturb, Android's Do Not Disturb, on
+  the owner's schedule, in their timezone, set by them. Rebuilding that on our server duplicates it and
+  can override when the member themselves wants quiet. No timezone is stored anywhere (checked), and
+  none will be for this.
+- ***"Why do we have to create this specific thing?"*** — the fallback idea, marking deadline warnings
+  iOS `time-sensitive` so they reach someone in Focus, is withdrawn too. It would let them through most
+  Focus modes by default — us deciding our reminder outranks a member's wish to be left alone. Nothing
+  in a pool is that urgent (Apple intends it for things like a ride arriving or a security alert); the
+  lock reminder already goes about a day ahead and by email; and push reaches 16 people.
+
+**What it means.** No notice is ever held server-side, so quiet hours can never turn a timely notice
+into a late one (Decision 16). No timezone column, no `interruption-level`, no app capability. N6 of the
+notification plan shrinks to a per-member daily limit and the digest.
+
+
 ## 💎 Later — monetization & cosmetics
 
 ### Sponsored pools `Feature` `Monetization`
