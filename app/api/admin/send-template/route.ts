@@ -15,9 +15,6 @@ import {
   soloPoolNudgeTemplate,
   smallPoolBoostTemplate,
   startAPoolTemplate,
-  weMissYouTemplate,
-  readyToJoinTemplate,
-  pastPredictorHypeTemplate,
   bracketFixTemplate,
   poolAdminFeedbackSurveyTemplate,
   playerFeedbackSurveyTemplate,
@@ -41,9 +38,6 @@ type TemplateType =
   | 'solo_pool_nudge'
   | 'small_pool_boost'
   | 'start_a_pool'
-  | 'we_miss_you'
-  | 'ready_to_join'
-  | 'past_predictor_hype'
   | 'support_reply'
   | 'custom'
   | 'bracket_fix'
@@ -187,15 +181,6 @@ export async function POST(request: NextRequest) {
       break
     case 'start_a_pool':
       result = await handleSimpleGrowthTemplate(supabase, 'non_admin_members', startAPoolTemplate)
-      break
-    case 'we_miss_you':
-      result = await handleSimpleGrowthTemplate(supabase, 'lapsed_users', weMissYouTemplate)
-      break
-    case 'ready_to_join':
-      result = await handleSimpleGrowthTemplate(supabase, 'engaged_no_pool', readyToJoinTemplate)
-      break
-    case 'past_predictor_hype':
-      result = await handleSimpleGrowthTemplate(supabase, 'past_predictors', pastPredictorHypeTemplate)
       break
     case 'support_reply':
       result = await handleSupportReply(supabase, body)

@@ -235,9 +235,6 @@ add('Growth', 'smallPoolBoost', T.smallPoolBoostTemplate({
 }))
 
 add('Growth', 'startAPool', T.startAPoolTemplate({ firstName: 'Ryan', dashboardUrl: DASH_URL }))
-add('Growth', 'weMissYou', T.weMissYouTemplate({ firstName: 'Ryan', dashboardUrl: DASH_URL }))
-add('Growth', 'readyToJoin', T.readyToJoinTemplate({ firstName: 'Ryan', dashboardUrl: DASH_URL }))
-add('Growth', 'pastPredictorHype', T.pastPredictorHypeTemplate({ firstName: 'Ryan', dashboardUrl: DASH_URL }))
 
 // --- Feedback surveys ------------------------------------------------------------------
 

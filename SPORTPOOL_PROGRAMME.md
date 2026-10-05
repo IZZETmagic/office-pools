@@ -5201,6 +5201,18 @@ is sent *twice*. A row that sat unsent — a paused consumer, an unscheduled cro
 straight through. Preventing a duplicate and preventing a backfill are different promises, and only the
 first was being kept.
 
+**Restated by Ryan, 2026-10-05 — the strong hold rule:**
+
+> **"We are not mass sending out notifications to users for past events."**
+
+It reaches past the queue. A backfill is one way to break it; an admin pressing Send on stale copy is
+another, and an edge function anyone can fire is a third. All three were live and were closed the same day:
+**seven edge functions** retired to do-nothing stubs (migrations 166/167, `supabase/functions-retired/`),
+and **eight World Cup 2026 emails** deleted from the two Super Admin screens that send by hand — the
+templates `we_miss_you`, `ready_to_join` and `past_predictor_hype`, and the Broadcast presets of those
+three plus `pool_admin_invite_push` and `inactive_reminder`. Each announced the World Cup as *coming*. What
+remains sendable names no event at all: the four pool-size nudges, `start_a_pool`, and the two legal notices.
+
 **The rule.** A notice is checked against the **world** at send time, never against the queue, and is
 sent only while it is still **true** and still **timely**. Otherwise it is skipped with an `expired:`
 reason — still marked done, still logged, countable — and never sent late.

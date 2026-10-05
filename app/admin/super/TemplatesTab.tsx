@@ -17,9 +17,6 @@ type TemplateKey =
   | 'solo_pool_nudge'
   | 'small_pool_boost'
   | 'start_a_pool'
-  | 'we_miss_you'
-  | 'ready_to_join'
-  | 'past_predictor_hype'
   | 'support_reply'
   | 'custom'
   | 'bracket_fix'
@@ -93,22 +90,6 @@ const TEMPLATES: TemplateDef[] = [
     recipientNote: 'Auto-detected: pool members who aren\'t admins',
   },
   {
-    key: 'we_miss_you',
-    label: 'We Miss You',
-    description: 'Re-engages users who signed up 30+ days ago but never joined a pool. World Cup hype angle.',
-    category: 'growth',
-    icon: 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z',
-    recipientNote: 'Auto-detected: signed up 30+ days ago, no pool',
-  },
-  {
-    key: 'ready_to_join',
-    label: 'Ready to Join?',
-    description: 'Reaches out to recent signups who haven\'t joined a pool yet. Guides them to join or create one.',
-    category: 'growth',
-    icon: 'M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z',
-    recipientNote: 'Auto-detected: recent signups not in any pool',
-  },
-  {
     key: 'bracket_fix',
     label: 'FIFA Bracket Fix Notification',
     description: 'One-time announcement for entries whose R16+ picks were reset when the bracket was re-aligned with FIFA. Their groups and R32 picks are preserved; they need to re-do R16 through the final.',
@@ -131,14 +112,6 @@ const TEMPLATES: TemplateDef[] = [
     category: 'survey',
     icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z',
     recipientNote: 'Auto-detected: users who submitted predictions',
-  },
-  {
-    key: 'past_predictor_hype',
-    label: 'Past Predictor Hype',
-    description: 'VIP treatment for users who have submitted predictions before. Hype them up for the next tournament.',
-    category: 'growth',
-    icon: 'M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z',
-    recipientNote: 'Auto-detected: users who submitted predictions before',
   },
   {
     key: 'support_reply',
@@ -298,9 +271,6 @@ export function TemplatesTab() {
       case 'solo_pool_nudge':
       case 'small_pool_boost':
       case 'start_a_pool':
-      case 'we_miss_you':
-      case 'ready_to_join':
-      case 'past_predictor_hype':
       case 'bracket_fix':
       case 'pool_admin_feedback_survey':
       case 'player_feedback_survey':
@@ -334,9 +304,6 @@ export function TemplatesTab() {
       case 'solo_pool_nudge':
       case 'small_pool_boost':
       case 'start_a_pool':
-      case 'we_miss_you':
-      case 'ready_to_join':
-      case 'past_predictor_hype':
       case 'bracket_fix':
       case 'pool_admin_feedback_survey':
       case 'player_feedback_survey':
@@ -566,27 +533,6 @@ export function TemplatesTab() {
             <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 sp-radius-sm p-4">
               <p className="text-sm text-green-800 dark:text-green-300">
                 Targets users who are in a pool but haven't created their own. Encourages them to start a pool for another group (office, family, friends).
-              </p>
-            </div>
-          )}
-          {selectedTemplate === 'we_miss_you' && (
-            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 sp-radius-sm p-4">
-              <p className="text-sm text-amber-800 dark:text-amber-300">
-                Re-engagement email for users who signed up 30+ days ago but never joined a pool. World Cup hype angle to draw them back.
-              </p>
-            </div>
-          )}
-          {selectedTemplate === 'ready_to_join' && (
-            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 sp-radius-sm p-4">
-              <p className="text-sm text-green-800 dark:text-green-300">
-                Targets recent signups (last 30 days) who haven't joined a pool yet. Guides them to join or create one before the tournament starts.
-              </p>
-            </div>
-          )}
-          {selectedTemplate === 'past_predictor_hype' && (
-            <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 sp-radius-sm p-4">
-              <p className="text-sm text-purple-800 dark:text-purple-300">
-                VIP treatment for proven users who have submitted predictions before. Hypes them up for the next tournament and encourages them to grow their pools.
               </p>
             </div>
           )}
