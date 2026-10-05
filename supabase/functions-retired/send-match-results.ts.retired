@@ -1,0 +1,267 @@
+// ⛔ RETIRED 2026-10-05 — DO NOT REDEPLOY. Archived as a record, not for restoring.
+// Last deployed: version 5, 2026-03-09. The deployed copy now answers 410 and does nothing.
+// It ran with the SERVICE-ROLE key, never checked its caller, and sat behind verify_jwt —
+// which the public anon key satisfies — so anyone could trigger it. See README.md.
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const RESEND_TOPIC_MATCH_RESULTS = Deno.env.get("RESEND_TOPIC_MATCH_RESULTS") || "";
+const FROM_EMAIL = "Sport Pool <notifications@sportpool.io>";
+const APP_URL = Deno.env.get("APP_URL") || "https://sportpool.io";
+
+function baseTemplate(preheader: string, heading: string, body: string, ctaText?: string, ctaUrl?: string): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.025em;">Sport Pool</h1>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
+          ${body}
+          ${ctaText && ctaUrl ? `<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a></div>` : ""}
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
+          <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
+            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
+            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Notification Settings</a> &middot;
+            <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:#a3a3a3;text-decoration:none;">Unsubscribe</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+Deno.serve(async (req: Request) => {
+  try {
+    const { match_id, tournament_id } = await req.json();
+    if (!match_id) {
+      return new Response(JSON.stringify({ error: "match_id required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Get match details
+    const { data: match } = await supabase
+      .from("matches")
+      .select("match_id, home_team_id, away_team_id, home_score_ft, away_score_ft, stage, tournament_id")
+      .eq("match_id", match_id)
+      .single();
+
+    if (!match) {
+      return new Response(JSON.stringify({ error: "Match not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Get team names
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("team_id, country_name")
+      .in("team_id", [match.home_team_id, match.away_team_id].filter(Boolean));
+
+    const homeTeam = teams?.find((t: any) => t.team_id === match.home_team_id)?.country_name || "Home";
+    const awayTeam = teams?.find((t: any) => t.team_id === match.away_team_id)?.country_name || "Away";
+    const scoreStr = `${homeTeam} ${match.home_score_ft} - ${match.away_score_ft} ${awayTeam}`;
+
+    // Get all pools for this tournament
+    const tid = tournament_id || match.tournament_id;
+    const { data: pools } = await supabase
+      .from("pools")
+      .select("pool_id, pool_name, tournament_id")
+      .eq("tournament_id", tid);
+
+    if (!pools || pools.length === 0) {
+      return new Response(JSON.stringify({ message: "No pools found" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    let totalSent = 0;
+
+    for (const pool of pools) {
+      // Get all members with their entries and predictions for this match
+      const { data: members } = await supabase
+        .from("pool_members")
+        .select(`
+          user_id,
+          users!inner(email, username, full_name),
+          pool_entries!inner(
+            entry_id, entry_name, total_points, current_rank, previous_rank,
+            predictions!inner(predicted_home_score, predicted_away_score, match_id)
+          )
+        `)
+        .eq("pool_id", pool.pool_id);
+
+      if (!members) continue;
+
+      // Group entries by user and build email content
+      const userMap = new Map<string, { email: string; name: string; entries: any[] }>();
+
+      for (const member of members) {
+        const u = (member as any).users;
+        const userId = member.user_id;
+
+        if (!userMap.has(userId)) {
+          userMap.set(userId, { email: u.email, name: u.full_name || u.username, entries: [] });
+        }
+
+        for (const entry of (member as any).pool_entries || []) {
+          const prediction = entry.predictions?.find((p: any) => p.match_id === match_id);
+          if (!prediction) continue;
+
+          const isExact =
+            prediction.predicted_home_score === match.home_score_ft &&
+            prediction.predicted_away_score === match.away_score_ft;
+
+          // Points: exact=3, correct result=1, else=0
+          let pointsEarned = 0;
+          const actualDiff = (match.home_score_ft ?? 0) - (match.away_score_ft ?? 0);
+          const predDiff = prediction.predicted_home_score - prediction.predicted_away_score;
+          if (isExact) {
+            pointsEarned = 3;
+          } else if (Math.sign(actualDiff) === Math.sign(predDiff)) {
+            pointsEarned = 1;
+          }
+
+          userMap.get(userId)!.entries.push({
+            entryName: entry.entry_name,
+            entryId: entry.entry_id,
+            pointsEarned,
+            isExact,
+            totalPoints: entry.total_points,
+            currentRank: entry.current_rank,
+            previousRank: entry.previous_rank,
+          });
+        }
+      }
+
+      // Send email per user
+      for (const [, userData] of userMap) {
+        if (userData.entries.length === 0) continue;
+
+        const entriesHtml = userData.entries
+          .map(
+            (e: any) => `
+          <tr>
+            <td style="padding:8px 12px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:14px;">${e.entryName}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:14px;text-align:right;font-weight:600;">
+              ${e.pointsEarned > 0 ? `+${e.pointsEarned} pts` : "0 pts"}
+              ${e.isExact ? ' <span style="color:#16a34a;">&#10003; Exact</span>' : ""}
+            </td>
+          </tr>`
+          )
+          .join("");
+
+        // Build rank change section
+        const rankChanges = userData.entries
+          .filter((e: any) => e.previousRank && e.currentRank && e.currentRank !== e.previousRank)
+          .map((e: any) => {
+            const improved = e.currentRank < e.previousRank;
+            return `<p style="margin:4px 0;font-size:13px;color:${improved ? "#166534" : "#991b1b"};">${e.entryName}: #${e.previousRank} &rarr; #${e.currentRank} ${improved ? "&#x1F4C8;" : "&#x1F4C9;"}</p>`;
+          })
+          .join("");
+
+        const rankSection = rankChanges
+          ? `<div style="background:#f5f5f5;border-radius:8px;padding:12px;margin:12px 0;">
+              <p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#525252;">Rank Changes</p>
+              ${rankChanges}
+            </div>`
+          : "";
+
+        const html = baseTemplate(
+          `${scoreStr} - see how your predictions did!`,
+          "Match Result",
+          `<p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${userData.name},</p>
+           <div style="background:#f5f5f5;border-radius:8px;padding:16px;text-align:center;margin:0 0 16px;">
+             <p style="margin:0;font-size:18px;font-weight:700;color:#171717;">${scoreStr}</p>
+           </div>
+           <p style="color:#525252;line-height:1.6;margin:0 0 12px;">Here's how your entries did in <strong>${pool.pool_name}</strong>:</p>
+           <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">${entriesHtml}</table>
+           ${rankSection}`,
+          "View Results",
+          `${APP_URL}/pools/${pool.pool_id}?tab=results`
+        );
+
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: [userData.email],
+            subject: `${scoreStr} - ${pool.pool_name} results`,
+            html,
+            ...(RESEND_TOPIC_MATCH_RESULTS ? { topicId: RESEND_TOPIC_MATCH_RESULTS } : {}),
+            tags: [{ name: "category", value: "match-results" }],
+          }),
+        });
+
+        totalSent++;
+      }
+
+      // Update previous_rank = current_rank for all entries in this pool
+      // so rank changes are tracked correctly for the next match
+      const { data: poolEntries } = await supabase
+        .from("pool_entries")
+        .select("entry_id, current_rank, member_id")
+        .in(
+          "member_id",
+          (members || []).map((m: any) => m.pool_entries?.[0]?.entry_id ? m.user_id : "").filter(Boolean)
+        );
+
+      // Direct update: set previous_rank = current_rank for all entries in this pool
+      const { data: allPoolMembers } = await supabase
+        .from("pool_members")
+        .select("member_id")
+        .eq("pool_id", pool.pool_id);
+
+      if (allPoolMembers && allPoolMembers.length > 0) {
+        const memberIds = allPoolMembers.map((m: any) => m.member_id);
+        // Fetch all entries for these members
+        const { data: entriesToUpdate } = await supabase
+          .from("pool_entries")
+          .select("entry_id, current_rank")
+          .in("member_id", memberIds);
+
+        if (entriesToUpdate) {
+          // Update each entry's previous_rank to current_rank
+          for (const entry of entriesToUpdate) {
+            if (entry.current_rank) {
+              await supabase
+                .from("pool_entries")
+                .update({ previous_rank: entry.current_rank })
+                .eq("entry_id", entry.entry_id);
+            }
+          }
+        }
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ sent: totalSent, pools: pools.length, match: scoreStr }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+});

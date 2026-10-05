@@ -1,0 +1,220 @@
+// ⛔ RETIRED 2026-10-05 — DO NOT REDEPLOY. Archived as a record, not for restoring.
+// Last deployed: version 5, 2026-03-09. The deployed copy now answers 410 and does nothing.
+// It ran with the SERVICE-ROLE key, never checked its caller, and sat behind verify_jwt —
+// which the public anon key satisfies — so anyone could trigger it. See README.md.
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const RESEND_TOPIC_LEADERBOARD = Deno.env.get("RESEND_TOPIC_LEADERBOARD") || "";
+const FROM_EMAIL = "Sport Pool <notifications@sportpool.io>";
+const APP_URL = Deno.env.get("APP_URL") || "https://sportpool.io";
+
+function baseTemplate(preheader: string, heading: string, body: string, ctaText?: string, ctaUrl?: string): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.025em;">Sport Pool</h1>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
+          ${body}
+          ${ctaText && ctaUrl ? `<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a></div>` : ""}
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
+          <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
+            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
+            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Notification Settings</a> &middot;
+            <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:#a3a3a3;text-decoration:none;">Unsubscribe</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+type PoolSummary = {
+  poolId: string;
+  poolName: string;
+  bestEntryName: string;
+  currentRank: number;
+  totalPoints: number;
+  totalEntrants: number;
+  topFive: { rank: number; entryName: string; points: number }[];
+};
+
+Deno.serve(async (_req: Request) => {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Get all active pools
+    const { data: pools } = await supabase
+      .from("pools")
+      .select("pool_id, pool_name")
+      .in("status", ["open", "closed"]);
+
+    if (!pools || pools.length === 0) {
+      return new Response(
+        JSON.stringify({ message: "No active pools" }),
+        { headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Build a map: userId -> { email, name, pools: PoolSummary[] }
+    const userMap = new Map<string, { email: string; name: string; pools: PoolSummary[] }>();
+
+    for (const pool of pools) {
+      // Get all members with entries
+      const { data: members } = await supabase
+        .from("pool_members")
+        .select(`
+          user_id,
+          users!inner(email, username, full_name),
+          pool_entries(entry_id, entry_name, total_points, current_rank)
+        `)
+        .eq("pool_id", pool.pool_id);
+
+      if (!members || members.length === 0) continue;
+
+      // Build top 5 leaderboard for this pool
+      const allEntries = members.flatMap((m: any) =>
+        (m.pool_entries || []).map((e: any) => ({
+          entryName: `${m.users.username} - ${e.entry_name}`,
+          points: e.total_points || 0,
+          rank: e.current_rank || 999,
+        }))
+      );
+      allEntries.sort((a: any, b: any) => a.rank - b.rank);
+      const topFive = allEntries.slice(0, 5);
+      const totalEntrants = allEntries.length;
+
+      // Add pool data to each user
+      for (const member of members) {
+        const u = (member as any).users;
+        const userId = member.user_id;
+        const entries = (member as any).pool_entries || [];
+        if (entries.length === 0) continue;
+
+        if (!userMap.has(userId)) {
+          userMap.set(userId, {
+            email: u.email,
+            name: u.full_name || u.username,
+            pools: [],
+          });
+        }
+
+        // Use best entry for this pool
+        const bestEntry = entries.reduce((best: any, e: any) =>
+          (e.current_rank || 999) < (best.current_rank || 999) ? e : best
+        , entries[0]);
+
+        userMap.get(userId)!.pools.push({
+          poolId: pool.pool_id,
+          poolName: pool.pool_name,
+          bestEntryName: bestEntry.entry_name,
+          currentRank: bestEntry.current_rank || 0,
+          totalPoints: bestEntry.total_points || 0,
+          totalEntrants,
+          topFive,
+        });
+      }
+    }
+
+    // Send ONE email per user with all their pools
+    let totalSent = 0;
+
+    for (const [, userData] of userMap) {
+      if (userData.pools.length === 0) continue;
+
+      // Build summary section for each pool
+      const poolSections = userData.pools.map((p) => {
+        const topFiveHtml = p.topFive
+          .map(
+            (e) => `
+            <tr>
+              <td style="padding:4px 8px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:13px;">#${e.rank}</td>
+              <td style="padding:4px 8px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:13px;">${e.entryName}</td>
+              <td style="padding:4px 8px;border-bottom:1px solid #f5f5f5;color:#525252;font-size:13px;text-align:right;font-weight:600;">${e.points} pts</td>
+            </tr>`
+          )
+          .join("");
+
+        return `
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:20px;margin:0 0 16px;">
+            <h3 style="margin:0 0 12px;color:#171717;font-size:16px;font-weight:600;">${p.poolName}</h3>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;text-align:center;margin:0 0 12px;">
+              <p style="margin:0;font-size:13px;color:#166534;">Your Best Entry: ${p.bestEntryName}</p>
+              <p style="margin:4px 0;font-size:24px;font-weight:700;color:#166534;">#${p.currentRank} <span style="font-size:13px;font-weight:400;">of ${p.totalEntrants}</span></p>
+              <p style="margin:4px 0 0;color:#737373;font-size:12px;">${p.totalPoints} total points</p>
+            </div>
+            <p style="color:#525252;font-size:13px;margin:0 0 6px;font-weight:600;">Top 5:</p>
+            <table width="100%" cellpadding="0" cellspacing="0">${topFiveHtml}</table>
+            <div style="text-align:center;margin:12px 0 0;">
+              <a href="${APP_URL}/pools/${p.poolId}?tab=leaderboard" style="color:#16a34a;font-size:13px;text-decoration:none;font-weight:600;">View Full Leaderboard &rarr;</a>
+            </div>
+          </div>`;
+      }).join("");
+
+      // Build summary line for preheader
+      const bestOverall = userData.pools.reduce((best, p) =>
+        (p.currentRank && p.currentRank < (best.currentRank || 999)) ? p : best
+      , userData.pools[0]);
+
+      const poolCount = userData.pools.length;
+      const preheader = poolCount === 1
+        ? `You're #${bestOverall.currentRank} in ${bestOverall.poolName}`
+        : `You're in ${poolCount} pools - best rank: #${bestOverall.currentRank} in ${bestOverall.poolName}`;
+
+      const subjectLine = poolCount === 1
+        ? `Weekly recap: #${bestOverall.currentRank} in ${bestOverall.poolName}`
+        : `Weekly recap: ${poolCount} pools - best rank #${bestOverall.currentRank}`;
+
+      const html = baseTemplate(
+        preheader,
+        "Your Weekly Recap",
+        `<p style="color:#525252;line-height:1.6;margin:0 0 16px;">Hi ${userData.name},</p>
+         <p style="color:#525252;line-height:1.6;margin:0 0 20px;">Here's your weekly standings update across ${poolCount === 1 ? "your pool" : `all ${poolCount} of your pools`}:</p>
+         ${poolSections}`,
+        "View Dashboard",
+        `${APP_URL}/pools`
+      );
+
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: FROM_EMAIL,
+          to: [userData.email],
+          subject: subjectLine,
+          html,
+          ...(RESEND_TOPIC_LEADERBOARD ? { topicId: RESEND_TOPIC_LEADERBOARD } : {}),
+          tags: [{ name: "category", value: "leaderboard" }],
+        }),
+      });
+
+      totalSent++;
+    }
+
+    return new Response(
+      JSON.stringify({ sent: totalSent, users: userMap.size, pools: pools.length }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+});

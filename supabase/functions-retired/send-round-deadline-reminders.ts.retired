@@ -1,0 +1,185 @@
+// ⛔ RETIRED 2026-10-05 — DO NOT REDEPLOY. Archived as a record, not for restoring.
+// Last deployed: version 3, 2026-03-09. The deployed copy now answers 410 and does nothing.
+// It ran with the SERVICE-ROLE key, never checked its caller, and sat behind verify_jwt —
+// which the public anon key satisfies — so anyone could trigger it. See README.md.
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const RESEND_TOPIC_PREDICTIONS = Deno.env.get("RESEND_TOPIC_PREDICTIONS") || "";
+const FROM_EMAIL = "Sport Pool <notifications@sportpool.io>";
+const APP_URL = Deno.env.get("APP_URL") || "https://sportpool.io";
+
+const ROUND_LABELS: Record<string, string> = {
+  group: "Group Stage",
+  round_32: "Round of 32",
+  round_16: "Round of 16",
+  quarter_final: "Quarter Finals",
+  semi_final: "Semi Finals",
+  third_place: "Third Place",
+  final: "Final",
+};
+
+function baseTemplate(preheader: string, heading: string, body: string, ctaText?: string, ctaUrl?: string): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.025em;">Sport Pool</h1>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
+          ${body}
+          ${ctaText && ctaUrl ? `<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a></div>` : ""}
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
+          <p style="margin:0;color:#a3a3a3;font-size:12px;line-height:1.5;">
+            <a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a> &middot;
+            <a href="${APP_URL}/profile?tab=settings" style="color:#a3a3a3;text-decoration:none;">Notification Settings</a> &middot;
+            <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:#a3a3a3;text-decoration:none;">Unsubscribe</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+Deno.serve(async (_req: Request) => {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const now = new Date();
+    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const in25h = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+
+    // Find open rounds with deadline between 24 and 25 hours from now
+    const { data: rounds, error: roundsError } = await supabase
+      .from("pool_round_states")
+      .select("id, pool_id, round_key, deadline")
+      .eq("state", "open")
+      .gte("deadline", in24h.toISOString())
+      .lte("deadline", in25h.toISOString());
+
+    if (roundsError || !rounds || rounds.length === 0) {
+      return new Response(
+        JSON.stringify({ message: "No rounds with upcoming deadlines", error: roundsError }),
+        { headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    let totalSent = 0;
+
+    for (const round of rounds) {
+      const roundKey = round.round_key;
+      const roundName = ROUND_LABELS[roundKey] ?? roundKey;
+
+      // Get pool info
+      const { data: pool } = await supabase
+        .from("pools")
+        .select("pool_id, pool_name")
+        .eq("pool_id", round.pool_id)
+        .single();
+
+      if (!pool) continue;
+
+      // Get members with their entries and round submissions
+      const { data: members } = await supabase
+        .from("pool_members")
+        .select(`
+          user_id, member_id,
+          users!inner(email, username, full_name),
+          pool_entries(entry_id, entry_name)
+        `)
+        .eq("pool_id", pool.pool_id);
+
+      if (!members) continue;
+
+      const deadline = new Date(round.deadline).toLocaleString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short",
+      });
+
+      for (const member of members) {
+        const u = (member as any).users;
+        const entries = (member as any).pool_entries || [];
+        if (entries.length === 0) continue;
+
+        // Check which entries have NOT submitted for this round
+        const unsubmittedEntries: string[] = [];
+
+        for (const entry of entries) {
+          const { data: sub } = await supabase
+            .from("entry_round_submissions")
+            .select("has_submitted")
+            .eq("entry_id", entry.entry_id)
+            .eq("round_key", roundKey)
+            .maybeSingle();
+
+          if (!sub?.has_submitted) {
+            unsubmittedEntries.push(entry.entry_name);
+          }
+        }
+
+        if (unsubmittedEntries.length === 0) continue;
+
+        const entriesList = unsubmittedEntries
+          .map((e: string) => `<li style="color:#92400e;font-size:13px;">${e}</li>`)
+          .join("");
+
+        const html = baseTemplate(
+          `Don't miss out! ${roundName} predictions close soon.`,
+          `${roundName} Deadline Approaching`,
+          `<p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${u.full_name || u.username},</p>
+           <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The <strong>${roundName}</strong> deadline for <strong>${pool.pool_name}</strong> is approaching.</p>
+           <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
+             <p style="color:#92400e;margin:0 0 8px;font-weight:600;">Deadline: ${deadline}</p>
+             <p style="color:#92400e;margin:0 0 4px;font-size:13px;">Unsubmitted entries:</p>
+             <ul style="margin:0;padding-left:20px;">${entriesList}</ul>
+           </div>
+           <p style="color:#525252;line-height:1.6;margin:0;">Submit your predictions before time runs out!</p>`,
+          "Submit Predictions",
+          `${APP_URL}/pools/${pool.pool_id}?tab=predictions`
+        );
+
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: [u.email],
+            subject: `Reminder: ${roundName} predictions closing soon - ${pool.pool_name}`,
+            html,
+            ...(RESEND_TOPIC_PREDICTIONS ? { topicId: RESEND_TOPIC_PREDICTIONS } : {}),
+            tags: [{ name: "category", value: "predictions" }],
+          }),
+        });
+
+        totalSent++;
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ sent: totalSent, rounds: rounds.length }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+});

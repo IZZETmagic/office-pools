@@ -1,0 +1,134 @@
+// ⛔ RETIRED 2026-10-05 — DO NOT REDEPLOY. Archived as a record, not for restoring.
+// Last deployed: version 4, 2026-02-27. The deployed copy now answers 410 and does nothing.
+// It ran with the SERVICE-ROLE key, never checked its caller, and sat behind verify_jwt —
+// which the public anon key satisfies — so anyone could trigger it. See README.md.
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const RESEND_TOPIC_PREDICTIONS = Deno.env.get("RESEND_TOPIC_PREDICTIONS") || "";
+const FROM_EMAIL = "Sport Pool <notifications@sportpool.io>";
+const APP_URL = Deno.env.get("APP_URL") || "https://sportpool.io";
+
+function baseTemplate(preheader: string, heading: string, body: string, ctaText?: string, ctaUrl?: string): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 32px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">Sport Pool</h1>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <h2 style="margin:0 0 16px;color:#171717;font-size:18px;font-weight:600;">${heading}</h2>
+          ${body}
+          ${ctaText && ctaUrl ? `<div style="text-align:center;margin:24px 0;"><a href="${ctaUrl}" style="display:inline-block;padding:12px 32px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">${ctaText}</a></div>` : ''}
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #e5e5e5;text-align:center;">
+          <p style="margin:0;color:#a3a3a3;font-size:12px;"><a href="${APP_URL}" style="color:#a3a3a3;text-decoration:none;">Sport Pool</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+Deno.serve(async (req: Request) => {
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Find pools with deadline between 24 and 25 hours from now
+    const now = new Date();
+    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const in25h = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+
+    const { data: pools, error: poolsError } = await supabase
+      .from('pools')
+      .select('pool_id, pool_name, prediction_deadline')
+      .gte('prediction_deadline', in24h.toISOString())
+      .lte('prediction_deadline', in25h.toISOString())
+      .eq('status', 'open');
+
+    if (poolsError || !pools || pools.length === 0) {
+      return new Response(JSON.stringify({ message: 'No pools with upcoming deadlines', error: poolsError }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    let totalSent = 0;
+
+    for (const pool of pools) {
+      // Get members with unsubmitted entries
+      const { data: members } = await supabase
+        .from('pool_members')
+        .select('user_id, users!inner(email, username, full_name), pool_entries!inner(entry_name, has_submitted_predictions)')
+        .eq('pool_id', pool.pool_id);
+
+      if (!members) continue;
+
+      // Filter to members who have at least one unsubmitted entry
+      const membersToNotify = members.filter((m: any) =>
+        m.pool_entries?.some((e: any) => !e.has_submitted_predictions)
+      );
+
+      const deadline = new Date(pool.prediction_deadline).toLocaleString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+      });
+
+      for (const member of membersToNotify) {
+        const u = (member as any).users;
+        const unsubmitted = (member as any).pool_entries
+          .filter((e: any) => !e.has_submitted_predictions)
+          .map((e: any) => e.entry_name);
+
+        const entriesList = unsubmitted.map((name: string) => `<li style="color:#525252;padding:2px 0;">${name}</li>`).join('');
+        const html = baseTemplate(
+          `Less than 24 hours to submit your predictions for ${pool.pool_name}!`,
+          'Deadline Approaching!',
+          `<p style="color:#525252;line-height:1.6;margin:0 0 12px;">Hi ${u.full_name || u.username},</p>
+           <p style="color:#525252;line-height:1.6;margin:0 0 12px;">The prediction deadline for <strong>${pool.pool_name}</strong> is <strong>${deadline}</strong>.</p>
+           <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;">
+             <p style="color:#92400e;margin:0 0 8px;font-weight:600;">Unsubmitted entries:</p>
+             <ul style="margin:0;padding-left:20px;">${entriesList}</ul>
+           </div>
+           <p style="color:#525252;line-height:1.6;margin:0;">Don't miss out - submit your predictions now!</p>`,
+          'Submit Predictions',
+          `${APP_URL}/pools/${pool.pool_id}`
+        );
+
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: [u.email],
+            subject: `Prediction deadline approaching for ${pool.pool_name}`,
+            html,
+            ...(RESEND_TOPIC_PREDICTIONS ? { topicId: RESEND_TOPIC_PREDICTIONS } : {}),
+            tags: [{ name: 'category', value: 'predictions' }],
+          }),
+        });
+
+        totalSent++;
+      }
+    }
+
+    return new Response(JSON.stringify({ sent: totalSent, pools: pools.length }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+});
