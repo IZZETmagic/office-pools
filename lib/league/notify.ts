@@ -47,6 +47,7 @@ import {
 } from '@/lib/email/templates'
 import { sendPushToUsers } from '@/lib/push/apns'
 import type { PushCategory } from '@/lib/push/categories'
+import { enqueue } from '@/lib/notifications/outbox'
 
 export type LeagueNoticeKind =
   | 'matchweek_opened'
@@ -56,6 +57,55 @@ export type LeagueNoticeKind =
   | 'table_deadline'
 
 export type NoticeResult = { emails: number; pushes: number; skipped?: string }
+
+// =============================================================
+// PLAN, THEN SEND (N3, 2026-10-05)
+// =============================================================
+// Each notice is two steps: a PLAN — who gets what, read from the world now —
+// and a send. Today's path sends the plan at once (`fromPlan`). The outbox
+// path (lib/notifications) queues one row per member from the SAME plan, and
+// its composer re-plans at send time, so the two paths cannot disagree about
+// who a notice is for. While they run side by side, the outbox's rows are
+// shadow rows: composed and gated, never sent.
+// =============================================================
+
+/** One member's share of a planned notice. */
+export type PlannedMember = {
+  userId: string
+  /** Usually one; the matchweek result sends one per entry. `key` names each within the member's row. */
+  emails: Array<{
+    key: string
+    to: string
+    subject: string
+    html: string
+    topicId?: string
+    tags: { name: string; value: string }[]
+  }>
+  push: boolean
+}
+
+export type LeaguePlan =
+  /** The notice is not sent, and why — the same words NoticeResult has always carried. */
+  | { skipped: string }
+  | {
+      members: PlannedMember[]
+      push: { title: string; body: string; data?: Record<string, string> }
+      category: PushCategory
+      /** What Decision 16 measures the notice against: the deadline it is about, or when its event happened. */
+      deadlineAt: string | null
+      eventAt: string | null
+    }
+
+/** Today's path: send a plan at once. */
+async function fromPlan(plan: LeaguePlan): Promise<NoticeResult> {
+  if ('skipped' in plan) return { emails: 0, pushes: 0, skipped: plan.skipped }
+  return deliver(
+    plan.members.flatMap((m) => m.emails.map((e) => ({ to: e.to, subject: e.subject, html: e.html, topicId: e.topicId, tags: e.tags }))),
+    plan.members.filter((m) => m.push).map((m) => m.userId),
+    plan.push,
+    plan.category,
+  )
+}
 
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
 
@@ -186,45 +236,53 @@ export async function notifyMatchweekOpened(
   poolId: string,
   matchweekId: string,
 ): Promise<NoticeResult> {
+  return fromPlan(await planMatchweekOpened(admin, poolId, matchweekId))
+}
+
+export async function planMatchweekOpened(
+  admin: SupabaseClient,
+  poolId: string,
+  matchweekId: string,
+): Promise<LeaguePlan> {
   const ctx = await context(admin, poolId, matchweekId)
-  if (!ctx) return { emails: 0, pushes: 0, skipped: 'pool or matchweek not found' }
-  if (ctx.archived) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
-  if (!ctx.hasFixturePicks) {
-    return { emails: 0, pushes: 0, skipped: 'mode has no weekly fixture picks' }
-  }
+  if (!ctx) return { skipped: 'pool or matchweek not found' }
+  if (ctx.archived) return { skipped: 'pool is archived' }
+  if (!ctx.hasFixturePicks) return { skipped: 'mode has no weekly fixture picks' }
   // "A new matchweek is open" is false once it has locked.
-  if (hasLocked(ctx.lockAt)) {
-    return { emails: 0, pushes: 0, skipped: 'expired: the matchweek has already locked' }
-  }
+  if (hasLocked(ctx.lockAt)) return { skipped: 'expired: the matchweek has already locked' }
 
-  const emails = ctx.members.map((m) => {
-    const { subject, html } = roundOpenTemplate({
-      userName: displayName(m),
-      poolName: ctx.poolName,
-      roundName: ctx.matchweekName,
-      deadline: ctx.lockAt ?? new Date().toISOString(),
-      matchCount: ctx.fixtureCount,
-      poolUrl: ctx.poolUrl,
-    })
-    return {
-      to: m.users!.email as string,
-      subject,
-      html,
-      topicId: TOPICS.PREDICTIONS,
-      tags: [{ name: 'category', value: 'league_matchweek_open' }],
-    }
-  })
-
-  return deliver(
-    emails,
-    ctx.members.map((m) => m.user_id),
-    {
+  return {
+    members: ctx.members.map((m) => {
+      const { subject, html } = roundOpenTemplate({
+        userName: displayName(m),
+        poolName: ctx.poolName,
+        roundName: ctx.matchweekName,
+        deadline: ctx.lockAt ?? new Date().toISOString(),
+        matchCount: ctx.fixtureCount,
+        poolUrl: ctx.poolUrl,
+      })
+      return {
+        userId: m.user_id,
+        emails: [{
+          key: 'open',
+          to: m.users!.email as string,
+          subject,
+          html,
+          topicId: TOPICS.PREDICTIONS,
+          tags: [{ name: 'category', value: 'league_matchweek_open' }],
+        }],
+        push: true,
+      }
+    }),
+    push: {
       title: `${ctx.matchweekName} is open`,
       body: `${ctx.fixtureCount} games to predict in ${ctx.poolName}.`,
       data: { poolId, tab: 'predictions' },
     },
-    'PREDICTIONS',
-  )
+    category: 'PREDICTIONS',
+    deadlineAt: ctx.lockAt,
+    eventAt: null,
+  }
 }
 
 /**
@@ -238,24 +296,28 @@ export async function notifyLockReminder(
   poolId: string,
   matchweekId: string,
 ): Promise<NoticeResult> {
+  return fromPlan(await planLockReminder(admin, poolId, matchweekId))
+}
+
+export async function planLockReminder(
+  admin: SupabaseClient,
+  poolId: string,
+  matchweekId: string,
+): Promise<LeaguePlan> {
   const ctx = await context(admin, poolId, matchweekId)
-  if (!ctx) return { emails: 0, pushes: 0, skipped: 'pool or matchweek not found' }
-  if (ctx.archived) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
-  if (!ctx.hasFixturePicks) {
-    return { emails: 0, pushes: 0, skipped: 'mode has no weekly fixture picks' }
-  }
+  if (!ctx) return { skipped: 'pool or matchweek not found' }
+  if (ctx.archived) return { skipped: 'pool is archived' }
+  if (!ctx.hasFixturePicks) return { skipped: 'mode has no weekly fixture picks' }
   // "Picks lock soon" is false once they have locked.
-  if (hasLocked(ctx.lockAt)) {
-    return { emails: 0, pushes: 0, skipped: 'expired: the matchweek has already locked' }
-  }
+  if (hasLocked(ctx.lockAt)) return { skipped: 'expired: the matchweek has already locked' }
 
   const { data: fixtures } = await admin
     .from('league_fixtures').select('fixture_id').eq('matchweek_id', matchweekId)
   const fixtureIds = ((fixtures ?? []) as Array<{ fixture_id: string }>).map((f) => f.fixture_id)
-  if (fixtureIds.length === 0) return { emails: 0, pushes: 0, skipped: 'matchweek has no fixtures' }
+  if (fixtureIds.length === 0) return { skipped: 'matchweek has no fixtures' }
 
   const entryIds = ctx.members.flatMap((m) => (m.pool_entries ?? []).map((e) => e.entry_id))
-  if (entryIds.length === 0) return { emails: 0, pushes: 0, skipped: 'no active entries' }
+  if (entryIds.length === 0) return { skipped: 'no active entries' }
 
   // How many of THIS matchweek's fixtures each entry has picked. Both depths
   // count: a Results pick is a row here exactly as a Scores pick is.
@@ -280,37 +342,41 @@ export async function notifyLockReminder(
   if (due.length === 0) {
     // Everybody is done. Not an error — the happy path, and worth returning
     // rather than sending nothing silently.
-    return { emails: 0, pushes: 0, skipped: 'everyone has picked' }
+    return { skipped: 'everyone has picked' }
   }
 
-  const emails = due.map(({ member, unfinished }) => {
-    const { subject, html } = roundDeadlineReminderTemplate({
-      userName: displayName(member),
-      poolName: ctx.poolName,
-      roundName: ctx.matchweekName,
-      deadline: ctx.lockAt ?? new Date().toISOString(),
-      unsubmittedEntries: unfinished,
-      poolUrl: ctx.poolUrl,
-    })
-    return {
-      to: member.users!.email as string,
-      subject,
-      html,
-      topicId: TOPICS.PREDICTIONS,
-      tags: [{ name: 'category', value: 'league_lock_reminder' }],
-    }
-  })
-
-  return deliver(
-    emails,
-    due.map((r) => r.member.user_id),
-    {
+  return {
+    members: due.map(({ member, unfinished }) => {
+      const { subject, html } = roundDeadlineReminderTemplate({
+        userName: displayName(member),
+        poolName: ctx.poolName,
+        roundName: ctx.matchweekName,
+        deadline: ctx.lockAt ?? new Date().toISOString(),
+        unsubmittedEntries: unfinished,
+        poolUrl: ctx.poolUrl,
+      })
+      return {
+        userId: member.user_id,
+        emails: [{
+          key: 'reminder',
+          to: member.users!.email as string,
+          subject,
+          html,
+          topicId: TOPICS.PREDICTIONS,
+          tags: [{ name: 'category', value: 'league_lock_reminder' }],
+        }],
+        push: true,
+      }
+    }),
+    push: {
       title: `${ctx.matchweekName} closes soon`,
       body: `You haven't picked yet in ${ctx.poolName}.`,
       data: { poolId, tab: 'predictions' },
     },
-    'PREDICTIONS',
-  )
+    category: 'PREDICTIONS',
+    deadlineAt: ctx.lockAt,
+    eventAt: null,
+  }
 }
 
 /** "Matchweek 12 is scored — here is where you finished." */
@@ -319,26 +385,32 @@ export async function notifyMatchweekCompleted(
   poolId: string,
   matchweekId: string,
 ): Promise<NoticeResult> {
+  return fromPlan(await planMatchweekCompleted(admin, poolId, matchweekId))
+}
+
+export async function planMatchweekCompleted(
+  admin: SupabaseClient,
+  poolId: string,
+  matchweekId: string,
+): Promise<LeaguePlan> {
   const ctx = await context(admin, poolId, matchweekId)
-  if (!ctx) return { emails: 0, pushes: 0, skipped: 'pool or matchweek not found' }
-  if (ctx.archived) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
-  if (!ctx.hasFixturePicks) {
-    return { emails: 0, pushes: 0, skipped: 'mode has no weekly fixture picks' }
-  }
+  if (!ctx) return { skipped: 'pool or matchweek not found' }
+  if (ctx.archived) return { skipped: 'pool is archived' }
+  if (!ctx.hasFixturePicks) return { skipped: 'mode has no weekly fixture picks' }
   // A result stays true forever but stops being news. Aged from when the
   // matchweek was SCORED, not from when the row was queued, so a stale event
   // that gets re-queued is still caught. A missing stamp fails closed: the
   // snapshot is what produces this event, so its absence means something is
   // wrong, and a late recap is the outcome Decision 16 exists to prevent.
   if (!ctx.snapshotAt) {
-    return { emails: 0, pushes: 0, skipped: 'expired: no scored time, so freshness cannot be established' }
+    return { skipped: 'expired: no scored time, so freshness cannot be established' }
   }
   if (Date.now() - new Date(ctx.snapshotAt).getTime() > RECAP_FRESH_FOR_MS) {
-    return { emails: 0, pushes: 0, skipped: 'expired: the matchweek was scored more than 48 hours ago' }
+    return { skipped: 'expired: the matchweek was scored more than 48 hours ago' }
   }
 
   const entryIds = ctx.members.flatMap((m) => (m.pool_entries ?? []).map((e) => e.entry_id))
-  if (entryIds.length === 0) return { emails: 0, pushes: 0, skipped: 'no active entries' }
+  if (entryIds.length === 0) return { skipped: 'no active entries' }
 
   const [{ data: weekScores }, { data: totals }] = await Promise.all([
     admin.from('league_match_scores')
@@ -363,42 +435,45 @@ export async function notifyMatchweekCompleted(
   )
   const memberCount = totalByEntry.size
 
-  const emails = ctx.members.flatMap((m) =>
-    (m.pool_entries ?? []).map((e) => {
-      const t = totalByEntry.get(e.entry_id)
-      const { subject, html } = leagueMatchweekResultTemplate({
-        userName: displayName(m),
-        poolName: ctx.poolName,
-        matchweekName: ctx.matchweekName,
-        pointsThisWeek: weekByEntry.get(e.entry_id) ?? 0,
-        // Picks + duels — the sum the engine performs in its ORDER BY and
-        // keeps in no column. See the select above.
-        totalPoints: (t?.total_points ?? 0) + (t?.duel_points ?? 0),
-        rank: t?.final_rank ?? null,
-        previousRank: t?.previous_final_rank ?? null,
-        memberCount,
-        poolUrl: `${appUrl()}/pools/${poolId}?tab=leaderboard`,
-      })
-      return {
-        to: m.users!.email as string,
-        subject,
-        html,
-        topicId: TOPICS.MATCH_RESULTS,
-        tags: [{ name: 'category', value: 'league_matchweek_result' }],
-      }
-    }),
-  )
-
-  return deliver(
-    emails,
-    ctx.members.map((m) => m.user_id),
-    {
+  return {
+    // One email per ENTRY, one push per member — as it has always been.
+    members: ctx.members.map((m) => ({
+      userId: m.user_id,
+      emails: (m.pool_entries ?? []).map((e) => {
+        const t = totalByEntry.get(e.entry_id)
+        const { subject, html } = leagueMatchweekResultTemplate({
+          userName: displayName(m),
+          poolName: ctx.poolName,
+          matchweekName: ctx.matchweekName,
+          pointsThisWeek: weekByEntry.get(e.entry_id) ?? 0,
+          // Picks + duels — the sum the engine performs in its ORDER BY and
+          // keeps in no column. See the select above.
+          totalPoints: (t?.total_points ?? 0) + (t?.duel_points ?? 0),
+          rank: t?.final_rank ?? null,
+          previousRank: t?.previous_final_rank ?? null,
+          memberCount,
+          poolUrl: `${appUrl()}/pools/${poolId}?tab=leaderboard`,
+        })
+        return {
+          key: `result-${e.entry_id}`,
+          to: m.users!.email as string,
+          subject,
+          html,
+          topicId: TOPICS.MATCH_RESULTS,
+          tags: [{ name: 'category', value: 'league_matchweek_result' }],
+        }
+      }),
+      push: true,
+    })),
+    push: {
       title: `${ctx.matchweekName} is scored`,
       body: `See where you finished in ${ctx.poolName}.`,
       data: { poolId, tab: 'leaderboard' },
     },
-    'MATCH_RESULTS',
-  )
+    category: 'MATCH_RESULTS',
+    deadlineAt: null,
+    eventAt: ctx.snapshotAt,
+  }
 }
 
 /** Dispatch by kind. Unknown kinds are reported, never silently dropped. */
@@ -421,27 +496,34 @@ export async function notifyTableDeadline(
   admin: SupabaseClient,
   poolId: string,
 ): Promise<NoticeResult> {
+  return fromPlan(await planTableDeadline(admin, poolId))
+}
+
+export async function planTableDeadline(
+  admin: SupabaseClient,
+  poolId: string,
+): Promise<LeaguePlan> {
   const { data: pool } = await admin
     .from('pools')
     .select('pool_name, archived_at, league_mode, league_table_lock_at, league_season_id')
     .eq('pool_id', poolId)
     .single()
-  if (!pool) return { emails: 0, pushes: 0, skipped: 'pool not found' }
+  if (!pool) return { skipped: 'pool not found' }
 
   const p = pool as {
     pool_name: string; archived_at: string | null; league_mode: string | null
     league_table_lock_at: string | null; league_season_id: string | null
   }
-  if (p.archived_at !== null) return { emails: 0, pushes: 0, skipped: 'pool is archived' }
-  if (p.league_mode !== 'table') return { emails: 0, pushes: 0, skipped: 'not a table pool' }
-  if (!p.league_table_lock_at) return { emails: 0, pushes: 0, skipped: 'pool has no table deadline' }
+  if (p.archived_at !== null) return { skipped: 'pool is archived' }
+  if (p.league_mode !== 'table') return { skipped: 'not a table pool' }
+  if (!p.league_table_lock_at) return { skipped: 'pool has no table deadline' }
 
   // Re-checked at SEND time, not just at queue time. A row can sit in the outbox
   // across a failed drain, and mailing "closes soon" about a deadline that has
   // already gone would be worse than staying quiet — nothing can be done about
   // it, and migration 098 will not reopen it.
   if (new Date(p.league_table_lock_at) <= new Date()) {
-    return { emails: 0, pushes: 0, skipped: 'deadline already passed' }
+    return { skipped: 'deadline already passed' }
   }
 
   // Same retired/detached exclusion as the matchweek notices — migrations
@@ -454,7 +536,7 @@ export async function notifyTableDeadline(
 
   const roster = ((members ?? []) as unknown as MemberRow[]).filter((m) => m.users?.email)
   const entryIds = roster.flatMap((m) => (m.pool_entries ?? []).map((e) => e.entry_id))
-  if (entryIds.length === 0) return { emails: 0, pushes: 0, skipped: 'no active entries' }
+  if (entryIds.length === 0) return { skipped: 'no active entries' }
 
   // WHO HAS FILED A TABLE. One row per club, so presence of ANY row is the
   // answer — a half-finished order is not possible through the UI, which writes
@@ -475,7 +557,7 @@ export async function notifyTableDeadline(
 
   if (due.length === 0) {
     // The happy path, and worth naming rather than sending nothing silently.
-    return { emails: 0, pushes: 0, skipped: 'everyone has filed a table' }
+    return { skipped: 'everyone has filed a table' }
   }
 
   // How many clubs they are being asked to order. Read rather than assumed —
@@ -486,34 +568,38 @@ export async function notifyTableDeadline(
     .eq('season_id', p.league_season_id ?? '')
 
   const poolUrl = `${appUrl()}/pools/${poolId}`
-  const emails = due.map(({ member, missing }) => {
-    const { subject, html } = leagueTableDeadlineTemplate({
-      userName: displayName(member),
-      poolName: p.pool_name,
-      deadline: p.league_table_lock_at as string,
-      unpredictedEntries: missing,
-      clubCount: clubCount ?? 20,
-      poolUrl,
-    })
-    return {
-      to: member.users!.email as string,
-      subject,
-      html,
-      topicId: TOPICS.PREDICTIONS,
-      tags: [{ name: 'category', value: 'league_table_deadline' }],
-    }
-  })
-
-  return deliver(
-    emails,
-    due.map((r) => r.member.user_id),
-    {
+  return {
+    members: due.map(({ member, missing }) => {
+      const { subject, html } = leagueTableDeadlineTemplate({
+        userName: displayName(member),
+        poolName: p.pool_name,
+        deadline: p.league_table_lock_at as string,
+        unpredictedEntries: missing,
+        clubCount: clubCount ?? 20,
+        poolUrl,
+      })
+      return {
+        userId: member.user_id,
+        emails: [{
+          key: 'table',
+          to: member.users!.email as string,
+          subject,
+          html,
+          topicId: TOPICS.PREDICTIONS,
+          tags: [{ name: 'category', value: 'league_table_deadline' }],
+        }],
+        push: true,
+      }
+    }),
+    push: {
       title: `Your table closes soon`,
       body: `You haven't ordered the clubs yet in ${p.pool_name}.`,
       data: { poolId, tab: 'predictions' },
     },
-    'PREDICTIONS',
-  )
+    category: 'PREDICTIONS',
+    deadlineAt: p.league_table_lock_at,
+    eventAt: null,
+  }
 }
 
 /**
@@ -604,31 +690,89 @@ export async function notifyTableDeadlineMoved(
   )
 }
 
+/** The plan for any queued league notice. Unknown kinds are reported, never silently dropped. */
+export async function planLeagueNotice(
+  admin: SupabaseClient,
+  kind: string,
+  poolId: string,
+  matchweekId: string | null,
+): Promise<LeaguePlan> {
+  // POOL-level kinds first: they legitimately arrive with no matchweek, and the
+  // outbox constraint (migration 099) guarantees the pairing is right.
+  if (kind === 'table_deadline') return planTableDeadline(admin, poolId)
+
+  // Everything else is matchweek-level. A missing matchweek here is a malformed
+  // row, and saying so is better than passing an empty string into a query that
+  // would simply find nothing and look like "everyone has picked".
+  if (!matchweekId) return { skipped: `'${kind}' needs a matchweek and the row has none` }
+
+  switch (kind) {
+    case 'matchweek_opened':
+      return planMatchweekOpened(admin, poolId, matchweekId)
+    case 'lock_reminder':
+      return planLockReminder(admin, poolId, matchweekId)
+    case 'matchweek_completed':
+      return planMatchweekCompleted(admin, poolId, matchweekId)
+    default:
+      return { skipped: `no handler for kind '${kind}'` }
+  }
+}
+
+/**
+ * Send a queued league notice.
+ *
+ * With `shadow`, the same plan is ALSO queued into the notification outbox as
+ * shadow rows — one per member — which the outbox composes and gates without
+ * sending. That is N3's side-by-side run: the send below is unchanged, and a
+ * failure to queue the shadow is logged and never touches it.
+ */
 export async function sendLeagueNotice(
   admin: SupabaseClient,
   kind: string,
   poolId: string,
   matchweekId: string | null,
+  opts: { shadow?: boolean } = {},
 ): Promise<NoticeResult> {
-  // POOL-level kinds first: they legitimately arrive with no matchweek, and the
-  // outbox constraint (migration 099) guarantees the pairing is right.
-  if (kind === 'table_deadline') return notifyTableDeadline(admin, poolId)
-
-  // Everything else is matchweek-level. A missing matchweek here is a malformed
-  // row, and saying so is better than passing an empty string into a query that
-  // would simply find nothing and look like "everyone has picked".
-  if (!matchweekId) {
-    return { emails: 0, pushes: 0, skipped: `'${kind}' needs a matchweek and the row has none` }
+  const plan = await planLeagueNotice(admin, kind, poolId, matchweekId)
+  const result = await fromPlan(plan)
+  if (opts.shadow && !('skipped' in plan) && isLeagueOutboxKind(kind)) {
+    try {
+      await enqueue(admin, plan.members.map((m) => ({
+        type: kind,
+        userId: m.userId,
+        poolId,
+        shadow: true,
+        dedupKey: leagueDedupKey(kind, poolId, matchweekId, m.userId, plan.deadlineAt),
+        payload: { matchweekId },
+        deadlineAt: plan.deadlineAt,
+        ...(plan.eventAt ? { eventAt: plan.eventAt } : {}),
+      })))
+    } catch (err) {
+      console.error(`[league-notify] shadow enqueue failed for ${kind} in ${poolId} (the send was unaffected):`,
+        err instanceof Error ? err.message : err)
+    }
   }
+  return result
+}
 
-  switch (kind) {
-    case 'matchweek_opened':
-      return notifyMatchweekOpened(admin, poolId, matchweekId)
-    case 'lock_reminder':
-      return notifyLockReminder(admin, poolId, matchweekId)
-    case 'matchweek_completed':
-      return notifyMatchweekCompleted(admin, poolId, matchweekId)
-    default:
-      return { emails: 0, pushes: 0, skipped: `no handler for kind '${kind}'` }
-  }
+/** The league notices the outbox knows how to compose. */
+export const LEAGUE_OUTBOX_KINDS = ['matchweek_opened', 'lock_reminder', 'matchweek_completed', 'table_deadline'] as const
+export type LeagueOutboxKind = (typeof LEAGUE_OUTBOX_KINDS)[number]
+export const isLeagueOutboxKind = (kind: string): kind is LeagueOutboxKind =>
+  (LEAGUE_OUTBOX_KINDS as readonly string[]).includes(kind)
+
+/**
+ * One member's row for one notice. A table deadline carries its date, so a
+ * moved deadline that is reminded again is a new row, not a duplicate.
+ */
+export function leagueDedupKey(
+  kind: LeagueOutboxKind,
+  poolId: string,
+  matchweekId: string | null,
+  userId: string,
+  deadlineAt: string | null,
+): string {
+  return kind === 'table_deadline'
+    ? `${kind}:${poolId}:${deadlineAt ?? 'none'}:${userId}`
+    : `${kind}:${matchweekId ?? 'none'}:${poolId}:${userId}`
 }

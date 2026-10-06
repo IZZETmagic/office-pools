@@ -176,7 +176,10 @@ async function handle(request: NextRequest) {
   // reminder it represents was never delivered.
   for (const e of events.filter((ev) => ev.fixture_id === null)) {
     try {
-      const result = await sendLeagueNotice(admin, e.kind, e.pool_id, e.matchweek_id)
+      // N3's side-by-side run (2026-10-05): the send is unchanged, and the
+      // same plan is also queued into notification_outbox as shadow rows, which
+      // are composed and gated but never sent. Switched over once they agree.
+      const result = await sendLeagueNotice(admin, e.kind, e.pool_id, e.matchweek_id, { shadow: true })
       if (result.skipped) {
         // A skip is a real outcome, not a failure: an archived pool, a
         // matchweek everyone has already picked, or a kind with no handler.
