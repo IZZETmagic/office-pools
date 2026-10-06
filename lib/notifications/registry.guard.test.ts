@@ -42,9 +42,14 @@ const ROW =
 
 function registryFromMigrations(): { rows: Map<string, SqlRow>; unparsed: string[] } {
   const dir = resolve(process.cwd(), 'lib/migrations')
+  // Lettered files (025b_…) are migrations too — a registry row in one must not be skipped.
+  const order = (f: string) => {
+    const m = /^(\d+)([a-z]?)_/.exec(f)
+    return m ? parseInt(m[1], 10) * 100 + (m[2] ? m[2].charCodeAt(0) - 96 : 0) : Infinity
+  }
   const files = readdirSync(dir)
-    .filter((f) => /^\d+_.*\.sql$/.test(f))
-    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+    .filter((f) => /^\d+[a-z]?_.*\.sql$/.test(f))
+    .sort((a, b) => order(a) - order(b))
   const rows = new Map<string, SqlRow>()
   const unparsed: string[] = []
   for (const file of files) {
