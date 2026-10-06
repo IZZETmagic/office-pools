@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { planLeagueNotice, type LeagueOutboxKind } from '@/lib/league/notify'
 import { composeCrewInvites, composeCrewSeats } from '@/lib/crews/notify'
 import { composeMemberJoined, composePoolWelcome } from '@/lib/pools/joinNotices'
+import { composeLmsPickOpen, composeLmsPickReminder } from '@/lib/league/lmsNotices'
 import type { Composed, Composer, OutboxRow } from './outbox'
 
 /**
@@ -91,4 +92,7 @@ export const COMPOSERS: Partial<Record<string, Composer>> = {
   // The join notices (N3, 2026-10-06) — queued by the join itself, every way into a pool.
   pool_welcome: composePoolWelcome,
   member_joined: composeMemberJoined,
+  // Last Man Standing (2026-10-06) — a missed pick knocks you out, so these exist at all.
+  lms_pick_open: composeLmsPickOpen,
+  lms_pick_reminder: composeLmsPickReminder,
 }

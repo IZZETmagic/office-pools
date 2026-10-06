@@ -47,6 +47,9 @@ export const NOTIFICATION_TYPES = {
   matchweek_opened: { category: 'PREDICTIONS', status: 'live' },
   lock_reminder: { category: 'PREDICTIONS', status: 'live' },
   matchweek_completed: { category: 'MATCH_RESULTS', status: 'live' },
+  // League — Last Man Standing (migration 174)
+  lms_pick_open: { category: 'PREDICTIONS', status: 'live' },
+  lms_pick_reminder: { category: 'PREDICTIONS', status: 'live' },
   // League — Table
   table_deadline: { category: 'PREDICTIONS', status: 'live' },
   table_deadline_moved: { category: 'PREDICTIONS', status: 'live' },

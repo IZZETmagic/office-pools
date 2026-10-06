@@ -642,6 +642,89 @@ export function roundDeadlineReminderTemplate(params: {
   }
 }
 
+// --- Last Man Standing (N3+, 2026-10-06) ---
+//
+// ⚠ A MISSED PICK KNOCKS YOU OUT. league_lms_settle judges an entry with no pick as not
+// surviving, so these say so plainly — that is the rule, and the whole reason to tell anyone.
+// Factual, in the plural "we": what is open, when it locks, what each entry has already used.
+
+const lmsDeadline = (deadline: string) =>
+  new Date(deadline).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  })
+
+/** "Matchweek 6 is open for your pick." To members still in who have not picked. */
+export function lmsPickOpenTemplate(params: {
+  userName: string
+  poolName: string
+  matchweekName: string
+  deadline: string
+  entries: Array<{ entryName: string; usedClubs: string[] }>
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, matchweekName, deadline, entries, poolUrl } = params
+  const used = entries.map((e) =>
+    `${entries.length > 1 ? `${e.entryName}: ` : ''}${e.usedClubs.length > 0 ? `already used ${e.usedClubs.join(', ')}` : 'no clubs used yet'}`)
+  return {
+    subject: `${matchweekName} is open for your pick - ${poolName}`,
+    html: brandedTemplate({
+      preheader: `You're still in ${poolName}. Pick a club for ${matchweekName} before it locks.`,
+      heading: `Pick a club for ${matchweekName}`,
+      body: `
+        ${greeting(userName)}
+        ${paragraph(`You're still in <strong>${poolName}</strong>. Pick one club to win in <strong>${matchweekName}</strong>. If it wins, you're through; if it doesn't — or if there's no pick when it locks — you're out.`)}
+        ${callout(
+          'info',
+          `${calloutLine('info', `Locks: ${lmsDeadline(deadline)}`, { bold: true, marginBottom: 8 })}
+           ${calloutList('info', used)}`
+        )}
+        ${paragraph('A club you have already used cannot be picked again this round.', { marginBottom: 0 })}
+      `,
+      ctaText: 'Make Your Pick',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
+/** "There's no pick from you yet." A day before the lock, and once more in its last two hours. */
+export function lmsPickReminderTemplate(params: {
+  userName: string
+  poolName: string
+  matchweekName: string
+  deadline: string
+  unpickedEntries: string[]
+  lastCall: boolean
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, matchweekName, deadline, unpickedEntries, lastCall, poolUrl } = params
+  return {
+    subject: lastCall
+      ? `Last call: ${matchweekName} locks soon - ${poolName}`
+      : `Your ${matchweekName} pick isn't in yet - ${poolName}`,
+    html: brandedTemplate({
+      preheader: `No pick means you're out of ${poolName}.`,
+      heading: lastCall ? `${matchweekName} locks soon` : `No pick yet for ${matchweekName}`,
+      body: `
+        ${greeting(userName)}
+        ${paragraph(`We don't have a pick from you for <strong>${matchweekName}</strong> in <strong>${poolName}</strong>. Without one when it locks, you're out.`)}
+        ${callout(
+          'warning',
+          `${calloutLine('warning', `Locks: ${lmsDeadline(deadline)}`, { bold: true, marginBottom: unpickedEntries.length > 1 ? 8 : 0 })}
+           ${unpickedEntries.length > 1
+             ? `${calloutLine('warning', 'Entries without a pick:', { size: 13, marginBottom: 4 })}
+                ${calloutList('warning', unpickedEntries)}`
+             : ''}`
+        )}
+        ${paragraph(lastCall
+          ? 'This is our last reminder for this matchweek.'
+          : 'We will remind you once more in its last two hours, and not again after that.', { marginBottom: 0 })}
+      `,
+      ctaText: 'Make Your Pick',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
 // --- League Templates ---
 
 /**

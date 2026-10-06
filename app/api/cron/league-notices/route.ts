@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth'
+import { queueLeagueReminders } from '@/lib/league/lmsNotices'
 
 export const dynamic = 'force-dynamic'
 // Two statements against a handful of matchweeks. Fast even with every league
@@ -124,10 +125,25 @@ async function handle(request: NextRequest) {
 
   const result = (data ?? { opened: 0, reminded: 0 }) as { opened: number; reminded: number }
   const table = (tableData ?? { table_deadline: 0 }) as { table_deadline: number }
+
+  // Last Man Standing, and the matchweek's last call (2026-10-06): queued into the notification
+  // outbox, which sends them. Not fatal to the response for the same reason as the table deadline
+  // above — the matchweek notices are already queued and stamped, and this re-runs in an hour,
+  // queueing nothing twice.
+  let reminders: { lmsQueued: number; lastCallsQueued: number } | { reminders_error: string }
+  try {
+    reminders = await queueLeagueReminders(admin, Date.now())
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[league-notices] reminders failed:', message)
+    reminders = { reminders_error: message }
+  }
+
   return NextResponse.json({
     ok: true,
     ...result,
     table_deadline: table.table_deadline,
     ...(tableErr ? { table_deadline_error: tableErr.message } : {}),
+    ...reminders,
   })
 }
