@@ -11,6 +11,7 @@ const restore = vi.fn()
 const rescore = vi.fn()
 const regenerate = vi.fn()
 const crewJoined = vi.fn()
+const enqueue = vi.fn()
 
 vi.mock('@/lib/entries/retire', () => ({
   restoreEntriesForMember: (...a: unknown[]) => restore(...a),
@@ -21,6 +22,10 @@ vi.mock('@/lib/league/duels', () => ({
 }))
 vi.mock('@/lib/crews/store', () => ({
   onCrewPoolJoined: (...a: unknown[]) => crewJoined(...a),
+}))
+// The join's notices go to the notification outbox (N3). A spy: what matters is what was queued.
+vi.mock('@/lib/notifications/outbox', () => ({
+  enqueue: (...a: unknown[]) => enqueue(...a),
 }))
 
 import { joinPool } from '../join'
@@ -33,6 +38,7 @@ type Pool = {
   accepting_members: boolean | null
   league_season_id: string | null
   crew_id?: string | null
+  admin_user_id?: string | null
 }
 
 type Opts = {
@@ -98,6 +104,7 @@ beforeEach(() => {
   rescore.mockReset().mockResolvedValue({ error: null })
   regenerate.mockReset().mockResolvedValue({ error: null })
   crewJoined.mockReset().mockResolvedValue(undefined)
+  enqueue.mockReset().mockImplementation(async (_admin: unknown, notices: unknown[]) => notices.map((_, i) => 100 + i))
 })
 
 describe('joinPool', () => {
@@ -162,7 +169,7 @@ describe('joinPool', () => {
   it('a newcomer joins as a player and gets a first entry named after them', async () => {
     const { client, inserts } = fakeClient({ pool: OPEN, username: 'dave' })
     const r = await joinPool(client, { poolId: 'p1' }, 'u1')
-    expect(r).toEqual({ ok: true, memberId: 'm-new', poolId: 'p1', poolName: 'Bermuda Office', restoredEntries: 0 })
+    expect(r).toEqual({ ok: true, memberId: 'm-new', poolId: 'p1', poolName: 'Bermuda Office', restoredEntries: 0, queued: [100] })
     expect(inserts).toEqual([
       { table: 'pool_members', row: { pool_id: 'p1', user_id: 'u1', role: 'player' } },
       { table: 'pool_entries', row: { member_id: 'm-new', entry_name: 'dave', entry_number: 1 } },
@@ -215,5 +222,34 @@ describe('joinPool', () => {
     const { client } = fakeClient({ pool: OPEN })
     expect(await joinPool(client, { poolId: 'p1' }, 'u1')).toMatchObject({ ok: true })
     spy.mockRestore()
+  })
+
+  // ── The join's notices (N3, 2026-10-06) ─────────────────────────────────────────────────────
+  it('queues a welcome for the joiner and "X joined" for the admin, keyed to this membership', async () => {
+    const { client } = fakeClient({ pool: { ...OPEN, admin_user_id: 'boss' } })
+    const r = await joinPool(client, { poolId: 'p1' }, 'u1')
+    expect(enqueue.mock.calls[0][1]).toEqual([
+      { type: 'pool_welcome', userId: 'u1', poolId: 'p1', dedupKey: 'pool_welcome:m-new', payload: { memberId: 'm-new' } },
+      { type: 'member_joined', userId: 'boss', poolId: 'p1', dedupKey: 'member_joined:m-new', payload: { memberId: 'm-new', joinerId: 'u1' } },
+    ])
+    expect(r).toMatchObject({ ok: true, queued: [100, 101] })
+  })
+
+  it('does not tell an admin that they joined their own pool', async () => {
+    const { client } = fakeClient({ pool: { ...OPEN, admin_user_id: 'u1' } })
+    await joinPool(client, { poolId: 'p1' }, 'u1')
+    expect((enqueue.mock.calls[0][1] as Array<{ type: string }>).map((n) => n.type)).toEqual(['pool_welcome'])
+  })
+
+  it('queues nothing for a join that was refused', async () => {
+    const { client } = fakeClient({ pool: OPEN, existingMember: true })
+    await joinPool(client, { poolId: 'p1' }, 'u1')
+    expect(enqueue).not.toHaveBeenCalled()
+  })
+
+  it('still joins when the notices cannot be queued — the join is what matters', async () => {
+    enqueue.mockRejectedValueOnce(new Error('outbox down'))
+    const { client } = fakeClient({ pool: { ...OPEN, admin_user_id: 'boss' } })
+    expect(await joinPool(client, { poolId: 'p1' }, 'u1')).toMatchObject({ ok: true, memberId: 'm-new', queued: [] })
   })
 })

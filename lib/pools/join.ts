@@ -14,6 +14,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { poolJoinability } from '@/lib/poolStatus'
 import { restoreEntriesForMember, rescoreRestoredEntries } from '@/lib/entries/retire'
+import { enqueue } from '@/lib/notifications/outbox'
 
 export type JoinTarget = { poolId: string } | { poolCode: string }
 
@@ -25,6 +26,8 @@ export type JoinResult =
       poolName: string
       /** Entries brought back from a previous membership (056). 0 for a newcomer. */
       restoredEntries: number
+      /** Outbox rows the join queued — its notices. The route sends them straight away. */
+      queued: number[]
     }
   | {
       ok: false
@@ -44,7 +47,8 @@ export async function joinPool(
     .from('pools')
     // league_season_id is needed only to re-score a restored league entry — see below.
     // crew_id: a crew's pool makes its players crew members (Crews, 154) — see the end.
-    .select('pool_id, pool_name, status, accepting_members, league_season_id, crew_id')
+    // admin_user_id: who is told that somebody joined — see the end.
+    .select('pool_id, pool_name, status, accepting_members, league_season_id, crew_id, admin_user_id')
   const { data: pool } = await ('poolId' in target
     ? lookup.eq('pool_id', target.poolId)
     : lookup.eq('pool_code', target.poolCode)
@@ -55,6 +59,7 @@ export async function joinPool(
     accepting_members: boolean | null
     league_season_id: string | null
     crew_id: string | null
+    admin_user_id: string | null
   }>()
 
   if (!pool) {
@@ -170,11 +175,44 @@ export async function joinPool(
     await onCrewPoolJoined(admin, { crewId: pool.crew_id, poolId: pool.pool_id, userId })
   }
 
+  // The join's two notices (N3, 2026-10-06): a welcome to the joiner, and "X joined" to the pool's
+  // admin. QUEUED here, so every door into a pool sends them — until now only the website's join
+  // screens did, by calling /api/notifications/pool-joined from the browser afterwards, so a join
+  // from the app or by taking a crew's saved spot welcomed nobody and told the admin nothing.
+  // Keyed to THIS membership: the same join queued twice is one notice, while somebody who leaves
+  // and comes back is welcomed again, as before. Best-effort, like the steps above — the join has
+  // happened, and a notice that failed to queue must not undo it.
+  let queued: number[] = []
+  try {
+    queued = await enqueue(admin, [
+      {
+        type: 'pool_welcome',
+        userId,
+        poolId: pool.pool_id,
+        dedupKey: `pool_welcome:${memberData.member_id}`,
+        payload: { memberId: memberData.member_id },
+      },
+      // Not when the admin is the one joining — nobody needs telling they joined.
+      ...(pool.admin_user_id && pool.admin_user_id !== userId
+        ? [{
+            type: 'member_joined' as const,
+            userId: pool.admin_user_id,
+            poolId: pool.pool_id,
+            dedupKey: `member_joined:${memberData.member_id}`,
+            payload: { memberId: memberData.member_id, joinerId: userId },
+          }]
+        : []),
+    ])
+  } catch (err) {
+    console.error('Failed to queue the join notices:', err)
+  }
+
   return {
     ok: true,
     memberId: memberData.member_id,
     poolId: pool.pool_id,
     poolName: pool.pool_name,
     restoredEntries: restored.restored,
+    queued,
   }
 }

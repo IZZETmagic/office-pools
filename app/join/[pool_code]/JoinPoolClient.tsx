@@ -61,12 +61,7 @@ export function JoinPoolClient({ pool, memberCount, isAlreadyMember }: JoinPoolC
         return
       }
 
-      // Send welcome email (fire-and-forget)
-      fetch('/api/notifications/pool-joined', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pool_id: data.pool_id }),
-      }).catch(() => {})
+      // The join sends its own welcome now (lib/pools/join.ts, N3) — nothing to call here.
 
       showToast(`Joined "${pool.pool_name}"!`, 'success')
       router.push(`/pools/${pool.pool_id}`)

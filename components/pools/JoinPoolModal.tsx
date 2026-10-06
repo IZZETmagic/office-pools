@@ -52,12 +52,7 @@ export function JoinPoolModal({ onClose, onSuccess, initialCode = '', initialPoo
         return
       }
 
-      // Send welcome email (fire-and-forget)
-      fetch('/api/notifications/pool-joined', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pool_id: data.pool_id }),
-      }).catch(() => {})
+      // The join sends its own welcome now (lib/pools/join.ts, N3) — nothing to call here.
 
       setLoading(false)
       showToast(`Joined "${data.pool_name}"!`, 'success')
