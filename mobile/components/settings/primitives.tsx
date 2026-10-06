@@ -69,6 +69,11 @@ export type NotificationOption = {
   label: string;
   desc: string;
   icon: string;
+  /**
+   * What this switch actually sends, one sentence each (N2). When set, these
+   * replace `desc`; an empty list says the switch sends nothing right now.
+   */
+  notices?: string[];
 };
 
 export function NotificationRow({
@@ -109,11 +114,30 @@ export function NotificationRow({
         <RNText style={{ fontFamily: fontFamilies.semibold, fontSize: 14, color: theme.colors.ink }}>
           {option.label}
         </RNText>
-        <RNText
-          style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
-        >
-          {option.desc}
-        </RNText>
+        {option.notices === undefined ? (
+          <RNText
+            style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
+          >
+            {option.desc}
+          </RNText>
+        ) : option.notices.length === 0 ? (
+          <RNText
+            style={{ fontFamily: fontFamilies.medium, fontSize: 11, color: theme.colors.slate }}
+          >
+            Nothing is sent under this switch at the moment.
+          </RNText>
+        ) : (
+          <View style={{ gap: 3, marginTop: 2 }}>
+            {option.notices.map((sentence) => (
+              <RNText
+                key={sentence}
+                style={{ fontFamily: fontFamilies.medium, fontSize: 11, lineHeight: 15, color: theme.colors.slate }}
+              >
+                {sentence}
+              </RNText>
+            ))}
+          </View>
+        )}
       </View>
       {updating ? (
         <ActivityIndicator size="small" color={theme.colors.primary} />

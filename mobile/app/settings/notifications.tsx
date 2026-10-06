@@ -21,6 +21,7 @@ import {
   fetchPushPrefs,
   updateNotificationPref,
   updatePushPref,
+  type SwitchNotice,
 } from '@/lib/api';
 import { usePushPermission, type PushPermissionStatus } from '@/lib/usePushPermission';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
@@ -47,6 +48,9 @@ const EMAIL_PREF_OPTIONS: NotificationOption[] = [
 export default function NotificationSettingsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  // One read serves both sections: the email switches, and the notices every
+  // switch controls (N2) — push switches included.
+  const email = useEmailPrefs();
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.snow }}>
@@ -60,11 +64,63 @@ export default function NotificationSettingsScreen() {
       >
         <Intro />
         <PushPermissionSection />
-        <PushCategoriesSection />
-        <EmailPreferencesSection />
+        <PushCategoriesSection notices={email.notices} />
+        <EmailPreferencesSection email={email} />
       </ScrollView>
     </View>
   );
+}
+
+type EmailPrefs = {
+  prefs: Record<string, boolean>;
+  setPrefs: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  notices: SwitchNotice[] | null;
+  loading: boolean;
+};
+
+function useEmailPrefs(): EmailPrefs {
+  const [prefs, setPrefs] = useState<Record<string, boolean>>({});
+  const [notices, setNotices] = useState<SwitchNotice[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchNotificationPrefs()
+      .then((res) => {
+        if (cancelled) return;
+        setPrefs(res.preferences);
+        setNotices(res.notices ?? null);
+      })
+      .catch((err) => {
+        console.warn('[settings/notifications] failed to load notification prefs', err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { prefs, setPrefs, notices, loading };
+}
+
+/**
+ * Each option with the sentences of what its switch sends on this channel. With
+ * no notices (an older API, or a failed read) the options keep their summaries.
+ */
+function withNotices(
+  options: NotificationOption[],
+  notices: SwitchNotice[] | null,
+  channel: 'email' | 'push',
+): NotificationOption[] {
+  if (!notices) return options;
+  return options.map((o) => ({
+    ...o,
+    notices: notices
+      .filter((n) => n.category === o.key && n.channels.includes(channel))
+      .map((n) => n.sentence),
+  }));
 }
 
 function Intro() {
@@ -196,7 +252,7 @@ function pushSectionState(
   };
 }
 
-function PushCategoriesSection() {
+function PushCategoriesSection({ notices }: { notices: SwitchNotice[] | null }) {
   const { status } = usePushPermission();
   const [prefs, setPrefs] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -250,7 +306,7 @@ function PushCategoriesSection() {
         </SettingsCard>
       ) : (
         <DividedList
-          items={PUSH_PREF_OPTIONS}
+          items={withNotices(PUSH_PREF_OPTIONS, notices, 'push')}
           keyOf={(o) => o.key}
           render={(o) => (
             <NotificationRow
@@ -266,28 +322,9 @@ function PushCategoriesSection() {
   );
 }
 
-function EmailPreferencesSection() {
-  const [prefs, setPrefs] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
+function EmailPreferencesSection({ email }: { email: EmailPrefs }) {
+  const { prefs, setPrefs, notices, loading } = email;
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchNotificationPrefs()
-      .then((res) => {
-        if (cancelled) return;
-        setPrefs(res.preferences);
-      })
-      .catch((err) => {
-        console.warn('[settings/notifications] failed to load notification prefs', err);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function handleToggle(key: string) {
     const next = !(prefs[key] ?? true);
@@ -311,7 +348,7 @@ function EmailPreferencesSection() {
         </SettingsCard>
       ) : (
         <DividedList
-          items={EMAIL_PREF_OPTIONS}
+          items={withNotices(EMAIL_PREF_OPTIONS, notices, 'email')}
           keyOf={(o) => o.key}
           render={(o) => (
             <NotificationRow

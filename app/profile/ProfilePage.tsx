@@ -22,6 +22,7 @@ import { useTheme } from '@/components/ThemeProvider'
 import { getFormDotClass } from '@/lib/design/formDots'
 import { formatNumber } from '@/lib/format'
 import { MyCrewsTab } from '@/components/crews/MyCrewsTab'
+import type { MemberNotice } from '@/lib/notifications/registry'
 
 // =====================
 // TYPES
@@ -1138,6 +1139,25 @@ function PerformanceRing({
   )
 }
 
+/**
+ * What one notification switch sends, in the registry's own words (N2). With
+ * no list it shows the switch's old one-line summary; with an empty one it
+ * says so, because a switch that controls nothing should not look like it does.
+ */
+function SwitchNotices({ notices, fallback }: { notices: MemberNotice[] | null; fallback: string }) {
+  if (notices === null) return <p className="text-xs text-muted">{fallback}</p>
+  if (notices.length === 0) return <p className="text-xs text-muted">Nothing is sent under this switch at the moment.</p>
+  return (
+    <ul className="mt-1 space-y-1">
+      {notices.map((n) => (
+        <li key={n.key} className="text-xs text-muted leading-snug">
+          {n.sentence}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function AccuracyRow({ label, color, count, total }: { label: string; color: string; count: number; total: number }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
   return (
@@ -1725,6 +1745,9 @@ function AccountSettingsTab({
   })
   const [notifLoading, setNotifLoading] = useState(true)
   const [notifUpdating, setNotifUpdating] = useState<string | null>(null)
+  // What each switch actually sends, in the registry's own words (N2). Null
+  // until it loads, and if it can't: then each row keeps its one-line summary.
+  const [notices, setNotices] = useState<MemberNotice[] | null>(null)
 
   const NOTIF_OPTIONS = [
     { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Join/leave pool, invitations' },
@@ -1740,6 +1763,7 @@ function AccountSettingsTab({
       .then((res) => res.json())
       .then((data) => {
         if (data.preferences) setNotifPrefs(data.preferences)
+        if (Array.isArray(data.notices)) setNotices(data.notices)
       })
       .catch(() => {})
       .finally(() => setNotifLoading(false))
@@ -1983,7 +2007,10 @@ function AccountSettingsTab({
           </div>
           <h4 className="text-base font-semibold text-ink">Email Notifications</h4>
         </div>
-        <p className="text-sm text-muted mb-4">Choose which email notifications you&apos;d like to receive.</p>
+        <p className="text-sm text-muted mb-4">
+          Choose which email notifications you&apos;d like to receive.
+          {notices && ' Under each switch is exactly what it sends you.'}
+        </p>
         <div className="space-y-3">
           {notifLoading ? (
             <div className="bg-snow rounded-control p-4 text-center">
@@ -1997,7 +2024,10 @@ function AccountSettingsTab({
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-ink">{opt.label}</p>
-                  <p className="text-xs text-muted">{opt.desc}</p>
+                  <SwitchNotices
+                    notices={notices?.filter((n) => n.category === opt.key && n.channels.includes('email')) ?? null}
+                    fallback={opt.desc}
+                  />
                 </div>
                 <button
                   type="button"

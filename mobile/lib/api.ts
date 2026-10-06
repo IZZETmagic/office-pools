@@ -933,8 +933,26 @@ export function markActivitySeen(userId: string) {
 
 // --- Notification preferences -----------------------------------------
 
+/**
+ * One notice a switch controls, in the registry's own words (N2,
+ * lib/notifications/registry.ts on the web). Only the ones that can reach
+ * this member, in reading order.
+ */
+export type SwitchNotice = {
+  key: string;
+  category: string;
+  channels: string[];
+  sentence: string;
+};
+
 export type NotificationPrefsResponse = {
   preferences: Record<string, boolean>;
+  /**
+   * Absent from an older API, and null when the server couldn't read them —
+   * either way the screen keeps its one-line summaries. An empty list is a
+   * real answer: that switch sends nothing at the moment.
+   */
+  notices?: SwitchNotice[] | null;
 };
 
 export function fetchNotificationPrefs() {

@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth'
 import { syncContactToResend } from '@/lib/email/contacts'
 import { TOPICS, TOPIC_KEYS, type TopicKey } from '@/lib/email/topics'
 import { emailPreferencesFrom } from '@/lib/email/preferences'
+import { noticesForMember, poolGameMode, type GameMode, type MemberNotice, type RegistryRow } from '@/lib/notifications/registry'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withPerfLogging } from '@/lib/api-perf'
 
@@ -17,22 +18,58 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY!
 //
 // ⚠ A failed read is an ERROR, not a page of defaults. Answering "subscribed
 // to everything" on an error would show somebody who left as still signed up.
+//
+// `notices` (N2, 2026-10-05) is what each switch actually controls, in the
+// registry's own words — every channel, so the app can show its push switches
+// too. Only the notices that can reach this member: their game modes come from
+// the pools they are in that are still running. `null` means the list could
+// not be read, which is NOT the same as an empty one: the screens fall back to
+// their old one-line summaries rather than claim a switch controls nothing.
 async function handleGET() {
   const auth = await requireAuth()
   if (auth.error) return auth.error
   const { supabase, userData } = auth.data
 
-  const { data: rows, error } = await supabase
-    .from('notification_preferences')
-    .select('category, channel, enabled')
-    .eq('user_id', userData.user_id)
-    .eq('channel', 'email')
+  const [prefsRes, registryRes, poolsRes] = await Promise.all([
+    supabase
+      .from('notification_preferences')
+      .select('category, channel, enabled')
+      .eq('user_id', userData.user_id)
+      .eq('channel', 'email'),
+    supabase
+      .from('notification_types')
+      .select('type_key, category, modes, channels, is_transactional, status, disclosure_sentence'),
+    supabase
+      .from('pool_members')
+      .select('pool:pools!inner(prediction_mode, league_mode)')
+      .eq('user_id', userData.user_id)
+      .eq('pool.status', 'open')
+      .is('pool.archived_at', null),
+  ])
 
-  if (error) {
-    console.error('[Preferences] Failed to read from Postgres:', error.message)
+  if (prefsRes.error) {
+    console.error('[Preferences] Failed to read from Postgres:', prefsRes.error.message)
     return NextResponse.json({ error: 'Could not load your preferences' }, { status: 500 })
   }
-  return NextResponse.json({ preferences: emailPreferencesFrom(rows ?? []) })
+
+  let notices: MemberNotice[] | null = null
+  if (registryRes.error || poolsRes.error) {
+    console.error('[Preferences] Notices unavailable:', registryRes.error?.message ?? poolsRes.error?.message)
+  } else {
+    // PostgREST types an embedded row as the object or a one-element array
+    // depending on how it infers the relationship, so normalise both.
+    type ModePool = { prediction_mode: string | null; league_mode: string | null }
+    const modes = new Set<GameMode>()
+    for (const m of (poolsRes.data ?? []) as unknown as Array<{ pool: ModePool | ModePool[] | null }>) {
+      for (const pool of Array.isArray(m.pool) ? m.pool : m.pool ? [m.pool] : []) {
+        const mode = poolGameMode(pool)
+        if (mode) modes.add(mode)
+      }
+    }
+    notices = noticesForMember((registryRes.data ?? []) as RegistryRow[], modes)
+  }
+
+  return NextResponse.json({ preferences: emailPreferencesFrom(prefsRes.data ?? []), notices })
 }
 
 // PATCH - Update a notification preference in Resend
