@@ -14,6 +14,25 @@ export async function POST(request: NextRequest) {
   const { pool_id } = await request.json()
   if (!pool_id) return NextResponse.json({ error: 'pool_id is required' }, { status: 400 })
 
+  // ⚠ ONLY FOR SOMEBODY WHO HAS JUST JOINED. The join screens call this
+  // straight after a join succeeds — but until 2026-10-05 it checked neither,
+  // so any signed-in user could call it for any public pool, as often as they
+  // liked: a welcome email to themselves each time, and a "X joined your pool"
+  // push to the pool's admin each time. Now: a member, and a join made in the
+  // last ten minutes. (N3 moves these notices onto the outbox, whose one-row-
+  // per-person key makes a repeat impossible rather than just late.)
+  const { data: membership } = await supabase
+    .from('pool_members')
+    .select('joined_at')
+    .eq('pool_id', pool_id)
+    .eq('user_id', userData.user_id)
+    .maybeSingle()
+  if (!membership) return NextResponse.json({ error: 'Not a member of this pool' }, { status: 403 })
+  const joinedAt = membership.joined_at ? new Date(membership.joined_at).getTime() : 0
+  if (Date.now() - joinedAt > 10 * 60 * 1000) {
+    return NextResponse.json({ sent: false, skipped: 'not a new member' })
+  }
+
   // Fetch additional user fields needed for email
   const { data: userProfile } = await supabase
     .from('users')
