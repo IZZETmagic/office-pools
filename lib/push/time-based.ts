@@ -157,10 +157,18 @@ export async function firePredictReminders(): Promise<{
   const today = new Date(now).toISOString().slice(0, 10)
 
   // Find pools with upcoming deadlines in the next 7 days.
+  //
+  // ⚠ NEVER A LEAGUE POOL. A league pool's prediction_deadline is its season's
+  // last kickoff, not a pick deadline, and its entries never set
+  // has_submitted_predictions — so without this filter every league member
+  // would be reminded daily, for a week, about a deadline that does not exist.
+  // (Found 2026-10-05; the cron was unscheduled by migration 171 the same day.
+  // deadline-warnings.ts has carried the same filter since it learnt this.)
   const { data: pools } = await adminClient
     .from('pools')
     .select('pool_id, pool_name, prediction_deadline')
     .eq('status', 'open')
+    .is('league_season_id', null)
     .not('prediction_deadline', 'is', null)
     .gte('prediction_deadline', new Date(now).toISOString())
     .lte('prediction_deadline', sevenDays)
