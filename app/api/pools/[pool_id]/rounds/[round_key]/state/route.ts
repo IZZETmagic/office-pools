@@ -7,6 +7,7 @@ import { fetchPoolRoundKeys, fetchRoundMatches } from '@/lib/roundMatches'
 import { sendBatchEmails } from '@/lib/email/send'
 import { roundOpenTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/registry'
 import { withPerfLogging } from '@/lib/api-perf'
 import type { RoundKey } from '@/app/pools/[pool_id]/types'
 
@@ -320,7 +321,9 @@ async function sendRoundOpenNotifications(
         to: m.users.email,
         subject,
         html,
-        topicId: TOPICS.POOL_ACTIVITY,
+        // The registry's switch: until 2026-10-05 this email followed Pool
+        // activity while the round-open push followed Predictions.
+        topicId: TOPICS[NOTIFICATION_TYPES.round_open.category],
         tags: [{ name: 'category', value: 'round_open' }],
       }
     })

@@ -4,6 +4,7 @@ import { sendBatchEmails } from '@/lib/email/send'
 import { roundOpenTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { sendPushToUsers } from '@/lib/push/apns'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/registry'
 import { roundLabel, selectorForKey } from '@/lib/competitionRounds'
 import type { RoundKey } from '@/app/pools/[pool_id]/types'
 
@@ -114,7 +115,9 @@ export async function POST(request: NextRequest) {
         to: m.users.email,
         subject,
         html,
-        topicId: TOPICS.POOL_ACTIVITY,
+        // The registry's switch, as the push below already used: until
+        // 2026-10-05 this email followed Pool activity instead.
+        topicId: TOPICS[NOTIFICATION_TYPES.round_open.category],
         tags: [{ name: 'category', value: 'round_open' }],
       })
       recipients++
@@ -129,7 +132,7 @@ export async function POST(request: NextRequest) {
           body: `Make your predictions for ${pool.pool_name}!`,
           data: { type: 'pool_activity', pool_id: pool.pool_id },
         },
-        'PREDICTIONS',
+        NOTIFICATION_TYPES.round_open.category,
       )
       pushSent += res.sent
       pushTotal += res.total

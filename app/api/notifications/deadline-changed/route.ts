@@ -4,6 +4,7 @@ import { sendBatchEmails } from '@/lib/email/send'
 import { deadlineChangedTemplate } from '@/lib/email/templates'
 import { TOPICS } from '@/lib/email/topics'
 import { sendPushToUsers } from '@/lib/push/apns'
+import { NOTIFICATION_TYPES } from '@/lib/notifications/registry'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
@@ -92,7 +93,9 @@ export async function POST(request: NextRequest) {
         body: `${pool.pool_name}: new deadline is ${formattedDeadline}`,
         data: { type: 'admin', pool_id },
       },
-      'PREDICTIONS',
+      // The registry's switch, so push and email can't disagree again: until
+      // 2026-10-05 this push followed Predictions while the email followed Admin.
+      NOTIFICATION_TYPES.deadline_changed.category,
     ),
   ])
 

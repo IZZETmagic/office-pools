@@ -4,9 +4,9 @@
 // use the match's tournament. One push per (user, match).
 //
 // PREDICT REMINDER — daily nudge for users with at least one unsubmitted
-// entry in a pool whose deadline is in the next 7 days, AND the user has
-// not opened the app in N days (signaled by no recent push_tokens.updated_at
-// touch). One push per user per day max.
+// entry in a pool whose deadline is in the next 7 days. One push per user
+// per day max. (Until 2026-10-05 this said it also waited until the user had
+// stopped opening the app. It never did, and it must not: see below.)
 //
 // Both atomic-claim deduped.
 
@@ -140,8 +140,11 @@ async function claimMatchStarting(
  * their pools where the deadline is in the next 7 days. One push per
  * user per day max.
  *
- * Not gated on app-recency (would require a last_active_at column).
- * Future enhancement: only push to dormant users (no app open in 3+ days).
+ * ⚠ NOT GATED ON APP-RECENCY, AND IT MUST NOT BE. Pushing only to people who
+ * stopped opening the app is an absence trigger: written as a tooltip — "you
+ * stopped opening the app, so we pushed you" — it fails the disclosure gate
+ * (CLAUDE.md). The registry's sentence for this (migration 170,
+ * predict_reminder) describes what it does, and that is all it may do.
  */
 export async function firePredictReminders(): Promise<{
   users_checked: number
