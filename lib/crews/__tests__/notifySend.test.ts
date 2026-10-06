@@ -6,9 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/email/send', () => ({ sendEmail: vi.fn(async () => ({ success: true })) }))
 vi.mock('@/lib/push/apns', () => ({ sendPushToUser: vi.fn(async () => undefined) }))
 vi.mock('@/lib/email/topics', () => ({ TOPICS: { POOL_ACTIVITY: 'topic-pool-activity' } }))
+// N3: an ACCOUNT's invite and every seat message are queued into the notification outbox, which
+// sends them (lib/notifications). Here the queue is a spy — what matters is what was queued.
+vi.mock('@/lib/notifications/outbox', () => ({
+  enqueue: vi.fn(async (_admin: unknown, notices: unknown[]) => notices.map((_, i) => i + 1)),
+}))
 
 import { sendEmail } from '@/lib/email/send'
 import { sendPushToUser } from '@/lib/push/apns'
+import { enqueue } from '@/lib/notifications/outbox'
 
 import { hashInviteToken } from '../inviteToken'
 import { runCrewNotices, sendInviteNotice } from '../notify'
@@ -17,6 +23,7 @@ import { fakeDb } from './fakeDb'
 const NOW = Date.parse('2026-10-02T12:00:00Z')
 const emailed = vi.mocked(sendEmail)
 const pushed = vi.mocked(sendPushToUser)
+const queued = vi.mocked(enqueue)
 
 const invite = (o: Record<string, unknown>) => ({
   crew_id: 'c1',
@@ -47,7 +54,11 @@ const tokenIn = (html: string) => html.match(/\/crew-invite#([A-Za-z0-9_-]{43})"
 beforeEach(() => {
   emailed.mockClear()
   pushed.mockClear()
+  queued.mockClear()
 })
+
+/** What the queue was asked to send, flattened across calls. */
+const queuedNotices = () => queued.mock.calls.flatMap((c) => c[1] as Array<Record<string, unknown>>)
 
 describe('an invite made while the switch is off', () => {
   it('sends nothing at the moment of adding — and stays unclaimed for the cron', async () => {
@@ -65,9 +76,35 @@ describe('an invite made while the switch is off', () => {
       ]),
     )
     expect(await runCrewNotices(db.client, NOW)).toEqual({ notices: 0, reminders: 0, invites: 2 })
-    expect(pushed).toHaveBeenCalledWith('mia', expect.objectContaining({ title: 'Dave Okafor added you to Bermuda Office' }), 'POOL_ACTIVITY')
+    // The account's invite is QUEUED — the outbox sends it — and the address's is emailed here.
+    expect(queuedNotices()).toEqual([{ type: 'crew_invite', userId: 'mia', dedupKey: 'crew_invite:acct', payload: { inviteId: 'acct' } }])
+    expect(pushed).not.toHaveBeenCalled()
     expect(emailed).toHaveBeenCalledWith(expect.objectContaining({ to: 'new@person.org' }))
     for (const row of db.tables.crew_invites) expect(row.notified_at).toBe(new Date(NOW).toISOString())
+  })
+})
+
+describe('N3 — queued first, stamped second', () => {
+  it('an account invite whose queueing fails is NOT stamped, so the next run queues it — nothing lost', async () => {
+    const db = fakeDb(seed(true, [invite({ invite_id: 'acct', invitee_user_id: 'mia' })]))
+    queued.mockRejectedValueOnce(new Error('outbox down'))
+    expect(await runCrewNotices(db.client, NOW)).toMatchObject({ invites: 0 })
+    expect(db.tables.crew_invites[0].notified_at).toBeNull()
+
+    expect(await runCrewNotices(db.client, NOW + 900_000)).toMatchObject({ invites: 1 })
+    expect(db.tables.crew_invites[0].notified_at).not.toBeNull()
+  })
+
+  it('the moment of adding hands back the rows it queued, so the request can send them at once', async () => {
+    const db = fakeDb(seed(true, [invite({ invite_id: 'acct', invitee_user_id: 'mia' })]))
+    expect(await sendInviteNotice(db.client, 'acct')).toEqual([1])
+  })
+
+  it('a failure to queue does not fail the captain\'s request — the cron sends it later', async () => {
+    const db = fakeDb(seed(true, [invite({ invite_id: 'acct', invitee_user_id: 'mia' })]))
+    queued.mockRejectedValueOnce(new Error('outbox down'))
+    await expect(sendInviteNotice(db.client, 'acct')).resolves.toEqual([])
+    expect(db.tables.crew_invites[0].notified_at).toBeNull()
   })
 })
 
@@ -78,11 +115,11 @@ describe('exactly once', () => {
     expect(await runCrewNotices(db.client, NOW + 900_000)).toMatchObject({ invites: 0 })
     expect(emailed).toHaveBeenCalledTimes(1)
   })
-  it('an invite sent at the moment of adding is not sent again by the cron', async () => {
+  it('an invite queued at the moment of adding is not queued again by the cron', async () => {
     const db = fakeDb(seed(true, [invite({ invite_id: 'acct', invitee_user_id: 'mia' })]))
     await sendInviteNotice(db.client, 'acct')
     await runCrewNotices(db.client, NOW)
-    expect(pushed).toHaveBeenCalledTimes(1)
+    expect(queued).toHaveBeenCalledTimes(1)
   })
   it('a withdrawn or answered invite is never sent', async () => {
     const db = fakeDb(
@@ -94,8 +131,9 @@ describe('exactly once', () => {
     expect(await runCrewNotices(db.client, NOW)).toMatchObject({ invites: 0 })
     expect(emailed).not.toHaveBeenCalled()
     expect(pushed).not.toHaveBeenCalled()
+    expect(queued).not.toHaveBeenCalled()
   })
-  it('⚠ a failed send is not retried — one missed message beats two (as the seat notices)', async () => {
+  it('⚠ an ADDRESS\'s failed send is not retried — one missed email beats two; its link cannot be queued', async () => {
     emailed.mockRejectedValueOnce(new Error('resend down'))
     const db = fakeDb(seed(true, [invite({ invite_id: 'addr', invitee_email: 'new@person.org' })]))
     expect(await runCrewNotices(db.client, NOW)).toMatchObject({ invites: 1 })

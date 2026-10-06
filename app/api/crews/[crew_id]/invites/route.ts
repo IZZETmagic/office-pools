@@ -5,6 +5,8 @@ import { inviteToCrew } from '@/lib/crews/store'
 import { parseInviteTarget } from '@/lib/crews/rules'
 import { crewResponse, readBody } from '@/lib/crews/http'
 import { sendInviteNotice } from '@/lib/crews/notify'
+import { dispatch } from '@/lib/notifications/outbox'
+import { COMPOSERS } from '@/lib/notifications/composers'
 
 // Add someone — captain or co-captain. Either { user_id } (picked from /api/users/lookup, after the
 // captain saw their face) or { email }. ⚠ An email answers { sent: true } whether or not it has an
@@ -27,6 +29,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // The invite's one push/email (lib/crews/notify) — only when a NEW invite was written. A blocked
   // email invite answers "sent" with no row, and sends nothing. Awaited, not fire-and-forget: a
   // serverless function can be frozen the moment it responds. Off until crew_notices_enabled.
-  if (result.ok && result.inviteId) await sendInviteNotice(admin, result.inviteId)
+  if (result.ok && result.inviteId) {
+    const queued = await sendInviteNotice(admin, result.inviteId)
+    // An account's invite is queued (N3). Send it now rather than at the outbox's next minute — and
+    // if this fails, the outbox sends it then; it is never sent twice.
+    if (queued.length > 0) {
+      await dispatch(admin, COMPOSERS, { ids: queued }).catch((err) =>
+        console.error('[crews] invite dispatch failed; the outbox will retry:', err))
+    }
+  }
   return crewResponse(result)
 }

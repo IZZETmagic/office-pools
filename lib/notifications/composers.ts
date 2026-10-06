@@ -14,6 +14,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { planLeagueNotice, type LeagueOutboxKind } from '@/lib/league/notify'
+import { composeCrewInvites, composeCrewSeats } from '@/lib/crews/notify'
 import type { Composed, Composer, OutboxRow } from './outbox'
 
 /**
@@ -81,4 +82,9 @@ export const COMPOSERS: Partial<Record<string, Composer>> = {
   lock_reminder: leagueComposer('lock_reminder'),
   matchweek_completed: leagueComposer('matchweek_completed'),
   table_deadline: leagueComposer('table_deadline'),
+  // Crews (N3, 2026-10-05) — composed in lib/crews/notify.ts, beside the copy they send. The invite
+  // to an ADDRESS is deliberately absent: it is sent where it is claimed, never queued (see there).
+  crew_seat_saved: composeCrewSeats('crew_seat_saved'),
+  crew_seat_reminder: composeCrewSeats('crew_seat_reminder'),
+  crew_invite: composeCrewInvites,
 }

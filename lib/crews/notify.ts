@@ -27,8 +27,7 @@ import type { createAdminClient } from '@/lib/supabase/server'
 import { paragraph } from '@/lib/email/components'
 import { sendEmail } from '@/lib/email/send'
 import { brandedTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
-import { sendPushToUser } from '@/lib/push/apns'
+import { enqueue, type Composed, type OutboxRow } from '@/lib/notifications/outbox'
 import { modeLabel } from './needs'
 import { inviteLinkFor } from './inviteLink'
 import { newInviteToken } from './inviteToken'
@@ -252,22 +251,17 @@ async function poolFacts(admin: Admin, poolId: string) {
   }
 }
 
-async function deliver(admin: Admin, userId: string, msg: Message, data: Record<string, string>) {
-  const { data: u } = await admin.from('users').select('email').eq('user_id', userId).maybeSingle()
-  await Promise.allSettled([
-    sendPushToUser(userId, { title: msg.push.title, body: msg.push.body, data }, 'POOL_ACTIVITY'),
-    u?.email
-      ? sendEmail({ to: u.email, subject: msg.email.subject, html: msg.email.html, topicId: TOPICS.POOL_ACTIVITY })
-      : Promise.resolve(null),
-  ])
-}
-
 /**
- * One cron tick: send every due seat notice, then every due reminder, then every invite nobody has
- * sent yet (156 — made while the switch was off, or whose request died before sending). Each row is
- * CLAIMED first — an UPDATE that only succeeds while the stamp is still NULL — so overlapping runs,
- * retries and redeploys never send the same message twice. A claimed row whose send fails is NOT
- * retried: one missed email is better than a crew getting two.
+ * One cron tick: queue every due seat notice, then every due reminder, then send every invite
+ * nobody has sent yet (156 — made while the switch was off, or whose request died before sending).
+ *
+ * N3 (2026-10-05, Ryan: "yes do it"): seat notices, reminders and invites to an ACCOUNT now go
+ * through the notification outbox, which sends them, retries a failure, and never sends one twice
+ * — so the old trade-off ("a claimed row whose send fails is NOT retried: one missed email is
+ * better than a crew getting two") is gone for them. Each is QUEUED FIRST and stamped second:
+ * queueing is idempotent (one row per seat or invite), so a run that dies between the two loses
+ * nothing, and the next run re-queues nothing and stamps. An invite to an ADDRESS is still sent
+ * here, once — its email carries a one-time link whose secret must never sit in the queue.
  */
 export async function runCrewNotices(
   admin: Admin,
@@ -290,30 +284,43 @@ export async function runCrewNotices(
     if (!f || !f.firstLockAt) continue
     const input = { ...f, firstLockAt: f.firstLockAt }
 
-    if (dueNotice(s, f.firstLockAt, now)) {
-      const { data: claimed } = await admin
-        .from('crew_seats')
-        .update({ notified_at: new Date(now).toISOString() })
-        .eq('pool_id', s.pool_id)
-        .eq('user_id', s.user_id)
-        .is('notified_at', null)
-        .select('user_id')
-      if (claimed && claimed.length) {
-        await deliver(admin, s.user_id, seatNoticeCopy(input, now), { type: 'crew_seat', poolId: s.pool_id })
-        notices++
+    try {
+      if (dueNotice(s, f.firstLockAt, now)) {
+        await enqueue(admin, [{
+          type: 'crew_seat_saved',
+          userId: s.user_id,
+          poolId: s.pool_id,
+          dedupKey: `crew_seat_saved:${s.pool_id}:${s.user_id}`,
+          deadlineAt: input.firstLockAt,
+        }])
+        const { data: claimed } = await admin
+          .from('crew_seats')
+          .update({ notified_at: new Date(now).toISOString() })
+          .eq('pool_id', s.pool_id)
+          .eq('user_id', s.user_id)
+          .is('notified_at', null)
+          .select('user_id')
+        if (claimed && claimed.length) notices++
+      } else if (dueReminder(s, f.firstLockAt, now)) {
+        await enqueue(admin, [{
+          type: 'crew_seat_reminder',
+          userId: s.user_id,
+          poolId: s.pool_id,
+          dedupKey: `crew_seat_reminder:${s.pool_id}:${s.user_id}`,
+          deadlineAt: input.firstLockAt,
+        }])
+        const { data: claimed } = await admin
+          .from('crew_seats')
+          .update({ reminded_at: new Date(now).toISOString() })
+          .eq('pool_id', s.pool_id)
+          .eq('user_id', s.user_id)
+          .is('reminded_at', null)
+          .select('user_id')
+        if (claimed && claimed.length) reminders++
       }
-    } else if (dueReminder(s, f.firstLockAt, now)) {
-      const { data: claimed } = await admin
-        .from('crew_seats')
-        .update({ reminded_at: new Date(now).toISOString() })
-        .eq('pool_id', s.pool_id)
-        .eq('user_id', s.user_id)
-        .is('reminded_at', null)
-        .select('user_id')
-      if (claimed && claimed.length) {
-        await deliver(admin, s.user_id, seatReminderCopy(input, now), { type: 'crew_seat', poolId: s.pool_id })
-        reminders++
-      }
+    } catch (e) {
+      // Not stamped, so the next run tries this seat again. One seat must not stop the rest.
+      console.error(`[crews] seat ${s.pool_id}/${s.user_id} could not be queued; retried next run:`, e)
     }
   }
 
@@ -332,19 +339,33 @@ export async function runCrewNotices(
   if (unsentErr) throw new Error(`crew_invites: ${unsentErr.message}`)
   let invites = 0
   for (const i of unsent ?? []) {
-    if (await deliverInvite(admin, i.invite_id, now)) invites++
+    try {
+      if ((await deliverInvite(admin, i.invite_id, now)).handled) invites++
+    } catch (e) {
+      console.error(`[crews] invite ${i.invite_id} could not be queued; retried next run:`, e)
+    }
   }
   return { notices, reminders, invites }
 }
 
 /**
- * The invite, sent once when the captain adds someone. An account gets a push and an email; an
- * address with no account gets one email, carrying its one-time link. Checks the switch, then
- * hands over to deliverInvite — and if the switch is off, the cron sends it later (156).
+ * The invite, sent once when the captain adds someone. An account's push and email are queued; an
+ * address with no account gets one email, sent here, carrying its one-time link. Checks the switch,
+ * then hands over to deliverInvite — and if the switch is off, the cron sends it later (156).
+ *
+ * Returns the outbox rows it queued, so the request that added them can send those straight away
+ * rather than waiting for the outbox's next minute.
  */
-export async function sendInviteNotice(admin: Admin, inviteId: string): Promise<void> {
-  if (!(await crewNoticesEnabled(admin))) return
-  await deliverInvite(admin, inviteId, Date.now())
+export async function sendInviteNotice(admin: Admin, inviteId: string): Promise<number[]> {
+  if (!(await crewNoticesEnabled(admin))) return []
+  try {
+    return (await deliverInvite(admin, inviteId, Date.now())).queued
+  } catch (e) {
+    // The invite is saved; only its message failed to queue, and it was not stamped — so the
+    // cron's catch-up (156) sends it on its next run. Failing the captain's request would not.
+    console.error(`[crews] invite ${inviteId} could not be queued; the cron will send it:`, e)
+    return []
+  }
 }
 
 /**
@@ -354,11 +375,16 @@ export async function sendInviteNotice(admin: Admin, inviteId: string): Promise<
  * try and exactly one sends. For an address, the same UPDATE arms the one-time link (155) — only
  * its hash is stored; the token goes out in this one email and nowhere else.
  *
- * Like the seat notices, a claimed invite whose send fails is NOT retried: one missed message is
- * better than two. An account still has its Needs-you card; an address can be withdrawn and added
- * again. Does not check the switch — its callers do. Returns whether this call sent it.
+ * An ACCOUNT's invite is queued into the notification outbox (N3), which retries a failure and
+ * never sends twice. An ADDRESS's is sent here, and a failed send is NOT retried — one missed email
+ * beats two, and the address can be withdrawn and added again. Does not check the switch — its
+ * callers do. Returns whether this call handled the invite, and any outbox rows it queued.
  */
-async function deliverInvite(admin: Admin, inviteId: string, now: number): Promise<boolean> {
+async function deliverInvite(
+  admin: Admin,
+  inviteId: string,
+  now: number,
+): Promise<{ handled: boolean; queued: number[] }> {
   const { data: inv } = await admin
     .from('crew_invites')
     .select('crew_id, invited_by, invitee_user_id, invitee_email')
@@ -366,21 +392,59 @@ async function deliverInvite(admin: Admin, inviteId: string, now: number): Promi
     .is('resolved_at', null)
     .is('notified_at', null)
     .maybeSingle()
-  if (!inv) return false
-
-  const link = !inv.invitee_user_id && inv.invitee_email ? newInviteToken() : null
+  if (!inv) return { handled: false, queued: [] }
   const stamp = new Date(now).toISOString()
-  let claim = admin
+
+  // An ACCOUNT: queued first, then stamped — see runCrewNotices. The outbox composes it when it
+  // sends, so an invite answered in between is not sent.
+  if (inv.invitee_user_id) {
+    const queued = await enqueue(admin, [{
+      type: 'crew_invite',
+      userId: inv.invitee_user_id,
+      dedupKey: `crew_invite:${inviteId}`,
+      payload: { inviteId },
+    }])
+    const { data: claimed } = await admin
+      .from('crew_invites')
+      .update({ notified_at: stamp })
+      .eq('invite_id', inviteId)
+      .is('resolved_at', null)
+      .is('notified_at', null)
+      .select('invite_id')
+    return { handled: !!claimed && claimed.length > 0, queued }
+  }
+
+  // An ADDRESS: claimed with its one-time link armed, then ONE email, sent here. Not through the
+  // outbox — the queue composes at send time, and only the token's hash is stored, so the email
+  // could never be rebuilt there; storing the token in the queue to make it possible would leave a
+  // live invite link sitting in a table.
+  if (!inv.invitee_email) return { handled: false, queued: [] }
+  const link = newInviteToken()
+  const { data: claimed } = await admin
     .from('crew_invites')
-    .update(link ? { notified_at: stamp, token_hash: link.hash } : { notified_at: stamp })
+    .update({ notified_at: stamp, token_hash: link.hash })
     .eq('invite_id', inviteId)
     .is('resolved_at', null)
     .is('notified_at', null)
-  // Still to an address — a link must never land on an invite that has become an account's.
-  if (link) claim = claim.is('invitee_user_id', null)
-  const { data: claimed } = await claim.select('invite_id')
-  if (!claimed || claimed.length === 0) return false
+    // Still to an address — a link must never land on an invite that has become an account's.
+    .is('invitee_user_id', null)
+    .select('invite_id')
+  if (!claimed || claimed.length === 0) return { handled: false, queued: [] }
 
+  try {
+    const m = inviteToEmailCopy({ ...(await inviteCopyInput(admin, inv)), inviteUrl: inviteLinkUrl(link.token) })
+    await sendEmail({ to: inv.invitee_email, subject: m.subject, html: m.html })
+  } catch (e) {
+    console.error('[crews] invite notice failed:', e)
+  }
+  return { handled: true, queued: [] }
+}
+
+/** Who asked, which crew, and how many are in it — the words every invite carries. */
+async function inviteCopyInput(
+  admin: Admin,
+  inv: { crew_id: string; invited_by: string | null },
+): Promise<InviteCopyInput> {
   const [{ data: crew }, { data: inviter }, { count: people }] = await Promise.all([
     admin.from('crews').select('name').eq('crew_id', inv.crew_id).maybeSingle(),
     inv.invited_by
@@ -388,20 +452,74 @@ async function deliverInvite(admin: Admin, inviteId: string, now: number): Promi
       : Promise.resolve({ data: null as { full_name: string | null; username: string } | null }),
     admin.from('crew_members').select('user_id', { count: 'exact', head: true }).eq('crew_id', inv.crew_id).is('left_at', null),
   ])
-  const input = {
+  return {
     inviter: inviter?.full_name?.trim() || inviter?.username || 'Someone',
     crewName: crew?.name ?? 'a crew',
     people: people ?? 0,
   }
-  try {
-    if (inv.invitee_user_id) {
-      await deliver(admin, inv.invitee_user_id, inviteToAccountCopy(input), { type: 'crew_invite', crewId: inv.crew_id })
-    } else if (inv.invitee_email && link) {
-      const m = inviteToEmailCopy({ ...input, inviteUrl: inviteLinkUrl(link.token) })
-      await sendEmail({ to: inv.invitee_email, subject: m.subject, html: m.html })
+}
+
+// ── N3: what a queued Crews message says, composed when the outbox sends it ─────────────────────
+//
+// Read at SEND time, so a spot taken or declined since it was queued, or an invite answered, is
+// skipped as no longer true rather than announced. Registered in lib/notifications/composers.ts.
+
+const asMessage = (key: string, msg: Message, data: Record<string, string>): Composed => ({
+  emails: [{ key, subject: msg.email.subject, html: msg.email.html }],
+  push: { title: msg.push.title, body: msg.push.body, data },
+})
+
+export function composeCrewSeats(kind: 'crew_seat_saved' | 'crew_seat_reminder') {
+  return async (admin: Admin, rows: OutboxRow[]): Promise<Map<number, Composed>> => {
+    const out = new Map<number, Composed>()
+    const now = Date.now()
+    const facts = new Map<string, Awaited<ReturnType<typeof poolFacts>>>()
+    for (const row of rows) {
+      if (!row.pool_id || !row.user_id) {
+        out.set(row.outbox_id, { skip: 'not_found' })
+        continue
+      }
+      if (!facts.has(row.pool_id)) facts.set(row.pool_id, await poolFacts(admin, row.pool_id))
+      const f = facts.get(row.pool_id)
+      if (!f || !f.firstLockAt) {
+        out.set(row.outbox_id, { skip: 'not_found' })
+        continue
+      }
+      const { data: seat } = await admin
+        .from('crew_seats')
+        .select('resolution, resolved_at')
+        .eq('pool_id', row.pool_id)
+        .eq('user_id', row.user_id)
+        .maybeSingle()
+      if (!seat || seat.resolution !== null || seat.resolved_at !== null) {
+        out.set(row.outbox_id, { skip: 'no_longer_true' })
+        continue
+      }
+      const input = { ...f, firstLockAt: f.firstLockAt }
+      const msg = kind === 'crew_seat_saved' ? seatNoticeCopy(input, now) : seatReminderCopy(input, now)
+      out.set(row.outbox_id, asMessage(kind === 'crew_seat_saved' ? 'seat' : 'reminder', msg, { type: 'crew_seat', poolId: row.pool_id }))
     }
-  } catch (e) {
-    console.error('[crews] invite notice failed:', e)
+    return out
   }
-  return true
+}
+
+export async function composeCrewInvites(admin: Admin, rows: OutboxRow[]): Promise<Map<number, Composed>> {
+  const out = new Map<number, Composed>()
+  for (const row of rows) {
+    const inviteId = typeof row.payload.inviteId === 'string' ? row.payload.inviteId : null
+    const { data: inv } = inviteId
+      ? await admin
+          .from('crew_invites')
+          .select('crew_id, invited_by, invitee_user_id, resolved_at')
+          .eq('invite_id', inviteId)
+          .maybeSingle()
+      : { data: null }
+    if (!inv || inv.resolved_at !== null || inv.invitee_user_id !== row.user_id) {
+      out.set(row.outbox_id, { skip: 'no_longer_true' })
+      continue
+    }
+    const msg = inviteToAccountCopy(await inviteCopyInput(admin, inv))
+    out.set(row.outbox_id, asMessage('invite', msg, { type: 'crew_invite', crewId: inv.crew_id }))
+  }
+  return out
 }
