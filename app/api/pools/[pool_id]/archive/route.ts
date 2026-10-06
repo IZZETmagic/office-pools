@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendBatchEmails } from '@/lib/email/send'
-import { poolArchivedTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
-import { sendPushToUsers } from '@/lib/push/apns'
+import { queuePoolArchived } from '@/lib/pools/adminNotices'
+import { dispatch } from '@/lib/notifications/outbox'
+import { COMPOSERS } from '@/lib/notifications/composers'
 
 // POST /api/pools/:pool_id/archive
 //
@@ -82,63 +81,25 @@ export async function POST(
     details: { pool_name: pool.pool_name, archived_at: archivedAt },
   })
 
-  // Tell every member except the admin who did it.
-  const { data: members } = await adminClient
-    .from('pool_members')
-    .select('user_id, users!inner(email, username, full_name)')
-    .eq('pool_id', pool_id)
-    .neq('user_id', userData.user_id)
-
-  let notified = 0
-  if (members && members.length > 0) {
-    // requireAuth's userData carries only user_id/is_super_admin, so the
-    // actor's display name has to be read separately.
-    const { data: actor } = await adminClient
-      .from('users')
-      .select('username, full_name')
-      .eq('user_id', userData.user_id)
-      .single()
-
-    const actorName = actor?.full_name || actor?.username || 'An admin'
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
-
-    type EmbeddedUser = { email: string; username: string | null; full_name: string | null }
-    const emails = members.map((m) => {
-      const raw = m.users as unknown as EmbeddedUser | EmbeddedUser[]
-      const u = Array.isArray(raw) ? raw[0] : raw
-      const { subject, html } = poolArchivedTemplate({
-        userName: u.full_name || u.username || 'there',
-        poolName: pool.pool_name,
-        actorName,
-        archiveUrl: `${appUrl}/profile?tab=archived`,
-      })
-      return {
-        to: u.email,
-        subject,
-        html,
-        topicId: TOPICS.ADMIN,
-        tags: [{ name: 'category', value: 'admin' }],
-      }
-    })
-
-    await Promise.allSettled([
-      sendBatchEmails(emails),
-      sendPushToUsers(
-        members.map((m) => m.user_id),
-        {
-          title: 'Pool archived',
-          body: `${actorName} archived ${pool.pool_name}. Nothing is lost — find it under Profile → Archived.`,
-          data: { type: 'admin', pool_id },
-        },
-        'ADMIN',
-      ),
-    ])
-    notified = members.length
+  // Tell every member except the admin who did it — queued (N3, 2026-10-06), so a send that
+  // fails is retried rather than lost, and sent straight after the response.
+  let queued: number[] = []
+  try {
+    queued = await queuePoolArchived(adminClient, { poolId: pool_id, actorId: userData.user_id, archivedAt })
+  } catch (err) {
+    // The archive happened; only its notices failed to queue. Reported, not undone.
+    console.error('[archive] notices could not be queued:', err)
+  }
+  if (queued.length > 0) {
+    after(() => dispatch(createAdminClient(), COMPOSERS, { ids: queued }).then(
+      () => undefined,
+      (err) => console.error('[archive] notice dispatch failed; the outbox will retry:', err),
+    ))
   }
 
   return NextResponse.json({
     archived_at: archivedAt,
     archived_by: userData.user_id,
-    notified,
+    notified: queued.length,
   })
 }

@@ -1,7 +1,7 @@
 // An in-memory stand-in for the admin client, just wide enough for lib/crews/store.ts.
 //
 // Supports the PostgREST builder calls the store and readers make — select (incl. count/head),
-// insert, update, delete; eq / is / in / gte / ilike (exact, case-insensitive, wildcards escaped) /
+// insert, update, delete; eq / neq / is / in / gte / ilike (exact, case-insensitive, wildcards escaped) /
 // order / limit; single /
 // maybeSingle / await — plus rpc() answered from a table of canned values.
 //
@@ -105,6 +105,7 @@ export function fakeDb(seed: Record<string, Row[]>, rpcAnswers: Record<string, u
       return b
     }
     b.eq = (c: string, v: unknown) => (filters.push((r) => r[c] === v), b)
+    b.neq = (c: string, v: unknown) => (filters.push((r) => r[c] !== v), b)
     b.is = (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), b)
     b.in = (c: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[c])), b)
     b.gte = (c: string, v: string) => (filters.push((r) => String(r[c]) >= v), b)

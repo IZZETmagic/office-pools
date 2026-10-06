@@ -1,98 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { requireAuth } from '@/lib/auth'
-import { sendPushToUsers } from '@/lib/push/apns'
 import { createAdminClient } from '@/lib/supabase/server'
-import { withoutBlockersOf } from '@/lib/banter/blocks'
+import { queueChatMessages } from '@/lib/banter/chatNotices'
+import { dispatch } from '@/lib/notifications/outbox'
+import { COMPOSERS } from '@/lib/notifications/composers'
 
 /**
  * POST /api/notifications/message
  *
- * Sends a push notification to all pool members (except the sender)
- * when a new banter message is posted.
+ * Called by the pool chat straight after a message is posted: a push to every member but the
+ * sender. Body: { pool_id } — anything else is ignored.
  *
- * Body: { pool_id, message_content, sender_name }
+ * ⚠ BUILT FROM THE MESSAGE, NEVER FROM THE REQUEST (2026-10-06). This used to push whatever
+ * text and sender name it was sent. Now the push is built from the caller's own messages in the
+ * pool from the last two minutes, queued per message and person (so a repeat queues nothing) and
+ * sent by the notification outbox. See lib/banter/chatNotices.ts.
  */
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
   const { supabase, userData } = auth.data
 
-  let body: { pool_id?: string; message_content?: string; sender_name?: string }
+  let body: { pool_id?: string }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
+  if (!body.pool_id) return NextResponse.json({ error: 'pool_id is required' }, { status: 400 })
 
-  const { pool_id, message_content, sender_name } = body
+  const { data: membership } = await supabase
+    .from('pool_members')
+    .select('member_id')
+    .eq('pool_id', body.pool_id)
+    .eq('user_id', userData.user_id)
+    .maybeSingle()
+  if (!membership) return NextResponse.json({ error: 'Not a member of this pool' }, { status: 403 })
 
-  if (!pool_id || !message_content) {
-    return NextResponse.json(
-      { error: 'pool_id and message_content are required' },
-      { status: 400 }
-    )
+  const queued = await queueChatMessages(createAdminClient(), body.pool_id, userData.user_id)
+  if (queued.length > 0) {
+    after(() => dispatch(createAdminClient(), COMPOSERS, { ids: queued }).then(
+      () => undefined,
+      (err) => console.error('[MessagePush] dispatch failed; the outbox will retry:', err),
+    ))
   }
-
-  // Get pool name and sender info in parallel
-  const [poolResult, senderResult, membersResult] = await Promise.all([
-    supabase.from('pools').select('pool_name').eq('pool_id', pool_id).single(),
-    supabase.from('users').select('username, full_name').eq('user_id', userData.user_id).single(),
-    supabase.from('pool_members').select('user_id').eq('pool_id', pool_id).neq('user_id', userData.user_id),
-  ])
-
-  if (poolResult.error || !poolResult.data) {
-    console.error('[MessagePush] Pool lookup failed:', poolResult.error)
-    return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
-  }
-
-  if (membersResult.error) {
-    console.error('[MessagePush] Members lookup failed:', membersResult.error)
-    return NextResponse.json({ error: 'Failed to lookup members' }, { status: 500 })
-  }
-
-  const pool = poolResult.data
-  const members = membersResult.data
-
-  if (!members || members.length === 0) {
-    return NextResponse.json({ sent: true, count: 0 })
-  }
-
-  // Nobody is pushed a message from someone they blocked (158).
-  const recipientIds = await withoutBlockersOf(
-    createAdminClient(),
-    userData.user_id,
-    members.map((m) => m.user_id),
-  )
-  if (recipientIds.length === 0) {
-    return NextResponse.json({ sent: true, count: 0 })
-  }
-  const senderData = senderResult.data
-  const displayName = sender_name || senderData?.full_name || senderData?.username || 'Someone'
-
-  // Truncate message for notification preview
-  const preview = message_content.length > 80
-    ? message_content.slice(0, 77) + '...'
-    : message_content
-
-  console.log(
-    `[MessagePush] Sending push to ${recipientIds.length} members in pool "${pool.pool_name}"`
-  )
-
-  // Send push to all pool members (await so we can log the result)
-  try {
-    const result = await sendPushToUsers(
-      recipientIds,
-      {
-        title: `${displayName} in ${pool.pool_name}`,
-        body: preview,
-        data: { type: 'community', pool_id },
-      },
-      'COMMUNITY',
-    )
-    console.log(`[MessagePush] Push result: ${result.sent}/${result.total} sent`)
-    return NextResponse.json({ sent: true, count: recipientIds.length, push: result })
-  } catch (err) {
-    console.error('[MessagePush] Push error:', err)
-    return NextResponse.json({ sent: true, count: recipientIds.length, push_error: String(err) })
-  }
+  return NextResponse.json({ sent: true, count: queued.length })
 }

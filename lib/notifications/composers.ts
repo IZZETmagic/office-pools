@@ -17,6 +17,8 @@ import { planLeagueNotice, type LeagueOutboxKind } from '@/lib/league/notify'
 import { composeCrewInvites, composeCrewSeats } from '@/lib/crews/notify'
 import { composeMemberJoined, composePoolWelcome } from '@/lib/pools/joinNotices'
 import { composeLmsPickOpen, composeLmsPickReminder } from '@/lib/league/lmsNotices'
+import { composeMemberRemoved, composePointsAdjusted, composePoolArchived, composePoolRestored } from '@/lib/pools/adminNotices'
+import { composeChatMention, composeChatMessage } from '@/lib/banter/chatNotices'
 import type { Composed, Composer, OutboxRow } from './outbox'
 
 /**
@@ -95,4 +97,12 @@ export const COMPOSERS: Partial<Record<string, Composer>> = {
   // Last Man Standing (2026-10-06) — a missed pick knocks you out, so these exist at all.
   lms_pick_open: composeLmsPickOpen,
   lms_pick_reminder: composeLmsPickReminder,
+  // An admin's actions (N3, 2026-10-06) — queued by the route that performs them.
+  pool_archived: composePoolArchived,
+  pool_restored: composePoolRestored,
+  points_adjusted: composePointsAdjusted,
+  member_removed: composeMemberRemoved,
+  // Chat (N3, 2026-10-06) — built from the stored message, never from a request.
+  chat_message: composeChatMessage,
+  chat_mention: composeChatMention,
 }

@@ -1,167 +1,65 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { requireAuth } from '@/lib/auth'
-import { sendEmail, sendBatchEmails } from '@/lib/email/send'
-import { mentionNotificationTemplate } from '@/lib/email/templates'
-import { syncContactToResend } from '@/lib/email/contacts'
-import { TOPICS } from '@/lib/email/topics'
-import { sendPushToUsers } from '@/lib/push/apns'
 import { createAdminClient } from '@/lib/supabase/server'
-import { withoutBlockersOf } from '@/lib/banter/blocks'
+import { syncContactToResend } from '@/lib/email/contacts'
+import { queueChatMentions } from '@/lib/banter/chatNotices'
+import { dispatch } from '@/lib/notifications/outbox'
+import { COMPOSERS } from '@/lib/notifications/composers'
 
+/**
+ * POST /api/notifications/mention
+ *
+ * Called by the pool chat — web and app — straight after a message that @mentions people is
+ * posted. Body: { pool_id } — message_content and mentioned_user_ids are ignored (older app
+ * builds still send them, harmlessly).
+ *
+ * ⚠ BUILT FROM THE MESSAGE, NEVER FROM THE REQUEST (2026-10-06). This used to email whatever
+ * text it was sent to whatever user ids it was given, members of the pool or not — so anyone who
+ * could see a public pool could email anybody on the site from SportPool's address. Now the
+ * mentions are the ones stored on the caller's own recent messages in the pool, and only people
+ * actually in it are told. Queued per message and person, sent by the notification outbox.
+ */
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
   const { supabase, userData } = auth.data
 
-  let body: { pool_id?: string; message_content?: string; mentioned_user_ids?: string[] }
+  let body: { pool_id?: string }
   try {
     body = await request.json()
   } catch {
-    console.error('[Mention] Invalid JSON body')
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
+  if (!body.pool_id) return NextResponse.json({ error: 'pool_id is required' }, { status: 400 })
 
-  const { pool_id, message_content, mentioned_user_ids } = body
-
-  if (!pool_id || !message_content || !mentioned_user_ids?.length) {
-    console.error('[Mention] Missing fields:', { pool_id: !!pool_id, message_content: !!message_content, mentioned_user_ids: mentioned_user_ids?.length })
-    return NextResponse.json({ error: 'pool_id, message_content, and mentioned_user_ids are required' }, { status: 400 })
-  }
-
-  console.log(`[Mention] Processing mention notification for ${mentioned_user_ids.length} user(s) in pool ${pool_id}`)
-
-  // Get sender display info
-  const { data: senderData, error: senderError } = await supabase
-    .from('users')
-    .select('username, full_name')
+  const { data: membership } = await supabase
+    .from('pool_members')
+    .select('member_id')
+    .eq('pool_id', body.pool_id)
     .eq('user_id', userData.user_id)
-    .single()
+    .maybeSingle()
+  if (!membership) return NextResponse.json({ error: 'Not a member of this pool' }, { status: 403 })
 
-  if (senderError || !senderData) {
-    console.error('[Mention] Sender lookup failed:', senderError)
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
-  }
-
-  // Get pool info
-  const { data: pool, error: poolError } = await supabase
-    .from('pools')
-    .select('pool_name')
-    .eq('pool_id', pool_id)
-    .single()
-
-  if (poolError || !pool) {
-    console.error('[Mention] Pool lookup failed:', poolError)
-    return NextResponse.json({ error: 'Pool not found' }, { status: 404 })
-  }
-
-  // Get mentioned users' emails (excluding the sender, and anyone who blocked them — 158)
-  const mentionedIds = await withoutBlockersOf(
-    createAdminClient(),
-    userData.user_id,
-    (mentioned_user_ids as string[]).filter(id => id !== userData.user_id),
-  )
-
-  if (mentionedIds.length === 0) {
-    console.log('[Mention] Sender mentioned themselves only, skipping')
-    return NextResponse.json({ sent: true, count: 0 })
-  }
-
-  const { data: mentionedUsers, error: mentionedError } = await supabase
-    .from('users')
-    .select('email, username, full_name')
-    .in('user_id', mentionedIds)
-
-  if (mentionedError) {
-    console.error('[Mention] Mentioned users lookup failed:', mentionedError)
-    return NextResponse.json({ error: 'Failed to lookup mentioned users' }, { status: 500 })
-  }
-
-  if (!mentionedUsers || mentionedUsers.length === 0) {
-    console.warn('[Mention] No mentioned users found for IDs:', mentionedIds)
-    return NextResponse.json({ sent: true, count: 0 })
-  }
-
-  console.log(`[Mention] Sending to ${mentionedUsers.length} recipient(s): ${mentionedUsers.map(u => u.email).join(', ')}`)
-
-  // Sync mentioned users as Resend contacts (non-blocking — don't let sync failures prevent email)
-  try {
-    await Promise.allSettled(
-      mentionedUsers.map((recipient) => {
-        const nameParts = (recipient.full_name || '').split(' ')
-        return syncContactToResend({
-          email: recipient.email,
-          firstName: nameParts[0] || recipient.username,
-          lastName: nameParts.slice(1).join(' ') || undefined,
-        })
-      })
-    )
-  } catch (err) {
-    console.warn('[Mention] Contact sync had errors (continuing with send):', err)
-  }
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
-  const senderName = senderData.full_name || senderData.username
-
-  const emailPayloads = mentionedUsers.map((recipient) => {
-    const { subject, html } = mentionNotificationTemplate({
-      recipientName: recipient.full_name || recipient.username,
-      mentionerName: senderName,
-      poolName: pool.pool_name,
-      messageContent: message_content,
-      poolUrl: `${appUrl}/pools/${pool_id}`,
+  const admin = createAdminClient()
+  const queued = await queueChatMentions(admin, body.pool_id, userData.user_id)
+  if (queued.length > 0) {
+    after(async () => {
+      // The mention email goes under the Community topic, which needs each recipient to be a
+      // Resend contact — the app's sign-up never makes one — so make sure, as this route did.
+      try {
+        const { data: rows } = await admin.from('notification_outbox').select('user_id').in('outbox_id', queued)
+        const ids = [...new Set(((rows ?? []) as Array<{ user_id: string | null }>).map((r) => r.user_id).filter((u): u is string => !!u))]
+        const { data: users } = await admin.from('users').select('email, username, full_name').in('user_id', ids)
+        await Promise.allSettled(((users ?? []) as Array<{ email: string; username: string; full_name: string | null }>).map((u) => {
+          const nameParts = (u.full_name || '').split(' ')
+          return syncContactToResend({ email: u.email, firstName: nameParts[0] || u.username, lastName: nameParts.slice(1).join(' ') || undefined })
+        }))
+      } catch (err) {
+        console.error('[Mention] contact sync failed; sending anyway:', err)
+      }
+      await dispatch(admin, COMPOSERS, { ids: queued }).catch((err) =>
+        console.error('[Mention] dispatch failed; the outbox will retry:', err))
     })
-    return {
-      to: recipient.email,
-      subject,
-      html,
-      ...(TOPICS.COMMUNITY ? { topicId: TOPICS.COMMUNITY } : {}),
-      tags: [{ name: 'category', value: 'community' }],
-    }
-  })
-
-  // Use individual sendEmail for single recipient (more reliable), batch for multiple
-  let result: { success: boolean; error?: unknown }
-
-  if (emailPayloads.length === 1) {
-    result = await sendEmail(emailPayloads[0])
-    if (!result.success) {
-      console.error('[Mention] Single send failed:', result.error)
-      // Retry once
-      console.log('[Mention] Retrying single send...')
-      result = await sendEmail(emailPayloads[0])
-      if (!result.success) {
-        console.error('[Mention] Retry also failed:', result.error)
-      }
-    }
-  } else {
-    result = await sendBatchEmails(emailPayloads)
-    if (!result.success) {
-      console.error('[Mention] Batch send failed:', result.error)
-      // Fallback: send individually
-      console.log('[Mention] Falling back to individual sends...')
-      let sentCount = 0
-      for (const email of emailPayloads) {
-        const individual = await sendEmail(email)
-        if (individual.success) sentCount++
-        else console.error(`[Mention] Individual send to ${email.to} failed:`, individual.error)
-      }
-      result = { success: sentCount > 0 }
-      console.log(`[Mention] Fallback sent ${sentCount}/${emailPayloads.length}`)
-    }
   }
-
-  // Send push notifications (fire-and-forget). Category: COMMUNITY → users
-  // who opted out of community pushes won't receive this.
-  sendPushToUsers(
-    mentionedIds,
-    {
-      title: `${senderName} mentioned you`,
-      body: `in ${pool.pool_name}: "${message_content.slice(0, 100)}"`,
-      data: { type: 'community', pool_id },
-    },
-    'COMMUNITY',
-  ).catch((err) => console.error('[Mention] Push error:', err))
-
-  console.log(`[Mention] Result: ${result.success ? 'success' : 'failed'}, count: ${emailPayloads.length}`)
-  return NextResponse.json({ sent: result.success, count: emailPayloads.length })
+  return NextResponse.json({ sent: true, count: queued.length })
 }
