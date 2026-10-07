@@ -144,6 +144,56 @@ export function groupByDay(items: FeedItem[], now: Date = new Date()): DayGroup[
 
 // ---- pages ----------------------------------------------------
 
+/**
+ * What the page shows: the list, or — while there is no row to list — loading, a problem, or the
+ * empty state.
+ *
+ * ⚠ "NOTHING ON PAGE ONE" IS NOT "NOTHING". Page one is the last three matchweeks across every
+ * league the member plays (lib/activity/page.ts), so it can hold no row while older pages do: a
+ * member who sat out the latest weeks. The empty state is only for a history known to be empty
+ * (`nextBefore === null`). While an older page exists the list renders, and its sentinel pulls
+ * pages until something shows or the history ends (Ryan, 2026-10-07 — the app showed one row and
+ * stopped; this page would have said "No activity yet").
+ */
+export function feedView(s: {
+  loading: boolean
+  error: string | null
+  rows: number
+  needs: number
+  nextBefore: string | null | undefined
+}): 'loading' | 'problem' | 'empty' | 'list' {
+  if (s.rows > 0 || s.needs > 0) return 'list'
+  if (s.loading) return 'loading'
+  if (s.error) return 'problem'
+  return s.nextBefore ? 'list' : 'empty'
+}
+
+/** A list showing fewer rows than this pulls older pages on its own… */
+export const FILL_ROWS = 8
+/** …at most this many per chip change, so a member with no mentions doesn't page their whole history. */
+export const FILL_PAGES = 4
+
+/**
+ * Whether to fetch the next older page without waiting for a scroll: fewer than FILL_ROWS rows,
+ * an older page exists, nothing is loading or has failed, and fewer than FILL_PAGES tries since the
+ * chip last changed.
+ *
+ * ⚠ EVERY CHIP, "ALL" INCLUDED (2026-10-07). "All" used to wait for the bottom-of-list observer,
+ * and an observer only fires for a page someone is looking at with the sentinel in view — an
+ * empty or one-row first page in a background tab never loaded the rest. The app had the same gap
+ * from a different cause (mobile/lib/activityFilters.ts, the same rule).
+ */
+export function shouldFillMore(s: {
+  rows: number
+  nextBefore: string | null | undefined
+  loadingMore: boolean
+  loadMoreError: string | null
+  pagesTried: number
+}): boolean {
+  if (!s.nextBefore || s.loadingMore || s.loadMoreError) return false
+  return s.rows < FILL_ROWS && s.pagesTried < FILL_PAGES
+}
+
 /** Append a page, dropping any row already held — the same id twice is the same event. */
 export function appendUnique(prev: FeedItem[], add: FeedItem[]): FeedItem[] {
   const seen = new Set(prev.map((i) => i.activity_id))

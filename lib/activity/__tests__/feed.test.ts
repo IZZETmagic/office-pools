@@ -6,8 +6,8 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  appendUnique, groupByDay, matchesFilter, refreshPages, unreadMentions, webHref,
-  type FeedItem, type FeedType,
+  appendUnique, feedView, FILL_PAGES, FILL_ROWS, groupByDay, matchesFilter, refreshPages, shouldFillMore,
+  unreadMentions, webHref, type FeedItem, type FeedType,
 } from '../feed'
 
 const item = (type: FeedType, created_at = '2026-09-28T09:00:00Z', extra: Partial<FeedItem> = {}): FeedItem => ({
@@ -128,5 +128,42 @@ describe('the dot\'s mention half', () => {
     ]
     expect(unreadMentions(items, '2026-10-06T00:00:00Z')).toBe(1)
     expect(unreadMentions(items, null)).toBe(0)
+  })
+})
+
+describe('what the page shows', () => {
+  const none = { loading: false, error: null, rows: 0, needs: 0, nextBefore: null }
+
+  it('rows or Needs-you cards are the list, whatever else is going on', () => {
+    expect(feedView({ ...none, rows: 1 })).toBe('list')
+    expect(feedView({ ...none, needs: 1, loading: true })).toBe('list')
+  })
+  it('nothing yet: loading, then a problem if the first page failed', () => {
+    expect(feedView({ ...none, loading: true, nextBefore: undefined })).toBe('loading')
+    expect(feedView({ ...none, error: 'Failed', nextBefore: undefined })).toBe('problem')
+  })
+  it('an empty first page with older pages behind it is NOT empty — the list loads them', () => {
+    expect(feedView({ ...none, nextBefore: '2026-09-20T20:40:02Z' })).toBe('list')
+  })
+  it('the empty state only once the whole history is known to be empty', () => {
+    expect(feedView(none)).toBe('empty')
+  })
+})
+
+describe('filling a short list', () => {
+  const short = { rows: 0, nextBefore: '2026-09-20T20:40:02Z', loadingMore: false, loadMoreError: null, pagesTried: 0 }
+
+  it('a list too short to scroll pulls the next page without waiting for a scroll — All included', () => {
+    expect(shouldFillMore(short)).toBe(true)
+  })
+  it('not before the cursor is known, at the end, while loading, or after a failure', () => {
+    expect(shouldFillMore({ ...short, nextBefore: undefined })).toBe(false)
+    expect(shouldFillMore({ ...short, nextBefore: null })).toBe(false)
+    expect(shouldFillMore({ ...short, loadingMore: true })).toBe(false)
+    expect(shouldFillMore({ ...short, loadMoreError: 'offline' })).toBe(false)
+  })
+  it('stops once the list has enough rows, or after a few pages', () => {
+    expect(shouldFillMore({ ...short, rows: FILL_ROWS })).toBe(false)
+    expect(shouldFillMore({ ...short, pagesTried: FILL_PAGES })).toBe(false)
   })
 })

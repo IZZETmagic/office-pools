@@ -17,16 +17,11 @@ import { Icon } from '@/components/ui/Icon'
 import { useToast } from '@/components/ui/Toast'
 import { CrewNeedCard } from '@/components/crews/CrewNeedsStrip'
 import { SaveCrewModal } from '@/components/crews/SaveCrewModal'
-import { FILTER_EMPTY, FILTERS, groupByDay, matchesFilter, unreadMentions, webHref, type FeedFilter, type FeedItem } from '@/lib/activity/feed'
+import { FILTER_EMPTY, FILTERS, feedView, groupByDay, matchesFilter, shouldFillMore, unreadMentions, webHref, type FeedFilter, type FeedItem } from '@/lib/activity/feed'
 import type { NeedAction, NeedItem } from '@/lib/activity/needsYou'
 import { crewActionPlan } from '@/lib/crews/needActions'
 import { ActivityRow, MentionCard, PickNeedCard, StoryCard } from './cards'
 import { useActivityFeed } from './useActivityFeed'
-
-/** A chip showing fewer rows than this pulls older pages on its own… */
-const FILTER_FILL_ROWS = 8
-/** …at most this many per chip change, so a member with no mentions doesn't page their whole history. */
-const FILTER_FILL_PAGES = 4
 
 const isCrewNeed = (n: NeedItem) => n.kind === 'crew_seat' || n.kind === 'crew_invite' || n.kind === 'crew_save'
 
@@ -43,15 +38,14 @@ export function ActivityPage({ userId, isSuperAdmin }: { userId: string; isSuper
   const groups = useMemo(() => groupByDay(filtered), [filtered])
   const mentionsNew = useMemo(() => unreadMentions(items, seenAt), [items, seenAt])
 
-  // A chip with too little on it pulls older pages until it has enough, the history ends, or it has
-  // tried FILTER_FILL_PAGES times — so Mentions never opens empty with mentions one page away.
+  // A list with too little on it — any chip, All included — pulls older pages until it has enough,
+  // the history ends, or it has tried FILL_PAGES times. ⚠ All too: see `shouldFillMore`.
   const fillPagesRef = useRef(0)
   useEffect(() => {
     fillPagesRef.current = 0
   }, [filter])
   useEffect(() => {
-    if (filter === 'all' || !nextBefore || loadingMore || loadMoreError) return
-    if (filtered.length >= FILTER_FILL_ROWS || fillPagesRef.current >= FILTER_FILL_PAGES) return
+    if (!shouldFillMore({ rows: filtered.length, nextBefore, loadingMore, loadMoreError, pagesTried: fillPagesRef.current })) return
     fillPagesRef.current += 1
     void loadMore()
   }, [filter, filtered.length, nextBefore, loadingMore, loadMoreError, loadMore])
@@ -106,7 +100,8 @@ export function ActivityPage({ userId, isSuperAdmin }: { userId: string; isSuper
     [busy, settleNeeds, restoreNeeds, showToast, refresh, router],
   )
 
-  const hasAnything = items.length > 0 || needs.length > 0
+  // ⚠ Not "no rows → empty": page one can be empty while older pages are not (see feedView).
+  const view = feedView({ loading, error, rows: items.length, needs: needs.length, nextBefore })
   const subtitle = needs.length > 0
     ? `${needs.length} thing${needs.length === 1 ? '' : 's'} need${needs.length === 1 ? 's' : ''} you`
     : 'Don’t miss a beat'
@@ -123,11 +118,11 @@ export function ActivityPage({ userId, isSuperAdmin }: { userId: string; isSuper
           <p className="text-sm font-medium text-muted">{subtitle}</p>
         </header>
 
-        {loading && !hasAnything ? (
+        {view === 'loading' ? (
           <Loading />
-        ) : error && !hasAnything ? (
-          <Problem message={error} onRetry={() => void refresh()} />
-        ) : !hasAnything ? (
+        ) : view === 'problem' ? (
+          <Problem message={error ?? 'Something went wrong.'} onRetry={() => void refresh()} />
+        ) : view === 'empty' ? (
           <Empty />
         ) : (
           <>

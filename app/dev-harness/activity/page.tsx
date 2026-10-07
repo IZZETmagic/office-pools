@@ -117,6 +117,13 @@ const PAGE_TWO: FeedPage = {
   ],
 }
 
+/**
+ * `?first=empty`: page one holds nothing while older pages do — a member who sat out the latest
+ * matchweeks. The page must load them rather than say "No activity yet" (lib/activity/feed.ts,
+ * `feedView`).
+ */
+const EMPTY_FIRST: FeedPage = { needs_you: [], seen_at: SEEN, next_before: ago(1), items: [] }
+
 function answer(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
@@ -131,7 +138,12 @@ function installSampleFeed() {
     if (url.includes('/activity/seen')) return answer({ seen_at: new Date().toISOString() })
     if (url.includes('/api/users/') && url.includes('/activity')) {
       await new Promise((r) => setTimeout(r, 400))
-      return answer(url.includes('before=') ? PAGE_TWO : PAGE_ONE)
+      const before = new URL(url, window.location.origin).searchParams.get('before')
+      if (new URLSearchParams(window.location.search).get('first') === 'empty') {
+        if (!before) return answer(EMPTY_FIRST)
+        if (before === EMPTY_FIRST.next_before) return answer({ ...PAGE_ONE, needs_you: [] })
+      }
+      return answer(before ? PAGE_TWO : PAGE_ONE)
     }
     return real(input, init)
   }
