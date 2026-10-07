@@ -23,7 +23,7 @@ import {
 } from '@/components/pools';
 import { Button, Icon, Text } from '@/components/ui';
 import { useSharedActivity } from '@/lib/ActivityProvider';
-import { groupByDay, matchesFilter, type ActivityFilter } from '@/lib/activityFilters';
+import { groupByDay, matchesFilter, shouldFillMore, type ActivityFilter } from '@/lib/activityFilters';
 import {
   answerCrewInvite,
   answerCrewSeat,
@@ -46,16 +46,6 @@ import { fontFamilies, useTheme } from '@/theme';
  * flicking between tabs should not refetch every time.
  */
 const FOCUS_REFRESH_MS = 30_000;
-
-/**
- * How few rows a chip may show before the list fetches older pages on its own.
- * Mentions are rare, so without this the Mentions chip could open on an empty
- * screen while older mentions sat one page away.
- */
-const FILTER_FILL_ROWS = 8;
-/** …and at most this many pages per chip change, so a member with no mentions
- * at all does not page through their entire history every time they tap it. */
-const FILTER_FILL_PAGES = 4;
 
 type Row =
   | { kind: 'needs'; key: 'needs' }
@@ -200,15 +190,25 @@ export default function ActivityScreen() {
     return out;
   }, [filtered, nextBefore]);
 
-  // A chip with too little on screen pulls older pages until it has enough,
-  // the history ends, or it has tried FILTER_FILL_PAGES times.
+  // A list with too little on screen — any chip, All included — pulls older
+  // pages until it has enough, the history ends, or it has tried FILL_PAGES
+  // times. ⚠ All too: see `shouldFillMore` for the cold-open race it closes.
   const fillPagesRef = useRef(0);
   useEffect(() => {
     fillPagesRef.current = 0;
   }, [filter]);
   useEffect(() => {
-    if (filter === 'all' || !nextBefore || loadingMore || loadMoreError) return;
-    if (filtered.length >= FILTER_FILL_ROWS || fillPagesRef.current >= FILTER_FILL_PAGES) return;
+    if (
+      !shouldFillMore({
+        rows: filtered.length,
+        nextBefore,
+        loadingMore,
+        loadMoreError,
+        pagesTried: fillPagesRef.current,
+      })
+    ) {
+      return;
+    }
     fillPagesRef.current += 1;
     loadMore();
   }, [filter, filtered.length, nextBefore, loadingMore, loadMoreError, loadMore]);

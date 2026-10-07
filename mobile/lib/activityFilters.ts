@@ -34,6 +34,39 @@ export function matchesFilter(item: ActivityItem, filter: ActivityFilter): boole
   return filter === 'all' || TYPES[filter].has(item.activityType);
 }
 
+/**
+ * How few rows the list may show before it pulls older pages on its own. Mentions are rare, so a
+ * chip could otherwise open empty with its rows one page away.
+ */
+export const FILL_ROWS = 8;
+/** …and at most this many pages per chip change, so a member with no mentions at all does not
+ * page through their entire history every time they tap it. */
+export const FILL_PAGES = 4;
+
+/**
+ * Whether the list should fetch the next older page by itself: it shows fewer than FILL_ROWS
+ * rows, an older page exists, nothing is loading or has failed, and it has tried fewer than
+ * FILL_PAGES times since the chip last changed.
+ *
+ * ⚠ EVERY CHIP, "ALL" INCLUDED (Ryan, 2026-10-07: "What happened to all the activity?"). "All"
+ * used to rely on the list's end-reached signal alone, and that signal fires ONCE per content
+ * height. On a cold open it fired while the list was still the copy saved from the last visit,
+ * before the cursor to page two was known, so it did nothing — and when the fetch landed with the
+ * cursor, the one-row page had not changed height, so it never fired again. A first page holds the
+ * last three matchweeks across every league the member plays, so a quiet stretch can leave it a
+ * single row, too short to scroll. This re-asks whenever the cursor arrives.
+ */
+export function shouldFillMore(s: {
+  rows: number;
+  nextBefore: string | null | undefined;
+  loadingMore: boolean;
+  loadMoreError: string | null;
+  pagesTried: number;
+}): boolean {
+  if (!s.nextBefore || s.loadingMore || s.loadMoreError) return false;
+  return s.rows < FILL_ROWS && s.pagesTried < FILL_PAGES;
+}
+
 export type DayGroup = { key: string; label: string; items: ActivityItem[] };
 
 function dayKey(d: Date): string {

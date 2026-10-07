@@ -1,6 +1,9 @@
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
 import { describe, expect, it } from 'vitest'
 
-import { groupByDay, matchesFilter } from '../activityFilters'
+import { FILL_PAGES, FILL_ROWS, groupByDay, matchesFilter, shouldFillMore } from '../activityFilters'
 import type { ActivityItem, ActivityType } from '../useActivity'
 
 const item = (type: ActivityType, createdAt = '2026-09-28T09:00:00Z'): ActivityItem => ({
@@ -66,5 +69,40 @@ describe('groupByDay', () => {
   })
   it('drops an unparseable date rather than inventing a day', () => {
     expect(groupByDay([item('mention', 'not a date')], now)).toEqual([])
+  })
+})
+
+describe('shouldFillMore', () => {
+  const short = { rows: 1, nextBefore: '2026-09-20T20:40:02Z', loadingMore: false, loadMoreError: null, pagesTried: 0 }
+
+  it('a list too short to scroll pulls the next page by itself', () => {
+    expect(shouldFillMore(short)).toBe(true)
+  })
+  it('not before the cursor to the next page is known — a list restored from the last visit has none', () => {
+    expect(shouldFillMore({ ...short, nextBefore: undefined })).toBe(false)
+  })
+  it('not at the end of the history, while a page is loading, or after one failed', () => {
+    expect(shouldFillMore({ ...short, nextBefore: null })).toBe(false)
+    expect(shouldFillMore({ ...short, loadingMore: true })).toBe(false)
+    expect(shouldFillMore({ ...short, loadMoreError: 'offline' })).toBe(false)
+  })
+  it('stops once the screen has enough, or after a few pages', () => {
+    expect(shouldFillMore({ ...short, rows: FILL_ROWS })).toBe(false)
+    expect(shouldFillMore({ ...short, rows: FILL_ROWS - 1 })).toBe(true)
+    expect(shouldFillMore({ ...short, pagesTried: FILL_PAGES })).toBe(false)
+  })
+})
+
+describe('the Activity tab fills on every chip', () => {
+  // Source text, comments stripped: the rule above only helps if the screen asks it for "All" too.
+  // Leaving All to the list's end-reached signal is what showed Ryan one row on 2026-10-07.
+  it('asks shouldFillMore, and no longer skips All', () => {
+    const src = readFileSync(join(__dirname, '..', '..', 'app', '(tabs)', 'activity.tsx'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('//'))
+      .join('\n')
+    expect(src).toContain('shouldFillMore(')
+    expect(src).not.toMatch(/filter === 'all' \|\| !nextBefore/)
   })
 })
