@@ -104,14 +104,16 @@ async function main() {
       html: s.html,
       text: `${s.label} — preview. This is a rendering test, not a real notification.`,
       tags: [{ name: 'category', value: 'template-preview' }],
+      // A preview to our own inbox: a direct email, so no switch of ours can swallow it.
+      kind: 'direct_email',
     })
 
     if (result.success) {
       sent++
       console.log(`  ✓ ${n}/${samples.length}  ${s.label}`)
     } else {
-      failures.push({ label: s.label, error: result.error })
-      console.log(`  ✗ ${n}/${samples.length}  ${s.label} — ${JSON.stringify(result.error)}`)
+      failures.push({ label: s.label, error: ('error' in result ? result.error : result.skipped) })
+      console.log(`  ✗ ${n}/${samples.length}  ${s.label} — ${JSON.stringify(('error' in result ? result.error : result.skipped))}`)
     }
 
     if (i < samples.length - 1) await sleep(THROTTLE_MS)

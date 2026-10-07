@@ -37,7 +37,6 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendKeyedEmail } from '@/lib/email/send'
-import { TOPICS, TOPIC_KEYS, type TopicKey } from '@/lib/email/topics'
 import { sendPushToUser } from '@/lib/push/apns'
 import { PUSH_CATEGORY_COLUMNS } from '@/lib/push/categories'
 import type { NotificationCategory, NotificationTypeKey } from './registry'
@@ -251,7 +250,6 @@ export type DispatchDeps = {
   sendEmail: (args: {
     to: string
     email: ComposedEmail
-    topicId: string | undefined
     idempotencyKey: string
     typeKey: string
     /** For the delivery record (migration 176). */
@@ -351,7 +349,7 @@ export async function dispatch(
             const res = await deps.sendEmail({
               to: recipient.address as string,
               email,
-              topicId: fact.is_transactional ? undefined : topicFor(fact.category),
+              // The topic comes from the kind, in the transport (lib/email/send.ts) — not from here.
               idempotencyKey: `outbox/${row.outbox_id}/${email.key}`,
               typeKey,
               recordAs: { userId: row.user_id, poolId: row.pool_id, outboxId: row.outbox_id },
@@ -385,11 +383,6 @@ export async function dispatch(
     }
   }
   return summary
-}
-
-/** A category's Resend topic, if it has one. Achievements has none — and the registry refuses it an email. */
-function topicFor(category: NotificationCategory): string | undefined {
-  return (TOPIC_KEYS as readonly string[]).includes(category) ? TOPICS[category as TopicKey] : undefined
 }
 
 function groupBy<T>(items: T[], key: (t: T) => string): Map<string, T[]> {
@@ -468,7 +461,7 @@ function defaultDeps(admin: SupabaseClient): DispatchDeps {
       return out
     },
 
-    async sendEmail({ to, email, topicId, idempotencyKey, typeKey, recordAs }) {
+    async sendEmail({ to, email, idempotencyKey, typeKey, recordAs }) {
       // lib/email/send.ts records the delivery; a replay (the key already spent on an earlier,
       // different payload) means it went then — sent, and recorded then.
       const res = await sendKeyedEmail(
@@ -476,7 +469,6 @@ function defaultDeps(admin: SupabaseClient): DispatchDeps {
           to,
           subject: email.subject,
           html: email.html,
-          topicId,
           tags: [...(email.tags ?? []), { name: 'type', value: typeKey }],
           kind: typeKey as NotificationTypeKey,
           ...recordAs,

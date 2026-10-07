@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendBatchEmails } from '@/lib/email/send'
 import { roundOpenTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
 import { sendPushToUsers } from '@/lib/push/apns'
-import { NOTIFICATION_TYPES } from '@/lib/notifications/registry'
 import { roundLabel, selectorForKey } from '@/lib/competitionRounds'
 import type { RoundKey } from '@/app/pools/[pool_id]/types'
 
@@ -83,7 +81,7 @@ export async function POST(request: NextRequest) {
     return c
   }
 
-  const emails: Array<{ to: string; subject: string; html: string; topicId: string; tags: { name: string; value: string }[] }> = []
+  const emails: Array<{ to: string; subject: string; html: string; kind: 'round_open'; userId: string; poolId: string; tags: { name: string; value: string }[] }> = []
   let recipients = 0
   let pushSent = 0
   let pushTotal = 0
@@ -116,9 +114,11 @@ export async function POST(request: NextRequest) {
         to: m.users.email,
         subject,
         html,
-        // The registry's switch, as the push below already used: until
-        // 2026-10-05 this email followed Pool activity instead.
-        topicId: TOPICS[NOTIFICATION_TYPES.round_open.category],
+        // The kind's switch, as the push below uses: until 2026-10-05 this email
+        // followed Pool activity instead.
+        kind: 'round_open',
+        userId: m.user_id,
+        poolId: pool.pool_id,
         tags: [{ name: 'category', value: 'round_open' }],
       })
       recipients++

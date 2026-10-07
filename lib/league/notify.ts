@@ -30,14 +30,14 @@
 //
 // ## Preferences are honoured
 //
-// Push goes through `sendPushToUsers(..., kind)`, which looks up the kind's
-// switch in the registry and filters on `push_notification_preferences`. Email carries a Resend `topicId` so an
-// unsubscribe applies to the right stream rather than to everything.
+// Every message names its kind. Push goes through `sendPushToUsers(..., kind)`,
+// which takes the kind's switch from the registry; email goes through
+// lib/email/send.ts, which checks the same switch for each member and gives the
+// email the kind's Resend topic, so an unsubscribe applies to the right stream.
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendBatchEmails } from '@/lib/email/send'
-import { TOPICS } from '@/lib/email/topics'
 import {
   roundOpenTemplate,
   roundDeadlineReminderTemplate,
@@ -78,7 +78,6 @@ export type PlannedMember = {
     to: string
     subject: string
     html: string
-    topicId?: string
     tags: { name: string; value: string }[]
   }>
   push: boolean
@@ -102,7 +101,7 @@ async function fromPlan(plan: LeaguePlan, poolId: string): Promise<NoticeResult>
   if ('skipped' in plan) return { emails: 0, pushes: 0, skipped: plan.skipped }
   return deliver(
     plan.members.flatMap((m) => m.emails.map((e) => ({
-      to: e.to, subject: e.subject, html: e.html, topicId: e.topicId, tags: e.tags,
+      to: e.to, subject: e.subject, html: e.html, tags: e.tags,
       // For the delivery record: who it was for, so the cut-over can compare recipients.
       kind: plan.kind, userId: m.userId, poolId,
     }))),
@@ -214,8 +213,8 @@ const displayName = (m: MemberRow) => m.users?.full_name || m.users?.username ||
 
 async function deliver(
   emails: Array<{
-    to: string; subject: string; html: string; topicId?: string; tags?: { name: string; value: string }[]
-    kind?: NotificationTypeKey; userId?: string; poolId?: string
+    to: string; subject: string; html: string; tags?: { name: string; value: string }[]
+    kind: NotificationTypeKey; userId?: string; poolId?: string
   }>,
   userIds: string[],
   push: { title: string; body: string; data?: Record<string, string> },
@@ -278,7 +277,6 @@ export async function planMatchweekOpened(
           to: m.users!.email as string,
           subject,
           html,
-          topicId: TOPICS.PREDICTIONS,
           tags: [{ name: 'category', value: 'league_matchweek_open' }],
         }],
         push: true,
@@ -372,7 +370,6 @@ export async function planLockReminder(
           to: member.users!.email as string,
           subject,
           html,
-          topicId: TOPICS.PREDICTIONS,
           tags: [{ name: 'category', value: 'league_lock_reminder' }],
         }],
         push: true,
@@ -469,7 +466,6 @@ export async function planMatchweekCompleted(
           to: m.users!.email as string,
           subject,
           html,
-          topicId: TOPICS.MATCH_RESULTS,
           tags: [{ name: 'category', value: 'league_matchweek_result' }],
         }
       }),
@@ -595,7 +591,6 @@ export async function planTableDeadline(
           to: member.users!.email as string,
           subject,
           html,
-          topicId: TOPICS.PREDICTIONS,
           tags: [{ name: 'category', value: 'league_table_deadline' }],
         }],
         push: true,
@@ -681,7 +676,6 @@ export async function notifyTableDeadlineMoved(
       to: m.users!.email as string,
       subject,
       html,
-      topicId: TOPICS.PREDICTIONS,
       tags: [{ name: 'category', value: 'league_table_deadline_moved' }],
       kind: 'table_deadline_moved' as const,
       userId: m.user_id,

@@ -29,6 +29,8 @@ async function main() {
     subject: 'Reminder: The Road To Glory — One Month To Go',
     html,
     reply_to: 'ryansousa93@gmail.com',
+    // A review copy to our own inboxes: a direct email.
+    kind: 'direct_email',
   })
 
   console.log(JSON.stringify({ recipients, result }, null, 2))

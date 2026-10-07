@@ -3,7 +3,6 @@ import { saveLeaguePredictions } from '@/lib/league/write'
 import { requireAuth } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/send'
 import { predictionsSubmittedTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
 import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
@@ -565,7 +564,9 @@ async function handlePUT(
     to: userProfile?.email,
     subject,
     html,
-    topicId: TOPICS.PREDICTIONS,
+    kind: 'predictions_submitted',
+    userId: userData.user_id,
+    poolId: pool_id,
     tags: [{ name: 'category', value: 'predictions' }],
   }).catch(console.error)
 

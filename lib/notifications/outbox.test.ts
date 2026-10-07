@@ -4,10 +4,6 @@ import { describe, it, expect, vi } from 'vitest'
 // the module imports them, so they are stubbed to keep the import inert.
 vi.mock('@/lib/email/resend', () => ({ getResendClient: () => { throw new Error('no real email in tests') } }))
 vi.mock('@/lib/push/apns', () => ({ sendPushToUser: () => { throw new Error('no real push in tests') } }))
-vi.mock('@/lib/email/topics', () => ({
-  TOPICS: { POOL_ACTIVITY: 'topic-pool', PREDICTIONS: 'topic-predictions', MATCH_RESULTS: 'topic-results', LEADERBOARD: 'topic-lb', ADMIN: 'topic-admin', COMMUNITY: 'topic-community' },
-  TOPIC_KEYS: ['POOL_ACTIVITY', 'PREDICTIONS', 'MATCH_RESULTS', 'LEADERBOARD', 'ADMIN', 'COMMUNITY'],
-}))
 
 import {
   backoffMs, decide, dispatch, MAX_ATTEMPTS, recipientFor, settle,
@@ -123,7 +119,7 @@ describe('decide — the gate before anything is sent', () => {
 
 function harness(rows: OutboxRow[], opts: { person?: Person; transactional?: boolean; emailOk?: boolean[]; pushResult?: { sent: number; total: number } } = {}) {
   const store = new Map(rows.map((r) => [r.outbox_id, { ...r }]))
-  const emails: Array<{ to: string; idempotencyKey: string; topicId: string | undefined }> = []
+  const emails: Array<{ to: string; idempotencyKey: string }> = []
   const pushes: string[] = []
   const recordedAs: unknown[] = []
   const pauses: number[] = []
@@ -135,8 +131,8 @@ function harness(rows: OutboxRow[], opts: { person?: Person; transactional?: boo
       .map((r) => ({ ...r, attempts: r.attempts + 1 })),
     registry: async (types) => new Map(types.map((t) => [t, { category: 'POOL_ACTIVITY' as const, is_transactional: opts.transactional ?? false }])),
     people: async (ids) => new Map(ids.map((id) => [id, opts.person ?? person()])),
-    sendEmail: async ({ to, idempotencyKey, topicId, recordAs }) => {
-      emails.push({ to, idempotencyKey, topicId })
+    sendEmail: async ({ to, idempotencyKey, recordAs }) => {
+      emails.push({ to, idempotencyKey })
       recordedAs.push({ channel: 'email', ...recordAs })
       return emailOk.length ? (emailOk.shift() ? { ok: true } : { ok: false, error: 'rate_limit_exceeded' }) : { ok: true }
     },
@@ -159,11 +155,12 @@ const composeWelcome: Composer = async (_admin, rows) => new Map(rows.map((r) =>
 const admin = {} as never
 
 describe('dispatch', () => {
-  it('sends each channel once, with a per-row idempotency key and the category\'s topic', async () => {
+  it('sends each channel once, with a per-row idempotency key', async () => {
     const h = harness([row()])
     const s = await dispatch(admin, { pool_welcome: composeWelcome }, {}, h.deps)
     expect(s).toMatchObject({ claimed: 1, sent: 1 })
-    expect(h.emails).toEqual([{ to: 'member@example.com', idempotencyKey: 'outbox/1/welcome', topicId: 'topic-pool' }])
+    // The topic is the transport's to choose, from the kind (lib/email/send.ts) — not the outbox's.
+    expect(h.emails).toEqual([{ to: 'member@example.com', idempotencyKey: 'outbox/1/welcome' }])
     expect(h.pushes).toEqual(['u1'])
   })
 
@@ -206,10 +203,11 @@ describe('dispatch', () => {
     expect(h.pushes).toEqual([])
   })
 
-  it('sends a transactional kind with no topic, so no unsubscribe can swallow it', async () => {
+  it('sends a transactional kind to its address, with no member behind it', async () => {
     const h = harness([row({ type_key: 'crew_invite_email', user_id: null, to_email: 'new@example.com', channels: ['email'] })], { transactional: true })
     await dispatch(admin, { crew_invite_email: composeWelcome }, {}, h.deps)
-    expect(h.emails).toEqual([{ to: 'new@example.com', idempotencyKey: 'outbox/1/welcome', topicId: undefined }])
+    expect(h.emails).toEqual([{ to: 'new@example.com', idempotencyKey: 'outbox/1/welcome' }])
+    expect(h.recordedAs).toEqual([{ channel: 'email', userId: null, poolId: 'p1', outboxId: 1 }])
   })
 
   it('fails a kind with no composer at once — retrying cannot write the code', async () => {

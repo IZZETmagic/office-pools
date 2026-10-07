@@ -151,14 +151,6 @@ const SEGMENTS = {
 
 type SegmentKey = keyof typeof SEGMENTS
 
-const TOPIC_OPTIONS = [
-  { key: '', label: 'None (always delivered)' },
-  { key: 'PREDICTIONS', label: 'Predictions' },
-  { key: 'POOL_ACTIVITY', label: 'Pool Activity' },
-  { key: 'ADMIN', label: 'Admin' },
-  { key: 'COMMUNITY', label: 'Community' },
-] as const
-
 type PoolInfo = { pool_id: string; pool_name: string; prediction_mode: string; prediction_deadline: string | null }
 type RoundInfo = { id: string; pool_id: string; round_key: string; deadline: string | null; state: string }
 type UserInfo = { user_id: string; email: string; name: string }
@@ -188,7 +180,6 @@ export function TemplatesTab() {
   const [bodyText, setBodyText] = useState('')
   const [ctaText, setCtaText] = useState('')
   const [ctaUrl, setCtaUrl] = useState('')
-  const [topic, setTopic] = useState('')
 
   // Recipient targeting (custom template)
   const [recipientMode, setRecipientMode] = useState<'segment' | 'users'>('segment')
@@ -251,7 +242,6 @@ export function TemplatesTab() {
     setBodyText('')
     setCtaText('')
     setCtaUrl('')
-    setTopic('')
     setRecipientMode(key === 'support_reply' ? 'users' : 'segment')
     setSegment('all')
     setSelectedUserIds([])
@@ -288,7 +278,6 @@ export function TemplatesTab() {
           body_text: bodyText,
           cta_text: ctaText,
           cta_url: ctaUrl,
-          topic,
           recipient_mode: recipientMode,
           ...(recipientMode === 'segment' ? { segment } : { user_ids: selectedUserIds }),
         }
@@ -910,17 +899,13 @@ export function TemplatesTab() {
                 </FormField>
               </div>
 
-              <FormField label="Notification Topic" helperText="Users can unsubscribe from specific topics. Leave empty to always deliver.">
-                <select
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  className="w-full sp-radius-sm border sp-border-silver bg-surface px-3 py-2 text-sm sp-text-ink focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  {TOPIC_OPTIONS.map((t) => (
-                    <option key={t.key} value={t.key}>{t.label}</option>
-                  ))}
-                </select>
-              </FormField>
+              {/* N4 (2026-10-07): there is no topic to pick. The server decides from who it goes to —
+                  one person: a direct email, always delivered; more: News from SportPool, under that switch. */}
+              <p className="text-xs sp-text-slate">
+                {recipientMode === 'users' && selectedUserIds.length === 1
+                  ? 'Sent as a direct email — always delivered.'
+                  : 'Sent as News from SportPool — members who switched that off will not get it.'}
+              </p>
             </>
           )}
 

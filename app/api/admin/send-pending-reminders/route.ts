@@ -4,7 +4,6 @@ import { resolveSendMode } from '@/lib/email/sendMode'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendBatchEmails } from '@/lib/email/send'
 import { pendingPredictionsReminderTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
 import { ROUND_LABELS, ROUND_MATCH_STAGES, type RoundKey } from '@/lib/tournament'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sportpool.io'
@@ -235,11 +234,12 @@ export async function POST(request: NextRequest) {
     to: string
     subject: string
     html: string
-    topicId: string
+    kind: 'predictions_reminder'
+    userId: string
     tags: { name: string; value: string }[]
   }> = []
 
-  for (const [, userData] of userPending) {
+  for (const [userId, userData] of userPending) {
     if (userData.pools.length === 0) continue
 
     // Sort pools by days left (most urgent first)
@@ -254,7 +254,9 @@ export async function POST(request: NextRequest) {
       to: userData.email,
       subject,
       html,
-      topicId: TOPICS.PREDICTIONS,
+      // A manual tournament reminder (migration 179) — under Predictions, checked per member.
+      kind: 'predictions_reminder',
+      userId,
       tags: [{ name: 'category', value: 'pending-predictions-reminder' }],
     })
   }

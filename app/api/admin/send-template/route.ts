@@ -19,7 +19,7 @@ import {
   poolAdminFeedbackSurveyTemplate,
   playerFeedbackSurveyTemplate,
 } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
+import type { NotificationTypeKey } from '@/lib/notifications/registry'
 import { querySegment, type SegmentKey, SEGMENT_KEYS } from '@/lib/email/segments'
 import { ROUND_LABELS, ROUND_MATCH_STAGES, type RoundKey } from '@/lib/tournament'
 
@@ -319,7 +319,10 @@ type EmailPayload = {
   to: string
   subject: string
   html: string
-  topicId?: string
+  /** The registry kind — the transport takes the topic and the member's switch from it (N4). */
+  kind: NotificationTypeKey
+  userId?: string | null
+  poolId?: string | null
   tags?: { name: string; value: string }[]
 }
 
@@ -490,7 +493,7 @@ async function handlePendingPredictions(
   }
 
   const emails: EmailPayload[] = []
-  for (const [, userData] of userPending) {
+  for (const [userId, userData] of userPending) {
     if (userData.pools.length === 0) continue
     userData.pools.sort((a, b) => a.daysLeft - b.daysLeft)
 
@@ -502,7 +505,8 @@ async function handlePendingPredictions(
       to: userData.email,
       subject,
       html,
-      topicId: TOPICS.PREDICTIONS,
+      kind: 'predictions_reminder',
+      userId,
       tags: [{ name: 'category', value: 'pending-predictions-reminder' }],
     })
   }
@@ -560,7 +564,7 @@ async function handleDeadlineReminder(
 
   const poolUrl = `${APP_URL}/pools/${pool.pool_id}`
   const emails: EmailPayload[] = []
-  for (const [, u] of userEntries) {
+  for (const [userId, u] of userEntries) {
     const { subject, html } = deadlineReminderTemplate({
       userName: u.userName,
       poolName: pool.pool_name,
@@ -572,7 +576,9 @@ async function handleDeadlineReminder(
       to: u.email,
       subject,
       html,
-      topicId: TOPICS.PREDICTIONS,
+      kind: 'predictions_reminder',
+      userId,
+      poolId: pool.pool_id,
       tags: [{ name: 'category', value: 'deadline-reminder' }],
     })
   }
@@ -648,7 +654,7 @@ async function handleRoundDeadlineReminder(
 
   const poolUrl = `${APP_URL}/pools/${pool.pool_id}?tab=predictions`
   const emails: EmailPayload[] = []
-  for (const [, u] of userEntries) {
+  for (const [userId, u] of userEntries) {
     const { subject, html } = roundDeadlineReminderTemplate({
       userName: u.userName,
       poolName: pool.pool_name,
@@ -661,7 +667,9 @@ async function handleRoundDeadlineReminder(
       to: u.email,
       subject,
       html,
-      topicId: TOPICS.PREDICTIONS,
+      kind: 'predictions_reminder',
+      userId,
+      poolId: pool.pool_id,
       tags: [{ name: 'category', value: 'round-deadline-reminder' }],
     })
   }
@@ -677,18 +685,18 @@ async function handleCustom(
   if (!body.body_text) return { emails: [], error: 'body_text is required for custom template' }
 
   // Resolve recipients
-  type Recipient = { email: string; firstName: string }
+  type Recipient = { email: string; firstName: string; userId: string }
   const recipients: Recipient[] = []
 
   if (body.recipient_mode === 'users' && body.user_ids?.length) {
     const { data: users } = await supabase
       .from('users')
-      .select('email, full_name, username')
+      .select('user_id, email, full_name, username')
       .in('user_id', body.user_ids)
       .not('email', 'is', null)
 
     for (const u of users ?? []) {
-      recipients.push({ email: u.email, firstName: extractFirstName(u.full_name, u.username) })
+      recipients.push({ email: u.email, firstName: extractFirstName(u.full_name, u.username), userId: u.user_id })
     }
   } else if (body.segment) {
     if (!SEGMENT_KEYS.includes(body.segment)) {
@@ -696,7 +704,7 @@ async function handleCustom(
     }
     const users = await querySegment(supabase, body.segment)
     for (const u of users) {
-      recipients.push({ email: u.email, firstName: extractFirstName(u.full_name, u.username) })
+      recipients.push({ email: u.email, firstName: extractFirstName(u.full_name, u.username), userId: u.user_id })
     }
   } else {
     return { emails: [], error: 'Either segment or user_ids must be provided for custom template' }
@@ -704,10 +712,10 @@ async function handleCustom(
 
   if (recipients.length === 0) return { emails: [] }
 
-  // Resolve topic
-  const topicId = body.topic && TOPICS[body.topic as keyof typeof TOPICS]
-    ? TOPICS[body.topic as keyof typeof TOPICS]
-    : undefined
+  // Its kind (Ryan, 2026-10-07): to exactly one person it is a direct email, always delivered;
+  // to more, it is News from SportPool, under that switch. There is no topic to pick any more —
+  // a switch comes only from a registered kind and its sentence.
+  const kind = body.recipient_mode === 'users' && recipients.length === 1 ? 'direct_email' : 'sportpool_news'
 
   const emails: EmailPayload[] = recipients.map((r) => {
     const bodyHtml = (body.body_text as string).replace(/\n/g, '<br>')
@@ -725,7 +733,8 @@ async function handleCustom(
       to: r.email,
       subject: body.subject,
       html,
-      ...(topicId ? { topicId } : {}),
+      kind,
+      userId: r.userId,
       tags: [{ name: 'category', value: 'admin-custom' }],
     }
   })
@@ -803,6 +812,10 @@ async function handleGrowthTemplate(
       to: user.email,
       subject,
       html,
+      // Under Pool activity (migration 179); until now nothing but "unsubscribe from everything" stopped these.
+      kind: 'pool_size_nudge',
+      userId: user.user_id,
+      poolId: pool.pool_id,
       tags: [{ name: 'category', value: segmentKey }],
     })
   }
@@ -828,6 +841,9 @@ async function handleSimpleGrowthTemplate(
       to: u.email,
       subject,
       html,
+      // "Start a pool" and the surveys are about SportPool itself: News from SportPool (Ryan, 2026-10-07).
+      kind: 'sportpool_news' as const,
+      userId: u.user_id,
       tags: [{ name: 'category', value: segmentKey }],
     }
   })
@@ -851,7 +867,7 @@ async function handleSupportReply(
 
   const { data: users } = await supabase
     .from('users')
-    .select('email, full_name, username')
+    .select('user_id, email, full_name, username')
     .in('user_id', body.user_ids)
     .not('email', 'is', null)
 
@@ -875,6 +891,9 @@ async function handleSupportReply(
       to: u.email,
       subject: body.subject,
       html,
+      // Always delivered (Ryan, 2026-10-07).
+      kind: 'direct_email' as const,
+      userId: u.user_id,
       tags: [{ name: 'category', value: 'support-reply' }],
     }
   })
@@ -961,7 +980,10 @@ async function handleBracketFix(
       to: user.email,
       subject,
       html,
-      topicId: TOPICS.ADMIN,
+      // A correction to the member's own entry — always delivered.
+      kind: 'direct_email',
+      userId: member.user_id as string,
+      poolId,
       tags: [{ name: 'category', value: 'bracket-fix' }],
     })
   }

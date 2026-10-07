@@ -76,6 +76,8 @@ export async function POST(request: NextRequest) {
     reply_to: SUPPORT_EMAIL,
     headers: Object.keys(headers).length > 0 ? headers : undefined,
     tags: [{ name: 'category', value: 'support-reply' }],
+    // Always delivered (Ryan, 2026-10-07): no switch blocks a reply to someone who wrote to us.
+    kind: 'direct_email',
   })
 
   if (!result.success) {

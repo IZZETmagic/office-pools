@@ -1,7 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendBatchEmails } from '@/lib/email/send'
 import { predictionsAutoSubmittedTemplate, roundAutoSubmittedTemplate, roundOpenTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
 // No longer imports lib/tournament's ROUND_* maps: every round question in this
 // file now goes through the format-aware resolver, so the World Cup's seven
 // hardcoded rounds are no longer baked into the sweep that has to drive a
@@ -171,7 +170,9 @@ export async function autoSubmitDraftEntries(poolId?: string): Promise<AutoSubmi
           to: entry.email,
           subject: template.subject,
           html: template.html,
-          topicId: TOPICS.PREDICTIONS,
+          kind: 'predictions_auto_submitted' as const,
+          userId: entry.userId,
+          poolId: pool.pool_id,
         }
       })
 
@@ -344,7 +345,9 @@ export async function autoSubmitProgressiveRounds(): Promise<AutoSubmitResult> {
               to: member.users.email,
               subject,
               html,
-              topicId: TOPICS.PREDICTIONS,
+              kind: 'round_auto_submitted',
+              userId: member.user_id,
+              poolId,
             }]).catch(console.error)
 
             // Push notification
@@ -610,7 +613,10 @@ async function sendAutoRoundOpenNotifications(
         to: m.users.email,
         subject,
         html,
-        topicId: TOPICS.POOL_ACTIVITY,
+        // round_open is a Predictions notice; this used to file it under Pool activity.
+        kind: 'round_open' as const,
+        userId: m.user_id as string,
+        poolId,
         tags: [{ name: 'category', value: 'round_open' }],
       }
     })

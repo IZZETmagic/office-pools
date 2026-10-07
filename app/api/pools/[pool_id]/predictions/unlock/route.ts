@@ -3,7 +3,6 @@ import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email/send'
 import { predictionsUnlockedTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
 import { withPerfLogging } from '@/lib/api-perf'
 
 // POST /api/pools/:poolId/predictions/unlock - Admin unlocks an entry's predictions
@@ -151,7 +150,9 @@ async function handlePOST(
         to: ownerData.email,
         subject,
         html,
-        topicId: TOPICS.ADMIN,
+        kind: 'predictions_unlocked',
+        userId: entryOwnerUserId,
+        poolId: pool_id,
         tags: [{ name: 'category', value: 'admin' }],
       }).catch(console.error)
     }

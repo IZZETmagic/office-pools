@@ -14,7 +14,6 @@ import {
 } from '@/lib/advancement'
 import { sendBatchEmails } from '@/lib/email/send'
 import { roundOpenTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
 
 // =============================================================
 // POST /api/admin/advance-teams
@@ -466,7 +465,7 @@ async function checkProgressiveRoundCompletion(
       // Send notification emails to pool members
       const { data: members } = await supabase
         .from('pool_members')
-        .select('users(email, full_name, username)')
+        .select('user_id, users(email, full_name, username)')
         .eq('pool_id', pool.pool_id)
 
       if (members && members.length > 0) {
@@ -488,7 +487,10 @@ async function checkProgressiveRoundCompletion(
               to: m.users.email,
               subject,
               html,
-              topicId: TOPICS.POOL_ACTIVITY,
+              // round_open is a Predictions notice; this used to file it under Pool activity.
+              kind: 'round_open' as const,
+              userId: m.user_id as string,
+              poolId: pool.pool_id as string,
               tags: [{ name: 'category', value: 'round_open' }],
             }
           })

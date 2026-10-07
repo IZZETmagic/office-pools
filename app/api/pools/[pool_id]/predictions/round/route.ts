@@ -4,7 +4,6 @@ import { roundLabel } from '@/lib/competitionRounds'
 import { fetchRoundMatches } from '@/lib/roundMatches'
 import { sendEmail } from '@/lib/email/send'
 import { roundSubmittedTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
 import { withPerfLogging } from '@/lib/api-perf'
 
 // =============================================================
@@ -215,7 +214,9 @@ async function handlePUT(
     to: userProfile?.email,
     subject,
     html,
-    topicId: TOPICS.PREDICTIONS,
+    kind: 'round_submitted',
+    userId: userData.user_id,
+    poolId: pool_id,
     tags: [{ name: 'category', value: 'round_submitted' }],
   }).catch(console.error)
 

@@ -39,7 +39,8 @@ describe('testEmailFor', () => {
     to: 'member@example.com',
     subject: 'Your pool needs you',
     html: '<p>Hi Alice</p>',
-    topicId: 't-pool-activity',
+    kind: 'pool_size_nudge' as const,
+    userId: 'u-alice',
     tags: [{ name: 'category', value: 'growth' }],
   }
   const t = testEmailFor(first, 'admin@example.com')
@@ -52,8 +53,12 @@ describe('testEmailFor', () => {
     expect(t.html).toBe(first.html)
     expect(t.subject).toBe('[TEST] Your pool needs you')
   })
-  it('carries no topic, so an unsubscribed admin still receives it', () => {
-    expect(t.topicId).toBeUndefined()
+  it('is a direct email — no topic, no switch — so an admin who turned it off still receives it', () => {
+    expect(t.kind).toBe('direct_email')
     expect(t.tags).toEqual([{ name: 'category', value: 'test_send' }])
+  })
+  it('is not the member\'s: the record must not say they were emailed', () => {
+    expect(t.userId).toBeNull()
+    expect(JSON.stringify(t)).not.toContain('u-alice')
   })
 })

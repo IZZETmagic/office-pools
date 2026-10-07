@@ -1,3 +1,4 @@
+import type { NotificationTypeKey } from '@/lib/notifications/registry'
 // =============================================================
 // Admin email sends — SAFE BY DEFAULT
 // =============================================================
@@ -29,7 +30,9 @@ type Email = {
   to: string
   subject: string
   html: string
-  topicId?: string
+  kind: NotificationTypeKey
+  userId?: string | null
+  poolId?: string | null
   tags?: { name: string; value: string }[]
 }
 
@@ -37,16 +40,20 @@ type Email = {
  * The copy a test send delivers: the first recipient's email exactly as they
  * would receive it, addressed to the admin instead.
  *
- * ⚠ NO topicId, deliberately. A topic routes through the admin's OWN Resend
- * subscription, so an admin who had unsubscribed from it would get a test that
- * silently never arrives — worse than no test. The cost is cosmetic: the
- * footer's unsubscribe link renders without a topic.
+ * ⚠ SENT AS A DIRECT EMAIL, deliberately: always delivered, so no topic and no
+ * switch. A topic routes through the admin's OWN Resend subscription, and a
+ * switch is the admin's own choice — either way an admin who had turned it off
+ * would get a test that silently never arrives, worse than no test. And no
+ * member: the record must not say the member was emailed. The cost is
+ * cosmetic: the footer's unsubscribe link renders without a topic.
  */
 export function testEmailFor(first: Email, adminEmail: string): Email {
   return {
     to: adminEmail,
     subject: `[TEST] ${first.subject}`,
     html: first.html,
+    kind: 'direct_email',
+    userId: null,
     tags: [{ name: 'category', value: 'test_send' }],
   }
 }

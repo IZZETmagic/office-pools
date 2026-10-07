@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { sendBatchEmails } from '@/lib/email/send'
 import { deadlineChangedTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
 import { sendPushToUsers } from '@/lib/push/apns'
-import { NOTIFICATION_TYPES } from '@/lib/notifications/registry'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
@@ -76,7 +74,9 @@ export async function POST(request: NextRequest) {
       to: u.email,
       subject,
       html,
-      topicId: TOPICS[NOTIFICATION_TYPES.deadline_changed.category],
+      kind: 'deadline_changed' as const,
+      userId: member.user_id,
+      poolId: pool_id,
       tags: [{ name: 'category', value: 'admin' }],
     }
   })

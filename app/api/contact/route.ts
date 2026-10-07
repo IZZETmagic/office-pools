@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendEmail } from '@/lib/email/send'
+import { sendInternalEmail } from '@/lib/email/send'
 import { brandedTemplate } from '@/lib/email/templates'
 import { dataRows, panel, paragraph, sectionLabel } from '@/lib/email/components'
 import { withPerfLogging } from '@/lib/api-perf'
@@ -100,7 +100,7 @@ async function handlePOST(request: NextRequest) {
     // is the cost this whole change exists to remove.
     const emailSubject = `[Contact] ${category.label}${normalizedPoolCode ? ` · ${normalizedPoolCode}` : ''} — ${subject}`
 
-    const result = await sendEmail({
+    const result = await sendInternalEmail({
       to: 'support@sportpool.io',
       subject: emailSubject,
       html,

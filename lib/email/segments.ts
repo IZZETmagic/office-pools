@@ -87,6 +87,8 @@ type SegmentUser = {
   email: string
   full_name: string | null
   username: string
+  /** Who it is — the email transport checks this member's switch (N4). */
+  user_id: string
 }
 
 type SegmentUserRow = SegmentUser & { user_id: string }
@@ -339,6 +341,7 @@ export async function querySegment(
           email: user.email,
           full_name: user.full_name,
           username: user.username,
+          user_id: member.user_id,
         })
       }
       return result

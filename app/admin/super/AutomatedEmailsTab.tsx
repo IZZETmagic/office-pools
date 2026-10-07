@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { Badge } from '@/components/ui/Badge'
+import { NOTIFICATION_TYPES, type NotificationTypeKey } from '@/lib/notifications/registry'
 
 // --- Automated email definitions ---
 
@@ -14,7 +15,16 @@ type AutomatedEmail = {
   category: 'transactional' | 'notification' | 'confirmation' | 'admin'
   recipient: string
   endpoint: string
-  topic?: string
+  /** The registry kind it is sent as — the switch shown is read from the registry, never typed here (N4). */
+  kind?: NotificationTypeKey
+}
+
+/** Which switch governs an email, in the registry's words. */
+function switchFor(kind: NotificationTypeKey | undefined): string | null {
+  if (!kind) return null
+  const spec = NOTIFICATION_TYPES[kind]
+  if ('transactional' in spec && spec.transactional) return 'Always delivered'
+  return spec.category
 }
 
 const AUTOMATED_EMAILS: AutomatedEmail[] = [
@@ -27,7 +37,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'confirmation',
     recipient: 'Submitting user',
     endpoint: '/api/pools/[pool_id]/predictions',
-    topic: 'PREDICTIONS',
+    kind: 'predictions_submitted',
   },
   {
     key: 'round_prediction_submitted',
@@ -37,7 +47,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'confirmation',
     recipient: 'Submitting user',
     endpoint: '/api/pools/[pool_id]/predictions/round',
-    topic: 'PREDICTIONS',
+    kind: 'round_submitted',
   },
   {
     key: 'bracket_picks_submitted',
@@ -47,7 +57,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'confirmation',
     recipient: 'Submitting user',
     endpoint: '/api/pools/[pool_id]/bracket-picks',
-    topic: 'PREDICTIONS',
+    kind: 'predictions_submitted',
   },
   {
     key: 'predictions_unlocked',
@@ -57,7 +67,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'confirmation',
     recipient: 'User whose predictions were unlocked',
     endpoint: '/api/pools/[pool_id]/predictions/unlock',
-    topic: 'POOL_ACTIVITY',
+    kind: 'predictions_unlocked',
   },
 
   // Notifications
@@ -69,7 +79,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'notification',
     recipient: 'Pool admin',
     endpoint: '/api/notifications/pool-joined',
-    topic: 'POOL_ACTIVITY',
+    kind: 'pool_welcome',
   },
   {
     key: 'member_removed',
@@ -79,7 +89,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'notification',
     recipient: 'Removed user',
     endpoint: '/api/notifications/member-removed',
-    topic: 'POOL_ACTIVITY',
+    kind: 'member_removed',
   },
   {
     key: 'deadline_changed',
@@ -89,7 +99,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'notification',
     recipient: 'All pool members',
     endpoint: '/api/notifications/deadline-changed',
-    topic: 'POOL_ACTIVITY',
+    kind: 'deadline_changed',
   },
   {
     key: 'points_adjusted',
@@ -99,7 +109,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'notification',
     recipient: 'Affected user',
     endpoint: '/api/notifications/points-adjusted',
-    topic: 'POOL_ACTIVITY',
+    kind: 'points_adjusted',
   },
   {
     key: 'mention',
@@ -109,7 +119,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'notification',
     recipient: 'Mentioned user',
     endpoint: '/api/notifications/mention',
-    topic: 'COMMUNITY',
+    kind: 'chat_mention',
   },
   {
     key: 'round_state_changed',
@@ -119,7 +129,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'notification',
     recipient: 'All pool members',
     endpoint: '/api/pools/[pool_id]/rounds/[round_key]/state',
-    topic: 'POOL_ACTIVITY',
+    kind: 'round_open',
   },
 
   // Admin-triggered
@@ -131,7 +141,7 @@ const AUTOMATED_EMAILS: AutomatedEmail[] = [
     category: 'admin',
     recipient: 'Affected pool members',
     endpoint: '/api/admin/advance-teams',
-    topic: 'POOL_ACTIVITY',
+    kind: 'round_open',
   },
 
   // Transactional
@@ -220,10 +230,10 @@ export function AutomatedEmailsTab() {
             <div className="sp-text-slate text-xs mb-1.5 sp-body">API Endpoint</div>
             <div className="text-sm sp-text-slate font-mono text-xs">{selectedEmail.endpoint}</div>
           </div>
-          {selectedEmail.topic && (
+          {switchFor(selectedEmail.kind) && (
             <div className="sp-bg-surface sp-radius-sm p-4" style={{ border: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
-              <div className="sp-text-slate text-xs mb-1.5 sp-body">Notification Topic</div>
-              <Badge variant="blue">{selectedEmail.topic}</Badge>
+              <div className="sp-text-slate text-xs mb-1.5 sp-body">Switch</div>
+              <Badge variant="blue">{switchFor(selectedEmail.kind)}</Badge>
               <p className="text-xs sp-text-slate mt-1.5">Users can unsubscribe from this topic</p>
             </div>
           )}
@@ -271,8 +281,8 @@ export function AutomatedEmailsTab() {
             >
               <div className="flex items-center gap-2 px-3.5 py-2" style={{ backgroundColor: 'var(--sp-snow, #F7F8FA)', borderBottom: '0.5px solid var(--sp-silver, #C8CCD4)66' }}>
                 <Badge variant={cat.variant}>{cat.label}</Badge>
-                {email.topic && (
-                  <span className="text-[11px] font-medium sp-text-primary sp-body">{email.topic}</span>
+                {switchFor(email.kind) && (
+                  <span className="text-[11px] font-medium sp-text-primary sp-body">{switchFor(email.kind)}</span>
                 )}
                 <Icon name="chevron.right" size={16} className="sp-text-slate ml-auto" />
               </div>
@@ -300,7 +310,7 @@ export function AutomatedEmailsTab() {
                 <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Type</th>
                 <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Trigger</th>
                 <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Recipient</th>
-                <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Topic</th>
+                <th className="text-left px-4 py-3.5 font-medium sp-text-slate whitespace-nowrap sp-body">Switch</th>
               </tr>
             </thead>
             <tbody>
@@ -327,8 +337,8 @@ export function AutomatedEmailsTab() {
                       {email.recipient}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      {email.topic ? (
-                        <span className="text-xs font-medium sp-text-primary">{email.topic}</span>
+                      {switchFor(email.kind) ? (
+                        <span className="text-xs font-medium sp-text-primary">{switchFor(email.kind)}</span>
                       ) : (
                         <span className="text-xs sp-text-slate">—</span>
                       )}

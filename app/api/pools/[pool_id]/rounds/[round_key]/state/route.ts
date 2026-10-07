@@ -6,8 +6,6 @@ import { isMatchweekKey, nextRoundKey, roundLabel } from '@/lib/competitionRound
 import { fetchPoolRoundKeys, fetchRoundMatches } from '@/lib/roundMatches'
 import { sendBatchEmails } from '@/lib/email/send'
 import { roundOpenTemplate } from '@/lib/email/templates'
-import { TOPICS } from '@/lib/email/topics'
-import { NOTIFICATION_TYPES } from '@/lib/notifications/registry'
 import { withPerfLogging } from '@/lib/api-perf'
 import type { RoundKey } from '@/app/pools/[pool_id]/types'
 
@@ -284,7 +282,7 @@ async function sendRoundOpenNotifications(
   // Get all pool members with their user info
   const { data: members } = await adminClient
     .from('pool_members')
-    .select('users(email, full_name, username)')
+    .select('user_id, users(email, full_name, username)')
     .eq('pool_id', poolId)
 
   if (!members || members.length === 0) return
@@ -321,9 +319,11 @@ async function sendRoundOpenNotifications(
         to: m.users.email,
         subject,
         html,
-        // The registry's switch: until 2026-10-05 this email followed Pool
-        // activity while the round-open push followed Predictions.
-        topicId: TOPICS[NOTIFICATION_TYPES.round_open.category],
+        // The kind's switch (Predictions) — the transport takes the topic from it. Until
+        // 2026-10-05 this email followed Pool activity while the push followed Predictions.
+        kind: 'round_open' as const,
+        userId: m.user_id as string,
+        poolId,
         tags: [{ name: 'category', value: 'round_open' }],
       }
     })

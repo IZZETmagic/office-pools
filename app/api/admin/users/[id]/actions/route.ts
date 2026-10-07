@@ -74,6 +74,9 @@ export async function POST(
         subject: subject.trim(),
         html: emailBody.trim(),
         tags: [{ name: 'category', value: 'admin-direct' }],
+        // Always delivered: a one-off email to one person (Ryan, 2026-10-07).
+        kind: 'direct_email',
+        userId: targetUser.user_id,
       })
       if (!result.success) {
         return NextResponse.json({ error: 'Failed to send email' }, { status: 500 })

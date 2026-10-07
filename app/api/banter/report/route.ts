@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendEmail } from '@/lib/email/send'
+import { sendInternalEmail } from '@/lib/email/send'
 import { messageReportAlertTemplate } from '@/lib/email/templates'
 
 const REASONS = ['spam', 'offensive', 'harassment', 'inappropriate_image', 'other'] as const
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         openReportCount: open.count ?? 1,
         reportsUrl: `${appUrl}/admin/super?tab=reports`,
       })
-      const result = await sendEmail({
+      const result = await sendInternalEmail({
         to: process.env.REPORT_ALERT_EMAIL || 'support@sportpool.io',
         subject,
         html,
