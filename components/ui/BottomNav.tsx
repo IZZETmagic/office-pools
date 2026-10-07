@@ -8,6 +8,8 @@ import { useStandaloneMode } from '@/hooks/useStandaloneMode'
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Home' },
   { href: '/pools', label: 'Pools' },
+  // The web Activity page (2026-10-07), after Home and Pools as in the app's tab bar.
+  { href: '/activity', label: 'Activity' },
   { href: '/profile', label: 'Profile' },
 ] as const
 
@@ -82,6 +84,11 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
       // Outline grid
       <Icon name="square.grid.2x2" />
     )
+  }
+
+  if (href === '/activity') {
+    // The app's Activity tab is a bell too (Hugeicons Notification01); filled when active.
+    return <Icon name="bell.fill" solid={active} />
   }
 
   if (href === '/profile') {
