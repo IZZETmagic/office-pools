@@ -9,21 +9,10 @@ import { useToast } from '@/components/ui/Toast'
 import { brandedTemplate } from '@/lib/email/templates'
 import { greeting, paragraph } from '@/lib/email/components'
 
+// Everyone only (Ryan, 2026-10-07): a broadcast goes to the fixed General list, as News from
+// SportPool. A smaller group goes through Templates → Custom. See app/api/admin/broadcast.
 const SEGMENTS = {
-  all: { label: 'All Users', description: 'Every registered user' },
-  pool_admins: { label: 'Pool Admins', description: 'Users who have created a pool' },
-  empty_pool_admins: { label: 'Empty Pool Admins', description: 'Pool admins with no members yet' },
-  solo_pool_admins: { label: 'Solo Pool Admins', description: 'Only member of their pool' },
-  small_pool_admins: { label: 'Small Pool Admins', description: '2-4 members in their pool' },
-  non_admin_members: { label: 'Non-Admin Members', description: 'In a pool but haven\'t created one' },
-  active_members: { label: 'Active Members', description: 'Users in at least one pool' },
-  inactive_users: { label: 'Inactive Users', description: 'Signed up but never joined a pool' },
-  lapsed_users: { label: 'Lapsed Users', description: 'Signed up 30+ days ago, no pool' },
-  engaged_no_pool: { label: 'Engaged, No Pool', description: 'Recent signup, not in any pool' },
-  past_predictors: { label: 'Past Predictors', description: 'Have submitted predictions before' },
-  past_predictors_non_admin: { label: 'Past Predictors (non-admin)', description: 'Predicted before and does not run a pool' },
-  recent_signups: { label: 'Recent Signups', description: 'Joined in the last 14 days' },
-  super_admins: { label: 'Super Admins', description: 'Internal / test emails only' },
+  all: { label: 'Everyone', description: 'Every member, except anyone who switched off News from SportPool' },
 } as const
 
 type SegmentKey = keyof typeof SEGMENTS
@@ -45,19 +34,6 @@ type BroadcastPreset = {
 }
 
 const PRESETS: BroadcastPreset[] = [
-  {
-    key: 'start_a_pool',
-    label: 'Start Your Own Pool',
-    description: 'Encourage members who are in a pool but haven\'t created one to start their own for another group.',
-    category: 'growth',
-    icon: 'M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
-    segment: 'non_admin_members',
-    subject: 'Love being in a pool? Start your own!',
-    heading: 'Start Your Own Pool',
-    body: "You're already part of the action — but why stop at one pool?\n\nCreate a pool for:\n\n• Your office or work team\n• Your family group chat\n• Your fantasy league crew\n• Your local pub or sports bar\n\nIt only takes 30 seconds to set up. You'll be the commissioner!",
-    ctaText: 'Create a Pool',
-    ctaUrl: 'https://sportpool.io/pools/create',
-  },
   {
     key: 'privacy_policy_update',
     label: 'Privacy Policy Update',
@@ -280,7 +256,7 @@ export function BroadcastTab() {
                     Compose from Scratch
                   </div>
                   <div className="text-xs sp-text-slate mt-0.5 sp-body">
-                    Write a custom broadcast email. Choose your segment and compose the content.
+                    Write a broadcast to everyone, sent as News from SportPool.
                   </div>
                 </div>
               </div>
@@ -315,7 +291,7 @@ export function BroadcastTab() {
               <p className="text-sm text-neutral-500 mt-0.5 sp-body">
                 {selectedPresetDef
                   ? selectedPresetDef.description
-                  : 'Write a custom broadcast email. Choose your segment and compose the content.'}
+                  : 'Write a broadcast to everyone, sent as News from SportPool.'}
               </p>
             </div>
           </div>
@@ -328,24 +304,12 @@ export function BroadcastTab() {
               </p>
             )}
 
-          {/* Segment selector */}
+          {/* Where it goes — there is one choice now (N4, 2026-10-07). */}
           <FormField label="Send To">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(Object.entries(SEGMENTS) as [SegmentKey, typeof SEGMENTS[SegmentKey]][]).map(([key, seg]) => (
-                <button
-                  key={key}
-                  onClick={() => { setSegment(key); setConfirmSend(false) }}
-                  className={`text-left px-3 py-2.5 sp-radius-sm border text-sm transition-colors ${
-                    segment === key
-                      ? 'border-primary-500 bg-primary-50  text-primary-700  ring-1 ring-primary-500'
-                      : 'sp-border-silver hover:border-neutral-300 sp-text-slate'
-                  }`}
-                >
-                  <div className="font-bold text-xs sp-heading">{seg.label}</div>
-                  <div className="text-[11px] sp-text-slate mt-0.5 sp-body">{seg.description}</div>
-                </button>
-              ))}
-            </div>
+            <p className="text-sm sp-text-slate sp-body">
+              Everyone, as News from SportPool — anyone who switched that off is left out. For a smaller
+              group, use Templates → Custom.
+            </p>
           </FormField>
 
           <FormField label="Email Subject">

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSuperAdmin } from '@/lib/auth'
 import { getResendClient } from '@/lib/email/resend'
-import { querySegment, SEGMENTS, type SegmentKey } from '@/lib/email/segments'
+import { querySegment, SEGMENTS } from '@/lib/email/segments'
+import { TOPICS } from '@/lib/email/topics'
+import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/paginate'
 import { resolveSendMode } from '@/lib/email/sendMode'
 
 // =============================================================
@@ -9,27 +12,29 @@ import { resolveSendMode } from '@/lib/email/sendMode'
 // List all broadcasts from Resend (persisted history).
 //
 // POST /api/admin/broadcast
-// Send a broadcast email to a user segment via Resend Broadcasts API.
+// Send a broadcast email to EVERYONE through Resend Broadcasts.
 //
-// For "all" segment → sends broadcast to the main audience.
-// For other segments → clears the "Broadcast Target" audience,
-// populates it with the segment's users, then sends the broadcast.
+// Body: { subject, html, segment?: 'all', dry_run?, idempotency_key? }
 //
-// Body: { subject, html, segment: SegmentKey, dry_run?, idempotency_key? }
+// ⚠ EVERYONE ONLY (Ryan, 2026-10-07). It used to take any segment, and for any
+// but "all" it cleared and refilled ONE shared Resend list ("Broadcast Target")
+// before sending — so two broadcasts in flight could overwrite each other's
+// recipients. A list per broadcast was not possible: Resend adds contacts one
+// request at a time, about two a second, ~40 minutes for everyone. So Broadcast
+// now sends only to the fixed "General" segment (RESEND_AUDIENCE_ID — Resend
+// turned audiences into segments with the same ids), and nothing is rebuilt. A
+// smaller group goes through Templates → Custom, which sends as News from
+// SportPool to just them.
 //
-// ⚠ SAFE BY DEFAULT (2026-10-05) — see lib/email/sendMode.ts. Until then
-// every POST sent: no preview mode and no one-time key, so a retry or a
-// double-click broadcast twice. Now a body PREVIEWS unless it says
-// `dry_run: false`, and a real send must carry an idempotency_key, which is
-// recorded BEFORE the shared audience is touched — so a duplicate is refused
-// while it can still do no harm.
+// ⚠ THE NEWS SWITCH. Every broadcast carries the News from SportPool topic
+// (RESEND_TOPIC_NEWS, migration 179), so Resend skips whoever switched it off —
+// and a broadcast is REFUSED while that topic is not configured, rather than
+// sent past members' switches. Resend keeps its one-click unsubscribe and its
+// first-name fill-in, which is why Broadcast stays on Resend at all.
 //
-// ⚠ STILL OPEN — the shared "Broadcast Target" audience. Every non-"all"
-// broadcast clears and refills ONE Resend audience. The one-time key removes
-// the likeliest overlap (one admin's double-click), but two DIFFERENT
-// broadcasts in flight at once can still overwrite each other's recipients —
-// and whether Resend snapshots an audience at send time or reads it as it
-// delivers is unverified, so even back-to-back sends may not be safe.
+// ⚠ SAFE BY DEFAULT (2026-10-05) — see lib/email/sendMode.ts. A body PREVIEWS
+// unless it says `dry_run: false`, and a real send must carry an
+// idempotency_key, recorded BEFORE anything is sent — so a duplicate is refused.
 // =============================================================
 
 export async function GET() {
@@ -74,34 +79,41 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { subject, html, segment } = body
+    const { subject, html } = body
+    const segment = body.segment ?? 'all'
 
     if (!subject || !html) {
       return NextResponse.json({ error: 'subject and html are required' }, { status: 400 })
     }
 
-    if (!segment || !(segment in SEGMENTS)) {
-      return NextResponse.json({ error: 'Invalid segment' }, { status: 400 })
+    if (segment !== 'all') {
+      return NextResponse.json({
+        error: 'Broadcast goes to everyone. For a smaller group, use Templates → Custom — it goes as News from SportPool to just them.',
+      }, { status: 400 })
     }
 
     const resend = getResendClient()
-    const mainAudienceId = process.env.RESEND_AUDIENCE_ID
-    const broadcastAudienceId = process.env.RESEND_BROADCAST_AUDIENCE_ID
-    if (!mainAudienceId || !broadcastAudienceId) {
-      return NextResponse.json({ error: 'RESEND_AUDIENCE_ID or RESEND_BROADCAST_AUDIENCE_ID not configured' }, { status: 500 })
+    const everyoneSegmentId = process.env.RESEND_AUDIENCE_ID
+    if (!everyoneSegmentId) {
+      return NextResponse.json({ error: 'RESEND_AUDIENCE_ID (the General segment) is not configured' }, { status: 500 })
+    }
+    const newsTopicId = TOPICS.NEWS
+    if (!newsTopicId) {
+      return NextResponse.json({
+        error: 'The News from SportPool topic is not set up (RESEND_TOPIC_NEWS), so a broadcast would ignore members\' News switch. Nothing was sent.',
+      }, { status: 500 })
     }
 
     const fromAddress = process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'
-    const segmentKey = segment as SegmentKey
-    const broadcastName = `${subject} [${SEGMENTS[segmentKey].label}]`
-    let targetAudienceId: string
+    const broadcastName = `${subject} [${SEGMENTS.all.label}]`
 
-    // Always query the segment to capture recipients for audit log
-    const users = await querySegment(supabase, segmentKey)
-    const recipientEmails = users.filter((u) => u.email).map((u) => u.email)
+    // Who it reaches, for the preview and the log: every member with an email, less whoever
+    // switched News off. Resend also leaves out anyone unsubscribed from everything.
+    const [users, newsOff] = await Promise.all([querySegment(supabase, 'all'), newsSwitchedOff()])
+    const recipientEmails = users.filter((u) => u.email && !newsOff.has(u.user_id)).map((u) => u.email)
 
     if (recipientEmails.length === 0) {
-      return NextResponse.json({ message: 'No users in this segment', sent: 0 })
+      return NextResponse.json({ message: 'Nobody to send to', sent: 0 })
     }
 
     // Preview unless the caller said `dry_run: false`. There is no test send
@@ -109,7 +121,7 @@ export async function POST(request: NextRequest) {
     if (resolveSendMode(body) !== 'send') {
       return NextResponse.json({
         dry_run: true,
-        segment: segmentKey,
+        segment: 'all',
         recipientCount: recipientEmails.length,
         preview: recipientEmails.slice(0, 5),
       })
@@ -135,46 +147,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Could not record the send, so nothing was sent' }, { status: 500 })
     }
 
-    if (segmentKey === 'all') {
-      // Send to the main audience directly
-      targetAudienceId = mainAudienceId
-    } else {
-
-      // Clear the Broadcast Target audience
-      const { data: existingContacts } = await resend.contacts.list({ audienceId: broadcastAudienceId })
-      if (existingContacts?.data?.length) {
-        await Promise.allSettled(
-          existingContacts.data.map((c) =>
-            resend.contacts.remove({ audienceId: broadcastAudienceId, email: c.email })
-          )
-        )
-      }
-
-      // Populate with segment users
-      const addResults = await Promise.allSettled(
-        users
-          .filter((u) => u.email)
-          .map((u) => {
-            const nameParts = (u.full_name || '').split(' ')
-            return resend.contacts.create({
-              audienceId: broadcastAudienceId,
-              email: u.email,
-              firstName: nameParts[0] || u.username || undefined,
-              lastName: nameParts.slice(1).join(' ') || undefined,
-            })
-          })
-      )
-
-      const added = addResults.filter((r) => r.status === 'fulfilled').length
-      console.log(`[Broadcast] Populated target audience with ${added}/${users.length} contacts`)
-
-      targetAudienceId = broadcastAudienceId
-    }
-
-    // Create the broadcast
     const { data: broadcast, error: createError } = await resend.broadcasts.create({
       name: broadcastName,
-      audienceId: targetAudienceId,
+      segmentId: everyoneSegmentId,
+      topicId: newsTopicId,
       from: fromAddress,
       subject,
       html,
@@ -200,20 +176,35 @@ export async function POST(request: NextRequest) {
     await supabase.from('broadcast_log').insert({
       broadcast_id: broadcast.id,
       subject,
-      segment: segmentKey,
+      segment: 'all',
       recipient_count: recipientEmails.length,
       recipients: recipientEmails,
       sent_by: auth.data.userData.user_id,
     })
 
     return NextResponse.json({
-      message: `Broadcast sent to ${recipientEmails.length} ${SEGMENTS[segmentKey].label}`,
+      message: `Broadcast sent to ${recipientEmails.length} ${SEGMENTS.all.label}`,
       broadcastId: broadcast.id,
-      segment: segmentKey,
+      segment: 'all',
       recipientCount: recipientEmails.length,
     })
   } catch (err) {
     console.error('[Broadcast] Unhandled error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+/**
+ * Members who switched News from SportPool off. Read with the admin client — a member's
+ * preferences are theirs alone under RLS — and paged, because the list can pass PostgREST's
+ * 1,000-row cap.
+ */
+async function newsSwitchedOff(): Promise<Set<string>> {
+  const admin = createAdminClient()
+  const rows = await fetchAllRows<{ user_id: string }>((from, to) =>
+    admin.from('notification_preferences').select('user_id')
+      .eq('category', 'NEWS').eq('channel', 'email').eq('enabled', false)
+      .order('user_id').range(from, to),
+  )
+  return new Set(rows.map((r) => r.user_id))
 }
