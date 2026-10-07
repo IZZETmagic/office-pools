@@ -19,6 +19,7 @@ import { composeMemberJoined, composePoolWelcome } from '@/lib/pools/joinNotices
 import { composeLmsPickOpen, composeLmsPickReminder } from '@/lib/league/lmsNotices'
 import { composeMemberRemoved, composePointsAdjusted, composePoolArchived, composePoolRestored } from '@/lib/pools/adminNotices'
 import { composeChatMention, composeChatMessage } from '@/lib/banter/chatNotices'
+import { composePoolCountdown, composePoolCountdownAdmin } from '@/lib/pools/countdown'
 import type { Composed, Composer, OutboxRow } from './outbox'
 
 /**
@@ -105,4 +106,7 @@ export const COMPOSERS: Partial<Record<string, Composer>> = {
   // Chat (N3, 2026-10-06) — built from the stored message, never from a request.
   chat_message: composeChatMessage,
   chat_mention: composeChatMention,
+  // Countdowns to a pool's start (2026-10-06).
+  pool_countdown: composePoolCountdown,
+  pool_countdown_admin: composePoolCountdownAdmin,
 }

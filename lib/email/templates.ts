@@ -725,6 +725,74 @@ export function lmsPickReminderTemplate(params: {
   }
 }
 
+// --- Pool countdowns (2026-10-06) ---
+//
+// Ryan asked for a countdown to a pool's start. ONE message a week out (or as soon as the start is
+// within a week): when it starts, and what the member still has to pick. The day-before message is
+// the existing reminder, sent only to people who still have picks to make — never a second
+// countdown. Factual, plural "we".
+
+/** "Prem 2026/27 Showdown starts in 4 days." To every member of a pool that has not started. */
+export function poolCountdownTemplate(params: {
+  userName: string
+  poolName: string
+  startsIn: string
+  deadline: string
+  toDo: string | null
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, startsIn, deadline, toDo, poolUrl } = params
+  return {
+    subject: `${poolName} starts ${startsIn}`,
+    html: brandedTemplate({
+      preheader: toDo ? `${poolName} starts ${startsIn}. ${toDo}` : `${poolName} starts ${startsIn}. You're all set.`,
+      heading: `${poolName} starts ${startsIn}`,
+      body: `
+        ${greeting(userName)}
+        ${paragraph(`<strong>${poolName}</strong> starts ${startsIn}.`)}
+        ${callout(
+          toDo ? 'info' : 'success',
+          `${calloutLine(toDo ? 'info' : 'success', `First deadline: ${lmsDeadline(deadline)}`, { bold: true, marginBottom: 6 })}
+           ${calloutLine(toDo ? 'info' : 'success', toDo ?? "You're all set — everything is picked.", { size: 13 })}`
+        )}
+        ${paragraph(toDo
+          ? 'We will remind you once more the day before, only if there is still something to pick.'
+          : "We won't remind you again before it starts.", { marginBottom: 0 })}
+      `,
+      ctaText: toDo ? 'Make Your Picks' : 'View Pool',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
+/** To a pool's admin, once, when it starts within a week and hardly anyone has joined. */
+export function poolCountdownAdminTemplate(params: {
+  userName: string
+  poolName: string
+  startsIn: string
+  others: string[]
+  poolCode: string
+  poolUrl: string
+}): { subject: string; html: string } {
+  const { userName, poolName, startsIn, others, poolCode, poolUrl } = params
+  const who = others.length === 0 ? "it's just you so far" : `it's you and ${others.join(' and ')} so far`
+  return {
+    subject: `${poolName} starts ${startsIn} — ${who}`,
+    html: brandedTemplate({
+      preheader: `Share the code ${poolCode} to bring people in before it starts.`,
+      heading: `${poolName} starts ${startsIn}`,
+      body: `
+        ${greeting(userName)}
+        ${paragraph(`<strong>${poolName}</strong> starts ${startsIn}, and ${who}.`)}
+        ${callout('info', calloutLine('info', `Pool code: ${poolCode}`, { bold: true }))}
+        ${paragraph("Anyone with the code can join before the first deadline. We won't remind you about this again.", { marginBottom: 0 })}
+      `,
+      ctaText: 'Invite People',
+      ctaUrl: poolUrl,
+    }),
+  }
+}
+
 // --- League Templates ---
 
 /**

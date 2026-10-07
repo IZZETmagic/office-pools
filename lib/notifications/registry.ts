@@ -50,6 +50,9 @@ export const NOTIFICATION_TYPES = {
   // League — Last Man Standing (migration 174)
   lms_pick_open: { category: 'PREDICTIONS', status: 'live' },
   lms_pick_reminder: { category: 'PREDICTIONS', status: 'live' },
+  // Pool countdowns (migration 175)
+  pool_countdown: { category: 'PREDICTIONS', status: 'live' },
+  pool_countdown_admin: { category: 'POOL_ACTIVITY', status: 'live' },
   // League — Table
   table_deadline: { category: 'PREDICTIONS', status: 'live' },
   table_deadline_moved: { category: 'PREDICTIONS', status: 'live' },

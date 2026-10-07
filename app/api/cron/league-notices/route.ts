@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth'
 import { queueLeagueReminders } from '@/lib/league/lmsNotices'
+import { queuePoolCountdowns } from '@/lib/pools/countdown'
 
 export const dynamic = 'force-dynamic'
 // Two statements against a handful of matchweeks. Fast even with every league
@@ -139,11 +140,22 @@ async function handle(request: NextRequest) {
     reminders = { reminders_error: message }
   }
 
+  // Countdowns to a pool's start (2026-10-06) — same posture: queued, not fatal, idempotent.
+  let countdowns: { countdowns: number; adminNotices: number } | { countdowns_error: string }
+  try {
+    countdowns = await queuePoolCountdowns(admin, Date.now())
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[league-notices] countdowns failed:', message)
+    countdowns = { countdowns_error: message }
+  }
+
   return NextResponse.json({
     ok: true,
     ...result,
     table_deadline: table.table_deadline,
     ...(tableErr ? { table_deadline_error: tableErr.message } : {}),
     ...reminders,
+    ...countdowns,
   })
 }
