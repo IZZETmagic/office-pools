@@ -53,6 +53,8 @@ export function AppHeader({ breadcrumbs, badges, isSuperAdmin, sticky = true, ov
   const navLinks = [
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/pools', label: 'Pools' },
+    // The web Activity page (2026-10-07) — the app's Activity tab, on the web.
+    { href: '/activity', label: 'Activity' },
     { href: '/profile', label: 'Profile' },
     ...(isSuperAdmin ? [{ href: '/admin/super', label: 'Admin' }] : []),
   ]

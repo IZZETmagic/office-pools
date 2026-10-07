@@ -107,7 +107,8 @@ export function CrewNeedsStrip({ items }: { items: NeedItem[] }) {
   )
 }
 
-function CrewNeedCard({
+/** One crew card — shared with the web Activity page (app/activity), which answers it the same way. */
+export function CrewNeedCard({
   item,
   busy,
   onAction,
@@ -180,7 +181,7 @@ function CrewNeedCard({
  * client pass) draw a neutral "Before picks lock"; after hydration the pill tells the truth, and it
  * keeps telling it — the minute ticks, so "40m left" counts down while the dashboard is open.
  */
-function DeadlinePill({ iso }: { iso: string }) {
+export function DeadlinePill({ iso }: { iso: string }) {
   const now = useSyncExternalStore(subscribeMinute, currentMinute, () => null)
   const urgent = now !== null && Date.parse(iso) - now < 86_400_000
   return (
