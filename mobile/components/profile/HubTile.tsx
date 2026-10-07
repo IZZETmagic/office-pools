@@ -12,6 +12,10 @@ import { fontFamilies, useTheme, withOpacity } from '@/theme';
 // ⚠ A tile with no `onPress` is a page that is not built yet. It draws at full
 // weight with a "Soon" chip and does nothing when tapped — visibly part of the
 // plan, never a door into an empty screen.
+//
+// `chip` is the state of what the tile opens ("OFF" on Notifications while the
+// phone has them off). It sits BESIDE the chevron, because unlike "Soon" the
+// tile still opens.
 // =============================================================
 
 export function HubTile({
@@ -19,12 +23,14 @@ export function HubTile({
   title,
   teaser,
   tint,
+  chip,
   onPress,
 }: {
   icon: string;
   title: string;
   teaser: string | null;
   tint: string;
+  chip?: string;
   onPress?: () => void;
 }) {
   const theme = useTheme();
@@ -35,7 +41,7 @@ export function HubTile({
       onPress={onPress}
       disabled={soon}
       accessibilityRole={soon ? undefined : 'button'}
-      accessibilityLabel={soon ? `${title}, coming soon` : title}
+      accessibilityLabel={soon ? `${title}, coming soon` : chip ? `${title}, ${chip.toLowerCase()}` : title}
       style={({ pressed }) => ({
         flex: 1,
         minHeight: 124,
@@ -60,27 +66,12 @@ export function HubTile({
           <Icon name={icon as never} tint={tint} size={17} weight="semibold" />
         </View>
         {soon ? (
-          <View
-            style={{
-              backgroundColor: theme.colors.mist,
-              borderRadius: 6,
-              paddingHorizontal: 6,
-              paddingVertical: 2,
-            }}
-          >
-            <RNText
-              style={{
-                fontFamily: fontFamilies.black,
-                fontSize: 9,
-                letterSpacing: 0.8,
-                color: theme.colors.slate,
-              }}
-            >
-              SOON
-            </RNText>
-          </View>
+          <TileChip label="SOON" />
         ) : (
-          <Icon name="chevron.right" tint={theme.colors.slate} size={12} weight="semibold" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {chip ? <TileChip label={chip} /> : null}
+            <Icon name="chevron.right" tint={theme.colors.slate} size={12} weight="semibold" />
+          </View>
         )}
       </View>
       <View style={{ gap: 2 }}>
@@ -101,5 +92,31 @@ export function HubTile({
         </RNText>
       </View>
     </Pressable>
+  );
+}
+
+/** The tile's small state label — "SOON", or what the page it opens is set to. */
+function TileChip({ label }: { label: string }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        backgroundColor: theme.colors.mist,
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+      }}
+    >
+      <RNText
+        style={{
+          fontFamily: fontFamilies.black,
+          fontSize: 9,
+          letterSpacing: 0.8,
+          color: theme.colors.slate,
+        }}
+      >
+        {label}
+      </RNText>
+    </View>
   );
 }

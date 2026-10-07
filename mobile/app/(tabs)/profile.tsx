@@ -46,6 +46,7 @@ import { useMyCrews } from '@/lib/useCrews';
 import { useArchivedPools } from '@/lib/useArchivedPools';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import { usePodium } from '@/lib/usePodium';
+import { usePushAsk } from '@/lib/usePushAsk';
 import { useTrophies } from '@/lib/useTrophies';
 import { fontFamilies, useTheme } from '@/theme';
 
@@ -64,6 +65,8 @@ export default function ProfileScreen() {
   const podium = usePodium();
   const { rows: archived, loading: archivedLoading } = useArchivedPools();
   const { data: myCrews } = useMyCrews();
+  // Non-null while this phone has notifications off (lib/pushAsk.ts).
+  const { mode: pushOffMode } = usePushAsk();
 
   // Pull-to-refresh: spinner bound to real user gesture only. Refreshes the
   // badge count alongside the pools, since the avatar card shows both.
@@ -118,6 +121,7 @@ export default function ProfileScreen() {
     title: string;
     teaser: string | null;
     tint: string;
+    chip?: string;
     onPress?: () => void;
   }[] = [
     {
@@ -164,10 +168,14 @@ export default function ProfileScreen() {
     },
     {
       id: 'notifications',
-      icon: 'bell.fill',
+      // ⚠ Says "Off" for as long as the phone has them off: the quiet,
+      // permanent half of the ask (lib/pushAsk.ts) — and the way back after the
+      // Activity card is closed. A state, never a count, never red.
+      icon: pushOffMode ? 'bell.slash' : 'bell.fill',
       title: 'Notifications',
-      teaser: 'Push alerts and email',
+      teaser: pushOffMode ? 'Off on this phone' : 'Push alerts and email',
       tint: theme.colors.slate,
+      chip: pushOffMode ? 'OFF' : undefined,
       onPress: () => router.push('/settings/notifications'),
     },
     {
@@ -228,6 +236,13 @@ export default function ProfileScreen() {
       title: 'Onboarding journey',
       subtitle: '⚠ Builds a real avatar — the picker and board are the live ones',
       onPress: () => router.push('/onboarding-flow'),
+    },
+    {
+      id: 'dev-push-ask',
+      icon: 'bell.slash',
+      title: 'Notifications off',
+      subtitle: 'The popup, the Activity card and the Off tile — never asks the phone',
+      onPress: () => router.push('/push-ask-harness'),
     },
   ];
 

@@ -18,6 +18,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { useSyncExternalStore } from 'react';
 
+import { markPushAskShown } from './usePushAsk';
+
 const ONBOARDING_SEEN_KEY = 'onboarding_seen';
 const NOTIFICATIONS_PROMPTED_KEY = 'notifications_prompted';
 
@@ -97,6 +99,10 @@ export async function markOnboardingSeen(): Promise<void> {
 }
 
 export async function markNotificationsPrompted(): Promise<void> {
+  // ⚠ THIS ASK IS ALSO THE NOTIFICATIONS POPUP'S "ONCE" (lib/pushAsk.ts), so a
+  // member asked here is not asked again on Home a minute later. Only a phone
+  // that came through these screens before the popup existed ever sees it.
+  void markPushAskShown();
   try {
     await SecureStore.setItemAsync(NOTIFICATIONS_PROMPTED_KEY, '1');
   } catch (err) {

@@ -4,8 +4,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, ConfirmDialog, Text } from '@/components/ui';
-import { useAuth } from '@/lib/auth';
+import { Button, Text } from '@/components/ui';
 import {
   CountdownHero,
   EmptyHome,
@@ -24,18 +23,17 @@ import {
   PoolCreateJoinSheet,
   type PoolCreateJoinSheetHandle,
 } from '@/components/pools';
+import { PushAskGate } from '@/components/notifications';
 import { useHomeData } from '@/lib/HomeDataProvider';
 import { homeMatchesFrom } from '@/lib/homeMatches';
 import { useTournamentMatches } from '@/lib/TournamentMatchesProvider';
 import type { PoolSummary } from '@/lib/useHomeData';
 import type { ResultsMatch } from '@/lib/useTournamentMatches';
 import { useManualRefresh } from '@/lib/useManualRefresh';
-import { useNotificationPrompt } from '@/lib/useNotificationPrompt';
 import { useTheme } from '@/theme';
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const { user } = useAuth();
   const { data, loading, error, refresh, refreshIfStale } = useHomeData();
   // ⚠ The Home cards read the MERGED match list — World Cup matches and league
   // fixtures — not `useHomeData`. Those two `matches` reads asked the wrong
@@ -67,11 +65,6 @@ export default function HomeScreen() {
   // refreshes (focus, realtime, stale) trigger via `refresh` directly and
   // don't surface the OS-level spinner.
   const { refreshing, onRefresh } = useManualRefresh(refreshAll);
-  // One-shot notification soft-ask. Surfaces a custom ConfirmDialog the
-  // first time the user lands here with permission still 'undetermined'.
-  // Tapping "Enable" triggers the OS prompt; tapping "Not now" dismisses
-  // permanently (persisted in SecureStore). See useNotificationPrompt.
-  const notificationPrompt = useNotificationPrompt({ enabled: !!user });
   const initialFocus = useRef(true);
   // Create/Join action sheet opened from the "+" in HomeHeader. Picking
   // "Join with Code" closes this one and opens JoinPoolSheet below.
@@ -232,23 +225,10 @@ export default function HomeScreen() {
       />
       <JoinPoolSheet ref={joinPoolSheetRef} />
 
-      {/* Notification soft-ask. shouldPrompt only flips true the FIRST
-          time a signed-in user lands here with OS permission still
-          'undetermined' — once dismissed (either choice) the SecureStore
-          flag prevents it from showing again on subsequent app launches. */}
-      <ConfirmDialog
-        visible={notificationPrompt.shouldPrompt}
-        title="Get notified about your pools?"
-        description="Turn on notifications and we'll ping you when new banter lands, your pools earn badges, deadlines get close, and matches finish."
-        confirmLabel="Enable Notifications"
-        cancelLabel="Not now"
-        onConfirm={() => {
-          void notificationPrompt.enable();
-        }}
-        onCancel={() => {
-          void notificationPrompt.dismiss();
-        }}
-      />
+      {/* The notifications popup — once per phone, for a member whose
+          notifications are off (lib/pushAsk.ts). It replaced a dialog that
+          only covered people never asked and still described the World Cup. */}
+      <PushAskGate />
     </SafeAreaView>
   );
 }

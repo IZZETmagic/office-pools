@@ -18,10 +18,15 @@ export function usePushPermission() {
   // `null` while we're still reading the initial status from the OS so the
   // UI can show a brief "checking…" state rather than flashing the wrong CTA.
   const [status, setStatus] = useState<PushPermissionStatus | null>(null);
+  // Whether `request()` can still show the OS box. ⚠ Not the same question as
+  // `status`: Android lets an app ask twice, so one refusal reads 'denied'
+  // while the box can still be shown. See `lib/pushAsk.ts`.
+  const [canAskAgain, setCanAskAgain] = useState<boolean | null>(null);
 
   const check = useCallback(async () => {
     const res = await Notifications.getPermissionsAsync();
     setStatus(normalize(res.status));
+    setCanAskAgain(res.canAskAgain);
   }, []);
 
   useEffect(() => {
@@ -52,6 +57,7 @@ export function usePushPermission() {
     });
     const next = normalize(res.status);
     setStatus(next);
+    setCanAskAgain(res.canAskAgain);
     return next;
   }, []);
 
@@ -64,5 +70,5 @@ export function usePushPermission() {
     }
   }, []);
 
-  return { status, request, openSettings, refresh: check };
+  return { status, canAskAgain, request, openSettings, refresh: check };
 }

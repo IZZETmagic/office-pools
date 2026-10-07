@@ -54,6 +54,7 @@ import {
 import { usePushNotificationHandlers } from '@/lib/usePushNotificationHandlers';
 import { usePushPermission } from '@/lib/usePushPermission';
 import { usePushTokenRegistration } from '@/lib/usePushTokenRegistration';
+import { markSplashGone } from '@/lib/splashState';
 
 // Crash + error reporting. Module-scope init runs once per JS context — Fast
 // Refresh re-runs the file but Sentry.init guards against duplicate setup.
@@ -444,6 +445,9 @@ function InnerLayout() {
             full-bleed instead of under the stack's default header, which would title itself
             "onboarding-harness" from the file path. Delete with the harness. */}
         <Stack.Screen name="onboarding-harness" options={{ headerShown: false }} />
+        {/* DEV-ONLY — the notifications-off popup, card and tile on demand. Declared so it
+            renders full-bleed instead of under a header titled from the file path. */}
+        <Stack.Screen name="push-ask-harness" options={{ headerShown: false }} />
         </Stack>
         <SplashOverlay routingSettled={routingSettled} />
       </PendingActionsProvider>
@@ -505,7 +509,12 @@ function SplashOverlay({ routingSettled }: { routingSettled: boolean }) {
   return (
     <Splash
       preloadComplete={preloadComplete}
-      onDismissed={() => setDismissed(true)}
+      onDismissed={() => {
+        setDismissed(true);
+        // Anything that opens by itself at launch waits for this — a Modal
+        // opened sooner draws on top of the splash (lib/splashState.ts).
+        markSplashGone();
+      }}
     />
   );
 }

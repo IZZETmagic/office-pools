@@ -13,6 +13,7 @@ import {
   NeedsYouCard,
 } from '@/components/activity';
 import { SaveCrewSheet, type SaveCrewSheetHandle } from '@/components/crews/SaveCrewSheet';
+import { PushOffCard } from '@/components/notifications';
 import {
   JoinPoolSheet,
   type JoinPoolSheetHandle,
@@ -33,8 +34,10 @@ import {
   type NeedsYouItem,
 } from '@/lib/api';
 import { useHomeData } from '@/lib/HomeDataProvider';
+import { shouldShowPushCard } from '@/lib/pushAsk';
 import { useManualRefresh } from '@/lib/useManualRefresh';
 import type { ActivityItem } from '@/lib/useActivity';
+import { closePushCard, usePushAsk } from '@/lib/usePushAsk';
 import { fontFamilies, useTheme } from '@/theme';
 
 /**
@@ -100,6 +103,10 @@ export default function ActivityScreen() {
   const saveCrewSheetRef = useRef<SaveCrewSheetHandle | null>(null);
   const lastFocusFetchRef = useRef(0);
   const { refresh: refreshHomeData } = useHomeData();
+  // Notifications off on this phone: one card above Needs you, until they are
+  // on or the card is closed (lib/pushAsk.ts).
+  const { mode: pushMode, cardClosed: pushCardClosed, turnOn: turnPushOn } = usePushAsk();
+  const showPushCard = shouldShowPushCard(pushMode, pushCardClosed);
 
   /**
    * A crew card's buttons (lib/crews/needs.ts decides which a card has). The card leaves the moment
@@ -216,10 +223,18 @@ export default function ActivityScreen() {
             <View
               style={{
                 paddingHorizontal: theme.spacing.xl,
-                paddingBottom: needsYou.length > 0 ? theme.spacing.lg : 0,
+                paddingBottom: needsYou.length > 0 || showPushCard ? theme.spacing.lg : 0,
                 gap: theme.spacing.sm + 2,
               }}
             >
+              {/* Above the heading, not under it: a setting is not a decision about a pool. */}
+              {showPushCard && pushMode ? (
+                <PushOffCard
+                  mode={pushMode}
+                  onTurnOn={() => void turnPushOn()}
+                  onClose={() => void closePushCard()}
+                />
+              ) : null}
               {needsYou.length > 0 ? (
                 <>
                   <SectionLabel text={`Needs you · ${needsYou.length}`} />
@@ -260,7 +275,7 @@ export default function ActivityScreen() {
           return <FilterEmpty filter={filter} />;
       }
     },
-    [theme, needsYou, filter, unreadMentions, onCrewAction],
+    [theme, needsYou, filter, unreadMentions, onCrewAction, showPushCard, pushMode, turnPushOn],
   );
 
   const hasAnything = items.length > 0 || needsYou.length > 0;
