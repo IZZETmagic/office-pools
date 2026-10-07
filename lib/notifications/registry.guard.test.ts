@@ -94,13 +94,16 @@ describe('the notification registry: code and database agree', () => {
       .toEqual({ missingFromDatabase: [], missingFromCode: [] })
   })
 
-  it('gives every kind the same switch and status on both sides', () => {
+  it('gives every kind the same switch, status and always-delivered flag on both sides', () => {
     const disagreements: string[] = []
     for (const [key, spec] of Object.entries(NOTIFICATION_TYPES)) {
       const row = rows.get(key)
       if (!row) continue
       if (row.category !== spec.category) disagreements.push(`${key}: category ${spec.category} in code, ${row.category} in ${row.file}`)
       if (row.status !== spec.status) disagreements.push(`${key}: status ${spec.status} in code, ${row.status} in ${row.file}`)
+      // An always-delivered kind skips the switch at send time — the code's copy decides that, so it must not drift.
+      const transactional = 'transactional' in spec && spec.transactional === true
+      if (row.transactional !== transactional) disagreements.push(`${key}: transactional ${transactional} in code, ${row.transactional} in ${row.file}`)
     }
     expect(disagreements).toEqual([])
   })
@@ -120,6 +123,7 @@ describe('every registered kind passes what the database will enforce', () => {
       for (const m of r.modes ?? []) if (!(GAME_MODES as readonly string[]).includes(m)) problems.push(`${r.key}: mode ${m}`)
       for (const c of r.channels) if (!['email', 'push', 'inapp'].includes(c)) problems.push(`${r.key}: channel ${c}`)
       if (r.category === 'GAMIFICATION' && r.channels.includes('email')) problems.push(`${r.key}: Achievements has no email switch`)
+      if (r.category === 'NEWS' && r.channels.includes('push')) problems.push(`${r.key}: News from SportPool has no push switch`)
       if ((r.expires === 'after_window') !== (r.window !== null)) problems.push(`${r.key}: expiry window does not match ${r.expires}`)
     }
     expect(problems).toEqual([])

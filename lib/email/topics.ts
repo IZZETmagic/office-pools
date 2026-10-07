@@ -5,6 +5,8 @@ export const TOPICS = {
   LEADERBOARD: process.env.RESEND_TOPIC_LEADERBOARD!,
   ADMIN: process.env.RESEND_TOPIC_ADMIN!,
   COMMUNITY: process.env.RESEND_TOPIC_COMMUNITY!,
+  // News from SportPool (migration 179, 2026-10-07). Email only.
+  NEWS: process.env.RESEND_TOPIC_NEWS!,
 } as const
 
 export const TOPIC_KEYS = [
@@ -14,6 +16,7 @@ export const TOPIC_KEYS = [
   'LEADERBOARD',
   'ADMIN',
   'COMMUNITY',
+  'NEWS',
 ] as const
 
 export type TopicKey = (typeof TOPIC_KEYS)[number]
@@ -42,5 +45,9 @@ export const TOPIC_LABELS: Record<TopicKey, { name: string; description: string 
   COMMUNITY: {
     name: 'Community & Mentions',
     description: 'When someone @mentions you in a pool chat',
+  },
+  NEWS: {
+    name: 'News from SportPool',
+    description: 'What\'s new, short surveys, starting a pool of your own',
   },
 }

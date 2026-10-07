@@ -1742,6 +1742,7 @@ function AccountSettingsTab({
     LEADERBOARD: true,
     ADMIN: true,
     COMMUNITY: true,
+    NEWS: true,
   })
   const [notifLoading, setNotifLoading] = useState(true)
   const [notifUpdating, setNotifUpdating] = useState<string | null>(null)
@@ -1756,6 +1757,7 @@ function AccountSettingsTab({
     { key: 'LEADERBOARD', label: 'Leaderboard Updates', desc: 'Rank changes, weekly standings' },
     { key: 'ADMIN', label: 'Admin Notifications', desc: 'Settings changed, member removed, predictions unlocked' },
     { key: 'COMMUNITY', label: 'Community & Mentions', desc: 'When someone @mentions you in a pool chat' },
+    { key: 'NEWS', label: 'News from SportPool', desc: 'What\'s new, short surveys, starting a pool of your own' },
   ]
 
   useEffect(() => {

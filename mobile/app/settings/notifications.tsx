@@ -43,6 +43,8 @@ const EMAIL_PREF_OPTIONS: NotificationOption[] = [
   { key: 'LEADERBOARD', label: 'Leaderboard Updates', desc: 'Rank changes, weekly standings', icon: 'chart.bar.fill' },
   { key: 'ADMIN', label: 'Admin Notifications', desc: 'Settings changed, member removed', icon: 'gearshape.fill' },
   { key: 'COMMUNITY', label: 'Community & Mentions', desc: '@mentions in pool chat', icon: 'bubble.left.and.bubble.right.fill' },
+  // Email only (migration 179) — there is no push switch for it.
+  { key: 'NEWS', label: 'News from SportPool', desc: 'What\'s new, surveys, starting a pool', icon: 'sparkles' },
 ];
 
 export default function NotificationSettingsScreen() {

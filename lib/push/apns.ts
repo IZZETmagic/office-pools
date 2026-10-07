@@ -256,6 +256,8 @@ function switchFor(kind: NotificationTypeKey): PushCategory {
   const spec = NOTIFICATION_TYPES[kind]
   if (!spec) throw new Error(`push: ${String(kind)} is not in the notification registry`)
   if (spec.status !== 'live') throw new Error(`push: ${kind} is ${spec.status}, not live`)
+  // News from SportPool is email only — push preferences have no switch for it (migration 179).
+  if (spec.category === 'NEWS') throw new Error(`push: ${kind} is News from SportPool, which is email only`)
   return spec.category
 }
 

@@ -13,7 +13,10 @@ const idToKey = topicIdToKey(IDS)
 
 describe('emailPreferencesFrom — a missing row means subscribed', () => {
   it('is all on with no rows', () => {
-    expect(Object.values(emailPreferencesFrom([]))).toEqual([true, true, true, true, true, true])
+    expect(emailPreferencesFrom([])).toEqual({
+      POOL_ACTIVITY: true, PREDICTIONS: true, MATCH_RESULTS: true, LEADERBOARD: true, ADMIN: true, COMMUNITY: true,
+      NEWS: true,
+    })
   })
   it('turns off only what a row turns off', () => {
     const p = emailPreferencesFrom([{ category: 'MATCH_RESULTS', channel: 'email', enabled: false }])

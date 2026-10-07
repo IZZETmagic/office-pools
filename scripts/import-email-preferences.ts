@@ -18,7 +18,7 @@
 // 3,400 fetched contacts when its run hit a time limit.) --apply refuses while
 // any contact is still unfetched, unless --allow-partial.
 //
-// ONLY OPT-OUTS ARE STORED. All six topics default to opt_in in Resend
+// ONLY OPT-OUTS ARE STORED. Every topic defaults to opt_in in Resend
 // (verified 2026-10-05), so a missing row means subscribed.
 //
 // RE-RUN AFTER EVERY DEPLOY THAT TOUCHES THIS — with --fresh, so every
@@ -69,7 +69,7 @@ import { createClient } from '@supabase/supabase-js'
   }
 })()
 
-const KEYS = ['POOL_ACTIVITY', 'PREDICTIONS', 'MATCH_RESULTS', 'LEADERBOARD', 'ADMIN', 'COMMUNITY'] as const
+const KEYS = ['POOL_ACTIVITY', 'PREDICTIONS', 'MATCH_RESULTS', 'LEADERBOARD', 'ADMIN', 'COMMUNITY', 'NEWS'] as const
 type Key = (typeof KEYS)[number]
 
 // Mapped by NAME because only one topic id is in a local .env.local; every id
@@ -81,6 +81,8 @@ const NAME_TO_KEY: Record<string, Key> = {
   'Leaderboard Updates': 'LEADERBOARD',
   'Admin Notifications': 'ADMIN',
   'Community Topic': 'COMMUNITY',
+  // Migration 179, 2026-10-07 — created in Resend by name, default opt-in.
+  'News from SportPool': 'NEWS',
 }
 
 /** One fetched contact — one line of the progress file. */

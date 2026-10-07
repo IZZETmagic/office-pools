@@ -13,18 +13,21 @@
 // enforced. The sentences themselves live only in the database; the
 // preferences screens read them from there.
 //
-// ⚠ A SEND GATE FOR PUSH (N4, 2026-10-07): sendPushToUser takes a kind from
-// this list — nothing else — and refuses one that is not live, so every push
-// has a switch and a sentence. Email still passes its own topicId to Resend;
-// it joins in N4's fourth step.
+// ⚠ A SEND GATE (N4, 2026-10-07): sendPushToUser and the email transport take a
+// kind from this list — nothing else — and refuse one that is not live, so
+// every message has a switch (or is marked always delivered) and a sentence.
 //
 // The ORDER below is the order members read them in, under each switch.
 // =============================================================
 
 import type { PushCategory } from '@/lib/push/categories'
 
-/** The switches. One list for every channel — the same seven as notification_preferences. */
-export type NotificationCategory = PushCategory
+/**
+ * The switches — the same eight as notification_preferences. Seven are shared by
+ * every channel; NEWS (migration 179, "News from SportPool") is email only: push
+ * preferences have no column for it, and the database refuses a NEWS kind with push.
+ */
+export type NotificationCategory = PushCategory | 'NEWS'
 
 /** How the registry scopes a notice: by game mode, never by competition. */
 export const GAME_MODES = [
@@ -41,7 +44,12 @@ export type GameMode = (typeof GAME_MODES)[number]
 
 export type NotificationStatus = 'live' | 'planned' | 'retired'
 
-type Spec = { category: NotificationCategory; status: NotificationStatus }
+type Spec = {
+  category: NotificationCategory
+  status: NotificationStatus
+  /** Always delivered: no switch governs it (is_transactional in the database). */
+  transactional?: true
+}
 
 export const NOTIFICATION_TYPES = {
   // League — pick'em and Showdown
@@ -88,9 +96,15 @@ export const NOTIFICATION_TYPES = {
   chat_mention: { category: 'COMMUNITY', status: 'live' },
   // Crews
   crew_invite: { category: 'POOL_ACTIVITY', status: 'live' },
-  crew_invite_email: { category: 'POOL_ACTIVITY', status: 'live' },
+  crew_invite_email: { category: 'POOL_ACTIVITY', status: 'live', transactional: true },
   crew_seat_saved: { category: 'POOL_ACTIVITY', status: 'live' },
   crew_seat_reminder: { category: 'POOL_ACTIVITY', status: 'live' },
+  // Our own emails (migration 179). A reply or one-off email to one person is
+  // always delivered; the rest sit under a switch like everything else.
+  direct_email: { category: 'ADMIN', status: 'live', transactional: true },
+  pool_size_nudge: { category: 'POOL_ACTIVITY', status: 'live' },
+  predictions_reminder: { category: 'PREDICTIONS', status: 'live' },
+  sportpool_news: { category: 'NEWS', status: 'live' },
   // Planned — N7. Written down so they pass the gate while being designed.
   duel_drawn: { category: 'POOL_ACTIVITY', status: 'planned' },
   duel_reveal_ready: { category: 'POOL_ACTIVITY', status: 'planned' },

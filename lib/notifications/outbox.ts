@@ -39,8 +39,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendKeyedEmail } from '@/lib/email/send'
 import { TOPICS, TOPIC_KEYS, type TopicKey } from '@/lib/email/topics'
 import { sendPushToUser } from '@/lib/push/apns'
-import { PUSH_CATEGORY_COLUMNS, type PushCategory } from '@/lib/push/categories'
-import type { NotificationTypeKey } from './registry'
+import { PUSH_CATEGORY_COLUMNS } from '@/lib/push/categories'
+import type { NotificationCategory, NotificationTypeKey } from './registry'
 
 export type Channel = 'email' | 'push'
 const CHANNELS: readonly Channel[] = ['email', 'push']
@@ -241,7 +241,7 @@ export function decide(
 
 export type DispatchSummary = { claimed: number; sent: number; skipped: number; failed: number; retrying: number; shadow: number }
 
-type RegistryFacts = { category: PushCategory; is_transactional: boolean }
+type RegistryFacts = { category: NotificationCategory; is_transactional: boolean }
 
 /** Everything dispatch touches outside itself — swapped out by the tests. */
 export type DispatchDeps = {
@@ -388,7 +388,7 @@ export async function dispatch(
 }
 
 /** A category's Resend topic, if it has one. Achievements has none — and the registry refuses it an email. */
-function topicFor(category: PushCategory): string | undefined {
+function topicFor(category: NotificationCategory): string | undefined {
   return (TOPIC_KEYS as readonly string[]).includes(category) ? TOPICS[category as TopicKey] : undefined
 }
 
@@ -422,7 +422,7 @@ function defaultDeps(admin: SupabaseClient): DispatchDeps {
         .in('type_key', types)
       if (error) throw new Error(`registry read failed: ${error.message}`)
       return new Map(
-        ((data ?? []) as Array<{ type_key: string; category: PushCategory; is_transactional: boolean }>).map((r) => [
+        ((data ?? []) as Array<{ type_key: string; category: NotificationCategory; is_transactional: boolean }>).map((r) => [
           r.type_key,
           { category: r.category, is_transactional: r.is_transactional },
         ]),
