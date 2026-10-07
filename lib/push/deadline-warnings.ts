@@ -198,7 +198,7 @@ export async function firePendingDeadlineWarnings(): Promise<{
               window_hours: String(windowHours),
             },
           },
-          'PREDICTIONS',
+          'deadline_warning',
         )
         pushes_sent++
       } catch (err) {

@@ -104,7 +104,7 @@ export async function fireMatchStartingPushes(): Promise<{
               match_id: match.match_id,
             },
           },
-          'PREDICTIONS',
+          'match_starting',
         )
         pushes_sent++
       } catch (err) {
@@ -236,7 +236,7 @@ export async function firePredictReminders(): Promise<{
             pool_id: bucket.poolId,
           },
         },
-        'PREDICTIONS',
+        'predict_reminder',
       )
       pushes_sent++
     } catch (err) {

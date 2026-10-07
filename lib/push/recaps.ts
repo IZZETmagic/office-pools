@@ -231,7 +231,7 @@ export async function firePendingMatchdayRecaps(): Promise<{
               matchday: md.date,
             },
           },
-          'MATCH_RESULTS',
+          'matchday_recap',
         )
         pushes_sent++
       } catch (err) {
@@ -369,7 +369,7 @@ export async function firePendingWeeklyRecaps(): Promise<{
             week_starting: weekStartIso,
           },
         },
-        'MATCH_RESULTS',
+        'weekly_recap',
       )
       pushes_sent++
     } catch (err) {

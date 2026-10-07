@@ -319,7 +319,7 @@ async function detectAndPushBadgesForEntry(args: {
           pool_id: poolId,
         },
       },
-      'GAMIFICATION',
+      'badge_unlocked',
     ).catch((err) => console.error('[badges] badge push failed', userId, badgeId, err))
   }
 
@@ -356,7 +356,7 @@ async function detectAndPushBadgesForEntry(args: {
           pool_id: poolId,
         },
       },
-      'GAMIFICATION',
+      'level_up',
     ).catch((err) => console.error('[badges] level push failed', userId, err))
   }
 }

@@ -192,7 +192,7 @@ export async function autoSubmitDraftEntries(poolId?: string): Promise<AutoSubmi
             body: `Your draft predictions for ${pool.pool_name} were submitted before the deadline.`,
             data: { type: 'predictions', pool_id: pool.pool_id },
           },
-          'PREDICTIONS',
+          'predictions_auto_submitted',
         ).catch((err) => console.error('[AutoSubmit] Push error:', err))
       }
     }
@@ -355,7 +355,7 @@ export async function autoSubmitProgressiveRounds(): Promise<AutoSubmitResult> {
                 body: `Your predictions for ${pool.pool_name} were submitted before the deadline.`,
                 data: { type: 'predictions', pool_id: poolId },
               },
-              'PREDICTIONS',
+              'round_auto_submitted',
             ).catch(console.error)
           }
         }
@@ -630,7 +630,7 @@ async function sendAutoRoundOpenNotifications(
         body: `Make your predictions for ${poolName}!`,
         data: { type: 'pool_activity', pool_id: poolId },
       },
-      'PREDICTIONS',
+      'round_open',
     ).catch(console.error)
   }
 }

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import http2 from 'node:http2'
 
+import { NOTIFICATION_TYPES, type NotificationTypeKey } from '@/lib/notifications/registry'
 import { PUSH_CATEGORY_COLUMNS, type PushCategory } from './categories'
 import { sendExpoPushNotification } from './expo-push'
 
@@ -229,23 +230,39 @@ function sendHTTP2Request(
 }
 
 /**
- * Filter a list of user IDs down to those who haven't opted out of `category`.
+ * The switch a kind of notification belongs to, from the registry. Every push
+ * names its kind (N4, 2026-10-07): there is no way to send one without, so no
+ * push can skip the member's switch, and none can go out that the registry —
+ * and the sentence members read there — does not know about.
+ *
+ * ⚠ Throws for a kind that is not live. A planned or retired kind reaching a
+ * sender is a programming error, and failing loudly beats sending it.
+ */
+function switchFor(kind: NotificationTypeKey): PushCategory {
+  const spec = NOTIFICATION_TYPES[kind]
+  if (!spec) throw new Error(`push: ${String(kind)} is not in the notification registry`)
+  if (spec.status !== 'live') throw new Error(`push: ${kind} is ${spec.status}, not live`)
+  return spec.category
+}
+
+/**
+ * Filter a list of user IDs down to those who haven't switched `category` off.
  * Users with no preferences row are treated as opted-in (defaults are all-true).
  */
-async function filterByCategoryOptIn(
-  userIds: string[],
-  category: PushCategory | undefined,
-): Promise<string[]> {
-  if (!category || userIds.length === 0) return userIds
+async function filterByCategoryOptIn(userIds: string[], category: PushCategory): Promise<string[]> {
+  if (userIds.length === 0) return userIds
   const supabase = createAdminClient()
   const column = PUSH_CATEGORY_COLUMNS[category]
   // Find users who EXPLICITLY have the column set to false; everyone else
   // (including users with no row at all) gets the push.
-  const { data: optedOut } = await supabase
+  const { data: optedOut, error } = await supabase
     .from('push_notification_preferences')
     .select(`user_id, ${column}`)
     .in('user_id', userIds)
     .eq(column, false)
+  // ⚠ A failed read is an error, never a default: "no opt-outs found" read off
+  // a failed query would push to somebody who switched it off.
+  if (error) throw new Error(`push: preference read failed: ${error.message}`)
   const optedOutSet = new Set(
     ((optedOut ?? []) as unknown as Array<{ user_id: string }>).map((r) => r.user_id),
   )
@@ -276,15 +293,15 @@ async function dispatchPush(t: TokenRow, payload: PushPayload): Promise<boolean>
 /**
  * Send a push notification to all devices registered for a user.
  *
- * If `category` is set, the user's opt-out preference for that category is
- * checked first — a `false` pref silently no-ops the send. Pass `undefined`
- * to bypass the gate (admin broadcasts, member-removed, deadline-changed —
- * messages users can't reasonably mute).
+ * `kind` is the registry kind being sent. Its switch is checked first — a
+ * member who switched it off is skipped (`{ sent: 0, total: 0 }`). There is no
+ * way to bypass the switch: the last sender that could, the admin push tool,
+ * was deleted on 2026-10-07.
  */
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
-  category?: PushCategory,
+  kind: NotificationTypeKey,
 ): Promise<{ sent: number; total: number }> {
   // Delivery kill-switch. A process that sets SUPPRESS_PUSH_DELIVERY=true (e.g.
   // a bulk historical re-score) runs all detection + entry_xp_state snapshot
@@ -296,7 +313,7 @@ export async function sendPushToUser(
     return { sent: 0, total: 0 }
   }
 
-  const allowed = await filterByCategoryOptIn([userId], category)
+  const allowed = await filterByCategoryOptIn([userId], switchFor(kind))
   if (allowed.length === 0) return { sent: 0, total: 0 }
 
   const supabase = createAdminClient()
@@ -350,7 +367,7 @@ export async function sendPushToUser(
 /**
  * Send a push notification to multiple users in parallel.
  *
- * Same `category` opt-out semantics as `sendPushToUser`.
+ * Same `kind` and switch semantics as `sendPushToUser`.
  *
  * Per-recipient badge counts: this fans out via `sendPushToUser` so each
  * user gets a payload with their own unread-messages count. The previous
@@ -364,14 +381,14 @@ export async function sendPushToUser(
 export async function sendPushToUsers(
   userIds: string[],
   payload: PushPayload,
-  category?: PushCategory,
+  kind: NotificationTypeKey,
 ): Promise<{ sent: number; total: number }> {
   if (userIds.length === 0) return { sent: 0, total: 0 }
-  const allowed = await filterByCategoryOptIn(userIds, category)
+  const allowed = await filterByCategoryOptIn(userIds, switchFor(kind))
   if (allowed.length === 0) return { sent: 0, total: 0 }
 
   const results = await Promise.allSettled(
-    allowed.map((uid) => sendPushToUser(uid, payload, category)),
+    allowed.map((uid) => sendPushToUser(uid, payload, kind)),
   )
 
   let sent = 0
@@ -383,39 +400,6 @@ export async function sendPushToUsers(
     }
   }
   return { sent, total }
-}
-
-/**
- * Send a push to ALL registered devices (for admin broadcasts).
- */
-export async function sendPushToAll(
-  payload: PushPayload
-): Promise<{ sent: number; total: number }> {
-  const supabase = createAdminClient()
-
-  const { data: tokens } = await supabase
-    .from('push_tokens')
-    .select('token, environment, bundle_id, platform')
-
-  if (!tokens || tokens.length === 0) {
-    return { sent: 0, total: 0 }
-  }
-
-  // Send in chunks to avoid overwhelming the connection
-  const CHUNK_SIZE = 50
-  let sent = 0
-
-  for (let i = 0; i < tokens.length; i += CHUNK_SIZE) {
-    const chunk = tokens.slice(i, i + CHUNK_SIZE) as TokenRow[]
-    const results = await Promise.allSettled(
-      chunk.map((t) => dispatchPush(t, payload)),
-    )
-    sent += results.filter(
-      (r) => r.status === 'fulfilled' && r.value === true
-    ).length
-  }
-
-  return { sent, total: tokens.length }
 }
 
 /**

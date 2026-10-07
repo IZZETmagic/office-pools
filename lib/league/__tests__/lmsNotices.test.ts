@@ -120,7 +120,7 @@ describe('the pick\'em and Showdown last call', () => {
   it('in the last two hours, goes to whoever the lock reminder\'s own plan says has not finished', async () => {
     lockPlan.mockResolvedValue({
       members: [{ userId: 'u9', emails: [], push: true }],
-      push: { title: 't', body: 'b' }, category: 'PREDICTIONS', deadlineAt: null, eventAt: null,
+      push: { title: 't', body: 'b' }, kind: 'lock_reminder', deadlineAt: null, eventAt: null,
     })
     const { db, lockAt } = world(1.5)
     await queueLeagueReminders(db.client, NOW)

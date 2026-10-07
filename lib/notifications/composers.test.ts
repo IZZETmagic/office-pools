@@ -25,7 +25,7 @@ const plan = (members: Array<{ userId: string; push?: boolean; keys?: string[] }
     emails: (m.keys ?? ['reminder']).map((key) => ({ key, to: `${m.userId}@example.com`, subject: `Subject ${key}`, html: '<p/>', tags: [{ name: 'category', value: 'x' }] })),
   })),
   push: { title: 'Matchweek 12 closes soon', body: 'pick', data: { poolId: 'p1', tab: 'predictions' } },
-  category: 'PREDICTIONS',
+  kind: 'lock_reminder',
   deadlineAt: '2026-11-01T12:30:00Z',
   eventAt: null,
 })

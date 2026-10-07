@@ -13,9 +13,10 @@
 // enforced. The sentences themselves live only in the database; the
 // preferences screens read them from there.
 //
-// ⚠ NOT YET A SEND GATE. Senders still pass their own category to
-// sendPushToUser and their own topicId to Resend. Making every send go through
-// this registry is N4 (the dispatcher).
+// ⚠ A SEND GATE FOR PUSH (N4, 2026-10-07): sendPushToUser takes a kind from
+// this list — nothing else — and refuses one that is not live, so every push
+// has a switch and a sentence. Email still passes its own topicId to Resend;
+// it joins in N4's fourth step.
 //
 // The ORDER below is the order members read them in, under each switch.
 // =============================================================

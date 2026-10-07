@@ -1,5 +1,6 @@
-// Push notification categories. Each push fan-out passes a category so the
-// dispatcher can suppress sends to users who opted out of that category.
+// Push notification categories — the switches. A push never names one itself:
+// it names its registry kind (lib/notifications/registry.ts), and the transport
+// takes the kind's category from there, so no push can skip a switch (N4).
 //
 // Categories mirror the email Resend topics (lib/email/topics.ts) so the UX
 // can group them together in the Profile screen — except GAMIFICATION, which

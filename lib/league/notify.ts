@@ -30,8 +30,8 @@
 //
 // ## Preferences are honoured
 //
-// Push goes through `sendPushToUsers(..., category)`, which filters on
-// `push_notification_preferences`. Email carries a Resend `topicId` so an
+// Push goes through `sendPushToUsers(..., kind)`, which looks up the kind's
+// switch in the registry and filters on `push_notification_preferences`. Email carries a Resend `topicId` so an
 // unsubscribe applies to the right stream rather than to everything.
 // =============================================================
 
@@ -46,7 +46,7 @@ import {
   leagueTableDeadlineMovedTemplate,
 } from '@/lib/email/templates'
 import { sendPushToUsers } from '@/lib/push/apns'
-import type { PushCategory } from '@/lib/push/categories'
+import type { NotificationTypeKey } from '@/lib/notifications/registry'
 import { enqueue } from '@/lib/notifications/outbox'
 
 export type LeagueNoticeKind =
@@ -90,7 +90,8 @@ export type LeaguePlan =
   | {
       members: PlannedMember[]
       push: { title: string; body: string; data?: Record<string, string> }
-      category: PushCategory
+      /** The registry kind — its switch decides who may be pushed. */
+      kind: NotificationTypeKey
       /** What Decision 16 measures the notice against: the deadline it is about, or when its event happened. */
       deadlineAt: string | null
       eventAt: string | null
@@ -103,7 +104,7 @@ async function fromPlan(plan: LeaguePlan): Promise<NoticeResult> {
     plan.members.flatMap((m) => m.emails.map((e) => ({ to: e.to, subject: e.subject, html: e.html, topicId: e.topicId, tags: e.tags }))),
     plan.members.filter((m) => m.push).map((m) => m.userId),
     plan.push,
-    plan.category,
+    plan.kind,
   )
 }
 
@@ -210,14 +211,14 @@ async function deliver(
   emails: Array<{ to: string; subject: string; html: string; topicId?: string; tags?: { name: string; value: string }[] }>,
   userIds: string[],
   push: { title: string; body: string; data?: Record<string, string> },
-  category: PushCategory,
+  kind: NotificationTypeKey,
 ): Promise<NoticeResult> {
   // Email and push are independent: one failing must not suppress the other,
   // and neither failing may throw, because the caller marks the outbox row on
   // the strength of this returning.
   const [emailRes, pushRes] = await Promise.allSettled([
     emails.length > 0 ? sendBatchEmails(emails) : Promise.resolve(null),
-    userIds.length > 0 ? sendPushToUsers(userIds, push, category) : Promise.resolve({ sent: 0, total: 0 }),
+    userIds.length > 0 ? sendPushToUsers(userIds, push, kind) : Promise.resolve({ sent: 0, total: 0 }),
   ])
   if (emailRes.status === 'rejected') console.error('[league-notify] email failed:', emailRes.reason)
   if (pushRes.status === 'rejected') console.error('[league-notify] push failed:', pushRes.reason)
@@ -279,7 +280,7 @@ export async function planMatchweekOpened(
       body: `${ctx.fixtureCount} games to predict in ${ctx.poolName}.`,
       data: { poolId, tab: 'predictions' },
     },
-    category: 'PREDICTIONS',
+    kind: 'matchweek_opened',
     deadlineAt: ctx.lockAt,
     eventAt: null,
   }
@@ -373,7 +374,7 @@ export async function planLockReminder(
       body: `You haven't picked yet in ${ctx.poolName}.`,
       data: { poolId, tab: 'predictions' },
     },
-    category: 'PREDICTIONS',
+    kind: 'lock_reminder',
     deadlineAt: ctx.lockAt,
     eventAt: null,
   }
@@ -470,7 +471,7 @@ export async function planMatchweekCompleted(
       body: `See where you finished in ${ctx.poolName}.`,
       data: { poolId, tab: 'leaderboard' },
     },
-    category: 'MATCH_RESULTS',
+    kind: 'matchweek_completed',
     deadlineAt: null,
     eventAt: ctx.snapshotAt,
   }
@@ -596,7 +597,7 @@ export async function planTableDeadline(
       body: `You haven't ordered the clubs yet in ${p.pool_name}.`,
       data: { poolId, tab: 'predictions' },
     },
-    category: 'PREDICTIONS',
+    kind: 'table_deadline',
     deadlineAt: p.league_table_lock_at,
     eventAt: null,
   }
@@ -686,7 +687,7 @@ export async function notifyTableDeadlineMoved(
         : `${p.pool_name}: the table prediction now closes at a new time.`,
       data: { poolId, tab: 'predictions' },
     },
-    'PREDICTIONS',
+    'table_deadline_moved',
   )
 }
 

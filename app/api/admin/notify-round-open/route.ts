@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
   let recipients = 0
   let pushSent = 0
   let pushTotal = 0
+  let pushFailedPools = 0
 
   for (const row of roundRows) {
     const pool = (row as any).pools
@@ -125,17 +126,25 @@ export async function POST(request: NextRequest) {
 
     if (sendPush && !dryRun) {
       const userIds = (members as any[]).map((m) => m.user_id).filter(Boolean)
-      const res = await sendPushToUsers(
-        userIds,
-        {
-          title: `${roundName} Now Open`,
-          body: `Make your predictions for ${pool.pool_name}!`,
-          data: { type: 'pool_activity', pool_id: pool.pool_id },
-        },
-        NOTIFICATION_TYPES.round_open.category,
-      )
-      pushSent += res.sent
-      pushTotal += res.total
+      // One pool's push failing (it throws when the switches can't be read,
+      // rather than pushing to people who said no) must not abandon the other
+      // pools, or the emails below — a retry would push the earlier pools twice.
+      try {
+        const res = await sendPushToUsers(
+          userIds,
+          {
+            title: `${roundName} Now Open`,
+            body: `Make your predictions for ${pool.pool_name}!`,
+            data: { type: 'pool_activity', pool_id: pool.pool_id },
+          },
+          'round_open',
+        )
+        pushSent += res.sent
+        pushTotal += res.total
+      } catch (err) {
+        pushFailedPools++
+        console.error('[notify-round-open] push failed for pool', pool.pool_id, err)
+      }
     }
   }
 
@@ -151,7 +160,7 @@ export async function POST(request: NextRequest) {
     poolsTargeted: roundRows.length,
     emails: emails.length,
     recipients,
-    push: { sent: pushSent, total: pushTotal },
+    push: { sent: pushSent, total: pushTotal, failedPools: pushFailedPools },
     message: dryRun
       ? 'DRY RUN — no emails or pushes sent. Re-run with {"dryRun": false} to send.'
       : `Sent ${emails.length} emails.`,

@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       to: u.email,
       subject,
       html,
-      topicId: TOPICS.ADMIN,
+      topicId: TOPICS[NOTIFICATION_TYPES.deadline_changed.category],
       tags: [{ name: 'category', value: 'admin' }],
     }
   })
@@ -93,9 +93,10 @@ export async function POST(request: NextRequest) {
         body: `${pool.pool_name}: new deadline is ${formattedDeadline}`,
         data: { type: 'admin', pool_id },
       },
-      // The registry's switch, so push and email can't disagree again: until
-      // 2026-10-05 this push followed Predictions while the email followed Admin.
-      NOTIFICATION_TYPES.deadline_changed.category,
+      // The registry kind — the transport takes its switch from there, so push
+      // and email can't disagree again: until 2026-10-05 this push followed
+      // Predictions while the email followed Admin.
+      'deadline_changed',
     ),
   ])
 

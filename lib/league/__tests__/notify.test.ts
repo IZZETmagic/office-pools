@@ -24,15 +24,15 @@ const sendBatchEmails = vi.fn<(emails: EmailArg) => Promise<{ success: boolean }
   async () => ({ success: true }),
 )
 const sendPushToUsers = vi.fn<
-  (userIds: string[], push: { title: string; body: string }, category?: string) => Promise<{ sent: number; total: number }>
+  (userIds: string[], push: { title: string; body: string }, kind: string) => Promise<{ sent: number; total: number }>
 >(async () => ({ sent: 0, total: 0 }))
 
 vi.mock('@/lib/email/send', () => ({
   sendBatchEmails: (emails: EmailArg) => sendBatchEmails(emails),
 }))
 vi.mock('@/lib/push/apns', () => ({
-  sendPushToUsers: (userIds: string[], push: { title: string; body: string }, category?: string) =>
-    sendPushToUsers(userIds, push, category),
+  sendPushToUsers: (userIds: string[], push: { title: string; body: string }, kind: string) =>
+    sendPushToUsers(userIds, push, kind),
 }))
 vi.mock('@/lib/email/topics', () => ({ TOPICS: { PREDICTIONS: 't1', MATCH_RESULTS: 't2' } }))
 
@@ -280,13 +280,13 @@ describe('the lock reminder goes ONLY to people who have not picked', () => {
     expect(recipients()).toHaveLength(1)
   })
 
-  it('uses the PREDICTIONS push category, so an opt-out is honoured', async () => {
+  it('names its kind, so the transport applies that kind\'s switch (Predictions)', async () => {
     await notifyLockReminder(
       fakeAdmin({ ...BASE, members: [MEMBER(1, ['e1'])] }),
       'p1',
       'mw1',
     )
-    expect(sendPushToUsers.mock.calls[0]?.[2]).toBe('PREDICTIONS')
+    expect(sendPushToUsers.mock.calls[0]?.[2]).toBe('lock_reminder')
   })
 })
 

@@ -249,7 +249,7 @@ export type DispatchDeps = {
   registry: (types: string[]) => Promise<Map<string, RegistryFacts>>
   people: (userIds: string[]) => Promise<Map<string, Person>>
   sendEmail: (args: { to: string; email: ComposedEmail; topicId: string | undefined; idempotencyKey: string; typeKey: string }) => Promise<{ ok: boolean; error?: string }>
-  sendPush: (userId: string, push: ComposedPush, category: PushCategory) => Promise<{ sent: number; total: number }>
+  sendPush: (userId: string, push: ComposedPush, kind: NotificationTypeKey) => Promise<{ sent: number; total: number }>
   record: (outboxId: number, settlement: Settlement) => Promise<void>
   pause: (ms: number) => Promise<void>
   now: () => Date
@@ -350,7 +350,9 @@ export async function dispatch(
           results.email = allOk ? 'sent' : 'failed'
         } else if (channel === 'push' && 'push' in c && c.push && row.user_id) {
           try {
-            const res = await deps.sendPush(row.user_id, c.push, fact.category)
+            // The kind, not its switch: the transport looks the switch up itself, so
+            // no sender anywhere can push without one (N4).
+            const res = await deps.sendPush(row.user_id, c.push, typeKey as NotificationTypeKey)
             results.push = res.sent > 0 ? 'sent' : res.total === 0 ? 'skipped:no_device' : 'failed'
             if (results.push === 'failed') errors.push(`push: 0 of ${res.total} devices accepted it`)
           } catch (err) {
@@ -474,7 +476,7 @@ function defaultDeps(admin: SupabaseClient): DispatchDeps {
       }
     },
 
-    sendPush: (userId, push, category) => sendPushToUser(userId, push, category),
+    sendPush: (userId, push, kind) => sendPushToUser(userId, push, kind),
 
     async record(outboxId, settlement) {
       const { error } = await admin.from('notification_outbox').update(settlement).eq('outbox_id', outboxId)
