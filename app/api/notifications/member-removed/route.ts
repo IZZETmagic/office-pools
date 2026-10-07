@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
-import { enqueue, dispatch } from '@/lib/notifications/outbox'
+import { dispatch } from '@/lib/notifications/outbox'
 import { COMPOSERS } from '@/lib/notifications/composers'
-import { removalEvidence } from '@/lib/pools/adminNotices'
+import { queueMemberRemoved } from '@/lib/pools/adminNotices'
 
 // =============================================================
 // POST /api/notifications/member-removed
 // =============================================================
-// Called by the admin Members tab straight after it deletes a membership.
+// ⚠ KEPT FOR APP VERSIONS BEFORE 2026-10-07, which delete the membership themselves and then call
+// this. The website and newer apps remove a member with ONE request instead —
+// DELETE /api/pools/[pool_id]/members/[member_id] — which removes, rescores and notifies. Both
+// tell the member through queueMemberRemoved (lib/pools/adminNotices.ts), so they cannot drift.
+// Remove this route once no supported app version calls it.
 //
 // ⚠ ONLY FOR SOMEBODY WHO REALLY WAS REMOVED (2026-10-06). Until today this checked only that
 // the caller was the pool's admin — not that the person had ever been in the pool, or been
@@ -19,9 +23,6 @@ import { removalEvidence } from '@/lib/pools/adminNotices'
 // detached and NOT retired — exactly what an admin's removal leaves behind (leaving through
 // /leave retires them instead). The notice is keyed to that entry, so it is queued once per
 // removal, and the activity event is written only when it is. Sent by the notification outbox.
-//
-// A server-side removal route — one request that removes, records and notifies, as /leave does
-// for leaving — is the durable shape, and is noted as a follow-up.
 // =============================================================
 
 export async function POST(request: NextRequest) {
@@ -48,32 +49,8 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient()
-  const [evidence, { data: pool }] = await Promise.all([
-    removalEvidence(admin, { poolId: pool_id, userId: removed_user_id }),
-    admin.from('pools').select('pool_name').eq('pool_id', pool_id).single(),
-  ])
-  if (!evidence || !pool) {
-    return NextResponse.json({ sent: false, reason: 'no removal to tell them about' }, { status: 404 })
-  }
-
-  const queued = await enqueue(admin, [{
-    type: 'member_removed',
-    userId: removed_user_id,
-    poolId: pool_id,
-    dedupKey: `member_removed:${pool_id}:${removed_user_id}:${evidence}`,
-    payload: { actorId: userData.user_id },
-  }])
-  if (queued.length === 0) return NextResponse.json({ sent: false, reason: 'already told' })
-
-  // The activity feed's "Removed from <pool>" card — written once, with the notice. Stored as a
-  // snapshot (pool_name in the row) so it survives a later pool deletion.
-  await admin.from('pool_membership_events').insert({
-    pool_id,
-    user_id: removed_user_id,
-    actor_user_id: userData.user_id,
-    event_type: 'removed',
-    pool_name: (pool as { pool_name: string }).pool_name,
-  })
+  const queued = await queueMemberRemoved(admin, { poolId: pool_id, userId: removed_user_id, actorId: userData.user_id })
+  if (queued.length === 0) return NextResponse.json({ queued: false, reason: 'no removal to tell them about, or already told' })
 
   after(() => dispatch(createAdminClient(), COMPOSERS, { ids: queued }).then(
     () => undefined,

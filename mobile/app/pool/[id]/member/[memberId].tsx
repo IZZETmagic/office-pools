@@ -15,7 +15,7 @@ import {
   type AdjustPointsSheetHandle,
 } from '@/components/pool-detail/AdjustPointsSheet';
 import { ConfirmDialog, Icon, Text } from '@/components/ui';
-import { deleteEntry, notifyMemberRemoved } from '@/lib/api';
+import { deleteEntry, removeMember } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useMemberDetail, type MemberDetail, type MemberEntry } from '@/lib/useMemberDetail';
 import { LeaderboardAvatar } from '@/components/pool-detail/LeaderboardAvatar';
@@ -156,20 +156,9 @@ export default function MemberDetailScreen() {
     setBusy(true);
     setShowRemoveConfirm(false);
     try {
-      const { error } = await supabase
-        .from('pool_members')
-        .delete()
-        .eq('member_id', member.memberId);
-      if (error) throw error;
-      // Best-effort: tell the server to email + push the removed
-      // user. Fire-and-forget so a slow / failing notification
-      // doesn't block the admin's UI return — the actual removal
-      // is the source of truth and is already committed.
-      if (id) {
-        void notifyMemberRemoved(id, member.userId).catch((err) => {
-          console.warn('[notifyMemberRemoved]', err);
-        });
-      }
+      // One request removes, rescores and tells them (N4, 2026-10-07).
+      if (!id) throw new Error('No pool to remove them from');
+      await removeMember(id, member.memberId);
       router.back();
     } catch (err) {
       Alert.alert(

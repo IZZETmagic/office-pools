@@ -299,30 +299,15 @@ export function MembersTab({
   async function handleRemove(member: MemberData) {
     setLoading(true)
 
-    // Deleting the member cascades to predictions, scores, etc.
-    const { error: memError } = await supabase
-      .from('pool_members')
-      .delete()
-      .eq('member_id', member.member_id)
-
-    if (memError) {
-      setError('Failed to remove member: ' + memError.message)
+    // One request removes, rescores and tells them (N4, 2026-10-07) — it used to be three, made
+    // from here, any of which could fail without the others knowing.
+    const res = await fetch(`/api/pools/${pool.pool_id}/members/${member.member_id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string }
+      setError('Failed to remove member: ' + (body.error ?? `HTTP ${res.status}`))
       setLoading(false)
       return
     }
-
-    // Recalculate v2 scores and ranks
-    await fetch(`/api/pools/${pool.pool_id}/recalculate`, { method: 'POST' })
-
-    // Notify removed member (fire-and-forget)
-    fetch('/api/notifications/member-removed', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pool_id: pool.pool_id,
-        removed_user_id: member.users.user_id,
-      }),
-    }).catch(() => {})
 
     showToast(`${member.users.username} removed from pool.`, 'success')
     await refreshMembers()

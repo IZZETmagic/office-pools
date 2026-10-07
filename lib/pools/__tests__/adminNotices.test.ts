@@ -13,7 +13,7 @@ import { enqueue } from '@/lib/notifications/outbox'
 import type { OutboxRow } from '@/lib/notifications/outbox'
 import {
   composeMemberRemoved, composePointsAdjusted, composePoolArchived, composePoolRestored,
-  queuePoolArchived, recentAdjustmentBy, removalEvidence,
+  queueMemberRemoved, queuePoolArchived, recentAdjustmentBy, removalEvidence,
 } from '../adminNotices'
 import { fakeDb } from '../../crews/__tests__/fakeDb'
 
@@ -128,5 +128,33 @@ describe('member removed — only for somebody who really was', () => {
   it('does not tell somebody who has rejoined since that they were removed', async () => {
     const out = await composeMemberRemoved(world().client, [row({ type_key: 'member_removed', user_id: 'mia' })])
     expect(out.get(1)).toEqual({ skip: 'no_longer_true' })
+  })
+  // queueMemberRemoved — shared by the one-request removal route and the older notice route.
+  const removed = () => world({
+    members: [{ pool_id: 'p1', user_id: 'boss' }],
+    extra: { pool_entries: entries({ member_id: null, retired_at: null }), pool_membership_events: [] },
+  })
+
+  it('queues the notice keyed to the removal, and writes the activity card with it', async () => {
+    const db = removed()
+    expect(await queueMemberRemoved(db.client, { poolId: 'p1', userId: 'zoe', actorId: 'boss' })).toEqual([1])
+    expect(queued.mock.calls[0][1]).toEqual([expect.objectContaining({ type: 'member_removed', userId: 'zoe', dedupKey: 'member_removed:p1:zoe:e7' })])
+    expect(db.tables.pool_membership_events).toEqual([
+      expect.objectContaining({ pool_id: 'p1', user_id: 'zoe', actor_user_id: 'boss', event_type: 'removed', pool_name: 'Bermuda Office' }),
+    ])
+  })
+
+  it('no removal: no notice and no card', async () => {
+    const db = world({ extra: { pool_entries: [], pool_membership_events: [] } })
+    expect(await queueMemberRemoved(db.client, { poolId: 'p1', userId: 'mia', actorId: 'boss' })).toEqual([])
+    expect(queued).not.toHaveBeenCalled()
+    expect(db.tables.pool_membership_events).toEqual([])
+  })
+
+  it('told already (the notice deduplicates): no second card', async () => {
+    const db = removed()
+    queued.mockResolvedValueOnce([])
+    expect(await queueMemberRemoved(db.client, { poolId: 'p1', userId: 'zoe', actorId: 'boss' })).toEqual([])
+    expect(db.tables.pool_membership_events).toEqual([])
   })
 })

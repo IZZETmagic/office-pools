@@ -1021,16 +1021,14 @@ export function recalculatePool(poolId: string) {
 }
 
 /**
- * Tell the server an admin just removed `removedUserId` from `poolId`.
- * The endpoint sends both an email and a push notification to that user
- * (category ADMIN — bypasses opt-out). Mobile clients call this AFTER
- * the supabase `pool_members.delete()` succeeds so the notification is
- * a best-effort follow-up rather than a precondition for the removal.
+ * An admin removes a player from `poolId`: ONE request that removes, rescores and tells them
+ * (N4, 2026-10-07). It replaces a direct `pool_members.delete()` followed by a best-effort
+ * /api/notifications/member-removed call — which never rescored the pool. That older route stays
+ * for app builds that still make those two calls.
  */
-export function notifyMemberRemoved(poolId: string, removedUserId: string) {
-  return apiFetch<{ sent: boolean }>('/api/notifications/member-removed', {
-    method: 'POST',
-    body: { pool_id: poolId, removed_user_id: removedUserId },
+export function removeMember(poolId: string, memberId: string) {
+  return apiFetch<{ removed: boolean; told: boolean }>(`/api/pools/${poolId}/members/${memberId}`, {
+    method: 'DELETE',
   });
 }
 

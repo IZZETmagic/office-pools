@@ -261,3 +261,44 @@ export async function removalEvidence(
   if (stillIn) return null
   return ((detached ?? []) as Array<{ entry_id: string }>)[0]?.entry_id ?? null
 }
+
+/**
+ * Tell somebody they were removed from a pool — once per removal, and only when one happened
+ * (removalEvidence: not a member, entries detached and not retired). Queues the member_removed
+ * notice keyed to that entry, and writes the "Removed from <pool>" activity card with it — never
+ * without it, so a repeated call writes neither. Returns the outbox ids queued, for an eager
+ * dispatch. Shared by the removal route (/api/pools/[pool_id]/members/[member_id]) and the older
+ * notice route that app versions before it still call.
+ */
+export async function queueMemberRemoved(
+  admin: SupabaseClient,
+  a: { poolId: string; userId: string; actorId: string },
+): Promise<number[]> {
+  const [evidence, { data: pool, error: pErr }] = await Promise.all([
+    removalEvidence(admin, { poolId: a.poolId, userId: a.userId }),
+    admin.from('pools').select('pool_name').eq('pool_id', a.poolId).maybeSingle(),
+  ])
+  if (pErr) throw new Error(`pools: ${pErr.message}`)
+  if (!evidence || !pool) return []
+
+  const queued = await enqueue(admin, [{
+    type: 'member_removed',
+    userId: a.userId,
+    poolId: a.poolId,
+    dedupKey: `member_removed:${a.poolId}:${a.userId}:${evidence}`,
+    payload: { actorId: a.actorId },
+  }])
+  if (queued.length === 0) return []
+
+  // The activity feed's card — written once, with the notice. A snapshot (pool_name in the row),
+  // so it survives a later pool deletion.
+  const { error: evErr } = await admin.from('pool_membership_events').insert({
+    pool_id: a.poolId,
+    user_id: a.userId,
+    actor_user_id: a.actorId,
+    event_type: 'removed',
+    pool_name: (pool as { pool_name: string }).pool_name,
+  })
+  if (evErr) console.error('[member-removed] activity card not written:', evErr.message)
+  return queued
+}
