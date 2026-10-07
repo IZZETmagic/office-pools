@@ -26,25 +26,27 @@ import {
 import { usePushPermission, type PushPermissionStatus } from '@/lib/usePushPermission';
 import { fontFamilies, useTheme, withOpacity } from '@/theme';
 
+// `desc` is all a closed row says (Ryan, 2026-10-07), so each is true of the
+// whole switch for anyone: the notices under it open on a tap.
 const PUSH_PREF_OPTIONS: NotificationOption[] = [
-  { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Join/leave a pool, invitations', icon: 'person.3.fill' },
-  { key: 'PREDICTIONS', label: 'Predictions', desc: 'Deadline reminders, confirmations', icon: 'target' },
-  { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'Per-match outcomes, matchday recaps', icon: 'sportscourt.fill' },
-  { key: 'LEADERBOARD', label: 'Leaderboard', desc: 'Rank changes and shake-ups', icon: 'chart.bar.fill' },
-  { key: 'ADMIN', label: 'Admin Alerts', desc: 'Settings changed, points adjusted', icon: 'gearshape.fill' },
-  { key: 'COMMUNITY', label: 'Community', desc: '@mentions and pool chat', icon: 'bubble.left.and.bubble.right.fill' },
-  { key: 'GAMIFICATION', label: 'Achievements', desc: 'Badges, level-ups, streaks, MVP', icon: 'rosette' },
+  { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Pools you join or run, and your crews', icon: 'person.3.fill' },
+  { key: 'PREDICTIONS', label: 'Predictions', desc: 'When picks open, and reminders before they lock', icon: 'target' },
+  { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'How your picks scored', icon: 'sportscourt.fill' },
+  { key: 'LEADERBOARD', label: 'Leaderboard', desc: 'Rank changes in your pools', icon: 'chart.bar.fill' },
+  { key: 'ADMIN', label: 'Admin Alerts', desc: 'Changes a pool’s admin makes that affect you', icon: 'gearshape.fill' },
+  { key: 'COMMUNITY', label: 'Community', desc: '@mentions and messages in your pools’ chat', icon: 'bubble.left.and.bubble.right.fill' },
+  { key: 'GAMIFICATION', label: 'Achievements', desc: 'Badges, levels and streaks', icon: 'rosette' },
 ];
 
 const EMAIL_PREF_OPTIONS: NotificationOption[] = [
-  { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Join/leave pool, invitations', icon: 'person.3.fill' },
-  { key: 'PREDICTIONS', label: 'Predictions', desc: 'Deadline reminders, confirmations', icon: 'target' },
-  { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'Results and points earned', icon: 'sportscourt.fill' },
-  { key: 'LEADERBOARD', label: 'Leaderboard Updates', desc: 'Rank changes, weekly standings', icon: 'chart.bar.fill' },
-  { key: 'ADMIN', label: 'Admin Notifications', desc: 'Settings changed, member removed', icon: 'gearshape.fill' },
-  { key: 'COMMUNITY', label: 'Community & Mentions', desc: '@mentions in pool chat', icon: 'bubble.left.and.bubble.right.fill' },
+  { key: 'POOL_ACTIVITY', label: 'Pool Activity', desc: 'Pools you join or run, and your crews', icon: 'person.3.fill' },
+  { key: 'PREDICTIONS', label: 'Predictions', desc: 'When picks open, and reminders before they lock', icon: 'target' },
+  { key: 'MATCH_RESULTS', label: 'Match Results', desc: 'How your picks scored', icon: 'sportscourt.fill' },
+  { key: 'LEADERBOARD', label: 'Leaderboard Updates', desc: 'Rank changes in your pools', icon: 'chart.bar.fill' },
+  { key: 'ADMIN', label: 'Admin Notifications', desc: 'Changes a pool’s admin makes that affect you', icon: 'gearshape.fill' },
+  { key: 'COMMUNITY', label: 'Community & Mentions', desc: 'When someone @mentions you in a pool’s chat', icon: 'bubble.left.and.bubble.right.fill' },
   // Email only (migration 179) — there is no push switch for it.
-  { key: 'NEWS', label: 'News from SportPool', desc: 'What\'s new, surveys, starting a pool', icon: 'sparkles' },
+  { key: 'NEWS', label: 'News from SportPool', desc: 'What’s new at SportPool, now and then', icon: 'sparkles' },
 ];
 
 export default function NotificationSettingsScreen() {
@@ -108,8 +110,9 @@ function useEmailPrefs(): EmailPrefs {
 }
 
 /**
- * Each option with the sentences of what its switch sends on this channel. With
- * no notices (an older API, or a failed read) the options keep their summaries.
+ * Each option with what its switch sends on this channel: the registry's title
+ * and sentence for each. With no notices (an older API, or a failed read) the
+ * options keep their summaries and don't open.
  */
 function withNotices(
   options: NotificationOption[],
@@ -121,7 +124,7 @@ function withNotices(
     ...o,
     notices: notices
       .filter((n) => n.category === o.key && n.channels.includes(channel))
-      .map((n) => n.sentence),
+      .map((n) => ({ title: n.title ?? null, sentence: n.sentence })),
   }));
 }
 

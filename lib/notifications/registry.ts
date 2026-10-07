@@ -49,64 +49,71 @@ type Spec = {
   status: NotificationStatus
   /** Always delivered: no switch governs it (is_transactional in the database). */
   transactional?: true
+  /**
+   * Its name in the preferences screens, above its sentence (Ryan, 2026-10-07:
+   * the lists read as a wall of sentences). A label only — the sentence in the
+   * database stays the account of how it works. Every kind a switch controls
+   * has one; registry.test.ts holds that.
+   */
+  title?: string
 }
 
 export const NOTIFICATION_TYPES = {
   // League — pick'em and Showdown
-  matchweek_opened: { category: 'PREDICTIONS', status: 'live' },
-  lock_reminder: { category: 'PREDICTIONS', status: 'live' },
-  matchweek_completed: { category: 'MATCH_RESULTS', status: 'live' },
+  matchweek_opened: { category: 'PREDICTIONS', status: 'live', title: 'New matchweek' },
+  lock_reminder: { category: 'PREDICTIONS', status: 'live', title: 'Pick reminder' },
+  matchweek_completed: { category: 'MATCH_RESULTS', status: 'live', title: 'Matchweek results' },
   // League — Last Man Standing (migration 174)
-  lms_pick_open: { category: 'PREDICTIONS', status: 'live' },
-  lms_pick_reminder: { category: 'PREDICTIONS', status: 'live' },
+  lms_pick_open: { category: 'PREDICTIONS', status: 'live', title: 'Last Man Standing pick' },
+  lms_pick_reminder: { category: 'PREDICTIONS', status: 'live', title: 'Last Man Standing reminder' },
   // Pool countdowns (migration 175)
-  pool_countdown: { category: 'PREDICTIONS', status: 'live' },
-  pool_countdown_admin: { category: 'POOL_ACTIVITY', status: 'live' },
+  pool_countdown: { category: 'PREDICTIONS', status: 'live', title: 'Pool starting soon' },
+  pool_countdown_admin: { category: 'POOL_ACTIVITY', status: 'live', title: 'Pool needs players' },
   // League — Table
-  table_deadline: { category: 'PREDICTIONS', status: 'live' },
-  table_deadline_moved: { category: 'PREDICTIONS', status: 'live' },
+  table_deadline: { category: 'PREDICTIONS', status: 'live', title: 'Season table reminder' },
+  table_deadline_moved: { category: 'PREDICTIONS', status: 'live', title: 'Table deadline moved' },
   // Tournaments — before the deadline
-  deadline_warning: { category: 'PREDICTIONS', status: 'live' },
-  predict_reminder: { category: 'PREDICTIONS', status: 'live' },
-  match_starting: { category: 'PREDICTIONS', status: 'live' },
-  round_open: { category: 'PREDICTIONS', status: 'live' },
-  deadline_changed: { category: 'ADMIN', status: 'live' },
+  deadline_warning: { category: 'PREDICTIONS', status: 'live', title: 'Deadline reminders' },
+  predict_reminder: { category: 'PREDICTIONS', status: 'live', title: 'Daily reminder' },
+  match_starting: { category: 'PREDICTIONS', status: 'live', title: 'Kickoff soon' },
+  round_open: { category: 'PREDICTIONS', status: 'live', title: 'New round' },
+  deadline_changed: { category: 'ADMIN', status: 'live', title: 'Deadline changed' },
   // Tournaments — submitting
-  predictions_submitted: { category: 'PREDICTIONS', status: 'live' },
-  round_submitted: { category: 'PREDICTIONS', status: 'live' },
-  predictions_auto_submitted: { category: 'PREDICTIONS', status: 'live' },
-  round_auto_submitted: { category: 'PREDICTIONS', status: 'live' },
-  predictions_unlocked: { category: 'ADMIN', status: 'live' },
+  predictions_submitted: { category: 'PREDICTIONS', status: 'live', title: 'Predictions confirmed' },
+  round_submitted: { category: 'PREDICTIONS', status: 'live', title: 'Round confirmed' },
+  predictions_auto_submitted: { category: 'PREDICTIONS', status: 'live', title: 'Submitted for you' },
+  round_auto_submitted: { category: 'PREDICTIONS', status: 'live', title: 'Round submitted for you' },
+  predictions_unlocked: { category: 'ADMIN', status: 'live', title: 'Predictions unlocked' },
   // Tournaments — results and achievements
-  prediction_result: { category: 'MATCH_RESULTS', status: 'live' },
-  matchday_recap: { category: 'MATCH_RESULTS', status: 'live' },
-  weekly_recap: { category: 'MATCH_RESULTS', status: 'live' },
-  matchday_mvp: { category: 'GAMIFICATION', status: 'live' },
-  streak_milestone: { category: 'GAMIFICATION', status: 'live' },
-  badge_unlocked: { category: 'GAMIFICATION', status: 'live' },
-  level_up: { category: 'GAMIFICATION', status: 'live' },
+  prediction_result: { category: 'MATCH_RESULTS', status: 'live', title: 'Match result' },
+  matchday_recap: { category: 'MATCH_RESULTS', status: 'live', title: 'Matchday recap' },
+  weekly_recap: { category: 'MATCH_RESULTS', status: 'live', title: 'Weekly recap' },
+  matchday_mvp: { category: 'GAMIFICATION', status: 'live', title: 'Matchday MVP' },
+  streak_milestone: { category: 'GAMIFICATION', status: 'live', title: 'Streaks' },
+  badge_unlocked: { category: 'GAMIFICATION', status: 'live', title: 'Badge earned' },
+  level_up: { category: 'GAMIFICATION', status: 'live', title: 'Level up' },
   // Any pool
-  pool_welcome: { category: 'POOL_ACTIVITY', status: 'live' },
-  member_joined: { category: 'POOL_ACTIVITY', status: 'live' },
-  member_removed: { category: 'ADMIN', status: 'live' },
-  points_adjusted: { category: 'ADMIN', status: 'live' },
-  pool_archived: { category: 'ADMIN', status: 'live' },
-  pool_restored: { category: 'ADMIN', status: 'live' },
-  chat_message: { category: 'COMMUNITY', status: 'live' },
-  chat_mention: { category: 'COMMUNITY', status: 'live' },
+  pool_welcome: { category: 'POOL_ACTIVITY', status: 'live', title: 'Welcome to a pool' },
+  member_joined: { category: 'POOL_ACTIVITY', status: 'live', title: 'New member' },
+  member_removed: { category: 'ADMIN', status: 'live', title: 'Removed from a pool' },
+  points_adjusted: { category: 'ADMIN', status: 'live', title: 'Points adjusted' },
+  pool_archived: { category: 'ADMIN', status: 'live', title: 'Pool archived' },
+  pool_restored: { category: 'ADMIN', status: 'live', title: 'Pool restored' },
+  chat_message: { category: 'COMMUNITY', status: 'live', title: 'Chat messages' },
+  chat_mention: { category: 'COMMUNITY', status: 'live', title: '@mentions' },
   // Crews
-  crew_invite: { category: 'POOL_ACTIVITY', status: 'live' },
+  crew_invite: { category: 'POOL_ACTIVITY', status: 'live', title: 'Crew invite' },
   crew_invite_email: { category: 'POOL_ACTIVITY', status: 'live', transactional: true },
-  crew_seat_saved: { category: 'POOL_ACTIVITY', status: 'live' },
-  crew_seat_reminder: { category: 'POOL_ACTIVITY', status: 'live' },
+  crew_seat_saved: { category: 'POOL_ACTIVITY', status: 'live', title: 'Spot saved' },
+  crew_seat_reminder: { category: 'POOL_ACTIVITY', status: 'live', title: 'Saved spot reminder' },
   // Our own emails (migration 179). A reply or one-off email to one person is
   // always delivered; the rest sit under a switch like everything else.
   direct_email: { category: 'ADMIN', status: 'live', transactional: true },
   // Terms and Privacy updates (migration 180) — always delivered, as a Broadcast without the News topic.
   policy_update: { category: 'ADMIN', status: 'live', transactional: true },
-  pool_size_nudge: { category: 'POOL_ACTIVITY', status: 'live' },
-  predictions_reminder: { category: 'PREDICTIONS', status: 'live' },
-  sportpool_news: { category: 'NEWS', status: 'live' },
+  pool_size_nudge: { category: 'POOL_ACTIVITY', status: 'live', title: 'Ideas for your pool' },
+  predictions_reminder: { category: 'PREDICTIONS', status: 'live', title: 'Prediction reminder' },
+  sportpool_news: { category: 'NEWS', status: 'live', title: 'News from SportPool' },
   // Planned — N7. Written down so they pass the gate while being designed.
   duel_drawn: { category: 'POOL_ACTIVITY', status: 'planned' },
   duel_reveal_ready: { category: 'POOL_ACTIVITY', status: 'planned' },
@@ -139,8 +146,11 @@ export type RegistryRow = {
   disclosure_sentence: string
 }
 
-/** One notice a member's switches control, as the preferences screens show it. */
-export type MemberNotice = { key: string; category: string; channels: string[]; sentence: string }
+/**
+ * One notice a member's switches control, as the preferences screens show it.
+ * `title` is null only for a kind the database has and this file does not yet.
+ */
+export type MemberNotice = { key: string; category: string; channels: string[]; title: string | null; sentence: string }
 
 /**
  * What a member's switches actually control, in reading order: live kinds
@@ -156,5 +166,11 @@ export function noticesForMember(rows: RegistryRow[], modes: ReadonlySet<GameMod
     .filter((r) => r.status === 'live' && !r.is_transactional)
     .filter((r) => r.modes === null || r.modes.some((m) => modes.has(m as GameMode)))
     .sort((a, b) => rank(a.type_key) - rank(b.type_key))
-    .map((r) => ({ key: r.type_key, category: r.category, channels: r.channels, sentence: r.disclosure_sentence }))
+    .map((r) => ({
+      key: r.type_key,
+      category: r.category,
+      channels: r.channels,
+      title: (NOTIFICATION_TYPES as Record<string, Spec>)[r.type_key]?.title ?? null,
+      sentence: r.disclosure_sentence,
+    }))
 }

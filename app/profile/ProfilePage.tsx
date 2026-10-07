@@ -1140,17 +1140,19 @@ function PerformanceRing({
 }
 
 /**
- * What one notification switch sends, in the registry's own words (N2). With
- * no list it shows the switch's old one-line summary; with an empty one it
- * says so, because a switch that controls nothing should not look like it does.
+ * What one notification switch sends, in the registry's own words (N2): each
+ * notice's title over its sentence, as the app lists them. With no list it
+ * shows the switch's old one-line summary; with an empty one it says so,
+ * because a switch that controls nothing should not look like it does.
  */
 function SwitchNotices({ notices, fallback }: { notices: MemberNotice[] | null; fallback: string }) {
   if (notices === null) return <p className="text-xs text-muted">{fallback}</p>
   if (notices.length === 0) return <p className="text-xs text-muted">Nothing is sent under this switch at the moment.</p>
   return (
-    <ul className="mt-1 space-y-1">
+    <ul className="mt-1 space-y-2">
       {notices.map((n) => (
         <li key={n.key} className="text-xs text-muted leading-snug">
+          {n.title ? <span className="block font-semibold text-ink">{n.title}</span> : null}
           {n.sentence}
         </li>
       ))}

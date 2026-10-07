@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { noticesForMember, poolGameMode, type GameMode, type RegistryRow } from './registry'
+import { NOTIFICATION_TYPES, noticesForMember, poolGameMode, type GameMode, type RegistryRow } from './registry'
 
 const row = (over: Partial<RegistryRow> & { type_key: string }): RegistryRow => ({
   category: 'PREDICTIONS',
@@ -63,9 +63,28 @@ describe('noticesForMember', () => {
     expect(noticesForMember(rows, modes()).map((n) => n.key)).toEqual(['matchweek_opened', 'not_in_code_yet'])
   })
 
-  it('carries the sentence word for word', () => {
+  it('carries the sentence word for word, under the title the code gives it', () => {
     const sentence = 'If you haven\'t picked every match and the matchweek locks within 24 hours, we remind you once.'
     const [notice] = noticesForMember([row({ type_key: 'lock_reminder', disclosure_sentence: sentence })], modes())
-    expect(notice).toEqual({ key: 'lock_reminder', category: 'PREDICTIONS', channels: ['email', 'push'], sentence })
+    expect(notice).toEqual({ key: 'lock_reminder', category: 'PREDICTIONS', channels: ['email', 'push'], title: 'Pick reminder', sentence })
+  })
+
+  it('a kind the code does not know yet keeps its sentence and has no title', () => {
+    const [notice] = noticesForMember([row({ type_key: 'not_in_code_yet' })], modes())
+    expect(notice.title).toBeNull()
+    expect(notice.sentence).toBe('A sentence for not_in_code_yet.')
+  })
+})
+
+describe('titles', () => {
+  // The preferences screens list a switch's notices by title, with the sentence underneath — so a
+  // kind a switch controls and no title would show as a sentence with nothing above it.
+  it('every live kind a switch controls has a title, and no two share one', () => {
+    const switched = Object.entries(NOTIFICATION_TYPES as Record<string, { status: string; transactional?: true; title?: string }>)
+      .filter(([, spec]) => spec.status === 'live' && !spec.transactional)
+    const untitled = switched.filter(([, spec]) => !spec.title?.trim()).map(([key]) => key)
+    expect(untitled).toEqual([])
+    const titles = switched.map(([, spec]) => spec.title)
+    expect(new Set(titles).size).toBe(titles.length)
   })
 })

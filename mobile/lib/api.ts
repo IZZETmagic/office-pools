@@ -942,6 +942,8 @@ export type SwitchNotice = {
   key: string;
   category: string;
   channels: string[];
+  /** Its short name, shown above the sentence. Absent from an older API. */
+  title?: string | null;
   sentence: string;
 };
 
