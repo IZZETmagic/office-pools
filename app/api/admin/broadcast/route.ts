@@ -14,7 +14,7 @@ import { resolveSendMode } from '@/lib/email/sendMode'
 // POST /api/admin/broadcast
 // Send a broadcast email to EVERYONE through Resend Broadcasts.
 //
-// Body: { subject, html, segment?: 'all', dry_run?, idempotency_key? }
+// Body: { subject, html, segment?: 'all', kind?: 'sportpool_news' | 'policy_update', dry_run?, idempotency_key? }
 //
 // ⚠ EVERYONE ONLY (Ryan, 2026-10-07). It used to take any segment, and for any
 // but "all" it cleared and refilled ONE shared Resend list ("Broadcast Target")
@@ -31,6 +31,11 @@ import { resolveSendMode } from '@/lib/email/sendMode'
 // and a broadcast is REFUSED while that topic is not configured, rather than
 // sent past members' switches. Resend keeps its one-click unsubscribe and its
 // first-name fill-in, which is why Broadcast stays on Resend at all.
+//
+// ⚠ POLICY UPDATES (migration 180): a Terms or Privacy update is `kind:
+// 'policy_update'` — always delivered, so it goes WITHOUT the News topic and
+// leaves nobody out for having switched News off. Only unsubscribing from all
+// our email stops it: Resend never broadcasts to a contact who did that.
 //
 // ⚠ SAFE BY DEFAULT (2026-10-05) — see lib/email/sendMode.ts. A body PREVIEWS
 // unless it says `dry_run: false`, and a real send must carry an
@@ -81,6 +86,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { subject, html } = body
     const segment = body.segment ?? 'all'
+    // News from SportPool unless it is a Terms or Privacy update (always delivered).
+    const kind: 'sportpool_news' | 'policy_update' = body.kind === 'policy_update' ? 'policy_update' : 'sportpool_news'
+    const isNews = kind === 'sportpool_news'
 
     if (!subject || !html) {
       return NextResponse.json({ error: 'subject and html are required' }, { status: 400 })
@@ -98,18 +106,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'RESEND_AUDIENCE_ID (the General segment) is not configured' }, { status: 500 })
     }
     const newsTopicId = TOPICS.NEWS
-    if (!newsTopicId) {
+    if (isNews && !newsTopicId) {
       return NextResponse.json({
         error: 'The News from SportPool topic is not set up (RESEND_TOPIC_NEWS), so a broadcast would ignore members\' News switch. Nothing was sent.',
       }, { status: 500 })
     }
 
     const fromAddress = process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'
-    const broadcastName = `${subject} [${SEGMENTS.all.label}]`
+    const broadcastName = `${subject} [${SEGMENTS.all.label}${isNews ? '' : ' · policy update'}]`
 
-    // Who it reaches, for the preview and the log: every member with an email, less whoever
-    // switched News off. Resend also leaves out anyone unsubscribed from everything.
-    const [users, newsOff] = await Promise.all([querySegment(supabase, 'all'), newsSwitchedOff()])
+    // Who it reaches, for the preview and the log: every member with an email — less whoever
+    // switched News off, for News. Resend also leaves out anyone unsubscribed from everything.
+    const [users, newsOff] = await Promise.all([querySegment(supabase, 'all'), isNews ? newsSwitchedOff() : new Set<string>()])
     const recipientEmails = users.filter((u) => u.email && !newsOff.has(u.user_id)).map((u) => u.email)
 
     if (recipientEmails.length === 0) {
@@ -122,6 +130,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         dry_run: true,
         segment: 'all',
+        kind,
         recipientCount: recipientEmails.length,
         preview: recipientEmails.slice(0, 5),
       })
@@ -150,7 +159,8 @@ export async function POST(request: NextRequest) {
     const { data: broadcast, error: createError } = await resend.broadcasts.create({
       name: broadcastName,
       segmentId: everyoneSegmentId,
-      topicId: newsTopicId,
+      // The News topic makes Resend skip whoever switched News off; a policy update carries none.
+      ...(isNews ? { topicId: newsTopicId } : {}),
       from: fromAddress,
       subject,
       html,

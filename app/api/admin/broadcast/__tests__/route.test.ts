@@ -92,10 +92,30 @@ describe('the News switch', () => {
     h.newsOff = [{ user_id: 'leo' }]
     expect(await post({ subject: 'Hello', html: '<p>Hi</p>' })).toEqual({
       status: 200,
-      body: { dry_run: true, segment: 'all', recipientCount: 1, preview: ['mia@example.com'] },
+      body: { dry_run: true, segment: 'all', kind: 'sportpool_news', recipientCount: 1, preview: ['mia@example.com'] },
     })
     await post(SEND)
     const log = h.inserted.find((i) => i.table === 'broadcast_log')?.row as { recipient_count: number; recipients: string[] }
     expect(log).toMatchObject({ recipient_count: 1, recipients: ['mia@example.com'] })
+  })
+})
+
+describe('a Terms or Privacy update — always delivered (migration 180)', () => {
+  it('carries no News topic and leaves out nobody who switched News off', async () => {
+    h.newsOff = [{ user_id: 'leo' }]
+    expect(await post({ subject: 'Terms', html: '<p>Hi</p>', kind: 'policy_update' })).toMatchObject({
+      status: 200,
+      body: { kind: 'policy_update', recipientCount: 2 },
+    })
+    await post({ ...SEND, kind: 'policy_update' })
+    const created = h.resend.create.mock.calls[0][0] as Record<string, unknown>
+    expect(created).toMatchObject({ segmentId: 'seg-general' })
+    expect(created).not.toHaveProperty('topicId')
+  })
+
+  it('goes even while the News topic is not set up — it does not depend on it', async () => {
+    h.newsTopic = undefined
+    expect((await post({ ...SEND, kind: 'policy_update' })).status).toBe(200)
+    expect(h.resend.send).toHaveBeenCalledWith('b1')
   })
 })

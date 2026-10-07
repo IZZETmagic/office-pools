@@ -102,6 +102,8 @@ export const NOTIFICATION_TYPES = {
   // Our own emails (migration 179). A reply or one-off email to one person is
   // always delivered; the rest sit under a switch like everything else.
   direct_email: { category: 'ADMIN', status: 'live', transactional: true },
+  // Terms and Privacy updates (migration 180) — always delivered, as a Broadcast without the News topic.
+  policy_update: { category: 'ADMIN', status: 'live', transactional: true },
   pool_size_nudge: { category: 'POOL_ACTIVITY', status: 'live' },
   predictions_reminder: { category: 'PREDICTIONS', status: 'live' },
   sportpool_news: { category: 'NEWS', status: 'live' },

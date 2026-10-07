@@ -85,6 +85,8 @@ export function BroadcastTab() {
   const [ctaText, setCtaText] = useState('')
   const [ctaUrl, setCtaUrl] = useState('')
   const [segment, setSegment] = useState<SegmentKey>('all')
+  // A Terms or Privacy update is always delivered (migration 180) — it goes without the News topic.
+  const [isPolicyUpdate, setIsPolicyUpdate] = useState(false)
   const [previewHtml, setPreviewHtml] = useState('')
   const [confirmSend, setConfirmSend] = useState(false)
   // One key per broadcast, made when Send opens the confirm step. Confirming
@@ -118,6 +120,7 @@ export function BroadcastTab() {
     setCtaText(preset.ctaText)
     setCtaUrl(preset.ctaUrl)
     setSegment(preset.segment)
+    setIsPolicyUpdate(preset.category === 'legal')
     setPreviewHtml('')
     setConfirmSend(false)
     setComposeStep('compose')
@@ -131,6 +134,7 @@ export function BroadcastTab() {
     setCtaText('')
     setCtaUrl('')
     setSegment('all')
+    setIsPolicyUpdate(false)
     setPreviewHtml('')
     setConfirmSend(false)
     setComposeStep('compose')
@@ -154,7 +158,10 @@ export function BroadcastTab() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // ⚠ `dry_run: false` must be explicit — the route previews without it.
-        body: JSON.stringify({ subject, html, segment, dry_run: false, idempotency_key: sendKey }),
+        body: JSON.stringify({
+          subject, html, segment, dry_run: false, idempotency_key: sendKey,
+          kind: isPolicyUpdate ? 'policy_update' : 'sportpool_news',
+        }),
       })
 
       const data = await res.json()
@@ -181,6 +188,7 @@ export function BroadcastTab() {
     setCtaText('')
     setCtaUrl('')
     setSegment('all')
+    setIsPolicyUpdate(false)
     setPreviewHtml('')
     setConfirmSend(false)
     setSendKey(null)
@@ -307,9 +315,18 @@ export function BroadcastTab() {
           {/* Where it goes — there is one choice now (N4, 2026-10-07). */}
           <FormField label="Send To">
             <p className="text-sm sp-text-slate sp-body">
-              Everyone, as News from SportPool — anyone who switched that off is left out. For a smaller
-              group, use Templates → Custom.
+              {isPolicyUpdate
+                ? 'Everyone, as a Terms or Privacy update — always delivered, whatever their switches. Only people who unsubscribed from all our email are left out.'
+                : 'Everyone, as News from SportPool — anyone who switched that off is left out. For a smaller group, use Templates → Custom.'}
             </p>
+            <label className="mt-2 flex items-center gap-2 text-xs sp-text-slate sp-body">
+              <input
+                type="checkbox"
+                checked={isPolicyUpdate}
+                onChange={(e) => { setIsPolicyUpdate(e.target.checked); setConfirmSend(false) }}
+              />
+              This is a Terms or Privacy Policy update
+            </label>
           </FormField>
 
           <FormField label="Email Subject">
