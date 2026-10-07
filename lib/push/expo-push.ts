@@ -45,9 +45,16 @@ type ExpoPushResponse = {
 }
 
 /**
- * Send a push notification to a single Expo push token. Returns true on
- * success, false on any failure. Invalid tokens (`DeviceNotRegistered`)
- * are auto-removed from push_tokens, mirroring the APNs 410-Gone cleanup.
+ * One device's push, as the delivery record keeps it: whether the provider took
+ * it, the provider's id for it (Expo's ticket id — what step 3 asks Expo about
+ * later — or APNs's apns-id), and the provider's reason when it refused.
+ */
+export type PushAttempt = { ok: boolean; providerId: string | null; error: string | null }
+
+/**
+ * Send a push notification to a single Expo push token. Returns the attempt —
+ * see PushAttempt. Invalid tokens (`DeviceNotRegistered`) are auto-removed from
+ * push_tokens, mirroring the APNs 410-Gone cleanup.
  */
 export async function sendExpoPushNotification(
   expoToken: string,
@@ -61,7 +68,7 @@ export async function sendExpoPushNotification(
     // the Expo relay path will keep whatever was last set).
     badge?: number
   },
-): Promise<boolean> {
+): Promise<PushAttempt> {
   const message: ExpoPushPayload = {
     to: expoToken,
     title: payload.title,
@@ -88,13 +95,13 @@ export async function sendExpoPushNotification(
 
     if (!res.ok) {
       console.error(`[ExpoPush] HTTP ${res.status}:`, json)
-      return false
+      return { ok: false, providerId: null, error: `HTTP ${res.status} ${json.errors?.[0]?.code ?? ''}`.trim() }
     }
 
     const ticket = json.data?.[0]
     if (!ticket) {
       console.error('[ExpoPush] No ticket returned:', json)
-      return false
+      return { ok: false, providerId: null, error: 'no ticket returned' }
     }
 
     if (ticket.status === 'error') {
@@ -105,14 +112,14 @@ export async function sendExpoPushNotification(
       if (ticket.details?.error === 'DeviceNotRegistered') {
         await removeInvalidToken(expoToken)
       }
-      return false
+      return { ok: false, providerId: ticket.id ?? null, error: ticket.details?.error ?? ticket.message ?? 'error' }
     }
 
     console.log(`[ExpoPush] Success for token ${tokenPreview(expoToken)}`)
-    return true
+    return { ok: true, providerId: ticket.id ?? null, error: null }
   } catch (err) {
     console.error(`[ExpoPush] Exception for token ${tokenPreview(expoToken)}:`, err)
-    return false
+    return { ok: false, providerId: null, error: err instanceof Error ? err.message : String(err) }
   }
 }
 

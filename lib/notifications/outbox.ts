@@ -36,7 +36,7 @@
 // =============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getResendClient } from '@/lib/email/resend'
+import { sendKeyedEmail } from '@/lib/email/send'
 import { TOPICS, TOPIC_KEYS, type TopicKey } from '@/lib/email/topics'
 import { sendPushToUser } from '@/lib/push/apns'
 import { PUSH_CATEGORY_COLUMNS, type PushCategory } from '@/lib/push/categories'
@@ -248,8 +248,21 @@ export type DispatchDeps = {
   claim: (limit: number, ids: number[] | null) => Promise<OutboxRow[]>
   registry: (types: string[]) => Promise<Map<string, RegistryFacts>>
   people: (userIds: string[]) => Promise<Map<string, Person>>
-  sendEmail: (args: { to: string; email: ComposedEmail; topicId: string | undefined; idempotencyKey: string; typeKey: string }) => Promise<{ ok: boolean; error?: string }>
-  sendPush: (userId: string, push: ComposedPush, kind: NotificationTypeKey) => Promise<{ sent: number; total: number }>
+  sendEmail: (args: {
+    to: string
+    email: ComposedEmail
+    topicId: string | undefined
+    idempotencyKey: string
+    typeKey: string
+    /** For the delivery record (migration 176). */
+    recordAs: { userId: string | null; poolId: string | null; outboxId: number }
+  }) => Promise<{ ok: boolean; error?: string }>
+  sendPush: (
+    userId: string,
+    push: ComposedPush,
+    kind: NotificationTypeKey,
+    context: { outboxId: number; poolId: string | null },
+  ) => Promise<{ sent: number; total: number }>
   record: (outboxId: number, settlement: Settlement) => Promise<void>
   pause: (ms: number) => Promise<void>
   now: () => Date
@@ -341,6 +354,7 @@ export async function dispatch(
               topicId: fact.is_transactional ? undefined : topicFor(fact.category),
               idempotencyKey: `outbox/${row.outbox_id}/${email.key}`,
               typeKey,
+              recordAs: { userId: row.user_id, poolId: row.pool_id, outboxId: row.outbox_id },
             })
             if (!res.ok) {
               allOk = false
@@ -352,7 +366,10 @@ export async function dispatch(
           try {
             // The kind, not its switch: the transport looks the switch up itself, so
             // no sender anywhere can push without one (N4).
-            const res = await deps.sendPush(row.user_id, c.push, typeKey as NotificationTypeKey)
+            const res = await deps.sendPush(row.user_id, c.push, typeKey as NotificationTypeKey, {
+              outboxId: row.outbox_id,
+              poolId: row.pool_id,
+            })
             results.push = res.sent > 0 ? 'sent' : res.total === 0 ? 'skipped:no_device' : 'failed'
             if (results.push === 'failed') errors.push(`push: 0 of ${res.total} devices accepted it`)
           } catch (err) {
@@ -451,32 +468,25 @@ function defaultDeps(admin: SupabaseClient): DispatchDeps {
       return out
     },
 
-    async sendEmail({ to, email, topicId, idempotencyKey, typeKey }) {
-      const from = process.env.RESEND_FROM_EMAIL || 'SportPool <notifications@sportpool.io>'
-      try {
-        const { error } = await getResendClient().emails.send(
-          {
-            from,
-            to: [to],
-            subject: email.subject,
-            html: email.html,
-            text: email.subject,
-            ...(topicId ? { topicId } : {}),
-            tags: [...(email.tags ?? []), { name: 'type', value: typeKey }],
-          },
-          { idempotencyKey },
-        )
-        if (!error) return { ok: true }
-        // The key was already used for a DIFFERENT payload: the email went on
-        // an earlier attempt and the content has changed since. Sent.
-        if (error.name === 'invalid_idempotent_request') return { ok: true }
-        return { ok: false, error: `${error.name}: ${error.message}` }
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
-      }
+    async sendEmail({ to, email, topicId, idempotencyKey, typeKey, recordAs }) {
+      // lib/email/send.ts records the delivery; a replay (the key already spent on an earlier,
+      // different payload) means it went then — sent, and recorded then.
+      const res = await sendKeyedEmail(
+        {
+          to,
+          subject: email.subject,
+          html: email.html,
+          topicId,
+          tags: [...(email.tags ?? []), { name: 'type', value: typeKey }],
+          kind: typeKey as NotificationTypeKey,
+          ...recordAs,
+        },
+        idempotencyKey,
+      )
+      return res.ok ? { ok: true } : { ok: false, error: res.error }
     },
 
-    sendPush: (userId, push, kind) => sendPushToUser(userId, push, kind),
+    sendPush: (userId, push, kind, context) => sendPushToUser(userId, push, kind, context),
 
     async record(outboxId, settlement) {
       const { error } = await admin.from('notification_outbox').update(settlement).eq('outbox_id', outboxId)

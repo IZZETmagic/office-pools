@@ -125,6 +125,7 @@ function harness(rows: OutboxRow[], opts: { person?: Person; transactional?: boo
   const store = new Map(rows.map((r) => [r.outbox_id, { ...r }]))
   const emails: Array<{ to: string; idempotencyKey: string; topicId: string | undefined }> = []
   const pushes: string[] = []
+  const recordedAs: unknown[] = []
   const pauses: number[] = []
   const emailOk = [...(opts.emailOk ?? [])]
   const deps: DispatchDeps = {
@@ -134,11 +135,16 @@ function harness(rows: OutboxRow[], opts: { person?: Person; transactional?: boo
       .map((r) => ({ ...r, attempts: r.attempts + 1 })),
     registry: async (types) => new Map(types.map((t) => [t, { category: 'POOL_ACTIVITY' as const, is_transactional: opts.transactional ?? false }])),
     people: async (ids) => new Map(ids.map((id) => [id, opts.person ?? person()])),
-    sendEmail: async ({ to, idempotencyKey, topicId }) => {
+    sendEmail: async ({ to, idempotencyKey, topicId, recordAs }) => {
       emails.push({ to, idempotencyKey, topicId })
+      recordedAs.push({ channel: 'email', ...recordAs })
       return emailOk.length ? (emailOk.shift() ? { ok: true } : { ok: false, error: 'rate_limit_exceeded' }) : { ok: true }
     },
-    sendPush: async (userId) => { pushes.push(userId); return opts.pushResult ?? { sent: 1, total: 1 } },
+    sendPush: async (userId, _push, kind, context) => {
+      pushes.push(userId)
+      recordedAs.push({ channel: 'push', kind, ...context })
+      return opts.pushResult ?? { sent: 1, total: 1 }
+    },
     record: async (id, s: Settlement) => {
       const r = store.get(id)!
       store.set(id, { ...r, email_status: s.email_status, push_status: s.push_status, attempts: r.attempts + 1 })
@@ -146,7 +152,7 @@ function harness(rows: OutboxRow[], opts: { person?: Person; transactional?: boo
     pause: async (ms) => { pauses.push(ms) },
     now: () => NOW,
   }
-  return { deps, store, emails, pushes, pauses }
+  return { deps, store, emails, pushes, pauses, recordedAs }
 }
 
 const composeWelcome: Composer = async (_admin, rows) => new Map(rows.map((r) => [r.outbox_id, welcome]))
@@ -159,6 +165,15 @@ describe('dispatch', () => {
     expect(s).toMatchObject({ claimed: 1, sent: 1 })
     expect(h.emails).toEqual([{ to: 'member@example.com', idempotencyKey: 'outbox/1/welcome', topicId: 'topic-pool' }])
     expect(h.pushes).toEqual(['u1'])
+  })
+
+  it('tells both transports which outbox row and pool it is, for the delivery record', async () => {
+    const h = harness([row({ outbox_id: 9 })])
+    await dispatch(admin, { pool_welcome: composeWelcome }, {}, h.deps)
+    expect(h.recordedAs).toEqual([
+      { channel: 'email', userId: 'u1', poolId: 'p1', outboxId: 9 },
+      { channel: 'push', kind: 'pool_welcome', outboxId: 9, poolId: 'p1' },
+    ])
   })
 
   it('retries ONLY the channel that failed — the push is not sent twice', async () => {

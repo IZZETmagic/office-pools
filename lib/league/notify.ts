@@ -98,13 +98,18 @@ export type LeaguePlan =
     }
 
 /** Today's path: send a plan at once. */
-async function fromPlan(plan: LeaguePlan): Promise<NoticeResult> {
+async function fromPlan(plan: LeaguePlan, poolId: string): Promise<NoticeResult> {
   if ('skipped' in plan) return { emails: 0, pushes: 0, skipped: plan.skipped }
   return deliver(
-    plan.members.flatMap((m) => m.emails.map((e) => ({ to: e.to, subject: e.subject, html: e.html, topicId: e.topicId, tags: e.tags }))),
+    plan.members.flatMap((m) => m.emails.map((e) => ({
+      to: e.to, subject: e.subject, html: e.html, topicId: e.topicId, tags: e.tags,
+      // For the delivery record: who it was for, so the cut-over can compare recipients.
+      kind: plan.kind, userId: m.userId, poolId,
+    }))),
     plan.members.filter((m) => m.push).map((m) => m.userId),
     plan.push,
     plan.kind,
+    poolId,
   )
 }
 
@@ -208,17 +213,21 @@ async function context(admin: SupabaseClient, poolId: string, matchweekId: strin
 const displayName = (m: MemberRow) => m.users?.full_name || m.users?.username || 'there'
 
 async function deliver(
-  emails: Array<{ to: string; subject: string; html: string; topicId?: string; tags?: { name: string; value: string }[] }>,
+  emails: Array<{
+    to: string; subject: string; html: string; topicId?: string; tags?: { name: string; value: string }[]
+    kind?: NotificationTypeKey; userId?: string; poolId?: string
+  }>,
   userIds: string[],
   push: { title: string; body: string; data?: Record<string, string> },
   kind: NotificationTypeKey,
+  poolId: string,
 ): Promise<NoticeResult> {
   // Email and push are independent: one failing must not suppress the other,
   // and neither failing may throw, because the caller marks the outbox row on
   // the strength of this returning.
   const [emailRes, pushRes] = await Promise.allSettled([
     emails.length > 0 ? sendBatchEmails(emails) : Promise.resolve(null),
-    userIds.length > 0 ? sendPushToUsers(userIds, push, kind) : Promise.resolve({ sent: 0, total: 0 }),
+    userIds.length > 0 ? sendPushToUsers(userIds, push, kind, { poolId }) : Promise.resolve({ sent: 0, total: 0 }),
   ])
   if (emailRes.status === 'rejected') console.error('[league-notify] email failed:', emailRes.reason)
   if (pushRes.status === 'rejected') console.error('[league-notify] push failed:', pushRes.reason)
@@ -237,7 +246,7 @@ export async function notifyMatchweekOpened(
   poolId: string,
   matchweekId: string,
 ): Promise<NoticeResult> {
-  return fromPlan(await planMatchweekOpened(admin, poolId, matchweekId))
+  return fromPlan(await planMatchweekOpened(admin, poolId, matchweekId), poolId)
 }
 
 export async function planMatchweekOpened(
@@ -297,7 +306,7 @@ export async function notifyLockReminder(
   poolId: string,
   matchweekId: string,
 ): Promise<NoticeResult> {
-  return fromPlan(await planLockReminder(admin, poolId, matchweekId))
+  return fromPlan(await planLockReminder(admin, poolId, matchweekId), poolId)
 }
 
 export async function planLockReminder(
@@ -386,7 +395,7 @@ export async function notifyMatchweekCompleted(
   poolId: string,
   matchweekId: string,
 ): Promise<NoticeResult> {
-  return fromPlan(await planMatchweekCompleted(admin, poolId, matchweekId))
+  return fromPlan(await planMatchweekCompleted(admin, poolId, matchweekId), poolId)
 }
 
 export async function planMatchweekCompleted(
@@ -497,7 +506,7 @@ export async function notifyTableDeadline(
   admin: SupabaseClient,
   poolId: string,
 ): Promise<NoticeResult> {
-  return fromPlan(await planTableDeadline(admin, poolId))
+  return fromPlan(await planTableDeadline(admin, poolId), poolId)
 }
 
 export async function planTableDeadline(
@@ -674,6 +683,9 @@ export async function notifyTableDeadlineMoved(
       html,
       topicId: TOPICS.PREDICTIONS,
       tags: [{ name: 'category', value: 'league_table_deadline_moved' }],
+      kind: 'table_deadline_moved' as const,
+      userId: m.user_id,
+      poolId,
     }
   })
 
@@ -688,6 +700,7 @@ export async function notifyTableDeadlineMoved(
       data: { poolId, tab: 'predictions' },
     },
     'table_deadline_moved',
+    poolId,
   )
 }
 
@@ -735,7 +748,7 @@ export async function sendLeagueNotice(
   opts: { shadow?: boolean } = {},
 ): Promise<NoticeResult> {
   const plan = await planLeagueNotice(admin, kind, poolId, matchweekId)
-  const result = await fromPlan(plan)
+  const result = await fromPlan(plan, poolId)
   if (opts.shadow && !('skipped' in plan) && isLeagueOutboxKind(kind)) {
     try {
       await enqueue(admin, plan.members.map((m) => ({

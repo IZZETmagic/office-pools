@@ -1,9 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import http2 from 'node:http2'
 
+import { recordDeliveries, type Delivery, type DeliveryContext } from '@/lib/notifications/deliveries'
 import { NOTIFICATION_TYPES, type NotificationTypeKey } from '@/lib/notifications/registry'
 import { PUSH_CATEGORY_COLUMNS, type PushCategory } from './categories'
-import { sendExpoPushNotification } from './expo-push'
+import { sendExpoPushNotification, type PushAttempt } from './expo-push'
 
 // =============================================================
 // APNs HTTP/2 Push Notification Client
@@ -104,7 +105,8 @@ type PushPayload = {
 /**
  * Send a push notification to a single device token via HTTP/2.
  * APNs requires HTTP/2 — Node.js fetch only does HTTP/1.1.
- * Returns true if successful, false if failed.
+ * Returns the attempt: whether APNs took it, its `apns-id`, and APNs's reason
+ * when it refused — the delivery record keeps all three.
  *
  * `bundleId` overrides the global APNS_BUNDLE_ID — required for routing pushes
  * to a different binary (e.g. Swift app vs Expo app share an Apple team but
@@ -115,7 +117,7 @@ export async function sendPushNotification(
   payload: PushPayload,
   sandbox = false,
   bundleId?: string | null
-): Promise<boolean> {
+): Promise<PushAttempt> {
   try {
     const jwt = await generateAPNsJWT()
     const host = sandbox ? 'api.sandbox.push.apple.com' : 'api.push.apple.com'
@@ -150,11 +152,11 @@ export async function sendPushNotification(
 
     console.log(`[APNs] Sending to ${host}, token ${deviceToken.slice(0, 8)}..., topic=${topic}, sandbox=${sandbox}`)
 
-    const { statusCode, responseBody } = await sendHTTP2Request(host, deviceToken, jwt, requestBody, topic)
+    const { statusCode, responseBody, apnsId } = await sendHTTP2Request(host, deviceToken, jwt, requestBody, topic)
 
     if (statusCode === 200) {
       console.log(`[APNs] Success for token ${deviceToken.slice(0, 8)}...`)
-      return true
+      return { ok: true, providerId: apnsId, error: null }
     }
 
     console.error(`[APNs] Error ${statusCode} for token ${deviceToken.slice(0, 8)}...: ${responseBody}`)
@@ -164,16 +166,27 @@ export async function sendPushNotification(
       await removeInvalidToken(deviceToken)
     }
 
-    return false
+    return { ok: false, providerId: apnsId, error: `${statusCode} ${apnsReason(responseBody)}` }
   } catch (err) {
     console.error(`[APNs] Exception sending to ${deviceToken.slice(0, 8)}...:`, err)
-    return false
+    return { ok: false, providerId: null, error: err instanceof Error ? err.message : String(err) }
   }
+}
+
+/** APNs answers a refusal with `{"reason":"BadDeviceToken"}`; the reason is what's worth keeping. */
+function apnsReason(body: string): string {
+  try {
+    const reason = (JSON.parse(body) as { reason?: unknown }).reason
+    if (typeof reason === 'string') return reason
+  } catch {
+    /* not JSON — keep the raw body */
+  }
+  return body
 }
 
 /**
  * Send an HTTP/2 request to APNs using Node.js built-in http2 module.
- * Returns the HTTP status code.
+ * Returns the HTTP status code, the body, and APNs's `apns-id` for the message.
  */
 function sendHTTP2Request(
   host: string,
@@ -181,7 +194,7 @@ function sendHTTP2Request(
   jwt: string,
   body: string,
   topic: string
-): Promise<{ statusCode: number; responseBody: string }> {
+): Promise<{ statusCode: number; responseBody: string; apnsId: string | null }> {
   return new Promise((resolve, reject) => {
     const client = http2.connect(`https://${host}`)
 
@@ -203,12 +216,13 @@ function sendHTTP2Request(
 
     req.on('response', (headers) => {
       const statusCode = headers[':status'] as number
+      const apnsId = typeof headers['apns-id'] === 'string' ? headers['apns-id'] : null
       const chunks: Buffer[] = []
       req.on('data', (chunk: Buffer) => { chunks.push(chunk) })
       req.on('end', () => {
         const responseBody = Buffer.concat(chunks).toString('utf8')
         client.close()
-        resolve({ statusCode, responseBody })
+        resolve({ statusCode, responseBody, apnsId })
       })
     })
 
@@ -276,18 +290,23 @@ async function filterByCategoryOptIn(userIds: string[], category: PushCategory):
  * with a token-shape fallback for legacy rows where platform may be wrong.
  */
 type TokenRow = {
+  id: string
   token: string
   environment: string | null
   bundle_id: string | null
   platform: string | null
 }
 
-async function dispatchPush(t: TokenRow, payload: PushPayload): Promise<boolean> {
-  const isExpoToken = t.token.startsWith('ExponentPushToken[')
-  if (t.platform === 'android' || isExpoToken) {
-    return sendExpoPushNotification(t.token, payload)
+/** Which provider a token goes through: Expo's relay for Android and Expo tokens, APNs direct otherwise. */
+function platformOf(t: TokenRow): 'apns' | 'expo' {
+  return t.platform === 'android' || t.token.startsWith('ExponentPushToken[') ? 'expo' : 'apns'
+}
+
+async function dispatchPush(t: TokenRow, payload: PushPayload): Promise<PushAttempt & { provider: 'apns' | 'expo' }> {
+  if (platformOf(t) === 'expo') {
+    return { provider: 'expo', ...(await sendExpoPushNotification(t.token, payload)) }
   }
-  return sendPushNotification(t.token, payload, t.environment === 'development', t.bundle_id)
+  return { provider: 'apns', ...(await sendPushNotification(t.token, payload, t.environment === 'development', t.bundle_id)) }
 }
 
 /**
@@ -297,11 +316,15 @@ async function dispatchPush(t: TokenRow, payload: PushPayload): Promise<boolean>
  * member who switched it off is skipped (`{ sent: 0, total: 0 }`). There is no
  * way to bypass the switch: the last sender that could, the admin push tool,
  * was deleted on 2026-10-07.
+ *
+ * Every device it goes to gets a row in the delivery record (migration 176),
+ * with `context` saying where the send came from when the caller knows.
  */
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
   kind: NotificationTypeKey,
+  context: DeliveryContext = {},
 ): Promise<{ sent: number; total: number }> {
   // Delivery kill-switch. A process that sets SUPPRESS_PUSH_DELIVERY=true (e.g.
   // a bulk historical re-score) runs all detection + entry_xp_state snapshot
@@ -320,7 +343,7 @@ export async function sendPushToUser(
 
   const { data: tokens } = await supabase
     .from('push_tokens')
-    .select('token, environment, bundle_id, platform')
+    .select('id, token, environment, bundle_id, platform')
     .eq('user_id', userId)
 
   if (!tokens || tokens.length === 0) {
@@ -353,15 +376,29 @@ export async function sendPushToUser(
     }
   }
 
-  const results = await Promise.allSettled(
-    (tokens as TokenRow[]).map((t) => dispatchPush(t, personalizedPayload)),
-  )
+  const rows = tokens as TokenRow[]
+  const results = await Promise.allSettled(rows.map((t) => dispatchPush(t, personalizedPayload)))
 
-  const sent = results.filter(
-    (r) => r.status === 'fulfilled' && r.value === true
-  ).length
+  const deliveries: Delivery[] = results.map((r, i) => {
+    const attempt = r.status === 'fulfilled'
+      ? r.value
+      : { provider: platformOf(rows[i]), ok: false, providerId: null, error: r.reason instanceof Error ? r.reason.message : String(r.reason) }
+    return {
+      kind,
+      channel: 'push',
+      provider: attempt.provider,
+      status: attempt.ok ? 'sent' : 'failed',
+      userId,
+      poolId: context.poolId ?? null,
+      outboxId: context.outboxId ?? null,
+      pushTokenId: rows[i].id,
+      providerId: attempt.providerId,
+      error: attempt.error,
+    }
+  })
+  await recordDeliveries(deliveries)
 
-  return { sent, total: tokens.length }
+  return { sent: deliveries.filter((d) => d.status === 'sent').length, total: rows.length }
 }
 
 /**
@@ -382,13 +419,14 @@ export async function sendPushToUsers(
   userIds: string[],
   payload: PushPayload,
   kind: NotificationTypeKey,
+  context: DeliveryContext = {},
 ): Promise<{ sent: number; total: number }> {
   if (userIds.length === 0) return { sent: 0, total: 0 }
   const allowed = await filterByCategoryOptIn(userIds, switchFor(kind))
   if (allowed.length === 0) return { sent: 0, total: 0 }
 
   const results = await Promise.allSettled(
-    allowed.map((uid) => sendPushToUser(uid, payload, kind)),
+    allowed.map((uid) => sendPushToUser(uid, payload, kind, context)),
   )
 
   let sent = 0

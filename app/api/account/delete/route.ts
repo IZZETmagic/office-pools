@@ -157,10 +157,16 @@ async function handleDELETE() {
   // already been destroyed. It is now the first thing this route does.)
 
   // Clear nullable NO-ACTION refs that would otherwise block the users delete.
-  // (notification_log.user_id, broadcast_log.sent_by, match_reset_log.reset_by_user_id,
+  // (broadcast_log.sent_by, match_reset_log.reset_by_user_id,
   //  pool_round_states.opened_by, sync_settings.updated_by are all nullable + NO ACTION.)
+  //
+  // The delivery record (migration 176) needs no line for its user_id — the foreign key sets it
+  // null when the users row goes. What it keeps by ADDRESS (an invitation sent before this person
+  // had an account) is cleared here. notification_log, which nothing ever wrote, is retired.
   await Promise.all([
-    adminSupabase.from('notification_log').update({ user_id: null }).eq('user_id', userData.user_id),
+    user.email
+      ? adminSupabase.from('notification_deliveries').update({ address: null }).eq('address', user.email.trim().toLowerCase())
+      : Promise.resolve(),
     adminSupabase.from('broadcast_log').update({ sent_by: null }).eq('sent_by', userData.user_id),
     adminSupabase.from('match_reset_log').update({ reset_by_user_id: null }).eq('reset_by_user_id', userData.user_id),
     adminSupabase.from('pool_round_states').update({ opened_by: null }).eq('opened_by', userData.user_id),

@@ -433,7 +433,8 @@ async function deliverInvite(
 
   try {
     const m = inviteToEmailCopy({ ...(await inviteCopyInput(admin, inv)), inviteUrl: inviteLinkUrl(link.token) })
-    await sendEmail({ to: inv.invitee_email, subject: m.subject, html: m.html })
+    // Recorded by address: there is no account behind it yet. The link is NOT recorded — only its hash is stored anywhere.
+    await sendEmail({ to: inv.invitee_email, subject: m.subject, html: m.html, kind: 'crew_invite_email' })
   } catch (e) {
     console.error('[crews] invite notice failed:', e)
   }
