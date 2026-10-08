@@ -126,6 +126,15 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
   const numberWidth = Math.max(theme.spacing.hero, ladderNumberChars(values) * DIGIT_PT);
 
   /**
+   * ⚠ THE POSITION COLUMN IS SIZED THE SAME WAY, ONCE FOR THE BOARD. It was a
+   * flat `spacing.lg` — room for one digit — so from tenth down the number
+   * wrapped onto two lines. Positions run 1..rows.length, so the last row is
+   * always the widest, and every row takes its width so the avatars stay in one
+   * column.
+   */
+  const positionWidth = Math.max(theme.spacing.lg, String(rows.length).length * DIGIT_PT);
+
+  /**
    * Which way each member moved — MEASURED ON THE BOARD BEING SHOWN.
    *
    * ⚠⚠ THE TWO BOARDS MOVE FOR DIFFERENT REASONS, and this row used to arrow
@@ -175,6 +184,7 @@ export function ShowdownLeaderboard({ poolId, entries, currentUserId }: Props) {
             */
             gap={r.isYou ? ladderGap(values, i) : null}
             numberWidth={numberWidth}
+            positionWidth={positionWidth}
             moved={duelMoved ? duelMoved.get(r.entry.entry_id) ?? 0 : null}
           />
         ))}
@@ -198,6 +208,7 @@ function Row({
   board,
   gap,
   numberWidth,
+  positionWidth,
   moved,
 }: {
   position: number;
@@ -213,6 +224,8 @@ function Row({
   gap: LadderGap | null;
   /** The points column, sized once for the whole board. */
   numberWidth: number;
+  /** The position column, sized once for the whole board. */
+  positionWidth: number;
   /**
    * Places climbed on the DUELS board, or null on Table — where the engine's
    * own `previous_rank` is the answer and re-deriving it would be a second
@@ -270,7 +283,7 @@ function Row({
           <Text
             variant="cardTitle"
             style={{
-              width: theme.spacing.lg,
+              width: positionWidth,
               textAlign: 'right',
               fontFamily: fontFamilies.black,
               color: leader ? theme.colors.accent : theme.colors.slate,
