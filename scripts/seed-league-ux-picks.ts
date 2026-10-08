@@ -1,5 +1,5 @@
 // =============================================================
-// seed-league-ux-picks — top the six UI/UX pools up for the OPEN matchweek
+// seed-league-ux-picks — top the six UI/UX pools (and Ryan's Showdown's ux- seven) up for the OPEN matchweek
 // =============================================================
 // `seed-league-ux-pools.ts` builds the pools once. This runs every matchweek,
 // and it is deliberately a separate script rather than a flag on that one,
@@ -37,6 +37,7 @@
 // ------------------------------------------------------------------
 //   npx tsx scripts/seed-league-ux-picks.ts            # dry run, writes nothing
 //   npx tsx scripts/seed-league-ux-picks.ts --apply
+//   npx tsx scripts/seed-league-ux-picks.ts --apply --pool=<pool_id>   # one pool only
 // =============================================================
 
 import { readFileSync } from 'fs'
@@ -76,6 +77,8 @@ import { saveLmsPick } from '../lib/league/lms'
 
 const admin = createAdminClient()
 const APPLY = process.argv.includes('--apply')
+/** `--pool=<id>` narrows the run to one pool in POOLS. It can only narrow — an id not in the list matches nothing. */
+const ONLY_POOL = process.argv.find((a) => a.startsWith('--pool='))?.slice('--pool='.length) ?? null
 
 /**
  * The only accounts this script may write for.
@@ -112,6 +115,10 @@ const POOLS: PoolSpec[] = [
   { poolId: '5eed0004-0000-4000-8000-000000000004', name: 'Showdown: Exact Scores', notPicked: ['devp'],           partial: ['elenar'] },
   { poolId: '5eed0005-0000-4000-8000-000000000005', name: 'Last Man Standing',      notPicked: ['jonasw', 'miat'], partial: [] },
   { poolId: '5eed0006-0000-4000-8000-000000000006', name: 'Predict the Table',      notPicked: ['elenar'],         partial: [] },
+  // ⚠ NOT a UI/UX pool: Ryan's own Showdown, with three real friends in it. Its seven `ux-`
+  // members are `seed-showdown-test-members.ts`, and Ryan asked for every one of them to pick
+  // (2026-10-08), so nobody sits out. The email filter is what keeps the real four untouched.
+  { poolId: '93c4115a-43da-47b7-9c99-463bbd95c053', name: 'Prem 2026/27 Showdown',  notPicked: [],                 partial: [] },
 ]
 
 // ------------------------------------------------------------------ plumbing
@@ -370,14 +377,16 @@ async function seedLmsPicks(spec: PoolSpec, season: Season, entries: Entry[]) {
 
 async function main() {
   console.log(`\n${'='.repeat(74)}`)
-  console.log('  Topping the six UI/UX pools up for the open matchweek')
+  console.log('  Topping the UI/UX pools up for the open matchweek')
   console.log(`  ${APPLY ? 'APPLY — this writes to production' : 'DRY RUN — nothing is written. Add --apply.'}`)
   console.log('='.repeat(74))
 
   const season = await resolveOpenMatchweek()
 
   head(`2. Picks for matchweek ${season.matchweekNumber}`)
-  for (const spec of POOLS) {
+  const specs = ONLY_POOL ? POOLS.filter((s) => s.poolId === ONLY_POOL) : POOLS
+  if (specs.length === 0) bad(`--pool=${ONLY_POOL} is not one of the pools in POOLS`)
+  for (const spec of specs) {
     const { data: pool } = await admin
       .from('pools')
       .select('pool_id, league_mode, league_depth')
